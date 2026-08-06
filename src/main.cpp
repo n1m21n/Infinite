@@ -1313,9 +1313,26 @@ namespace
             dl->AddCircleFilled(ImVec2(headerPos.x + 11, headerPos.y + 5 + d * 4.0f), 1.3f,
                                 IM_COL32(140, 146, 168, 255));
          }
-         char title[32];
-         snprintf(title, sizeof(title), "layer %c", 'A' + slot);
-         dl->AddText(ImVec2(headerPos.x + 20, headerPos.y + 2), IM_COL32(190, 196, 215, 255), title);
+         // Name the layer after whatever is feeding it - far more useful than
+         // "layer C" once a stack has four things in it.
+         char title[96];
+         const INode* source = n->Input(slot).GetSource();
+         if (source != nullptr)
+         {
+            const char* sourceName = "?";
+            for (const GraphNode& other : gNodes)
+            {
+               if (other.node.get() == source)
+                  sourceName = other.typeName.c_str();
+            }
+            snprintf(title, sizeof(title), "%c  %s", 'A' + slot, sourceName);
+         }
+         else
+         {
+            snprintf(title, sizeof(title), "%c  (empty)", 'A' + slot);
+         }
+         dl->AddText(ImVec2(headerPos.x + 20, headerPos.y + 2),
+                     source ? IM_COL32(190, 196, 215, 255) : IM_COL32(120, 124, 142, 255), title);
 
          char modeLabel[32];
          snprintf(modeLabel, sizeof(modeLabel), "mode##%d", slot);
@@ -1471,6 +1488,44 @@ namespace
       ImGui::Checkbox("eraser", &n->eraser);
       if (ImGui::Button("Clear canvas", ImVec2(kPreviewSize, 0)))
          n->ClearCanvas();
+
+      ImGui::SeparatorText("animation");
+      if (n->IsRecordingStrokes())
+      {
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+         if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
+            n->StopRecording();
+         ImGui::PopStyleColor();
+      }
+      else if (ImGui::Button("Rec strokes", ImVec2(kPreviewSize * 0.48f, 0)))
+      {
+         n->StartRecording();
+      }
+      ImGui::SameLine();
+      if (n->IsPlayingBack())
+      {
+         if (ImGui::Button("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+            n->StopPlayback();
+      }
+      else if (ImGui::Button("Replay", ImVec2(kPreviewSize * 0.48f, 0)))
+      {
+         n->PlayRecording();
+      }
+
+      if (n->RecordedStamps() > 0)
+      {
+         ImGui::TextDisabled("%zu marks over %.1f beats", n->RecordedStamps(), n->RecordedLength());
+         if (n->IsPlayingBack())
+            ImGui::TextColored(ImVec4(0.5f, 0.95f, 0.6f, 1.0f), "playhead %.1f", n->PlayheadBeats());
+      }
+      else
+      {
+         ImGui::TextDisabled("record, then draw - replay redraws it in time");
+      }
+      ImGui::Checkbox("loop replay", &n->loopPlayback);
+      ModSlider("replay speed", &n->playSpeed, 0.1f, 4.0f);
+      if (ImGui::SmallButton("clear recording"))
+         n->ClearRecording();
       ImGui::TextDisabled("(canvas size follows the input when one is patched in)");
       ModSlider("canvas w", &n->canvasWidth, 64.0f, 4096.0f, "%.0f");
       ModSlider("canvas h", &n->canvasHeight, 64.0f, 4096.0f, "%.0f");
@@ -1640,6 +1695,35 @@ namespace
             "driven. Delete the cable to take manual control back.");
       }
 
+      if (ImGui::CollapsingHeader("Using Feedback", ImGuiTreeNodeFlags_DefaultOpen))
+      {
+         ImGui::TextWrapped(
+            "A Feedback node outputs what its input produced on the PREVIOUS frame. "
+            "That one-frame delay is the whole point: it lets you wire a cycle "
+            "without the graph chasing its own tail forever.");
+         ImGui::Spacing();
+         ImGui::TextWrapped("Feedback on its own does nothing visible - it is a delay, not an effect. "
+                            "It only earns its keep inside a loop. The classic patch:");
+         ImGui::Indent();
+         ImGui::Bullet(); ImGui::TextWrapped("Shape (or any source)  ->  Blend input A");
+         ImGui::Bullet(); ImGui::TextWrapped("Feedback  ->  Blend input B");
+         ImGui::Bullet(); ImGui::TextWrapped("Blend  ->  transform  (scale 1.02, small rotation)");
+         ImGui::Bullet(); ImGui::TextWrapped("transform  ->  back into Feedback's input   <- this closes the loop");
+         ImGui::Unindent();
+         ImGui::Spacing();
+         ImGui::TextWrapped(
+            "Now every frame is the previous frame, nudged, with the source drawn "
+            "over the top - which gives you infinite-zoom tunnels, echoes and "
+            "growth. Set the Blend to Screen or Lighten and lower the opacity so "
+            "the history fades rather than saturating.");
+         ImGui::Spacing();
+         ImGui::TextWrapped(
+            "If you just want trails, use the Trails node instead - it is that same "
+            "loop wrapped into one node, with decay, drift, zoom and rotation built "
+            "in. Reaction-Diffusion is the other pre-wired feedback node: it needs "
+            "no input at all and simulates a chemical system frame over frame.");
+      }
+
       if (ImGui::CollapsingHeader("Module reference"))
       {
          struct Entry { const char* name; const char* text; };
@@ -1650,6 +1734,7 @@ namespace
                { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available." },
                { "Shape", "Ten vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line - with fill, stroke, feather and background." },
                { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
+               { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
                { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
             } },
             { "Text", {
@@ -1686,6 +1771,17 @@ namespace
                { "Random", "A new random value every N beats, with adjustable smoothing between steps. Deterministic, so rewinding replays the same sequence." },
                { "Pattern", "An eight-step sequencer. Set the eight sliders, choose how many steps to use, and it loops through them one step every N beats. Optional glide." },
                { "Math", "Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant." },
+            } },
+            { "Feedback", {
+               { "Feedback", "Outputs the previous frame. Nothing visible on its own - it is the delay that makes a loop legal. See 'Using Feedback' above." },
+               { "Trails", "A pre-wired feedback loop: decaying accumulation with drift, zoom, rotation and hue rotation. Reach for this before wiring a loop by hand." },
+               { "Reaction-Diffusion", "Gray-Scott chemical simulation, six presets. Needs no input; patch one in and its luminance varies the feed rate so the pattern grows differently through light and dark." },
+            } },
+            { "Mask", {
+               { "Remove Background", "On-device segmentation via the OS - no model download, no network, no key. Subject mode needs macOS 14, Person mode macOS 12. Segmentation is slow, so the mask is computed on demand and cached; for video use auto-refresh, which runs on a beat interval rather than every frame." },
+            } },
+            { "Resynth", {
+               { "Resynthesize", "Each generation reads the previous one, so the image drifts away from the source. The XY pad blends four named mutation effects assigned to its corners; Randomise re-rolls which four. The orb's path can be recorded, looped and replayed in time." },
             } },
             { "Output", {
                { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },

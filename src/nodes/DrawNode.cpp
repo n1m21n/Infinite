@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "Transport.h"
+
 namespace
 {
    const std::vector<std::string> kBrushNames = {
@@ -108,13 +110,71 @@ bool DrawNode::EnsureShaders()
    return mStampProgram != 0 && mCompositeProgram != 0;
 }
 
+DrawNode::Stamp DrawNode::MakeStamp(float x, float y, float seed) const
+{
+   Stamp s;
+   s.x = x;
+   s.y = y;
+   s.seed = seed;
+   s.size = brushSize;
+   s.opacity = opacity;
+   s.hardness = hardness;
+   s.brush = brush;
+   s.erase = eraser;
+   s.color[0] = color[0];
+   s.color[1] = color[1];
+   s.color[2] = color[2];
+   return s;
+}
+
+void DrawNode::StartRecording()
+{
+   mRecorded.clear();
+   mRecording = true;
+   mPlaying = false;
+   mRecordStartBeat = Transport::Instance().Beats();
+}
+
+void DrawNode::StopRecording()
+{
+   mRecording = false;
+}
+
+void DrawNode::PlayRecording()
+{
+   if (mRecorded.empty())
+      return;
+   mPlaying = true;
+   mRecording = false;
+   mPlayStartBeat = Transport::Instance().Beats();
+   mPlayIndex = 0;
+   mPlayhead = 0.0;
+   mNeedsClear = true; // replay draws onto a fresh canvas
+}
+
+void DrawNode::StopPlayback()
+{
+   mPlaying = false;
+}
+
+void DrawNode::ClearRecording()
+{
+   mRecorded.clear();
+   mRecording = false;
+   mPlaying = false;
+   mPlayIndex = 0;
+}
+
 void DrawNode::BeginStroke(float x, float y)
 {
    mStrokeActive = true;
    mLastX = x;
    mLastY = y;
    mSeedCounter += 3.77f;
-   mPending.push_back({ x, y, mSeedCounter });
+   const Stamp s = MakeStamp(x, y, mSeedCounter);
+   mPending.push_back(s);
+   if (mRecording)
+      mRecorded.push_back({ s, Transport::Instance().Beats() - mRecordStartBeat });
    mStrokeCount++;
 }
 
@@ -146,7 +206,10 @@ void DrawNode::ContinueStroke(float x, float y)
          jx = (std::fmod(std::fabs(std::sin(mSeedCounter * 12.9898f) * 43758.5453f), 1.0f) - 0.5f) * jitter * brushSize;
          jy = (std::fmod(std::fabs(std::sin(mSeedCounter * 78.233f) * 43758.5453f), 1.0f) - 0.5f) * jitter * brushSize;
       }
-      mPending.push_back({ mLastX + dx * t + jx, mLastY + dy * t + jy, mSeedCounter });
+      const Stamp s = MakeStamp(mLastX + dx * t + jx, mLastY + dy * t + jy, mSeedCounter);
+      mPending.push_back(s);
+      if (mRecording)
+         mRecorded.push_back({ s, Transport::Instance().Beats() - mRecordStartBeat });
    }
    mLastX = x;
    mLastY = y;
@@ -175,13 +238,13 @@ void DrawNode::FlushStamps()
          glBindTexture(GL_TEXTURE_2D, canvasTex);
          glUniform1i(glGetUniformLocation(mStampProgram, "uCanvas"), 0);
          glUniform2f(glGetUniformLocation(mStampProgram, "uCenter"), stamp.x, stamp.y);
-         glUniform1f(glGetUniformLocation(mStampProgram, "uRadius"), std::max(0.001f, brushSize * 0.5f));
+         glUniform1f(glGetUniformLocation(mStampProgram, "uRadius"), std::max(0.001f, stamp.size * 0.5f));
          glUniform1f(glGetUniformLocation(mStampProgram, "uAspect"), aspect);
-         glUniform1i(glGetUniformLocation(mStampProgram, "uBrush"), brush);
-         glUniform1f(glGetUniformLocation(mStampProgram, "uHardness"), std::min(0.98f, hardness));
-         glUniform1f(glGetUniformLocation(mStampProgram, "uOpacity"), opacity);
-         glUniform3f(glGetUniformLocation(mStampProgram, "uColor"), color[0], color[1], color[2]);
-         glUniform1i(glGetUniformLocation(mStampProgram, "uErase"), eraser ? 1 : 0);
+         glUniform1i(glGetUniformLocation(mStampProgram, "uBrush"), stamp.brush);
+         glUniform1f(glGetUniformLocation(mStampProgram, "uHardness"), std::min(0.98f, stamp.hardness));
+         glUniform1f(glGetUniformLocation(mStampProgram, "uOpacity"), stamp.opacity);
+         glUniform3f(glGetUniformLocation(mStampProgram, "uColor"), stamp.color[0], stamp.color[1], stamp.color[2]);
+         glUniform1i(glGetUniformLocation(mStampProgram, "uErase"), stamp.erase ? 1 : 0);
          glUniform1f(glGetUniformLocation(mStampProgram, "uSeed"), stamp.seed);
       });
       std::swap(mCanvas, mScratch);
@@ -220,7 +283,7 @@ void DrawNode::CookIfNeeded(int frameId)
    GLUtil::EnsureFbo(mScratch, w, h);
    GLUtil::EnsureFbo(mComposite, w, h);
 
-   if (mNeedsClear)
+   auto clearCanvas = [this]()
    {
       // RunShaderPass clears to transparent before drawing; an empty setup gives
       // a wiped canvas without needing a dedicated clear shader.
@@ -231,9 +294,44 @@ void DrawNode::CookIfNeeded(int frameId)
          glBindTexture(GL_TEXTURE_2D, 0);
          glUniform1i(glGetUniformLocation(mCompositeProgram, "uPaint"), 1);
       });
+   };
+
+   if (mNeedsClear)
+   {
+      clearCanvas();
       mNeedsClear = false;
       mStrokeCount = 0;
       mPending.clear();
+   }
+
+   if (mPlaying && !mRecorded.empty())
+   {
+      const double length = std::max(1e-4, RecordedLength());
+      mPlayhead = (Transport::Instance().Beats() - mPlayStartBeat) * std::max(0.01f, playSpeed);
+      if (mPlayhead > length)
+      {
+         if (loopPlayback)
+         {
+            mPlayhead = 0.0;
+            mPlayStartBeat = Transport::Instance().Beats();
+            mPlayIndex = 0;
+            // clear immediately: the clear block already ran this frame, so
+            // deferring would paint the new loop's first stamps over the old one
+            clearCanvas();
+            mStrokeCount = 0;
+            mPending.clear();
+         }
+         else
+         {
+            mPlaying = false;
+         }
+      }
+      // emit every stamp whose timestamp the playhead has now passed
+      while (mPlayIndex < mRecorded.size() && mRecorded[mPlayIndex].beat <= mPlayhead)
+      {
+         mPending.push_back(mRecorded[mPlayIndex].stamp);
+         mPlayIndex++;
+      }
    }
 
    FlushStamps();

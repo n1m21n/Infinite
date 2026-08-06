@@ -38,6 +38,24 @@ public:
 
    bool HasStrokes() const { return mStrokeCount > 0; }
 
+   // --- stroke recording -------------------------------------------------
+   // Every stamp is logged with the brush settings in force at the time and a
+   // transport timestamp, so replay reproduces the drawing exactly, including
+   // colour and brush changes mid-drawing.
+   void StartRecording();
+   void StopRecording();
+   void PlayRecording();
+   void StopPlayback();
+   void ClearRecording();
+   bool IsRecordingStrokes() const { return mRecording; }
+   bool IsPlayingBack() const { return mPlaying; }
+   size_t RecordedStamps() const { return mRecorded.size(); }
+   double RecordedLength() const { return mRecorded.empty() ? 0.0 : mRecorded.back().beat; }
+   double PlayheadBeats() const { return mPlayhead; }
+
+   bool loopPlayback = true;
+   float playSpeed = 1.0f;
+
    int brush = 0;
    float brushSize = 0.05f;
    float opacity = 0.8f;
@@ -55,7 +73,23 @@ private:
       float x = 0.0f;
       float y = 0.0f;
       float seed = 0.0f;
+      // Snapshot of the brush at stamp time. Replay must not use the *current*
+      // brush, or changing a slider would rewrite history.
+      float size = 0.05f;
+      float opacity = 0.8f;
+      float hardness = 0.5f;
+      int brush = 0;
+      bool erase = false;
+      float color[3] = { 1.0f, 1.0f, 1.0f };
    };
+
+   struct RecordedStamp
+   {
+      Stamp stamp;
+      double beat = 0.0;
+   };
+
+   Stamp MakeStamp(float x, float y, float seed) const;
 
    bool EnsureShaders();
    void FlushStamps();
@@ -76,4 +110,12 @@ private:
    float mLastY = 0.0f;
    int mStrokeCount = 0;
    float mSeedCounter = 0.0f;
+
+   std::vector<RecordedStamp> mRecorded;
+   bool mRecording = false;
+   bool mPlaying = false;
+   double mRecordStartBeat = 0.0;
+   double mPlayStartBeat = 0.0;
+   double mPlayhead = 0.0;
+   size_t mPlayIndex = 0;
 };

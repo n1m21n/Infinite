@@ -47,7 +47,8 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 - **Remove Background** — on-device subject or person segmentation via Vision.
   No model download, no network, no API key.
 - **Draw** — paint straight onto the node with six procedural brushes, an
-  eraser, and optional image underneath.
+  eraser, and optional image underneath. Strokes can be recorded and replayed
+  as an animation, in time with the transport.
 
 ## Install
 

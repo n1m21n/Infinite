@@ -658,7 +658,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Colour", "uColor", T::Color, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f) } },
 
       // ---------------- Color: curves + LUT ----------------
-      { "curves", "Color",
+      { "tone shaper", "Color",
         // Four control points shaped into a smooth response per channel. Not a
         // spline editor, but it covers the usual lift/gamma/gain style moves.
         "uniform float uShadows;\n"
