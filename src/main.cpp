@@ -1836,7 +1836,7 @@ namespace
                { "Pan the canvas", "Drag empty canvas" },
                { "Rubber-band select", "Shift + drag" },
                { "Duplicate", "Cmd+C / Cmd+V, or Shift+D to duplicate in place" },
-               { "Select several", "Shift + drag a box around them; then move, duplicate or delete as a group" },
+               { "Select several", "Shift + drag a box around them, or Shift-click (or Ctrl-click) each one to add it. Then move, duplicate or delete as a group." },
                { "Delete", "Select, then Delete or Backspace" },
                { "Zoom", "Scroll (speed is adjustable in the Menu)" },
                { "Play / pause everything", "Play button in the top bar" },

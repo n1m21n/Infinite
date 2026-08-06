@@ -4090,7 +4090,11 @@ ed::EditorAction::AcceptResult ed::SelectAction::Accept(const Control& control)
         return False;
 
     auto& io = ImGui::GetIO();
-    m_SelectGroups   = io.KeyShift;
+    // --- Infinite local change ---
+    // Upstream maps Shift to "rubber-band selects groups only". Infinite has no
+    // group/comment nodes, so that made Shift+drag select nothing at all. Shift
+    // is our multi-select modifier instead (plain drag pans the canvas).
+    m_SelectGroups   = false;
     m_SelectLinkMode = io.KeyAlt;
 
     m_SelectedObjectsAtStart.clear();
@@ -4108,7 +4112,8 @@ ed::EditorAction::AcceptResult ed::SelectAction::Accept(const Control& control)
             Editor->ClearSelection();
         }
 
-        if (io.KeyCtrl)
+        // --- Infinite local change: Shift adds to the selection like Ctrl ---
+        if (io.KeyCtrl || io.KeyShift)
             m_SelectedObjectsAtStart = Editor->GetSelectedObjects();
     }
     else if (control.BackgroundClickButtonIndex == Editor->GetConfig().SelectButtonIndex)
@@ -4128,7 +4133,8 @@ ed::EditorAction::AcceptResult ed::SelectAction::Accept(const Control& control)
                 Editor->ClearSelection();
             }
 
-            if (io.KeyCtrl)
+            // --- Infinite local change: Shift toggles like Ctrl ---
+            if (io.KeyCtrl || io.KeyShift)
                 Editor->ToggleObjectSelection(clickedObject);
             else
                 Editor->SetSelectedObject(clickedObject);
