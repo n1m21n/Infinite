@@ -24,6 +24,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   INode* BypassSource() override { return mInput.GetSource(); }
 
    // --- recording ---
    bool StartRecording(const std::string& path);

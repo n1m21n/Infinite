@@ -393,6 +393,29 @@ namespace
       return pressed;
    }
 
+   // Power toggle. Drawn rather than typed for the same reason as the eye: the
+   // UI font has no power glyph.
+   bool BypassToggle(bool enabled)
+   {
+      const float w = 24.0f;
+      const float h = 18.0f;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      const bool pressed = ImGui::InvisibleButton("##bypass", ImVec2(w, h));
+      const bool hovered = ImGui::IsItemHovered();
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
+      const ImU32 col = hovered ? IM_COL32(235, 240, 255, 255)
+                                : (enabled ? IM_COL32(120, 210, 150, 255)
+                                           : IM_COL32(210, 120, 110, 255));
+
+      // circle broken at the top, with a stem through the gap
+      dl->PathArcTo(c, 6.0f, -1.15f, 4.3f, 20);
+      dl->PathStroke(col, 0, 1.7f);
+      dl->AddLine(ImVec2(c.x, c.y - 8.0f), ImVec2(c.x, c.y - 1.5f), col, 1.7f);
+      return pressed;
+   }
+
    // ---- pins --------------------------------------------------------------
    // Drawn inside a kPinHit-wide box so the clickable area is far larger than
    // the visible dot; connecting used to require pixel-perfect aim.
@@ -432,7 +455,14 @@ namespace
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
       REGISTER_NODE(GeometryNode, Geometry, "3D");
-      REGISTER_NODE(GeometryOpNode, Geometry Op, "3D");
+      // Ten named operator nodes, all backed by GeometryOpNode.
+      for (int i = 0; i < GeometryOpNode::kOpCount; i++)
+      {
+         NodeFactory::Instance().Register(
+            GeometryOpNode::OpNames()[i],
+            [i]() -> INode* { return GeometryOpNode::CreateFor(i); },
+            "3D");
+      }
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
       REGISTER_NODE(CameraNode, Camera, "3D");
       REGISTER_NODE(LightNode, Light, "3D");
@@ -2136,6 +2166,7 @@ namespace
                { "Connect", "Drag from a node's 'out' dot to another node's input dot" },
                { "Modulate a parameter", "Drag a modulator's 'out' onto the small dot beside any slider" },
                { "Type an exact value", "Double-click a slider" },
+               { "Bypass a node", "Click the power icon next to the eye - the node is skipped and its input passes straight through" },
                { "Pan the canvas", "Drag empty canvas" },
                { "Rubber-band select", "Shift + drag" },
                { "Duplicate", "Cmd+C / Cmd+V, or Shift+D to duplicate in place" },
@@ -2494,7 +2525,15 @@ int main()
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr;
 
-      if (getenv("INFINITE_GEOTEST") != nullptr)
+      if (getenv("INFINITE_BYPASSTEST") != nullptr)
+      {
+         SpawnNode("Shape", "Source", 40.0f, 40.0f);   // 0 white circle
+         SpawnNode("invert", "Color", 320.0f, 40.0f);  // 1
+         SpawnNode("Output", "Output", 600.0f, 40.0f); // 2
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         CableFor(gNodes[2], 0)->Connect(gNodes[1].node.get());
+      }
+      else if (getenv("INFINITE_GEOTEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);      // 0 points source
          SpawnNode("Geometry", "3D", 40.0f, 400.0f);     // 1 instance shape
@@ -3004,6 +3043,35 @@ int main()
             glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
+      if (getenv("INFINITE_BYPASSTEST") != nullptr)
+      {
+         auto sample = [](INode* n, unsigned char* out)
+         {
+            GLuint fbo = 0;
+            glGenFramebuffers(1, &fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, n->GetOutputTexture(), 0);
+            glReadPixels(n->GetOutputWidth()/2, n->GetOutputHeight()/2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, out);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDeleteFramebuffers(1, &fbo);
+         };
+         unsigned char px[4];
+         if (frameId == 3)
+         {
+            sample(gNodes[2].node.get(), px);
+            printf("invert active:   output=(%d,%d,%d) %s\n", px[0], px[1], px[2],
+                   px[0] < 40 ? "inverted OK" : "UNEXPECTED");
+            gNodes[1].node->bypassed = true;
+         }
+         if (frameId == 6)
+         {
+            sample(gNodes[2].node.get(), px);
+            printf("invert bypassed: output=(%d,%d,%d) %s\n", px[0], px[1], px[2],
+                   px[0] > 200 ? "PASSED THROUGH OK" : "STILL INVERTED - BUG");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       if (getenv("INFINITE_GEOTEST") != nullptr && frameId == 4)
       {
          auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[2].node.get());
@@ -3133,13 +3201,18 @@ int main()
 
          ed::BeginNode(gn.NodeId());
          ImGui::PushID(gn.index);
+         const bool dimmed = gn.node->bypassed;
+         if (dimmed)
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.55f);
 
          // --- inputs spread along the top edge ---
          int inputs = InputCountFor(gn);
          for (int slot = 0; slot < inputs; slot++)
          {
-            char label[16];
-            if (inputs == 1)
+            char label[24];
+            if (const char* named = gn.node->InputLabel(slot))
+               snprintf(label, sizeof(label), "%s", named);
+            else if (inputs == 1)
                label[0] = '\0';
             else
                snprintf(label, sizeof(label), "%c", 'A' + slot);
@@ -3212,9 +3285,17 @@ int main()
          else
             DrawPreview(gn.node.get());
 
-         // --- params, collapsed behind an eye toggle to keep nodes compact ---
+         // --- params (eye) and bypass (power) ---
          if (EyeToggle(gn.showParams))
             gn.showParams = !gn.showParams;
+         ImGui::SameLine();
+         if (BypassToggle(!gn.node->bypassed))
+            gn.node->bypassed = !gn.node->bypassed;
+         if (gn.node->bypassed)
+         {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.85f, 0.5f, 0.45f, 1.0f), "bypassed");
+         }
          if (!gn.showParams && gn.hasModulatedParams)
          {
             // make it obvious a collapsed node still has live modulation
@@ -3347,6 +3428,8 @@ int main()
             }
          }
 
+         if (dimmed)
+            ImGui::PopStyleVar();
          ImGui::PopID();
          ed::EndNode();
       }

@@ -134,6 +134,13 @@ if(APPLE)
         RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns"
     )
 
+    # Rebuilding the executable inside a signed bundle invalidates the
+    # signature, and an unsigned bundle hangs in glfwInit() on macOS rather
+    # than failing loudly. Re-sign on every build so iterating never trips it.
+    add_custom_command(TARGET Infinite POST_BUILD
+        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:Infinite>"
+        COMMENT "Ad-hoc signing the bundle")
+
     target_sources(Infinite PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns")
     set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns"
         PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")

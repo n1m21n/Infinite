@@ -26,6 +26,10 @@ public:
 
    ImageCable& InputA() { return mInputA; }
    ImageCable& InputB() { return mInputB; }
+   INode* BypassSource() override
+   {
+      return mInputA.IsConnected() ? mInputA.GetSource() : mInputB.GetSource();
+   }
    int& ModeIndex() { return mModeIndex; }
    float& Mix() { return mMix; }
 

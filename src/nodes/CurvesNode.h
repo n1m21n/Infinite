@@ -33,6 +33,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   INode* BypassSource() override { return mInput.GetSource(); }
 
    struct Point
    {

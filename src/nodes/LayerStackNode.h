@@ -22,6 +22,13 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input(int slot) { return mInputs[slot]; }
+   INode* BypassSource() override
+   {
+      for (int i = 0; i < kSlots; i++)
+         if (mInputs[i].IsConnected())
+            return mInputs[i].GetSource();
+      return nullptr;
+   }
 
    // Swaps two layers wholesale - cable, mode and opacity - so reordering in
    // the UI moves the whole layer rather than just its settings.

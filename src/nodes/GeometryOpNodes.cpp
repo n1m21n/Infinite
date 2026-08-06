@@ -44,6 +44,8 @@ const Mesh& GeometryOpNode::GetMesh()
 {
    if (input == nullptr)
       return kEmptyMesh;
+   if (bypassed)
+      return input->GetMesh();
 
    const Signature sig = CurrentSignature();
    if (mHasBuilt && sig == mBuilt)

@@ -22,7 +22,18 @@ public:
    };
 
    static INode* Create() { return new GeometryOpNode(); }
+   // Each operator is registered as its own spawnable node, all sharing this
+   // class - the spawn menu shows ten named nodes, and the dropdown still lets
+   // you switch operation without rewiring.
+   static INode* CreateFor(int operation)
+   {
+      auto* node = new GeometryOpNode();
+      node->op = operation;
+      return node;
+   }
    static const std::vector<std::string>& OpNames();
+
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
@@ -36,6 +47,7 @@ public:
    unsigned int GetSurfaceTexture() override;
 
    IGeometrySource* input = nullptr;
+   const char* InputLabel(int) const override { return "geo"; }
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
 
    int op = kArray;
@@ -114,6 +126,8 @@ public:
    // Slot 0 supplies the points, slot 1 the shape stamped on them.
    IGeometrySource* pointSource = nullptr;
    IGeometrySource* instanceShape = nullptr;
+
+   const char* InputLabel(int slot) const override { return slot == 0 ? "points" : "shape"; }
 
    // Instanced draw data, consumed by Render3DNode.
    const std::vector<Mat4>& InstanceTransforms() const { return mTransforms; }

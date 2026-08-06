@@ -29,6 +29,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   INode* BypassSource() override { return mInput.GetSource(); }
 
    void RequestMask() { mNeedsMask = true; }
    const std::string& Status() const { return mStatus; }

@@ -26,6 +26,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   INode* BypassSource() override { return mInput.GetSource(); }
 
    float delayFrames = 1.0f; // held for information; the delay is always one frame
 
@@ -57,6 +58,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   INode* BypassSource() override { return mInput.GetSource(); }
    void Clear() { mNeedsClear = true; }
 
    float decay = 0.92f;
@@ -97,6 +99,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   INode* BypassSource() override { return mInput.GetSource(); }
    void Reseed() { mNeedsSeed = true; }
    void ApplyPreset(int index);
 

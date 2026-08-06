@@ -28,6 +28,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   INode* BypassSource() override { return mInput.GetSource(); }
 
    // Called by the editor while the user drags on the node's preview. Coordinates
    // are normalised 0..1 with the origin bottom-left, matching texture space.

@@ -29,4 +29,15 @@ public:
    // output index. Returning null falls back to the node itself for output 0,
    // which is what every single-output modulator wants.
    virtual IModulator* ModulatorOutput(int /*index*/) { return nullptr; }
+
+   // --- bypass -------------------------------------------------------------
+   // A bypassed node is skipped entirely: anything pulling from it is handed
+   // whatever its own pass-through input produces instead. Nodes with an image
+   // input return that input's source here; sources return null, so bypassing
+   // one simply removes it from the chain.
+   bool bypassed = false;
+   virtual INode* BypassSource() { return nullptr; }
+
+   // Label shown next to an input pin. Defaults to A, B, C... in the editor.
+   virtual const char* InputLabel(int /*slot*/) const { return nullptr; }
 };

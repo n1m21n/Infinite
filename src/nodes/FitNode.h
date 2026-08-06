@@ -32,6 +32,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   INode* BypassSource() override { return mInput.GetSource(); }
 
    int mode = 0;
    float width = 1024.0f;   // float so modulators can drive it

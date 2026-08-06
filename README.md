@@ -12,7 +12,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**82 node types across ten categories.**
+**91 node types across ten categories.**
 
 | Category | Nodes |
 |---|---|
@@ -23,7 +23,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 | Compositing | Blend (31 modes), Layer Stack (4 reorderable layers), Switcher, Fit, outer glow, colour overlay, drop shadow |
 | Feedback | Feedback (one-frame delay, makes cycles legal), Trails, Reaction-Diffusion |
 | Mask | Remove Background (on-device Vision segmentation), Chroma Key, Luma Key |
-| 3D | Geometry (8 primitives), Geometry Op (10 mesh operators), Instance on Points, Camera, Light, Render 3D |
+| 3D | Geometry (8 primitives), Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Instance on Points, Camera, Light, Render 3D |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
 | Modulators | LFO, Random, Pattern (8-step), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio File**, **Audio Analyze** |
 | Output | Output (PNG export + H.264 recording) |
@@ -115,6 +115,7 @@ To build the DMG:
 | Delete | Select, then Delete or Backspace |
 | Type an exact value | Double-click a slider |
 | Add a file | Drag an image or video onto the canvas |
+| Bypass a node | Click the power icon beside the eye — the node is skipped and its input passes through |
 
 The usual signal flow is **Source → Effects → Color → Compositing → Output**,
 but nothing enforces it; any output can feed any input.

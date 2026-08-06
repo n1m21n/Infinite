@@ -27,6 +27,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   INode* BypassSource() override { return mInput.GetSource(); }
    ImageCable& Input2() { return mInput2; }
    const FilterDef& Def() const { return mDef; }
 

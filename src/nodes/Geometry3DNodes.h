@@ -49,6 +49,7 @@ public:
    unsigned int GetSurfaceTexture() override;
 
    ImageCable& TextureInput() { return mTextureInput; }
+   const char* InputLabel(int) const override { return "texture"; }
    size_t TriangleCount() const { return mMesh.indices.size() / 3; }
 
    int shape = 1;        // cube by default
@@ -109,6 +110,13 @@ public:
    static const int kLightSlots = 3;
    class CameraNode* camera = nullptr;
    class LightNode* lights[kLightSlots] = { nullptr, nullptr, nullptr };
+
+   const char* InputLabel(int slot) const override
+   {
+      static const char* kNames[] = { "geo A", "geo B", "geo C", "geo D",
+                                      "camera", "light 1", "light 2", "light 3" };
+      return (slot >= 0 && slot < 8) ? kNames[slot] : nullptr;
+   }
 
    size_t LastTriangleCount() const { return mLastTriangles; }
    size_t LastDrawCalls() const { return mLastDrawCalls; }

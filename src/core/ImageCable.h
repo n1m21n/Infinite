@@ -17,17 +17,36 @@ public:
    INode* GetSource() const { return mSource; }
    bool IsConnected() const { return mSource != nullptr; }
 
+   // Walks past bypassed nodes to the first one that is actually enabled. The
+   // hop limit stops a bypassed feedback cycle from spinning forever.
+   INode* Resolved() const
+   {
+      INode* node = mSource;
+      for (int hops = 0; node != nullptr && node->bypassed && hops < 64; hops++)
+         node = node->BypassSource();
+      return (node != nullptr && node->bypassed) ? nullptr : node;
+   }
+
    // Pulls the upstream node's output for this frame, cooking it if needed.
    unsigned int Pull(int frameId)
    {
-      if (mSource == nullptr)
+      INode* node = Resolved();
+      if (node == nullptr)
          return 0;
-      mSource->CookIfNeeded(frameId);
-      return mSource->GetOutputTexture();
+      node->CookIfNeeded(frameId);
+      return node->GetOutputTexture();
    }
 
-   int Width() const { return mSource ? mSource->GetOutputWidth() : 0; }
-   int Height() const { return mSource ? mSource->GetOutputHeight() : 0; }
+   int Width() const
+   {
+      INode* node = Resolved();
+      return node ? node->GetOutputWidth() : 0;
+   }
+   int Height() const
+   {
+      INode* node = Resolved();
+      return node ? node->GetOutputHeight() : 0;
+   }
 
 private:
    INode* mSource = nullptr;
