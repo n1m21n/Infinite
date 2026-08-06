@@ -8,7 +8,9 @@
 class INode;
 
 // A node that emits a control value instead of an image. Modulators are patched
-// into individual parameters rather than into image inputs.
+// into individual parameters rather than into image inputs. The binding always
+// normalises: a modulator speaks in 0..1 and each destination maps that onto its
+// own range, so one macro can drive parameters with wildly different scales.
 class IModulator
 {
 public:
@@ -40,15 +42,21 @@ public:
 
    static Modulation& Instance();
 
-   void Bind(int nodeIndex, int paramIndex, int modulatorNodeIndex);
+   struct Source
+   {
+      int nodeIndex = -1;
+      int outputIndex = 0;
+   };
+
+   void Bind(int nodeIndex, int paramIndex, int modulatorNodeIndex, int outputIndex = 0);
    void Unbind(int nodeIndex, int paramIndex);
    void UnbindAllFor(int nodeIndex); // node deleted: drop it as target and as source
 
-   // -1 when the parameter is not modulated.
-   int ModulatorFor(int nodeIndex, int paramIndex) const;
-   bool IsModulated(int nodeIndex, int paramIndex) const { return ModulatorFor(nodeIndex, paramIndex) >= 0; }
+   // nodeIndex is -1 when the parameter is not modulated.
+   Source ModulatorFor(int nodeIndex, int paramIndex) const;
+   bool IsModulated(int nodeIndex, int paramIndex) const { return ModulatorFor(nodeIndex, paramIndex).nodeIndex >= 0; }
 
-   const std::map<Key, int>& Links() const { return mLinks; }
+   const std::map<Key, Source>& Links() const { return mLinks; }
 
    // Parameters registered during the current frame's node drawing.
    void ClearFrameParams() { mFrameParams.clear(); }
@@ -56,6 +64,6 @@ public:
    const std::vector<ParamRef>& FrameParams() const { return mFrameParams; }
 
 private:
-   std::map<Key, int> mLinks;
+   std::map<Key, Source> mLinks;
    std::vector<ParamRef> mFrameParams;
 };

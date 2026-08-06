@@ -55,6 +55,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/ModulatorNodes.cpp
     src/nodes/NoiseNode.cpp
     src/nodes/ResynthNode.cpp
+    src/nodes/MacroNodes.cpp
     src/nodes/SwitcherNode.cpp
     src/nodes/TextNode.cpp
     src/nodes/OutputNode.cpp

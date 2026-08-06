@@ -12,7 +12,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**62 node types across seven categories.**
+**64 node types across seven categories.**
 
 | Category | Nodes |
 |---|---|
@@ -22,12 +22,15 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 | Color | Brightness/contrast, levels, curves, LUT, gradient map, channel mixer, HSL, invert, posterize, threshold, vibrance, black & white, colour balance, exposure |
 | Compositing | Blend (31 modes), Layer Stack (4 reorderable layers), Switcher, Fit, outer glow, colour overlay, drop shadow |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
-| Modulators | LFO, Random, Pattern (8-step), Math |
+| Modulators | LFO, Random, Pattern (8-step), Math, Macro Knob, Macro XY (two outputs, recordable path) |
 | Output | Output (PNG export + H.264 recording) |
 
 - **Live 1:1 preview on every node**, including effects and compositing.
-- **Modulation** — every slider has a pin. Patch an LFO, Random or Pattern
-  modulator into it and the value is driven live. Modulated sliders turn amber.
+- **Modulation** — every slider has a pin. Patch a modulator into it and the
+  value is driven live; modulated sliders turn amber. Modulators speak in 0..1
+  and each destination maps that onto its own range, so one **Macro Knob** can
+  sweep a blur radius, an opacity and a hue shift together. **Macro XY** gives
+  two independent outputs from one pad, with a recordable, loopable path.
 - **Transport** — global play/pause and BPM. Pausing freezes modulators, video
   playback and shader animation together, so a patch is deterministic.
 - **Recording** — encode the output to an H.264 `.mov` via AVAssetWriter.

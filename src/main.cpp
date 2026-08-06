@@ -41,6 +41,7 @@
 #include "nodes/VideoSourceNode.h"
 #include "nodes/NoiseNode.h"
 #include "nodes/ResynthNode.h"
+#include "nodes/MacroNodes.h"
 #include "nodes/SwitcherNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/OutputNode.h"
@@ -195,6 +196,10 @@ namespace
    int gCurrentNodeIndex = -1;
    int gParamCounter = 0;
    std::set<std::pair<int, int>> gTypedParam;                 // params showing a text field
+   // Param pins declared this frame. A node with its params collapsed declares
+   // none, and emitting a link to an undeclared pin makes the editor treat the
+   // link as dead and delete it - which silently dropped the modulation.
+   std::set<int> gDrawnParamPins;
    std::pair<int, int> gTypedParamJustOpened(-1, -1);
    std::vector<int> gParamPinsThisFrame;
 
@@ -220,6 +225,7 @@ namespace
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex;
       const bool modulated = Modulation::Instance().IsModulated(nodeIndex, paramIndex);
+      gDrawnParamPins.insert(pinId);
 
       ImGui::PushID(paramIndex + 5000);
 
@@ -304,6 +310,48 @@ namespace
       return kAlign;
    }
 
+   // Small eye toggle. Drawn rather than typed: the UI font has no eye glyph,
+   // and an emoji would not render in a non-emoji face.
+   bool EyeToggle(bool shown)
+   {
+      const float w = 26.0f;
+      const float h = 18.0f;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      const bool pressed = ImGui::InvisibleButton("##eye", ImVec2(w, h));
+      const bool hovered = ImGui::IsItemHovered();
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
+      ImU32 col = hovered ? IM_COL32(235, 240, 255, 255)
+                          : (shown ? IM_COL32(150, 190, 255, 255) : IM_COL32(120, 124, 140, 255));
+
+      // almond outline: two arcs meeting at the corners
+      const float rx = 9.0f, ry = 5.5f;
+      dl->PathClear();
+      for (int i = 0; i <= 16; i++)
+      {
+         float t = (float)i / 16.0f;
+         float x = -rx + 2.0f * rx * t;
+         float y = -ry * (float)sin(3.14159f * t);
+         dl->PathLineTo(ImVec2(c.x + x, c.y + y));
+      }
+      for (int i = 0; i <= 16; i++)
+      {
+         float t = (float)i / 16.0f;
+         float x = rx - 2.0f * rx * t;
+         float y = ry * (float)sin(3.14159f * t);
+         dl->PathLineTo(ImVec2(c.x + x, c.y + y));
+      }
+      dl->PathStroke(col, ImDrawFlags_Closed, 1.6f);
+
+      if (shown)
+         dl->AddCircleFilled(c, 2.6f, col);
+      else
+         dl->AddLine(ImVec2(c.x - rx, c.y + ry * 0.9f), ImVec2(c.x + rx, c.y - ry * 0.9f), col, 1.6f);
+
+      return pressed;
+   }
+
    // ---- pins --------------------------------------------------------------
    // Drawn inside a kPinHit-wide box so the clickable area is far larger than
    // the visible dot; connecting used to require pixel-perfect aim.
@@ -351,6 +399,8 @@ namespace
       REGISTER_NODE(RandomNode, Random, "Modulators");
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
       REGISTER_NODE(MathNode, Math, "Modulators");
+      REGISTER_NODE(MacroKnobNode, Macro Knob, "Modulators");
+      REGISTER_NODE(MacroXYNode, Macro XY, "Modulators");
 
       // Every entry in the filter table becomes its own spawnable node type,
       // all sharing FilterNode. `def` is a reference into the static table, so
@@ -363,6 +413,13 @@ namespace
             [defPtr]() -> INode* { return FilterNode::CreateFor(*defPtr); },
             def.category);
       }
+   }
+
+   IModulator* ModulatorForOutput(INode* node, int outputIndex)
+   {
+      if (auto* xy = dynamic_cast<MacroXYNode*>(node))
+         return outputIndex == 1 ? xy->YOutput() : xy;
+      return dynamic_cast<IModulator*>(node);
    }
 
    GraphNode* FindNodeByIndex(int index)
@@ -868,6 +925,87 @@ namespace
       ModSlider("seed", &n->seed, 0.0f, 100.0f);
    }
 
+   void DrawMacroKnobParams(MacroKnobNode* n)
+   {
+      char buf[64];
+      snprintf(buf, sizeof(buf), "%s", n->label.c_str());
+      ImGui::SetNextItemWidth(kParamWidth);
+      if (ImGui::InputText("name", buf, sizeof(buf)))
+         n->label = buf;
+
+      ImGui::SetNextItemWidth(kPreviewSize);
+      ImGui::SliderFloat("##macro", &n->value, 0.0f, 1.0f, "%.3f");
+      ImGui::TextDisabled("patch 'out' into as many params as you like");
+      ModSlider("curve", &n->curve, 0.2f, 4.0f);
+      ImGui::Checkbox("invert", &n->invert);
+   }
+
+   void DrawMacroXYParams(MacroXYNode* n)
+   {
+      const float size = kPreviewSize;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImGui::InvisibleButton("##macroxy", ImVec2(size, size));
+      if (ImGui::IsItemActive())
+      {
+         ImVec2 m = ImGui::GetIO().MousePos;
+         n->padX = std::min(1.0f, std::max(0.0f, (m.x - origin.x) / size));
+         n->padY = std::min(1.0f, std::max(0.0f, 1.0f - (m.y - origin.y) / size));
+      }
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImVec2 br(origin.x + size, origin.y + size);
+      dl->AddRectFilled(origin, br, IM_COL32(16, 16, 22, 255), 4.0f);
+      for (int i = 1; i < 4; i++)
+      {
+         float f = (float)i / 4.0f;
+         dl->AddLine(ImVec2(origin.x + size * f, origin.y), ImVec2(origin.x + size * f, br.y), IM_COL32(48, 50, 62, 255));
+         dl->AddLine(ImVec2(origin.x, origin.y + size * f), ImVec2(br.x, origin.y + size * f), IM_COL32(48, 50, 62, 255));
+      }
+      const std::vector<MacroXYNode::PadPoint>& path = n->Path();
+      for (size_t i = 1; i < path.size(); i++)
+      {
+         ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
+         ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
+         dl->AddLine(a, b, IM_COL32(120, 200, 255, 170), 1.4f);
+      }
+      ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
+      ImU32 orbColor = n->IsRecordingPath() ? IM_COL32(255, 90, 90, 255)
+                     : n->IsPlayingPath()   ? IM_COL32(120, 235, 150, 255)
+                                            : IM_COL32(255, 190, 90, 255);
+      dl->AddCircleFilled(orb, 9.0f, orbColor);
+      dl->AddCircle(orb, 9.0f, IM_COL32(20, 20, 28, 255), 0, 2.0f);
+      dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+
+      ImGui::TextDisabled("x %.3f   y %.3f", n->padX, n->padY);
+
+      if (n->IsRecordingPath())
+      {
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+         if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
+            n->StopRecording();
+         ImGui::PopStyleColor();
+      }
+      else if (ImGui::Button("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
+      {
+         n->StartRecording();
+      }
+      ImGui::SameLine();
+      if (n->IsPlayingPath())
+      {
+         if (ImGui::Button("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+            n->StopPath();
+      }
+      else if (ImGui::Button("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
+      {
+         n->PlayPath();
+      }
+      ImGui::Checkbox("loop", &n->loopPath);
+      ImGui::SameLine();
+      if (ImGui::SmallButton("clear"))
+         n->ClearPath();
+      ModSlider("speed", &n->speed, 0.05f, 4.0f);
+   }
+
    void DrawBlendParams(BlendNode* n)
    {
       DropdownButton("mode", BlendNode::ModeNames(), n->ModeIndex(),
@@ -1195,13 +1333,17 @@ namespace
    {
       // a deleted modulator must also be cleared from any Math node feeding on it
       auto* dyingMod = dynamic_cast<IModulator*>(dying);
+      auto* dyingXY = dynamic_cast<MacroXYNode*>(dying);
+      IModulator* dyingY = dyingXY ? dyingXY->YOutput() : nullptr;
       for (GraphNode& other : gNodes)
       {
          if (auto* math = dynamic_cast<MathNode*>(other.node.get()))
          {
-            if (dyingMod != nullptr && math->inputA == dyingMod)
+            if ((dyingMod != nullptr && math->inputA == dyingMod) ||
+                (dyingY != nullptr && math->inputA == dyingY))
                math->inputA = nullptr;
-            if (dyingMod != nullptr && math->inputB == dyingMod)
+            if ((dyingMod != nullptr && math->inputB == dyingMod) ||
+                (dyingY != nullptr && math->inputB == dyingY))
                math->inputB = nullptr;
          }
          int inputs = InputCountFor(other);
@@ -1351,12 +1493,27 @@ int main()
       // but a normal launch gives the user a blank patch.
       const bool wantsFixture =
          getenv("INFINITE_RESYNTHTEST") != nullptr ||
+         getenv("INFINITE_HIDETEST") != nullptr ||
+         getenv("INFINITE_MACROTEST") != nullptr ||
          getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_MODTEST") != nullptr ||
          getenv("INFINITE_SIZETEST") != nullptr || getenv("INFINITE_INPUTTEST") != nullptr ||
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr;
 
-      if (getenv("INFINITE_SHOWCASE2") != nullptr)
+      if (getenv("INFINITE_SHOWCASE3") != nullptr)
+      {
+         SpawnNode("Shape", "Source", 40.0f, 40.0f);
+         SpawnNode("kaleidoscope", "Effects", 300.0f, 40.0f);
+         SpawnNode("Macro Knob", "Modulators", 560.0f, 40.0f);
+         SpawnNode("Macro XY", "Modulators", 820.0f, 40.0f);
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         gNodes[1].showParams = true;
+         gNodes[2].showParams = true;
+         gNodes[3].showParams = true;
+         static_cast<MacroXYNode*>(gNodes[3].node.get())->padX = 0.32f;
+         static_cast<MacroXYNode*>(gNodes[3].node.get())->padY = 0.68f;
+      }
+      else if (getenv("INFINITE_SHOWCASE2") != nullptr)
       {
          SpawnNode("Noise", "Source", 40.0f, 40.0f);
          SpawnNode("kaleidoscope", "Effects", 300.0f, 40.0f);
@@ -1413,10 +1570,20 @@ int main()
             SpawnNode("Output", "Output", 380.0f, 60.0f);
          if (getenv("INFINITE_RECTEST") != nullptr)
             CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         if (getenv("INFINITE_HIDETEST") != nullptr)
+         {
+            SpawnNode("LFO", "Modulators", 60.0f, 500.0f);
+            gNodes[0].showParams = true;
+         }
          if (getenv("INFINITE_MODTEST") != nullptr)
          {
             SpawnNode("LFO", "Modulators", 60.0f, 500.0f);
             gNodes[0].showParams = true; // params must be drawn for them to register
+         }
+         if (getenv("INFINITE_MACROTEST") != nullptr)
+         {
+            SpawnNode("Macro XY", "Modulators", 60.0f, 500.0f);
+            gNodes[0].showParams = true;
          }
       }
    }
@@ -1518,6 +1685,17 @@ int main()
 
       Transport::Instance().Tick(ImGui::GetIO().DeltaTime);
       Modulation::Instance().ClearFrameParams();
+      gDrawnParamPins.clear();
+      {
+         Modulation& modulation = Modulation::Instance();
+         for (GraphNode& gn : gNodes)
+            gn.hasModulatedParams = false;
+         for (const auto& link : modulation.Links())
+         {
+            if (GraphNode* target = FindNodeByIndex(link.first.first))
+               target->hasModulatedParams = true;
+         }
+      }
 
       // ---------------- node editor ----------------
       const ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -1847,9 +2025,15 @@ int main()
          else
             DrawPreview(gn.node.get());
 
-         // --- params, collapsed behind a toggle to keep nodes compact ---
-         if (ImGui::Button(gn.showParams ? "hide params" : "params...", ImVec2(kPreviewSize, 0)))
+         // --- params, collapsed behind an eye toggle to keep nodes compact ---
+         if (EyeToggle(gn.showParams))
             gn.showParams = !gn.showParams;
+         if (!gn.showParams && gn.hasModulatedParams)
+         {
+            // make it obvious a collapsed node still has live modulation
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f), "mod");
+         }
 
          BeginNodeParams(gn.index);
          if (gn.showParams)
@@ -1868,6 +2052,10 @@ int main()
                DrawPatternParams(n);
             else if (auto* n = dynamic_cast<MathNode*>(gn.node.get()))
                DrawMathParams(n);
+            else if (auto* n = dynamic_cast<MacroKnobNode*>(gn.node.get()))
+               DrawMacroKnobParams(n);
+            else if (auto* n = dynamic_cast<MacroXYNode*>(gn.node.get()))
+               DrawMacroXYParams(n);
             else if (auto* n = dynamic_cast<NoiseNode*>(gn.node.get()))
                DrawNoiseParams(n);
             else if (auto* n = dynamic_cast<ResynthNode*>(gn.node.get()))
@@ -1924,14 +2112,20 @@ int main()
          ImGui::EndGroup();
          const float contentW = ImGui::GetItemRectSize().x;
 
-         // --- output dot, bottom-right: cables start here ---
+         // --- output dots, bottom-right: cables start here ---
          if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr)
          {
-            float itemW = kPinHit + 4.0f + ImGui::CalcTextSize("out").x;
+            const int outputs = std::max(1, gn.node->OutputCount());
+            float itemW = 0.0f;
+            for (int o = 0; o < outputs; o++)
+               itemW += kPinHit + 4.0f + ImGui::CalcTextSize(gn.node->OutputLabel(o)).x + (o ? 10.0f : 0.0f);
             float pad = std::max(0.0f, contentW - itemW);
             ImGui::Dummy(ImVec2(pad, 1.0f));
-            ImGui::SameLine(0.0f, 0.0f);
-            DrawPin(gn.OutputPinId(), ed::PinKind::Output, "out", true);
+            for (int o = 0; o < outputs; o++)
+            {
+               ImGui::SameLine(0.0f, o == 0 ? 0.0f : 10.0f);
+               DrawPin(gn.OutputPinId(o), ed::PinKind::Output, gn.node->OutputLabel(o), true);
+            }
          }
 
          ImGui::PopID();
@@ -1972,14 +2166,20 @@ int main()
             IModulator* wanted = (slot == 0) ? math->inputA : math->inputB;
             if (wanted == nullptr)
                continue;
+            bool found = false;
             for (GraphNode& src : gNodes)
             {
-               if (dynamic_cast<IModulator*>(src.node.get()) == wanted)
+               for (int o = 0; o < std::max(1, src.node->OutputCount()) && !found; o++)
                {
-                  gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
-                                     src.OutputPinId(), gn.InputPinId(slot) });
-                  break;
+                  if (ModulatorForOutput(src.node.get(), o) == wanted)
+                  {
+                     gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
+                                        src.OutputPinId(o), gn.InputPinId(slot) });
+                     found = true;
+                  }
                }
+               if (found)
+                  break;
             }
          }
       }
@@ -1987,11 +2187,14 @@ int main()
       for (const auto& link : Modulation::Instance().Links())
       {
          GraphNode* target = FindNodeByIndex(link.first.first);
-         GraphNode* source = FindNodeByIndex(link.second);
+         GraphNode* source = FindNodeByIndex(link.second.nodeIndex);
          if (target == nullptr || source == nullptr)
             continue;
+         const int paramPin = target->ParamPinId(link.first.second);
+         if (gDrawnParamPins.count(paramPin) == 0)
+            continue; // params collapsed: keep the binding, just don't draw the cable
          gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
-                            source->OutputPinId(), target->ParamPinId(link.first.second) });
+                            source->OutputPinId(link.second.outputIndex), paramPin });
       }
 
       for (const LinkInfo& link : gLinks)
@@ -2043,11 +2246,12 @@ int main()
                   {
                      Modulation::Instance().Bind(dstNode->index,
                                                  GraphNode::ParamIndexFromPin(b),
-                                                 srcNode->index);
+                                                 srcNode->index,
+                                                 GraphNode::OutputIndexFromPin(a));
                   }
                   else if (dstMath != nullptr)
                   {
-                     auto* mod = dynamic_cast<IModulator*>(srcNode->node.get());
+                     auto* mod = ModulatorForOutput(srcNode->node.get(), GraphNode::OutputIndexFromPin(a));
                      if (GraphNode::InputSlotFromPin(b) == 0)
                         dstMath->inputA = mod;
                      else
@@ -2437,13 +2641,13 @@ int main()
          Modulation& modulation = Modulation::Instance();
          for (const ParamRef& ref : modulation.FrameParams())
          {
-            const int modIndex = modulation.ModulatorFor(ref.nodeIndex, ref.paramIndex);
-            if (modIndex < 0 || ref.value == nullptr)
+            const Modulation::Source src = modulation.ModulatorFor(ref.nodeIndex, ref.paramIndex);
+            if (src.nodeIndex < 0 || ref.value == nullptr)
                continue;
-            GraphNode* modNode = FindNodeByIndex(modIndex);
+            GraphNode* modNode = FindNodeByIndex(src.nodeIndex);
             if (modNode == nullptr)
                continue;
-            auto* modulator = dynamic_cast<IModulator*>(modNode->node.get());
+            auto* modulator = ModulatorForOutput(modNode->node.get(), src.outputIndex);
             if (modulator == nullptr)
                continue;
             const float v01 = modulator->Value01();
@@ -2462,6 +2666,91 @@ int main()
          {
             if (ref.nodeIndex == gNodes[1].index && ref.name == "Amount")
                Modulation::Instance().Bind(ref.nodeIndex, ref.paramIndex, gNodes[5].index);
+         }
+      }
+
+      if (getenv("INFINITE_MACROTEST") != nullptr)
+      {
+         auto& mod = Modulation::Instance();
+         if (gNodes.size() < 3)
+         {
+            printf("MACROTEST fixture missing (%zu nodes)\n", gNodes.size());
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+            return 1;
+         }
+         auto* xy = static_cast<MacroXYNode*>(gNodes[2].node.get());
+         auto* sh = static_cast<ShapeNode*>(gNodes[0].node.get());
+         if (frameId == 2)
+         {
+            int sizeParam = -1, rotParam = -1;
+            for (const ParamRef& ref : mod.FrameParams())
+            {
+               if (ref.nodeIndex != gNodes[0].index) continue;
+               if (ref.name == "size") sizeParam = ref.paramIndex;
+               if (ref.name == "rotation") rotParam = ref.paramIndex;
+            }
+            // X drives size, Y drives rotation - one pad, two destinations
+            printf("sizeParam=%d rotParam=%d node0=%d node2=%d frameParams=%zu\n",
+                   sizeParam, rotParam, gNodes[0].index, gNodes[2].index, mod.FrameParams().size());
+            mod.Bind(gNodes[0].index, sizeParam, gNodes[2].index, 0);
+            mod.Bind(gNodes[0].index, rotParam, gNodes[2].index, 1);
+            printf("isModulated(size)=%d isModulated(rot)=%d\n",
+                   (int)mod.IsModulated(gNodes[0].index, sizeParam),
+                   (int)mod.IsModulated(gNodes[0].index, rotParam));
+            xy->padX = 0.25f;
+            xy->padY = 0.75f;
+            printf("bound X->size Y->rotation\n");
+         }
+         if (frameId == 5)
+         {
+            printf("padX=%.2f -> size=%.4f (expect %.4f)\n", xy->padX, sh->size, 0.01f + 0.49f * 0.25f);
+            printf("padY=%.2f -> rotation=%.4f (expect %.4f)\n", xy->padY, sh->rotation, -3.1416f + 6.2832f * 0.75f);
+            xy->padX = 0.9f; xy->padY = 0.1f;
+         }
+         if (frameId == 8)
+         {
+            printf("after move: size=%.4f rotation=%.4f  %s\n", sh->size, sh->rotation,
+                   (std::fabs(sh->size - (0.01f + 0.49f * 0.9f)) < 0.01f &&
+                    std::fabs(sh->rotation - (-3.1416f + 6.2832f * 0.1f)) < 0.05f)
+                      ? "INDEPENDENT OUTPUTS OK" : "MISMATCH");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      if (getenv("INFINITE_HIDETEST") != nullptr)
+      {
+         auto& mod = Modulation::Instance();
+         if (frameId == 2)
+         {
+            for (const ParamRef& ref : mod.FrameParams())
+            {
+               if (ref.nodeIndex == gNodes[0].index && ref.name == "size")
+                  mod.Bind(ref.nodeIndex, ref.paramIndex, gNodes[2].index);
+            }
+            printf("bound: links=%zu (frameParams=%zu)\n", mod.Links().size(), mod.FrameParams().size());
+            for (const ParamRef& ref : mod.FrameParams())
+            {
+               if (ref.nodeIndex == gNodes[0].index)
+                  printf("   node0 param %d = %s\n", ref.paramIndex, ref.name.c_str());
+            }
+         }
+         if (frameId == 4)
+         {
+            gNodes[0].showParams = false; // collapse the modulated node
+            printf("params hidden\n");
+         }
+         if (frameId == 8)
+            printf("after hide: links=%zu %s\n", mod.Links().size(),
+                   mod.Links().empty() ? "LOST - BUG" : "SURVIVED OK");
+         if (frameId == 9)
+         {
+            gNodes[0].showParams = true; // reopen
+         }
+         if (frameId == 12)
+         {
+            printf("after reopen: links=%zu %s\n", mod.Links().size(),
+                   mod.Links().empty() ? "LOST - BUG" : "SURVIVED OK");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
 
