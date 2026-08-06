@@ -27,6 +27,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   ImageCable& Input2() { return mInput2; }
    const FilterDef& Def() const { return mDef; }
 
    // component in [0,2] for Color params, 0 for Float/Int/Bool.
@@ -43,6 +44,7 @@ private:
    std::vector<std::array<float, 3>> mParamValues;
 
    ImageCable mInput;
+   ImageCable mInput2; // only used when Def().inputs == 2
    GLUtil::Fbo mOut;
    unsigned int mProgram = 0;
    bool mShaderTried = false;

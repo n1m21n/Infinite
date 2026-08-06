@@ -29,9 +29,13 @@ struct FilterParamDef
 struct FilterDef
 {
    std::string name; // node-factory key / spawn menu label
-   std::string category; // "Effects" or "Color"
+   std::string category; // "Effects", "Color" or "Compositing"
    std::string fragmentBody; // extra uniform decls + main(), appended after the shared preamble
    std::vector<FilterParamDef> params;
+
+   // Most filters take one image. Set to 2 for filters that read a second
+   // texture (uSrc2) - displacement maps, LUTs, and the like.
+   int inputs = 1;
 };
 
 const std::vector<FilterDef>& GetFilterDefs();

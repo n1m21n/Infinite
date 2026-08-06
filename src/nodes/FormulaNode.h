@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "INode.h"
 #include "GLUtil.h"
@@ -25,6 +26,15 @@ public:
    // Recompiles from `formula`. Returns false and fills LastError() on failure,
    // leaving the previously-working program active.
    bool Apply();
+
+   struct Preset
+   {
+      const char* name;
+      const char* code;
+   };
+   static const std::vector<Preset>& Presets();
+   static const std::vector<std::string>& PresetNames();
+   void LoadPreset(int index);
    const std::string& LastError() const { return mLastError; }
 
    // Bound directly by the ImGui params panel.
@@ -36,6 +46,7 @@ public:
    float knobC = 0.5f;
    float knobD = 0.5f;
    bool animate = true;
+   int presetIndex = 0;
 
 private:
    unsigned int mProgram = 0;

@@ -1,6 +1,7 @@
 #include "LayerStackNode.h"
 
 #include <OpenGL/gl3.h>
+#include <algorithm>
 #include <string>
 
 #include "BlendModes.h"
@@ -52,6 +53,26 @@ LayerStackNode::~LayerStackNode()
    GLUtil::DestroyFbo(mOut);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
+}
+
+void LayerStackNode::SwapLayers(int a, int b)
+{
+   if (a < 0 || b < 0 || a >= kSlots || b >= kSlots || a == b)
+      return;
+
+   INode* srcA = mInputs[a].GetSource();
+   INode* srcB = mInputs[b].GetSource();
+   if (srcB != nullptr)
+      mInputs[a].Connect(srcB);
+   else
+      mInputs[a].Disconnect();
+   if (srcA != nullptr)
+      mInputs[b].Connect(srcA);
+   else
+      mInputs[b].Disconnect();
+
+   std::swap(modes[a], modes[b]);
+   std::swap(opacities[a], opacities[b]);
 }
 
 bool LayerStackNode::EnsureShader()

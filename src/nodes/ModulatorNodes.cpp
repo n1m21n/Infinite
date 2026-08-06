@@ -92,55 +92,64 @@ float RandomNode::Value01()
 
 // ---------------------------------------------------------------- Pattern
 
-void PatternNode::Reparse()
-{
-   mSteps.clear();
-   std::string cleaned = text;
-   for (char& c : cleaned)
-   {
-      if (c == ',' || c == ';' || c == '\n' || c == '\t')
-         c = ' ';
-   }
-
-   std::istringstream stream(cleaned);
-   std::string token;
-   while (stream >> token)
-   {
-      try
-      {
-         mSteps.push_back(std::stof(token));
-      }
-      catch (...)
-      {
-         // ignore anything that isn't a number rather than clearing the pattern
-      }
-   }
-}
-
 float PatternNode::Value01()
 {
-   if (mSteps.empty())
-      Reparse();
-   if (mSteps.empty())
-      return low;
-
+   const int count = std::max(1, std::min(length, kSteps));
    const double beats = Transport::Instance().Beats();
    const float rate = std::max(0.01f, stepBeats);
    const double pos = beats / rate;
    const long long stepIndex = (long long)std::floor(pos);
-   const int count = (int)mSteps.size();
 
-   int i = (int)(((stepIndex % count) + count) % count);
+   const int i = (int)(((stepIndex % count) + count) % count);
    mCurrentStep = i;
 
-   float raw = mSteps[i];
+   float raw = steps[i];
    if (smoothSteps)
    {
-      int nextI = (i + 1) % count;
-      float t = Frac(pos);
-      float eased = t * t * (3.0f - 2.0f * t);
-      raw = mSteps[i] + (mSteps[nextI] - mSteps[i]) * eased;
+      const int nextI = (i + 1) % count;
+      const float t = Frac(pos);
+      const float eased = t * t * (3.0f - 2.0f * t);
+      raw = steps[i] + (steps[nextI] - steps[i]) * eased;
    }
 
    return Remap(raw, low, high);
+}
+
+// ---------------------------------------------------------------- Math
+
+namespace
+{
+   const std::vector<std::string> kMathOps = {
+      "A + B", "A - B", "A * B", "A / B", "min(A,B)", "max(A,B)",
+      "average", "difference", "A only", "B only"
+   };
+}
+
+const std::vector<std::string>& MathNode::OpNames()
+{
+   return kMathOps;
+}
+
+float MathNode::Value01()
+{
+   const float a = inputA ? inputA->Value01() : constantA;
+   const float b = inputB ? inputB->Value01() : constantB;
+
+   float r;
+   switch (op)
+   {
+      case 0: r = a + b; break;
+      case 1: r = a - b; break;
+      case 2: r = a * b; break;
+      case 3: r = a / std::max(b, 1e-4f); break;
+      case 4: r = std::min(a, b); break;
+      case 5: r = std::max(a, b); break;
+      case 6: r = (a + b) * 0.5f; break;
+      case 7: r = std::fabs(a - b); break;
+      case 8: r = a; break;
+      default: r = b; break;
+   }
+
+   r = r * gain + offset;
+   return clampOutput ? std::min(1.0f, std::max(0.0f, r)) : r;
 }

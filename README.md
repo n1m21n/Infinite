@@ -12,16 +12,17 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**38 node types across six categories.**
+**62 node types across seven categories.**
 
 | Category | Nodes |
 |---|---|
-| Source | Image, Video, Shape (10 primitives), Formula (live GLSL) |
+| Source | Image, Video, Shape (10 primitives), Noise (6 kinds), Formula (live GLSL, 16 presets) |
 | Text | Text (any installed system font) |
-| Effects | Gaussian / box / motion / radial blur, unsharp mask, twirl, pinch-punch, ripple, pixelate, glitch, noise, vignette, transform |
-| Color | Brightness/contrast, levels, HSL, invert, posterize, threshold, vibrance, black & white, colour balance, exposure |
-| Compositing | Blend (31 blend modes), Layer Stack (4 inputs), Fit, outer glow, colour overlay, drop shadow |
-| Modulators | LFO, Random, Pattern |
+| Effects | Blur family (gaussian/box/motion/radial), bloom, diffuse glow, unsharp mask, twirl, pinch-punch, ripple, lens distortion, displace, liquify, 6 glitch types, symmetry, kaleidoscope, mirror tile, halftone, sobel edge, edge outline, pixelate, noise, vignette, transform |
+| Color | Brightness/contrast, levels, curves, LUT, gradient map, channel mixer, HSL, invert, posterize, threshold, vibrance, black & white, colour balance, exposure |
+| Compositing | Blend (31 modes), Layer Stack (4 reorderable layers), Switcher, Fit, outer glow, colour overlay, drop shadow |
+| Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
+| Modulators | LFO, Random, Pattern (8-step), Math |
 | Output | Output (PNG export + H.264 recording) |
 
 - **Live 1:1 preview on every node**, including effects and compositing.
@@ -31,7 +32,11 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
   playback and shader animation together, so a patch is deterministic.
 - **Recording** — encode the output to an H.264 `.mov` via AVAssetWriter.
 - **Any image or video format the OS can decode** — decoding goes through
-  ImageIO/AVFoundation rather than a bundled decoder.
+  ImageIO/AVFoundation rather than a bundled decoder. Drag a file onto the
+  canvas and the matching source node appears, already loaded.
+- **Resynthesize** — feeds each generation back into itself, so the image
+  evolves away from the original. An XY pad sweeps the mutation character, and
+  its path can be recorded, looped and played back.
 
 ## Install
 
@@ -79,11 +84,14 @@ To build the DMG:
 | Rubber-band select | Shift + drag |
 | Duplicate | Cmd+C / Cmd+V |
 | Delete | Select, then Delete or Backspace |
+| Type an exact value | Double-click a slider |
+| Add a file | Drag an image or video onto the canvas |
 
 The usual signal flow is **Source → Effects → Color → Compositing → Output**,
 but nothing enforces it; any output can feed any input.
 
-Canvas settings (snap, grid size, zoom speed) live in the **Infinite** menu.
+Canvas settings (snap, grid size, zoom speed) live in the **Menu**, along with a
+full **Help / module reference** describing every node.
 
 ## Architecture
 

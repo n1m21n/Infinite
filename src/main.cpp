@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <functional>
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,6 +39,9 @@
 #include "nodes/TextNode.h"
 #include "nodes/FitNode.h"
 #include "nodes/VideoSourceNode.h"
+#include "nodes/NoiseNode.h"
+#include "nodes/ResynthNode.h"
+#include "nodes/SwitcherNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/OutputNode.h"
 
@@ -113,6 +117,36 @@ namespace
    };
    ColorRequest gColor;
    ImVec4 gColorPickerRect(0, 0, 0, 0); // x, y, w, h of the picker widget on screen
+   FormulaNode* gFormulaEditor = nullptr;
+   bool gFormulaEditorOpen = false;
+   bool gHelpOpen = false;
+
+   // Files dropped on the window, consumed on the next frame so the spawn can
+   // happen inside the editor where canvas coordinates are meaningful.
+   std::vector<std::string> gDroppedFiles;
+   ImVec2 gDropPos(0.0f, 0.0f);
+
+   bool HasExtension(const std::string& path, const std::vector<std::string>& exts)
+   {
+      size_t dot = path.find_last_of('.');
+      if (dot == std::string::npos)
+         return false;
+      std::string ext = path.substr(dot + 1);
+      std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+      for (const std::string& e : exts)
+      {
+         if (ext == e)
+            return true;
+      }
+      return false;
+   }
+
+   void OnFilesDropped(GLFWwindow*, int count, const char** paths)
+   {
+      gDropPos = ImGui::GetMousePos();
+      for (int i = 0; i < count; i++)
+         gDroppedFiles.push_back(paths[i]);
+   }
 
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect)
@@ -160,6 +194,8 @@ namespace
    // locks the slider) while something is patched in.
    int gCurrentNodeIndex = -1;
    int gParamCounter = 0;
+   std::set<std::pair<int, int>> gTypedParam;                 // params showing a text field
+   std::pair<int, int> gTypedParamJustOpened(-1, -1);
    std::vector<int> gParamPinsThisFrame;
 
    void BeginNodeParams(int nodeIndex)
@@ -198,8 +234,28 @@ namespace
       ed::EndPin();
       ImGui::SameLine(0.0f, 4.0f);
 
+      // Double-clicking swaps the slider for a text field so an exact value can
+      // be typed. ImGui's built-in Ctrl+click does this too, but double-click is
+      // what people reach for.
+      const std::pair<int, int> editKey(nodeIndex, paramIndex);
+      bool typing = gTypedParam.count(editKey) > 0;
+
       bool changed = false;
-      if (modulated)
+      if (typing && !modulated)
+      {
+         ImGui::SetNextItemWidth(kParamWidth - box - 4.0f);
+         if (gTypedParamJustOpened == editKey)
+         {
+            ImGui::SetKeyboardFocusHere();
+            gTypedParamJustOpened = std::pair<int, int>(-1, -1);
+         }
+         changed = ImGui::InputFloat(label, value, 0.0f, 0.0f, fmt,
+                                     ImGuiInputTextFlags_EnterReturnsTrue |
+                                     ImGuiInputTextFlags_AutoSelectAll);
+         if (changed || ImGui::IsItemDeactivated())
+            gTypedParam.erase(editKey);
+      }
+      else if (modulated)
       {
          // value is driven externally; show it read-only so it is obvious why
          // dragging does nothing
@@ -214,6 +270,11 @@ namespace
       {
          ImGui::SetNextItemWidth(kParamWidth - box - 4.0f);
          changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+         {
+            gTypedParam.insert(editKey);
+            gTypedParamJustOpened = editKey;
+         }
       }
 
       ImGui::PopID();
@@ -279,13 +340,17 @@ namespace
       REGISTER_NODE(FormulaNode, Formula, "Source");
       REGISTER_NODE(TextNode, Text, "Text");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
+      REGISTER_NODE(NoiseNode, Noise, "Source");
+      REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");
       REGISTER_NODE(BlendNode, Blend, "Compositing");
       REGISTER_NODE(LayerStackNode, Layer Stack, "Compositing");
+      REGISTER_NODE(SwitcherNode, Switcher, "Compositing");
       REGISTER_NODE(OutputNode, Output, "Output");
       REGISTER_NODE(LFONode, LFO, "Modulators");
       REGISTER_NODE(RandomNode, Random, "Modulators");
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
+      REGISTER_NODE(MathNode, Math, "Modulators");
 
       // Every entry in the filter table becomes its own spawnable node type,
       // all sharing FilterNode. `def` is a reference into the static table, so
@@ -315,11 +380,19 @@ namespace
    {
       if (dynamic_cast<LayerStackNode*>(gn.node.get()) != nullptr)
          return LayerStackNode::kSlots;
+      if (dynamic_cast<SwitcherNode*>(gn.node.get()) != nullptr)
+         return SwitcherNode::kSlots;
+      // Math takes two modulator cables rather than images, but they are still
+      // ordinary input pins as far as the editor is concerned.
+      if (dynamic_cast<MathNode*>(gn.node.get()) != nullptr)
+         return 2;
       if (dynamic_cast<BlendNode*>(gn.node.get()) != nullptr)
          return 2;
-      if (dynamic_cast<FilterNode*>(gn.node.get()) != nullptr)
-         return 1;
+      if (auto* filter = dynamic_cast<FilterNode*>(gn.node.get()))
+         return filter->Def().inputs;
       if (dynamic_cast<FitNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<ResynthNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr)
          return 1;
@@ -330,12 +403,20 @@ namespace
    {
       if (auto* stack = dynamic_cast<LayerStackNode*>(gn.node.get()))
          return (slot >= 0 && slot < LayerStackNode::kSlots) ? &stack->Input(slot) : nullptr;
+      if (auto* sw = dynamic_cast<SwitcherNode*>(gn.node.get()))
+         return (slot >= 0 && slot < SwitcherNode::kSlots) ? &sw->Input(slot) : nullptr;
       if (auto* blend = dynamic_cast<BlendNode*>(gn.node.get()))
          return slot == 0 ? &blend->InputA() : &blend->InputB();
       if (auto* filter = dynamic_cast<FilterNode*>(gn.node.get()))
-         return slot == 0 ? &filter->Input() : nullptr;
+      {
+         if (slot == 0)
+            return &filter->Input();
+         return (slot == 1 && filter->Def().inputs > 1) ? &filter->Input2() : nullptr;
+      }
       if (auto* fit = dynamic_cast<FitNode*>(gn.node.get()))
          return slot == 0 ? &fit->Input() : nullptr;
+      if (auto* resynth = dynamic_cast<ResynthNode*>(gn.node.get()))
+         return slot == 0 ? &resynth->Input() : nullptr;
       if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
          return slot == 0 ? &out->Input() : nullptr;
       return nullptr;
@@ -495,21 +576,27 @@ namespace
 
    void DrawFormulaParams(FormulaNode* n)
    {
-      char buf[4096];
-      snprintf(buf, sizeof(buf), "%s", n->formula.c_str());
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
-      ImGui::TextDisabled("shape(uv, p, t) body:");
-      if (ImGui::InputTextMultiline("##formula", buf, sizeof(buf), ImVec2(kPreviewSize, 130)))
-         n->formula = buf;
-      if (ImGui::Button("Apply", ImVec2(kParamWidth, 0)))
-         n->Apply();
+      // The GLSL editor lives in its own window, not inline: ImGui multi-line
+      // fields are child windows, and child windows inside the node canvas get
+      // clipped away - which is why the box used to render empty.
+      DropdownButton("preset", FormulaNode::PresetNames(), n->presetIndex,
+                     [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+
+      if (ImGui::Button("Edit GLSL...", ImVec2(kPreviewSize, 0)))
+      {
+         gFormulaEditor = n;
+         gFormulaEditorOpen = true;
+      }
+
       if (!n->LastError().empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
          ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
+
+      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModSlider("uA", &n->knobA, 0.0f, 1.0f);
       ModSlider("uB", &n->knobB, 0.0f, 1.0f);
       ModSlider("uC", &n->knobC, 0.0f, 1.0f);
@@ -605,20 +692,180 @@ namespace
 
    void DrawPatternParams(PatternNode* n)
    {
-      char buf[512];
-      snprintf(buf, sizeof(buf), "%s", n->text.c_str());
-      ImGui::TextDisabled("steps (numbers, looped):");
-      ImGui::SetNextItemWidth(kPreviewSize);
-      if (ImGui::InputText("##pattern", buf, sizeof(buf)))
+      ImGui::TextDisabled("8 steps, looped:");
+      for (int i = 0; i < PatternNode::kSteps; i++)
       {
-         n->text = buf;
-         n->Reparse();
+         char label[16];
+         snprintf(label, sizeof(label), "%d", i + 1);
+         const bool active = (i == n->CurrentStep()) && i < n->length;
+         if (active)
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.32f, 0.24f, 0.08f, 1.0f));
+         ModSlider(label, &n->steps[i], 0.0f, 1.0f);
+         if (active)
+            ImGui::PopStyleColor();
       }
-      ImGui::TextDisabled("%d steps, on step %d", (int)n->Steps().size(), n->CurrentStep() + 1);
+      ImGui::SetNextItemWidth(kParamWidth);
+      ImGui::SliderInt("length", &n->length, 1, PatternNode::kSteps);
       ModSlider("beats / step", &n->stepBeats, 0.05f, 8.0f);
       ImGui::Checkbox("glide between steps", &n->smoothSteps);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
+   }
+
+   void DrawMathParams(MathNode* n)
+   {
+      DropdownButton("operation", MathNode::OpNames(), n->op, [n](int i) { n->op = i; });
+      if (n->inputA == nullptr)
+         ModSlider("A (no cable)", &n->constantA, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("A: patched");
+      if (n->inputB == nullptr)
+         ModSlider("B (no cable)", &n->constantB, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("B: patched");
+      ModSlider("gain", &n->gain, -4.0f, 4.0f);
+      ModSlider("offset", &n->offset, -1.0f, 1.0f);
+      ImGui::Checkbox("clamp to 0..1", &n->clampOutput);
+   }
+
+   void DrawNoiseParams(NoiseNode* n)
+   {
+      DropdownButton("type", NoiseNode::TypeNames(), n->noiseType, [n](int i) { n->noiseType = i; });
+      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModSlider("scale", &n->scale, 0.5f, 60.0f);
+      ModSlider("octaves", &n->octaves, 1.0f, 8.0f, "%.0f");
+      ModSlider("lacunarity", &n->lacunarity, 1.0f, 4.0f);
+      ModSlider("gain", &n->gain, 0.1f, 0.9f);
+      ModSlider("warp", &n->warp, 0.0f, 2.0f);
+      ModSlider("speed", &n->speed, -2.0f, 2.0f);
+      ModSlider("contrast", &n->contrast, 0.1f, 4.0f);
+      ModSlider("brightness", &n->brightness, -0.5f, 0.5f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ImGui::Checkbox("rgb noise", &n->colorNoise);
+      if (!n->colorNoise)
+      {
+         ColorSwatch("low", n->lowColor, n);
+         ColorSwatch("high", n->highColor, n);
+      }
+   }
+
+   void DrawSwitcherParams(SwitcherNode* n)
+   {
+      DropdownButton("unit", SwitcherNode::UnitNames(), n->unit, [n](int i) { n->unit = i; });
+      ModSlider("every", &n->interval, 0.05f, 32.0f);
+      ModSlider("crossfade", &n->crossfade, 0.0f, 0.99f);
+      ImGui::Checkbox("manual", &n->manual);
+      if (n->manual)
+      {
+         ImGui::SetNextItemWidth(kParamWidth);
+         ImGui::SliderInt("slot", &n->manualSlot, 0, SwitcherNode::kSlots - 1);
+      }
+      else
+      {
+         ImGui::TextDisabled("showing input %c", 'A' + n->ActiveSlot());
+      }
+   }
+
+   // 2D control surface. Dragging the orb sweeps the mutation weights; the
+   // recorded path is drawn behind it so a loop is visible while it plays.
+   void DrawFxPad(ResynthNode* n)
+   {
+      const float size = kPreviewSize;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImGui::InvisibleButton("##fxpad", ImVec2(size, size));
+      const bool active = ImGui::IsItemActive();
+
+      if (active)
+      {
+         ImVec2 m = ImGui::GetIO().MousePos;
+         n->padX = std::min(1.0f, std::max(0.0f, (m.x - origin.x) / size));
+         n->padY = std::min(1.0f, std::max(0.0f, 1.0f - (m.y - origin.y) / size));
+      }
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImVec2 br(origin.x + size, origin.y + size);
+      dl->AddRectFilled(origin, br, IM_COL32(16, 16, 22, 255), 4.0f);
+
+      for (int i = 1; i < 4; i++)
+      {
+         float f = (float)i / 4.0f;
+         dl->AddLine(ImVec2(origin.x + size * f, origin.y), ImVec2(origin.x + size * f, br.y),
+                     IM_COL32(48, 50, 62, 255));
+         dl->AddLine(ImVec2(origin.x, origin.y + size * f), ImVec2(br.x, origin.y + size * f),
+                     IM_COL32(48, 50, 62, 255));
+      }
+
+      const std::vector<ResynthNode::PadPoint>& path = n->Path();
+      for (size_t i = 1; i < path.size(); i++)
+      {
+         ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
+         ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
+         dl->AddLine(a, b, IM_COL32(120, 200, 255, 170), 1.4f);
+      }
+
+      ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
+      ImU32 orbColor = n->IsRecordingPath() ? IM_COL32(255, 90, 90, 255)
+                     : n->IsPlayingPath()   ? IM_COL32(120, 235, 150, 255)
+                                            : IM_COL32(255, 190, 90, 255);
+      dl->AddCircleFilled(orb, 9.0f, orbColor);
+      dl->AddCircle(orb, 9.0f, IM_COL32(20, 20, 28, 255), 0, 2.0f);
+      dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+   }
+
+   void DrawResynthParams(ResynthNode* n)
+   {
+      ImGui::TextDisabled("FX pad - drag the orb");
+      DrawFxPad(n);
+
+      if (n->IsRecordingPath())
+      {
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+         if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
+            n->StopRecording();
+         ImGui::PopStyleColor();
+      }
+      else
+      {
+         if (ImGui::Button("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
+            n->StartRecording();
+      }
+      ImGui::SameLine();
+      if (n->IsPlayingPath())
+      {
+         if (ImGui::Button("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+            n->StopPath();
+      }
+      else
+      {
+         if (ImGui::Button("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
+            n->PlayPath();
+      }
+      ImGui::Checkbox("loop path", &n->loopPath);
+      ImGui::SameLine();
+      if (ImGui::SmallButton("clear"))
+         n->ClearPath();
+
+      ImGui::Separator();
+      DropdownButton("mode", ResynthNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
+      ModSlider("chaos", &n->chaos, 0.0f, 1.0f);
+      ModSlider("mutation", &n->mutation, 0.0f, 1.0f);
+      ModSlider("feedback", &n->feedback, 0.0f, 1.0f);
+      ModSlider("source pull", &n->sourcePull, 0.0f, 1.0f);
+
+      ImGui::Separator();
+      ImGui::TextDisabled("generation %d", n->Generation());
+      if (ImGui::Button("Iterate", ImVec2(kPreviewSize * 0.48f, 0)))
+         n->StepOnce();
+      ImGui::SameLine();
+      if (ImGui::Button("Reset", ImVec2(kPreviewSize * 0.48f, 0)))
+         n->Reset();
+      if (ImGui::Button("Randomise FX", ImVec2(kPreviewSize, 0)))
+         n->Randomise();
+      ImGui::Checkbox("auto iterate", &n->autoIterate);
+      if (n->autoIterate)
+         ModSlider("steps / beat", &n->stepsPerBeat, 0.05f, 16.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f);
    }
 
    void DrawBlendParams(BlendNode* n)
@@ -630,10 +877,24 @@ namespace
 
    void DrawLayerStackParams(LayerStackNode* n)
    {
+      // Layers composite bottom-up: A is the base, D sits on top. The arrows
+      // move a whole layer (cable, mode and opacity) up or down the stack.
+      ImGui::TextDisabled("A is the base, D is on top");
       for (int slot = 0; slot < LayerStackNode::kSlots; slot++)
       {
          ImGui::PushID(slot);
          ImGui::TextDisabled("layer %c", 'A' + slot);
+         ImGui::SameLine();
+         ImGui::BeginDisabled(slot == 0);
+         if (ImGui::SmallButton("up"))
+            n->SwapLayers(slot, slot - 1);
+         ImGui::EndDisabled();
+         ImGui::SameLine();
+         ImGui::BeginDisabled(slot == LayerStackNode::kSlots - 1);
+         if (ImGui::SmallButton("down"))
+            n->SwapLayers(slot, slot + 1);
+         ImGui::EndDisabled();
+
          char modeLabel[32];
          snprintf(modeLabel, sizeof(modeLabel), "mode##%d", slot);
          DropdownButton(modeLabel, BlendModes::Names(), n->modes[slot],
@@ -762,15 +1023,187 @@ namespace
          return;
 
       if (GraphNode::IsParamPin(dstPin))
+      {
          Modulation::Instance().Unbind(dst->index, GraphNode::ParamIndexFromPin(dstPin));
+      }
+      else if (auto* math = dynamic_cast<MathNode*>(dst->node.get()))
+      {
+         if (GraphNode::InputSlotFromPin(dstPin) == 0)
+            math->inputA = nullptr;
+         else
+            math->inputB = nullptr;
+      }
       else if (ImageCable* cable = CableFor(*dst, GraphNode::InputSlotFromPin(dstPin)))
+      {
          cable->Disconnect();
+      }
+   }
+
+   void DrawHelpWindow(bool* open)
+   {
+      ImGui::SetNextWindowSize(ImVec2(720, 620), ImGuiCond_FirstUseEver);
+      if (!ImGui::Begin("Infinite - help & module reference", open))
+      {
+         ImGui::End();
+         return;
+      }
+
+      if (ImGui::CollapsingHeader("Getting started", ImGuiTreeNodeFlags_DefaultOpen))
+      {
+         ImGui::TextWrapped(
+            "Infinite is a node graph. Every node renders an image and passes it "
+            "down a cable to the next one. A typical patch reads left to right:");
+         ImGui::Bullet(); ImGui::TextWrapped("Source (image, video, shape, noise, formula) makes a picture.");
+         ImGui::Bullet(); ImGui::TextWrapped("Effects and Color nodes change it.");
+         ImGui::Bullet(); ImGui::TextWrapped("Compositing nodes combine several pictures into one.");
+         ImGui::Bullet(); ImGui::TextWrapped("Output shows the result, exports a PNG, or records a video.");
+         ImGui::Spacing();
+         ImGui::TextWrapped(
+            "Nothing enforces that order - any output can feed any input, including "
+            "back into effects for feedback-style chains.");
+      }
+
+      if (ImGui::CollapsingHeader("Controls", ImGuiTreeNodeFlags_DefaultOpen))
+      {
+         if (ImGui::BeginTable("controls", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+         {
+            ImGui::TableSetupColumn("Action");
+            ImGui::TableSetupColumn("How");
+            ImGui::TableHeadersRow();
+            struct Row { const char* a; const char* b; };
+            static const Row rows[] = {
+               { "Add a node", "Right-click or double-click the canvas, then type to filter" },
+               { "Connect", "Drag from a node's 'out' dot to another node's input dot" },
+               { "Modulate a parameter", "Drag a modulator's 'out' onto the small dot beside any slider" },
+               { "Type an exact value", "Double-click a slider" },
+               { "Pan the canvas", "Drag empty canvas" },
+               { "Rubber-band select", "Shift + drag" },
+               { "Duplicate", "Select, then Cmd+C / Cmd+V" },
+               { "Delete", "Select, then Delete or Backspace" },
+               { "Zoom", "Scroll (speed is adjustable in the Menu)" },
+               { "Play / pause everything", "Play button in the top bar" },
+            };
+            for (const Row& r : rows)
+            {
+               ImGui::TableNextRow();
+               ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(r.a);
+               ImGui::TableSetColumnIndex(1); ImGui::TextWrapped("%s", r.b);
+            }
+            ImGui::EndTable();
+         }
+      }
+
+      if (ImGui::CollapsingHeader("Transport and modulation", ImGuiTreeNodeFlags_DefaultOpen))
+      {
+         ImGui::TextWrapped(
+            "The top bar holds a global clock: Play/Pause, Rewind and BPM. Everything "
+            "time-based reads from it - modulators, video playback and animated shaders - "
+            "so pausing freezes the whole patch and changing the tempo retimes all of it "
+            "at once.");
+         ImGui::Spacing();
+         ImGui::TextWrapped(
+            "Modulator rates are given in beats, not seconds. A rate of 4 means one "
+            "cycle every four beats, so it stays in time when you change the BPM.");
+         ImGui::Spacing();
+         ImGui::TextWrapped(
+            "Every slider has a small dot to its left. Patch a modulator into that dot "
+            "and the slider turns amber and becomes read-only - the value is now being "
+            "driven. Delete the cable to take manual control back.");
+      }
+
+      if (ImGui::CollapsingHeader("Module reference"))
+      {
+         struct Entry { const char* name; const char* text; };
+         struct Group { const char* category; std::vector<Entry> entries; };
+         static const std::vector<Group> groups = {
+            { "Source", {
+               { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
+               { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available." },
+               { "Shape", "Ten vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line - with fill, stroke, feather and background." },
+               { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
+               { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
+            } },
+            { "Text", {
+               { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
+            } },
+            { "Effects", {
+               { "Blur family", "Gaussian, box, motion (angle + distance) and radial (with a centre point)." },
+               { "Bloom / Diffuse Glow", "Bloom isolates pixels above a threshold and blooms them outward. Diffuse Glow screens a blurred copy back over the image." },
+               { "Sharpen", "Unsharp mask - blurs a copy and adds back the difference." },
+               { "Distortion", "Twirl, pinch/punch, ripple, lens distortion (with chromatic aberration), displace and liquify. Position-dependent effects have Centre X/Y." },
+               { "Glitch family", "Five kinds: the original combined glitch, RGB shift, scanlines, blocks, wave and datamosh." },
+               { "Symmetry", "Symmetry (mirror about X, Y or both), Kaleidoscope (segment count, rotation, zoom) and Mirror Tile." },
+               { "Stylise", "Halftone (mono or CMY-style colour), Sobel edge detection and Edge Outline." },
+               { "Transform", "Translate, scale and rotate - filed under Effects rather than as a separate category." },
+               { "Pixelate / Noise / Vignette", "Block pixelation, additive grain and a vignette with its own centre." },
+            } },
+            { "Color", {
+               { "Basic", "Brightness/contrast, exposure, levels (black/white point + gamma), invert, posterize, threshold, vibrance." },
+               { "Curves", "Shadow / midtone / highlight lift plus an S-curve control." },
+               { "LUT", "Applies a lookup-table image patched into the second input." },
+               { "Gradient Map", "Remaps luminance onto a two-colour gradient." },
+               { "Channel Mixer", "Rebuilds each output channel from a weighted mix of the input channels." },
+               { "HSL / Colour Balance / Black & White", "Hue, saturation and lightness; per-axis colour shifts; weighted greyscale." },
+            } },
+            { "Compositing", {
+               { "Blend", "Two inputs and 31 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
+               { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and the up/down buttons move a whole layer." },
+               { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
+               { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
+               { "Drop Shadow / Outer Glow / Colour Overlay", "Layer-effect style filters." },
+            } },
+            { "Modulators", {
+               { "LFO", "Sine, triangle, saw up/down, square and sample-and-hold. Rate in beats, plus phase and an output range." },
+               { "Random", "A new random value every N beats, with adjustable smoothing between steps. Deterministic, so rewinding replays the same sequence." },
+               { "Pattern", "An eight-step sequencer. Set the eight sliders, choose how many steps to use, and it loops through them one step every N beats. Optional glide." },
+               { "Math", "Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant." },
+            } },
+            { "Output", {
+               { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
+            } },
+         };
+
+         for (const Group& group : groups)
+         {
+            ImGui::SeparatorText(group.category);
+            for (const Entry& entry : group.entries)
+            {
+               ImGui::Bullet();
+               ImGui::TextUnformatted(entry.name);
+               ImGui::Indent();
+               ImGui::PushTextWrapPos(0.0f);
+               ImGui::TextDisabled("%s", entry.text);
+               ImGui::PopTextWrapPos();
+               ImGui::Unindent();
+            }
+         }
+      }
+
+      if (ImGui::CollapsingHeader("Tips"))
+      {
+         ImGui::Bullet(); ImGui::TextWrapped("Put a Fit node before a Blend or Layer Stack when your sources are different sizes.");
+         ImGui::Bullet(); ImGui::TextWrapped("Modulate a Switcher's 'every' with an LFO for irregular cutting.");
+         ImGui::Bullet(); ImGui::TextWrapped("Chain a Math node off two LFOs at different rates to get slow drifting motion.");
+         ImGui::Bullet(); ImGui::TextWrapped("A node's output can feed several inputs at once - it only renders once per frame.");
+         ImGui::Bullet(); ImGui::TextWrapped("Settings and the last graph layout are stored in ~/Library/Application Support/Infinite.");
+      }
+
+      ImGui::End();
    }
 
    void DisconnectAllTo(INode* dying)
    {
+      // a deleted modulator must also be cleared from any Math node feeding on it
+      auto* dyingMod = dynamic_cast<IModulator*>(dying);
       for (GraphNode& other : gNodes)
       {
+         if (auto* math = dynamic_cast<MathNode*>(other.node.get()))
+         {
+            if (dyingMod != nullptr && math->inputA == dyingMod)
+               math->inputA = nullptr;
+            if (dyingMod != nullptr && math->inputB == dyingMod)
+               math->inputB = nullptr;
+         }
          int inputs = InputCountFor(other);
          for (int slot = 0; slot < inputs; slot++)
          {
@@ -853,6 +1286,8 @@ int main()
    style.ItemSpacing = ImVec2(6, 5);
 
    ImGui_ImplGlfw_InitForOpenGL(window, true);
+   // Installed after the backend so it chains rather than replacing ImGui's.
+   glfwSetDropCallback(window, OnFilesDropped);
    ImGui_ImplOpenGL3_Init("#version 150");
 
    // Cocoa chdir's a bundled app into Contents/Resources, so anything written
@@ -915,12 +1350,28 @@ int main()
       // The canvas starts empty; the dev test modes below need a fixture graph,
       // but a normal launch gives the user a blank patch.
       const bool wantsFixture =
+         getenv("INFINITE_RESYNTHTEST") != nullptr ||
          getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_MODTEST") != nullptr ||
          getenv("INFINITE_SIZETEST") != nullptr || getenv("INFINITE_INPUTTEST") != nullptr ||
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr;
 
-      if (getenv("INFINITE_SHOWCASE") != nullptr)
+      if (getenv("INFINITE_SHOWCASE2") != nullptr)
+      {
+         SpawnNode("Noise", "Source", 40.0f, 40.0f);
+         SpawnNode("kaleidoscope", "Effects", 300.0f, 40.0f);
+         SpawnNode("bloom", "Effects", 560.0f, 40.0f);
+         SpawnNode("Switcher", "Compositing", 820.0f, 40.0f);
+         SpawnNode("Pattern", "Modulators", 1080.0f, 40.0f);
+         SpawnNode("Math", "Modulators", 1340.0f, 40.0f);
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         CableFor(gNodes[2], 0)->Connect(gNodes[1].node.get());
+         CableFor(gNodes[3], 0)->Connect(gNodes[2].node.get());
+         CableFor(gNodes[3], 1)->Connect(gNodes[0].node.get());
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
+      else if (getenv("INFINITE_SHOWCASE") != nullptr)
       {
          // dev-only: a representative patch, used to generate the README image
          SpawnNode("Shape", "Source", 40.0f, 40.0f);
@@ -952,7 +1403,14 @@ int main()
       else if (wantsFixture)
       {
          SpawnNode("Shape", "Source", 60.0f, 60.0f);
-         SpawnNode("Output", "Output", 380.0f, 60.0f);
+         if (getenv("INFINITE_RESYNTHTEST") != nullptr)
+         {
+            SpawnNode("Resynthesize", "Resynth", 380.0f, 60.0f);
+            CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+            gNodes[1].showParams = true;
+         }
+         else
+            SpawnNode("Output", "Output", 380.0f, 60.0f);
          if (getenv("INFINITE_RECTEST") != nullptr)
             CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          if (getenv("INFINITE_MODTEST") != nullptr)
@@ -1072,7 +1530,7 @@ int main()
 
       if (ImGui::BeginMenuBar())
       {
-         if (ImGui::BeginMenu("Infinite"))
+         if (ImGui::BeginMenu("Menu"))
          {
             ImGui::SeparatorText("Canvas");
             ImGui::Checkbox("Snap to grid", &gSnapToGrid);
@@ -1095,11 +1553,9 @@ int main()
                   gn.showParams = false;
             }
 
-            ImGui::SeparatorText("Help");
-            ImGui::TextDisabled("right-click / double-click canvas: add node");
-            ImGui::TextDisabled("drag empty canvas: pan   shift+drag: select");
-            ImGui::TextDisabled("drag dot to dot: connect");
-            ImGui::TextDisabled("Cmd+C / Cmd+V: duplicate   Delete: remove");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Help / module reference"))
+               gHelpOpen = true;
 
             ImGui::Separator();
             if (ImGui::MenuItem("Quit"))
@@ -1162,6 +1618,37 @@ int main()
          gRequestFitView = false;
       }
 
+      // Dropping a file on the canvas spawns the matching source node, already
+      // loaded, at the drop point.
+      if (!gDroppedFiles.empty())
+      {
+         static const std::vector<std::string> kVideoExt = {
+            "mov", "mp4", "m4v", "avi", "mkv", "webm", "mpg", "mpeg", "wmv", "flv", "hevc"
+         };
+         ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
+         float offset = 0.0f;
+         for (const std::string& path : gDroppedFiles)
+         {
+            GraphNode* spawned = nullptr;
+            if (HasExtension(path, kVideoExt))
+            {
+               spawned = SpawnNode("Video", "Source", canvasPos.x + offset, canvasPos.y);
+               if (spawned != nullptr)
+                  static_cast<VideoSourceNode*>(spawned->node.get())->Open(path);
+            }
+            else
+            {
+               spawned = SpawnNode("Image Source", "Source", canvasPos.x + offset, canvasPos.y);
+               if (spawned != nullptr)
+                  static_cast<ImageSourceNode*>(spawned->node.get())->Load(path);
+            }
+            if (spawned != nullptr)
+               spawned->showParams = true;
+            offset += 240.0f;
+         }
+         gDroppedFiles.clear();
+      }
+
       if (getenv("INFINITE_COLORTEST") != nullptr)
       {
          auto* sh = static_cast<ShapeNode*>(gNodes[0].node.get());
@@ -1203,6 +1690,40 @@ int main()
             printf("stop: %s\n", out->RecordStatus().c_str());
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
+      }
+
+      if (getenv("INFINITE_RESYNTHTEST") != nullptr)
+      {
+         auto* rs = static_cast<ResynthNode*>(gNodes[1].node.get());
+         auto sample = [](INode* n, unsigned char* out)
+         {
+            GLuint fbo = 0;
+            glGenFramebuffers(1, &fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, n->GetOutputTexture(), 0);
+            glReadPixels(n->GetOutputWidth() / 3, n->GetOutputHeight() / 3, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, out);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDeleteFramebuffers(1, &fbo);
+         };
+         static unsigned char prev[4] = { 0, 0, 0, 0 };
+         if (frameId == 2)
+         {
+            rs->chaos = 0.8f; rs->mutation = 0.8f; rs->sourcePull = 0.02f;
+            rs->Randomise();
+            sample(rs, prev);
+            printf("gen %-3d pixel=(%d,%d,%d)\n", rs->Generation(), prev[0], prev[1], prev[2]);
+         }
+         if (frameId >= 3 && frameId <= 12)
+         {
+            rs->StepOnce();
+            unsigned char now[4];
+            sample(rs, now);
+            int drift = abs(now[0]-prev[0]) + abs(now[1]-prev[1]) + abs(now[2]-prev[2]);
+            printf("gen %-3d pixel=(%d,%d,%d) drift=%d\n", rs->Generation(), now[0], now[1], now[2], drift);
+            memcpy(prev, now, 4);
+         }
+         if (frameId == 14)
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
       if (getenv("INFINITE_SIZETEST") != nullptr)
@@ -1345,6 +1866,14 @@ int main()
                DrawRandomParams(n);
             else if (auto* n = dynamic_cast<PatternNode*>(gn.node.get()))
                DrawPatternParams(n);
+            else if (auto* n = dynamic_cast<MathNode*>(gn.node.get()))
+               DrawMathParams(n);
+            else if (auto* n = dynamic_cast<NoiseNode*>(gn.node.get()))
+               DrawNoiseParams(n);
+            else if (auto* n = dynamic_cast<ResynthNode*>(gn.node.get()))
+               DrawResynthParams(n);
+            else if (auto* n = dynamic_cast<SwitcherNode*>(gn.node.get()))
+               DrawSwitcherParams(n);
             else if (auto* n = dynamic_cast<ShapeNode*>(gn.node.get()))
                DrawShapeParams(n);
             else if (auto* n = dynamic_cast<FormulaNode*>(gn.node.get()))
@@ -1433,6 +1962,28 @@ int main()
             }
          }
       }
+      for (GraphNode& gn : gNodes)
+      {
+         auto* math = dynamic_cast<MathNode*>(gn.node.get());
+         if (math == nullptr)
+            continue;
+         for (int slot = 0; slot < 2; slot++)
+         {
+            IModulator* wanted = (slot == 0) ? math->inputA : math->inputB;
+            if (wanted == nullptr)
+               continue;
+            for (GraphNode& src : gNodes)
+            {
+               if (dynamic_cast<IModulator*>(src.node.get()) == wanted)
+               {
+                  gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
+                                     src.OutputPinId(), gn.InputPinId(slot) });
+                  break;
+               }
+            }
+         }
+      }
+
       for (const auto& link : Modulation::Instance().Links())
       {
          GraphNode* target = FindNodeByIndex(link.first.first);
@@ -1473,14 +2024,17 @@ int main()
                const bool srcIsModulator = srcNode != nullptr &&
                                            dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr;
 
+               auto* dstMath = dstNode ? dynamic_cast<MathNode*>(dstNode->node.get()) : nullptr;
+
                bool valid = false;
                if (GraphNode::IsOutputPin(a) && srcNode != nullptr && dstNode != nullptr && differentNodes)
                {
-                  // modulators patch into parameters; image nodes into image inputs
+                  // modulators patch into parameters and into Math's inputs;
+                  // image nodes patch into image inputs
                   if (GraphNode::IsParamPin(b))
                      valid = srcIsModulator;
                   else if (GraphNode::IsInputPin(b))
-                     valid = !srcIsModulator;
+                     valid = dstMath != nullptr ? srcIsModulator : !srcIsModulator;
                }
 
                if (valid && ed::AcceptNewItem())
@@ -1490,6 +2044,14 @@ int main()
                      Modulation::Instance().Bind(dstNode->index,
                                                  GraphNode::ParamIndexFromPin(b),
                                                  srcNode->index);
+                  }
+                  else if (dstMath != nullptr)
+                  {
+                     auto* mod = dynamic_cast<IModulator*>(srcNode->node.get());
+                     if (GraphNode::InputSlotFromPin(b) == 0)
+                        dstMath->inputA = mod;
+                     else
+                        dstMath->inputB = mod;
                   }
                   else
                   {
@@ -1808,6 +2370,63 @@ int main()
       io.MouseWheelH = savedWheelH;
 
       ImGui::End();
+
+      // ---- windows that must live outside the node canvas ----
+      if (gFormulaEditorOpen && gFormulaEditor != nullptr)
+      {
+         // guard against the node being deleted while its editor is open
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gFormulaEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gFormulaEditor = nullptr;
+            gFormulaEditorOpen = false;
+         }
+      }
+
+      if (gFormulaEditorOpen && gFormulaEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(620, 460), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Formula editor", &gFormulaEditorOpen))
+         {
+            ImGui::TextDisabled("body of  vec4 shape(vec2 uv, vec2 p, float t)");
+            ImGui::TextDisabled("p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs");
+            ImGui::Separator();
+
+            static char editBuf[8192];
+            static FormulaNode* lastEdited = nullptr;
+            if (lastEdited != gFormulaEditor)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
+               lastEdited = gFormulaEditor;
+            }
+
+            ImGui::InputTextMultiline("##glsl", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               gFormulaEditor->formula = editBuf;
+               gFormulaEditor->Apply();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
+
+            if (!gFormulaEditor->LastError().empty())
+            {
+               ImGui::TextWrapped("%s", gFormulaEditor->LastError().c_str());
+            }
+         }
+         ImGui::End();
+      }
+
+      if (gHelpOpen)
+         DrawHelpWindow(&gHelpOpen);
 
       // ---- apply modulation, then cook ----
       // Deliberately after the UI: the parameter registry is rebuilt every frame

@@ -15,7 +15,9 @@ namespace
       "out vec4 fragColor;\n"
       "uniform sampler2D uSrc;\n"
       "uniform vec2 uTexelSize;\n"
-      "uniform float uTime;\n";
+      "uniform float uTime;\n"
+      "uniform sampler2D uSrc2;\n"
+      "uniform int uHasSrc2;\n";
 
 
 }
@@ -59,18 +61,26 @@ void FilterNode::CookIfNeeded(int frameId)
    unsigned int srcTex = mInput.Pull(frameId);
    if (srcTex == 0)
       return;
+   unsigned int srcTex2 = (mDef.inputs > 1) ? mInput2.Pull(frameId) : 0;
 
    if (!EnsureShader())
       return;
    if (!GLUtil::EnsureFbo(mOut, mInput.Width(), mInput.Height()))
       return;
 
-   GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex]()
+   GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, srcTex2]()
    {
       GLint locSrc = glGetUniformLocation(mProgram, "uSrc");
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, srcTex);
       glUniform1i(locSrc, 0);
+
+      // bind the second sampler to a real texture even when unused; sampling an
+      // unbound unit is undefined and spams the GL driver log
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, srcTex2 != 0 ? srcTex2 : srcTex);
+      glUniform1i(glGetUniformLocation(mProgram, "uSrc2"), 1);
+      glUniform1i(glGetUniformLocation(mProgram, "uHasSrc2"), srcTex2 != 0 ? 1 : 0);
 
       GLint locTexel = glGetUniformLocation(mProgram, "uTexelSize");
       glUniform2f(locTexel, 1.0f / mInput.Width(), 1.0f / mInput.Height());

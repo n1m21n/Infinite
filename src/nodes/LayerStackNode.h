@@ -23,6 +23,10 @@ public:
 
    ImageCable& Input(int slot) { return mInputs[slot]; }
 
+   // Swaps two layers wholesale - cable, mode and opacity - so reordering in
+   // the UI moves the whole layer rather than just its settings.
+   void SwapLayers(int a, int b);
+
    int modes[kSlots] = { 0, 0, 0, 0 };
    float opacities[kSlots] = { 1.0f, 1.0f, 1.0f, 1.0f };
 

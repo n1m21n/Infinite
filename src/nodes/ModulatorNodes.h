@@ -51,9 +51,12 @@ private:
    float ValueForStep(long long step) const;
 };
 
+// An 8-step sequencer: the value walks through eight sliders and repeats.
 class PatternNode : public INode, public IModulator
 {
 public:
+   static const int kSteps = 8;
+
    static INode* Create() { return new PatternNode(); }
 
    unsigned int GetOutputTexture() override { return 0; }
@@ -63,18 +66,42 @@ public:
 
    float Value01() override;
 
-   // Re-parses `text` into `steps`. Accepts numbers separated by commas or spaces.
-   void Reparse();
-   const std::vector<float>& Steps() const { return mSteps; }
    int CurrentStep() const { return mCurrentStep; }
 
-   std::string text = "0, 0.25, 0.5, 1, 0.5, 0.25";
+   float steps[kSteps] = { 0.0f, 0.15f, 0.35f, 0.6f, 1.0f, 0.6f, 0.35f, 0.15f };
+   int length = kSteps;    // how many of the eight are used before looping
    float stepBeats = 1.0f; // one step every N beats
    bool smoothSteps = false;
    float low = 0.0f;
    float high = 1.0f;
 
 private:
-   std::vector<float> mSteps;
    int mCurrentStep = 0;
+};
+
+// Combines two other modulators with an arithmetic operation.
+class MathNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new MathNode(); }
+   static const std::vector<std::string>& OpNames();
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   float Value01() override;
+
+   // The editor patches other modulators in here; either may be null, in which
+   // case the corresponding constant is used instead.
+   IModulator* inputA = nullptr;
+   IModulator* inputB = nullptr;
+
+   int op = 0;
+   float constantA = 0.5f; // used when nothing is patched into A
+   float constantB = 0.5f;
+   float gain = 1.0f;
+   float offset = 0.0f;
+   bool clampOutput = true;
 };
