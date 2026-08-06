@@ -1,0 +1,15 @@
+build/
+build-*/
+dist/
+*.dmg
+
+# editor/runtime state written next to the app
+Infinite.json
+imgui.ini
+
+.DS_Store
+*.swp
+
+# external/ is vendored on purpose: imgui, imgui-node-editor and stb are all
+# permissively licensed, and committing them means a fresh clone builds offline
+# with no version drift. GLFW is the exception - it is fetched by CMake.
