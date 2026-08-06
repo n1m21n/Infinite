@@ -46,6 +46,7 @@
 #include "nodes/RemoveBgNode.h"
 #include "nodes/RampNode.h"
 #include "nodes/AnalyzeNodes.h"
+#include "nodes/Geometry3DNodes.h"
 #include "nodes/DrawNode.h"
 #include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
@@ -399,6 +400,8 @@ namespace
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
+      REGISTER_NODE(GeometryNode, Geometry, "3D");
+      REGISTER_NODE(Render3DNode, Render 3D, "3D");
       REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");
@@ -482,6 +485,10 @@ namespace
          return 1;
       if (dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr)
+         return Render3DNode::kSlots;
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
@@ -519,6 +526,8 @@ namespace
          return slot == 0 ? &draw->Input() : nullptr;
       if (auto* an = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
          return slot == 0 ? &an->Input() : nullptr;
+      if (auto* geo = dynamic_cast<GeometryNode*>(gn.node.get()))
+         return slot == 0 ? &geo->TextureInput() : nullptr;
       if (auto* fb = dynamic_cast<FeedbackNode*>(gn.node.get()))
          return slot == 0 ? &fb->Input() : nullptr;
       if (auto* trails = dynamic_cast<TrailsNode*>(gn.node.get()))
@@ -1434,6 +1443,86 @@ namespace
       ModSlider("onset hold", &n->onsetHold, 0.02f, 1.0f);
    }
 
+   void DrawGeometryParams(GeometryNode* n)
+   {
+      DropdownButton("shape", GeometryNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
+      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+
+      ImGui::SeparatorText("form");
+      ModSliderInt("detail", &n->detail, 2, 96);
+      ModSliderInt("sides", &n->sides, 3, 64);
+      if (n->shape == 4 || n->shape == 7)
+         ModSlider("tube", &n->tubeRadius, 0.02f, 0.95f);
+      if (n->shape == 7)
+      {
+         ModSliderInt("knot p", &n->knotP, 1, 8);
+         ModSliderInt("knot q", &n->knotQ, 1, 8);
+      }
+
+      ImGui::SeparatorText("transform");
+      ModSlider("pos x", &n->posX, -3.0f, 3.0f);
+      ModSlider("pos y", &n->posY, -3.0f, 3.0f);
+      ModSlider("pos z", &n->posZ, -3.0f, 3.0f);
+      ModSlider("rot x", &n->rotX, -3.1416f, 3.1416f);
+      ModSlider("rot y", &n->rotY, -3.1416f, 3.1416f);
+      ModSlider("rot z", &n->rotZ, -3.1416f, 3.1416f);
+      ModSlider("scale", &n->uniformScale, 0.05f, 4.0f);
+      ModSlider("scale x", &n->scaleX, 0.05f, 4.0f);
+      ModSlider("scale y", &n->scaleY, 0.05f, 4.0f);
+      ModSlider("scale z", &n->scaleZ, 0.05f, 4.0f);
+      ModSlider("spin / beat", &n->spinY, -3.1416f, 3.1416f);
+
+      ImGui::SeparatorText("material");
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+      ColorSwatch("colour", n->color, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ImGui::TextDisabled("patch an image into the input to texture it");
+      ImGui::TextDisabled("patch 'out' into Render 3D");
+   }
+
+   void DrawRender3DParams(Render3DNode* n)
+   {
+      int connected = 0;
+      for (int i = 0; i < Render3DNode::kSlots; i++)
+         if (n->geometry[i] != nullptr)
+            connected++;
+      ImGui::TextDisabled("%d geometry input%s connected", connected, connected == 1 ? "" : "s");
+
+      ImGui::SeparatorText("output");
+      ModSlider("width", &n->width, 64.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 64.0f, 4096.0f, "%.0f");
+      ColorSwatch("background", n->bgColor, n);
+      ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
+
+      ImGui::SeparatorText("camera");
+      DropdownButton("projection", Render3DNode::ProjectionNames(), n->projection,
+                     [n](int i) { n->projection = i; });
+      if (n->projection == 0)
+         ModSlider("fov", &n->fov, 10.0f, 120.0f);
+      else
+         ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f);
+      ModSlider("distance", &n->camDistance, 0.3f, 20.0f);
+      ModSlider("orbit", &n->camAzimuth, -3.1416f, 3.1416f);
+      ModSlider("elevation", &n->camElevation, -1.5f, 1.5f);
+      ModSlider("target x", &n->targetX, -3.0f, 3.0f);
+      ModSlider("target y", &n->targetY, -3.0f, 3.0f);
+      ModSlider("target z", &n->targetZ, -3.0f, 3.0f);
+
+      ImGui::SeparatorText("light");
+      ModSlider("light orbit", &n->lightAzimuth, -3.1416f, 3.1416f);
+      ModSlider("light height", &n->lightElevation, -1.5f, 1.5f);
+      ColorSwatch("light", n->lightColor, n);
+      ModSlider("intensity", &n->lightIntensity, 0.0f, 4.0f);
+      ColorSwatch("ambient", n->ambientColor, n);
+      ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f);
+
+      ImGui::SeparatorText("raster");
+      ImGui::Checkbox("depth test", &n->depthTest);
+      ImGui::Checkbox("cull backfaces", &n->backfaceCull);
+   }
+
    void DrawBlendParams(BlendNode* n)
    {
       DropdownButton("mode", BlendNode::ModeNames(), n->ModeIndex(),
@@ -1779,6 +1868,12 @@ namespace
       {
          Modulation::Instance().Unbind(dst->index, GraphNode::ParamIndexFromPin(dstPin));
       }
+      else if (auto* render = dynamic_cast<Render3DNode*>(dst->node.get()))
+      {
+         const int slot = GraphNode::InputSlotFromPin(dstPin);
+         if (slot >= 0 && slot < Render3DNode::kSlots)
+            render->geometry[slot] = nullptr;
+      }
       else if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst->node.get()))
       {
          audio->fileSource = nullptr;
@@ -1995,10 +2090,17 @@ namespace
       // a deleted modulator must also be cleared from any Math node feeding on it
       auto* dyingMod = dynamic_cast<IModulator*>(dying);
       auto* dyingFile = dynamic_cast<AudioFileNode*>(dying);
+      auto* dyingGeometry = dynamic_cast<IGeometrySource*>(dying);
       auto* dyingXY = dynamic_cast<MacroXYNode*>(dying);
       IModulator* dyingY = dyingXY ? dyingXY->YOutput() : nullptr;
       for (GraphNode& other : gNodes)
       {
+         if (auto* render = dynamic_cast<Render3DNode*>(other.node.get()))
+         {
+            for (int slot = 0; slot < Render3DNode::kSlots; slot++)
+               if (dyingGeometry != nullptr && render->geometry[slot] == dyingGeometry)
+                  render->geometry[slot] = nullptr;
+         }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
          {
             if (dyingFile != nullptr && audio->fileSource == dyingFile)
@@ -2167,7 +2269,31 @@ int main()
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr;
 
-      if (getenv("INFINITE_TEXTFIT") != nullptr)
+      if (getenv("INFINITE_3DTEST") != nullptr)
+      {
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);
+         SpawnNode("Geometry", "3D", 40.0f, 500.0f);
+         SpawnNode("Render 3D", "3D", 360.0f, 40.0f);
+         auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+         g0->shape = 7; g0->color[0] = 1.0f; g0->color[1] = 0.45f; g0->color[2] = 0.2f;
+         g0->uniformScale = 1.5f;
+         auto* g1 = static_cast<GeometryNode*>(gNodes[1].node.get());
+         g1->shape = 3; g1->posX = 0.9f; g1->posY = -0.35f; g1->uniformScale = 0.7f;
+         g1->color[0] = 0.35f; g1->color[1] = 0.7f; g1->color[2] = 1.0f;
+         auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
+         r->geometry[0] = g0;
+         r->geometry[1] = g1;
+         r->width = 700.0f; r->height = 700.0f;
+         if (getenv("INFINITE_NOCULL") != nullptr)
+            r->backfaceCull = false;
+         if (getenv("INFINITE_NODEPTH") != nullptr)
+            r->depthTest = false;
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+         gNodes[0].showParams = false;
+         gNodes[1].showParams = false;
+      }
+      else if (getenv("INFINITE_TEXTFIT") != nullptr)
       {
          SpawnNode("Text", "Text", 40.0f, 40.0f);
          auto* t = static_cast<TextNode*>(gNodes[0].node.get());
@@ -2619,6 +2745,32 @@ int main()
             glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
+      if (getenv("INFINITE_3DTEST") != nullptr && frameId == 4)
+      {
+         auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
+         const int w = r->GetOutputWidth(), h = r->GetOutputHeight();
+         std::vector<unsigned char> px((size_t)w * h * 4);
+         GLuint fbo = 0;
+         glGenFramebuffers(1, &fbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, r->GetOutputTexture(), 0);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+         glDeleteFramebuffers(1, &fbo);
+
+         // Count coverage rather than sampling points: a torus knot has holes,
+         // and an earlier point-sample test reported "nothing drawn" for a
+         // render that was in fact perfectly correct.
+         size_t lit = 0;
+         for (size_t i = 0; i < px.size(); i += 4)
+            if (px[i] + px[i + 1] + px[i + 2] > 60)
+               lit++;
+         const double coverage = (double)lit / (double)(w * h);
+         printf("render %dx%d coverage=%.1f%%  %s\n", w, h, coverage * 100.0,
+                (coverage > 0.03 && coverage < 0.95) ? "GEOMETRY RASTERISED OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_SIZETEST") != nullptr)
       {
          if (frameId >= 2 && frameId <= 14)
@@ -2743,6 +2895,25 @@ int main()
             ; // these draw their own meters in the params panel
          else if (auto* mod = dynamic_cast<IModulator*>(gn.node.get()))
             DrawModulatorMeter(mod, gn.index);
+         else if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
+         {
+            // Geometry emits a mesh, not a picture: show what it is instead of
+            // an empty preview box.
+            auto* geo = static_cast<GeometryNode*>(gn.node.get());
+            ImVec2 origin = ImGui::GetCursorScreenPos();
+            ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize * 0.45f));
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 br(origin.x + kPreviewSize, origin.y + kPreviewSize * 0.45f);
+            dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
+            dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+            const std::string& name = GeometryNode::ShapeNames()[
+               std::max(0, std::min(geo->shape, (int)GeometryNode::ShapeNames().size() - 1))];
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 14), IM_COL32(200, 206, 226, 255), name.c_str());
+            char tris[48];
+            snprintf(tris, sizeof(tris), "%zu triangles", geo->TriangleCount());
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 34), IM_COL32(130, 136, 156, 255), tris);
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 54), IM_COL32(130, 136, 156, 255), "geometry -> Render 3D");
+         }
          else if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
             DrawPaintablePreview(draw);
          else
@@ -2783,6 +2954,10 @@ int main()
                DrawNoiseParams(n);
             else if (auto* n = dynamic_cast<RampNode*>(gn.node.get()))
                DrawRampParams(n);
+            else if (auto* n = dynamic_cast<GeometryNode*>(gn.node.get()))
+               DrawGeometryParams(n);
+            else if (auto* n = dynamic_cast<Render3DNode*>(gn.node.get()))
+               DrawRender3DParams(n);
             else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
                DrawImageAnalyzeParams(n);
             else if (auto* n = dynamic_cast<AudioFileNode*>(gn.node.get()))
@@ -2901,6 +3076,24 @@ int main()
       }
       for (GraphNode& gn : gNodes)
       {
+         if (auto* render = dynamic_cast<Render3DNode*>(gn.node.get()))
+         {
+            for (int slot = 0; slot < Render3DNode::kSlots; slot++)
+            {
+               if (render->geometry[slot] == nullptr)
+                  continue;
+               for (GraphNode& src : gNodes)
+               {
+                  if (dynamic_cast<IGeometrySource*>(src.node.get()) == render->geometry[slot])
+                  {
+                     gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
+                                        src.OutputPinId(), gn.InputPinId(slot) });
+                     break;
+                  }
+               }
+            }
+         }
+
          auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get());
          if (audio != nullptr && audio->fileSource != nullptr)
          {
@@ -2987,6 +3180,8 @@ int main()
                auto* dstMath = dstNode ? dynamic_cast<MathNode*>(dstNode->node.get()) : nullptr;
                auto* dstAudio = dstNode ? dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) : nullptr;
                auto* srcAudioFile = srcNode ? dynamic_cast<AudioFileNode*>(srcNode->node.get()) : nullptr;
+               auto* dstRender = dstNode ? dynamic_cast<Render3DNode*>(dstNode->node.get()) : nullptr;
+               auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
 
                bool valid = false;
                if (GraphNode::IsOutputPin(a) && srcNode != nullptr && dstNode != nullptr && differentNodes)
@@ -3000,7 +3195,11 @@ int main()
                      valid = srcIsModulator;
                   else if (GraphNode::IsInputPin(b))
                   {
-                     if (dstAudio != nullptr)
+                     if (dstRender != nullptr)
+                        valid = srcGeometry != nullptr; // Render 3D only accepts geometry
+                     else if (srcGeometry != nullptr)
+                        valid = false;                  // geometry only goes into Render 3D
+                     else if (dstAudio != nullptr)
                         valid = srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
                      else
                         valid = (dstMath != nullptr && !dstWantsImage) ? srcIsModulator : !srcIsModulator;
@@ -3015,6 +3214,10 @@ int main()
                                                  GraphNode::ParamIndexFromPin(b),
                                                  srcNode->index,
                                                  GraphNode::OutputIndexFromPin(a));
+                  }
+                  else if (dstRender != nullptr)
+                  {
+                     dstRender->geometry[GraphNode::InputSlotFromPin(b)] = srcGeometry;
                   }
                   else if (dstAudio != nullptr)
                   {
@@ -3608,6 +3811,18 @@ int main()
             // modulators emit a value, not a texture, so they are checked
             // differently - including nodes that expose taps rather than being
             // modulators themselves (Image/Audio Analyze).
+            if (auto* geo = dynamic_cast<GeometryNode*>(gn.node.get()))
+            {
+               // geometry emits a mesh, not a texture
+               const bool ok = geo->TriangleCount() > 0;
+               if (!ok)
+                  ++failures;
+               printf("%-22s [%-12s] %zu triangles  %s\n",
+                      gn.typeName.c_str(), gn.category.c_str(), geo->TriangleCount(),
+                      ok ? "OK" : "FAIL");
+               continue;
+            }
+
             if (dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr)
             {
                // an audio source has neither a texture nor a modulator tap

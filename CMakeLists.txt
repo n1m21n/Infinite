@@ -41,6 +41,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/core/NodeFactory.cpp
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
+    src/core/Mesh.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
     src/platform/Platform.mm
@@ -61,6 +62,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/DrawNode.cpp
     src/nodes/RampNode.cpp
     src/nodes/AnalyzeNodes.cpp
+    src/nodes/Geometry3DNodes.cpp
     src/nodes/FeedbackNodes.cpp
     src/nodes/SwitcherNode.cpp
     src/nodes/TextNode.cpp
