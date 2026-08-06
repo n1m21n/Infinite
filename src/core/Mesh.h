@@ -155,6 +155,36 @@ struct Mat4
    }
 };
 
+// A point sampled off a mesh, used by the instancing nodes.
+struct MeshPoint
+{
+   float px = 0, py = 0, pz = 0;
+   float nx = 0, ny = 1, nz = 0;
+   float scale = 1.0f;
+   int index = 0;
+};
+
+namespace MeshOps
+{
+   // All of these are mesh -> mesh, which is what lets the operator nodes chain
+   // freely in any order.
+   Mesh Transform(const Mesh& in, const Mat4& m);
+   Mesh Array(const Mesh& in, int count, float dx, float dy, float dz,
+              float rotStep, float scaleStep, bool radial, float radius);
+   Mesh Subdivide(const Mesh& in, int levels, float smooth);
+   Mesh Solidify(const Mesh& in, float thickness, bool keepOriginal);
+   Mesh Extrude(const Mesh& in, float distance, float inset);
+   Mesh Wireframe(const Mesh& in, float thickness);
+   Mesh Triangulate(const Mesh& in, float jitter);
+   Mesh RecalculateNormals(const Mesh& in, bool flat, bool flip);
+   Mesh Explode(const Mesh& in, float amount, float seed);
+   Mesh Twist(const Mesh& in, float angle, int axis);
+
+   // Sampling for instancing: vertices, edge midpoints or face centres.
+   std::vector<MeshPoint> ToPoints(const Mesh& in, int mode, int maxPoints);
+   Mesh PointsToFaces(const std::vector<MeshPoint>& points, float size);
+}
+
 namespace Primitives
 {
    Mesh Plane(int segments);

@@ -63,6 +63,8 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/RampNode.cpp
     src/nodes/AnalyzeNodes.cpp
     src/nodes/Geometry3DNodes.cpp
+    src/nodes/GeometryOpNodes.cpp
+    src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp
     src/nodes/SwitcherNode.cpp
     src/nodes/TextNode.cpp

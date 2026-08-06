@@ -12,7 +12,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**78 node types across ten categories.**
+**82 node types across ten categories.**
 
 | Category | Nodes |
 |---|---|
@@ -23,7 +23,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 | Compositing | Blend (31 modes), Layer Stack (4 reorderable layers), Switcher, Fit, outer glow, colour overlay, drop shadow |
 | Feedback | Feedback (one-frame delay, makes cycles legal), Trails, Reaction-Diffusion |
 | Mask | Remove Background (on-device Vision segmentation), Chroma Key, Luma Key |
-| 3D | Geometry (8 primitives), Render 3D (camera, lights, depth buffer) |
+| 3D | Geometry (8 primitives), Geometry Op (10 mesh operators), Instance on Points, Camera, Light, Render 3D |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
 | Modulators | LFO, Random, Pattern (8-step), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio File**, **Audio Analyze** |
 | Output | Output (PNG export + H.264 recording) |
@@ -46,9 +46,15 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 - **Image Analyze** closes the loop the other way: brightness, contrast, RGB,
   saturation, motion and luminance centroid come out of an image as control
   values, so a video can drive a blur.
-- **3D** — Geometry nodes emit meshes down their own kind of cable into a
-  Render 3D node, which rasterises them with a real depth buffer, a camera and
-  lighting, and hands the result back to the 2D graph as an ordinary image.
+- **3D** — Geometry nodes emit meshes down their own kind of cable. Chain them
+  through **Geometry Op** (transform, array, subdivide, solidify, extrude,
+  wireframe, triangulate, normals, explode, twist), scatter them with
+  **Instance on Points**, light them with separate **Camera** and **Light**
+  nodes, and rasterise with **Render 3D** — which hands the result back to the
+  2D graph as an ordinary image.
+- **Instancing is one draw call.** 642 instances of a cube is 70,000 triangles
+  in a single `glDrawElementsInstanced`, and meshes are cached so operators
+  only re-run when a parameter actually changes.
 - **Resynthesize** — feeds each generation back into itself, so the image
   evolves away from the original. An XY pad sweeps between four named mutation
   effects, and its path can be recorded, looped and played back.

@@ -104,6 +104,15 @@ public:
 
    IGeometrySource* geometry[kSlots] = { nullptr, nullptr, nullptr, nullptr };
 
+   // Optional scene nodes. When null, the built-in camera/light values below
+   // are used, so a Render node works on its own.
+   static const int kLightSlots = 3;
+   class CameraNode* camera = nullptr;
+   class LightNode* lights[kLightSlots] = { nullptr, nullptr, nullptr };
+
+   size_t LastTriangleCount() const { return mLastTriangles; }
+   size_t LastDrawCalls() const { return mLastDrawCalls; }
+
    float width = 1024.0f;
    float height = 1024.0f;
    int projection = 0;      // perspective / orthographic
@@ -139,6 +148,8 @@ private:
 
    unsigned int mProgram = 0;
    bool mShaderTried = false;
-   unsigned int mVao = 0, mVbo = 0, mIbo = 0;
+   unsigned int mVao = 0, mVbo = 0, mIbo = 0, mInstanceVbo = 0;
    int mLastCookFrame = -1;
+   size_t mLastTriangles = 0;
+   size_t mLastDrawCalls = 0;
 };

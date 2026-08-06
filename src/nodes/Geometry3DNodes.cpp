@@ -5,6 +5,8 @@
 #include <cstdio>
 
 #include "Transport.h"
+#include "SceneNodes.h"
+#include "GeometryOpNodes.h"
 
 namespace
 {
@@ -19,16 +21,21 @@ namespace
       "in vec3 aPos;\n"
       "in vec3 aNormal;\n"
       "in vec2 aUv;\n"
+      "in mat4 aInstance;\n"      // per-instance transform, divisor 1
       "uniform mat4 uModel;\n"
+      "uniform int uInstanced;\n"
       "uniform mat4 uViewProj;\n"
       "uniform mat3 uNormalMatrix;\n"
       "out vec3 vWorldPos;\n"
       "out vec3 vNormal;\n"
       "out vec2 vUv;\n"
       "void main() {\n"
-      "   vec4 world = uModel * vec4(aPos, 1.0);\n"
+      "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "   vec4 world = model * vec4(aPos, 1.0);\n"
       "   vWorldPos = world.xyz;\n"
-      "   vNormal = normalize(uNormalMatrix * aNormal);\n"
+      "   vNormal = (uInstanced == 1)\n"
+      "      ? normalize(mat3(model) * aNormal)\n"
+      "      : normalize(uNormalMatrix * aNormal);\n"
       "   vUv = aUv;\n"
       "   gl_Position = uViewProj * world;\n"
       "}\n";
@@ -44,9 +51,11 @@ namespace
       "uniform float uRoughness;\n"
       "uniform float uOpacity;\n"
       "uniform int uShading;\n"
-      "uniform vec3 uLightDir;\n"
-      "uniform vec3 uLightColor;\n"
-      "uniform float uLightIntensity;\n"
+      "uniform vec3 uLightDir[3];\n"
+      "uniform vec3 uLightColor[3];\n"
+      "uniform float uLightIntensity[3];\n"
+      "uniform int uLightType[3];\n"
+      "uniform int uLightCount;\n"
       "uniform vec3 uAmbient;\n"
       "uniform float uRim;\n"
       "uniform vec3 uCamPos;\n"
@@ -61,23 +70,32 @@ namespace
       "   if (uHasTexture == 1) base *= texture(uTexture, vUv).rgb;\n"
       "   if (uShading == 3) { fragColor = vec4(base, uOpacity); return; }\n"
       "\n"
-      "   vec3 lightDir = normalize(uLightDir);\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
-      "   vec3 halfway = normalize(lightDir + viewDir);\n"
-      "\n"
-      "   float diffuse = max(dot(n, lightDir), 0.0);\n"
-      "   // Blinn-Phong: enough for solid shapes, and far cheaper than a full\n"
-      "   // PBR pass we would only be approximating anyway.\n"
       "   float shininess = mix(4.0, 256.0, 1.0 - clamp(uRoughness, 0.0, 1.0));\n"
-      "   float spec = pow(max(dot(n, halfway), 0.0), shininess) * (1.0 - uRoughness);\n"
-      "   float rim = pow(1.0 - max(dot(n, viewDir), 0.0), 3.0) * uRim;\n"
-      "\n"
       "   vec3 diffuseColor = mix(base, vec3(0.02), uMetallic);\n"
       "   vec3 specColor = mix(vec3(1.0), base, uMetallic);\n"
-      "   vec3 col = uAmbient * base\n"
-      "            + diffuseColor * uLightColor * uLightIntensity * diffuse\n"
-      "            + specColor * uLightColor * uLightIntensity * spec\n"
-      "            + base * rim;\n"
+      "   vec3 col = uAmbient * base;\n"
+      "\n"
+      "   for (int i = 0; i < 3; i++) {\n"
+      "      if (i >= uLightCount) break;\n"
+      "      vec3 lightDir;\n"
+      "      float attenuation = 1.0;\n"
+      "      if (uLightType[i] == 1) {\n"
+      "         vec3 toLight = uLightDir[i] - vWorldPos;\n"
+      "         float dist = length(toLight);\n"
+      "         lightDir = toLight / max(dist, 1e-4);\n"
+      "         attenuation = 1.0 / (1.0 + dist * dist * 0.25);\n"
+      "      } else {\n"
+      "         lightDir = normalize(uLightDir[i]);\n"
+      "      }\n"
+      "      vec3 halfway = normalize(lightDir + viewDir);\n"
+      "      float diffuse = max(dot(n, lightDir), 0.0);\n"
+      "      float spec = pow(max(dot(n, halfway), 0.0), shininess) * (1.0 - uRoughness);\n"
+      "      float energy = uLightIntensity[i] * attenuation;\n"
+      "      col += diffuseColor * uLightColor[i] * energy * diffuse;\n"
+      "      col += specColor * uLightColor[i] * energy * spec;\n"
+      "   }\n"
+      "   col += base * pow(1.0 - max(dot(n, viewDir), 0.0), 3.0) * uRim;\n"
       "   fragColor = vec4(col, uOpacity);\n"
       "}\n";
 }
@@ -183,6 +201,7 @@ Render3DNode::~Render3DNode()
    if (mFbo != 0) glDeleteFramebuffers(1, &mFbo);
    if (mVbo != 0) glDeleteBuffers(1, &mVbo);
    if (mIbo != 0) glDeleteBuffers(1, &mIbo);
+   if (mInstanceVbo != 0) glDeleteBuffers(1, &mInstanceVbo);
    if (mVao != 0) glDeleteVertexArrays(1, &mVao);
    if (mProgram != 0) glDeleteProgram(mProgram);
 }
@@ -219,6 +238,7 @@ bool Render3DNode::EnsureShader()
    glBindAttribLocation(mProgram, 0, "aPos");
    glBindAttribLocation(mProgram, 1, "aNormal");
    glBindAttribLocation(mProgram, 2, "aUv");
+   glBindAttribLocation(mProgram, 3, "aInstance"); // occupies locations 3..6
    glAttachShader(mProgram, vert);
    glAttachShader(mProgram, frag);
    glLinkProgram(mProgram);
@@ -240,6 +260,7 @@ bool Render3DNode::EnsureShader()
    glGenVertexArrays(1, &mVao);
    glGenBuffers(1, &mVbo);
    glGenBuffers(1, &mIbo);
+   glGenBuffers(1, &mInstanceVbo);
    return true;
 }
 
@@ -309,25 +330,63 @@ void Render3DNode::CookIfNeeded(int frameId)
    }
 
    const float aspect = (float)w / (float)h;
-   const float ce = std::cos(camElevation), se = std::sin(camElevation);
-   const float eye[3] = {
-      targetX + camDistance * ce * std::cos(camAzimuth),
-      targetY + camDistance * se,
-      targetZ + camDistance * ce * std::sin(camAzimuth)
-   };
-   const float target[3] = { targetX, targetY, targetZ };
-   const float up[3] = { 0.0f, 1.0f, 0.0f };
 
-   const Mat4 view = Mat4::LookAt(eye, target, up);
-   const Mat4 proj = (projection == 1)
-      ? Mat4::Orthographic(orthoHeight, aspect, nearPlane, farPlane)
-      : Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
+   float eye[3];
+   Mat4 view, proj;
+   if (camera != nullptr)
+   {
+      camera->ComputeEye(eye);
+      view = camera->ViewMatrix();
+      proj = camera->ProjectionMatrix(aspect);
+   }
+   else
+   {
+      const float ce = std::cos(camElevation);
+      eye[0] = targetX + camDistance * ce * std::cos(camAzimuth);
+      eye[1] = targetY + camDistance * std::sin(camElevation);
+      eye[2] = targetZ + camDistance * ce * std::sin(camAzimuth);
+      const float target[3] = { targetX, targetY, targetZ };
+      const float up[3] = { 0.0f, 1.0f, 0.0f };
+      view = Mat4::LookAt(eye, target, up);
+      proj = (projection == 1)
+         ? Mat4::Orthographic(orthoHeight, aspect, nearPlane, farPlane)
+         : Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
+   }
    const Mat4 viewProj = Mat4::Multiply(proj, view);
 
-   const float le = std::cos(lightElevation);
-   const float lightDir[3] = {
-      le * std::cos(lightAzimuth), std::sin(lightElevation), le * std::sin(lightAzimuth)
-   };
+   // Gather lights: patched Light nodes win, otherwise the built-in one.
+   float lightDirs[kLightSlots * 3] = { 0 };
+   float lightCols[kLightSlots * 3] = { 0 };
+   float lightPower[kLightSlots] = { 0 };
+   int lightTypes[kLightSlots] = { 0 };
+   int lightCount = 0;
+   for (int i = 0; i < kLightSlots; i++)
+   {
+      if (lights[i] == nullptr)
+         continue;
+      float vec[3];
+      lights[i]->ComputeVector(vec);
+      lightDirs[lightCount * 3 + 0] = vec[0];
+      lightDirs[lightCount * 3 + 1] = vec[1];
+      lightDirs[lightCount * 3 + 2] = vec[2];
+      lightCols[lightCount * 3 + 0] = lights[i]->color[0];
+      lightCols[lightCount * 3 + 1] = lights[i]->color[1];
+      lightCols[lightCount * 3 + 2] = lights[i]->color[2];
+      lightPower[lightCount] = lights[i]->intensity;
+      lightTypes[lightCount] = lights[i]->type;
+      lightCount++;
+   }
+   if (lightCount == 0)
+   {
+      const float le = std::cos(lightElevation);
+      lightDirs[0] = le * std::cos(lightAzimuth);
+      lightDirs[1] = std::sin(lightElevation);
+      lightDirs[2] = le * std::sin(lightAzimuth);
+      lightCols[0] = lightColor[0]; lightCols[1] = lightColor[1]; lightCols[2] = lightColor[2];
+      lightPower[0] = lightIntensity;
+      lightTypes[0] = 0;
+      lightCount = 1;
+   }
 
    // --- save the GL state the 2D pipeline relies on -------------------
    GLint prevFbo = 0, prevViewport[4];
@@ -381,11 +440,15 @@ void Render3DNode::CookIfNeeded(int frameId)
 
    glUseProgram(mProgram);
    glBindVertexArray(mVao);
+   mLastTriangles = 0;
+   mLastDrawCalls = 0;
 
    glUniformMatrix4fv(glGetUniformLocation(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
-   glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), 1, lightDir);
-   glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), 1, lightColor);
-   glUniform1f(glGetUniformLocation(mProgram, "uLightIntensity"), lightIntensity);
+   glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kLightSlots, lightDirs);
+   glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kLightSlots, lightCols);
+   glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kLightSlots, lightPower);
+   glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kLightSlots, lightTypes);
+   glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
    glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, ambientColor);
    glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
    glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
@@ -428,6 +491,35 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
       glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
 
+      // Instanced sources upload a transform per copy and draw them all at
+      // once; ten thousand instances stay a single draw call.
+      auto* instancer = dynamic_cast<InstanceOnPointsNode*>(source);
+      const bool instanced = instancer != nullptr && instancer->InstanceCount() > 0;
+      glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), instanced ? 1 : 0);
+      if (instanced)
+      {
+         const std::vector<Mat4>& xforms = instancer->InstanceTransforms();
+         glBindBuffer(GL_ARRAY_BUFFER, mInstanceVbo);
+         glBufferData(GL_ARRAY_BUFFER, xforms.size() * sizeof(Mat4), xforms.data(), GL_DYNAMIC_DRAW);
+         // a mat4 attribute is four consecutive vec4 slots
+         for (int col = 0; col < 4; col++)
+         {
+            const unsigned int loc = 3 + col;
+            glEnableVertexAttribArray(loc);
+            glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
+                                  (void*)(size_t)(col * 4 * sizeof(float)));
+            glVertexAttribDivisor(loc, 1);
+         }
+      }
+      else
+      {
+         for (int col = 0; col < 4; col++)
+         {
+            glDisableVertexAttribArray(3 + col);
+            glVertexAttribDivisor(3 + col, 0);
+         }
+      }
+
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, baseColor);
@@ -436,7 +528,18 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), opacity);
       glUniform1i(glGetUniformLocation(mProgram, "uShading"), shading);
 
-      glDrawElements(GL_TRIANGLES, (GLsizei)mesh.indices.size(), GL_UNSIGNED_INT, nullptr);
+      if (instanced)
+      {
+         glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)mesh.indices.size(), GL_UNSIGNED_INT,
+                                 nullptr, (GLsizei)instancer->InstanceCount());
+         mLastTriangles += (mesh.indices.size() / 3) * instancer->InstanceCount();
+      }
+      else
+      {
+         glDrawElements(GL_TRIANGLES, (GLsizei)mesh.indices.size(), GL_UNSIGNED_INT, nullptr);
+         mLastTriangles += mesh.indices.size() / 3;
+      }
+      mLastDrawCalls++;
 
    }
 

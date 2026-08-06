@@ -47,6 +47,8 @@
 #include "nodes/RampNode.h"
 #include "nodes/AnalyzeNodes.h"
 #include "nodes/Geometry3DNodes.h"
+#include "nodes/GeometryOpNodes.h"
+#include "nodes/SceneNodes.h"
 #include "nodes/DrawNode.h"
 #include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
@@ -430,6 +432,10 @@ namespace
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
       REGISTER_NODE(GeometryNode, Geometry, "3D");
+      REGISTER_NODE(GeometryOpNode, Geometry Op, "3D");
+      REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
+      REGISTER_NODE(CameraNode, Camera, "3D");
+      REGISTER_NODE(LightNode, Light, "3D");
       REGISTER_NODE(Render3DNode, Render 3D, "3D");
       REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
@@ -517,7 +523,11 @@ namespace
       if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr)
-         return Render3DNode::kSlots;
+         return Render3DNode::kSlots + 1 + Render3DNode::kLightSlots; // geo, camera, lights
+      if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<InstanceOnPointsNode*>(gn.node.get()) != nullptr)
+         return 2;
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
@@ -1511,13 +1521,153 @@ namespace
       ImGui::TextDisabled("patch 'out' into Render 3D");
    }
 
+   void DrawGeometryOpParams(GeometryOpNode* n)
+   {
+      DropdownButton("operation", GeometryOpNode::OpNames(), n->op, [n](int i) { n->op = i; });
+      if (n->input == nullptr)
+         ImGui::TextColored(ImVec4(1, 0.6f, 0.4f, 1), "no geometry input");
+      else
+         ImGui::TextDisabled("%zu triangles out", n->TriangleCount());
+
+      switch (n->op)
+      {
+         case GeometryOpNode::kTransform:
+            ModSlider("move x", &n->offsetX, -3.0f, 3.0f);
+            ModSlider("move y", &n->offsetY, -3.0f, 3.0f);
+            ModSlider("move z", &n->offsetZ, -3.0f, 3.0f);
+            ModSlider("rotate", &n->rotStep, -3.1416f, 3.1416f);
+            ModSlider("scale", &n->scaleStep, 0.05f, 4.0f);
+            break;
+         case GeometryOpNode::kArray:
+            ModSliderInt("count", &n->count, 1, 128);
+            ImGui::Checkbox("radial", &n->radial);
+            if (n->radial)
+               ModSlider("radius", &n->radius, 0.0f, 5.0f);
+            else
+            {
+               ModSlider("offset x", &n->offsetX, -2.0f, 2.0f);
+               ModSlider("offset y", &n->offsetY, -2.0f, 2.0f);
+               ModSlider("offset z", &n->offsetZ, -2.0f, 2.0f);
+            }
+            ModSlider("rot / step", &n->rotStep, -1.5f, 1.5f);
+            ModSlider("scale / step", &n->scaleStep, 0.5f, 1.5f);
+            break;
+         case GeometryOpNode::kSubdivide:
+            ModSliderInt("levels", &n->levels, 0, 3);
+            ModSlider("smooth", &n->smooth, 0.0f, 2.0f);
+            ImGui::TextDisabled("each level quadruples the triangles");
+            break;
+         case GeometryOpNode::kSolidify:
+            ModSlider("thickness", &n->thickness, 0.001f, 0.5f);
+            ImGui::Checkbox("keep original", &n->keepOriginal);
+            break;
+         case GeometryOpNode::kExtrude:
+            ModSlider("distance", &n->thickness, -0.5f, 0.5f);
+            ModSlider("inset", &n->inset, 0.0f, 0.9f);
+            break;
+         case GeometryOpNode::kWireframe:
+            ModSlider("thickness", &n->thickness, 0.002f, 0.1f);
+            break;
+         case GeometryOpNode::kTriangulate:
+            ModSlider("jitter", &n->amount, 0.0f, 2.0f);
+            break;
+         case GeometryOpNode::kNormals:
+            ImGui::Checkbox("flat shade", &n->flatShade);
+            ImGui::Checkbox("flip", &n->flipNormals);
+            break;
+         case GeometryOpNode::kExplode:
+            ModSlider("amount", &n->amount, 0.0f, 3.0f);
+            ModSlider("seed", &n->seed, 0.0f, 100.0f);
+            break;
+         default:
+            ModSlider("angle", &n->amount, -3.0f, 3.0f);
+            ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+            break;
+      }
+
+      NodeSeparator("material");
+      ImGui::Checkbox("inherit from input", &n->inheritMaterial);
+      if (!n->inheritMaterial)
+      {
+         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+         ColorSwatch("colour", n->color, n);
+         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      }
+   }
+
+   void DrawInstanceParams(InstanceOnPointsNode* n)
+   {
+      ImGui::TextDisabled("A = points source, B = shape to stamp");
+      if (n->pointSource == nullptr || n->instanceShape == nullptr)
+         ImGui::TextColored(ImVec4(1, 0.6f, 0.4f, 1), "needs both inputs");
+      else
+         ImGui::TextDisabled("%zu instances, %zu triangles", n->InstanceCount(), n->TriangleCount());
+      ImGui::TextDisabled("drawn in one instanced call");
+
+      DropdownButton("points from", InstanceOnPointsNode::SourceNames(), n->pointMode,
+                     [n](int i) { n->pointMode = i; });
+      ModSliderInt("max points", &n->maxPoints, 1, 20000);
+      ModSlider("scale", &n->instanceScale, 0.005f, 1.0f);
+      ModSlider("scale random", &n->scaleRandom, 0.0f, 1.0f);
+      ModSlider("rotation random", &n->rotationRandom, 0.0f, 1.0f);
+      ModSlider("normal offset", &n->normalOffset, -0.5f, 0.5f);
+      ImGui::Checkbox("align to normal", &n->alignToNormal);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+
+      NodeSeparator("material");
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+      ColorSwatch("colour", n->color, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+   }
+
+   void DrawCameraParams(CameraNode* n)
+   {
+      DropdownButton("projection", CameraNode::ProjectionNames(), n->projection,
+                     [n](int i) { n->projection = i; });
+      if (n->projection == 0)
+         ModSlider("fov", &n->fov, 10.0f, 120.0f);
+      else
+         ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f);
+      ModSlider("distance", &n->distance, 0.3f, 20.0f);
+      ModSlider("orbit", &n->azimuth, -3.1416f, 3.1416f);
+      ModSlider("elevation", &n->elevation, -1.5f, 1.5f);
+      ModSlider("roll", &n->roll, -3.1416f, 3.1416f);
+      ModSlider("orbit / beat", &n->orbitPerBeat, -1.0f, 1.0f);
+      ModSlider("target x", &n->targetX, -3.0f, 3.0f);
+      ModSlider("target y", &n->targetY, -3.0f, 3.0f);
+      ModSlider("target z", &n->targetZ, -3.0f, 3.0f);
+      ModSlider("near", &n->nearPlane, 0.01f, 1.0f);
+      ModSlider("far", &n->farPlane, 5.0f, 500.0f);
+      ImGui::TextDisabled("patch into Render 3D's camera input");
+   }
+
+   void DrawLightParams(LightNode* n)
+   {
+      DropdownButton("type", LightNode::TypeNames(), n->type, [n](int i) { n->type = i; });
+      ModSlider("orbit", &n->azimuth, -3.1416f, 3.1416f);
+      ModSlider("elevation", &n->elevation, -1.5f, 1.5f);
+      if (n->type == 1)
+         ModSlider("distance", &n->distance, 0.2f, 20.0f);
+      ColorSwatch("colour", n->color, n);
+      ModSlider("intensity", &n->intensity, 0.0f, 5.0f);
+      ModSlider("orbit / beat", &n->orbitPerBeat, -1.0f, 1.0f);
+      ImGui::TextDisabled("Render 3D takes up to 3 lights");
+   }
+
    void DrawRender3DParams(Render3DNode* n)
    {
       int connected = 0;
       for (int i = 0; i < Render3DNode::kSlots; i++)
          if (n->geometry[i] != nullptr)
             connected++;
-      ImGui::TextDisabled("%d geometry input%s connected", connected, connected == 1 ? "" : "s");
+      ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
+      ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
+      if (n->LastTriangleCount() > 2000000)
+         ImGui::TextColored(ImVec4(1, 0.55f, 0.35f, 1), "very heavy scene");
 
       NodeSeparator("output");
       ModSlider("width", &n->width, 64.0f, 4096.0f, "%.0f");
@@ -1526,6 +1676,10 @@ namespace
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
 
       NodeSeparator("camera");
+      if (n->camera != nullptr)
+         ImGui::TextDisabled("driven by a Camera node");
+      else
+      {
       DropdownButton("projection", Render3DNode::ProjectionNames(), n->projection,
                      [n](int i) { n->projection = i; });
       if (n->projection == 0)
@@ -1538,12 +1692,22 @@ namespace
       ModSlider("target x", &n->targetX, -3.0f, 3.0f);
       ModSlider("target y", &n->targetY, -3.0f, 3.0f);
       ModSlider("target z", &n->targetZ, -3.0f, 3.0f);
+      }
 
       NodeSeparator("light");
+      int patchedLights = 0;
+      for (int i = 0; i < Render3DNode::kLightSlots; i++)
+         if (n->lights[i] != nullptr)
+            patchedLights++;
+      if (patchedLights > 0)
+         ImGui::TextDisabled("%d Light node%s patched", patchedLights, patchedLights == 1 ? "" : "s");
+      else
+      {
       ModSlider("light orbit", &n->lightAzimuth, -3.1416f, 3.1416f);
       ModSlider("light height", &n->lightElevation, -1.5f, 1.5f);
       ColorSwatch("light", n->lightColor, n);
       ModSlider("intensity", &n->lightIntensity, 0.0f, 4.0f);
+      }
       ColorSwatch("ambient", n->ambientColor, n);
       ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f);
 
@@ -1902,6 +2066,21 @@ namespace
          const int slot = GraphNode::InputSlotFromPin(dstPin);
          if (slot >= 0 && slot < Render3DNode::kSlots)
             render->geometry[slot] = nullptr;
+         else if (slot == Render3DNode::kSlots)
+            render->camera = nullptr;
+         else if (slot > Render3DNode::kSlots)
+            render->lights[slot - Render3DNode::kSlots - 1] = nullptr;
+      }
+      else if (auto* geoOp = dynamic_cast<GeometryOpNode*>(dst->node.get()))
+      {
+         geoOp->input = nullptr;
+      }
+      else if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(dst->node.get()))
+      {
+         if (GraphNode::InputSlotFromPin(dstPin) == 0)
+            inst->pointSource = nullptr;
+         else
+            inst->instanceShape = nullptr;
       }
       else if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst->node.get()))
       {
@@ -2129,6 +2308,23 @@ namespace
             for (int slot = 0; slot < Render3DNode::kSlots; slot++)
                if (dyingGeometry != nullptr && render->geometry[slot] == dyingGeometry)
                   render->geometry[slot] = nullptr;
+            if ((const void*)render->camera == (const void*)dying)
+               render->camera = nullptr;
+            for (int i = 0; i < Render3DNode::kLightSlots; i++)
+               if ((const void*)render->lights[i] == (const void*)dying)
+                  render->lights[i] = nullptr;
+         }
+         if (auto* geoOp = dynamic_cast<GeometryOpNode*>(other.node.get()))
+         {
+            if (dyingGeometry != nullptr && geoOp->input == dyingGeometry)
+               geoOp->input = nullptr;
+         }
+         if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(other.node.get()))
+         {
+            if (dyingGeometry != nullptr && inst->pointSource == dyingGeometry)
+               inst->pointSource = nullptr;
+            if (dyingGeometry != nullptr && inst->instanceShape == dyingGeometry)
+               inst->instanceShape = nullptr;
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
          {
@@ -2298,7 +2494,41 @@ int main()
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr;
 
-      if (getenv("INFINITE_3DTEST") != nullptr)
+      if (getenv("INFINITE_GEOTEST") != nullptr)
+      {
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);      // 0 points source
+         SpawnNode("Geometry", "3D", 40.0f, 400.0f);     // 1 instance shape
+         SpawnNode("Instance on Points", "3D", 320.0f, 40.0f); // 2
+         SpawnNode("Geometry Op", "3D", 320.0f, 400.0f); // 3
+         SpawnNode("Camera", "3D", 620.0f, 400.0f);      // 4
+         SpawnNode("Light", "3D", 620.0f, 620.0f);       // 5
+         SpawnNode("Render 3D", "3D", 900.0f, 40.0f);    // 6
+
+         auto* pts = static_cast<GeometryNode*>(gNodes[0].node.get());
+         pts->shape = 3; pts->detail = 24;               // icosphere
+         auto* shape = static_cast<GeometryNode*>(gNodes[1].node.get());
+         shape->shape = 1;                               // cube
+         auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[2].node.get());
+         inst->pointSource = pts; inst->instanceShape = shape;
+         inst->pointMode = 0; inst->instanceScale = 0.07f; inst->maxPoints = 5000;
+         inst->color[0] = 1.0f; inst->color[1] = 0.55f; inst->color[2] = 0.25f;
+         auto* op = static_cast<GeometryOpNode*>(gNodes[3].node.get());
+         op->input = shape; op->op = GeometryOpNode::kArray;
+         op->count = 8; op->radial = true; op->radius = 1.6f; op->scaleStep = 0.92f;
+         op->inheritMaterial = false;
+         op->color[0] = 0.35f; op->color[1] = 0.7f; op->color[2] = 1.0f;
+         auto* cam = static_cast<CameraNode*>(gNodes[4].node.get());
+         cam->distance = 5.0f; cam->elevation = 0.45f;
+         auto* light = static_cast<LightNode*>(gNodes[5].node.get());
+         light->intensity = 1.6f;
+         auto* r = static_cast<Render3DNode*>(gNodes[6].node.get());
+         r->geometry[0] = inst; r->geometry[1] = op;
+         r->camera = cam; r->lights[0] = light;
+         r->width = 700.0f; r->height = 700.0f;
+         gNodes[2].showParams = true;
+         gNodes[6].showParams = true;
+      }
+      else if (getenv("INFINITE_3DTEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Geometry", "3D", 40.0f, 500.0f);
@@ -2774,6 +3004,18 @@ int main()
             glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
+      if (getenv("INFINITE_GEOTEST") != nullptr && frameId == 4)
+      {
+         auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[2].node.get());
+         auto* op = static_cast<GeometryOpNode*>(gNodes[3].node.get());
+         auto* r = static_cast<Render3DNode*>(gNodes[6].node.get());
+         printf("instances=%zu  arrayTris=%zu  rendered=%zu tris in %zu draw calls\n",
+                inst->InstanceCount(), op->TriangleCount(),
+                r->LastTriangleCount(), r->LastDrawCalls());
+         printf("%s\n", (inst->InstanceCount() > 100 && op->TriangleCount() > 100 &&
+                          r->LastDrawCalls() <= 2) ? "INSTANCING + OPS OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_3DTEST") != nullptr && frameId == 4)
       {
          auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
@@ -2924,6 +3166,28 @@ int main()
             ; // these draw their own meters in the params panel
          else if (auto* mod = dynamic_cast<IModulator*>(gn.node.get()))
             DrawModulatorMeter(mod, gn.index);
+         else if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<InstanceOnPointsNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
+         {
+            ImVec2 origin = ImGui::GetCursorScreenPos();
+            const float h = 52.0f;
+            ImGui::Dummy(ImVec2(kPreviewSize, h));
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 br(origin.x + kPreviewSize, origin.y + h);
+            dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
+            dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+            char line[64] = "";
+            if (auto* o = dynamic_cast<GeometryOpNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", o->TriangleCount());
+            else if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu instances", inst->InstanceCount());
+            else
+               snprintf(line, sizeof(line), "scene node");
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255), gn.typeName.c_str());
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 28), IM_COL32(130, 136, 156, 255), line);
+         }
          else if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
          {
             // Geometry emits a mesh, not a picture: show what it is instead of
@@ -2985,6 +3249,14 @@ int main()
                DrawRampParams(n);
             else if (auto* n = dynamic_cast<GeometryNode*>(gn.node.get()))
                DrawGeometryParams(n);
+            else if (auto* n = dynamic_cast<GeometryOpNode*>(gn.node.get()))
+               DrawGeometryOpParams(n);
+            else if (auto* n = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
+               DrawInstanceParams(n);
+            else if (auto* n = dynamic_cast<CameraNode*>(gn.node.get()))
+               DrawCameraParams(n);
+            else if (auto* n = dynamic_cast<LightNode*>(gn.node.get()))
+               DrawLightParams(n);
             else if (auto* n = dynamic_cast<Render3DNode*>(gn.node.get()))
                DrawRender3DParams(n);
             else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
@@ -3105,22 +3377,36 @@ int main()
       }
       for (GraphNode& gn : gNodes)
       {
+         auto linkFromNode = [&](const void* wanted, int slot)
+         {
+            if (wanted == nullptr)
+               return;
+            for (GraphNode& src : gNodes)
+            {
+               const void* asGeo = dynamic_cast<IGeometrySource*>(src.node.get());
+               if (asGeo == wanted || (const void*)src.node.get() == wanted)
+               {
+                  gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
+                                     src.OutputPinId(), gn.InputPinId(slot) });
+                  return;
+               }
+            }
+         };
+
          if (auto* render = dynamic_cast<Render3DNode*>(gn.node.get()))
          {
             for (int slot = 0; slot < Render3DNode::kSlots; slot++)
-            {
-               if (render->geometry[slot] == nullptr)
-                  continue;
-               for (GraphNode& src : gNodes)
-               {
-                  if (dynamic_cast<IGeometrySource*>(src.node.get()) == render->geometry[slot])
-                  {
-                     gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
-                                        src.OutputPinId(), gn.InputPinId(slot) });
-                     break;
-                  }
-               }
-            }
+               linkFromNode(render->geometry[slot], slot);
+            linkFromNode(render->camera, Render3DNode::kSlots);
+            for (int i = 0; i < Render3DNode::kLightSlots; i++)
+               linkFromNode(render->lights[i], Render3DNode::kSlots + 1 + i);
+         }
+         if (auto* geoOp = dynamic_cast<GeometryOpNode*>(gn.node.get()))
+            linkFromNode(geoOp->input, 0);
+         if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
+         {
+            linkFromNode(inst->pointSource, 0);
+            linkFromNode(inst->instanceShape, 1);
          }
 
          auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get());
@@ -3210,7 +3496,11 @@ int main()
                auto* dstAudio = dstNode ? dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) : nullptr;
                auto* srcAudioFile = srcNode ? dynamic_cast<AudioFileNode*>(srcNode->node.get()) : nullptr;
                auto* dstRender = dstNode ? dynamic_cast<Render3DNode*>(dstNode->node.get()) : nullptr;
+               auto* dstGeoOp = dstNode ? dynamic_cast<GeometryOpNode*>(dstNode->node.get()) : nullptr;
+               auto* dstInstance = dstNode ? dynamic_cast<InstanceOnPointsNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
+               auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
+               auto* srcLight = srcNode ? dynamic_cast<LightNode*>(srcNode->node.get()) : nullptr;
 
                bool valid = false;
                if (GraphNode::IsOutputPin(a) && srcNode != nullptr && dstNode != nullptr && differentNodes)
@@ -3224,10 +3514,22 @@ int main()
                      valid = srcIsModulator;
                   else if (GraphNode::IsInputPin(b))
                   {
+                     const int slot = GraphNode::InputSlotFromPin(b);
                      if (dstRender != nullptr)
-                        valid = srcGeometry != nullptr; // Render 3D only accepts geometry
-                     else if (srcGeometry != nullptr)
-                        valid = false;                  // geometry only goes into Render 3D
+                     {
+                        if (slot < Render3DNode::kSlots)
+                           valid = srcGeometry != nullptr;
+                        else if (slot == Render3DNode::kSlots)
+                           valid = srcCamera != nullptr;
+                        else
+                           valid = srcLight != nullptr;
+                     }
+                     else if (dstGeoOp != nullptr)
+                        valid = srcGeometry != nullptr;
+                     else if (dstInstance != nullptr)
+                        valid = srcGeometry != nullptr;
+                     else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
+                        valid = false; // 3D cables only go into 3D nodes
                      else if (dstAudio != nullptr)
                         valid = srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
                      else
@@ -3246,7 +3548,24 @@ int main()
                   }
                   else if (dstRender != nullptr)
                   {
-                     dstRender->geometry[GraphNode::InputSlotFromPin(b)] = srcGeometry;
+                     const int slot = GraphNode::InputSlotFromPin(b);
+                     if (slot < Render3DNode::kSlots)
+                        dstRender->geometry[slot] = srcGeometry;
+                     else if (slot == Render3DNode::kSlots)
+                        dstRender->camera = srcCamera;
+                     else
+                        dstRender->lights[slot - Render3DNode::kSlots - 1] = srcLight;
+                  }
+                  else if (dstGeoOp != nullptr)
+                  {
+                     dstGeoOp->input = srcGeometry;
+                  }
+                  else if (dstInstance != nullptr)
+                  {
+                     if (GraphNode::InputSlotFromPin(b) == 0)
+                        dstInstance->pointSource = srcGeometry;
+                     else
+                        dstInstance->instanceShape = srcGeometry;
                   }
                   else if (dstAudio != nullptr)
                   {
@@ -3840,6 +4159,24 @@ int main()
             // modulators emit a value, not a texture, so they are checked
             // differently - including nodes that expose taps rather than being
             // modulators themselves (Image/Audio Analyze).
+            if (dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
+            {
+               printf("%-22s [%-12s] scene node     OK\n", gn.typeName.c_str(), gn.category.c_str());
+               continue;
+            }
+            if (auto* op = dynamic_cast<GeometryOpNode*>(gn.node.get()))
+            {
+               printf("%-22s [%-12s] %zu triangles  OK\n",
+                      gn.typeName.c_str(), gn.category.c_str(), op->TriangleCount());
+               continue;
+            }
+            if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
+            {
+               printf("%-22s [%-12s] %zu instances  OK\n",
+                      gn.typeName.c_str(), gn.category.c_str(), inst->InstanceCount());
+               continue;
+            }
             if (auto* geo = dynamic_cast<GeometryNode*>(gn.node.get()))
             {
                // geometry emits a mesh, not a texture
