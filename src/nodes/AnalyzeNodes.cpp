@@ -254,6 +254,8 @@ void AudioAnalyzeNode::Stop()
 
 bool AudioAnalyzeNode::IsRunning() const
 {
+   if (fileSource != nullptr)
+      return fileSource->IsLoaded();
    return Platform::AudioIsRunning();
 }
 
@@ -291,7 +293,17 @@ void AudioAnalyzeNode::CookIfNeeded(int frameId)
    Platform::AudioSetGain(1.0f);
 
    Platform::AudioLevels levels;
-   const bool running = Platform::AudioRead(levels);
+   bool running = false;
+   if (fileSource != nullptr)
+   {
+      fileSource->CookIfNeeded(frameId);
+      levels = fileSource->Levels();
+      running = fileSource->IsLoaded();
+   }
+   else
+   {
+      running = Platform::AudioRead(levels);
+   }
 
    const double now = Transport::Instance().Seconds();
    const double dt = std::max(0.0, std::min(0.25, now - mLastSeconds));
@@ -313,4 +325,84 @@ void AudioAnalyzeNode::CookIfNeeded(int frameId)
    {
       mOnsetEnvelope = 0.0f;
    }
+}
+
+// ============================================================== Audio File
+
+AudioFileNode::~AudioFileNode()
+{
+   if (mHandle != nullptr)
+      Platform::AudioFileClose(mHandle);
+}
+
+bool AudioFileNode::Open(const std::string& path)
+{
+   std::string error;
+   Platform::AudioPlayerHandle* handle = Platform::AudioFileOpen(path, error);
+   if (handle == nullptr)
+   {
+      mStatus = error;
+      return false;
+   }
+
+   if (mHandle != nullptr)
+      Platform::AudioFileClose(mHandle);
+   mHandle = handle;
+
+   size_t slash = path.find_last_of('/');
+   mFileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
+   mStatus = "loaded";
+
+   Platform::AudioFileSetLoop(mHandle, loop);
+   Platform::AudioFileSetVolume(mHandle, volume);
+   Platform::AudioFileSetMonitor(mHandle, monitor);
+   return true;
+}
+
+bool AudioFileNode::OpenViaDialog()
+{
+   const std::string path = Platform::OpenAudioDialog();
+   if (path.empty())
+      return false; // cancelled
+   return Open(path);
+}
+
+void AudioFileNode::Play() { Platform::AudioFilePlay(mHandle); }
+void AudioFileNode::Pause() { Platform::AudioFilePause(mHandle); }
+void AudioFileNode::Restart() { Platform::AudioFileRestart(mHandle); }
+bool AudioFileNode::IsPlaying() const { return Platform::AudioFileIsPlaying(mHandle); }
+double AudioFileNode::Duration() const { return Platform::AudioFileDuration(mHandle); }
+double AudioFileNode::Position() const { return Platform::AudioFilePosition(mHandle); }
+
+void AudioFileNode::CookIfNeeded(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   mLastCookFrame = frameId;
+
+   if (mHandle == nullptr)
+      return;
+
+   Platform::AudioFileSetLoop(mHandle, loop);
+   Platform::AudioFileSetVolume(mHandle, volume);
+   Platform::AudioFileSetMonitor(mHandle, monitor);
+   Platform::AudioFileSetSmoothing(mHandle, attack, release);
+   Platform::AudioFileSetGain(mHandle, gain);
+
+   // Following the transport keeps the track locked to the same play/pause the
+   // rest of the patch obeys, so a recording lines up with the audio.
+   if (followTransport)
+   {
+      const bool transportPlaying = Transport::Instance().IsPlaying();
+      if (transportPlaying != mWasTransportPlaying)
+      {
+         if (transportPlaying)
+            Play();
+         else
+            Pause();
+         mWasTransportPlaying = transportPlaying;
+      }
+   }
+
+   Platform::AudioFileRead(mHandle, mLevels);
 }

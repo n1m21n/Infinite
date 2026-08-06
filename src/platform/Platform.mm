@@ -660,47 +660,64 @@ namespace Platform
       const int kFftSize = 1 << kFftLog2;
       const int kSpectrumSize = kFftSize / 2;
 
-      AVAudioEngine* gEngine = nil;
-      bool gRunning = false;
-      std::string gDeviceName;
-
-      std::mutex gAudioMutex;
-      AudioLevels gLevels;
-      float gAttack = 0.5f;
-      float gRelease = 0.12f;
-      float gGain = 1.0f;
-      float gPrevFlux = 0.0f;
-      std::vector<float> gPrevMagnitude;
-
       FFTSetup gFftSetup = nullptr;
       std::vector<float> gWindow;
-      std::vector<float> gSampleRing;
 
-      float Smooth(float previous, float target)
+      void EnsureFftSetup()
       {
-         const float rate = (target > previous) ? gAttack : gRelease;
-         return previous + (target - previous) * rate;
+         if (gFftSetup != nullptr)
+            return;
+         gFftSetup = vDSP_create_fftsetup(kFftLog2, FFT_RADIX2);
+         gWindow.resize(kFftSize);
+         vDSP_hann_window(gWindow.data(), kFftSize, vDSP_HANN_NORM);
       }
 
-      void ProcessBuffer(const float* samples, int frameCount, double sampleRate)
+      // One analyser per audio source. The live input owns one; every file
+      // player owns its own, so several sources can be analysed at once.
+      struct Analyser
       {
-         if (frameCount <= 0)
+         std::mutex mutex;
+         AudioLevels levels;
+         float attack = 0.5f;
+         float release = 0.12f;
+         float gain = 1.0f;
+         float prevFlux = 0.0f;
+         std::vector<float> prevMagnitude;
+         std::vector<float> ring;
+
+         float Smooth(float previous, float target) const
+         {
+            const float rate = (target > previous) ? attack : release;
+            return previous + (target - previous) * rate;
+         }
+      };
+
+      void ProcessInto(Analyser& a, const float* samples, int frameCount, double sampleRate)
+      {
+         if (frameCount <= 0 || samples == nullptr)
             return;
+         EnsureFftSetup();
+
+         float gain;
+         {
+            std::lock_guard<std::mutex> lock(a.mutex);
+            gain = a.gain;
+         }
 
          // Keep a rolling window so the FFT always sees a full frame even when
          // CoreAudio hands us short buffers.
-         gSampleRing.insert(gSampleRing.end(), samples, samples + frameCount);
-         if ((int)gSampleRing.size() < kFftSize)
+         a.ring.insert(a.ring.end(), samples, samples + frameCount);
+         if ((int)a.ring.size() < kFftSize)
             return;
-         if ((int)gSampleRing.size() > kFftSize * 4)
-            gSampleRing.erase(gSampleRing.begin(), gSampleRing.end() - kFftSize);
+         if ((int)a.ring.size() > kFftSize * 4)
+            a.ring.erase(a.ring.begin(), a.ring.end() - kFftSize);
 
-         const float* frame = gSampleRing.data() + (gSampleRing.size() - kFftSize);
+         const float* frame = a.ring.data() + (a.ring.size() - kFftSize);
 
          float rms = 0.0f, peak = 0.0f;
          for (int i = 0; i < kFftSize; i++)
          {
-            const float v = frame[i] * gGain;
+            const float v = frame[i] * gain;
             rms += v * v;
             peak = std::max(peak, std::fabs(v));
          }
@@ -719,35 +736,21 @@ namespace Platform
          vDSP_zvabs(&split, 1, magnitude.data(), 1, kSpectrumSize);
          const float norm = 2.0f / (float)kFftSize;
          for (int i = 0; i < kSpectrumSize; i++)
-            magnitude[i] *= norm * gGain;
+            magnitude[i] *= norm * gain;
 
-         if (gPrevMagnitude.size() != magnitude.size())
-            gPrevMagnitude.assign(magnitude.size(), 0.0f);
+         if (a.prevMagnitude.size() != magnitude.size())
+            a.prevMagnitude.assign(magnitude.size(), 0.0f);
 
          // Spectral flux: sum of positive frame-to-frame change, the standard
          // cheap onset detector.
          float flux = 0.0f;
          for (int i = 0; i < kSpectrumSize; i++)
-            flux += std::max(0.0f, magnitude[i] - gPrevMagnitude[i]);
-         const bool onset = flux > gPrevFlux * 1.6f && flux > 0.02f;
-         gPrevFlux = gPrevFlux * 0.7f + flux * 0.3f;
-         gPrevMagnitude = magnitude;
+            flux += std::max(0.0f, magnitude[i] - a.prevMagnitude[i]);
+         const bool onset = flux > a.prevFlux * 1.6f && flux > 0.02f;
+         a.prevFlux = a.prevFlux * 0.7f + flux * 0.3f;
+         a.prevMagnitude = magnitude;
 
-         // Log-spaced bands: linear bins would put almost everything in band 0.
          const double nyquist = sampleRate * 0.5;
-         float bands[kAudioBands] = { 0 };
-         for (int b = 0; b < kAudioBands; b++)
-         {
-            const double loHz = 20.0 * std::pow(nyquist / 20.0, (double)b / kAudioBands);
-            const double hiHz = 20.0 * std::pow(nyquist / 20.0, (double)(b + 1) / kAudioBands);
-            const int lo = std::max(1, (int)(loHz / nyquist * kSpectrumSize));
-            const int hi = std::min(kSpectrumSize - 1, (int)(hiHz / nyquist * kSpectrumSize));
-            float sum = 0.0f;
-            int count = 0;
-            for (int i = lo; i <= hi; i++) { sum += magnitude[i]; count++; }
-            bands[b] = count > 0 ? sum / count : 0.0f;
-         }
-
          auto rangeEnergy = [&](double fromHz, double toHz) {
             const int lo = std::max(1, (int)(fromHz / nyquist * kSpectrumSize));
             const int hi = std::min(kSpectrumSize - 1, (int)(toHz / nyquist * kSpectrumSize));
@@ -756,21 +759,42 @@ namespace Platform
             return count > 0 ? sum / count : 0.0f;
          };
 
-         // Magnitudes are tiny; a compressive curve maps them into a usable 0..1
-         // without the user having to ride a gain slider constantly.
+         // Log-spaced bands: linear bins would put almost everything in band 0.
+         float bands[kAudioBands] = { 0 };
+         for (int b = 0; b < kAudioBands; b++)
+         {
+            const double loHz = 20.0 * std::pow(nyquist / 20.0, (double)b / kAudioBands);
+            const double hiHz = 20.0 * std::pow(nyquist / 20.0, (double)(b + 1) / kAudioBands);
+            bands[b] = rangeEnergy(loHz, hiHz);
+         }
+
+         // Magnitudes are tiny; a compressive curve maps them into a usable 0..1.
          auto shape = [](float v) { return std::min(1.0f, std::sqrt(v * 12.0f)); };
 
-         std::lock_guard<std::mutex> lock(gAudioMutex);
-         gLevels.rms = Smooth(gLevels.rms, std::min(1.0f, rms * 3.0f));
-         gLevels.peak = Smooth(gLevels.peak, std::min(1.0f, peak));
-         gLevels.low = Smooth(gLevels.low, shape(rangeEnergy(20.0, 250.0)));
-         gLevels.mid = Smooth(gLevels.mid, shape(rangeEnergy(250.0, 2000.0)));
-         gLevels.high = Smooth(gLevels.high, shape(rangeEnergy(2000.0, 16000.0)));
+         std::lock_guard<std::mutex> lock(a.mutex);
+         a.levels.rms = a.Smooth(a.levels.rms, std::min(1.0f, rms * 3.0f));
+         a.levels.peak = a.Smooth(a.levels.peak, std::min(1.0f, peak));
+         a.levels.low = a.Smooth(a.levels.low, shape(rangeEnergy(20.0, 250.0)));
+         a.levels.mid = a.Smooth(a.levels.mid, shape(rangeEnergy(250.0, 2000.0)));
+         a.levels.high = a.Smooth(a.levels.high, shape(rangeEnergy(2000.0, 16000.0)));
          for (int b = 0; b < kAudioBands; b++)
-            gLevels.bands[b] = Smooth(gLevels.bands[b], shape(bands[b]));
+            a.levels.bands[b] = a.Smooth(a.levels.bands[b], shape(bands[b]));
          if (onset)
-            gLevels.onset = true;
+            a.levels.onset = true;
       }
+
+      bool ReadFrom(Analyser& a, AudioLevels& out)
+      {
+         std::lock_guard<std::mutex> lock(a.mutex);
+         out = a.levels;
+         a.levels.onset = false; // consume the flag so each onset fires once
+         return true;
+      }
+
+      AVAudioEngine* gEngine = nil;
+      bool gRunning = false;
+      std::string gDeviceName;
+      Analyser gLiveAnalyser;
    }
 
    bool AudioStart(std::string& outError)
@@ -780,13 +804,7 @@ namespace Platform
 
       @autoreleasepool
       {
-         if (gFftSetup == nullptr)
-         {
-            gFftSetup = vDSP_create_fftsetup(kFftLog2, FFT_RADIX2);
-            gWindow.resize(kFftSize);
-            vDSP_hann_window(gWindow.data(), kFftSize, vDSP_HANN_NORM);
-         }
-
+         EnsureFftSetup();
          gEngine = [[AVAudioEngine alloc] init];
          AVAudioInputNode* input = [gEngine inputNode];
          AVAudioFormat* format = [input inputFormatForBus:0];
@@ -800,14 +818,11 @@ namespace Platform
          gDeviceName = "default input";
          const double sampleRate = format.sampleRate;
 
-         [input installTapOnBus:0
-                     bufferSize:1024
-                         format:format
+         [input installTapOnBus:0 bufferSize:1024 format:format
                           block:^(AVAudioPCMBuffer* buffer, AVAudioTime*) {
             const float* const* channels = buffer.floatChannelData;
-            if (channels == nullptr)
-               return;
-            ProcessBuffer(channels[0], (int)buffer.frameLength, sampleRate);
+            if (channels != nullptr)
+               ProcessInto(gLiveAnalyser, channels[0], (int)buffer.frameLength, sampleRate);
          }];
 
          NSError* err = nil;
@@ -837,8 +852,8 @@ namespace Platform
          gEngine = nil;
       }
       gRunning = false;
-      std::lock_guard<std::mutex> lock(gAudioMutex);
-      gLevels = AudioLevels();
+      std::lock_guard<std::mutex> lock(gLiveAnalyser.mutex);
+      gLiveAnalyser.levels = AudioLevels();
    }
 
    bool AudioIsRunning() { return gRunning; }
@@ -846,15 +861,15 @@ namespace Platform
 
    void AudioSetSmoothing(float attack, float release)
    {
-      std::lock_guard<std::mutex> lock(gAudioMutex);
-      gAttack = std::min(1.0f, std::max(0.01f, attack));
-      gRelease = std::min(1.0f, std::max(0.005f, release));
+      std::lock_guard<std::mutex> lock(gLiveAnalyser.mutex);
+      gLiveAnalyser.attack = std::min(1.0f, std::max(0.01f, attack));
+      gLiveAnalyser.release = std::min(1.0f, std::max(0.005f, release));
    }
 
    void AudioSetGain(float gain)
    {
-      std::lock_guard<std::mutex> lock(gAudioMutex);
-      gGain = std::max(0.0f, gain);
+      std::lock_guard<std::mutex> lock(gLiveAnalyser.mutex);
+      gLiveAnalyser.gain = std::max(0.0f, gain);
    }
 
    bool AudioRead(AudioLevels& out)
@@ -864,9 +879,235 @@ namespace Platform
          out = AudioLevels();
          return false;
       }
-      std::lock_guard<std::mutex> lock(gAudioMutex);
-      out = gLevels;
-      gLevels.onset = false; // consume the flag so each onset fires once
-      return true;
+      return ReadFrom(gLiveAnalyser, out);
+   }
+
+   // ---------------------------------------------------------- file players
+
+   struct AudioPlayerHandle
+   {
+      AVAudioEngine* engine = nil;
+      AVAudioPlayerNode* player = nil;
+      AVAudioFile* file = nil;
+      AVAudioFormat* format = nil;
+      double duration = 0.0;
+      double sampleRate = 44100.0;
+      bool loop = true;
+      bool playing = false;
+      bool monitor = true;
+      Analyser analyser;
+   };
+
+   namespace
+   {
+      void ScheduleFile(AudioPlayerHandle* h)
+      {
+         if (h == nullptr || h->file == nil)
+            return;
+         h->file.framePosition = 0;
+         AVAudioPlayerNode* player = h->player;
+         AudioPlayerHandle* handle = h;
+         [player scheduleFile:h->file
+                       atTime:nil
+        completionCallbackType:AVAudioPlayerNodeCompletionDataPlayedBack
+             completionHandler:^(AVAudioPlayerNodeCompletionCallbackType) {
+            // Re-arm on the main queue: the callback fires on an audio thread
+            // and AVAudioFile is not safe to touch from there.
+            dispatch_async(dispatch_get_main_queue(), ^{
+               if (handle->loop && handle->playing)
+               {
+                  ScheduleFile(handle);
+                  [handle->player play];
+               }
+               else
+               {
+                  handle->playing = false;
+               }
+            });
+         }];
+      }
+   }
+
+   std::string OpenAudioDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Open audio"];
+         if (@available(macOS 11.0, *))
+            [panel setAllowedContentTypes:@[ UTTypeAudio, UTTypeMP3, UTTypeWAV, UTTypeAIFF, UTTypeMPEG4Audio ]];
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
+   AudioPlayerHandle* AudioFileOpen(const std::string& path, std::string& outError)
+   {
+      @autoreleasepool
+      {
+         EnsureFftSetup();
+
+         NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
+         NSURL* url = [NSURL fileURLWithPath:nsPath];
+         NSError* err = nil;
+         AVAudioFile* file = [[AVAudioFile alloc] initForReading:url error:&err];
+         if (file == nil)
+         {
+            outError = err ? std::string([[err localizedDescription] UTF8String]) : "could not open audio file";
+            return nullptr;
+         }
+
+         AudioPlayerHandle* h = new AudioPlayerHandle();
+         h->file = file;
+         h->format = file.processingFormat;
+         h->sampleRate = h->format.sampleRate;
+         h->duration = (double)file.length / std::max(1.0, h->sampleRate);
+
+         h->engine = [[AVAudioEngine alloc] init];
+         h->player = [[AVAudioPlayerNode alloc] init];
+         [h->engine attachNode:h->player];
+         [h->engine connect:h->player to:[h->engine mainMixerNode] format:h->format];
+
+         const double rate = h->sampleRate;
+         AudioPlayerHandle* raw = h;
+         [h->player installTapOnBus:0 bufferSize:1024 format:h->format
+                              block:^(AVAudioPCMBuffer* buffer, AVAudioTime*) {
+            const float* const* channels = buffer.floatChannelData;
+            if (channels != nullptr)
+               ProcessInto(raw->analyser, channels[0], (int)buffer.frameLength, rate);
+         }];
+
+         [h->engine prepare];
+         if (![h->engine startAndReturnError:&err])
+         {
+            outError = err ? std::string([[err localizedDescription] UTF8String]) : "audio engine failed";
+            delete h;
+            return nullptr;
+         }
+
+         ScheduleFile(h);
+         outError.clear();
+         return h;
+      }
+   }
+
+   void AudioFileClose(AudioPlayerHandle* handle)
+   {
+      if (handle == nullptr)
+         return;
+      @autoreleasepool
+      {
+         [handle->player removeTapOnBus:0];
+         [handle->player stop];
+         [handle->engine stop];
+         handle->player = nil;
+         handle->engine = nil;
+         handle->file = nil;
+         handle->format = nil;
+      }
+      delete handle;
+   }
+
+   void AudioFilePlay(AudioPlayerHandle* handle)
+   {
+      if (handle == nullptr)
+         return;
+      handle->playing = true;
+      [handle->player play];
+   }
+
+   void AudioFilePause(AudioPlayerHandle* handle)
+   {
+      if (handle == nullptr)
+         return;
+      handle->playing = false;
+      [handle->player pause];
+   }
+
+   void AudioFileRestart(AudioPlayerHandle* handle)
+   {
+      if (handle == nullptr)
+         return;
+      [handle->player stop];
+      ScheduleFile(handle);
+      if (handle->playing)
+         [handle->player play];
+   }
+
+   bool AudioFileIsPlaying(AudioPlayerHandle* handle)
+   {
+      return handle != nullptr && handle->playing;
+   }
+
+   void AudioFileSetLoop(AudioPlayerHandle* handle, bool loop)
+   {
+      if (handle != nullptr)
+         handle->loop = loop;
+   }
+
+   void AudioFileSetVolume(AudioPlayerHandle* handle, float volume)
+   {
+      if (handle != nullptr)
+         handle->player.volume = std::max(0.0f, std::min(1.0f, volume));
+   }
+
+   void AudioFileSetMonitor(AudioPlayerHandle* handle, bool audible)
+   {
+      if (handle == nullptr)
+         return;
+      handle->monitor = audible;
+      // Muting the mixer keeps the tap running, so analysis continues while
+      // the file is silent - useful when driving visuals from a backing track.
+      handle->engine.mainMixerNode.outputVolume = audible ? 1.0f : 0.0f;
+   }
+
+   double AudioFileDuration(AudioPlayerHandle* handle)
+   {
+      return handle ? handle->duration : 0.0;
+   }
+
+   double AudioFilePosition(AudioPlayerHandle* handle)
+   {
+      if (handle == nullptr || handle->player == nil)
+         return 0.0;
+      AVAudioTime* nodeTime = [handle->player lastRenderTime];
+      if (nodeTime == nil)
+         return 0.0;
+      AVAudioTime* playerTime = [handle->player playerTimeForNodeTime:nodeTime];
+      if (playerTime == nil)
+         return 0.0;
+      return (double)playerTime.sampleTime / std::max(1.0, playerTime.sampleRate);
+   }
+
+   bool AudioFileRead(AudioPlayerHandle* handle, AudioLevels& out)
+   {
+      if (handle == nullptr)
+      {
+         out = AudioLevels();
+         return false;
+      }
+      return ReadFrom(handle->analyser, out);
+   }
+
+   void AudioFileSetSmoothing(AudioPlayerHandle* handle, float attack, float release)
+   {
+      if (handle == nullptr)
+         return;
+      std::lock_guard<std::mutex> lock(handle->analyser.mutex);
+      handle->analyser.attack = std::min(1.0f, std::max(0.01f, attack));
+      handle->analyser.release = std::min(1.0f, std::max(0.005f, release));
+   }
+
+   void AudioFileSetGain(AudioPlayerHandle* handle, float gain)
+   {
+      if (handle == nullptr)
+         return;
+      std::lock_guard<std::mutex> lock(handle->analyser.mutex);
+      handle->analyser.gain = std::max(0.0f, gain);
    }
 }

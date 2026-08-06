@@ -78,6 +78,54 @@ private:
    int mLastCookFrame = -1;
 };
 
+// --- Audio File ---------------------------------------------------------
+// Plays an audio file and analyses it independently of the live input, so a
+// backing track can drive the visuals. Patch its output into Audio Analyze, or
+// read it directly - it exposes the same set of taps.
+class AudioFileNode : public INode
+{
+public:
+   static INode* Create() { return new AudioFileNode(); }
+
+   ~AudioFileNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+
+   bool OpenViaDialog();
+   bool Open(const std::string& path);
+
+   void Play();
+   void Pause();
+   void Restart();
+   bool IsPlaying() const;
+   bool IsLoaded() const { return mHandle != nullptr; }
+
+   double Duration() const;
+   double Position() const;
+   const std::string& FileName() const { return mFileName; }
+   const std::string& Status() const { return mStatus; }
+   const Platform::AudioLevels& Levels() const { return mLevels; }
+
+   bool loop = true;
+   bool followTransport = true; // play/pause with the global transport
+   bool monitor = true;         // audible, or silent but still analysed
+   float volume = 0.8f;
+   float gain = 1.0f;
+   float attack = 0.5f;
+   float release = 0.12f;
+
+private:
+   Platform::AudioPlayerHandle* mHandle = nullptr;
+   Platform::AudioLevels mLevels;
+   std::string mFileName;
+   std::string mStatus = "no file loaded";
+   bool mWasTransportPlaying = false;
+   int mLastCookFrame = -1;
+};
+
 // --- Audio Analyze ------------------------------------------------------
 // Live audio in, control values out. Makes every parameter in the graph
 // audio-reactive, since any of these outputs can be patched into any slider.
@@ -111,6 +159,9 @@ public:
 
    float Value(int index) const;
    const Platform::AudioLevels& Levels() const { return mLevels; }
+
+   // When a file node is patched in, it is analysed instead of the live input.
+   AudioFileNode* fileSource = nullptr;
 
    bool Start();
    void Stop();

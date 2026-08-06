@@ -206,6 +206,9 @@ namespace
    // none, and emitting a link to an undeclared pin makes the editor treat the
    // link as dead and delete it - which silently dropped the modulation.
    std::set<int> gDrawnParamPins;
+   // Nodes to select next frame; they do not exist in the editor until they
+   // have been drawn once, so selection has to wait a frame.
+   std::vector<int> gPendingSelect;
    std::pair<int, int> gTypedParamJustOpened(-1, -1);
    std::vector<int> gParamPinsThisFrame;
 
@@ -415,6 +418,7 @@ namespace
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Modulators");
       REGISTER_NODE(MacroXYNode, Macro XY, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
+      REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
 
       // Every entry in the filter table becomes its own spawnable node type,
@@ -475,6 +479,8 @@ namespace
       if (dynamic_cast<DrawNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
          return 1;
@@ -1328,22 +1334,76 @@ namespace
       ImGui::TextDisabled("readback is rate-limited; it stalls the GPU");
    }
 
-   void DrawAudioAnalyzeParams(AudioAnalyzeNode* n)
+   void DrawAudioFileParams(AudioFileNode* n)
    {
-      if (n->IsRunning())
-      {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-         if (ImGui::Button("Stop listening", ImVec2(kPreviewSize, 0)))
-            n->Stop();
-         ImGui::PopStyleColor();
-      }
-      else if (ImGui::Button("Start listening", ImVec2(kPreviewSize, 0)))
-      {
-         n->Start();
-      }
+      if (ImGui::Button("Choose audio...", ImVec2(kPreviewSize, 0)))
+         n->OpenViaDialog();
+
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      if (!n->FileName().empty())
+         ImGui::TextDisabled("%s", n->FileName().c_str());
       ImGui::TextDisabled("%s", n->Status().c_str());
       ImGui::PopTextWrapPos();
+
+      if (n->IsLoaded())
+      {
+         const double dur = std::max(0.001, n->Duration());
+         ImGui::ProgressBar((float)(n->Position() / dur), ImVec2(kPreviewSize, 0));
+         ImGui::TextDisabled("%.1f / %.1f s", n->Position(), dur);
+
+         if (n->IsPlaying())
+         {
+            if (ImGui::Button("Pause", ImVec2(kPreviewSize * 0.48f, 0)))
+               n->Pause();
+         }
+         else if (ImGui::Button("Play", ImVec2(kPreviewSize * 0.48f, 0)))
+         {
+            n->Play();
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Restart", ImVec2(kPreviewSize * 0.48f, 0)))
+            n->Restart();
+
+         ImGui::Checkbox("follow transport", &n->followTransport);
+         ImGui::Checkbox("loop", &n->loop);
+         ImGui::Checkbox("audible", &n->monitor);
+         if (!n->monitor)
+            ImGui::TextDisabled("silent, but still analysed");
+         ModSlider("volume", &n->volume, 0.0f, 1.0f);
+         ModSlider("gain", &n->gain, 0.1f, 16.0f);
+
+         const Platform::AudioLevels& lv = n->Levels();
+         ImGui::Text("level "); ImGui::SameLine();
+         ImGui::ProgressBar(std::min(1.0f, lv.rms * n->gain), ImVec2(kPreviewSize * 0.6f, 0), "");
+      }
+      ImGui::TextDisabled("patch 'out' into Audio Analyze");
+   }
+
+   void DrawAudioAnalyzeParams(AudioAnalyzeNode* n)
+   {
+      if (n->fileSource != nullptr)
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextColored(ImVec4(0.5f, 0.9f, 1.0f, 1.0f), "source: Audio File");
+         ImGui::PopTextWrapPos();
+      }
+      else
+      {
+         if (Platform::AudioIsRunning())
+         {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+            if (ImGui::Button("Stop listening", ImVec2(kPreviewSize, 0)))
+               n->Stop();
+            ImGui::PopStyleColor();
+         }
+         else if (ImGui::Button("Start listening", ImVec2(kPreviewSize, 0)))
+         {
+            n->Start();
+         }
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("%s", n->Status().c_str());
+         ImGui::PopTextWrapPos();
+      }
 
       // spectrum, so it is obvious whether audio is actually arriving
       const Platform::AudioLevels& levels = n->Levels();
@@ -1719,6 +1779,10 @@ namespace
       {
          Modulation::Instance().Unbind(dst->index, GraphNode::ParamIndexFromPin(dstPin));
       }
+      else if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst->node.get()))
+      {
+         audio->fileSource = nullptr;
+      }
       else if (auto* math = dynamic_cast<MathNode*>(dst->node.get()))
       {
          if (GraphNode::InputSlotFromPin(dstPin) == 0)
@@ -1771,7 +1835,8 @@ namespace
                { "Type an exact value", "Double-click a slider" },
                { "Pan the canvas", "Drag empty canvas" },
                { "Rubber-band select", "Shift + drag" },
-               { "Duplicate", "Select, then Cmd+C / Cmd+V" },
+               { "Duplicate", "Cmd+C / Cmd+V, or Shift+D to duplicate in place" },
+               { "Select several", "Shift + drag a box around them; then move, duplicate or delete as a group" },
                { "Delete", "Select, then Delete or Backspace" },
                { "Zoom", "Scroll (speed is adjustable in the Menu)" },
                { "Play / pause everything", "Play button in the top bar" },
@@ -1929,10 +1994,16 @@ namespace
    {
       // a deleted modulator must also be cleared from any Math node feeding on it
       auto* dyingMod = dynamic_cast<IModulator*>(dying);
+      auto* dyingFile = dynamic_cast<AudioFileNode*>(dying);
       auto* dyingXY = dynamic_cast<MacroXYNode*>(dying);
       IModulator* dyingY = dyingXY ? dyingXY->YOutput() : nullptr;
       for (GraphNode& other : gNodes)
       {
+         if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
+         {
+            if (dyingFile != nullptr && audio->fileSource == dyingFile)
+               audio->fileSource = nullptr;
+         }
          if (auto* math = dynamic_cast<MathNode*>(other.node.get()))
          {
             if ((dyingMod != nullptr && math->inputA == dyingMod) ||
@@ -2423,6 +2494,17 @@ int main()
 
       ed::Begin("graph", ImVec2(0.0f, ImGui::GetContentRegionAvail().y));
 
+      if (!gPendingSelect.empty())
+      {
+         bool first = true;
+         for (int nodeId : gPendingSelect)
+         {
+            ed::SelectNode(nodeId, !first);
+            first = false;
+         }
+         gPendingSelect.clear();
+      }
+
       if (gRequestFitView)
       {
          ed::NavigateToContent(0.0f);
@@ -2655,6 +2737,7 @@ int main()
          // --- preview: image for image nodes, a value meter for modulators ---
          const bool multiOutModulator =
             dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
+            dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr;
          if (multiOutModulator)
             ; // these draw their own meters in the params panel
@@ -2702,6 +2785,8 @@ int main()
                DrawRampParams(n);
             else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
                DrawImageAnalyzeParams(n);
+            else if (auto* n = dynamic_cast<AudioFileNode*>(gn.node.get()))
+               DrawAudioFileParams(n);
             else if (auto* n = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
                DrawAudioAnalyzeParams(n);
             else if (auto* n = dynamic_cast<ResynthNode*>(gn.node.get()))
@@ -2816,6 +2901,20 @@ int main()
       }
       for (GraphNode& gn : gNodes)
       {
+         auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get());
+         if (audio != nullptr && audio->fileSource != nullptr)
+         {
+            for (GraphNode& src : gNodes)
+            {
+               if (src.node.get() == audio->fileSource)
+               {
+                  gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
+                                     src.OutputPinId(), gn.InputPinId(0) });
+                  break;
+               }
+            }
+         }
+
          auto* math = dynamic_cast<MathNode*>(gn.node.get());
          if (math == nullptr)
             continue;
@@ -2886,6 +2985,8 @@ int main()
                                            dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr;
 
                auto* dstMath = dstNode ? dynamic_cast<MathNode*>(dstNode->node.get()) : nullptr;
+               auto* dstAudio = dstNode ? dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) : nullptr;
+               auto* srcAudioFile = srcNode ? dynamic_cast<AudioFileNode*>(srcNode->node.get()) : nullptr;
 
                bool valid = false;
                if (GraphNode::IsOutputPin(a) && srcNode != nullptr && dstNode != nullptr && differentNodes)
@@ -2894,10 +2995,16 @@ int main()
                   // image nodes patch into image inputs
                   const bool dstWantsImage =
                      dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) != nullptr;
+
                   if (GraphNode::IsParamPin(b))
                      valid = srcIsModulator;
                   else if (GraphNode::IsInputPin(b))
-                     valid = (dstMath != nullptr && !dstWantsImage) ? srcIsModulator : !srcIsModulator;
+                  {
+                     if (dstAudio != nullptr)
+                        valid = srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
+                     else
+                        valid = (dstMath != nullptr && !dstWantsImage) ? srcIsModulator : !srcIsModulator;
+                  }
                }
 
                if (valid && ed::AcceptNewItem())
@@ -2908,6 +3015,10 @@ int main()
                                                  GraphNode::ParamIndexFromPin(b),
                                                  srcNode->index,
                                                  GraphNode::OutputIndexFromPin(a));
+                  }
+                  else if (dstAudio != nullptr)
+                  {
+                     dstAudio->fileSource = srcAudioFile;
                   }
                   else if (dstMath != nullptr)
                   {
@@ -2959,6 +3070,41 @@ int main()
                RemoveNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
             }
             ed::ClearSelection();
+         }
+      }
+
+      // Shift+D duplicates whatever is selected without touching the clipboard.
+      if (!typing && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D, false))
+      {
+         const int count = ed::GetSelectedObjectCount();
+         if (count > 0)
+         {
+            std::vector<ed::NodeId> selNodes(count);
+            const int nodeCount = ed::GetSelectedNodes(selNodes.data(), count);
+
+            // Resolve everything first: SpawnNode can reallocate gNodes.
+            struct DupItem { std::string type; std::string category; INode* src; ImVec2 pos; bool params; };
+            std::vector<DupItem> items;
+            for (int i = 0; i < nodeCount; i++)
+            {
+               if (GraphNode* gn = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride))
+               {
+                  const ImVec2 p = ed::GetNodePosition(gn->NodeId());
+                  items.push_back({ gn->typeName, gn->category, gn->node.get(),
+                                    ImVec2(p.x + 40.0f, p.y + 40.0f), gn->showParams });
+               }
+            }
+
+            ed::ClearSelection();
+            for (const DupItem& item : items)
+            {
+               if (GraphNode* copy = SpawnNode(item.type, item.category, item.pos.x, item.pos.y))
+               {
+                  CopyParams(copy->node.get(), item.src);
+                  copy->showParams = item.params;
+                  gPendingSelect.push_back(copy->NodeId());
+               }
+            }
          }
       }
 
@@ -3462,6 +3608,14 @@ int main()
             // modulators emit a value, not a texture, so they are checked
             // differently - including nodes that expose taps rather than being
             // modulators themselves (Image/Audio Analyze).
+            if (dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr)
+            {
+               // an audio source has neither a texture nor a modulator tap
+               printf("%-22s [%-12s] audio source   OK\n",
+                      gn.typeName.c_str(), gn.category.c_str());
+               continue;
+            }
+
             IModulator* mod = dynamic_cast<IModulator*>(gn.node.get());
             if (mod == nullptr)
                mod = gn.node->ModulatorOutput(0);

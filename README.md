@@ -12,7 +12,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**75 node types across nine categories.**
+**76 node types across nine categories.**
 
 | Category | Nodes |
 |---|---|
@@ -24,7 +24,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 | Feedback | Feedback (one-frame delay, makes cycles legal), Trails, Reaction-Diffusion |
 | Mask | Remove Background (on-device Vision segmentation), Chroma Key, Luma Key |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
-| Modulators | LFO, Random, Pattern (8-step), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio Analyze** |
+| Modulators | LFO, Random, Pattern (8-step), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio File**, **Audio Analyze** |
 | Output | Output (PNG export + H.264 recording) |
 
 - **Live 1:1 preview on every node**, including effects and compositing.
@@ -39,7 +39,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 - **Any image or video format the OS can decode** — decoding goes through
   ImageIO/AVFoundation rather than a bundled decoder. Drag a file onto the
   canvas and the matching source node appears, already loaded.
-- **Audio reactive** — the Audio Analyze node taps a live input and emits
+- **Audio reactive** — feed it a live input or an **Audio File**, and it emits
   level, low/mid/high, onset and eight spectrum bands as modulators. Patch any
   of them into any slider and that parameter becomes audio-reactive.
 - **Image Analyze** closes the loop the other way: brightness, contrast, RGB,
@@ -100,7 +100,8 @@ To build the DMG:
 | Modulate a param | Drag a modulator's `out` onto the small dot beside any slider |
 | Pan | Drag empty canvas |
 | Rubber-band select | Shift + drag |
-| Duplicate | Cmd+C / Cmd+V |
+| Duplicate | Cmd+C / Cmd+V, or **Shift+D** in place |
+| Select several | **Shift + drag** a box, then move / duplicate / delete as a group |
 | Delete | Select, then Delete or Backspace |
 | Type an exact value | Double-click a slider |
 | Add a file | Drag an image or video onto the canvas |
