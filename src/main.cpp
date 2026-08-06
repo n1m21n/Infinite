@@ -314,6 +314,35 @@ namespace
       return changed;
    }
 
+   // ImGui's Separator / SeparatorText span the available content width, and
+   // inside a node that width is unbounded - the rule shot off across the whole
+   // canvas. Draw our own, clamped to the node's preview width.
+   void NodeSeparator(const char* label = nullptr)
+   {
+      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const float y = origin.y + 6.0f;
+      const ImU32 col = IM_COL32(78, 82, 100, 255);
+
+      if (label != nullptr && label[0] != '\0')
+      {
+         const ImVec2 textSize = ImGui::CalcTextSize(label);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + 10.0f, y), col);
+         dl->AddText(ImVec2(origin.x + 16.0f, origin.y), IM_COL32(150, 156, 180, 255), label);
+         const float lineStart = origin.x + 22.0f + textSize.x;
+         if (lineStart < origin.x + kPreviewSize)
+            dl->AddLine(ImVec2(lineStart, y), ImVec2(origin.x + kPreviewSize, y), col);
+         ImGui::Dummy(ImVec2(kPreviewSize, textSize.y));
+      }
+      else
+      {
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + kPreviewSize, y), col);
+         ImGui::Dummy(ImVec2(kPreviewSize, 8.0f));
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+   }
+
    const std::vector<std::string>& AlignOptions()
    {
       static const std::vector<std::string> kAlign = { "Left", "Center", "Right", "Justified" };
@@ -996,14 +1025,14 @@ namespace
       if (ImGui::SmallButton("clear"))
          n->ClearPath();
 
-      ImGui::Separator();
+      NodeSeparator();
       DropdownButton("mode", ResynthNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
       ModSlider("chaos", &n->chaos, 0.0f, 1.0f);
       ModSlider("mutation", &n->mutation, 0.0f, 1.0f);
       ModSlider("feedback", &n->feedback, 0.0f, 1.0f);
       ModSlider("source pull", &n->sourcePull, 0.0f, 1.0f);
 
-      ImGui::Separator();
+      NodeSeparator();
       ImGui::TextDisabled("generation %d", n->Generation());
       if (ImGui::Button("Iterate", ImVec2(kPreviewSize * 0.48f, 0)))
          n->StepOnce();
@@ -1448,7 +1477,7 @@ namespace
       DropdownButton("shape", GeometryNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
 
-      ImGui::SeparatorText("form");
+      NodeSeparator("form");
       ModSliderInt("detail", &n->detail, 2, 96);
       ModSliderInt("sides", &n->sides, 3, 64);
       if (n->shape == 4 || n->shape == 7)
@@ -1459,7 +1488,7 @@ namespace
          ModSliderInt("knot q", &n->knotQ, 1, 8);
       }
 
-      ImGui::SeparatorText("transform");
+      NodeSeparator("transform");
       ModSlider("pos x", &n->posX, -3.0f, 3.0f);
       ModSlider("pos y", &n->posY, -3.0f, 3.0f);
       ModSlider("pos z", &n->posZ, -3.0f, 3.0f);
@@ -1472,7 +1501,7 @@ namespace
       ModSlider("scale z", &n->scaleZ, 0.05f, 4.0f);
       ModSlider("spin / beat", &n->spinY, -3.1416f, 3.1416f);
 
-      ImGui::SeparatorText("material");
+      NodeSeparator("material");
       DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
       ColorSwatch("colour", n->color, n);
       ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
@@ -1490,13 +1519,13 @@ namespace
             connected++;
       ImGui::TextDisabled("%d geometry input%s connected", connected, connected == 1 ? "" : "s");
 
-      ImGui::SeparatorText("output");
+      NodeSeparator("output");
       ModSlider("width", &n->width, 64.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 64.0f, 4096.0f, "%.0f");
       ColorSwatch("background", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
 
-      ImGui::SeparatorText("camera");
+      NodeSeparator("camera");
       DropdownButton("projection", Render3DNode::ProjectionNames(), n->projection,
                      [n](int i) { n->projection = i; });
       if (n->projection == 0)
@@ -1510,7 +1539,7 @@ namespace
       ModSlider("target y", &n->targetY, -3.0f, 3.0f);
       ModSlider("target z", &n->targetZ, -3.0f, 3.0f);
 
-      ImGui::SeparatorText("light");
+      NodeSeparator("light");
       ModSlider("light orbit", &n->lightAzimuth, -3.1416f, 3.1416f);
       ModSlider("light height", &n->lightElevation, -1.5f, 1.5f);
       ColorSwatch("light", n->lightColor, n);
@@ -1518,7 +1547,7 @@ namespace
       ColorSwatch("ambient", n->ambientColor, n);
       ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f);
 
-      ImGui::SeparatorText("raster");
+      NodeSeparator("raster");
       ImGui::Checkbox("depth test", &n->depthTest);
       ImGui::Checkbox("cull backfaces", &n->backfaceCull);
    }
@@ -1747,7 +1776,7 @@ namespace
       if (ImGui::Button("Clear canvas", ImVec2(kPreviewSize, 0)))
          n->ClearCanvas();
 
-      ImGui::SeparatorText("animation");
+      NodeSeparator("animation");
       if (n->IsRecordingStrokes())
       {
          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
@@ -2030,7 +2059,7 @@ namespace
             } },
             { "Compositing", {
                { "Blend", "Two inputs and 31 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
-               { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and the up/down buttons move a whole layer." },
+               { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
                { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
                { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
                { "Drop Shadow / Outer Glow / Colour Overlay", "Layer-effect style filters." },
