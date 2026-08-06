@@ -47,6 +47,32 @@ namespace Platform
                     MattingMode mode, std::vector<unsigned char>& outMask,
                     std::string& outError);
 
+   // ---- audio input ----
+   // Taps the default input device and keeps a running spectrum. Everything is
+   // computed on the audio thread and read lock-free-ish by the render thread;
+   // the graph only ever reads smoothed magnitudes, so a torn read is harmless.
+   const int kAudioBands = 16;
+
+   struct AudioLevels
+   {
+      float rms = 0.0f;
+      float peak = 0.0f;
+      float low = 0.0f;   // ~20-250 Hz
+      float mid = 0.0f;   // ~250-2k
+      float high = 0.0f;  // ~2k-16k
+      float bands[kAudioBands] = { 0 };
+      bool onset = false; // transient detected since the last read
+   };
+
+   bool AudioStart(std::string& outError);
+   void AudioStop();
+   bool AudioIsRunning();
+   std::string AudioDeviceName();
+   // Returns false if audio is not running; `out` is then left at zero.
+   bool AudioRead(AudioLevels& out);
+   void AudioSetSmoothing(float attack, float release);
+   void AudioSetGain(float gain);
+
    // ---- video recording ---------------------------------------------------
    struct RecorderHandle;
 

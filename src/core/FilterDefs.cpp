@@ -593,6 +593,194 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { P("Tiles", "uTiles", T::Float, 1.0f, 12.0f, 2.0f) } },
 
+      // ---------------- Keying ----------------
+      { "chroma key", "Mask",
+        "uniform vec3 uKeyColor;\n"
+        "uniform float uTolerance;\n"
+        "uniform float uSoftness;\n"
+        "uniform float uSpill;\n"
+        "uniform int uShowMatte;\n"
+        "vec3 rgb2ycbcr(vec3 c) {\n"
+        "   float y  = dot(c, vec3(0.299, 0.587, 0.114));\n"
+        "   return vec3(y, (c.b - y) * 0.565, (c.r - y) * 0.713);\n"
+        "}\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   // Chroma distance in YCbCr, so brightness differences do not break the key\n"
+        "   vec3 a = rgb2ycbcr(c.rgb);\n"
+        "   vec3 b = rgb2ycbcr(uKeyColor);\n"
+        "   float d = distance(a.yz, b.yz);\n"
+        "   float alpha = smoothstep(uTolerance, uTolerance + max(uSoftness, 1e-4), d);\n"
+        "   if (uShowMatte == 1) { fragColor = vec4(vec3(alpha), 1.0); return; }\n"
+        "   vec3 col = c.rgb;\n"
+        "   if (uSpill > 0.0) {\n"
+        "      // pull residual key colour out of the edges\n"
+        "      float m = dot(normalize(uKeyColor + 1e-4), normalize(col + 1e-4));\n"
+        "      float grey = dot(col, vec3(0.299, 0.587, 0.114));\n"
+        "      col = mix(col, vec3(grey), clamp((m - 0.5) * 2.0, 0.0, 1.0) * uSpill * (1.0 - alpha));\n"
+        "   }\n"
+        "   fragColor = vec4(col, c.a * alpha);\n"
+        "}\n",
+        { P("Key Colour", "uKeyColor", T::Color, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f),
+          P("Tolerance", "uTolerance", T::Float, 0.0f, 0.5f, 0.08f),
+          P("Softness", "uSoftness", T::Float, 0.001f, 0.4f, 0.06f),
+          P("Spill Removal", "uSpill", T::Float, 0.0f, 1.0f, 0.5f),
+          E("show", "uShowMatte", { "Keyed", "Matte" }, 0) } },
+
+      { "luma key", "Mask",
+        "uniform float uLow;\n"
+        "uniform float uHigh;\n"
+        "uniform float uSoftness;\n"
+        "uniform int uInvert;\n"
+        "uniform int uShowMatte;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));\n"
+        "   float s = max(uSoftness, 1e-4);\n"
+        "   float alpha = smoothstep(uLow - s, uLow + s, lum) *\n"
+        "                 (1.0 - smoothstep(uHigh - s, uHigh + s, lum));\n"
+        "   if (uInvert == 1) alpha = 1.0 - alpha;\n"
+        "   if (uShowMatte == 1) { fragColor = vec4(vec3(alpha), 1.0); return; }\n"
+        "   fragColor = vec4(c.rgb, c.a * alpha);\n"
+        "}\n",
+        { P("Low", "uLow", T::Float, 0.0f, 1.0f, 0.1f),
+          P("High", "uHigh", T::Float, 0.0f, 1.0f, 1.0f),
+          P("Softness", "uSoftness", T::Float, 0.001f, 0.3f, 0.03f),
+          E("invert", "uInvert", { "Off", "On" }, 0),
+          E("show", "uShowMatte", { "Keyed", "Matte" }, 0) } },
+
+      // ---------------- Effects: framing / surface ----------------
+      { "crop", "Effects",
+        "uniform float uLeft;\n"
+        "uniform float uRight;\n"
+        "uniform float uTop;\n"
+        "uniform float uBottom;\n"
+        "uniform int uMode;\n"
+        "uniform vec3 uFill;\n"
+        "void main() {\n"
+        "   float l = uLeft, r = 1.0 - uRight, b = uBottom, t = 1.0 - uTop;\n"
+        "   if (uMode == 1) {\n"
+        "      // zoom the kept region back out to fill the frame\n"
+        "      vec2 uv = vec2(mix(l, r, vUv.x), mix(b, t, vUv.y));\n"
+        "      fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
+        "      return;\n"
+        "   }\n"
+        "   if (vUv.x < l || vUv.x > r || vUv.y < b || vUv.y > t) {\n"
+        "      fragColor = vec4(uFill, uMode == 2 ? 1.0 : 0.0);\n"
+        "      return;\n"
+        "   }\n"
+        "   fragColor = texture(uSrc, vUv);\n"
+        "}\n",
+        { P("Left", "uLeft", T::Float, 0.0f, 0.95f, 0.1f),
+          P("Right", "uRight", T::Float, 0.0f, 0.95f, 0.1f),
+          P("Top", "uTop", T::Float, 0.0f, 0.95f, 0.1f),
+          P("Bottom", "uBottom", T::Float, 0.0f, 0.95f, 0.1f),
+          E("outside", "uMode", { "Transparent", "Zoom to fill", "Fill colour" }, 0),
+          P("Fill", "uFill", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f) } },
+
+      { "emboss", "Effects",
+        "uniform float uAmount;\n"
+        "uniform float uAngle;\n"
+        "uniform float uDistance;\n"
+        "uniform int uKeepColor;\n"
+        "void main() {\n"
+        "   vec2 off = vec2(cos(uAngle), sin(uAngle)) * uTexelSize * uDistance;\n"
+        "   vec3 a = texture(uSrc, vUv + off).rgb;\n"
+        "   vec3 b = texture(uSrc, vUv - off).rgb;\n"
+        "   vec3 diff = (a - b) * uAmount;\n"
+        "   float e = dot(diff, vec3(0.299, 0.587, 0.114));\n"
+        "   vec4 src = texture(uSrc, vUv);\n"
+        "   if (uKeepColor == 1) fragColor = vec4(clamp(src.rgb + diff, 0.0, 1.0), src.a);\n"
+        "   else fragColor = vec4(vec3(clamp(e + 0.5, 0.0, 1.0)), src.a);\n"
+        "}\n",
+        { P("Amount", "uAmount", T::Float, 0.0f, 8.0f, 2.0f),
+          P("Angle", "uAngle", T::Float, 0.0f, 6.2832f, 0.785f),
+          P("Distance", "uDistance", T::Float, 0.5f, 12.0f, 1.5f),
+          E("style", "uKeepColor", { "Grey", "Over colour" }, 0) } },
+
+      { "normal map", "Effects",
+        "uniform float uStrength;\n"
+        "uniform int uInvertY;\n"
+        "uniform int uOutput;\n"
+        "float lum(vec2 uv) { return dot(texture(uSrc, uv).rgb, vec3(0.299, 0.587, 0.114)); }\n"
+        "void main() {\n"
+        "   vec2 t = uTexelSize;\n"
+        "   // Sobel gradient of luminance treated as a height field\n"
+        "   float tl = lum(vUv + vec2(-t.x,  t.y)), tc = lum(vUv + vec2(0.0,  t.y)), tr = lum(vUv + vec2( t.x,  t.y));\n"
+        "   float ml = lum(vUv + vec2(-t.x, 0.0)),                                   mr = lum(vUv + vec2( t.x, 0.0));\n"
+        "   float bl = lum(vUv + vec2(-t.x, -t.y)), bc = lum(vUv + vec2(0.0, -t.y)), br = lum(vUv + vec2( t.x, -t.y));\n"
+        "   float dx = (tr + 2.0*mr + br) - (tl + 2.0*ml + bl);\n"
+        "   float dy = (bl + 2.0*bc + br) - (tl + 2.0*tc + tr);\n"
+        "   if (uInvertY == 1) dy = -dy;\n"
+        "   vec3 n = normalize(vec3(-dx * uStrength, -dy * uStrength, 1.0));\n"
+        "   if (uOutput == 1) { fragColor = vec4(vec3(lum(vUv)), 1.0); return; }\n"
+        "   if (uOutput == 2) { fragColor = vec4(vec3(length(vec2(dx, dy)) * uStrength), 1.0); return; }\n"
+        "   fragColor = vec4(n * 0.5 + 0.5, 1.0);\n"
+        "}\n",
+        { P("Strength", "uStrength", T::Float, 0.1f, 12.0f, 3.0f),
+          E("flip Y", "uInvertY", { "OpenGL", "DirectX" }, 0),
+          E("output", "uOutput", { "Normals", "Height", "Slope" }, 0) } },
+
+      { "convolve", "Effects",
+        // A user-editable 3x3 kernel. Blur, sharpen, edge and emboss are all just
+        // different numbers in this grid.
+        "uniform float uK[9];\n"
+        "uniform float uDivisor;\n"
+        "uniform float uBias;\n"
+        "uniform float uSpread;\n"
+        "uniform float uMix;\n"
+        "void main() {\n"
+        "   vec4 src = texture(uSrc, vUv);\n"
+        "   vec3 sum = vec3(0.0);\n"
+        "   int i = 0;\n"
+        "   for (int y = 1; y >= -1; y--) {\n"
+        "      for (int x = -1; x <= 1; x++) {\n"
+        "         vec2 off = vec2(float(x), float(y)) * uTexelSize * max(uSpread, 0.1);\n"
+        "         sum += texture(uSrc, vUv + off).rgb * uK[i];\n"
+        "         i++;\n"
+        "      }\n"
+        "   }\n"
+        "   float div = abs(uDivisor) < 1e-4 ? 1.0 : uDivisor;\n"
+        "   vec3 outCol = clamp(sum / div + uBias, 0.0, 1.0);\n"
+        "   fragColor = vec4(mix(src.rgb, outCol, uMix), src.a);\n"
+        "}\n",
+        { P("k11", "uK[0]", T::Float, -8.0f, 8.0f, 0.0f),
+          P("k12", "uK[1]", T::Float, -8.0f, 8.0f, -1.0f),
+          P("k13", "uK[2]", T::Float, -8.0f, 8.0f, 0.0f),
+          P("k21", "uK[3]", T::Float, -8.0f, 8.0f, -1.0f),
+          P("k22", "uK[4]", T::Float, -8.0f, 8.0f, 5.0f),
+          P("k23", "uK[5]", T::Float, -8.0f, 8.0f, -1.0f),
+          P("k31", "uK[6]", T::Float, -8.0f, 8.0f, 0.0f),
+          P("k32", "uK[7]", T::Float, -8.0f, 8.0f, -1.0f),
+          P("k33", "uK[8]", T::Float, -8.0f, 8.0f, 0.0f),
+          P("Divisor", "uDivisor", T::Float, -16.0f, 16.0f, 1.0f),
+          P("Bias", "uBias", T::Float, -1.0f, 1.0f, 0.0f),
+          P("Spread", "uSpread", T::Float, 0.5f, 8.0f, 1.0f),
+          P("Mix", "uMix", T::Float, 0.0f, 1.0f, 1.0f) } },
+
+      { "lookup", "Color",
+        // Second input is the palette: this pixel's luminance indexes across it.
+        "uniform float uMix;\n"
+        "uniform int uChannel;\n"
+        "uniform float uOffset;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   if (uHasSrc2 == 0) { fragColor = c; return; }\n"
+        "   float idx;\n"
+        "   if (uChannel == 1) idx = c.r;\n"
+        "   else if (uChannel == 2) idx = c.g;\n"
+        "   else if (uChannel == 3) idx = c.b;\n"
+        "   else if (uChannel == 4) idx = c.a;\n"
+        "   else idx = dot(c.rgb, vec3(0.299, 0.587, 0.114));\n"
+        "   idx = fract(idx + uOffset);\n"
+        "   vec3 mapped = texture(uSrc2, vec2(idx, 0.5)).rgb;\n"
+        "   fragColor = vec4(mix(c.rgb, mapped, uMix), c.a);\n"
+        "}\n",
+        { E("index by", "uChannel", { "Luminance", "Red", "Green", "Blue", "Alpha" }, 0),
+          P("Offset", "uOffset", T::Float, 0.0f, 1.0f, 0.0f),
+          P("Mix", "uMix", T::Float, 0.0f, 1.0f, 1.0f) },
+        2 },
+
       // ---------------- Effects: halftone / edges ----------------
       { "halftone", "Effects",
         "uniform float uScale;\n"

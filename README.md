@@ -12,19 +12,19 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**65 node types across nine categories.**
+**75 node types across nine categories.**
 
 | Category | Nodes |
 |---|---|
-| Source | Image, Video, Shape (10 primitives), Noise (6 kinds), Draw (paintable canvas), Formula (live GLSL, 16 presets) |
+| Source | Image, Video, Shape (10 primitives), Noise (6 kinds), Ramp (5 gradient types), Draw (paintable canvas), Formula (live GLSL, 16 presets) |
 | Text | Text (any installed system font) |
 | Effects | Blur family (gaussian/box/motion/radial), bloom, diffuse glow, unsharp mask, twirl, pinch-punch, ripple, lens distortion, displace, liquify, 6 glitch types, symmetry, kaleidoscope, mirror tile, halftone, sobel edge, edge outline, pixelate, noise, vignette, transform |
 | Color | Brightness/contrast, levels, Curves (interactive spline editor), LUT, gradient map, channel mixer, HSL, invert, posterize, threshold, vibrance, black & white, colour balance, exposure |
 | Compositing | Blend (31 modes), Layer Stack (4 reorderable layers), Switcher, Fit, outer glow, colour overlay, drop shadow |
 | Feedback | Feedback (one-frame delay, makes cycles legal), Trails, Reaction-Diffusion |
-| Mask | Remove Background (on-device Vision segmentation) |
+| Mask | Remove Background (on-device Vision segmentation), Chroma Key, Luma Key |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
-| Modulators | LFO, Random, Pattern (8-step), Math, Macro Knob, Macro XY (two outputs, recordable path) |
+| Modulators | LFO, Random, Pattern (8-step), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio Analyze** |
 | Output | Output (PNG export + H.264 recording) |
 
 - **Live 1:1 preview on every node**, including effects and compositing.
@@ -39,6 +39,12 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 - **Any image or video format the OS can decode** — decoding goes through
   ImageIO/AVFoundation rather than a bundled decoder. Drag a file onto the
   canvas and the matching source node appears, already loaded.
+- **Audio reactive** — the Audio Analyze node taps a live input and emits
+  level, low/mid/high, onset and eight spectrum bands as modulators. Patch any
+  of them into any slider and that parameter becomes audio-reactive.
+- **Image Analyze** closes the loop the other way: brightness, contrast, RGB,
+  saturation, motion and luminance centroid come out of an image as control
+  values, so a video can drive a blur.
 - **Resynthesize** — feeds each generation back into itself, so the image
   evolves away from the original. An XY pad sweeps between four named mutation
   effects, and its path can be recorded, looped and played back.

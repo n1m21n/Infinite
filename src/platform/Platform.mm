@@ -5,12 +5,14 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <AVFoundation/AVFoundation.h>
 #import <Vision/Vision.h>
+#import <Accelerate/Accelerate.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
 
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+#include <mutex>
 
 namespace Platform
 {
@@ -645,5 +647,226 @@ namespace Platform
          outError.clear();
          return true;
       }
+   }
+}
+
+// =============================================================== audio input
+
+namespace Platform
+{
+   namespace
+   {
+      const int kFftLog2 = 10;              // 1024-point FFT
+      const int kFftSize = 1 << kFftLog2;
+      const int kSpectrumSize = kFftSize / 2;
+
+      AVAudioEngine* gEngine = nil;
+      bool gRunning = false;
+      std::string gDeviceName;
+
+      std::mutex gAudioMutex;
+      AudioLevels gLevels;
+      float gAttack = 0.5f;
+      float gRelease = 0.12f;
+      float gGain = 1.0f;
+      float gPrevFlux = 0.0f;
+      std::vector<float> gPrevMagnitude;
+
+      FFTSetup gFftSetup = nullptr;
+      std::vector<float> gWindow;
+      std::vector<float> gSampleRing;
+
+      float Smooth(float previous, float target)
+      {
+         const float rate = (target > previous) ? gAttack : gRelease;
+         return previous + (target - previous) * rate;
+      }
+
+      void ProcessBuffer(const float* samples, int frameCount, double sampleRate)
+      {
+         if (frameCount <= 0)
+            return;
+
+         // Keep a rolling window so the FFT always sees a full frame even when
+         // CoreAudio hands us short buffers.
+         gSampleRing.insert(gSampleRing.end(), samples, samples + frameCount);
+         if ((int)gSampleRing.size() < kFftSize)
+            return;
+         if ((int)gSampleRing.size() > kFftSize * 4)
+            gSampleRing.erase(gSampleRing.begin(), gSampleRing.end() - kFftSize);
+
+         const float* frame = gSampleRing.data() + (gSampleRing.size() - kFftSize);
+
+         float rms = 0.0f, peak = 0.0f;
+         for (int i = 0; i < kFftSize; i++)
+         {
+            const float v = frame[i] * gGain;
+            rms += v * v;
+            peak = std::max(peak, std::fabs(v));
+         }
+         rms = std::sqrt(rms / (float)kFftSize);
+
+         std::vector<float> windowed(kFftSize);
+         vDSP_vmul(frame, 1, gWindow.data(), 1, windowed.data(), 1, kFftSize);
+
+         std::vector<float> real(kSpectrumSize, 0.0f);
+         std::vector<float> imag(kSpectrumSize, 0.0f);
+         DSPSplitComplex split = { real.data(), imag.data() };
+         vDSP_ctoz((const DSPComplex*)windowed.data(), 2, &split, 1, kSpectrumSize);
+         vDSP_fft_zrip(gFftSetup, &split, 1, kFftLog2, FFT_FORWARD);
+
+         std::vector<float> magnitude(kSpectrumSize, 0.0f);
+         vDSP_zvabs(&split, 1, magnitude.data(), 1, kSpectrumSize);
+         const float norm = 2.0f / (float)kFftSize;
+         for (int i = 0; i < kSpectrumSize; i++)
+            magnitude[i] *= norm * gGain;
+
+         if (gPrevMagnitude.size() != magnitude.size())
+            gPrevMagnitude.assign(magnitude.size(), 0.0f);
+
+         // Spectral flux: sum of positive frame-to-frame change, the standard
+         // cheap onset detector.
+         float flux = 0.0f;
+         for (int i = 0; i < kSpectrumSize; i++)
+            flux += std::max(0.0f, magnitude[i] - gPrevMagnitude[i]);
+         const bool onset = flux > gPrevFlux * 1.6f && flux > 0.02f;
+         gPrevFlux = gPrevFlux * 0.7f + flux * 0.3f;
+         gPrevMagnitude = magnitude;
+
+         // Log-spaced bands: linear bins would put almost everything in band 0.
+         const double nyquist = sampleRate * 0.5;
+         float bands[kAudioBands] = { 0 };
+         for (int b = 0; b < kAudioBands; b++)
+         {
+            const double loHz = 20.0 * std::pow(nyquist / 20.0, (double)b / kAudioBands);
+            const double hiHz = 20.0 * std::pow(nyquist / 20.0, (double)(b + 1) / kAudioBands);
+            const int lo = std::max(1, (int)(loHz / nyquist * kSpectrumSize));
+            const int hi = std::min(kSpectrumSize - 1, (int)(hiHz / nyquist * kSpectrumSize));
+            float sum = 0.0f;
+            int count = 0;
+            for (int i = lo; i <= hi; i++) { sum += magnitude[i]; count++; }
+            bands[b] = count > 0 ? sum / count : 0.0f;
+         }
+
+         auto rangeEnergy = [&](double fromHz, double toHz) {
+            const int lo = std::max(1, (int)(fromHz / nyquist * kSpectrumSize));
+            const int hi = std::min(kSpectrumSize - 1, (int)(toHz / nyquist * kSpectrumSize));
+            float sum = 0.0f; int count = 0;
+            for (int i = lo; i <= hi; i++) { sum += magnitude[i]; count++; }
+            return count > 0 ? sum / count : 0.0f;
+         };
+
+         // Magnitudes are tiny; a compressive curve maps them into a usable 0..1
+         // without the user having to ride a gain slider constantly.
+         auto shape = [](float v) { return std::min(1.0f, std::sqrt(v * 12.0f)); };
+
+         std::lock_guard<std::mutex> lock(gAudioMutex);
+         gLevels.rms = Smooth(gLevels.rms, std::min(1.0f, rms * 3.0f));
+         gLevels.peak = Smooth(gLevels.peak, std::min(1.0f, peak));
+         gLevels.low = Smooth(gLevels.low, shape(rangeEnergy(20.0, 250.0)));
+         gLevels.mid = Smooth(gLevels.mid, shape(rangeEnergy(250.0, 2000.0)));
+         gLevels.high = Smooth(gLevels.high, shape(rangeEnergy(2000.0, 16000.0)));
+         for (int b = 0; b < kAudioBands; b++)
+            gLevels.bands[b] = Smooth(gLevels.bands[b], shape(bands[b]));
+         if (onset)
+            gLevels.onset = true;
+      }
+   }
+
+   bool AudioStart(std::string& outError)
+   {
+      if (gRunning)
+         return true;
+
+      @autoreleasepool
+      {
+         if (gFftSetup == nullptr)
+         {
+            gFftSetup = vDSP_create_fftsetup(kFftLog2, FFT_RADIX2);
+            gWindow.resize(kFftSize);
+            vDSP_hann_window(gWindow.data(), kFftSize, vDSP_HANN_NORM);
+         }
+
+         gEngine = [[AVAudioEngine alloc] init];
+         AVAudioInputNode* input = [gEngine inputNode];
+         AVAudioFormat* format = [input inputFormatForBus:0];
+         if (format == nil || format.sampleRate <= 0 || format.channelCount == 0)
+         {
+            outError = "no audio input available (check System Settings > Privacy > Microphone)";
+            gEngine = nil;
+            return false;
+         }
+
+         gDeviceName = "default input";
+         const double sampleRate = format.sampleRate;
+
+         [input installTapOnBus:0
+                     bufferSize:1024
+                         format:format
+                          block:^(AVAudioPCMBuffer* buffer, AVAudioTime*) {
+            const float* const* channels = buffer.floatChannelData;
+            if (channels == nullptr)
+               return;
+            ProcessBuffer(channels[0], (int)buffer.frameLength, sampleRate);
+         }];
+
+         NSError* err = nil;
+         [gEngine prepare];
+         if (![gEngine startAndReturnError:&err])
+         {
+            outError = err ? std::string([[err localizedDescription] UTF8String]) : "engine failed to start";
+            [input removeTapOnBus:0];
+            gEngine = nil;
+            return false;
+         }
+
+         gRunning = true;
+         outError.clear();
+         return true;
+      }
+   }
+
+   void AudioStop()
+   {
+      if (!gRunning)
+         return;
+      @autoreleasepool
+      {
+         [[gEngine inputNode] removeTapOnBus:0];
+         [gEngine stop];
+         gEngine = nil;
+      }
+      gRunning = false;
+      std::lock_guard<std::mutex> lock(gAudioMutex);
+      gLevels = AudioLevels();
+   }
+
+   bool AudioIsRunning() { return gRunning; }
+   std::string AudioDeviceName() { return gDeviceName; }
+
+   void AudioSetSmoothing(float attack, float release)
+   {
+      std::lock_guard<std::mutex> lock(gAudioMutex);
+      gAttack = std::min(1.0f, std::max(0.01f, attack));
+      gRelease = std::min(1.0f, std::max(0.005f, release));
+   }
+
+   void AudioSetGain(float gain)
+   {
+      std::lock_guard<std::mutex> lock(gAudioMutex);
+      gGain = std::max(0.0f, gain);
+   }
+
+   bool AudioRead(AudioLevels& out)
+   {
+      if (!gRunning)
+      {
+         out = AudioLevels();
+         return false;
+      }
+      std::lock_guard<std::mutex> lock(gAudioMutex);
+      out = gLevels;
+      gLevels.onset = false; // consume the flag so each onset fires once
+      return true;
    }
 }

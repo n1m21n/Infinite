@@ -47,6 +47,10 @@ public:
 
    float Value01() override; // X
    IModulator* YOutput() { return &mYOutput; }
+   IModulator* ModulatorOutput(int index) override
+   {
+      return index == 1 ? static_cast<IModulator*>(&mYOutput) : static_cast<IModulator*>(this);
+   }
 
    struct PadPoint
    {

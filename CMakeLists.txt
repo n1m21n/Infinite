@@ -59,6 +59,8 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/CurvesNode.cpp
     src/nodes/RemoveBgNode.cpp
     src/nodes/DrawNode.cpp
+    src/nodes/RampNode.cpp
+    src/nodes/AnalyzeNodes.cpp
     src/nodes/FeedbackNodes.cpp
     src/nodes/SwitcherNode.cpp
     src/nodes/TextNode.cpp
@@ -112,6 +114,7 @@ if(APPLE)
         "-framework UniformTypeIdentifiers"
         "-framework AVFoundation"
         "-framework Vision"
+        "-framework Accelerate"
         "-framework CoreMedia"
         "-framework CoreVideo"
     )
@@ -123,6 +126,7 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "0.1"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
         MACOSX_BUNDLE_ICON_FILE "Infinite"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in"
         RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns"
     )
 

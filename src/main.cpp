@@ -44,6 +44,8 @@
 #include "nodes/MacroNodes.h"
 #include "nodes/CurvesNode.h"
 #include "nodes/RemoveBgNode.h"
+#include "nodes/RampNode.h"
+#include "nodes/AnalyzeNodes.h"
 #include "nodes/DrawNode.h"
 #include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
@@ -393,6 +395,7 @@ namespace
       REGISTER_NODE(TextNode, Text, "Text");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
+      REGISTER_NODE(RampNode, Ramp, "Source");
       REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");
@@ -411,6 +414,8 @@ namespace
       REGISTER_NODE(MathNode, Math, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Modulators");
       REGISTER_NODE(MacroXYNode, Macro XY, "Modulators");
+      REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
+      REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
 
       // Every entry in the filter table becomes its own spawnable node type,
       // all sharing FilterNode. `def` is a reference into the static table, so
@@ -427,9 +432,11 @@ namespace
 
    IModulator* ModulatorForOutput(INode* node, int outputIndex)
    {
-      if (auto* xy = dynamic_cast<MacroXYNode*>(node))
-         return outputIndex == 1 ? xy->YOutput() : xy;
-      return dynamic_cast<IModulator*>(node);
+      if (node == nullptr)
+         return nullptr;
+      if (IModulator* specific = node->ModulatorOutput(outputIndex))
+         return specific;
+      return outputIndex == 0 ? dynamic_cast<IModulator*>(node) : nullptr;
    }
 
    GraphNode* FindNodeByIndex(int index)
@@ -467,6 +474,8 @@ namespace
          return 1;
       if (dynamic_cast<DrawNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
@@ -502,6 +511,8 @@ namespace
          return slot == 0 ? &rbg->Input() : nullptr;
       if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
          return slot == 0 ? &draw->Input() : nullptr;
+      if (auto* an = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
+         return slot == 0 ? &an->Input() : nullptr;
       if (auto* fb = dynamic_cast<FeedbackNode*>(gn.node.get()))
          return slot == 0 ? &fb->Input() : nullptr;
       if (auto* trails = dynamic_cast<TrailsNode*>(gn.node.get()))
@@ -1267,6 +1278,100 @@ namespace
       ColorSwatch("high", n->highColor, n);
       if (ImGui::Button("Reseed", ImVec2(kPreviewSize, 0)))
          n->Reseed();
+   }
+
+   void DrawRampParams(RampNode* n)
+   {
+      DropdownButton("type", RampNode::TypeNames(), n->type, [n](int i) { n->type = i; });
+      DropdownButton("repeat", RampNode::RepeatNames(), n->repeat, [n](int i) { n->repeat = i; });
+      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModSlider("angle", &n->angle, -3.1416f, 3.1416f);
+      ModSlider("center x", &n->centerX, -0.5f, 1.5f);
+      ModSlider("center y", &n->centerY, -0.5f, 1.5f);
+      ModSlider("scale", &n->scale, 0.05f, 8.0f);
+      ModSlider("offset", &n->offset, -1.0f, 1.0f);
+      ModSlider("gamma", &n->gamma, 0.1f, 4.0f);
+      ModSlider("dither", &n->dither, 0.0f, 1.0f);
+
+      ImGui::SetNextItemWidth(kParamWidth);
+      ImGui::SliderInt("stops", &n->stopCount, 2, RampNode::kStops);
+      for (int i = 0; i < n->stopCount; i++)
+      {
+         ImGui::PushID(i);
+         char label[24];
+         snprintf(label, sizeof(label), "stop %d", i + 1);
+         ColorSwatch(label, n->stopColor[i], n);
+         ModSlider("at", &n->stopPos[i], 0.0f, 1.0f);
+         ImGui::PopID();
+      }
+   }
+
+   void DrawImageAnalyzeParams(ImageAnalyzeNode* n)
+   {
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      ImGui::TextDisabled("Turns an image into control values. Patch any output "
+                          "into any slider - a video can drive a blur.");
+      ImGui::PopTextWrapPos();
+      for (int i = 0; i < ImageAnalyzeNode::kOutputCount; i++)
+      {
+         const float v = n->Value(i);
+         ImGui::Text("%-9s", n->OutputLabel(i));
+         ImGui::SameLine();
+         ImGui::ProgressBar(v, ImVec2(kPreviewSize * 0.55f, 0), "");
+      }
+      ModSlider("gain", &n->gain, 0.1f, 8.0f);
+      ModSlider("smoothing", &n->smoothing, 0.0f, 0.95f);
+      ModSlider("samples / sec", &n->sampleRate, 1.0f, 60.0f, "%.0f");
+      ImGui::SetNextItemWidth(kParamWidth);
+      ImGui::SliderInt("sample res", &n->sampleSize, 8, 256);
+      ImGui::TextDisabled("readback is rate-limited; it stalls the GPU");
+   }
+
+   void DrawAudioAnalyzeParams(AudioAnalyzeNode* n)
+   {
+      if (n->IsRunning())
+      {
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+         if (ImGui::Button("Stop listening", ImVec2(kPreviewSize, 0)))
+            n->Stop();
+         ImGui::PopStyleColor();
+      }
+      else if (ImGui::Button("Start listening", ImVec2(kPreviewSize, 0)))
+      {
+         n->Start();
+      }
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      ImGui::TextDisabled("%s", n->Status().c_str());
+      ImGui::PopTextWrapPos();
+
+      // spectrum, so it is obvious whether audio is actually arriving
+      const Platform::AudioLevels& levels = n->Levels();
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      const float h = 60.0f;
+      ImGui::Dummy(ImVec2(kPreviewSize, h));
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), IM_COL32(16, 16, 22, 255), 3.0f);
+      const float bw = kPreviewSize / (float)Platform::kAudioBands;
+      for (int i = 0; i < Platform::kAudioBands; i++)
+      {
+         const float v = std::min(1.0f, levels.bands[i] * n->gain);
+         dl->AddRectFilled(ImVec2(origin.x + i * bw + 1, origin.y + h - v * h),
+                           ImVec2(origin.x + (i + 1) * bw - 1, origin.y + h),
+                           IM_COL32(120, 200, 255, 235));
+      }
+      dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), IM_COL32(70, 74, 90, 255), 3.0f);
+
+      for (int i = 0; i < 5; i++)
+      {
+         ImGui::Text("%-6s", n->OutputLabel(i));
+         ImGui::SameLine();
+         ImGui::ProgressBar(n->Value(i), ImVec2(kPreviewSize * 0.6f, 0), "");
+      }
+      ModSlider("gain", &n->gain, 0.1f, 16.0f);
+      ModSlider("attack", &n->attack, 0.02f, 1.0f);
+      ModSlider("release", &n->release, 0.005f, 1.0f);
+      ModSlider("onset hold", &n->onsetHold, 0.02f, 1.0f);
    }
 
    void DrawBlendParams(BlendNode* n)
@@ -2548,7 +2653,12 @@ int main()
          ImGui::TextDisabled("%s", gn.category.c_str());
 
          // --- preview: image for image nodes, a value meter for modulators ---
-         if (auto* mod = dynamic_cast<IModulator*>(gn.node.get()))
+         const bool multiOutModulator =
+            dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
+            dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr;
+         if (multiOutModulator)
+            ; // these draw their own meters in the params panel
+         else if (auto* mod = dynamic_cast<IModulator*>(gn.node.get()))
             DrawModulatorMeter(mod, gn.index);
          else if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
             DrawPaintablePreview(draw);
@@ -2588,6 +2698,12 @@ int main()
                DrawMacroXYParams(n);
             else if (auto* n = dynamic_cast<NoiseNode*>(gn.node.get()))
                DrawNoiseParams(n);
+            else if (auto* n = dynamic_cast<RampNode*>(gn.node.get()))
+               DrawRampParams(n);
+            else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
+               DrawImageAnalyzeParams(n);
+            else if (auto* n = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
+               DrawAudioAnalyzeParams(n);
             else if (auto* n = dynamic_cast<ResynthNode*>(gn.node.get()))
                DrawResynthParams(n);
             else if (auto* n = dynamic_cast<CurvesNode*>(gn.node.get()))
@@ -2776,10 +2892,12 @@ int main()
                {
                   // modulators patch into parameters and into Math's inputs;
                   // image nodes patch into image inputs
+                  const bool dstWantsImage =
+                     dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) != nullptr;
                   if (GraphNode::IsParamPin(b))
                      valid = srcIsModulator;
                   else if (GraphNode::IsInputPin(b))
-                     valid = dstMath != nullptr ? srcIsModulator : !srcIsModulator;
+                     valid = (dstMath != nullptr && !dstWantsImage) ? srcIsModulator : !srcIsModulator;
                }
 
                if (valid && ed::AcceptNewItem())
@@ -3341,8 +3459,13 @@ int main()
          int failures = 0;
          for (GraphNode& gn : gNodes)
          {
-            // modulators emit a value, not a texture, so they are checked differently
-            if (auto* mod = dynamic_cast<IModulator*>(gn.node.get()))
+            // modulators emit a value, not a texture, so they are checked
+            // differently - including nodes that expose taps rather than being
+            // modulators themselves (Image/Audio Analyze).
+            IModulator* mod = dynamic_cast<IModulator*>(gn.node.get());
+            if (mod == nullptr)
+               mod = gn.node->ModulatorOutput(0);
+            if (mod != nullptr)
             {
                const float v = mod->Value01();
                const bool ok = v >= 0.0f && v <= 1.0f;
