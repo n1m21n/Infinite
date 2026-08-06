@@ -70,7 +70,6 @@ void TextNode::CookIfNeeded(int frameId)
          fontName = AvailableFonts().front();
 
       CFStringRef cfFontName = MakeCFString(fontName);
-      CTFontRef font = CTFontCreateWithName(cfFontName, fontSize, nullptr);
       CFRelease(cfFontName);
 
       CGColorRef fillColor = CGColorCreateGenericRGB(color[0], color[1], color[2], 1.0);
@@ -95,48 +94,97 @@ void TextNode::CookIfNeeded(int frameId)
       CTParagraphStyleRef paragraphStyle = CTParagraphStyleCreate(paragraphSettings, 2);
 
       CFStringRef cfText = MakeCFString(text);
-      CFStringRef keys[] = {
-         kCTFontAttributeName, kCTForegroundColorAttributeName, kCTKernAttributeName,
-         kCTStrokeWidthAttributeName, kCTStrokeColorAttributeName, kCTParagraphStyleAttributeName
-      };
       CFNumberRef kern = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &tracking);
       CFNumberRef strokeNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &strokeSetting);
-      CFTypeRef values[] = { font, fillColor, kern, strokeNum, strokeColor, paragraphStyle };
-      CFDictionaryRef attrs = CFDictionaryCreate(
-         kCFAllocatorDefault, (const void**)keys, (const void**)values, 6,
-         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
-      CFAttributedStringRef attrString = CFAttributedStringCreate(kCFAllocatorDefault, cfText, attrs);
+      // Builds the attributed string at a given point size. Fitting has to
+      // rebuild it per trial size because the font is baked into the attributes.
+      auto buildAttrString = [&](float pointSize) -> CFAttributedStringRef
+      {
+         CFStringRef nameRef = MakeCFString(fontName);
+         CTFontRef trialFont = CTFontCreateWithName(nameRef, pointSize, nullptr);
+         CFRelease(nameRef);
 
-      // Non-uniform scale is applied as a transform about the anchor point so it
-      // stretches the rendered glyphs rather than changing the layout metrics.
+         CFStringRef keys[] = {
+            kCTFontAttributeName, kCTForegroundColorAttributeName, kCTKernAttributeName,
+            kCTStrokeWidthAttributeName, kCTStrokeColorAttributeName, kCTParagraphStyleAttributeName
+         };
+         CFTypeRef values[] = { trialFont, fillColor, kern, strokeNum, strokeColor, paragraphStyle };
+         CFDictionaryRef attrs = CFDictionaryCreate(
+            kCFAllocatorDefault, (const void**)keys, (const void**)values, 6,
+            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+         CFAttributedStringRef result = CFAttributedStringCreate(kCFAllocatorDefault, cfText, attrs);
+         CFRelease(attrs);
+         CFRelease(trialFont);
+         return result;
+      };
+
+      // Non-uniform scale is applied as a transform about the anchor point, so
+      // the fit has to be measured in pre-scale space or the scaled result spills.
+      const float sx = std::max(0.01f, scaleX);
+      const float sy = std::max(0.01f, scaleY);
       CGContextSaveGState(ctx);
       const double anchorX = mWidth * posX;
       const double anchorY = mHeight * (1.0 - posY);
       CGContextTranslateCTM(ctx, anchorX, anchorY);
-      CGContextScaleCTM(ctx, std::max(0.01f, scaleX), std::max(0.01f, scaleY));
+      CGContextScaleCTM(ctx, sx, sy);
       CGContextTranslateCTM(ctx, -anchorX, -anchorY);
 
       if (wordWrap)
       {
-         // Framesetter handles wrapping, multi-line layout and justification.
-         CTFramesetterRef setter = CTFramesetterCreateWithAttributedString(attrString);
-         const CGFloat boxW = std::max(16.0f, mWidth * std::max(0.05f, wrapWidth));
-         CGSize suggested = CTFramesetterSuggestFrameSizeWithConstraints(
+         const CGFloat boxW = std::max(8.0, (double)mWidth * std::max(0.05f, wrapWidth) / sx);
+         const CGFloat boxH = std::max(8.0, (double)mHeight * std::max(0.05f, wrapHeight) / sy);
+
+         float usedSize = fontSize;
+         CFAttributedStringRef finalString = nullptr;
+         CGSize finalFit = CGSizeMake(0, 0);
+
+         if (fitToBox)
+         {
+            // Largest size that fits both axes. Binary search rather than a
+            // linear walk so a 400pt request still resolves in ~8 layouts.
+            float lo = 4.0f;
+            float hi = std::max(5.0f, fontSize);
+            for (int i = 0; i < 9; i++)
+            {
+               const float mid = (lo + hi) * 0.5f;
+               CFAttributedStringRef trial = buildAttrString(mid);
+               CTFramesetterRef trialSetter = CTFramesetterCreateWithAttributedString(trial);
+               CGSize fit = CTFramesetterSuggestFrameSizeWithConstraints(
+                  trialSetter, CFRangeMake(0, 0), nullptr, CGSizeMake(boxW, CGFLOAT_MAX), nullptr);
+               CFRelease(trialSetter);
+               CFRelease(trial);
+
+               if (fit.height <= boxH && fit.width <= boxW)
+                  lo = mid;
+               else
+                  hi = mid;
+            }
+            usedSize = lo;
+         }
+
+         finalString = buildAttrString(usedSize);
+         CTFramesetterRef setter = CTFramesetterCreateWithAttributedString(finalString);
+         finalFit = CTFramesetterSuggestFrameSizeWithConstraints(
             setter, CFRangeMake(0, 0), nullptr, CGSizeMake(boxW, CGFLOAT_MAX), nullptr);
 
-         CGRect box = CGRectMake(anchorX - boxW * 0.5, anchorY - suggested.height * 0.5,
-                                 boxW, suggested.height);
+         // Give the frame the full measured height, never less, or CoreText
+         // silently drops the lines that do not fit.
+         const CGFloat frameH = std::max(finalFit.height, (CGFloat)1.0);
+         CGRect box = CGRectMake(anchorX - boxW * 0.5, anchorY - frameH * 0.5, boxW, frameH);
          CGPathRef path = CGPathCreateWithRect(box, nullptr);
          CTFrameRef frame = CTFramesetterCreateFrame(setter, CFRangeMake(0, 0), path, nullptr);
          CTFrameDraw(frame, ctx);
          CFRelease(frame);
          CGPathRelease(path);
          CFRelease(setter);
+         CFRelease(finalString);
+         mFittedSize = usedSize;
       }
       else
       {
-         CTLineRef line = CTLineCreateWithAttributedString(attrString);
+         CFAttributedStringRef single = buildAttrString(fontSize);
+         CTLineRef line = CTLineCreateWithAttributedString(single);
          CGRect bounds = CTLineGetImageBounds(line, ctx);
          double originX = anchorX;
          double originY = anchorY - bounds.size.height * 0.5;
@@ -148,19 +196,18 @@ void TextNode::CookIfNeeded(int frameId)
          CGContextSetTextPosition(ctx, originX, originY);
          CTLineDraw(line, ctx);
          CFRelease(line);
+         CFRelease(single);
+         mFittedSize = fontSize;
       }
 
       CGContextRestoreGState(ctx);
 
-      CFRelease(attrString);
-      CFRelease(attrs);
       CFRelease(strokeNum);
       CFRelease(kern);
       CFRelease(cfText);
       CFRelease(paragraphStyle);
       CGColorRelease(strokeColor);
       CGColorRelease(fillColor);
-      CFRelease(font);
       CGContextRelease(ctx);
    }
 

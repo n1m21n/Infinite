@@ -725,7 +725,11 @@ namespace
       ImGui::Checkbox("word wrap", &n->wordWrap);
       if (n->wordWrap)
       {
-         ModSlider("wrap width", &n->wrapWidth, 0.1f, 1.0f);
+         ModSlider("box width", &n->wrapWidth, 0.1f, 1.0f);
+         ModSlider("box height", &n->wrapHeight, 0.1f, 1.0f);
+         ImGui::Checkbox("fit text to box", &n->fitToBox);
+         if (n->fitToBox)
+            ImGui::TextDisabled("size is a maximum - fitted to %.0f pt", n->FittedSize());
          ModSlider("line spacing", &n->lineSpacing, 0.5f, 2.5f);
       }
       ModSlider("outline", &n->outlineWidth, 0.0f, 20.0f);
@@ -1987,7 +1991,22 @@ int main()
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr;
 
-      if (getenv("INFINITE_SHOWCASE4") != nullptr)
+      if (getenv("INFINITE_TEXTFIT") != nullptr)
+      {
+         SpawnNode("Text", "Text", 40.0f, 40.0f);
+         auto* t = static_cast<TextNode*>(gNodes[0].node.get());
+         t->text = "naman is a weirdo and this line is deliberately long enough to need several rows";
+         t->fontName = "Verdana";
+         t->fontSize = 300.0f;   // absurd on purpose: fitting must rein it in
+         t->wordWrap = true;
+         t->fitToBox = true;
+         t->align = 3;
+         t->scaleX = 1.4f;
+         t->scaleY = 2.2f;
+         gNodes[0].showParams = true;
+         printf("TEXTFIT fixture: %zu nodes spawned\n", gNodes.size());
+      }
+      else if (getenv("INFINITE_SHOWCASE4") != nullptr)
       {
          SpawnNode("Reaction Diffusion", "Feedback", 40.0f, 40.0f);
          SpawnNode("Curves", "Color", 300.0f, 40.0f);
@@ -3307,6 +3326,15 @@ int main()
 
       for (GraphNode& gn : gNodes)
          gn.node->CookIfNeeded(frameId);
+
+      if (getenv("INFINITE_TEXTFIT") != nullptr && frameId == 4 && !gNodes.empty())
+      {
+         if (auto* t = dynamic_cast<TextNode*>(gNodes[0].node.get()))
+            printf("requested %.0f pt -> fitted %.1f pt (box %.0fx%.0f of %dx%d)\n",
+                   t->fontSize, t->FittedSize(),
+                   t->width * t->wrapWidth, t->height * t->wrapHeight,
+                   t->GetOutputWidth(), t->GetOutputHeight());
+      }
 
       if (selfTest && frameId >= 1)
       {

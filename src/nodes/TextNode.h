@@ -37,7 +37,9 @@ public:
    float scaleX = 1.0f;
    float scaleY = 1.0f;
    bool wordWrap = false;
-   float wrapWidth = 0.8f;    // fraction of the frame width
+   float wrapWidth = 0.9f;    // fraction of the frame width
+   float wrapHeight = 0.9f;   // fraction of the frame height
+   bool fitToBox = true;      // shrink the type until every line fits the box
    float lineSpacing = 1.0f;
    float outlineWidth = 0.0f;
    float outlineColor[3] = { 0.0f, 0.0f, 0.0f };
@@ -50,4 +52,11 @@ private:
    int mWidth = 512;
    int mHeight = 512;
    int mLastCookFrame = -1;
+
+public:
+   // Point size actually used after fitting, so the UI can show what happened.
+   float FittedSize() const { return mFittedSize; }
+
+private:
+   float mFittedSize = 0.0f;
 };
