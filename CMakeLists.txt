@@ -56,6 +56,10 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/NoiseNode.cpp
     src/nodes/ResynthNode.cpp
     src/nodes/MacroNodes.cpp
+    src/nodes/CurvesNode.cpp
+    src/nodes/RemoveBgNode.cpp
+    src/nodes/DrawNode.cpp
+    src/nodes/FeedbackNodes.cpp
     src/nodes/SwitcherNode.cpp
     src/nodes/TextNode.cpp
     src/nodes/OutputNode.cpp
@@ -107,6 +111,7 @@ if(APPLE)
         "-framework AppKit"
         "-framework UniformTypeIdentifiers"
         "-framework AVFoundation"
+        "-framework Vision"
         "-framework CoreMedia"
         "-framework CoreVideo"
     )

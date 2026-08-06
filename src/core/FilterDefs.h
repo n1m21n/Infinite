@@ -15,7 +15,8 @@ struct FilterParamDef
       Float,
       Int,
       Bool,
-      Color // 3-component RGB
+      Color, // 3-component RGB
+      Enum   // int, shown as a dropdown of `options`
    };
 
    std::string label; // shown in the params panel
@@ -24,6 +25,7 @@ struct FilterParamDef
    float minVal = 0.0f;
    float maxVal = 1.0f;
    float defaultVal[3] = { 0.0f, 0.0f, 0.0f };
+   std::vector<std::string> options; // Enum only
 };
 
 struct FilterDef

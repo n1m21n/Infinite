@@ -102,6 +102,7 @@ void FilterNode::CookIfNeeded(int frameId)
                break;
             case FilterParamDef::Type::Int:
             case FilterParamDef::Type::Bool:
+            case FilterParamDef::Type::Enum:
                glUniform1i(loc, (int)mParamValues[i][0]);
                break;
             case FilterParamDef::Type::Color:

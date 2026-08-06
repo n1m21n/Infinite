@@ -33,7 +33,15 @@ public:
    float tracking = 0.0f;
    float posX = 0.5f; // normalized, 0..1
    float posY = 0.5f;
-   int align = 1; // 0=left, 1=center, 2=right
+   int align = 1; // 0=left, 1=center, 2=right, 3=justified
+   float scaleX = 1.0f;
+   float scaleY = 1.0f;
+   bool wordWrap = false;
+   float wrapWidth = 0.8f;    // fraction of the frame width
+   float lineSpacing = 1.0f;
+   float outlineWidth = 0.0f;
+   float outlineColor[3] = { 0.0f, 0.0f, 0.0f };
+   bool outlineOnly = false;
    float width = 1024.0f;
    float height = 1024.0f;
 

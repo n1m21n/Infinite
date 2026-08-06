@@ -4,6 +4,20 @@ namespace
 {
    using T = FilterParamDef::Type;
 
+   FilterParamDef E(const char* label, const char* uniform,
+                    std::vector<std::string> options, int defaultIndex = 0)
+   {
+      FilterParamDef p;
+      p.label = label;
+      p.uniformName = uniform;
+      p.type = FilterParamDef::Type::Enum;
+      p.minVal = 0.0f;
+      p.maxVal = (float)(options.size() - 1);
+      p.defaultVal[0] = (float)defaultIndex;
+      p.options = std::move(options);
+      return p;
+   }
+
    FilterParamDef P(const char* label, const char* uniform, T type, float minV, float maxV, float def0, float def1 = 0, float def2 = 0)
    {
       FilterParamDef p;
@@ -186,23 +200,6 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { P("Block Size", "uBlockSize", T::Float, 1.0f, 64.0f, 8.0f) } },
 
-      { "glitch", "Effects",
-        "uniform float uAmount;\n"
-        "uniform float uBlockiness;\n"
-        "float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }\n"
-        "void main() {\n"
-        "   vec2 uv = vUv;\n"
-        "   float blockY = floor(uv.y * max(1.0, uBlockiness * 40.0));\n"
-        "   float shift = (rand(vec2(blockY, floor(uTime * 10.0))) - 0.5) * uAmount * 0.2;\n"
-        "   uv.x += shift;\n"
-        "   vec4 c = texture(uSrc, uv);\n"
-        "   vec4 cr = texture(uSrc, uv + vec2(uAmount * 0.01, 0.0));\n"
-        "   vec4 cb = texture(uSrc, uv - vec2(uAmount * 0.01, 0.0));\n"
-        "   fragColor = vec4(cr.r, c.g, cb.b, c.a);\n"
-        "}\n",
-        { P("Amount", "uAmount", T::Float, 0.0f, 5.0f, 1.0f),
-          P("Blockiness", "uBlockiness", T::Float, 0.0f, 1.0f, 0.4f) } },
-
       // ---------------- Effects: noise / vignette ----------------
       { "addnoise", "Effects",
         "uniform float uAmount;\n"
@@ -238,12 +235,15 @@ const std::vector<FilterDef>& GetFilterDefs()
         "uniform float uTranslateX;\n"
         "uniform float uTranslateY;\n"
         "uniform float uScale;\n"
+        "uniform float uScaleX;\n"
+        "uniform float uScaleY;\n"
         "uniform float uRotation;\n"
         "void main() {\n"
         "   vec2 uv = vUv - vec2(0.5, 0.5);\n"
         "   float s = sin(-uRotation), c = cos(-uRotation);\n"
         "   uv = vec2(c*uv.x - s*uv.y, s*uv.x + c*uv.y);\n"
         "   uv /= max(uScale, 0.0001);\n"
+        "   uv /= vec2(max(uScaleX, 0.0001), max(uScaleY, 0.0001));\n"
         "   uv -= vec2(uTranslateX, uTranslateY);\n"
         "   uv += vec2(0.5, 0.5);\n"
         "   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) fragColor = vec4(0.0);\n"
@@ -252,6 +252,8 @@ const std::vector<FilterDef>& GetFilterDefs()
         { P("Translate X", "uTranslateX", T::Float, -1.0f, 1.0f, 0.0f),
           P("Translate Y", "uTranslateY", T::Float, -1.0f, 1.0f, 0.0f),
           P("Scale", "uScale", T::Float, 0.1f, 4.0f, 1.0f),
+          P("Scale X", "uScaleX", T::Float, 0.1f, 4.0f, 1.0f),
+          P("Scale Y", "uScaleY", T::Float, 0.1f, 4.0f, 1.0f),
           P("Rotation", "uRotation", T::Float, -6.2832f, 6.2832f, 0.0f) } },
 
       // ---------------- Color adjustments ----------------
@@ -409,80 +411,67 @@ const std::vector<FilterDef>& GetFilterDefs()
         { P("Amount", "uAmount", T::Float, 0.0f, 1.0f, 0.6f),
           P("Radius", "uRadius", T::Float, 0.5f, 12.0f, 4.0f) } },
 
-      // ---------------- Effects: glitch family ----------------
-      { "glitch rgb shift", "Effects",
+      // ---------------- Effects: glitch ----------------
+      // One node, six algorithms behind a dropdown, rather than six near-identical
+      // nodes cluttering the spawn menu.
+      { "glitch", "Effects",
+        "uniform int uKind;\n"
         "uniform float uAmount;\n"
-        "uniform float uAngle;\n"
-        "void main() {\n"
-        "   vec2 dir = vec2(cos(uAngle), sin(uAngle)) * uAmount * 0.02;\n"
-        "   float r = texture(uSrc, vUv + dir).r;\n"
-        "   float g = texture(uSrc, vUv).g;\n"
-        "   float b = texture(uSrc, vUv - dir).b;\n"
-        "   fragColor = vec4(r, g, b, texture(uSrc, vUv).a);\n"
-        "}\n",
-        { P("Amount", "uAmount", T::Float, 0.0f, 4.0f, 1.0f),
-          P("Angle", "uAngle", T::Float, 0.0f, 6.2832f, 0.0f) } },
-
-      { "glitch scanlines", "Effects",
-        "uniform float uCount;\n"
-        "uniform float uStrength;\n"
-        "uniform float uScroll;\n"
-        "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   float line = sin((vUv.y + uTime * uScroll) * uCount * 3.14159);\n"
-        "   float darken = 1.0 - uStrength * step(0.0, -line);\n"
-        "   fragColor = vec4(c.rgb * darken, c.a);\n"
-        "}\n",
-        { P("Line Count", "uCount", T::Float, 10.0f, 800.0f, 200.0f),
-          P("Strength", "uStrength", T::Float, 0.0f, 1.0f, 0.4f),
-          P("Scroll", "uScroll", T::Float, -2.0f, 2.0f, 0.0f) } },
-
-      { "glitch blocks", "Effects",
-        "uniform float uAmount;\n"
-        "uniform float uBlockSize;\n"
-        "uniform float uSeed;\n"
-        "float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }\n"
-        "void main() {\n"
-        "   vec2 grid = max(vec2(2.0), vec2(uBlockSize));\n"
-        "   vec2 cell = floor(vUv * grid);\n"
-        "   float r = rand(cell + floor(uTime * 8.0) + uSeed);\n"
-        "   vec2 uv = vUv;\n"
-        "   if (r > 1.0 - uAmount) {\n"
-        "      uv += (vec2(rand(cell + 1.0 + uSeed), rand(cell + 2.0 + uSeed)) - 0.5) * 0.15;\n"
-        "   }\n"
-        "   fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
-        "}\n",
-        { P("Amount", "uAmount", T::Float, 0.0f, 1.0f, 0.3f),
-          P("Block Size", "uBlockSize", T::Float, 2.0f, 60.0f, 16.0f),
-          P("Seed", "uSeed", T::Float, 0.0f, 100.0f, 0.0f) } },
-
-      { "glitch wave", "Effects",
-        "uniform float uAmplitude;\n"
-        "uniform float uFrequency;\n"
+        "uniform float uDetail;\n"
         "uniform float uSpeed;\n"
+        "uniform float uSeed;\n"
+        "float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233)) + uSeed) * 43758.5453); }\n"
         "void main() {\n"
-        "   float shift = sin(vUv.y * uFrequency + uTime * uSpeed) * uAmplitude * 0.05;\n"
-        "   fragColor = texture(uSrc, vec2(vUv.x + shift, vUv.y));\n"
-        "}\n",
-        { P("Amplitude", "uAmplitude", T::Float, 0.0f, 4.0f, 1.0f),
-          P("Frequency", "uFrequency", T::Float, 1.0f, 200.0f, 30.0f),
-          P("Speed", "uSpeed", T::Float, -10.0f, 10.0f, 2.0f) } },
-
-      { "glitch datamosh", "Effects",
-        "uniform float uAmount;\n"
-        "uniform float uSlices;\n"
-        "float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }\n"
-        "void main() {\n"
-        "   float slice = floor(vUv.y * max(2.0, uSlices));\n"
-        "   float r = rand(vec2(slice, floor(uTime * 4.0)));\n"
-        "   float offset = (r - 0.5) * uAmount * 0.5;\n"
-        "   vec2 uv = vec2(fract(vUv.x + offset), vUv.y);\n"
+        "   float t = uTime * uSpeed;\n"
+        "   vec2 uv = vUv;\n"
+        "\n"
+        "   if (uKind == 0) {\n"           // Slice shift (the original)
+        "      float blockY = floor(uv.y * max(1.0, uDetail * 40.0));\n"
+        "      uv.x += (rand(vec2(blockY, floor(t * 10.0))) - 0.5) * uAmount * 0.2;\n"
+        "      vec4 c = texture(uSrc, uv);\n"
+        "      vec4 cr = texture(uSrc, uv + vec2(uAmount * 0.01, 0.0));\n"
+        "      vec4 cb = texture(uSrc, uv - vec2(uAmount * 0.01, 0.0));\n"
+        "      fragColor = vec4(cr.r, c.g, cb.b, c.a);\n"
+        "      return;\n"
+        "   }\n"
+        "   if (uKind == 1) {\n"           // RGB shift
+        "      vec2 dir = vec2(cos(uDetail * 6.2832), sin(uDetail * 6.2832)) * uAmount * 0.02;\n"
+        "      fragColor = vec4(texture(uSrc, uv + dir).r, texture(uSrc, uv).g,\n"
+        "                       texture(uSrc, uv - dir).b, texture(uSrc, uv).a);\n"
+        "      return;\n"
+        "   }\n"
+        "   if (uKind == 2) {\n"           // Scanlines
+        "      vec4 c = texture(uSrc, uv);\n"
+        "      float line = sin((uv.y + t * 0.1) * max(10.0, uDetail * 800.0) * 3.14159);\n"
+        "      fragColor = vec4(c.rgb * (1.0 - uAmount * step(0.0, -line)), c.a);\n"
+        "      return;\n"
+        "   }\n"
+        "   if (uKind == 3) {\n"           // Blocks
+        "      vec2 grid = max(vec2(2.0), vec2(uDetail * 60.0));\n"
+        "      vec2 cell = floor(uv * grid);\n"
+        "      if (rand(cell + floor(t * 8.0)) > 1.0 - uAmount)\n"
+        "         uv += (vec2(rand(cell + 1.0), rand(cell + 2.0)) - 0.5) * 0.15;\n"
+        "      fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
+        "      return;\n"
+        "   }\n"
+        "   if (uKind == 4) {\n"           // Wave
+        "      uv.x += sin(uv.y * max(1.0, uDetail * 200.0) + t * 2.0) * uAmount * 0.05;\n"
+        "      fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
+        "      return;\n"
+        "   }\n"
+        "   // Datamosh\n"
+        "   float slice = floor(uv.y * max(2.0, uDetail * 120.0));\n"
+        "   float r = rand(vec2(slice, floor(t * 4.0)));\n"
+        "   uv.x = fract(uv.x + (r - 0.5) * uAmount * 0.5);\n"
         "   vec4 c = texture(uSrc, uv);\n"
         "   if (r > 0.85) c.rgb = c.gbr;\n"
         "   fragColor = c;\n"
         "}\n",
-        { P("Amount", "uAmount", T::Float, 0.0f, 2.0f, 0.6f),
-          P("Slices", "uSlices", T::Float, 2.0f, 120.0f, 24.0f) } },
+        { E("kind", "uKind", { "Slice Shift", "RGB Shift", "Scanlines", "Blocks", "Wave", "Datamosh" }, 0),
+          P("Amount", "uAmount", T::Float, 0.0f, 2.0f, 0.6f),
+          P("Detail", "uDetail", T::Float, 0.02f, 1.0f, 0.4f),
+          P("Speed", "uSpeed", T::Float, 0.0f, 4.0f, 1.0f),
+          P("Seed", "uSeed", T::Float, 0.0f, 100.0f, 0.0f) } },
 
       // ---------------- Effects: lens / warp ----------------
       { "lensdistortion", "Effects",
@@ -565,10 +554,10 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   if (uFlip == 1) uv = 1.0 - uv;\n"
         "   fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
         "}\n",
-        { P("Axis 0=X 1=Y 2=Both", "uAxis", T::Int, 0.0f, 2.0f, 0.0f),
+        { E("axis", "uAxis", { "Mirror X", "Mirror Y", "Both" }, 0),
           P("Center X", "uCenterX", T::Float, 0.0f, 1.0f, 0.5f),
           P("Center Y", "uCenterY", T::Float, 0.0f, 1.0f, 0.5f),
-          P("Flip", "uFlip", T::Int, 0.0f, 1.0f, 0.0f) } },
+          E("flip", "uFlip", { "Off", "On" }, 0) } },
 
       { "kaleidoscope", "Effects",
         "uniform float uSegments;\n"
@@ -630,7 +619,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { P("Scale", "uScale", T::Float, 10.0f, 300.0f, 80.0f),
           P("Angle", "uAngle", T::Float, 0.0f, 1.5708f, 0.4f),
-          P("Colour (0/1)", "uColorMode", T::Int, 0.0f, 1.0f, 0.0f) } },
+          E("style", "uColorMode", { "Mono", "Colour" }, 0) } },
 
       { "edge sobel", "Effects",
         "uniform float uAmount;\n"
@@ -649,7 +638,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   fragColor = vec4(vec3(e), texture(uSrc, vUv).a);\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.1f, 8.0f, 1.5f),
-          P("Invert", "uInvert", T::Int, 0.0f, 1.0f, 0.0f) } },
+          E("invert", "uInvert", { "Off", "On" }, 0) } },
 
       { "edge outline", "Effects",
         "uniform float uThickness;\n"

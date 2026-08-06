@@ -42,6 +42,10 @@
 #include "nodes/NoiseNode.h"
 #include "nodes/ResynthNode.h"
 #include "nodes/MacroNodes.h"
+#include "nodes/CurvesNode.h"
+#include "nodes/RemoveBgNode.h"
+#include "nodes/DrawNode.h"
+#include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/OutputNode.h"
@@ -306,7 +310,7 @@ namespace
 
    const std::vector<std::string>& AlignOptions()
    {
-      static const std::vector<std::string> kAlign = { "Left", "Center", "Right" };
+      static const std::vector<std::string> kAlign = { "Left", "Center", "Right", "Justified" };
       return kAlign;
    }
 
@@ -389,8 +393,14 @@ namespace
       REGISTER_NODE(TextNode, Text, "Text");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
+      REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");
+      REGISTER_NODE(CurvesNode, Curves, "Color");
+      REGISTER_NODE(RemoveBgNode, Remove Background, "Mask");
+      REGISTER_NODE(FeedbackNode, Feedback, "Feedback");
+      REGISTER_NODE(TrailsNode, Trails, "Feedback");
+      REGISTER_NODE(ReactionDiffusionNode, Reaction Diffusion, "Feedback");
       REGISTER_NODE(BlendNode, Blend, "Compositing");
       REGISTER_NODE(LayerStackNode, Layer Stack, "Compositing");
       REGISTER_NODE(SwitcherNode, Switcher, "Compositing");
@@ -451,6 +461,18 @@ namespace
          return 1;
       if (dynamic_cast<ResynthNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<CurvesNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<RemoveBgNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<DrawNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<ReactionDiffusionNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr)
          return 1;
       return 0; // sources and modulators have no image inputs
@@ -474,6 +496,18 @@ namespace
          return slot == 0 ? &fit->Input() : nullptr;
       if (auto* resynth = dynamic_cast<ResynthNode*>(gn.node.get()))
          return slot == 0 ? &resynth->Input() : nullptr;
+      if (auto* curves = dynamic_cast<CurvesNode*>(gn.node.get()))
+         return slot == 0 ? &curves->Input() : nullptr;
+      if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn.node.get()))
+         return slot == 0 ? &rbg->Input() : nullptr;
+      if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
+         return slot == 0 ? &draw->Input() : nullptr;
+      if (auto* fb = dynamic_cast<FeedbackNode*>(gn.node.get()))
+         return slot == 0 ? &fb->Input() : nullptr;
+      if (auto* trails = dynamic_cast<TrailsNode*>(gn.node.get()))
+         return slot == 0 ? &trails->Input() : nullptr;
+      if (auto* rd = dynamic_cast<ReactionDiffusionNode*>(gn.node.get()))
+         return slot == 0 ? &rd->Input() : nullptr;
       if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
          return slot == 0 ? &out->Input() : nullptr;
       return nullptr;
@@ -686,6 +720,20 @@ namespace
       ModSlider("pos x", &n->posX, 0.0f, 1.0f);
       ModSlider("pos y", &n->posY, 0.0f, 1.0f);
       DropdownButton("align", AlignOptions(), n->align, [n](int i) { n->align = i; });
+      ModSlider("scale x", &n->scaleX, 0.1f, 4.0f);
+      ModSlider("scale y", &n->scaleY, 0.1f, 4.0f);
+      ImGui::Checkbox("word wrap", &n->wordWrap);
+      if (n->wordWrap)
+      {
+         ModSlider("wrap width", &n->wrapWidth, 0.1f, 1.0f);
+         ModSlider("line spacing", &n->lineSpacing, 0.5f, 2.5f);
+      }
+      ModSlider("outline", &n->outlineWidth, 0.0f, 20.0f);
+      if (n->outlineWidth > 0.0f)
+      {
+         ColorSwatch("outline colour", n->outlineColor, n);
+         ImGui::Checkbox("outline only", &n->outlineOnly);
+      }
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
    }
@@ -861,6 +909,21 @@ namespace
          dl->AddLine(a, b, IM_COL32(120, 200, 255, 170), 1.4f);
       }
 
+      // Corner labels: the pad blends between these four named effects, so it is
+      // obvious what is being swept rather than four anonymous weights.
+      const ImU32 labelCol = IM_COL32(150, 156, 180, 255);
+      const char* bl = n->CornerLabel(0);
+      const char* brName = n->CornerLabel(1);
+      const char* tl = n->CornerLabel(2);
+      const char* trName = n->CornerLabel(3);
+      dl->AddText(ImVec2(origin.x + 5, origin.y + 4), labelCol, tl);
+      ImVec2 trSize = ImGui::CalcTextSize(trName);
+      dl->AddText(ImVec2(br.x - trSize.x - 5, origin.y + 4), labelCol, trName);
+      ImVec2 blSize = ImGui::CalcTextSize(bl);
+      dl->AddText(ImVec2(origin.x + 5, br.y - blSize.y - 4), labelCol, bl);
+      ImVec2 brSize = ImGui::CalcTextSize(brName);
+      dl->AddText(ImVec2(br.x - brSize.x - 5, br.y - brSize.y - 4), labelCol, brName);
+
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
       ImU32 orbColor = n->IsRecordingPath() ? IM_COL32(255, 90, 90, 255)
                      : n->IsPlayingPath()   ? IM_COL32(120, 235, 150, 255)
@@ -919,6 +982,22 @@ namespace
          n->Reset();
       if (ImGui::Button("Randomise FX", ImVec2(kPreviewSize, 0)))
          n->Randomise();
+
+      if (ImGui::TreeNode("pad corners"))
+      {
+         static const char* kCornerNames[4] = { "bottom left", "bottom right", "top left", "top right" };
+         for (int c = 0; c < ResynthNode::kCorners; c++)
+         {
+            ImGui::PushID(c);
+            char label[32];
+            snprintf(label, sizeof(label), "%s##c%d", kCornerNames[c], c);
+            DropdownButton(label, ResynthNode::EffectNames(), n->cornerEffect[c],
+                           [n, c](int i) { n->cornerEffect[c] = i; });
+            ModSlider("amount", &n->cornerAmount[c], 0.0f, 1.0f);
+            ImGui::PopID();
+         }
+         ImGui::TreePop();
+      }
       ImGui::Checkbox("auto iterate", &n->autoIterate);
       if (n->autoIterate)
          ModSlider("steps / beat", &n->stepsPerBeat, 0.05f, 16.0f);
@@ -1006,6 +1085,186 @@ namespace
       ModSlider("speed", &n->speed, 0.05f, 4.0f);
    }
 
+   // Interactive tone curve. Drag points, click empty space to add one,
+   // right-click a point to remove it.
+   void DrawCurveEditor(CurvesNode* n)
+   {
+      const float size = kPreviewSize;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImGui::InvisibleButton("##curve", ImVec2(size, size));
+      const bool hovered = ImGui::IsItemHovered();
+      const bool active = ImGui::IsItemActive();
+
+      auto toScreen = [&](float x, float y) {
+         return ImVec2(origin.x + x * size, origin.y + (1.0f - y) * size);
+      };
+      auto toCurve = [&](ImVec2 p) {
+         return ImVec2(std::min(1.0f, std::max(0.0f, (p.x - origin.x) / size)),
+                       std::min(1.0f, std::max(0.0f, 1.0f - (p.y - origin.y) / size)));
+      };
+
+      std::vector<CurvesNode::Point>& pts = n->Points(n->activeChannel);
+
+      static int sDragIndex = -1;
+      static CurvesNode* sDragNode = nullptr;
+
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      int nearest = -1;
+      float nearestDist = 12.0f;
+      for (int i = 0; i < (int)pts.size(); i++)
+      {
+         ImVec2 sp = toScreen(pts[i].x, pts[i].y);
+         float d = std::sqrt((sp.x - mouse.x) * (sp.x - mouse.x) + (sp.y - mouse.y) * (sp.y - mouse.y));
+         if (d < nearestDist)
+         {
+            nearestDist = d;
+            nearest = i;
+         }
+      }
+
+      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      {
+         if (nearest >= 0)
+         {
+            sDragIndex = nearest;
+            sDragNode = n;
+         }
+         else
+         {
+            ImVec2 c = toCurve(mouse);
+            sDragIndex = n->AddPoint(n->activeChannel, c.x, c.y);
+            sDragNode = n;
+         }
+      }
+      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && nearest >= 0)
+         n->RemovePoint(n->activeChannel, nearest);
+
+      if (active && sDragNode == n && sDragIndex >= 0)
+      {
+         ImVec2 c = toCurve(mouse);
+         n->MovePoint(n->activeChannel, sDragIndex, c.x, c.y);
+      }
+      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+      {
+         sDragIndex = -1;
+         sDragNode = nullptr;
+      }
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImVec2 br(origin.x + size, origin.y + size);
+      dl->AddRectFilled(origin, br, IM_COL32(16, 16, 22, 255), 4.0f);
+      for (int i = 1; i < 4; i++)
+      {
+         float f = (float)i / 4.0f;
+         dl->AddLine(ImVec2(origin.x + size * f, origin.y), ImVec2(origin.x + size * f, br.y), IM_COL32(44, 46, 58, 255));
+         dl->AddLine(ImVec2(origin.x, origin.y + size * f), ImVec2(br.x, origin.y + size * f), IM_COL32(44, 46, 58, 255));
+      }
+      dl->AddLine(origin, ImVec2(br.x, br.y), IM_COL32(58, 60, 74, 255)); // identity reference
+
+      ImU32 lineCol = IM_COL32(230, 235, 250, 255);
+      if (n->activeChannel == CurvesNode::kRed)   lineCol = IM_COL32(255, 110, 110, 255);
+      if (n->activeChannel == CurvesNode::kGreen) lineCol = IM_COL32(120, 230, 130, 255);
+      if (n->activeChannel == CurvesNode::kBlue)  lineCol = IM_COL32(120, 170, 255, 255);
+
+      const int kSegments = 64;
+      for (int i = 1; i <= kSegments; i++)
+      {
+         float x0 = (float)(i - 1) / kSegments;
+         float x1 = (float)i / kSegments;
+         dl->AddLine(toScreen(x0, n->Evaluate(n->activeChannel, x0)),
+                     toScreen(x1, n->Evaluate(n->activeChannel, x1)), lineCol, 1.8f);
+      }
+      for (int i = 0; i < (int)pts.size(); i++)
+      {
+         ImVec2 sp = toScreen(pts[i].x, pts[i].y);
+         dl->AddCircleFilled(sp, i == nearest ? 6.0f : 4.5f, lineCol);
+         dl->AddCircle(sp, i == nearest ? 6.0f : 4.5f, IM_COL32(18, 18, 26, 255), 0, 1.5f);
+      }
+      dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+   }
+
+   void DrawCurvesParams(CurvesNode* n)
+   {
+      DropdownButton("channel", CurvesNode::ChannelNames(), n->activeChannel,
+                     [n](int i) { n->activeChannel = i; });
+      DrawCurveEditor(n);
+      ImGui::TextDisabled("drag points, click to add, right-click to remove");
+      if (ImGui::Button("Reset channel", ImVec2(kPreviewSize, 0)))
+         n->ResetChannel(n->activeChannel);
+      ModSlider("mix", &n->mix, 0.0f, 1.0f);
+   }
+
+   void DrawRemoveBgParams(RemoveBgNode* n)
+   {
+      DropdownButton("detect", RemoveBgNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
+      DropdownButton("output", RemoveBgNode::OutputModeNames(), n->outputMode,
+                     [n](int i) { n->outputMode = i; });
+
+      if (ImGui::Button("Remove Background", ImVec2(kPreviewSize, 0)))
+         n->RequestMask();
+
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      ImGui::TextDisabled("%s", n->Status().c_str());
+      ImGui::PopTextWrapPos();
+
+      ModSlider("feather", &n->feather, 0.0f, 4.0f);
+      ModSlider("threshold", &n->threshold, 0.0f, 1.0f);
+      ModSlider("edge contrast", &n->contrast, 0.5f, 8.0f);
+      ColorSwatch("bg", n->bgColor, n);
+      ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
+
+      ImGui::Checkbox("auto refresh (video)", &n->autoRefresh);
+      if (n->autoRefresh)
+      {
+         ModSlider("every beats", &n->refreshBeats, 0.1f, 8.0f);
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("segmentation is expensive - it runs on this interval, not every frame");
+         ImGui::PopTextWrapPos();
+      }
+   }
+
+   void DrawFeedbackParams(FeedbackNode*)
+   {
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      ImGui::TextDisabled("Outputs the previous frame. Patch a downstream node's "
+                          "output back through this to build a loop without the "
+                          "graph recursing.");
+      ImGui::PopTextWrapPos();
+   }
+
+   void DrawTrailsParams(TrailsNode* n)
+   {
+      static const std::vector<std::string> kBlends = { "Max", "Add", "Screen" };
+      DropdownButton("blend", kBlends, n->blendMode, [n](int i) { n->blendMode = i; });
+      ModSlider("decay", &n->decay, 0.5f, 0.999f);
+      ModSlider("zoom", &n->zoom, 0.9f, 1.1f);
+      ModSlider("rotate", &n->rotate, -0.1f, 0.1f);
+      ModSlider("drift x", &n->driftX, -0.02f, 0.02f);
+      ModSlider("drift y", &n->driftY, -0.02f, 0.02f);
+      ModSlider("hue shift", &n->hueShift, -0.05f, 0.05f);
+      if (ImGui::Button("Clear", ImVec2(kPreviewSize, 0)))
+         n->Clear();
+   }
+
+   void DrawReactionDiffusionParams(ReactionDiffusionNode* n)
+   {
+      DropdownButton("preset", ReactionDiffusionNode::PresetNames(), n->preset,
+                     [n](int i) { n->ApplyPreset(i); });
+      ModSlider("feed", &n->feed, 0.01f, 0.09f, "%.4f");
+      ModSlider("kill", &n->kill, 0.03f, 0.08f, "%.4f");
+      ModSlider("diffuse A", &n->diffuseA, 0.2f, 1.5f);
+      ModSlider("diffuse B", &n->diffuseB, 0.1f, 1.0f);
+      ModSlider("steps / frame", &n->stepsPerFrame, 1.0f, 32.0f, "%.0f");
+      ImGui::TextDisabled("with an input connected:");
+      ModSlider("source influence", &n->sourceInfluence, 0.0f, 1.0f);
+      ModSlider("width", &n->width, 64.0f, 2048.0f, "%.0f");
+      ModSlider("height", &n->height, 64.0f, 2048.0f, "%.0f");
+      ColorSwatch("low", n->lowColor, n);
+      ColorSwatch("high", n->highColor, n);
+      if (ImGui::Button("Reseed", ImVec2(kPreviewSize, 0)))
+         n->Reseed();
+   }
+
    void DrawBlendParams(BlendNode* n)
    {
       DropdownButton("mode", BlendNode::ModeNames(), n->ModeIndex(),
@@ -1015,23 +1274,48 @@ namespace
 
    void DrawLayerStackParams(LayerStackNode* n)
    {
-      // Layers composite bottom-up: A is the base, D sits on top. The arrows
-      // move a whole layer (cable, mode and opacity) up or down the stack.
-      ImGui::TextDisabled("A is the base, D is on top");
+      // Layers composite bottom-up: A is the base, D sits on top. Grab a layer's
+      // header strip and drag vertically to reorder - the whole layer moves,
+      // cable, blend mode and opacity together.
+      ImGui::TextDisabled("A is the base, D is on top - drag a header to reorder");
+
+      static LayerStackNode* sDragNode = nullptr;
+      static int sDragSlot = -1;
+      static float sDragAccum = 0.0f;
+      const float rowHeight = ImGui::GetTextLineHeightWithSpacing();
+
       for (int slot = 0; slot < LayerStackNode::kSlots; slot++)
       {
          ImGui::PushID(slot);
-         ImGui::TextDisabled("layer %c", 'A' + slot);
-         ImGui::SameLine();
-         ImGui::BeginDisabled(slot == 0);
-         if (ImGui::SmallButton("up"))
-            n->SwapLayers(slot, slot - 1);
-         ImGui::EndDisabled();
-         ImGui::SameLine();
-         ImGui::BeginDisabled(slot == LayerStackNode::kSlots - 1);
-         if (ImGui::SmallButton("down"))
-            n->SwapLayers(slot, slot + 1);
-         ImGui::EndDisabled();
+
+         const bool dragging = (sDragNode == n && sDragSlot == slot);
+         ImVec2 headerPos = ImGui::GetCursorScreenPos();
+         ImGui::InvisibleButton("##grip", ImVec2(kPreviewSize, rowHeight));
+         if (ImGui::IsItemActive() && sDragNode == nullptr)
+         {
+            sDragNode = n;
+            sDragSlot = slot;
+            sDragAccum = 0.0f;
+         }
+
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         if (dragging || ImGui::IsItemHovered())
+         {
+            dl->AddRectFilled(headerPos,
+                              ImVec2(headerPos.x + kPreviewSize, headerPos.y + rowHeight),
+                              dragging ? IM_COL32(70, 90, 130, 200) : IM_COL32(50, 54, 68, 160), 3.0f);
+         }
+         // grip dots, so the header reads as draggable
+         for (int d = 0; d < 3; d++)
+         {
+            dl->AddCircleFilled(ImVec2(headerPos.x + 6, headerPos.y + 5 + d * 4.0f), 1.3f,
+                                IM_COL32(140, 146, 168, 255));
+            dl->AddCircleFilled(ImVec2(headerPos.x + 11, headerPos.y + 5 + d * 4.0f), 1.3f,
+                                IM_COL32(140, 146, 168, 255));
+         }
+         char title[32];
+         snprintf(title, sizeof(title), "layer %c", 'A' + slot);
+         dl->AddText(ImVec2(headerPos.x + 20, headerPos.y + 2), IM_COL32(190, 196, 215, 255), title);
 
          char modeLabel[32];
          snprintf(modeLabel, sizeof(modeLabel), "mode##%d", slot);
@@ -1039,6 +1323,34 @@ namespace
                         [n, slot](int i) { n->modes[slot] = i; });
          ModSlider("opacity", &n->opacities[slot], 0.0f, 1.0f);
          ImGui::PopID();
+      }
+
+      // Resolve the drag once per frame: accumulate vertical movement and swap a
+      // slot at a time so the layer follows the cursor.
+      if (sDragNode == n && sDragSlot >= 0)
+      {
+         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         {
+            sDragNode = nullptr;
+            sDragSlot = -1;
+         }
+         else
+         {
+            sDragAccum += ImGui::GetIO().MouseDelta.y;
+            const float threshold = rowHeight * 3.0f; // one full layer block
+            while (sDragAccum > threshold && sDragSlot < LayerStackNode::kSlots - 1)
+            {
+               n->SwapLayers(sDragSlot, sDragSlot + 1);
+               sDragSlot++;
+               sDragAccum -= threshold;
+            }
+            while (sDragAccum < -threshold && sDragSlot > 0)
+            {
+               n->SwapLayers(sDragSlot, sDragSlot - 1);
+               sDragSlot--;
+               sDragAccum += threshold;
+            }
+         }
       }
    }
 
@@ -1052,6 +1364,12 @@ namespace
          if (p.type == FilterParamDef::Type::Color)
          {
             ColorSwatch(p.label.c_str(), n->ParamPtr(i), n);
+         }
+         else if (p.type == FilterParamDef::Type::Enum)
+         {
+            float* slot = n->ParamPtr(i);
+            DropdownButton(p.label.c_str(), p.options, (int)(*slot + 0.5f),
+                           [slot](int choice) { *slot = (float)choice; });
          }
          else
          {
@@ -1083,6 +1401,79 @@ namespace
 
       stbi_flip_vertically_on_write(1);
       stbi_write_png(path.c_str(), w, h, 4, pixels.data(), w * 4);
+   }
+
+   // Paintable preview: the Draw node turns its 1:1 preview into the canvas, so
+   // you draw directly on the node rather than in a separate window.
+   void DrawPaintablePreview(DrawNode* node)
+   {
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImGui::InvisibleButton("##canvas", ImVec2(kPreviewSize, kPreviewSize));
+
+      const int w = node->GetOutputWidth();
+      const int h = node->GetOutputHeight();
+      float dw = kPreviewSize, dh = kPreviewSize;
+      if (w > 0 && h > 0)
+      {
+         const float scale = kPreviewSize / (float)std::max(w, h);
+         dw = w * scale;
+         dh = h * scale;
+      }
+      const ImVec2 tl(origin.x + (kPreviewSize - dw) * 0.5f, origin.y + (kPreviewSize - dh) * 0.5f);
+
+      if (ImGui::IsItemActive())
+      {
+         const ImVec2 m = ImGui::GetIO().MousePos;
+         const float u = (m.x - tl.x) / std::max(1.0f, dw);
+         const float v = 1.0f - (m.y - tl.y) / std::max(1.0f, dh); // texture space is bottom-up
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            node->BeginStroke(u, v);
+         else
+            node->ContinueStroke(u, v);
+      }
+      else if (ImGui::IsItemDeactivated())
+      {
+         node->EndStroke();
+      }
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
+                        IM_COL32(18, 18, 24, 255), 4.0f);
+      // checkerboard, so transparent areas of the canvas are obvious
+      for (int y = 0; y < 8; y++)
+      {
+         for (int x = 0; x < 8; x++)
+         {
+            if ((x + y) % 2)
+               continue;
+            const float c = kPreviewSize / 8.0f;
+            dl->AddRectFilled(ImVec2(origin.x + x * c, origin.y + y * c),
+                              ImVec2(origin.x + (x + 1) * c, origin.y + (y + 1) * c),
+                              IM_COL32(30, 30, 38, 255));
+         }
+      }
+      if (node->GetOutputTexture() != 0)
+         dl->AddImage((ImTextureID)(intptr_t)node->GetOutputTexture(), tl,
+                      ImVec2(tl.x + dw, tl.y + dh), ImVec2(0, 1), ImVec2(1, 0));
+      dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
+                  IM_COL32(90, 130, 190, 255), 4.0f, 0, 2.0f);
+   }
+
+   void DrawDrawParams(DrawNode* n)
+   {
+      DropdownButton("brush", DrawNode::BrushNames(), n->brush, [n](int i) { n->brush = i; });
+      ModSlider("size", &n->brushSize, 0.002f, 0.5f);
+      ModSlider("opacity", &n->opacity, 0.02f, 1.0f);
+      ModSlider("hardness", &n->hardness, 0.0f, 0.98f);
+      ModSlider("spacing", &n->spacing, 0.02f, 1.0f);
+      ModSlider("jitter", &n->jitter, 0.0f, 2.0f);
+      ColorSwatch("colour", n->color, n);
+      ImGui::Checkbox("eraser", &n->eraser);
+      if (ImGui::Button("Clear canvas", ImVec2(kPreviewSize, 0)))
+         n->ClearCanvas();
+      ImGui::TextDisabled("(canvas size follows the input when one is patched in)");
+      ModSlider("canvas w", &n->canvasWidth, 64.0f, 4096.0f, "%.0f");
+      ModSlider("canvas h", &n->canvasHeight, 64.0f, 4096.0f, "%.0f");
    }
 
    // Square, letterboxed preview so non-square sources still read 1:1.
@@ -1500,7 +1891,29 @@ int main()
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr;
 
-      if (getenv("INFINITE_SHOWCASE3") != nullptr)
+      if (getenv("INFINITE_SHOWCASE4") != nullptr)
+      {
+         SpawnNode("Reaction Diffusion", "Feedback", 40.0f, 40.0f);
+         SpawnNode("Curves", "Color", 300.0f, 40.0f);
+         SpawnNode("Shape", "Source", 560.0f, 40.0f);
+         SpawnNode("Trails", "Feedback", 820.0f, 40.0f);
+         SpawnNode("Resynthesize", "Resynth", 1080.0f, 40.0f);
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         CableFor(gNodes[3], 0)->Connect(gNodes[2].node.get());
+         CableFor(gNodes[4], 0)->Connect(gNodes[0].node.get());
+         auto* cv = static_cast<CurvesNode*>(gNodes[1].node.get());
+         cv->AddPoint(CurvesNode::kRGB, 0.35f, 0.75f);
+         cv->AddPoint(CurvesNode::kRGB, 0.7f, 0.2f);
+         auto* tr = static_cast<TrailsNode*>(gNodes[3].node.get());
+         tr->zoom = 1.02f; tr->rotate = 0.01f; tr->decay = 0.96f;
+         auto* rd = static_cast<ReactionDiffusionNode*>(gNodes[0].node.get());
+         rd->ApplyPreset(0);
+         rd->stepsPerFrame = 24.0f;
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+         gNodes[2].showParams = false;
+      }
+      else if (getenv("INFINITE_SHOWCASE3") != nullptr)
       {
          SpawnNode("Shape", "Source", 40.0f, 40.0f);
          SpawnNode("kaleidoscope", "Effects", 300.0f, 40.0f);
@@ -2022,6 +2435,8 @@ int main()
          // --- preview: image for image nodes, a value meter for modulators ---
          if (auto* mod = dynamic_cast<IModulator*>(gn.node.get()))
             DrawModulatorMeter(mod, gn.index);
+         else if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
+            DrawPaintablePreview(draw);
          else
             DrawPreview(gn.node.get());
 
@@ -2060,6 +2475,18 @@ int main()
                DrawNoiseParams(n);
             else if (auto* n = dynamic_cast<ResynthNode*>(gn.node.get()))
                DrawResynthParams(n);
+            else if (auto* n = dynamic_cast<CurvesNode*>(gn.node.get()))
+               DrawCurvesParams(n);
+            else if (auto* n = dynamic_cast<RemoveBgNode*>(gn.node.get()))
+               DrawRemoveBgParams(n);
+            else if (auto* n = dynamic_cast<DrawNode*>(gn.node.get()))
+               DrawDrawParams(n);
+            else if (auto* n = dynamic_cast<FeedbackNode*>(gn.node.get()))
+               DrawFeedbackParams(n);
+            else if (auto* n = dynamic_cast<TrailsNode*>(gn.node.get()))
+               DrawTrailsParams(n);
+            else if (auto* n = dynamic_cast<ReactionDiffusionNode*>(gn.node.get()))
+               DrawReactionDiffusionParams(n);
             else if (auto* n = dynamic_cast<SwitcherNode*>(gn.node.get()))
                DrawSwitcherParams(n);
             else if (auto* n = dynamic_cast<ShapeNode*>(gn.node.get()))

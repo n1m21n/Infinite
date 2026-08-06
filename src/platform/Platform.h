@@ -33,6 +33,20 @@ namespace Platform
    // Seeking backwards restarts the reader, which is how looping works.
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels);
 
+   // ---- background removal ----
+   // Uses Vision's on-device segmentation: no model download, no network, no
+   // API key. Subject lifting (any salient foreground) needs macOS 14; person
+   // segmentation works from macOS 12. Returns false with a reason otherwise.
+   enum class MattingMode
+   {
+      Subject, // any salient foreground object (macOS 14+)
+      Person   // people only (macOS 12+)
+   };
+
+   bool SubjectMask(const std::vector<unsigned char>& rgbaPixels, int width, int height,
+                    MattingMode mode, std::vector<unsigned char>& outMask,
+                    std::string& outError);
+
    // ---- video recording ---------------------------------------------------
    struct RecorderHandle;
 

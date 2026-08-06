@@ -4,11 +4,13 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <AVFoundation/AVFoundation.h>
+#import <Vision/Vision.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
 
 #include <cstring>
 #include <cmath>
+#include <algorithm>
 
 namespace Platform
 {
@@ -502,5 +504,146 @@ namespace Platform
    int RecorderFrameCount(RecorderHandle* handle)
    {
       return handle ? (int)handle->frameIndex : 0;
+   }
+}
+
+// ==================================================== background removal
+
+namespace Platform
+{
+   bool SubjectMask(const std::vector<unsigned char>& rgbaPixels, int width, int height,
+                    MattingMode mode, std::vector<unsigned char>& outMask,
+                    std::string& outError)
+   {
+      if (width <= 0 || height <= 0 || rgbaPixels.size() < (size_t)width * height * 4)
+      {
+         outError = "bad image";
+         return false;
+      }
+
+      @autoreleasepool
+      {
+         // Incoming pixels are bottom-up (GL order); Vision wants top-down.
+         const size_t stride = (size_t)width * 4;
+         std::vector<unsigned char> topDown(rgbaPixels.size());
+         for (int y = 0; y < height; y++)
+            memcpy(&topDown[y * stride], &rgbaPixels[(height - 1 - y) * stride], stride);
+
+         CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+         CGContextRef ctx = CGBitmapContextCreate(topDown.data(), width, height, 8, stride, cs,
+                                                  kCGImageAlphaPremultipliedLast);
+         CGColorSpaceRelease(cs);
+         if (ctx == NULL)
+         {
+            outError = "could not wrap image";
+            return false;
+         }
+         CGImageRef cgImage = CGBitmapContextCreateImage(ctx);
+         CGContextRelease(ctx);
+         if (cgImage == NULL)
+         {
+            outError = "could not build CGImage";
+            return false;
+         }
+
+         VNImageRequestHandler* handler =
+            [[VNImageRequestHandler alloc] initWithCGImage:cgImage options:@{}];
+
+         CVPixelBufferRef maskBuffer = NULL;
+         NSError* err = nil;
+
+         if (mode == MattingMode::Subject)
+         {
+            if (@available(macOS 14.0, *))
+            {
+               VNGenerateForegroundInstanceMaskRequest* request =
+                  [[VNGenerateForegroundInstanceMaskRequest alloc] init];
+               if (![handler performRequests:@[ request ] error:&err])
+               {
+                  outError = err ? std::string([[err localizedDescription] UTF8String]) : "vision failed";
+                  CGImageRelease(cgImage);
+                  return false;
+               }
+               VNInstanceMaskObservation* obs = [[request results] firstObject];
+               if (obs == nil)
+               {
+                  outError = "no subject found in this image";
+                  CGImageRelease(cgImage);
+                  return false;
+               }
+               maskBuffer = [obs generateScaledMaskForImageForInstances:obs.allInstances
+                                                     fromRequestHandler:handler
+                                                                  error:&err];
+            }
+            else
+            {
+               outError = "subject masking needs macOS 14 - try Person mode";
+               CGImageRelease(cgImage);
+               return false;
+            }
+         }
+         else
+         {
+            if (@available(macOS 12.0, *))
+            {
+               VNGeneratePersonSegmentationRequest* request =
+                  [[VNGeneratePersonSegmentationRequest alloc] init];
+               request.qualityLevel = VNGeneratePersonSegmentationRequestQualityLevelAccurate;
+               request.outputPixelFormat = kCVPixelFormatType_OneComponent8;
+               if (![handler performRequests:@[ request ] error:&err])
+               {
+                  outError = err ? std::string([[err localizedDescription] UTF8String]) : "vision failed";
+                  CGImageRelease(cgImage);
+                  return false;
+               }
+               VNPixelBufferObservation* obs = [[request results] firstObject];
+               if (obs == nil)
+               {
+                  outError = "no person found in this image";
+                  CGImageRelease(cgImage);
+                  return false;
+               }
+               maskBuffer = obs.pixelBuffer;
+               CVPixelBufferRetain(maskBuffer);
+            }
+            else
+            {
+               outError = "person segmentation needs macOS 12";
+               CGImageRelease(cgImage);
+               return false;
+            }
+         }
+
+         CGImageRelease(cgImage);
+
+         if (maskBuffer == NULL)
+         {
+            if (outError.empty())
+               outError = err ? std::string([[err localizedDescription] UTF8String]) : "no mask produced";
+            return false;
+         }
+
+         CVPixelBufferLockBaseAddress(maskBuffer, kCVPixelBufferLock_ReadOnly);
+         const int mw = (int)CVPixelBufferGetWidth(maskBuffer);
+         const int mh = (int)CVPixelBufferGetHeight(maskBuffer);
+         const size_t mStride = CVPixelBufferGetBytesPerRow(maskBuffer);
+         const unsigned char* mSrc = (const unsigned char*)CVPixelBufferGetBaseAddress(maskBuffer);
+
+         // Rescale (nearest) to the requested size and flip back to GL order.
+         outMask.assign((size_t)width * height, 0);
+         for (int y = 0; y < height; y++)
+         {
+            const int sy = std::min(mh - 1, y * mh / height);
+            unsigned char* dstRow = &outMask[(size_t)(height - 1 - y) * width];
+            const unsigned char* srcRow = mSrc + (size_t)sy * mStride;
+            for (int x = 0; x < width; x++)
+               dstRow[x] = srcRow[std::min(mw - 1, x * mw / width)];
+         }
+
+         CVPixelBufferUnlockBaseAddress(maskBuffer, kCVPixelBufferLock_ReadOnly);
+         CVPixelBufferRelease(maskBuffer);
+         outError.clear();
+         return true;
+      }
    }
 }

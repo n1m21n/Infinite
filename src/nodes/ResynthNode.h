@@ -22,6 +22,17 @@ public:
    static INode* Create() { return new ResynthNode(); }
    static const std::vector<std::string>& ModeNames();
 
+   // The eight mutation operators the pad can sweep between. Each pad corner is
+   // assigned one of these, and the orb's position bilinearly blends the four
+   // corner amounts - so the pad shows you exactly what it is mixing.
+   static const std::vector<std::string>& EffectNames();
+   static const int kEffectCount = 8;
+   static const int kCorners = 4; // 0=BL, 1=BR, 2=TL, 3=TR
+
+   int cornerEffect[kCorners] = { 0, 4, 5, 7 };
+   float cornerAmount[kCorners] = { 1.0f, 1.0f, 1.0f, 1.0f };
+   const char* CornerLabel(int corner) const;
+
    ~ResynthNode() override;
 
    unsigned int GetOutputTexture() override;
@@ -84,8 +95,7 @@ private:
    bool mNeedsReset = true;
    double mLastStepBeat = 0.0;
 
-   // eight mutation weights, blended by the pad position
-   float mWeights[8] = { 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f };
+
 
    std::vector<PadPoint> mPath;
    bool mRecordingPath = false;

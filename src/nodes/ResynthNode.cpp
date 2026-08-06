@@ -12,6 +12,12 @@ namespace
       "Drift", "Quilt", "Cellular", "Spectral", "Shatter"
    };
 
+   // Index order must match the uAmt[] slots the shader reads.
+   const std::vector<std::string> kEffectNames = {
+      "Flow Warp", "Patch Jump", "Cell Pull", "Ring Warp",
+      "Shatter", "Hue Drift", "Posterize", "Grain"
+   };
+
    // One generation of the mutation. Reads the previous generation (uPrev) and
    // the untouched source (uSrc), and writes the next generation.
    const char* kFragSrc =
@@ -29,7 +35,7 @@ namespace
       "uniform float uSourcePull;\n"
       "uniform float uGeneration;\n"
       "uniform float uSeed;\n"
-      "uniform float uW[8];\n"
+      "uniform float uAmt[8];\n"
       "\n"
       "float hash(vec2 p) {\n"
       "   p += uSeed;\n"
@@ -65,68 +71,67 @@ namespace
       "   float g = uGeneration;\n"
       "   vec2 uv = vUv;\n"
       "\n"
-      "   // --- displacement: how the sampling grid is perturbed each generation\n"
-      "   if (uMode == 0) {\n"
-      "      vec2 flow = vec2(vnoise(uv * (2.0 + uW[0] * 14.0) + g * 0.07),\n"
-      "                       vnoise(uv * (2.0 + uW[1] * 14.0) - g * 0.05)) - 0.5;\n"
-      "      uv += flow * uMutation * uChaos * 0.06;\n"
-      "   } else if (uMode == 1) {\n"
-      "      // quilt: snap to patch centres and resample a neighbouring patch\n"
-      "      float patch = 4.0 + uW[0] * 40.0;\n"
+      "   // uAmt[i] is how strongly effect i is being asked for by the pad.\n"
+      "   // 0 Flow Warp\n"
+      "   if (uAmt[0] > 0.001) {\n"
+      "      vec2 flow = vec2(vnoise(uv * 8.0 + g * 0.07), vnoise(uv * 8.0 - g * 0.05)) - 0.5;\n"
+      "      uv += flow * uAmt[0] * uMutation * uChaos * 0.12;\n"
+      "   }\n"
+      "   // 1 Patch Jump\n"
+      "   if (uAmt[1] > 0.001) {\n"
+      "      float patch = 16.0;\n"
       "      vec2 cell = floor(uv * patch);\n"
-      "      vec2 jump = (hash2(cell + floor(g)) - 0.5) * uChaos * 0.25;\n"
-      "      uv = (cell + fract(uv * patch)) / patch + jump;\n"
-      "   } else if (uMode == 2) {\n"
-      "      // cellular: pull each pixel toward its nearest wandering site\n"
-      "      float scale = 3.0 + uW[1] * 20.0;\n"
-      "      vec2 i = floor(uv * scale), f = fract(uv * scale);\n"
+      "      uv += (hash2(cell + floor(g)) - 0.5) * uAmt[1] * uChaos * 0.2;\n"
+      "   }\n"
+      "   // 2 Cell Pull\n"
+      "   if (uAmt[2] > 0.001) {\n"
+      "      float scale = 9.0;\n"
+      "      vec2 i2 = floor(uv * scale), f2 = fract(uv * scale);\n"
       "      float best = 8.0; vec2 bestOff = vec2(0.0);\n"
       "      for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {\n"
       "         vec2 gg = vec2(float(x), float(y));\n"
-      "         vec2 o = hash2(i + gg + floor(g * 0.5));\n"
-      "         float d = length(gg + o - f);\n"
-      "         if (d < best) { best = d; bestOff = gg + o - f; }\n"
+      "         vec2 o = hash2(i2 + gg + floor(g * 0.5));\n"
+      "         float d = length(gg + o - f2);\n"
+      "         if (d < best) { best = d; bestOff = gg + o - f2; }\n"
       "      }\n"
-      "      uv += bestOff / scale * uChaos * 0.5;\n"
-      "   } else if (uMode == 3) {\n"
-      "      // spectral: radial ring-shaped resampling, structure vs residual\n"
+      "      uv += bestOff / scale * uAmt[2] * uChaos * 0.6;\n"
+      "   }\n"
+      "   // 3 Ring Warp\n"
+      "   if (uAmt[3] > 0.001) {\n"
       "      vec2 d = uv - 0.5;\n"
-      "      float r = length(d);\n"
-      "      float ring = sin(r * (10.0 + uW[2] * 90.0) - g * 0.4);\n"
-      "      uv += normalize(d + 1e-5) * ring * uChaos * 0.02;\n"
-      "   } else {\n"
-      "      // shatter: hard blocky offsets, most violent of the five\n"
-      "      float blocks = 6.0 + uW[3] * 40.0;\n"
-      "      vec2 cell = floor(uv * blocks);\n"
-      "      float r = hash(cell + floor(g));\n"
-      "      if (r > 1.0 - uChaos * 0.6)\n"
-      "         uv += (hash2(cell + 3.0) - 0.5) * 0.2 * uChaos;\n"
+      "      float ring = sin(length(d) * 40.0 - g * 0.4);\n"
+      "      uv += normalize(d + 1e-5) * ring * uAmt[3] * uChaos * 0.03;\n"
+      "   }\n"
+      "   // 4 Shatter\n"
+      "   if (uAmt[4] > 0.001) {\n"
+      "      vec2 cell = floor(uv * 14.0);\n"
+      "      if (hash(cell + floor(g)) > 1.0 - uAmt[4] * uChaos)\n"
+      "         uv += (hash2(cell + 3.0) - 0.5) * 0.25 * uAmt[4] * uChaos;\n"
       "   }\n"
       "\n"
       "   uv = clamp(uv, 0.0, 1.0);\n"
       "   vec4 prev = texture(uPrev, uv);\n"
-      "\n"
-      "   // --- colour mutation, weighted by the pad\n"
       "   vec3 col = prev.rgb;\n"
-      "   vec3 hsv = rgb2hsv(col);\n"
-      "   hsv.x = fract(hsv.x + (uW[4] - 0.5) * uMutation * 0.08);\n"
-      "   hsv.y = clamp(hsv.y * (1.0 + (uW[5] - 0.5) * uMutation * 0.6), 0.0, 1.0);\n"
-      "   col = hsv2rgb(hsv);\n"
       "\n"
-      "   // posterise toward a shrinking palette as W6 rises\n"
-      "   float levels = mix(255.0, 3.0, uW[6] * uMutation);\n"
-      "   col = floor(col * levels + 0.5) / levels;\n"
+      "   // 5 Hue Drift\n"
+      "   if (uAmt[5] > 0.001) {\n"
+      "      vec3 hsv = rgb2hsv(col);\n"
+      "      hsv.x = fract(hsv.x + uAmt[5] * uMutation * 0.12);\n"
+      "      hsv.y = clamp(hsv.y * (1.0 + uAmt[5] * uMutation * 0.5), 0.0, 1.0);\n"
+      "      col = hsv2rgb(hsv);\n"
+      "   }\n"
+      "   // 6 Posterize\n"
+      "   if (uAmt[6] > 0.001) {\n"
+      "      float levels = mix(255.0, 3.0, uAmt[6] * uMutation);\n"
+      "      col = floor(col * levels + 0.5) / levels;\n"
+      "   }\n"
+      "   // 7 Grain\n"
+      "   if (uAmt[7] > 0.001)\n"
+      "      col += (hash(vUv * 997.0 + g) - 0.5) * uAmt[7] * uChaos * 0.35;\n"
       "\n"
-      "   // grain proportional to chaos\n"
-      "   float n = (hash(vUv * 997.0 + g) - 0.5) * uChaos * uW[7] * 0.25;\n"
-      "   col += n;\n"
-      "\n"
-      "   // --- recombine: keep some of the previous generation, pull back toward\n"
-      "   //     the source so it never fully disintegrates\n"
       "   vec3 outCol = mix(prev.rgb, col, clamp(uMutation, 0.0, 1.0));\n"
       "   outCol = mix(outCol, prev.rgb, 1.0 - clamp(uFeedback, 0.0, 1.0));\n"
       "   outCol = mix(outCol, src.rgb, clamp(uSourcePull, 0.0, 1.0));\n"
-      "\n"
       "   fragColor = vec4(clamp(outCol, 0.0, 1.0), max(prev.a, src.a));\n"
       "}\n";
 }
@@ -134,6 +139,17 @@ namespace
 const std::vector<std::string>& ResynthNode::ModeNames()
 {
    return kModeNames;
+}
+
+const std::vector<std::string>& ResynthNode::EffectNames()
+{
+   return kEffectNames;
+}
+
+const char* ResynthNode::CornerLabel(int corner) const
+{
+   const int e = std::max(0, std::min(cornerEffect[corner], kEffectCount - 1));
+   return kEffectNames[e].c_str();
 }
 
 ResynthNode::~ResynthNode()
@@ -160,13 +176,22 @@ bool ResynthNode::EnsureShader()
 
 void ResynthNode::Randomise()
 {
-   // Deterministic re-roll from the seed so a given seed always gives the same
-   // pad behaviour; nudging the seed is how you audition variations.
+   // Re-rolls which effect sits at each corner (all four distinct) and how hard
+   // it pushes. Deterministic from the seed so a look can be recovered.
    seed = std::fmod(seed * 1.618f + 7.31f, 100.0f);
-   for (int i = 0; i < 8; i++)
+
+   bool used[kEffectCount] = { false, false, false, false, false, false, false, false };
+   for (int c = 0; c < kCorners; c++)
    {
-      const float x = std::sin((seed + 1.0f) * (float)(i + 1) * 12.9898f) * 43758.5453f;
-      mWeights[i] = x - std::floor(x);
+      const float r = std::fmod(std::fabs(std::sin((seed + 1.0f) * (float)(c + 3) * 12.9898f) * 43758.5453f), 1.0f);
+      int pick = (int)(r * kEffectCount) % kEffectCount;
+      for (int guard = 0; guard < kEffectCount && used[pick]; guard++)
+         pick = (pick + 1) % kEffectCount;
+      used[pick] = true;
+      cornerEffect[c] = pick;
+
+      const float a = std::fmod(std::fabs(std::sin((seed + 5.0f) * (float)(c + 7) * 78.233f) * 43758.5453f), 1.0f);
+      cornerAmount[c] = 0.4f + a * 0.6f;
    }
 }
 
@@ -268,14 +293,25 @@ void ResynthNode::RunGeneration(unsigned int srcTex, int w, int h)
    const bool first = mNeedsReset;
    const unsigned int prevTex = GLUtil::FboTexture(mBuffers[mFront]);
 
-   // Pad position cross-fades the eight rolled weights: X drives the first four,
-   // Y the second four, so moving the orb sweeps between mutation characters.
-   float blended[8];
-   for (int i = 0; i < 8; i++)
+   // Bilinear blend of the four corners into per-effect amounts. An effect only
+   // contributes where its corner has weight, so the pad reads as a real map:
+   // bottom-left is corner 0, bottom-right 1, top-left 2, top-right 3.
+   float blended[kEffectCount] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+   const float wx = std::min(1.0f, std::max(0.0f, padX));
+   const float wy = std::min(1.0f, std::max(0.0f, padY));
+   const float cornerWeight[kCorners] = {
+      (1.0f - wx) * (1.0f - wy),
+      wx * (1.0f - wy),
+      (1.0f - wx) * wy,
+      wx * wy
+   };
+   for (int c = 0; c < kCorners; c++)
    {
-      const float axis = (i < 4) ? padX : padY;
-      blended[i] = mWeights[i] * axis + (1.0f - axis) * (1.0f - mWeights[i]);
+      const int e = std::max(0, std::min(cornerEffect[c], kEffectCount - 1));
+      blended[e] += cornerWeight[c] * cornerAmount[c];
    }
+   for (int i = 0; i < kEffectCount; i++)
+      blended[i] = std::min(1.0f, blended[i]);
 
    GLUtil::RunShaderPass(mBuffers[back], mProgram, [&]()
    {
@@ -296,7 +332,7 @@ void ResynthNode::RunGeneration(unsigned int srcTex, int w, int h)
       glUniform1f(glGetUniformLocation(mProgram, "uSourcePull"), sourcePull);
       glUniform1f(glGetUniformLocation(mProgram, "uGeneration"), (float)mGeneration);
       glUniform1f(glGetUniformLocation(mProgram, "uSeed"), seed);
-      glUniform1fv(glGetUniformLocation(mProgram, "uW"), 8, blended);
+      glUniform1fv(glGetUniformLocation(mProgram, "uAmt"), kEffectCount, blended);
    });
 
    mFront = back;

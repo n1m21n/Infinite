@@ -73,37 +73,93 @@ void TextNode::CookIfNeeded(int frameId)
       CTFontRef font = CTFontCreateWithName(cfFontName, fontSize, nullptr);
       CFRelease(cfFontName);
 
-      CGColorRef cgColor = CGColorCreateGenericRGB(color[0], color[1], color[2], 1.0);
+      CGColorRef fillColor = CGColorCreateGenericRGB(color[0], color[1], color[2], 1.0);
+      CGColorRef strokeColor = CGColorCreateGenericRGB(outlineColor[0], outlineColor[1], outlineColor[2], 1.0);
+
+      // CoreText encodes "stroke as well as fill" as a negative stroke width and
+      // "stroke only" as a positive one, both as a percentage of the font size.
+      float strokeSetting = 0.0f;
+      if (outlineWidth > 0.0f)
+         strokeSetting = outlineOnly ? outlineWidth : -outlineWidth;
+
+      CTTextAlignment ctAlign = kCTTextAlignmentCenter;
+      if (align == 0) ctAlign = kCTTextAlignmentLeft;
+      else if (align == 2) ctAlign = kCTTextAlignmentRight;
+      else if (align == 3) ctAlign = kCTTextAlignmentJustified;
+
+      CGFloat lineSpacingMultiple = std::max(0.1f, lineSpacing);
+      CTParagraphStyleSetting paragraphSettings[] = {
+         { kCTParagraphStyleSpecifierAlignment, sizeof(ctAlign), &ctAlign },
+         { kCTParagraphStyleSpecifierLineHeightMultiple, sizeof(lineSpacingMultiple), &lineSpacingMultiple },
+      };
+      CTParagraphStyleRef paragraphStyle = CTParagraphStyleCreate(paragraphSettings, 2);
 
       CFStringRef cfText = MakeCFString(text);
-      CFStringRef keys[] = { kCTFontAttributeName, kCTForegroundColorAttributeName, kCTKernAttributeName };
+      CFStringRef keys[] = {
+         kCTFontAttributeName, kCTForegroundColorAttributeName, kCTKernAttributeName,
+         kCTStrokeWidthAttributeName, kCTStrokeColorAttributeName, kCTParagraphStyleAttributeName
+      };
       CFNumberRef kern = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &tracking);
-      CFTypeRef values[] = { font, cgColor, kern };
+      CFNumberRef strokeNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &strokeSetting);
+      CFTypeRef values[] = { font, fillColor, kern, strokeNum, strokeColor, paragraphStyle };
       CFDictionaryRef attrs = CFDictionaryCreate(
-         kCFAllocatorDefault, (const void**)keys, (const void**)values, 3,
+         kCFAllocatorDefault, (const void**)keys, (const void**)values, 6,
          &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
       CFAttributedStringRef attrString = CFAttributedStringCreate(kCFAllocatorDefault, cfText, attrs);
-      CTLineRef line = CTLineCreateWithAttributedString(attrString);
 
-      CGRect bounds = CTLineGetImageBounds(line, ctx);
-      double originX = mWidth * posX;
-      double originY = mHeight * (1.0 - posY);
-      if (align == 1)
-         originX -= bounds.size.width * 0.5;
-      else if (align == 2)
-         originX -= bounds.size.width;
-      originY -= bounds.size.height * 0.5;
+      // Non-uniform scale is applied as a transform about the anchor point so it
+      // stretches the rendered glyphs rather than changing the layout metrics.
+      CGContextSaveGState(ctx);
+      const double anchorX = mWidth * posX;
+      const double anchorY = mHeight * (1.0 - posY);
+      CGContextTranslateCTM(ctx, anchorX, anchorY);
+      CGContextScaleCTM(ctx, std::max(0.01f, scaleX), std::max(0.01f, scaleY));
+      CGContextTranslateCTM(ctx, -anchorX, -anchorY);
 
-      CGContextSetTextPosition(ctx, originX, originY);
-      CTLineDraw(line, ctx);
+      if (wordWrap)
+      {
+         // Framesetter handles wrapping, multi-line layout and justification.
+         CTFramesetterRef setter = CTFramesetterCreateWithAttributedString(attrString);
+         const CGFloat boxW = std::max(16.0f, mWidth * std::max(0.05f, wrapWidth));
+         CGSize suggested = CTFramesetterSuggestFrameSizeWithConstraints(
+            setter, CFRangeMake(0, 0), nullptr, CGSizeMake(boxW, CGFLOAT_MAX), nullptr);
 
-      CFRelease(line);
+         CGRect box = CGRectMake(anchorX - boxW * 0.5, anchorY - suggested.height * 0.5,
+                                 boxW, suggested.height);
+         CGPathRef path = CGPathCreateWithRect(box, nullptr);
+         CTFrameRef frame = CTFramesetterCreateFrame(setter, CFRangeMake(0, 0), path, nullptr);
+         CTFrameDraw(frame, ctx);
+         CFRelease(frame);
+         CGPathRelease(path);
+         CFRelease(setter);
+      }
+      else
+      {
+         CTLineRef line = CTLineCreateWithAttributedString(attrString);
+         CGRect bounds = CTLineGetImageBounds(line, ctx);
+         double originX = anchorX;
+         double originY = anchorY - bounds.size.height * 0.5;
+         if (align == 1 || align == 3)
+            originX -= bounds.size.width * 0.5;
+         else if (align == 2)
+            originX -= bounds.size.width;
+
+         CGContextSetTextPosition(ctx, originX, originY);
+         CTLineDraw(line, ctx);
+         CFRelease(line);
+      }
+
+      CGContextRestoreGState(ctx);
+
       CFRelease(attrString);
       CFRelease(attrs);
+      CFRelease(strokeNum);
       CFRelease(kern);
       CFRelease(cfText);
-      CGColorRelease(cgColor);
+      CFRelease(paragraphStyle);
+      CGColorRelease(strokeColor);
+      CGColorRelease(fillColor);
       CFRelease(font);
       CGContextRelease(ctx);
    }

@@ -12,15 +12,17 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**64 node types across seven categories.**
+**65 node types across nine categories.**
 
 | Category | Nodes |
 |---|---|
-| Source | Image, Video, Shape (10 primitives), Noise (6 kinds), Formula (live GLSL, 16 presets) |
+| Source | Image, Video, Shape (10 primitives), Noise (6 kinds), Draw (paintable canvas), Formula (live GLSL, 16 presets) |
 | Text | Text (any installed system font) |
 | Effects | Blur family (gaussian/box/motion/radial), bloom, diffuse glow, unsharp mask, twirl, pinch-punch, ripple, lens distortion, displace, liquify, 6 glitch types, symmetry, kaleidoscope, mirror tile, halftone, sobel edge, edge outline, pixelate, noise, vignette, transform |
-| Color | Brightness/contrast, levels, curves, LUT, gradient map, channel mixer, HSL, invert, posterize, threshold, vibrance, black & white, colour balance, exposure |
+| Color | Brightness/contrast, levels, Curves (interactive spline editor), LUT, gradient map, channel mixer, HSL, invert, posterize, threshold, vibrance, black & white, colour balance, exposure |
 | Compositing | Blend (31 modes), Layer Stack (4 reorderable layers), Switcher, Fit, outer glow, colour overlay, drop shadow |
+| Feedback | Feedback (one-frame delay, makes cycles legal), Trails, Reaction-Diffusion |
+| Mask | Remove Background (on-device Vision segmentation) |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
 | Modulators | LFO, Random, Pattern (8-step), Math, Macro Knob, Macro XY (two outputs, recordable path) |
 | Output | Output (PNG export + H.264 recording) |
@@ -38,8 +40,14 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
   ImageIO/AVFoundation rather than a bundled decoder. Drag a file onto the
   canvas and the matching source node appears, already loaded.
 - **Resynthesize** — feeds each generation back into itself, so the image
-  evolves away from the original. An XY pad sweeps the mutation character, and
-  its path can be recorded, looped and played back.
+  evolves away from the original. An XY pad sweeps between four named mutation
+  effects, and its path can be recorded, looped and played back.
+- **Feedback** — a one-frame delay node makes graph cycles legal, which is what
+  Trails and Reaction-Diffusion are built on.
+- **Remove Background** — on-device subject or person segmentation via Vision.
+  No model download, no network, no API key.
+- **Draw** — paint straight onto the node with six procedural brushes, an
+  eraser, and optional image underneath.
 
 ## Install
 
