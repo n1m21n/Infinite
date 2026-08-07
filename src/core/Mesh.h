@@ -239,6 +239,13 @@ namespace MeshOps
    // vertices at UV seams and flat-shaded edges, and treating those as separate
    // points tears a surface open along its seams.
    std::vector<unsigned int> BuildWeldMap(const Mesh& in);
+
+   // Rounds off hard edges by pulling every vertex toward the average of its
+   // neighbours, then re-splitting so the flat regions stay flat. Not a true
+   // edge bevel - that needs a half-edge structure and per-edge loops - but it
+   // gives a cube the softened silhouette that catches a highlight, which is
+   // what a bevel is usually wanted for.
+   Mesh Bevel(const Mesh& in, float amount, int segments);
    Mesh Solidify(const Mesh& in, float thickness, bool keepOriginal);
    Mesh Extrude(const Mesh& in, float distance, float inset);
    Mesh Wireframe(const Mesh& in, float thickness);

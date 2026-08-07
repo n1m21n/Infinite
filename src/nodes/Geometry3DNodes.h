@@ -56,6 +56,16 @@ class GeometryNode : public INode, public IGeometrySource
 {
 public:
    static INode* Create() { return new GeometryNode(); }
+   // Each primitive is also registered under its own name, all sharing this
+   // class. The dropdown still works and still switches shape without
+   // rewiring - this just means "cube" is findable by typing "cube" rather
+   // than by knowing it lives inside a node called Geometry.
+   static INode* CreateFor(int shapeIndex)
+   {
+      auto* node = new GeometryNode();
+      node->shape = shapeIndex;
+      return node;
+   }
    static const std::vector<std::string>& ShapeNames();
    static const std::vector<std::string>& ShadingNames();
 
@@ -83,6 +93,8 @@ public:
    float tubeRadius = 0.4f;
    int knotP = 2;
    int knotQ = 3;
+   float bevel = 0.0f;
+   int bevelSegments = 1;
 
    float posX = 0.0f, posY = 0.0f, posZ = 0.0f;
    float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
@@ -102,6 +114,7 @@ public:
    {
       v.Int("shape", shape); v.Int("detail", detail); v.Int("sides", sides);
       v.Float("tube", tubeRadius); v.Int("knotP", knotP); v.Int("knotQ", knotQ);
+      v.Float("bevel", bevel); v.Int("bevelSegments", bevelSegments);
       v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
       v.Float("rotX", rotX); v.Float("rotY", rotY); v.Float("rotZ", rotZ);
       v.Float("scaleX", scaleX); v.Float("scaleY", scaleY); v.Float("scaleZ", scaleZ);
@@ -118,6 +131,8 @@ private:
    Mesh mMesh;
    int mBuiltShape = -1, mBuiltDetail = -1, mBuiltSides = -1, mBuiltP = -1, mBuiltQ = -1;
    float mBuiltTube = -1.0f;
+   float mBuiltBevel = -1.0f;
+   int mBuiltBevelSegments = -1;
    unsigned long long mMeshRevision = 0;
 
    ImageCable mTextureInput;

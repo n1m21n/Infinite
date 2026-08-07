@@ -14,6 +14,12 @@ class ShapeNode : public INode
 {
 public:
    static INode* Create() { return new ShapeNode(); }
+   static INode* CreateFor(int shapeIndex)
+   {
+      auto* node = new ShapeNode();
+      node->shapeType = shapeIndex;
+      return node;
+   }
    static const std::vector<std::string>& ShapeNames();
 
    ~ShapeNode() override;

@@ -297,7 +297,8 @@ GeometryNode::~GeometryNode()
 void GeometryNode::RebuildIfNeeded()
 {
    if (shape == mBuiltShape && detail == mBuiltDetail && sides == mBuiltSides &&
-       knotP == mBuiltP && knotQ == mBuiltQ && tubeRadius == mBuiltTube && !mMesh.Empty())
+       knotP == mBuiltP && knotQ == mBuiltQ && tubeRadius == mBuiltTube &&
+       bevel == mBuiltBevel && bevelSegments == mBuiltBevelSegments && !mMesh.Empty())
       return;
 
    switch (shape)
@@ -317,7 +318,12 @@ void GeometryNode::RebuildIfNeeded()
    mBuiltSides = sides;
    mBuiltP = knotP;
    mBuiltQ = knotQ;
+   if (bevel > 0.0f)
+      mMesh = MeshOps::Bevel(mMesh, bevel, bevelSegments);
+
    mBuiltTube = tubeRadius;
+   mBuiltBevel = bevel;
+   mBuiltBevelSegments = bevelSegments;
    mMeshRevision = NextMeshRevision();
 }
 

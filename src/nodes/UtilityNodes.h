@@ -13,6 +13,7 @@ class NullNode : public INode
 {
 public:
    static INode* Create() { return new NullNode(); }
+   virtual ~NullNode() {}
 
    unsigned int GetOutputTexture() override
    {
@@ -37,6 +38,16 @@ public:
 private:
    ImageCable mInput;
    int mLastCookFrame = -1;
+};
+
+// --- Viewport -----------------------------------------------------------
+// A Null that draws big. Same zero-cost pass-through, but the editor gives it a
+// large canvas so a stage of a patch can actually be inspected mid-graph
+// instead of being judged from a thumbnail.
+class ViewportNode : public NullNode
+{
+public:
+   static INode* Create() { return new ViewportNode(); }
 };
 
 // --- Null 3D ------------------------------------------------------------

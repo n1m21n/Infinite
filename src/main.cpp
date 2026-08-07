@@ -487,12 +487,25 @@ namespace
    {
       REGISTER_NODE(ImageSourceNode, Image Source, "Source");
       REGISTER_NODE(ShapeNode, Shape, "Source");
+      for (int i = 0; i < (int)ShapeNode::ShapeNames().size(); i++)
+      {
+         NodeFactory::Instance().Register(
+            ShapeNode::ShapeNames()[i],
+            [i]() -> INode* { return ShapeNode::CreateFor(i); }, "Source");
+      }
       REGISTER_NODE(FormulaNode, Formula, "Source");
       REGISTER_NODE(TextNode, Text, "Text");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
       REGISTER_NODE(GeometryNode, Geometry, "3D");
+      // Every primitive as its own searchable node, sharing one class.
+      for (int i = 0; i < (int)GeometryNode::ShapeNames().size(); i++)
+      {
+         NodeFactory::Instance().Register(
+            GeometryNode::ShapeNames()[i],
+            [i]() -> INode* { return GeometryNode::CreateFor(i); }, "3D");
+      }
       REGISTER_NODE(ModelSourceNode, Model 3D, "3D");
       REGISTER_NODE(Text3DNode, Text 3D, "3D");
       REGISTER_NODE(Null3DNode, Null 3D, "3D");
@@ -524,6 +537,7 @@ namespace
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");
       REGISTER_NODE(NullNode, Null, "Compositing");
+      REGISTER_NODE(ViewportNode, Viewport, "Compositing");
       REGISTER_NODE(CurvesNode, Curves, "Color");
       REGISTER_NODE(RemoveBgNode, Remove Background, "Mask");
       REGISTER_NODE(FeedbackNode, Feedback, "Feedback");
@@ -540,6 +554,7 @@ namespace
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Modulators");
       REGISTER_NODE(MacroXYNode, Macro XY, "Modulators");
       REGISTER_NODE(PathNode, Path, "Modulators");
+      REGISTER_NODE(ConstantNode, Constant, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
@@ -612,7 +627,7 @@ namespace
       if (dynamic_cast<Text3DNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<NullNode*>(gn.node.get()) != nullptr)
-         return 1;
+         return 1; // also covers Viewport, which derives from it
       if (dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
@@ -1984,6 +1999,9 @@ namespace
 
       NodeSeparator("form");
       ModSliderInt("detail", &n->detail, 2, 96);
+      ModSlider("bevel", &n->bevel, 0.0f, 1.0f);
+      if (n->bevel > 0.0f)
+         ModSliderInt("bevel segments", &n->bevelSegments, 1, 3);
       ModSliderInt("sides", &n->sides, 3, 64);
       if (n->shape == 4 || n->shape == 7)
          ModSlider("tube", &n->tubeRadius, 0.02f, 0.95f);
@@ -2623,9 +2641,12 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       // Render 3D gets a working viewport rather than a thumbnail: it is the
-      // one preview you orbit and frame a scene in.
+      // one preview you orbit and frame a scene in. Viewport nodes are asking
+      // for the same thing explicitly.
       auto* render = dynamic_cast<Render3DNode*>(node);
-      const float size = (render != nullptr) ? kViewportSize : kPreviewSize;
+      const bool wantsBigCanvas =
+         render != nullptr || dynamic_cast<ViewportNode*>(node) != nullptr;
+      const float size = wantsBigCanvas ? kViewportSize : kPreviewSize;
 
       dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + size),
                         IM_COL32(18, 18, 24, 255), 4.0f);
@@ -4343,6 +4364,56 @@ int main()
          }
       }
 
+      if (getenv("INFINITE_PHASEATEST") != nullptr && frameId == 4)
+      {
+         // Every primitive and 2D shape must be spawnable by its own name and
+         // come out preset to that shape, not to the class default.
+         bool allShapes = true;
+         for (int i = 0; i < (int)GeometryNode::ShapeNames().size(); i++)
+         {
+            const std::string& name = GeometryNode::ShapeNames()[i];
+            INode* made = NodeFactory::Instance().MakeNode(name);
+            auto* geo = dynamic_cast<GeometryNode*>(made);
+            // GetMesh() first: the mesh is built lazily, so TriangleCount is 0
+            // until something asks for it.
+            const bool ok = geo != nullptr && geo->shape == i &&
+                            !geo->GetMesh().Empty();
+            if (!ok) { allShapes = false; printf("  failed: %s\n", name.c_str()); }
+            delete made;
+         }
+         bool allShapes2D = true;
+         for (int i = 0; i < (int)ShapeNode::ShapeNames().size(); i++)
+         {
+            INode* made = NodeFactory::Instance().MakeNode(ShapeNode::ShapeNames()[i]);
+            auto* sh = dynamic_cast<ShapeNode*>(made);
+            if (sh == nullptr || sh->shapeType != i) allShapes2D = false;
+            delete made;
+         }
+         printf("primitives spawnable by name: 3D=%d 2D=%d\n", (int)allShapes, (int)allShapes2D);
+
+         // Bevel must actually round a cube - more triangles, and a smaller
+         // extent than the original since the corners get pulled in.
+         const Mesh cube = Primitives::Cube(1);
+         const Mesh rounded = MeshOps::Bevel(cube, 0.6f, 2);
+         // Measured as the furthest vertex from the centre, not the bounding
+         // box: a bevel rounds the corners while leaving the flat faces exactly
+         // where they were, so the box does not shrink at all. The corners are
+         // the only thing that moves, and they are what this catches.
+         auto maxRadius = [](const Mesh& m) {
+            float worst = 0.0f;
+            for (const Vertex& v : m.vertices)
+               worst = std::max(worst, std::sqrt(v.px*v.px + v.py*v.py + v.pz*v.pz));
+            return worst;
+         };
+         const float r0 = maxRadius(cube), r1 = maxRadius(rounded);
+         printf("bevel: %zu -> %zu tris, corner radius %.3f -> %.3f (faces stay put)\n",
+                cube.indices.size() / 3, rounded.indices.size() / 3, r0, r1);
+         const bool bevelled = rounded.indices.size() > cube.indices.size() &&
+                               r1 < r0 - 0.02f && r1 > 0.3f;
+
+         printf("%s\n", (allShapes && allShapes2D && bevelled) ? "PHASE A OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_BUGTEST") != nullptr && frameId == 6)
       {
          auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
@@ -5420,6 +5491,11 @@ int main()
                DrawMeshToPointsParams(n);
             else if (auto* n = dynamic_cast<PathNode*>(gn.node.get()))
                DrawPathParams(n);
+            else if (auto* n = dynamic_cast<ConstantNode*>(gn.node.get()))
+            {
+               ModSlider("value", &n->value, 0.0f, 1.0f);
+               ImGui::TextDisabled("a fixed value for Math inputs");
+            }
             else if (auto* n = dynamic_cast<MaterialNode*>(gn.node.get()))
                DrawMaterialParams(n);
             else if (auto* n = dynamic_cast<ParticleSystemNode*>(gn.node.get()))

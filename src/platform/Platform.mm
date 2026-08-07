@@ -1657,9 +1657,24 @@ namespace Platform
          return;
       @autoreleasepool
       {
-         [handle->player removeTapOnBus:0];
-         [handle->player stop];
-         [handle->engine stop];
+         // Order matters, and so does the @try. AVAudioEngine reports state
+         // errors by throwing an ObjC exception, and an uncaught one aborts the
+         // whole process - closing an audio file was killing the app outright
+         // with "nodeBussesVec.size() >= (inBus + 1)" when the player had
+         // already lost its busses. There is no API to ask whether a tap is
+         // still installed, so the only way to make teardown safe is to catch.
+         @try
+         {
+            [handle->player stop];
+            [handle->engine stop];
+            [handle->player removeTapOnBus:0];
+            [handle->engine detachNode:handle->player];
+         }
+         @catch (NSException* exception)
+         {
+            fprintf(stderr, "audio teardown: %s\n",
+                    [[exception reason] UTF8String] ? [[exception reason] UTF8String] : "unknown");
+         }
          handle->player = nil;
          handle->engine = nil;
          handle->file = nil;

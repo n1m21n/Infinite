@@ -30,6 +30,34 @@ public:
    float high = 1.0f;
 };
 
+// A fixed value, as a modulator.
+//
+// Exists because Math has no way to express "multiply this LFO by 0.5" - both
+// its inputs are modulator pins, so a literal needs a node to come from. Macro
+// Knob is close but is meant to be performed; this is meant to be set once and
+// left, and it reads in the destination's own units rather than 0..1.
+class ConstantNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new ConstantNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   float Value01() override
+   {
+      // Clamped, since every modulator is contractually 0..1 and a destination
+      // maps that onto its own range.
+      return value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+   }
+
+   float value = 0.5f;
+
+   void VisitParams(ParamVisitor& v) override { v.Float("value", value); }
+};
+
 class RandomNode : public INode, public IModulator
 {
 public:

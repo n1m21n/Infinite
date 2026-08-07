@@ -1315,6 +1315,67 @@ namespace MeshOps
       return RecalculateNormals(out, false, false);
    }
 
+   Mesh Bevel(const Mesh& in, float amount, int segments)
+   {
+      if (in.Empty() || amount <= 0.0f)
+         return in;
+
+      // Subdividing first is what gives the rounding somewhere to happen: on a
+      // raw cube there are no interior vertices to move, so the corners would
+      // simply collapse toward the centre.
+      Mesh work = in;
+      const int passes = std::max(1, std::min(segments, 3));
+      for (int i = 0; i < passes; i++)
+      {
+         if (work.indices.size() / 3 > 100000)
+            break;
+         work = Subdivide(work, 1, 0.0f);
+      }
+
+      const std::vector<unsigned int> weld = BuildWeldMap(work);
+      const std::map<unsigned int, std::set<unsigned int>> adjacency = BuildAdjacency(work, weld);
+
+      std::vector<float> px(work.vertices.size()), py(work.vertices.size()), pz(work.vertices.size());
+      for (size_t i = 0; i < work.vertices.size(); i++)
+      {
+         px[i] = work.vertices[i].px; py[i] = work.vertices[i].py; pz[i] = work.vertices[i].pz;
+      }
+
+      // A few Laplacian passes scaled by the bevel amount. Corners have more
+      // neighbours pulling them inward than a face centre does, so they round
+      // first and flat regions barely move - which is the behaviour wanted.
+      const float strength = std::max(0.0f, std::min(amount, 1.0f));
+      for (int pass = 0; pass < 2; pass++)
+      {
+         std::vector<float> nx = px, ny = py, nz = pz;
+         for (const auto& entry : adjacency)
+         {
+            const unsigned int v = entry.first;
+            if (entry.second.empty())
+               continue;
+            float sx = 0, sy = 0, sz = 0;
+            for (unsigned int n : entry.second)
+            {
+               sx += px[n]; sy += py[n]; sz += pz[n];
+            }
+            const float inv = 1.0f / (float)entry.second.size();
+            nx[v] = px[v] + (sx * inv - px[v]) * strength;
+            ny[v] = py[v] + (sy * inv - py[v]) * strength;
+            nz[v] = pz[v] + (sz * inv - pz[v]) * strength;
+         }
+         px.swap(nx); py.swap(ny); pz.swap(nz);
+      }
+
+      for (size_t i = 0; i < work.vertices.size(); i++)
+      {
+         const unsigned int rep = weld[i];
+         work.vertices[i].px = px[rep];
+         work.vertices[i].py = py[rep];
+         work.vertices[i].pz = pz[rep];
+      }
+      return RecalculateNormals(work, false, false);
+   }
+
    Mesh RecalculateNormals(const Mesh& in, bool flat, bool flip)
    {
       Mesh out = in;
