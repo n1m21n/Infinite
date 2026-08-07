@@ -2338,6 +2338,18 @@ namespace
       ModSlider("target z", &n->targetZ, -3.0f, 3.0f);
       }
 
+      NodeSeparator("shadows");
+      ImGui::Checkbox("cast shadows", &n->shadowsEnabled);
+      if (n->shadowsEnabled)
+      {
+         DropdownButton("resolution", Render3DNode::ShadowQualityNames(), n->shadowQuality,
+                        [n](int i) { n->shadowQuality = i; });
+         ModSlider("strength", &n->shadowStrength, 0.0f, 1.0f);
+         ModSlider("softness", &n->shadowSoftness, 0.0f, 4.0f);
+         ModSlider("bias", &n->shadowBias, 0.0002f, 0.02f, "%.4f");
+         ImGui::TextDisabled("light 1 casts; point lights cannot");
+      }
+
       NodeSeparator("light");
       int patchedLights = 0;
       for (int i = 0; i < Render3DNode::kLightSlots; i++)
@@ -3516,6 +3528,36 @@ int main()
          gNodes[2].showParams = true;
          gNodes[6].showParams = true;
       }
+      else if (getenv("INFINITE_SHADOWTEST") != nullptr)
+      {
+         // A sphere above a wide flat plane: the arrangement where a shadow is
+         // unmistakable if it works and obviously absent if it does not.
+         SpawnNode("Plane", "3D", 40.0f, 40.0f);        // 0 ground
+         SpawnNode("Sphere", "3D", 40.0f, 400.0f);      // 1 caster
+         SpawnNode("Light", "3D", 40.0f, 760.0f);       // 2
+         SpawnNode("Render 3D", "3D", 400.0f, 40.0f);   // 3
+
+         auto* ground = static_cast<GeometryNode*>(gNodes[0].node.get());
+         ground->rotX = -1.5707963f;   // lay it flat
+         ground->uniformScale = 6.0f;
+         ground->posY = -1.0f;
+         auto* ball = static_cast<GeometryNode*>(gNodes[1].node.get());
+         ball->posY = 0.4f;
+         auto* light = static_cast<LightNode*>(gNodes[2].node.get());
+         light->type = 0;              // directional
+         light->elevation = 1.1f;      // high, so the shadow lands on the plane
+         light->intensity = 2.0f;
+
+         auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
+         render->geometry[0] = ground;
+         render->geometry[1] = ball;
+         render->lights[0] = light;
+         render->width = 400.0f; render->height = 400.0f;
+         render->samples = 0;
+         render->shadowsEnabled = false; // turned on mid-test to compare
+         render->camElevation = 0.7f;
+         render->camDistance = 7.0f;
+      }
       else if (getenv("INFINITE_BUGTEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);       // 0 -> array -> render
@@ -4412,6 +4454,51 @@ int main()
                                r1 < r0 - 0.02f && r1 > 0.3f;
 
          printf("%s\n", (allShapes && allShapes2D && bevelled) ? "PHASE A OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_SHADOWTEST") != nullptr && (frameId == 4 || frameId == 8))
+      {
+         auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
+         const int w = render->GetOutputWidth(), h = render->GetOutputHeight();
+         std::vector<unsigned char> px((size_t)w * h * 4);
+         GLuint fbo = 0;
+         glGenFramebuffers(1, &fbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                render->GetOutputTexture(), 0);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+         glDeleteFramebuffers(1, &fbo);
+
+         static std::vector<unsigned char> sNoShadow;
+         if (frameId == 4)
+         {
+            sNoShadow = px;
+            render->shadowsEnabled = true;
+            printf("shadow map: %dx%d\n", render->ActiveShadowSize(), render->ActiveShadowSize());
+         }
+         else
+         {
+            // Only some pixels should change, and every one of them should get
+            // *darker*. A shadow that brightened anything would mean the depth
+            // comparison is inverted; a change everywhere would mean the whole
+            // image dimmed rather than a shadow being cast.
+            size_t darker = 0, brighter = 0;
+            for (size_t i = 0; i + 3 < px.size() && i < sNoShadow.size(); i += 4)
+            {
+               const int before = sNoShadow[i] + sNoShadow[i+1] + sNoShadow[i+2];
+               const int after = px[i] + px[i+1] + px[i+2];
+               if (after < before - 12) darker++;
+               else if (after > before + 12) brighter++;
+            }
+            const double pct = 100.0 * (double)darker / (double)(w * h);
+            printf("shadow: %zu px darker (%.1f%%), %zu brighter, active=%d\n",
+                   darker, pct, brighter, render->ActiveShadowSize() > 0);
+            const bool ok = darker > 500 && pct < 60.0 && brighter < darker / 10 &&
+                            render->ActiveShadowSize() > 0;
+            printf("%s\n", ok ? "SHADOWS OK" : "SUSPECT");
+         }
       }
 
       if (getenv("INFINITE_BUGTEST") != nullptr && frameId == 6)

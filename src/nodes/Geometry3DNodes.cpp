@@ -3,6 +3,7 @@
 #include <OpenGL/gl3.h>
 #include <algorithm>
 #include <cstdio>
+#include <cmath>
 
 #include "Transport.h"
 #include "SceneNodes.h"
@@ -17,6 +18,27 @@ namespace
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard" };
+   const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
+   const int kShadowSizes[] = { 1024, 2048, 4096 };
+
+   // Depth-only pass from the light's point of view. Shares the instancing
+   // attribute layout with the main shader so an instanced source casts shadows
+   // from all its copies rather than just the base mesh.
+   const char* kShadowVertSrc =
+      "#version 150\n"
+      "in vec3 aPos;\n"
+      "in mat4 aInstance;\n"
+      "uniform mat4 uModel;\n"
+      "uniform int uInstanced;\n"
+      "uniform mat4 uLightViewProj;\n"
+      "void main() {\n"
+      "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "   gl_Position = uLightViewProj * model * vec4(aPos, 1.0);\n"
+      "}\n";
+
+   const char* kShadowFragSrc =
+      "#version 150\n"
+      "void main() { }\n";
    const int kSampleCounts[] = { 0, 2, 4, 8 };
 
    // Not in gl3.h - the anisotropic filter extension predates core profiles and
@@ -80,6 +102,27 @@ namespace
       return sTex;
    }
 
+   // Bound to the shadow sampler when shadows are off. A depth sampler pointed
+   // at texture 0 is incomplete, and the driver warns about it - the same issue
+   // the white texture solves for the colour sampler.
+   unsigned int DummyShadowTexture()
+   {
+      static unsigned int sTex = 0;
+      if (sTex == 0)
+      {
+         const float one = 1.0f; // fully lit
+         glGenTextures(1, &sTex);
+         glBindTexture(GL_TEXTURE_2D, sTex);
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, 1, 1, 0,
+                      GL_DEPTH_COMPONENT, GL_FLOAT, &one);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+      }
+      return sTex;
+   }
+
    const char* kVertSrc =
       "#version 150\n"
       "in vec3 aPos;\n"
@@ -92,6 +135,8 @@ namespace
       "uniform int uInstanceColored;\n"
       "uniform mat4 uViewProj;\n"
       "uniform mat3 uNormalMatrix;\n"
+      "uniform mat4 uLightViewProj;\n"
+      "out vec4 vLightSpacePos;\n"
       "out vec3 vWorldPos;\n"
       "out vec3 vNormal;\n"
       "out vec2 vUv;\n"
@@ -107,6 +152,7 @@ namespace
       // White when there is no per-instance colour, so the fragment shader can
       // multiply unconditionally rather than branching on it.
       "   vInstanceColor = (uInstanceColored == 1) ? aInstanceColor : vec3(1.0);\n"
+      "   vLightSpacePos = uLightViewProj * world;\n"
       "   gl_Position = uViewProj * world;\n"
       "}\n";
 
@@ -116,6 +162,7 @@ namespace
       "in vec3 vNormal;\n"
       "in vec2 vUv;\n"
       "in vec3 vInstanceColor;\n"
+      "in vec4 vLightSpacePos;\n"
       "out vec4 fragColor;\n"
       "uniform vec3 uBaseColor;\n"
       "uniform float uMetallic;\n"
@@ -140,6 +187,42 @@ namespace
       "uniform vec3 uEnvHorizon;\n"
       "uniform vec3 uEnvGround;\n"
       "uniform float uEnvIntensity;\n"
+      "uniform sampler2DShadow uShadowMap;\n"
+      "uniform int uShadowsOn;\n"
+      "uniform float uShadowBias;\n"
+      "uniform float uShadowSoftness;\n"
+      "uniform float uShadowStrength;\n"
+      "uniform float uShadowTexel;\n"
+      "\n"
+      // 3x3 percentage-closer filter. A single depth comparison gives a hard,
+      // stair-stepped edge at any shadow map resolution; averaging several
+      // comparisons around the sample turns that into a gradient.
+      //
+      // sampler2DShadow does the compare in hardware, so each tap is one
+      // instruction rather than a fetch plus a branch.
+      "float shadowFactor(vec3 normal, vec3 lightDir) {\n"
+      "   if (uShadowsOn == 0) return 1.0;\n"
+      "   vec3 proj = vLightSpacePos.xyz / max(vLightSpacePos.w, 1e-6);\n"
+      "   proj = proj * 0.5 + 0.5;\n"
+      // Outside the shadow volume there is no information, so treat it as lit
+      // rather than shadowing everything beyond the fitted box.
+      "   if (proj.z > 1.0 || proj.x < 0.0 || proj.x > 1.0 || proj.y < 0.0 || proj.y > 1.0)\n"
+      "      return 1.0;\n"
+      // Slope-scaled bias: a surface at a grazing angle to the light spans more
+      // depth per texel, and a constant bias either acnes those or peters the
+      // face-on ones off their own contact shadow.
+      "   float slope = 1.0 - max(dot(normal, lightDir), 0.0);\n"
+      "   float bias = uShadowBias * (1.0 + slope * 4.0);\n"
+      "   float lit = 0.0;\n"
+      "   for (int x = -1; x <= 1; x++) {\n"
+      "      for (int y = -1; y <= 1; y++) {\n"
+      "         vec2 offset = vec2(float(x), float(y)) * uShadowTexel * uShadowSoftness;\n"
+      "         lit += texture(uShadowMap, vec3(proj.xy + offset, proj.z - bias));\n"
+      "      }\n"
+      "   }\n"
+      "   lit /= 9.0;\n"
+      "   return mix(1.0, lit, uShadowStrength);\n"
+      "}\n"
       "\n"
       // Colours arrive from the UI in sRGB. Lighting has to happen in linear
       // space or every sum and product is being done on gamma-encoded numbers,
@@ -260,7 +343,9 @@ namespace
       // two lobes together never return more energy than arrived.
       "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal);\n"
       "      vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
-      "      col += (kD * base / 3.14159265 + specular) * radiance * nDotL;\n"
+      // Only light 0 casts: one depth map is rendered, from that light.
+      "      float shadow = (i == 0) ? shadowFactor(n, lightDir) : 1.0;\n"
+      "      col += (kD * base / 3.14159265 + specular) * radiance * nDotL * shadow;\n"
       "   }\n"
       "\n"
       // Ambient, from the environment rather than a flat constant: the diffuse
@@ -395,6 +480,143 @@ void GeometryNode::CookIfNeeded(int frameId)
 const std::vector<std::string>& Render3DNode::ProjectionNames() { return kProjectionNames; }
 const std::vector<std::string>& Render3DNode::SampleNames() { return kSampleNames; }
 const std::vector<std::string>& Render3DNode::TonemapNames() { return kTonemapNames; }
+const std::vector<std::string>& Render3DNode::ShadowQualityNames() { return kShadowQualityNames; }
+
+void Render3DNode::ReleaseShadowTargets()
+{
+   if (mShadowTex != 0) { glDeleteTextures(1, &mShadowTex); mShadowTex = 0; }
+   if (mShadowFbo != 0) { glDeleteFramebuffers(1, &mShadowFbo); mShadowFbo = 0; }
+   mShadowSize = 0;
+}
+
+bool Render3DNode::EnsureShadowShader()
+{
+   if (mShadowShaderTried)
+      return mShadowProgram != 0;
+   mShadowShaderTried = true;
+
+   auto compile = [](GLenum type, const char* src) -> unsigned int {
+      unsigned int shader = glCreateShader(type);
+      glShaderSource(shader, 1, &src, nullptr);
+      glCompileShader(shader);
+      GLint ok = 0;
+      glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+      if (!ok)
+      {
+         char log[1024];
+         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+         fprintf(stderr, "Shadow shader error: %s\n", log);
+         glDeleteShader(shader);
+         return 0u;
+      }
+      return shader;
+   };
+
+   const unsigned int vert = compile(GL_VERTEX_SHADER, kShadowVertSrc);
+   const unsigned int frag = compile(GL_FRAGMENT_SHADER, kShadowFragSrc);
+   if (vert == 0 || frag == 0)
+      return false;
+
+   mShadowProgram = glCreateProgram();
+   // Same attribute slots as the main program, so one VAO serves both passes.
+   glBindAttribLocation(mShadowProgram, 0, "aPos");
+   glBindAttribLocation(mShadowProgram, 3, "aInstance");
+   glAttachShader(mShadowProgram, vert);
+   glAttachShader(mShadowProgram, frag);
+   glLinkProgram(mShadowProgram);
+   glDeleteShader(vert);
+   glDeleteShader(frag);
+
+   GLint linked = 0;
+   glGetProgramiv(mShadowProgram, GL_LINK_STATUS, &linked);
+   if (!linked)
+   {
+      char log[1024];
+      glGetProgramInfoLog(mShadowProgram, sizeof(log), nullptr, log);
+      fprintf(stderr, "Shadow link error: %s\n", log);
+      glDeleteProgram(mShadowProgram);
+      mShadowProgram = 0;
+      return false;
+   }
+   return true;
+}
+
+bool Render3DNode::EnsureShadowResources(int size)
+{
+   if (mShadowFbo != 0 && mShadowSize == size)
+      return true;
+   ReleaseShadowTargets();
+
+   glGenTextures(1, &mShadowTex);
+   glBindTexture(GL_TEXTURE_2D, mShadowTex);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, size, size, 0,
+                GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   // Clamped to a border of 1.0 (fully lit) so geometry outside the shadow
+   // volume is not shadowed by the edge texel repeating.
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+   const float border[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+   glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border);
+   // Hardware depth comparison, which is what makes each PCF tap a single
+   // instruction instead of a fetch and a branch.
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+
+   glGenFramebuffers(1, &mShadowFbo);
+   glBindFramebuffer(GL_FRAMEBUFFER, mShadowFbo);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mShadowTex, 0);
+   // Depth only: no colour attachment at all.
+   glDrawBuffer(GL_NONE);
+   glReadBuffer(GL_NONE);
+
+   const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+   glBindTexture(GL_TEXTURE_2D, 0);
+   if (status != GL_FRAMEBUFFER_COMPLETE)
+   {
+      fprintf(stderr, "Shadow framebuffer incomplete: 0x%x\n", status);
+      ReleaseShadowTargets();
+      return false;
+   }
+
+   mShadowSize = size;
+   return true;
+}
+
+bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
+{
+   outLo[0] = outLo[1] = outLo[2] = 1e30f;
+   outHi[0] = outHi[1] = outHi[2] = -1e30f;
+   bool any = false;
+
+   for (int i = 0; i < kSlots; i++)
+   {
+      if (geometry[i] == nullptr || !mGpu[i].hasBounds)
+         continue;
+      const Mat4 model = geometry[i]->GetModelMatrix();
+      // The eight corners through the matrix: a rotated box's true extent
+      // cannot be had from transforming the min and max alone.
+      for (int corner = 0; corner < 8; corner++)
+      {
+         const float c[3] = {
+            (corner & 1) ? mGpu[i].hi[0] : mGpu[i].lo[0],
+            (corner & 2) ? mGpu[i].hi[1] : mGpu[i].lo[1],
+            (corner & 4) ? mGpu[i].hi[2] : mGpu[i].lo[2]
+         };
+         for (int k = 0; k < 3; k++)
+         {
+            const float w = model.m[k] * c[0] + model.m[4 + k] * c[1] +
+                            model.m[8 + k] * c[2] + model.m[12 + k];
+            outLo[k] = std::min(outLo[k], w);
+            outHi[k] = std::max(outHi[k], w);
+         }
+      }
+      any = true;
+   }
+   return any;
+}
 
 void Render3DNode::ReleaseTargets()
 {
@@ -409,9 +631,11 @@ void Render3DNode::ReleaseTargets()
 Render3DNode::~Render3DNode()
 {
    ReleaseTargets();
+   ReleaseShadowTargets();
    for (int i = 0; i < kSlots; i++)
       ReleaseGpuMesh(mGpu[i]);
    if (mProgram != 0) glDeleteProgram(mProgram);
+   if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
 }
 
 void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
@@ -657,6 +881,101 @@ void Render3DNode::CookIfNeeded(int frameId)
       lightCount = 1;
    }
 
+   // --- shadow pass ---------------------------------------------------
+   // Depth from the light's point of view, rendered before the main pass and
+   // sampled by it. Only the first light casts, and only when it has a
+   // direction: a point light would need a depth cube map and six passes.
+   bool shadowsActive = false;
+   if (shadowsEnabled && lightTypes[0] != 1 && EnsureShadowShader())
+   {
+      const int wantSize = kShadowSizes[std::max(0, std::min(shadowQuality, 2))];
+      float sceneLo[3], sceneHi[3];
+      if (EnsureShadowResources(wantSize) && SceneBounds(sceneLo, sceneHi))
+      {
+         const float centre[3] = { (sceneLo[0]+sceneHi[0])*0.5f,
+                                   (sceneLo[1]+sceneHi[1])*0.5f,
+                                   (sceneLo[2]+sceneHi[2])*0.5f };
+         const float radius = std::max(0.01f,
+            0.5f * std::sqrt((sceneHi[0]-sceneLo[0])*(sceneHi[0]-sceneLo[0]) +
+                             (sceneHi[1]-sceneLo[1])*(sceneHi[1]-sceneLo[1]) +
+                             (sceneHi[2]-sceneLo[2])*(sceneHi[2]-sceneLo[2])));
+
+         // The light sits outside the bounding sphere looking at its centre, and
+         // the ortho box is fitted to that sphere. Fitting to the scene rather
+         // than using a fixed volume is what keeps texel density usable whether
+         // the scene is a centimetre or a hundred units across.
+         float dir[3] = { lightDirs[0], lightDirs[1], lightDirs[2] };
+         const float dirLen = std::sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
+         if (dirLen > 1e-5f) { dir[0] /= dirLen; dir[1] /= dirLen; dir[2] /= dirLen; }
+         else { dir[0] = 0.0f; dir[1] = 1.0f; dir[2] = 0.0f; }
+
+         const float eye[3] = { centre[0] + dir[0] * radius * 2.5f,
+                                centre[1] + dir[1] * radius * 2.5f,
+                                centre[2] + dir[2] * radius * 2.5f };
+         // A light pointing straight down would make the view matrix's up
+         // vector parallel to its direction, which degenerates.
+         // A light pointing straight down would make the view matrix's up
+         // vector parallel to its direction, which degenerates.
+         const float upY[3] = { 0.0f, 1.0f, 0.0f };
+         const float upZ[3] = { 0.0f, 0.0f, 1.0f };
+         const Mat4 lightView =
+            Mat4::LookAt(eye, centre, (std::fabs(dir[1]) > 0.99f) ? upZ : upY);
+         const Mat4 lightProj = Mat4::Orthographic(radius * 1.2f, 1.0f,
+                                                   0.05f, radius * 5.0f);
+         mLightViewProj = Mat4::Multiply(lightProj, lightView);
+
+         GLint prevFboShadow = 0, prevViewportShadow[4];
+         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFboShadow);
+         glGetIntegerv(GL_VIEWPORT, prevViewportShadow);
+         const GLboolean prevScissorShadow = glIsEnabled(GL_SCISSOR_TEST);
+         glDisable(GL_SCISSOR_TEST);
+
+         glBindFramebuffer(GL_FRAMEBUFFER, mShadowFbo);
+         glViewport(0, 0, mShadowSize, mShadowSize);
+         glClearDepth(1.0);
+         glClear(GL_DEPTH_BUFFER_BIT);
+         glEnable(GL_DEPTH_TEST);
+         glDepthFunc(GL_LESS);
+         glDepthMask(GL_TRUE);
+         // Front faces culled so the depth written is the back of each object.
+         // Peter-panning is easier to bias away than the acne you get otherwise.
+         glEnable(GL_CULL_FACE);
+         glCullFace(GL_FRONT);
+
+         glUseProgram(mShadowProgram);
+         glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uLightViewProj"),
+                            1, GL_FALSE, mLightViewProj.m);
+
+         for (int i = 0; i < kSlots; i++)
+         {
+            IGeometrySource* source = geometry[i];
+            if (source == nullptr || mGpu[i].vao == 0 || mGpu[i].indexCount == 0)
+               continue;
+            glBindVertexArray(mGpu[i].vao);
+            const Mat4 model = source->GetModelMatrix();
+            auto* instancer = dynamic_cast<InstanceOnPointsNode*>(source);
+            const bool instanced = instancer != nullptr && mGpu[i].instanceCount > 0 &&
+                                   mGpu[i].instanceAttribsOn;
+            glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uModel"), 1, GL_FALSE, model.m);
+            glUniform1i(glGetUniformLocation(mShadowProgram, "uInstanced"), instanced ? 1 : 0);
+            if (instanced)
+               glDrawElementsInstanced(GL_TRIANGLES, mGpu[i].indexCount, GL_UNSIGNED_INT,
+                                       nullptr, (GLsizei)mGpu[i].instanceCount);
+            else
+               glDrawElements(GL_TRIANGLES, mGpu[i].indexCount, GL_UNSIGNED_INT, nullptr);
+         }
+
+         glBindVertexArray(0);
+         glCullFace(GL_BACK);
+         glBindFramebuffer(GL_FRAMEBUFFER, prevFboShadow);
+         glViewport(prevViewportShadow[0], prevViewportShadow[1],
+                    prevViewportShadow[2], prevViewportShadow[3]);
+         if (prevScissorShadow)
+            glEnable(GL_SCISSOR_TEST);
+         shadowsActive = true;
+      }
+   }
+
    // --- save the GL state the 2D pipeline relies on -------------------
    GLint prevFbo = 0, prevViewport[4];
    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
@@ -724,6 +1043,19 @@ void Render3DNode::CookIfNeeded(int frameId)
    glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
    glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
    glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), tonemap);
+   glActiveTexture(GL_TEXTURE1);
+   glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
+   glUniform1i(glGetUniformLocation(mProgram, "uShadowMap"), 1);
+   glUniform1i(glGetUniformLocation(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
+   glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBias);
+   glUniform1f(glGetUniformLocation(mProgram, "uShadowSoftness"), shadowSoftness);
+   glUniform1f(glGetUniformLocation(mProgram, "uShadowStrength"), shadowStrength);
+   glUniform1f(glGetUniformLocation(mProgram, "uShadowTexel"),
+               mShadowSize > 0 ? 1.0f / (float)mShadowSize : 0.0f);
+   glUniformMatrix4fv(glGetUniformLocation(mProgram, "uLightViewProj"), 1, GL_FALSE,
+                      mLightViewProj.m);
+   glActiveTexture(GL_TEXTURE0);
+
    glUniform3fv(glGetUniformLocation(mProgram, "uEnvSky"), 1, envSky);
    glUniform3fv(glGetUniformLocation(mProgram, "uEnvHorizon"), 1, envHorizon);
    glUniform3fv(glGetUniformLocation(mProgram, "uEnvGround"), 1, envGround);
@@ -774,6 +1106,23 @@ void Render3DNode::CookIfNeeded(int frameId)
          glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
          glEnableVertexAttribArray(2);
          glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(6 * sizeof(float)));
+
+         // Bounds computed here rather than per frame: this is the one place
+         // the vertices are already being walked.
+         gpu.lo[0] = gpu.lo[1] = gpu.lo[2] = 1e30f;
+         gpu.hi[0] = gpu.hi[1] = gpu.hi[2] = -1e30f;
+         for (const Vertex& v : mesh.vertices)
+         {
+            const float p[3] = { v.px, v.py, v.pz };
+            for (int k = 0; k < 3; k++)
+            {
+               if (!std::isfinite(p[k]))
+                  continue;
+               gpu.lo[k] = std::min(gpu.lo[k], p[k]);
+               gpu.hi[k] = std::max(gpu.hi[k], p[k]);
+            }
+         }
+         gpu.hasBounds = gpu.lo[0] <= gpu.hi[0];
 
          gpu.meshRevision = revision;
          gpu.indexCount = (int)mesh.indices.size();

@@ -212,6 +212,18 @@ public:
    bool depthTest = true;
    bool backfaceCull = true;
 
+   // Shadows. Rendered from the first directional or sun light, or from the
+   // built-in light when none is patched in. Point lights are deliberately not
+   // supported: an omnidirectional light needs a depth cube map and six passes,
+   // which is a different piece of work from this one.
+   static const std::vector<std::string>& ShadowQualityNames();
+   bool shadowsEnabled = false;
+   int shadowQuality = 1;      // index into ShadowQualityNames: 1024/2048/4096
+   float shadowBias = 0.0025f;
+   float shadowSoftness = 1.0f;
+   float shadowStrength = 0.8f;
+   int ActiveShadowSize() const { return mShadowSize; }
+
    // Multisample count for edge antialiasing: 0 is off, otherwise 2/4/8. The
    // scene is drawn into a multisampled buffer and resolved into the ordinary
    // output texture, so the 2D graph downstream sees a normal image either way.
@@ -243,6 +255,9 @@ public:
       v.Color("bg", bgColor); v.Float("bgOpacity", bgOpacity);
       v.Bool("depthTest", depthTest); v.Bool("cull", backfaceCull);
       v.Int("samples", samples); v.Int("tonemap", tonemap); v.Float("exposure", exposure);
+      v.Bool("shadows", shadowsEnabled); v.Int("shadowQuality", shadowQuality);
+      v.Float("shadowBias", shadowBias); v.Float("shadowSoftness", shadowSoftness);
+      v.Float("shadowStrength", shadowStrength);
    }
 
 private:
@@ -256,6 +271,13 @@ private:
    struct GpuMesh
    {
       unsigned int vao = 0, vbo = 0, ibo = 0, instanceVbo = 0, instanceColorVbo = 0;
+      // Object-space bounds, computed once per upload. The shadow volume has to
+      // be fitted to the scene every frame, and walking every vertex of a
+      // hundred-thousand-triangle mesh to do that would cost more than the
+      // shadow pass itself.
+      float lo[3] = { 0, 0, 0 };
+      float hi[3] = { 0, 0, 0 };
+      bool hasBounds = false;
       const void* source = nullptr;
       unsigned long long meshRevision = 0;
       unsigned long long instanceRevision = 0;
@@ -267,8 +289,14 @@ private:
 
    bool EnsureResources(int w, int h, int sampleCount);
    bool EnsureShader();
+   bool EnsureShadowResources(int size);
+   bool EnsureShadowShader();
    void ReleaseGpuMesh(GpuMesh& gpu);
    void ReleaseTargets();
+   void ReleaseShadowTargets();
+   // World-space bounds of everything patched in, from the cached per-slot
+   // object-space boxes pushed through each source's model matrix.
+   bool SceneBounds(float outLo[3], float outHi[3]);
 
    // Resolve target: a plain texture, and what the rest of the graph reads.
    unsigned int mFbo = 0;
@@ -283,6 +311,12 @@ private:
 
    unsigned int mProgram = 0;
    bool mShaderTried = false;
+   unsigned int mShadowProgram = 0;
+   bool mShadowShaderTried = false;
+   unsigned int mShadowFbo = 0;
+   unsigned int mShadowTex = 0;
+   int mShadowSize = 0;
+   Mat4 mLightViewProj;
    GpuMesh mGpu[kSlots];
    int mLastCookFrame = -1;
    size_t mLastTriangles = 0;
