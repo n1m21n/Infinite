@@ -15,6 +15,75 @@ namespace
 
 const std::vector<std::string>& PathNode::ShapeNames() { return kShapeNames; }
 
+namespace
+{
+   const std::vector<std::string> kFollowModeNames = { "Boundary", "Slice" };
+}
+const std::vector<std::string>& PathNode::FollowModeNames() { return kFollowModeNames; }
+
+void PathNode::RebuildFollowIfNeeded()
+{
+   // A curve is already a polyline, so following one is free; a mesh has to be
+   // reduced to one, which is not, hence the cache.
+   if (curveSource != nullptr)
+   {
+      const unsigned long long revision = curveSource->CurveRevision();
+      if (mBuiltCurve != (const void*)curveSource || mBuiltRevision != revision)
+      {
+         mFollow = curveSource->GetPolyline();
+         mBuiltCurve = curveSource;
+         mBuiltGeometry = nullptr;
+         mBuiltRevision = revision;
+      }
+      return;
+   }
+
+   if (geometrySource == nullptr)
+   {
+      if (!mFollow.Empty())
+         mFollow = Polyline();
+      mBuiltCurve = nullptr;
+      mBuiltGeometry = nullptr;
+      return;
+   }
+
+   const unsigned long long revision = geometrySource->MeshRevision();
+   if (mBuiltGeometry == (const void*)geometrySource && mBuiltRevision == revision &&
+       mBuiltFollowMode == followMode && mBuiltSliceAxis == sliceAxis &&
+       mBuiltSlicePosition == slicePosition && mBuiltContour == contourIndex)
+      return;
+
+   const Mesh& mesh = geometrySource->GetMesh();
+   std::vector<Polyline> loops;
+   if (followMode == kFollowBoundary)
+   {
+      loops = MeshOps::BoundaryLoops(mesh);
+      // A closed mesh has no boundary at all, so silently falling back to a
+      // slice is better than emitting nothing and looking broken.
+      if (loops.empty())
+         loops = MeshOps::SliceContours(mesh, sliceAxis, slicePosition);
+   }
+   else
+   {
+      loops = MeshOps::SliceContours(mesh, sliceAxis, slicePosition);
+      if (loops.empty())
+         loops = MeshOps::BoundaryLoops(mesh);
+   }
+
+   if (loops.empty())
+      mFollow = Polyline();
+   else
+      mFollow = loops[(size_t)std::max(0, std::min(contourIndex, (int)loops.size() - 1))];
+
+   mBuiltCurve = nullptr;
+   mBuiltGeometry = geometrySource;
+   mBuiltRevision = revision;
+   mBuiltFollowMode = followMode;
+   mBuiltSliceAxis = sliceAxis;
+   mBuiltSlicePosition = slicePosition;
+   mBuiltContour = contourIndex;
+}
+
 void PathNode::Evaluate()
 {
    // Driven by the transport rather than wall clock, so pausing freezes the
@@ -35,6 +104,18 @@ void PathNode::Evaluate()
       t = t - std::floor(t);
    }
    mProgress = t;
+
+   // A patched curve or mesh replaces the parametric shapes entirely.
+   RebuildFollowIfNeeded();
+   if (!mFollow.Empty())
+   {
+      float tangent[3];
+      MeshOps::SamplePolyline(mFollow, t, mPoint, tangent);
+      mPoint[0] *= sizeX;
+      mPoint[1] *= sizeY;
+      mPoint[2] *= sizeZ;
+      return;
+   }
 
    const float angle = t * kTau;
    switch (shape)

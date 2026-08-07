@@ -2223,3 +2223,418 @@ Mesh MetaBalls(const std::vector<MetaBall>& balls, int resolution, float thresho
    return MeshOps::RecalculateNormals(mesh, false, false);
 }
 }
+
+// =================================================================== curves
+
+namespace MeshOps
+{
+   void SamplePolyline(const Polyline& line, float t, float outPos[3], float outTangent[3])
+   {
+      outPos[0] = outPos[1] = outPos[2] = 0.0f;
+      outTangent[0] = 0.0f; outTangent[1] = 0.0f; outTangent[2] = 1.0f;
+      const size_t count = line.Count();
+      if (count == 0)
+         return;
+      if (count == 1)
+      {
+         outPos[0] = line.points[0]; outPos[1] = line.points[1]; outPos[2] = line.points[2];
+         return;
+      }
+
+      // Cumulative arc length, so t is distance along the curve rather than an
+      // index. Without this a point sweeping at constant t speeds up wherever
+      // the control points are far apart and crawls where they bunch.
+      const size_t segments = line.closed ? count : count - 1;
+      std::vector<float> lengths(segments + 1, 0.0f);
+      for (size_t i = 0; i < segments; i++)
+      {
+         const size_t a = i * 3;
+         const size_t b = ((i + 1) % count) * 3;
+         const float dx = line.points[b] - line.points[a];
+         const float dy = line.points[b+1] - line.points[a+1];
+         const float dz = line.points[b+2] - line.points[a+2];
+         lengths[i + 1] = lengths[i] + std::sqrt(dx*dx + dy*dy + dz*dz);
+      }
+      const float total = lengths[segments];
+      if (total < 1e-6f)
+      {
+         outPos[0] = line.points[0]; outPos[1] = line.points[1]; outPos[2] = line.points[2];
+         return;
+      }
+
+      float clamped = t;
+      if (line.closed)
+         clamped = clamped - std::floor(clamped);
+      else
+         clamped = std::max(0.0f, std::min(clamped, 1.0f));
+      const float target = clamped * total;
+
+      size_t seg = 0;
+      while (seg + 1 < segments && lengths[seg + 1] < target)
+         seg++;
+      const float spanLength = std::max(1e-6f, lengths[seg + 1] - lengths[seg]);
+      const float local = (target - lengths[seg]) / spanLength;
+
+      const size_t a = seg * 3;
+      const size_t b = ((seg + 1) % count) * 3;
+      for (int k = 0; k < 3; k++)
+         outPos[k] = line.points[a + k] + (line.points[b + k] - line.points[a + k]) * local;
+
+      float dir[3] = { line.points[b] - line.points[a],
+                       line.points[b+1] - line.points[a+1],
+                       line.points[b+2] - line.points[a+2] };
+      const float len = std::sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
+      if (len > 1e-6f)
+      {
+         outTangent[0] = dir[0] / len;
+         outTangent[1] = dir[1] / len;
+         outTangent[2] = dir[2] / len;
+      }
+   }
+
+   Polyline BuildCurve(const std::vector<float>& controlPoints, int kind, int segments,
+                       bool closed)
+   {
+      Polyline out;
+      const size_t count = controlPoints.size() / 3;
+      if (count < 2)
+      {
+         out.points = controlPoints;
+         out.closed = closed;
+         return out;
+      }
+
+      const int steps = std::max(1, std::min(segments, 64));
+      out.closed = closed;
+
+      auto point = [&](long long i, float p[3])
+      {
+         long long index = i;
+         const long long n = (long long)count;
+         if (closed)
+            index = ((index % n) + n) % n;
+         else
+            index = std::max((long long)0, std::min(index, n - 1));
+         p[0] = controlPoints[index * 3];
+         p[1] = controlPoints[index * 3 + 1];
+         p[2] = controlPoints[index * 3 + 2];
+      };
+
+      if (kind == kCurveLinear)
+      {
+         out.points = controlPoints;
+         return out;
+      }
+
+      const size_t spans = closed ? count : count - 1;
+      for (size_t i = 0; i < spans; i++)
+      {
+         float p0[3], p1[3], p2[3], p3[3];
+         if (kind == kCurveBezier)
+         {
+            // Control points read as anchor, handle, handle, anchor, so a
+            // four-point run is one cubic segment and they chain end to end.
+            point((long long)i * 3 + 0, p0);
+            point((long long)i * 3 + 1, p1);
+            point((long long)i * 3 + 2, p2);
+            point((long long)i * 3 + 3, p3);
+            if ((size_t)(i * 3) >= count)
+               break;
+         }
+         else
+         {
+            point((long long)i - 1, p0);
+            point((long long)i, p1);
+            point((long long)i + 1, p2);
+            point((long long)i + 2, p3);
+         }
+
+         for (int s = 0; s < steps; s++)
+         {
+            const float u = (float)s / (float)steps;
+            float v[3];
+            for (int k = 0; k < 3; k++)
+            {
+               if (kind == kCurveBezier)
+               {
+                  const float m = 1.0f - u;
+                  v[k] = m*m*m*p0[k] + 3*m*m*u*p1[k] + 3*m*u*u*p2[k] + u*u*u*p3[k];
+               }
+               else if (kind == kCurveBSpline)
+               {
+                  // Uniform cubic B-spline basis: smoother than Catmull-Rom but
+                  // it does not pass through its control points.
+                  const float u2 = u * u, u3 = u2 * u;
+                  v[k] = ((-u3 + 3*u2 - 3*u + 1) * p0[k] +
+                          (3*u3 - 6*u2 + 4) * p1[k] +
+                          (-3*u3 + 3*u2 + 3*u + 1) * p2[k] +
+                          u3 * p3[k]) / 6.0f;
+               }
+               else
+               {
+                  const float u2 = u * u, u3 = u2 * u;
+                  v[k] = 0.5f * ((2*p1[k]) +
+                                 (-p0[k] + p2[k]) * u +
+                                 (2*p0[k] - 5*p1[k] + 4*p2[k] - p3[k]) * u2 +
+                                 (-p0[k] + 3*p1[k] - 3*p2[k] + p3[k]) * u3);
+               }
+            }
+            out.points.push_back(v[0]);
+            out.points.push_back(v[1]);
+            out.points.push_back(v[2]);
+         }
+      }
+
+      if (!closed && count >= 2)
+      {
+         out.points.push_back(controlPoints[(count - 1) * 3]);
+         out.points.push_back(controlPoints[(count - 1) * 3 + 1]);
+         out.points.push_back(controlPoints[(count - 1) * 3 + 2]);
+      }
+      return out;
+   }
+
+   Mesh TubeAlong(const Polyline& line, float radius, int sides, float taper)
+   {
+      Mesh mesh;
+      const size_t count = line.Count();
+      if (count < 2 || radius <= 0.0f)
+         return mesh;
+
+      const int n = std::max(3, std::min(sides, 64));
+      const size_t rings = line.closed ? count + 1 : count;
+
+      // A parallel-transport frame rather than a fresh one per ring: computing
+      // each frame independently makes the tube spin about its own axis wherever
+      // the curve's curvature flips, which reads as a twist that is not there.
+      float normal[3] = { 0.0f, 1.0f, 0.0f };
+
+      for (size_t i = 0; i < rings; i++)
+      {
+         const size_t index = i % count;
+         const size_t nextIndex = (index + 1) % count;
+         const size_t prevIndex = (index + count - 1) % count;
+
+         float tangent[3];
+         for (int k = 0; k < 3; k++)
+            tangent[k] = line.points[nextIndex * 3 + k] - line.points[prevIndex * 3 + k];
+         float tl = std::sqrt(tangent[0]*tangent[0] + tangent[1]*tangent[1] + tangent[2]*tangent[2]);
+         if (tl < 1e-6f)
+         {
+            for (int k = 0; k < 3; k++)
+               tangent[k] = line.points[nextIndex * 3 + k] - line.points[index * 3 + k];
+            tl = std::sqrt(tangent[0]*tangent[0] + tangent[1]*tangent[1] + tangent[2]*tangent[2]);
+         }
+         if (tl > 1e-6f) { tangent[0] /= tl; tangent[1] /= tl; tangent[2] /= tl; }
+         else { tangent[0] = 0; tangent[1] = 0; tangent[2] = 1; }
+
+         // Re-orthogonalise the carried normal against the new tangent.
+         const float dot = normal[0]*tangent[0] + normal[1]*tangent[1] + normal[2]*tangent[2];
+         float n0[3] = { normal[0] - tangent[0]*dot,
+                         normal[1] - tangent[1]*dot,
+                         normal[2] - tangent[2]*dot };
+         float nl = std::sqrt(n0[0]*n0[0] + n0[1]*n0[1] + n0[2]*n0[2]);
+         if (nl < 1e-5f)
+         {
+            n0[0] = std::fabs(tangent[1]) > 0.9f ? 1.0f : 0.0f;
+            n0[1] = std::fabs(tangent[1]) > 0.9f ? 0.0f : 1.0f;
+            n0[2] = 0.0f;
+            const float d2 = n0[0]*tangent[0] + n0[1]*tangent[1] + n0[2]*tangent[2];
+            for (int k = 0; k < 3; k++)
+               n0[k] -= tangent[k] * d2;
+            nl = std::sqrt(n0[0]*n0[0] + n0[1]*n0[1] + n0[2]*n0[2]);
+         }
+         if (nl > 1e-6f) { n0[0] /= nl; n0[1] /= nl; n0[2] /= nl; }
+         normal[0] = n0[0]; normal[1] = n0[1]; normal[2] = n0[2];
+
+         const float binormal[3] = {
+            tangent[1]*normal[2] - tangent[2]*normal[1],
+            tangent[2]*normal[0] - tangent[0]*normal[2],
+            tangent[0]*normal[1] - tangent[1]*normal[0]
+         };
+
+         const float along = (rings > 1) ? (float)i / (float)(rings - 1) : 0.0f;
+         const float r = radius * (1.0f - taper * along);
+
+         for (int j = 0; j <= n; j++)
+         {
+            const float u = (float)j / (float)n;
+            const float theta = u * 2.0f * kPi;
+            const float c = std::cos(theta), s = std::sin(theta);
+            const float ox = normal[0]*c + binormal[0]*s;
+            const float oy = normal[1]*c + binormal[1]*s;
+            const float oz = normal[2]*c + binormal[2]*s;
+            PushVertex(mesh,
+                       line.points[index*3] + ox * r,
+                       line.points[index*3+1] + oy * r,
+                       line.points[index*3+2] + oz * r,
+                       ox, oy, oz, u, along);
+         }
+      }
+
+      const int stride = n + 1;
+      for (size_t i = 0; i + 1 < rings; i++)
+         for (int j = 0; j < n; j++)
+            PushQuad(mesh, (unsigned int)(i * stride + j),
+                     (unsigned int)((i + 1) * stride + j),
+                     (unsigned int)((i + 1) * stride + j + 1),
+                     (unsigned int)(i * stride + j + 1));
+      return mesh;
+   }
+}
+
+namespace MeshOps
+{
+namespace
+{
+   // Chains loose edges into ordered runs. Both boundary extraction and plane
+   // slicing produce an unordered soup of segments, and a follower needs them
+   // in travel order.
+   std::vector<Polyline> ChainSegments(const std::vector<std::array<float, 6>>& segments)
+   {
+      std::vector<Polyline> loops;
+      if (segments.empty())
+         return loops;
+
+      // Endpoints are quantised before matching: a slice computes the same
+      // shared vertex twice from two different triangles, and the results differ
+      // in the last float bit.
+      const double kQuantum = 1e4;
+      auto key = [&](const float* p) {
+         return std::array<long long, 3>{
+            (long long)std::llround((double)p[0] * kQuantum),
+            (long long)std::llround((double)p[1] * kQuantum),
+            (long long)std::llround((double)p[2] * kQuantum) };
+      };
+
+      std::map<std::array<long long, 3>, std::vector<size_t>> byEndpoint;
+      for (size_t i = 0; i < segments.size(); i++)
+      {
+         byEndpoint[key(&segments[i][0])].push_back(i);
+         byEndpoint[key(&segments[i][3])].push_back(i);
+      }
+
+      std::vector<bool> used(segments.size(), false);
+      for (size_t start = 0; start < segments.size(); start++)
+      {
+         if (used[start])
+            continue;
+         used[start] = true;
+
+         Polyline line;
+         line.points.insert(line.points.end(), segments[start].begin(), segments[start].begin() + 3);
+         line.points.insert(line.points.end(), segments[start].begin() + 3, segments[start].end());
+
+         // Walk forward from the tail until nothing connects.
+         bool extended = true;
+         size_t guard = segments.size() + 1;
+         while (extended && guard-- > 0)
+         {
+            extended = false;
+            const float* tail = &line.points[line.points.size() - 3];
+            auto it = byEndpoint.find(key(tail));
+            if (it == byEndpoint.end())
+               break;
+            for (size_t candidate : it->second)
+            {
+               if (used[candidate])
+                  continue;
+               const float* a = &segments[candidate][0];
+               const float* b = &segments[candidate][3];
+               const bool forward = key(a) == key(tail);
+               const float* next = forward ? b : a;
+               line.points.push_back(next[0]);
+               line.points.push_back(next[1]);
+               line.points.push_back(next[2]);
+               used[candidate] = true;
+               extended = true;
+               break;
+            }
+         }
+
+         // A run whose ends meet is a loop; drop the duplicated final point.
+         if (line.Count() > 2 && key(&line.points[0]) == key(&line.points[line.points.size() - 3]))
+         {
+            line.points.resize(line.points.size() - 3);
+            line.closed = true;
+         }
+         if (!line.Empty())
+            loops.push_back(std::move(line));
+      }
+
+      // Longest first: a follower almost always wants the main outline, not a
+      // stray two-segment fragment.
+      std::sort(loops.begin(), loops.end(), [](const Polyline& a, const Polyline& b) {
+         return a.Count() > b.Count();
+      });
+      return loops;
+   }
+}
+
+std::vector<Polyline> BoundaryLoops(const Mesh& in)
+{
+   const std::vector<unsigned int> weld = BuildWeldMap(in);
+   std::map<std::pair<unsigned int, unsigned int>, int> edgeUse;
+   for (size_t t = 0; t + 2 < in.indices.size(); t += 3)
+   {
+      const unsigned int v[3] = { weld[in.indices[t]], weld[in.indices[t+1]], weld[in.indices[t+2]] };
+      for (int e = 0; e < 3; e++)
+      {
+         const auto k = std::minmax(v[e], v[(e + 1) % 3]);
+         if (k.first != k.second)
+            edgeUse[{ k.first, k.second }]++;
+      }
+   }
+
+   std::vector<std::array<float, 6>> segments;
+   for (const auto& entry : edgeUse)
+   {
+      if (entry.second != 1)
+         continue;
+      const Vertex& a = in.vertices[entry.first.first];
+      const Vertex& b = in.vertices[entry.first.second];
+      segments.push_back({ a.px, a.py, a.pz, b.px, b.py, b.pz });
+   }
+   return ChainSegments(segments);
+}
+
+std::vector<Polyline> SliceContours(const Mesh& in, int axis, float position)
+{
+   const int k = std::max(0, std::min(axis, 2));
+   auto component = [k](const Vertex& v) {
+      return (k == 0) ? v.px : (k == 1) ? v.py : v.pz;
+   };
+
+   std::vector<std::array<float, 6>> segments;
+   for (size_t t = 0; t + 2 < in.indices.size(); t += 3)
+   {
+      const Vertex& a = in.vertices[in.indices[t]];
+      const Vertex& b = in.vertices[in.indices[t+1]];
+      const Vertex& c = in.vertices[in.indices[t+2]];
+      const Vertex* tri[3] = { &a, &b, &c };
+
+      // A triangle crossing the plane does so along exactly two of its edges.
+      float crossings[2][3];
+      int found = 0;
+      for (int e = 0; e < 3 && found < 2; e++)
+      {
+         const Vertex& p = *tri[e];
+         const Vertex& q = *tri[(e + 1) % 3];
+         const float dp = component(p) - position;
+         const float dq = component(q) - position;
+         if ((dp > 0.0f) == (dq > 0.0f))
+            continue;
+         const float denom = dq - dp;
+         const float u = (std::fabs(denom) < 1e-9f) ? 0.5f : (-dp / denom);
+         crossings[found][0] = p.px + (q.px - p.px) * u;
+         crossings[found][1] = p.py + (q.py - p.py) * u;
+         crossings[found][2] = p.pz + (q.pz - p.pz) * u;
+         found++;
+      }
+      if (found == 2)
+         segments.push_back({ crossings[0][0], crossings[0][1], crossings[0][2],
+                              crossings[1][0], crossings[1][1], crossings[1][2] });
+   }
+   return ChainSegments(segments);
+}
+}

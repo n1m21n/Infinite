@@ -194,6 +194,29 @@ public:
    virtual unsigned long long PointRevision() = 0;
 };
 
+// An ordered chain of points in space. Curves, extracted mesh boundaries and
+// plane-slice contours all reduce to this, so anything that can follow one can
+// follow all of them.
+struct Polyline
+{
+   std::vector<float> points; // xyz triples
+   bool closed = false;
+
+   size_t Count() const { return points.size() / 3; }
+   bool Empty() const { return Count() < 2; }
+};
+
+// A node that emits a curve. Kept separate from IGeometrySource because a curve
+// is a path through space, not a surface - what a follower wants from it is a
+// position and a heading at a parameter, which a mesh cannot answer.
+class ICurveSource
+{
+public:
+   virtual ~ICurveSource() {}
+   virtual const Polyline& GetPolyline() = 0;
+   virtual unsigned long long CurveRevision() = 0;
+};
+
 // A point sampled off a mesh, used by the instancing nodes.
 struct MeshPoint
 {
@@ -246,6 +269,32 @@ namespace MeshOps
    // gives a cube the softened silhouette that catches a highlight, which is
    // what a bevel is usually wanted for.
    Mesh Bevel(const Mesh& in, float amount, int segments);
+
+   // --- curves ---
+   // Samples a polyline by arc length rather than by index, so a point moving
+   // at constant t moves at constant speed even where the control points bunch
+   // up. Returns the position and the direction of travel there.
+   void SamplePolyline(const Polyline& line, float t, float outPos[3], float outTangent[3]);
+
+   // Control points to a smooth curve. Catmull-Rom passes through every control
+   // point; cubic bezier treats them as alternating anchors and handles; the
+   // B-spline is approximated rather than a true NURBS, since rational weights
+   // and a knot vector would be a lot of machinery for a visual difference that
+   // is hard to see at these scales.
+   enum CurveKind { kCurveCatmullRom = 0, kCurveBezier, kCurveBSpline, kCurveLinear };
+   Polyline BuildCurve(const std::vector<float>& controlPoints, int kind, int segments,
+                       bool closed);
+
+   // Sweeps a circular profile along a polyline, so a curve can be seen.
+   Mesh TubeAlong(const Polyline& line, float radius, int sides, float taper);
+
+   // The chain of edges used by exactly one triangle - the outline of an open
+   // surface. Empty for a closed mesh, which has no boundary at all.
+   std::vector<Polyline> BoundaryLoops(const Mesh& in);
+
+   // Contour where a mesh crosses an axis-aligned plane. This is what gives a
+   // closed object something to be followed "around", since it has no boundary.
+   std::vector<Polyline> SliceContours(const Mesh& in, int axis, float position);
    Mesh Solidify(const Mesh& in, float thickness, bool keepOriginal);
    Mesh Extrude(const Mesh& in, float distance, float inset);
    Mesh Wireframe(const Mesh& in, float thickness);

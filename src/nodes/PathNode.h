@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "INode.h"
+#include "Geometry3DNodes.h"
 #include "Modulation.h"
 
 // Moves something along a path over time.
@@ -24,6 +24,12 @@ public:
       kCircle = 0, kLine, kFigureEight, kHelix, kSpiral, kLissajous, kShapeCount
    };
 
+   // How a patched mesh is turned into something to travel along. A boundary is
+   // the outline of an open surface; a closed object has none, so slicing it
+   // gives the contour that "around the object" actually means there.
+   enum FollowMode { kFollowBoundary = 0, kFollowSlice, kFollowModeCount };
+   static const std::vector<std::string>& FollowModeNames();
+
    static INode* Create() { return new PathNode(); }
    static const std::vector<std::string>& ShapeNames();
 
@@ -31,6 +37,23 @@ public:
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
+
+   // A patched curve or mesh replaces the parametric shape entirely: it is the
+   // more specific instruction. Curve wins over geometry when both are present.
+   ICurveSource* curveSource = nullptr;
+   IGeometrySource* geometrySource = nullptr;
+   const char* InputLabel(int slot) const override
+   {
+      return slot == 0 ? "curve" : "geo";
+   }
+
+   int followMode = kFollowSlice;
+   float slicePosition = 0.0f;
+   int sliceAxis = 1;
+   int contourIndex = 0;
+   bool alignToPath = true;   // reserved: orientation output
+   size_t FollowPointCount() const { return mFollow.Count(); }
+   bool IsFollowing() const { return !mFollow.Empty(); }
 
    // X, Y, Z and the raw progress along the path.
    int OutputCount() const override { return 4; }
@@ -65,6 +88,8 @@ public:
       v.Float("sizeX", sizeX); v.Float("sizeY", sizeY); v.Float("sizeZ", sizeZ);
       v.Float("turns", turns); v.Int("lissajousA", lissajousA);
       v.Int("lissajousB", lissajousB); v.Bool("pingPong", pingPong);
+      v.Int("followMode", followMode); v.Float("slicePosition", slicePosition);
+      v.Int("sliceAxis", sliceAxis); v.Int("contourIndex", contourIndex);
    }
 
 private:
@@ -79,6 +104,15 @@ private:
    };
 
    void Evaluate();
+   void RebuildFollowIfNeeded();
+
+   // The polyline actually being travelled when a curve or mesh is patched in.
+   Polyline mFollow;
+   const void* mBuiltCurve = nullptr;
+   const void* mBuiltGeometry = nullptr;
+   unsigned long long mBuiltRevision = 0;
+   int mBuiltFollowMode = -1, mBuiltSliceAxis = -1, mBuiltContour = -1;
+   float mBuiltSlicePosition = -999.0f;
 
    float mPoint[3] = { 0.0f, 0.0f, 0.0f };
    float mProgress = 0.0f;

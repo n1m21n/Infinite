@@ -56,6 +56,7 @@
 #include "nodes/Text3DNode.h"
 #include "nodes/UtilityNodes.h"
 #include "nodes/PathNode.h"
+#include "nodes/CurveNode.h"
 #include "nodes/OceanNode.h"
 #include "nodes/SimulationNodes.h"
 #include "nodes/DrawNode.h"
@@ -515,6 +516,7 @@ namespace
       REGISTER_NODE(ClothNode, Cloth, "3D");
       REGISTER_NODE(JoinGeometryNode, Join Geometry, "3D");
       REGISTER_NODE(MetaBallNode, Metaballs, "3D");
+      REGISTER_NODE(CurveNode, Curve, "3D");
       // Three names, one class - Points/Edges/Faces are the same sampler.
       for (int i = 0; i < 3; i++)
       {
@@ -639,6 +641,8 @@ namespace
          return JoinGeometryNode::kSlots;
       if (dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr)
          return 1; // an optional point cloud to surface
+      if (dynamic_cast<PathNode*>(gn.node.get()) != nullptr)
+         return 2; // an optional curve, or geometry to travel around
       if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
@@ -745,6 +749,14 @@ namespace
       if (auto* meta = dynamic_cast<MetaBallNode*>(dst.node.get()))
       {
          meta->cloudSource = dynamic_cast<IPointCloudSource*>(src.node.get());
+         return;
+      }
+      if (auto* path = dynamic_cast<PathNode*>(dst.node.get()))
+      {
+         if (slot == 0)
+            path->curveSource = dynamic_cast<ICurveSource*>(src.node.get());
+         else
+            path->geometrySource = geo;
          return;
       }
       if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(dst.node.get()))
@@ -1683,7 +1695,10 @@ namespace
 
    void DrawPathParams(PathNode* n)
    {
-      DropdownButton("shape", PathNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
+      if (n->IsFollowing())
+         ImGui::TextDisabled("following %zu points", n->FollowPointCount());
+      else
+         DropdownButton("shape", PathNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
       float p[3];
       n->CurrentPoint(p);
       ImGui::TextDisabled("t %.2f   (%.2f, %.2f, %.2f)", n->Progress(), p[0], p[1], p[2]);
@@ -1692,6 +1707,19 @@ namespace
       ModSlider("speed / beat", &n->speed, -2.0f, 2.0f);
       ModSlider("phase", &n->phase, 0.0f, 1.0f);
       ImGui::Checkbox("ping-pong", &n->pingPong);
+
+      if (n->geometrySource != nullptr && n->curveSource == nullptr)
+      {
+         NodeSeparator("follow");
+         DropdownButton("mode", PathNode::FollowModeNames(), n->followMode,
+                        [n](int i) { n->followMode = i; });
+         if (n->followMode == PathNode::kFollowSlice)
+         {
+            ModSliderInt("axis 0=X 1=Y 2=Z", &n->sliceAxis, 0, 2);
+            ModSlider("slice at", &n->slicePosition, -3.0f, 3.0f);
+         }
+         ModSliderInt("contour", &n->contourIndex, 0, 8);
+      }
 
       NodeSeparator("shape");
       ModSlider("size x", &n->sizeX, 0.0f, 3.0f);
@@ -1720,6 +1748,43 @@ namespace
       ModSlider("direction", &n->direction, -3.1416f, 3.1416f);
       ModSliderInt("octaves", &n->octaves, 1, 8);
       ModSlider("speed", &n->speed, -3.0f, 3.0f);
+
+      NodeSeparator("transform");
+      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
+      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
+      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
+      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
+
+      NodeSeparator("material");
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+      ColorSwatch("colour", n->color, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f);
+   }
+
+   void DrawCurveParams(CurveNode* n)
+   {
+      ImGui::TextDisabled("%zu points, %zu triangles", n->PointCount(), n->TriangleCount());
+      DropdownButton("type", CurveNode::KindNames(), n->kind, [n](int i) { n->kind = i; });
+      DropdownButton("preset", CurveNode::PresetNames(), n->preset, [n](int i) { n->preset = i; });
+
+      NodeSeparator("shape");
+      ModSliderInt("points", &n->pointCount, 2, CurveNode::kMaxPoints);
+      ModSliderInt("smoothness", &n->segments, 1, 64);
+      ImGui::Checkbox("closed", &n->closed);
+      ModSlider("spread", &n->spread, 0.0f, 4.0f);
+      ModSlider("height", &n->height, -3.0f, 3.0f);
+      ModSlider("twist", &n->twist, -3.1416f, 3.1416f);
+      if (n->preset == 3)
+         ModSlider("seed", &n->seed, 0.0f, 100.0f);
+
+      NodeSeparator("tube");
+      ModSlider("radius", &n->radius, 0.0f, 0.5f);
+      ModSliderInt("sides", &n->sides, 3, 32);
+      ModSlider("taper", &n->taper, 0.0f, 1.0f);
 
       NodeSeparator("transform");
       ModSlider("pos x", &n->posX, -5.0f, 5.0f);
@@ -3083,6 +3148,14 @@ namespace
          if (auto* meta = dynamic_cast<MetaBallNode*>(other.node.get()))
             if (dyingCloud != nullptr && meta->cloudSource == dyingCloud)
                meta->cloudSource = nullptr;
+         if (auto* path = dynamic_cast<PathNode*>(other.node.get()))
+         {
+            if (dyingGeometry != nullptr && path->geometrySource == dyingGeometry)
+               path->geometrySource = nullptr;
+            if (auto* dyingCurve = dynamic_cast<ICurveSource*>(dying))
+               if (path->curveSource == dyingCurve)
+                  path->curveSource = nullptr;
+         }
          // The single-geometry-input nodes. Missing one here would leave a
          // pointer to a freed node and crash on the next cook.
          if (dyingGeometry != nullptr)
@@ -3228,6 +3301,11 @@ namespace
                record(join->inputs[i], i);
          if (auto* meta = dynamic_cast<MetaBallNode*>(gn.node.get()))
             record(meta->cloudSource, 0);
+         if (auto* path = dynamic_cast<PathNode*>(gn.node.get()))
+         {
+            record(path->curveSource, 0);
+            record(path->geometrySource, 1);
+         }
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
          {
             record(inst->pointSource, 0);
@@ -4513,6 +4591,83 @@ int main()
          printf("%s\n", (allShapes && allShapes2D && bevelled) ? "PHASE A OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_PHASEDTEST") != nullptr && frameId == 4)
+      {
+         // Curves of every kind must produce a usable polyline and a tube.
+         bool allKinds = true;
+         for (int kind = 0; kind < 4; kind++)
+         {
+            std::vector<float> control = { -1,0,0,  -0.3f,0.8f,0,  0.3f,-0.8f,0,  1,0,0 };
+            const Polyline line = MeshOps::BuildCurve(control, kind, 16, false);
+            const Mesh tube = MeshOps::TubeAlong(line, 0.05f, 8, 0.0f);
+            const bool ok = line.Count() >= 4 && !tube.Empty();
+            printf("  curve %-12s %zu points, %zu tris  %s\n",
+                   CurveNode::KindNames()[kind].c_str(), line.Count(),
+                   tube.indices.size() / 3, ok ? "OK" : "FAIL");
+            if (!ok) allKinds = false;
+         }
+
+         // Arc-length sampling: equal steps in t must cover roughly equal
+         // distance. Sampling by index instead would crawl where control points
+         // bunch and race where they spread.
+         std::vector<float> control = { -1,0,0,  -0.9f,0.1f,0,  0.9f,0.1f,0,  1,0,0 };
+         const Polyline line = MeshOps::BuildCurve(control, MeshOps::kCurveCatmullRom, 24, false);
+         float prev[3], tangent[3], minStep = 1e30f, maxStep = 0.0f;
+         MeshOps::SamplePolyline(line, 0.0f, prev, tangent);
+         for (int i = 1; i <= 20; i++)
+         {
+            float pos[3];
+            MeshOps::SamplePolyline(line, (float)i / 20.0f, pos, tangent);
+            const float d = std::sqrt((pos[0]-prev[0])*(pos[0]-prev[0]) +
+                                      (pos[1]-prev[1])*(pos[1]-prev[1]) +
+                                      (pos[2]-prev[2])*(pos[2]-prev[2]));
+            minStep = std::min(minStep, d);
+            maxStep = std::max(maxStep, d);
+            prev[0] = pos[0]; prev[1] = pos[1]; prev[2] = pos[2];
+         }
+         const float ratio = (minStep > 1e-6f) ? maxStep / minStep : 1e30f;
+         printf("arc-length sampling: step ratio %.2f (1.0 is perfectly even)  %s\n",
+                ratio, ratio < 1.6f ? "OK" : "FAIL");
+         const bool evenSpeed = ratio < 1.6f;
+
+         // Slicing a sphere through its centre must give one closed contour,
+         // and every point on it must sit at the sphere's radius - that is what
+         // proves it is really following the surface and not something else.
+         const Mesh sphere = Primitives::Sphere(24, 32);
+         const std::vector<Polyline> contours = MeshOps::SliceContours(sphere, 1, 0.0f);
+         bool sliceOk = false;
+         if (!contours.empty())
+         {
+            float minR = 1e30f, maxR = 0.0f;
+            for (size_t i = 0; i < contours[0].Count(); i++)
+            {
+               const float x = contours[0].points[i*3];
+               const float z = contours[0].points[i*3+2];
+               const float r = std::sqrt(x*x + z*z);
+               minR = std::min(minR, r); maxR = std::max(maxR, r);
+            }
+            sliceOk = contours[0].closed && contours[0].Count() > 16 &&
+                      std::fabs(maxR - 0.5f) < 0.02f && std::fabs(minR - 0.5f) < 0.02f;
+            printf("sphere slice: %zu contours, %zu points, closed=%d, radius %.3f..%.3f  %s\n",
+                   contours.size(), contours[0].Count(), (int)contours[0].closed,
+                   minR, maxR, sliceOk ? "OK" : "FAIL");
+         }
+         else
+         {
+            printf("sphere slice: no contours  FAIL\n");
+         }
+
+         // A plane has a real boundary, so that path needs no fallback.
+         const std::vector<Polyline> edges = MeshOps::BoundaryLoops(Primitives::Plane(4));
+         const bool boundaryOk = !edges.empty() && edges[0].closed && edges[0].Count() >= 16;
+         printf("plane boundary: %zu loops, %zu points, closed=%d  %s\n",
+                edges.size(), edges.empty() ? 0 : edges[0].Count(),
+                edges.empty() ? 0 : (int)edges[0].closed, boundaryOk ? "OK" : "FAIL");
+
+         printf("%s\n", (allKinds && evenSpeed && sliceOk && boundaryOk)
+                            ? "PHASE D OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_PHASECTEST") != nullptr && frameId == 4)
       {
          // Every new primitive must produce a finite, non-degenerate mesh.
@@ -5650,7 +5805,10 @@ int main()
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
          {
@@ -5680,6 +5838,8 @@ int main()
                snprintf(line, sizeof(line), "%zu triangles", mat->TriangleCount());
             else if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu particles", ps->AliveCount());
+            else if (auto* cv = dynamic_cast<CurveNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu points, %zu tris", cv->PointCount(), cv->TriangleCount());
             else if (auto* mb = dynamic_cast<MetaBallNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu balls, %zu tris", mb->BallCount(), mb->TriangleCount());
             else if (auto* jn = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
@@ -5780,6 +5940,8 @@ int main()
                DrawJoinGeometryParams(n);
             else if (auto* n = dynamic_cast<MetaBallNode*>(gn.node.get()))
                DrawMetaBallParams(n);
+            else if (auto* n = dynamic_cast<CurveNode*>(gn.node.get()))
+               DrawCurveParams(n);
             else if (auto* n = dynamic_cast<OceanNode*>(gn.node.get()))
                DrawOceanParams(n);
             else if (dynamic_cast<NullNode*>(gn.node.get()) != nullptr ||
@@ -5963,6 +6125,11 @@ int main()
                linkFromNode(join->inputs[i], i);
          if (auto* meta = dynamic_cast<MetaBallNode*>(gn.node.get()))
             linkFromNode(meta->cloudSource, 0);
+         if (auto* path = dynamic_cast<PathNode*>(gn.node.get()))
+         {
+            linkFromNode(path->curveSource, 0);
+            linkFromNode(path->geometrySource, 1);
+         }
          if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
             linkFromNode(mat->input, 0);
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
@@ -6077,6 +6244,8 @@ int main()
                auto* dstCloth = dstNode ? dynamic_cast<ClothNode*>(dstNode->node.get()) : nullptr;
                auto* dstJoin = dstNode ? dynamic_cast<JoinGeometryNode*>(dstNode->node.get()) : nullptr;
                auto* dstMeta = dstNode ? dynamic_cast<MetaBallNode*>(dstNode->node.get()) : nullptr;
+               auto* dstPath = dstNode ? dynamic_cast<PathNode*>(dstNode->node.get()) : nullptr;
+               auto* srcCurve = srcNode ? dynamic_cast<ICurveSource*>(srcNode->node.get()) : nullptr;
                auto* dstOutput = dstNode ? dynamic_cast<OutputNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
                auto* srcCloud = srcNode ? dynamic_cast<IPointCloudSource*>(srcNode->node.get()) : nullptr;
@@ -6115,6 +6284,8 @@ int main()
                         valid = srcGeometry != nullptr;
                      else if (dstMeta != nullptr)
                         valid = srcCloud != nullptr;
+                     else if (dstPath != nullptr)
+                        valid = (slot == 0) ? (srcCurve != nullptr) : (srcGeometry != nullptr);
                      else if (dstMaterial != nullptr)
                         // Slot 0 takes geometry; the rest are ordinary images.
                         valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
@@ -6161,6 +6332,13 @@ int main()
                      dstCloth->input = srcGeometry;
                   else if (dstMeta != nullptr)
                      dstMeta->cloudSource = srcCloud;
+                  else if (dstPath != nullptr)
+                  {
+                     if (GraphNode::InputSlotFromPin(b) == 0)
+                        dstPath->curveSource = srcCurve;
+                     else
+                        dstPath->geometrySource = srcGeometry;
+                  }
                   else if (dstJoin != nullptr)
                   {
                      const int jslot = GraphNode::InputSlotFromPin(b);
@@ -6865,6 +7043,7 @@ int main()
                 dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
             {
                // Pass-throughs and samplers with nothing patched in are empty

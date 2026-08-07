@@ -69,6 +69,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/UtilityNodes.cpp
     src/nodes/PathNode.cpp
     src/nodes/OceanNode.cpp
+    src/nodes/CurveNode.cpp
     src/nodes/SimulationNodes.cpp
     src/nodes/GeometryOpNodes.cpp
     src/nodes/SceneNodes.cpp
