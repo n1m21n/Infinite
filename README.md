@@ -12,7 +12,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**91 node types across ten categories.**
+**107 node types across ten categories.**
 
 | Category | Nodes |
 |---|---|
@@ -23,10 +23,10 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 | Compositing | Blend (31 modes), Layer Stack (4 reorderable layers), Switcher, Fit, outer glow, colour overlay, drop shadow |
 | Feedback | Feedback (one-frame delay, makes cycles legal), Trails, Reaction-Diffusion |
 | Mask | Remove Background (on-device Vision segmentation), Chroma Key, Luma Key |
-| 3D | Geometry (8 primitives), Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Instance on Points, Camera, Light, Render 3D |
+| 3D | Geometry (8 primitives), Model 3D (obj/ply/stl/usd), Text 3D (extruded glyphs), Ocean (Gerstner waves), Transform, Array, Subdivide (Loop), Smooth (Taubin), Mirror, Screw, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Join Geometry, Material, Null 3D, Mesh to Points/Edges/Faces, Instance on Points, **Particle System**, **Cloth**, Camera, Light (directional/point/sun/ambient), Render 3D |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
-| Modulators | LFO, Random, Pattern (8-step), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio File**, **Audio Analyze** |
-| Output | Output (PNG export + H.264 recording) |
+| Modulators | LFO, Random, Pattern (8-step), Path (6 shapes), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio File**, **Audio Analyze** |
+| Output | Output (PNG export + H.264 recording, with an optional audio track) |
 
 - **Live 1:1 preview on every node**, including effects and compositing.
 - **Modulation** — every slider has a pin. Patch a modulator into it and the
@@ -34,6 +34,20 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
   and each destination maps that onto its own range, so one **Macro Knob** can
   sweep a blur radius, an opacity and a hue shift together. **Macro XY** gives
   two independent outputs from one pad, with a recordable, loopable path.
+- **Physically based shading** — Cook-Torrance GGX with Fresnel and energy
+  conservation, emission, and a procedural sky/horizon/ground environment that
+  metal actually reflects. Lighting runs in linear space and is tonemapped
+  (ACES) on the way out, with dithering to kill banding.
+- **Antialiasing** — multisampled 3D rendering up to 8x, automatically stepped
+  down when a large export would not fit in the memory budget.
+- **Patches** — save, save as, open and a recents list, in a line-based text
+  format that stays readable and diffable.
+- **Simulation** — a particle system and a position-based-dynamics cloth/soft
+  body solver. Both step on the transport at a fixed timestep, so pausing
+  genuinely freezes them and rewinding resets them; a patch looks the same
+  every time rather than depending on how long it was left running.
+- **Interactive viewport** — drag the Render 3D preview to orbit, scroll to
+  zoom, and frame the whole scene with one button.
 - **Transport** — global play/pause and BPM. Pausing freezes modulators, video
   playback and shader animation together, so a patch is deterministic.
 - **Recording** — encode the output to an H.264 `.mov` via AVAssetWriter.
@@ -71,16 +85,27 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 Download the DMG from [Releases](../../releases), drag **Infinite** to
 Applications.
 
-The app is **not notarized** (that needs a paid Apple Developer account), so
-Gatekeeper will refuse the first launch. To open it:
+The build is a universal binary (Apple Silicon and Intel) and is self-contained
+— it links nothing outside the system frameworks, so it does not need Homebrew
+or anything else installed.
 
-**right-click the app → Open → Open**
+It is **ad-hoc signed but not notarized**, because notarizing requires a paid
+Apple Developer account. macOS therefore blocks it on first launch with
+*"Infinite cannot be opened because the developer cannot be verified"*. This is
+expected, and it is a signature problem, not a broken download.
 
-You only need to do this once. Alternatively:
+**To open it the first time: right-click (or Control-click) the app → Open →
+Open.** After that it launches normally like any other app.
+
+If macOS instead says the app is **damaged and should be moved to the Bin**,
+that is the quarantine flag rather than actual damage:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Infinite.app
 ```
+
+There is no way around this short of notarization; anyone distributing this
+further should expect to explain the same step.
 
 ## Build from source
 
