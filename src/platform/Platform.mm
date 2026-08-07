@@ -4,6 +4,7 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <AVFoundation/AVFoundation.h>
+#import <ModelIO/ModelIO.h>
 #import <Vision/Vision.h>
 #import <Accelerate/Accelerate.h>
 #import <CoreMedia/CoreMedia.h>
@@ -223,6 +224,472 @@ namespace Platform
 
          CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
          CFRelease(sample);
+         return true;
+      }
+   }
+
+   std::string OpenPatchDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Open patch"];
+         if (@available(macOS 11.0, *))
+         {
+            UTType* type = [UTType typeWithFilenameExtension:@"infinite"];
+            if (type != nil)
+               [panel setAllowedContentTypes:@[ type ]];
+         }
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
+   std::string SavePatchDialog(const std::string& suggestedName)
+   {
+      @autoreleasepool
+      {
+         NSSavePanel* panel = [NSSavePanel savePanel];
+         [panel setTitle:@"Save patch"];
+         [panel setNameFieldStringValue:
+            [NSString stringWithUTF8String:suggestedName.empty() ? "Untitled.infinite"
+                                                                 : suggestedName.c_str()]];
+         if (@available(macOS 11.0, *))
+         {
+            UTType* type = [UTType typeWithFilenameExtension:@"infinite"];
+            if (type != nil)
+               [panel setAllowedContentTypes:@[ type ]];
+         }
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [panel URL];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
+   std::string OpenModelDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Open 3D model"];
+
+         if (@available(macOS 11.0, *))
+         {
+            NSMutableArray<UTType*>* types = [NSMutableArray array];
+            // USD has first-class UTTypes; the rest are matched by extension
+            // because macOS declares no universal type for them.
+            if (UTTypeUSD != nil) [types addObject:UTTypeUSD];
+            if (UTTypeUSDZ != nil) [types addObject:UTTypeUSDZ];
+            for (NSString* ext in @[ @"obj", @"ply", @"stl", @"abc" ])
+            {
+               UTType* t = [UTType typeWithFilenameExtension:ext];
+               if (t != nil)
+                  [types addObject:t];
+            }
+            if ([types count] > 0)
+               [panel setAllowedContentTypes:types];
+         }
+
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         if (url == nil)
+            return std::string();
+         return std::string([[url path] UTF8String]);
+      }
+   }
+
+   namespace
+   {
+      struct OutlineBuilder
+      {
+         std::vector<Platform::TextContour>* contours = nullptr;
+         Platform::TextContour current;
+         float lastX = 0.0f, lastY = 0.0f;
+         float startX = 0.0f, startY = 0.0f;
+         float offsetX = 0.0f, offsetY = 0.0f;
+         float scale = 1.0f;
+
+         void Push(float x, float y)
+         {
+            current.points.push_back((x + offsetX) * scale);
+            current.points.push_back((y + offsetY) * scale);
+            lastX = x;
+            lastY = y;
+         }
+
+         void Close()
+         {
+            // Under four points is a degenerate contour - two points and a
+            // close, say - and would only produce zero-area triangles.
+            if (current.points.size() >= 6)
+               contours->push_back(current);
+            current.points.clear();
+         }
+      };
+
+      // Fixed subdivision rather than adaptive: glyph curves are short and the
+      // step is chosen so the error stays under a pixel at any sane text size.
+      const int kCurveSteps = 12;
+
+      void OutlineApply(void* info, const CGPathElement* element)
+      {
+         OutlineBuilder* b = (OutlineBuilder*)info;
+         const CGPoint* p = element->points;
+         switch (element->type)
+         {
+            case kCGPathElementMoveToPoint:
+               b->Close();
+               b->startX = (float)p[0].x;
+               b->startY = (float)p[0].y;
+               b->Push((float)p[0].x, (float)p[0].y);
+               break;
+            case kCGPathElementAddLineToPoint:
+               b->Push((float)p[0].x, (float)p[0].y);
+               break;
+            case kCGPathElementAddQuadCurveToPoint:
+            {
+               const float x0 = b->lastX, y0 = b->lastY;
+               for (int i = 1; i <= kCurveSteps; i++)
+               {
+                  const float t = (float)i / (float)kCurveSteps;
+                  const float u = 1.0f - t;
+                  const float x = u*u*x0 + 2*u*t*(float)p[0].x + t*t*(float)p[1].x;
+                  const float y = u*u*y0 + 2*u*t*(float)p[0].y + t*t*(float)p[1].y;
+                  b->Push(x, y);
+               }
+               break;
+            }
+            case kCGPathElementAddCurveToPoint:
+            {
+               const float x0 = b->lastX, y0 = b->lastY;
+               for (int i = 1; i <= kCurveSteps; i++)
+               {
+                  const float t = (float)i / (float)kCurveSteps;
+                  const float u = 1.0f - t;
+                  const float x = u*u*u*x0 + 3*u*u*t*(float)p[0].x +
+                                  3*u*t*t*(float)p[1].x + t*t*t*(float)p[2].x;
+                  const float y = u*u*u*y0 + 3*u*u*t*(float)p[0].y +
+                                  3*u*t*t*(float)p[1].y + t*t*t*(float)p[2].y;
+                  b->Push(x, y);
+               }
+               break;
+            }
+            case kCGPathElementCloseSubpath:
+               b->Close();
+               break;
+         }
+      }
+   }
+
+   const std::vector<std::string>& AvailableFontFamilies()
+   {
+      // Enumerated once and cached: the query walks every installed font and is
+      // far too slow to run while drawing a params panel each frame.
+      static std::vector<std::string> sFamilies;
+      static bool sLoaded = false;
+      if (sLoaded)
+         return sFamilies;
+      sLoaded = true;
+
+      @autoreleasepool
+      {
+         CFArrayRef names = CTFontManagerCopyAvailableFontFamilyNames();
+         if (names != nullptr)
+         {
+            const CFIndex count = CFArrayGetCount(names);
+            for (CFIndex i = 0; i < count; i++)
+            {
+               NSString* name = (__bridge NSString*)CFArrayGetValueAtIndex(names, i);
+               // Families beginning with a dot are Apple's internal system
+               // faces; they are not meant to be selected by name.
+               if (name == nil || [name hasPrefix:@"."])
+                  continue;
+               sFamilies.push_back(std::string([name UTF8String]));
+            }
+            CFRelease(names);
+         }
+      }
+
+      std::sort(sFamilies.begin(), sFamilies.end());
+      if (sFamilies.empty())
+         sFamilies.push_back("Helvetica");
+      return sFamilies;
+   }
+
+   bool GetTextOutlines(const std::string& text, const std::string& fontName,
+                        float letterSpacing, std::vector<TextContour>& outContours,
+                        std::string& outError)
+   {
+      @autoreleasepool
+      {
+         outContours.clear();
+         if (text.empty())
+         {
+            outError = "no text";
+            return false;
+         }
+
+         // A fixed large point size keeps the outlines well away from the font's
+         // integer hinting grid; the result is normalised by units-per-em below.
+         const CGFloat kPointSize = 256.0;
+         NSString* nsFont = fontName.empty()
+            ? @"Helvetica"
+            : [NSString stringWithUTF8String:fontName.c_str()];
+
+         CTFontRef font = CTFontCreateWithName((__bridge CFStringRef)nsFont, kPointSize, nullptr);
+         if (font == nullptr)
+            font = CTFontCreateWithName(CFSTR("Helvetica"), kPointSize, nullptr);
+         if (font == nullptr)
+         {
+            outError = "could not create font";
+            return false;
+         }
+
+         NSString* nsText = [NSString stringWithUTF8String:text.c_str()];
+         if (nsText == nil)
+         {
+            CFRelease(font);
+            outError = "text is not valid UTF-8";
+            return false;
+         }
+
+         // CTLine rather than per-character positioning, so kerning, ligatures
+         // and non-Latin shaping come out right instead of being approximated
+         // by stacking advances.
+         NSDictionary* attributes = @{ (__bridge NSString*)kCTFontAttributeName: (__bridge id)font };
+         NSAttributedString* attributed =
+            [[NSAttributedString alloc] initWithString:nsText attributes:attributes];
+         CTLineRef line = CTLineCreateWithAttributedString((__bridge CFAttributedStringRef)attributed);
+         if (line == nullptr)
+         {
+            CFRelease(font);
+            outError = "could not lay out text";
+            return false;
+         }
+
+         // Normalise so the design is about one unit tall, matching the scale
+         // the primitives use.
+         const float scale = 1.0f / (float)CTFontGetCapHeight(font);
+
+         OutlineBuilder builder;
+         builder.contours = &outContours;
+         builder.scale = scale;
+
+         CFArrayRef runs = CTLineGetGlyphRuns(line);
+         const CFIndex runCount = CFArrayGetCount(runs);
+         float extraAdvance = 0.0f;
+
+         for (CFIndex r = 0; r < runCount; r++)
+         {
+            CTRunRef run = (CTRunRef)CFArrayGetValueAtIndex(runs, r);
+            const CFIndex glyphCount = CTRunGetGlyphCount(run);
+            if (glyphCount == 0)
+               continue;
+
+            std::vector<CGGlyph> glyphs((size_t)glyphCount);
+            std::vector<CGPoint> positions((size_t)glyphCount);
+            CTRunGetGlyphs(run, CFRangeMake(0, glyphCount), glyphs.data());
+            CTRunGetPositions(run, CFRangeMake(0, glyphCount), positions.data());
+
+            CFDictionaryRef runAttributes = CTRunGetAttributes(run);
+            CTFontRef runFont = (CTFontRef)CFDictionaryGetValue(runAttributes, kCTFontAttributeName);
+            if (runFont == nullptr)
+               runFont = font;
+
+            for (CFIndex g = 0; g < glyphCount; g++)
+            {
+               CGPathRef path = CTFontCreatePathForGlyph(runFont, glyphs[(size_t)g], nullptr);
+               if (path == nullptr)
+                  continue; // spaces have no outline
+
+               builder.offsetX = (float)positions[(size_t)g].x + extraAdvance * (float)g;
+               builder.offsetY = (float)positions[(size_t)g].y;
+               CGPathApply(path, &builder, OutlineApply);
+               builder.Close();
+               CGPathRelease(path);
+            }
+            extraAdvance += letterSpacing * (float)CTFontGetSize(runFont);
+         }
+
+         CFRelease(line);
+         CFRelease(font);
+
+         if (outContours.empty())
+         {
+            outError = "text produced no outlines";
+            return false;
+         }
+
+         // Centre horizontally and vertically on the origin so rotation and
+         // scaling behave predictably.
+         float lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
+         for (const TextContour& c : outContours)
+         {
+            for (size_t i = 0; i + 1 < c.points.size(); i += 2)
+            {
+               lo[0] = std::min(lo[0], c.points[i]);
+               hi[0] = std::max(hi[0], c.points[i]);
+               lo[1] = std::min(lo[1], c.points[i + 1]);
+               hi[1] = std::max(hi[1], c.points[i + 1]);
+            }
+         }
+         const float cx = (lo[0] + hi[0]) * 0.5f, cy = (lo[1] + hi[1]) * 0.5f;
+         for (TextContour& c : outContours)
+         {
+            for (size_t i = 0; i + 1 < c.points.size(); i += 2)
+            {
+               c.points[i] -= cx;
+               c.points[i + 1] -= cy;
+            }
+         }
+         return true;
+      }
+   }
+
+   bool LoadModel(const std::string& path, std::vector<ModelVertex>& outVertices,
+                  std::vector<unsigned int>& outIndices, std::string& outError)
+   {
+      @autoreleasepool
+      {
+         outVertices.clear();
+         outIndices.clear();
+
+         NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
+         NSURL* url = [NSURL fileURLWithPath:nsPath];
+         if (![[NSFileManager defaultManager] fileExistsAtPath:nsPath])
+         {
+            outError = "file not found";
+            return false;
+         }
+
+         // Ask ModelIO for exactly the layout core/Mesh.h uses, so the vertex
+         // data can be memcpy'd out rather than converted attribute by attribute.
+         MDLVertexDescriptor* descriptor = [[MDLVertexDescriptor alloc] init];
+         descriptor.attributes[0] = [[MDLVertexAttribute alloc]
+            initWithName:MDLVertexAttributePosition format:MDLVertexFormatFloat3 offset:0 bufferIndex:0];
+         descriptor.attributes[1] = [[MDLVertexAttribute alloc]
+            initWithName:MDLVertexAttributeNormal format:MDLVertexFormatFloat3 offset:12 bufferIndex:0];
+         descriptor.attributes[2] = [[MDLVertexAttribute alloc]
+            initWithName:MDLVertexAttributeTextureCoordinate format:MDLVertexFormatFloat2 offset:24 bufferIndex:0];
+         descriptor.layouts[0] = [[MDLVertexBufferLayout alloc] initWithStride:32];
+
+         NSError* error = nil;
+         MDLAsset* asset = [[MDLAsset alloc] initWithURL:url
+                                       vertexDescriptor:descriptor
+                                        bufferAllocator:nil
+                                       preserveTopology:NO
+                                                  error:&error];
+         if (asset == nil)
+         {
+            outError = error != nil ? std::string([[error localizedDescription] UTF8String])
+                                    : std::string("could not read model");
+            return false;
+         }
+
+         // Flatten the scene graph: a file can hold many meshes under nested
+         // transforms, and the graph here has no concept of an object hierarchy.
+         NSArray<MDLObject*>* meshes = [asset childObjectsOfClass:[MDLMesh class]];
+         if ([meshes count] == 0)
+         {
+            outError = "file contains no mesh";
+            return false;
+         }
+
+         for (MDLObject* object in meshes)
+         {
+            MDLMesh* mesh = (MDLMesh*)object;
+
+            // Files often ship without normals - most STLs, plenty of OBJs -
+            // and without these the surface renders unlit and flat black.
+            if ([mesh vertexAttributeDataForAttributeNamed:MDLVertexAttributeNormal] == nil)
+               [mesh addNormalsWithAttributeNamed:MDLVertexAttributeNormal creaseThreshold:0.5f];
+            if ([mesh vertexAttributeDataForAttributeNamed:MDLVertexAttributeTextureCoordinate] == nil)
+            {
+               // Wrapped in a try: the generator throws on degenerate geometry,
+               // and a model without UVs is still worth showing.
+               @try
+               {
+                  [mesh addUnwrappedTextureCoordinatesForAttributeNamed:MDLVertexAttributeTextureCoordinate];
+               }
+               @catch (NSException*) {}
+            }
+
+            MDLVertexAttributeData* positions =
+               [mesh vertexAttributeDataForAttributeNamed:MDLVertexAttributePosition];
+            MDLVertexAttributeData* normals =
+               [mesh vertexAttributeDataForAttributeNamed:MDLVertexAttributeNormal];
+            MDLVertexAttributeData* uvs =
+               [mesh vertexAttributeDataForAttributeNamed:MDLVertexAttributeTextureCoordinate];
+            if (positions == nil)
+               continue;
+
+            const unsigned int base = (unsigned int)outVertices.size();
+            const NSUInteger vertexCount = mesh.vertexCount;
+            for (NSUInteger i = 0; i < vertexCount; i++)
+            {
+               ModelVertex v;
+               const char* p = (const char*)positions.dataStart + i * positions.stride;
+               std::memcpy(&v.px, p, sizeof(float) * 3);
+               if (normals != nil)
+               {
+                  const char* n = (const char*)normals.dataStart + i * normals.stride;
+                  std::memcpy(&v.nx, n, sizeof(float) * 3);
+               }
+               if (uvs != nil)
+               {
+                  const char* t = (const char*)uvs.dataStart + i * uvs.stride;
+                  std::memcpy(&v.u, t, sizeof(float) * 2);
+               }
+               outVertices.push_back(v);
+            }
+
+            for (MDLSubmesh* submesh in mesh.submeshes)
+            {
+               // preserveTopology:NO above asks ModelIO to triangulate, but a
+               // submesh can still arrive as something else; anything that is
+               // not triangles is skipped rather than read as garbage indices.
+               if (submesh.geometryType != MDLGeometryTypeTriangles)
+                  continue;
+
+               const NSUInteger count = submesh.indexCount;
+               const void* raw = submesh.indexBuffer.map.bytes;
+               if (raw == nullptr)
+                  continue;
+
+               switch (submesh.indexType)
+               {
+                  case MDLIndexBitDepthUInt32:
+                  case MDLIndexBitDepthInvalid:
+                     for (NSUInteger i = 0; i < count; i++)
+                        outIndices.push_back(base + ((const uint32_t*)raw)[i]);
+                     break;
+                  case MDLIndexBitDepthUInt16:
+                     for (NSUInteger i = 0; i < count; i++)
+                        outIndices.push_back(base + ((const uint16_t*)raw)[i]);
+                     break;
+                  case MDLIndexBitDepthUInt8:
+                     for (NSUInteger i = 0; i < count; i++)
+                        outIndices.push_back(base + ((const uint8_t*)raw)[i]);
+                     break;
+               }
+            }
+         }
+
+         if (outVertices.empty() || outIndices.empty())
+         {
+            outError = "model produced no triangles";
+            return false;
+         }
          return true;
       }
    }

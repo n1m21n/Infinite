@@ -36,6 +36,15 @@ public:
    float nearPlane = 0.05f;
    float farPlane = 100.0f;
    float orbitPerBeat = 0.0f; // free rotation, useful for turntables
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("projection", projection); v.Float("fov", fov);
+      v.Float("orthoHeight", orthoHeight); v.Float("distance", distance);
+      v.Float("azimuth", azimuth); v.Float("elevation", elevation);
+      v.Float("targetX", targetX); v.Float("targetY", targetY); v.Float("targetZ", targetZ);
+      v.Float("roll", roll); v.Float("near", nearPlane); v.Float("far", farPlane);
+      v.Float("orbitPerBeat", orbitPerBeat);
+   }
 };
 
 class LightNode : public INode
@@ -59,5 +68,13 @@ public:
    float color[3] = { 1.0f, 0.98f, 0.94f };
    float intensity = 1.2f;
    float falloff = 1.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("type", type); v.Float("azimuth", azimuth); v.Float("elevation", elevation);
+      v.Float("distance", distance); v.Color("color", color);
+      v.Float("intensity", intensity); v.Float("falloff", falloff);
+      v.Float("orbitPerBeat", orbitPerBeat);
+   }
    float orbitPerBeat = 0.0f;
 };

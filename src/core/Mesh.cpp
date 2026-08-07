@@ -1,7 +1,16 @@
 #include "Mesh.h"
 
 #include <algorithm>
+#include <array>
 #include <map>
+#include <set>
+
+// Zero is reserved as "nothing uploaded yet", so the first real stamp is 1.
+unsigned long long NextMeshRevision()
+{
+   static unsigned long long sCounter = 0;
+   return ++sCounter;
+}
 
 namespace
 {
@@ -418,51 +427,238 @@ namespace MeshOps
       return out;
    }
 
+   // Primitives here duplicate vertices wherever UVs or normals split - the
+   // sphere's date line, every edge of a flat-shaded cube. Any operator that
+   // reasons about connectivity has to weld those back together first or it
+   // will treat one surface as several and tear it open along the seams.
+   //
+   // Returns, for each vertex, the index of the first vertex sharing its
+   // position. Positions are quantised before hashing so that values that
+   // differ only in the last float bit still land together.
+   std::vector<unsigned int> BuildWeldMap(const Mesh& in)
+   {
+      std::map<std::array<long long, 3>, unsigned int> unique;
+      std::vector<unsigned int> weld(in.vertices.size());
+      const double kQuantum = 1e5; // ~0.00001 units
+
+      for (size_t i = 0; i < in.vertices.size(); i++)
+      {
+         const Vertex& v = in.vertices[i];
+         const std::array<long long, 3> key = {
+            (long long)std::llround((double)v.px * kQuantum),
+            (long long)std::llround((double)v.py * kQuantum),
+            (long long)std::llround((double)v.pz * kQuantum)
+         };
+         auto it = unique.find(key);
+         if (it == unique.end())
+         {
+            unique[key] = (unsigned int)i;
+            weld[i] = (unsigned int)i;
+         }
+         else
+         {
+            weld[i] = it->second;
+         }
+      }
+      return weld;
+   }
+
+   // Neighbour sets over welded indices, built from triangle edges.
+   std::map<unsigned int, std::set<unsigned int>> BuildAdjacency(
+      const Mesh& in, const std::vector<unsigned int>& weld)
+   {
+      std::map<unsigned int, std::set<unsigned int>> adjacency;
+      for (size_t t = 0; t + 2 < in.indices.size(); t += 3)
+      {
+         const unsigned int v[3] = { weld[in.indices[t]], weld[in.indices[t + 1]],
+                                     weld[in.indices[t + 2]] };
+         for (int e = 0; e < 3; e++)
+         {
+            const unsigned int a = v[e], b = v[(e + 1) % 3];
+            if (a == b)
+               continue;
+            adjacency[a].insert(b);
+            adjacency[b].insert(a);
+         }
+      }
+      return adjacency;
+   }
+
+   // Loop subdivision. Each pass splits every triangle into four and then moves
+   // both the new edge points and the original vertices onto the limit surface
+   // using Loop's weights.
+   //
+   // This replaces an earlier version that split the triangles and then shoved
+   // each midpoint along its own normal by a twelfth of the edge length. That
+   // rounded a sphere convincingly enough, but it was not subdivision: the
+   // displacement depended only on the edge, so flat regions bulged, creases
+   // rounded off at the same rate as everything else, and the result drifted
+   // further from the true surface with every level rather than converging.
+   //
+   // `smooth` blends between plain 4:1 tessellation at 0 and the full limit
+   // surface at 1, so the parameter still means roughly what it used to.
    Mesh Subdivide(const Mesh& in, int levels, float smooth)
    {
       Mesh current = in;
       const int passes = std::max(0, std::min(levels, 3));
+      const float blend = std::max(0.0f, std::min(smooth, 1.0f));
+
       for (int pass = 0; pass < passes; pass++)
       {
          // Guard against a runaway: each pass quadruples the triangle count.
          if (current.indices.size() / 3 > 200000)
             break;
 
-         Mesh next;
-         std::map<std::pair<unsigned int, unsigned int>, unsigned int> edgeCache;
-         next.vertices = current.vertices;
+         // Connectivity has to be computed on welded vertices, or the sphere's
+         // seam and every cube edge read as a boundary and stay creased.
+         const std::vector<unsigned int> weld = BuildWeldMap(current);
+         const std::map<unsigned int, std::set<unsigned int>> adjacency =
+            BuildAdjacency(current, weld);
 
-         auto midpoint = [&](unsigned int a, unsigned int b) -> unsigned int {
-            auto key = std::minmax(a, b);
-            auto it = edgeCache.find({ key.first, key.second });
-            if (it != edgeCache.end())
-               return it->second;
-            const Vertex& va = current.vertices[a];
-            const Vertex& vb = current.vertices[b];
-            Vertex m;
-            m.px = (va.px + vb.px) * 0.5f;
-            m.py = (va.py + vb.py) * 0.5f;
-            m.pz = (va.pz + vb.pz) * 0.5f;
+         // For each welded edge: how many triangles use it, and the opposite
+         // vertex of each. Loop's interior edge point is 3/8 of the two endpoints
+         // plus 1/8 of the two opposite vertices.
+         using Edge = std::pair<unsigned int, unsigned int>;
+         std::map<Edge, int> edgeCount;
+         std::map<Edge, std::vector<unsigned int>> edgeOpposite;
+         for (size_t t = 0; t + 2 < current.indices.size(); t += 3)
+         {
+            const unsigned int w[3] = { weld[current.indices[t]], weld[current.indices[t + 1]],
+                                        weld[current.indices[t + 2]] };
+            for (int e = 0; e < 3; e++)
+            {
+               const auto key = std::minmax(w[e], w[(e + 1) % 3]);
+               if (key.first == key.second)
+                  continue;
+               edgeCount[{ key.first, key.second }]++;
+               edgeOpposite[{ key.first, key.second }].push_back(w[(e + 2) % 3]);
+            }
+         }
+
+         auto position = [&](unsigned int i, float out[3]) {
+            out[0] = current.vertices[i].px;
+            out[1] = current.vertices[i].py;
+            out[2] = current.vertices[i].pz;
+         };
+
+         // --- repositioned original vertices ---
+         std::map<unsigned int, std::array<float, 3>> movedVertex;
+         for (const auto& entry : adjacency)
+         {
+            const unsigned int v = entry.first;
+            const std::set<unsigned int>& neighbours = entry.second;
+            const int n = (int)neighbours.size();
+
+            float original[3];
+            position(v, original);
+
+            // A vertex is on a boundary when any of its edges is used by only
+            // one triangle. Those follow the 1/8, 3/4, 1/8 curve rule so the
+            // border stays put instead of shrinking inward.
+            std::vector<unsigned int> boundaryNeighbours;
+            for (unsigned int nb : neighbours)
+            {
+               const auto key = std::minmax(v, nb);
+               auto it = edgeCount.find({ key.first, key.second });
+               if (it != edgeCount.end() && it->second == 1)
+                  boundaryNeighbours.push_back(nb);
+            }
+
+            std::array<float, 3> moved = { original[0], original[1], original[2] };
+            if (boundaryNeighbours.size() == 2)
+            {
+               float a[3], b[3];
+               position(boundaryNeighbours[0], a);
+               position(boundaryNeighbours[1], b);
+               for (int k = 0; k < 3; k++)
+                  moved[k] = 0.75f * original[k] + 0.125f * (a[k] + b[k]);
+            }
+            else if (n > 2)
+            {
+               // Loop's beta. At valence 3 this is 3/16; the general form
+               // converges to 3/(8n) for larger valences.
+               const float t = 0.375f + 0.25f * std::cos(2.0f * kPi / (float)n);
+               const float beta = (0.625f - t * t) / (float)n;
+               float sum[3] = { 0, 0, 0 };
+               for (unsigned int nb : neighbours)
+               {
+                  float p[3];
+                  position(nb, p);
+                  sum[0] += p[0]; sum[1] += p[1]; sum[2] += p[2];
+               }
+               for (int k = 0; k < 3; k++)
+                  moved[k] = original[k] * (1.0f - (float)n * beta) + sum[k] * beta;
+            }
+
+            for (int k = 0; k < 3; k++)
+               moved[k] = original[k] + (moved[k] - original[k]) * blend;
+            movedVertex[v] = moved;
+         }
+
+         Mesh next;
+         next.vertices = current.vertices;
+         for (size_t i = 0; i < next.vertices.size(); i++)
+         {
+            auto it = movedVertex.find(weld[i]);
+            if (it == movedVertex.end())
+               continue;
+            next.vertices[i].px = it->second[0];
+            next.vertices[i].py = it->second[1];
+            next.vertices[i].pz = it->second[2];
+         }
+
+         // --- edge points ---
+         // Cached on the welded pair so the two triangles either side of an edge
+         // agree on one vertex, rather than each making its own and cracking.
+         std::map<Edge, unsigned int> edgePoint;
+         auto splitEdge = [&](unsigned int ia, unsigned int ib) -> unsigned int {
+            const auto key = std::minmax(weld[ia], weld[ib]);
+            const Edge e = { key.first, key.second };
+            auto cached = edgePoint.find(e);
+            if (cached != edgePoint.end())
+               return cached->second;
+
+            const Vertex& va = current.vertices[ia];
+            const Vertex& vb = current.vertices[ib];
+            Vertex m = va;
+            // UVs and normals stay at the plain midpoint: interpolating them
+            // with Loop's weights would drag them across seams.
+            m.u = (va.u + vb.u) * 0.5f;
+            m.v = (va.v + vb.v) * 0.5f;
             m.nx = (va.nx + vb.nx) * 0.5f;
             m.ny = (va.ny + vb.ny) * 0.5f;
             m.nz = (va.nz + vb.nz) * 0.5f;
             const float len = std::sqrt(m.nx*m.nx + m.ny*m.ny + m.nz*m.nz);
             if (len > 1e-6f) { m.nx /= len; m.ny /= len; m.nz /= len; }
-            // Nudging the midpoint along its normal rounds the surface off,
-            // which is the cheap stand-in for a real Catmull-Clark limit surface.
-            if (smooth > 0.0f)
+
+            float pa[3], pb[3];
+            position(ia, pa);
+            position(ib, pb);
+            float mid[3] = { (pa[0] + pb[0]) * 0.5f, (pa[1] + pb[1]) * 0.5f,
+                             (pa[2] + pb[2]) * 0.5f };
+            float limit[3] = { mid[0], mid[1], mid[2] };
+
+            auto opposites = edgeOpposite.find(e);
+            auto count = edgeCount.find(e);
+            const bool interior = count != edgeCount.end() && count->second == 2 &&
+                                  opposites != edgeOpposite.end() &&
+                                  opposites->second.size() >= 2;
+            if (interior)
             {
-               const float edgeLen = std::sqrt((va.px-vb.px)*(va.px-vb.px) +
-                                               (va.py-vb.py)*(va.py-vb.py) +
-                                               (va.pz-vb.pz)*(va.pz-vb.pz));
-               const float push = edgeLen * 0.12f * smooth;
-               m.px += m.nx * push; m.py += m.ny * push; m.pz += m.nz * push;
+               float c[3], d[3];
+               position(opposites->second[0], c);
+               position(opposites->second[1], d);
+               for (int k = 0; k < 3; k++)
+                  limit[k] = 0.375f * (pa[k] + pb[k]) + 0.125f * (c[k] + d[k]);
             }
-            m.u = (va.u + vb.u) * 0.5f;
-            m.v = (va.v + vb.v) * 0.5f;
+
+            m.px = mid[0] + (limit[0] - mid[0]) * blend;
+            m.py = mid[1] + (limit[1] - mid[1]) * blend;
+            m.pz = mid[2] + (limit[2] - mid[2]) * blend;
+
             next.vertices.push_back(m);
             const unsigned int index = (unsigned int)next.vertices.size() - 1;
-            edgeCache[{ key.first, key.second }] = index;
+            edgePoint[e] = index;
             return index;
          };
 
@@ -471,9 +667,9 @@ namespace MeshOps
             const unsigned int a = current.indices[t];
             const unsigned int b = current.indices[t + 1];
             const unsigned int c = current.indices[t + 2];
-            const unsigned int ab = midpoint(a, b);
-            const unsigned int bc = midpoint(b, c);
-            const unsigned int ca = midpoint(c, a);
+            const unsigned int ab = splitEdge(a, b);
+            const unsigned int bc = splitEdge(b, c);
+            const unsigned int ca = splitEdge(c, a);
             const unsigned int tri[4][3] = { { a, ab, ca }, { b, bc, ab }, { c, ca, bc }, { ab, bc, ca } };
             for (auto& x : tri)
             {
@@ -484,7 +680,639 @@ namespace MeshOps
          }
          current = std::move(next);
       }
-      return current;
+      return RecalculateNormals(current, false, false);
+   }
+
+   Mesh Smooth(const Mesh& in, int iterations, float strength)
+   {
+      Mesh out = in;
+      if (in.Empty() || iterations <= 0 || strength <= 0.0f)
+         return out;
+
+      const std::vector<unsigned int> weld = BuildWeldMap(in);
+      const std::map<unsigned int, std::set<unsigned int>> adjacency = BuildAdjacency(in, weld);
+
+      // Taubin: a positive Laplacian pass that relaxes the surface, then a
+      // slightly larger negative one that pushes back out. Plain Laplacian
+      // smoothing shrinks a closed mesh toward its centroid a little more with
+      // every iteration, and a sphere run enough times collapses to a point;
+      // the alternating signs cancel that while still removing the high
+      // frequencies.
+      const float lambda = 0.5f * std::max(0.0f, std::min(strength, 1.0f));
+      const float mu = -lambda * 1.04f;
+
+      std::vector<float> px(out.vertices.size()), py(out.vertices.size()), pz(out.vertices.size());
+      for (size_t i = 0; i < out.vertices.size(); i++)
+      {
+         px[i] = out.vertices[i].px; py[i] = out.vertices[i].py; pz[i] = out.vertices[i].pz;
+      }
+
+      const int passes = std::max(0, std::min(iterations, 20));
+      for (int pass = 0; pass < passes * 2; pass++)
+      {
+         const float step = (pass % 2 == 0) ? lambda : mu;
+         std::vector<float> nx = px, ny = py, nz = pz;
+
+         for (const auto& entry : adjacency)
+         {
+            const unsigned int v = entry.first;
+            if (entry.second.empty())
+               continue;
+            float sx = 0, sy = 0, sz = 0;
+            for (unsigned int n : entry.second)
+            {
+               sx += px[n]; sy += py[n]; sz += pz[n];
+            }
+            const float inv = 1.0f / (float)entry.second.size();
+            nx[v] = px[v] + step * (sx * inv - px[v]);
+            ny[v] = py[v] + step * (sy * inv - py[v]);
+            nz[v] = pz[v] + step * (sz * inv - pz[v]);
+         }
+         px.swap(nx); py.swap(ny); pz.swap(nz);
+      }
+
+      // Written back through the weld map so split vertices move together and
+      // the seams stay closed.
+      for (size_t i = 0; i < out.vertices.size(); i++)
+      {
+         const unsigned int rep = weld[i];
+         out.vertices[i].px = px[rep];
+         out.vertices[i].py = py[rep];
+         out.vertices[i].pz = pz[rep];
+      }
+      return RecalculateNormals(out, false, false);
+   }
+
+   Mesh Mirror(const Mesh& in, int axis, float offset, bool weldSeam, bool keepOriginal)
+   {
+      Mesh out;
+      if (in.Empty())
+         return out;
+
+      const int a = std::max(0, std::min(axis, 2));
+      auto component = [](Vertex& v, int i) -> float& {
+         return (i == 0) ? v.px : (i == 1) ? v.py : v.pz;
+      };
+      auto normalComponent = [](Vertex& v, int i) -> float& {
+         return (i == 0) ? v.nx : (i == 1) ? v.ny : v.nz;
+      };
+
+      if (keepOriginal)
+         out = in;
+
+      const unsigned int base = (unsigned int)out.vertices.size();
+      for (Vertex v : in.vertices)
+      {
+         // Reflect about the plane at `offset`, and flip the matching normal
+         // component so the mirrored half is not lit inside out.
+         float& p = component(v, a);
+         p = 2.0f * offset - p;
+         normalComponent(v, a) = -normalComponent(v, a);
+         out.vertices.push_back(v);
+      }
+
+      // Reflection reverses handedness, so the winding has to be reversed too
+      // or every mirrored triangle faces backwards and backface culling eats it.
+      for (size_t t = 0; t + 2 < in.indices.size(); t += 3)
+      {
+         out.indices.push_back(base + in.indices[t]);
+         out.indices.push_back(base + in.indices[t + 2]);
+         out.indices.push_back(base + in.indices[t + 1]);
+      }
+
+      if (weldSeam && keepOriginal)
+      {
+         // Vertices sitting on the mirror plane are now duplicated. Snap the
+         // near-plane ones exactly onto it so the halves meet without a crack;
+         // BuildWeldMap then sees them as one.
+         const float tolerance = 1e-4f;
+         for (Vertex& v : out.vertices)
+         {
+            float& p = component(v, a);
+            if (std::fabs(p - offset) < tolerance)
+               p = offset;
+         }
+      }
+      return out;
+   }
+
+   Mesh Screw(const Mesh& in, int steps, float turns, float rise, float radiusOffset, int axis)
+   {
+      Mesh out;
+      if (in.Empty())
+         return out;
+
+      // Blender's Screw revolves a profile, not a solid. The profile here is the
+      // input's boundary: edges used by exactly one triangle. For an open mesh
+      // like a Plane that is its outline, which is what makes this behave like a
+      // lathe rather than smearing the whole surface around the axis.
+      const std::vector<unsigned int> weld = BuildWeldMap(in);
+      std::map<std::pair<unsigned int, unsigned int>, int> edgeUse;
+      for (size_t t = 0; t + 2 < in.indices.size(); t += 3)
+      {
+         const unsigned int v[3] = { weld[in.indices[t]], weld[in.indices[t + 1]],
+                                     weld[in.indices[t + 2]] };
+         for (int e = 0; e < 3; e++)
+         {
+            const auto key = std::minmax(v[e], v[(e + 1) % 3]);
+            if (key.first != key.second)
+               edgeUse[{ key.first, key.second }]++;
+         }
+      }
+
+      std::vector<std::pair<unsigned int, unsigned int>> profile;
+      for (const auto& e : edgeUse)
+         if (e.second == 1)
+            profile.push_back(e.first);
+
+      // A closed mesh has no boundary at all. Falling back to every edge would
+      // produce an unreadable tangle, so revolve the silhouette-ish set of edges
+      // that face away from the axis instead of returning nothing.
+      if (profile.empty())
+      {
+         for (const auto& e : edgeUse)
+            profile.push_back(e.first);
+         if (profile.size() > 4000)
+            profile.resize(4000);
+      }
+
+      const int segments = std::max(2, std::min(steps, 512));
+      const float totalAngle = turns * 6.28318530718f;
+      const int a = std::max(0, std::min(axis, 2));
+
+      auto rotateAbout = [a](float p[3], float angle) {
+         const float s = std::sin(angle), c = std::cos(angle);
+         float r[3] = { p[0], p[1], p[2] };
+         if (a == 1)      { r[0] = p[0] * c + p[2] * s; r[2] = -p[0] * s + p[2] * c; }
+         else if (a == 0) { r[1] = p[1] * c - p[2] * s; r[2] = p[1] * s + p[2] * c; }
+         else             { r[0] = p[0] * c - p[1] * s; r[1] = p[0] * s + p[1] * c; }
+         p[0] = r[0]; p[1] = r[1]; p[2] = r[2];
+      };
+
+      for (const auto& edge : profile)
+      {
+         const Vertex& v0 = in.vertices[edge.first];
+         const Vertex& v1 = in.vertices[edge.second];
+         const unsigned int base = (unsigned int)out.vertices.size();
+
+         for (int s = 0; s <= segments; s++)
+         {
+            const float t = (float)s / (float)segments;
+            const float angle = totalAngle * t;
+            const float lift = rise * turns * t;
+
+            for (int end = 0; end < 2; end++)
+            {
+               const Vertex& src = (end == 0) ? v0 : v1;
+               float p[3] = { src.px, src.py, src.pz };
+               // Push away from the axis before rotating, so a profile sitting
+               // on the axis opens into a tube instead of a degenerate sliver.
+               if (radiusOffset != 0.0f)
+               {
+                  if (a == 1) { const float len = std::sqrt(p[0]*p[0] + p[2]*p[2]);
+                                if (len > 1e-6f) { p[0] += p[0]/len * radiusOffset; p[2] += p[2]/len * radiusOffset; }
+                                else p[0] += radiusOffset; }
+                  else if (a == 0) { const float len = std::sqrt(p[1]*p[1] + p[2]*p[2]);
+                                if (len > 1e-6f) { p[1] += p[1]/len * radiusOffset; p[2] += p[2]/len * radiusOffset; }
+                                else p[1] += radiusOffset; }
+                  else { const float len = std::sqrt(p[0]*p[0] + p[1]*p[1]);
+                                if (len > 1e-6f) { p[0] += p[0]/len * radiusOffset; p[1] += p[1]/len * radiusOffset; }
+                                else p[0] += radiusOffset; }
+               }
+               rotateAbout(p, angle);
+               p[a] += lift;
+
+               Vertex nv = src;
+               nv.px = p[0]; nv.py = p[1]; nv.pz = p[2];
+               nv.u = t;
+               nv.v = (float)end;
+               out.vertices.push_back(nv);
+            }
+         }
+
+         for (int s = 0; s < segments; s++)
+         {
+            const unsigned int q = base + (unsigned int)s * 2;
+            PushQuad(out, q, q + 2, q + 3, q + 1);
+         }
+      }
+      return RecalculateNormals(out, false, false);
+   }
+
+   namespace
+   {
+      struct P2 { float x = 0, y = 0; };
+
+      float SignedArea(const std::vector<P2>& poly)
+      {
+         float area = 0.0f;
+         for (size_t i = 0, n = poly.size(); i < n; i++)
+         {
+            const P2& a = poly[i];
+            const P2& b = poly[(i + 1) % n];
+            area += a.x * b.y - b.x * a.y;
+         }
+         return area * 0.5f;
+      }
+
+      // Strictly inside: a point exactly on an edge does not block an ear.
+      //
+      // This has to be strict because hole bridging deliberately duplicates two
+      // vertices to make a zero-width seam. With a boundary-inclusive test the
+      // duplicate always sits on the candidate ear's edge, every ear is
+      // rejected, and the whole face silently triangulates to nothing.
+      bool PointInTriangle(const P2& p, const P2& a, const P2& b, const P2& c)
+      {
+         const float d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
+         const float d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
+         const float d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
+         const bool hasNeg = (d1 < 0.0f) || (d2 < 0.0f) || (d3 < 0.0f);
+         const bool hasPos = (d1 > 0.0f) || (d2 > 0.0f) || (d3 > 0.0f);
+         if (hasNeg && hasPos)
+            return false;
+         // All same sign, but a zero means it is on the boundary, not within.
+         return d1 != 0.0f && d2 != 0.0f && d3 != 0.0f;
+      }
+
+      bool PointInPolygon(const P2& p, const std::vector<P2>& poly)
+      {
+         bool inside = false;
+         for (size_t i = 0, n = poly.size(), j = n - 1; i < n; j = i++)
+         {
+            const P2& a = poly[i];
+            const P2& b = poly[j];
+            if (((a.y > p.y) != (b.y > p.y)) &&
+                (p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x))
+               inside = !inside;
+         }
+         return inside;
+      }
+
+      // Ear clipping over a simple anticlockwise polygon. O(n^2), which is fine
+      // for glyph outlines - a few hundred points at most after flattening.
+      void EarClip(const std::vector<P2>& poly, const std::vector<unsigned int>& ids,
+                   std::vector<unsigned int>& outIndices)
+      {
+         const size_t n = poly.size();
+         if (n < 3)
+            return;
+
+         std::vector<size_t> remaining(n);
+         for (size_t i = 0; i < n; i++)
+            remaining[i] = i;
+
+         // Bounded so a self-intersecting contour cannot spin here forever;
+         // a partially triangulated glyph beats a hung UI.
+         size_t guard = n * n + 16;
+         while (remaining.size() > 3 && guard-- > 0)
+         {
+            bool clipped = false;
+            const size_t count = remaining.size();
+            for (size_t i = 0; i < count; i++)
+            {
+               const size_t ia = remaining[(i + count - 1) % count];
+               const size_t ib = remaining[i];
+               const size_t ic = remaining[(i + 1) % count];
+               const P2& a = poly[ia];
+               const P2& b = poly[ib];
+               const P2& c = poly[ic];
+
+               // Convex in an anticlockwise polygon means a positive cross.
+               const float cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+               if (cross <= 0.0f)
+                  continue;
+
+               bool contains = false;
+               for (size_t j = 0; j < count && !contains; j++)
+               {
+                  const size_t idx = remaining[j];
+                  if (idx == ia || idx == ib || idx == ic)
+                     continue;
+                  contains = PointInTriangle(poly[idx], a, b, c);
+               }
+               if (contains)
+                  continue;
+
+               outIndices.push_back(ids[ia]);
+               outIndices.push_back(ids[ib]);
+               outIndices.push_back(ids[ic]);
+               remaining.erase(remaining.begin() + (long)i);
+               clipped = true;
+               break;
+            }
+            if (!clipped)
+               break; // no ear found: the contour is degenerate, stop cleanly
+         }
+
+         if (remaining.size() == 3)
+         {
+            outIndices.push_back(ids[remaining[0]]);
+            outIndices.push_back(ids[remaining[1]]);
+            outIndices.push_back(ids[remaining[2]]);
+         }
+      }
+
+      // Cuts each hole into the outline with a bridge, producing one simple
+      // polygon that ear clipping can handle. The bridge runs from the hole's
+      // rightmost vertex to a visible outline vertex, and both endpoints are
+      // duplicated so the seam has zero width.
+      std::vector<size_t> MergeHoles(std::vector<P2>& poly,
+                                     const std::vector<std::vector<P2>>& holes)
+      {
+         std::vector<size_t> dummy;
+         for (const std::vector<P2>& hole : holes)
+         {
+            if (hole.size() < 3)
+               continue;
+
+            size_t holeStart = 0;
+            for (size_t i = 1; i < hole.size(); i++)
+               if (hole[i].x > hole[holeStart].x)
+                  holeStart = i;
+
+            // Nearest outline vertex to the right of the hole. Not a full
+            // visibility test, but glyph counters are convex enough that the
+            // closest candidate is reliably reachable.
+            size_t bridge = 0;
+            float best = 1e30f;
+            bool found = false;
+            for (size_t i = 0; i < poly.size(); i++)
+            {
+               if (poly[i].x < hole[holeStart].x)
+                  continue;
+               const float dx = poly[i].x - hole[holeStart].x;
+               const float dy = poly[i].y - hole[holeStart].y;
+               const float d = dx * dx + dy * dy;
+               if (d < best)
+               {
+                  best = d;
+                  bridge = i;
+                  found = true;
+               }
+            }
+            if (!found)
+            {
+               for (size_t i = 0; i < poly.size(); i++)
+               {
+                  const float dx = poly[i].x - hole[holeStart].x;
+                  const float dy = poly[i].y - hole[holeStart].y;
+                  const float d = dx * dx + dy * dy;
+                  if (d < best) { best = d; bridge = i; }
+               }
+            }
+
+            std::vector<P2> merged;
+            merged.reserve(poly.size() + hole.size() + 2);
+            for (size_t i = 0; i <= bridge; i++)
+               merged.push_back(poly[i]);
+            for (size_t i = 0; i < hole.size(); i++)
+               merged.push_back(hole[(holeStart + i) % hole.size()]);
+            merged.push_back(hole[holeStart]);
+            for (size_t i = bridge; i < poly.size(); i++)
+               merged.push_back(poly[i]);
+            poly.swap(merged);
+         }
+         return dummy;
+      }
+   }
+
+   Mesh ExtrudeContours(const std::vector<Contour2D>& contours, float depth, float bevel)
+   {
+      Mesh out;
+      if (contours.empty())
+         return out;
+
+      std::vector<std::vector<P2>> polys;
+      for (const Contour2D& c : contours)
+      {
+         std::vector<P2> poly;
+         poly.reserve(c.points.size() / 2);
+         for (size_t i = 0; i + 1 < c.points.size(); i += 2)
+            poly.push_back({ c.points[i], c.points[i + 1] });
+         if (poly.size() >= 3)
+            polys.push_back(std::move(poly));
+      }
+      if (polys.empty())
+         return out;
+
+      // Outline or hole is decided by nesting depth, not by winding direction.
+      // Winding is not portable here: TrueType fonts wind outer contours
+      // clockwise and CFF/PostScript ones anticlockwise, so keying off the sign
+      // of the area classified every glyph in a TrueType face as a hole.
+      // Counting how many other contours enclose each one works for both, and
+      // also handles a genuinely nested shape like the inner ring of an 'O'
+      // inside a surrounding box.
+      std::vector<std::vector<P2>> outlines, holes;
+      for (size_t i = 0; i < polys.size(); i++)
+      {
+         int depth = 0;
+         for (size_t j = 0; j < polys.size(); j++)
+         {
+            if (i == j)
+               continue;
+            if (PointInPolygon(polys[i][0], polys[j]))
+               depth++;
+         }
+
+         // Winding is then forced to match the role, since ear clipping assumes
+         // an anticlockwise outline and hole bridging assumes the reverse.
+         std::vector<P2> poly = polys[i];
+         const float area = SignedArea(poly);
+         const bool isHole = (depth % 2) == 1;
+         if ((isHole && area > 0.0f) || (!isHole && area < 0.0f))
+            std::reverse(poly.begin(), poly.end());
+
+         if (isHole)
+            holes.push_back(std::move(poly));
+         else
+            outlines.push_back(std::move(poly));
+      }
+      if (outlines.empty())
+         return out;
+
+      const float half = depth * 0.5f;
+      // The bevel is applied as an inset on the back face rather than as extra
+      // geometry: a real chamfer would need offset curves, and this reads the
+      // same at the sizes text is used at.
+      const float shrink = std::max(0.0f, std::min(bevel, 0.45f));
+
+      for (std::vector<P2>& outline : outlines)
+      {
+         // Each hole goes to the outline that actually contains it, so two
+         // adjacent letters do not steal each other's counters.
+         std::vector<std::vector<P2>> mine;
+         for (size_t h = 0; h < holes.size(); h++)
+         {
+            if (holes[h].empty())
+               continue;
+            if (PointInPolygon(holes[h][0], outline))
+            {
+               mine.push_back(holes[h]);
+               holes[h].clear();
+            }
+         }
+
+         std::vector<P2> merged = outline;
+         MergeHoles(merged, mine);
+
+         const unsigned int base = (unsigned int)out.vertices.size();
+         const size_t count = merged.size();
+
+         float lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
+         for (const P2& p : merged)
+         {
+            lo[0] = std::min(lo[0], p.x); hi[0] = std::max(hi[0], p.x);
+            lo[1] = std::min(lo[1], p.y); hi[1] = std::max(hi[1], p.y);
+         }
+         const float spanX = std::max(1e-5f, hi[0] - lo[0]);
+         const float spanY = std::max(1e-5f, hi[1] - lo[1]);
+
+         // Front face, then back face, then the wall between them.
+         for (int side = 0; side < 2; side++)
+         {
+            const float z = (side == 0) ? half : -half;
+            const float nz = (side == 0) ? 1.0f : -1.0f;
+            const float inset = (side == 1) ? shrink * 0.02f : 0.0f;
+            for (const P2& p : merged)
+            {
+               Vertex v;
+               v.px = p.x - (p.x > 0 ? inset : -inset);
+               v.py = p.y - (p.y > 0 ? inset : -inset);
+               v.pz = z;
+               v.nx = 0; v.ny = 0; v.nz = nz;
+               v.u = (p.x - lo[0]) / spanX;
+               v.v = (p.y - lo[1]) / spanY;
+               out.vertices.push_back(v);
+            }
+         }
+
+         std::vector<unsigned int> ids(count);
+         for (size_t i = 0; i < count; i++)
+            ids[i] = (unsigned int)i;
+         std::vector<unsigned int> faceIndices;
+         EarClip(merged, ids, faceIndices);
+
+         for (size_t i = 0; i + 2 < faceIndices.size(); i += 3)
+         {
+            // Front, as clipped.
+            out.indices.push_back(base + faceIndices[i]);
+            out.indices.push_back(base + faceIndices[i + 1]);
+            out.indices.push_back(base + faceIndices[i + 2]);
+            // Back, reversed so it faces the other way.
+            const unsigned int backBase = base + (unsigned int)count;
+            out.indices.push_back(backBase + faceIndices[i + 2]);
+            out.indices.push_back(backBase + faceIndices[i + 1]);
+            out.indices.push_back(backBase + faceIndices[i]);
+         }
+
+         // Side wall, one quad per contour edge, joining front to back.
+         for (size_t i = 0; i < count; i++)
+         {
+            const size_t next = (i + 1) % count;
+            const unsigned int f0 = base + (unsigned int)i;
+            const unsigned int f1 = base + (unsigned int)next;
+            const unsigned int b0 = base + (unsigned int)count + (unsigned int)i;
+            const unsigned int b1 = base + (unsigned int)count + (unsigned int)next;
+            PushQuad(out, f0, b0, b1, f1);
+         }
+      }
+
+      if (out.vertices.empty())
+         return out;
+      // Flat shading: the wall and the faces meet at a hard 90 degrees, and
+      // averaged normals would smear that corner into a soft gradient.
+      return RecalculateNormals(out, true, false);
+   }
+
+   Mesh Ocean(int resolution, float size, float amplitude, float wavelength,
+              float steepness, float direction, float choppiness, int octaves, float time)
+   {
+      Mesh out;
+      const int n = std::max(2, std::min(resolution, 400));
+      const int waveCount = std::max(1, std::min(octaves, 8));
+
+      out.vertices.reserve((size_t)(n + 1) * (size_t)(n + 1));
+
+      // Each octave is a shorter, steeper, slightly rotated wave train. The
+      // golden-angle turn between them stops the crests lining up into an
+      // obvious diagonal grid the way an even split would.
+      struct Wave { float dx, dz, k, amp, speed, steep; };
+      std::vector<Wave> waves;
+      waves.reserve((size_t)waveCount);
+      float totalAmp = 0.0f;
+      for (int w = 0; w < waveCount; w++)
+      {
+         const float falloff = std::pow(0.62f, (float)w);
+         const float angle = direction + (float)w * 2.39996323f;
+         const float length = std::max(0.02f, wavelength * falloff);
+         Wave wave;
+         wave.dx = std::cos(angle);
+         wave.dz = std::sin(angle);
+         wave.k = 6.28318530718f / length;
+         wave.amp = amplitude * falloff;
+         // Deep-water dispersion: longer waves genuinely travel faster, which
+         // is what stops the octaves marching in lockstep.
+         wave.speed = std::sqrt(9.81f / wave.k);
+         wave.steep = steepness * falloff;
+         waves.push_back(wave);
+         totalAmp += wave.amp;
+      }
+      // Steepness is shared across the octaves; letting each use the full value
+      // lets the sum loop the surface back through itself and self-intersect.
+      const float steepNorm = (totalAmp > 1e-6f) ? 1.0f / (totalAmp * (float)waveCount) : 0.0f;
+
+      for (int z = 0; z <= n; z++)
+      {
+         for (int x = 0; x <= n; x++)
+         {
+            const float u = (float)x / (float)n;
+            const float v = (float)z / (float)n;
+            const float px = (u - 0.5f) * size;
+            const float pz = (v - 0.5f) * size;
+
+            float dispX = 0.0f, dispY = 0.0f, dispZ = 0.0f;
+            for (const Wave& w : waves)
+            {
+               const float phase = w.k * (w.dx * px + w.dz * pz) - w.speed * w.k * time;
+               const float c = std::cos(phase);
+               const float s = std::sin(phase);
+               dispY += w.amp * s;
+               // The horizontal displacement is what makes a Gerstner crest
+               // sharpen and a trough flatten, instead of a plain sine hump.
+               const float q = w.steep * steepNorm * w.amp * choppiness;
+               dispX += q * w.dx * c;
+               dispZ += q * w.dz * c;
+            }
+
+            Vertex vert;
+            vert.px = px + dispX;
+            vert.py = dispY;
+            vert.pz = pz + dispZ;
+            vert.nx = 0; vert.ny = 1; vert.nz = 0;
+            vert.u = u;
+            vert.v = v;
+            out.vertices.push_back(vert);
+         }
+      }
+
+      const int stride = n + 1;
+      out.indices.reserve((size_t)n * (size_t)n * 6);
+      for (int z = 0; z < n; z++)
+      {
+         for (int x = 0; x < n; x++)
+         {
+            const unsigned int a = (unsigned int)(z * stride + x);
+            const unsigned int b = (unsigned int)(z * stride + x + 1);
+            const unsigned int c = (unsigned int)((z + 1) * stride + x + 1);
+            const unsigned int d = (unsigned int)((z + 1) * stride + x);
+            PushQuad(out, a, b, c, d);
+         }
+      }
+
+      // Normals are derived from the displaced mesh rather than analytically:
+      // the horizontal displacement moves vertices sideways, so the analytic
+      // gradient of the height field alone would light the crests wrongly.
+      return RecalculateNormals(out, false, false);
    }
 
    Mesh RecalculateNormals(const Mesh& in, bool flat, bool flip)

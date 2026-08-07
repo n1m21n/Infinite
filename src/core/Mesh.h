@@ -155,6 +155,16 @@ struct Mat4
    }
 };
 
+// Globally unique, monotonically increasing version stamp for mesh data. A
+// source bumps its stamp whenever it rebuilds; the renderer compares the stamp
+// it last uploaded against the current one and skips the upload when they match.
+//
+// Global rather than per-node so that two different meshes can never share a
+// stamp. A bypassed operator hands back its input's stamp, and with per-node
+// counters those two could collide at the same number and leave last frame's
+// geometry sitting on the GPU.
+unsigned long long NextMeshRevision();
+
 // A point sampled off a mesh, used by the instancing nodes.
 struct MeshPoint
 {
@@ -172,6 +182,28 @@ namespace MeshOps
    Mesh Array(const Mesh& in, int count, float dx, float dy, float dz,
               float rotStep, float scaleStep, bool radial, float radius);
    Mesh Subdivide(const Mesh& in, int levels, float smooth);
+   // Taubin lambda/mu smoothing: relaxes the surface without the steady
+   // shrinkage a plain Laplacian causes.
+   Mesh Smooth(const Mesh& in, int iterations, float strength);
+   Mesh Mirror(const Mesh& in, int axis, float offset, bool weldSeam, bool keepOriginal);
+   // Revolves the input's boundary edges around an axis, with an optional rise
+   // per turn for threads and helices.
+   Mesh Screw(const Mesh& in, int steps, float turns, float rise, float radiusOffset, int axis);
+
+   // Turns closed 2D contours into an extruded solid. Contours wound
+   // anticlockwise are treated as outlines and clockwise ones as holes, so the
+   // counter of an 'o' is cut out rather than filled.
+   struct Contour2D
+   {
+      std::vector<float> points; // x,y pairs
+   };
+   Mesh ExtrudeContours(const std::vector<Contour2D>& contours, float depth, float bevel);
+
+   // Gerstner (trochoidal) wave surface. Not a simulation: every vertex is a
+   // closed-form function of position and time, so it costs one evaluation per
+   // vertex per frame with no state and no timestep to keep stable.
+   Mesh Ocean(int resolution, float size, float amplitude, float wavelength,
+              float steepness, float direction, float choppiness, int octaves, float time);
    Mesh Solidify(const Mesh& in, float thickness, bool keepOriginal);
    Mesh Extrude(const Mesh& in, float distance, float inset);
    Mesh Wireframe(const Mesh& in, float thickness);

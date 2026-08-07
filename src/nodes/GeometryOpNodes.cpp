@@ -7,7 +7,8 @@ namespace
 {
    const std::vector<std::string> kOpNames = {
       "Transform", "Array", "Subdivide", "Solidify", "Extrude",
-      "Wireframe", "Triangulate", "Normals", "Explode", "Twist"
+      "Wireframe", "Triangulate", "Normals", "Explode", "Twist",
+      "Smooth", "Mirror", "Screw"
    };
    const std::vector<std::string> kSourceNames = { "Vertices", "Edges", "Faces" };
    const Mesh kEmptyMesh;
@@ -33,6 +34,13 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.rs = rotStep; s.ss = scaleStep; s.rad = radius;
    s.sm = smooth; s.th = thickness; s.ins = inset; s.sd = seed;
    s.radial = radial; s.keep = keepOriginal; s.flat = flatShade; s.flip = flipNormals;
+   s.iter = iterations;
+   s.screwSteps = screwSteps;
+   s.mirrorOffset = mirrorOffset;
+   s.turns = turns;
+   s.rise = rise;
+   s.radiusOffset = radiusOffset;
+   s.weldSeam = weldSeam;
    s.upstream = input;
    // Upstream triangle count stands in for "the mesh changed": cheap, and it
    // catches a primitive being switched or resubdivided upstream.
@@ -87,6 +95,15 @@ const Mesh& GeometryOpNode::GetMesh()
       case kExplode:
          mCache = MeshOps::Explode(src, amount * 0.3f, seed);
          break;
+      case kSmooth:
+         mCache = MeshOps::Smooth(src, iterations, amount);
+         break;
+      case kMirror:
+         mCache = MeshOps::Mirror(src, axis, mirrorOffset, weldSeam, keepOriginal);
+         break;
+      case kScrew:
+         mCache = MeshOps::Screw(src, screwSteps, turns, rise, radiusOffset, axis);
+         break;
       default:
          mCache = MeshOps::Twist(src, amount * 3.0f, axis);
          break;
@@ -94,22 +111,38 @@ const Mesh& GeometryOpNode::GetMesh()
 
    mBuilt = sig;
    mHasBuilt = true;
+   mMeshRevision = NextMeshRevision();
    return mCache;
 }
 
-void GeometryOpNode::GetMaterial(float outColor[3], float& outMetallic, float& outRoughness,
-                                 float& outOpacity, int& outShading) const
+unsigned long long GeometryOpNode::MeshRevision()
+{
+   // Both early-outs in GetMesh() hand back somebody else's mesh, so they have
+   // to hand back that mesh's stamp too rather than this node's.
+   if (input == nullptr)
+      return 0;
+   if (bypassed)
+      return input->MeshRevision();
+   GetMesh();
+   return mMeshRevision;
+}
+
+Material GeometryOpNode::GetMaterial() const
 {
    if (inheritMaterial && input != nullptr)
-   {
-      input->GetMaterial(outColor, outMetallic, outRoughness, outOpacity, outShading);
-      return;
-   }
-   outColor[0] = color[0]; outColor[1] = color[1]; outColor[2] = color[2];
-   outMetallic = metallic;
-   outRoughness = roughness;
-   outOpacity = opacity;
-   outShading = shading;
+      return input->GetMaterial();
+
+   Material m;
+   m.color[0] = color[0]; m.color[1] = color[1]; m.color[2] = color[2];
+   m.metallic = metallic;
+   m.roughness = roughness;
+   m.opacity = opacity;
+   m.shading = shading;
+   m.emissionColor[0] = emissionColor[0];
+   m.emissionColor[1] = emissionColor[1];
+   m.emissionColor[2] = emissionColor[2];
+   m.emission = emission;
+   return m;
 }
 
 unsigned int GeometryOpNode::GetSurfaceTexture()
@@ -136,6 +169,12 @@ const Mesh& InstanceOnPointsNode::GetMesh()
    return instanceShape ? instanceShape->GetMesh() : mEmpty;
 }
 
+unsigned long long InstanceOnPointsNode::MeshRevision()
+{
+   // The uploaded mesh is the shape's, so the stamp has to be the shape's too.
+   return instanceShape ? instanceShape->MeshRevision() : 0;
+}
+
 size_t InstanceOnPointsNode::TriangleCount() const
 {
    if (instanceShape == nullptr)
@@ -143,14 +182,19 @@ size_t InstanceOnPointsNode::TriangleCount() const
    return (const_cast<IGeometrySource*>(instanceShape)->GetMesh().indices.size() / 3) * mTransforms.size();
 }
 
-void InstanceOnPointsNode::GetMaterial(float outColor[3], float& outMetallic, float& outRoughness,
-                                       float& outOpacity, int& outShading) const
+Material InstanceOnPointsNode::GetMaterial() const
 {
-   outColor[0] = color[0]; outColor[1] = color[1]; outColor[2] = color[2];
-   outMetallic = metallic;
-   outRoughness = roughness;
-   outOpacity = opacity;
-   outShading = shading;
+   Material m;
+   m.color[0] = color[0]; m.color[1] = color[1]; m.color[2] = color[2];
+   m.metallic = metallic;
+   m.roughness = roughness;
+   m.opacity = opacity;
+   m.shading = shading;
+   m.emissionColor[0] = emissionColor[0];
+   m.emissionColor[1] = emissionColor[1];
+   m.emissionColor[2] = emissionColor[2];
+   m.emission = emission;
+   return m;
 }
 
 unsigned int InstanceOnPointsNode::GetSurfaceTexture()
@@ -238,6 +282,7 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
       return;
 
    Rebuild();
+   mInstanceRevision = NextMeshRevision();
 
    mBuiltPointSource = pointSource;
    mBuiltShape = instanceShape;

@@ -15,6 +15,52 @@ namespace Platform
    bool LoadImageRGBA(const std::string& path, std::vector<unsigned char>& outPixels,
                       int& outWidth, int& outHeight, std::string& outError);
 
+   // ---- 3D model loading --------------------------------------------------
+   // Goes through ModelIO for the same reason image decoding goes through
+   // ImageIO: the OS already reads OBJ, PLY, STL, USD and USDZ, and a bundled
+   // importer would be a far heavier dependency than the code it replaces.
+   // Not covered: glTF and FBX, which ModelIO does not read.
+   //
+   // Returns interleaved position/normal/uv vertices and triangle indices,
+   // matching the layout of the Vertex struct in core/Mesh.h. Normals are
+   // generated when the file has none.
+   struct ModelVertex
+   {
+      float px = 0, py = 0, pz = 0;
+      float nx = 0, ny = 0, nz = 1;
+      float u = 0, v = 0;
+   };
+
+   std::string OpenModelDialog();
+
+   // Patch files. Save returns the chosen path, or "" if cancelled.
+   std::string OpenPatchDialog();
+   std::string SavePatchDialog(const std::string& suggestedName);
+
+   // ---- text outlines -----------------------------------------------------
+   // Glyph outlines for a laid-out string, flattened to polygons in font units
+   // normalised so cap height is roughly 1. Curves are subdivided here because
+   // CoreGraphics has no public path-flattening call.
+   //
+   // Winding is whatever the font format uses and is deliberately not
+   // normalised here - TrueType winds outer contours clockwise and CFF the
+   // other way. The triangulator decides outline-versus-hole by nesting depth
+   // instead, which works for both.
+   struct TextContour
+   {
+      std::vector<float> points; // x,y pairs
+   };
+
+   // Installed font families, sorted, for the Text nodes' font pickers.
+   const std::vector<std::string>& AvailableFontFamilies();
+
+   bool GetTextOutlines(const std::string& text, const std::string& fontName,
+                        float letterSpacing, std::vector<TextContour>& outContours,
+                        std::string& outError);
+
+   bool LoadModel(const std::string& path, std::vector<ModelVertex>& outVertices,
+                  std::vector<unsigned int>& outIndices, std::string& outError);
+
    // ---- video decoding ----------------------------------------------------
    // Opaque handle around an AVAssetReader that decodes frames in order.
    // Frames are delivered as RGBA8, already row-flipped for OpenGL.

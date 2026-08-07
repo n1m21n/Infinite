@@ -15,6 +15,70 @@ namespace
    };
    const std::vector<std::string> kShadingNames = { "Lit", "Normals", "UV", "Flat" };
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
+   const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
+   const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard" };
+   const int kSampleCounts[] = { 0, 2, 4, 8 };
+
+   // Not in gl3.h - the anisotropic filter extension predates core profiles and
+   // is still exposed only under its EXT names on macOS.
+   const GLenum kTextureMaxAnisotropy = 0x84FE;
+   const GLenum kMaxTextureMaxAnisotropy = 0x84FF;
+
+   // Give the currently bound texture mipmaps and anisotropic filtering, then
+   // put its filter back the way the 2D pipeline left it.
+   //
+   // Surface textures belong to other nodes: they are ordinary FBO textures
+   // built with GL_LINEAR and no mip chain, and a UV-mapped object minifying
+   // one of those aliases hard - it is the shimmer you see on a textured cube
+   // at 4K. Mipmaps have to be regenerated per frame because the owning node
+   // may have re-rendered into the texture since we last looked.
+   //
+   // The filter is restored afterwards rather than left on: the owner keeps
+   // drawing into level 0 without telling us, and leaving a mip filter on a
+   // chain that is about to go stale would show up as blur in its own preview.
+   void PrepareSurfaceTexture()
+   {
+      glGenerateMipmap(GL_TEXTURE_2D);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+      static float sMaxAniso = -1.0f;
+      if (sMaxAniso < 0.0f)
+      {
+         sMaxAniso = 1.0f;
+         glGetFloatv(kMaxTextureMaxAnisotropy, &sMaxAniso);
+         // Querying an unsupported enum leaves the value untouched and raises
+         // GL_INVALID_ENUM; clear it so the next real error is not misread.
+         if (glGetError() != GL_NO_ERROR || sMaxAniso < 1.0f)
+            sMaxAniso = 1.0f;
+      }
+      if (sMaxAniso > 1.0f)
+         glTexParameterf(GL_TEXTURE_2D, kTextureMaxAnisotropy, std::min(8.0f, sMaxAniso));
+   }
+
+   void RestoreSurfaceTexture()
+   {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   }
+
+   // Bound in place of a real surface texture when a geometry has none. Binding
+   // texture 0 instead leaves the sampler pointing at an incomplete texture,
+   // which the macOS driver reports as "unloadable ... using zero texture" -
+   // harmless, since uHasTexture gates the sample, but it is a real warning that
+   // would mask a real one later.
+   unsigned int WhiteTexture()
+   {
+      static unsigned int sTex = 0;
+      if (sTex == 0)
+      {
+         const unsigned char white[4] = { 255, 255, 255, 255 };
+         glGenTextures(1, &sTex);
+         glBindTexture(GL_TEXTURE_2D, sTex);
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      }
+      return sTex;
+   }
 
    const char* kVertSrc =
       "#version 150\n"
@@ -61,20 +125,92 @@ namespace
       "uniform vec3 uCamPos;\n"
       "uniform sampler2D uTexture;\n"
       "uniform int uHasTexture;\n"
+      "uniform float uExposure;\n"
+      "uniform int uTonemap;\n"
+      "uniform vec3 uEmissionColor;\n"
+      "uniform float uEmission;\n"
+      "uniform vec3 uEnvSky;\n"
+      "uniform vec3 uEnvHorizon;\n"
+      "uniform vec3 uEnvGround;\n"
+      "uniform float uEnvIntensity;\n"
+      "\n"
+      // Colours arrive from the UI in sRGB. Lighting has to happen in linear
+      // space or every sum and product is being done on gamma-encoded numbers,
+      // which is what makes falloff read as too dark in the mids and blow out
+      // abruptly at the top.
+      "vec3 toLinear(vec3 c) { return pow(max(c, vec3(0.0)), vec3(2.2)); }\n"
+      "vec3 toSrgb(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }\n"
+      "\n"
+      // Narkowicz's ACES fit: cheap, and it rolls highlights off instead of
+      // clipping them flat the way a bare clamp does.
+      "vec3 acesFilm(vec3 x) {\n"
+      "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
+      "}\n"
+      "\n"
+      // Ordered dither, one 8-bit step wide, applied just before the frame is
+      // quantised. Smooth shading across a large surface otherwise lands in
+      // visible bands, and this scatters the rounding instead.
+      "float ditherOffset() {\n"
+      "   vec2 p = floor(gl_FragCoord.xy);\n"
+      "   float v = fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);\n"
+      "   return (v - 0.5) / 255.0;\n"
+      "}\n"
+      "\n"
+      // A three-stop vertical gradient standing in for a sky. Metal with nothing
+      // to reflect reads as flat grey plastic no matter how good the BRDF is,
+      // and this is the cheapest thing that gives it something. Roughness fades
+      // the sample toward the horizon colour, which approximates a blurred
+      // reflection without any mip chain or IBL precompute.
+      "vec3 sampleEnv(vec3 dir, float rough) {\n"
+      "   float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);\n"
+      "   vec3 lower = mix(toLinear(uEnvGround), toLinear(uEnvHorizon), smoothstep(0.0, 0.5, t));\n"
+      "   vec3 env = mix(lower, toLinear(uEnvSky), smoothstep(0.5, 1.0, t));\n"
+      "   return mix(env, toLinear(uEnvHorizon), rough * rough) * uEnvIntensity;\n"
+      "}\n"
+      "\n"
+      // Cook-Torrance: GGX/Trowbridge-Reitz distribution, Smith height-
+      // correlated geometry via Schlick-GGX, Schlick Fresnel.
+      "float distributionGGX(float nDotH, float rough) {\n"
+      "   float a = rough * rough;\n"
+      "   float a2 = a * a;\n"
+      "   float d = nDotH * nDotH * (a2 - 1.0) + 1.0;\n"
+      "   return a2 / max(3.14159265 * d * d, 1e-7);\n"
+      "}\n"
+      "float geometrySchlickGGX(float nDotV, float rough) {\n"
+      // Direct-lighting remap of k; image-based lighting uses a different one.
+      "   float r = rough + 1.0;\n"
+      "   float k = (r * r) / 8.0;\n"
+      "   return nDotV / (nDotV * (1.0 - k) + k);\n"
+      "}\n"
+      "vec3 fresnelSchlick(float cosTheta, vec3 f0) {\n"
+      "   return f0 + (1.0 - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);\n"
+      "}\n"
+      "vec3 fresnelSchlickRoughness(float cosTheta, vec3 f0, float rough) {\n"
+      // Rough surfaces should not develop a razor-thin mirror rim at grazing
+      // angles the way the plain Schlick term would give them.
+      "   vec3 ceiling = max(vec3(1.0 - rough), f0);\n"
+      "   return f0 + (ceiling - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);\n"
+      "}\n"
+      "\n"
       "void main() {\n"
       "   vec3 n = normalize(vNormal);\n"
+      // Normals and UVs are data being visualised, not light - they must not be
+      // tonemapped or gamma-encoded on the way out.
       "   if (uShading == 1) { fragColor = vec4(n * 0.5 + 0.5, uOpacity); return; }\n"
       "   if (uShading == 2) { fragColor = vec4(vUv, 0.0, uOpacity); return; }\n"
       "\n"
-      "   vec3 base = uBaseColor;\n"
-      "   if (uHasTexture == 1) base *= texture(uTexture, vUv).rgb;\n"
-      "   if (uShading == 3) { fragColor = vec4(base, uOpacity); return; }\n"
+      "   vec3 base = toLinear(uBaseColor);\n"
+      "   if (uHasTexture == 1) base *= toLinear(texture(uTexture, vUv).rgb);\n"
+      "   if (uShading == 3) { fragColor = vec4(toSrgb(base), uOpacity); return; }\n"
       "\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
-      "   float shininess = mix(4.0, 256.0, 1.0 - clamp(uRoughness, 0.0, 1.0));\n"
-      "   vec3 diffuseColor = mix(base, vec3(0.02), uMetallic);\n"
-      "   vec3 specColor = mix(vec3(1.0), base, uMetallic);\n"
-      "   vec3 col = uAmbient * base;\n"
+      "   float rough = clamp(uRoughness, 0.045, 1.0);\n"
+      "   float metal = clamp(uMetallic, 0.0, 1.0);\n"
+      "   float nDotV = max(dot(n, viewDir), 1e-4);\n"
+      // Dielectrics reflect ~4% head-on; metals reflect their own albedo and
+      // have no diffuse lobe at all.
+      "   vec3 f0 = mix(vec3(0.04), base, metal);\n"
+      "   vec3 col = vec3(0.0);\n"
       "\n"
       "   for (int i = 0; i < 3; i++) {\n"
       "      if (i >= uLightCount) break;\n"
@@ -89,13 +225,38 @@ namespace
       "         lightDir = normalize(uLightDir[i]);\n"
       "      }\n"
       "      vec3 halfway = normalize(lightDir + viewDir);\n"
-      "      float diffuse = max(dot(n, lightDir), 0.0);\n"
-      "      float spec = pow(max(dot(n, halfway), 0.0), shininess) * (1.0 - uRoughness);\n"
-      "      float energy = uLightIntensity[i] * attenuation;\n"
-      "      col += diffuseColor * uLightColor[i] * energy * diffuse;\n"
-      "      col += specColor * uLightColor[i] * energy * spec;\n"
+      "      float nDotL = max(dot(n, lightDir), 0.0);\n"
+      "      if (nDotL <= 0.0) continue;\n"
+      "      float nDotH = max(dot(n, halfway), 0.0);\n"
+      "\n"
+      "      float d = distributionGGX(nDotH, rough);\n"
+      "      float g = geometrySchlickGGX(nDotV, rough) * geometrySchlickGGX(nDotL, rough);\n"
+      "      vec3 f = fresnelSchlick(max(dot(halfway, viewDir), 0.0), f0);\n"
+      "      vec3 specular = (d * g * f) / max(4.0 * nDotV * nDotL, 1e-7);\n"
+      // Whatever is not reflected is refracted and available to scatter, so the
+      // two lobes together never return more energy than arrived.
+      "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal);\n"
+      "      vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
+      "      col += (kD * base / 3.14159265 + specular) * radiance * nDotL;\n"
       "   }\n"
-      "   col += base * pow(1.0 - max(dot(n, viewDir), 0.0), 3.0) * uRim;\n"
+      "\n"
+      // Ambient, from the environment rather than a flat constant: the diffuse
+      // half samples straight up the normal, the specular half up the mirror
+      // direction. uAmbient stays as a tint so old patches still respond to it.
+      "   vec3 reflectDir = reflect(-viewDir, n);\n"
+      "   vec3 irradiance = sampleEnv(n, 1.0) * toLinear(uAmbient) * 3.0;\n"
+      "   vec3 reflection = sampleEnv(reflectDir, rough);\n"
+      "   vec3 fAmbient = fresnelSchlickRoughness(nDotV, f0, rough);\n"
+      "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance;\n"
+      "   col += reflection * fAmbient;\n"
+      "\n"
+      "   col += base * pow(1.0 - nDotV, 3.0) * uRim;\n"
+      "   col += toLinear(uEmissionColor) * uEmission;\n"
+      "\n"
+      "   col *= uExposure;\n"
+      "   if (uTonemap == 1) col = acesFilm(col);\n"
+      "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
+      "   col = toSrgb(col) + ditherOffset();\n"
       "   fragColor = vec4(col, uOpacity);\n"
       "}\n";
 }
@@ -134,12 +295,19 @@ void GeometryNode::RebuildIfNeeded()
    mBuiltP = knotP;
    mBuiltQ = knotQ;
    mBuiltTube = tubeRadius;
+   mMeshRevision = NextMeshRevision();
 }
 
 const Mesh& GeometryNode::GetMesh()
 {
    RebuildIfNeeded();
    return mMesh;
+}
+
+unsigned long long GeometryNode::MeshRevision()
+{
+   RebuildIfNeeded();
+   return mMeshRevision;
 }
 
 Mat4 GeometryNode::GetModelMatrix() const
@@ -153,16 +321,19 @@ Mat4 GeometryNode::GetModelMatrix() const
    return m;
 }
 
-void GeometryNode::GetMaterial(float outColor[3], float& outMetallic, float& outRoughness,
-                               float& outOpacity, int& outShading) const
+Material GeometryNode::GetMaterial() const
 {
-   outColor[0] = color[0];
-   outColor[1] = color[1];
-   outColor[2] = color[2];
-   outMetallic = metallic;
-   outRoughness = roughness;
-   outOpacity = opacity;
-   outShading = shading;
+   Material m;
+   m.color[0] = color[0]; m.color[1] = color[1]; m.color[2] = color[2];
+   m.metallic = metallic;
+   m.roughness = roughness;
+   m.opacity = opacity;
+   m.shading = shading;
+   m.emissionColor[0] = emissionColor[0];
+   m.emissionColor[1] = emissionColor[1];
+   m.emissionColor[2] = emissionColor[2];
+   m.emission = emission;
+   return m;
 }
 
 unsigned int GeometryNode::GetSurfaceTexture()
@@ -193,17 +364,34 @@ void GeometryNode::CookIfNeeded(int frameId)
 // ================================================================= Render
 
 const std::vector<std::string>& Render3DNode::ProjectionNames() { return kProjectionNames; }
+const std::vector<std::string>& Render3DNode::SampleNames() { return kSampleNames; }
+const std::vector<std::string>& Render3DNode::TonemapNames() { return kTonemapNames; }
+
+void Render3DNode::ReleaseTargets()
+{
+   if (mColorTex != 0) { glDeleteTextures(1, &mColorTex); mColorTex = 0; }
+   if (mDepthBuffer != 0) { glDeleteRenderbuffers(1, &mDepthBuffer); mDepthBuffer = 0; }
+   if (mFbo != 0) { glDeleteFramebuffers(1, &mFbo); mFbo = 0; }
+   if (mMsColor != 0) { glDeleteRenderbuffers(1, &mMsColor); mMsColor = 0; }
+   if (mMsDepth != 0) { glDeleteRenderbuffers(1, &mMsDepth); mMsDepth = 0; }
+   if (mMsFbo != 0) { glDeleteFramebuffers(1, &mMsFbo); mMsFbo = 0; }
+}
 
 Render3DNode::~Render3DNode()
 {
-   if (mColorTex != 0) glDeleteTextures(1, &mColorTex);
-   if (mDepthBuffer != 0) glDeleteRenderbuffers(1, &mDepthBuffer);
-   if (mFbo != 0) glDeleteFramebuffers(1, &mFbo);
-   if (mVbo != 0) glDeleteBuffers(1, &mVbo);
-   if (mIbo != 0) glDeleteBuffers(1, &mIbo);
-   if (mInstanceVbo != 0) glDeleteBuffers(1, &mInstanceVbo);
-   if (mVao != 0) glDeleteVertexArrays(1, &mVao);
+   ReleaseTargets();
+   for (int i = 0; i < kSlots; i++)
+      ReleaseGpuMesh(mGpu[i]);
    if (mProgram != 0) glDeleteProgram(mProgram);
+}
+
+void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
+{
+   if (gpu.vbo != 0) glDeleteBuffers(1, &gpu.vbo);
+   if (gpu.ibo != 0) glDeleteBuffers(1, &gpu.ibo);
+   if (gpu.instanceVbo != 0) glDeleteBuffers(1, &gpu.instanceVbo);
+   if (gpu.vao != 0) glDeleteVertexArrays(1, &gpu.vao);
+   gpu = GpuMesh();
 }
 
 bool Render3DNode::EnsureShader()
@@ -257,21 +445,15 @@ bool Render3DNode::EnsureShader()
       return false;
    }
 
-   glGenVertexArrays(1, &mVao);
-   glGenBuffers(1, &mVbo);
-   glGenBuffers(1, &mIbo);
-   glGenBuffers(1, &mInstanceVbo);
    return true;
 }
 
-bool Render3DNode::EnsureResources(int w, int h)
+bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
 {
-   if (mFbo != 0 && mWidth == w && mHeight == h)
+   if (mFbo != 0 && mWidth == w && mHeight == h && mActiveSamples == sampleCount)
       return true;
 
-   if (mColorTex != 0) { glDeleteTextures(1, &mColorTex); mColorTex = 0; }
-   if (mDepthBuffer != 0) { glDeleteRenderbuffers(1, &mDepthBuffer); mDepthBuffer = 0; }
-   if (mFbo != 0) { glDeleteFramebuffers(1, &mFbo); mFbo = 0; }
+   ReleaseTargets();
 
    glGenTextures(1, &mColorTex);
    glBindTexture(GL_TEXTURE_2D, mColorTex);
@@ -292,7 +474,7 @@ bool Render3DNode::EnsureResources(int w, int h)
    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mColorTex, 0);
    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, mDepthBuffer);
 
-   const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+   GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
    glBindFramebuffer(GL_FRAMEBUFFER, 0);
    glBindTexture(GL_TEXTURE_2D, 0);
    glBindRenderbuffer(GL_RENDERBUFFER, 0);
@@ -303,6 +485,60 @@ bool Render3DNode::EnsureResources(int w, int h)
       return false;
    }
 
+   // Multisampled twin of the above. The scene is drawn here and then resolved
+   // into mColorTex, which is what GetOutputTexture() hands downstream - so the
+   // 2D graph is unaware any of this happened.
+   int resolved = 0;
+   if (sampleCount > 1)
+   {
+      GLint maxSamples = 0;
+      glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
+      resolved = std::min(sampleCount, (int)maxSamples);
+
+      // Multisampled storage is colour + depth at every sample, so it grows with
+      // both area and sample count: 4096 square at 8x is over a gigabyte of
+      // renderbuffer. Halve the sample count until it fits a budget rather than
+      // letting a big export try to allocate more than the GPU will give.
+      const double bytesPerSample = (double)w * (double)h * 8.0;
+      const double budget = 512.0 * 1024.0 * 1024.0;
+      while (resolved > 1 && bytesPerSample * resolved > budget)
+         resolved /= 2;
+      if (resolved < 2)
+         resolved = 0;
+   }
+
+   if (resolved > 1)
+   {
+      glGenRenderbuffers(1, &mMsColor);
+      glBindRenderbuffer(GL_RENDERBUFFER, mMsColor);
+      glRenderbufferStorageMultisample(GL_RENDERBUFFER, resolved, GL_RGBA8, w, h);
+
+      glGenRenderbuffers(1, &mMsDepth);
+      glBindRenderbuffer(GL_RENDERBUFFER, mMsDepth);
+      glRenderbufferStorageMultisample(GL_RENDERBUFFER, resolved, GL_DEPTH_COMPONENT24, w, h);
+
+      glGenFramebuffers(1, &mMsFbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, mMsFbo);
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, mMsColor);
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, mMsDepth);
+
+      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+      if (status != GL_FRAMEBUFFER_COMPLETE)
+      {
+         // Fall back to drawing straight into the resolve target rather than
+         // failing the whole render: aliased output beats no output.
+         fprintf(stderr, "Render3D multisample framebuffer incomplete: 0x%x, falling back\n", status);
+         if (mMsColor != 0) { glDeleteRenderbuffers(1, &mMsColor); mMsColor = 0; }
+         if (mMsDepth != 0) { glDeleteRenderbuffers(1, &mMsDepth); mMsDepth = 0; }
+         if (mMsFbo != 0) { glDeleteFramebuffers(1, &mMsFbo); mMsFbo = 0; }
+         resolved = 0;
+      }
+   }
+
+   mActiveSamples = resolved;
    mWidth = w;
    mHeight = h;
    return true;
@@ -319,7 +555,9 @@ void Render3DNode::CookIfNeeded(int frameId)
 
    const int w = std::max(16, (int)width);
    const int h = std::max(16, (int)height);
-   if (!EnsureResources(w, h))
+   const int wantSamples =
+      kSampleCounts[std::max(0, std::min(samples, (int)(sizeof(kSampleCounts) / sizeof(int)) - 1))];
+   if (!EnsureResources(w, h, wantSamples))
       return;
 
    // Pull any textures the geometry wants before we start drawing.
@@ -408,7 +646,8 @@ void Render3DNode::CookIfNeeded(int frameId)
    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
    glDepthMask(GL_TRUE);
 
-   glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
+   const bool multisampling = mActiveSamples > 1 && mMsFbo != 0;
+   glBindFramebuffer(GL_FRAMEBUFFER, multisampling ? mMsFbo : mFbo);
    glViewport(0, 0, w, h);
    glClearColor(bgColor[0], bgColor[1], bgColor[2], bgOpacity);
    glClearDepth(1.0);
@@ -439,9 +678,9 @@ void Render3DNode::CookIfNeeded(int frameId)
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
    glUseProgram(mProgram);
-   glBindVertexArray(mVao);
    mLastTriangles = 0;
    mLastDrawCalls = 0;
+   mLastUploads = 0;
 
    glUniformMatrix4fv(glGetUniformLocation(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
    glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kLightSlots, lightDirs);
@@ -452,6 +691,12 @@ void Render3DNode::CookIfNeeded(int frameId)
    glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, ambientColor);
    glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
    glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
+   glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
+   glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), tonemap);
+   glUniform3fv(glGetUniformLocation(mProgram, "uEnvSky"), 1, envSky);
+   glUniform3fv(glGetUniformLocation(mProgram, "uEnvHorizon"), 1, envHorizon);
+   glUniform3fv(glGetUniformLocation(mProgram, "uEnvGround"), 1, envGround);
+   glUniform1f(glGetUniformLocation(mProgram, "uEnvIntensity"), envIntensity);
 
    for (int i = 0; i < kSlots; i++)
    {
@@ -462,32 +707,59 @@ void Render3DNode::CookIfNeeded(int frameId)
       if (mesh.Empty())
          continue;
 
-      glBindBuffer(GL_ARRAY_BUFFER, mVbo);
-      glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex),
-                   mesh.vertices.data(), GL_DYNAMIC_DRAW);
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIbo);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int),
-                   mesh.indices.data(), GL_DYNAMIC_DRAW);
+      GpuMesh& gpu = mGpu[i];
+      if (gpu.vao == 0)
+      {
+         glGenVertexArrays(1, &gpu.vao);
+         glGenBuffers(1, &gpu.vbo);
+         glGenBuffers(1, &gpu.ibo);
+      }
+      glBindVertexArray(gpu.vao);
 
-      glEnableVertexAttribArray(0);
-      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-      glEnableVertexAttribArray(1);
-      glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
-      glEnableVertexAttribArray(2);
-      glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(6 * sizeof(float)));
+      // A slot that swapped to a different node re-uploads even if the stamps
+      // happen to line up, and drops any instancing state the old source left.
+      const bool sourceChanged = gpu.source != (const void*)source;
+      if (sourceChanged)
+      {
+         gpu.meshRevision = 0;
+         gpu.instanceRevision = 0;
+         gpu.source = source;
+      }
+
+      const unsigned long long revision = source->MeshRevision();
+      if (gpu.meshRevision != revision)
+      {
+         glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
+         glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex),
+                      mesh.vertices.data(), GL_STATIC_DRAW);
+         // The element binding is captured by the VAO, so it survives the frame.
+         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpu.ibo);
+         glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int),
+                      mesh.indices.data(), GL_STATIC_DRAW);
+
+         glEnableVertexAttribArray(0);
+         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+         glEnableVertexAttribArray(1);
+         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
+         glEnableVertexAttribArray(2);
+         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(6 * sizeof(float)));
+
+         gpu.meshRevision = revision;
+         gpu.indexCount = (int)mesh.indices.size();
+         mLastUploads++;
+      }
 
       const Mat4 model = source->GetModelMatrix();
       float normalMatrix[9];
       model.NormalMatrix(normalMatrix);
 
-      float baseColor[3];
-      float metallic, roughness, opacity;
-      int shading;
-      source->GetMaterial(baseColor, metallic, roughness, opacity, shading);
+      const Material material = source->GetMaterial();
 
       const unsigned int surface = source->GetSurfaceTexture();
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, surface);
+      glBindTexture(GL_TEXTURE_2D, surface != 0 ? surface : WhiteTexture());
+      if (surface != 0)
+         PrepareSurfaceTexture();
       glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
       glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
 
@@ -498,53 +770,86 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), instanced ? 1 : 0);
       if (instanced)
       {
-         const std::vector<Mat4>& xforms = instancer->InstanceTransforms();
-         glBindBuffer(GL_ARRAY_BUFFER, mInstanceVbo);
-         glBufferData(GL_ARRAY_BUFFER, xforms.size() * sizeof(Mat4), xforms.data(), GL_DYNAMIC_DRAW);
-         // a mat4 attribute is four consecutive vec4 slots
-         for (int col = 0; col < 4; col++)
+         if (gpu.instanceVbo == 0)
+            glGenBuffers(1, &gpu.instanceVbo);
+
+         const unsigned long long instanceRevision = instancer->InstanceRevision();
+         if (gpu.instanceRevision != instanceRevision || !gpu.instanceAttribsOn)
          {
-            const unsigned int loc = 3 + col;
-            glEnableVertexAttribArray(loc);
-            glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
-                                  (void*)(size_t)(col * 4 * sizeof(float)));
-            glVertexAttribDivisor(loc, 1);
+            const std::vector<Mat4>& xforms = instancer->InstanceTransforms();
+            glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVbo);
+            glBufferData(GL_ARRAY_BUFFER, xforms.size() * sizeof(Mat4), xforms.data(),
+                         GL_STATIC_DRAW);
+            // a mat4 attribute is four consecutive vec4 slots
+            for (int col = 0; col < 4; col++)
+            {
+               const unsigned int loc = 3 + col;
+               glEnableVertexAttribArray(loc);
+               glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
+                                     (void*)(size_t)(col * 4 * sizeof(float)));
+               glVertexAttribDivisor(loc, 1);
+            }
+            gpu.instanceRevision = instanceRevision;
+            gpu.instanceCount = (int)xforms.size();
+            gpu.instanceAttribsOn = true;
+            mLastUploads++;
          }
       }
-      else
+      else if (gpu.instanceAttribsOn)
       {
+         // Only on the transition; these are VAO state and persist otherwise.
          for (int col = 0; col < 4; col++)
          {
             glDisableVertexAttribArray(3 + col);
             glVertexAttribDivisor(3 + col, 0);
          }
+         gpu.instanceAttribsOn = false;
       }
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
-      glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, baseColor);
-      glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), metallic);
-      glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), roughness);
-      glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), opacity);
-      glUniform1i(glGetUniformLocation(mProgram, "uShading"), shading);
+      glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
+      glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
+      glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
+      glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), material.opacity);
+      glUniform1i(glGetUniformLocation(mProgram, "uShading"), material.shading);
+      glUniform3fv(glGetUniformLocation(mProgram, "uEmissionColor"), 1, material.emissionColor);
+      glUniform1f(glGetUniformLocation(mProgram, "uEmission"), material.emission);
 
       if (instanced)
       {
-         glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)mesh.indices.size(), GL_UNSIGNED_INT,
-                                 nullptr, (GLsizei)instancer->InstanceCount());
-         mLastTriangles += (mesh.indices.size() / 3) * instancer->InstanceCount();
+         glDrawElementsInstanced(GL_TRIANGLES, gpu.indexCount, GL_UNSIGNED_INT,
+                                 nullptr, (GLsizei)gpu.instanceCount);
+         mLastTriangles += (size_t)(gpu.indexCount / 3) * (size_t)gpu.instanceCount;
       }
       else
       {
-         glDrawElements(GL_TRIANGLES, (GLsizei)mesh.indices.size(), GL_UNSIGNED_INT, nullptr);
-         mLastTriangles += mesh.indices.size() / 3;
+         glDrawElements(GL_TRIANGLES, gpu.indexCount, GL_UNSIGNED_INT, nullptr);
+         mLastTriangles += gpu.indexCount / 3;
       }
       mLastDrawCalls++;
 
+      if (surface != 0)
+      {
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, surface);
+         RestoreSurfaceTexture();
+      }
    }
 
    glBindVertexArray(0);
    glUseProgram(0);
+
+   // Resolve the multisampled buffer down into the texture the graph reads.
+   // Scissor is already off, which matters here: a blit is clipped by it too.
+   if (multisampling)
+   {
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, mMsFbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
+      glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+   }
 
    // --- restore, or every 2D node after this draws wrongly ------------
    if (!prevDepth) glDisable(GL_DEPTH_TEST);

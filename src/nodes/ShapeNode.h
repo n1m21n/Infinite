@@ -43,6 +43,20 @@ public:
    float bgColor[3] = { 0.0f, 0.0f, 0.0f };
    float bgOpacity = 0.0f;
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("shapeType", shapeType);
+      v.Float("width", width); v.Float("height", height);
+      v.Float("size", size); v.Float("aspect", aspect);
+      v.Float("cornerRadius", cornerRadius); v.Int("sides", sides);
+      v.Float("innerRatio", innerRatio); v.Float("rotation", rotation);
+      v.Float("posX", posX); v.Float("posY", posY);
+      v.Color("fillColor", fillColor); v.Float("fillOpacity", fillOpacity);
+      v.Float("strokeWidth", strokeWidth); v.Color("strokeColor", strokeColor);
+      v.Float("feather", feather);
+      v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
+   }
+
 private:
    bool EnsureShader();
 

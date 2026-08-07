@@ -44,6 +44,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/core/Mesh.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
+    src/core/Patch.cpp
     src/platform/Platform.mm
     src/nodes/ImageSourceNode.cpp
     src/nodes/ShapeNode.cpp
@@ -63,6 +64,11 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/RampNode.cpp
     src/nodes/AnalyzeNodes.cpp
     src/nodes/Geometry3DNodes.cpp
+    src/nodes/ModelSourceNode.cpp
+    src/nodes/Text3DNode.cpp
+    src/nodes/UtilityNodes.cpp
+    src/nodes/PathNode.cpp
+    src/nodes/OceanNode.cpp
     src/nodes/GeometryOpNodes.cpp
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp
@@ -118,6 +124,7 @@ if(APPLE)
         "-framework UniformTypeIdentifiers"
         "-framework AVFoundation"
         "-framework Vision"
+        "-framework ModelIO"
         "-framework Accelerate"
         "-framework CoreMedia"
         "-framework CoreVideo"

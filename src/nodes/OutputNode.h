@@ -35,6 +35,11 @@ public:
 
    int recordFps = 30;
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("recordFps", recordFps);
+   }
+
 private:
    bool EnsureShader();
    void CaptureFrame();

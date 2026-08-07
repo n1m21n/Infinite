@@ -29,6 +29,20 @@ public:
 
    std::string pathInput; // bound to the ImGui text field
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Text("path", mLoadedPath);
+   }
+
+   void ReloadFromPath()
+   {
+      if (!mLoadedPath.empty())
+      {
+         const std::string p = mLoadedPath;
+         Load(p);
+      }
+   }
+
 private:
    void EnsurePlaceholder();
 

@@ -17,10 +17,12 @@
 #include <cstring>
 #include <sys/stat.h>
 #include <functional>
+#include <chrono>
 #include <map>
 #include <set>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "core/NodeFactory.h"
@@ -30,6 +32,7 @@
 #include "core/BlendModes.h"
 #include "core/Transport.h"
 #include "core/Modulation.h"
+#include "core/Patch.h"
 #include "nodes/ImageSourceNode.h"
 #include "nodes/ShapeNode.h"
 #include "nodes/FormulaNode.h"
@@ -49,6 +52,11 @@
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/SceneNodes.h"
+#include "nodes/ModelSourceNode.h"
+#include "nodes/Text3DNode.h"
+#include "nodes/UtilityNodes.h"
+#include "nodes/PathNode.h"
+#include "nodes/OceanNode.h"
 #include "nodes/DrawNode.h"
 #include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
@@ -67,7 +75,12 @@ namespace
 
 
    std::vector<GraphNode> gNodes;
-   int gNextIndex = 0;
+   // Starts at 1, not 0: node index 0 would give NodeId 0, and the node editor
+   // reserves 0 as its Invalid id. A node with that id still draws, but every
+   // `if (ed::NodeId n = ed::GetHoveredNode())` silently reads false for it, so
+   // the first node spawned in a patch could not be hovered, selected or
+   // dragged the way every other node could.
+   int gNextIndex = 1;
    ed::EditorContext* gEditor = nullptr;
    GraphNode* gSelfTestFeeder = nullptr;
    ImVec2 gSpawnPos(0.0f, 0.0f);
@@ -92,6 +105,10 @@ namespace
    }
    bool gSnapToGrid = true;
    float gGridSnap = 20.0f;
+   double gLastFrameMs = 0.0; // wall clock across the previous whole frame
+   double gFrameStart = 0.0;  // when the current frame began, for the limiter
+   int gTargetFps = 0;        // 0 = uncapped; otherwise the frame limiter's budget
+   bool gVsync = true;
    bool gRequestFitView = false;
    float gZoomSensitivity = 0.5f;
    bool gHoveringItem = false;   // last frame: cursor over a node/pin/link
@@ -455,6 +472,18 @@ namespace
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
       REGISTER_NODE(GeometryNode, Geometry, "3D");
+      REGISTER_NODE(ModelSourceNode, Model 3D, "3D");
+      REGISTER_NODE(Text3DNode, Text 3D, "3D");
+      REGISTER_NODE(Null3DNode, Null 3D, "3D");
+      REGISTER_NODE(OceanNode, Ocean, "3D");
+      REGISTER_NODE(MaterialNode, Material, "3D");
+      // Three names, one class - Points/Edges/Faces are the same sampler.
+      for (int i = 0; i < 3; i++)
+      {
+         static const char* kNames[] = { "Mesh to Points", "Mesh to Edges", "Mesh to Faces" };
+         NodeFactory::Instance().Register(
+            kNames[i], [i]() -> INode* { return MeshToPointsNode::CreateFor(i); }, "3D");
+      }
       // Ten named operator nodes, all backed by GeometryOpNode.
       for (int i = 0; i < GeometryOpNode::kOpCount; i++)
       {
@@ -470,6 +499,7 @@ namespace
       REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");
+      REGISTER_NODE(NullNode, Null, "Compositing");
       REGISTER_NODE(CurvesNode, Curves, "Color");
       REGISTER_NODE(RemoveBgNode, Remove Background, "Mask");
       REGISTER_NODE(FeedbackNode, Feedback, "Feedback");
@@ -485,6 +515,7 @@ namespace
       REGISTER_NODE(MathNode, Math, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Modulators");
       REGISTER_NODE(MacroXYNode, Macro XY, "Modulators");
+      REGISTER_NODE(PathNode, Path, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
@@ -552,6 +583,20 @@ namespace
          return 1;
       if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<ModelSourceNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<Text3DNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<NullNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
+         return 2; // geometry, then an optional surface texture
       if (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr)
          return Render3DNode::kSlots + 1 + Render3DNode::kLightSlots; // geo, camera, lights
       if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr)
@@ -595,6 +640,17 @@ namespace
          return slot == 0 ? &draw->Input() : nullptr;
       if (auto* an = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
          return slot == 0 ? &an->Input() : nullptr;
+      if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
+         return slot == 0 ? &model->TextureInput() : nullptr;
+      if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
+         return slot == 0 ? &t3d->TextureInput() : nullptr;
+      if (auto* nul = dynamic_cast<NullNode*>(gn.node.get()))
+         return slot == 0 ? &nul->Input() : nullptr;
+      if (auto* ocean = dynamic_cast<OceanNode*>(gn.node.get()))
+         return slot == 0 ? &ocean->TextureInput() : nullptr;
+      // Slot 0 is a geometry pin, wired by pointer, not an image cable.
+      if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
+         return slot == 1 ? &mat->TextureInput() : nullptr;
       if (auto* geo = dynamic_cast<GeometryNode*>(gn.node.get()))
          return slot == 0 ? &geo->TextureInput() : nullptr;
       if (auto* fb = dynamic_cast<FeedbackNode*>(gn.node.get()))
@@ -606,6 +662,53 @@ namespace
       if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
          return slot == 0 ? &out->Input() : nullptr;
       return nullptr;
+   }
+
+   // Which geometry-ish pin a node exposes at a given slot, and how to set it.
+   // Geometry, camera and light connections are raw pointers rather than
+   // ImageCables, so saving and loading them needs this one place that knows
+   // the mapping - the same knowledge the link-drawing and connect paths use.
+   void ConnectGeometrySlot(GraphNode& dst, int slot, GraphNode& src)
+   {
+      auto* geo = dynamic_cast<IGeometrySource*>(src.node.get());
+      auto* cam = dynamic_cast<CameraNode*>(src.node.get());
+      auto* light = dynamic_cast<LightNode*>(src.node.get());
+
+      if (auto* render = dynamic_cast<Render3DNode*>(dst.node.get()))
+      {
+         if (slot < Render3DNode::kSlots)
+            render->geometry[slot] = geo;
+         else if (slot == Render3DNode::kSlots)
+            render->camera = cam;
+         else if (slot - Render3DNode::kSlots - 1 < Render3DNode::kLightSlots)
+            render->lights[slot - Render3DNode::kSlots - 1] = light;
+         return;
+      }
+      if (auto* op = dynamic_cast<GeometryOpNode*>(dst.node.get())) { op->input = geo; return; }
+      if (auto* n3d = dynamic_cast<Null3DNode*>(dst.node.get())) { n3d->input = geo; return; }
+      if (auto* mat = dynamic_cast<MaterialNode*>(dst.node.get())) { mat->input = geo; return; }
+      if (auto* m2p = dynamic_cast<MeshToPointsNode*>(dst.node.get())) { m2p->input = geo; return; }
+      if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(dst.node.get()))
+      {
+         if (slot == 0)
+            inst->pointSource = geo;
+         else
+            inst->instanceShape = geo;
+         return;
+      }
+      if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst.node.get()))
+      {
+         audio->fileSource = dynamic_cast<AudioFileNode*>(src.node.get());
+         return;
+      }
+      if (auto* math = dynamic_cast<MathNode*>(dst.node.get()))
+      {
+         IModulator* mod = ModulatorForOutput(src.node.get(), 0);
+         if (slot == 0)
+            math->inputA = mod;
+         else
+            math->inputB = mod;
+      }
    }
 
    GraphNode* SpawnNode(const std::string& typeName, const std::string& category,
@@ -1512,6 +1615,200 @@ namespace
       ModSlider("onset hold", &n->onsetHold, 0.02f, 1.0f);
    }
 
+   void DrawPathParams(PathNode* n)
+   {
+      DropdownButton("shape", PathNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
+      float p[3];
+      n->CurrentPoint(p);
+      ImGui::TextDisabled("t %.2f   (%.2f, %.2f, %.2f)", n->Progress(), p[0], p[1], p[2]);
+      ImGui::TextDisabled("patch x/y/z into any slider");
+
+      NodeSeparator("motion");
+      ModSlider("speed / beat", &n->speed, -2.0f, 2.0f);
+      ModSlider("phase", &n->phase, 0.0f, 1.0f);
+      ImGui::Checkbox("ping-pong", &n->pingPong);
+
+      NodeSeparator("shape");
+      ModSlider("size x", &n->sizeX, 0.0f, 3.0f);
+      ModSlider("size y", &n->sizeY, 0.0f, 3.0f);
+      ModSlider("size z", &n->sizeZ, 0.0f, 3.0f);
+      if (n->shape == PathNode::kHelix || n->shape == PathNode::kSpiral)
+         ModSlider("turns", &n->turns, 0.5f, 12.0f);
+      if (n->shape == PathNode::kLissajous)
+      {
+         ModSliderInt("ratio a", &n->lissajousA, 1, 9);
+         ModSliderInt("ratio b", &n->lissajousB, 1, 9);
+      }
+   }
+
+   void DrawOceanParams(OceanNode* n)
+   {
+      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      NodeSeparator("surface");
+      ModSliderInt("resolution", &n->resolution, 8, 300);
+      ModSlider("size", &n->size, 0.5f, 20.0f);
+
+      NodeSeparator("waves");
+      ModSlider("amplitude", &n->amplitude, 0.0f, 1.0f);
+      ModSlider("wavelength", &n->wavelength, 0.1f, 8.0f);
+      ModSlider("steepness", &n->steepness, 0.0f, 2.0f);
+      ModSlider("choppiness", &n->choppiness, 0.0f, 2.0f);
+      ModSlider("direction", &n->direction, -3.1416f, 3.1416f);
+      ModSliderInt("octaves", &n->octaves, 1, 8);
+      ModSlider("speed", &n->speed, -3.0f, 3.0f);
+      ImGui::TextDisabled("moves with the transport");
+
+      NodeSeparator("transform");
+      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
+      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
+      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
+      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
+
+      NodeSeparator("material");
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+      ColorSwatch("colour", n->color, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f);
+   }
+
+   void DrawMaterialParams(MaterialNode* n)
+   {
+      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      ImGui::TextDisabled("restyles everything upstream");
+      NodeSeparator("material");
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+      ColorSwatch("colour", n->color, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f);
+   }
+
+   void DrawMeshToPointsParams(MeshToPointsNode* n)
+   {
+      DropdownButton("sample", MeshToPointsNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
+      ImGui::TextDisabled("%zu points, %zu triangles", n->PointCount(), n->TriangleCount());
+      ModSliderInt("max points", &n->maxPoints, 16, 20000);
+      ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
+
+      NodeSeparator("material");
+      ImGui::Checkbox("inherit material", &n->inheritMaterial);
+      if (!n->inheritMaterial)
+      {
+         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+         ColorSwatch("colour", n->color, n);
+         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+         ColorSwatch("emission", n->emissionColor, n);
+         ModSlider("emission", &n->emission, 0.0f, 8.0f);
+      }
+   }
+
+   void DrawText3DParams(Text3DNode* n)
+   {
+      char buf[256];
+      snprintf(buf, sizeof(buf), "%s", n->text.c_str());
+      ImGui::SetNextItemWidth(kParamWidth);
+      if (ImGui::InputText("text", buf, sizeof(buf)))
+         n->text = buf;
+
+      {
+         const std::vector<std::string>& families = Platform::AvailableFontFamilies();
+         int current = 0;
+         for (size_t i = 0; i < families.size(); i++)
+            if (families[i] == n->fontName)
+               current = (int)i;
+         DropdownButton("font", families, current,
+                        [n, &families](int i)
+                        {
+                           if (i >= 0 && i < (int)families.size())
+                              n->fontName = families[(size_t)i];
+                        });
+      }
+
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      ImGui::TextUnformatted(n->Status().c_str());
+      ImGui::PopTextWrapPos();
+
+      NodeSeparator("form");
+      ModSlider("depth", &n->depth, 0.0f, 1.5f);
+      ModSlider("bevel", &n->bevel, 0.0f, 0.45f);
+      ModSlider("tracking", &n->letterSpacing, -0.1f, 0.5f);
+
+      NodeSeparator("transform");
+      ModSlider("pos x", &n->posX, -3.0f, 3.0f);
+      ModSlider("pos y", &n->posY, -3.0f, 3.0f);
+      ModSlider("pos z", &n->posZ, -3.0f, 3.0f);
+      ModSlider("rot x", &n->rotX, -3.1416f, 3.1416f);
+      ModSlider("rot y", &n->rotY, -3.1416f, 3.1416f);
+      ModSlider("rot z", &n->rotZ, -3.1416f, 3.1416f);
+      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
+      ModSlider("spin / beat", &n->spinY, -1.0f, 1.0f);
+
+      NodeSeparator("material");
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+      ColorSwatch("colour", n->color, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f);
+   }
+
+   void DrawModelParams(ModelSourceNode* n)
+   {
+      if (ImGui::Button("Open model...", ImVec2(kParamWidth, 0)))
+      {
+         const std::string path = Platform::OpenModelDialog();
+         if (!path.empty())
+            n->Load(path);
+      }
+      // Bare TextWrapped has no usable content width inside the node editor and
+      // wraps to one character per line; every other panel here sets the wrap
+      // position explicitly.
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      ImGui::TextUnformatted(n->Status().c_str());
+      ImGui::PopTextWrapPos();
+      ImGui::TextDisabled("obj, ply, stl, usd, usdz");
+
+      NodeSeparator("import");
+      // Evaluated into separate variables rather than OR'd inline: `||` would
+      // short-circuit and skip drawing the second checkbox on any frame the
+      // first one was clicked.
+      const bool fitChanged = ImGui::Checkbox("fit to unit size", &n->normalizeScale);
+      const bool centreChanged = ImGui::Checkbox("recentre", &n->recenter);
+      if (fitChanged || centreChanged)
+      {
+         // Both are applied at load time, so changing them has to re-import.
+         if (!n->Path().empty())
+            n->Load(n->Path());
+      }
+
+      NodeSeparator("transform");
+      ModSlider("pos x", &n->posX, -3.0f, 3.0f);
+      ModSlider("pos y", &n->posY, -3.0f, 3.0f);
+      ModSlider("pos z", &n->posZ, -3.0f, 3.0f);
+      ModSlider("rot x", &n->rotX, -3.1416f, 3.1416f);
+      ModSlider("rot y", &n->rotY, -3.1416f, 3.1416f);
+      ModSlider("rot z", &n->rotZ, -3.1416f, 3.1416f);
+      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
+      ModSlider("spin / beat", &n->spinY, -1.0f, 1.0f);
+
+      NodeSeparator("material");
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+      ColorSwatch("colour", n->color, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f);
+   }
+
    void DrawGeometryParams(GeometryNode* n)
    {
       DropdownButton("shape", GeometryNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
@@ -1547,6 +1844,8 @@ namespace
       ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
       ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f);
       ImGui::TextDisabled("patch an image into the input to texture it");
       ImGui::TextDisabled("patch 'out' into Render 3D");
    }
@@ -1609,6 +1908,25 @@ namespace
             ModSlider("amount", &n->amount, 0.0f, 3.0f);
             ModSlider("seed", &n->seed, 0.0f, 100.0f);
             break;
+         case GeometryOpNode::kSmooth:
+            ModSliderInt("iterations", &n->iterations, 1, 20);
+            ModSlider("strength", &n->amount, 0.0f, 1.0f);
+            ImGui::TextDisabled("Taubin - relaxes without shrinking");
+            break;
+         case GeometryOpNode::kMirror:
+            ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+            ModSlider("plane offset", &n->mirrorOffset, -2.0f, 2.0f);
+            ImGui::Checkbox("keep original", &n->keepOriginal);
+            ImGui::Checkbox("weld seam", &n->weldSeam);
+            break;
+         case GeometryOpNode::kScrew:
+            ModSliderInt("steps", &n->screwSteps, 3, 256);
+            ModSlider("turns", &n->turns, 0.05f, 6.0f);
+            ModSlider("rise / turn", &n->rise, -2.0f, 2.0f);
+            ModSlider("radius", &n->radiusOffset, 0.0f, 3.0f);
+            ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+            ImGui::TextDisabled("revolves the input's boundary edges");
+            break;
          default:
             ModSlider("angle", &n->amount, -3.0f, 3.0f);
             ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
@@ -1624,6 +1942,8 @@ namespace
          ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
          ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
          ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+         ColorSwatch("emission", n->emissionColor, n);
+         ModSlider("emission", &n->emission, 0.0f, 8.0f);
       }
    }
 
@@ -1652,6 +1972,8 @@ namespace
       ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
       ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
    void DrawCameraParams(CameraNode* n)
@@ -1688,6 +2010,92 @@ namespace
       ImGui::TextDisabled("Render 3D takes up to 3 lights");
    }
 
+   // Fits the camera around everything patched into a Render node.
+   //
+   // Bounds are taken from each mesh's object-space corners pushed through its
+   // model matrix, rather than from every vertex: a rotated box's true extent
+   // needs the corners, and a scene can carry hundreds of thousands of vertices
+   // that would be pointless to walk for a button press.
+   void FrameSceneInView(Render3DNode* n)
+   {
+      float lo[3] = { 1e30f, 1e30f, 1e30f };
+      float hi[3] = { -1e30f, -1e30f, -1e30f };
+      bool any = false;
+
+      for (int i = 0; i < Render3DNode::kSlots; i++)
+      {
+         IGeometrySource* source = n->geometry[i];
+         if (source == nullptr)
+            continue;
+         const Mesh& mesh = source->GetMesh();
+         if (mesh.Empty())
+            continue;
+
+         float mlo[3] = { 1e30f, 1e30f, 1e30f };
+         float mhi[3] = { -1e30f, -1e30f, -1e30f };
+         for (const Vertex& v : mesh.vertices)
+         {
+            const float p[3] = { v.px, v.py, v.pz };
+            for (int k = 0; k < 3; k++)
+            {
+               if (!std::isfinite(p[k]))
+                  continue;
+               mlo[k] = std::min(mlo[k], p[k]);
+               mhi[k] = std::max(mhi[k], p[k]);
+            }
+         }
+         if (mlo[0] > mhi[0])
+            continue;
+
+         const Mat4 model = source->GetModelMatrix();
+         for (int corner = 0; corner < 8; corner++)
+         {
+            const float c[3] = {
+               (corner & 1) ? mhi[0] : mlo[0],
+               (corner & 2) ? mhi[1] : mlo[1],
+               (corner & 4) ? mhi[2] : mlo[2]
+            };
+            for (int k = 0; k < 3; k++)
+            {
+               const float w = model.m[k] * c[0] + model.m[4 + k] * c[1] +
+                               model.m[8 + k] * c[2] + model.m[12 + k];
+               lo[k] = std::min(lo[k], w);
+               hi[k] = std::max(hi[k], w);
+            }
+         }
+         any = true;
+      }
+
+      if (!any)
+         return;
+
+      const float centre[3] = { (lo[0]+hi[0])*0.5f, (lo[1]+hi[1])*0.5f, (lo[2]+hi[2])*0.5f };
+      const float radius = 0.5f * std::sqrt((hi[0]-lo[0])*(hi[0]-lo[0]) +
+                                            (hi[1]-lo[1])*(hi[1]-lo[1]) +
+                                            (hi[2]-lo[2])*(hi[2]-lo[2]));
+
+      // Distance that puts the bounding sphere just inside the vertical field
+      // of view, with a little air around it.
+      const float fovDegrees = n->camera ? n->camera->fov : n->fov;
+      const float halfFov = std::max(0.1f, fovDegrees * 0.5f * 3.14159265f / 180.0f);
+      const float distance = std::max(0.3f, (radius / std::sin(halfFov)) * 1.15f);
+
+      if (n->camera != nullptr)
+      {
+         n->camera->targetX = centre[0];
+         n->camera->targetY = centre[1];
+         n->camera->targetZ = centre[2];
+         n->camera->distance = distance;
+      }
+      else
+      {
+         n->targetX = centre[0];
+         n->targetY = centre[1];
+         n->targetZ = centre[2];
+         n->camDistance = distance;
+      }
+   }
+
    void DrawRender3DParams(Render3DNode* n)
    {
       int connected = 0;
@@ -1696,12 +2104,32 @@ namespace
             connected++;
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
       ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
+      ImGui::TextDisabled("drag the preview to orbit, scroll to zoom");
+      if (ImGui::Button("Frame scene", ImVec2(kParamWidth, 0)))
+         FrameSceneInView(n);
       if (n->LastTriangleCount() > 2000000)
          ImGui::TextColored(ImVec4(1, 0.55f, 0.35f, 1), "very heavy scene");
 
       NodeSeparator("output");
-      ModSlider("width", &n->width, 64.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 64.0f, 4096.0f, "%.0f");
+      // This is the export resolution: Output sizes its own buffer from whatever
+      // its input hands it, so a 4000px PNG needs 4000 set here or it is an
+      // upscale of a smaller render.
+      ModSlider("width", &n->width, 64.0f, 8192.0f, "%.0f");
+      ModSlider("height", &n->height, 64.0f, 8192.0f, "%.0f");
+      DropdownButton("antialias", Render3DNode::SampleNames(), n->samples,
+                     [n](int i) { n->samples = i; });
+      {
+         // The requested sample count is clamped by both the driver and a memory
+         // budget, so show what actually happened when they disagree.
+         const int wanted = (n->samples <= 0) ? 0 : (1 << n->samples);
+         if (n->ActiveSamples() != wanted)
+            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.35f, 1.0f),
+                               "antialias reduced to %dx at this size",
+                               n->ActiveSamples());
+      }
+      DropdownButton("tonemap", Render3DNode::TonemapNames(), n->tonemap,
+                     [n](int i) { n->tonemap = i; });
+      ModSlider("exposure", &n->exposure, 0.1f, 4.0f);
       ColorSwatch("background", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
 
@@ -1740,6 +2168,13 @@ namespace
       }
       ColorSwatch("ambient", n->ambientColor, n);
       ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f);
+
+      NodeSeparator("environment");
+      ImGui::TextDisabled("what metal reflects");
+      ColorSwatch("sky", n->envSky, n);
+      ColorSwatch("horizon", n->envHorizon, n);
+      ColorSwatch("ground", n->envGround, n);
+      ModSlider("env intensity", &n->envIntensity, 0.0f, 3.0f);
 
       NodeSeparator("raster");
       ImGui::Checkbox("depth test", &n->depthTest);
@@ -2041,7 +2476,50 @@ namespace
 
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
                   IM_COL32(70, 74, 90, 255), 4.0f);
-      ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize));
+
+      // A Render 3D preview is a viewport, not a picture: drag to orbit, scroll
+      // to zoom. An InvisibleButton is what makes this safe inside the node
+      // editor - while it is active the editor leaves the drag alone, which is
+      // the same mechanism the in-node sliders already rely on.
+      auto* render = dynamic_cast<Render3DNode*>(node);
+      if (render == nullptr)
+      {
+         ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize));
+         return;
+      }
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##viewport", ImVec2(kPreviewSize, kPreviewSize));
+
+      // A patched Camera node owns the view, so drive that instead of the
+      // built-in values; otherwise the drag would appear to do nothing.
+      float* azimuth = render->camera ? &render->camera->azimuth : &render->camAzimuth;
+      float* elevation = render->camera ? &render->camera->elevation : &render->camElevation;
+      float* distance = render->camera ? &render->camera->distance : &render->camDistance;
+
+      if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+      {
+         const ImVec2 drag = ImGui::GetIO().MouseDelta;
+         *azimuth -= drag.x * 0.012f;
+         // Clamped just short of the poles: straight overhead makes the view
+         // matrix's up vector parallel to the view direction and the image rolls.
+         *elevation = std::max(-1.5f, std::min(*elevation + drag.y * 0.012f, 1.5f));
+      }
+
+      if (ImGui::IsItemHovered())
+      {
+         ImGuiIO& vio = ImGui::GetIO();
+         if (vio.MouseWheel != 0.0f)
+         {
+            *distance = std::max(0.2f, std::min(*distance * (1.0f - vio.MouseWheel * 0.15f), 60.0f));
+            // Consumed, or the canvas zooms at the same time as the camera.
+            vio.MouseWheel = 0.0f;
+         }
+      }
+
+      if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+         dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
+                     IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
    }
 
    // Rolling history so a modulator reads like a scope rather than a number.
@@ -2357,6 +2835,20 @@ namespace
             if (dyingGeometry != nullptr && inst->instanceShape == dyingGeometry)
                inst->instanceShape = nullptr;
          }
+         // The single-geometry-input nodes. Missing one here would leave a
+         // pointer to a freed node and crash on the next cook.
+         if (dyingGeometry != nullptr)
+         {
+            if (auto* n3d = dynamic_cast<Null3DNode*>(other.node.get()))
+               if (n3d->input == dyingGeometry)
+                  n3d->input = nullptr;
+            if (auto* mat = dynamic_cast<MaterialNode*>(other.node.get()))
+               if (mat->input == dyingGeometry)
+                  mat->input = nullptr;
+            if (auto* m2p = dynamic_cast<MeshToPointsNode*>(other.node.get()))
+               if (m2p->input == dyingGeometry)
+                  m2p->input = nullptr;
+         }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
          {
             if (dyingFile != nullptr && audio->fileSource == dyingFile)
@@ -2393,6 +2885,237 @@ namespace
                                   [index](const GraphNode& g) { return g.index == index; }),
                    gNodes.end());
    }
+   std::string gPatchPath;      // "" until the patch has been saved somewhere
+   bool gPatchDirty = false;
+   std::string gPatchStatus;
+
+   // ---- saving ----
+   bool SavePatchTo(const std::string& path)
+   {
+      Patch::Data data;
+      for (GraphNode& gn : gNodes)
+      {
+         Patch::NodeRecord rec;
+         rec.index = gn.index;
+         rec.category = gn.category;
+         rec.typeName = gn.typeName;
+         // Live position from the editor, not the spawn position: the node has
+         // almost certainly been dragged since it was created.
+         const ImVec2 pos = ed::GetNodePosition(gn.NodeId());
+         rec.x = pos.x;
+         rec.y = pos.y;
+         rec.showParams = gn.showParams;
+         rec.bypassed = gn.node->bypassed;
+         Patch::SaveParams(gn.node.get(), rec.params);
+         data.nodes.push_back(std::move(rec));
+
+         for (int slot = 0; slot < InputCountFor(gn); slot++)
+         {
+            if (ImageCable* cable = CableFor(gn, slot))
+            {
+               if (!cable->IsConnected())
+                  continue;
+               for (GraphNode& src : gNodes)
+               {
+                  if (src.node.get() == cable->GetSource())
+                  {
+                     data.cables.push_back({ gn.index, slot, src.index });
+                     break;
+                  }
+               }
+            }
+         }
+      }
+
+      // Geometry, camera, light, audio and modulator-input pins, found by
+      // comparing against each candidate source rather than stored by index.
+      for (GraphNode& gn : gNodes)
+      {
+         auto record = [&](const void* wanted, int slot)
+         {
+            if (wanted == nullptr)
+               return;
+            for (GraphNode& src : gNodes)
+            {
+               const void* asGeo = dynamic_cast<IGeometrySource*>(src.node.get());
+               if (asGeo == wanted || (const void*)src.node.get() == wanted)
+               {
+                  data.geometry.push_back({ gn.index, slot, src.index });
+                  return;
+               }
+            }
+         };
+
+         if (auto* render = dynamic_cast<Render3DNode*>(gn.node.get()))
+         {
+            for (int i = 0; i < Render3DNode::kSlots; i++)
+               record(render->geometry[i], i);
+            record(render->camera, Render3DNode::kSlots);
+            for (int i = 0; i < Render3DNode::kLightSlots; i++)
+               record(render->lights[i], Render3DNode::kSlots + 1 + i);
+         }
+         if (auto* op = dynamic_cast<GeometryOpNode*>(gn.node.get())) record(op->input, 0);
+         if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get())) record(n3d->input, 0);
+         if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get())) record(mat->input, 0);
+         if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get())) record(m2p->input, 0);
+         if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
+         {
+            record(inst->pointSource, 0);
+            record(inst->instanceShape, 1);
+         }
+         if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
+            record(audio->fileSource, 0);
+         if (auto* math = dynamic_cast<MathNode*>(gn.node.get()))
+         {
+            for (int slot = 0; slot < 2; slot++)
+            {
+               IModulator* wanted = (slot == 0) ? math->inputA : math->inputB;
+               if (wanted == nullptr)
+                  continue;
+               for (GraphNode& src : gNodes)
+               {
+                  bool found = false;
+                  for (int o = 0; o < std::max(1, src.node->OutputCount()) && !found; o++)
+                     if (ModulatorForOutput(src.node.get(), o) == wanted)
+                     {
+                        data.geometry.push_back({ gn.index, slot, src.index });
+                        found = true;
+                     }
+                  if (found)
+                     break;
+               }
+            }
+         }
+      }
+
+      for (const auto& link : Modulation::Instance().Links())
+         data.modulation.push_back({ link.first.first, link.first.second,
+                                     link.second.nodeIndex, link.second.outputIndex });
+
+      std::string error;
+      if (!Patch::Write(path, data, error))
+      {
+         gPatchStatus = "Save failed: " + error;
+         return false;
+      }
+
+      gPatchPath = path;
+      gPatchDirty = false;
+      gPatchStatus = "Saved";
+      Patch::NoteRecent(path);
+      return true;
+   }
+
+   void NewPatch()
+   {
+      gNodes.clear();
+      gLinks.clear();
+      gModHistory.clear();
+      gNextIndex = 1;
+      gPatchPath.clear();
+      gPatchDirty = false;
+      gPatchStatus = "New patch";
+   }
+
+   bool LoadPatchFrom(const std::string& path)
+   {
+      Patch::Data data;
+      std::string error;
+      if (!Patch::Read(path, data, error))
+      {
+         gPatchStatus = "Open failed: " + error;
+         return false;
+      }
+
+      NewPatch();
+
+      // Saved indices are remapped rather than reused: they only have to be
+      // internally consistent, and reusing them would collide with the running
+      // counter and with the editor's own per-id state.
+      std::map<int, int> remap;
+      for (const Patch::NodeRecord& rec : data.nodes)
+      {
+         GraphNode* spawned = SpawnNode(rec.typeName, rec.category, rec.x, rec.y);
+         if (spawned == nullptr)
+         {
+            // A patch naming a node type this build does not have still opens;
+            // it just comes back missing that node.
+            fprintf(stderr, "patch: unknown node type '%s', skipped\n", rec.typeName.c_str());
+            continue;
+         }
+         remap[rec.index] = spawned->index;
+         spawned->showParams = rec.showParams;
+         spawned->node->bypassed = rec.bypassed;
+         Patch::LoadParams(spawned->node.get(), rec.params);
+
+         // Sources that reference a file have to re-read it; the patch stores
+         // the path, not the pixels or the mesh.
+         if (auto* img = dynamic_cast<ImageSourceNode*>(spawned->node.get()))
+            img->ReloadFromPath();
+         if (auto* model = dynamic_cast<ModelSourceNode*>(spawned->node.get()))
+            model->ReloadFromPath();
+      }
+
+      auto resolve = [&](int savedIndex) -> GraphNode*
+      {
+         auto it = remap.find(savedIndex);
+         return (it == remap.end()) ? nullptr : FindNodeByIndex(it->second);
+      };
+
+      for (const Patch::CableRecord& c : data.cables)
+      {
+         GraphNode* dst = resolve(c.dstIndex);
+         GraphNode* src = resolve(c.srcIndex);
+         if (dst == nullptr || src == nullptr)
+            continue;
+         if (ImageCable* cable = CableFor(*dst, c.dstSlot))
+            cable->Connect(src->node.get());
+      }
+      for (const Patch::CableRecord& c : data.geometry)
+      {
+         GraphNode* dst = resolve(c.dstIndex);
+         GraphNode* src = resolve(c.srcIndex);
+         if (dst != nullptr && src != nullptr)
+            ConnectGeometrySlot(*dst, c.dstSlot, *src);
+      }
+      for (const Patch::ModRecord& m : data.modulation)
+      {
+         GraphNode* dst = resolve(m.dstIndex);
+         GraphNode* src = resolve(m.srcIndex);
+         if (dst != nullptr && src != nullptr)
+            Modulation::Instance().Bind(dst->index, m.dstParam, src->index, m.srcOutput);
+      }
+
+      gPatchPath = path;
+      gPatchDirty = false;
+      gPatchStatus = "Opened";
+      Patch::NoteRecent(path);
+      gRequestFitView = true;
+      return true;
+   }
+
+   void SavePatchInteractive(bool forceDialog)
+   {
+      std::string path = gPatchPath;
+      if (path.empty() || forceDialog)
+      {
+         std::string suggested = "Untitled.infinite";
+         if (!gPatchPath.empty())
+         {
+            const size_t slash = gPatchPath.find_last_of('/');
+            suggested = (slash == std::string::npos) ? gPatchPath : gPatchPath.substr(slash + 1);
+         }
+         path = Platform::SavePatchDialog(suggested);
+         if (path.empty())
+            return; // cancelled
+         // The dialog does not force an extension, and a patch without one is
+         // awkward to find again.
+         if (path.size() < 9 || path.compare(path.size() - 9, 9, ".infinite") != 0)
+            path += ".infinite";
+      }
+      SavePatchTo(path);
+   }
+
 }
 
 int main()
@@ -2476,6 +3199,8 @@ int main()
    ed::Config config;
    config.SettingsFile = graphPath.c_str();
    config.EnableSmoothZoom = true; // trackpad momentum made stepped zoom feel jumpy
+   Patch::LoadRecents();
+
    gEditor = ed::CreateEditor(&config);
 
    RegisterNodes();
@@ -2538,7 +3263,10 @@ int main()
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);      // 0 points source
          SpawnNode("Geometry", "3D", 40.0f, 400.0f);     // 1 instance shape
          SpawnNode("Instance on Points", "3D", 320.0f, 40.0f); // 2
-         SpawnNode("Geometry Op", "3D", 320.0f, 400.0f); // 3
+         // "Array" rather than "Geometry Op": the operators were split into ten
+         // separately registered nodes, and spawning the old name silently
+         // failed, leaving this fixture reading past the end of gNodes.
+         SpawnNode("Array", "3D", 320.0f, 400.0f);       // 3
          SpawnNode("Camera", "3D", 620.0f, 400.0f);      // 4
          SpawnNode("Light", "3D", 620.0f, 620.0f);       // 5
          SpawnNode("Render 3D", "3D", 900.0f, 40.0f);    // 6
@@ -2567,11 +3295,107 @@ int main()
          gNodes[2].showParams = true;
          gNodes[6].showParams = true;
       }
+      else if (getenv("INFINITE_PATCHTEST") != nullptr)
+      {
+         // A patch touching every kind of connection: image cables, a geometry
+         // chain, camera and light pins, and a modulation binding.
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);        // 0
+         SpawnNode("Smooth", "3D", 320.0f, 40.0f);         // 1
+         SpawnNode("Material", "3D", 600.0f, 40.0f);       // 2
+         SpawnNode("Camera", "3D", 320.0f, 400.0f);        // 3
+         SpawnNode("Light", "3D", 320.0f, 620.0f);         // 4
+         SpawnNode("Render 3D", "3D", 880.0f, 40.0f);      // 5
+         SpawnNode("invert", "Color", 1160.0f, 40.0f);     // 6
+         SpawnNode("Output", "Output", 1440.0f, 40.0f);    // 7
+         SpawnNode("Path", "Modulators", 40.0f, 800.0f);   // 8
+
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* smooth = static_cast<GeometryOpNode*>(gNodes[1].node.get());
+         auto* mat = static_cast<MaterialNode*>(gNodes[2].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[5].node.get());
+         auto* path = static_cast<PathNode*>(gNodes[8].node.get());
+
+         geo->shape = 4; geo->detail = 33; geo->posX = 1.25f;
+         geo->color[0] = 0.11f; geo->color[1] = 0.22f; geo->color[2] = 0.33f;
+         geo->emission = 2.5f;
+         smooth->iterations = 7; smooth->amount = 0.66f;
+         mat->metallic = 0.77f; mat->roughness = 0.11f;
+         render->samples = 3; render->exposure = 1.8f; render->width = 512.0f;
+         path->shape = PathNode::kHelix; path->turns = 5.0f; path->pingPong = true;
+
+         smooth->input = geo;
+         mat->input = smooth;
+         render->geometry[0] = mat;
+         render->camera = static_cast<CameraNode*>(gNodes[3].node.get());
+         render->lights[0] = static_cast<LightNode*>(gNodes[4].node.get());
+         CableFor(gNodes[6], 0)->Connect(gNodes[5].node.get());
+         CableFor(gNodes[7], 0)->Connect(gNodes[6].node.get());
+         Modulation::Instance().Bind(gNodes[0].index, 6, gNodes[8].index, 2);
+      }
+      else if (getenv("INFINITE_MATFRAMETEST") != nullptr)
+      {
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);     // 0
+         SpawnNode("Material", "3D", 320.0f, 40.0f);    // 1
+         SpawnNode("Render 3D", "3D", 620.0f, 40.0f);   // 2
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* mat = static_cast<MaterialNode*>(gNodes[1].node.get());
+         geo->posX = 4.0f; geo->posY = 2.0f; geo->uniformScale = 2.0f;
+         mat->input = geo;
+         static_cast<Render3DNode*>(gNodes[2].node.get())->geometry[0] = mat;
+      }
+      else if (getenv("INFINITE_PATHOCEANTEST") != nullptr)
+      {
+         SpawnNode("Path", "Modulators", 40.0f, 40.0f);   // 0
+         SpawnNode("Ocean", "3D", 40.0f, 400.0f);         // 1
+         SpawnNode("Render 3D", "3D", 400.0f, 40.0f);     // 2
+         static_cast<Render3DNode*>(gNodes[2].node.get())->geometry[0] =
+            static_cast<OceanNode*>(gNodes[1].node.get());
+      }
+      else if (getenv("INFINITE_UTILTEST") != nullptr)
+      {
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);        // 0
+         SpawnNode("Null 3D", "3D", 300.0f, 40.0f);        // 1
+         SpawnNode("Mesh to Points", "3D", 560.0f, 40.0f); // 2
+         SpawnNode("Render 3D", "3D", 820.0f, 40.0f);      // 3
+         SpawnNode("Shape", "Source", 40.0f, 500.0f);      // 4
+         SpawnNode("Null", "Compositing", 300.0f, 500.0f); // 5
+         SpawnNode("Output", "Output", 560.0f, 500.0f);    // 6
+
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* null3d = static_cast<Null3DNode*>(gNodes[1].node.get());
+         auto* m2p = static_cast<MeshToPointsNode*>(gNodes[2].node.get());
+         null3d->input = geo;
+         m2p->input = null3d;
+         static_cast<Render3DNode*>(gNodes[3].node.get())->geometry[0] = m2p;
+         CableFor(gNodes[5], 0)->Connect(gNodes[4].node.get());
+         CableFor(gNodes[6], 0)->Connect(gNodes[5].node.get());
+      }
+      else if (getenv("INFINITE_TEXT3DTEST") != nullptr)
+      {
+         SpawnNode("Text 3D", "3D", 40.0f, 40.0f);
+         SpawnNode("Render 3D", "3D", 400.0f, 40.0f);
+         static_cast<Render3DNode*>(gNodes[1].node.get())->geometry[0] =
+            static_cast<Text3DNode*>(gNodes[0].node.get());
+      }
+      else if (getenv("INFINITE_MODELTEST") != nullptr)
+      {
+         SpawnNode("Model 3D", "3D", 40.0f, 40.0f);
+         SpawnNode("Render 3D", "3D", 400.0f, 40.0f);
+         auto* model = static_cast<ModelSourceNode*>(gNodes[0].node.get());
+         static_cast<Render3DNode*>(gNodes[1].node.get())->geometry[0] = model;
+      }
+      else if (getenv("INFINITE_MESHOPTEST") != nullptr)
+      {
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);
+         SpawnNode("Render 3D", "3D", 700.0f, 40.0f);
+      }
       else if (getenv("INFINITE_3DTEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Geometry", "3D", 40.0f, 500.0f);
          SpawnNode("Render 3D", "3D", 360.0f, 40.0f);
+         // A textured surface, so the mipmap/anisotropy path is exercised too.
+         SpawnNode("Noise", "Source", 40.0f, 900.0f);
          auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
          g0->shape = 7; g0->color[0] = 1.0f; g0->color[1] = 0.45f; g0->color[2] = 0.2f;
          g0->uniformScale = 1.5f;
@@ -2581,7 +3405,9 @@ int main()
          auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
          r->geometry[0] = g0;
          r->geometry[1] = g1;
+         g0->TextureInput().Connect(gNodes[3].node.get());
          r->width = 700.0f; r->height = 700.0f;
+         r->samples = 0; // the antialias check below turns it on at frame 4
          if (getenv("INFINITE_NOCULL") != nullptr)
             r->backfaceCull = false;
          if (getenv("INFINITE_NODEPTH") != nullptr)
@@ -2738,6 +3564,7 @@ int main()
 
    while (!glfwWindowShouldClose(window))
    {
+      gFrameStart = glfwGetTime();
       glfwPollEvents();
 
       // dev-only: drive copy/paste/delete with synthetic key events so the
@@ -2836,6 +3663,57 @@ int main()
 
       if (ImGui::BeginMenuBar())
       {
+         if (ImGui::BeginMenu("File"))
+         {
+            if (ImGui::MenuItem("New", "Cmd+N"))
+               NewPatch();
+            if (ImGui::MenuItem("Open...", "Cmd+O"))
+            {
+               const std::string path = Platform::OpenPatchDialog();
+               if (!path.empty())
+                  LoadPatchFrom(path);
+            }
+
+            if (ImGui::BeginMenu("Open Recent", !Patch::Recents().empty()))
+            {
+               // Copied before iterating: opening one calls NoteRecent, which
+               // reorders the very list being walked.
+               const std::vector<std::string> recents = Patch::Recents();
+               for (const std::string& entry : recents)
+               {
+                  const size_t slash = entry.find_last_of('/');
+                  const std::string name =
+                     (slash == std::string::npos) ? entry : entry.substr(slash + 1);
+                  if (ImGui::MenuItem(name.c_str()))
+                     LoadPatchFrom(entry);
+                  if (ImGui::IsItemHovered())
+                     ImGui::SetTooltip("%s", entry.c_str());
+               }
+               ImGui::EndMenu();
+            }
+
+            ImGui::Separator();
+            if (ImGui::MenuItem("Save", "Cmd+S"))
+               SavePatchInteractive(false);
+            if (ImGui::MenuItem("Save As...", "Cmd+Shift+S"))
+               SavePatchInteractive(true);
+
+            if (!gPatchPath.empty() || !gPatchStatus.empty())
+            {
+               ImGui::Separator();
+               if (!gPatchPath.empty())
+               {
+                  const size_t slash = gPatchPath.find_last_of('/');
+                  ImGui::TextDisabled("%s", (slash == std::string::npos)
+                                               ? gPatchPath.c_str()
+                                               : gPatchPath.c_str() + slash + 1);
+               }
+               if (!gPatchStatus.empty())
+                  ImGui::TextDisabled("%s", gPatchStatus.c_str());
+            }
+            ImGui::EndMenu();
+         }
+
          if (ImGui::BeginMenu("Menu"))
          {
             ImGui::SeparatorText("Canvas");
@@ -2846,6 +3724,34 @@ int main()
             ImGui::SliderFloat("Zoom speed", &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
             if (ImGui::MenuItem("Fit view to content"))
                gRequestFitView = true;
+
+            ImGui::SeparatorText("Performance");
+            {
+               // A cap is useful in both directions: it stops a light patch
+               // spinning the GPU at 400fps for no reason, and it gives a
+               // predictable frame budget to judge a heavy one against.
+               static const char* kFpsLabels[] = { "Unlimited", "30", "60", "120" };
+               static const int kFpsValues[] = { 0, 30, 60, 120 };
+               int current = 0;
+               for (int i = 0; i < 4; i++)
+                  if (kFpsValues[i] == gTargetFps)
+                     current = i;
+
+               ImGui::SetNextItemWidth(170);
+               if (ImGui::BeginCombo("Target FPS", kFpsLabels[current]))
+               {
+                  for (int i = 0; i < 4; i++)
+                  {
+                     if (ImGui::Selectable(kFpsLabels[i], current == i))
+                        gTargetFps = kFpsValues[i];
+                  }
+                  ImGui::EndCombo();
+               }
+
+               if (ImGui::Checkbox("Vsync", &gVsync))
+                  glfwSwapInterval(gVsync ? 1 : 0);
+               ImGui::TextDisabled("Vsync also caps to the display's refresh");
+            }
 
             ImGui::SeparatorText("Nodes");
             if (ImGui::MenuItem("Show all params"))
@@ -2889,6 +3795,38 @@ int main()
          ImGui::TextDisabled("bar %d  beat %.2f",
                              1 + (int)(transport.Beats() / 4.0),
                              std::fmod(transport.Beats(), 4.0) + 1.0);
+
+         // Frame cost, pinned right. Measured from the swap-to-swap wall clock
+         // rather than ImGui's smoothed rate, so a heavy patch shows its real
+         // cost immediately instead of easing into it over a second.
+         {
+            static double sSmoothedMs = 0.0;
+            // A gentle EMA: raw frame times jitter too much to read, but the
+            // window is short enough that dragging a slider shows up at once.
+            sSmoothedMs = (sSmoothedMs <= 0.0)
+                             ? gLastFrameMs
+                             : sSmoothedMs * 0.9 + gLastFrameMs * 0.1;
+            const double fps = sSmoothedMs > 0.0001 ? 1000.0 / sSmoothedMs : 0.0;
+
+            char readout[80];
+            if (gTargetFps > 0)
+               snprintf(readout, sizeof(readout), "%.1f / %d fps   %.1f ms",
+                        fps, gTargetFps, sSmoothedMs);
+            else
+               snprintf(readout, sizeof(readout), "%.1f fps   %.1f ms", fps, sSmoothedMs);
+            const float textWidth = ImGui::CalcTextSize(readout).x;
+            ImGui::SameLine(ImGui::GetWindowWidth() - textWidth - ImGui::GetStyle().WindowPadding.x * 2.0f);
+
+            // Judged against the target when there is one, so hitting a
+            // deliberate 30fps cap reads as green rather than as a problem.
+            // Otherwise against 50/25, where dragging a slider stops feeling live.
+            const double good = gTargetFps > 0 ? gTargetFps * 0.95 : 50.0;
+            const double poor = gTargetFps > 0 ? gTargetFps * 0.5 : 25.0;
+            const ImVec4 color = (fps >= good) ? ImVec4(0.45f, 0.85f, 0.5f, 1.0f)
+                               : (fps >= poor) ? ImVec4(0.95f, 0.75f, 0.35f, 1.0f)
+                                               : ImVec4(0.95f, 0.45f, 0.4f, 1.0f);
+            ImGui::TextColored(color, "%s", readout);
+         }
 
          ImGui::EndMenuBar();
       }
@@ -2942,12 +3880,32 @@ int main()
          static const std::vector<std::string> kVideoExt = {
             "mov", "mp4", "m4v", "avi", "mkv", "webm", "mpg", "mpeg", "wmv", "flv", "hevc"
          };
+         // Everything ModelIO reads. Checked before video because "usdz" and
+         // "abc" would otherwise fall through to the image branch and fail.
+         static const std::vector<std::string> kAudioExt = {
+            "wav", "aif", "aiff", "mp3", "m4a", "aac", "caf", "flac", "ogg"
+         };
+         static const std::vector<std::string> kModelExt = {
+            "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc"
+         };
          ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
          float offset = 0.0f;
          for (const std::string& path : gDroppedFiles)
          {
             GraphNode* spawned = nullptr;
-            if (HasExtension(path, kVideoExt))
+            if (HasExtension(path, kAudioExt))
+            {
+               spawned = SpawnNode("Audio File", "Modulators", canvasPos.x + offset, canvasPos.y);
+               if (spawned != nullptr)
+                  static_cast<AudioFileNode*>(spawned->node.get())->Open(path);
+            }
+            else if (HasExtension(path, kModelExt))
+            {
+               spawned = SpawnNode("Model 3D", "3D", canvasPos.x + offset, canvasPos.y);
+               if (spawned != nullptr)
+                  static_cast<ModelSourceNode*>(spawned->node.get())->Load(path);
+            }
+            else if (HasExtension(path, kVideoExt))
             {
                spawned = SpawnNode("Video", "Source", canvasPos.x + offset, canvasPos.y);
                if (spawned != nullptr)
@@ -3072,19 +4030,421 @@ int main()
          }
       }
 
-      if (getenv("INFINITE_GEOTEST") != nullptr && frameId == 4)
+      if (getenv("INFINITE_PATCHTEST") != nullptr && frameId == 4)
+      {
+         const std::string path = "/tmp/infinite_roundtrip.infinite";
+         const size_t nodesBefore = gNodes.size();
+         const bool saved = SavePatchTo(path);
+
+         // Wiped between save and load, so anything that appears afterwards
+         // genuinely came out of the file rather than surviving in memory.
+         NewPatch();
+         const bool cleared = gNodes.empty();
+         const bool loaded = LoadPatchFrom(path);
+
+         printf("saved=%d cleared=%d loaded=%d  nodes %zu -> %zu\n",
+                saved, cleared, loaded, nodesBefore, gNodes.size());
+
+         GeometryNode* geo = nullptr;
+         GeometryOpNode* smooth = nullptr;
+         MaterialNode* mat = nullptr;
+         Render3DNode* render = nullptr;
+         PathNode* path3d = nullptr;
+         OutputNode* out = nullptr;
+         for (GraphNode& gn : gNodes)
+         {
+            if (!geo) geo = dynamic_cast<GeometryNode*>(gn.node.get());
+            if (!smooth) smooth = dynamic_cast<GeometryOpNode*>(gn.node.get());
+            if (!mat) mat = dynamic_cast<MaterialNode*>(gn.node.get());
+            if (!render) render = dynamic_cast<Render3DNode*>(gn.node.get());
+            if (!path3d) path3d = dynamic_cast<PathNode*>(gn.node.get());
+            if (!out) out = dynamic_cast<OutputNode*>(gn.node.get());
+         }
+
+         const bool haveAll = geo && smooth && mat && render && path3d && out;
+         bool params = false, wiring = false, mods = false;
+         if (haveAll)
+         {
+            params = geo->shape == 4 && geo->detail == 33 &&
+                     std::fabs(geo->posX - 1.25f) < 1e-5f &&
+                     std::fabs(geo->color[1] - 0.22f) < 1e-5f &&
+                     std::fabs(geo->emission - 2.5f) < 1e-5f &&
+                     smooth->iterations == 7 && std::fabs(smooth->amount - 0.66f) < 1e-5f &&
+                     std::fabs(mat->metallic - 0.77f) < 1e-5f &&
+                     render->samples == 3 && std::fabs(render->exposure - 1.8f) < 1e-5f &&
+                     std::fabs(render->width - 512.0f) < 1e-5f &&
+                     path3d->shape == PathNode::kHelix &&
+                     std::fabs(path3d->turns - 5.0f) < 1e-5f && path3d->pingPong;
+
+            wiring = smooth->input == geo && mat->input == smooth &&
+                     render->geometry[0] == mat && render->camera != nullptr &&
+                     render->lights[0] != nullptr && out->Input().IsConnected();
+
+            mods = !Modulation::Instance().Links().empty();
+         }
+
+         printf("params=%d wiring=%d modulation=%d\n", params, wiring, mods);
+         printf("%s\n", (saved && cleared && loaded && nodesBefore == gNodes.size() &&
+                         haveAll && params && wiring && mods)
+                           ? "PATCH ROUND TRIP OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_MATFRAMETEST") != nullptr && frameId == 4)
+      {
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* mat = static_cast<MaterialNode*>(gNodes[1].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[2].node.get());
+
+         // Material overrides the surface but must leave the mesh untouched,
+         // stamp included, or it would defeat the upload cache.
+         geo->color[0] = 1.0f; geo->color[1] = 0.0f; geo->color[2] = 0.0f;
+         mat->color[0] = 0.0f; mat->color[1] = 0.0f; mat->color[2] = 1.0f;
+         mat->metallic = 0.9f;
+         const Material through = mat->GetMaterial();
+         const bool overrides = through.color[2] > 0.9f && through.color[0] < 0.1f &&
+                                through.metallic > 0.8f;
+         const bool meshUntouched = &mat->GetMesh() == &geo->GetMesh() &&
+                                    mat->MeshRevision() == geo->MeshRevision();
+         printf("material overrides=%d, mesh passed through=%d\n", overrides, meshUntouched);
+
+         // The geometry sits at (4,2,0) scaled 2x, well off-centre, so framing
+         // has to move the target as well as pull the camera back.
+         render->camDistance = 3.0f;
+         render->targetX = 0.0f; render->targetY = 0.0f; render->targetZ = 0.0f;
+         FrameSceneInView(render);
+         const bool centred = std::fabs(render->targetX - 4.0f) < 0.2f &&
+                              std::fabs(render->targetY - 2.0f) < 0.2f;
+         const bool pulledBack = render->camDistance > 3.0f && render->camDistance < 30.0f;
+         printf("frame: target (%.2f, %.2f, %.2f) distance %.2f\n",
+                render->targetX, render->targetY, render->targetZ, render->camDistance);
+         printf("%s\n", (overrides && meshUntouched && centred && pulledBack)
+                           ? "MATERIAL + FRAME OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_PATHOCEANTEST") != nullptr && frameId == 4)
+      {
+         auto* path = static_cast<PathNode*>(gNodes[0].node.get());
+         auto* ocean = static_cast<OceanNode*>(gNodes[1].node.get());
+         Transport::Instance().SetPlaying(true);
+
+         // Every path shape must stay in range and actually move over time.
+         bool allShapes = true;
+         for (int shape = 0; shape < PathNode::kShapeCount; shape++)
+         {
+            path->shape = shape;
+            path->speed = 0.25f;
+            float lo[3] = { 2, 2, 2 }, hi[3] = { -2, -2, -2 };
+            bool inRange = true, finite = true;
+            for (int step = 0; step < 64; step++)
+            {
+               // Phase is swept directly rather than waiting on the transport,
+               // so a whole lap is covered inside one frame.
+               path->phase = (float)step / 64.0f;
+               path->CookIfNeeded(1000 + shape * 100 + step);
+               float p[3];
+               path->CurrentPoint(p);
+               for (int k = 0; k < 3; k++)
+               {
+                  if (!std::isfinite(p[k])) finite = false;
+                  lo[k] = std::min(lo[k], p[k]);
+                  hi[k] = std::max(hi[k], p[k]);
+               }
+               for (int o = 0; o < 4; o++)
+               {
+                  IModulator* m = path->ModulatorOutput(o);
+                  const float v = m ? m->Value01() : -1.0f;
+                  if (v < 0.0f || v > 1.0f)
+                     inRange = false;
+               }
+            }
+            const float travel = std::max(hi[0]-lo[0], std::max(hi[1]-lo[1], hi[2]-lo[2]));
+            const bool ok = finite && inRange && travel > 0.1f;
+            allShapes &= ok;
+            printf("  path %-10s travel %.2f  outputs in 0..1: %d  %s\n",
+                   PathNode::ShapeNames()[shape].c_str(), travel, inRange, ok ? "OK" : "FAIL");
+         }
+         printf("%s\n", allShapes ? "PATH OK" : "SUSPECT");
+
+         // The ocean must be a real displaced surface, not a flat plane, and it
+         // has to change as the transport advances.
+         const Mesh& m0 = ocean->GetMesh();
+         float lo = 1e30f, hi = -1e30f;
+         bool finite = true;
+         for (const Vertex& v : m0.vertices)
+         {
+            if (!std::isfinite(v.py)) { finite = false; continue; }
+            lo = std::min(lo, v.py); hi = std::max(hi, v.py);
+         }
+         const float relief = hi - lo;
+         const size_t tris = m0.indices.size() / 3;
+         const unsigned long long stampBefore = ocean->MeshRevision();
+
+         Transport::Instance().Tick(2.0f);
+         ocean->GetMesh();
+         const unsigned long long stampAfter = ocean->MeshRevision();
+
+         printf("ocean: %zu tris, wave relief %.3f, finite=%d, animates=%d\n",
+                tris, relief, finite, stampAfter != stampBefore);
+         printf("%s\n", (tris > 100 && finite && relief > 0.02f && stampAfter != stampBefore)
+                           ? "OCEAN OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_UTILTEST") != nullptr && (frameId == 4 || frameId == 10))
+      {
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* null3d = static_cast<Null3DNode*>(gNodes[1].node.get());
+         auto* m2p = static_cast<MeshToPointsNode*>(gNodes[2].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
+         auto* null2d = static_cast<NullNode*>(gNodes[5].node.get());
+         auto* shape = gNodes[4].node.get();
+         auto* out = static_cast<OutputNode*>(gNodes[6].node.get());
+
+         if (frameId == 4)
+         {
+            // Null 3D must forward, not copy: same mesh, same stamp. A stamp of
+            // its own would make Render 3D re-upload every single frame.
+            const bool sameMesh = &null3d->GetMesh() == &geo->GetMesh();
+            const bool sameStamp = null3d->MeshRevision() == geo->MeshRevision();
+            printf("null 3D forwards: mesh=%d stamp=%d (%llu)\n",
+                   sameMesh, sameStamp, null3d->MeshRevision());
+
+            // Null 2D must report the upstream texture as its own, with no
+            // framebuffer of its own in between.
+            const bool sameTexture = null2d->GetOutputTexture() == shape->GetOutputTexture();
+            const bool sameSize = null2d->GetOutputWidth() == shape->GetOutputWidth();
+            const bool outputFed = out->GetOutputWidth() > 0;
+            printf("null 2D passes: tex=%d size=%d, output %dx%d\n",
+                   sameTexture, sameSize, out->GetOutputWidth(), out->GetOutputHeight());
+
+            printf("mesh to points: %zu points -> %zu triangles\n",
+                   m2p->PointCount(), m2p->TriangleCount());
+            const bool sampled = m2p->PointCount() > 10 && m2p->TriangleCount() > 10;
+
+            printf("%s\n", (sameMesh && sameStamp && sameTexture && sameSize &&
+                            outputFed && sampled) ? "NULL + MESH TO POINTS OK" : "SUSPECT");
+         }
+         else
+         {
+            // Nothing animates here, so a settled frame must upload nothing -
+            // proving the pass-through did not defeat the cache.
+            printf("steady frame: %zu tris, %zu uploads  %s\n",
+                   render->LastTriangleCount(), render->LastUploads(),
+                   render->LastUploads() == 0 ? "PASS-THROUGH CACHE OK"
+                                              : "SUSPECT - re-uploading through Null");
+         }
+      }
+
+      if (getenv("INFINITE_TEXT3DTEST") != nullptr && frameId == 4)
+      {
+         auto* t = static_cast<Text3DNode*>(gNodes[0].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
+
+         // A square ring: one anticlockwise outline, one clockwise hole. If the
+         // hole is filled in rather than cut, the area comes out as the full
+         // square instead of the ring, so area is the thing worth measuring.
+         {
+            std::vector<MeshOps::Contour2D> c(2);
+            c[0].points = { -1,-1,  1,-1,  1,1,  -1,1 };          // CCW outline
+            c[1].points = { -0.5f,0.5f, 0.5f,0.5f, 0.5f,-0.5f, -0.5f,-0.5f }; // CW hole
+            const Mesh ring = MeshOps::ExtrudeContours(c, 0.2f, 0.0f);
+
+            // Front-facing area only, so the back face and walls do not count.
+            double area = 0.0;
+            for (size_t i = 0; i + 2 < ring.indices.size(); i += 3)
+            {
+               const Vertex& a = ring.vertices[ring.indices[i]];
+               const Vertex& b = ring.vertices[ring.indices[i + 1]];
+               const Vertex& v = ring.vertices[ring.indices[i + 2]];
+               if (a.pz < 0.0f || b.pz < 0.0f || v.pz < 0.0f)
+                  continue;
+               area += std::fabs((b.px - a.px) * (v.py - a.py) -
+                                 (v.px - a.px) * (b.py - a.py)) * 0.5;
+            }
+            // Outer 2x2 = 4, hole 1x1 = 1, so a correctly cut ring is 3.
+            printf("ring: %zu tris, front area %.3f (expect 3.0, filled would be 4.0)  %s\n",
+                   ring.indices.size() / 3, area,
+                   std::fabs(area - 3.0) < 0.05 ? "HOLE CUT OK" : "SUSPECT");
+         }
+
+         // Then real glyphs. 'o' has a counter, so it must produce more than one
+         // contour; a string of them must stay finite and bounded.
+         const char* samples[] = { "o", "Infinite", "AWAY" };
+         bool all = true;
+         for (const char* sample : samples)
+         {
+            t->text = sample;
+            const Mesh& mesh = t->GetMesh();
+            bool finite = true;
+            float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+            for (const Vertex& v : mesh.vertices)
+            {
+               const float p[3] = { v.px, v.py, v.pz };
+               for (int k = 0; k < 3; k++)
+               {
+                  if (!std::isfinite(p[k])) { finite = false; continue; }
+                  lo[k] = std::min(lo[k], p[k]); hi[k] = std::max(hi[k], p[k]);
+               }
+            }
+            const bool ok = finite && mesh.indices.size() >= 3 && (hi[0] - lo[0]) > 0.05f;
+            all &= ok;
+            printf("  %-10s %6zu tris  width %.2f height %.2f  %s\n", sample,
+                   mesh.indices.size() / 3, hi[0] - lo[0], hi[1] - lo[1], ok ? "OK" : "FAIL");
+            printf("     %s\n", t->Status().c_str());
+         }
+
+         t->text = "Infinite";
+         render->CookIfNeeded(frameId);
+         printf("rendered %zu tris\n", render->LastTriangleCount());
+         printf("%s\n", (all && render->LastTriangleCount() > 0) ? "TEXT 3D OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_MODELTEST") != nullptr && frameId == 4)
+      {
+         auto* model = static_cast<ModelSourceNode*>(gNodes[0].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
+         const char* files = getenv("INFINITE_MODELTEST");
+
+         bool all = true;
+         std::string list(files);
+         size_t start = 0;
+         while (start < list.size())
+         {
+            const size_t comma = list.find(',', start);
+            const std::string path = list.substr(start, comma == std::string::npos
+                                                          ? std::string::npos : comma - start);
+            start = (comma == std::string::npos) ? list.size() : comma + 1;
+            if (path.empty() || path == "1")
+               continue;
+
+            const bool loaded = model->Load(path);
+            const Mesh& mesh = model->GetMesh();
+            float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+            bool finite = true;
+            for (const Vertex& v : mesh.vertices)
+            {
+               const float p[3] = { v.px, v.py, v.pz };
+               for (int k = 0; k < 3; k++)
+               {
+                  if (!std::isfinite(p[k])) { finite = false; continue; }
+                  lo[k] = std::min(lo[k], p[k]); hi[k] = std::max(hi[k], p[k]);
+               }
+            }
+            const float extent = mesh.vertices.empty() ? 0.0f
+               : std::max(hi[0]-lo[0], std::max(hi[1]-lo[1], hi[2]-lo[2]));
+            // Normalisation should land every model on a unit box no matter
+            // what scale it was authored at.
+            const bool sane = loaded && finite && mesh.indices.size() >= 3 &&
+                              std::fabs(extent - 1.0f) < 0.01f;
+            printf("  %-28s %5zu tris  extent %.3f  %s\n",
+                   path.c_str(), mesh.indices.size() / 3, extent, sane ? "OK" : "FAIL");
+            printf("     status: %s\n", model->Status().c_str());
+            all &= sane;
+         }
+
+         // And it must actually rasterise through the normal render path.
+         render->CookIfNeeded(frameId);
+         printf("rendered %zu tris in %zu draw calls\n",
+                render->LastTriangleCount(), render->LastDrawCalls());
+         printf("%s\n", (all && render->LastTriangleCount() > 0) ? "MODEL LOADING OK" : "SUSPECT");
+
+         // A file that is not a model at all must fail cleanly, not crash.
+         const bool rejected = !model->Load("/etc/hosts");
+         printf("bad file rejected: %d (%s)\n", rejected, model->Status().c_str());
+      }
+
+      // Exercises every mesh operator directly, checking each produces a
+      // non-degenerate mesh with finite coordinates and a sane bounding box.
+      // A silently empty or NaN-riddled result is the failure mode that matters
+      // here: the renderer draws nothing and says nothing.
+      if (getenv("INFINITE_MESHOPTEST") != nullptr && frameId == 3)
+      {
+         auto check = [](const char* name, const Mesh& m, size_t minTris) {
+            bool finite = true;
+            float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+            for (const Vertex& v : m.vertices)
+            {
+               const float p[3] = { v.px, v.py, v.pz };
+               for (int k = 0; k < 3; k++)
+               {
+                  if (!std::isfinite(p[k])) { finite = false; continue; }
+                  lo[k] = std::min(lo[k], p[k]);
+                  hi[k] = std::max(hi[k], p[k]);
+               }
+            }
+            const size_t tris = m.indices.size() / 3;
+            const float extent = (m.vertices.empty() || !finite)
+                                    ? 0.0f
+                                    : std::max(hi[0]-lo[0], std::max(hi[1]-lo[1], hi[2]-lo[2]));
+            const bool ok = tris >= minTris && finite && extent > 0.001f && extent < 1000.0f;
+            printf("  %-12s %7zu tris  extent %6.2f  %s\n", name, tris, extent,
+                   ok ? "OK" : (!finite ? "FAIL non-finite" : "FAIL"));
+            return ok;
+         };
+
+         printf("mesh operators:\n");
+         const Mesh sphere = Primitives::Sphere(24, 32);
+         const Mesh plane = Primitives::Plane(4);
+         bool all = true;
+         all &= check("source", sphere, 100);
+         all &= check("subdivide", MeshOps::Subdivide(sphere, 1, 1.0f), 4 * (sphere.indices.size() / 3));
+         all &= check("smooth", MeshOps::Smooth(sphere, 5, 0.8f), sphere.indices.size() / 3);
+         all &= check("mirror", MeshOps::Mirror(sphere, 0, 1.0f, true, true), 2 * (sphere.indices.size() / 3));
+         all &= check("screw", MeshOps::Screw(plane, 32, 1.0f, 0.4f, 0.6f, 1), 32);
+         printf("%s\n", all ? "MESH OPERATORS OK" : "SUSPECT");
+
+         // Taubin's whole point: repeated smoothing must not collapse the mesh.
+         const Mesh heavy = MeshOps::Smooth(sphere, 20, 1.0f);
+         float r0 = 0.0f, r1 = 0.0f;
+         for (const Vertex& v : sphere.vertices)
+            r0 = std::max(r0, std::sqrt(v.px*v.px + v.py*v.py + v.pz*v.pz));
+         for (const Vertex& v : heavy.vertices)
+            r1 = std::max(r1, std::sqrt(v.px*v.px + v.py*v.py + v.pz*v.pz));
+         printf("smoothing 20x: radius %.4f -> %.4f (%.1f%% retained)\n", r0, r1, 100.0f * r1 / r0);
+         printf("%s\n", (r1 > r0 * 0.9f) ? "TAUBIN NO-SHRINK OK"
+                                         : "SUSPECT - smoothing is collapsing the mesh");
+      }
+
+      // Frame limiter check: run uncapped, then at 30fps, and compare. Vsync is
+      // off for this so the display refresh is not what is being measured.
+      if (getenv("INFINITE_FPSTEST") != nullptr)
+      {
+         static double sUncapped = 0.0;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); }
+         if (frameId == 30) { sUncapped = gLastFrameMs; gTargetFps = 30; }
+         if (frameId == 60)
+         {
+            printf("uncapped %.2f ms/frame -> capped %.2f ms/frame (target 30fps = 33.3 ms)\n",
+                   sUncapped, gLastFrameMs);
+            printf("%s\n", (gLastFrameMs > 30.0 && gLastFrameMs < 37.0)
+                              ? "FRAME LIMITER OK" : "SUSPECT - limiter missed its budget");
+         }
+      }
+
+      if (getenv("INFINITE_GEOTEST") != nullptr && (frameId == 4 || frameId == 10))
       {
          auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[2].node.get());
          auto* op = static_cast<GeometryOpNode*>(gNodes[3].node.get());
          auto* r = static_cast<Render3DNode*>(gNodes[6].node.get());
-         printf("instances=%zu  arrayTris=%zu  rendered=%zu tris in %zu draw calls\n",
-                inst->InstanceCount(), op->TriangleCount(),
-                r->LastTriangleCount(), r->LastDrawCalls());
-         printf("%s\n", (inst->InstanceCount() > 100 && op->TriangleCount() > 100 &&
-                          r->LastDrawCalls() <= 2) ? "INSTANCING + OPS OK" : "SUSPECT");
+         printf("frame %d: instances=%zu  arrayTris=%zu  rendered=%zu tris in %zu draw calls, %zu uploads, %.2f ms/frame\n",
+                frameId, inst->InstanceCount(), op->TriangleCount(),
+                r->LastTriangleCount(), r->LastDrawCalls(), r->LastUploads(), gLastFrameMs);
+         if (frameId == 4)
+            printf("%s\n", (inst->InstanceCount() > 100 && op->TriangleCount() > 100 &&
+                             r->LastDrawCalls() <= 2) ? "INSTANCING + OPS OK" : "SUSPECT");
+         else
+            // Nothing in this fixture animates, so a steady frame must re-upload
+            // nothing at all; any upload here means the mesh stamps are churning.
+            printf("%s\n", r->LastUploads() == 0 ? "MESH UPLOAD CACHING OK"
+                                                 : "SUSPECT - re-uploading a static mesh");
       }
 
-      if (getenv("INFINITE_3DTEST") != nullptr && frameId == 4)
+      // Frame 4 renders with antialiasing off, frame 8 with it on, and the two
+      // are compared. Counting "soft" pixels in a single image cannot tell an
+      // antialiased silhouette from ordinary shading gradients; differencing
+      // two renders of an identical scene can, because only the edges move.
+      if (getenv("INFINITE_3DTEST") != nullptr &&
+          (frameId == 4 || frameId == 8 || frameId == 12 || frameId == 16 ||
+           frameId == 20 || frameId == 24 || frameId == 28))
       {
          auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
          const int w = r->GetOutputWidth(), h = r->GetOutputHeight();
@@ -3106,8 +4466,101 @@ int main()
             if (px[i] + px[i + 1] + px[i + 2] > 60)
                lit++;
          const double coverage = (double)lit / (double)(w * h);
-         printf("render %dx%d coverage=%.1f%%  %s\n", w, h, coverage * 100.0,
+         printf("render %dx%d samples=%d coverage=%.1f%%  %s\n", w, h, r->ActiveSamples(),
+                coverage * 100.0,
                 (coverage > 0.03 && coverage < 0.95) ? "GEOMETRY RASTERISED OK" : "SUSPECT");
+
+         // The textured geometry above runs the mipmap/anisotropy path; an
+         // unsupported enum or an incomplete mip chain would surface here.
+         GLenum err = glGetError();
+         printf("gl error after render: 0x%x  %s\n", err,
+                err == GL_NO_ERROR ? "CLEAN" : "SUSPECT");
+
+         // Mean luminance, used below to prove the exposure/tonemap uniforms
+         // reach the shader rather than being silently optimised away.
+         double meanLum = 0.0;
+         for (size_t i = 0; i < px.size(); i += 4)
+            meanLum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+         meanLum /= (double)(w * h);
+
+         static std::vector<unsigned char> sAliased;
+         static double sMeanAtDefault = 0.0;
+         if (frameId == 8)
+         {
+            sMeanAtDefault = meanLum;
+            r->exposure = 2.5f;
+            r->tonemap = 0; // none
+         }
+         else if (frameId == 12)
+         {
+            printf("mean luminance %.2f -> %.2f after exposure 1.0/ACES -> 2.5/none\n",
+                   sMeanAtDefault, meanLum);
+            printf("%s\n", std::fabs(meanLum - sMeanAtDefault) > 2.0
+                              ? "EXPOSURE + TONEMAP UNIFORMS LIVE"
+                              : "SUSPECT - shader ignored exposure/tonemap");
+            // Ask for a 4000px export at 8x and check the budget clamp steps it
+            // down instead of trying to allocate a gigabyte of renderbuffer.
+            r->width = 4000.0f; r->height = 4000.0f;
+            r->samples = 3; // 8x
+         }
+         else if (frameId == 16)
+         {
+            printf("export %dx%d requested 8x -> active %dx\n", w, h, r->ActiveSamples());
+            printf("%s\n", (w == 4000 && h == 4000 && r->ActiveSamples() >= 1 &&
+                            r->ActiveSamples() <= 4)
+                              ? "HIGH-RES EXPORT + MSAA BUDGET OK"
+                              : "SUSPECT");
+            // Back to a cheap size, then sweep the PBR material knobs.
+            r->width = 700.0f; r->height = 700.0f;
+            r->exposure = 1.0f; r->tonemap = 1;
+            auto* g = static_cast<GeometryNode*>(gNodes[0].node.get());
+            g->metallic = 1.0f; g->roughness = 0.05f;
+         }
+         else if (frameId == 20)
+         {
+            sMeanAtDefault = meanLum; // polished metal
+            auto* g = static_cast<GeometryNode*>(gNodes[0].node.get());
+            g->metallic = 0.0f; g->roughness = 1.0f;
+         }
+         else if (frameId == 24)
+         {
+            printf("mean luminance: polished metal %.2f -> rough dielectric %.2f\n",
+                   sMeanAtDefault, meanLum);
+            printf("%s\n", std::fabs(meanLum - sMeanAtDefault) > 2.0
+                              ? "GGX METALLIC/ROUGHNESS RESPOND"
+                              : "SUSPECT - BRDF ignored metallic/roughness");
+            sMeanAtDefault = meanLum;
+            auto* g = static_cast<GeometryNode*>(gNodes[0].node.get());
+            g->emission = 4.0f;
+         }
+         else if (frameId == 28)
+         {
+            printf("mean luminance: emission 0 %.2f -> emission 4 %.2f\n",
+                   sMeanAtDefault, meanLum);
+            printf("%s\n", meanLum > sMeanAtDefault + 5.0
+                              ? "EMISSION OK" : "SUSPECT - emission had no effect");
+         }
+
+         if (frameId == 4)
+         {
+            sAliased = px;
+            r->samples = 2; // index 2 == 4x
+         }
+         else if (frameId == 8 && sAliased.size() == px.size())
+         {
+            size_t changed = 0, maxDelta = 0;
+            for (size_t i = 0; i < px.size(); i += 4)
+            {
+               const int d = std::abs((int)px[i] - (int)sAliased[i]);
+               if (d > 8) changed++;
+               if ((size_t)d > maxDelta) maxDelta = (size_t)d;
+            }
+            const double pct = 100.0 * (double)changed / (double)(w * h);
+            printf("antialias diff: %zu px changed (%.2f%%), max delta %zu\n",
+                   changed, pct, maxDelta);
+            printf("%s\n", (r->ActiveSamples() > 1 && changed > 1000)
+                              ? "MSAA OK" : "SUSPECT - multisampling had no effect");
+         }
       }
 
       if (getenv("INFINITE_SIZETEST") != nullptr)
@@ -3241,6 +4694,12 @@ int main()
             DrawModulatorMeter(mod, gn.index);
          else if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<InstanceOnPointsNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<ModelSourceNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<Text3DNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<OceanNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
          {
@@ -3256,6 +4715,18 @@ int main()
                snprintf(line, sizeof(line), "%zu triangles", o->TriangleCount());
             else if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu instances", inst->InstanceCount());
+            else if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", model->TriangleCount());
+            else if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", t3d->TriangleCount());
+            else if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", n3d->TriangleCount());
+            else if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu points", m2p->PointCount());
+            else if (auto* oc = dynamic_cast<OceanNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", oc->TriangleCount());
+            else if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", mat->TriangleCount());
             else
                snprintf(line, sizeof(line), "scene node");
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255), gn.typeName.c_str());
@@ -3330,6 +4801,21 @@ int main()
                DrawRampParams(n);
             else if (auto* n = dynamic_cast<GeometryNode*>(gn.node.get()))
                DrawGeometryParams(n);
+            else if (auto* n = dynamic_cast<ModelSourceNode*>(gn.node.get()))
+               DrawModelParams(n);
+            else if (auto* n = dynamic_cast<Text3DNode*>(gn.node.get()))
+               DrawText3DParams(n);
+            else if (auto* n = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
+               DrawMeshToPointsParams(n);
+            else if (auto* n = dynamic_cast<PathNode*>(gn.node.get()))
+               DrawPathParams(n);
+            else if (auto* n = dynamic_cast<MaterialNode*>(gn.node.get()))
+               DrawMaterialParams(n);
+            else if (auto* n = dynamic_cast<OceanNode*>(gn.node.get()))
+               DrawOceanParams(n);
+            else if (dynamic_cast<NullNode*>(gn.node.get()) != nullptr ||
+                     dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr)
+               ImGui::TextDisabled("pass-through");
             else if (auto* n = dynamic_cast<GeometryOpNode*>(gn.node.get()))
                DrawGeometryOpParams(n);
             else if (auto* n = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
@@ -3486,6 +4972,12 @@ int main()
          }
          if (auto* geoOp = dynamic_cast<GeometryOpNode*>(gn.node.get()))
             linkFromNode(geoOp->input, 0);
+         if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get()))
+            linkFromNode(n3d->input, 0);
+         if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
+            linkFromNode(m2p->input, 0);
+         if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
+            linkFromNode(mat->input, 0);
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
          {
             linkFromNode(inst->pointSource, 0);
@@ -3545,6 +5037,11 @@ int main()
                             source->OutputPinId(link.second.outputIndex), paramPin });
       }
 
+      // ---- drop a node on a cable to splice it in ----
+      // While a single node is being dragged, find an image cable passing under
+      // it. The link is approximated as a straight line between the two nodes'
+      // facing edges rather than the bezier actually drawn: close enough to feel
+      // right, and it avoids reaching into the editor's internal curve geometry.
       for (const LinkInfo& link : gLinks)
       {
          const bool isMod = GraphNode::IsParamPin(link.dstPin);
@@ -3581,6 +5078,12 @@ int main()
                auto* dstRender = dstNode ? dynamic_cast<Render3DNode*>(dstNode->node.get()) : nullptr;
                auto* dstGeoOp = dstNode ? dynamic_cast<GeometryOpNode*>(dstNode->node.get()) : nullptr;
                auto* dstInstance = dstNode ? dynamic_cast<InstanceOnPointsNode*>(dstNode->node.get()) : nullptr;
+               // Null 3D, Material and Mesh to Points all take a single
+               // geometry input on slot 0 and are otherwise interchangeable
+               // here, so they share one branch.
+               auto* dstNull3D = dstNode ? dynamic_cast<Null3DNode*>(dstNode->node.get()) : nullptr;
+               auto* dstMaterial = dstNode ? dynamic_cast<MaterialNode*>(dstNode->node.get()) : nullptr;
+               auto* dstMeshPoints = dstNode ? dynamic_cast<MeshToPointsNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
                auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
                auto* srcLight = srcNode ? dynamic_cast<LightNode*>(srcNode->node.get()) : nullptr;
@@ -3611,6 +5114,11 @@ int main()
                         valid = srcGeometry != nullptr;
                      else if (dstInstance != nullptr)
                         valid = srcGeometry != nullptr;
+                     else if (dstNull3D != nullptr || dstMeshPoints != nullptr)
+                        valid = srcGeometry != nullptr;
+                     else if (dstMaterial != nullptr)
+                        // Slot 0 takes geometry; slot 1 is an ordinary image.
+                        valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
                      else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
                         valid = false; // 3D cables only go into 3D nodes
                      else if (dstAudio != nullptr)
@@ -3643,6 +5151,12 @@ int main()
                   {
                      dstGeoOp->input = srcGeometry;
                   }
+                  else if (dstNull3D != nullptr)
+                     dstNull3D->input = srcGeometry;
+                  else if (dstMeshPoints != nullptr)
+                     dstMeshPoints->input = srcGeometry;
+                  else if (dstMaterial != nullptr && GraphNode::InputSlotFromPin(b) == 0)
+                     dstMaterial->input = srcGeometry;
                   else if (dstInstance != nullptr)
                   {
                      if (GraphNode::InputSlotFromPin(b) == 0)
@@ -4260,6 +5774,40 @@ int main()
                       gn.typeName.c_str(), gn.category.c_str(), inst->InstanceCount());
                continue;
             }
+            if (dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
+            {
+               // Pass-throughs and samplers with nothing patched in are empty
+               // by definition, so that is not a failure.
+               printf("%-22s [%-12s] geometry pass  OK\n",
+                      gn.typeName.c_str(), gn.category.c_str());
+               continue;
+            }
+            if (auto* oc = dynamic_cast<OceanNode*>(gn.node.get()))
+            {
+               const bool ok = oc->TriangleCount() > 0;
+               if (!ok) ++failures;
+               printf("%-22s [%-12s] %zu triangles  %s\n",
+                      gn.typeName.c_str(), gn.category.c_str(), oc->TriangleCount(),
+                      ok ? "OK" : "FAIL");
+               continue;
+            }
+            if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
+            {
+               printf("%-22s [%-12s] %zu triangles  OK\n",
+                      gn.typeName.c_str(), gn.category.c_str(), t3d->TriangleCount());
+               continue;
+            }
+            if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
+            {
+               // A freshly spawned Model 3D has no file yet, so an empty mesh
+               // here is correct rather than a failure - same as a Geometry Op
+               // with nothing patched into it.
+               printf("%-22s [%-12s] %zu triangles  OK\n",
+                      gn.typeName.c_str(), gn.category.c_str(), model->TriangleCount());
+               continue;
+            }
             if (auto* geo = dynamic_cast<GeometryNode*>(gn.node.get()))
             {
                // geometry emits a mesh, not a texture
@@ -4331,6 +5879,60 @@ int main()
 
       glfwSwapBuffers(window);
       ++frameId;
+
+      // Patch shortcuts. Handled outside the node editor so its own Cmd-key
+      // bindings do not swallow them, and gated on no text field having focus
+      // so typing an 'S' into a Text node does not save the patch.
+      if (!ImGui::GetIO().WantTextInput && ImGui::GetIO().KeySuper)
+      {
+         if (ImGui::IsKeyPressed(ImGuiKey_S, false))
+            SavePatchInteractive(ImGui::GetIO().KeyShift);
+         else if (ImGui::IsKeyPressed(ImGuiKey_O, false))
+         {
+            const std::string path = Platform::OpenPatchDialog();
+            if (!path.empty())
+               LoadPatchFrom(path);
+         }
+         else if (ImGui::IsKeyPressed(ImGuiKey_N, false))
+            NewPatch();
+      }
+
+      // Frame limiter. Sleeping most of the way there and spinning the last
+      // sliver keeps the cap accurate without burning a core: sleep_for is only
+      // accurate to a millisecond or two, which at 120fps is most of the budget.
+      if (gTargetFps > 0)
+      {
+         const double budget = 1.0 / (double)gTargetFps;
+         const double deadline = gFrameStart + budget;
+         const double slack = deadline - glfwGetTime();
+         if (slack > 0.002)
+            std::this_thread::sleep_for(std::chrono::duration<double>(slack - 0.001));
+         while (glfwGetTime() < deadline)
+            std::this_thread::yield();
+      }
+
+      {
+         // Measured after the swap so the number includes GPU work the driver
+         // blocks on there, which is where a heavy 3D render actually lands.
+         static double sPrevTime = 0.0;
+         const double now = glfwGetTime();
+         if (sPrevTime > 0.0)
+            gLastFrameMs = (now - sPrevTime) * 1000.0;
+         sPrevTime = now;
+      }
+
+      // Dev harness: quit after N frames. The self-tests above printf their
+      // verdict and then run forever, so a scripted run has to kill the app -
+      // which throws away stdout still sitting in the block buffer when it is
+      // redirected to a file. Exiting normally lets it flush.
+      if (const char* exitAfter = getenv("INFINITE_EXITAFTER"))
+      {
+         if (frameId >= atoi(exitAfter))
+         {
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
    }
 
    gNodes.clear();
