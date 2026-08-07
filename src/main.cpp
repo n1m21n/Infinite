@@ -639,7 +639,7 @@ namespace
       if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
-         return 2; // geometry, then an optional surface texture
+         return 1 + kMapCount; // geometry, then one pin per material channel
       if (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr)
          return Render3DNode::kSlots + 1 + Render3DNode::kLightSlots; // geo, camera, lights
       if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr)
@@ -691,9 +691,10 @@ namespace
          return slot == 0 ? &nul->Input() : nullptr;
       if (auto* ocean = dynamic_cast<OceanNode*>(gn.node.get()))
          return slot == 0 ? &ocean->TextureInput() : nullptr;
-      // Slot 0 is a geometry pin, wired by pointer, not an image cable.
+      // Slot 0 is a geometry pin, wired by pointer, not an image cable; the
+      // rest are the material channels in MaterialMap order.
       if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
-         return slot == 1 ? &mat->TextureInput() : nullptr;
+         return (slot >= 1 && slot <= kMapCount) ? &mat->MapInput(slot - 1) : nullptr;
       if (auto* geo = dynamic_cast<GeometryNode*>(gn.node.get()))
          return slot == 0 ? &geo->TextureInput() : nullptr;
       if (auto* fb = dynamic_cast<FeedbackNode*>(gn.node.get()))
@@ -1861,6 +1862,15 @@ namespace
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
       ImGui::TextDisabled("restyles everything upstream");
+      ImGui::TextDisabled("patch Noise/Ramp/Formula into the map pins");
+      NodeSeparator("maps");
+      {
+         static const char* kNames[] = { "albedo", "roughness", "metallic", "normal", "ao" };
+         for (int map = 0; map < kMapCount; map++)
+            ImGui::TextDisabled("%-10s %s", kNames[map],
+                                n->MapInput(map).IsConnected() ? "patched" : "-");
+         ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f);
+      }
       NodeSeparator("material");
       DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
       ColorSwatch("colour", n->color, n);
@@ -3528,6 +3538,21 @@ int main()
          gNodes[2].showParams = true;
          gNodes[6].showParams = true;
       }
+      else if (getenv("INFINITE_MAPTEST") != nullptr)
+      {
+         SpawnNode("Sphere", "3D", 40.0f, 40.0f);        // 0
+         SpawnNode("Material", "3D", 400.0f, 40.0f);     // 1
+         SpawnNode("Noise", "Source", 40.0f, 400.0f);    // 2
+         SpawnNode("Render 3D", "3D", 760.0f, 40.0f);    // 3
+         auto* mat = static_cast<MaterialNode*>(gNodes[1].node.get());
+         mat->input = static_cast<GeometryNode*>(gNodes[0].node.get());
+         mat->metallic = 0.4f;
+         mat->roughness = 0.5f;
+         auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
+         render->geometry[0] = mat;
+         render->width = 300.0f; render->height = 300.0f;
+         render->samples = 0;
+      }
       else if (getenv("INFINITE_SHADOWTEST") != nullptr)
       {
          // A sphere above a wide flat plane: the arrangement where a shadow is
@@ -4454,6 +4479,46 @@ int main()
                                r1 < r0 - 0.02f && r1 > 0.3f;
 
          printf("%s\n", (allShapes && allShapes2D && bevelled) ? "PHASE A OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_MAPTEST") != nullptr && frameId >= 4 && frameId <= 16 && frameId % 4 == 0)
+      {
+         auto* mat = static_cast<MaterialNode*>(gNodes[1].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
+         auto* noise = gNodes[2].node.get();
+
+         const int w = render->GetOutputWidth(), h = render->GetOutputHeight();
+         std::vector<unsigned char> px((size_t)w * h * 4);
+         GLuint fbo = 0;
+         glGenFramebuffers(1, &fbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                render->GetOutputTexture(), 0);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+         glDeleteFramebuffers(1, &fbo);
+
+         static std::vector<unsigned char> sBase;
+         static int sPassed = 0;
+         auto differs = [&](const char* label) {
+            size_t changed = 0;
+            for (size_t i = 0; i + 3 < px.size() && i < sBase.size(); i += 4)
+               if (std::abs((int)px[i] - (int)sBase[i]) > 6) changed++;
+            const bool ok = changed > 200;
+            printf("  %-10s %zu px changed  %s\n", label, changed, ok ? "OK" : "FAIL");
+            if (ok) sPassed++;
+         };
+
+         // Each channel is patched in turn against the same untouched baseline,
+         // so a channel that silently did nothing shows up as zero change.
+         if (frameId == 4)      { sBase = px; mat->MapInput(kMapRoughness).Connect(noise); }
+         else if (frameId == 8) { differs("roughness"); mat->MapInput(kMapRoughness).Disconnect();
+                                  mat->MapInput(kMapNormal).Connect(noise); }
+         else if (frameId == 12){ differs("normal"); mat->MapInput(kMapNormal).Disconnect();
+                                  mat->MapInput(kMapAmbientOcclusion).Connect(noise); }
+         else if (frameId == 16){ differs("ao");
+                                  printf("%s\n", sPassed == 3 ? "MATERIAL MAPS OK" : "SUSPECT"); }
       }
 
       if (getenv("INFINITE_SHADOWTEST") != nullptr && (frameId == 4 || frameId == 8))
@@ -5924,7 +5989,7 @@ int main()
                               dstCloth != nullptr || dstJoin != nullptr)
                         valid = srcGeometry != nullptr;
                      else if (dstMaterial != nullptr)
-                        // Slot 0 takes geometry; slot 1 is an ordinary image.
+                        // Slot 0 takes geometry; the rest are ordinary images.
                         valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
                      else if (dstOutput != nullptr && slot == 1)
                         valid = srcAudioFile != nullptr; // slot 1 is the audio pin

@@ -31,6 +31,19 @@ struct Material
 // kind of cable - it is neither an image nor a control value - so Render's
 // inputs hold IGeometrySource pointers rather than ImageCables, the same
 // pattern Math uses for modulators.
+// Which channel a texture drives. Albedo was the only one for a long time; the
+// rest let the existing 2D generators - Noise, Ramp, Formula - author a whole
+// material rather than only its colour.
+enum MaterialMap
+{
+   kMapAlbedo = 0,
+   kMapRoughness,
+   kMapMetallic,
+   kMapNormal,
+   kMapAmbientOcclusion,
+   kMapCount
+};
+
 class IGeometrySource
 {
 public:
@@ -49,6 +62,12 @@ public:
    virtual Material GetMaterial() const = 0;
    // Optional texture applied to the surface (0 when none is patched in).
    virtual unsigned int GetSurfaceTexture() { return 0; }
+   // Per-channel maps. Defaults to routing slot 0 to the albedo texture, so a
+   // source that only ever had one texture keeps working untouched.
+   virtual unsigned int GetMaterialTexture(int map)
+   {
+      return map == kMapAlbedo ? GetSurfaceTexture() : 0;
+   }
 };
 
 // --- Geometry -----------------------------------------------------------

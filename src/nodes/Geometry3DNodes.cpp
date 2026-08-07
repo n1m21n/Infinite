@@ -8,6 +8,7 @@
 #include "Transport.h"
 #include "SceneNodes.h"
 #include "GeometryOpNodes.h"
+#include "UtilityNodes.h"
 
 namespace
 {
@@ -179,6 +180,15 @@ namespace
       "uniform vec3 uCamPos;\n"
       "uniform sampler2D uTexture;\n"
       "uniform int uHasTexture;\n"
+      "uniform sampler2D uRoughnessMap;\n"
+      "uniform sampler2D uMetallicMap;\n"
+      "uniform sampler2D uNormalMap;\n"
+      "uniform sampler2D uAoMap;\n"
+      "uniform int uHasRoughnessMap;\n"
+      "uniform int uHasMetallicMap;\n"
+      "uniform int uHasNormalMap;\n"
+      "uniform int uHasAoMap;\n"
+      "uniform float uNormalStrength;\n"
       "uniform float uExposure;\n"
       "uniform int uTonemap;\n"
       "uniform vec3 uEmissionColor;\n"
@@ -275,6 +285,30 @@ namespace
       "vec3 fresnelSchlick(float cosTheta, vec3 f0) {\n"
       "   return f0 + (1.0 - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);\n"
       "}\n"
+      // Tangent frame derived from screen-space derivatives rather than from
+      // vertex tangents. The Vertex struct carries only position, normal and UV,
+      // and adding tangents would mean regenerating them in every primitive and
+      // every mesh operator; this needs nothing but the UVs already present.
+      "vec3 applyNormalMap(vec3 normal, vec3 viewDir, vec2 uv) {\n"
+      "   vec3 dp1 = dFdx(vWorldPos);\n"
+      "   vec3 dp2 = dFdy(vWorldPos);\n"
+      "   vec2 duv1 = dFdx(uv);\n"
+      "   vec2 duv2 = dFdy(uv);\n"
+      "   vec3 dp2perp = cross(dp2, normal);\n"
+      "   vec3 dp1perp = cross(normal, dp1);\n"
+      "   vec3 tangent = dp2perp * duv1.x + dp1perp * duv2.x;\n"
+      "   vec3 bitangent = dp2perp * duv1.y + dp1perp * duv2.y;\n"
+      // A face with degenerate UVs gives a zero-length frame; falling back to
+      // the geometric normal is better than normalising a zero vector.
+      "   float maxLen = max(dot(tangent, tangent), dot(bitangent, bitangent));\n"
+      "   if (maxLen < 1e-12) return normal;\n"
+      "   float invMax = inversesqrt(maxLen);\n"
+      "   mat3 tbn = mat3(tangent * invMax, bitangent * invMax, normal);\n"
+      "   vec3 sampled = texture(uNormalMap, uv).rgb * 2.0 - 1.0;\n"
+      "   sampled.xy *= uNormalStrength;\n"
+      "   return normalize(tbn * sampled);\n"
+      "}\n"
+      "\n"
       "vec3 fresnelSchlickRoughness(float cosTheta, vec3 f0, float rough) {\n"
       // Rough surfaces should not develop a razor-thin mirror rim at grazing
       // angles the way the plain Schlick term would give them.
@@ -294,8 +328,16 @@ namespace
       "   if (uShading == 3) { fragColor = vec4(toSrgb(base), uOpacity); return; }\n"
       "\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
-      "   float rough = clamp(uRoughness, 0.045, 1.0);\n"
-      "   float metal = clamp(uMetallic, 0.0, 1.0);\n"
+      // Maps multiply the slider rather than replacing it, so the slider stays
+      // the overall level and the map is the variation across the surface.
+      "   float rough = uRoughness;\n"
+      "   if (uHasRoughnessMap == 1) rough *= texture(uRoughnessMap, vUv).r;\n"
+      "   rough = clamp(rough, 0.045, 1.0);\n"
+      "   float metal = uMetallic;\n"
+      "   if (uHasMetallicMap == 1) metal *= texture(uMetallicMap, vUv).r;\n"
+      "   metal = clamp(metal, 0.0, 1.0);\n"
+      "   if (uHasNormalMap == 1) n = applyNormalMap(n, viewDir, vUv);\n"
+      "   float ao = (uHasAoMap == 1) ? texture(uAoMap, vUv).r : 1.0;\n"
       "   float nDotV = max(dot(n, viewDir), 1e-4);\n"
       // Dielectrics reflect ~4% head-on; metals reflect their own albedo and
       // have no diffuse lobe at all.
@@ -355,8 +397,11 @@ namespace
       "   vec3 irradiance = sampleEnv(n, 1.0) * toLinear(uAmbient) * 3.0;\n"
       "   vec3 reflection = sampleEnv(reflectDir, rough);\n"
       "   vec3 fAmbient = fresnelSchlickRoughness(nDotV, f0, rough);\n"
-      "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance;\n"
-      "   col += reflection * fAmbient;\n"
+      // Ambient occlusion darkens only the ambient and environment terms - it
+      // describes light that cannot reach a crevice from the surroundings, not
+      // light blocked from a specific lamp, which is what shadows are for.
+      "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance * ao;\n"
+      "   col += reflection * fAmbient * ao;\n"
       "\n"
       "   col += base * pow(1.0 - nDotV, 3.0) * uRim;\n"
       "   col += toLinear(uEmissionColor) * uEmission;\n"
@@ -1142,6 +1187,30 @@ void Render3DNode::CookIfNeeded(int frameId)
          PrepareSurfaceTexture();
       glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
       glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
+
+      // The remaining material channels. Units 0 and 1 are taken by albedo and
+      // the shadow map, so these start at 2.
+      {
+         static const char* kMapUniform[] = { "", "uRoughnessMap", "uMetallicMap",
+                                              "uNormalMap", "uAoMap" };
+         static const char* kHasUniform[] = { "", "uHasRoughnessMap", "uHasMetallicMap",
+                                              "uHasNormalMap", "uHasAoMap" };
+         for (int map = kMapRoughness; map < kMapCount; map++)
+         {
+            const unsigned int tex = source->GetMaterialTexture(map);
+            const int unit = 2 + (map - kMapRoughness);
+            glActiveTexture(GL_TEXTURE0 + unit);
+            glBindTexture(GL_TEXTURE_2D, tex != 0 ? tex : WhiteTexture());
+            glUniform1i(glGetUniformLocation(mProgram, kMapUniform[map]), unit);
+            glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), tex != 0 ? 1 : 0);
+         }
+         glActiveTexture(GL_TEXTURE0);
+      }
+      {
+         auto* asMaterial = dynamic_cast<MaterialNode*>(source);
+         glUniform1f(glGetUniformLocation(mProgram, "uNormalStrength"),
+                     asMaterial ? asMaterial->normalStrength : 1.0f);
+      }
 
       // Instanced sources upload a transform per copy and draw them all at
       // once; ten thousand instances stay a single draw call.

@@ -53,6 +53,10 @@ public:
    }
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
+   unsigned int GetMaterialTexture(int map) override
+   {
+      return input ? input->GetMaterialTexture(map) : 0;
+   }
 
    IGeometrySource* input = nullptr;
    const char* InputLabel(int) const override { return "geo"; }

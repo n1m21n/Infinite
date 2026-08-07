@@ -78,6 +78,10 @@ public:
    {
       return input ? input->GetSurfaceTexture() : 0;
    }
+   unsigned int GetMaterialTexture(int map) override
+   {
+      return input ? input->GetMaterialTexture(map) : 0;
+   }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
@@ -116,11 +120,23 @@ public:
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
 
+   unsigned int GetMaterialTexture(int map) override;
+
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
-   ImageCable& TextureInput() { return mTextureInput; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "geo" : "texture"; }
+   ImageCable& TextureInput() { return mMaps[kMapAlbedo]; }
+   // Slot 0 is geometry; slots 1..5 are the material channels, in MaterialMap
+   // order, so the existing 2D generators can author a whole surface.
+   ImageCable& MapInput(int map) { return mMaps[map]; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* kNames[] = { "geo", "albedo", "roughness", "metallic",
+                                      "normal", "ao" };
+      return (slot >= 0 && slot < 6) ? kNames[slot] : nullptr;
+   }
    size_t TriangleCount() const;
+
+   float normalStrength = 1.0f;
 
    float color[3] = { 0.85f, 0.86f, 0.9f };
    float metallic = 0.1f;
@@ -137,9 +153,10 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("normalStrength", normalStrength);
    }
 private:
-   ImageCable mTextureInput;
+   ImageCable mMaps[kMapCount];
    Mesh mEmpty;
    int mLastCookFrame = -1;
 };
@@ -253,6 +270,10 @@ public:
    }
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
+   unsigned int GetMaterialTexture(int map) override
+   {
+      return input ? input->GetMaterialTexture(map) : 0;
+   }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;

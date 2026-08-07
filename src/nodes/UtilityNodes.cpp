@@ -62,11 +62,18 @@ Material MaterialNode::GetMaterial() const
 
 unsigned int MaterialNode::GetSurfaceTexture()
 {
-   // Its own texture wins when one is patched in; otherwise whatever the
-   // upstream shape already carried is left alone.
-   if (mTextureInput.IsConnected() && mTextureInput.GetSource())
-      return mTextureInput.GetSource()->GetOutputTexture();
-   return input ? input->GetSurfaceTexture() : 0;
+   return GetMaterialTexture(kMapAlbedo);
+}
+
+unsigned int MaterialNode::GetMaterialTexture(int map)
+{
+   if (map < 0 || map >= kMapCount)
+      return 0;
+   // Its own map wins when one is patched in; otherwise whatever the upstream
+   // shape already carried passes through untouched.
+   if (mMaps[map].IsConnected() && mMaps[map].GetSource())
+      return mMaps[map].GetSource()->GetOutputTexture();
+   return input ? input->GetMaterialTexture(map) : 0;
 }
 
 void MaterialNode::CookIfNeeded(int frameId)
@@ -76,8 +83,9 @@ void MaterialNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
-   if (mTextureInput.IsConnected())
-      mTextureInput.Pull(frameId);
+   for (int map = 0; map < kMapCount; map++)
+      if (mMaps[map].IsConnected())
+         mMaps[map].Pull(frameId);
 }
 
 // =============================================================== Join Geometry
