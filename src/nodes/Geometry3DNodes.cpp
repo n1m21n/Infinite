@@ -86,13 +86,16 @@ namespace
       "in vec3 aNormal;\n"
       "in vec2 aUv;\n"
       "in mat4 aInstance;\n"      // per-instance transform, divisor 1
+      "in vec3 aInstanceColor;\n" // per-instance tint, divisor 1
       "uniform mat4 uModel;\n"
       "uniform int uInstanced;\n"
+      "uniform int uInstanceColored;\n"
       "uniform mat4 uViewProj;\n"
       "uniform mat3 uNormalMatrix;\n"
       "out vec3 vWorldPos;\n"
       "out vec3 vNormal;\n"
       "out vec2 vUv;\n"
+      "out vec3 vInstanceColor;\n"
       "void main() {\n"
       "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
       "   vec4 world = model * vec4(aPos, 1.0);\n"
@@ -101,6 +104,9 @@ namespace
       "      ? normalize(mat3(model) * aNormal)\n"
       "      : normalize(uNormalMatrix * aNormal);\n"
       "   vUv = aUv;\n"
+      // White when there is no per-instance colour, so the fragment shader can
+      // multiply unconditionally rather than branching on it.
+      "   vInstanceColor = (uInstanceColored == 1) ? aInstanceColor : vec3(1.0);\n"
       "   gl_Position = uViewProj * world;\n"
       "}\n";
 
@@ -109,6 +115,7 @@ namespace
       "in vec3 vWorldPos;\n"
       "in vec3 vNormal;\n"
       "in vec2 vUv;\n"
+      "in vec3 vInstanceColor;\n"
       "out vec4 fragColor;\n"
       "uniform vec3 uBaseColor;\n"
       "uniform float uMetallic;\n"
@@ -199,7 +206,7 @@ namespace
       "   if (uShading == 1) { fragColor = vec4(n * 0.5 + 0.5, uOpacity); return; }\n"
       "   if (uShading == 2) { fragColor = vec4(vUv, 0.0, uOpacity); return; }\n"
       "\n"
-      "   vec3 base = toLinear(uBaseColor);\n"
+      "   vec3 base = toLinear(uBaseColor) * vInstanceColor;\n"
       "   if (uHasTexture == 1) base *= toLinear(texture(uTexture, vUv).rgb);\n"
       "   if (uShading == 3) { fragColor = vec4(toSrgb(base), uOpacity); return; }\n"
       "\n"
@@ -390,6 +397,7 @@ void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
    if (gpu.vbo != 0) glDeleteBuffers(1, &gpu.vbo);
    if (gpu.ibo != 0) glDeleteBuffers(1, &gpu.ibo);
    if (gpu.instanceVbo != 0) glDeleteBuffers(1, &gpu.instanceVbo);
+   if (gpu.instanceColorVbo != 0) glDeleteBuffers(1, &gpu.instanceColorVbo);
    if (gpu.vao != 0) glDeleteVertexArrays(1, &gpu.vao);
    gpu = GpuMesh();
 }
@@ -427,6 +435,7 @@ bool Render3DNode::EnsureShader()
    glBindAttribLocation(mProgram, 1, "aNormal");
    glBindAttribLocation(mProgram, 2, "aUv");
    glBindAttribLocation(mProgram, 3, "aInstance"); // occupies locations 3..6
+   glBindAttribLocation(mProgram, 7, "aInstanceColor");
    glAttachShader(mProgram, vert);
    glAttachShader(mProgram, frag);
    glLinkProgram(mProgram);
@@ -789,6 +798,28 @@ void Render3DNode::CookIfNeeded(int frameId)
                                      (void*)(size_t)(col * 4 * sizeof(float)));
                glVertexAttribDivisor(loc, 1);
             }
+            // Per-instance colours travel in their own buffer rather than being
+            // packed into the transform, so the common case - instances sharing
+            // one material - uploads nothing extra at all.
+            const std::vector<float>& colors = instancer->InstanceColors();
+            if (!colors.empty())
+            {
+               if (gpu.instanceColorVbo == 0)
+                  glGenBuffers(1, &gpu.instanceColorVbo);
+               glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceColorVbo);
+               glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), colors.data(),
+                            GL_STATIC_DRAW);
+               glEnableVertexAttribArray(7);
+               glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+               glVertexAttribDivisor(7, 1);
+            }
+            else
+            {
+               glDisableVertexAttribArray(7);
+               glVertexAttribDivisor(7, 0);
+            }
+            gpu.instanceColored = !colors.empty();
+
             gpu.instanceRevision = instanceRevision;
             gpu.instanceCount = (int)xforms.size();
             gpu.instanceAttribsOn = true;
@@ -803,8 +834,13 @@ void Render3DNode::CookIfNeeded(int frameId)
             glDisableVertexAttribArray(3 + col);
             glVertexAttribDivisor(3 + col, 0);
          }
+         glDisableVertexAttribArray(7);
+         glVertexAttribDivisor(7, 0);
          gpu.instanceAttribsOn = false;
+         gpu.instanceColored = false;
       }
+      glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"),
+                  (instanced && gpu.instanceColored) ? 1 : 0);
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);

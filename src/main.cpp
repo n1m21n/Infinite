@@ -57,6 +57,7 @@
 #include "nodes/UtilityNodes.h"
 #include "nodes/PathNode.h"
 #include "nodes/OceanNode.h"
+#include "nodes/SimulationNodes.h"
 #include "nodes/DrawNode.h"
 #include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
@@ -477,6 +478,8 @@ namespace
       REGISTER_NODE(Null3DNode, Null 3D, "3D");
       REGISTER_NODE(OceanNode, Ocean, "3D");
       REGISTER_NODE(MaterialNode, Material, "3D");
+      REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
+      REGISTER_NODE(ClothNode, Cloth, "3D");
       // Three names, one class - Points/Edges/Faces are the same sampler.
       for (int i = 0; i < 3; i++)
       {
@@ -593,6 +596,8 @@ namespace
          return 1;
       if (dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<ClothNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
@@ -602,7 +607,7 @@ namespace
       if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<InstanceOnPointsNode*>(gn.node.get()) != nullptr)
-         return 2;
+         return 3; // points, shape, cloud
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
@@ -688,12 +693,15 @@ namespace
       if (auto* n3d = dynamic_cast<Null3DNode*>(dst.node.get())) { n3d->input = geo; return; }
       if (auto* mat = dynamic_cast<MaterialNode*>(dst.node.get())) { mat->input = geo; return; }
       if (auto* m2p = dynamic_cast<MeshToPointsNode*>(dst.node.get())) { m2p->input = geo; return; }
+      if (auto* cloth = dynamic_cast<ClothNode*>(dst.node.get())) { cloth->input = geo; return; }
       if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(dst.node.get()))
       {
          if (slot == 0)
             inst->pointSource = geo;
-         else
+         else if (slot == 1)
             inst->instanceShape = geo;
+         else
+            inst->cloudSource = dynamic_cast<IPointCloudSource*>(src.node.get());
          return;
       }
       if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst.node.get()))
@@ -1678,6 +1686,99 @@ namespace
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
       ColorSwatch("emission", n->emissionColor, n);
       ModSlider("emission", &n->emission, 0.0f, 8.0f);
+   }
+
+   void DrawClothParams(ClothNode* n)
+   {
+      ImGui::TextDisabled("%zu triangles, %zu links", n->TriangleCount(), n->ConstraintCount());
+      if (ImGui::Button("Reset", ImVec2(kParamWidth, 0)))
+         n->Reset();
+
+      NodeSeparator("solver");
+      DropdownButton("pinned", ClothNode::PinModeNames(), n->pinMode, [n](int i) { n->pinMode = i; });
+      ModSlider("stiffness", &n->stiffness, 0.0f, 1.0f);
+      ModSliderInt("iterations", &n->iterations, 1, 40);
+      ImGui::TextDisabled("more iterations = less stretchy");
+      ModSlider("damping", &n->damping, 0.0f, 0.5f);
+      ModSlider("mass", &n->mass, 0.05f, 10.0f);
+      ModSlider("hold shape", &n->shapeRetention, 0.0f, 1.0f);
+
+      NodeSeparator("forces");
+      ModSlider("gravity x", &n->gravityX, -20.0f, 20.0f);
+      ModSlider("gravity y", &n->gravityY, -20.0f, 20.0f);
+      ModSlider("gravity z", &n->gravityZ, -20.0f, 20.0f);
+      ModSlider("wind x", &n->windX, -20.0f, 20.0f);
+      ModSlider("wind y", &n->windY, -20.0f, 20.0f);
+      ModSlider("wind z", &n->windZ, -20.0f, 20.0f);
+      ModSlider("wind turbulence", &n->windTurbulence, 0.0f, 20.0f);
+
+      NodeSeparator("ground");
+      ImGui::Checkbox("collide with ground", &n->groundEnabled);
+      if (n->groundEnabled)
+      {
+         ModSlider("height", &n->groundHeight, -5.0f, 5.0f);
+         ModSlider("bounce", &n->bounce, 0.0f, 1.0f);
+         ModSlider("friction", &n->friction, 0.0f, 1.0f);
+      }
+
+      NodeSeparator("transform");
+      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
+      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
+      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
+      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
+
+      NodeSeparator("material");
+      ImGui::Checkbox("inherit material", &n->inheritMaterial);
+      if (!n->inheritMaterial)
+      {
+         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+         ColorSwatch("colour", n->color, n);
+         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+         ColorSwatch("emission", n->emissionColor, n);
+         ModSlider("emission", &n->emission, 0.0f, 8.0f);
+      }
+   }
+
+   void DrawParticleSystemParams(ParticleSystemNode* n)
+   {
+      ImGui::TextDisabled("%zu alive", n->AliveCount());
+      ImGui::TextDisabled("patch into Instance on Points > cloud");
+      if (ImGui::Button("Reset", ImVec2(kParamWidth, 0)))
+         n->Reset();
+
+      NodeSeparator("emitter");
+      DropdownButton("shape", ParticleSystemNode::EmitShapeNames(), n->emitShape,
+                     [n](int i) { n->emitShape = i; });
+      ModSliderInt("max particles", &n->maxParticles, 16, 50000);
+      ModSlider("rate / sec", &n->emitRate, 0.0f, 3000.0f);
+      ModSlider("radius", &n->emitRadius, 0.0f, 3.0f);
+      ModSlider("lifetime", &n->lifetime, 0.1f, 20.0f);
+      ModSlider("life random", &n->lifetimeRandom, 0.0f, 1.0f);
+
+      NodeSeparator("launch");
+      ModSlider("speed", &n->initialSpeed, 0.0f, 10.0f);
+      ModSlider("speed random", &n->speedRandom, 0.0f, 1.0f);
+      ModSlider("spread", &n->spread, 0.0f, 1.0f);
+      ModSlider("dir x", &n->dirX, -1.0f, 1.0f);
+      ModSlider("dir y", &n->dirY, -1.0f, 1.0f);
+      ModSlider("dir z", &n->dirZ, -1.0f, 1.0f);
+
+      NodeSeparator("forces");
+      ModSlider("gravity x", &n->gravityX, -10.0f, 10.0f);
+      ModSlider("gravity y", &n->gravityY, -10.0f, 10.0f);
+      ModSlider("gravity z", &n->gravityZ, -10.0f, 10.0f);
+      ModSlider("drag", &n->drag, 0.0f, 5.0f);
+      ModSlider("turbulence", &n->turbulence, 0.0f, 10.0f);
+      ModSlider("turb scale", &n->turbulenceScale, 0.1f, 8.0f);
+
+      NodeSeparator("over life");
+      ModSlider("start size", &n->startSize, 0.0f, 4.0f);
+      ModSlider("end size", &n->endSize, 0.0f, 4.0f);
+      ColorSwatch("start colour", n->startColor, n);
+      ColorSwatch("end colour", n->endColor, n);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f);
    }
 
    void DrawMaterialParams(MaterialNode* n)
@@ -2814,6 +2915,7 @@ namespace
       auto* dyingMod = dynamic_cast<IModulator*>(dying);
       auto* dyingFile = dynamic_cast<AudioFileNode*>(dying);
       auto* dyingGeometry = dynamic_cast<IGeometrySource*>(dying);
+      auto* dyingCloud = dynamic_cast<IPointCloudSource*>(dying);
       auto* dyingXY = dynamic_cast<MacroXYNode*>(dying);
       IModulator* dyingY = dyingXY ? dyingXY->YOutput() : nullptr;
       for (GraphNode& other : gNodes)
@@ -2840,6 +2942,8 @@ namespace
                inst->pointSource = nullptr;
             if (dyingGeometry != nullptr && inst->instanceShape == dyingGeometry)
                inst->instanceShape = nullptr;
+            if (dyingCloud != nullptr && inst->cloudSource == dyingCloud)
+               inst->cloudSource = nullptr;
          }
          // The single-geometry-input nodes. Missing one here would leave a
          // pointer to a freed node and crash on the next cook.
@@ -2854,6 +2958,9 @@ namespace
             if (auto* m2p = dynamic_cast<MeshToPointsNode*>(other.node.get()))
                if (m2p->input == dyingGeometry)
                   m2p->input = nullptr;
+            if (auto* cloth = dynamic_cast<ClothNode*>(other.node.get()))
+               if (cloth->input == dyingGeometry)
+                  cloth->input = nullptr;
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
          {
@@ -2948,8 +3055,12 @@ namespace
                return;
             for (GraphNode& src : gNodes)
             {
+               // Compared against each interface separately: with multiple
+               // inheritance an IPointCloudSource* and an INode* into the same
+               // object are different addresses, so one comparison is not enough.
                const void* asGeo = dynamic_cast<IGeometrySource*>(src.node.get());
-               if (asGeo == wanted || (const void*)src.node.get() == wanted)
+               const void* asCloud = dynamic_cast<IPointCloudSource*>(src.node.get());
+               if (asGeo == wanted || asCloud == wanted || (const void*)src.node.get() == wanted)
                {
                   data.geometry.push_back({ gn.index, slot, src.index });
                   return;
@@ -2969,10 +3080,12 @@ namespace
          if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get())) record(n3d->input, 0);
          if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get())) record(mat->input, 0);
          if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get())) record(m2p->input, 0);
+         if (auto* cloth = dynamic_cast<ClothNode*>(gn.node.get())) record(cloth->input, 0);
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
          {
             record(inst->pointSource, 0);
             record(inst->instanceShape, 1);
+            record(inst->cloudSource, 2);
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
             record(audio->fileSource, 0);
@@ -3309,6 +3422,37 @@ int main()
          r->width = 700.0f; r->height = 700.0f;
          gNodes[2].showParams = true;
          gNodes[6].showParams = true;
+      }
+      else if (getenv("INFINITE_CLOTHTEST") != nullptr)
+      {
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);     // 0
+         SpawnNode("Cloth", "3D", 400.0f, 40.0f);       // 1
+         SpawnNode("Render 3D", "3D", 760.0f, 40.0f);   // 2
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         geo->shape = 0;    // plane
+         geo->detail = 16;
+         geo->rotX = -1.5707963f; // stand it up so gravity has something to do
+         auto* cloth = static_cast<ClothNode*>(gNodes[1].node.get());
+         cloth->input = geo;
+         cloth->pinMode = ClothNode::kPinTop;
+         static_cast<Render3DNode*>(gNodes[2].node.get())->geometry[0] = cloth;
+      }
+      else if (getenv("INFINITE_PARTICLETEST") != nullptr)
+      {
+         SpawnNode("Particle System", "3D", 40.0f, 40.0f);      // 0
+         SpawnNode("Geometry", "3D", 40.0f, 500.0f);            // 1 instanced shape
+         SpawnNode("Instance on Points", "3D", 400.0f, 40.0f);  // 2
+         SpawnNode("Render 3D", "3D", 760.0f, 40.0f);           // 3
+
+         auto* ps = static_cast<ParticleSystemNode*>(gNodes[0].node.get());
+         ps->emitRate = 600.0f;
+         ps->lifetime = 2.0f;
+         ps->seed = 7.0f;
+         auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[2].node.get());
+         inst->cloudSource = ps;
+         inst->instanceShape = static_cast<GeometryNode*>(gNodes[1].node.get());
+         inst->instanceScale = 0.04f;
+         static_cast<Render3DNode*>(gNodes[3].node.get())->geometry[0] = inst;
       }
       else if (getenv("INFINITE_AUDIORECTEST") != nullptr)
       {
@@ -4066,6 +4210,145 @@ int main()
          }
       }
 
+      if (getenv("INFINITE_CLOTHTEST") != nullptr)
+      {
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* cloth = static_cast<ClothNode*>(gNodes[1].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[2].node.get());
+
+         // Longest edge relative to its rest length. A position-based solver
+         // should hold this near 1; a force-based one at this stiffness would
+         // be visibly stretched, and an unstable one runs away to infinity.
+         auto maxStretch = [&]() -> float
+         {
+            const Mesh& m = cloth->GetMesh();
+            const Mesh& rest = geo->GetMesh();
+            if (m.vertices.size() != rest.vertices.size())
+               return -1.0f;
+            float worst = 0.0f;
+            for (size_t t = 0; t + 2 < m.indices.size(); t += 3)
+            {
+               for (int e = 0; e < 3; e++)
+               {
+                  const unsigned int a = m.indices[t + e];
+                  const unsigned int b = m.indices[t + (e + 1) % 3];
+                  auto len = [](const Vertex& p, const Vertex& q) {
+                     const float dx = p.px-q.px, dy = p.py-q.py, dz = p.pz-q.pz;
+                     return std::sqrt(dx*dx + dy*dy + dz*dz);
+                  };
+                  const float restLen = len(rest.vertices[a], rest.vertices[b]);
+                  if (restLen < 1e-5f)
+                     continue;
+                  worst = std::max(worst, len(m.vertices[a], m.vertices[b]) / restLen);
+               }
+            }
+            return worst;
+         };
+
+         static float sTopY = 0.0f;
+         if (frameId == 3)
+         {
+            printf("cloth: %zu tris, %zu constraints\n",
+                   cloth->TriangleCount(), cloth->ConstraintCount());
+            float hi = -1e30f;
+            for (const Vertex& v : cloth->GetMesh().vertices)
+               hi = std::max(hi, v.py);
+            sTopY = hi;
+         }
+         if (frameId == 60)
+         {
+            const Mesh& m = cloth->GetMesh();
+            float lo = 1e30f, hi = -1e30f;
+            bool finite = true;
+            for (const Vertex& v : m.vertices)
+            {
+               if (!std::isfinite(v.px) || !std::isfinite(v.py) || !std::isfinite(v.pz))
+                  finite = false;
+               lo = std::min(lo, v.py);
+               hi = std::max(hi, v.py);
+            }
+            const float stretch = maxStretch();
+            printf("after 1s: finite=%d  y range %.3f..%.3f (top was %.3f)  max stretch %.3f\n",
+                   (int)finite, lo, hi, sTopY, stretch);
+            printf("rendered %zu tris\n", render->LastTriangleCount());
+
+            // Pinned top edge must not have fallen, the rest must have, and no
+            // edge may be stretched more than a few percent.
+            const bool pinnedHeld = std::fabs(hi - sTopY) < 0.05f;
+            const bool draped = lo < sTopY - 0.05f;
+            const bool stable = finite && stretch > 0.5f && stretch < 1.2f;
+            printf("pinned held=%d draped=%d stable=%d\n",
+                   (int)pinnedHeld, (int)draped, (int)stable);
+            printf("%s\n", (pinnedHeld && draped && stable && render->LastTriangleCount() > 0)
+                              ? "CLOTH OK" : "SUSPECT");
+            Transport::Instance().Rewind();
+         }
+         if (frameId == 63)
+         {
+            const float stretch = maxStretch();
+            printf("after rewind: max stretch %.3f  %s\n", stretch,
+                   std::fabs(stretch - 1.0f) < 0.01f ? "CLOTH REWIND RESETS OK" : "SUSPECT");
+         }
+      }
+
+      if (getenv("INFINITE_PARTICLETEST") != nullptr)
+      {
+         auto* ps = static_cast<ParticleSystemNode*>(gNodes[0].node.get());
+         auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[2].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
+         static size_t sAtPause = 0;
+         static float sPausedY = 0.0f;
+
+         if (frameId == 30)
+         {
+            printf("running: %zu alive, %zu instances, %zu tris rendered\n",
+                   ps->AliveCount(), inst->InstanceCount(), render->LastTriangleCount());
+            const bool running = ps->AliveCount() > 50 &&
+                                 inst->InstanceCount() == ps->AliveCount() &&
+                                 render->LastTriangleCount() > 0;
+            printf("%s\n", running ? "PARTICLES SIMULATING OK" : "SUSPECT - not simulating");
+
+            // Every particle must be finite: one NaN propagates through the
+            // instance transforms and takes the whole render with it.
+            bool finite = true;
+            for (const Particle& p : ps->GetPoints())
+               if (p.alive && (!std::isfinite(p.px) || !std::isfinite(p.py) || !std::isfinite(p.pz)))
+                  finite = false;
+            printf("all finite: %d\n", (int)finite);
+
+            Transport::Instance().SetPlaying(false);
+         }
+         if (frameId == 33)
+         {
+            // Baseline taken a few frames after pausing, not on the same frame:
+            // this block runs before the node cooks, so on the pause frame
+            // itself there is still one step's worth of already-advanced clock
+            // left to consume. Sampling here measures the frozen state.
+            sAtPause = ps->AliveCount();
+            for (const Particle& p : ps->GetPoints())
+               if (p.alive) { sPausedY = p.py; break; }
+         }
+         if (frameId == 50)
+         {
+            // Paused means frozen, not merely not-drawn.
+            float nowY = 0.0f;
+            for (const Particle& p : ps->GetPoints())
+               if (p.alive) { nowY = p.py; break; }
+            const bool frozen = ps->AliveCount() == sAtPause &&
+                                std::fabs(nowY - sPausedY) < 1e-6f;
+            printf("after 17 paused frames: %zu alive (was %zu), y %.5f -> %.5f  %s\n",
+                   ps->AliveCount(), sAtPause, sPausedY, nowY,
+                   frozen ? "PAUSE FREEZES OK" : "SUSPECT - simulating while paused");
+            Transport::Instance().SetPlaying(true);
+            Transport::Instance().Rewind();
+         }
+         if (frameId == 52)
+         {
+            printf("after rewind: %zu alive  %s\n", ps->AliveCount(),
+                   ps->AliveCount() < 50 ? "REWIND RESETS OK" : "SUSPECT - state survived rewind");
+         }
+      }
+
       if (getenv("INFINITE_AUDIORECTEST") != nullptr)
       {
          auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
@@ -4786,6 +5069,8 @@ int main()
                   dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<OceanNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
          {
@@ -4813,6 +5098,10 @@ int main()
                snprintf(line, sizeof(line), "%zu triangles", oc->TriangleCount());
             else if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu triangles", mat->TriangleCount());
+            else if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu particles", ps->AliveCount());
+            else if (auto* cl = dynamic_cast<ClothNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu tris, %zu links", cl->TriangleCount(), cl->ConstraintCount());
             else
                snprintf(line, sizeof(line), "scene node");
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255), gn.typeName.c_str());
@@ -4897,6 +5186,10 @@ int main()
                DrawPathParams(n);
             else if (auto* n = dynamic_cast<MaterialNode*>(gn.node.get()))
                DrawMaterialParams(n);
+            else if (auto* n = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
+               DrawParticleSystemParams(n);
+            else if (auto* n = dynamic_cast<ClothNode*>(gn.node.get()))
+               DrawClothParams(n);
             else if (auto* n = dynamic_cast<OceanNode*>(gn.node.get()))
                DrawOceanParams(n);
             else if (dynamic_cast<NullNode*>(gn.node.get()) != nullptr ||
@@ -5047,8 +5340,12 @@ int main()
                return;
             for (GraphNode& src : gNodes)
             {
+               // Compared against each interface separately: with multiple
+               // inheritance an IPointCloudSource* and an INode* into the same
+               // object are different addresses, so one comparison is not enough.
                const void* asGeo = dynamic_cast<IGeometrySource*>(src.node.get());
-               if (asGeo == wanted || (const void*)src.node.get() == wanted)
+               const void* asCloud = dynamic_cast<IPointCloudSource*>(src.node.get());
+               if (asGeo == wanted || asCloud == wanted || (const void*)src.node.get() == wanted)
                {
                   gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
                                      src.OutputPinId(), gn.InputPinId(slot) });
@@ -5071,12 +5368,15 @@ int main()
             linkFromNode(n3d->input, 0);
          if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
             linkFromNode(m2p->input, 0);
+         if (auto* cloth = dynamic_cast<ClothNode*>(gn.node.get()))
+            linkFromNode(cloth->input, 0);
          if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
             linkFromNode(mat->input, 0);
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
          {
             linkFromNode(inst->pointSource, 0);
             linkFromNode(inst->instanceShape, 1);
+            linkFromNode(inst->cloudSource, 2);
          }
          if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
             linkFromNode(out->audioSource, 1);
@@ -5181,8 +5481,10 @@ int main()
                auto* dstNull3D = dstNode ? dynamic_cast<Null3DNode*>(dstNode->node.get()) : nullptr;
                auto* dstMaterial = dstNode ? dynamic_cast<MaterialNode*>(dstNode->node.get()) : nullptr;
                auto* dstMeshPoints = dstNode ? dynamic_cast<MeshToPointsNode*>(dstNode->node.get()) : nullptr;
+               auto* dstCloth = dstNode ? dynamic_cast<ClothNode*>(dstNode->node.get()) : nullptr;
                auto* dstOutput = dstNode ? dynamic_cast<OutputNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
+               auto* srcCloud = srcNode ? dynamic_cast<IPointCloudSource*>(srcNode->node.get()) : nullptr;
                auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
                auto* srcLight = srcNode ? dynamic_cast<LightNode*>(srcNode->node.get()) : nullptr;
 
@@ -5211,15 +5513,17 @@ int main()
                      else if (dstGeoOp != nullptr)
                         valid = srcGeometry != nullptr;
                      else if (dstInstance != nullptr)
-                        valid = srcGeometry != nullptr;
-                     else if (dstNull3D != nullptr || dstMeshPoints != nullptr)
+                        // Slot 2 is the point-cloud pin; 0 and 1 take geometry.
+                        valid = (slot == 2) ? (srcCloud != nullptr) : (srcGeometry != nullptr);
+                     else if (dstNull3D != nullptr || dstMeshPoints != nullptr || dstCloth != nullptr)
                         valid = srcGeometry != nullptr;
                      else if (dstMaterial != nullptr)
                         // Slot 0 takes geometry; slot 1 is an ordinary image.
                         valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
                      else if (dstOutput != nullptr && slot == 1)
                         valid = srcAudioFile != nullptr; // slot 1 is the audio pin
-                     else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
+                     else if (srcGeometry != nullptr || srcCloud != nullptr ||
+                              srcCamera != nullptr || srcLight != nullptr)
                         valid = false; // 3D cables only go into 3D nodes
                      else if (dstAudio != nullptr)
                         valid = srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
@@ -5255,14 +5559,19 @@ int main()
                      dstNull3D->input = srcGeometry;
                   else if (dstMeshPoints != nullptr)
                      dstMeshPoints->input = srcGeometry;
+                  else if (dstCloth != nullptr)
+                     dstCloth->input = srcGeometry;
                   else if (dstMaterial != nullptr && GraphNode::InputSlotFromPin(b) == 0)
                      dstMaterial->input = srcGeometry;
                   else if (dstInstance != nullptr)
                   {
-                     if (GraphNode::InputSlotFromPin(b) == 0)
+                     const int islot = GraphNode::InputSlotFromPin(b);
+                     if (islot == 0)
                         dstInstance->pointSource = srcGeometry;
-                     else
+                     else if (islot == 1)
                         dstInstance->instanceShape = srcGeometry;
+                     else
+                        dstInstance->cloudSource = srcCloud;
                   }
                   else if (dstAudio != nullptr)
                   {
@@ -5878,8 +6187,15 @@ int main()
                       gn.typeName.c_str(), gn.category.c_str(), inst->InstanceCount());
                continue;
             }
+            if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
+            {
+               printf("%-22s [%-12s] %zu particles  OK\n",
+                      gn.typeName.c_str(), gn.category.c_str(), ps->AliveCount());
+               continue;
+            }
             if (dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
             {
                // Pass-throughs and samplers with nothing patched in are empty

@@ -205,6 +205,30 @@ unsigned int InstanceOnPointsNode::GetSurfaceTexture()
 void InstanceOnPointsNode::Rebuild()
 {
    mTransforms.clear();
+   mColors.clear();
+
+   // A patched point cloud replaces mesh sampling: the positions already exist,
+   // so there is nothing to sample.
+   if (cloudSource != nullptr)
+   {
+      const std::vector<Particle>& cloud = cloudSource->GetPoints();
+      mTransforms.reserve(cloud.size());
+      mColors.reserve(cloud.size() * 3);
+      for (const Particle& p : cloud)
+      {
+         if (!p.alive)
+            continue;
+         const float s = instanceScale * p.scale;
+         Mat4 m = Mat4::Scale(s, s, s);
+         m = Mat4::Multiply(Mat4::Translation(p.px, p.py, p.pz), m);
+         mTransforms.push_back(m);
+         mColors.push_back(p.r);
+         mColors.push_back(p.g);
+         mColors.push_back(p.b);
+      }
+      return;
+   }
+
    if (pointSource == nullptr)
       return;
 
@@ -269,10 +293,16 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
       p->CookIfNeeded(frameId);
    if (auto* s = dynamic_cast<INode*>(instanceShape))
       s->CookIfNeeded(frameId);
+   if (auto* c = dynamic_cast<INode*>(cloudSource))
+      c->CookIfNeeded(frameId);
 
+   // A simulated cloud changes every frame while it is running, so its own
+   // revision stamp is what decides dirtiness rather than any parameter here.
+   const unsigned long long cloudRevision = cloudSource ? cloudSource->PointRevision() : 0;
    const size_t pointTris = pointSource ? pointSource->GetMesh().indices.size() : 0;
    const bool dirty =
       mBuiltPointSource != pointSource || mBuiltShape != instanceShape ||
+      mBuiltCloud != (const void*)cloudSource || mBuiltCloudRevision != cloudRevision ||
       mBuiltPointTris != pointTris || mBuiltMode != pointMode || mBuiltMax != maxPoints ||
       mBuiltScale != instanceScale || mBuiltScaleRand != scaleRandom ||
       mBuiltRotRand != rotationRandom || mBuiltSeed != seed ||
@@ -286,6 +316,8 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
 
    mBuiltPointSource = pointSource;
    mBuiltShape = instanceShape;
+   mBuiltCloud = cloudSource;
+   mBuiltCloudRevision = cloudRevision;
    mBuiltPointTris = pointTris;
    mBuiltMode = pointMode;
    mBuiltMax = maxPoints;

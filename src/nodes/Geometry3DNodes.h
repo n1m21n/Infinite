@@ -240,13 +240,14 @@ private:
    // changes source simply invalidates and re-uploads.
    struct GpuMesh
    {
-      unsigned int vao = 0, vbo = 0, ibo = 0, instanceVbo = 0;
+      unsigned int vao = 0, vbo = 0, ibo = 0, instanceVbo = 0, instanceColorVbo = 0;
       const void* source = nullptr;
       unsigned long long meshRevision = 0;
       unsigned long long instanceRevision = 0;
       int indexCount = 0;
       int instanceCount = 0;
       bool instanceAttribsOn = false;
+      bool instanceColored = false;
    };
 
    bool EnsureResources(int w, int h, int sampleCount);

@@ -164,11 +164,23 @@ public:
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
 
-   // Slot 0 supplies the points, slot 1 the shape stamped on them.
+   // Slot 0 supplies the points, slot 1 the shape stamped on them, and slot 2
+   // an optional point cloud that replaces the mesh sampling entirely. A cloud
+   // wins when both are patched: it is the more specific instruction.
    IGeometrySource* pointSource = nullptr;
    IGeometrySource* instanceShape = nullptr;
+   IPointCloudSource* cloudSource = nullptr;
 
-   const char* InputLabel(int slot) const override { return slot == 0 ? "points" : "shape"; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* kNames[] = { "points", "shape", "cloud" };
+      return (slot >= 0 && slot < 3) ? kNames[slot] : nullptr;
+   }
+
+   // Per-instance colours, parallel to InstanceTransforms(). Empty when the
+   // instances all share the node's own material, which is the mesh-sampling
+   // case; a point cloud fills it so particles can vary.
+   const std::vector<float>& InstanceColors() const { return mColors; }
 
    // Instanced draw data, consumed by Render3DNode. The transforms carry their
    // own stamp, separate from the mesh one: nudging the scatter re-uploads a few
@@ -211,10 +223,13 @@ private:
    void Rebuild();
 
    std::vector<Mat4> mTransforms;
+   std::vector<float> mColors; // rgb triples, or empty for a uniform material
    unsigned long long mInstanceRevision = 0;
    Mesh mEmpty;
    const void* mBuiltPointSource = nullptr;
    const void* mBuiltShape = nullptr;
+   const void* mBuiltCloud = nullptr;
+   unsigned long long mBuiltCloudRevision = 0;
    size_t mBuiltPointTris = 0;
    int mBuiltMode = -1, mBuiltMax = -1;
    float mBuiltScale = -1, mBuiltScaleRand = -1, mBuiltRotRand = -1, mBuiltSeed = -1, mBuiltOffset = -1;

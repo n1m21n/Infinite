@@ -165,6 +165,35 @@ struct Mat4
 // geometry sitting on the GPU.
 unsigned long long NextMeshRevision();
 
+// One element of a point cloud: a simulated particle, a scattered point, a
+// vertex of a soft body. Carries the state a simulation needs to step it, and
+// the state the renderer needs to draw it, in one struct - keeping them apart
+// would mean walking two parallel arrays that must stay index-aligned.
+struct Particle
+{
+   float px = 0, py = 0, pz = 0;
+   float vx = 0, vy = 0, vz = 0;
+   float nx = 0, ny = 1, nz = 0;  // orientation hint, e.g. a surface normal
+   float scale = 1.0f;
+   float r = 1.0f, g = 1.0f, b = 1.0f;
+   float age = 0.0f;              // seconds alive
+   float life = 0.0f;             // seconds until death; <= 0 means immortal
+   bool alive = true;
+};
+
+// A node that emits a point cloud. Distinct from IGeometrySource: a cloud has
+// no triangles of its own, only positions. Instance on Points can take one
+// directly, stamping its shape at every point without the mesh-sampling step.
+class IPointCloudSource
+{
+public:
+   virtual ~IPointCloudSource() {}
+   virtual const std::vector<Particle>& GetPoints() = 0;
+   // Bumped whenever the cloud changes, using the same stamp counter as meshes
+   // so the renderer's upload cache works identically for both.
+   virtual unsigned long long PointRevision() = 0;
+};
+
 // A point sampled off a mesh, used by the instancing nodes.
 struct MeshPoint
 {
@@ -204,6 +233,12 @@ namespace MeshOps
    // vertex per frame with no state and no timestep to keep stable.
    Mesh Ocean(int resolution, float size, float amplitude, float wavelength,
               float steepness, float direction, float choppiness, int octaves, float time);
+
+   // For each vertex, the index of the first vertex sharing its position.
+   // Anything reasoning about connectivity needs this: the primitives duplicate
+   // vertices at UV seams and flat-shaded edges, and treating those as separate
+   // points tears a surface open along its seams.
+   std::vector<unsigned int> BuildWeldMap(const Mesh& in);
    Mesh Solidify(const Mesh& in, float thickness, bool keepOriginal);
    Mesh Extrude(const Mesh& in, float distance, float inset);
    Mesh Wireframe(const Mesh& in, float thickness);
