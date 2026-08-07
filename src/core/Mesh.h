@@ -379,6 +379,24 @@ namespace Primitives
    Mesh Pyramid(int sides);
    Mesh Prism(int sides, int rings);
    Mesh Helix(int segments, int sides, float tubeRadius, float turns, float height);
+
+   // The three platonic solids an icosphere/cube can't stand in for. All are
+   // flat-shaded - a smoothed tetrahedron is just a bad sphere.
+   Mesh Tetrahedron();
+   Mesh Octahedron();
+   Mesh Dodecahedron();
+   // Cube whose surface points are projected onto a rounded box, so the corner
+   // radius is exact rather than a bevel approximation. `segments` controls how
+   // finely the rounded region is tessellated.
+   Mesh RoundedCube(int segments, float radius);
+   // One-sided surfaces, emitted with both windings so they read as solid from
+   // either side rather than vanishing under backface culling.
+   Mesh MobiusStrip(int segments, int widthSegments, float width);
+   Mesh KleinBottle(int uSegments, int vSegments);
+   Mesh Gear(int teeth, float depth, float toothDepth, float hubRadius);
+   Mesh Star(int points, float innerRatio, float depth);
+   Mesh Disc(int sides, float innerRadius);
+   Mesh Arrow(int sides, float shaftRadius, float headLength);
    // Gielis superformula on a sphere. Two sets of exponents give everything
    // from a rounded cube to a starfish to a spiky shell, which is a lot of
    // distinct silhouettes out of one function.

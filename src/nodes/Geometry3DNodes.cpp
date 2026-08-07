@@ -14,7 +14,12 @@ namespace
 {
    const std::vector<std::string> kShapeNames = {
       "Plane", "Cube", "Sphere", "Icosphere", "Torus", "Cylinder", "Cone", "Torus Knot",
-      "Capsule", "Tube", "Pyramid", "Prism", "Helix", "Supershape"
+      "Capsule", "Tube", "Pyramid", "Prism", "Helix", "Supershape",
+      "Tetrahedron", "Octahedron", "Dodecahedron", "Rounded Cube", "Mobius Strip",
+      // Gear/Star/Arrow carry the "3D" suffix because the 2D shape list already
+      // owns those names, and node names are the factory's registry keys - the
+      // later registration would silently replace the earlier one.
+      "Klein Bottle", "Gear 3D", "Star 3D", "Disc", "Arrow 3D"
    };
    const std::vector<std::string> kShadingNames = { "Lit", "Normals", "UV", "Flat" };
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
@@ -430,7 +435,7 @@ void GeometryNode::RebuildIfNeeded()
    if (shape == mBuiltShape && detail == mBuiltDetail && sides == mBuiltSides &&
        knotP == mBuiltP && knotQ == mBuiltQ && tubeRadius == mBuiltTube &&
        bevel == mBuiltBevel && bevelSegments == mBuiltBevelSegments &&
-       superN2 == mBuiltN2 && superN3 == mBuiltN3 &&
+       superN2 == mBuiltN2 && superN3 == mBuiltN3 && discInner == mBuiltDiscInner &&
        superP2 == mBuiltP2 && superP3 == mBuiltP3 && !mMesh.Empty())
       return;
 
@@ -450,9 +455,22 @@ void GeometryNode::RebuildIfNeeded()
       case 11: mMesh = Primitives::Prism(sides, std::max(1, detail / 8)); break;
       case 12: mMesh = Primitives::Helix(detail * 8, sides, tubeRadius * 0.4f,
                                          (float)knotP, (float)knotQ * 0.5f); break;
-      default: mMesh = Primitives::Supershape(detail, sides * 2,
+      case 13: mMesh = Primitives::Supershape(detail, sides * 2,
                                               (float)knotP, 1.0f, superN2, superN3,
                                               (float)knotQ, 1.0f, superP2, superP3); break;
+      case 14: mMesh = Primitives::Tetrahedron(); break;
+      case 15: mMesh = Primitives::Octahedron(); break;
+      case 16: mMesh = Primitives::Dodecahedron(); break;
+      case 17: mMesh = Primitives::RoundedCube(std::max(2, detail / 3), tubeRadius * 0.5f); break;
+      case 18: mMesh = Primitives::MobiusStrip(detail * 4, std::max(1, detail / 6), tubeRadius); break;
+      case 19: mMesh = Primitives::KleinBottle(detail * 2, detail * 2); break;
+      // The extruded profiles reuse `tube` as depth and `superN2` as the shape
+      // of the profile, rather than growing a parallel set of sliders.
+      case 20: mMesh = Primitives::Gear(sides, tubeRadius * 0.5f, superN2 * 0.25f,
+                                        superN3 * 0.2f); break;
+      case 21: mMesh = Primitives::Star(sides, superN2 * 0.5f, tubeRadius * 0.5f); break;
+      case 22: mMesh = Primitives::Disc(std::max(3, sides * 2), discInner * 0.5f); break;
+      default: mMesh = Primitives::Arrow(sides, tubeRadius * 0.3f, superN2 * 0.35f); break;
    }
 
    mBuiltShape = shape;
@@ -466,7 +484,7 @@ void GeometryNode::RebuildIfNeeded()
    mBuiltTube = tubeRadius;
    mBuiltBevel = bevel;
    mBuiltBevelSegments = bevelSegments;
-   mBuiltN2 = superN2; mBuiltN3 = superN3;
+   mBuiltN2 = superN2; mBuiltN3 = superN3; mBuiltDiscInner = discInner;
    mBuiltP2 = superP2; mBuiltP3 = superP3;
    mMeshRevision = NextMeshRevision();
 }

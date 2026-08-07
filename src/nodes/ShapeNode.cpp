@@ -5,9 +5,13 @@
 
 namespace
 {
+   // Append only - `shapeType` is stored in patch files as an index, so
+   // reordering this list would silently change every saved patch.
    const std::vector<std::string> kShapeNames = {
       "Circle", "Ellipse", "Rectangle", "Rounded Rect", "Triangle",
-      "Polygon", "Star", "Ring", "Cross", "Line"
+      "Polygon", "Star", "Ring", "Cross", "Line",
+      "Hexagon", "Heart", "Arrow", "Crescent", "Gear",
+      "Superellipse", "Pie", "Teardrop", "Chevron", "Blob"
    };
 
    const char* kFragSrc =
@@ -58,6 +62,49 @@ namespace
       "   float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);\n"
       "   return length(pa - ba*h) - th;\n"
       "}\n"
+      "float dot2(vec2 v) { return dot(v, v); }\n"
+      // Exact distance to the classic cardioid-ish heart, so stroke and feather
+      // behave the same here as on a circle. Spans roughly x in [-1,1],
+      // y in [0,1] with the tip at the origin, hence the caller's y offset.
+      "float sdHeart(vec2 p) {\n"
+      "   p.x = abs(p.x);\n"
+      "   if (p.y + p.x > 1.0)\n"
+      "      return sqrt(dot2(p - vec2(0.25, 0.75))) - sqrt(2.0) / 4.0;\n"
+      "   return sqrt(min(dot2(p - vec2(0.0, 1.0)),\n"
+      "                   dot2(p - 0.5 * max(p.x + p.y, 0.0)))) * sign(p.x - p.y);\n"
+      "}\n"
+      // Isosceles triangle as the intersection of three half-planes: apex at
+      // (apexX, 0), base at x = baseX, half-height h. Exact inside, a slight
+      // under-estimate around the outer corners - invisible at mask scale.
+      "float sdTri(vec2 p, float apexX, float baseX, float h) {\n"
+      "   vec2 n = normalize(vec2(h, apexX - baseX));\n"
+      "   return max(baseX - p.x, dot(vec2(p.x, abs(p.y)) - vec2(apexX, 0.0), n));\n"
+      "}\n"
+      "float sdPie(vec2 p, float r, float frac) {\n"
+      "   float ang = 3.14159265 * clamp(frac, 0.001, 0.999);\n"
+      "   vec2 c = vec2(sin(ang), cos(ang));\n"
+      "   p.x = abs(p.x);\n"
+      "   float l = length(p) - r;\n"
+      "   float m = length(p - c * clamp(dot(p, c), 0.0, r));\n"
+      "   return max(l, m * sign(c.y * p.x - c.x * p.y));\n"
+      "}\n"
+      "float sdGear(vec2 p, float r, int teeth, float hub) {\n"
+      "   float a = atan(p.y, p.x);\n"
+      "   float len = length(p);\n"
+      "   float tooth = cos(a * float(max(teeth, 3)));\n"
+      "   float outer = r * (0.80 + 0.20 * smoothstep(-0.35, 0.35, tooth));\n"
+      "   return max(len - outer, hub * r - len);\n"
+      "}\n"
+      "float sdSuperellipse(vec2 p, float r, float n) {\n"
+      "   vec2 q = abs(p) / max(r, 1e-4);\n"
+      "   float f = pow(pow(q.x, n) + pow(q.y, n), 1.0 / n);\n"
+      "   return (f - 1.0) * r;\n"
+      "}\n"
+      "float sdBlob(vec2 p, float r, int lobes) {\n"
+      "   float a = atan(p.y, p.x);\n"
+      "   float k = float(max(lobes, 2));\n"
+      "   return length(p) - r * (1.0 + 0.24 * sin(k * a) + 0.11 * sin(k * 2.0 * a + 1.7));\n"
+      "}\n"
       "\n"
       "void main() {\n"
       "   vec2 p = vUv - uPos;\n"
@@ -75,7 +122,30 @@ namespace
       "   else if (uShape == 6) d = sdStar(p, uSize, uSides, uInnerRatio);\n"
       "   else if (uShape == 7) d = abs(sdCircle(p, uSize)) - max(uCornerRadius, 0.001);\n"
       "   else if (uShape == 8) d = sdCross(p, vec2(uSize, uSize * 0.28));\n"
-      "   else d = sdSegment(p, vec2(-uSize, 0.0), vec2(uSize, 0.0), max(uCornerRadius, 0.002));\n"
+      "   else if (uShape == 9) d = sdSegment(p, vec2(-uSize, 0.0), vec2(uSize, 0.0), max(uCornerRadius, 0.002));\n"
+      "   else if (uShape == 10) d = sdNgon(p, uSize, 6);\n"
+      "   else if (uShape == 11) d = sdHeart(vec2(p.x, p.y + uSize * 0.5) / uSize) * uSize;\n"
+      "   else if (uShape == 12) {\n"
+      // Union of shaft and head. min() of two SDFs is exact outside both and a
+      // safe under-estimate in the seam, which never shows through the mask.
+      "      float shaft = sdBox(p - vec2(-uSize * 0.30, 0.0), vec2(uSize * 0.50, uSize * 0.22));\n"
+      "      float head = sdTri(p, uSize, uSize * 0.20, uSize * 0.55);\n"
+      "      d = min(shaft, head);\n"
+      "   }\n"
+      "   else if (uShape == 13) d = max(sdCircle(p, uSize),\n"
+      "                                  -sdCircle(p - vec2(uSize * 0.45, 0.0), uSize * 0.88));\n"
+      "   else if (uShape == 14) d = sdGear(p, uSize, uSides, uInnerRatio * 0.7);\n"
+      "   else if (uShape == 15) d = sdSuperellipse(p, uSize, mix(2.0, 10.0, uInnerRatio));\n"
+      "   else if (uShape == 16) d = sdPie(p, uSize, uInnerRatio);\n"
+      "   else if (uShape == 17) {\n"
+      "      float ball = sdCircle(p - vec2(0.0, -uSize * 0.30), uSize * 0.62);\n"
+      "      float tip = sdTri(vec2(p.y, p.x), uSize, -uSize * 0.30, uSize * 0.62);\n"
+      "      d = min(ball, tip);\n"
+      "   }\n"
+      "   else if (uShape == 18) d = sdSegment(vec2(p.x, abs(p.y)),\n"
+      "                                        vec2(-uSize * 0.6, uSize * 0.8), vec2(uSize * 0.6, 0.0),\n"
+      "                                        max(uCornerRadius, 0.02));\n"
+      "   else d = sdBlob(p, uSize, uSides);\n"
       "\n"
       "   float aa = max(uFeather, 1e-4);\n"
       "   float fillMask = smoothstep(aa, -aa, d) * uFillOpacity;\n"

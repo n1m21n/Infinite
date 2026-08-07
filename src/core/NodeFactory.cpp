@@ -1,5 +1,7 @@
 #include "NodeFactory.h"
 
+#include <cstdio>
+
 #include "INode.h"
 
 NodeFactory& NodeFactory::Instance()
@@ -10,6 +12,14 @@ NodeFactory& NodeFactory::Instance()
 
 void NodeFactory::Register(const std::string& name, CreateNodeFn createFn, const std::string& category)
 {
+   if (mFactoryMap.count(name) != 0)
+   {
+      // Refuse rather than overwrite: whichever registration came first is the
+      // one every existing patch file already refers to by that name.
+      fprintf(stderr, "node name collision: \"%s\" is already registered\n", name.c_str());
+      mDuplicates.push_back(name);
+      return;
+   }
    mFactoryMap[name] = NodeInfo{ name, category, createFn };
 
    auto& list = mByCategory[category];

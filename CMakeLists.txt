@@ -71,6 +71,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/OceanNode.cpp
     src/nodes/CurveNode.cpp
     src/nodes/SimulationNodes.cpp
+    src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp

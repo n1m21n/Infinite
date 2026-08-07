@@ -1978,6 +1978,433 @@ namespace Primitives
       return mesh;
    }
 
+   namespace
+   {
+      // Flat-shaded convex polygon face. The winding is decided by testing the
+      // computed normal against the face centroid rather than trusting the
+      // caller's point order - every solid here is centred on the origin, so
+      // "points away from the centre" is exactly the outward test, and no
+      // hand-transcribed face table can get it backwards.
+      void PushHullFace(Mesh& mesh, std::vector<std::array<float, 3>> loop)
+      {
+         if (loop.size() < 3)
+            return;
+
+         float cx = 0, cy = 0, cz = 0;
+         for (const auto& p : loop) { cx += p[0]; cy += p[1]; cz += p[2]; }
+         cx /= (float)loop.size(); cy /= (float)loop.size(); cz /= (float)loop.size();
+
+         const float ax = loop[1][0] - loop[0][0], ay = loop[1][1] - loop[0][1], az = loop[1][2] - loop[0][2];
+         const float bx = loop[2][0] - loop[0][0], by = loop[2][1] - loop[0][1], bz = loop[2][2] - loop[0][2];
+         float nx = ay * bz - az * by;
+         float ny = az * bx - ax * bz;
+         float nz = ax * by - ay * bx;
+         const float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+         if (len < 1e-9f)
+            return;
+         nx /= len; ny /= len; nz /= len;
+
+         if (nx * cx + ny * cy + nz * cz < 0.0f)
+         {
+            nx = -nx; ny = -ny; nz = -nz;
+            std::reverse(loop.begin(), loop.end());
+         }
+
+         // Fan from the centroid so pentagons and larger stay convex-safe and
+         // every triangle shares the one true face normal.
+         const unsigned int centre = (unsigned int)mesh.vertices.size();
+         PushVertex(mesh, cx, cy, cz, nx, ny, nz, 0.5f, 0.5f);
+         for (size_t i = 0; i < loop.size(); i++)
+         {
+            const float u = 0.5f + 0.5f * std::cos((float)i / (float)loop.size() * 2.0f * kPi);
+            const float v = 0.5f + 0.5f * std::sin((float)i / (float)loop.size() * 2.0f * kPi);
+            PushVertex(mesh, loop[i][0], loop[i][1], loop[i][2], nx, ny, nz, u, v);
+         }
+         for (size_t i = 0; i < loop.size(); i++)
+         {
+            mesh.indices.push_back(centre);
+            mesh.indices.push_back(centre + 1 + (unsigned int)i);
+            mesh.indices.push_back(centre + 1 + (unsigned int)((i + 1) % loop.size()));
+         }
+      }
+
+      // Sorts the points of one planar face into ring order around its normal,
+      // so a face can be described as an unordered point set.
+      void SortAroundNormal(std::vector<std::array<float, 3>>& pts, const float n[3])
+      {
+         if (pts.size() < 3)
+            return;
+         float cx = 0, cy = 0, cz = 0;
+         for (const auto& p : pts) { cx += p[0]; cy += p[1]; cz += p[2]; }
+         cx /= (float)pts.size(); cy /= (float)pts.size(); cz /= (float)pts.size();
+
+         // Any vector perpendicular to n works as the zero-angle reference.
+         float ux = pts[0][0] - cx, uy = pts[0][1] - cy, uz = pts[0][2] - cz;
+         const float proj = ux * n[0] + uy * n[1] + uz * n[2];
+         ux -= n[0] * proj; uy -= n[1] * proj; uz -= n[2] * proj;
+         const float ul = std::sqrt(ux * ux + uy * uy + uz * uz);
+         if (ul < 1e-9f)
+            return;
+         ux /= ul; uy /= ul; uz /= ul;
+         const float vx = n[1] * uz - n[2] * uy;
+         const float vy = n[2] * ux - n[0] * uz;
+         const float vz = n[0] * uy - n[1] * ux;
+
+         std::sort(pts.begin(), pts.end(),
+                   [&](const std::array<float, 3>& a, const std::array<float, 3>& b)
+         {
+            const float aa = std::atan2((a[0] - cx) * vx + (a[1] - cy) * vy + (a[2] - cz) * vz,
+                                        (a[0] - cx) * ux + (a[1] - cy) * uy + (a[2] - cz) * uz);
+            const float ba = std::atan2((b[0] - cx) * vx + (b[1] - cy) * vy + (b[2] - cz) * vz,
+                                        (b[0] - cx) * ux + (b[1] - cy) * uy + (b[2] - cz) * uz);
+            return aa < ba;
+         });
+      }
+
+      // Builds a flat 2D outline with an optional concentric hole and extrudes
+      // it. Shared by Gear and Star, which differ only in their radius curve.
+      Mesh ExtrudeRadialProfile(const std::vector<float>& radii, float depth, float holeRadius)
+      {
+         MeshOps::Contour2D outer;
+         const size_t n = radii.size();
+         for (size_t i = 0; i < n; i++)
+         {
+            const float a = (float)i / (float)n * 2.0f * kPi;
+            outer.points.push_back(std::cos(a) * radii[i]);
+            outer.points.push_back(std::sin(a) * radii[i]);
+         }
+
+         std::vector<MeshOps::Contour2D> contours;
+         contours.push_back(outer);
+         if (holeRadius > 1e-4f)
+         {
+            MeshOps::Contour2D hole;
+            const int steps = 48;
+            for (int i = 0; i < steps; i++)
+            {
+               const float a = (float)i / (float)steps * 2.0f * kPi;
+               hole.points.push_back(std::cos(a) * holeRadius);
+               hole.points.push_back(std::sin(a) * holeRadius);
+            }
+            contours.push_back(hole);
+         }
+         return MeshOps::ExtrudeContours(contours, depth, 0.0f);
+      }
+   }
+
+   Mesh Tetrahedron()
+   {
+      // The four alternating corners of a cube, scaled so the solid fits the
+      // same unit box every other primitive here uses.
+      const float k = 0.5f / 1.7320508f;
+      const std::array<std::array<float, 3>, 4> v = { {
+         { { k, k, k } }, { { k, -k, -k } }, { { -k, k, -k } }, { { -k, -k, k } }
+      } };
+      Mesh mesh;
+      const int faces[4][3] = { { 0, 1, 2 }, { 0, 3, 1 }, { 0, 2, 3 }, { 1, 3, 2 } };
+      for (const auto& f : faces)
+         PushHullFace(mesh, { v[f[0]], v[f[1]], v[f[2]] });
+      return mesh;
+   }
+
+   Mesh Octahedron()
+   {
+      const float r = 0.5f;
+      Mesh mesh;
+      for (int sx = -1; sx <= 1; sx += 2)
+         for (int sy = -1; sy <= 1; sy += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+               PushHullFace(mesh, { { { (float)sx * r, 0, 0 } },
+                                    { { 0, (float)sy * r, 0 } },
+                                    { { 0, 0, (float)sz * r } } });
+      return mesh;
+   }
+
+   Mesh Dodecahedron()
+   {
+      const float phi = 1.61803399f;
+      const float inv = 1.0f / phi;
+      std::vector<std::array<float, 3>> pts;
+      for (int sx = -1; sx <= 1; sx += 2)
+         for (int sy = -1; sy <= 1; sy += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+               pts.push_back({ { (float)sx, (float)sy, (float)sz } });
+      for (int a = -1; a <= 1; a += 2)
+         for (int b = -1; b <= 1; b += 2)
+         {
+            pts.push_back({ { 0.0f, (float)a * inv, (float)b * phi } });
+            pts.push_back({ { (float)a * inv, (float)b * phi, 0.0f } });
+            pts.push_back({ { (float)a * phi, 0.0f, (float)b * inv } });
+         }
+
+      // Scale so the circumscribed sphere has radius 0.5, matching Sphere/Cube.
+      const float scale = 0.5f / std::sqrt(3.0f);
+      for (auto& p : pts) { p[0] *= scale; p[1] *= scale; p[2] *= scale; }
+
+      // The twelve face normals are the icosahedron's vertex directions - the
+      // dual relationship. Collecting the points that touch each supporting
+      // plane beats transcribing a twelve-pentagon face table by hand.
+      //
+      // Note the phi sits on the *first* named axis of each triple. Swapping it
+      // with the 1 gives the other icosahedron orientation, whose directions are
+      // face *corners* of this dodecahedron rather than face centres - each
+      // supporting plane then touches a single vertex and every face comes back
+      // empty.
+      std::vector<std::array<float, 3>> normals;
+      for (int a = -1; a <= 1; a += 2)
+         for (int b = -1; b <= 1; b += 2)
+         {
+            normals.push_back({ { 0.0f, (float)a * phi, (float)b } });
+            normals.push_back({ { (float)a * phi, (float)b, 0.0f } });
+            normals.push_back({ { (float)a, 0.0f, (float)b * phi } });
+         }
+
+      Mesh mesh;
+      for (auto& n : normals)
+      {
+         const float nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+         n[0] /= nl; n[1] /= nl; n[2] /= nl;
+
+         float best = -1e9f;
+         for (const auto& p : pts)
+            best = std::max(best, p[0] * n[0] + p[1] * n[1] + p[2] * n[2]);
+
+         std::vector<std::array<float, 3>> face;
+         for (const auto& p : pts)
+            if (p[0] * n[0] + p[1] * n[1] + p[2] * n[2] > best - 1e-4f)
+               face.push_back(p);
+
+         SortAroundNormal(face, n.data());
+         PushHullFace(mesh, face);
+      }
+      return mesh;
+   }
+
+   Mesh RoundedCube(int segments, float radius)
+   {
+      Mesh mesh = Cube(std::max(1, std::min(segments, 128)));
+      const float r = std::max(0.0f, std::min(radius, 0.4999f));
+      const float b = 0.5f - r;
+
+      // Every cube vertex is already on the box surface, so clamping it into
+      // the inner box and pushing back out by r lands it exactly on the rounded
+      // box - and the push direction *is* the surface normal, for free.
+      for (Vertex& vert : mesh.vertices)
+      {
+         const float qx = std::max(-b, std::min(vert.px, b));
+         const float qy = std::max(-b, std::min(vert.py, b));
+         const float qz = std::max(-b, std::min(vert.pz, b));
+         float dx = vert.px - qx, dy = vert.py - qy, dz = vert.pz - qz;
+         const float len = std::sqrt(dx * dx + dy * dy + dz * dz);
+         if (len < 1e-6f)
+            continue;
+         dx /= len; dy /= len; dz /= len;
+         vert.px = qx + dx * r;
+         vert.py = qy + dy * r;
+         vert.pz = qz + dz * r;
+         vert.nx = dx; vert.ny = dy; vert.nz = dz;
+      }
+      return mesh;
+   }
+
+   Mesh MobiusStrip(int segments, int widthSegments, float width)
+   {
+      Mesh mesh;
+      const int seg = std::max(8, std::min(segments, 2048));
+      const int wseg = std::max(1, std::min(widthSegments, 256));
+      const float w = std::max(0.01f, width);
+      const int stride = wseg + 1;
+
+      for (int i = 0; i <= seg; i++)
+      {
+         const float u = (float)i / (float)seg * 2.0f * kPi;
+         const float half = u * 0.5f;
+         for (int j = 0; j <= wseg; j++)
+         {
+            const float v = ((float)j / (float)wseg - 0.5f) * w;
+            const float rad = 0.4f + v * std::cos(half);
+            PushVertex(mesh, rad * std::cos(u), v * std::sin(half), rad * std::sin(u),
+                       0.0f, 1.0f, 0.0f,
+                       (float)i / (float)seg, (float)j / (float)wseg);
+         }
+      }
+
+      for (int i = 0; i < seg; i++)
+         for (int j = 0; j < wseg; j++)
+            PushQuad(mesh, (unsigned int)(i * stride + j),
+                     (unsigned int)((i + 1) * stride + j),
+                     (unsigned int)((i + 1) * stride + j + 1),
+                     (unsigned int)(i * stride + j + 1));
+
+      mesh = MeshOps::RecalculateNormals(mesh, false, false);
+
+      // A Mobius strip has one side, so half of it always faces away. Emitting
+      // the mirrored winding as well makes it visible from everywhere instead
+      // of half-disappearing under backface culling.
+      const size_t vertCount = mesh.vertices.size();
+      const size_t indexCount = mesh.indices.size();
+      for (size_t i = 0; i < vertCount; i++)
+      {
+         Vertex back = mesh.vertices[i];
+         back.nx = -back.nx; back.ny = -back.ny; back.nz = -back.nz;
+         mesh.vertices.push_back(back);
+      }
+      for (size_t i = 0; i + 2 < indexCount; i += 3)
+      {
+         mesh.indices.push_back(mesh.indices[i] + (unsigned int)vertCount);
+         mesh.indices.push_back(mesh.indices[i + 2] + (unsigned int)vertCount);
+         mesh.indices.push_back(mesh.indices[i + 1] + (unsigned int)vertCount);
+      }
+      return mesh;
+   }
+
+   Mesh KleinBottle(int uSegments, int vSegments)
+   {
+      // Figure-8 immersion: closed with no boundary and no self-intersecting
+      // neck to tessellate around, unlike the classic bottle shape.
+      Mesh mesh;
+      const int us = std::max(8, std::min(uSegments, 512));
+      const int vs = std::max(8, std::min(vSegments, 512));
+      const float r = 0.3f;
+
+      // No duplicated seam rows: both wraps are handled by the index mapping
+      // below, which is the only way to close this surface at all.
+      for (int i = 0; i < us; i++)
+      {
+         const float u = (float)i / (float)us * 2.0f * kPi;
+         const float half = u * 0.5f;
+         for (int j = 0; j < vs; j++)
+         {
+            const float v = (float)j / (float)vs * 2.0f * kPi;
+            const float t = 0.18f * (std::cos(half) * std::sin(v) - std::sin(half) * std::sin(2.0f * v));
+            const float y = 0.18f * (std::sin(half) * std::sin(v) + std::cos(half) * std::sin(2.0f * v));
+            PushVertex(mesh, (r + t) * std::cos(u), y, (r + t) * std::sin(u),
+                       0.0f, 1.0f, 0.0f,
+                       (float)i / (float)us, (float)j / (float)vs);
+         }
+      }
+
+      // Going once around u advances the half-angle by pi, which negates the
+      // whole cross-section: the point at (u + 2pi, v) is the point at (u, -v),
+      // not (u, v). That reversal *is* the Klein bottle. Wrapping u naively
+      // leaves the two ends of the tube misaligned and tears the seam open.
+      auto at = [&](int i, int j) -> unsigned int
+      {
+         if (i >= us)
+         {
+            i -= us;
+            j = (vs - j) % vs;
+         }
+         return (unsigned int)(i * vs + (j % vs));
+      };
+
+      for (int i = 0; i < us; i++)
+         for (int j = 0; j < vs; j++)
+            PushQuad(mesh, at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1));
+      return MeshOps::RecalculateNormals(mesh, false, false);
+   }
+
+   Mesh Gear(int teeth, float depth, float toothDepth, float hubRadius)
+   {
+      const int n = std::max(3, std::min(teeth, 200));
+      const float outer = 0.5f;
+      const float root = outer * (1.0f - std::max(0.02f, std::min(toothDepth, 0.6f)));
+
+      // Four samples per tooth - root, rising flank, tip, falling flank - which
+      // is the minimum that gives a trapezoidal tooth rather than a sine wave.
+      std::vector<float> radii;
+      for (int i = 0; i < n; i++)
+      {
+         radii.push_back(root);
+         radii.push_back(outer);
+         radii.push_back(outer);
+         radii.push_back(root);
+      }
+      return ExtrudeRadialProfile(radii, std::max(0.01f, depth),
+                                  std::max(0.0f, std::min(hubRadius, root * 0.9f)));
+   }
+
+   Mesh Star(int points, float innerRatio, float depth)
+   {
+      const int n = std::max(3, std::min(points, 200));
+      const float outer = 0.5f;
+      const float inner = outer * std::max(0.05f, std::min(innerRatio, 0.95f));
+      std::vector<float> radii;
+      for (int i = 0; i < n; i++)
+      {
+         radii.push_back(outer);
+         radii.push_back(inner);
+      }
+      return ExtrudeRadialProfile(radii, std::max(0.01f, depth), 0.0f);
+   }
+
+   Mesh Disc(int sides, float innerRadius)
+   {
+      const int n = std::max(3, std::min(sides, 4096));
+      const float outer = 0.5f;
+      const float inner = std::max(0.0f, std::min(innerRadius, 0.49f));
+      Mesh mesh;
+
+      // Two-sided: a disc with one face is invisible from below, which is never
+      // what anyone wants from a ground plane or a cap.
+      for (int side = 0; side < 2; side++)
+      {
+         const float ny = (side == 0) ? 1.0f : -1.0f;
+         const unsigned int base = (unsigned int)mesh.vertices.size();
+         for (int i = 0; i <= n; i++)
+         {
+            const float a = (float)i / (float)n * 2.0f * kPi;
+            const float c = std::cos(a), s = std::sin(a);
+            PushVertex(mesh, c * inner, 0.0f, s * inner, 0.0f, ny,
+                       0.0f, 0.5f + c * inner, 0.5f + s * inner);
+            PushVertex(mesh, c * outer, 0.0f, s * outer, 0.0f, ny,
+                       0.0f, 0.5f + c * outer, 0.5f + s * outer);
+         }
+         for (int i = 0; i < n; i++)
+         {
+            const unsigned int a = base + (unsigned int)i * 2;
+            if (side == 0)
+               PushQuad(mesh, a, a + 1, a + 3, a + 2);
+            else
+               PushQuad(mesh, a, a + 2, a + 3, a + 1);
+         }
+      }
+      return mesh;
+   }
+
+   Mesh Arrow(int sides, float shaftRadius, float headLength)
+   {
+      const int n = std::max(3, std::min(sides, 512));
+      const float head = std::max(0.05f, std::min(headLength, 0.9f));
+      const float shaftLen = 1.0f - head;
+      const float sr = std::max(0.01f, std::min(shaftRadius, 0.24f));
+
+      Mesh mesh = Cylinder(n, 1, 1.0f);
+      // Cylinder is unit-height about the origin; squash and slide it so the
+      // whole arrow still spans -0.5..0.5 with the tip at +Y.
+      for (Vertex& v : mesh.vertices)
+      {
+         v.px *= sr * 2.0f;
+         v.pz *= sr * 2.0f;
+         v.py = v.py * shaftLen - head * 0.5f;
+      }
+
+      Mesh cone = Cone(n, 1);
+      for (Vertex& v : cone.vertices)
+      {
+         v.py = v.py * head + shaftLen * 0.5f;
+      }
+
+      const unsigned int offset = (unsigned int)mesh.vertices.size();
+      mesh.vertices.insert(mesh.vertices.end(), cone.vertices.begin(), cone.vertices.end());
+      for (unsigned int i : cone.indices)
+         mesh.indices.push_back(i + offset);
+      // Both halves were scaled non-uniformly, which leaves their inherited
+      // normals pointing the wrong way - a normal does not transform like a
+      // position under anisotropic scale.
+      return MeshOps::RecalculateNormals(mesh, true, false);
+   }
+
    Mesh Supershape(int rings, int sectors, float m1, float n1, float n2, float n3,
                    float m2, float p1, float p2, float p3)
    {

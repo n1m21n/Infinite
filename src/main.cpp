@@ -59,6 +59,7 @@
 #include "nodes/CurveNode.h"
 #include "nodes/OceanNode.h"
 #include "nodes/SimulationNodes.h"
+#include "nodes/GenerativeNodes.h"
 #include "nodes/DrawNode.h"
 #include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
@@ -524,6 +525,8 @@ namespace
             [i]() -> INode* { return JoinGeometryNode::CreateFor(i); }, "3D");
       }
       REGISTER_NODE(MetaBallNode, Metaballs, "3D");
+      REGISTER_NODE(MeshResynthNode, Resynthesize 3D, "3D");
+      REGISTER_NODE(ImageToPointsNode, Image to Points, "3D");
       REGISTER_NODE(CurveNode, Curve, "3D");
       // Three names, one class - Points/Edges/Faces are the same sampler.
       for (int i = 0; i < 3; i++)
@@ -643,6 +646,10 @@ namespace
          return 1;
       if (dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<MeshResynthNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<ImageToPointsNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<ClothNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr)
@@ -690,6 +697,8 @@ namespace
          return slot == 0 ? &fit->Input() : nullptr;
       if (auto* resynth = dynamic_cast<ResynthNode*>(gn.node.get()))
          return slot == 0 ? &resynth->Input() : nullptr;
+      if (auto* i2p = dynamic_cast<ImageToPointsNode*>(gn.node.get()))
+         return slot == 0 ? &i2p->Input() : nullptr;
       if (auto* curves = dynamic_cast<CurvesNode*>(gn.node.get()))
          return slot == 0 ? &curves->Input() : nullptr;
       if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn.node.get()))
@@ -747,6 +756,7 @@ namespace
       if (auto* n3d = dynamic_cast<Null3DNode*>(dst.node.get())) { n3d->input = geo; return; }
       if (auto* mat = dynamic_cast<MaterialNode*>(dst.node.get())) { mat->input = geo; return; }
       if (auto* m2p = dynamic_cast<MeshToPointsNode*>(dst.node.get())) { m2p->input = geo; return; }
+      if (auto* mrs = dynamic_cast<MeshResynthNode*>(dst.node.get())) { mrs->input = geo; return; }
       if (auto* cloth = dynamic_cast<ClothNode*>(dst.node.get())) { cloth->input = geo; return; }
       if (auto* join = dynamic_cast<JoinGeometryNode*>(dst.node.get()))
       {
@@ -1985,6 +1995,48 @@ namespace
       ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
+   void DrawMeshResynthParams(MeshResynthNode* n)
+   {
+      ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());
+      if (ImGui::Button("step")) n->StepOnce();
+      ImGui::SameLine();
+      if (ImGui::Button("reset")) n->Reset();
+      ImGui::SameLine();
+      if (ImGui::Button("randomise")) n->Randomise();
+
+      NodeSeparator("evolve");
+      ModSlider("chaos", &n->chaos, 0.0f, 1.5f);
+      ImGui::Checkbox("auto step", &n->autoStep);
+      if (n->autoStep)
+         ModSlider("steps per beat", &n->stepsPerBeat, 0.05f, 8.0f);
+      ModSlider("seed", &n->seed, 0.0f, 1000.0f);
+      ModSliderInt("triangle budget", &n->triangleBudget, 2000, 500000);
+
+      NodeSeparator("operators");
+      for (int i = 0; i < MeshResynthNode::kOpCount; i++)
+         ModSlider(MeshResynthNode::OpNames()[i].c_str(), &n->weight[i], 0.0f, 1.0f);
+   }
+
+   void DrawImageToPointsParams(ImageToPointsNode* n)
+   {
+      ImGui::TextDisabled("%zu points", n->PointCount());
+      ModSliderInt("density", &n->density, 4, 400);
+      ModSlider("width", &n->width, 0.1f, 8.0f);
+      ModSlider("height", &n->height, 0.1f, 8.0f);
+      ModSlider("threshold", &n->threshold, 0.0f, 1.0f);
+
+      NodeSeparator("depth");
+      DropdownButton("from", ImageToPointsNode::DepthSourceNames(), n->depthSource,
+                     [n](int i) { n->depthSource = i; });
+      ModSlider("depth scale", &n->depthScale, -4.0f, 4.0f);
+
+      NodeSeparator("points");
+      ModSlider("point size", &n->pointSize, 0.01f, 4.0f);
+      ModSlider("size from luma", &n->sizeFromLuma, -1.0f, 1.0f);
+      ImGui::Checkbox("use image colour", &n->useImageColor);
+      ColorSwatch("tint", n->tint, n);
+   }
+
    void DrawMeshToPointsParams(MeshToPointsNode* n)
    {
       DropdownButton("sample", MeshToPointsNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
@@ -2124,12 +2176,43 @@ namespace
       if (n->bevel > 0.0f)
          ModSliderInt("bevel segments", &n->bevelSegments, 1, 3);
       ModSliderInt("sides", &n->sides, 3, 64);
-      if (n->shape == 4 || n->shape == 7)
-         ModSlider("tube", &n->tubeRadius, 0.02f, 0.95f);
-      if (n->shape == 7)
+      // `tube` and `n2` are reused as the second and third form parameter by
+      // several primitives, so each one is labelled for the shape in front of
+      // you rather than by the variable it happens to live in. Capsule, Tube
+      // and Helix were reading tubeRadius all along with no way to set it.
+      switch (n->shape)
       {
-         ModSliderInt("knot p", &n->knotP, 1, 8);
-         ModSliderInt("knot q", &n->knotQ, 1, 8);
+         case 4: case 7: case 8:
+            ModSlider("tube", &n->tubeRadius, 0.02f, 0.95f); break;
+         case 9:
+            ModSlider("inner radius", &n->tubeRadius, 0.02f, 0.95f); break;
+         case 12:
+            ModSlider("wire", &n->tubeRadius, 0.02f, 0.95f); break;
+         case 17:
+            ModSlider("corner radius", &n->tubeRadius, 0.0f, 0.99f); break;
+         case 18:
+            ModSlider("width", &n->tubeRadius, 0.02f, 0.95f); break;
+         case 20:
+            ModSlider("depth", &n->tubeRadius, 0.02f, 0.95f);
+            ModSlider("tooth depth", &n->superN2, 0.1f, 2.0f);
+            ModSlider("hub hole", &n->superN3, 0.0f, 2.0f);
+            break;
+         case 21:
+            ModSlider("depth", &n->tubeRadius, 0.02f, 0.95f);
+            ModSlider("inner ratio", &n->superN2, 0.1f, 1.9f);
+            break;
+         case 22:
+            ModSlider("inner radius", &n->discInner, 0.0f, 0.98f); break;
+         case 23:
+            ModSlider("shaft radius", &n->tubeRadius, 0.02f, 0.8f);
+            ModSlider("head length", &n->superN2, 0.15f, 2.5f);
+            break;
+         default: break;
+      }
+      if (n->shape == 7 || n->shape == 12)
+      {
+         ModSliderInt(n->shape == 12 ? "turns" : "knot p", &n->knotP, 1, 8);
+         ModSliderInt(n->shape == 12 ? "height" : "knot q", &n->knotQ, 1, 8);
       }
 
       NodeSeparator("transform");
@@ -3238,6 +3321,9 @@ namespace
             if (auto* m2p = dynamic_cast<MeshToPointsNode*>(other.node.get()))
                if (m2p->input == dyingGeometry)
                   m2p->input = nullptr;
+            if (auto* mrs = dynamic_cast<MeshResynthNode*>(other.node.get()))
+               if (mrs->input == dyingGeometry)
+                  mrs->input = nullptr;
             if (auto* cloth = dynamic_cast<ClothNode*>(other.node.get()))
                if (cloth->input == dyingGeometry)
                   cloth->input = nullptr;
@@ -3364,6 +3450,7 @@ namespace
          if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get())) record(n3d->input, 0);
          if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get())) record(mat->input, 0);
          if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get())) record(m2p->input, 0);
+         if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get())) record(mrs->input, 0);
          if (auto* cloth = dynamic_cast<ClothNode*>(gn.node.get())) record(cloth->input, 0);
          if (auto* join = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
             for (int i = 0; i < JoinGeometryNode::kSlots; i++)
@@ -4636,6 +4723,13 @@ int main()
             delete made;
          }
          printf("primitives spawnable by name: 3D=%d 2D=%d\n", (int)allShapes, (int)allShapes2D);
+         // Two nodes sharing a name is a silent bug: one of them becomes
+         // unspawnable and any patch naming it loads the wrong node.
+         const std::vector<std::string>& dupes = NodeFactory::Instance().DuplicateNames();
+         for (const std::string& d : dupes)
+            printf("  duplicate node name: %s\n", d.c_str());
+         printf("unique node names: %s\n", dupes.empty() ? "OK" : "FAIL");
+         allShapes = allShapes && dupes.empty();
 
          // Bevel must actually round a cube - more triangles, and a smaller
          // extent than the original since the corners get pulled in.
@@ -4720,6 +4814,325 @@ int main()
                          cut.FaceCount() == cube.FaceCount() - 2 && kept.FaceCount() == 2 &&
                          movedOk && extruded.FaceCount() > cube.FaceCount() && reproducible;
          printf("%s\n", ok ? "SELECTION OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_PHASEFTEST") != nullptr && frameId == 4)
+      {
+         // Signed volume by the divergence theorem. A closed mesh whose
+         // triangles all wind outward has positive volume; if any face is
+         // flipped the contributions cancel and it collapses. This is the exact
+         // check that caught the shattered metaballs, so every new closed
+         // primitive gets it rather than a triangle count that proves nothing.
+         auto volumeOf = [](const Mesh& m) {
+            double vol = 0.0;
+            for (size_t t = 0; t + 2 < m.indices.size(); t += 3)
+            {
+               const Vertex& a = m.vertices[m.indices[t]];
+               const Vertex& b = m.vertices[m.indices[t + 1]];
+               const Vertex& c = m.vertices[m.indices[t + 2]];
+               vol += ((double)a.px * ((double)b.py * c.pz - (double)c.py * b.pz)
+                     - (double)a.py * ((double)b.px * c.pz - (double)c.px * b.pz)
+                     + (double)a.pz * ((double)b.px * c.py - (double)c.px * b.py)) / 6.0;
+            }
+            return vol;
+         };
+         // Edges are matched by quantised *position*, not index: these solids are
+         // flat-shaded, so adjacent faces never share a vertex index even when
+         // they share an edge in space.
+         auto openEdges = [](const Mesh& m) {
+            auto key = [&](unsigned int i) {
+               const Vertex& v = m.vertices[i];
+               return std::to_string((long long)std::llround(v.px * 10000.0f)) + "," +
+                      std::to_string((long long)std::llround(v.py * 10000.0f)) + "," +
+                      std::to_string((long long)std::llround(v.pz * 10000.0f));
+            };
+            std::map<std::string, int> counts;
+            for (size_t t = 0; t + 2 < m.indices.size(); t += 3)
+               for (int e = 0; e < 3; e++)
+               {
+                  std::string a = key(m.indices[t + e]);
+                  std::string b = key(m.indices[t + (e + 1) % 3]);
+                  counts[a < b ? a + "|" + b : b + "|" + a]++;
+               }
+            int open = 0;
+            for (const auto& kv : counts)
+               if (kv.second != 2)
+                  open++;
+            return open;
+         };
+
+         bool ok = true;
+         struct Solid { const char* name; Mesh mesh; size_t expectTris; };
+         std::vector<Solid> solids = {
+            { "tetrahedron", Primitives::Tetrahedron(), 12 },
+            { "octahedron", Primitives::Octahedron(), 24 },
+            // Twelve pentagons fanned from their centroids: 12 * 5.
+            { "dodecahedron", Primitives::Dodecahedron(), 60 },
+            { "rounded cube", Primitives::RoundedCube(8, 0.2f), 0 },
+         };
+         for (const Solid& s : solids)
+         {
+            const double vol = volumeOf(s.mesh);
+            const int open = openEdges(s.mesh);
+            const size_t tris = s.mesh.indices.size() / 3;
+            const bool trisOk = s.expectTris == 0 || tris == s.expectTris;
+            // Klein bottle is closed but non-orientable, so its signed volume
+            // is meaningless - it is only required to be watertight.
+            const bool volOk = (std::string(s.name) == "klein bottle") || vol > 1e-4;
+            printf("%-14s %6zu tris, volume %+.4f, %d open edges  %s\n",
+                   s.name, tris, vol, open,
+                   (trisOk && volOk && open == 0) ? "OK" : "FAIL");
+            ok = ok && trisOk && volOk && open == 0;
+         }
+
+         // The figure-8 Klein bottle is a closed surface, but its cross-section
+         // passes through its own centre twice, so v = 0 and v = pi land on the
+         // same point for every u. Position-keyed edge matching therefore sees
+         // those rings as one and reports false tears. Index-keyed matching is
+         // the correct test here: this surface is one shared grid, so equal
+         // indices really do mean the same vertex.
+         {
+            const Mesh kb = Primitives::KleinBottle(24, 24);
+            std::map<std::pair<unsigned int, unsigned int>, int> counts;
+            for (size_t t = 0; t + 2 < kb.indices.size(); t += 3)
+               for (int e = 0; e < 3; e++)
+               {
+                  unsigned int a = kb.indices[t + e];
+                  unsigned int b = kb.indices[t + (e + 1) % 3];
+                  counts[a < b ? std::make_pair(a, b) : std::make_pair(b, a)]++;
+               }
+            int open = 0;
+            for (const auto& kv : counts)
+               if (kv.second != 2)
+                  open++;
+            // And confirm the diagnosis rather than asserting it: exactly one
+            // coincident partner per u ring, which is where the 24 phantom
+            // open edges came from.
+            std::set<std::string> distinct;
+            for (const Vertex& v : kb.vertices)
+               distinct.insert(std::to_string((long long)std::llround(v.px * 10000.0f)) + "," +
+                               std::to_string((long long)std::llround(v.py * 10000.0f)) + "," +
+                               std::to_string((long long)std::llround(v.pz * 10000.0f)));
+            const size_t duplicates = kb.vertices.size() - distinct.size();
+            // Index matching proves the seam is *joined*, not that it is joined
+            // correctly - a naive wrap is equally closed but stitches mismatched
+            // cross-sections together, which shows up as a few enormous quads
+            // spanning the tube. Comparing the longest edge to the median is
+            // what actually tests the (u + 2pi, v) = (u, -v) identification.
+            double longest = 0.0;
+            std::vector<double> lengths;
+            for (const auto& kv : counts)
+            {
+               const Vertex& a = kb.vertices[kv.first.first];
+               const Vertex& b = kb.vertices[kv.first.second];
+               const double d = std::sqrt((double)(a.px-b.px)*(a.px-b.px) +
+                                          (double)(a.py-b.py)*(a.py-b.py) +
+                                          (double)(a.pz-b.pz)*(a.pz-b.pz));
+               lengths.push_back(d);
+               longest = std::max(longest, d);
+            }
+            std::sort(lengths.begin(), lengths.end());
+            const double median = lengths[lengths.size() / 2];
+            const bool seamOk = longest < median * 3.0;
+            printf("klein bottle   %6zu tris, %d open edges by index, %zu self-touching vertices  %s\n",
+                   kb.indices.size() / 3, open, duplicates,
+                   (open == 0 && duplicates == 24) ? "OK" : "FAIL");
+            printf("klein seam: longest edge %.4f vs median %.4f  %s\n",
+                   longest, median, seamOk ? "OK" : "FAIL");
+            ok = ok && open == 0 && duplicates == 24 && seamOk;
+         }
+
+         // A rounded cube must sit strictly between the cube it came from and
+         // the sphere it would become - the one measurement that catches a
+         // projection that rounds too much or not at all.
+         const double rcVol = volumeOf(Primitives::RoundedCube(10, 0.2f));
+         const bool rcOk = rcVol < 1.0 && rcVol > 0.5236;
+         printf("rounded cube volume %.4f between sphere 0.5236 and cube 1.0  %s\n",
+                rcVol, rcOk ? "OK" : "FAIL");
+         ok = ok && rcOk;
+
+         // The open surfaces are emitted with both windings, so their triangle
+         // count is even and each is reachable from either side.
+         const Mesh mob = Primitives::MobiusStrip(64, 4, 0.3f);
+         const bool mobOk = !mob.Empty() && (mob.indices.size() / 3) % 2 == 0;
+         printf("mobius strip %zu tris, doubled  %s\n", mob.indices.size() / 3,
+                mobOk ? "OK" : "FAIL");
+         ok = ok && mobOk;
+
+         for (const auto& p : { std::make_pair("gear", Primitives::Gear(12, 0.3f, 0.25f, 0.15f)),
+                                std::make_pair("star", Primitives::Star(5, 0.4f, 0.3f)),
+                                std::make_pair("disc", Primitives::Disc(32, 0.0f)),
+                                std::make_pair("arrow", Primitives::Arrow(16, 0.12f, 0.35f)) })
+         {
+            const bool nonEmpty = !p.second.Empty();
+            printf("%-6s %zu tris  %s\n", p.first, p.second.indices.size() / 3,
+                   nonEmpty ? "OK" : "FAIL");
+            ok = ok && nonEmpty;
+         }
+
+         // --- 3D resynthesize ---
+         GeometryNode src;
+         src.shape = 2; // sphere
+         src.CookIfNeeded(9001);
+
+         auto evolve = [&](float seed, int steps) {
+            auto node = std::make_unique<MeshResynthNode>();
+            node->input = &src;
+            node->seed = seed;
+            node->chaos = 0.5f;
+            for (int i = 0; i < steps; i++)
+               node->StepOnce();
+            node->CookIfNeeded(9002);
+            return node;
+         };
+         auto a = evolve(3.0f, 5);
+         auto b = evolve(3.0f, 5);
+         auto c = evolve(11.0f, 5);
+
+         auto samePositions = [](const Mesh& x, const Mesh& y) {
+            if (x.vertices.size() != y.vertices.size())
+               return false;
+            for (size_t i = 0; i < x.vertices.size(); i++)
+               if (std::fabs(x.vertices[i].px - y.vertices[i].px) > 1e-6f ||
+                   std::fabs(x.vertices[i].py - y.vertices[i].py) > 1e-6f ||
+                   std::fabs(x.vertices[i].pz - y.vertices[i].pz) > 1e-6f)
+                  return false;
+            return true;
+         };
+
+         // The whole promise of the node: a patch reopened tomorrow replays the
+         // same evolution, and a different seed is genuinely a different one.
+         const bool deterministic = samePositions(a->GetMesh(), b->GetMesh());
+         const bool seedMatters = !samePositions(a->GetMesh(), c->GetMesh());
+         printf("resynth generation %d, deterministic %d, seed changes result %d  %s\n",
+                a->Generation(), (int)deterministic, (int)seedMatters,
+                (deterministic && seedMatters && a->Generation() == 5) ? "OK" : "FAIL");
+         ok = ok && deterministic && seedMatters && a->Generation() == 5;
+
+         // And it must actually mutate: five generations that leave the sphere
+         // untouched would pass every check above.
+         const bool moved = !samePositions(a->GetMesh(), src.GetMesh());
+         printf("resynth changed the mesh: %d  %s\n", (int)moved, moved ? "OK" : "FAIL");
+         ok = ok && moved;
+
+         // Reset must return to the source exactly, not approximately.
+         a->Reset();
+         a->CookIfNeeded(9003);
+         const bool resetOk = samePositions(a->GetMesh(), src.GetMesh()) && a->Generation() == 0;
+         printf("reset restores the input: %d  %s\n", (int)resetOk, resetOk ? "OK" : "FAIL");
+         ok = ok && resetOk;
+
+         // Subdivision at full weight, unattended, must stop at the budget.
+         auto budget = std::make_unique<MeshResynthNode>();
+         budget->input = &src;
+         budget->weight[MeshResynthNode::kSubdivide] = 1.0f;
+         budget->triangleBudget = 8000;
+         for (int frame = 0; frame < 12; frame++)
+         {
+            for (int i = 0; i < 4; i++)
+               budget->StepOnce();
+            budget->CookIfNeeded(9100 + frame);
+         }
+         const size_t grown = budget->TriangleCount();
+         const bool budgetOk = grown <= 8000;
+         printf("subdivide budget: %zu tris, cap 8000  %s\n", grown, budgetOk ? "OK" : "FAIL");
+         ok = ok && budgetOk;
+
+         // --- image to point cloud ---
+         ShapeNode circle;
+         circle.shapeType = 0;
+         circle.width = 256; circle.height = 256;
+         circle.size = 0.25f;
+         circle.posY = 0.75f;   // deliberately off-centre, see below
+         circle.CookIfNeeded(9200);
+
+         ImageToPointsNode i2p;
+         i2p.Input().Connect(&circle);
+         i2p.density = 64;
+         i2p.threshold = 0.3f;
+         i2p.height = 2.0f;
+         i2p.CookIfNeeded(9201);
+
+         const size_t pts = i2p.PointCount();
+         const size_t grid = 64 * 64;
+         // A circle of radius 0.25 covers pi*r^2 of the frame. If the threshold
+         // were ignored we would get all 4096 points; if it rejected everything,
+         // zero. Both failure modes are outside this band.
+         const double coverage = (double)pts / (double)grid;
+         const bool coverageOk = coverage > 0.10 && coverage < 0.30;
+         printf("image to points: %zu of %zu (%.1f%% vs expected 19.6%%)  %s\n",
+                pts, grid, coverage * 100.0, coverageOk ? "OK" : "FAIL");
+         ok = ok && coverageOk;
+
+         // The circle was placed at v = 0.75, so the cloud's centre of mass must
+         // land at the matching height. This is what catches a vertical flip -
+         // a centred test image would pass either way round.
+         double meanY = 0.0;
+         for (const Particle& p : i2p.GetPoints())
+            meanY += p.py;
+         if (pts > 0)
+            meanY /= (double)pts;
+         const double expectedY = (0.75 - 0.5) * 2.0;
+         const bool orientOk = std::fabs(meanY - expectedY) < 0.15;
+         printf("cloud centre y %.3f, image centre y %.3f  %s\n",
+                meanY, expectedY, orientOk ? "OK" : "FAIL");
+         ok = ok && orientOk;
+
+         // Formula presets are compiled at runtime, so a typo in one ships as a
+         // preset that silently does nothing. Compile every one.
+         {
+            FormulaNode fx;
+            int failed = 0;
+            for (int i = 0; i < (int)FormulaNode::PresetNames().size(); i++)
+            {
+               fx.LoadPreset(i);
+               if (!fx.Apply())
+               {
+                  failed++;
+                  printf("  preset \"%s\" failed: %s\n",
+                         FormulaNode::PresetNames()[i].c_str(), fx.LastError().c_str());
+               }
+            }
+            printf("formula presets: %zu compiled, %d failed  %s\n",
+                   FormulaNode::PresetNames().size(), failed, failed == 0 ? "OK" : "FAIL");
+            ok = ok && failed == 0;
+         }
+
+         // Same for the 2D shapes: they share one shader, but a new branch that
+         // never runs would leave the shape rendering as whatever the fallback
+         // is. Cook each and confirm it puts something on screen.
+         {
+            int blank = 0;
+            for (int i = 0; i < (int)ShapeNode::ShapeNames().size(); i++)
+            {
+               ShapeNode sh;
+               sh.shapeType = i;
+               sh.width = 64; sh.height = 64;
+               sh.CookIfNeeded(9300 + i);
+               unsigned char px[64 * 64 * 4] = { 0 };
+               glBindTexture(GL_TEXTURE_2D, sh.GetOutputTexture());
+               glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+               glBindTexture(GL_TEXTURE_2D, 0);
+               int lit = 0;
+               for (int q = 0; q < 64 * 64; q++)
+                  if (px[q * 4] > 20 || px[q * 4 + 1] > 20 || px[q * 4 + 2] > 20)
+                     lit++;
+               // A shape that fills nothing is broken; one that fills the whole
+               // frame means the distance field never went positive.
+               const bool shapeOk = lit > 20 && lit < 64 * 64 - 20;
+               if (!shapeOk)
+               {
+                  blank++;
+                  printf("  2D shape \"%s\": %d of %d pixels lit  FAIL\n",
+                         ShapeNode::ShapeNames()[i].c_str(), lit, 64 * 64);
+               }
+            }
+            printf("2D shapes: %zu drawn, %d bad  %s\n",
+                   ShapeNode::ShapeNames().size(), blank, blank == 0 ? "OK" : "FAIL");
+            ok = ok && blank == 0;
+         }
+
+         printf("%s\n", ok ? "PHASE F OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_PHASEETEST") != nullptr && frameId == 4)
@@ -5992,11 +6405,10 @@ int main()
                   dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
-                dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
-                dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
-                dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<MeshResynthNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<ImageToPointsNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
          {
@@ -6034,6 +6446,10 @@ int main()
                snprintf(line, sizeof(line), "%d inputs, %zu tris", jn->ConnectedCount(), jn->TriangleCount());
             else if (auto* cl = dynamic_cast<ClothNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu tris, %zu links", cl->TriangleCount(), cl->ConstraintCount());
+            else if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "gen %d, %zu tris", mrs->Generation(), mrs->TriangleCount());
+            else if (auto* i2p = dynamic_cast<ImageToPointsNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu points", i2p->PointCount());
             else
                snprintf(line, sizeof(line), "scene node");
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255),
@@ -6112,6 +6528,10 @@ int main()
                DrawText3DParams(n);
             else if (auto* n = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
                DrawMeshToPointsParams(n);
+            else if (auto* n = dynamic_cast<MeshResynthNode*>(gn.node.get()))
+               DrawMeshResynthParams(n);
+            else if (auto* n = dynamic_cast<ImageToPointsNode*>(gn.node.get()))
+               DrawImageToPointsParams(n);
             else if (auto* n = dynamic_cast<PathNode*>(gn.node.get()))
                DrawPathParams(n);
             else if (auto* n = dynamic_cast<ConstantNode*>(gn.node.get()))
