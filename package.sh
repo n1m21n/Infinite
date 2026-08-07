@@ -8,7 +8,28 @@ STAGE="$ROOT/dist/stage"
 DMG="$ROOT/dist/Infinite.dmg"
 
 echo "==> configuring"
-cmake -S "$ROOT" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release >/dev/null
+# Ninja when it is available, otherwise whatever CMake defaults to. This is the
+# bigger of the two builds - it compiles every source twice, once per
+# architecture - so it gains the most from a faster generator, but the script
+# still has to run on a machine that only has make.
+GENERATOR=()
+WANTED="Unix Makefiles"
+if command -v ninja >/dev/null 2>&1; then
+    GENERATOR=(-G Ninja)
+    WANTED="Ninja"
+fi
+echo "    using $WANTED"
+
+# CMake refuses to reconfigure an existing build directory with a different
+# generator, so a tree built before Ninja was installed would fail here rather
+# than switch. Wiping is safe: this directory is only ever a build artifact.
+if [ -f "$BUILD/CMakeCache.txt" ] &&
+   ! grep -q "CMAKE_GENERATOR:INTERNAL=$WANTED" "$BUILD/CMakeCache.txt"; then
+    echo "    generator changed, reconfiguring from scratch"
+    rm -rf "$BUILD"
+fi
+
+cmake -S "$ROOT" -B "$BUILD" "${GENERATOR[@]}" -DCMAKE_BUILD_TYPE=Release >/dev/null
 
 echo "==> building"
 cmake --build "$BUILD" -j"$(sysctl -n hw.ncpu)"
