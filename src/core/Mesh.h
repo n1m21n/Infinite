@@ -269,4 +269,25 @@ namespace Primitives
    Mesh Cone(int sides, int rings);
    Mesh Icosphere(int subdivisions);
    Mesh TorusKnot(int segments, int sides, float tubeRadius, int p, int q);
+   Mesh Capsule(int rings, int sectors, float height);
+   Mesh Tube(int sides, int rings, float innerRadius);
+   Mesh Pyramid(int sides);
+   Mesh Prism(int sides, int rings);
+   Mesh Helix(int segments, int sides, float tubeRadius, float turns, float height);
+   // Gielis superformula on a sphere. Two sets of exponents give everything
+   // from a rounded cube to a starfish to a spiky shell, which is a lot of
+   // distinct silhouettes out of one function.
+   Mesh Supershape(int rings, int sectors, float m1, float n1, float n2, float n3,
+                   float m2, float p1, float p2, float p3);
+
+   // Marching cubes over summed inverse-square fields. Metaballs merge into one
+   // another instead of intersecting, which is the whole reason to want them
+   // rather than a Join of spheres.
+   struct MetaBall
+   {
+      float x = 0, y = 0, z = 0;
+      float strength = 1.0f;
+   };
+   Mesh MetaBalls(const std::vector<MetaBall>& balls, int resolution, float threshold,
+                  float bounds);
 }

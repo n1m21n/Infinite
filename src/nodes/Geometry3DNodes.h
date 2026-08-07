@@ -114,6 +114,11 @@ public:
    int knotQ = 3;
    float bevel = 0.0f;
    int bevelSegments = 1;
+   // Supershape exponents. knotP and knotQ double as its two m values, since
+   // both are "how many lobes" parameters and reusing them keeps the panel from
+   // growing a second set of near-identical sliders.
+   float superN2 = 1.0f, superN3 = 1.0f;
+   float superP2 = 1.0f, superP3 = 1.0f;
 
    float posX = 0.0f, posY = 0.0f, posZ = 0.0f;
    float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
@@ -134,6 +139,8 @@ public:
       v.Int("shape", shape); v.Int("detail", detail); v.Int("sides", sides);
       v.Float("tube", tubeRadius); v.Int("knotP", knotP); v.Int("knotQ", knotQ);
       v.Float("bevel", bevel); v.Int("bevelSegments", bevelSegments);
+      v.Float("superN2", superN2); v.Float("superN3", superN3);
+      v.Float("superP2", superP2); v.Float("superP3", superP3);
       v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
       v.Float("rotX", rotX); v.Float("rotY", rotY); v.Float("rotZ", rotZ);
       v.Float("scaleX", scaleX); v.Float("scaleY", scaleY); v.Float("scaleZ", scaleZ);
@@ -152,6 +159,7 @@ private:
    float mBuiltTube = -1.0f;
    float mBuiltBevel = -1.0f;
    int mBuiltBevelSegments = -1;
+   float mBuiltN2 = -999.0f, mBuiltN3 = -999.0f, mBuiltP2 = -999.0f, mBuiltP3 = -999.0f;
    unsigned long long mMeshRevision = 0;
 
    ImageCable mTextureInput;

@@ -13,7 +13,8 @@
 namespace
 {
    const std::vector<std::string> kShapeNames = {
-      "Plane", "Cube", "Sphere", "Icosphere", "Torus", "Cylinder", "Cone", "Torus Knot"
+      "Plane", "Cube", "Sphere", "Icosphere", "Torus", "Cylinder", "Cone", "Torus Knot",
+      "Capsule", "Tube", "Pyramid", "Prism", "Helix", "Supershape"
    };
    const std::vector<std::string> kShadingNames = { "Lit", "Normals", "UV", "Flat" };
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
@@ -428,7 +429,9 @@ void GeometryNode::RebuildIfNeeded()
 {
    if (shape == mBuiltShape && detail == mBuiltDetail && sides == mBuiltSides &&
        knotP == mBuiltP && knotQ == mBuiltQ && tubeRadius == mBuiltTube &&
-       bevel == mBuiltBevel && bevelSegments == mBuiltBevelSegments && !mMesh.Empty())
+       bevel == mBuiltBevel && bevelSegments == mBuiltBevelSegments &&
+       superN2 == mBuiltN2 && superN3 == mBuiltN3 &&
+       superP2 == mBuiltP2 && superP3 == mBuiltP3 && !mMesh.Empty())
       return;
 
    switch (shape)
@@ -440,7 +443,16 @@ void GeometryNode::RebuildIfNeeded()
       case 4: mMesh = Primitives::Torus(detail, sides, tubeRadius); break;
       case 5: mMesh = Primitives::Cylinder(sides, std::max(1, detail / 8), 1.0f); break;
       case 6: mMesh = Primitives::Cone(sides, std::max(1, detail / 8)); break;
-      default: mMesh = Primitives::TorusKnot(detail * 8, sides, tubeRadius, knotP, knotQ); break;
+      case 7: mMesh = Primitives::TorusKnot(detail * 8, sides, tubeRadius, knotP, knotQ); break;
+      case 8: mMesh = Primitives::Capsule(detail, sides * 2, tubeRadius); break;
+      case 9: mMesh = Primitives::Tube(sides, std::max(1, detail / 8), tubeRadius); break;
+      case 10: mMesh = Primitives::Pyramid(sides); break;
+      case 11: mMesh = Primitives::Prism(sides, std::max(1, detail / 8)); break;
+      case 12: mMesh = Primitives::Helix(detail * 8, sides, tubeRadius * 0.4f,
+                                         (float)knotP, (float)knotQ * 0.5f); break;
+      default: mMesh = Primitives::Supershape(detail, sides * 2,
+                                              (float)knotP, 1.0f, superN2, superN3,
+                                              (float)knotQ, 1.0f, superP2, superP3); break;
    }
 
    mBuiltShape = shape;
@@ -454,6 +466,8 @@ void GeometryNode::RebuildIfNeeded()
    mBuiltTube = tubeRadius;
    mBuiltBevel = bevel;
    mBuiltBevelSegments = bevelSegments;
+   mBuiltN2 = superN2; mBuiltN3 = superN3;
+   mBuiltP2 = superP2; mBuiltP3 = superP3;
    mMeshRevision = NextMeshRevision();
 }
 

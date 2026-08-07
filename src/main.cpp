@@ -514,6 +514,7 @@ namespace
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
       REGISTER_NODE(ClothNode, Cloth, "3D");
       REGISTER_NODE(JoinGeometryNode, Join Geometry, "3D");
+      REGISTER_NODE(MetaBallNode, Metaballs, "3D");
       // Three names, one class - Points/Edges/Faces are the same sampler.
       for (int i = 0; i < 3; i++)
       {
@@ -636,6 +637,8 @@ namespace
          return 1;
       if (dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr)
          return JoinGeometryNode::kSlots;
+      if (dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr)
+         return 1; // an optional point cloud to surface
       if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
@@ -737,6 +740,11 @@ namespace
       {
          if (slot >= 0 && slot < JoinGeometryNode::kSlots)
             join->inputs[slot] = geo;
+         return;
+      }
+      if (auto* meta = dynamic_cast<MetaBallNode*>(dst.node.get()))
+      {
+         meta->cloudSource = dynamic_cast<IPointCloudSource*>(src.node.get());
          return;
       }
       if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(dst.node.get()))
@@ -1055,7 +1063,6 @@ namespace
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
       ModSlider("seed", &n->seed, 0.0f, 200.0f);
-      ImGui::TextDisabled("same seed = same sequence");
    }
 
    void DrawPatternParams(PatternNode* n)
@@ -1277,7 +1284,6 @@ namespace
 
       ImGui::SetNextItemWidth(kPreviewSize);
       ImGui::SliderFloat("##macro", &n->value, 0.0f, 1.0f, "%.3f");
-      ImGui::TextDisabled("patch 'out' into as many params as you like");
       ModSlider("curve", &n->curve, 0.2f, 4.0f);
       ImGui::Checkbox("invert", &n->invert);
    }
@@ -1618,7 +1624,6 @@ namespace
          ImGui::Text("level "); ImGui::SameLine();
          ImGui::ProgressBar(std::min(1.0f, lv.rms * n->gain), ImVec2(kPreviewSize * 0.6f, 0), "");
       }
-      ImGui::TextDisabled("patch 'out' into Audio Analyze");
    }
 
    void DrawAudioAnalyzeParams(AudioAnalyzeNode* n)
@@ -1682,7 +1687,6 @@ namespace
       float p[3];
       n->CurrentPoint(p);
       ImGui::TextDisabled("t %.2f   (%.2f, %.2f, %.2f)", n->Progress(), p[0], p[1], p[2]);
-      ImGui::TextDisabled("patch x/y/z into any slider");
 
       NodeSeparator("motion");
       ModSlider("speed / beat", &n->speed, -2.0f, 2.0f);
@@ -1704,7 +1708,6 @@ namespace
 
    void DrawOceanParams(OceanNode* n)
    {
-      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
       NodeSeparator("surface");
       ModSliderInt("resolution", &n->resolution, 8, 300);
       ModSlider("size", &n->size, 0.5f, 20.0f);
@@ -1717,7 +1720,41 @@ namespace
       ModSlider("direction", &n->direction, -3.1416f, 3.1416f);
       ModSliderInt("octaves", &n->octaves, 1, 8);
       ModSlider("speed", &n->speed, -3.0f, 3.0f);
-      ImGui::TextDisabled("moves with the transport");
+
+      NodeSeparator("transform");
+      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
+      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
+      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
+      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
+
+      NodeSeparator("material");
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+      ColorSwatch("colour", n->color, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f);
+   }
+
+   void DrawMetaBallParams(MetaBallNode* n)
+   {
+      ImGui::TextDisabled("%zu balls, %zu triangles", n->BallCount(), n->TriangleCount());
+      NodeSeparator("field");
+      if (n->cloudSource == nullptr)
+      {
+         ModSliderInt("balls", &n->ballCount, 1, MetaBallNode::kMaxBalls);
+         ModSlider("spread", &n->spread, 0.0f, 2.0f);
+         ModSlider("orbit / beat", &n->spin, -1.0f, 1.0f);
+      }
+      else
+      {
+         ModSliderInt("max from cloud", &n->maxFromCloud, 1, 64);
+      }
+      ModSlider("radius", &n->radius, 0.05f, 1.5f);
+      ModSlider("threshold", &n->threshold, 0.5f, 40.0f);
+      ModSlider("bounds", &n->bounds, 0.5f, 6.0f);
+      ModSliderInt("resolution", &n->resolution, 8, 96);
 
       NodeSeparator("transform");
       ModSlider("pos x", &n->posX, -5.0f, 5.0f);
@@ -1738,7 +1775,6 @@ namespace
    void DrawJoinGeometryParams(JoinGeometryNode* n)
    {
       ImGui::TextDisabled("%d inputs, %zu triangles", n->ConnectedCount(), n->TriangleCount());
-      ImGui::TextDisabled("each input's transform is baked in");
 
       NodeSeparator("material");
       ImGui::Checkbox("inherit material", &n->inheritMaterial);
@@ -1775,7 +1811,6 @@ namespace
       DropdownButton("pinned", ClothNode::PinModeNames(), n->pinMode, [n](int i) { n->pinMode = i; });
       ModSlider("stiffness", &n->stiffness, 0.0f, 1.0f);
       ModSliderInt("iterations", &n->iterations, 1, 40);
-      ImGui::TextDisabled("more iterations = less stretchy");
       ModSlider("damping", &n->damping, 0.0f, 0.5f);
       ModSlider("mass", &n->mass, 0.05f, 10.0f);
       ModSlider("hold shape", &n->shapeRetention, 0.0f, 1.0f);
@@ -1821,7 +1856,6 @@ namespace
    void DrawParticleSystemParams(ParticleSystemNode* n)
    {
       ImGui::TextDisabled("%zu alive", n->AliveCount());
-      ImGui::TextDisabled("patch into Instance on Points > cloud");
       if (ImGui::Button("Reset", ImVec2(kParamWidth, 0)))
          n->Reset();
 
@@ -1861,16 +1895,10 @@ namespace
    void DrawMaterialParams(MaterialNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
-      ImGui::TextDisabled("restyles everything upstream");
-      ImGui::TextDisabled("patch Noise/Ramp/Formula into the map pins");
-      NodeSeparator("maps");
-      {
-         static const char* kNames[] = { "albedo", "roughness", "metallic", "normal", "ao" };
-         for (int map = 0; map < kMapCount; map++)
-            ImGui::TextDisabled("%-10s %s", kNames[map],
-                                n->MapInput(map).IsConnected() ? "patched" : "-");
+      // Only shown when a normal map is actually patched in - a strength slider
+      // for a map that is not there is just another dead control.
+      if (n->MapInput(kMapNormal).IsConnected())
          ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f);
-      }
       NodeSeparator("material");
       DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
       ColorSwatch("colour", n->color, n);
@@ -2010,6 +2038,13 @@ namespace
       NodeSeparator("form");
       ModSliderInt("detail", &n->detail, 2, 96);
       ModSlider("bevel", &n->bevel, 0.0f, 1.0f);
+      if (n->shape == 13) // supershape
+      {
+         ModSlider("n2", &n->superN2, 0.1f, 8.0f);
+         ModSlider("n3", &n->superN3, 0.1f, 8.0f);
+         ModSlider("p2", &n->superP2, 0.1f, 8.0f);
+         ModSlider("p3", &n->superP3, 0.1f, 8.0f);
+      }
       if (n->bevel > 0.0f)
          ModSliderInt("bevel segments", &n->bevelSegments, 1, 3);
       ModSliderInt("sides", &n->sides, 3, 64);
@@ -2042,8 +2077,6 @@ namespace
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
       ColorSwatch("emission", n->emissionColor, n);
       ModSlider("emission", &n->emission, 0.0f, 8.0f);
-      ImGui::TextDisabled("patch an image into the input to texture it");
-      ImGui::TextDisabled("patch 'out' into Render 3D");
    }
 
    void DrawGeometryOpParams(GeometryOpNode* n)
@@ -2107,7 +2140,6 @@ namespace
          case GeometryOpNode::kSmooth:
             ModSliderInt("iterations", &n->iterations, 1, 20);
             ModSlider("strength", &n->amount, 0.0f, 1.0f);
-            ImGui::TextDisabled("Taubin - relaxes without shrinking");
             break;
          case GeometryOpNode::kMirror:
             ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
@@ -2121,7 +2153,6 @@ namespace
             ModSlider("rise / turn", &n->rise, -2.0f, 2.0f);
             ModSlider("radius", &n->radiusOffset, 0.0f, 3.0f);
             ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
-            ImGui::TextDisabled("revolves the input's boundary edges");
             break;
          default:
             ModSlider("angle", &n->amount, -3.0f, 3.0f);
@@ -2190,7 +2221,6 @@ namespace
       ModSlider("target z", &n->targetZ, -3.0f, 3.0f);
       ModSlider("near", &n->nearPlane, 0.01f, 1.0f);
       ModSlider("far", &n->farPlane, 5.0f, 500.0f);
-      ImGui::TextDisabled("patch into Render 3D's camera input");
    }
 
    void DrawLightParams(LightNode* n)
@@ -2300,7 +2330,6 @@ namespace
             connected++;
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
       ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
-      ImGui::TextDisabled("drag the preview to orbit, scroll to zoom");
       if (ImGui::Button("Frame scene", ImVec2(kParamWidth, 0)))
          FrameSceneInView(n);
       if (n->LastTriangleCount() > 2000000)
@@ -2357,7 +2386,6 @@ namespace
          ModSlider("strength", &n->shadowStrength, 0.0f, 1.0f);
          ModSlider("softness", &n->shadowSoftness, 0.0f, 4.0f);
          ModSlider("bias", &n->shadowBias, 0.0002f, 0.02f, "%.4f");
-         ImGui::TextDisabled("light 1 casts; point lights cannot");
       }
 
       NodeSeparator("light");
@@ -2378,7 +2406,6 @@ namespace
       ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f);
 
       NodeSeparator("environment");
-      ImGui::TextDisabled("what metal reflects");
       ColorSwatch("sky", n->envSky, n);
       ColorSwatch("horizon", n->envHorizon, n);
       ColorSwatch("ground", n->envGround, n);
@@ -3053,6 +3080,9 @@ namespace
             if (dyingCloud != nullptr && inst->cloudSource == dyingCloud)
                inst->cloudSource = nullptr;
          }
+         if (auto* meta = dynamic_cast<MetaBallNode*>(other.node.get()))
+            if (dyingCloud != nullptr && meta->cloudSource == dyingCloud)
+               meta->cloudSource = nullptr;
          // The single-geometry-input nodes. Missing one here would leave a
          // pointer to a freed node and crash on the next cook.
          if (dyingGeometry != nullptr)
@@ -3196,6 +3226,8 @@ namespace
          if (auto* join = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
             for (int i = 0; i < JoinGeometryNode::kSlots; i++)
                record(join->inputs[i], i);
+         if (auto* meta = dynamic_cast<MetaBallNode*>(gn.node.get()))
+            record(meta->cloudSource, 0);
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
          {
             record(inst->pointSource, 0);
@@ -4481,6 +4513,64 @@ int main()
          printf("%s\n", (allShapes && allShapes2D && bevelled) ? "PHASE A OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_PHASECTEST") != nullptr && frameId == 4)
+      {
+         // Every new primitive must produce a finite, non-degenerate mesh.
+         bool allPrims = true;
+         for (int i = 0; i < (int)GeometryNode::ShapeNames().size(); i++)
+         {
+            INode* made = NodeFactory::Instance().MakeNode(GeometryNode::ShapeNames()[i]);
+            auto* geo = dynamic_cast<GeometryNode*>(made);
+            bool ok = false;
+            if (geo != nullptr)
+            {
+               const Mesh& m = geo->GetMesh();
+               bool finite = true;
+               float lo = 1e30f, hi = -1e30f;
+               for (const Vertex& v : m.vertices)
+               {
+                  if (!std::isfinite(v.px) || !std::isfinite(v.py) || !std::isfinite(v.pz))
+                     finite = false;
+                  lo = std::min(lo, v.px); hi = std::max(hi, v.px);
+               }
+               ok = finite && m.indices.size() >= 3 && (hi - lo) > 0.01f && (hi - lo) < 100.0f;
+               printf("  %-12s %6zu tris  width %.2f  %s\n",
+                      GeometryNode::ShapeNames()[i].c_str(), m.indices.size() / 3,
+                      hi - lo, ok ? "OK" : "FAIL");
+            }
+            if (!ok) allPrims = false;
+            delete made;
+         }
+
+         // Two balls far apart give two separate surfaces; brought together
+         // they must merge into one. That merging is the entire reason to use
+         // metaballs rather than joining two spheres, so it is what to test.
+         std::vector<Primitives::MetaBall> apart = {
+            { -1.1f, 0.0f, 0.0f, 0.25f }, { 1.1f, 0.0f, 0.0f, 0.25f }
+         };
+         std::vector<Primitives::MetaBall> together = {
+            { -0.25f, 0.0f, 0.0f, 0.25f }, { 0.25f, 0.0f, 0.0f, 0.25f }
+         };
+         const Mesh mApart = Primitives::MetaBalls(apart, 40, 1.0f, 2.0f);
+         const Mesh mTogether = Primitives::MetaBalls(together, 40, 1.0f, 2.0f);
+
+         // Merged is detected by whether the surface spans the midpoint: apart,
+         // nothing exists near x=0; merged, the bridge does.
+         auto spansCentre = [](const Mesh& m) {
+            for (const Vertex& v : m.vertices)
+               if (std::fabs(v.px) < 0.05f)
+                  return true;
+            return false;
+         };
+         printf("metaballs: apart %zu tris (spans centre %d), together %zu tris (spans centre %d)\n",
+                mApart.indices.size() / 3, (int)spansCentre(mApart),
+                mTogether.indices.size() / 3, (int)spansCentre(mTogether));
+         const bool merges = !mApart.Empty() && !mTogether.Empty() &&
+                             !spansCentre(mApart) && spansCentre(mTogether);
+
+         printf("%s\n", (allPrims && merges) ? "PHASE C OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_MAPTEST") != nullptr && frameId >= 4 && frameId <= 16 && frameId % 4 == 0)
       {
          auto* mat = static_cast<MaterialNode*>(gNodes[1].node.get());
@@ -5530,6 +5620,8 @@ int main()
                   dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
          {
@@ -5559,6 +5651,8 @@ int main()
                snprintf(line, sizeof(line), "%zu triangles", mat->TriangleCount());
             else if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu particles", ps->AliveCount());
+            else if (auto* mb = dynamic_cast<MetaBallNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu balls, %zu tris", mb->BallCount(), mb->TriangleCount());
             else if (auto* jn = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%d inputs, %zu tris", jn->ConnectedCount(), jn->TriangleCount());
             else if (auto* cl = dynamic_cast<ClothNode*>(gn.node.get()))
@@ -5646,7 +5740,6 @@ int main()
             else if (auto* n = dynamic_cast<ConstantNode*>(gn.node.get()))
             {
                ModSlider("value", &n->value, 0.0f, 1.0f);
-               ImGui::TextDisabled("a fixed value for Math inputs");
             }
             else if (auto* n = dynamic_cast<MaterialNode*>(gn.node.get()))
                DrawMaterialParams(n);
@@ -5656,6 +5749,8 @@ int main()
                DrawClothParams(n);
             else if (auto* n = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
                DrawJoinGeometryParams(n);
+            else if (auto* n = dynamic_cast<MetaBallNode*>(gn.node.get()))
+               DrawMetaBallParams(n);
             else if (auto* n = dynamic_cast<OceanNode*>(gn.node.get()))
                DrawOceanParams(n);
             else if (dynamic_cast<NullNode*>(gn.node.get()) != nullptr ||
@@ -5719,13 +5814,11 @@ int main()
                ImGui::SliderInt("fps", &n->recordFps, 1, 60);
 
                ImGui::Checkbox("include audio", &n->includeAudio);
-               if (n->includeAudio)
-               {
-                  if (n->audioSource != nullptr)
-                     ImGui::TextDisabled("from: %s", n->audioSource->FileName().c_str());
-                  else
-                     ImGui::TextDisabled("patch an Audio File into the audio pin");
-               }
+               // Only the filename, and only when there is one: which file is
+               // being muxed is worth knowing, the instruction to patch one is
+               // not, since the pin is right there.
+               if (n->includeAudio && n->audioSource != nullptr)
+                  ImGui::TextDisabled("from: %s", n->audioSource->FileName().c_str());
 
                if (n->IsRecording())
                {
@@ -5839,6 +5932,8 @@ int main()
          if (auto* join = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
             for (int i = 0; i < JoinGeometryNode::kSlots; i++)
                linkFromNode(join->inputs[i], i);
+         if (auto* meta = dynamic_cast<MetaBallNode*>(gn.node.get()))
+            linkFromNode(meta->cloudSource, 0);
          if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
             linkFromNode(mat->input, 0);
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
@@ -5952,6 +6047,7 @@ int main()
                auto* dstMeshPoints = dstNode ? dynamic_cast<MeshToPointsNode*>(dstNode->node.get()) : nullptr;
                auto* dstCloth = dstNode ? dynamic_cast<ClothNode*>(dstNode->node.get()) : nullptr;
                auto* dstJoin = dstNode ? dynamic_cast<JoinGeometryNode*>(dstNode->node.get()) : nullptr;
+               auto* dstMeta = dstNode ? dynamic_cast<MetaBallNode*>(dstNode->node.get()) : nullptr;
                auto* dstOutput = dstNode ? dynamic_cast<OutputNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
                auto* srcCloud = srcNode ? dynamic_cast<IPointCloudSource*>(srcNode->node.get()) : nullptr;
@@ -5988,6 +6084,8 @@ int main()
                      else if (dstNull3D != nullptr || dstMeshPoints != nullptr ||
                               dstCloth != nullptr || dstJoin != nullptr)
                         valid = srcGeometry != nullptr;
+                     else if (dstMeta != nullptr)
+                        valid = srcCloud != nullptr;
                      else if (dstMaterial != nullptr)
                         // Slot 0 takes geometry; the rest are ordinary images.
                         valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
@@ -6032,6 +6130,8 @@ int main()
                      dstMeshPoints->input = srcGeometry;
                   else if (dstCloth != nullptr)
                      dstCloth->input = srcGeometry;
+                  else if (dstMeta != nullptr)
+                     dstMeta->cloudSource = srcCloud;
                   else if (dstJoin != nullptr)
                   {
                      const int jslot = GraphNode::InputSlotFromPin(b);
@@ -6735,6 +6835,7 @@ int main()
                 dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
             {
                // Pass-throughs and samplers with nothing patched in are empty

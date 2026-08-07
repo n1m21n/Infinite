@@ -236,6 +236,81 @@ private:
    int mLastCookFrame = -1;
 };
 
+// --- Metaballs ----------------------------------------------------------
+// Blobs that merge into one another rather than intersecting, surfaced with
+// marching cubes over a summed field. Optionally takes a point cloud, so a
+// particle system can be surfaced as liquid.
+class MetaBallNode : public INode, public IGeometrySource
+{
+public:
+   static constexpr int kMaxBalls = 8;
+
+   static INode* Create() { return new MetaBallNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+
+   const Mesh& GetMesh() override;
+   unsigned long long MeshRevision() override;
+   Mat4 GetModelMatrix() const override;
+   Material GetMaterial() const override;
+
+   // A cloud drives the balls when patched, so particles can be surfaced.
+   IPointCloudSource* cloudSource = nullptr;
+   const char* InputLabel(int) const override { return "cloud"; }
+   size_t TriangleCount() const { return mCache.indices.size() / 3; }
+   size_t BallCount() const { return mBallCount; }
+
+   int ballCount = 3;
+   int resolution = 40;
+   float threshold = 8.0f;
+   float bounds = 1.5f;
+   float radius = 0.35f;
+   float spread = 0.5f;
+   float spin = 0.15f;      // orbit per beat, so they move without modulation
+   int maxFromCloud = 16;
+
+   float posX = 0.0f, posY = 0.0f, posZ = 0.0f;
+   float uniformScale = 1.0f;
+
+   float color[3] = { 0.55f, 0.75f, 0.95f };
+   float metallic = 0.1f;
+   float roughness = 0.2f;
+   float opacity = 1.0f;
+   int shading = 0;
+   float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
+   float emission = 0.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("ballCount", ballCount); v.Int("resolution", resolution);
+      v.Float("threshold", threshold); v.Float("bounds", bounds);
+      v.Float("radius", radius); v.Float("spread", spread); v.Float("spin", spin);
+      v.Int("maxFromCloud", maxFromCloud);
+      v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
+      v.Float("scale", uniformScale);
+      v.Color("color", color); v.Float("metallic", metallic);
+      v.Float("roughness", roughness); v.Float("opacity", opacity);
+      v.Int("shading", shading);
+      v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+   }
+
+private:
+   void RebuildIfNeeded();
+
+   Mesh mCache;
+   size_t mBallCount = 0;
+   unsigned long long mMeshRevision = 0;
+   int mBuiltCount = -1, mBuiltRes = -1, mBuiltMax = -1;
+   float mBuiltThreshold = -1, mBuiltBounds = -1, mBuiltRadius = -1, mBuiltSpread = -1;
+   double mBuiltBeat = -1.0;
+   const void* mBuiltCloud = nullptr;
+   unsigned long long mBuiltCloudRevision = 0;
+   int mLastCookFrame = -1;
+};
+
 // --- Mesh to Points -----------------------------------------------------
 // Samples a mesh at its vertices, edge midpoints or face centres and emits a
 // small quad at each. The sampling itself already existed inside Instance on

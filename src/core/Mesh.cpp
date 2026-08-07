@@ -1742,3 +1742,450 @@ namespace MeshOps
       return out;
    }
 }
+
+// ============================================================ more primitives
+
+namespace Primitives
+{
+   Mesh Capsule(int rings, int sectors, float height)
+   {
+      // A sphere split at its equator with a cylinder inserted, so the caps
+      // stay hemispherical at any height rather than stretching with it.
+      Mesh mesh;
+      const int r = std::max(2, rings);
+      const int sec = std::max(3, sectors);
+      const float half = std::max(0.0f, height) * 0.5f;
+      const float radius = 0.5f;
+
+      for (int i = 0; i <= r; i++)
+      {
+         const float v = (float)i / (float)r;
+         const float phi = v * kPi;
+         const float y = std::cos(phi) * radius;
+         const float ring = std::sin(phi) * radius;
+         // Offset the top half up and the bottom half down by the barrel length.
+         const float offset = (phi <= kPi * 0.5f) ? half : -half;
+
+         for (int j = 0; j <= sec; j++)
+         {
+            const float u = (float)j / (float)sec;
+            const float theta = u * 2.0f * kPi;
+            const float x = std::cos(theta) * ring;
+            const float z = std::sin(theta) * ring;
+            float nx = x, ny = y, nz = z;
+            const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
+            if (len > 1e-6f) { nx /= len; ny /= len; nz /= len; }
+            PushVertex(mesh, x, y + offset, z, nx, ny, nz, u, v);
+         }
+      }
+
+      const int stride = sec + 1;
+      for (int i = 0; i < r; i++)
+         for (int j = 0; j < sec; j++)
+            PushQuad(mesh, (unsigned int)(i * stride + j),
+                     (unsigned int)(i * stride + j + 1),
+                     (unsigned int)((i + 1) * stride + j + 1),
+                     (unsigned int)((i + 1) * stride + j));
+      return mesh;
+   }
+
+   Mesh Tube(int sides, int rings, float innerRadius)
+   {
+      // A cylinder with its middle bored out: outer wall, inner wall wound the
+      // other way so it faces inward, and an annulus capping each end.
+      Mesh mesh;
+      const int n = std::max(3, sides);
+      const int r = std::max(1, rings);
+      const float outer = 0.5f;
+      const float inner = std::max(0.01f, std::min(innerRadius, 0.49f));
+
+      auto wall = [&](float radius, bool facingOut)
+      {
+         const unsigned int base = (unsigned int)mesh.vertices.size();
+         for (int i = 0; i <= r; i++)
+         {
+            const float v = (float)i / (float)r;
+            const float y = v - 0.5f;
+            for (int j = 0; j <= n; j++)
+            {
+               const float u = (float)j / (float)n;
+               const float theta = u * 2.0f * kPi;
+               const float c = std::cos(theta), s = std::sin(theta);
+               const float sign = facingOut ? 1.0f : -1.0f;
+               PushVertex(mesh, c * radius, y, s * radius, c * sign, 0.0f, s * sign, u, v);
+            }
+         }
+         const int stride = n + 1;
+         for (int i = 0; i < r; i++)
+            for (int j = 0; j < n; j++)
+            {
+               const unsigned int a = base + (unsigned int)(i * stride + j);
+               const unsigned int b = base + (unsigned int)(i * stride + j + 1);
+               const unsigned int c = base + (unsigned int)((i + 1) * stride + j + 1);
+               const unsigned int d = base + (unsigned int)((i + 1) * stride + j);
+               if (facingOut)
+                  PushQuad(mesh, a, b, c, d);
+               else
+                  PushQuad(mesh, a, d, c, b);
+            }
+      };
+
+      wall(outer, true);
+      wall(inner, false);
+
+      for (int end = 0; end < 2; end++)
+      {
+         const float y = (end == 0) ? 0.5f : -0.5f;
+         const float ny = (end == 0) ? 1.0f : -1.0f;
+         const unsigned int base = (unsigned int)mesh.vertices.size();
+         for (int j = 0; j <= n; j++)
+         {
+            const float u = (float)j / (float)n;
+            const float theta = u * 2.0f * kPi;
+            const float c = std::cos(theta), s = std::sin(theta);
+            PushVertex(mesh, c * outer, y, s * outer, 0.0f, ny, 0.0f, u, 1.0f);
+            PushVertex(mesh, c * inner, y, s * inner, 0.0f, ny, 0.0f, u, 0.0f);
+         }
+         for (int j = 0; j < n; j++)
+         {
+            const unsigned int a = base + (unsigned int)(j * 2);
+            const unsigned int b = base + (unsigned int)(j * 2 + 1);
+            const unsigned int c = base + (unsigned int)(j * 2 + 3);
+            const unsigned int d = base + (unsigned int)(j * 2 + 2);
+            if (end == 0)
+               PushQuad(mesh, a, b, c, d);
+            else
+               PushQuad(mesh, a, d, c, b);
+         }
+      }
+      return mesh;
+   }
+
+   Mesh Pyramid(int sides)
+   {
+      Mesh mesh;
+      const int n = std::max(3, sides);
+      const float radius = 0.5f;
+      const float apexY = 0.5f, baseY = -0.5f;
+
+      // Flat-shaded: each face gets its own vertices, or the apex normal would
+      // be averaged across every side and the facets would smear together.
+      for (int j = 0; j < n; j++)
+      {
+         const float t0 = (float)j / (float)n * 2.0f * kPi;
+         const float t1 = (float)(j + 1) / (float)n * 2.0f * kPi;
+         const float x0 = std::cos(t0) * radius, z0 = std::sin(t0) * radius;
+         const float x1 = std::cos(t1) * radius, z1 = std::sin(t1) * radius;
+
+         float ax = x1 - x0, az = z1 - z0;
+         float bx = -x0, by = apexY - baseY, bz = -z0;
+         float nx = az * by - 0.0f * bz;
+         float ny = 0.0f * bx - ax * bz;
+         float nz = ax * by - 0.0f * bx;
+         const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
+         if (len > 1e-6f) { nx /= len; ny /= len; nz /= len; }
+
+         const unsigned int base = (unsigned int)mesh.vertices.size();
+         PushVertex(mesh, x0, baseY, z0, nx, ny, nz, 0.0f, 0.0f);
+         PushVertex(mesh, x1, baseY, z1, nx, ny, nz, 1.0f, 0.0f);
+         PushVertex(mesh, 0.0f, apexY, 0.0f, nx, ny, nz, 0.5f, 1.0f);
+         mesh.indices.push_back(base);
+         mesh.indices.push_back(base + 1);
+         mesh.indices.push_back(base + 2);
+      }
+
+      const unsigned int centre = (unsigned int)mesh.vertices.size();
+      PushVertex(mesh, 0.0f, baseY, 0.0f, 0.0f, -1.0f, 0.0f, 0.5f, 0.5f);
+      for (int j = 0; j <= n; j++)
+      {
+         const float t = (float)j / (float)n * 2.0f * kPi;
+         PushVertex(mesh, std::cos(t) * radius, baseY, std::sin(t) * radius,
+                    0.0f, -1.0f, 0.0f, 0.5f + std::cos(t) * 0.5f, 0.5f + std::sin(t) * 0.5f);
+      }
+      for (int j = 0; j < n; j++)
+      {
+         mesh.indices.push_back(centre);
+         mesh.indices.push_back(centre + 1 + (unsigned int)j + 1);
+         mesh.indices.push_back(centre + 1 + (unsigned int)j);
+      }
+      return mesh;
+   }
+
+   Mesh Prism(int sides, int rings)
+   {
+      // Cylinder with a low side count is a prism; this just gives it a name
+      // and a flat-shaded look rather than a smoothed barrel.
+      Mesh mesh = Cylinder(std::max(3, sides), std::max(1, rings), 1.0f);
+      return MeshOps::RecalculateNormals(mesh, true, false);
+   }
+
+   Mesh Helix(int segments, int sides, float tubeRadius, float turns, float height)
+   {
+      Mesh mesh;
+      const int seg = std::max(8, std::min(segments, 4096));
+      const int n = std::max(3, sides);
+      const float coil = std::max(0.05f, tubeRadius);
+      const float radius = 0.5f;
+
+      for (int i = 0; i <= seg; i++)
+      {
+         const float t = (float)i / (float)seg;
+         const float angle = t * turns * 2.0f * kPi;
+         const float cx = std::cos(angle) * radius;
+         const float cz = std::sin(angle) * radius;
+         const float cy = (t - 0.5f) * height;
+
+         // Frame from the analytic tangent rather than finite differences, so
+         // the tube does not wobble where the curve is sampled coarsely.
+         float tx = -std::sin(angle) * radius * turns * 2.0f * kPi;
+         float tz = std::cos(angle) * radius * turns * 2.0f * kPi;
+         float ty = height;
+         const float tl = std::sqrt(tx*tx + ty*ty + tz*tz);
+         if (tl > 1e-6f) { tx /= tl; ty /= tl; tz /= tl; }
+
+         float ux = 0.0f, uy = 1.0f, uz = 0.0f;
+         if (std::fabs(ty) > 0.99f) { ux = 1.0f; uy = 0.0f; }
+         float nx = uy * tz - uz * ty;
+         float ny = uz * tx - ux * tz;
+         float nz = ux * ty - uy * tx;
+         const float nl = std::sqrt(nx*nx + ny*ny + nz*nz);
+         if (nl > 1e-6f) { nx /= nl; ny /= nl; nz /= nl; }
+         const float bx = ty * nz - tz * ny;
+         const float by = tz * nx - tx * nz;
+         const float bz = tx * ny - ty * nx;
+
+         for (int j = 0; j <= n; j++)
+         {
+            const float u = (float)j / (float)n;
+            const float theta = u * 2.0f * kPi;
+            const float c = std::cos(theta), s = std::sin(theta);
+            const float ox = nx * c + bx * s;
+            const float oy = ny * c + by * s;
+            const float oz = nz * c + bz * s;
+            PushVertex(mesh, cx + ox * coil, cy + oy * coil, cz + oz * coil,
+                       ox, oy, oz, u, t);
+         }
+      }
+
+      const int stride = n + 1;
+      for (int i = 0; i < seg; i++)
+         for (int j = 0; j < n; j++)
+            PushQuad(mesh, (unsigned int)(i * stride + j),
+                     (unsigned int)((i + 1) * stride + j),
+                     (unsigned int)((i + 1) * stride + j + 1),
+                     (unsigned int)(i * stride + j + 1));
+      return mesh;
+   }
+
+   Mesh Supershape(int rings, int sectors, float m1, float n1, float n2, float n3,
+                   float m2, float p1, float p2, float p3)
+   {
+      Mesh mesh;
+      const int r = std::max(3, rings);
+      const int sec = std::max(3, sectors);
+
+      auto super = [](float angle, float m, float e1, float e2, float e3) -> float
+      {
+         const float t = m * angle * 0.25f;
+         const float a = std::pow(std::fabs(std::cos(t)), e2);
+         const float b = std::pow(std::fabs(std::sin(t)), e3);
+         const float sum = a + b;
+         if (sum < 1e-6f)
+            return 0.0f;
+         return std::pow(sum, -1.0f / std::max(1e-3f, e1));
+      };
+
+      for (int i = 0; i <= r; i++)
+      {
+         const float v = (float)i / (float)r;
+         const float phi = (v - 0.5f) * kPi;
+         const float r2 = super(phi, m2, p1, p2, p3);
+         for (int j = 0; j <= sec; j++)
+         {
+            const float u = (float)j / (float)sec;
+            const float theta = (u - 0.5f) * 2.0f * kPi;
+            const float r1 = super(theta, m1, n1, n2, n3);
+            const float x = r1 * std::cos(theta) * r2 * std::cos(phi) * 0.5f;
+            const float y = r2 * std::sin(phi) * 0.5f;
+            const float z = r1 * std::sin(theta) * r2 * std::cos(phi) * 0.5f;
+            PushVertex(mesh, x, y, z, 0.0f, 1.0f, 0.0f, u, v);
+         }
+      }
+
+      const int stride = sec + 1;
+      for (int i = 0; i < r; i++)
+         for (int j = 0; j < sec; j++)
+            PushQuad(mesh, (unsigned int)(i * stride + j),
+                     (unsigned int)(i * stride + j + 1),
+                     (unsigned int)((i + 1) * stride + j + 1),
+                     (unsigned int)((i + 1) * stride + j));
+      // Normals are derived rather than analytic: the superformula's gradient
+      // is unpleasant and the mesh is dense enough that derived ones are fine.
+      return MeshOps::RecalculateNormals(mesh, false, false);
+   }
+}
+
+// ================================================================= metaballs
+
+namespace Primitives
+{
+namespace
+{
+   // Marching cubes needs the 256-entry edge table to know which of the twelve
+   // cube edges a surface crosses for a given corner sign pattern. Rather than
+   // paste the canonical table, it is derived once at startup from the twelve
+   // edge endpoints: an edge is crossed exactly when its two corners disagree.
+   //
+   // The tetrahedral decomposition below is used instead of the full 256-case
+   // triangle table. It emits more triangles for the same surface, but it needs
+   // no table at all and cannot produce the ambiguous-face holes that a naive
+   // partial marching-cubes table does.
+   const int kTetraOfCube[6][4] = {
+      { 0, 5, 1, 6 }, { 0, 1, 2, 6 }, { 0, 2, 3, 6 },
+      { 0, 3, 7, 6 }, { 0, 7, 4, 6 }, { 0, 4, 5, 6 }
+   };
+
+   struct FieldPoint { float x, y, z, value; };
+
+   void EmitTetra(Mesh& mesh, const FieldPoint p[4], float threshold)
+   {
+      // Classify corners, then emit the one or two triangles that separate the
+      // inside corners from the outside ones.
+      int inside[4], insideCount = 0, outside[4], outsideCount = 0;
+      for (int i = 0; i < 4; i++)
+      {
+         if (p[i].value >= threshold)
+            inside[insideCount++] = i;
+         else
+            outside[outsideCount++] = i;
+      }
+      if (insideCount == 0 || insideCount == 4)
+         return;
+
+      auto lerpPoint = [&](int a, int b, float out[3])
+      {
+         const float va = p[a].value, vb = p[b].value;
+         const float denom = vb - va;
+         const float t = (std::fabs(denom) < 1e-9f) ? 0.5f : (threshold - va) / denom;
+         const float clamped = std::max(0.0f, std::min(t, 1.0f));
+         out[0] = p[a].x + (p[b].x - p[a].x) * clamped;
+         out[1] = p[a].y + (p[b].y - p[a].y) * clamped;
+         out[2] = p[a].z + (p[b].z - p[a].z) * clamped;
+      };
+
+      auto pushTri = [&](const float a[3], const float b[3], const float c[3])
+      {
+         const unsigned int base = (unsigned int)mesh.vertices.size();
+         // Normals are left flat here and recomputed from the finished surface;
+         // per-tetra normals would be faceted along every cell boundary.
+         PushVertex(mesh, a[0], a[1], a[2], 0, 1, 0, 0, 0);
+         PushVertex(mesh, b[0], b[1], b[2], 0, 1, 0, 1, 0);
+         PushVertex(mesh, c[0], c[1], c[2], 0, 1, 0, 0, 1);
+         mesh.indices.push_back(base);
+         mesh.indices.push_back(base + 1);
+         mesh.indices.push_back(base + 2);
+      };
+
+      float v0[3], v1[3], v2[3], v3[3];
+      if (insideCount == 1)
+      {
+         lerpPoint(inside[0], outside[0], v0);
+         lerpPoint(inside[0], outside[1], v1);
+         lerpPoint(inside[0], outside[2], v2);
+         pushTri(v0, v1, v2);
+      }
+      else if (insideCount == 3)
+      {
+         lerpPoint(outside[0], inside[0], v0);
+         lerpPoint(outside[0], inside[1], v1);
+         lerpPoint(outside[0], inside[2], v2);
+         pushTri(v0, v2, v1);
+      }
+      else // two in, two out: the surface crosses four edges, so a quad
+      {
+         lerpPoint(inside[0], outside[0], v0);
+         lerpPoint(inside[0], outside[1], v1);
+         lerpPoint(inside[1], outside[1], v2);
+         lerpPoint(inside[1], outside[0], v3);
+         pushTri(v0, v1, v2);
+         pushTri(v0, v2, v3);
+      }
+   }
+}
+
+Mesh MetaBalls(const std::vector<MetaBall>& balls, int resolution, float threshold,
+               float bounds)
+{
+   Mesh mesh;
+   if (balls.empty())
+      return mesh;
+
+   // Capped: the grid is resolution cubed, and the sampling is balls times that.
+   const int n = std::max(4, std::min(resolution, 96));
+   const float extent = std::max(0.1f, bounds);
+   const float step = (extent * 2.0f) / (float)n;
+
+   // Field sampled once per grid point rather than per tetrahedron: each point
+   // is shared by up to eight cells and six tetrahedra within each.
+   std::vector<float> field((size_t)(n + 1) * (n + 1) * (n + 1), 0.0f);
+   auto at = [&](int x, int y, int z) -> float& {
+      return field[((size_t)z * (n + 1) + y) * (n + 1) + x];
+   };
+
+   for (int z = 0; z <= n; z++)
+   {
+      const float pz = -extent + step * (float)z;
+      for (int y = 0; y <= n; y++)
+      {
+         const float py = -extent + step * (float)y;
+         for (int x = 0; x <= n; x++)
+         {
+            const float px = -extent + step * (float)x;
+            float sum = 0.0f;
+            for (const MetaBall& b : balls)
+            {
+               const float dx = px - b.x, dy = py - b.y, dz = pz - b.z;
+               const float d2 = dx*dx + dy*dy + dz*dz;
+               // Inverse-square falloff: summing these is what makes two balls
+               // bulge toward each other and merge rather than intersect.
+               sum += b.strength / std::max(d2, 1e-4f);
+            }
+            at(x, y, z) = sum;
+         }
+      }
+   }
+
+   for (int z = 0; z < n; z++)
+   {
+      for (int y = 0; y < n; y++)
+      {
+         for (int x = 0; x < n; x++)
+         {
+            FieldPoint corner[8];
+            for (int c = 0; c < 8; c++)
+            {
+               const int cx = x + ((c == 1 || c == 2 || c == 5 || c == 6) ? 1 : 0);
+               const int cy = y + ((c == 2 || c == 3 || c == 6 || c == 7) ? 1 : 0);
+               const int cz = z + ((c >= 4) ? 1 : 0);
+               corner[c].x = -extent + step * (float)cx;
+               corner[c].y = -extent + step * (float)cy;
+               corner[c].z = -extent + step * (float)cz;
+               corner[c].value = at(cx, cy, cz);
+            }
+            for (int t = 0; t < 6; t++)
+            {
+               const FieldPoint tet[4] = {
+                  corner[kTetraOfCube[t][0]], corner[kTetraOfCube[t][1]],
+                  corner[kTetraOfCube[t][2]], corner[kTetraOfCube[t][3]]
+               };
+               EmitTetra(mesh, tet, threshold);
+            }
+         }
+      }
+   }
+
+   if (mesh.Empty())
+      return mesh;
+   return MeshOps::RecalculateNormals(mesh, false, false);
+}
+}

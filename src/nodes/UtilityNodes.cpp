@@ -1,6 +1,9 @@
 #include "UtilityNodes.h"
 
 #include <algorithm>
+#include <cmath>
+
+#include "Transport.h"
 
 namespace
 {
@@ -289,5 +292,120 @@ void MeshToPointsNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
+   RebuildIfNeeded();
+}
+
+// =================================================================== Metaballs
+
+void MetaBallNode::RebuildIfNeeded()
+{
+   // Marching cubes over a 40-cubed grid is far too expensive to redo for a
+   // sub-pixel change, so the orbit is quantised and every parameter is checked.
+   const double beat = Transport::Instance().Beats() * (double)spin;
+   const double quantised = std::floor(beat * 60.0) / 60.0;
+   const unsigned long long cloudRevision = cloudSource ? cloudSource->PointRevision() : 0;
+
+   if (mBuiltCount == ballCount && mBuiltRes == resolution &&
+       mBuiltThreshold == threshold && mBuiltBounds == bounds &&
+       mBuiltRadius == radius && mBuiltSpread == spread && mBuiltMax == maxFromCloud &&
+       mBuiltBeat == quantised && mBuiltCloud == (const void*)cloudSource &&
+       mBuiltCloudRevision == cloudRevision && !mCache.Empty())
+      return;
+
+   std::vector<Primitives::MetaBall> balls;
+   if (cloudSource != nullptr)
+   {
+      // Surfacing a particle system. Capped, because the field cost is the ball
+      // count times the whole grid - a thousand particles would be unusable.
+      const std::vector<Particle>& cloud = cloudSource->GetPoints();
+      const int cap = std::max(1, std::min(maxFromCloud, 64));
+      int taken = 0;
+      for (const Particle& p : cloud)
+      {
+         if (!p.alive)
+            continue;
+         if (taken >= cap)
+            break;
+         Primitives::MetaBall b;
+         b.x = p.px; b.y = p.py; b.z = p.pz;
+         b.strength = radius * radius * std::max(0.05f, p.scale);
+         balls.push_back(b);
+         taken++;
+      }
+   }
+   else
+   {
+      const int count = std::max(1, std::min(ballCount, kMaxBalls));
+      for (int i = 0; i < count; i++)
+      {
+         // Arranged on a ring at irrational angular offsets, so they drift in
+         // and out of contact rather than pulsing in unison.
+         const float t = (float)i / (float)count;
+         const float angle = t * 6.28318530718f + (float)quantised * 6.28318530718f;
+         Primitives::MetaBall b;
+         b.x = std::cos(angle) * spread;
+         b.y = std::sin(angle * 1.618f) * spread * 0.6f;
+         b.z = std::sin(angle) * spread;
+         b.strength = radius * radius;
+         balls.push_back(b);
+      }
+   }
+
+   mBallCount = balls.size();
+   mCache = Primitives::MetaBalls(balls, resolution, threshold, bounds);
+
+   mBuiltCount = ballCount;
+   mBuiltRes = resolution;
+   mBuiltThreshold = threshold;
+   mBuiltBounds = bounds;
+   mBuiltRadius = radius;
+   mBuiltSpread = spread;
+   mBuiltMax = maxFromCloud;
+   mBuiltBeat = quantised;
+   mBuiltCloud = cloudSource;
+   mBuiltCloudRevision = cloudRevision;
+   mMeshRevision = NextMeshRevision();
+}
+
+const Mesh& MetaBallNode::GetMesh()
+{
+   RebuildIfNeeded();
+   return mCache;
+}
+
+unsigned long long MetaBallNode::MeshRevision()
+{
+   RebuildIfNeeded();
+   return mMeshRevision;
+}
+
+Mat4 MetaBallNode::GetModelMatrix() const
+{
+   Mat4 m = Mat4::Scale(uniformScale, uniformScale, uniformScale);
+   return Mat4::Multiply(Mat4::Translation(posX, posY, posZ), m);
+}
+
+Material MetaBallNode::GetMaterial() const
+{
+   Material m;
+   m.color[0] = color[0]; m.color[1] = color[1]; m.color[2] = color[2];
+   m.metallic = metallic;
+   m.roughness = roughness;
+   m.opacity = opacity;
+   m.shading = shading;
+   m.emissionColor[0] = emissionColor[0];
+   m.emissionColor[1] = emissionColor[1];
+   m.emissionColor[2] = emissionColor[2];
+   m.emission = emission;
+   return m;
+}
+
+void MetaBallNode::CookIfNeeded(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   mLastCookFrame = frameId;
+   if (auto* c = dynamic_cast<INode*>(cloudSource))
+      c->CookIfNeeded(frameId);
    RebuildIfNeeded();
 }
