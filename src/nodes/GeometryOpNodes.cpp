@@ -8,7 +8,8 @@ namespace
    const std::vector<std::string> kOpNames = {
       "Transform", "Array", "Subdivide", "Solidify", "Extrude",
       "Wireframe", "Triangulate", "Normals", "Explode", "Twist",
-      "Smooth", "Mirror", "Screw"
+      "Smooth", "Mirror", "Screw",
+      "Select", "Delete Selected", "Transform Selected", "Extrude Selected"
    };
    const std::vector<std::string> kSourceNames = { "Vertices", "Edges", "Faces" };
    const Mesh kEmptyMesh;
@@ -34,6 +35,11 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.rs = rotStep; s.ss = scaleStep; s.rad = radius;
    s.sm = smooth; s.th = thickness; s.ins = inset; s.sd = seed;
    s.radial = radial; s.keep = keepOriginal; s.flat = flatShade; s.flip = flipNormals;
+   s.selectMode = selectMode;
+   s.selectA = selectA; s.selectB = selectB; s.selectC = selectC;
+   s.selectSeed = selectSeed; s.normalAmount = normalAmount;
+   s.selectInvert = selectInvert; s.selectAppend = selectAppend;
+   s.keepSelected = keepSelected; s.moveAlongNormals = moveAlongNormals;
    s.iter = iterations;
    s.screwSteps = screwSteps;
    s.mirrorOffset = mirrorOffset;
@@ -103,6 +109,24 @@ const Mesh& GeometryOpNode::GetMesh()
          break;
       case kScrew:
          mCache = MeshOps::Screw(src, screwSteps, turns, rise, radiusOffset, axis);
+         break;
+      case kSelect:
+         mCache = MeshOps::Select(src, selectMode, selectA, selectB, selectC, axis,
+                                  selectSeed, selectInvert, selectAppend);
+         break;
+      case kDeleteSelected:
+         mCache = MeshOps::DeleteSelected(src, keepSelected);
+         break;
+      case kTransformSelected:
+      {
+         Mat4 m = Mat4::Scale(scaleStep, scaleStep, scaleStep);
+         m = Mat4::Multiply(Mat4::RotationY(rotStep), m);
+         m = Mat4::Multiply(Mat4::Translation(offsetX, offsetY, offsetZ), m);
+         mCache = MeshOps::TransformSelected(src, m, moveAlongNormals, normalAmount);
+         break;
+      }
+      case kExtrudeSelected:
+         mCache = MeshOps::ExtrudeSelected(src, thickness, inset);
          break;
       default:
          mCache = MeshOps::Twist(src, amount * 3.0f, axis);

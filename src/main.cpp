@@ -2223,6 +2223,64 @@ namespace
             ImGui::Checkbox("keep original", &n->keepOriginal);
             ImGui::Checkbox("weld seam", &n->weldSeam);
             break;
+         case GeometryOpNode::kSelect:
+         {
+            static const std::vector<std::string> kSelectModes = {
+               "All", "By index", "By position", "By normal", "Random", "By radius"
+            };
+            ImGui::TextDisabled("%zu of %zu faces", n->SelectedCount(), n->TriangleCount());
+            DropdownButton("mode", kSelectModes, n->selectMode, [n](int i) { n->selectMode = i; });
+            switch (n->selectMode)
+            {
+               case 1: // index
+                  ModSlider("start", &n->selectA, 0.0f, 2000.0f, "%.0f");
+                  ModSlider("count", &n->selectB, 0.0f, 2000.0f, "%.0f");
+                  ModSlider("every", &n->selectC, 1.0f, 32.0f, "%.0f");
+                  break;
+               case 2: // position along an axis
+                  ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+                  ModSlider("min", &n->selectA, -3.0f, 3.0f);
+                  ModSlider("max", &n->selectB, -3.0f, 3.0f);
+                  break;
+               case 3: // normal direction
+                  ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+                  ModSlider("facing", &n->selectA, -1.0f, 1.0f);
+                  ModSlider("sign", &n->selectC, -1.0f, 1.0f);
+                  break;
+               case 4: // random
+                  ModSlider("amount", &n->selectA, 0.0f, 1.0f);
+                  ModSlider("seed", &n->selectSeed, 0.0f, 100.0f);
+                  break;
+               case 5: // radius
+                  ModSlider("x", &n->selectA, -3.0f, 3.0f);
+                  ModSlider("y", &n->selectB, -3.0f, 3.0f);
+                  ModSlider("z", &n->selectC, -3.0f, 3.0f);
+                  ModSlider("radius", &n->selectSeed, 0.0f, 3.0f);
+                  break;
+               default: break;
+            }
+            ImGui::Checkbox("invert", &n->selectInvert);
+            ImGui::Checkbox("add to selection", &n->selectAppend);
+            break;
+         }
+         case GeometryOpNode::kDeleteSelected:
+            ImGui::TextDisabled("%zu of %zu faces selected", n->SelectedCount(), n->TriangleCount());
+            ImGui::Checkbox("keep selected instead", &n->keepSelected);
+            break;
+         case GeometryOpNode::kTransformSelected:
+            ImGui::Checkbox("move along normals", &n->moveAlongNormals);
+            if (n->moveAlongNormals)
+               ModSlider("normal amount", &n->normalAmount, -2.0f, 2.0f);
+            ModSlider("move x", &n->offsetX, -3.0f, 3.0f);
+            ModSlider("move y", &n->offsetY, -3.0f, 3.0f);
+            ModSlider("move z", &n->offsetZ, -3.0f, 3.0f);
+            ModSlider("rotate", &n->rotStep, -3.1416f, 3.1416f);
+            ModSlider("scale", &n->scaleStep, 0.1f, 3.0f);
+            break;
+         case GeometryOpNode::kExtrudeSelected:
+            ModSlider("distance", &n->thickness, -1.0f, 1.0f);
+            ModSlider("inset", &n->inset, 0.0f, 0.9f);
+            break;
          case GeometryOpNode::kScrew:
             ModSliderInt("steps", &n->screwSteps, 3, 256);
             ModSlider("turns", &n->turns, 0.05f, 6.0f);
@@ -4600,6 +4658,68 @@ int main()
                                r1 < r0 - 0.02f && r1 > 0.3f;
 
          printf("%s\n", (allShapes && allShapes2D && bevelled) ? "PHASE A OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_SELECTTEST") != nullptr && frameId == 4)
+      {
+         const Mesh cube = Primitives::Cube(1);
+         printf("cube: %zu faces, %zu selected by default\n",
+                cube.FaceCount(), cube.SelectedCount());
+         // An empty mask has to mean "everything", or every operator would need
+         // to special-case a mesh that has never been through a Select.
+         const bool defaultAll = cube.SelectedCount() == cube.FaceCount();
+
+         // The top of a cube is two triangles: selecting by normal must find
+         // exactly those, which is the check that the mode means what it says.
+         const Mesh top = MeshOps::Select(cube, MeshOps::kSelectNormal,
+                                          0.9f, 0.0f, 1.0f, 1, 0.0f, false, false);
+         printf("faces pointing +Y: %zu of %zu  %s\n", top.SelectedCount(), top.FaceCount(),
+                top.SelectedCount() == 2 ? "OK" : "FAIL");
+
+         // Deleting them must remove exactly those two and nothing else.
+         const Mesh cut = MeshOps::DeleteSelected(top, false);
+         printf("delete the selection: %zu faces  %s\n", cut.FaceCount(),
+                cut.FaceCount() == cube.FaceCount() - 2 ? "OK" : "FAIL");
+
+         // Keeping instead of deleting is the exact complement.
+         const Mesh kept = MeshOps::DeleteSelected(top, true);
+         printf("keep instead: %zu faces  %s\n", kept.FaceCount(),
+                kept.FaceCount() == 2 ? "OK" : "FAIL");
+
+         // Moving the selection must move only the top, so the maximum y rises
+         // while the minimum stays exactly where it was.
+         auto rangeY = [](const Mesh& m) {
+            float lo = 1e30f, hi = -1e30f;
+            for (const Vertex& v : m.vertices) { lo = std::min(lo, v.py); hi = std::max(hi, v.py); }
+            return std::pair<float,float>(lo, hi);
+         };
+         const Mesh moved = MeshOps::TransformSelected(top, Mat4::Identity(), true, 0.5f);
+         const auto before = rangeY(cube);
+         const auto after = rangeY(moved);
+         printf("move top by 0.5: y %.2f..%.2f -> %.2f..%.2f  %s\n",
+                before.first, before.second, after.first, after.second,
+                (std::fabs(after.second - (before.second + 0.5f)) < 0.01f &&
+                 std::fabs(after.first - before.first) < 0.01f) ? "OK" : "FAIL");
+         const bool movedOk = std::fabs(after.second - (before.second + 0.5f)) < 0.01f &&
+                              std::fabs(after.first - before.first) < 0.01f;
+
+         // Extruding the selection adds a cap and walls but leaves the rest.
+         const Mesh extruded = MeshOps::ExtrudeSelected(top, 0.4f, 0.2f);
+         printf("extrude top: %zu -> %zu faces  %s\n", cube.FaceCount(), extruded.FaceCount(),
+                extruded.FaceCount() > cube.FaceCount() ? "OK" : "FAIL");
+
+         // Random selection has to be reproducible from its seed, or a patch
+         // would look different every time it was opened.
+         const Mesh r1 = MeshOps::Select(cube, MeshOps::kSelectRandom, 0.5f, 0, 0, 1, 7.0f, false, false);
+         const Mesh r2 = MeshOps::Select(cube, MeshOps::kSelectRandom, 0.5f, 0, 0, 1, 7.0f, false, false);
+         const Mesh r3 = MeshOps::Select(cube, MeshOps::kSelectRandom, 0.5f, 0, 0, 1, 9.0f, false, false);
+         const bool reproducible = r1.faceMask == r2.faceMask && r1.faceMask != r3.faceMask;
+         printf("random selection reproducible from seed: %d\n", (int)reproducible);
+
+         const bool ok = defaultAll && top.SelectedCount() == 2 &&
+                         cut.FaceCount() == cube.FaceCount() - 2 && kept.FaceCount() == 2 &&
+                         movedOk && extruded.FaceCount() > cube.FaceCount() && reproducible;
+         printf("%s\n", ok ? "SELECTION OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_PHASEETEST") != nullptr && frameId == 4)

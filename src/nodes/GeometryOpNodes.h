@@ -19,7 +19,10 @@ public:
    {
       kTransform = 0, kArray, kSubdivide, kSolidify, kExtrude,
       kWireframe, kTriangulate, kNormals, kExplode, kTwist,
-      kSmooth, kMirror, kScrew, kOpCount
+      kSmooth, kMirror, kScrew,
+      // Selection: one node chooses faces, the rest act only on what is chosen.
+      kSelect, kDeleteSelected, kTransformSelected, kExtrudeSelected,
+      kOpCount
    };
 
    static INode* Create() { return new GeometryOpNode(); }
@@ -61,6 +64,7 @@ public:
    IGeometrySource* input = nullptr;
    const char* InputLabel(int) const override { return "geo"; }
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
+   size_t SelectedCount() const { return mCache.SelectedCount(); }
 
    int op = kArray;
    bool inheritMaterial = true;
@@ -92,6 +96,18 @@ public:
    float rise = 0.0f;
    float radiusOffset = 0.5f;
 
+   // Selection
+   int selectMode = 3;          // normal, which is the most useful default
+   float selectA = 0.5f;        // threshold / start / min / probability / x
+   float selectB = 0.0f;        // end / max / y
+   float selectC = 1.0f;        // stride / sign / z
+   bool selectInvert = false;
+   bool selectAppend = false;
+   float selectSeed = 1.0f;
+   bool keepSelected = false;   // delete: keep the selection instead of dropping it
+   bool moveAlongNormals = true;
+   float normalAmount = 0.2f;
+
    // material used when not inheriting
    float color[3] = { 0.8f, 0.82f, 0.9f };
    float metallic = 0.1f;
@@ -115,6 +131,11 @@ public:
       v.Int("iterations", iterations); v.Float("mirrorOffset", mirrorOffset);
       v.Bool("weldSeam", weldSeam); v.Int("screwSteps", screwSteps);
       v.Float("turns", turns); v.Float("rise", rise); v.Float("radiusOffset", radiusOffset);
+      v.Int("selectMode", selectMode); v.Float("selectA", selectA);
+      v.Float("selectB", selectB); v.Float("selectC", selectC);
+      v.Bool("selectInvert", selectInvert); v.Bool("selectAppend", selectAppend);
+      v.Float("selectSeed", selectSeed); v.Bool("keepSelected", keepSelected);
+      v.Bool("moveAlongNormals", moveAlongNormals); v.Float("normalAmount", normalAmount);
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
@@ -131,6 +152,10 @@ private:
       int iter = 0, screwSteps = 0;
       float mirrorOffset = 0, turns = 0, rise = 0, radiusOffset = 0;
       bool weldSeam = false;
+      int selectMode = -1;
+      float selectA = 0, selectB = 0, selectC = 0, selectSeed = 0, normalAmount = 0;
+      bool selectInvert = false, selectAppend = false, keepSelected = false;
+      bool moveAlongNormals = false;
       const void* upstream = nullptr;
       size_t upstreamTris = 0;
       bool operator==(const Signature& o) const
@@ -142,6 +167,12 @@ private:
                 flip == o.flip && iter == o.iter && screwSteps == o.screwSteps &&
                 mirrorOffset == o.mirrorOffset && turns == o.turns && rise == o.rise &&
                 radiusOffset == o.radiusOffset && weldSeam == o.weldSeam &&
+                selectMode == o.selectMode && selectA == o.selectA &&
+                selectB == o.selectB && selectC == o.selectC &&
+                selectSeed == o.selectSeed && normalAmount == o.normalAmount &&
+                selectInvert == o.selectInvert && selectAppend == o.selectAppend &&
+                keepSelected == o.keepSelected &&
+                moveAlongNormals == o.moveAlongNormals &&
                 upstream == o.upstream && upstreamTris == o.upstreamTris;
       }
    };

@@ -3005,3 +3005,248 @@ Mesh Boolean(const Mesh& a, const Mesh& b, int op)
    return csg::ToMesh(merged);
 }
 }
+
+// =================================================================== selection
+
+namespace MeshOps
+{
+namespace
+{
+   void FaceCentre(const Mesh& m, size_t face, float out[3])
+   {
+      const Vertex& a = m.vertices[m.indices[face * 3]];
+      const Vertex& b = m.vertices[m.indices[face * 3 + 1]];
+      const Vertex& c = m.vertices[m.indices[face * 3 + 2]];
+      out[0] = (a.px + b.px + c.px) / 3.0f;
+      out[1] = (a.py + b.py + c.py) / 3.0f;
+      out[2] = (a.pz + b.pz + c.pz) / 3.0f;
+   }
+
+   void FaceNormal(const Mesh& m, size_t face, float out[3])
+   {
+      const Vertex& a = m.vertices[m.indices[face * 3]];
+      const Vertex& b = m.vertices[m.indices[face * 3 + 1]];
+      const Vertex& c = m.vertices[m.indices[face * 3 + 2]];
+      const float e1[3] = { b.px-a.px, b.py-a.py, b.pz-a.pz };
+      const float e2[3] = { c.px-a.px, c.py-a.py, c.pz-a.pz };
+      out[0] = e1[1]*e2[2] - e1[2]*e2[1];
+      out[1] = e1[2]*e2[0] - e1[0]*e2[2];
+      out[2] = e1[0]*e2[1] - e1[1]*e2[0];
+      const float len = std::sqrt(out[0]*out[0] + out[1]*out[1] + out[2]*out[2]);
+      if (len > 1e-9f) { out[0] /= len; out[1] /= len; out[2] /= len; }
+   }
+
+   float SelectHash(float seed, size_t index)
+   {
+      const float x = std::sin((seed + 1.0f) * (float)(index + 1) * 12.9898f) * 43758.5453f;
+      return x - std::floor(x);
+   }
+}
+
+Mesh Select(const Mesh& in, int mode, float a, float b, float c, int axis,
+            float seed, bool invert, bool append)
+{
+   Mesh out = in;
+   const size_t faces = out.FaceCount();
+   if (faces == 0)
+      return out;
+
+   const std::vector<unsigned char> previous = in.faceMask;
+   out.faceMask.assign(faces, 0);
+   const int k = std::max(0, std::min(axis, 2));
+
+   for (size_t f = 0; f < faces; f++)
+   {
+      bool hit = false;
+      switch (mode)
+      {
+         case kSelectIndex:
+         {
+            // Start, count and stride, so "every third face from face 10" is
+            // expressible without a second node.
+            const long long start = (long long)a;
+            const long long count = (long long)b;
+            const long long stride = std::max(1LL, (long long)c);
+            const long long rel = (long long)f - start;
+            hit = rel >= 0 && (count <= 0 || rel < count * stride) && (rel % stride) == 0;
+            break;
+         }
+         case kSelectAxis:
+         {
+            float centre[3];
+            FaceCentre(out, f, centre);
+            hit = centre[k] >= a && centre[k] <= b;
+            break;
+         }
+         case kSelectNormal:
+         {
+            // Faces whose normal points within a threshold of an axis - which
+            // is how "the top of the cube" gets said.
+            float normal[3];
+            FaceNormal(out, f, normal);
+            const float sign = (c >= 0.0f) ? 1.0f : -1.0f;
+            hit = (normal[k] * sign) >= a;
+            break;
+         }
+         case kSelectRandom:
+            hit = SelectHash(seed, f) < a;
+            break;
+         case kSelectRadius:
+         {
+            float centre[3];
+            FaceCentre(out, f, centre);
+            const float dx = centre[0] - a, dy = centre[1] - b, dz = centre[2] - c;
+            hit = std::sqrt(dx*dx + dy*dy + dz*dz) <= seed;
+            break;
+         }
+         case kSelectAll:
+         default:
+            hit = true;
+            break;
+      }
+
+      if (invert)
+         hit = !hit;
+      if (append && !previous.empty() && f < previous.size() && previous[f])
+         hit = true;
+      out.faceMask[f] = hit ? 1 : 0;
+   }
+   return out;
+}
+
+Mesh DeleteSelected(const Mesh& in, bool keepSelected)
+{
+   Mesh out;
+   const size_t faces = in.FaceCount();
+   if (faces == 0)
+      return out;
+
+   // Vertices are remapped rather than copied wholesale, so deleting most of a
+   // mesh actually frees the vertices too rather than leaving them orphaned.
+   std::vector<int> remap(in.vertices.size(), -1);
+   for (size_t f = 0; f < faces; f++)
+   {
+      // Named for what is kept, not what is dropped. The flag previously read
+      // as "keep unselected" while the comparison did the opposite, so the
+      // default deleted everything except the selection.
+      const bool selected = in.FaceSelected(f);
+      if (selected != keepSelected)
+         continue;
+      for (int k = 0; k < 3; k++)
+      {
+         const unsigned int index = in.indices[f * 3 + k];
+         if (remap[index] < 0)
+         {
+            remap[index] = (int)out.vertices.size();
+            out.vertices.push_back(in.vertices[index]);
+         }
+         out.indices.push_back((unsigned int)remap[index]);
+      }
+   }
+   return out;
+}
+
+Mesh TransformSelected(const Mesh& in, const Mat4& m, bool alongNormals, float normalAmount)
+{
+   Mesh out = in;
+   const size_t faces = in.FaceCount();
+   if (faces == 0)
+      return out;
+
+   // Only vertices belonging to a selected face move. A vertex shared with an
+   // unselected face still moves, which stretches the neighbour rather than
+   // tearing the mesh - splitting instead would leave a visible crack.
+   std::vector<unsigned char> moved(out.vertices.size(), 0);
+   for (size_t f = 0; f < faces; f++)
+   {
+      if (!in.FaceSelected(f))
+         continue;
+      float normal[3];
+      FaceNormal(in, f, normal);
+      for (int k = 0; k < 3; k++)
+      {
+         const unsigned int index = in.indices[f * 3 + k];
+         if (moved[index])
+            continue;
+         moved[index] = 1;
+         Vertex& v = out.vertices[index];
+         if (alongNormals)
+         {
+            v.px += normal[0] * normalAmount;
+            v.py += normal[1] * normalAmount;
+            v.pz += normal[2] * normalAmount;
+         }
+         const float x = v.px, y = v.py, z = v.pz;
+         v.px = m.m[0]*x + m.m[4]*y + m.m[8]*z + m.m[12];
+         v.py = m.m[1]*x + m.m[5]*y + m.m[9]*z + m.m[13];
+         v.pz = m.m[2]*x + m.m[6]*y + m.m[10]*z + m.m[14];
+      }
+   }
+   return RecalculateNormals(out, false, false);
+}
+
+Mesh ExtrudeSelected(const Mesh& in, float distance, float inset)
+{
+   Mesh out;
+   const size_t faces = in.FaceCount();
+   if (faces == 0)
+      return out;
+
+   // Unselected faces pass through unchanged; selected ones are lifted along
+   // their own normal and walled back to where they were.
+   std::vector<int> remap(in.vertices.size(), -1);
+   auto copyVertex = [&](unsigned int index) {
+      if (remap[index] < 0)
+      {
+         remap[index] = (int)out.vertices.size();
+         out.vertices.push_back(in.vertices[index]);
+      }
+      return (unsigned int)remap[index];
+   };
+
+   for (size_t f = 0; f < faces; f++)
+   {
+      if (in.FaceSelected(f))
+         continue;
+      for (int k = 0; k < 3; k++)
+         out.indices.push_back(copyVertex(in.indices[f * 3 + k]));
+   }
+
+   for (size_t f = 0; f < faces; f++)
+   {
+      if (!in.FaceSelected(f))
+         continue;
+
+      float normal[3], centre[3];
+      FaceNormal(in, f, normal);
+      FaceCentre(in, f, centre);
+
+      const unsigned int base = (unsigned int)out.vertices.size();
+      // Original rim, then the lifted cap, so the wall can be stitched between.
+      for (int k = 0; k < 3; k++)
+         out.vertices.push_back(in.vertices[in.indices[f * 3 + k]]);
+      for (int k = 0; k < 3; k++)
+      {
+         Vertex v = in.vertices[in.indices[f * 3 + k]];
+         v.px += (centre[0] - v.px) * inset + normal[0] * distance;
+         v.py += (centre[1] - v.py) * inset + normal[1] * distance;
+         v.pz += (centre[2] - v.pz) * inset + normal[2] * distance;
+         out.vertices.push_back(v);
+      }
+
+      out.indices.push_back(base + 3);
+      out.indices.push_back(base + 4);
+      out.indices.push_back(base + 5);
+
+      for (int k = 0; k < 3; k++)
+      {
+         const unsigned int a0 = base + (unsigned int)k;
+         const unsigned int a1 = base + (unsigned int)((k + 1) % 3);
+         const unsigned int b0 = base + 3 + (unsigned int)k;
+         const unsigned int b1 = base + 3 + (unsigned int)((k + 1) % 3);
+         PushQuad(out, a0, a1, b1, b0);
+      }
+   }
+   return RecalculateNormals(out, false, false);
+}
+}

@@ -19,7 +19,32 @@ struct Mesh
    std::vector<Vertex> vertices;
    std::vector<unsigned int> indices;
 
+   // Which faces are selected, one entry per triangle. Empty means "all of
+   // them", so nothing that does not care about selection has to think about it
+   // and no existing mesh grew a cost.
+   //
+   // Carried on the mesh rather than as a separate cable so a selection travels
+   // down the geometry connections that already exist - select on one node,
+   // act on it two nodes later, without rewiring anything.
+   std::vector<unsigned char> faceMask;
+
    bool Empty() const { return vertices.empty() || indices.empty(); }
+   size_t FaceCount() const { return indices.size() / 3; }
+
+   bool FaceSelected(size_t face) const
+   {
+      return faceMask.empty() || (face < faceMask.size() && faceMask[face] != 0);
+   }
+   size_t SelectedCount() const
+   {
+      if (faceMask.empty())
+         return FaceCount();
+      size_t n = 0;
+      for (unsigned char f : faceMask)
+         if (f)
+            n++;
+      return n;
+   }
 };
 
 // Column-major 4x4, matching what OpenGL expects from glUniformMatrix4fv.
@@ -304,6 +329,24 @@ namespace MeshOps
    // inside, so the result on one is unpredictable rather than wrong.
    enum BooleanOp { kBooleanUnion = 0, kBooleanIntersect, kBooleanDifference, kBooleanCount };
    Mesh Boolean(const Mesh& a, const Mesh& b, int op);
+
+   // --- selection ---
+   // How faces are chosen. Every mode is deterministic, so a patch selects the
+   // same faces every time it is opened.
+   enum SelectMode
+   {
+      kSelectAll = 0, kSelectIndex, kSelectAxis, kSelectNormal, kSelectRandom,
+      kSelectRadius, kSelectModeCount
+   };
+   // Returns the input with its face mask replaced. `invert` flips the result,
+   // and `append` unions with whatever was already selected upstream.
+   Mesh Select(const Mesh& in, int mode, float a, float b, float c, int axis,
+               float seed, bool invert, bool append);
+
+   // Acts on the selection only. Unselected faces pass through untouched.
+   Mesh DeleteSelected(const Mesh& in, bool keepSelected);
+   Mesh TransformSelected(const Mesh& in, const Mat4& m, bool alongNormals, float normalAmount);
+   Mesh ExtrudeSelected(const Mesh& in, float distance, float inset);
 
    // Contour where a mesh crosses an axis-aligned plane. This is what gives a
    // closed object something to be followed "around", since it has no boundary.
