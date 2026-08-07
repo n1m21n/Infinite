@@ -824,10 +824,117 @@ namespace Platform
       int height = 0;
       int fps = 30;
       long long frameIndex = 0;
+
+      // Audio, all optional - nil/zero when the recording is video-only.
+      AVAssetWriterInput* audioInput = nil;
+      AVAudioFile* audioFile = nil;
+      AVAudioFormat* audioFormat = nil;
+      AVAudioPCMBuffer* audioScratch = nil; // reused read buffer
+      double audioSampleRate = 44100.0;
+      int64_t audioFramesWritten = 0;
+      bool audioLoop = true;
+      bool audioExhausted = false; // file ended and looping is off
    };
 
+   namespace
+   {
+      // AVAssetWriterInput can accept linear-PCM CMSampleBuffers even when its
+      // outputSettings ask for compressed AAC - it transcodes internally, the
+      // same mechanism a microphone-to-.m4a recorder relies on. This is what
+      // makes muxing an arbitrary source file painless: no encoder to drive by
+      // hand, just PCM in.
+      CMSampleBufferRef PCMBufferToSampleBuffer(AVAudioPCMBuffer* buffer, CMTime presentationTime)
+      {
+         if (buffer == nil || buffer.frameLength == 0)
+            return NULL;
+
+         CMFormatDescriptionRef formatDesc = NULL;
+         OSStatus status = CMAudioFormatDescriptionCreate(
+            kCFAllocatorDefault, buffer.format.streamDescription, 0, NULL, 0, NULL, NULL, &formatDesc);
+         if (status != noErr || formatDesc == NULL)
+            return NULL;
+
+         CMSampleTimingInfo timing = {
+            .duration = CMTimeMake(1, (int32_t)buffer.format.sampleRate),
+            .presentationTimeStamp = presentationTime,
+            .decodeTimeStamp = kCMTimeInvalid
+         };
+
+         CMSampleBufferRef sampleBuffer = NULL;
+         status = CMSampleBufferCreate(kCFAllocatorDefault, NULL, false, NULL, NULL, formatDesc,
+                                       (CMItemCount)buffer.frameLength, 1, &timing, 0, NULL, &sampleBuffer);
+         CFRelease(formatDesc);
+         if (status != noErr || sampleBuffer == NULL)
+            return NULL;
+
+         status = CMSampleBufferSetDataBufferFromAudioBufferList(
+            sampleBuffer, kCFAllocatorDefault, kCFAllocatorDefault, 0, buffer.audioBufferList);
+         if (status != noErr)
+         {
+            CFRelease(sampleBuffer);
+            return NULL;
+         }
+         return sampleBuffer;
+      }
+
+      // Reads and appends whatever audio is needed to catch up to
+      // targetSampleFrames, looping or stopping at the source's end per
+      // audioLoop. Called once per video frame, so it never has more than a
+      // fraction of a second to make up.
+      void AppendAudioUpTo(RecorderHandle* h, int64_t targetSampleFrames)
+      {
+         if (h->audioInput == nil || h->audioExhausted)
+            return;
+
+         while (h->audioFramesWritten < targetSampleFrames)
+         {
+            if (!h->audioInput.isReadyForMoreMediaData)
+               return; // try again on the next video frame
+
+            AVAudioFramePosition remaining = h->audioFile.length - h->audioFile.framePosition;
+            if (remaining <= 0)
+            {
+               if (!h->audioLoop)
+               {
+                  h->audioExhausted = true;
+                  return;
+               }
+               h->audioFile.framePosition = 0;
+               remaining = h->audioFile.length;
+            }
+            if (remaining <= 0)
+               return; // a zero-length file: nothing to loop either
+
+            const AVAudioFrameCount wanted = (AVAudioFrameCount)std::min<int64_t>(
+               4096, targetSampleFrames - h->audioFramesWritten);
+            const AVAudioFrameCount toRead =
+               (AVAudioFrameCount)std::min<AVAudioFramePosition>(wanted, remaining);
+
+            if (h->audioScratch == nil)
+               h->audioScratch = [[AVAudioPCMBuffer alloc] initWithPCMFormat:h->audioFormat
+                                                              frameCapacity:4096];
+            h->audioScratch.frameLength = 0;
+
+            NSError* err = nil;
+            if (![h->audioFile readIntoBuffer:h->audioScratch frameCount:toRead error:&err] ||
+                h->audioScratch.frameLength == 0)
+               return;
+
+            CMTime pts = CMTimeMake(h->audioFramesWritten, (int32_t)h->audioSampleRate);
+            CMSampleBufferRef sb = PCMBufferToSampleBuffer(h->audioScratch, pts);
+            if (sb != NULL)
+            {
+               [h->audioInput appendSampleBuffer:sb];
+               CFRelease(sb);
+            }
+            h->audioFramesWritten += h->audioScratch.frameLength;
+         }
+      }
+   }
+
    RecorderHandle* RecorderStart(const std::string& path, int width, int height,
-                                 int fps, std::string& outError)
+                                 int fps, std::string& outError,
+                                 const std::string& audioPath, bool loopAudio)
    {
       @autoreleasepool
       {
@@ -879,6 +986,53 @@ namespace Platform
          }
          [writer addInput:input];
 
+         // Audio has to be resolved and added *before* startWriting: an
+         // AVAssetWriter refuses addInput: once writing has begun, so building
+         // this after the video's startWriting call (as an earlier version of
+         // this function did) silently produced a video-only file every time.
+         AVAssetWriterInput* audioInput = nil;
+         AVAudioFile* audioFile = nil;
+         double audioSampleRate = 44100.0;
+
+         if (!audioPath.empty())
+         {
+            NSString* audioNsPath = [NSString stringWithUTF8String:audioPath.c_str()];
+            NSURL* audioUrl = [NSURL fileURLWithPath:audioNsPath];
+            NSError* audioErr = nil;
+            audioFile = [[AVAudioFile alloc] initForReading:audioUrl error:&audioErr];
+            if (audioFile == nil)
+            {
+               // Video-only rather than failing the whole recording: a bad
+               // audio source should not cost the user the video they came for.
+               fprintf(stderr, "recorder: could not open audio '%s': %s\n", audioPath.c_str(),
+                      audioErr ? [[audioErr localizedDescription] UTF8String] : "unknown error");
+            }
+            else
+            {
+               NSDictionary* audioSettings = @{
+                  AVFormatIDKey         : @(kAudioFormatMPEG4AAC),
+                  AVSampleRateKey       : @(audioFile.processingFormat.sampleRate),
+                  AVNumberOfChannelsKey : @(std::min((unsigned int)2, audioFile.processingFormat.channelCount)),
+                  AVEncoderBitRateKey   : @(160000)
+               };
+               audioInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeAudio
+                                                               outputSettings:audioSettings];
+               audioInput.expectsMediaDataInRealTime = NO;
+
+               if ([writer canAddInput:audioInput])
+               {
+                  [writer addInput:audioInput];
+                  audioSampleRate = audioFile.processingFormat.sampleRate;
+               }
+               else
+               {
+                  fprintf(stderr, "recorder: could not add audio track, continuing video-only\n");
+                  audioInput = nil;
+                  audioFile = nil;
+               }
+            }
+         }
+
          if (![writer startWriting])
          {
             outError = "startWriting failed";
@@ -893,6 +1047,15 @@ namespace Platform
          h->width = width;
          h->height = height;
          h->fps = fps > 0 ? fps : 30;
+         h->audioLoop = loopAudio;
+         h->audioInput = audioInput;
+         h->audioFile = audioFile;
+         if (audioFile != nil)
+         {
+            h->audioFormat = audioFile.processingFormat;
+            h->audioSampleRate = audioSampleRate;
+         }
+
          return h;
       }
    }
@@ -938,6 +1101,15 @@ namespace Platform
          CVPixelBufferRelease(buffer);
          if (ok)
             handle->frameIndex++;
+
+         if (ok && handle->audioInput != nil)
+         {
+            // Catches audio up to the end of the video frame just written, so
+            // the two tracks cannot drift apart by more than one video frame.
+            const int64_t targetFrames =
+               (int64_t)((double)handle->frameIndex / (double)handle->fps * handle->audioSampleRate);
+            AppendAudioUpTo(handle, targetFrames);
+         }
          return ok == YES;
       }
    }
@@ -951,6 +1123,8 @@ namespace Platform
       @autoreleasepool
       {
          [handle->input markAsFinished];
+         if (handle->audioInput != nil)
+            [handle->audioInput markAsFinished];
          [handle->writer finishWritingWithCompletionHandler:^{ done = true; }];
 
          // finishWriting is async; the encoder is fast enough that a short spin is fine
@@ -973,6 +1147,20 @@ namespace Platform
    int RecorderFrameCount(RecorderHandle* handle)
    {
       return handle ? (int)handle->frameIndex : 0;
+   }
+
+   MovieInfo InspectMovie(const std::string& path)
+   {
+      MovieInfo info;
+      @autoreleasepool
+      {
+         NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
+         AVURLAsset* asset = [AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:nsPath] options:nil];
+         info.hasVideo = [asset tracksWithMediaType:AVMediaTypeVideo].count > 0;
+         info.hasAudio = [asset tracksWithMediaType:AVMediaTypeAudio].count > 0;
+         info.duration = CMTimeGetSeconds(asset.duration);
+      }
+      return info;
    }
 }
 

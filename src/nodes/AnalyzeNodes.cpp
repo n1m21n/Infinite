@@ -351,6 +351,7 @@ bool AudioFileNode::Open(const std::string& path)
 
    size_t slash = path.find_last_of('/');
    mFileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
+   mFilePath = path;
    mStatus = "loaded";
 
    Platform::AudioFileSetLoop(mHandle, loop);

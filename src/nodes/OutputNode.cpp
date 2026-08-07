@@ -2,6 +2,8 @@
 
 #include <OpenGL/gl3.h>
 
+#include "AnalyzeNodes.h"
+
 namespace
 {
    const char* kFragSrc =
@@ -49,15 +51,28 @@ bool OutputNode::StartRecording(const std::string& path)
    mRecordW = mOut.w & ~1;
    mRecordH = mOut.h & ~1;
 
+   // The audio file is read straight off disk by the recorder, independent of
+   // whatever the node's own playback/loop state is doing, so a paused or
+   // muted Audio File source still gets recorded correctly.
+   std::string audioPath;
+   bool audioLoop = true;
+   if (includeAudio && audioSource != nullptr && audioSource->IsLoaded())
+   {
+      audioPath = audioSource->FilePath();
+      audioLoop = audioSource->loop;
+   }
+
    std::string error;
-   mRecorder = Platform::RecorderStart(path, mRecordW, mRecordH, recordFps, error);
+   mRecorder = Platform::RecorderStart(path, mRecordW, mRecordH, recordFps, error,
+                                       audioPath, audioLoop);
    if (mRecorder == nullptr)
    {
       mRecordStatus = error.empty() ? "could not start recording" : error;
       return false;
    }
 
-   mRecordStatus = "recording...";
+   mRecordStatus = (includeAudio && !audioPath.empty()) ? "recording with audio..."
+                                                        : "recording...";
    return true;
 }
 

@@ -25,6 +25,7 @@ public:
 
    ImageCable& Input() { return mInput; }
    INode* BypassSource() override { return mInput.GetSource(); }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "in" : "audio"; }
 
    // --- recording ---
    bool StartRecording(const std::string& path);
@@ -34,10 +35,16 @@ public:
    const std::string& RecordStatus() const { return mRecordStatus; }
 
    int recordFps = 30;
+   bool includeAudio = false;
+   // Not an ImageCable: recording reads the file directly off disk at its own
+   // pace rather than pulling through the cook graph, so this is a plain
+   // pointer set the same way geometry/camera pins are.
+   class AudioFileNode* audioSource = nullptr;
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("recordFps", recordFps);
+      v.Bool("includeAudio", includeAudio);
    }
 
 private:

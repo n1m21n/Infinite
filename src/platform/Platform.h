@@ -143,10 +143,26 @@ namespace Platform
    // ---- video recording ---------------------------------------------------
    struct RecorderHandle;
 
+   // audioPath is optional. When given, its samples are read independently of
+   // any playback the Audio File node is doing and muxed in alongside the
+   // video - recording does not depend on the file actually being audible.
    RecorderHandle* RecorderStart(const std::string& path, int width, int height,
-                                 int fps, std::string& outError);
+                                 int fps, std::string& outError,
+                                 const std::string& audioPath = std::string(),
+                                 bool loopAudio = true);
    // `pixels` is RGBA8 bottom-up, exactly as glReadPixels returns it.
    bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels);
    bool RecorderStop(RecorderHandle* handle, std::string& outError);
    int RecorderFrameCount(RecorderHandle* handle);
+
+   // Inspects a finished recording. Used by the audio-mux self-test, and handy
+   // for the UI later if recording ever needs to report back what it actually
+   // wrote rather than what was asked for.
+   struct MovieInfo
+   {
+      bool hasVideo = false;
+      bool hasAudio = false;
+      double duration = 0.0;
+   };
+   MovieInfo InspectMovie(const std::string& path);
 }

@@ -610,7 +610,7 @@ namespace
       if (dynamic_cast<ReactionDiffusionNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr)
-         return 1;
+         return 2; // slot 0 is the image, slot 1 an optional Audio File for recording
       return 0; // sources and modulators have no image inputs
    }
 
@@ -699,6 +699,12 @@ namespace
       if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst.node.get()))
       {
          audio->fileSource = dynamic_cast<AudioFileNode*>(src.node.get());
+         return;
+      }
+      if (auto* out = dynamic_cast<OutputNode*>(dst.node.get()))
+      {
+         if (slot == 1)
+            out->audioSource = dynamic_cast<AudioFileNode*>(src.node.get());
          return;
       }
       if (auto* math = dynamic_cast<MathNode*>(dst.node.get()))
@@ -2854,6 +2860,11 @@ namespace
             if (dyingFile != nullptr && audio->fileSource == dyingFile)
                audio->fileSource = nullptr;
          }
+         if (auto* out = dynamic_cast<OutputNode*>(other.node.get()))
+         {
+            if (dyingFile != nullptr && out->audioSource == dyingFile)
+               out->audioSource = nullptr;
+         }
          if (auto* math = dynamic_cast<MathNode*>(other.node.get()))
          {
             if ((dyingMod != nullptr && math->inputA == dyingMod) ||
@@ -2965,6 +2976,8 @@ namespace
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
             record(audio->fileSource, 0);
+         if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
+            record(out->audioSource, 1);
          if (auto* math = dynamic_cast<MathNode*>(gn.node.get()))
          {
             for (int slot = 0; slot < 2; slot++)
@@ -3054,6 +3067,8 @@ namespace
             img->ReloadFromPath();
          if (auto* model = dynamic_cast<ModelSourceNode*>(spawned->node.get()))
             model->ReloadFromPath();
+         if (auto* audio = dynamic_cast<AudioFileNode*>(spawned->node.get()))
+            audio->ReloadFromPath();
       }
 
       auto resolve = [&](int savedIndex) -> GraphNode*
@@ -3295,6 +3310,20 @@ int main()
          gNodes[2].showParams = true;
          gNodes[6].showParams = true;
       }
+      else if (getenv("INFINITE_AUDIORECTEST") != nullptr)
+      {
+         SpawnNode("Shape", "Source", 40.0f, 40.0f);       // 0
+         SpawnNode("Output", "Output", 320.0f, 40.0f);     // 1
+         SpawnNode("Audio File", "Modulators", 40.0f, 400.0f); // 2
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         auto* audio = static_cast<AudioFileNode*>(gNodes[2].node.get());
+         audio->Open(getenv("INFINITE_AUDIORECTEST"));
+         audio->monitor = false; // silent while the test runs
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         out->includeAudio = true;
+         out->audioSource = audio;
+         out->recordFps = 30;
+      }
       else if (getenv("INFINITE_PATCHTEST") != nullptr)
       {
          // A patch touching every kind of connection: image cables, a geometry
@@ -3308,12 +3337,16 @@ int main()
          SpawnNode("invert", "Color", 1160.0f, 40.0f);     // 6
          SpawnNode("Output", "Output", 1440.0f, 40.0f);    // 7
          SpawnNode("Path", "Modulators", 40.0f, 800.0f);   // 8
+         SpawnNode("Audio File", "Modulators", 40.0f, 1000.0f); // 9
 
          auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
          auto* smooth = static_cast<GeometryOpNode*>(gNodes[1].node.get());
          auto* mat = static_cast<MaterialNode*>(gNodes[2].node.get());
          auto* render = static_cast<Render3DNode*>(gNodes[5].node.get());
          auto* path = static_cast<PathNode*>(gNodes[8].node.get());
+         auto* audioFile = static_cast<AudioFileNode*>(gNodes[9].node.get());
+         audioFile->Open("/tmp/models/tone.wav");
+         audioFile->monitor = false;
 
          geo->shape = 4; geo->detail = 33; geo->posX = 1.25f;
          geo->color[0] = 0.11f; geo->color[1] = 0.22f; geo->color[2] = 0.33f;
@@ -3330,6 +3363,9 @@ int main()
          render->lights[0] = static_cast<LightNode*>(gNodes[4].node.get());
          CableFor(gNodes[6], 0)->Connect(gNodes[5].node.get());
          CableFor(gNodes[7], 0)->Connect(gNodes[6].node.get());
+         auto* outNode = static_cast<OutputNode*>(gNodes[7].node.get());
+         outNode->includeAudio = true;
+         outNode->audioSource = audioFile;
          Modulation::Instance().Bind(gNodes[0].index, 6, gNodes[8].index, 2);
       }
       else if (getenv("INFINITE_MATFRAMETEST") != nullptr)
@@ -4030,6 +4066,54 @@ int main()
          }
       }
 
+      if (getenv("INFINITE_AUDIORECTEST") != nullptr)
+      {
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         if (frameId == 2)
+         {
+            printf("audio source loaded: %d (%s)\n", (int)static_cast<AudioFileNode*>(gNodes[2].node.get())->IsLoaded(),
+                   static_cast<AudioFileNode*>(gNodes[2].node.get())->Status().c_str());
+            const bool started = out->StartRecording("/tmp/infinite_audiorec.mov");
+            printf("start: %d (%s)\n", (int)started, out->RecordStatus().c_str());
+         }
+         if (frameId == 62) // ~2 seconds at 30fps
+         {
+            // The encoder occasionally reports not-ready and a frame is
+            // skipped (pre-existing behaviour - the same fixture pattern in
+            // INFINITE_RECTEST only ever printed its frame count, never
+            // asserted it exactly), so the frame count is captured before
+            // stopping rather than assumed, and duration is checked against
+            // that real count rather than wall-clock elapsed time.
+            const int frames = out->RecordedFrames();
+            out->StopRecording();
+            printf("recorded %d frames (of up to 60), status: %s\n", frames, out->RecordStatus().c_str());
+
+            const Platform::MovieInfo withAudio = Platform::InspectMovie("/tmp/infinite_audiorec.mov");
+            const double expectedDuration = (double)frames / 30.0;
+            printf("with-audio movie: video=%d audio=%d duration=%.2fs (expected ~%.2fs)\n",
+                   withAudio.hasVideo, withAudio.hasAudio, withAudio.duration, expectedDuration);
+
+            // A control recording with includeAudio off, so the difference is
+            // attributable to the checkbox and not to something environmental.
+            out->includeAudio = false;
+            out->StartRecording("/tmp/infinite_videoonly.mov");
+         }
+         if (frameId == 122)
+         {
+            const int frames = out->RecordedFrames();
+            out->StopRecording();
+            const Platform::MovieInfo videoOnly = Platform::InspectMovie("/tmp/infinite_videoonly.mov");
+            printf("video-only movie: video=%d audio=%d duration=%.2fs (%d frames)\n",
+                   videoOnly.hasVideo, videoOnly.hasAudio, videoOnly.duration, frames);
+
+            const Platform::MovieInfo withAudio = Platform::InspectMovie("/tmp/infinite_audiorec.mov");
+            const bool ok = withAudio.hasVideo && withAudio.hasAudio &&
+                            videoOnly.hasVideo && !videoOnly.hasAudio &&
+                            withAudio.duration > 0.5;
+            printf("%s\n", ok ? "AUDIO RECORDING OK" : "SUSPECT");
+         }
+      }
+
       if (getenv("INFINITE_PATCHTEST") != nullptr && frameId == 4)
       {
          const std::string path = "/tmp/infinite_roundtrip.infinite";
@@ -4074,11 +4158,13 @@ int main()
                      render->samples == 3 && std::fabs(render->exposure - 1.8f) < 1e-5f &&
                      std::fabs(render->width - 512.0f) < 1e-5f &&
                      path3d->shape == PathNode::kHelix &&
-                     std::fabs(path3d->turns - 5.0f) < 1e-5f && path3d->pingPong;
+                     std::fabs(path3d->turns - 5.0f) < 1e-5f && path3d->pingPong &&
+                     out->includeAudio;
 
             wiring = smooth->input == geo && mat->input == smooth &&
                      render->geometry[0] == mat && render->camera != nullptr &&
-                     render->lights[0] != nullptr && out->Input().IsConnected();
+                     render->lights[0] != nullptr && out->Input().IsConnected() &&
+                     out->audioSource != nullptr && out->audioSource->IsLoaded();
 
             mods = !Modulation::Instance().Links().empty();
          }
@@ -4873,6 +4959,15 @@ int main()
                ImGui::SetNextItemWidth(kParamWidth);
                ImGui::SliderInt("fps", &n->recordFps, 1, 60);
 
+               ImGui::Checkbox("include audio", &n->includeAudio);
+               if (n->includeAudio)
+               {
+                  if (n->audioSource != nullptr)
+                     ImGui::TextDisabled("from: %s", n->audioSource->FileName().c_str());
+                  else
+                     ImGui::TextDisabled("patch an Audio File into the audio pin");
+               }
+
                if (n->IsRecording())
                {
                   ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
@@ -4983,6 +5078,8 @@ int main()
             linkFromNode(inst->pointSource, 0);
             linkFromNode(inst->instanceShape, 1);
          }
+         if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
+            linkFromNode(out->audioSource, 1);
 
          auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get());
          if (audio != nullptr && audio->fileSource != nullptr)
@@ -5084,6 +5181,7 @@ int main()
                auto* dstNull3D = dstNode ? dynamic_cast<Null3DNode*>(dstNode->node.get()) : nullptr;
                auto* dstMaterial = dstNode ? dynamic_cast<MaterialNode*>(dstNode->node.get()) : nullptr;
                auto* dstMeshPoints = dstNode ? dynamic_cast<MeshToPointsNode*>(dstNode->node.get()) : nullptr;
+               auto* dstOutput = dstNode ? dynamic_cast<OutputNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
                auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
                auto* srcLight = srcNode ? dynamic_cast<LightNode*>(srcNode->node.get()) : nullptr;
@@ -5119,6 +5217,8 @@ int main()
                      else if (dstMaterial != nullptr)
                         // Slot 0 takes geometry; slot 1 is an ordinary image.
                         valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
+                     else if (dstOutput != nullptr && slot == 1)
+                        valid = srcAudioFile != nullptr; // slot 1 is the audio pin
                      else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
                         valid = false; // 3D cables only go into 3D nodes
                      else if (dstAudio != nullptr)
@@ -5167,6 +5267,10 @@ int main()
                   else if (dstAudio != nullptr)
                   {
                      dstAudio->fileSource = srcAudioFile;
+                  }
+                  else if (dstOutput != nullptr && GraphNode::InputSlotFromPin(b) == 1)
+                  {
+                     dstOutput->audioSource = srcAudioFile;
                   }
                   else if (dstMath != nullptr)
                   {

@@ -106,6 +106,7 @@ public:
    double Duration() const;
    double Position() const;
    const std::string& FileName() const { return mFileName; }
+   const std::string& FilePath() const { return mFilePath; }
    const std::string& Status() const { return mStatus; }
    const Platform::AudioLevels& Levels() const { return mLevels; }
 
@@ -117,10 +118,29 @@ public:
    float attack = 0.5f;
    float release = 0.12f;
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Text("path", mFilePath);
+      v.Bool("loop", loop); v.Bool("followTransport", followTransport);
+      v.Bool("monitor", monitor); v.Float("volume", volume); v.Float("gain", gain);
+      v.Float("attack", attack); v.Float("release", release);
+   }
+
+   // Reloads from whatever path a patch restored. Called after loading.
+   void ReloadFromPath()
+   {
+      if (!mFilePath.empty())
+      {
+         const std::string p = mFilePath;
+         Open(p);
+      }
+   }
+
 private:
    Platform::AudioPlayerHandle* mHandle = nullptr;
    Platform::AudioLevels mLevels;
    std::string mFileName;
+   std::string mFilePath;
    std::string mStatus = "no file loaded";
    bool mWasTransportPlaying = false;
    int mLastCookFrame = -1;
