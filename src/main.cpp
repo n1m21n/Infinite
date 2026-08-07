@@ -4568,7 +4568,36 @@ int main()
          const bool merges = !mApart.Empty() && !mTogether.Empty() &&
                              !spansCentre(mApart) && spansCentre(mTogether);
 
-         printf("%s\n", (allPrims && merges) ? "PHASE C OK" : "SUSPECT");
+         // Merging alone is not enough: the surface has to be closed and
+         // consistently wound, or backface culling eats the wrongly-facing half
+         // and the blob renders shattered. Every edge of a watertight, coherently
+         // oriented mesh is traversed once in each direction, so a directed edge
+         // seen twice the same way means two triangles disagree about facing.
+         auto surfaceIntact = [](const Mesh& m, const char* label) {
+            const std::vector<unsigned int> weld = MeshOps::BuildWeldMap(m);
+            std::map<std::pair<unsigned int, unsigned int>, int> directed;
+            for (size_t t = 0; t + 2 < m.indices.size(); t += 3)
+               for (int e = 0; e < 3; e++)
+                  directed[{ weld[m.indices[t + e]], weld[m.indices[t + (e + 1) % 3]] }]++;
+
+            size_t boundary = 0, flipped = 0;
+            for (const auto& entry : directed)
+            {
+               if (entry.second > 1)
+                  flipped++;
+               const auto opposite = directed.find({ entry.first.second, entry.first.first });
+               if (opposite == directed.end())
+                  boundary++;
+            }
+            const bool ok = boundary == 0 && flipped == 0;
+            printf("  %s: %zu open edges, %zu inconsistently wound  %s\n",
+                   label, boundary, flipped, ok ? "watertight" : "BROKEN");
+            return ok;
+         };
+         const bool intact = surfaceIntact(mApart, "apart") &&
+                             surfaceIntact(mTogether, "together");
+
+         printf("%s\n", (allPrims && merges && intact) ? "PHASE C OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_MAPTEST") != nullptr && frameId >= 4 && frameId <= 16 && frameId % 4 == 0)

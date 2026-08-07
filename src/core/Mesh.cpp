@@ -2073,8 +2073,42 @@ namespace
          out[2] = p[a].z + (p[b].z - p[a].z) * clamped;
       };
 
+      // Outward is from the inside corners toward the outside ones - the
+      // direction the field is falling.
+      float insideCentre[3] = { 0, 0, 0 }, outsideCentre[3] = { 0, 0, 0 };
+      for (int i = 0; i < insideCount; i++)
+      {
+         insideCentre[0] += p[inside[i]].x; insideCentre[1] += p[inside[i]].y;
+         insideCentre[2] += p[inside[i]].z;
+      }
+      for (int i = 0; i < outsideCount; i++)
+      {
+         outsideCentre[0] += p[outside[i]].x; outsideCentre[1] += p[outside[i]].y;
+         outsideCentre[2] += p[outside[i]].z;
+      }
+      const float outward[3] = {
+         outsideCentre[0] / (float)outsideCount - insideCentre[0] / (float)insideCount,
+         outsideCentre[1] / (float)outsideCount - insideCentre[1] / (float)insideCount,
+         outsideCentre[2] / (float)outsideCount - insideCentre[2] / (float)insideCount
+      };
+
       auto pushTri = [&](const float a[3], const float b[3], const float c[3])
       {
+         // Winding has to be decided per triangle, not assumed. Which corners
+         // land in inside[] versus outside[] depends on the order they were
+         // tested in, so a fixed vertex order gives each tetrahedron whichever
+         // facing it happens to get - and with backface culling on, half the
+         // surface simply vanishes, which is what made the blobs look shattered.
+         const float e1[3] = { b[0]-a[0], b[1]-a[1], b[2]-a[2] };
+         const float e2[3] = { c[0]-a[0], c[1]-a[1], c[2]-a[2] };
+         const float normal[3] = {
+            e1[1]*e2[2] - e1[2]*e2[1],
+            e1[2]*e2[0] - e1[0]*e2[2],
+            e1[0]*e2[1] - e1[1]*e2[0]
+         };
+         const bool flip = (normal[0]*outward[0] + normal[1]*outward[1] +
+                            normal[2]*outward[2]) < 0.0f;
+
          const unsigned int base = (unsigned int)mesh.vertices.size();
          // Normals are left flat here and recomputed from the finished surface;
          // per-tetra normals would be faceted along every cell boundary.
@@ -2082,8 +2116,8 @@ namespace
          PushVertex(mesh, b[0], b[1], b[2], 0, 1, 0, 1, 0);
          PushVertex(mesh, c[0], c[1], c[2], 0, 1, 0, 0, 1);
          mesh.indices.push_back(base);
-         mesh.indices.push_back(base + 1);
-         mesh.indices.push_back(base + 2);
+         mesh.indices.push_back(base + (flip ? 2 : 1));
+         mesh.indices.push_back(base + (flip ? 1 : 2));
       };
 
       float v0[3], v1[3], v2[3], v3[3];
