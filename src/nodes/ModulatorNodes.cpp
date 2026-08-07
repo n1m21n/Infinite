@@ -64,7 +64,11 @@ float LFONode::Value01()
 
 float RandomNode::ValueForStep(long long step) const
 {
-   return Hash01(step);
+   // The seed is mixed into the hash input rather than added to the result, so
+   // two seeds give genuinely different sequences instead of the same sequence
+   // offset by a constant.
+   const long long salt = (long long)(seed * 1013.0f);
+   return Hash01(step * 6364136223LL + salt * 1442695040888963407LL);
 }
 
 float RandomNode::Value01()

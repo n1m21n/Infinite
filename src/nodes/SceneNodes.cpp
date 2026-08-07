@@ -8,7 +8,7 @@
 namespace
 {
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
-   const std::vector<std::string> kLightTypeNames = { "Directional", "Point" };
+   const std::vector<std::string> kLightTypeNames = { "Directional", "Point", "Sun", "Ambient" };
 }
 
 const std::vector<std::string>& CameraNode::ProjectionNames() { return kProjectionNames; }
@@ -47,6 +47,7 @@ void LightNode::ComputeVector(float out[3]) const
    const float spin = orbitPerBeat * (float)Transport::Instance().Beats();
    const float az = azimuth + spin;
    const float ce = std::cos(elevation);
+   // Only a point light needs a world position; the others carry a direction.
    const float radius = (type == 1) ? distance : 1.0f;
    out[0] = radius * ce * std::cos(az);
    out[1] = radius * std::sin(elevation);

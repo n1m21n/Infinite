@@ -33,7 +33,15 @@ public:
 class RandomNode : public INode, public IModulator
 {
 public:
-   static INode* Create() { return new RandomNode(); }
+   // Each spawned Random starts on a different seed. Two of them dropped on the
+   // canvas should not march in lockstep, which is what a shared default does.
+   static INode* Create()
+   {
+      static int sSpawnCounter = 0;
+      auto* node = new RandomNode();
+      node->seed = (float)(++sSpawnCounter) * 7.3f;
+      return node;
+   }
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
@@ -46,6 +54,18 @@ public:
    float smooth = 0.5f;    // 0 = stepped, 1 = fully interpolated
    float low = 0.0f;
    float high = 1.0f;
+
+   // Without this every Random node in a patch runs the identical sequence:
+   // the value is a hash of the transport step, and the step is global. Each
+   // instance gets a different default so two freshly spawned Random nodes are
+   // uncorrelated, while the same seed still reproduces the same run exactly.
+   float seed = 0.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("rate", rateBeats); v.Float("smooth", smooth);
+      v.Float("low", low); v.Float("high", high); v.Float("seed", seed);
+   }
 
 private:
    float ValueForStep(long long step) const;

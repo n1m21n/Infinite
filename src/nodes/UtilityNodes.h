@@ -133,6 +133,77 @@ private:
    int mLastCookFrame = -1;
 };
 
+// --- Join Geometry ------------------------------------------------------
+// Merges several meshes into one, so an assembly can be smoothed, scattered or
+// materialled as a single thing rather than one piece at a time.
+//
+// Each input's model matrix is baked into the merged vertices. Without that the
+// parts would all collapse onto the origin, since the combined mesh can only
+// carry one transform of its own.
+class JoinGeometryNode : public INode, public IGeometrySource
+{
+public:
+   static const int kSlots = 4;
+
+   static INode* Create() { return new JoinGeometryNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+
+   const Mesh& GetMesh() override;
+   unsigned long long MeshRevision() override;
+   Mat4 GetModelMatrix() const override;
+   Material GetMaterial() const override;
+   unsigned int GetSurfaceTexture() override;
+
+   IGeometrySource* inputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
+   const char* InputLabel(int slot) const override
+   {
+      static const char* kNames[] = { "geo A", "geo B", "geo C", "geo D" };
+      return (slot >= 0 && slot < kSlots) ? kNames[slot] : nullptr;
+   }
+   size_t TriangleCount() const { return mCache.indices.size() / 3; }
+   int ConnectedCount() const;
+
+   // Which input's material the merged mesh wears. A merged mesh is one draw
+   // call, so it can only have one material; this picks which.
+   int materialFrom = 0;
+   bool inheritMaterial = true;
+
+   float posX = 0.0f, posY = 0.0f, posZ = 0.0f;
+   float uniformScale = 1.0f;
+
+   float color[3] = { 0.85f, 0.86f, 0.9f };
+   float metallic = 0.1f;
+   float roughness = 0.45f;
+   float opacity = 1.0f;
+   int shading = 0;
+   float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
+   float emission = 0.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("materialFrom", materialFrom); v.Bool("inherit", inheritMaterial);
+      v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
+      v.Float("scale", uniformScale);
+      v.Color("color", color); v.Float("metallic", metallic);
+      v.Float("roughness", roughness); v.Float("opacity", opacity);
+      v.Int("shading", shading);
+      v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+   }
+
+private:
+   void RebuildIfNeeded();
+
+   Mesh mCache;
+   unsigned long long mMeshRevision = 0;
+   const void* mBuiltInputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
+   unsigned long long mBuiltRevisions[kSlots] = { 0, 0, 0, 0 };
+   int mLastCookFrame = -1;
+};
+
 // --- Mesh to Points -----------------------------------------------------
 // Samples a mesh at its vertices, edge midpoints or face centres and emits a
 // small quad at each. The sampling itself already existed inside Instance on

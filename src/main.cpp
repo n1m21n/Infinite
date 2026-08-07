@@ -70,10 +70,24 @@ namespace
 {
    // Every node renders its output at this size, square, above its params.
    const float kPreviewSize = 190.0f;
+   // Render 3D's preview is a viewport you actually work in - orbiting and
+   // framing a scene through a thumbnail is not workable.
+   const float kViewportSize = 340.0f;
    const float kParamWidth = 168.0f;
    const float kPinRadius = 7.0f;
    const float kPinHit = 20.0f; // generous click target - small dots were unhittable
 
+
+   // Registered node names are the patch-file keys and must not change, so
+   // casing is a display concern only - lowering it here keeps saved patches
+   // loading while the UI reads the way the user asked for.
+   std::string DisplayName(const std::string& name)
+   {
+      std::string out = name;
+      std::transform(out.begin(), out.end(), out.begin(),
+                     [](unsigned char c) { return (char)std::tolower(c); });
+      return out;
+   }
 
    std::vector<GraphNode> gNodes;
    // Starts at 1, not 0: node index 0 would give NodeId 0, and the node editor
@@ -108,9 +122,15 @@ namespace
    float gGridSnap = 20.0f;
    double gLastFrameMs = 0.0; // wall clock across the previous whole frame
    double gFrameStart = 0.0;  // when the current frame began, for the limiter
-   int gTargetFps = 0;        // 0 = uncapped; otherwise the frame limiter's budget
+   // 60 by default: a light patch spinning the GPU at 400fps costs power for
+   // nothing, and a predictable budget makes the cost of a setting readable.
+   int gTargetFps = 60;       // 0 = uncapped; otherwise the frame limiter's budget
    bool gVsync = true;
    bool gRequestFitView = false;
+   // The node browser lives in a docked panel rather than only the canvas popup,
+   // so modules can be found without knowing the double-click gesture exists.
+   bool gNodePanelOpen = false;
+   ImVec2 gViewCenterCanvas(0.0f, 0.0f); // captured inside the editor for spawning
    float gZoomSensitivity = 0.5f;
    bool gHoveringItem = false;   // last frame: cursor over a node/pin/link
    bool gPanWithLeft = false;    // current left-drag is a canvas pan, not a select
@@ -480,6 +500,7 @@ namespace
       REGISTER_NODE(MaterialNode, Material, "3D");
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
       REGISTER_NODE(ClothNode, Cloth, "3D");
+      REGISTER_NODE(JoinGeometryNode, Join Geometry, "3D");
       // Three names, one class - Points/Edges/Faces are the same sampler.
       for (int i = 0; i < 3; i++)
       {
@@ -598,6 +619,8 @@ namespace
          return 1;
       if (dynamic_cast<ClothNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr)
+         return JoinGeometryNode::kSlots;
       if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
@@ -694,6 +717,12 @@ namespace
       if (auto* mat = dynamic_cast<MaterialNode*>(dst.node.get())) { mat->input = geo; return; }
       if (auto* m2p = dynamic_cast<MeshToPointsNode*>(dst.node.get())) { m2p->input = geo; return; }
       if (auto* cloth = dynamic_cast<ClothNode*>(dst.node.get())) { cloth->input = geo; return; }
+      if (auto* join = dynamic_cast<JoinGeometryNode*>(dst.node.get()))
+      {
+         if (slot >= 0 && slot < JoinGeometryNode::kSlots)
+            join->inputs[slot] = geo;
+         return;
+      }
       if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(dst.node.get()))
       {
          if (slot == 0)
@@ -1009,6 +1038,8 @@ namespace
       ModSlider("smooth", &n->smooth, 0.0f, 1.0f);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
+      ModSlider("seed", &n->seed, 0.0f, 200.0f);
+      ImGui::TextDisabled("same seed = same sequence");
    }
 
    void DrawPatternParams(PatternNode* n)
@@ -1686,6 +1717,36 @@ namespace
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
       ColorSwatch("emission", n->emissionColor, n);
       ModSlider("emission", &n->emission, 0.0f, 8.0f);
+   }
+
+   void DrawJoinGeometryParams(JoinGeometryNode* n)
+   {
+      ImGui::TextDisabled("%d inputs, %zu triangles", n->ConnectedCount(), n->TriangleCount());
+      ImGui::TextDisabled("each input's transform is baked in");
+
+      NodeSeparator("material");
+      ImGui::Checkbox("inherit material", &n->inheritMaterial);
+      if (n->inheritMaterial)
+      {
+         // A merged mesh is one draw call, so it can only wear one material.
+         ModSliderInt("from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
+      }
+      else
+      {
+         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+         ColorSwatch("colour", n->color, n);
+         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+         ColorSwatch("emission", n->emissionColor, n);
+         ModSlider("emission", &n->emission, 0.0f, 8.0f);
+      }
+
+      NodeSeparator("transform");
+      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
+      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
+      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
+      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
    }
 
    void DrawClothParams(ClothNode* n)
@@ -2561,42 +2622,46 @@ namespace
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
+      // Render 3D gets a working viewport rather than a thumbnail: it is the
+      // one preview you orbit and frame a scene in.
+      auto* render = dynamic_cast<Render3DNode*>(node);
+      const float size = (render != nullptr) ? kViewportSize : kPreviewSize;
+
+      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + size),
                         IM_COL32(18, 18, 24, 255), 4.0f);
 
       if (tex != 0 && node->GetOutputWidth() > 0)
       {
          float w = (float)node->GetOutputWidth();
          float h = (float)node->GetOutputHeight();
-         float scale = kPreviewSize / std::max(w, h);
+         float scale = size / std::max(w, h);
          float dw = w * scale;
          float dh = h * scale;
-         ImVec2 tl(origin.x + (kPreviewSize - dw) * 0.5f, origin.y + (kPreviewSize - dh) * 0.5f);
+         ImVec2 tl(origin.x + (size - dw) * 0.5f, origin.y + (size - dh) * 0.5f);
          dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dw, tl.y + dh),
                       ImVec2(0, 1), ImVec2(1, 0));
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 10, origin.y + kPreviewSize * 0.5f - 8),
+         dl->AddText(ImVec2(origin.x + 10, origin.y + size * 0.5f - 8),
                      IM_COL32(120, 120, 135, 255), "no input");
       }
 
-      dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                   IM_COL32(70, 74, 90, 255), 4.0f);
 
       // A Render 3D preview is a viewport, not a picture: drag to orbit, scroll
       // to zoom. An InvisibleButton is what makes this safe inside the node
       // editor - while it is active the editor leaves the drag alone, which is
       // the same mechanism the in-node sliders already rely on.
-      auto* render = dynamic_cast<Render3DNode*>(node);
       if (render == nullptr)
       {
-         ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize));
+         ImGui::Dummy(ImVec2(size, size));
          return;
       }
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##viewport", ImVec2(kPreviewSize, kPreviewSize));
+      ImGui::InvisibleButton("##viewport", ImVec2(size, size));
 
       // A patched Camera node owns the view, so drive that instead of the
       // built-in values; otherwise the drag would appear to do nothing.
@@ -2625,7 +2690,7 @@ namespace
       }
 
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-         dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
+         dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
    }
 
@@ -2961,6 +3026,10 @@ namespace
             if (auto* cloth = dynamic_cast<ClothNode*>(other.node.get()))
                if (cloth->input == dyingGeometry)
                   cloth->input = nullptr;
+            if (auto* join = dynamic_cast<JoinGeometryNode*>(other.node.get()))
+               for (int i = 0; i < JoinGeometryNode::kSlots; i++)
+                  if (join->inputs[i] == dyingGeometry)
+                     join->inputs[i] = nullptr;
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
          {
@@ -3081,6 +3150,9 @@ namespace
          if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get())) record(mat->input, 0);
          if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get())) record(m2p->input, 0);
          if (auto* cloth = dynamic_cast<ClothNode*>(gn.node.get())) record(cloth->input, 0);
+         if (auto* join = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
+            for (int i = 0; i < JoinGeometryNode::kSlots; i++)
+               record(join->inputs[i], i);
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
          {
             record(inst->pointSource, 0);
@@ -3422,6 +3494,25 @@ int main()
          r->width = 700.0f; r->height = 700.0f;
          gNodes[2].showParams = true;
          gNodes[6].showParams = true;
+      }
+      else if (getenv("INFINITE_FIXTEST") != nullptr)
+      {
+         SpawnNode("Random", "Modulators", 40.0f, 40.0f);   // 0
+         SpawnNode("Random", "Modulators", 40.0f, 300.0f);  // 1
+         SpawnNode("Random", "Modulators", 40.0f, 560.0f);  // 2
+         SpawnNode("Geometry", "3D", 400.0f, 40.0f);        // 3
+         SpawnNode("Geometry", "3D", 400.0f, 300.0f);       // 4
+         SpawnNode("Join Geometry", "3D", 760.0f, 40.0f);   // 5
+         SpawnNode("Render 3D", "3D", 1100.0f, 40.0f);      // 6
+
+         auto* a = static_cast<GeometryNode*>(gNodes[3].node.get());
+         auto* b = static_cast<GeometryNode*>(gNodes[4].node.get());
+         a->posX = -1.0f;
+         b->posX = 1.5f; b->shape = 2;
+         auto* join = static_cast<JoinGeometryNode*>(gNodes[5].node.get());
+         join->inputs[0] = a;
+         join->inputs[1] = b;
+         static_cast<Render3DNode*>(gNodes[6].node.get())->geometry[0] = join;
       }
       else if (getenv("INFINITE_CLOTHTEST") != nullptr)
       {
@@ -3976,6 +4067,16 @@ int main()
                              1 + (int)(transport.Beats() / 4.0),
                              std::fmod(transport.Beats(), 4.0) + 1.0);
 
+         {
+            // Sits just left of the frame readout, so the two right-hand
+            // controls stay together.
+            const char* label = gNodePanelOpen ? "> modules" : "search modules";
+            const float w = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+            ImGui::SameLine(ImGui::GetWindowWidth() - w - 200.0f);
+            if (ImGui::Button(label))
+               gNodePanelOpen = !gNodePanelOpen;
+         }
+
          // Frame cost, pinned right. Measured from the swap-to-swap wall clock
          // rather than ImGui's smoothed rate, so a heavy patch shows its real
          // cost immediately instead of easing into it over a second.
@@ -4034,7 +4135,11 @@ int main()
          liveCfg.NavigateButtonIndex = gPanWithLeft ? 0 : 1;
       }
 
-      ed::Begin("graph", ImVec2(0.0f, ImGui::GetContentRegionAvail().y));
+      const float kNodePanelWidth = 270.0f;
+      const float graphWidth = gNodePanelOpen
+                                  ? std::max(200.0f, ImGui::GetContentRegionAvail().x - kNodePanelWidth)
+                                  : 0.0f;
+      ed::Begin("graph", ImVec2(graphWidth, ImGui::GetContentRegionAvail().y));
 
       if (!gPendingSelect.empty())
       {
@@ -4051,6 +4156,14 @@ int main()
       {
          ed::NavigateToContent(0.0f);
          gRequestFitView = false;
+      }
+
+      // Where a panel-spawned node should land. ScreenToCanvas is only valid
+      // inside the editor, so it is captured here and used after ed::End().
+      {
+         const ImVec2 tl = ImGui::GetWindowPos();
+         const ImVec2 size = ImGui::GetWindowSize();
+         gViewCenterCanvas = ed::ScreenToCanvas(ImVec2(tl.x + size.x * 0.5f, tl.y + size.y * 0.5f));
       }
 
       // Dropping a file on the canvas spawns the matching source node, already
@@ -4208,6 +4321,58 @@ int main()
                    px[0] > 200 ? "PASSED THROUGH OK" : "STILL INVERTED - BUG");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
+      }
+
+      if (getenv("INFINITE_FIXTEST") != nullptr && frameId == 6)
+      {
+         auto* r0 = static_cast<RandomNode*>(gNodes[0].node.get());
+         auto* r1 = static_cast<RandomNode*>(gNodes[1].node.get());
+         auto* r2 = static_cast<RandomNode*>(gNodes[2].node.get());
+
+         // Three independently spawned Random nodes must not agree. Sampled
+         // across several steps, since any two can coincide on a single one.
+         int identical01 = 0, identical02 = 0;
+         for (int step = 0; step < 32; step++)
+         {
+            r0->rateBeats = r1->rateBeats = r2->rateBeats = 0.25f;
+            Transport::Instance().Tick(0.12f);
+            const float v0 = r0->Value01();
+            const float v1 = r1->Value01();
+            const float v2 = r2->Value01();
+            if (std::fabs(v0 - v1) < 1e-6f) identical01++;
+            if (std::fabs(v0 - v2) < 1e-6f) identical02++;
+         }
+         printf("random: %d/32 samples identical between node 0 and 1, %d/32 between 0 and 2\n",
+                identical01, identical02);
+         printf("seeds: %.1f %.1f %.1f\n", r0->seed, r1->seed, r2->seed);
+         const bool independent = identical01 < 4 && identical02 < 4;
+         printf("%s\n", independent ? "RANDOM INDEPENDENT OK"
+                                    : "SUSPECT - Random nodes still correlated");
+
+         // Same seed must still reproduce the same sequence exactly.
+         r1->seed = r0->seed;
+         const bool reproducible = std::fabs(r0->Value01() - r1->Value01()) < 1e-6f;
+         printf("same seed reproduces: %d\n", (int)reproducible);
+
+         auto* a = static_cast<GeometryNode*>(gNodes[3].node.get());
+         auto* b = static_cast<GeometryNode*>(gNodes[4].node.get());
+         auto* join = static_cast<JoinGeometryNode*>(gNodes[5].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[6].node.get());
+
+         const size_t expected = a->GetMesh().indices.size() / 3 + b->GetMesh().indices.size() / 3;
+         // The merged mesh must span both parts' placements, or the transforms
+         // were dropped and everything collapsed onto the origin.
+         float lo = 1e30f, hi = -1e30f;
+         for (const Vertex& v : join->GetMesh().vertices)
+         {
+            lo = std::min(lo, v.px);
+            hi = std::max(hi, v.px);
+         }
+         printf("join: %zu tris (expected %zu), x span %.2f..%.2f, %d inputs\n",
+                join->TriangleCount(), expected, lo, hi, join->ConnectedCount());
+         const bool merged = join->TriangleCount() == expected && lo < -0.5f && hi > 1.0f;
+         printf("%s\n", (merged && render->LastTriangleCount() > 0)
+                           ? "JOIN GEOMETRY OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_CLOTHTEST") != nullptr)
@@ -5049,7 +5214,7 @@ int main()
          // covered the canvas and swallowed every click.
          ImGui::BeginGroup();
 
-         ImGui::TextUnformatted(gn.typeName.c_str());
+         ImGui::TextUnformatted(DisplayName(gn.typeName).c_str());
          ImGui::TextDisabled("%s", gn.category.c_str());
 
          // --- preview: image for image nodes, a value meter for modulators ---
@@ -5071,6 +5236,7 @@ int main()
                   dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
          {
@@ -5100,11 +5266,14 @@ int main()
                snprintf(line, sizeof(line), "%zu triangles", mat->TriangleCount());
             else if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu particles", ps->AliveCount());
+            else if (auto* jn = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%d inputs, %zu tris", jn->ConnectedCount(), jn->TriangleCount());
             else if (auto* cl = dynamic_cast<ClothNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu tris, %zu links", cl->TriangleCount(), cl->ConstraintCount());
             else
                snprintf(line, sizeof(line), "scene node");
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255), gn.typeName.c_str());
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255),
+                        DisplayName(gn.typeName).c_str());
             dl->AddText(ImVec2(origin.x + 12, origin.y + 28), IM_COL32(130, 136, 156, 255), line);
          }
          else if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
@@ -5137,11 +5306,8 @@ int main()
          ImGui::SameLine();
          if (BypassToggle(!gn.node->bypassed))
             gn.node->bypassed = !gn.node->bypassed;
-         if (gn.node->bypassed)
-         {
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.85f, 0.5f, 0.45f, 1.0f), "bypassed");
-         }
+         // No text label: the power icon turning red already reads as bypassed,
+         // and a word beside it is noise on every node in the patch.
          if (!gn.showParams && gn.hasModulatedParams)
          {
             // make it obvious a collapsed node still has live modulation
@@ -5190,6 +5356,8 @@ int main()
                DrawParticleSystemParams(n);
             else if (auto* n = dynamic_cast<ClothNode*>(gn.node.get()))
                DrawClothParams(n);
+            else if (auto* n = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
+               DrawJoinGeometryParams(n);
             else if (auto* n = dynamic_cast<OceanNode*>(gn.node.get()))
                DrawOceanParams(n);
             else if (dynamic_cast<NullNode*>(gn.node.get()) != nullptr ||
@@ -5370,6 +5538,9 @@ int main()
             linkFromNode(m2p->input, 0);
          if (auto* cloth = dynamic_cast<ClothNode*>(gn.node.get()))
             linkFromNode(cloth->input, 0);
+         if (auto* join = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
+            for (int i = 0; i < JoinGeometryNode::kSlots; i++)
+               linkFromNode(join->inputs[i], i);
          if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
             linkFromNode(mat->input, 0);
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
@@ -5482,6 +5653,7 @@ int main()
                auto* dstMaterial = dstNode ? dynamic_cast<MaterialNode*>(dstNode->node.get()) : nullptr;
                auto* dstMeshPoints = dstNode ? dynamic_cast<MeshToPointsNode*>(dstNode->node.get()) : nullptr;
                auto* dstCloth = dstNode ? dynamic_cast<ClothNode*>(dstNode->node.get()) : nullptr;
+               auto* dstJoin = dstNode ? dynamic_cast<JoinGeometryNode*>(dstNode->node.get()) : nullptr;
                auto* dstOutput = dstNode ? dynamic_cast<OutputNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
                auto* srcCloud = srcNode ? dynamic_cast<IPointCloudSource*>(srcNode->node.get()) : nullptr;
@@ -5515,7 +5687,8 @@ int main()
                      else if (dstInstance != nullptr)
                         // Slot 2 is the point-cloud pin; 0 and 1 take geometry.
                         valid = (slot == 2) ? (srcCloud != nullptr) : (srcGeometry != nullptr);
-                     else if (dstNull3D != nullptr || dstMeshPoints != nullptr || dstCloth != nullptr)
+                     else if (dstNull3D != nullptr || dstMeshPoints != nullptr ||
+                              dstCloth != nullptr || dstJoin != nullptr)
                         valid = srcGeometry != nullptr;
                      else if (dstMaterial != nullptr)
                         // Slot 0 takes geometry; slot 1 is an ordinary image.
@@ -5561,6 +5734,12 @@ int main()
                      dstMeshPoints->input = srcGeometry;
                   else if (dstCloth != nullptr)
                      dstCloth->input = srcGeometry;
+                  else if (dstJoin != nullptr)
+                  {
+                     const int jslot = GraphNode::InputSlotFromPin(b);
+                     if (jslot >= 0 && jslot < JoinGeometryNode::kSlots)
+                        dstJoin->inputs[jslot] = srcGeometry;
+                  }
                   else if (dstMaterial != nullptr && GraphNode::InputSlotFromPin(b) == 0)
                      dstMaterial->input = srcGeometry;
                   else if (dstInstance != nullptr)
@@ -5866,11 +6045,11 @@ int main()
             // no query yet: browse by category
             for (const std::string& category : NodeFactory::Instance().GetCategories())
             {
-               ImGui::SeparatorText(category.c_str());
+               ImGui::SeparatorText(DisplayName(category).c_str());
                for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                {
                   ++shown;
-                  if (ImGui::Selectable(name.c_str()))
+                  if (ImGui::Selectable(DisplayName(name).c_str()))
                   {
                      spawnName = name;
                      spawnCategory = category;
@@ -5887,7 +6066,7 @@ int main()
                if (hay.find(q) == std::string::npos)
                   continue;
                ++shown;
-               std::string entry = t.first + "   (" + t.second + ")";
+               std::string entry = DisplayName(t.first) + "   (" + DisplayName(t.second) + ")";
                bool activate = ImGui::Selectable(entry.c_str());
                if (shown == 1 && pickFirst)
                   activate = true;
@@ -5939,6 +6118,67 @@ int main()
 
       io.MouseWheel = savedWheel;
       io.MouseWheelH = savedWheelH;
+
+      // ---- node browser panel ----
+      // The same catalogue as the canvas popup, but persistent: it can be left
+      // open while building a patch, which the popup cannot.
+      if (gNodePanelOpen)
+      {
+         ImGui::SameLine();
+         ImGui::BeginChild("##nodepanel", ImVec2(0, 0), true);
+
+         static char panelSearch[128] = "";
+         ImGui::SetNextItemWidth(-1.0f);
+         ImGui::InputTextWithHint("##panelsearch", "search modules...", panelSearch, sizeof(panelSearch));
+
+         std::string q = panelSearch;
+         std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+
+         std::string spawnName, spawnCategory;
+         ImGui::Separator();
+         ImGui::BeginChild("##nodepanellist", ImVec2(0, 0), false);
+         for (const std::string& category : NodeFactory::Instance().GetCategories())
+         {
+            // With a query the categories are only drawn when something in them
+            // matches, so an empty heading never sits there on its own.
+            std::vector<std::string> matches;
+            for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+            {
+               if (q.empty())
+               {
+                  matches.push_back(name);
+                  continue;
+               }
+               std::string hay = name + " " + category;
+               std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+               if (hay.find(q) != std::string::npos)
+                  matches.push_back(name);
+            }
+            if (matches.empty())
+               continue;
+
+            ImGui::SeparatorText(DisplayName(category).c_str());
+            for (const std::string& name : matches)
+            {
+               if (ImGui::Selectable(DisplayName(name).c_str()))
+               {
+                  spawnName = name;
+                  spawnCategory = category;
+               }
+            }
+         }
+         ImGui::EndChild();
+
+         if (!spawnName.empty())
+         {
+            // Dropped at the middle of the view rather than at the mouse: the
+            // click happened over the panel, not over the canvas.
+            SpawnNode(spawnName, spawnCategory, gViewCenterCanvas.x, gViewCenterCanvas.y);
+            gPatchDirty = true;
+         }
+
+         ImGui::EndChild();
+      }
 
       ImGui::End();
 
@@ -6196,6 +6436,7 @@ int main()
             if (dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
             {
                // Pass-throughs and samplers with nothing patched in are empty

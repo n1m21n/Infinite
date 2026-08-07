@@ -221,6 +221,13 @@ namespace
       "\n"
       "   for (int i = 0; i < 3; i++) {\n"
       "      if (i >= uLightCount) break;\n"
+      // Type 3 is an ambient fill: it has no direction at all, so it skips the
+      // whole BRDF and simply lifts the surface. Handled before anything that
+      // needs a light vector.
+      "      if (uLightType[i] == 3) {\n"
+      "         col += base * (1.0 - metal) * toLinear(uLightColor[i]) * uLightIntensity[i];\n"
+      "         continue;\n"
+      "      }\n"
       "      vec3 lightDir;\n"
       "      float attenuation = 1.0;\n"
       "      if (uLightType[i] == 1) {\n"
@@ -232,7 +239,16 @@ namespace
       "         lightDir = normalize(uLightDir[i]);\n"
       "      }\n"
       "      vec3 halfway = normalize(lightDir + viewDir);\n"
-      "      float nDotL = max(dot(n, lightDir), 0.0);\n"
+      // A sun is a large angular source, not a point at infinity, so its
+      // terminator is soft. Wrapping the diffuse term is the cheap stand-in for
+      // that; without it a "sun" is indistinguishable from a directional light.
+      "      float nDotL;\n"
+      "      if (uLightType[i] == 2) {\n"
+      "         const float wrap = 0.35;\n"
+      "         nDotL = max((dot(n, lightDir) + wrap) / (1.0 + wrap), 0.0);\n"
+      "      } else {\n"
+      "         nDotL = max(dot(n, lightDir), 0.0);\n"
+      "      }\n"
       "      if (nDotL <= 0.0) continue;\n"
       "      float nDotH = max(dot(n, halfway), 0.0);\n"
       "\n"
