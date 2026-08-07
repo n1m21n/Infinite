@@ -9,6 +9,7 @@ namespace
 {
    const Mesh kEmptyMesh;
    const std::vector<std::string> kModeNames = { "Vertices", "Edges", "Faces" };
+   const std::vector<std::string> kJoinModeNames = { "Merge", "Union", "Intersect", "Difference" };
 }
 
 // ===================================================================== Null 3D
@@ -93,6 +94,8 @@ void MaterialNode::CookIfNeeded(int frameId)
 
 // =============================================================== Join Geometry
 
+const std::vector<std::string>& JoinGeometryNode::ModeNames() { return kJoinModeNames; }
+
 int JoinGeometryNode::ConnectedCount() const
 {
    int count = 0;
@@ -121,10 +124,13 @@ void JoinGeometryNode::RebuildIfNeeded()
           !sameMatrix(mBuiltMatrices[i], matrix))
          dirty = true;
    }
+   if (mBuiltMode != mode)
+      dirty = true;
    if (!dirty)
       return;
 
    mCache = Mesh();
+   bool haveFirst = false;
    for (int i = 0; i < kSlots; i++)
    {
       mBuiltInputs[i] = inputs[i];
@@ -140,11 +146,30 @@ void JoinGeometryNode::RebuildIfNeeded()
       // Each part's own transform is baked in here. The merged mesh carries a
       // single model matrix, so anything not baked would lose its placement.
       const Mesh placed = MeshOps::Transform(src, inputs[i]->GetModelMatrix());
-      const unsigned int base = (unsigned int)mCache.vertices.size();
-      mCache.vertices.insert(mCache.vertices.end(), placed.vertices.begin(), placed.vertices.end());
-      for (unsigned int idx : placed.indices)
-         mCache.indices.push_back(base + idx);
+
+      if (mode == kMerge)
+      {
+         const unsigned int base = (unsigned int)mCache.vertices.size();
+         mCache.vertices.insert(mCache.vertices.end(), placed.vertices.begin(), placed.vertices.end());
+         for (unsigned int idx : placed.indices)
+            mCache.indices.push_back(base + idx);
+      }
+      else if (!haveFirst)
+      {
+         // The first input is the base; later ones are applied to it in turn,
+         // so A minus B minus C means what it reads like.
+         mCache = placed;
+         haveFirst = true;
+      }
+      else
+      {
+         const int op = (mode == kUnion) ? MeshOps::kBooleanUnion
+                      : (mode == kIntersect) ? MeshOps::kBooleanIntersect
+                                             : MeshOps::kBooleanDifference;
+         mCache = MeshOps::Boolean(mCache, placed, op);
+      }
    }
+   mBuiltMode = mode;
    mMeshRevision = NextMeshRevision();
 }
 

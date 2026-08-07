@@ -4,6 +4,7 @@
 #include <array>
 #include <map>
 #include <set>
+#include <memory>
 
 // Zero is reserved as "nothing uploaded yet", so the first real stamp is 1.
 unsigned long long NextMeshRevision()
@@ -2636,5 +2637,371 @@ std::vector<Polyline> SliceContours(const Mesh& in, int axis, float position)
                               crossings[1][0], crossings[1][1], crossings[1][2] });
    }
    return ChainSegments(segments);
+}
+}
+
+// ====================================================== constructive solid geometry
+
+namespace MeshOps
+{
+namespace csg
+{
+   // Classic BSP-tree CSG, in the shape Evan Wallace's csg.js popularised: a
+   // polygon soup is partitioned by planes, then each tree is used to clip the
+   // other's polygons, and what survives is reassembled.
+   const float kEpsilon = 1e-5f;
+
+   struct Vec3 { float x = 0, y = 0, z = 0; };
+
+   inline Vec3 Sub(const Vec3& a, const Vec3& b) { return { a.x-b.x, a.y-b.y, a.z-b.z }; }
+   inline Vec3 Cross(const Vec3& a, const Vec3& b)
+   {
+      return { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
+   }
+   inline float Dot(const Vec3& a, const Vec3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+   inline Vec3 Lerp(const Vec3& a, const Vec3& b, float t)
+   {
+      return { a.x + (b.x-a.x)*t, a.y + (b.y-a.y)*t, a.z + (b.z-a.z)*t };
+   }
+
+   struct CsgVertex
+   {
+      Vec3 pos;
+      Vec3 normal;
+      float u = 0, v = 0;
+   };
+
+   CsgVertex LerpVertex(const CsgVertex& a, const CsgVertex& b, float t)
+   {
+      CsgVertex out;
+      out.pos = Lerp(a.pos, b.pos, t);
+      out.normal = Lerp(a.normal, b.normal, t);
+      out.u = a.u + (b.u - a.u) * t;
+      out.v = a.v + (b.v - a.v) * t;
+      return out;
+   }
+
+   struct Plane
+   {
+      Vec3 normal;
+      float w = 0.0f;
+      bool valid = false;
+   };
+
+   struct Polygon
+   {
+      std::vector<CsgVertex> vertices;
+      Plane plane;
+   };
+
+   Plane PlaneFrom(const CsgVertex& a, const CsgVertex& b, const CsgVertex& c)
+   {
+      Plane p;
+      Vec3 n = Cross(Sub(b.pos, a.pos), Sub(c.pos, a.pos));
+      const float len = std::sqrt(Dot(n, n));
+      if (len < 1e-12f)
+         return p; // degenerate triangle: no plane, and no contribution
+      n.x /= len; n.y /= len; n.z /= len;
+      p.normal = n;
+      p.w = Dot(n, a.pos);
+      p.valid = true;
+      return p;
+   }
+
+   // Splits a polygon against a plane, appending each piece to whichever list
+   // it belongs in. Coplanar polygons are sorted by facing, which is what makes
+   // union and intersection differ on shared surfaces.
+   void SplitPolygon(const Plane& plane, const Polygon& poly,
+                     std::vector<Polygon>& coplanarFront, std::vector<Polygon>& coplanarBack,
+                     std::vector<Polygon>& front, std::vector<Polygon>& back)
+   {
+      enum { kCoplanar = 0, kFront = 1, kBack = 2, kSpanning = 3 };
+
+      int polygonType = 0;
+      std::vector<int> types(poly.vertices.size());
+      for (size_t i = 0; i < poly.vertices.size(); i++)
+      {
+         const float t = Dot(plane.normal, poly.vertices[i].pos) - plane.w;
+         const int type = (t < -kEpsilon) ? kBack : ((t > kEpsilon) ? kFront : kCoplanar);
+         polygonType |= type;
+         types[i] = type;
+      }
+
+      switch (polygonType)
+      {
+         case kCoplanar:
+            (Dot(plane.normal, poly.plane.normal) > 0 ? coplanarFront : coplanarBack)
+               .push_back(poly);
+            break;
+         case kFront:
+            front.push_back(poly);
+            break;
+         case kBack:
+            back.push_back(poly);
+            break;
+         default:
+         {
+            Polygon f, b;
+            f.plane = poly.plane;
+            b.plane = poly.plane;
+            for (size_t i = 0; i < poly.vertices.size(); i++)
+            {
+               const size_t j = (i + 1) % poly.vertices.size();
+               const int ti = types[i], tj = types[j];
+               const CsgVertex& vi = poly.vertices[i];
+               const CsgVertex& vj = poly.vertices[j];
+               if (ti != kBack) f.vertices.push_back(vi);
+               if (ti != kFront) b.vertices.push_back(vi);
+               if ((ti | tj) == kSpanning)
+               {
+                  const float denom = Dot(plane.normal, Sub(vj.pos, vi.pos));
+                  const float t = (std::fabs(denom) < 1e-12f) ? 0.5f
+                     : (plane.w - Dot(plane.normal, vi.pos)) / denom;
+                  const CsgVertex mid = LerpVertex(vi, vj, t);
+                  f.vertices.push_back(mid);
+                  b.vertices.push_back(mid);
+               }
+            }
+            if (f.vertices.size() >= 3) front.push_back(f);
+            if (b.vertices.size() >= 3) back.push_back(b);
+            break;
+         }
+      }
+   }
+
+   struct Node
+   {
+      Plane plane;
+      std::unique_ptr<Node> front;
+      std::unique_ptr<Node> back;
+      std::vector<Polygon> polygons;
+   };
+
+   void Build(Node& node, const std::vector<Polygon>& polygons, int depth = 0)
+   {
+      if (polygons.empty())
+         return;
+      // Depth cap: a pathological input can otherwise recurse until the stack
+      // gives out, and a slightly wrong result beats a crash.
+      if (depth > 256)
+      {
+         node.polygons.insert(node.polygons.end(), polygons.begin(), polygons.end());
+         return;
+      }
+
+      size_t start = 0;
+      if (!node.plane.valid)
+      {
+         while (start < polygons.size() && !polygons[start].plane.valid)
+            start++;
+         if (start >= polygons.size())
+            return;
+         node.plane = polygons[start].plane;
+      }
+
+      std::vector<Polygon> frontList, backList;
+      for (size_t i = 0; i < polygons.size(); i++)
+      {
+         if (!polygons[i].plane.valid)
+            continue;
+         SplitPolygon(node.plane, polygons[i], node.polygons, node.polygons,
+                      frontList, backList);
+      }
+
+      if (!frontList.empty())
+      {
+         if (!node.front) node.front.reset(new Node());
+         Build(*node.front, frontList, depth + 1);
+      }
+      if (!backList.empty())
+      {
+         if (!node.back) node.back.reset(new Node());
+         Build(*node.back, backList, depth + 1);
+      }
+   }
+
+   std::vector<Polygon> ClipPolygons(const Node& node, const std::vector<Polygon>& polygons)
+   {
+      if (!node.plane.valid)
+         return polygons;
+
+      std::vector<Polygon> frontList, backList;
+      for (const Polygon& p : polygons)
+         SplitPolygon(node.plane, p, frontList, backList, frontList, backList);
+
+      if (node.front)
+         frontList = ClipPolygons(*node.front, frontList);
+      // Nothing behind the plane means the space back there is solid, so what
+      // is behind it is inside the solid and gets dropped.
+      if (node.back)
+         backList = ClipPolygons(*node.back, backList);
+      else
+         backList.clear();
+
+      frontList.insert(frontList.end(), backList.begin(), backList.end());
+      return frontList;
+   }
+
+   void ClipTo(Node& node, const Node& other)
+   {
+      node.polygons = ClipPolygons(other, node.polygons);
+      if (node.front) ClipTo(*node.front, other);
+      if (node.back) ClipTo(*node.back, other);
+   }
+
+   void Invert(Node& node)
+   {
+      for (Polygon& p : node.polygons)
+      {
+         std::reverse(p.vertices.begin(), p.vertices.end());
+         for (CsgVertex& v : p.vertices)
+         {
+            v.normal.x = -v.normal.x; v.normal.y = -v.normal.y; v.normal.z = -v.normal.z;
+         }
+         p.plane.normal.x = -p.plane.normal.x;
+         p.plane.normal.y = -p.plane.normal.y;
+         p.plane.normal.z = -p.plane.normal.z;
+         p.plane.w = -p.plane.w;
+      }
+      // The node's own splitting plane has to flip too, not just the planes of
+      // the polygons stored on it. Without this the tree still partitions space
+      // the old way while claiming the opposite sense of solid, so every later
+      // clip against it decides inside-versus-out backwards. Union and
+      // difference survived it; intersection came back empty.
+      if (node.plane.valid)
+      {
+         node.plane.normal.x = -node.plane.normal.x;
+         node.plane.normal.y = -node.plane.normal.y;
+         node.plane.normal.z = -node.plane.normal.z;
+         node.plane.w = -node.plane.w;
+      }
+      node.front.swap(node.back);
+      if (node.front) Invert(*node.front);
+      if (node.back) Invert(*node.back);
+   }
+
+   void AllPolygons(const Node& node, std::vector<Polygon>& out)
+   {
+      out.insert(out.end(), node.polygons.begin(), node.polygons.end());
+      if (node.front) AllPolygons(*node.front, out);
+      if (node.back) AllPolygons(*node.back, out);
+   }
+
+   std::vector<Polygon> FromMesh(const Mesh& mesh)
+   {
+      std::vector<Polygon> polygons;
+      polygons.reserve(mesh.indices.size() / 3);
+      for (size_t t = 0; t + 2 < mesh.indices.size(); t += 3)
+      {
+         Polygon p;
+         p.vertices.resize(3);
+         for (int k = 0; k < 3; k++)
+         {
+            const Vertex& v = mesh.vertices[mesh.indices[t + k]];
+            p.vertices[k].pos = { v.px, v.py, v.pz };
+            p.vertices[k].normal = { v.nx, v.ny, v.nz };
+            p.vertices[k].u = v.u;
+            p.vertices[k].v = v.v;
+         }
+         p.plane = PlaneFrom(p.vertices[0], p.vertices[1], p.vertices[2]);
+         if (p.plane.valid)
+            polygons.push_back(std::move(p));
+      }
+      return polygons;
+   }
+
+   Mesh ToMesh(const std::vector<Polygon>& polygons)
+   {
+      Mesh mesh;
+      for (const Polygon& p : polygons)
+      {
+         if (p.vertices.size() < 3)
+            continue;
+         // Fan-triangulated: every polygon here came from a triangle split by
+         // planes, so it stays convex and a fan is safe.
+         const unsigned int base = (unsigned int)mesh.vertices.size();
+         for (const CsgVertex& v : p.vertices)
+            PushVertex(mesh, v.pos.x, v.pos.y, v.pos.z,
+                       v.normal.x, v.normal.y, v.normal.z, v.u, v.v);
+         for (size_t i = 1; i + 1 < p.vertices.size(); i++)
+         {
+            mesh.indices.push_back(base);
+            mesh.indices.push_back(base + (unsigned int)i);
+            mesh.indices.push_back(base + (unsigned int)i + 1);
+         }
+      }
+      return mesh;
+   }
+}
+
+Mesh Boolean(const Mesh& a, const Mesh& b, int op)
+{
+   if (a.Empty())
+      return (op == kBooleanIntersect || op == kBooleanDifference) ? Mesh() : b;
+   if (b.Empty())
+      return (op == kBooleanIntersect) ? Mesh() : a;
+
+   csg::Node treeA, treeB;
+   csg::Build(treeA, csg::FromMesh(a));
+   csg::Build(treeB, csg::FromMesh(b));
+
+   // The three operations are the same clipping sequence with inversions in
+   // different places - inverting a tree swaps its notion of inside and out,
+   // so intersection is a union of complements and difference is a union with
+   // one side complemented.
+   //
+   // Each ends by building what survives of B into A's tree and reading A. That
+   // final step is not optional: for intersection the result is inverted
+   // afterwards, and inverting A while B's polygons sit outside it leaves the
+   // two halves disagreeing about which way is solid. Collecting from both
+   // trees instead happens to give the right answer for union and difference,
+   // and gives an empty mesh for intersection.
+   switch (op)
+   {
+      case kBooleanIntersect:
+      {
+         csg::Invert(treeA);
+         csg::ClipTo(treeB, treeA);
+         csg::Invert(treeB);
+         csg::ClipTo(treeA, treeB);
+         csg::ClipTo(treeB, treeA);
+         std::vector<csg::Polygon> fromB;
+         csg::AllPolygons(treeB, fromB);
+         csg::Build(treeA, fromB);
+         csg::Invert(treeA);
+         break;
+      }
+      case kBooleanDifference:
+      {
+         csg::Invert(treeA);
+         csg::ClipTo(treeA, treeB);
+         csg::ClipTo(treeB, treeA);
+         csg::Invert(treeB);
+         csg::ClipTo(treeB, treeA);
+         csg::Invert(treeB);
+         std::vector<csg::Polygon> fromB;
+         csg::AllPolygons(treeB, fromB);
+         csg::Build(treeA, fromB);
+         csg::Invert(treeA);
+         break;
+      }
+      case kBooleanUnion:
+      default:
+      {
+         csg::ClipTo(treeA, treeB);
+         csg::ClipTo(treeB, treeA);
+         csg::Invert(treeB);
+         csg::ClipTo(treeB, treeA);
+         csg::Invert(treeB);
+         std::vector<csg::Polygon> fromB;
+         csg::AllPolygons(treeB, fromB);
+         csg::Build(treeA, fromB);
+         break;
+      }
+   }
+
+   std::vector<csg::Polygon> merged;
+   csg::AllPolygons(treeA, merged);
+   return csg::ToMesh(merged);
 }
 }

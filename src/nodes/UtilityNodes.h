@@ -173,7 +173,21 @@ class JoinGeometryNode : public INode, public IGeometrySource
 public:
    static const int kSlots = 4;
 
+   // Merge is a plain concatenation; the rest are real CSG. Registered as
+   // separate nodes too, since "union" and "difference" are what someone
+   // searches for, not "join with the mode dropdown set to difference".
+   enum Mode { kMerge = 0, kUnion, kIntersect, kDifference, kModeCount };
+   static const std::vector<std::string>& ModeNames();
+
    static INode* Create() { return new JoinGeometryNode(); }
+   static INode* CreateFor(int mode)
+   {
+      auto* node = new JoinGeometryNode();
+      node->mode = mode;
+      return node;
+   }
+
+   int mode = kMerge;
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
@@ -213,6 +227,7 @@ public:
 
    void VisitParams(ParamVisitor& v) override
    {
+      v.Int("mode", mode);
       v.Int("materialFrom", materialFrom); v.Bool("inherit", inheritMaterial);
       v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
       v.Float("scale", uniformScale);
@@ -229,6 +244,7 @@ private:
    unsigned long long mMeshRevision = 0;
    const void* mBuiltInputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
    unsigned long long mBuiltRevisions[kSlots] = { 0, 0, 0, 0 };
+   int mBuiltMode = -1;
    // The transforms are baked into the merged vertices, so a change to one has
    // to trigger a rebuild exactly like a change to a mesh would. Keying only on
    // the mesh stamp meant moving or scaling an input did nothing at all.

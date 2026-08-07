@@ -515,6 +515,14 @@ namespace
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
       REGISTER_NODE(ClothNode, Cloth, "3D");
       REGISTER_NODE(JoinGeometryNode, Join Geometry, "3D");
+      // The boolean modes as their own nodes: "difference" is what gets
+      // searched for, not "join geometry with a dropdown set to difference".
+      for (int i = 1; i < JoinGeometryNode::kModeCount; i++)
+      {
+         NodeFactory::Instance().Register(
+            JoinGeometryNode::ModeNames()[i],
+            [i]() -> INode* { return JoinGeometryNode::CreateFor(i); }, "3D");
+      }
       REGISTER_NODE(MetaBallNode, Metaballs, "3D");
       REGISTER_NODE(CurveNode, Curve, "3D");
       // Three names, one class - Points/Edges/Faces are the same sampler.
@@ -1840,6 +1848,9 @@ namespace
    void DrawJoinGeometryParams(JoinGeometryNode* n)
    {
       ImGui::TextDisabled("%d inputs, %zu triangles", n->ConnectedCount(), n->TriangleCount());
+      DropdownButton("mode", JoinGeometryNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
+      if (n->mode != JoinGeometryNode::kMerge)
+         ImGui::TextDisabled("needs closed solids");
 
       NodeSeparator("material");
       ImGui::Checkbox("inherit material", &n->inheritMaterial);
@@ -4589,6 +4600,63 @@ int main()
                                r1 < r0 - 0.02f && r1 > 0.3f;
 
          printf("%s\n", (allShapes && allShapes2D && bevelled) ? "PHASE A OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_PHASEETEST") != nullptr && frameId == 4)
+      {
+         // Signed volume via the divergence theorem. Triangle counts prove
+         // nothing about a boolean - only the enclosed volume says whether the
+         // operation actually did what it claims.
+         auto volumeOf = [](const Mesh& m) {
+            double vol = 0.0;
+            for (size_t t = 0; t + 2 < m.indices.size(); t += 3)
+            {
+               const Vertex& a = m.vertices[m.indices[t]];
+               const Vertex& b = m.vertices[m.indices[t+1]];
+               const Vertex& c = m.vertices[m.indices[t+2]];
+               vol += ((double)a.px * ((double)b.py * c.pz - (double)b.pz * c.py) -
+                       (double)a.py * ((double)b.px * c.pz - (double)b.pz * c.px) +
+                       (double)a.pz * ((double)b.px * c.py - (double)b.py * c.px)) / 6.0;
+            }
+            return std::fabs(vol);
+         };
+
+         // Two unit cubes overlapping in exactly half their volume: the answers
+         // are known in advance, which is what makes this a real check.
+         const Mesh cubeA = Primitives::Cube(1);
+         const Mesh cubeB = MeshOps::Transform(Primitives::Cube(1),
+                                               Mat4::Translation(0.5f, 0.0f, 0.0f));
+         const double vA = volumeOf(cubeA);
+         const double overlap = 0.5;  // half of a unit cube
+
+         const Mesh un = MeshOps::Boolean(cubeA, cubeB, MeshOps::kBooleanUnion);
+         const Mesh inter = MeshOps::Boolean(cubeA, cubeB, MeshOps::kBooleanIntersect);
+         const Mesh diff = MeshOps::Boolean(cubeA, cubeB, MeshOps::kBooleanDifference);
+
+         const double vUnion = volumeOf(un);
+         const double vInter = volumeOf(inter);
+         const double vDiff = volumeOf(diff);
+
+         printf("cube volume %.3f\n", vA);
+         printf("  union      %.3f  (expect 1.500)  %s\n", vUnion,
+                std::fabs(vUnion - 1.5) < 0.02 ? "OK" : "FAIL");
+         printf("  intersect  %.3f  (expect 0.500)  %s\n", vInter,
+                std::fabs(vInter - overlap) < 0.02 ? "OK" : "FAIL");
+         printf("  difference %.3f  (expect 0.500)  %s\n", vDiff,
+                std::fabs(vDiff - overlap) < 0.02 ? "OK" : "FAIL");
+
+         // A difference must actually remove material, not just re-emit the
+         // original, so its extent has to shrink on the side that was cut.
+         float diffMax = -1e30f;
+         for (const Vertex& v : diff.vertices)
+            diffMax = std::max(diffMax, v.px);
+         printf("  difference max x %.3f (cube was 0.500, cut from +x)  %s\n",
+                diffMax, diffMax < 0.02f ? "OK" : "FAIL");
+
+         const bool ok = std::fabs(vUnion - 1.5) < 0.02 &&
+                         std::fabs(vInter - overlap) < 0.02 &&
+                         std::fabs(vDiff - overlap) < 0.02 && diffMax < 0.02f;
+         printf("%s\n", ok ? "PHASE E OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_PHASEDTEST") != nullptr && frameId == 4)

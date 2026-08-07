@@ -292,6 +292,19 @@ namespace MeshOps
    // surface. Empty for a closed mesh, which has no boundary at all.
    std::vector<Polyline> BoundaryLoops(const Mesh& in);
 
+   // --- constructive solid geometry ---
+   // Union, intersection and difference of two closed meshes.
+   //
+   // Implemented with BSP trees rather than by voxelising both meshes and
+   // re-surfacing: a voxel approach is more robust against bad input, but it
+   // rounds every flat face and sharp edge to the grid, which is exactly what
+   // is wanted preserved when cutting a hole in a cube.
+   //
+   // Expects closed, non-self-intersecting input. Open surfaces have no defined
+   // inside, so the result on one is unpredictable rather than wrong.
+   enum BooleanOp { kBooleanUnion = 0, kBooleanIntersect, kBooleanDifference, kBooleanCount };
+   Mesh Boolean(const Mesh& a, const Mesh& b, int op);
+
    // Contour where a mesh crosses an axis-aligned plane. This is what gives a
    // closed object something to be followed "around", since it has no boundary.
    std::vector<Polyline> SliceContours(const Mesh& in, int axis, float position);
