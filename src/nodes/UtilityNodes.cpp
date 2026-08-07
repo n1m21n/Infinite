@@ -93,11 +93,21 @@ int JoinGeometryNode::ConnectedCount() const
 
 void JoinGeometryNode::RebuildIfNeeded()
 {
+   auto sameMatrix = [](const Mat4& a, const Mat4& b)
+   {
+      for (int k = 0; k < 16; k++)
+         if (a.m[k] != b.m[k])
+            return false;
+      return true;
+   };
+
    bool dirty = false;
    for (int i = 0; i < kSlots; i++)
    {
       const unsigned long long rev = inputs[i] ? inputs[i]->MeshRevision() : 0;
-      if (mBuiltInputs[i] != (const void*)inputs[i] || mBuiltRevisions[i] != rev)
+      const Mat4 matrix = inputs[i] ? inputs[i]->GetModelMatrix() : Mat4::Identity();
+      if (mBuiltInputs[i] != (const void*)inputs[i] || mBuiltRevisions[i] != rev ||
+          !sameMatrix(mBuiltMatrices[i], matrix))
          dirty = true;
    }
    if (!dirty)
@@ -108,6 +118,7 @@ void JoinGeometryNode::RebuildIfNeeded()
    {
       mBuiltInputs[i] = inputs[i];
       mBuiltRevisions[i] = inputs[i] ? inputs[i]->MeshRevision() : 0;
+      mBuiltMatrices[i] = inputs[i] ? inputs[i]->GetModelMatrix() : Mat4::Identity();
       if (inputs[i] == nullptr)
          continue;
 

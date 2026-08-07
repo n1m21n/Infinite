@@ -43,7 +43,14 @@ public:
 
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
-   Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+   // Forwarded, not identity. An operator changes the shape, not where it sits,
+   // so dropping the input's transform here made moving the upstream Geometry
+   // node - or modulating its position with a Path - have no visible effect at
+   // all once anything was chained after it.
+   Mat4 GetModelMatrix() const override
+   {
+      return input ? input->GetModelMatrix() : Mat4::Identity();
+   }
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
 
@@ -160,6 +167,8 @@ public:
 
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
+   // Instances are positioned by their own transforms, so this stays identity -
+   // applying the point source's transform on top would move them twice.
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;

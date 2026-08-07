@@ -3086,11 +3086,11 @@ namespace
          rec.index = gn.index;
          rec.category = gn.category;
          rec.typeName = gn.typeName;
-         // Live position from the editor, not the spawn position: the node has
-         // almost certainly been dragged since it was created.
-         const ImVec2 pos = ed::GetNodePosition(gn.NodeId());
-         rec.x = pos.x;
-         rec.y = pos.y;
+         // The cached live position, not the spawn position: the node has almost
+         // certainly been dragged since it was created. Read from the cache
+         // rather than the editor, since saving runs outside the editor context.
+         rec.x = gn.liveX;
+         rec.y = gn.liveY;
          rec.showParams = gn.showParams;
          rec.bypassed = gn.node->bypassed;
          Patch::SaveParams(gn.node.get(), rec.params);
@@ -3494,6 +3494,26 @@ int main()
          r->width = 700.0f; r->height = 700.0f;
          gNodes[2].showParams = true;
          gNodes[6].showParams = true;
+      }
+      else if (getenv("INFINITE_BUGTEST") != nullptr)
+      {
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);       // 0 -> array -> render
+         SpawnNode("Array", "3D", 400.0f, 40.0f);         // 1
+         SpawnNode("Render 3D", "3D", 760.0f, 40.0f);     // 2
+         SpawnNode("Geometry", "3D", 40.0f, 500.0f);      // 3 -> join
+         SpawnNode("Geometry", "3D", 40.0f, 760.0f);      // 4 -> join
+         SpawnNode("Join Geometry", "3D", 400.0f, 500.0f); // 5
+
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* arr = static_cast<GeometryOpNode*>(gNodes[1].node.get());
+         arr->input = geo;
+         static_cast<Render3DNode*>(gNodes[2].node.get())->geometry[0] = arr;
+
+         auto* ja = static_cast<GeometryNode*>(gNodes[3].node.get());
+         auto* jb = static_cast<GeometryNode*>(gNodes[4].node.get());
+         auto* join = static_cast<JoinGeometryNode*>(gNodes[5].node.get());
+         join->inputs[0] = ja;
+         join->inputs[1] = jb;
       }
       else if (getenv("INFINITE_FIXTEST") != nullptr)
       {
@@ -4321,6 +4341,48 @@ int main()
                    px[0] > 200 ? "PASSED THROUGH OK" : "STILL INVERTED - BUG");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
+      }
+
+      if (getenv("INFINITE_BUGTEST") != nullptr && frameId == 6)
+      {
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* arr = static_cast<GeometryOpNode*>(gNodes[1].node.get());
+         auto* ja = static_cast<GeometryNode*>(gNodes[3].node.get());
+         auto* join = static_cast<JoinGeometryNode*>(gNodes[5].node.get());
+
+         // 1. Saving from outside the editor context must not crash. This is
+         //    the exact path the File menu and Cmd+S take.
+         const bool saved = SavePatchTo("/tmp/infinite_bugtest.infinite");
+         printf("save from outside editor context: %d\n", (int)saved);
+
+         // 2. Moving a Geometry node must move what an operator downstream
+         //    renders. The operator forwards the transform rather than
+         //    flattening it to identity.
+         geo->posX = 0.0f;
+         const float before = arr->GetModelMatrix().m[12];
+         geo->posX = 2.5f;
+         const float after = arr->GetModelMatrix().m[12];
+         printf("array transform follows input: %.2f -> %.2f  %s\n", before, after,
+                std::fabs(after - 2.5f) < 1e-4f ? "OK" : "FAIL");
+
+         // 3. Moving an input of Join Geometry must change the merged mesh,
+         //    since the transform is baked into its vertices.
+         ja->posX = 0.0f;
+         join->GetMesh();
+         float joinBefore = -1e30f;
+         for (const Vertex& v : join->GetMesh().vertices)
+            joinBefore = std::max(joinBefore, v.px);
+         ja->posX = 3.0f;
+         join->GetMesh();
+         float joinAfter = -1e30f;
+         for (const Vertex& v : join->GetMesh().vertices)
+            joinAfter = std::max(joinAfter, v.px);
+         printf("join rebuilds on input move: max x %.2f -> %.2f  %s\n",
+                joinBefore, joinAfter, joinAfter > joinBefore + 2.0f ? "OK" : "FAIL");
+
+         const bool allOk = saved && std::fabs(after - 2.5f) < 1e-4f &&
+                            joinAfter > joinBefore + 2.0f;
+         printf("%s\n", allOk ? "BUGFIXES OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_FIXTEST") != nullptr && frameId == 6)
@@ -5184,6 +5246,14 @@ int main()
          {
             ed::SetNodePosition(gn.NodeId(), ImVec2(gn.spawnX, gn.spawnY));
             gn.needsPosition = false;
+         }
+
+         // Cached here, inside the editor context, for anything that needs a
+         // position later in the frame when the context is gone.
+         {
+            const ImVec2 live = ed::GetNodePosition(gn.NodeId());
+            gn.liveX = live.x;
+            gn.liveY = live.y;
          }
 
          ed::BeginNode(gn.NodeId());

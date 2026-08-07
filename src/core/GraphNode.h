@@ -34,6 +34,14 @@ struct GraphNode
    float spawnY = 0.0f;
    bool needsPosition = true;
 
+   // The node's live canvas position, refreshed every frame while the editor
+   // draws it. Saving reads this rather than calling ed::GetNodePosition,
+   // because saving can be triggered from the menu bar or a keyboard shortcut,
+   // both of which run outside ed::SetCurrentEditor - and the editor's getters
+   // dereference the current context without checking it for null.
+   float liveX = 0.0f;
+   float liveY = 0.0f;
+
    int NodeId() const { return index * kStride; }
    int InputPinId(int slot) const { return index * kStride + 1 + slot; }
    int ParamPinId(int paramIndex) const { return index * kStride + kParamBase + paramIndex; }

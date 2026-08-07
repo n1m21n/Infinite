@@ -201,6 +201,10 @@ private:
    unsigned long long mMeshRevision = 0;
    const void* mBuiltInputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
    unsigned long long mBuiltRevisions[kSlots] = { 0, 0, 0, 0 };
+   // The transforms are baked into the merged vertices, so a change to one has
+   // to trigger a rebuild exactly like a change to a mesh would. Keying only on
+   // the mesh stamp meant moving or scaling an input did nothing at all.
+   Mat4 mBuiltMatrices[kSlots];
    int mLastCookFrame = -1;
 };
 
@@ -230,7 +234,12 @@ public:
 
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
-   Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+   // Forwarded for the same reason the geometry operators forward it: sampling
+   // a mesh does not relocate it.
+   Mat4 GetModelMatrix() const override
+   {
+      return input ? input->GetModelMatrix() : Mat4::Identity();
+   }
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
 
