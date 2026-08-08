@@ -158,7 +158,11 @@ namespace
    ImVec2 gGraphScreenTL(0.0f, 0.0f);    // graph canvas's screen-space rect,
    ImVec2 gGraphScreenSize(0.0f, 0.0f);  // captured the same way, for the minimap overlay
    bool gMinimapEnabled = true;
-   int gMinimapCorner = 3; // 0=TL, 1=TR, 2=BL, 3=BR
+   // Bottom-left by default: the module browser docks on the right, and the
+   // minimap draws (and takes its clicks) on the foreground draw list, so a
+   // right-hand corner would sit on top of the panel and swallow clicks meant
+   // for the module list.
+   int gMinimapCorner = 2; // 0=TL, 1=TR, 2=BL, 3=BR
    float gMinimapSize = 190.0f;
    float gMinimapOpacity = 0.85f;
    float gZoomSensitivity = 0.5f;
@@ -5141,7 +5145,19 @@ int main()
       const float graphWidth = gNodePanelOpen
                                   ? std::max(200.0f, ImGui::GetContentRegionAvail().x - kNodePanelWidth)
                                   : 0.0f;
-      ed::Begin("graph", ImVec2(graphWidth, ImGui::GetContentRegionAvail().y));
+      const float graphHeight = ImGui::GetContentRegionAvail().y;
+
+      // The canvas rect, captured here rather than from inside the editor:
+      // ed::Begin does not open a child window (ImGuiEx::Canvas draws straight
+      // into the current one), so GetWindowPos/GetWindowSize in there report
+      // the whole app window - menu bar and docked module panel included.
+      // Anything positioned against that, the minimap especially, would sit
+      // outside the graph and over the panel.
+      gGraphScreenTL = ImGui::GetCursorScreenPos();
+      gGraphScreenSize = ImVec2(graphWidth > 0.0f ? graphWidth : ImGui::GetContentRegionAvail().x,
+                                graphHeight);
+
+      ed::Begin("graph", ImVec2(graphWidth, graphHeight));
 
       if (!gPendingSelect.empty())
       {
@@ -5162,13 +5178,9 @@ int main()
 
       // Where a panel-spawned node should land. ScreenToCanvas is only valid
       // inside the editor, so it is captured here and used after ed::End().
-      {
-         const ImVec2 tl = ImGui::GetWindowPos();
-         const ImVec2 size = ImGui::GetWindowSize();
-         gViewCenterCanvas = ed::ScreenToCanvas(ImVec2(tl.x + size.x * 0.5f, tl.y + size.y * 0.5f));
-         gGraphScreenTL = tl;
-         gGraphScreenSize = size;
-      }
+      gViewCenterCanvas = ed::ScreenToCanvas(
+         ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f,
+                gGraphScreenTL.y + gGraphScreenSize.y * 0.5f));
 
       // Dropping a file on the canvas spawns the matching source node, already
       // loaded, at the drop point.
