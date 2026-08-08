@@ -13,13 +13,20 @@
 //    +0            the node
 //    +1 .. +99     image input pins  (slot = offset-1)
 //    +100 .. +899  parameter pins    (param = offset-100)
-//    +999          the image output pin
+//    +900 .. +989  colour pins       (colour = offset-900)
+//    +990 .. +998  output pins
 // Link ids live in their own range and are tracked separately, so they can never
 // collide with node or pin ids.
+//
+// Colour pins deliberately sit in a block of their own rather than sharing the
+// parameter counter. Parameter indices are patch-file keys, so slipping colour
+// pins into the same sequence would renumber every slider that follows a swatch
+// and silently repoint the modulation in existing patches.
 struct GraphNode
 {
    static const int kStride = 1000;
    static const int kParamBase = 100;
+   static const int kColorBase = 900;
    static const int kOutputBase = 990; // outputs occupy 990..998
 
    std::unique_ptr<INode> node;
@@ -28,6 +35,7 @@ struct GraphNode
    int index = 0;
    bool showParams = false; // params start collapsed so the preview leads
    bool hasModulatedParams = false; // recomputed each frame, drives the collapsed "mod" tag
+   bool hasPaletteColors = false;   // ditto, for the collapsed "pal" tag
 
    // Where to place the node the first frame it appears (canvas coords).
    float spawnX = 0.0f;
@@ -45,6 +53,7 @@ struct GraphNode
    int NodeId() const { return index * kStride; }
    int InputPinId(int slot) const { return index * kStride + 1 + slot; }
    int ParamPinId(int paramIndex) const { return index * kStride + kParamBase + paramIndex; }
+   int ColorPinId(int colorIndex) const { return index * kStride + kColorBase + colorIndex; }
    int OutputPinId(int output = 0) const { return index * kStride + kOutputBase + output; }
 
    static int NodeIndexFromPin(int pinId) { return pinId / kStride; }
@@ -58,8 +67,14 @@ struct GraphNode
    static bool IsParamPin(int pinId)
    {
       int off = OffsetFromPin(pinId);
-      return off >= kParamBase && off < kOutputBase;
+      return off >= kParamBase && off < kColorBase;
    }
+   static bool IsColorPin(int pinId)
+   {
+      int off = OffsetFromPin(pinId);
+      return off >= kColorBase && off < kOutputBase;
+   }
+   static int ColorIndexFromPin(int pinId) { return OffsetFromPin(pinId) - kColorBase; }
    static bool IsInputPin(int pinId)
    {
       int off = OffsetFromPin(pinId);

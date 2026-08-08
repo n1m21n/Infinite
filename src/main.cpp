@@ -33,6 +33,7 @@
 #include "core/BlendModes.h"
 #include "core/Transport.h"
 #include "core/Modulation.h"
+#include "core/Palette.h"
 #include "core/Patch.h"
 #include "nodes/ImageSourceNode.h"
 #include "nodes/ShapeNode.h"
@@ -49,6 +50,7 @@
 #include "nodes/CurvesNode.h"
 #include "nodes/RemoveBgNode.h"
 #include "nodes/RampNode.h"
+#include "nodes/PaletteNode.h"
 #include "nodes/AnalyzeNodes.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
@@ -116,6 +118,8 @@ namespace
    int gNextIndex = 1;
    ed::EditorContext* gEditor = nullptr;
    GraphNode* gSelfTestFeeder = nullptr;
+   bool gPaletteTestOk = false;    // dev test only
+   bool gPaletteTestPending = false;
    ImVec2 gSpawnPos(0.0f, 0.0f);
 
    struct LinkInfo
@@ -199,6 +203,28 @@ namespace
    };
    ColorRequest gColor;
    ImVec4 gColorPickerRect(0, 0, 0, 0); // x, y, w, h of the picker widget on screen
+
+   // And again for a comment's text. A multiline text field is an ImGui child
+   // window, which the canvas cannot transform at all: drawn inside the node it
+   // rendered the note at the canvas origin, nowhere near the comment it
+   // belonged to. So the note is painted into the node by hand and typing into
+   // it happens in a popup out here (see DrawCommentPreview).
+   struct CommentEditRequest
+   {
+      CommentNode* target = nullptr; // revalidated each frame; nodes can be deleted
+      bool justOpened = false;
+      // The double-click that opens the editor is also a click on the canvas,
+      // and the canvas takes the focus back when the button comes up - one
+      // frame after the popup appeared. So the field asks for the keyboard for
+      // the first few frames rather than only on the frame it appears, which
+      // otherwise left it open but dead until it was clicked a third time.
+      int framesOpen = 0;
+   };
+   CommentEditRequest gCommentEdit;
+   // Screen-space rect of the last comment body drawn, so the dev test can aim
+   // a synthetic double-click at it. Inside a node ImGui draws in canvas space,
+   // hence the explicit conversion where this is filled in.
+   ImVec4 gCommentBodyRect(0, 0, 0, 0); // x, y, w, h
    FormulaNode* gFormulaEditor = nullptr;
    bool gFormulaEditorOpen = false;
    bool gHelpOpen = false;
@@ -253,26 +279,6 @@ namespace
       ImGui::TextDisabled("%s", shown.c_str());
    }
 
-   void ColorSwatch(const char* label, float* col, const INode* owner)
-   {
-      ImGui::PushID(label);
-      if (ImGui::ColorButton(label, ImVec4(col[0], col[1], col[2], 1.0f),
-                             ImGuiColorEditFlags_NoTooltip, ImVec2(38, 0)))
-      {
-         // Captured once, at the moment the picker opens rather than per-frame
-         // while it's being dragged - the picker writes into *col continuously,
-         // so anywhere later would already see the edited value.
-         PushUndoCheckpoint();
-         gColor.target = col;
-         gColor.owner = owner;
-         gColor.label = label;
-         gColor.justOpened = true;
-      }
-      ImGui::SameLine();
-      ImGui::TextDisabled("%s", label);
-      ImGui::PopID();
-   }
-
    // ---- modulatable parameters --------------------------------------------
    // Every slider that can be driven by a modulator goes through ModSlider. It
    // draws an input pin beside the control, registers the parameter for this
@@ -280,6 +286,13 @@ namespace
    // locks the slider) while something is patched in.
    int gCurrentNodeIndex = -1;
    int gParamCounter = 0;
+   // Colour pins are counted separately from parameter pins (see
+   // GraphNode::kColorBase): sharing the counter would renumber every slider
+   // that follows a swatch and repoint existing patches' modulation.
+   int gColorCounter = 0;
+   std::set<int> gDrawnColorPins;
+   // Defined further down, once the gNodes lookup exists.
+   IPaletteSource* PaletteSourceByIndex(int nodeIndex);
    std::set<std::pair<int, int>> gTypedParam;                 // params showing a text field
    // Param pins declared this frame. A node with its params collapsed declares
    // none, and emitting a link to an undeclared pin makes the editor treat the
@@ -295,6 +308,7 @@ namespace
    {
       gCurrentNodeIndex = nodeIndex;
       gParamCounter = 0;
+      gColorCounter = 0;
    }
 
    bool ModSlider(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f")
@@ -401,6 +415,91 @@ namespace
       *value = (int)(slot + 0.5f);
       return changed;
    }
+
+   // ---- palette-bindable colours ------------------------------------------
+   // The colour counterpart of ModSlider. Every swatch in the app already goes
+   // through this one function, so giving it a pin here is what makes every
+   // colour in every node bindable to a Palette at once - the alternative was
+   // adding a pin by hand at fifty call sites and missing some.
+   //
+   // Colour pins are counted separately from parameter pins (see
+   // GraphNode::kColorBase) so that adding one to a node cannot renumber the
+   // sliders around it and repoint existing patches' modulation.
+   void ColorSwatch(const char* label, float* col, const INode* owner)
+   {
+      const int nodeIndex = gCurrentNodeIndex;
+      const int colorIndex = gColorCounter++;
+
+      ColorRef ref;
+      ref.nodeIndex = nodeIndex;
+      ref.colorIndex = colorIndex;
+      ref.value = col;
+      ref.name = label;
+      PaletteBinding::Instance().RegisterColor(ref);
+
+      const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kColorBase + colorIndex;
+      const PaletteBinding::Source bound =
+         PaletteBinding::Instance().SourceFor(nodeIndex, colorIndex);
+      const bool isBound = bound.nodeIndex >= 0;
+      gDrawnColorPins.insert(pinId);
+
+      ImGui::PushID(label);
+      ImGui::PushID(colorIndex + 9000);
+
+      ed::BeginPin(pinId, ed::PinKind::Input);
+      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float box = 14.0f;
+      ImGui::Dummy(ImVec2(box, box));
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
+      // Square where a modulation pin is round: the two accept different cables
+      // and sit right next to each other, so they should not look alike.
+      dl->AddRectFilled(ImVec2(c.x - 4.0f, c.y - 4.0f), ImVec2(c.x + 4.0f, c.y + 4.0f),
+                        isBound ? IM_COL32(130, 220, 190, 255) : IM_COL32(95, 100, 120, 255),
+                        1.0f);
+      ed::EndPin();
+      ImGui::SameLine(0.0f, 4.0f);
+
+      if (ImGui::ColorButton(label, ImVec4(col[0], col[1], col[2], 1.0f),
+                             ImGuiColorEditFlags_NoTooltip, ImVec2(38, 0)))
+      {
+         if (isBound)
+         {
+            // A bound colour is rewritten from the palette every frame, so
+            // opening the picker on it would show an edit that vanishes on the
+            // next tick. Step to the next swatch instead, which is the edit
+            // someone is actually reaching for here.
+            PushUndoCheckpoint();
+            int count = 1;
+            if (IPaletteSource* source = PaletteSourceByIndex(bound.nodeIndex))
+               count = std::max(1, source->SwatchCount());
+            PaletteBinding::Instance().Bind(nodeIndex, colorIndex, bound.nodeIndex,
+                                            (bound.swatchIndex + 1) % count);
+         }
+         else
+         {
+            // Captured once, at the moment the picker opens rather than per-frame
+            // while it's being dragged - the picker writes into *col continuously,
+            // so anywhere later would already see the edited value.
+            PushUndoCheckpoint();
+            gColor.target = col;
+            gColor.owner = owner;
+            gColor.label = label;
+            gColor.justOpened = true;
+         }
+      }
+      ImGui::SameLine();
+      if (isBound)
+         ImGui::TextColored(ImVec4(0.5f, 0.86f, 0.74f, 1.0f), "%s  #%d",
+                            label, bound.swatchIndex + 1);
+      else
+         ImGui::TextDisabled("%s", label);
+
+      ImGui::PopID();
+      ImGui::PopID();
+   }
+
 
    // ImGui's Separator / SeparatorText span the available content width, and
    // inside a node that width is unbounded - the rule shot off across the whole
@@ -596,6 +695,7 @@ namespace
       REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");
+      REGISTER_NODE(CommentNode, Comment, "Compositing");
       REGISTER_NODE(GroupNode, Group, "Compositing");
       REGISTER_NODE(NullNode, Null, "Compositing");
       REGISTER_NODE(ViewportNode, Viewport, "Compositing");
@@ -617,6 +717,7 @@ namespace
       REGISTER_NODE(PathNode, Path, "Modulators");
       REGISTER_NODE(ConstantNode, Constant, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
+      REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
 
@@ -652,6 +753,12 @@ namespace
       return nullptr;
    }
 
+   IPaletteSource* PaletteSourceByIndex(int nodeIndex)
+   {
+      GraphNode* gn = FindNodeByIndex(nodeIndex);
+      return gn ? dynamic_cast<IPaletteSource*>(gn->node.get()) : nullptr;
+   }
+
    // How many image inputs a node exposes (drives pin count + link routing).
    int InputCountFor(const GraphNode& gn)
    {
@@ -679,6 +786,8 @@ namespace
          return 1;
       if (dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
+         return 1; // the reference image, when it comes from the graph
       if (dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
@@ -754,6 +863,8 @@ namespace
          return slot == 0 ? &draw->Input() : nullptr;
       if (auto* an = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
          return slot == 0 ? &an->Input() : nullptr;
+      if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
+         return slot == 0 ? &pal->Input() : nullptr;
       if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
          return slot == 0 ? &model->TextureInput() : nullptr;
       if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
@@ -891,6 +1002,8 @@ namespace
          audio->ReloadFromPath();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
          video->ReloadFromPath();
+      if (auto* palette = dynamic_cast<PaletteNode*>(node))
+         palette->ReloadFromPath();
       if (auto* formula = dynamic_cast<FormulaNode*>(node))
          formula->Apply();
    }
@@ -1562,6 +1675,118 @@ namespace
       ColorSwatch("high", n->highColor, n);
       if (ImGui::Button("Reseed", ImVec2(kPreviewSize, 0)))
          n->Reseed();
+   }
+
+   // --- Palette from Image ---------------------------------------------
+   // Preview is the palette itself, not the strip texture: the strip is a
+   // by-product, while the swatches are what the rest of the graph binds to,
+   // and they need to be readable and countable at a glance.
+   void DrawPalettePreview(PaletteNode* n)
+   {
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const float h = 118.0f;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
+                        IM_COL32(18, 18, 24, 255), 4.0f);
+
+      const int count = std::max(1, n->SwatchCount());
+      const float pad = 6.0f;
+      const float chipW = (kPreviewSize - pad * 2.0f) / (float)count;
+      const float chipH = 60.0f;
+      for (int i = 0; i < count; i++)
+      {
+         float rgb[3];
+         n->GetSwatch(i, rgb);
+         const ImVec2 tl(origin.x + pad + chipW * (float)i, origin.y + pad);
+         const ImVec2 br(tl.x + chipW - 2.0f, tl.y + chipH);
+         dl->AddRectFilled(tl, br,
+                           IM_COL32((int)(rgb[0] * 255.0f), (int)(rgb[1] * 255.0f),
+                                    (int)(rgb[2] * 255.0f), 255),
+                           3.0f);
+
+         // How much of the reference each swatch actually covers. Without it a
+         // one-percent accent looks exactly as important as the colour half the
+         // photo is made of, which is the wrong thing to build a look on.
+         const float weight = n->SwatchWeight(i);
+         dl->AddRectFilled(ImVec2(tl.x, br.y + 4.0f),
+                           ImVec2(tl.x + (chipW - 2.0f) * std::min(1.0f, weight), br.y + 7.0f),
+                           IM_COL32(150, 156, 176, 255));
+
+         char idx[8];
+         snprintf(idx, sizeof(idx), "%d", i + 1);
+         dl->AddText(ImVec2(tl.x + 2.0f, br.y + 9.0f), IM_COL32(118, 124, 144, 255), idx);
+      }
+
+      const char* status;
+      if (n->Input().IsConnected())
+         status = n->live ? "live from cable" : "from cable";
+      else if (!n->LoadedPath().empty())
+         status = "from file";
+      else
+         status = "choose a photo, or cable one to 'ref'";
+      dl->AddText(ImVec2(origin.x + pad, origin.y + h - 18.0f),
+                  IM_COL32(126, 132, 152, 255), status);
+
+      dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
+                  IM_COL32(70, 74, 90, 255), 4.0f);
+      ImGui::Dummy(ImVec2(kPreviewSize, h));
+   }
+
+   void DrawPaletteParams(PaletteNode* n)
+   {
+      if (ImGui::Button("Choose reference...", ImVec2(kPreviewSize, 0)))
+         n->LoadViaDialog();
+
+      if (!n->LastError().empty())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::PopTextWrapPos();
+      }
+      else if (!n->LoadedPath().empty())
+      {
+         std::string file = n->LoadedPath();
+         const size_t slash = file.find_last_of('/');
+         if (slash != std::string::npos)
+            file = file.substr(slash + 1);
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("%s", file.c_str());
+         ImGui::PopTextWrapPos();
+      }
+      // A cabled reference wins, but the file is kept rather than cleared, so
+      // unplugging the cable falls back to it instead of emptying the node.
+      if (n->Input().IsConnected() && !n->LoadedPath().empty())
+         ImGui::TextDisabled("(cable overrides the file)");
+
+      ModSliderInt("swatches", &n->swatchCount, 2, PaletteNode::kMaxSwatches);
+      DropdownButton("order", PaletteNode::SortNames(), n->sortMode,
+                     [n](int i) { PushUndoCheckpoint(); n->sortMode = i; });
+
+      NodeSeparator("extract");
+      ModSlider("min chroma", &n->minChroma, 0.0f, 0.2f);
+      ImGui::Checkbox("include neutrals", &n->includeNeutrals);
+      ModSlider("seed", &n->seed, 0.0f, 64.0f, "%.1f");
+      ModSliderInt("sample", &n->sampleSize, 16, 256);
+      ImGui::Checkbox("live", &n->live);
+      // Drawn whether or not Live is on: hiding a modulatable slider behind a
+      // checkbox renumbers every pin after it, which silently repoints this
+      // node's modulation the moment the box is ticked.
+      ModSlider("rate", &n->sampleRate, 1.0f, 60.0f, "%.0f");
+      if (ImGui::Button("Re-extract", ImVec2(kPreviewSize, 0)))
+         n->RequestExtract();
+
+      // Shaping runs on the stored cluster centres, so these are live: they
+      // re-grade the palette without re-clustering the photo behind it.
+      NodeSeparator("shape");
+      ModSlider("hue", &n->hueShift, -0.5f, 0.5f);
+      ModSlider("saturation", &n->saturation, 0.0f, 2.0f);
+      ModSlider("brightness", &n->brightness, -0.4f, 0.4f);
+      ModSlider("spread", &n->spread, 0.0f, 2.0f);
+
+      NodeSeparator("strip output");
+      DropdownButton("blend", PaletteNode::StripNames(), n->stripMode,
+                     [n](int i) { PushUndoCheckpoint(); n->stripMode = i; });
+      ImGui::TextDisabled("out is a gradient of the palette");
    }
 
    void DrawRampParams(RampNode* n)
@@ -2631,6 +2856,25 @@ namespace
       NodeSeparator("raster");
       ImGui::Checkbox("depth test", &n->depthTest);
       ImGui::Checkbox("cull backfaces", &n->backfaceCull);
+
+      NodeSeparator("selection");
+      ImGui::Checkbox("highlight selected faces", &n->highlightSelection);
+      if (n->highlightSelection)
+      {
+         ColorSwatch("highlight", n->selectionColor, n);
+         ModSlider("highlight opacity", &n->selectionOpacity, 0.0f, 1.0f);
+         // Says which of the three states you are in: no Select upstream at
+         // all, a Select that matched nothing, or a live selection. Without it
+         // an empty highlight and an absent one look identical.
+         bool anyMask = false;
+         for (int slot = 0; slot < Render3DNode::kSlots; slot++)
+            if (n->geometry[slot] != nullptr && !n->geometry[slot]->GetMesh().faceMask.empty())
+               anyMask = true;
+         if (!anyMask)
+            ImGui::TextDisabled("no Select node upstream");
+         else
+            ImGui::TextDisabled("%zu faces highlighted", n->LastHighlighted());
+      }
    }
 
    void DrawBlendParams(BlendNode* n)
@@ -2842,6 +3086,73 @@ namespace
                       ImVec2(tl.x + dw, tl.y + dh), ImVec2(0, 1), ImVec2(1, 0));
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
                   IM_COL32(90, 130, 190, 255), 4.0f, 0, 2.0f);
+   }
+
+   // A comment shows its note on the face of the node, not behind the params
+   // (eye) toggle - the whole point of a note is to be readable without an
+   // extra click, the same reasoning DrawNode's canvas is drawn directly
+   // rather than collapsed.
+   //
+   // The text is painted into the node's draw list rather than sitting in an
+   // InputTextMultiline, which cannot go here at all: a multiline field is an
+   // ImGui child window, and a child window is the one thing the canvas
+   // transform cannot carry, so the note came out at the canvas origin instead
+   // of on the node. Double-click opens the real editor as a popup, out in
+   // screen space, exactly like the colour picker and the dropdowns.
+   void DrawCommentPreview(CommentNode* n)
+   {
+      const float w = std::max(120.0f, n->width);
+      const float h = std::max(60.0f, n->height);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+
+      // Reserved first: this is what the node measures itself against and what
+      // the double-click below hit-tests, so it has to be a real item.
+      ImGui::Dummy(ImVec2(w, h));
+      const bool hovered = ImGui::IsItemHovered();
+
+      dl->AddRectFilled(origin, br,
+                        IM_COL32((int)(n->color[0] * 40), (int)(n->color[1] * 40),
+                                 (int)(n->color[2] * 40), 255), 4.0f);
+      dl->AddRect(origin, br,
+                  IM_COL32((int)(n->color[0] * 255), (int)(n->color[1] * 255),
+                           (int)(n->color[2] * 255), 200), 4.0f, 0, 1.5f);
+
+      const ImU32 textCol = IM_COL32((int)((n->color[0] * 0.6f + 0.4f) * 255),
+                                     (int)((n->color[1] * 0.6f + 0.4f) * 255),
+                                     (int)((n->color[2] * 0.6f + 0.4f) * 255), 255);
+      // Clipped to the box so a note longer than its height is cut off at the
+      // edge instead of spilling over the params below it.
+      dl->PushClipRect(origin, br, true);
+      if (n->text.empty())
+         dl->AddText(ImVec2(origin.x + 8, origin.y + 6), IM_COL32(150, 150, 160, 255),
+                     "double-click to write");
+      else
+         dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+                     ImVec2(origin.x + 8, origin.y + 6), textCol,
+                     n->text.c_str(), nullptr, w - 16.0f);
+      dl->PopClipRect();
+
+      {
+         const ImVec2 tl = ed::CanvasToScreen(origin);
+         const ImVec2 rb = ed::CanvasToScreen(br);
+         gCommentBodyRect = ImVec4(tl.x, tl.y, rb.x - tl.x, rb.y - tl.y);
+      }
+
+      if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+      {
+         PushUndoCheckpoint(); // before the edit, so one undo restores the old note
+         gCommentEdit.target = n;
+         gCommentEdit.justOpened = true;
+      }
+   }
+
+   void DrawCommentParams(CommentNode* n)
+   {
+      ModSlider("width", &n->width, 120.0f, 800.0f, "%.0f");
+      ModSlider("height", &n->height, 60.0f, 600.0f, "%.0f");
+      ColorSwatch("colour", n->color, n);
    }
 
    // Padding kept between a group's members and the edge of its box.
@@ -3236,6 +3547,10 @@ namespace
       {
          Modulation::Instance().Unbind(dst->index, GraphNode::ParamIndexFromPin(dstPin));
       }
+      else if (GraphNode::IsColorPin(dstPin))
+      {
+         PaletteBinding::Instance().Unbind(dst->index, GraphNode::ColorIndexFromPin(dstPin));
+      }
       else if (auto* render = dynamic_cast<Render3DNode*>(dst->node.get()))
       {
          const int slot = GraphNode::InputSlotFromPin(dstPin);
@@ -3308,8 +3623,10 @@ namespace
             struct Row { const char* a; const char* b; };
             static const Row rows[] = {
                { "Add a node", "Right-click or double-click the canvas, then type to filter" },
+               { "Note on the canvas", "Press / and start typing. Double-click an existing note to edit it." },
                { "Connect", "Drag from a node's 'out' dot to another node's input dot" },
                { "Modulate a parameter", "Drag a modulator's 'out' onto the small dot beside any slider" },
+               { "Colour from a photo", "Add a Palette node, give it a reference image, then drag its 'out' onto the square dot beside any colour swatch. Each new cable takes the next swatch; click a bound swatch to step it." },
                { "Type an exact value", "Double-click a slider" },
                { "Bypass a node", "Click the power icon next to the eye - the node is skipped and its input passes straight through" },
                { "Pan the canvas", "Drag empty canvas" },
@@ -3576,6 +3893,7 @@ namespace
          return;
       PushUndoCheckpoint();
       Modulation::Instance().UnbindAllFor(index);
+      PaletteBinding::Instance().UnbindAllFor(index);
       gModHistory.erase(index);
       DisconnectAllTo(victim->node.get());
       // A deleted Group's membership set must go with it - otherwise its
@@ -3719,6 +4037,9 @@ namespace
       for (const auto& link : Modulation::Instance().Links())
          data.modulation.push_back({ link.first.first, link.first.second,
                                      link.second.nodeIndex, link.second.outputIndex });
+      for (const auto& link : PaletteBinding::Instance().Links())
+         data.palette.push_back({ link.first.first, link.first.second,
+                                  link.second.nodeIndex, link.second.swatchIndex });
       return data;
    }
 
@@ -3753,6 +4074,8 @@ namespace
       gNodes.clear();
       gLinks.clear();
       gModHistory.clear();
+      Modulation::Instance().Clear();
+      PaletteBinding::Instance().Clear();
       gNextIndex = 1;
       gPatchPath.clear();
       gPatchDirty = false;
@@ -3825,6 +4148,13 @@ namespace
          GraphNode* src = resolve(m.srcIndex);
          if (dst != nullptr && src != nullptr)
             Modulation::Instance().Bind(dst->index, m.dstParam, src->index, m.srcOutput);
+      }
+      for (const Patch::PaletteRecord& c : data.palette)
+      {
+         GraphNode* dst = resolve(c.dstIndex);
+         GraphNode* src = resolve(c.srcIndex);
+         if (dst != nullptr && src != nullptr)
+            PaletteBinding::Instance().Bind(dst->index, c.dstColor, src->index, c.srcSwatch);
       }
 
       gSuppressUndoCheckpoints = false;
@@ -4193,6 +4523,63 @@ int main()
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[2], 0)->Connect(gNodes[1].node.get());
       }
+      else if (getenv("INFINITE_SELECTVIZTEST") != nullptr)
+      {
+         // Cube -> Select (the +Y side, by normal) -> Transform Selected, the
+         // exact chain the highlight exists to make legible. Slot B is the same
+         // cube with no Select in front of it, so one frame shows both that the
+         // overlay lands on the right faces and that a mesh without a mask is
+         // left completely alone.
+         // Render first and closest to the origin: the canvas opens at the
+         // top-left, and the point of this fixture is to look at its output.
+         SpawnNode("Render 3D", "3D", 40.0f, 40.0f);            // 0
+         SpawnNode("Geometry", "3D", 1400.0f, 40.0f);           // 1
+         SpawnNode("Select", "3D", 1700.0f, 40.0f);             // 2
+         SpawnNode("Transform Selected", "3D", 2000.0f, 40.0f); // 3
+         SpawnNode("Geometry", "3D", 1400.0f, 500.0f);          // 4
+
+         auto* cube = static_cast<GeometryNode*>(gNodes[1].node.get());
+         cube->shape = 1; cube->detail = 24; // 3x3 grid per side, 108 triangles
+         auto* select = static_cast<GeometryOpNode*>(gNodes[2].node.get());
+         select->input = cube;
+         select->op = GeometryOpNode::kSelect;
+         select->selectMode = MeshOps::kSelectNormal;
+         select->axis = 1;          // Y
+         select->selectA = 0.9f;    // facing
+         select->selectC = 1.0f;    // +
+         auto* move = static_cast<GeometryOpNode*>(gNodes[3].node.get());
+         move->input = select;
+         move->op = GeometryOpNode::kTransformSelected;
+         move->moveAlongNormals = true;
+         move->normalAmount = 0.35f;
+         move->offsetX = move->offsetY = move->offsetZ = 0.0f;
+         move->rotStep = 0.0f; move->scaleStep = 1.0f;
+
+         // Selects the underside and leaves it in place, so the overlay is
+         // sitting on a face the camera cannot see: it must be hidden by the
+         // cube's own front faces rather than painted over them.
+         if (getenv("INFINITE_SELECTVIZ_HIDDEN") != nullptr)
+         {
+            select->axis = 1;
+            select->selectC = -1.0f;
+            move->normalAmount = 0.0f;
+         }
+
+         auto* plain = static_cast<GeometryNode*>(gNodes[4].node.get());
+         plain->shape = 1; plain->detail = 24;
+         plain->posX = 1.4f;
+
+         auto* r = static_cast<Render3DNode*>(gNodes[0].node.get());
+         r->geometry[0] = move;
+         r->geometry[1] = plain;
+         r->width = 700.0f; r->height = 700.0f;
+         r->camDistance = 4.2f;
+         r->targetX = 0.7f;
+         if (getenv("INFINITE_SELECTVIZ_OFF") != nullptr)
+            r->highlightSelection = false;
+         for (GraphNode& gn : gNodes)
+            gn.showParams = false;
+      }
       else if (getenv("INFINITE_GEOTEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);      // 0 points source
@@ -4441,12 +4828,62 @@ int main()
          CableFor(gNodes[5], 0)->Connect(gNodes[4].node.get());
          CableFor(gNodes[6], 0)->Connect(gNodes[5].node.get());
       }
+      else if (getenv("INFINITE_PALETTETEST") != nullptr)
+      {
+         // A Ramp makes a deterministic, strongly coloured reference without
+         // needing an image file on disk, so the check runs anywhere.
+         SpawnNode("Ramp", "Source", 40.0f, 40.0f);       // 0 reference
+         SpawnNode("Palette", "Modulators", 340.0f, 40.0f); // 1
+         SpawnNode("Ramp", "Source", 640.0f, 40.0f);      // 2 target, driven by 1
+         SpawnNode("Palette", "Modulators", 40.0f, 560.0f);  // 3 same input, same seed
+
+         auto* reference = static_cast<RampNode*>(gNodes[0].node.get());
+         reference->stopCount = 3;
+         reference->stopPos[0] = 0.0f;
+         reference->stopPos[1] = 0.5f;
+         reference->stopPos[2] = 1.0f;
+         const float bands[3][3] = {
+            { 0.90f, 0.10f, 0.10f }, { 0.10f, 0.85f, 0.15f }, { 0.15f, 0.20f, 0.95f }
+         };
+         for (int i = 0; i < 3; i++)
+            for (int c = 0; c < 3; c++)
+               reference->stopColor[i][c] = bands[i][c];
+
+         for (int n : { 1, 3 })
+         {
+            auto* palette = static_cast<PaletteNode*>(gNodes[n].node.get());
+            palette->swatchCount = 3;
+            CableFor(gNodes[n], 0)->Connect(gNodes[0].node.get());
+         }
+
+         // Params have to be drawn for colour pins to register, which is what
+         // the binding pass walks - and a Ramp only draws as many swatches as
+         // it has stops.
+         static_cast<RampNode*>(gNodes[2].node.get())->stopCount = 3;
+         gNodes[2].showParams = true;
+         gNodes[1].showParams = true;
+      }
       else if (getenv("INFINITE_TEXT3DTEST") != nullptr)
       {
          SpawnNode("Text 3D", "3D", 40.0f, 40.0f);
          SpawnNode("Render 3D", "3D", 400.0f, 40.0f);
          static_cast<Render3DNode*>(gNodes[1].node.get())->geometry[0] =
             static_cast<Text3DNode*>(gNodes[0].node.get());
+      }
+      // Nothing is pre-spawned in slash mode: the point of that check is that
+      // pressing "/" on an empty canvas is what produces the comment.
+      else if (getenv("INFINITE_COMMENTTEST") != nullptr &&
+               std::string(getenv("INFINITE_COMMENTTEST")) != "slash")
+      {
+         GraphNode* gn = SpawnNode("Comment", "Compositing", 60.0f, 60.0f);
+         auto* c = static_cast<CommentNode*>(gn->node.get());
+         // Middle line deliberately too long for the box, so the check covers
+         // wrapping and clipping and not just three short lines.
+         c->text = "Phase G\nfloating cubes instanced on the drift field, "
+                   "then graded\nTODO: add fog";
+         c->width = 260.0f; c->height = 140.0f;
+         c->color[0] = 0.95f; c->color[1] = 0.85f; c->color[2] = 0.45f;
+         gn->showParams = true; // exercise DrawCommentParams too, not just the preview
       }
       else if (getenv("INFINITE_GROUPTEST") != nullptr)
       {
@@ -4845,6 +5282,73 @@ int main()
             tio.AddMouseButtonEvent(0, false);
       }
 
+      // dev-only: the whole "/" flow with nothing else touched - press slash on
+      // an empty canvas and type. This is the path that has to stay one
+      // keystroke, so it is driven exactly as a person would drive it.
+      if (const char* cmode = getenv("INFINITE_COMMENTTEST"))
+      {
+         if (std::string(cmode) == "slash")
+         {
+            ImGuiIO& tio = ImGui::GetIO();
+            tio.ConfigInputTrickleEventQueue = false;
+            tio.AddFocusEvent(true); // headless runs are never OS-focused
+            if (frameId == 4)
+            {
+               tio.AddKeyEvent(ImGuiKey_Slash, true);
+               tio.AddInputCharacter('/'); // a real keyboard sends both
+            }
+            if (frameId == 5)
+               tio.AddKeyEvent(ImGuiKey_Slash, false);
+            // Typing starts immediately after: no click anywhere in between.
+            if (frameId == 7)
+            {
+               for (char ch : std::string("lighting"))
+                  tio.AddInputCharacter(ch);
+            }
+            if (frameId == 9)
+               tio.AddKeyEvent(ImGuiKey_Enter, true);
+            if (frameId == 10)
+               tio.AddKeyEvent(ImGuiKey_Enter, false);
+            if (frameId == 12)
+            {
+               for (char ch : std::string("rim light too hot"))
+                  tio.AddInputCharacter(ch);
+            }
+         }
+      }
+
+      // dev-only: double-click an existing note, the way an edit (rather than a
+      // fresh comment) starts.
+      if (const char* cmode = getenv("INFINITE_COMMENTTEST"))
+      {
+         if (std::string(cmode) == "edit")
+         {
+            ImGuiIO& tio = ImGui::GetIO();
+            tio.ConfigInputTrickleEventQueue = false;
+            tio.AddFocusEvent(true); // headless runs are never OS-focused
+            if (frameId >= 4 && gCommentBodyRect.z > 0.0f)
+               tio.AddMousePosEvent(gCommentBodyRect.x + gCommentBodyRect.z * 0.5f,
+                                    gCommentBodyRect.y + gCommentBodyRect.w * 0.5f);
+            // Two clicks a few frames apart: at 60fps that is well inside
+            // ImGui's double-click window.
+            if (frameId == 5 || frameId == 7)
+               tio.AddMouseButtonEvent(0, true);
+            if (frameId == 6 || frameId == 8)
+               tio.AddMouseButtonEvent(0, false);
+            // Then type, including a Return: a note whose editor cannot add a
+            // line is no better than the single-line field this replaced. Left
+            // a few frames after the click so the mouse has finished with the
+            // node - while the button is still down the editor holds the active
+            // item and the text field cannot take the keyboard.
+            if (frameId == 14)
+               tio.AddInputCharacter('!');
+            if (frameId == 16)
+               tio.AddKeyEvent(ImGuiKey_Enter, true);
+            if (frameId == 17)
+               tio.AddKeyEvent(ImGuiKey_Enter, false);
+         }
+      }
+
       // dev-only: synthetic mouse drags to prove empty-canvas drag pans the view
       // while a drag that starts on a node still moves that node. The position is
       // re-asserted every frame, otherwise the GLFW backend's real cursor wins on
@@ -4882,15 +5386,25 @@ int main()
 
       Transport::Instance().Tick(ImGui::GetIO().DeltaTime);
       Modulation::Instance().ClearFrameParams();
+      PaletteBinding::Instance().ClearFrameColors();
       gDrawnParamPins.clear();
+      gDrawnColorPins.clear();
       {
          Modulation& modulation = Modulation::Instance();
          for (GraphNode& gn : gNodes)
+         {
             gn.hasModulatedParams = false;
+            gn.hasPaletteColors = false;
+         }
          for (const auto& link : modulation.Links())
          {
             if (GraphNode* target = FindNodeByIndex(link.first.first))
                target->hasModulatedParams = true;
+         }
+         for (const auto& link : PaletteBinding::Instance().Links())
+         {
+            if (GraphNode* target = FindNodeByIndex(link.first.first))
+               target->hasPaletteColors = true;
          }
       }
 
@@ -5168,12 +5682,6 @@ int main()
             first = false;
          }
          gPendingSelect.clear();
-      }
-
-      if (gRequestFitView)
-      {
-         ed::NavigateToContent(0.0f);
-         gRequestFitView = false;
       }
 
       // Where a panel-spawned node should land. ScreenToCanvas is only valid
@@ -5625,6 +6133,123 @@ int main()
          ok = ok && loadClearsUndo;
 
          printf("%s\n", ok ? "UNDO REDO OK" : "SUSPECT");
+      }
+
+      // Bring the comment into view for the screenshot check. Frame 2 rather
+      // than frame 0 only so the node has settled at its spawn position and
+      // measured its own size first; the fit itself runs at the end of this
+      // same frame and lands on the frame after.
+      if (getenv("INFINITE_COMMENTTEST") != nullptr && frameId == 2)
+         gRequestFitView = true;
+
+      // Slash mode: one keystroke had to produce a comment already taking the
+      // keyboard, with no click of any kind in between, and the "/" itself must
+      // not have ended up in the note.
+      {
+         const char* mode = getenv("INFINITE_COMMENTTEST");
+         if (mode != nullptr && std::string(mode) == "slash" && frameId == 15)
+         {
+            CommentNode* c = gNodes.size() == 1
+                                ? dynamic_cast<CommentNode*>(gNodes[0].node.get())
+                                : nullptr;
+            const bool spawned = c != nullptr;
+            const bool typed = spawned && c->text == "lighting\nrim light too hot";
+            printf("slash spawned a comment=%d, text=\"%s\"  %s\n", (int)spawned,
+                   spawned ? c->text.c_str() : "(none)",
+                   (spawned && typed) ? "SLASH COMMENT OK" : "FAIL");
+            if (getenv("IMAGERESYNTH_SCREENSHOT") == nullptr)
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // In edit mode (see the synthetic double-click and typing above) report
+      // whether the note's only way in works end to end.
+      {
+         const char* mode = getenv("INFINITE_COMMENTTEST");
+         if (mode != nullptr && std::string(mode) == "edit" && frameId == 19)
+         {
+            auto* c = static_cast<CommentNode*>(gNodes[0].node.get());
+            const bool opened = gCommentEdit.target == c;
+            const bool typed = c->text.find('!') != std::string::npos;
+            const size_t lines = (size_t)std::count(c->text.begin(), c->text.end(), '\n') + 1;
+            printf("double-click opens editor=%d, typing reaches the note=%d, %zu lines  %s\n",
+                   (int)opened, (int)typed, lines,
+                   (opened && typed && lines == 4) ? "COMMENT EDIT OK" : "FAIL");
+            if (getenv("IMAGERESYNTH_SCREENSHOT") == nullptr)
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // A note's line breaks are its content, and one param round trip backs
+      // saving, undo/redo and copy/paste alike - so a comment that survives
+      // being written to disk and read back survives all three. Checked here
+      // rather than by eye because a screenshot cannot tell "kept the line
+      // breaks" from "happens to be short enough to wrap the same way".
+      //
+      // Runs before the screenshot frame, and puts the note back the way it
+      // found it, so the picture still shows the comment as authored. Skipped
+      // in edit mode: reloading the patch would delete the node whose text is
+      // being edited and close the popup under test.
+      if (getenv("INFINITE_COMMENTTEST") != nullptr && frameId == 11 &&
+          std::string(getenv("INFINITE_COMMENTTEST")) != "edit" &&
+          std::string(getenv("INFINITE_COMMENTTEST")) != "slash")
+      {
+         auto findComment = []() -> CommentNode*
+         {
+            for (GraphNode& gn : gNodes)
+            {
+               if (auto* c = dynamic_cast<CommentNode*>(gn.node.get()))
+                  return c;
+            }
+            return nullptr;
+         };
+         auto lineCount = [](const std::string& s)
+         {
+            return (size_t)std::count(s.begin(), s.end(), '\n') + 1;
+         };
+
+         bool ok = true;
+         CommentNode* c = findComment();
+         const std::string original = c != nullptr ? c->text : std::string();
+
+         SavePatchTo("/tmp/infinite_commenttest.infinite");
+         LoadPatchFrom("/tmp/infinite_commenttest.infinite");
+         CommentNode* reloaded = findComment(); // load rebuilt every node
+         const bool savedOk = reloaded != nullptr && reloaded->text == original;
+         printf("comment save/load: %zu lines -> %zu lines  %s\n",
+                lineCount(original),
+                reloaded != nullptr ? lineCount(reloaded->text) : (size_t)0,
+                savedOk ? "OK" : "FAIL");
+         ok = ok && savedOk;
+
+         // The same edit-then-undo the popup performs: the checkpoint is pushed
+         // when the editor opens, the text changes while it is open.
+         if (reloaded != nullptr)
+         {
+            PushUndoCheckpoint();
+            reloaded->text = "scribbled over";
+            Undo();
+            CommentNode* undone = findComment();
+            const bool undoOk = undone != nullptr && undone->text == original;
+            printf("comment undo: text back to %zu lines  %s\n",
+                   undone != nullptr ? lineCount(undone->text) : (size_t)0,
+                   undoOk ? "OK" : "FAIL");
+            ok = ok && undoOk;
+
+            Redo();
+            CommentNode* redone = findComment();
+            const bool redoOk = redone != nullptr && redone->text == "scribbled over";
+            printf("comment redo: %s  %s\n",
+                   redone != nullptr ? redone->text.c_str() : "(gone)",
+                   redoOk ? "OK" : "FAIL");
+            ok = ok && redoOk;
+
+            Undo(); // leave the authored note on screen for the screenshot
+         }
+
+         printf("%s\n", ok ? "COMMENT OK" : "SUSPECT");
+         if (getenv("IMAGERESYNTH_SCREENSHOT") == nullptr)
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
       // Group auto-fit: the box must track its members in BOTH directions, so
@@ -6958,6 +7583,146 @@ int main()
                            ? "OCEAN OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_PALETTETEST") != nullptr && frameId == 6)
+      {
+         auto* palette = static_cast<PaletteNode*>(gNodes[1].node.get());
+         auto* twin = static_cast<PaletteNode*>(gNodes[3].node.get());
+         auto* target = static_cast<RampNode*>(gNodes[2].node.get());
+
+         float sw[3][3];
+         for (int i = 0; i < 3; i++)
+            palette->GetSwatch(i, sw[i]);
+         printf("swatches: ");
+         for (int i = 0; i < 3; i++)
+            printf("(%.2f %.2f %.2f w=%.2f) ", sw[i][0], sw[i][1], sw[i][2],
+                   palette->SwatchWeight(i));
+         printf("\n");
+
+         // 1. three genuinely different colours came out, not three shades of one
+         float closest = 9.0f;
+         for (int i = 0; i < 3; i++)
+            for (int j = i + 1; j < 3; j++)
+            {
+               float d = 0.0f;
+               for (int c = 0; c < 3; c++)
+                  d += (sw[i][c] - sw[j][c]) * (sw[i][c] - sw[j][c]);
+               closest = std::min(closest, std::sqrt(d));
+            }
+         const bool distinct = closest > 0.15f;
+
+         // 2. the default order really is dark to light
+         auto luma = [](const float* c) { return 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2]; };
+         const bool ordered = luma(sw[0]) <= luma(sw[1]) + 1e-4f &&
+                              luma(sw[1]) <= luma(sw[2]) + 1e-4f;
+
+         // 3. same reference and seed give the same palette, or every binding
+         //    downstream would drift on its own
+         float deterministic = 0.0f;
+         for (int i = 0; i < 3; i++)
+         {
+            float other[3];
+            twin->GetSwatch(i, other);
+            for (int c = 0; c < 3; c++)
+               deterministic = std::max(deterministic, std::fabs(other[c] - sw[i][c]));
+         }
+
+         // 4. the extracted colours actually reach a bound swatch
+         PaletteBinding& binding = PaletteBinding::Instance();
+         for (int i = 0; i < 3; i++)
+            binding.Bind(gNodes[2].index, i, gNodes[1].index, i);
+         gPaletteTestPending = true;
+
+         printf("distinct=%d (closest %.3f) ordered=%d deterministic drift=%.4f\n",
+                distinct, closest, ordered, deterministic);
+         gPaletteTestOk = distinct && ordered && deterministic < 1e-5f;
+         (void)target;
+      }
+
+      if (getenv("INFINITE_PALETTETEST") != nullptr && frameId == 9)
+      {
+         auto* palette = static_cast<PaletteNode*>(gNodes[1].node.get());
+         auto* target = static_cast<RampNode*>(gNodes[2].node.get());
+
+         bool applied = true;
+         for (int i = 0; i < 3; i++)
+         {
+            float expected[3];
+            palette->GetSwatch(i, expected);
+            for (int c = 0; c < 3; c++)
+               if (std::fabs(target->stopColor[i][c] - expected[c]) > 1e-4f)
+                  applied = false;
+         }
+         printf("bound stops: (%.2f %.2f %.2f) (%.2f %.2f %.2f) (%.2f %.2f %.2f)  applied=%d\n",
+                target->stopColor[0][0], target->stopColor[0][1], target->stopColor[0][2],
+                target->stopColor[1][0], target->stopColor[1][1], target->stopColor[1][2],
+                target->stopColor[2][0], target->stopColor[2][1], target->stopColor[2][2],
+                applied);
+
+         // 5. shaping re-grades without re-clustering: saturation 0 must leave
+         //    swatches neutral but still ordered by lightness
+         palette->saturation = 0.0f;
+         palette->CookIfNeeded(frameId + 500);
+         float maxChroma = 0.0f;
+         for (int i = 0; i < 3; i++)
+         {
+            float c[3];
+            palette->GetSwatch(i, c);
+            maxChroma = std::max(maxChroma,
+                                 std::max(c[0], std::max(c[1], c[2])) -
+                                    std::min(c[0], std::min(c[1], c[2])));
+         }
+         palette->saturation = 1.0f;
+         printf("saturation 0 -> max channel spread %.3f\n", maxChroma);
+
+         // 6. the binding survives a patch round trip
+         Patch::Data data = BuildPatchData();
+         const bool saved = data.palette.size() == 3;
+         PaletteBinding::Instance().UnbindAllFor(gNodes[2].index);
+         const bool cleared = PaletteBinding::Instance().Links().empty();
+         for (const Patch::PaletteRecord& r : data.palette)
+            PaletteBinding::Instance().Bind(r.dstIndex, r.dstColor, r.srcIndex, r.srcSwatch);
+         const bool restored = PaletteBinding::Instance().Links().size() == 3;
+         printf("bindings: saved=%d cleared=%d restored=%d\n", saved, cleared, restored);
+
+         // 7. the headline path: a photo loaded from disk, not a cabled node.
+         //    Two known colours in, the same two colours out.
+         const char* shotDir = getenv("TMPDIR");
+         const std::string refPath =
+            std::string(shotDir ? shotDir : "/tmp") + "/infinite_palette_ref.png";
+         const int side = 64;
+         std::vector<unsigned char> ref((size_t)side * side * 4, 255);
+         for (int y = 0; y < side; y++)
+            for (int x = 0; x < side; x++)
+            {
+               const size_t i = ((size_t)y * side + x) * 4;
+               const bool left = x < side / 2;
+               ref[i + 0] = left ? 230 : 30;
+               ref[i + 1] = left ? 40 : 90;
+               ref[i + 2] = left ? 60 : 210;
+            }
+         stbi_flip_vertically_on_write(0);
+         stbi_write_png(refPath.c_str(), side, side, 4, ref.data(), side * 4);
+
+         auto* fromFile = static_cast<PaletteNode*>(gNodes[3].node.get());
+         gNodes[3].node->bypassed = false;
+         fromFile->Input().Disconnect();
+         fromFile->swatchCount = 2;
+         const bool loaded = fromFile->Load(refPath);
+         fromFile->CookIfNeeded(frameId + 900);
+         float a[3], b[3];
+         fromFile->GetSwatch(0, a);
+         fromFile->GetSwatch(1, b);
+         // Sorted dark-to-light, so the blue half comes first.
+         const bool fileOk = loaded && b[0] > 0.7f && b[2] < 0.4f &&
+                             a[2] > 0.6f && a[0] < 0.4f;
+         printf("from file: loaded=%d (%.2f %.2f %.2f) (%.2f %.2f %.2f) %s\n",
+                loaded, a[0], a[1], a[2], b[0], b[1], b[2], fileOk ? "OK" : "SUSPECT");
+
+         const bool ok = gPaletteTestOk && applied && maxChroma < 0.02f &&
+                         saved && cleared && restored && fileOk;
+         printf("%s\n", ok ? "PALETTE OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_UTILTEST") != nullptr && (frameId == 4 || frameId == 10))
       {
          auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
@@ -7209,6 +7974,52 @@ int main()
 
       // Frame 4 renders with antialiasing off, frame 8 with it on, and the two
       // are compared. Counting "soft" pixels in a single image cannot tell an
+      // The selection overlay, checked by counting warm-tinted pixels in the
+      // render rather than by eye. Three states have to be distinguishable, and
+      // the failure this guards against is the middle one silently becoming one
+      // of the outer two: a mesh with no Select untouched, a visible selection
+      // tinted, and a selection facing away from the camera still occluded.
+      if (getenv("INFINITE_SELECTVIZTEST") != nullptr && frameId == 10)
+      {
+         auto* r = static_cast<Render3DNode*>(gNodes[0].node.get());
+         const int w = r->GetOutputWidth(), h = r->GetOutputHeight();
+         std::vector<unsigned char> px((size_t)w * h * 4);
+         GLuint fbo = 0;
+         glGenFramebuffers(1, &fbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                r->GetOutputTexture(), 0);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+         glDeleteFramebuffers(1, &fbo);
+
+         // The scene is otherwise neutral grey on black, so "red clearly ahead
+         // of blue" identifies overlay pixels without needing an exact colour.
+         size_t tinted = 0;
+         for (size_t i = 0; i < px.size(); i += 4)
+            if (px[i] > 90 && px[i] > px[i + 2] + 40)
+               tinted++;
+
+         const bool off = getenv("INFINITE_SELECTVIZ_OFF") != nullptr;
+         const bool hidden = getenv("INFINITE_SELECTVIZ_HIDDEN") != nullptr;
+         // A cube side is 18 of 108 triangles and the camera sees roughly a
+         // twentieth of the frame as that face, so a live highlight lands in the
+         // thousands of pixels while both negative cases must be flat zero.
+         const bool expectTint = !off && !hidden;
+         const bool ok = expectTint ? tinted > 500 : tinted == 0;
+         printf("selection overlay: %zu tinted px, highlight=%s selection=%s  %s\n",
+                tinted, off ? "off" : "on", hidden ? "facing away" : "visible",
+                ok ? "OK" : "FAIL");
+         printf("faces highlighted: %zu of %zu drawn  %s\n",
+                r->LastHighlighted(), r->LastTriangleCount(),
+                // Slot B has no Select in front of it, so a mask that leaked
+                // into an unselected mesh would show up as far too many faces.
+                (off ? r->LastHighlighted() == 0 : r->LastHighlighted() == 18) ? "OK" : "FAIL");
+         printf("%s\n", ok ? "SELECTION OVERLAY OK" : "SUSPECT");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+
       // antialiased silhouette from ordinary shading gradients; differencing
       // two renders of an identical scene can, because only the edges move.
       if (getenv("INFINITE_3DTEST") != nullptr &&
@@ -7560,17 +8371,27 @@ int main()
          }
          else if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
             DrawPaintablePreview(draw);
+         else if (auto* comment = dynamic_cast<CommentNode*>(gn.node.get()))
+            DrawCommentPreview(comment);
+         else if (auto* palette = dynamic_cast<PaletteNode*>(gn.node.get()))
+            DrawPalettePreview(palette);
          else
             DrawPreview(gn.node.get());
 
          // --- params (eye) and bypass (power) ---
+         const bool isComment = dynamic_cast<CommentNode*>(gn.node.get()) != nullptr;
          if (EyeToggle(gn.showParams))
             gn.showParams = !gn.showParams;
-         ImGui::SameLine();
-         if (BypassToggle(!gn.node->bypassed))
+         // A comment carries no signal, so there is nothing for a power button
+         // to switch off; it gets the eye on its own.
+         if (!isComment)
          {
-            PushUndoCheckpoint();
-            gn.node->bypassed = !gn.node->bypassed;
+            ImGui::SameLine();
+            if (BypassToggle(!gn.node->bypassed))
+            {
+               PushUndoCheckpoint();
+               gn.node->bypassed = !gn.node->bypassed;
+            }
          }
          // No text label: the power icon turning red already reads as bypassed,
          // and a word beside it is noise on every node in the patch.
@@ -7579,6 +8400,11 @@ int main()
             // make it obvious a collapsed node still has live modulation
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f), "mod");
+         }
+         if (!gn.showParams && gn.hasPaletteColors)
+         {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.5f, 0.86f, 0.74f, 1.0f), "pal");
          }
 
          BeginNodeParams(gn.index);
@@ -7606,6 +8432,8 @@ int main()
                DrawNoiseParams(n);
             else if (auto* n = dynamic_cast<RampNode*>(gn.node.get()))
                DrawRampParams(n);
+            else if (auto* n = dynamic_cast<PaletteNode*>(gn.node.get()))
+               DrawPaletteParams(n);
             else if (auto* n = dynamic_cast<GeometryNode*>(gn.node.get()))
                DrawGeometryParams(n);
             else if (auto* n = dynamic_cast<ModelSourceNode*>(gn.node.get()))
@@ -7618,6 +8446,8 @@ int main()
                DrawMeshResynthParams(n);
             else if (auto* n = dynamic_cast<ImageToPointsNode*>(gn.node.get()))
                DrawImageToPointsParams(n);
+            else if (auto* n = dynamic_cast<CommentNode*>(gn.node.get()))
+               DrawCommentParams(n);
             else if (auto* n = dynamic_cast<PathNode*>(gn.node.get()))
                DrawPathParams(n);
             else if (auto* n = dynamic_cast<ConstantNode*>(gn.node.get()))
@@ -7731,7 +8561,11 @@ int main()
          const float contentW = ImGui::GetItemRectSize().x;
 
          // --- output dots, bottom-right: cables start here ---
-         if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr)
+         // A comment is not in the signal graph, and an out pin on one is worse
+         // than useless: link validation only asks whether a source is an image
+         // node, so a comment would happily patch into any image input and feed
+         // it a blank texture. No pin, no way to make that mistake.
+         if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment)
          {
             const int outputs = std::max(1, gn.node->OutputCount());
             float itemW = 0.0f;
@@ -7888,6 +8722,19 @@ int main()
                             source->OutputPinId(link.second.outputIndex), paramPin });
       }
 
+      for (const auto& link : PaletteBinding::Instance().Links())
+      {
+         GraphNode* target = FindNodeByIndex(link.first.first);
+         GraphNode* source = FindNodeByIndex(link.second.nodeIndex);
+         if (target == nullptr || source == nullptr)
+            continue;
+         const int colorPin = target->ColorPinId(link.first.second);
+         if (gDrawnColorPins.count(colorPin) == 0)
+            continue; // params collapsed: keep the binding, just don't draw the cable
+         gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
+                            source->OutputPinId(0), colorPin });
+      }
+
       // ---- drop a node on a cable to splice it in ----
       // While a single node is being dragged, find an image cable passing under
       // it. The link is approximated as a straight line between the two nodes'
@@ -7922,6 +8769,7 @@ int main()
                const bool differentNodes = GraphNode::NodeIndexFromPin(a) != GraphNode::NodeIndexFromPin(b);
                const bool srcIsModulator = srcNode != nullptr &&
                                            dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr;
+               auto* srcPalette = srcNode ? dynamic_cast<IPaletteSource*>(srcNode->node.get()) : nullptr;
 
                auto* dstMath = dstNode ? dynamic_cast<MathNode*>(dstNode->node.get()) : nullptr;
                auto* dstAudio = dstNode ? dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) : nullptr;
@@ -7956,6 +8804,8 @@ int main()
 
                   if (GraphNode::IsParamPin(b))
                      valid = srcIsModulator;
+                  else if (GraphNode::IsColorPin(b))
+                     valid = srcPalette != nullptr;
                   else if (GraphNode::IsInputPin(b))
                   {
                      const int slot = GraphNode::InputSlotFromPin(b);
@@ -8004,6 +8854,19 @@ int main()
                                                  GraphNode::ParamIndexFromPin(b),
                                                  srcNode->index,
                                                  GraphNode::OutputIndexFromPin(a));
+                  }
+                  else if (GraphNode::IsColorPin(b))
+                  {
+                     // Hand out a different swatch each time rather than the
+                     // same one: dragging a palette onto a ramp's five stops in
+                     // turn should lay the palette across the gradient, which
+                     // is the whole point, not paint it a flat colour five
+                     // times over.
+                     PaletteBinding& palette = PaletteBinding::Instance();
+                     const int used = palette.BindingCountFrom(srcNode->index, dstNode->index);
+                     const int count = std::max(1, srcPalette->SwatchCount());
+                     palette.Bind(dstNode->index, GraphNode::ColorIndexFromPin(b),
+                                  srcNode->index, used % count);
                   }
                   else if (dstRender != nullptr)
                   {
@@ -8095,6 +8958,33 @@ int main()
       if (!typing && ((cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
                       (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))))
          Redo();
+
+      // "/" drops a comment under the pointer and puts the caret straight into
+      // it, so annotating a patch is one keystroke and then typing. Not gated on
+      // Shift, so "?" does not leave a stray comment behind, and not on a
+      // modifier, so Cmd-/ stays free for a binding later.
+      if (!typing && !cmdOrCtrl && !io.KeyShift &&
+          ImGui::IsKeyPressed(ImGuiKey_Slash, false))
+      {
+         // The pointer is only meaningful over the canvas; anywhere else (the
+         // node panel, off the window entirely) the middle of the view is the
+         // only sensible place for it.
+         const ImVec2 mouse = ImGui::GetMousePos();
+         const bool overGraph = mouse.x >= gGraphScreenTL.x &&
+                                mouse.y >= gGraphScreenTL.y &&
+                                mouse.x <= gGraphScreenTL.x + gGraphScreenSize.x &&
+                                mouse.y <= gGraphScreenTL.y + gGraphScreenSize.y;
+         const ImVec2 at = overGraph ? ed::ScreenToCanvas(mouse) : gViewCenterCanvas;
+         if (GraphNode* gn = SpawnNode("Comment", "Compositing", at.x, at.y))
+         {
+            gCommentEdit.target = static_cast<CommentNode*>(gn->node.get());
+            gCommentEdit.justOpened = true;
+            // The '/' itself is already in the queue for this frame; without
+            // this it lands in the note that is about to take the keyboard and
+            // every comment starts with a slash.
+            io.InputQueueCharacters.resize(0);
+         }
+      }
 
       if (!typing && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
                       ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
@@ -8447,6 +9337,62 @@ int main()
          gColor.justOpened = true;
       }
 
+      if (gCommentEdit.justOpened)
+      {
+         ImGui::OpenPopup("##commentedit");
+         gCommentEdit.justOpened = false;
+      }
+
+      // the comment may have been deleted while its editor was open
+      if (gCommentEdit.target != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gCommentEdit.target)
+               alive = true;
+         }
+         if (!alive)
+            gCommentEdit.target = nullptr;
+      }
+
+      if (ImGui::BeginPopup("##commentedit"))
+      {
+         if (gCommentEdit.target != nullptr)
+         {
+            CommentNode* c = gCommentEdit.target;
+            ImGui::TextDisabled("comment");
+            gCommentEdit.framesOpen++;
+            if (gCommentEdit.framesOpen <= 4) // see CommentEditRequest::framesOpen
+            {
+               ImGui::SetWindowFocus();
+               ImGui::SetKeyboardFocusHere();
+            }
+            // Sized from the comment's own box so what is typed lines up with
+            // what will be on the canvas, within limits that keep the popup on
+            // screen for a comment scaled right up.
+            ImGui::InputTextMultiline("##commenttext", &c->text,
+                                      ImVec2(std::min(600.0f, std::max(240.0f, c->width)),
+                                             std::min(400.0f, std::max(120.0f, c->height))));
+            // The checkpoint was pushed when the editor opened, so every
+            // keystroke here is part of that one undo step; all that is left is
+            // to keep the patch marked unsaved.
+            if (ImGui::IsItemEdited())
+               gPatchDirty = true;
+            ImGui::TextDisabled("click outside to finish");
+         }
+         else
+         {
+            ImGui::CloseCurrentPopup();
+         }
+         ImGui::EndPopup();
+      }
+      else
+      {
+         gCommentEdit.target = nullptr;
+         gCommentEdit.framesOpen = 0;
+      }
+
       if (gColor.justOpened)
       {
          ImGui::OpenPopup("##colorpick");
@@ -8585,6 +9531,20 @@ int main()
       gHoveringItem = ed::GetHoveredNode() || ed::GetHoveredPin() || ed::GetHoveredLink();
 
       ed::Resume();
+
+      // Fit-to-content has to happen down here, after every node has been
+      // submitted this frame. ed::Begin() marks all nodes not-live and only
+      // drawing them marks them live again, and NavigateToContent() measures
+      // live nodes only - so called up next to ed::Begin() it always fit an
+      // empty rectangle and silently did nothing at all. The new view is
+      // picked up by the next ed::Begin(), one frame later.
+      if (gRequestFitView)
+      {
+         ed::NavigateToContent(0.0f);
+         gRequestFitView = false;
+      }
+      if (getenv("INFINITE_PALETTETEST") != nullptr && frameId == 3)
+         gRequestFitView = true; // dev screenshot: frame the whole fixture
 
       ed::End();
       ed::SetCurrentEditor(nullptr);
@@ -8732,6 +9692,37 @@ int main()
                continue;
             const float v01 = modulator->Value01();
             *ref.value = ref.minValue + (ref.maxValue - ref.minValue) * v01;
+         }
+      }
+
+      // A Palette is not an Output, so nothing downstream pulls it, and both its
+      // preview and its bindings need this frame's swatches. Cooking here - after
+      // modulation has been applied - is what lets a modulator drive the shaping
+      // controls and have it land the same frame.
+      for (GraphNode& gn : gNodes)
+      {
+         if (dynamic_cast<IPaletteSource*>(gn.node.get()) != nullptr)
+            gn.node->CookIfNeeded(frameId);
+      }
+
+      // Colours, the same way and for the same reason: the registry was rebuilt
+      // while the nodes drew, so every pointer here belongs to a node that
+      // still exists. A palette has to cook before it can be read, and it is
+      // not an Output so nothing else would pull it.
+      {
+         PaletteBinding& palette = PaletteBinding::Instance();
+         for (const ColorRef& ref : palette.FrameColors())
+         {
+            const PaletteBinding::Source src = palette.SourceFor(ref.nodeIndex, ref.colorIndex);
+            if (src.nodeIndex < 0 || ref.value == nullptr)
+               continue;
+            GraphNode* palNode = FindNodeByIndex(src.nodeIndex);
+            if (palNode == nullptr)
+               continue;
+            auto* source = dynamic_cast<IPaletteSource*>(palNode->node.get());
+            if (source == nullptr)
+               continue;
+            source->GetSwatch(src.swatchIndex, ref.value);
          }
       }
 

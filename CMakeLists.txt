@@ -44,6 +44,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/core/Mesh.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
+    src/core/Palette.cpp
     src/core/Patch.cpp
     src/platform/Platform.mm
     src/nodes/ImageSourceNode.cpp
@@ -62,6 +63,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/RemoveBgNode.cpp
     src/nodes/DrawNode.cpp
     src/nodes/RampNode.cpp
+    src/nodes/PaletteNode.cpp
     src/nodes/AnalyzeNodes.cpp
     src/nodes/Geometry3DNodes.cpp
     src/nodes/ModelSourceNode.cpp

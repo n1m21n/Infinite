@@ -211,6 +211,8 @@ public:
    size_t LastDrawCalls() const { return mLastDrawCalls; }
    // Slots that had to re-upload this frame; 0 means everything came from cache.
    size_t LastUploads() const { return mLastUploads; }
+   // Faces tinted by the selection overlay last frame, summed across slots.
+   size_t LastHighlighted() const { return mLastHighlighted; }
 
    float width = 1024.0f;
    float height = 1024.0f;
@@ -243,6 +245,17 @@ public:
    float bgOpacity = 1.0f;
    bool depthTest = true;
    bool backfaceCull = true;
+
+   // Tints the faces a Select node chose, so dialling in a selection is
+   // something you watch rather than infer from a triangle count.
+   //
+   // On by default and still a no-op for every patch that has no Select in it:
+   // a mesh that has never been through one carries an empty face mask, which
+   // means "all faces" everywhere else and is skipped outright here. Nothing
+   // renders differently until there is a selection to show.
+   bool highlightSelection = true;
+   float selectionColor[3] = { 1.0f, 0.42f, 0.12f };
+   float selectionOpacity = 0.55f;
 
    // Shadows. Rendered from the first directional or sun light, or from the
    // built-in light when none is patched in. Point lights are deliberately not
@@ -287,6 +300,9 @@ public:
       v.Color("bg", bgColor); v.Float("bgOpacity", bgOpacity);
       v.Bool("depthTest", depthTest); v.Bool("cull", backfaceCull);
       v.Int("samples", samples); v.Int("tonemap", tonemap); v.Float("exposure", exposure);
+      v.Bool("highlightSelection", highlightSelection);
+      v.Color("selectionColor", selectionColor);
+      v.Float("selectionOpacity", selectionOpacity);
       v.Bool("shadows", shadowsEnabled); v.Int("shadowQuality", shadowQuality);
       v.Float("shadowBias", shadowBias); v.Float("shadowSoftness", shadowSoftness);
       v.Float("shadowStrength", shadowStrength);
@@ -317,10 +333,25 @@ private:
       int instanceCount = 0;
       bool instanceAttribsOn = false;
       bool instanceColored = false;
+
+      // The selected faces as their own index buffer, in their own VAO. A
+      // second VAO rather than rebinding the element buffer on the first: the
+      // element binding is VAO state, so swapping it for the overlay would
+      // leave the main pass drawing the selection subset on the next frame.
+      //
+      // Built from the same mesh stamp as the vertices, so a Select whose
+      // parameters moved re-derives it and nothing else re-uploads.
+      unsigned int selVao = 0, selIbo = 0;
+      int selIndexCount = 0;
+      unsigned long long selRevision = 0;
+      bool selValid = false;
    };
 
    bool EnsureResources(int w, int h, int sampleCount);
    bool EnsureShader();
+   bool EnsureSelectionShader();
+   // Rebuilds gpu.selIbo from the mesh's face mask when the stamp has moved.
+   void UpdateSelectionBuffer(GpuMesh& gpu, const Mesh& mesh, unsigned long long revision);
    bool EnsureShadowResources(int size);
    bool EnsureShadowShader();
    void ReleaseGpuMesh(GpuMesh& gpu);
@@ -343,6 +374,8 @@ private:
 
    unsigned int mProgram = 0;
    bool mShaderTried = false;
+   unsigned int mSelectionProgram = 0;
+   bool mSelectionShaderTried = false;
    unsigned int mShadowProgram = 0;
    bool mShadowShaderTried = false;
    unsigned int mShadowFbo = 0;
@@ -354,4 +387,5 @@ private:
    size_t mLastTriangles = 0;
    size_t mLastDrawCalls = 0;
    size_t mLastUploads = 0;
+   size_t mLastHighlighted = 0;
 };

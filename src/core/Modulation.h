@@ -58,6 +58,12 @@ public:
 
    const std::map<Key, Source>& Links() const { return mLinks; }
 
+   // Dropping the whole graph must drop the bindings with it. Node indices
+   // restart from 1 on a new patch, so a link left over from the previous one
+   // does not go stale - it silently re-attaches to whichever node happens to
+   // land on that index next.
+   void Clear() { mLinks.clear(); }
+
    // Parameters registered during the current frame's node drawing.
    void ClearFrameParams() { mFrameParams.clear(); }
    void RegisterParam(const ParamRef& ref) { mFrameParams.push_back(ref); }

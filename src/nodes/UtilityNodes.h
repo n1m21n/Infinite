@@ -5,6 +5,36 @@
 
 #include "Geometry3DNodes.h"
 
+// --- Comment --------------------------------------------------------------
+// A free-floating annotation. Not part of the signal graph at all - no
+// inputs, no outputs, CookIfNeeded does nothing - so it can be dropped
+// anywhere on the canvas to label a section of a patch without affecting
+// anything downstream.
+class CommentNode : public INode
+{
+public:
+   static INode* Create() { return new CommentNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   // Empty on purpose: a fresh comment shows the prompt to write one rather
+   // than the word "Comment", which the node's own title already says.
+   std::string text;
+   float width = 260.0f;
+   float height = 140.0f;
+   float color[3] = { 0.95f, 0.85f, 0.45f };
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Text("text", text);
+      v.Float("width", width); v.Float("height", height);
+      v.Color("color", color);
+   }
+};
+
 // --- Group ------------------------------------------------------------------
 // A resizable backdrop that maps onto the node-editor library's own notion of
 // a "group" (see ax::NodeEditor::Group()): any node whose bounds currently sit

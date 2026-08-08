@@ -130,6 +130,28 @@ namespace
       return sTex;
    }
 
+   // Selection overlay. Deliberately unlit and untonemapped: the point is to
+   // read as an annotation rather than as a material, so it stays the same
+   // colour whichever way the face is turned to the light.
+   const char* kSelectVertSrc =
+      "#version 150\n"
+      "in vec3 aPos;\n"
+      "in mat4 aInstance;\n"
+      "uniform mat4 uModel;\n"
+      "uniform mat4 uViewProj;\n"
+      "uniform int uInstanced;\n"
+      "void main() {\n"
+      "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "   gl_Position = uViewProj * model * vec4(aPos, 1.0);\n"
+      "}\n";
+
+   const char* kSelectFragSrc =
+      "#version 150\n"
+      "out vec4 fragColor;\n"
+      "uniform vec3 uColor;\n"
+      "uniform float uOpacity;\n"
+      "void main() { fragColor = vec4(uColor, uOpacity); }\n";
+
    const char* kVertSrc =
       "#version 150\n"
       "in vec3 aPos;\n"
@@ -713,16 +735,127 @@ Render3DNode::~Render3DNode()
       ReleaseGpuMesh(mGpu[i]);
    if (mProgram != 0) glDeleteProgram(mProgram);
    if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
+   if (mSelectionProgram != 0) glDeleteProgram(mSelectionProgram);
 }
 
 void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
 {
    if (gpu.vbo != 0) glDeleteBuffers(1, &gpu.vbo);
    if (gpu.ibo != 0) glDeleteBuffers(1, &gpu.ibo);
+   if (gpu.selIbo != 0) glDeleteBuffers(1, &gpu.selIbo);
    if (gpu.instanceVbo != 0) glDeleteBuffers(1, &gpu.instanceVbo);
    if (gpu.instanceColorVbo != 0) glDeleteBuffers(1, &gpu.instanceColorVbo);
    if (gpu.vao != 0) glDeleteVertexArrays(1, &gpu.vao);
+   if (gpu.selVao != 0) glDeleteVertexArrays(1, &gpu.selVao);
    gpu = GpuMesh();
+}
+
+bool Render3DNode::EnsureSelectionShader()
+{
+   if (mSelectionShaderTried)
+      return mSelectionProgram != 0;
+   mSelectionShaderTried = true;
+
+   auto compile = [](GLenum type, const char* src) -> unsigned int {
+      unsigned int shader = glCreateShader(type);
+      glShaderSource(shader, 1, &src, nullptr);
+      glCompileShader(shader);
+      GLint ok = 0;
+      glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+      if (!ok)
+      {
+         char log[1024];
+         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+         fprintf(stderr, "Selection overlay shader error: %s\n", log);
+         glDeleteShader(shader);
+         return 0u;
+      }
+      return shader;
+   };
+
+   const unsigned int vert = compile(GL_VERTEX_SHADER, kSelectVertSrc);
+   const unsigned int frag = compile(GL_FRAGMENT_SHADER, kSelectFragSrc);
+   if (vert == 0 || frag == 0)
+      return false;
+
+   mSelectionProgram = glCreateProgram();
+   // Same attribute slots as the main program, so the overlay VAO is laid out
+   // identically and the instance buffer can be shared as-is.
+   glBindAttribLocation(mSelectionProgram, 0, "aPos");
+   glBindAttribLocation(mSelectionProgram, 3, "aInstance"); // occupies 3..6
+   glAttachShader(mSelectionProgram, vert);
+   glAttachShader(mSelectionProgram, frag);
+   glLinkProgram(mSelectionProgram);
+   glDeleteShader(vert);
+   glDeleteShader(frag);
+
+   GLint linked = 0;
+   glGetProgramiv(mSelectionProgram, GL_LINK_STATUS, &linked);
+   if (!linked)
+   {
+      char log[1024];
+      glGetProgramInfoLog(mSelectionProgram, sizeof(log), nullptr, log);
+      fprintf(stderr, "Selection overlay link error: %s\n", log);
+      glDeleteProgram(mSelectionProgram);
+      mSelectionProgram = 0;
+      return false;
+   }
+
+   return true;
+}
+
+void Render3DNode::UpdateSelectionBuffer(GpuMesh& gpu, const Mesh& mesh,
+                                         unsigned long long revision)
+{
+   if (gpu.selRevision == revision && gpu.selValid)
+      return;
+   gpu.selRevision = revision;
+   gpu.selIndexCount = 0;
+   gpu.selValid = false;
+
+   // An empty mask means "no Select upstream", which is a different thing from
+   // "a Select that chose nothing" - the first has nothing to annotate, and
+   // tinting the whole mesh for it would light up every existing patch.
+   if (mesh.faceMask.empty())
+      return;
+
+   const size_t faces = mesh.FaceCount();
+   std::vector<unsigned int> selected;
+   selected.reserve(faces * 3);
+   for (size_t f = 0; f < faces; f++)
+   {
+      // Read through the mask directly rather than FaceSelected(), whose
+      // empty-means-all rule is the case already excluded above.
+      if (f >= mesh.faceMask.size() || mesh.faceMask[f] == 0)
+         continue;
+      selected.push_back(mesh.indices[f * 3]);
+      selected.push_back(mesh.indices[f * 3 + 1]);
+      selected.push_back(mesh.indices[f * 3 + 2]);
+   }
+   if (selected.empty())
+   {
+      // Still valid: a selection of nothing is a real answer, and recomputing
+      // it every frame because the buffer came out empty would be a waste.
+      gpu.selValid = true;
+      return;
+   }
+
+   if (gpu.selVao == 0)
+      glGenVertexArrays(1, &gpu.selVao);
+   if (gpu.selIbo == 0)
+      glGenBuffers(1, &gpu.selIbo);
+
+   glBindVertexArray(gpu.selVao);
+   glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
+   glEnableVertexAttribArray(0);
+   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpu.selIbo);
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, selected.size() * sizeof(unsigned int),
+                selected.data(), GL_STATIC_DRAW);
+   glBindVertexArray(0);
+
+   gpu.selIndexCount = (int)selected.size();
+   gpu.selValid = true;
 }
 
 bool Render3DNode::EnsureShader()
@@ -1163,6 +1296,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       {
          gpu.meshRevision = 0;
          gpu.instanceRevision = 0;
+         gpu.selValid = false;
          gpu.source = source;
       }
 
@@ -1347,6 +1481,102 @@ void Render3DNode::CookIfNeeded(int frameId)
 
    glBindVertexArray(0);
    glUseProgram(0);
+
+   // --- selection overlay ---
+   // Drawn after the lit pass rather than folded into it: the alternative is a
+   // per-vertex selected flag, which would widen the vertex format for every
+   // mesh in the graph to annotate the few that carry a mask.
+   mLastHighlighted = 0;
+   if (highlightSelection && selectionOpacity > 0.001f && EnsureSelectionShader())
+   {
+      glUseProgram(mSelectionProgram);
+      glUniformMatrix4fv(glGetUniformLocation(mSelectionProgram, "uViewProj"), 1, GL_FALSE,
+                         viewProj.m);
+      glUniform3fv(glGetUniformLocation(mSelectionProgram, "uColor"), 1, selectionColor);
+      glUniform1f(glGetUniformLocation(mSelectionProgram, "uOpacity"),
+                  std::min(1.0f, std::max(0.0f, selectionOpacity)));
+
+      // The overlay is coplanar with the geometry it annotates, so an unmodified
+      // depth test would z-fight it into stipple. Pulling it a hair toward the
+      // camera and comparing with LEQUAL keeps it hidden behind anything genuinely
+      // in front while letting it win its own surface outright.
+      if (depthTest)
+      {
+         glDepthFunc(GL_LEQUAL);
+         glEnable(GL_POLYGON_OFFSET_FILL);
+         glPolygonOffset(-1.0f, -1.0f);
+      }
+      // Never written to the depth buffer: this is an annotation on top of the
+      // scene, and letting it occlude is not something a tint should do.
+      glDepthMask(GL_FALSE);
+
+      for (int i = 0; i < kSlots; i++)
+      {
+         IGeometrySource* source = geometry[i];
+         if (source == nullptr)
+            continue;
+         const Mesh& mesh = source->GetMesh();
+         if (mesh.Empty() || mesh.faceMask.empty())
+            continue;
+
+         GpuMesh& gpu = mGpu[i];
+         if (gpu.vao == 0 || gpu.vbo == 0)
+            continue;
+         UpdateSelectionBuffer(gpu, mesh, gpu.meshRevision);
+         if (gpu.selIndexCount == 0 || gpu.selVao == 0)
+            continue;
+
+         glBindVertexArray(gpu.selVao);
+
+         auto* instancer = dynamic_cast<InstanceOnPointsNode*>(source);
+         const bool instanced = instancer != nullptr && instancer->InstanceCount() > 0 &&
+                                gpu.instanceVbo != 0 && gpu.instanceCount > 0;
+         glUniform1i(glGetUniformLocation(mSelectionProgram, "uInstanced"), instanced ? 1 : 0);
+         if (instanced)
+         {
+            // Pointed at the buffer the main pass already filled, and re-pointed
+            // every frame rather than cached: this VAO is only touched when there
+            // is a selection to draw, so there is nothing to gain from tracking
+            // whether the instance buffer moved underneath it.
+            glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVbo);
+            for (int col = 0; col < 4; col++)
+            {
+               const unsigned int loc = 3 + col;
+               glEnableVertexAttribArray(loc);
+               glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
+                                     (void*)(size_t)(col * 4 * sizeof(float)));
+               glVertexAttribDivisor(loc, 1);
+            }
+         }
+
+         const Mat4 model = source->GetModelMatrix();
+         glUniformMatrix4fv(glGetUniformLocation(mSelectionProgram, "uModel"), 1, GL_FALSE,
+                            model.m);
+
+         if (instanced)
+         {
+            glDrawElementsInstanced(GL_TRIANGLES, gpu.selIndexCount, GL_UNSIGNED_INT,
+                                    nullptr, (GLsizei)gpu.instanceCount);
+            mLastHighlighted += (size_t)(gpu.selIndexCount / 3) * (size_t)gpu.instanceCount;
+         }
+         else
+         {
+            glDrawElements(GL_TRIANGLES, gpu.selIndexCount, GL_UNSIGNED_INT, nullptr);
+            mLastHighlighted += gpu.selIndexCount / 3;
+         }
+         mLastDrawCalls++;
+      }
+
+      glBindVertexArray(0);
+      glUseProgram(0);
+      glDepthMask(GL_TRUE);
+      if (depthTest)
+      {
+         glDisable(GL_POLYGON_OFFSET_FILL);
+         glPolygonOffset(0.0f, 0.0f);
+         glDepthFunc(GL_LESS);
+      }
+   }
 
    // Resolve the multisampled buffer down into the texture the graph reads.
    // Scissor is already off, which matters here: a blit is clipped by it too.

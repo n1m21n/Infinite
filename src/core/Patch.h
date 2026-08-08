@@ -26,6 +26,7 @@ class INode;
 //   cable <dstIndex> <dstSlot> <srcIndex>
 //   geo <dstIndex> <dstSlot> <srcIndex>
 //   mod <dstIndex> <dstParam> <srcIndex> <srcOutput>
+//   pal <dstIndex> <dstColor> <srcIndex> <srcSwatch>
 //
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
@@ -57,12 +58,22 @@ namespace Patch
       int srcOutput = 0;
    };
 
+   // A palette node driving one colour swatch on another node.
+   struct PaletteRecord
+   {
+      int dstIndex = 0;
+      int dstColor = 0;
+      int srcIndex = 0;
+      int srcSwatch = 0;
+   };
+
    struct Data
    {
       std::vector<NodeRecord> nodes;
       std::vector<CableRecord> cables;   // image cables
       std::vector<CableRecord> geometry; // geometry, camera and light pins
       std::vector<ModRecord> modulation;
+      std::vector<PaletteRecord> palette;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

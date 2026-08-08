@@ -55,11 +55,23 @@ namespace
       }
       void Text(const char* name, std::string& value) override
       {
-         // Newlines would break the line-based format, so they are folded to
-         // spaces rather than silently corrupting the following line.
-         std::string clean = value;
-         std::replace(clean.begin(), clean.end(), '\n', ' ');
-         std::replace(clean.begin(), clean.end(), '\r', ' ');
+         // A newline cannot go in raw - the format is one parameter per line,
+         // so it would be read back as the start of the next parameter. It is
+         // escaped rather than folded to a space because for a Comment the line
+         // breaks are the content, and because this same round trip is what
+         // undo/redo and copy/paste use: folding lost a comment's shape on the
+         // next undo, not just on the next save. Backslash is escaped too, so
+         // unescaping on load has exactly one reading.
+         std::string clean;
+         for (char c : value)
+         {
+            if (c == '\\')
+               clean += "\\\\";
+            else if (c == '\n')
+               clean += "\\n";
+            else if (c != '\r') // a lone CR carries nothing worth keeping
+               clean += c;
+         }
          out.push_back({ std::string("s ") + name, clean });
       }
       void Color(const char* name, float rgb[3]) override
@@ -99,8 +111,31 @@ namespace
       void Text(const char* name, std::string& value) override
       {
          auto it = values.find(std::string("s ") + name);
-         if (it != values.end())
-            value = it->second;
+         if (it == values.end())
+            return;
+         // Undoes Writer::Text. Any other escape is left exactly as written:
+         // patches saved before text was escaped at all never contain "\\n" or
+         // "\\\\", so they read back unchanged.
+         const std::string& raw = it->second;
+         std::string out;
+         for (size_t i = 0; i < raw.size(); i++)
+         {
+            if (raw[i] == '\\' && i + 1 < raw.size() && raw[i + 1] == 'n')
+            {
+               out += '\n';
+               i++;
+            }
+            else if (raw[i] == '\\' && i + 1 < raw.size() && raw[i + 1] == '\\')
+            {
+               out += '\\';
+               i++;
+            }
+            else
+            {
+               out += raw[i];
+            }
+         }
+         value = out;
       }
       void Color(const char* name, float rgb[3]) override
       {
@@ -160,6 +195,9 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
    for (const ModRecord& m : data.modulation)
       file << "mod " << m.dstIndex << " " << m.dstParam << " "
            << m.srcIndex << " " << m.srcOutput << "\n";
+   for (const PaletteRecord& p : data.palette)
+      file << "pal " << p.dstIndex << " " << p.dstColor << " "
+           << p.srcIndex << " " << p.srcSwatch << "\n";
 
    if (!file.good())
    {
@@ -266,6 +304,12 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          ModRecord m;
          in >> m.dstIndex >> m.dstParam >> m.srcIndex >> m.srcOutput;
          outData.modulation.push_back(m);
+      }
+      else if (tag == "pal")
+      {
+         PaletteRecord p;
+         in >> p.dstIndex >> p.dstColor >> p.srcIndex >> p.srcSwatch;
+         outData.palette.push_back(p);
       }
       // Anything else is from a newer version and is deliberately ignored.
    }
