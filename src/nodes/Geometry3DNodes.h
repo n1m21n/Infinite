@@ -44,6 +44,30 @@ enum MaterialMap
    kMapCount
 };
 
+// Which coordinates a Mapping node's offset/rotation/scale are applied to,
+// mirroring Blender's Texture Coordinate node. UV is the mesh's own baked
+// per-vertex UV (what every material map samples with today). Generated is
+// the vertex position normalised into its mesh's own object-space bounding
+// box, so a texture tiles consistently across an object no matter how it was
+// unwrapped. Object is the raw, unnormalised local-space position.
+enum MappingSpace
+{
+   kMapSpaceUv = 0,
+   kMapSpaceGenerated,
+   kMapSpaceObject
+};
+
+// Offset/rotation/scale applied to whichever coordinate space a Mapping node
+// picked, before a material map samples it. Identity by default so a source
+// with no Mapping patched in front of it renders exactly as it always did.
+struct MappingTransform
+{
+   int space = kMapSpaceUv;
+   float translate[3] = { 0.0f, 0.0f, 0.0f };
+   float rotate[3] = { 0.0f, 0.0f, 0.0f }; // radians
+   float scale[3] = { 1.0f, 1.0f, 1.0f };
+};
+
 class IGeometrySource
 {
 public:
@@ -68,6 +92,9 @@ public:
    {
       return map == kMapAlbedo ? GetSurfaceTexture() : 0;
    }
+   // How material maps are looked up on the surface. Identity/UV by default,
+   // so nothing changes for a chain with no Mapping node in it.
+   virtual MappingTransform GetMappingTransform() const { return MappingTransform(); }
 };
 
 // --- Geometry -----------------------------------------------------------

@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 // Minimal GL FBO / shader-pass helpers, ported from BespokeSynth's VizGL.
 // Targets OpenGL 3.2 core profile (matches Bespoke's macOS context) using plain
@@ -35,4 +36,14 @@ namespace GLUtil
    // Draws `tex` as a fullscreen quad into whatever framebuffer is currently
    // bound (used to blit the final node's output to the window).
    void DrawTextureToScreen(unsigned int tex, int windowW, int windowH);
+
+   // Reads an existing GPU texture's pixels back to the CPU as RGBA floats,
+   // for nodes that need to sample a texture per-vertex rather than per-pixel
+   // (e.g. displacing a mesh). `scratchFbo` is a caller-owned, lazily-created
+   // framebuffer name reused across calls; `srcTex` is attached to it
+   // temporarily rather than copied, so this does not take ownership of it.
+   // Call once per texture change, not per vertex - a glReadPixels per vertex
+   // would serialise the whole pipeline instead of one readback per rebuild.
+   bool ReadTexturePixels(unsigned int& scratchFbo, unsigned int srcTex, int w, int h,
+                          std::vector<float>& outRGBA);
 }

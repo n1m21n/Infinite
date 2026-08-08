@@ -167,6 +167,7 @@ namespace
       "uniform mat4 uLightViewProj;\n"
       "out vec4 vLightSpacePos;\n"
       "out vec3 vWorldPos;\n"
+      "out vec3 vLocalPos;\n"
       "out vec3 vNormal;\n"
       "out vec2 vUv;\n"
       "out vec3 vInstanceColor;\n"
@@ -174,6 +175,7 @@ namespace
       "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
       "   vec4 world = model * vec4(aPos, 1.0);\n"
       "   vWorldPos = world.xyz;\n"
+      "   vLocalPos = aPos;\n"
       "   vNormal = (uInstanced == 1)\n"
       "      ? normalize(mat3(model) * aNormal)\n"
       "      : normalize(uNormalMatrix * aNormal);\n"
@@ -188,6 +190,7 @@ namespace
    const char* kFragSrc =
       "#version 150\n"
       "in vec3 vWorldPos;\n"
+      "in vec3 vLocalPos;\n"
       "in vec3 vNormal;\n"
       "in vec2 vUv;\n"
       "in vec3 vInstanceColor;\n"
@@ -217,6 +220,16 @@ namespace
       "uniform int uHasNormalMap;\n"
       "uniform int uHasAoMap;\n"
       "uniform float uNormalStrength;\n"
+      // Mapping: which coordinate space the material maps sample (UV /
+      // Generated / Object) and the offset/rotation/scale applied to it before
+      // lookup. uObjLo/uObjHi are the mesh's own object-space bounds, needed to
+      // normalise Generated coordinates into the mesh's own box.
+      "uniform int uMapSpace;\n"
+      "uniform vec3 uMapTranslate;\n"
+      "uniform vec3 uMapRotate;\n"
+      "uniform vec3 uMapScale;\n"
+      "uniform vec3 uObjLo;\n"
+      "uniform vec3 uObjHi;\n"
       "uniform float uExposure;\n"
       "uniform int uTonemap;\n"
       "uniform vec3 uEmissionColor;\n"
@@ -344,6 +357,42 @@ namespace
       "   return f0 + (ceiling - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);\n"
       "}\n"
       "\n"
+      "vec3 mapRotate(vec3 p, vec3 r) {\n"
+      "   float cx = cos(r.x), sx = sin(r.x);\n"
+      "   float cy = cos(r.y), sy = sin(r.y);\n"
+      "   float cz = cos(r.z), sz = sin(r.z);\n"
+      "   p = vec3(p.x, cx * p.y - sx * p.z, sx * p.y + cx * p.z);\n"
+      "   p = vec3(cy * p.x + sy * p.z, p.y, -sy * p.x + cy * p.z);\n"
+      "   p = vec3(cz * p.x - sz * p.y, sz * p.x + cz * p.y, p.z);\n"
+      "   return p;\n"
+      "}\n"
+      "\n"
+      // Where a material map actually samples. UV space stays the mesh's own
+      // baked 2D UV, offset/rotated/scaled in place - the direct equivalent of
+      // Blender's Mapping node feeding an Image Texture set to UV. Generated
+      // and Object are 3D coordinates, so a single sampler2D lookup needs a 2D
+      // projection: this picks whichever of the three axis planes best faces
+      // the surface normal (a box/triplanar pick, one tap, no blending), which
+      // is what gives a primitive like a cube correct, unstretched orientation
+      // per face instead of one plane smeared across every side.
+      "vec2 computeMapUv(vec3 n) {\n"
+      "   vec3 base;\n"
+      "   if (uMapSpace == 1) {\n"
+      "      vec3 size = max(uObjHi - uObjLo, vec3(1e-5));\n"
+      "      base = (vLocalPos - uObjLo) / size;\n"
+      "   } else if (uMapSpace == 2) {\n"
+      "      base = vLocalPos;\n"
+      "   } else {\n"
+      "      base = vec3(vUv, 0.0);\n"
+      "   }\n"
+      "   base = mapRotate(base * uMapScale, uMapRotate) + uMapTranslate;\n"
+      "   if (uMapSpace == 0) return base.xy;\n"
+      "   vec3 an = abs(n);\n"
+      "   if (an.x >= an.y && an.x >= an.z) return base.yz;\n"
+      "   if (an.y >= an.x && an.y >= an.z) return base.xz;\n"
+      "   return base.xy;\n"
+      "}\n"
+      "\n"
       "void main() {\n"
       "   vec3 n = normalize(vNormal);\n"
       // Normals and UVs are data being visualised, not light - they must not be
@@ -351,21 +400,22 @@ namespace
       "   if (uShading == 1) { fragColor = vec4(n * 0.5 + 0.5, uOpacity); return; }\n"
       "   if (uShading == 2) { fragColor = vec4(vUv, 0.0, uOpacity); return; }\n"
       "\n"
+      "   vec2 mapUv = computeMapUv(n);\n"
       "   vec3 base = toLinear(uBaseColor) * vInstanceColor;\n"
-      "   if (uHasTexture == 1) base *= toLinear(texture(uTexture, vUv).rgb);\n"
+      "   if (uHasTexture == 1) base *= toLinear(texture(uTexture, mapUv).rgb);\n"
       "   if (uShading == 3) { fragColor = vec4(toSrgb(base), uOpacity); return; }\n"
       "\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
       // Maps multiply the slider rather than replacing it, so the slider stays
       // the overall level and the map is the variation across the surface.
       "   float rough = uRoughness;\n"
-      "   if (uHasRoughnessMap == 1) rough *= texture(uRoughnessMap, vUv).r;\n"
+      "   if (uHasRoughnessMap == 1) rough *= texture(uRoughnessMap, mapUv).r;\n"
       "   rough = clamp(rough, 0.045, 1.0);\n"
       "   float metal = uMetallic;\n"
-      "   if (uHasMetallicMap == 1) metal *= texture(uMetallicMap, vUv).r;\n"
+      "   if (uHasMetallicMap == 1) metal *= texture(uMetallicMap, mapUv).r;\n"
       "   metal = clamp(metal, 0.0, 1.0);\n"
-      "   if (uHasNormalMap == 1) n = applyNormalMap(n, viewDir, vUv);\n"
-      "   float ao = (uHasAoMap == 1) ? texture(uAoMap, vUv).r : 1.0;\n"
+      "   if (uHasNormalMap == 1) n = applyNormalMap(n, viewDir, mapUv);\n"
+      "   float ao = (uHasAoMap == 1) ? texture(uAoMap, mapUv).r : 1.0;\n"
       "   float nDotV = max(dot(n, viewDir), 1e-4);\n"
       // Dielectrics reflect ~4% head-on; metals reflect their own albedo and
       // have no diffuse lobe at all.
@@ -1376,6 +1426,22 @@ void Render3DNode::CookIfNeeded(int frameId)
          auto* asMaterial = dynamic_cast<MaterialNode*>(source);
          glUniform1f(glGetUniformLocation(mProgram, "uNormalStrength"),
                      asMaterial ? asMaterial->normalStrength : 1.0f);
+      }
+
+      {
+         const MappingTransform mapping = source->GetMappingTransform();
+         glUniform1i(glGetUniformLocation(mProgram, "uMapSpace"), mapping.space);
+         glUniform3fv(glGetUniformLocation(mProgram, "uMapTranslate"), 1, mapping.translate);
+         glUniform3fv(glGetUniformLocation(mProgram, "uMapRotate"), 1, mapping.rotate);
+         glUniform3fv(glGetUniformLocation(mProgram, "uMapScale"), 1, mapping.scale);
+         // Object-space bounds computed at upload time, so Generated coordinates
+         // normalise into this mesh's own box rather than a hardcoded -1..1.
+         static const float kFallbackLo[3] = { -1.0f, -1.0f, -1.0f };
+         static const float kFallbackHi[3] = { 1.0f, 1.0f, 1.0f };
+         glUniform3fv(glGetUniformLocation(mProgram, "uObjLo"), 1,
+                      gpu.hasBounds ? gpu.lo : kFallbackLo);
+         glUniform3fv(glGetUniformLocation(mProgram, "uObjHi"), 1,
+                      gpu.hasBounds ? gpu.hi : kFallbackHi);
       }
 
       // Instanced sources upload a transform per copy and draw them all at

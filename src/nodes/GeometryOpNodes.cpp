@@ -1,7 +1,10 @@
 #include "GeometryOpNodes.h"
 
+#include <OpenGL/gl3.h>
 #include <algorithm>
 #include <cmath>
+
+#include "GLUtil.h"
 
 namespace
 {
@@ -182,6 +185,119 @@ void GeometryOpNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
+}
+
+// ======================================================== Displacement
+
+DisplacementNode::~DisplacementNode()
+{
+   if (mReadFbo != 0)
+      glDeleteFramebuffers(1, &mReadFbo);
+}
+
+DisplacementNode::Signature DisplacementNode::CurrentSignature() const
+{
+   Signature s;
+   s.mode = mode;
+   s.strength = strength;
+   s.midlevel = midlevel;
+   s.flat = flatShade;
+   s.flip = flipNormals;
+   s.upstream = input;
+   s.upstreamRevision = input ? input->MeshRevision() : 0;
+   s.texGeneration = mTexGeneration;
+   return s;
+}
+
+const Mesh& DisplacementNode::GetMesh()
+{
+   if (input == nullptr)
+      return kEmptyMesh;
+   if (bypassed)
+      return input->GetMesh();
+
+   const Signature sig = CurrentSignature();
+   if (mHasBuilt && sig == mBuilt)
+      return mCache;
+
+   const Mesh& src = input->GetMesh();
+   mCache = MeshOps::Displace(src, mTexPixels, mTexW, mTexH, mode, strength, midlevel,
+                              flatShade, flipNormals);
+
+   mBuilt = sig;
+   mHasBuilt = true;
+   mMeshRevision = NextMeshRevision();
+   return mCache;
+}
+
+unsigned long long DisplacementNode::MeshRevision()
+{
+   if (input == nullptr)
+      return 0;
+   if (bypassed)
+      return input->MeshRevision();
+   GetMesh();
+   return mMeshRevision;
+}
+
+Material DisplacementNode::GetMaterial() const
+{
+   if (inheritMaterial && input != nullptr)
+      return input->GetMaterial();
+
+   Material m;
+   m.color[0] = color[0]; m.color[1] = color[1]; m.color[2] = color[2];
+   m.metallic = metallic;
+   m.roughness = roughness;
+   m.opacity = opacity;
+   m.shading = shading;
+   m.emissionColor[0] = emissionColor[0];
+   m.emissionColor[1] = emissionColor[1];
+   m.emissionColor[2] = emissionColor[2];
+   m.emission = emission;
+   return m;
+}
+
+unsigned int DisplacementNode::GetSurfaceTexture()
+{
+   return input ? input->GetSurfaceTexture() : 0;
+}
+
+void DisplacementNode::CookIfNeeded(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   mLastCookFrame = frameId;
+   if (auto* upstream = dynamic_cast<INode*>(input))
+      upstream->CookIfNeeded(frameId);
+
+   if (mTextureInput.IsConnected())
+   {
+      const unsigned int tex = mTextureInput.Pull(frameId);
+      const int w = mTextureInput.Width();
+      const int h = mTextureInput.Height();
+      if (tex != 0 && w > 0 && h > 0 &&
+          GLUtil::ReadTexturePixels(mReadFbo, tex, w, h, mTexPixels))
+      {
+         mTexW = w; mTexH = h;
+      }
+      else
+      {
+         mTexPixels.clear();
+         mTexW = mTexH = 0;
+      }
+      // Bumped every frame the texture is patched in - an animated source
+      // (Noise with time, Voronoi with a modulated seed) needs the mesh to
+      // rebuild every frame it changes, and there is no per-texture revision
+      // stamp to compare against instead.
+      mTexGeneration++;
+   }
+   else if (mTexW != 0 || mTexH != 0)
+   {
+      mTexPixels.clear();
+      mTexW = mTexH = 0;
+      mTexGeneration++;
+   }
 }
 
 // ===================================================== Instance on Points

@@ -60,7 +60,10 @@ void FilterNode::CookIfNeeded(int frameId)
 
    unsigned int srcTex = mInput.Pull(frameId);
    if (srcTex == 0)
+   {
+      GLUtil::DestroyFbo(mOut);
       return;
+   }
    unsigned int srcTex2 = (mDef.inputs > 1) ? mInput2.Pull(frameId) : 0;
 
    if (!EnsureShader())

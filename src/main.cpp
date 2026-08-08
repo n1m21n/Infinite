@@ -45,11 +45,13 @@
 #include "nodes/FitNode.h"
 #include "nodes/VideoSourceNode.h"
 #include "nodes/NoiseNode.h"
+#include "nodes/TextureNode.h"
 #include "nodes/ResynthNode.h"
 #include "nodes/MacroNodes.h"
 #include "nodes/CurvesNode.h"
 #include "nodes/RemoveBgNode.h"
 #include "nodes/RampNode.h"
+#include "nodes/ColorRampNode.h"
 #include "nodes/PaletteNode.h"
 #include "nodes/AnalyzeNodes.h"
 #include "nodes/Geometry3DNodes.h"
@@ -155,6 +157,7 @@ namespace
    // rather than the menu reaching into the editor from outside it.
    bool gRequestGroup = false;
    bool gRequestUngroup = false;
+   int gContextMenuNodeIndex = -1; // node the right-click context menu is open for
    // The node browser lives in a docked panel rather than only the canvas popup,
    // so modules can be found without knowing the double-click gesture exists.
    bool gNodePanelOpen = false;
@@ -505,6 +508,58 @@ namespace
       ImGui::PopID();
    }
 
+   // A node with its params collapsed draws no param or colour pins, and a link
+   // pointing at an undeclared pin is dead to the editor - so every cable feeding
+   // a collapsed node used to vanish the moment the eye was closed, even though
+   // the binding was still live and driving the value.
+   //
+   // Declare a stub pin for each bound parameter/colour instead, all stacked on
+   // the collapsed "mod"/"pal" tag. The pins are 1px and invisible; they exist
+   // purely so the cable has somewhere to land, and they make the tag itself the
+   // node's collapsed landing point.
+   void CollapsedBindingPins(int nodeIndex, const ImVec2& tagMin, const ImVec2& tagMax, bool colors)
+   {
+      const ImVec2 anchor((tagMin.x + tagMax.x) * 0.5f, (tagMin.y + tagMax.y) * 0.5f);
+      const ImVec2 restoreCursor = ImGui::GetCursorScreenPos();
+
+      auto stub = [&](int pinId)
+      {
+         ImGui::SetCursorScreenPos(ImVec2(anchor.x - 0.5f, anchor.y - 0.5f));
+         ed::BeginPin(pinId, ed::PinKind::Input);
+         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+         ImGui::Dummy(ImVec2(1.0f, 1.0f));
+         ed::EndPin();
+      };
+
+      if (colors)
+      {
+         for (const auto& link : PaletteBinding::Instance().Links())
+         {
+            if (link.first.first != nodeIndex)
+               continue;
+            const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kColorBase + link.first.second;
+            gDrawnColorPins.insert(pinId);
+            stub(pinId);
+         }
+      }
+      else
+      {
+         for (const auto& link : Modulation::Instance().Links())
+         {
+            if (link.first.first != nodeIndex)
+               continue;
+            const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kParamBase + link.first.second;
+            gDrawnParamPins.insert(pinId);
+            stub(pinId);
+         }
+      }
+
+      // The stubs are placed out of layout order, so hand the cursor back where
+      // the tag row left it. Call this only once the whole row is drawn: nothing
+      // after it may rely on SameLine().
+      ImGui::SetCursorScreenPos(restoreCursor);
+   }
+
 
    // ImGui's Separator / SeparatorText span the available content width, and
    // inside a node that width is unbounded - the rule shot off across the whole
@@ -649,6 +704,7 @@ namespace
       REGISTER_NODE(TextNode, Text, "Text");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
+      REGISTER_NODE(TextureNode, Texture, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
       REGISTER_NODE(GeometryNode, Geometry, "3D");
       // Every primitive as its own searchable node, sharing one class.
@@ -663,6 +719,8 @@ namespace
       REGISTER_NODE(Null3DNode, Null 3D, "3D");
       REGISTER_NODE(OceanNode, Ocean, "3D");
       REGISTER_NODE(MaterialNode, Material, "3D");
+      REGISTER_NODE(DisplacementNode, Displacement, "3D");
+      REGISTER_NODE(MappingNode, Mapping, "3D");
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
       REGISTER_NODE(ClothNode, Cloth, "3D");
       REGISTER_NODE(JoinGeometryNode, Join Geometry, "3D");
@@ -705,6 +763,7 @@ namespace
       REGISTER_NODE(NullNode, Null, "Compositing");
       REGISTER_NODE(ViewportNode, Viewport, "Compositing");
       REGISTER_NODE(CurvesNode, Curves, "Color");
+      REGISTER_NODE(ColorRampNode, Color Ramp, "Color");
       REGISTER_NODE(RemoveBgNode, Remove Background, "Mask");
       REGISTER_NODE(FeedbackNode, Feedback, "Feedback");
       REGISTER_NODE(TrailsNode, Trails, "Feedback");
@@ -785,6 +844,8 @@ namespace
          return 1;
       if (dynamic_cast<CurvesNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<ColorRampNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<RemoveBgNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<DrawNode*>(gn.node.get()) != nullptr)
@@ -804,6 +865,8 @@ namespace
       if (dynamic_cast<NullNode*>(gn.node.get()) != nullptr)
          return 1; // also covers Viewport, which derives from it
       if (dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<MappingNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
          return 1;
@@ -827,6 +890,8 @@ namespace
          return Render3DNode::kSlots + 1 + Render3DNode::kLightSlots; // geo, camera, lights
       if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr)
+         return 2; // geometry, then the displacement texture
       if (dynamic_cast<InstanceOnPointsNode*>(gn.node.get()) != nullptr)
          return 3; // points, shape, cloud
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
@@ -862,6 +927,8 @@ namespace
          return slot == 0 ? &i2p->Input() : nullptr;
       if (auto* curves = dynamic_cast<CurvesNode*>(gn.node.get()))
          return slot == 0 ? &curves->Input() : nullptr;
+      if (auto* cramp = dynamic_cast<ColorRampNode*>(gn.node.get()))
+         return slot == 0 ? &cramp->Input() : nullptr;
       if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn.node.get()))
          return slot == 0 ? &rbg->Input() : nullptr;
       if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
@@ -882,6 +949,10 @@ namespace
       // rest are the material channels in MaterialMap order.
       if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
          return (slot >= 1 && slot <= kMapCount) ? &mat->MapInput(slot - 1) : nullptr;
+      // Slot 0 is the geometry pin, wired by pointer in ConnectGeometrySlot;
+      // slot 1 is the height/vector displacement texture.
+      if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
+         return slot == 1 ? &disp->TextureInput() : nullptr;
       if (auto* geo = dynamic_cast<GeometryNode*>(gn.node.get()))
          return slot == 0 ? &geo->TextureInput() : nullptr;
       if (auto* fb = dynamic_cast<FeedbackNode*>(gn.node.get()))
@@ -916,7 +987,9 @@ namespace
          return;
       }
       if (auto* op = dynamic_cast<GeometryOpNode*>(dst.node.get())) { op->input = geo; return; }
+      if (auto* disp = dynamic_cast<DisplacementNode*>(dst.node.get())) { if (slot == 0) disp->input = geo; return; }
       if (auto* n3d = dynamic_cast<Null3DNode*>(dst.node.get())) { n3d->input = geo; return; }
+      if (auto* mapn = dynamic_cast<MappingNode*>(dst.node.get())) { mapn->input = geo; return; }
       if (auto* mat = dynamic_cast<MaterialNode*>(dst.node.get())) { mat->input = geo; return; }
       if (auto* m2p = dynamic_cast<MeshToPointsNode*>(dst.node.get())) { m2p->input = geo; return; }
       if (auto* mrs = dynamic_cast<MeshResynthNode*>(dst.node.get())) { mrs->input = geo; return; }
@@ -1267,6 +1340,72 @@ namespace
       ModSlider("seed", &n->seed, 0.0f, 100.0f);
       ImGui::Checkbox("rgb noise", &n->colorNoise);
       if (!n->colorNoise)
+      {
+         ColorSwatch("low", n->lowColor, n);
+         ColorSwatch("high", n->highColor, n);
+      }
+   }
+
+   void DrawTextureParams(TextureNode* n)
+   {
+      DropdownButton("type", TextureNode::TypeNames(), n->textureType, [n](int i) { n->textureType = i; });
+      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModSlider("scale", &n->scale, 0.5f, 60.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+
+      if (n->textureType == 0) // Voronoi
+      {
+         DropdownButton("distance", TextureNode::VoronoiDistanceNames(), n->voronoiDistance, [n](int i) { n->voronoiDistance = i; });
+         DropdownButton("feature", TextureNode::VoronoiFeatureNames(), n->voronoiFeature, [n](int i) { n->voronoiFeature = i; });
+         if (n->voronoiDistance == 3)
+            ModSlider("minkowski exponent", &n->voronoiMinkowskiExponent, 0.1f, 8.0f);
+         if (n->voronoiFeature == 2)
+            ModSlider("smoothness", &n->voronoiSmoothness, 0.001f, 1.0f);
+         ModSlider("randomness", &n->voronoiRandomness, 0.0f, 1.0f);
+         ImGui::Checkbox("cell color", &n->voronoiCellColor);
+      }
+      else if (n->textureType == 1) // Brick
+      {
+         ModSlider("brick width", &n->brickWidth, 0.05f, 2.0f);
+         ModSlider("row height", &n->brickHeight, 0.05f, 2.0f);
+         ModSlider("row offset", &n->brickRowOffset, 0.0f, 1.0f);
+         ModSlider("mortar size", &n->brickMortarSize, 0.0f, 0.2f);
+         ModSlider("mortar smooth", &n->brickMortarSmooth, 0.0f, 1.0f);
+         ModSlider("bias", &n->brickBias, -0.5f, 0.5f);
+         ColorSwatch("mortar", n->mortarColor, n);
+      }
+      else if (n->textureType == 2) // Magic
+      {
+         ModSlider("depth", &n->magicDepth, 1.0f, 10.0f, "%.0f");
+         ModSlider("distortion", &n->magicDistortion, 0.0f, 4.0f);
+      }
+      else if (n->textureType == 3) // Wave
+      {
+         DropdownButton("wave type", TextureNode::WaveTypeNames(), n->waveType, [n](int i) { n->waveType = i; });
+         if (n->waveType == 0)
+            DropdownButton("bands direction", TextureNode::WaveBandsDirectionNames(), n->waveBandsDirection, [n](int i) { n->waveBandsDirection = i; });
+         DropdownButton("profile", TextureNode::WaveProfileNames(), n->waveProfile, [n](int i) { n->waveProfile = i; });
+         ModSlider("distortion", &n->waveDistortion, 0.0f, 4.0f);
+         ModSlider("detail", &n->waveDetail, 1.0f, 8.0f, "%.0f");
+         ModSlider("detail scale", &n->waveDetailScale, 0.1f, 8.0f);
+         ModSlider("phase offset", &n->wavePhaseOffset, 0.0f, 1.0f);
+      }
+      else // Musgrave
+      {
+         DropdownButton("musgrave type", TextureNode::MusgraveTypeNames(), n->musgraveType, [n](int i) { n->musgraveType = i; });
+         ModSlider("dimension", &n->musgraveDimension, 0.0f, 4.0f);
+         ModSlider("lacunarity", &n->musgraveLacunarity, 1.001f, 6.0f);
+         ModSlider("octaves", &n->musgraveOctaves, 1.0f, 8.0f, "%.0f");
+         if (n->musgraveType == 3)
+            ModSlider("gain", &n->musgraveGain, 0.0f, 4.0f);
+         if (n->musgraveType >= 2)
+            ModSlider("offset", &n->musgraveOffset, 0.0f, 4.0f);
+      }
+
+      ModSlider("contrast", &n->contrast, 0.1f, 4.0f);
+      ModSlider("brightness", &n->brightness, -0.5f, 0.5f);
+      if (n->textureType != 1 && !(n->textureType == 0 && n->voronoiCellColor) && n->textureType != 2)
       {
          ColorSwatch("low", n->lowColor, n);
          ColorSwatch("high", n->highColor, n);
@@ -1821,6 +1960,147 @@ namespace
       }
    }
 
+   // Gradient-tool-style stop editor: drag a marker to reposition, click empty
+   // track to add a stop (seeded with the color already showing there), right
+   // click a marker to remove it. Position isn't run through ModSlider like
+   // RampNode's - dragging on the bar is the primary interaction, and it would
+   // otherwise fight the drag for control of the same float every frame.
+   void DrawColorRampEditor(ColorRampNode* n)
+   {
+      const float size = kPreviewSize;
+      const float barH = 26.0f;
+      const float trackH = 22.0f;
+      const float gap = 4.0f;
+
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      // gradient preview strip
+      const int kSegments = 96;
+      for (int i = 0; i < kSegments; i++)
+      {
+         float t0 = (float)i / kSegments;
+         float t1 = (float)(i + 1) / kSegments;
+         float c0[3], c1[3];
+         n->Evaluate(t0, c0);
+         n->Evaluate(t1, c1);
+         ImVec2 tl(origin.x + t0 * size, origin.y);
+         ImVec2 br(origin.x + t1 * size + 1.0f, origin.y + barH);
+         ImU32 col0 = IM_COL32((int)(c0[0] * 255), (int)(c0[1] * 255), (int)(c0[2] * 255), 255);
+         ImU32 col1 = IM_COL32((int)(c1[0] * 255), (int)(c1[1] * 255), (int)(c1[2] * 255), 255);
+         dl->AddRectFilledMultiColor(tl, br, col0, col1, col1, col0);
+      }
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(70, 74, 90, 255), 3.0f);
+
+      // stop track
+      ImVec2 trackOrigin(origin.x, origin.y + barH + gap);
+      ImVec2 trackBr(origin.x + size, trackOrigin.y + trackH);
+      dl->AddRectFilled(trackOrigin, trackBr, IM_COL32(16, 16, 22, 255), 3.0f);
+      dl->AddRect(trackOrigin, trackBr, IM_COL32(70, 74, 90, 255), 3.0f);
+
+      ImGui::SetCursorScreenPos(trackOrigin);
+      ImGui::InvisibleButton("##colorramp", ImVec2(size, trackH));
+      const bool hovered = ImGui::IsItemHovered();
+      const bool active = ImGui::IsItemActive();
+
+      auto toScreenX = [&](float x) { return trackOrigin.x + x * size; };
+      auto toX = [&](float screenX) {
+         return std::min(1.0f, std::max(0.0f, (screenX - trackOrigin.x) / size));
+      };
+
+      static ColorRampNode* sDragNode = nullptr;
+      static int sDragIndex = -1;
+      static ColorRampNode* sSelNode = nullptr;
+      static int sSelIndex = -1;
+
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      int nearest = -1;
+      float nearestDist = 10.0f;
+      for (int i = 0; i < n->stopCount; i++)
+      {
+         float d = std::fabs(toScreenX(n->stopPos[i]) - mouse.x);
+         if (d < nearestDist)
+         {
+            nearestDist = d;
+            nearest = i;
+         }
+      }
+
+      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      {
+         PushUndoCheckpoint();
+         if (nearest >= 0)
+         {
+            sDragIndex = nearest;
+         }
+         else
+         {
+            float x = toX(mouse.x);
+            float seedColor[3];
+            n->Evaluate(x, seedColor);
+            sDragIndex = n->AddStop(x, seedColor);
+         }
+         sDragNode = n;
+         sSelNode = n;
+         sSelIndex = sDragIndex;
+      }
+      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && nearest >= 0)
+      {
+         PushUndoCheckpoint();
+         n->RemoveStop(nearest);
+         if (sSelNode == n && sSelIndex == nearest)
+            sSelIndex = -1;
+      }
+      if (active && sDragNode == n && sDragIndex >= 0)
+         n->MoveStop(sDragIndex, toX(mouse.x));
+      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+      {
+         sDragIndex = -1;
+         sDragNode = nullptr;
+      }
+      if (sSelNode == n && sSelIndex >= n->stopCount)
+         sSelIndex = -1;
+
+      for (int i = 0; i < n->stopCount; i++)
+      {
+         float x = toScreenX(n->stopPos[i]);
+         const bool isSel = (sSelNode == n && sSelIndex == i);
+         ImU32 fill = IM_COL32((int)(n->stopColor[i][0] * 255), (int)(n->stopColor[i][1] * 255),
+                               (int)(n->stopColor[i][2] * 255), 255);
+         float r = (i == nearest || isSel) ? 7.0f : 5.5f;
+         ImVec2 tip(x, trackOrigin.y + 2.0f);
+         dl->AddTriangleFilled(ImVec2(x - r, tip.y + r * 1.6f), ImVec2(x + r, tip.y + r * 1.6f), tip,
+                               isSel ? IM_COL32(255, 220, 120, 255) : IM_COL32(220, 224, 236, 255));
+         ImVec2 chipTl(x - r * 0.6f, tip.y + r * 1.6f + 1.0f);
+         dl->AddRectFilled(chipTl, ImVec2(chipTl.x + r * 1.2f, chipTl.y + 5.0f), fill);
+      }
+
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, trackBr.y + gap));
+
+      if (sSelNode == n && sSelIndex >= 0 && sSelIndex < n->stopCount)
+      {
+         ImGui::PushID(sSelIndex + 20000);
+         char label[24];
+         snprintf(label, sizeof(label), "stop %d color", sSelIndex + 1);
+         ColorSwatch(label, n->stopColor[sSelIndex], n);
+         n->MarkDirty();
+         ImGui::PopID();
+      }
+      else
+      {
+         ImGui::TextDisabled("click a stop to edit its color");
+      }
+   }
+
+   void DrawColorRampParams(ColorRampNode* n)
+   {
+      DrawColorRampEditor(n);
+      ImGui::TextDisabled("drag to move, click to add, right-click to remove");
+      DropdownButton("interpolation", ColorRampNode::InterpNames(), n->interpMode,
+                     [n](int i) { PushUndoCheckpoint(); n->interpMode = i; n->MarkDirty(); });
+      ModSlider("mix", &n->mix, 0.0f, 1.0f);
+   }
+
    void DrawImageAnalyzeParams(ImageAnalyzeNode* n)
    {
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -2225,6 +2505,36 @@ namespace
       ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
+   void DrawMappingParams(MappingNode* n)
+   {
+      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      DropdownButton("space", MappingNode::SpaceNames(), n->space, [n](int i) { n->space = i; });
+
+      NodeSeparator("translate");
+      ModSlider("x", &n->translateX, -4.0f, 4.0f);
+      ModSlider("y", &n->translateY, -4.0f, 4.0f);
+      if (n->space != kMapSpaceUv)
+         ModSlider("z", &n->translateZ, -4.0f, 4.0f);
+
+      NodeSeparator("rotate");
+      if (n->space == kMapSpaceUv)
+      {
+         ModSlider("z", &n->rotateZ, -3.1416f, 3.1416f);
+      }
+      else
+      {
+         ModSlider("x", &n->rotateX, -3.1416f, 3.1416f);
+         ModSlider("y", &n->rotateY, -3.1416f, 3.1416f);
+         ModSlider("z", &n->rotateZ, -3.1416f, 3.1416f);
+      }
+
+      NodeSeparator("scale");
+      ModSlider("x", &n->scaleX, 0.05f, 8.0f);
+      ModSlider("y", &n->scaleY, 0.05f, 8.0f);
+      if (n->space != kMapSpaceUv)
+         ModSlider("z", &n->scaleZ, 0.05f, 8.0f);
+   }
+
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
       ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());
@@ -2606,6 +2916,37 @@ namespace
             ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
             break;
       }
+
+      NodeSeparator("material");
+      ImGui::Checkbox("inherit from input", &n->inheritMaterial);
+      if (!n->inheritMaterial)
+      {
+         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+         ColorSwatch("colour", n->color, n);
+         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+         ColorSwatch("emission", n->emissionColor, n);
+         ModSlider("emission", &n->emission, 0.0f, 8.0f);
+      }
+   }
+
+   void DrawDisplacementParams(DisplacementNode* n)
+   {
+      if (n->input == nullptr)
+         ImGui::TextColored(ImVec4(1, 0.6f, 0.4f, 1), "no geometry input");
+      else
+         ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      if (!n->TextureInput().IsConnected())
+         ImGui::TextColored(ImVec4(1, 0.6f, 0.4f, 1), "no texture input");
+
+      static const std::vector<std::string> kModeNames = { "Scalar (along normal)", "Vector (RGB = XYZ)" };
+      DropdownButton("mode", kModeNames, n->mode, [n](int i) { n->mode = i; });
+      ModSlider("strength", &n->strength, -2.0f, 2.0f);
+      if (n->mode == DisplacementNode::kScalar)
+         ModSlider("midlevel", &n->midlevel, 0.0f, 1.0f);
+      ImGui::Checkbox("flat shade", &n->flatShade);
+      ImGui::Checkbox("flip normals", &n->flipNormals);
 
       NodeSeparator("material");
       ImGui::Checkbox("inherit from input", &n->inheritMaterial);
@@ -3179,6 +3520,57 @@ namespace
       return nullptr;
    }
 
+   // The gNodes index a GroupNode* lives at, or -1 if it is not (or no longer)
+   // in the graph. Used to translate group ownership into an index that
+   // survives being carried around in a clipboard/duplicate item list.
+   int IndexOfGroupNode(GroupNode* g)
+   {
+      if (g == nullptr)
+         return -1;
+      for (const GraphNode& gn : gNodes)
+      {
+         if (gn.node.get() == g)
+            return gn.index;
+      }
+      return -1;
+   }
+
+   // How far to shift a duplicated/pasted cluster so the copy reads as a
+   // separate thing directly below the original, rather than sitting on
+   // top of it. A flat 40px works for a single node, but a whole group can
+   // span hundreds of pixels - the same flat offset there leaves the copy's
+   // box nearly fully overlapping the original. Shifting straight down by
+   // the cluster's own height (plus a margin) clears it in one predictable
+   // direction, landing right underneath rather than off at a diagonal.
+   ImVec2 ClusterOffset(const std::set<int>& indices)
+   {
+      bool any = false;
+      ImVec2 bmin(0.0f, 0.0f), bmax(0.0f, 0.0f);
+      for (int index : indices)
+      {
+         GraphNode* gn = FindNodeByIndex(index);
+         if (gn == nullptr)
+            continue;
+         const ImVec2 p = ed::GetNodePosition(gn->NodeId());
+         const ImVec2 s = ed::GetNodeSize(gn->NodeId());
+         if (!any)
+         {
+            bmin = p; bmax = ImVec2(p.x + s.x, p.y + s.y); any = true;
+         }
+         else
+         {
+            bmin.x = std::min(bmin.x, p.x);
+            bmin.y = std::min(bmin.y, p.y);
+            bmax.x = std::max(bmax.x, p.x + s.x);
+            bmax.y = std::max(bmax.y, p.y + s.y);
+         }
+      }
+      if (!any)
+         return ImVec2(0.0f, 40.0f);
+      const float kMargin = 60.0f;
+      return ImVec2(0.0f, (bmax.y - bmin.y) + kMargin);
+   }
+
    // Drops membership sets whose group no longer exists. Deleting a node goes
    // through RemoveNodeByIndex, which cleans up as it goes, but undo/redo
    // rebuilds gNodes wholesale without ever calling it - and a stale
@@ -3713,6 +4105,7 @@ namespace
                { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
                { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
                { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
+               { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
             } },
             { "Text", {
                { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
@@ -3735,6 +4128,7 @@ namespace
                { "Gradient Map", "Remaps luminance onto a two-colour gradient." },
                { "Channel Mixer", "Rebuilds each output channel from a weighted mix of the input channels." },
                { "HSL / Colour Balance / Black & White", "Hue, saturation and lightness; per-axis colour shifts; weighted greyscale." },
+               { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
             } },
             { "Compositing", {
                { "Blend", "Two inputs and 31 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
@@ -3847,9 +4241,15 @@ namespace
             if (auto* n3d = dynamic_cast<Null3DNode*>(other.node.get()))
                if (n3d->input == dyingGeometry)
                   n3d->input = nullptr;
+            if (auto* mapn = dynamic_cast<MappingNode*>(other.node.get()))
+               if (mapn->input == dyingGeometry)
+                  mapn->input = nullptr;
             if (auto* mat = dynamic_cast<MaterialNode*>(other.node.get()))
                if (mat->input == dyingGeometry)
                   mat->input = nullptr;
+            if (auto* disp = dynamic_cast<DisplacementNode*>(other.node.get()))
+               if (disp->input == dyingGeometry)
+                  disp->input = nullptr;
             if (auto* m2p = dynamic_cast<MeshToPointsNode*>(other.node.get()))
                if (m2p->input == dyingGeometry)
                   m2p->input = nullptr;
@@ -3994,7 +4394,9 @@ namespace
          }
          if (auto* op = dynamic_cast<GeometryOpNode*>(gn.node.get())) record(op->input, 0);
          if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get())) record(n3d->input, 0);
+         if (auto* mapn = dynamic_cast<MappingNode*>(gn.node.get())) record(mapn->input, 0);
          if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get())) record(mat->input, 0);
+         if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get())) record(disp->input, 0);
          if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get())) record(m2p->input, 0);
          if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get())) record(mrs->input, 0);
          if (auto* cloth = dynamic_cast<ClothNode*>(gn.node.get())) record(cloth->input, 0);
@@ -4466,6 +4868,18 @@ int main()
                                                     : settingsDir + "/imgui.ini";
    static std::string graphPath = settingsDir.empty() ? std::string("Infinite.json")
                                                       : settingsDir + "/Infinite.json";
+   if (getenv("INFINITE_DRAGTEST") != nullptr)
+   {
+      // DRAGTEST pans the view; SettingsFile persists that pan to disk, so
+      // sharing the real settings file means every run starts from wherever
+      // the last one left the camera, slowly walking the fixture node off
+      // the visible window over repeated runs (e.g. one hygiene-check run
+      // per commit). Use a throwaway path instead, reset before use, so the
+      // test always starts from a known view.
+      graphPath = settingsDir.empty() ? std::string("InfiniteDragTest.json")
+                                       : settingsDir + "/InfiniteDragTest.json";
+      remove(graphPath.c_str());
+   }
    ImGui::GetIO().IniFilename = iniPath.c_str();
 
    ed::Config config;
@@ -4638,6 +5052,86 @@ int main()
          render->geometry[0] = mat;
          render->width = 300.0f; render->height = 300.0f;
          render->samples = 0;
+      }
+      else if (getenv("INFINITE_DISPLACETEST") != nullptr)
+      {
+         // A subdivided sphere pushed by a Noise texture, end to end through
+         // the actual GPU readback path (not a synthetic buffer, unlike the
+         // scalar/vector checks in MESHOPTEST) - this is what verifies the
+         // texture-to-mesh plumbing itself, not just MeshOps::Displace.
+         SpawnNode(getenv("INFINITE_DISPLACE_CUBE") ? "Cube" : "Sphere", "3D", 40.0f, 40.0f); // 0
+         SpawnNode("Subdivide", "3D", 320.0f, 40.0f);      // 1
+         SpawnNode("Displacement", "3D", 600.0f, 40.0f);   // 2
+         SpawnNode("Noise", "Source", 40.0f, 400.0f);      // 3
+         SpawnNode("Camera", "3D", 900.0f, 400.0f);        // 4
+         SpawnNode("Light", "3D", 900.0f, 620.0f);         // 5
+         SpawnNode("Render 3D", "3D", 900.0f, 40.0f);      // 6
+
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         geo->detail = 24;
+         auto* sub = static_cast<GeometryOpNode*>(gNodes[1].node.get());
+         sub->op = GeometryOpNode::kSubdivide; sub->input = geo; sub->levels = 2;
+         auto* disp = static_cast<DisplacementNode*>(gNodes[2].node.get());
+         disp->input = sub;
+         disp->mode = DisplacementNode::kScalar;
+         disp->strength = 0.35f;
+         disp->TextureInput().Connect(gNodes[3].node.get());
+         auto* cam = static_cast<CameraNode*>(gNodes[4].node.get());
+         cam->distance = 4.0f;
+         auto* r = static_cast<Render3DNode*>(gNodes[6].node.get());
+         r->geometry[0] = disp;
+         r->camera = cam; r->lights[0] = static_cast<LightNode*>(gNodes[5].node.get());
+         r->width = 700.0f; r->height = 700.0f;
+         gNodes[2].showParams = true;
+         gNodes[6].showParams = true;
+      }
+      else if (getenv("INFINITE_MAPPINGVIZTEST") != nullptr)
+      {
+         // Dev-only visual check: a checkerboard (Image Source's built-in
+         // fallback when no file is loaded) box-projected onto a cube through
+         // Generated coordinates, next to the same cube left on plain UV, so a
+         // screenshot shows the per-face orientation directly.
+         SpawnNode("Cube", "3D", 40.0f, 40.0f);            // 0
+         SpawnNode("Mapping", "3D", 320.0f, 40.0f);        // 1
+         SpawnNode("Image Source", "Source", 40.0f, 400.0f); // 2
+         SpawnNode("Material", "3D", 600.0f, 40.0f);       // 3
+         SpawnNode("Cube", "3D", 40.0f, 700.0f);           // 4 plain UV comparison
+         SpawnNode("Material", "3D", 320.0f, 700.0f);      // 5
+         SpawnNode("Render 3D", "3D", 900.0f, 40.0f);      // 6
+         SpawnNode("Noise", "Source", 40.0f, 1000.0f);     // 7 normal map source
+
+         auto* cube = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* mapping = static_cast<MappingNode*>(gNodes[1].node.get());
+         mapping->input = cube;
+         mapping->space = kMapSpaceGenerated;
+         mapping->scaleX = 2.0f; mapping->scaleY = 2.0f; mapping->scaleZ = 2.0f;
+
+         auto* img = static_cast<ImageSourceNode*>(gNodes[2].node.get());
+         auto* noise = static_cast<NoiseNode*>(gNodes[7].node.get());
+         auto* mat = static_cast<MaterialNode*>(gNodes[3].node.get());
+         mat->input = mapping;
+         mat->TextureInput().Connect(img);
+         mat->MapInput(kMapNormal).Connect(noise);
+         mat->roughness = 0.6f;
+         mat->normalStrength = 2.0f;
+
+         auto* cubeB = static_cast<GeometryNode*>(gNodes[4].node.get());
+         cubeB->posX = 2.5f;
+         auto* matB = static_cast<MaterialNode*>(gNodes[5].node.get());
+         matB->input = cubeB;
+         matB->TextureInput().Connect(img);
+         matB->roughness = 0.6f;
+
+         auto* render = static_cast<Render3DNode*>(gNodes[6].node.get());
+         render->geometry[0] = mat;
+         render->geometry[1] = matB;
+         render->width = 900.0f; render->height = 500.0f;
+         render->samples = 0;
+         render->camDistance = 6.0f;
+         render->camAzimuth = 0.7f;
+         render->camElevation = 0.35f;
+         render->targetX = 1.25f;
+         gNodes[6].showParams = true;
       }
       else if (getenv("INFINITE_SHADOWTEST") != nullptr)
       {
@@ -5246,6 +5740,8 @@ int main()
    bool searchJustOpened = false;
    std::vector<std::string> clipboard;      // typeNames copied
    std::vector<INode*> clipboardSources;    // live sources to copy params from
+   std::vector<int> clipboardOrigIndex;     // gNodes index each item had at copy time
+   std::vector<int> clipboardOrigGroup;     // that item's owning group's index, or -1
    int frameId = 0;
 
    while (!glfwWindowShouldClose(window))
@@ -5367,14 +5863,22 @@ int main()
          // positions; that splits a synthetic gesture apart, so disable it here.
          tio.ConfigInputTrickleEventQueue = false;
          auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
+         // Hardcoded absolute pixels (e.g. 1400,800) assumed the requested
+         // 1600x1000 window; the actual window can come up smaller than
+         // requested (display-clamped), which put the drag start and later
+         // points off-screen entirely - ImGui never saw the canvas as
+         // hovered, the window lost focus, and NavigateAction never armed.
+         // Anchor to the real display size instead.
+         const ImVec2 dispSize = tio.DisplaySize;
+         const ImVec2 dragBase(dispSize.x * 0.75f, dispSize.y * 0.70f);
          switch (frameId)
          {
             // --- phase 1: drag empty canvas (should pan, not move nodes) ---
-            case 3: gTestMouse = ImVec2(1400.0f, 800.0f); break;
+            case 3: gTestMouse = dragBase; break;
             case 4: btn(true); break;
-            case 5: gTestMouse = ImVec2(1440.0f, 830.0f); break;
-            case 6: gTestMouse = ImVec2(1500.0f, 880.0f); break;
-            case 7: gTestMouse = ImVec2(1560.0f, 920.0f); break;
+            case 5: gTestMouse = ImVec2(dragBase.x + 40.0f, dragBase.y + 30.0f); break;
+            case 6: gTestMouse = ImVec2(dragBase.x + 100.0f, dragBase.y + 80.0f); break;
+            case 7: gTestMouse = ImVec2(dragBase.x + 160.0f, dragBase.y + 120.0f); break;
             case 8: btn(false); break;
             // --- phase 2: drag the node's title row (should move the node) ---
             case 12: gTestMouse = gDragTestNodeScreen; break;
@@ -7931,6 +8435,55 @@ int main()
          all &= check("smooth", MeshOps::Smooth(sphere, 5, 0.8f), sphere.indices.size() / 3);
          all &= check("mirror", MeshOps::Mirror(sphere, 0, 1.0f, true, true), 2 * (sphere.indices.size() / 3));
          all &= check("screw", MeshOps::Screw(plane, 32, 1.0f, 0.4f, 0.6f, 1), 32);
+
+         // Displace with a synthetic checkerboard buffer, standing in for a
+         // readback of a Noise/Voronoi texture - exercises the bilinear
+         // sampler and both modes without needing a live GL context here.
+         {
+            const int texW = 16, texH = 16;
+            std::vector<float> tex((size_t)texW * texH * 4);
+            for (int y = 0; y < texH; y++)
+               for (int x = 0; x < texW; x++)
+               {
+                  const float v = ((x / 4 + y / 4) % 2 == 0) ? 1.0f : 0.0f;
+                  const size_t i = ((size_t)y * texW + x) * 4;
+                  tex[i + 0] = v; tex[i + 1] = 1.0f - v; tex[i + 2] = v * 0.5f; tex[i + 3] = 1.0f;
+               }
+            all &= check("displace scalar",
+                         MeshOps::Displace(sphere, tex, texW, texH, 0, 0.3f, 0.5f, false, false),
+                         sphere.indices.size() / 3);
+            all &= check("displace vector",
+                         MeshOps::Displace(sphere, tex, texW, texH, 1, 0.3f, 0.5f, false, false),
+                         sphere.indices.size() / 3);
+
+            // A hard-shaded primitive like Cube duplicates each corner once
+            // per adjoining face - same position, different normal/UV - so
+            // this checks that displacing it does not tear those duplicates
+            // apart: every vertex that started at a shared position must
+            // still be within epsilon of the others in its group afterward.
+            const Mesh cube = Primitives::Cube(1);
+            const Mesh displacedCube = MeshOps::Displace(cube, tex, texW, texH, 0, 0.8f, 0.5f, false, false);
+            const std::vector<unsigned int> weld = MeshOps::BuildWeldMap(cube);
+            std::map<unsigned int, std::array<float, 3>> first;
+            float maxGap = 0.0f;
+            for (size_t i = 0; i < displacedCube.vertices.size(); i++)
+            {
+               const unsigned int w = weld[i];
+               const Vertex& v = displacedCube.vertices[i];
+               auto it = first.find(w);
+               if (it == first.end())
+                  first[w] = { v.px, v.py, v.pz };
+               else
+               {
+                  const float dx = v.px - it->second[0], dy = v.py - it->second[1], dz = v.pz - it->second[2];
+                  maxGap = std::max(maxGap, std::sqrt(dx * dx + dy * dy + dz * dz));
+               }
+            }
+            const bool seamsClosed = maxGap < 0.001f;
+            printf("  %-12s max seam gap %.5f  %s\n", "displace cube", maxGap,
+                   seamsClosed ? "OK" : "FAIL cracked at seams");
+            all &= seamsClosed;
+         }
          printf("%s\n", all ? "MESH OPERATORS OK" : "SUSPECT");
 
          // Taubin's whole point: repeated smoothing must not collapse the mesh.
@@ -7977,6 +8530,53 @@ int main()
             // nothing at all; any upload here means the mesh stamps are churning.
             printf("%s\n", r->LastUploads() == 0 ? "MESH UPLOAD CACHING OK"
                                                  : "SUSPECT - re-uploading a static mesh");
+      }
+
+      if (getenv("INFINITE_DISPLACETEST") != nullptr && frameId == 6)
+      {
+         auto* sub = static_cast<GeometryOpNode*>(gNodes[1].node.get());
+         auto* disp = static_cast<DisplacementNode*>(gNodes[2].node.get());
+         auto* r = static_cast<Render3DNode*>(gNodes[6].node.get());
+
+         const Mesh& before = sub->GetMesh();
+         const Mesh& after = disp->GetMesh();
+
+         auto bounds = [](const Mesh& m, float lo[3], float hi[3]) {
+            lo[0] = lo[1] = lo[2] = 1e30f;
+            hi[0] = hi[1] = hi[2] = -1e30f;
+            bool finite = true;
+            for (const Vertex& v : m.vertices)
+            {
+               const float p[3] = { v.px, v.py, v.pz };
+               for (int k = 0; k < 3; k++)
+               {
+                  if (!std::isfinite(p[k])) { finite = false; continue; }
+                  lo[k] = std::min(lo[k], p[k]);
+                  hi[k] = std::max(hi[k], p[k]);
+               }
+            }
+            return finite;
+         };
+
+         float loB[3], hiB[3], loA[3], hiA[3];
+         const bool finiteBefore = bounds(before, loB, hiB);
+         const bool finiteAfter = bounds(after, loA, hiA);
+         const float extentBefore = hiB[0] - loB[0];
+         const float extentAfter = hiA[0] - loA[0];
+
+         // Same triangle/vertex count - Displace moves points, it does not
+         // remesh - but a different radius, since a unit sphere pushed by a
+         // Noise texture must not still be a unit sphere.
+         const bool sameTopology = before.indices.size() == after.indices.size() &&
+                                   before.vertices.size() == after.vertices.size();
+         const bool actuallyMoved = std::fabs(extentAfter - extentBefore) > 0.01f;
+
+         r->CookIfNeeded(frameId);
+         printf("before extent %.3f  after extent %.3f  tris=%zu  rendered=%zu tris\n",
+                extentBefore, extentAfter, disp->TriangleCount(), r->LastTriangleCount());
+         printf("%s\n", (finiteBefore && finiteAfter && sameTopology && actuallyMoved &&
+                         r->LastTriangleCount() > 0)
+                           ? "DISPLACEMENT OK" : "SUSPECT");
       }
 
       // Frame 4 renders with antialiasing off, frame 8 with it on, and the two
@@ -8184,11 +8784,6 @@ int main()
                    nodeStill ? "still" : "MOVED",
                    viewMoved ? "panned" : "STATIC",
                    (nodeStill && viewMoved) ? "PAN OK" : "BUG");
-         }
-         if (frameId == 9)
-            ed::NavigateToContent(0.0f); // phase 1 panned the node off-screen
-         if (frameId == 11)
-         {
             // aim at the node's title row: below the pins, above the preview
             ImVec2 p = ed::GetNodePosition(gNodes[0].NodeId());
             gDragTestNodeScreen = ed::CanvasToScreen(ImVec2(p.x + 60.0f, p.y + 42.0f));
@@ -8300,9 +8895,11 @@ int main()
                   dynamic_cast<ModelSourceNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<Text3DNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<MappingNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<OceanNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
@@ -8331,12 +8928,16 @@ int main()
                snprintf(line, sizeof(line), "%zu triangles", t3d->TriangleCount());
             else if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu triangles", n3d->TriangleCount());
+            else if (auto* mapn = dynamic_cast<MappingNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", mapn->TriangleCount());
             else if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu points", m2p->PointCount());
             else if (auto* oc = dynamic_cast<OceanNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu triangles", oc->TriangleCount());
             else if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu triangles", mat->TriangleCount());
+            else if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", disp->TriangleCount());
             else if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu particles", ps->AliveCount());
             else if (auto* cv = dynamic_cast<CurveNode*>(gn.node.get()))
@@ -8402,17 +9003,30 @@ int main()
          }
          // No text label: the power icon turning red already reads as bypassed,
          // and a word beside it is noise on every node in the patch.
-         if (!gn.showParams && gn.hasModulatedParams)
+         ImVec2 modTagMin(0.0f, 0.0f), modTagMax(0.0f, 0.0f);
+         ImVec2 palTagMin(0.0f, 0.0f), palTagMax(0.0f, 0.0f);
+         const bool modTag = !gn.showParams && gn.hasModulatedParams;
+         const bool palTag = !gn.showParams && gn.hasPaletteColors;
+         if (modTag)
          {
             // make it obvious a collapsed node still has live modulation
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f), "mod");
+            modTagMin = ImGui::GetItemRectMin();
+            modTagMax = ImGui::GetItemRectMax();
          }
-         if (!gn.showParams && gn.hasPaletteColors)
+         if (palTag)
          {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(0.5f, 0.86f, 0.74f, 1.0f), "pal");
+            palTagMin = ImGui::GetItemRectMin();
+            palTagMax = ImGui::GetItemRectMax();
          }
+         // Only once the whole row is laid out: the stubs move the cursor.
+         if (modTag)
+            CollapsedBindingPins(gn.index, modTagMin, modTagMax, false);
+         if (palTag)
+            CollapsedBindingPins(gn.index, palTagMin, palTagMax, true);
 
          BeginNodeParams(gn.index);
          if (gn.showParams)
@@ -8437,6 +9051,8 @@ int main()
                DrawMacroXYParams(n);
             else if (auto* n = dynamic_cast<NoiseNode*>(gn.node.get()))
                DrawNoiseParams(n);
+            else if (auto* n = dynamic_cast<TextureNode*>(gn.node.get()))
+               DrawTextureParams(n);
             else if (auto* n = dynamic_cast<RampNode*>(gn.node.get()))
                DrawRampParams(n);
             else if (auto* n = dynamic_cast<PaletteNode*>(gn.node.get()))
@@ -8463,6 +9079,8 @@ int main()
             }
             else if (auto* n = dynamic_cast<MaterialNode*>(gn.node.get()))
                DrawMaterialParams(n);
+            else if (auto* n = dynamic_cast<MappingNode*>(gn.node.get()))
+               DrawMappingParams(n);
             else if (auto* n = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
                DrawParticleSystemParams(n);
             else if (auto* n = dynamic_cast<ClothNode*>(gn.node.get()))
@@ -8480,6 +9098,8 @@ int main()
                ImGui::TextDisabled("pass-through");
             else if (auto* n = dynamic_cast<GeometryOpNode*>(gn.node.get()))
                DrawGeometryOpParams(n);
+            else if (auto* n = dynamic_cast<DisplacementNode*>(gn.node.get()))
+               DrawDisplacementParams(n);
             else if (auto* n = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
                DrawInstanceParams(n);
             else if (auto* n = dynamic_cast<CameraNode*>(gn.node.get()))
@@ -8498,6 +9118,8 @@ int main()
                DrawResynthParams(n);
             else if (auto* n = dynamic_cast<CurvesNode*>(gn.node.get()))
                DrawCurvesParams(n);
+            else if (auto* n = dynamic_cast<ColorRampNode*>(gn.node.get()))
+               DrawColorRampParams(n);
             else if (auto* n = dynamic_cast<RemoveBgNode*>(gn.node.get()))
                DrawRemoveBgParams(n);
             else if (auto* n = dynamic_cast<DrawNode*>(gn.node.get()))
@@ -8651,8 +9273,12 @@ int main()
             linkFromNode(geoOp->input, 0);
          if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get()))
             linkFromNode(n3d->input, 0);
+         if (auto* mapn = dynamic_cast<MappingNode*>(gn.node.get()))
+            linkFromNode(mapn->input, 0);
          if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
             linkFromNode(m2p->input, 0);
+         if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get()))
+            linkFromNode(mrs->input, 0);
          if (auto* cloth = dynamic_cast<ClothNode*>(gn.node.get()))
             linkFromNode(cloth->input, 0);
          if (auto* join = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
@@ -8667,6 +9293,8 @@ int main()
          }
          if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
             linkFromNode(mat->input, 0);
+         if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
+            linkFromNode(disp->input, 0);
          if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
          {
             linkFromNode(inst->pointSource, 0);
@@ -8724,7 +9352,7 @@ int main()
             continue;
          const int paramPin = target->ParamPinId(link.first.second);
          if (gDrawnParamPins.count(paramPin) == 0)
-            continue; // params collapsed: keep the binding, just don't draw the cable
+            continue; // no pin declared this frame: emitting the link would kill it
          gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
                             source->OutputPinId(link.second.outputIndex), paramPin });
       }
@@ -8737,7 +9365,7 @@ int main()
             continue;
          const int colorPin = target->ColorPinId(link.first.second);
          if (gDrawnColorPins.count(colorPin) == 0)
-            continue; // params collapsed: keep the binding, just don't draw the cable
+            continue; // no pin declared this frame: emitting the link would kill it
          gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
                             source->OutputPinId(0), colorPin });
       }
@@ -8788,8 +9416,11 @@ int main()
                // geometry input on slot 0 and are otherwise interchangeable
                // here, so they share one branch.
                auto* dstNull3D = dstNode ? dynamic_cast<Null3DNode*>(dstNode->node.get()) : nullptr;
+               auto* dstMapping = dstNode ? dynamic_cast<MappingNode*>(dstNode->node.get()) : nullptr;
                auto* dstMaterial = dstNode ? dynamic_cast<MaterialNode*>(dstNode->node.get()) : nullptr;
+               auto* dstDisplacement = dstNode ? dynamic_cast<DisplacementNode*>(dstNode->node.get()) : nullptr;
                auto* dstMeshPoints = dstNode ? dynamic_cast<MeshToPointsNode*>(dstNode->node.get()) : nullptr;
+               auto* dstMeshResynth = dstNode ? dynamic_cast<MeshResynthNode*>(dstNode->node.get()) : nullptr;
                auto* dstCloth = dstNode ? dynamic_cast<ClothNode*>(dstNode->node.get()) : nullptr;
                auto* dstJoin = dstNode ? dynamic_cast<JoinGeometryNode*>(dstNode->node.get()) : nullptr;
                auto* dstMeta = dstNode ? dynamic_cast<MetaBallNode*>(dstNode->node.get()) : nullptr;
@@ -8830,8 +9461,8 @@ int main()
                      else if (dstInstance != nullptr)
                         // Slot 2 is the point-cloud pin; 0 and 1 take geometry.
                         valid = (slot == 2) ? (srcCloud != nullptr) : (srcGeometry != nullptr);
-                     else if (dstNull3D != nullptr || dstMeshPoints != nullptr ||
-                              dstCloth != nullptr || dstJoin != nullptr)
+                     else if (dstNull3D != nullptr || dstMapping != nullptr || dstMeshPoints != nullptr ||
+                              dstMeshResynth != nullptr || dstCloth != nullptr || dstJoin != nullptr)
                         valid = srcGeometry != nullptr;
                      else if (dstMeta != nullptr)
                         valid = srcCloud != nullptr;
@@ -8839,6 +9470,9 @@ int main()
                         valid = (slot == 0) ? (srcCurve != nullptr) : (srcGeometry != nullptr);
                      else if (dstMaterial != nullptr)
                         // Slot 0 takes geometry; the rest are ordinary images.
+                        valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
+                     else if (dstDisplacement != nullptr)
+                        // Slot 0 takes geometry; slot 1 the displacement texture.
                         valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
                      else if (dstOutput != nullptr && slot == 1)
                         valid = srcAudioFile != nullptr; // slot 1 is the audio pin
@@ -8891,8 +9525,12 @@ int main()
                   }
                   else if (dstNull3D != nullptr)
                      dstNull3D->input = srcGeometry;
+                  else if (dstMapping != nullptr)
+                     dstMapping->input = srcGeometry;
                   else if (dstMeshPoints != nullptr)
                      dstMeshPoints->input = srcGeometry;
+                  else if (dstMeshResynth != nullptr)
+                     dstMeshResynth->input = srcGeometry;
                   else if (dstCloth != nullptr)
                      dstCloth->input = srcGeometry;
                   else if (dstMeta != nullptr)
@@ -8912,6 +9550,8 @@ int main()
                   }
                   else if (dstMaterial != nullptr && GraphNode::InputSlotFromPin(b) == 0)
                      dstMaterial->input = srcGeometry;
+                  else if (dstDisplacement != nullptr && GraphNode::InputSlotFromPin(b) == 0)
+                     dstDisplacement->input = srcGeometry;
                   else if (dstInstance != nullptr)
                   {
                      const int islot = GraphNode::InputSlotFromPin(b);
@@ -8966,6 +9606,14 @@ int main()
                       (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))))
          Redo();
 
+      // Shift+A selects every node on the canvas.
+      if (!typing && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false))
+      {
+         ed::ClearSelection();
+         for (GraphNode& gn : gNodes)
+            ed::SelectNode(gn.NodeId(), true);
+      }
+
       // "/" drops a comment under the pointer and puts the caret straight into
       // it, so annotating a patch is one keystroke and then typing. Not gated on
       // Shift, so "?" does not leave a stray comment behind, and not on a
@@ -9004,17 +9652,44 @@ int main()
             std::vector<ed::LinkId> selLinks(count);
             int linkCount = ed::GetSelectedLinks(selLinks.data(), count);
 
+            // A selected group takes its members with it - otherwise "delete"
+            // on a group would silently do no more than an ungroup.
+            std::set<int> toDelete;
+            for (int i = 0; i < nodeCount; i++)
+            {
+               GraphNode* gn = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+               if (gn == nullptr)
+                  continue;
+               toDelete.insert(gn->index);
+               if (auto* g = dynamic_cast<GroupNode*>(gn->node.get()))
+               {
+                  auto it = gGroupMembers.find(g);
+                  if (it != gGroupMembers.end())
+                     toDelete.insert(it->second.begin(), it->second.end());
+               }
+            }
+
+            // One checkpoint for the whole batch: RemoveNodeByIndex (and the
+            // per-link path below) each push their own by default, which
+            // would otherwise turn "delete this group" into a checkpoint per
+            // node - so a single Undo only clawed back the last one removed
+            // instead of the whole cluster.
+            if (linkCount > 0 || !toDelete.empty())
+               PushUndoCheckpoint();
+            gSuppressUndoCheckpoints = true;
+
             for (int i = 0; i < linkCount; i++)
             {
-               PushUndoCheckpoint();
                DisconnectLinkById((int)selLinks[i].Get());
                ed::DeleteLink(selLinks[i]);
             }
-            for (int i = 0; i < nodeCount; i++)
+            for (int index : toDelete)
             {
-               ed::DeleteNode(selNodes[i]);
-               RemoveNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+               ed::DeleteNode(ed::NodeId(index * GraphNode::kStride));
+               RemoveNodeByIndex(index);
             }
+
+            gSuppressUndoCheckpoints = false;
             ed::ClearSelection();
          }
       }
@@ -9028,29 +9703,73 @@ int main()
             std::vector<ed::NodeId> selNodes(count);
             const int nodeCount = ed::GetSelectedNodes(selNodes.data(), count);
 
-            // Resolve everything first: SpawnNode can reallocate gNodes.
-            struct DupItem { std::string type; std::string category; INode* src; ImVec2 pos; bool params; };
-            std::vector<DupItem> items;
+            // A selected group brings its members along, even if they are not
+            // individually part of the editor's own selection set.
+            std::set<int> toDup;
             for (int i = 0; i < nodeCount; i++)
             {
-               if (GraphNode* gn = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride))
+               GraphNode* gn = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+               if (gn == nullptr)
+                  continue;
+               toDup.insert(gn->index);
+               if (auto* g = dynamic_cast<GroupNode*>(gn->node.get()))
+               {
+                  auto it = gGroupMembers.find(g);
+                  if (it != gGroupMembers.end())
+                     toDup.insert(it->second.begin(), it->second.end());
+               }
+            }
+
+            // Resolve everything first: SpawnNode can reallocate gNodes.
+            const ImVec2 off = ClusterOffset(toDup);
+            struct DupItem
+            {
+               std::string type; std::string category; INode* src; ImVec2 pos; bool params;
+               int origIndex; int origGroup;
+            };
+            std::vector<DupItem> items;
+            for (int index : toDup)
+            {
+               if (GraphNode* gn = FindNodeByIndex(index))
                {
                   const ImVec2 p = ed::GetNodePosition(gn->NodeId());
                   items.push_back({ gn->typeName, gn->category, gn->node.get(),
-                                    ImVec2(p.x + 40.0f, p.y + 40.0f), gn->showParams });
+                                    ImVec2(p.x + off.x, p.y + off.y), gn->showParams,
+                                    gn->index, IndexOfGroupNode(GroupOwning(gn->index)) });
                }
             }
 
             ed::ClearSelection();
+            // One checkpoint for the whole duplicate: SpawnNode pushes its
+            // own by default, which would otherwise scatter a multi-node
+            // duplicate across several undo steps instead of one.
+            if (!items.empty())
+               PushUndoCheckpoint();
+            gSuppressUndoCheckpoints = true;
+            std::map<int, GraphNode*> newByOrig;
             for (const DupItem& item : items)
             {
                if (GraphNode* copy = SpawnNode(item.type, item.category, item.pos.x, item.pos.y))
                {
                   CopyParams(copy->node.get(), item.src);
                   copy->showParams = item.params;
+                  newByOrig[item.origIndex] = copy;
                   gPendingSelect.push_back(copy->NodeId());
                }
             }
+            // Re-establish group membership among the duplicates.
+            for (const DupItem& item : items)
+            {
+               if (item.origGroup < 0)
+                  continue;
+               auto groupIt = newByOrig.find(item.origGroup);
+               auto memberIt = newByOrig.find(item.origIndex);
+               if (groupIt == newByOrig.end() || memberIt == newByOrig.end())
+                  continue;
+               if (auto* g = dynamic_cast<GroupNode*>(groupIt->second->node.get()))
+                  gGroupMembers[g].insert(memberIt->second->index);
+            }
+            gSuppressUndoCheckpoints = false;
          }
       }
 
@@ -9102,11 +9821,18 @@ int main()
                }
             }
 
+            // One checkpoint for the whole batch - see the Delete-key handler
+            // above for why (multiple groups dissolved at once would
+            // otherwise leave Undo only able to claw back the last one).
+            if (!doomed.empty())
+               PushUndoCheckpoint();
+            gSuppressUndoCheckpoints = true;
             for (int index : doomed)
             {
                ed::DeleteNode(ed::NodeId(index * GraphNode::kStride));
                RemoveNodeByIndex(index);
             }
+            gSuppressUndoCheckpoints = false;
             if (!doomed.empty())
                ed::ClearSelection();
          }
@@ -9184,26 +9910,58 @@ int main()
       {
          clipboard.clear();
          clipboardSources.clear();
+         clipboardOrigIndex.clear();
+         clipboardOrigGroup.clear();
          int count = ed::GetSelectedObjectCount();
          if (count > 0)
          {
             std::vector<ed::NodeId> selNodes(count);
             int nodeCount = ed::GetSelectedNodes(selNodes.data(), count);
+
+            // A selected group brings its members along, even if they are not
+            // individually part of the editor's own selection set.
+            std::set<int> toCopy;
             for (int i = 0; i < nodeCount; i++)
             {
-               if (GraphNode* gn = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride))
+               GraphNode* gn = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+               if (gn == nullptr)
+                  continue;
+               toCopy.insert(gn->index);
+               if (auto* g = dynamic_cast<GroupNode*>(gn->node.get()))
                {
-                  clipboard.push_back(gn->typeName);
-                  clipboardSources.push_back(gn->node.get());
+                  auto it = gGroupMembers.find(g);
+                  if (it != gGroupMembers.end())
+                     toCopy.insert(it->second.begin(), it->second.end());
                }
+            }
+
+            for (int index : toCopy)
+            {
+               GraphNode* gn = FindNodeByIndex(index);
+               if (gn == nullptr)
+                  continue;
+               clipboard.push_back(gn->typeName);
+               clipboardSources.push_back(gn->node.get());
+               clipboardOrigIndex.push_back(gn->index);
+               clipboardOrigGroup.push_back(IndexOfGroupNode(GroupOwning(gn->index)));
             }
          }
       }
 
       if (!typing && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false) && !clipboard.empty())
       {
+         // Recomputed fresh against the canvas as it stands right now, so a
+         // second Cmd+V (which already sees the first paste sitting on the
+         // canvas) lands clear of that too, not on top of it.
+         const ImVec2 off =
+            ClusterOffset(std::set<int>(clipboardOrigIndex.begin(), clipboardOrigIndex.end()));
+
          // resolve sources first: SpawnNode can reallocate gNodes and invalidate pointers
-         struct PasteItem { std::string type; std::string category; INode* src; ImVec2 pos; };
+         struct PasteItem
+         {
+            std::string type; std::string category; INode* src; ImVec2 pos;
+            int origIndex; int origGroup;
+         };
          std::vector<PasteItem> items;
          for (size_t i = 0; i < clipboard.size(); i++)
          {
@@ -9213,17 +9971,41 @@ int main()
                {
                   ImVec2 p = ed::GetNodePosition(gn.NodeId());
                   items.push_back({ clipboard[i], gn.category, gn.node.get(),
-                                    ImVec2(p.x + 40.0f, p.y + 40.0f) });
+                                    ImVec2(p.x + off.x, p.y + off.y),
+                                    clipboardOrigIndex[i], clipboardOrigGroup[i] });
                   break;
                }
             }
          }
+         // One checkpoint for the whole paste: SpawnNode pushes its own by
+         // default, which would otherwise scatter a multi-node paste across
+         // several undo steps instead of one.
+         if (!items.empty())
+            PushUndoCheckpoint();
+         gSuppressUndoCheckpoints = true;
+         std::map<int, GraphNode*> newByOrig;
          for (const PasteItem& item : items)
          {
             GraphNode* copy = SpawnNode(item.type, item.category, item.pos.x, item.pos.y);
             if (copy != nullptr)
+            {
                CopyParams(copy->node.get(), item.src);
+               newByOrig[item.origIndex] = copy;
+            }
          }
+         // Re-establish group membership among the pasted copies.
+         for (const PasteItem& item : items)
+         {
+            if (item.origGroup < 0)
+               continue;
+            auto groupIt = newByOrig.find(item.origGroup);
+            auto memberIt = newByOrig.find(item.origIndex);
+            if (groupIt == newByOrig.end() || memberIt == newByOrig.end())
+               continue;
+            if (auto* g = dynamic_cast<GroupNode*>(groupIt->second->node.get()))
+               gGroupMembers[g].insert(memberIt->second->index);
+         }
+         gSuppressUndoCheckpoints = false;
       }
 
       // ---- handle deletions raised by the editor itself ----
@@ -9304,6 +10086,80 @@ int main()
          searchBuf[0] = '\0';
          searchJustOpened = true;
          ImGui::OpenPopup("search");
+      }
+
+      // Right-click (two-finger click on a Mac trackpad) a node or group ->
+      // a menu of actions specific to what got clicked, rather than only the
+      // menu-bar/shortcut routes to the same operations.
+      {
+         ed::NodeId contextNodeId = 0;
+         if (ed::ShowNodeContextMenu(&contextNodeId))
+         {
+            gContextMenuNodeIndex = (int)contextNodeId.Get() / GraphNode::kStride;
+            ImGui::OpenPopup("##nodecontext");
+         }
+      }
+      if (ImGui::BeginPopup("##nodecontext"))
+      {
+         GraphNode* gn = FindNodeByIndex(gContextMenuNodeIndex);
+         if (gn == nullptr)
+         {
+            ImGui::CloseCurrentPopup();
+         }
+         else if (auto* g = dynamic_cast<GroupNode*>(gn->node.get()))
+         {
+            if (ImGui::MenuItem("Rename"))
+            {
+               PushUndoCheckpoint();
+               g->renaming = true;
+               g->renameJustStarted = true;
+            }
+            if (ImGui::MenuItem("Ungroup"))
+            {
+               ed::ClearSelection();
+               ed::SelectNode(gn->NodeId());
+               gRequestUngroup = true;
+            }
+         }
+         else
+         {
+            if (gn->showParams)
+            {
+               if (ImGui::MenuItem("Hide params"))
+                  gn->showParams = false;
+            }
+            else
+            {
+               if (ImGui::MenuItem("Show params"))
+                  gn->showParams = true;
+            }
+            if (GroupNode* owner = GroupOwning(gn->index))
+            {
+               // Unlike the group's own "Ungroup" (which dissolves the whole
+               // cluster), this detaches just the one node that was
+               // right-clicked - its groupmates stay put.
+               if (ImGui::MenuItem("Ungroup"))
+               {
+                  PushUndoCheckpoint();
+                  gGroupMembers[owner].erase(gn->index);
+                  // Membership here is purely geometric - anything fully
+                  // inside the group's box gets adopted right back in next
+                  // frame. Nudging the node just past the box's bottom edge
+                  // is what makes removing it actually stick.
+                  if (int ownerIndex = IndexOfGroupNode(owner); ownerIndex >= 0)
+                  {
+                     if (GraphNode* ownerGn = FindNodeByIndex(ownerIndex))
+                     {
+                        const ImVec2 gp = ed::GetNodePosition(ownerGn->NodeId());
+                        const ImVec2 gs = ed::GetNodeSize(ownerGn->NodeId());
+                        const ImVec2 mp = ed::GetNodePosition(gn->NodeId());
+                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + 40.0f));
+                     }
+                  }
+               }
+            }
+         }
+         ImGui::EndPopup();
       }
 
       // double-click empty canvas -> searchable spawner
@@ -9577,6 +10433,8 @@ int main()
       }
       if (getenv("INFINITE_PALETTETEST") != nullptr && frameId == 3)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
+      if (getenv("INFINITE_HIDETEST") != nullptr && frameId == 3)
+         gRequestFitView = true; // dev screenshot: frame the whole fixture
 
       ed::End();
       ed::SetCurrentEditor(nullptr);
@@ -9843,8 +10701,19 @@ int main()
             printf("params hidden\n");
          }
          if (frameId == 8)
+         {
             printf("after hide: links=%zu %s\n", mod.Links().size(),
                    mod.Links().empty() ? "LOST - BUG" : "SURVIVED OK");
+            // The binding surviving is not enough: a collapsed node still has to
+            // show the cable, landing on its "mod" tag.
+            int drawn = 0;
+            for (const LinkInfo& link : gLinks)
+               if (GraphNode::IsParamPin(link.dstPin) &&
+                   GraphNode::NodeIndexFromPin(link.dstPin) == gNodes[0].index)
+                  drawn++;
+            printf("cable while hidden: %d %s\n", drawn,
+                   drawn > 0 ? "DRAWN OK" : "MISSING - BUG");
+         }
          if (frameId == 9)
          {
             gNodes[0].showParams = true; // reopen
@@ -9930,12 +10799,15 @@ int main()
                continue;
             }
             if (dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<MappingNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
-                dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
+                dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<MeshResynthNode*>(gn.node.get()) != nullptr)
             {
                // Pass-throughs and samplers with nothing patched in are empty
                // by definition, so that is not a failure.

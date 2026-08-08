@@ -59,7 +59,10 @@ void SwitcherNode::CookIfNeeded(int frameId)
          connected[count++] = i;
    }
    if (count == 0)
+   {
+      GLUtil::DestroyFbo(mOut);
       return;
+   }
 
    int slotA = connected[0];
    int slotB = connected[0];
@@ -95,7 +98,10 @@ void SwitcherNode::CookIfNeeded(int frameId)
    unsigned int texA = mInputs[slotA].Pull(frameId);
    unsigned int texB = (slotB == slotA) ? texA : mInputs[slotB].Pull(frameId);
    if (texA == 0)
+   {
+      GLUtil::DestroyFbo(mOut);
       return;
+   }
    if (texB == 0)
       texB = texA;
 

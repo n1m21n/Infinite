@@ -223,4 +223,33 @@ namespace GLUtil
 
       glUseProgram(0);
    }
+
+   bool ReadTexturePixels(unsigned int& scratchFbo, unsigned int srcTex, int w, int h,
+                          std::vector<float>& outRGBA)
+   {
+      if (srcTex == 0 || w <= 0 || h <= 0)
+         return false;
+
+      if (scratchFbo == 0)
+         glGenFramebuffers(1, &scratchFbo);
+
+      GLint prevFbo = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, scratchFbo);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, srcTex, 0);
+
+      const bool ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+      if (ok)
+      {
+         outRGBA.assign((size_t)w * h * 4, 0.0f);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, outRGBA.data());
+      }
+
+      // Detach rather than leave srcTex bound to a framebuffer this function
+      // does not own - the caller may delete or rebind it next frame.
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+      glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+      return ok;
+   }
 }

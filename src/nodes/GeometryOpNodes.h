@@ -60,6 +60,10 @@ public:
    {
       return input ? input->GetMaterialTexture(map) : 0;
    }
+   MappingTransform GetMappingTransform() const override
+   {
+      return input ? input->GetMappingTransform() : MappingTransform();
+   }
 
    IGeometrySource* input = nullptr;
    const char* InputLabel(int) const override { return "geo"; }
@@ -188,6 +192,118 @@ private:
    bool mHasBuilt = false;
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
+};
+
+// --- Displacement ---------------------------------------------------------
+// Offsets vertex positions using a texture - the true-3D counterpart to the
+// `displace`/`liquify` filters in FilterDefs.cpp, which only warp a flat
+// image's UVs and never move any geometry. Modelled on Blender's
+// Displacement node: a raw pointer + a single ImageCable rather than the
+// GeometryOpNode table, since none of the other operators need a texture
+// input and giving every one of them an unused pin would be a worse fit than
+// its own small class (see MaterialNode for the same geometry+texture shape).
+class DisplacementNode : public INode, public IGeometrySource
+{
+public:
+   enum Mode { kScalar = 0, kVector };
+
+   static INode* Create() { return new DisplacementNode(); }
+   ~DisplacementNode() override;
+
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+
+   const Mesh& GetMesh() override;
+   unsigned long long MeshRevision() override;
+   // Forwarded, not identity - see GeometryOpNode::GetModelMatrix for why.
+   Mat4 GetModelMatrix() const override
+   {
+      return input ? input->GetModelMatrix() : Mat4::Identity();
+   }
+   Material GetMaterial() const override;
+   unsigned int GetSurfaceTexture() override;
+   unsigned int GetMaterialTexture(int map) override
+   {
+      return input ? input->GetMaterialTexture(map) : 0;
+   }
+   MappingTransform GetMappingTransform() const override
+   {
+      return input ? input->GetMappingTransform() : MappingTransform();
+   }
+
+   IGeometrySource* input = nullptr;
+   ImageCable& TextureInput() { return mTextureInput; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* kNames[] = { "geo", "texture" };
+      return (slot >= 0 && slot < 2) ? kNames[slot] : nullptr;
+   }
+   size_t TriangleCount() const { return mCache.indices.size() / 3; }
+
+   int mode = kScalar;
+   float strength = 1.0f;
+   float midlevel = 0.5f;
+   bool flatShade = false, flipNormals = false;
+   bool inheritMaterial = true;
+
+   // material used when not inheriting
+   float color[3] = { 0.8f, 0.82f, 0.9f };
+   float metallic = 0.1f;
+   float roughness = 0.45f;
+   float opacity = 1.0f;
+   int shading = 0;
+   float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
+   float emission = 0.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("mode", mode); v.Float("strength", strength); v.Float("midlevel", midlevel);
+      v.Bool("flat", flatShade); v.Bool("flip", flipNormals);
+      v.Bool("inherit", inheritMaterial);
+      v.Color("color", color); v.Float("metallic", metallic);
+      v.Float("roughness", roughness); v.Float("opacity", opacity);
+      v.Int("shading", shading);
+      v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+   }
+
+private:
+   struct Signature
+   {
+      int mode = -1;
+      float strength = 0, midlevel = 0;
+      bool flat = false, flip = false;
+      const void* upstream = nullptr;
+      unsigned long long upstreamRevision = 0;
+      // Bumped every frame the texture is patched in (see CookIfNeeded) so a
+      // Noise/Voronoi feeding this keeps animating the mesh; there is no
+      // per-texture revision counter to compare against instead.
+      unsigned long long texGeneration = 0;
+      bool operator==(const Signature& o) const
+      {
+         return mode == o.mode && strength == o.strength && midlevel == o.midlevel &&
+                flat == o.flat && flip == o.flip &&
+                upstream == o.upstream && upstreamRevision == o.upstreamRevision &&
+                texGeneration == o.texGeneration;
+      }
+   };
+
+   Signature CurrentSignature() const;
+
+   Mesh mCache;
+   Signature mBuilt;
+   bool mHasBuilt = false;
+   unsigned long long mMeshRevision = 0;
+   int mLastCookFrame = -1;
+
+   ImageCable mTextureInput;
+   std::vector<float> mTexPixels;
+   int mTexW = 0, mTexH = 0;
+   unsigned int mReadFbo = 0;
+   unsigned long long mTexGeneration = 0;
 };
 
 // --- Mesh to Points / Instance on Points --------------------------------

@@ -57,12 +57,14 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/VideoSourceNode.cpp
     src/nodes/ModulatorNodes.cpp
     src/nodes/NoiseNode.cpp
+    src/nodes/TextureNode.cpp
     src/nodes/ResynthNode.cpp
     src/nodes/MacroNodes.cpp
     src/nodes/CurvesNode.cpp
     src/nodes/RemoveBgNode.cpp
     src/nodes/DrawNode.cpp
     src/nodes/RampNode.cpp
+    src/nodes/ColorRampNode.cpp
     src/nodes/PaletteNode.cpp
     src/nodes/AnalyzeNodes.cpp
     src/nodes/Geometry3DNodes.cpp

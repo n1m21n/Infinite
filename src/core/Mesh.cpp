@@ -27,6 +27,37 @@ namespace
       mesh.vertices.push_back(vert);
    }
 
+   // Bilinear sample of an RGBA float buffer (row 0 = bottom, matching
+   // glReadPixels/GL_TEXTURE_2D convention) with wrapped UVs - GL_REPEAT, not
+   // clamp, so a displacement texture tiled across an Array still samples the
+   // pattern instead of smearing the edge texel past UV 1.
+   void SampleBilinearRGBA(const std::vector<float>& rgba, int w, int h, float u, float v, float out[4])
+   {
+      if (rgba.empty() || w <= 0 || h <= 0)
+      {
+         out[0] = out[1] = out[2] = out[3] = 0.0f;
+         return;
+      }
+      auto wrap01 = [](float x) { x = x - std::floor(x); return x; };
+      u = wrap01(u);
+      v = wrap01(v);
+      const float fx = u * w - 0.5f;
+      const float fy = v * h - 0.5f;
+      int x0 = (int)std::floor(fx), y0 = (int)std::floor(fy);
+      const float tx = fx - (float)x0, ty = fy - (float)y0;
+      auto wrapI = [](int x, int n) { x %= n; return x < 0 ? x + n : x; };
+      const int x1 = wrapI(x0 + 1, w), y1 = wrapI(y0 + 1, h);
+      x0 = wrapI(x0, w);
+      y0 = wrapI(y0, h);
+      auto at = [&](int x, int y, int c) { return rgba[((size_t)y * w + x) * 4 + c]; };
+      for (int c = 0; c < 4; c++)
+      {
+         const float a = at(x0, y0, c) * (1 - tx) + at(x1, y0, c) * tx;
+         const float b = at(x0, y1, c) * (1 - tx) + at(x1, y1, c) * tx;
+         out[c] = a * (1 - ty) + b * ty;
+      }
+   }
+
    void PushQuad(Mesh& mesh, unsigned int a, unsigned int b, unsigned int c, unsigned int d)
    {
       mesh.indices.push_back(a); mesh.indices.push_back(b); mesh.indices.push_back(c);
@@ -1652,6 +1683,60 @@ namespace MeshOps
          }
       }
       return RecalculateNormals(out, false, false);
+   }
+
+   Mesh Displace(const Mesh& in, const std::vector<float>& texRGBA, int texW, int texH,
+                 int mode, float strength, float midlevel, bool flat, bool flip)
+   {
+      Mesh out = in;
+      if (!texRGBA.empty() && texW > 0 && texH > 0 && !out.vertices.empty())
+      {
+         // A hard-shaded primitive (Cube, Icosphere's poles, anything with a
+         // UV seam) duplicates one corner into several vertices at the same
+         // position but with different face normals and UVs. Displacing each
+         // along its own normal/sample pulls those duplicates apart and tears
+         // the surface open at exactly the edges that used to be closed - so
+         // the offset is computed per vertex but then averaged across every
+         // vertex sharing a start position (the same weld map Subdivide/Smooth
+         // use) and applied uniformly to the group, keeping seams closed.
+         const std::vector<unsigned int> weld = BuildWeldMap(out);
+         const size_t n = out.vertices.size();
+         std::vector<float> accum(n * 3, 0.0f);
+         std::vector<int> count(n, 0);
+
+         for (size_t i = 0; i < n; i++)
+         {
+            const Vertex& v = out.vertices[i];
+            float s[4];
+            SampleBilinearRGBA(texRGBA, texW, texH, v.u, v.v, s);
+            float dx, dy, dz;
+            if (mode == 1) // vector: RGB is an XYZ offset in the mesh's own local space
+            {
+               dx = (s[0] - 0.5f) * 2.0f * strength;
+               dy = (s[1] - 0.5f) * 2.0f * strength;
+               dz = (s[2] - 0.5f) * 2.0f * strength;
+            }
+            else // scalar: luminance pushes the vertex along its own normal
+            {
+               const float height = 0.299f * s[0] + 0.587f * s[1] + 0.114f * s[2];
+               const float d = (height - midlevel) * strength;
+               dx = v.nx * d; dy = v.ny * d; dz = v.nz * d;
+            }
+            const unsigned int w = weld[i];
+            accum[w * 3 + 0] += dx; accum[w * 3 + 1] += dy; accum[w * 3 + 2] += dz;
+            count[w]++;
+         }
+
+         for (size_t i = 0; i < n; i++)
+         {
+            const unsigned int w = weld[i];
+            const float c = (float)std::max(1, count[w]);
+            out.vertices[i].px += accum[w * 3 + 0] / c;
+            out.vertices[i].py += accum[w * 3 + 1] / c;
+            out.vertices[i].pz += accum[w * 3 + 2] / c;
+         }
+      }
+      return RecalculateNormals(out, flat, flip);
    }
 
    std::vector<MeshPoint> ToPoints(const Mesh& in, int mode, int maxPoints)

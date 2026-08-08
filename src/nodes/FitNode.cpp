@@ -54,7 +54,10 @@ void FitNode::CookIfNeeded(int frameId)
 
    unsigned int srcTex = mInput.Pull(frameId);
    if (srcTex == 0)
+   {
+      GLUtil::DestroyFbo(mOut);
       return;
+   }
 
    const int srcW = std::max(1, mInput.Width());
    const int srcH = std::max(1, mInput.Height());

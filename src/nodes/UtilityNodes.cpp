@@ -92,6 +92,46 @@ void MaterialNode::CookIfNeeded(int frameId)
          mMaps[map].Pull(frameId);
 }
 
+// ==================================================================== Mapping
+
+namespace
+{
+   const std::vector<std::string> kMapSpaceNames = { "UV", "Generated", "Object" };
+}
+
+const std::vector<std::string>& MappingNode::SpaceNames() { return kMapSpaceNames; }
+
+const Mesh& MappingNode::GetMesh()
+{
+   return input ? input->GetMesh() : mEmpty;
+}
+
+size_t MappingNode::TriangleCount() const
+{
+   if (input == nullptr)
+      return 0;
+   return const_cast<IGeometrySource*>(input)->GetMesh().indices.size() / 3;
+}
+
+MappingTransform MappingNode::GetMappingTransform() const
+{
+   MappingTransform t;
+   t.space = space;
+   t.translate[0] = translateX; t.translate[1] = translateY; t.translate[2] = translateZ;
+   t.rotate[0] = rotateX; t.rotate[1] = rotateY; t.rotate[2] = rotateZ;
+   t.scale[0] = scaleX; t.scale[1] = scaleY; t.scale[2] = scaleZ;
+   return t;
+}
+
+void MappingNode::CookIfNeeded(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   mLastCookFrame = frameId;
+   if (auto* upstream = dynamic_cast<INode*>(input))
+      upstream->CookIfNeeded(frameId);
+}
+
 // =============================================================== Join Geometry
 
 const std::vector<std::string>& JoinGeometryNode::ModeNames() { return kJoinModeNames; }

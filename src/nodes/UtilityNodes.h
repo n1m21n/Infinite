@@ -147,6 +147,10 @@ public:
    {
       return input ? input->GetMaterial() : Material();
    }
+   MappingTransform GetMappingTransform() const override
+   {
+      return input ? input->GetMappingTransform() : MappingTransform();
+   }
    unsigned int GetSurfaceTexture() override
    {
       return input ? input->GetSurfaceTexture() : 0;
@@ -194,6 +198,10 @@ public:
    unsigned int GetSurfaceTexture() override;
 
    unsigned int GetMaterialTexture(int map) override;
+   MappingTransform GetMappingTransform() const override
+   {
+      return input ? input->GetMappingTransform() : MappingTransform();
+   }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
@@ -230,6 +238,76 @@ public:
    }
 private:
    ImageCable mMaps[kMapCount];
+   Mesh mEmpty;
+   int mLastCookFrame = -1;
+};
+
+// --- Mapping --------------------------------------------------------------
+// Chooses which coordinates a material's maps sample - the mesh's own UV, or
+// a 3D coordinate generated from the surface itself - and offsets, rotates
+// and scales them before lookup. The Blender equivalent is a Texture
+// Coordinate node feeding a Mapping node feeding an Image Texture; here that
+// is one node, since every material map already samples through the same
+// IGeometrySource chain rather than through a separate texture-node graph.
+//
+// A pass-through in the geometry chain, like Null 3D and Material: it forwards
+// the mesh and material untouched and only changes how MaterialNode's maps -
+// or the plain GetSurfaceTexture() path - are looked up on the surface. Placed
+// anywhere upstream of a Material or Render 3D, so an image or a Noise/Ramp/
+// Formula texture can be tiled, offset or object-space-projected without
+// re-authoring the geometry's own UVs.
+class MappingNode : public INode, public IGeometrySource
+{
+public:
+   static INode* Create() { return new MappingNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+
+   const Mesh& GetMesh() override;
+   unsigned long long MeshRevision() override { return input ? input->MeshRevision() : 0; }
+   Mat4 GetModelMatrix() const override
+   {
+      return input ? input->GetModelMatrix() : Mat4::Identity();
+   }
+   Material GetMaterial() const override
+   {
+      return input ? input->GetMaterial() : Material();
+   }
+   unsigned int GetSurfaceTexture() override
+   {
+      return input ? input->GetSurfaceTexture() : 0;
+   }
+   unsigned int GetMaterialTexture(int map) override
+   {
+      return input ? input->GetMaterialTexture(map) : 0;
+   }
+   MappingTransform GetMappingTransform() const override;
+
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
+   IGeometrySource* input = nullptr;
+   const char* InputLabel(int) const override { return "geo"; }
+   size_t TriangleCount() const;
+
+   int space = kMapSpaceUv;
+   float translateX = 0.0f, translateY = 0.0f, translateZ = 0.0f;
+   float rotateX = 0.0f, rotateY = 0.0f, rotateZ = 0.0f;
+   float scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
+
+   static const std::vector<std::string>& SpaceNames();
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("space", space);
+      v.Float("translateX", translateX); v.Float("translateY", translateY);
+      v.Float("translateZ", translateZ);
+      v.Float("rotateX", rotateX); v.Float("rotateY", rotateY); v.Float("rotateZ", rotateZ);
+      v.Float("scaleX", scaleX); v.Float("scaleY", scaleY); v.Float("scaleZ", scaleZ);
+   }
+
+private:
    Mesh mEmpty;
    int mLastCookFrame = -1;
 };

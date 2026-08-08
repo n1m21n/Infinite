@@ -59,7 +59,10 @@ void BlendNode::CookIfNeeded(int frameId)
    unsigned int texA = mInputA.Pull(frameId);
    unsigned int texB = mInputB.Pull(frameId);
    if (texA == 0 && texB == 0)
+   {
+      GLUtil::DestroyFbo(mOut);
       return;
+   }
 
    int w = mInputA.IsConnected() ? mInputA.Width() : mInputB.Width();
    int h = mInputA.IsConnected() ? mInputA.Height() : mInputB.Height();

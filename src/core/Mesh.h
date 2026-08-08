@@ -359,6 +359,25 @@ namespace MeshOps
    Mesh Explode(const Mesh& in, float amount, float seed);
    Mesh Twist(const Mesh& in, float angle, int axis);
 
+   // Moves each vertex using a texture sampled at its UV, the 3D counterpart
+   // to the 2D `displace`/`liquify` filters - those warp an image's UVs, this
+   // actually offsets mesh geometry. Mode 0 (Blender's "Displacement Only")
+   // reads the texture's luminance and pushes along the vertex's own normal
+   // by (height - midlevel) * strength. Mode 1 ("Vector Displacement") reads
+   // RGB as an XYZ offset in the mesh's own local space, scaled by strength -
+   // this can carve overhangs a normal-only push cannot reach. `texRGBA` is a
+   // pre-sampled readback of the driving texture (row 0 = bottom), so this
+   // stays pure CPU-side mesh math with no GL calls of its own. Normals are
+   // recalculated afterward via RecalculateNormals(flat, flip).
+   //
+   // Vertices that share a starting position - a hard-shaded primitive like
+   // Cube duplicates each corner once per adjoining face - get their
+   // per-vertex offsets averaged and applied as one, so seams stay closed
+   // instead of tearing open as each duplicate is pushed along its own
+   // (different) normal.
+   Mesh Displace(const Mesh& in, const std::vector<float>& texRGBA, int texW, int texH,
+                 int mode, float strength, float midlevel, bool flat, bool flip);
+
    // Sampling for instancing: vertices, edge midpoints or face centres.
    std::vector<MeshPoint> ToPoints(const Mesh& in, int mode, int maxPoints);
    Mesh PointsToFaces(const std::vector<MeshPoint>& points, float size);
