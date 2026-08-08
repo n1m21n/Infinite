@@ -5,13 +5,16 @@
 
 namespace
 {
-   const std::vector<std::string> kTypeNames = { "Voronoi", "Brick", "Magic", "Wave", "Musgrave" };
+   const std::vector<std::string> kTypeNames = { "Voronoi", "Brick", "Magic", "Wave", "Musgrave", "Checker", "Gradient", "Clouds", "Marble", "Wood" };
    const std::vector<std::string> kVoronoiDistanceNames = { "Euclidean", "Manhattan", "Chebyshev", "Minkowski" };
    const std::vector<std::string> kVoronoiFeatureNames = { "F1", "F2", "Smooth F1", "Distance to Edge", "N-Sphere Radius" };
    const std::vector<std::string> kWaveTypeNames = { "Bands", "Rings" };
    const std::vector<std::string> kWaveProfileNames = { "Sine", "Saw", "Triangle" };
    const std::vector<std::string> kWaveBandsDirectionNames = { "X", "Y", "Diagonal" };
    const std::vector<std::string> kMusgraveTypeNames = { "fBm", "Multifractal", "Hybrid Multifractal", "Ridged Multifractal", "Hetero Terrain" };
+   const std::vector<std::string> kGradientTypeNames = { "Linear", "Quadratic", "Easing", "Diagonal", "Radial", "Spherical", "Quadratic Sphere" };
+   const std::vector<std::string> kMarbleTypeNames = { "Soft", "Sharp", "Sharper" };
+   const std::vector<std::string> kWoodTypeNames = { "Bands", "Rings", "Band Noise", "Ring Noise" };
 
    const char* kFragSrc =
       "#version 150\n"
@@ -53,6 +56,16 @@ namespace
       "uniform float uMusOctaves;\n"
       "uniform float uMusGain;\n"
       "uniform float uMusOffset;\n"
+      "uniform int uGradType;\n"
+      "uniform float uCloudsDepth;\n"
+      "uniform int uCloudsHard;\n"
+      "uniform int uMarbleType;\n"
+      "uniform float uMarbleTurbulence;\n"
+      "uniform float uMarbleNoiseScale;\n"
+      "uniform float uMarbleNoiseDepth;\n"
+      "uniform int uWoodType;\n"
+      "uniform float uWoodTurbulence;\n"
+      "uniform float uWoodNoiseScale;\n"
       "\n"
       "float hash(vec2 p) {\n"
       "   p += uSeed;\n"
@@ -79,6 +92,15 @@ namespace
       "   for (int i = 0; i < 8; i++) {\n"
       "      if (i >= oct) break;\n"
       "      sum += valueNoise(p) * amp; norm += amp;\n"
+      "      p *= lac; amp *= gain;\n"
+      "   }\n"
+      "   return norm > 1e-4 ? sum / norm : 0.0;\n"
+      "}\n"
+      "float fbmTurbulence(vec2 p, int oct, float lac, float gain) {\n"
+      "   float sum = 0.0, amp = 0.5, norm = 0.0;\n"
+      "   for (int i = 0; i < 8; i++) {\n"
+      "      if (i >= oct) break;\n"
+      "      sum += abs(valueNoise(p) * 2.0 - 1.0) * amp; norm += amp;\n"
       "      p *= lac; amp *= gain;\n"
       "   }\n"
       "   return norm > 1e-4 ? sum / norm : 0.0;\n"
@@ -248,6 +270,46 @@ namespace
       "   }\n"
       "}\n"
       "\n"
+      "float checkerValue(vec2 p) {\n"
+      "   vec2 c = floor(p);\n"
+      "   return mod(c.x + c.y, 2.0) < 1.0 ? 0.0 : 1.0;\n"
+      "}\n"
+      "\n"
+      "float gradientValue(vec2 gp) {\n"
+      "   if (uGradType == 0) return gp.x * 0.5 + 0.5;\n"
+      "   else if (uGradType == 1) { float t = max(gp.x, 0.0); return t * t; }\n"
+      "   else if (uGradType == 2) { float t = clamp(gp.x * 0.5 + 0.5, 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }\n"
+      "   else if (uGradType == 3) return (gp.x + gp.y) * 0.25 + 0.5;\n"
+      "   else if (uGradType == 4) return atan(gp.y, gp.x) / 6.2831853 + 0.5;\n"
+      "   else if (uGradType == 5) return clamp(1.0 - length(gp), 0.0, 1.0);\n"
+      "   else return clamp(sqrt(max(0.0, 1.0 - dot(gp, gp))), 0.0, 1.0);\n"
+      "}\n"
+      "\n"
+      "float cloudsValue(vec2 p) {\n"
+      "   int oct = int(clamp(uCloudsDepth, 1.0, 8.0));\n"
+      "   return uCloudsHard == 1 ? fbmTurbulence(p, oct, 2.0, 0.5) : fbmBasic(p, oct, 2.0, 0.5);\n"
+      "}\n"
+      "\n"
+      "float marbleValue(vec2 p) {\n"
+      "   int depth = int(clamp(uMarbleNoiseDepth, 1.0, 8.0));\n"
+      "   float turb = fbmTurbulence(p * uMarbleNoiseScale, depth, 2.0, 0.5);\n"
+      "   float w = sin((p.x + p.y) * 5.0 + turb * uMarbleTurbulence);\n"
+      "   float v = clamp(w * 0.5 + 0.5, 0.0, 1.0);\n"
+      "   if (uMarbleType == 1) v = pow(v, 2.0);\n"
+      "   else if (uMarbleType == 2) v = pow(v, 6.0);\n"
+      "   return v;\n"
+      "}\n"
+      "\n"
+      "float woodValue(vec2 p) {\n"
+      "   float turb = fbmTurbulence(p * uWoodNoiseScale, 4, 2.0, 0.5) * uWoodTurbulence;\n"
+      "   float grain;\n"
+      "   if (uWoodType == 0 || uWoodType == 2) grain = p.x + turb;\n"
+      "   else grain = length(p) + turb;\n"
+      "   float v = 0.5 + 0.5 * sin(grain * 6.2831853);\n"
+      "   if (uWoodType >= 2) v = mix(v, valueNoise(p * 6.0), 0.25);\n"
+      "   return v;\n"
+      "}\n"
+      "\n"
       "void main() {\n"
       "   vec2 uv = vUv;\n"
       "   uv.x *= uAspect;\n"
@@ -278,8 +340,19 @@ namespace
       "         useNativeColor = true;\n"
       "      } else if (uType == 3) {\n"
       "         n = waveValue(p);\n"
-      "      } else {\n"
+      "      } else if (uType == 4) {\n"
       "         n = musgrave(p) * 0.5 + 0.5;\n"
+      "      } else if (uType == 5) {\n"
+      "         n = checkerValue(p);\n"
+      "      } else if (uType == 6) {\n"
+      "         vec2 gp = uv - vec2(0.5 * uAspect, 0.5);\n"
+      "         n = clamp(gradientValue(gp), 0.0, 1.0);\n"
+      "      } else if (uType == 7) {\n"
+      "         n = cloudsValue(p);\n"
+      "      } else if (uType == 8) {\n"
+      "         n = marbleValue(p);\n"
+      "      } else {\n"
+      "         n = woodValue(p);\n"
       "      }\n"
       "      if (useNativeColor) {\n"
       "         outColor = clamp((nativeColor - 0.5) * uContrast + 0.5 + uBrightness, 0.0, 1.0);\n"
@@ -299,6 +372,9 @@ const std::vector<std::string>& TextureNode::WaveTypeNames() { return kWaveTypeN
 const std::vector<std::string>& TextureNode::WaveProfileNames() { return kWaveProfileNames; }
 const std::vector<std::string>& TextureNode::WaveBandsDirectionNames() { return kWaveBandsDirectionNames; }
 const std::vector<std::string>& TextureNode::MusgraveTypeNames() { return kMusgraveTypeNames; }
+const std::vector<std::string>& TextureNode::GradientTypeNames() { return kGradientTypeNames; }
+const std::vector<std::string>& TextureNode::MarbleTypeNames() { return kMarbleTypeNames; }
+const std::vector<std::string>& TextureNode::WoodTypeNames() { return kWoodTypeNames; }
 
 TextureNode::~TextureNode()
 {
@@ -373,5 +449,19 @@ void TextureNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uMusOctaves"), musgraveOctaves);
       glUniform1f(glGetUniformLocation(mProgram, "uMusGain"), musgraveGain);
       glUniform1f(glGetUniformLocation(mProgram, "uMusOffset"), musgraveOffset);
+
+      glUniform1i(glGetUniformLocation(mProgram, "uGradType"), gradientType);
+
+      glUniform1f(glGetUniformLocation(mProgram, "uCloudsDepth"), cloudsDepth);
+      glUniform1i(glGetUniformLocation(mProgram, "uCloudsHard"), cloudsHard ? 1 : 0);
+
+      glUniform1i(glGetUniformLocation(mProgram, "uMarbleType"), marbleType);
+      glUniform1f(glGetUniformLocation(mProgram, "uMarbleTurbulence"), marbleTurbulence);
+      glUniform1f(glGetUniformLocation(mProgram, "uMarbleNoiseScale"), marbleNoiseScale);
+      glUniform1f(glGetUniformLocation(mProgram, "uMarbleNoiseDepth"), marbleNoiseDepth);
+
+      glUniform1i(glGetUniformLocation(mProgram, "uWoodType"), woodType);
+      glUniform1f(glGetUniformLocation(mProgram, "uWoodTurbulence"), woodTurbulence);
+      glUniform1f(glGetUniformLocation(mProgram, "uWoodNoiseScale"), woodNoiseScale);
    });
 }

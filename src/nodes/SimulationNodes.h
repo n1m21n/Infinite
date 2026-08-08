@@ -209,6 +209,11 @@ private:
    unsigned long long mBuiltUpstream = 0;
    const void* mBuiltInput = nullptr;
    int mBuiltPinMode = -1;
+   // The input's transform is baked into the rest state (see RebuildFromInput),
+   // and it never bumps mBuiltUpstream on its own - GetModelMatrix() is a live
+   // value, not a revision - so it has to be compared directly to catch a
+   // pure transform edit on the upstream source.
+   Mat4 mBuiltInputModel;
 
    float mAccumulator = 0.0f;
    double mLastBeats = -1.0;

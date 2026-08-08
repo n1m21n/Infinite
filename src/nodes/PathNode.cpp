@@ -48,12 +48,17 @@ void PathNode::RebuildFollowIfNeeded()
    }
 
    const unsigned long long revision = geometrySource->MeshRevision();
+   const Mat4 geometryModel = geometrySource->GetModelMatrix();
    if (mBuiltGeometry == (const void*)geometrySource && mBuiltRevision == revision &&
        mBuiltFollowMode == followMode && mBuiltSliceAxis == sliceAxis &&
-       mBuiltSlicePosition == slicePosition && mBuiltContour == contourIndex)
+       mBuiltSlicePosition == slicePosition && mBuiltContour == contourIndex &&
+       mBuiltGeometryModel == geometryModel)
       return;
 
-   const Mesh& mesh = geometrySource->GetMesh();
+   // Moving/rotating/scaling the source has to move the followed contour with
+   // it, since the path is meant to trace where the mesh actually sits in the
+   // scene, not where it sat in its own local space.
+   const Mesh mesh = MeshOps::Transform(geometrySource->GetMesh(), geometryModel);
    std::vector<Polyline> loops;
    if (followMode == kFollowBoundary)
    {
@@ -82,6 +87,7 @@ void PathNode::RebuildFollowIfNeeded()
    mBuiltSliceAxis = sliceAxis;
    mBuiltSlicePosition = slicePosition;
    mBuiltContour = contourIndex;
+   mBuiltGeometryModel = geometryModel;
 }
 
 void PathNode::Evaluate()

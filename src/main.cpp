@@ -12,6 +12,7 @@
 #include "stb_image_write.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -20,6 +21,7 @@
 #include <functional>
 #include <chrono>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <memory>
 #include <string>
@@ -158,6 +160,8 @@ namespace
    bool gRequestGroup = false;
    bool gRequestUngroup = false;
    int gContextMenuNodeIndex = -1; // node the right-click context menu is open for
+   int gHelpPopupNodeIndex = -1; // node the per-node "Help" popup is open for
+   bool gOpenNodeHelpPopup = false; // set for one frame to open it (can't OpenPopup from inside another popup's Begin/End and have it show the same frame)
    // The node browser lives in a docked panel rather than only the canvas popup,
    // so modules can be found without knowing the double-click gesture exists.
    bool gNodePanelOpen = false;
@@ -752,6 +756,7 @@ namespace
             "3D");
       }
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
+      REGISTER_NODE(WrapNode, Wrap, "3D");
       REGISTER_NODE(CameraNode, Camera, "3D");
       REGISTER_NODE(LightNode, Light, "3D");
       REGISTER_NODE(Render3DNode, Render 3D, "3D");
@@ -894,6 +899,8 @@ namespace
          return 2; // geometry, then the displacement texture
       if (dynamic_cast<InstanceOnPointsNode*>(gn.node.get()) != nullptr)
          return 3; // points, shape, cloud
+      if (dynamic_cast<WrapNode*>(gn.node.get()) != nullptr)
+         return 2; // source, target
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
@@ -1021,6 +1028,12 @@ namespace
             inst->instanceShape = geo;
          else
             inst->cloudSource = dynamic_cast<IPointCloudSource*>(src.node.get());
+         return;
+      }
+      if (auto* wrap = dynamic_cast<WrapNode*>(dst.node.get()))
+      {
+         if (slot == 0) wrap->sourceInput = geo;
+         else if (slot == 1) wrap->targetInput = geo;
          return;
       }
       if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst.node.get()))
@@ -1391,7 +1404,7 @@ namespace
          ModSlider("detail scale", &n->waveDetailScale, 0.1f, 8.0f);
          ModSlider("phase offset", &n->wavePhaseOffset, 0.0f, 1.0f);
       }
-      else // Musgrave
+      else if (n->textureType == 4) // Musgrave
       {
          DropdownButton("musgrave type", TextureNode::MusgraveTypeNames(), n->musgraveType, [n](int i) { n->musgraveType = i; });
          ModSlider("dimension", &n->musgraveDimension, 0.0f, 4.0f);
@@ -1401,6 +1414,32 @@ namespace
             ModSlider("gain", &n->musgraveGain, 0.0f, 4.0f);
          if (n->musgraveType >= 2)
             ModSlider("offset", &n->musgraveOffset, 0.0f, 4.0f);
+      }
+      else if (n->textureType == 5) // Checker
+      {
+         // No extra params - scale/seed above already control cell size.
+      }
+      else if (n->textureType == 6) // Gradient
+      {
+         DropdownButton("gradient type", TextureNode::GradientTypeNames(), n->gradientType, [n](int i) { n->gradientType = i; });
+      }
+      else if (n->textureType == 7) // Clouds
+      {
+         ModSlider("depth", &n->cloudsDepth, 1.0f, 8.0f, "%.0f");
+         ImGui::Checkbox("hard", &n->cloudsHard);
+      }
+      else if (n->textureType == 8) // Marble
+      {
+         DropdownButton("marble type", TextureNode::MarbleTypeNames(), n->marbleType, [n](int i) { n->marbleType = i; });
+         ModSlider("turbulence", &n->marbleTurbulence, 0.0f, 20.0f);
+         ModSlider("noise scale", &n->marbleNoiseScale, 0.1f, 8.0f);
+         ModSlider("noise depth", &n->marbleNoiseDepth, 1.0f, 8.0f, "%.0f");
+      }
+      else // Wood
+      {
+         DropdownButton("wood type", TextureNode::WoodTypeNames(), n->woodType, [n](int i) { n->woodType = i; });
+         ModSlider("turbulence", &n->woodTurbulence, 0.0f, 20.0f);
+         ModSlider("noise scale", &n->woodNoiseScale, 0.1f, 8.0f);
       }
 
       ModSlider("contrast", &n->contrast, 0.1f, 4.0f);
@@ -1492,7 +1531,6 @@ namespace
 
    void DrawResynthParams(ResynthNode* n)
    {
-      ImGui::TextDisabled("FX pad - drag the orb");
       DrawFxPad(n);
 
       if (n->IsRecordingPath())
@@ -1744,7 +1782,6 @@ namespace
       DropdownButton("channel", CurvesNode::ChannelNames(), n->activeChannel,
                      [n](int i) { n->activeChannel = i; });
       DrawCurveEditor(n);
-      ImGui::TextDisabled("drag points, click to add, right-click to remove");
       if (ImGui::Button("Reset channel", ImVec2(kPreviewSize, 0)))
          n->ResetChannel(n->activeChannel);
       ModSlider("mix", &n->mix, 0.0f, 1.0f);
@@ -1773,19 +1810,11 @@ namespace
       if (n->autoRefresh)
       {
          ModSlider("every beats", &n->refreshBeats, 0.1f, 8.0f);
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextDisabled("segmentation is expensive - it runs on this interval, not every frame");
-         ImGui::PopTextWrapPos();
       }
    }
 
    void DrawFeedbackParams(FeedbackNode*)
    {
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-      ImGui::TextDisabled("Outputs the previous frame. Patch a downstream node's "
-                          "output back through this to build a loop without the "
-                          "graph recursing.");
-      ImGui::PopTextWrapPos();
    }
 
    void DrawTrailsParams(TrailsNode* n)
@@ -1897,11 +1926,6 @@ namespace
          ImGui::TextDisabled("%s", file.c_str());
          ImGui::PopTextWrapPos();
       }
-      // A cabled reference wins, but the file is kept rather than cleared, so
-      // unplugging the cable falls back to it instead of emptying the node.
-      if (n->Input().IsConnected() && !n->LoadedPath().empty())
-         ImGui::TextDisabled("(cable overrides the file)");
-
       ModSliderInt("swatches", &n->swatchCount, 2, PaletteNode::kMaxSwatches);
       DropdownButton("order", PaletteNode::SortNames(), n->sortMode,
                      [n](int i) { PushUndoCheckpoint(); n->sortMode = i; });
@@ -2051,6 +2075,15 @@ namespace
          if (sSelNode == n && sSelIndex == nearest)
             sSelIndex = -1;
       }
+      if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && nearest >= 0)
+      {
+         PushUndoCheckpoint();
+         n->RemoveStop(nearest);
+         if (sSelNode == n && sSelIndex == nearest)
+            sSelIndex = -1;
+         sDragIndex = -1;
+         sDragNode = nullptr;
+      }
       if (active && sDragNode == n && sDragIndex >= 0)
          n->MoveStop(sDragIndex, toX(mouse.x));
       if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
@@ -2077,25 +2110,54 @@ namespace
 
       ImGui::SetCursorScreenPos(ImVec2(origin.x, trackBr.y + gap));
 
-      if (sSelNode == n && sSelIndex >= 0 && sSelIndex < n->stopCount)
+      // One row per stop, left-to-right by position along the ramp - not by
+      // raw array index, since RemoveStop's compaction reassigns indices and
+      // a raw-index label would relabel unrelated stops out from under the
+      // user every time one is deleted.
+      int order[ColorRampNode::kMaxStops];
+      for (int i = 0; i < n->stopCount; i++)
+         order[i] = i;
+      for (int i = 0; i < n->stopCount; i++)
+         for (int j = i + 1; j < n->stopCount; j++)
+            if (n->stopPos[order[j]] < n->stopPos[order[i]])
+               std::swap(order[i], order[j]);
+
+      for (int rank = 0; rank < n->stopCount; rank++)
       {
-         ImGui::PushID(sSelIndex + 20000);
-         char label[24];
-         snprintf(label, sizeof(label), "stop %d color", sSelIndex + 1);
-         ColorSwatch(label, n->stopColor[sSelIndex], n);
-         n->MarkDirty();
+         const int idx = order[rank];
+         ImGui::PushID(idx + 20000);
+         char label[16];
+         snprintf(label, sizeof(label), "stop %d", rank + 1);
+         ColorSwatch(label, n->stopColor[idx], n);
+         ImGui::SameLine(size - 18.0f);
+         ImGui::BeginDisabled(n->stopCount <= 2);
+         if (ImGui::SmallButton("x"))
+         {
+            PushUndoCheckpoint();
+            n->RemoveStop(idx);
+            if (sSelNode == n && sSelIndex == idx)
+               sSelIndex = -1;
+         }
+         ImGui::EndDisabled();
          ImGui::PopID();
       }
-      else
+      n->MarkDirty();
+
+      ImGui::BeginDisabled(n->stopCount >= ColorRampNode::kMaxStops);
+      if (ImGui::Button("+ stop", ImVec2(size, 0)))
       {
-         ImGui::TextDisabled("click a stop to edit its color");
+         PushUndoCheckpoint();
+         float x = n->stopCount > 0 ? std::min(1.0f, n->stopPos[order[n->stopCount - 1]] + 0.1f) : 0.5f;
+         float seedColor[3];
+         n->Evaluate(x, seedColor);
+         n->AddStop(x, seedColor);
       }
+      ImGui::EndDisabled();
    }
 
    void DrawColorRampParams(ColorRampNode* n)
    {
       DrawColorRampEditor(n);
-      ImGui::TextDisabled("drag to move, click to add, right-click to remove");
       DropdownButton("interpolation", ColorRampNode::InterpNames(), n->interpMode,
                      [n](int i) { PushUndoCheckpoint(); n->interpMode = i; n->MarkDirty(); });
       ModSlider("mix", &n->mix, 0.0f, 1.0f);
@@ -2103,10 +2165,6 @@ namespace
 
    void DrawImageAnalyzeParams(ImageAnalyzeNode* n)
    {
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-      ImGui::TextDisabled("Turns an image into control values. Patch any output "
-                          "into any slider - a video can drive a blur.");
-      ImGui::PopTextWrapPos();
       for (int i = 0; i < ImageAnalyzeNode::kOutputCount; i++)
       {
          const float v = n->Value(i);
@@ -2119,7 +2177,6 @@ namespace
       ModSlider("samples / sec", &n->sampleRate, 1.0f, 60.0f, "%.0f");
       ImGui::SetNextItemWidth(kParamWidth);
       ImGui::SliderInt("sample res", &n->sampleSize, 8, 256);
-      ImGui::TextDisabled("readback is rate-limited; it stalls the GPU");
    }
 
    void DrawAudioFileParams(AudioFileNode* n)
@@ -2155,8 +2212,6 @@ namespace
          ImGui::Checkbox("follow transport", &n->followTransport);
          ImGui::Checkbox("loop", &n->loop);
          ImGui::Checkbox("audible", &n->monitor);
-         if (!n->monitor)
-            ImGui::TextDisabled("silent, but still analysed");
          ModSlider("volume", &n->volume, 0.0f, 1.0f);
          ModSlider("gain", &n->gain, 0.1f, 16.0f);
 
@@ -2369,8 +2424,6 @@ namespace
    {
       ImGui::TextDisabled("%d inputs, %zu triangles", n->ConnectedCount(), n->TriangleCount());
       DropdownButton("mode", JoinGeometryNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
-      if (n->mode != JoinGeometryNode::kMerge)
-         ImGui::TextDisabled("needs closed solids");
 
       NodeSeparator("material");
       ImGui::Checkbox("inherit material", &n->inheritMaterial);
@@ -2395,6 +2448,49 @@ namespace
       ModSlider("pos y", &n->posY, -5.0f, 5.0f);
       ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
       ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
+   }
+
+   void DrawWrapParams(WrapNode* n)
+   {
+      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      DropdownButton("mode", WrapNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
+      // Axis, radius and fit steer the parametric bend; nearest-surface has no
+      // parameterisation for them to act on.
+      if (n->mode != MeshOps::kWrapNearest)
+      {
+         ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+         // With a target the radius always follows the target's size, so the
+         // only control is a multiplier - and the resolved value is shown so
+         // that link stays visible. Without one there is nothing to follow,
+         // so the radius is set outright. Never both.
+         if (n->targetInput != nullptr)
+         {
+            ImGui::TextDisabled("radius %.3f (from target)", n->ResolvedRadius());
+            ModSlider("radius scale", &n->radiusScale, 0.05f, 3.0f);
+         }
+         else
+         {
+            ModSlider("radius", &n->radiusOverride, 0.05f, 5.0f);
+         }
+         ImGui::Checkbox("fit around", &n->fitAround);
+      }
+      ModSlider("offset", &n->offset, -0.5f, 0.5f);
+      ModSlider("blend", &n->blend, 0.0f, 1.0f);
+      ImGui::Checkbox("flat shade", &n->flatShade);
+      ImGui::Checkbox("flip normals", &n->flipNormals);
+
+      NodeSeparator("material");
+      ImGui::Checkbox("inherit material", &n->inheritMaterial);
+      if (!n->inheritMaterial)
+      {
+         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+         ColorSwatch("colour", n->color, n);
+         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+         ColorSwatch("emission", n->emissionColor, n);
+         ModSlider("emission", &n->emission, 0.0f, 8.0f);
+      }
    }
 
    void DrawClothParams(ClothNode* n)
@@ -2663,7 +2759,6 @@ namespace
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       ImGui::TextUnformatted(n->Status().c_str());
       ImGui::PopTextWrapPos();
-      ImGui::TextDisabled("obj, ply, stl, usd, usdz");
 
       NodeSeparator("import");
       // Evaluated into separate variables rather than OR'd inline: `||` would
@@ -2781,9 +2876,7 @@ namespace
    void DrawGeometryOpParams(GeometryOpNode* n)
    {
       DropdownButton("operation", GeometryOpNode::OpNames(), n->op, [n](int i) { n->op = i; });
-      if (n->input == nullptr)
-         ImGui::TextColored(ImVec4(1, 0.6f, 0.4f, 1), "no geometry input");
-      else
+      if (n->input != nullptr)
          ImGui::TextDisabled("%zu triangles out", n->TriangleCount());
 
       switch (n->op)
@@ -2812,7 +2905,6 @@ namespace
          case GeometryOpNode::kSubdivide:
             ModSliderInt("levels", &n->levels, 0, 3);
             ModSlider("smooth", &n->smooth, 0.0f, 2.0f);
-            ImGui::TextDisabled("each level quadruples the triangles");
             break;
          case GeometryOpNode::kSolidify:
             ModSlider("thickness", &n->thickness, 0.001f, 0.5f);
@@ -2933,12 +3025,8 @@ namespace
 
    void DrawDisplacementParams(DisplacementNode* n)
    {
-      if (n->input == nullptr)
-         ImGui::TextColored(ImVec4(1, 0.6f, 0.4f, 1), "no geometry input");
-      else
+      if (n->input != nullptr)
          ImGui::TextDisabled("%zu triangles", n->TriangleCount());
-      if (!n->TextureInput().IsConnected())
-         ImGui::TextColored(ImVec4(1, 0.6f, 0.4f, 1), "no texture input");
 
       static const std::vector<std::string> kModeNames = { "Scalar (along normal)", "Vector (RGB = XYZ)" };
       DropdownButton("mode", kModeNames, n->mode, [n](int i) { n->mode = i; });
@@ -2964,12 +3052,8 @@ namespace
 
    void DrawInstanceParams(InstanceOnPointsNode* n)
    {
-      ImGui::TextDisabled("A = points source, B = shape to stamp");
-      if (n->pointSource == nullptr || n->instanceShape == nullptr)
-         ImGui::TextColored(ImVec4(1, 0.6f, 0.4f, 1), "needs both inputs");
-      else
+      if (n->pointSource != nullptr && n->instanceShape != nullptr)
          ImGui::TextDisabled("%zu instances, %zu triangles", n->InstanceCount(), n->TriangleCount());
-      ImGui::TextDisabled("drawn in one instanced call");
 
       DropdownButton("points from", InstanceOnPointsNode::SourceNames(), n->pointMode,
                      [n](int i) { n->pointMode = i; });
@@ -3021,7 +3105,6 @@ namespace
       ColorSwatch("colour", n->color, n);
       ModSlider("intensity", &n->intensity, 0.0f, 5.0f);
       ModSlider("orbit / beat", &n->orbitPerBeat, -1.0f, 1.0f);
-      ImGui::TextDisabled("Render 3D takes up to 3 lights");
    }
 
    // Fits the camera around everything patched into a Render node.
@@ -3120,8 +3203,6 @@ namespace
       ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
       if (ImGui::Button("Frame scene", ImVec2(kParamWidth, 0)))
          FrameSceneInView(n);
-      if (n->LastTriangleCount() > 2000000)
-         ImGui::TextColored(ImVec4(1, 0.55f, 0.35f, 1), "very heavy scene");
 
       NodeSeparator("output");
       // This is the export resolution: Output sizes its own buffer from whatever
@@ -3235,8 +3316,6 @@ namespace
       // Layers composite bottom-up: A is the base, D sits on top. Grab a layer's
       // header strip and drag vertically to reorder - the whole layer moves,
       // cable, blend mode and opacity together.
-      ImGui::TextDisabled("A is the base, D is on top - drag a header to reorder");
-
       static LayerStackNode* sDragNode = nullptr;
       static int sDragSlot = -1;
       static float sDragAccum = 0.0f;
@@ -3804,15 +3883,10 @@ namespace
          if (n->IsPlayingBack())
             ImGui::TextColored(ImVec4(0.5f, 0.95f, 0.6f, 1.0f), "playhead %.1f", n->PlayheadBeats());
       }
-      else
-      {
-         ImGui::TextDisabled("record, then draw - replay redraws it in time");
-      }
       ImGui::Checkbox("loop replay", &n->loopPlayback);
       ModSlider("replay speed", &n->playSpeed, 0.1f, 4.0f);
       if (ImGui::SmallButton("clear recording"))
          n->ClearRecording();
-      ImGui::TextDisabled("(canvas size follows the input when one is patched in)");
       ModSlider("canvas w", &n->canvasWidth, 64.0f, 4096.0f, "%.0f");
       ModSlider("canvas h", &n->canvasHeight, 64.0f, 4096.0f, "%.0f");
    }
@@ -3986,6 +4060,276 @@ namespace
       {
          cable->Disconnect();
       }
+   }
+
+   // Per-node "Help" popup text, keyed by the exact registered typeName (the
+   // same string GraphNode::typeName holds - see REGISTER_NODE / FilterDef::name).
+   // This is where usage notes, wiring conventions and gotchas live now, rather
+   // than as permanent text drawn on the node body: a node you already know how
+   // to use shouldn't have to carry its own manual around forever.
+   const char* SpecificNodeHelpText(const std::string& typeName)
+   {
+      static const std::unordered_map<std::string, const char*> kText = {
+         // ---------------- Source / Text ----------------
+         { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
+         { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available." },
+         { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
+         { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
+         { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
+         { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
+         { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
+         { "Ramp", "Generates a gradient from scratch (no input) between up to 8 user-set colour stops, at a chosen angle, scale and offset. Gamma and dither smooth out visible banding." },
+         { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
+
+         // ---------------- Effects (built-in, non-filter-table) ----------------
+         { "Curves", "Shadow / midtone / highlight lift plus an S-curve control, per RGB channel or all together. Drag points on the curve to bend it, click empty curve to add a point, right-click a point to remove it." },
+
+         // ---------------- Color ----------------
+         { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
+
+         // ---------------- Compositing ----------------
+         { "Blend", "Two inputs and 31 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
+         { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
+         { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
+         { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
+         { "Comment", "A free-floating note on the canvas - has no image input or output, just text. Double-click to edit." },
+         { "Group", "A resizable box that owns whatever nodes are geometrically inside it - drag it and its members move together, right-click > Ungroup dissolves it (or ungroup one member from its own context menu)." },
+         { "Null", "A pass-through node: its output is exactly its input, unchanged. Useful as a stable junction point to branch a cable to several destinations, or as a placeholder while rewiring." },
+         { "Viewport", "Shows its input at actual pixel size in its own resizable window, separate from the small node preview - useful for judging detail without zooming the whole canvas." },
+
+         // ---------------- Modulators ----------------
+         { "LFO", "Sine, triangle, saw up/down, square and sample-and-hold. Rate in beats, plus phase and an output range." },
+         { "Random", "A new random value every N beats, with adjustable smoothing between steps. Deterministic, so rewinding replays the same sequence." },
+         { "Pattern", "An eight-step sequencer. Set the eight sliders, choose how many steps to use, and it loops through them one step every N beats. Optional glide between steps." },
+         { "Math", "Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant, shown as an editable slider; a patched input just shows as 'patched'." },
+         { "Macro Knob", "A single named slider (0-1, with a response curve and invert) meant to be patched out to several other sliders at once - one control that fans out to many parameters." },
+         { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
+         { "Path", "Outputs a moving 3D point (X/Y/Z, each patchable separately) travelling around a built-in shape (circle, helix, spiral, lissajous, etc.) at a beat-synced speed, or along the points of a patched-in geometry/curve source instead." },
+         { "Constant", "Outputs one fixed number - the simplest possible modulator, useful for feeding a Math input or a modulation slot that expects a cable rather than manual control." },
+         { "Palette", "Samples colours from a reference image, loaded here or patched in - a patched cable overrides the loaded file, but the file is kept so unplugging falls back to it. Drag its 'out' onto the square dot beside any colour swatch to bind it - each new cable takes the next swatch, and clicking a bound swatch steps it. Its image output is a gradient of the palette." },
+         { "Audio File", "Loads an audio file for playback and Audio Analyze to read. Keeps analysing even while muted - the 'audible' checkbox only controls monitoring." },
+         { "Image Analyze", "Turns an image into control values. Patch any of its outputs into any slider's modulation dot - a video can drive a blur. Sample res readback is rate-limited because it stalls the GPU." },
+         { "Audio Analyze", "Extracts level/frequency-band values from an Audio File for modulation." },
+
+         // ---------------- Feedback ----------------
+         { "Feedback", "Outputs the previous frame - a one-frame delay, not an effect. It only does something visible inside a loop: patch a downstream node's output back into a Feedback node's input, then use that Feedback output upstream, without the graph recursing. See Menu > Help > 'Using Feedback' for the full patch." },
+         { "Trails", "A pre-wired feedback loop: decaying accumulation with drift, zoom, rotation and hue rotation. Reach for this before wiring a Feedback loop by hand." },
+         { "Reaction Diffusion", "Gray-Scott chemical simulation, six presets. Needs no input; patch one in and its luminance varies the feed rate so the pattern grows differently through light and dark." },
+
+         // ---------------- Mask ----------------
+         { "Remove Background", "On-device segmentation via the OS - no model download, no network, no key. Subject mode needs macOS 14, Person mode macOS 12. Segmentation is expensive, so the mask is computed on this interval rather than every frame; for video, raise the interval or use auto-refresh." },
+
+         // ---------------- Resynth ----------------
+         { "Resynthesize", "Each generation reads the previous one, so the image drifts away from the source. The XY pad blends four named mutation effects assigned to its corners - drag the orb to mix them. Randomise re-rolls which four effects sit in the corners, and the orb's path can be recorded, looped and replayed in time." },
+         { "Resynthesize 3D", "The mesh equivalent of Resynthesize: each generation applies a weighted mix of geometry operators to the previous one, drifting the shape over time. 'step' advances one generation manually, 'auto step' runs it continuously, 'randomise' re-rolls the seed." },
+
+         // ---------------- Output ----------------
+         { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
+
+         // ---------------- 3D / geometry pipeline ----------------
+         { "Geometry", "The base 3D primitive node - pick any of its 24 shapes from the dropdown. Each shape also has its own directly-spawnable named node (Cube, Sphere, Torus, ...) that just starts on that shape." },
+         { "Text 3D", "Extrudes text into a 3D mesh, with depth, bevel and letter tracking, using any font installed on the system." },
+         { "Ocean", "A simulated ocean surface mesh - Gerstner-style waves with amplitude, wavelength, steepness, choppiness, direction and octaves for layered swell." },
+         { "Material", "Applies shading, colour, metallic/roughness/opacity and emission to a geometry input, plus an optional normal map input (its strength slider only appears once something is patched into it)." },
+         { "Displacement", "Displaces a geometry's vertices along their normals using a texture's luminance. Needs both a geometry input and a texture input to do anything." },
+         { "Mapping", "Transforms the UV or 3D texture coordinates used by materials/textures downstream - translate, rotate and scale, independent of moving the geometry itself." },
+         { "Particle System", "A GPU particle emitter - shape, rate, lifetime, launch speed/spread/direction, gravity/drag/turbulence, and start/end size and colour over each particle's life." },
+         { "Cloth", "A cloth simulation over an input mesh - stiffness, iterations, damping, mass and shape retention, plus gravity, wind and optional ground collision. 'Reset' re-drops the cloth from its rest pose." },
+         { "Join Geometry", "Combines two or more geometry inputs into one. The boolean modes (Union, Difference, Intersection, etc, each also spawnable as its own named node) need closed, manifold solids to produce a clean result - open surfaces can give garbage." },
+         { "Metaballs", "Builds an isosurface (blobby, merging spheres) from a point cloud source, or from a manually-placed set of balls when no cloud is patched in." },
+         { "Image to Points", "Converts an image into a 3D point cloud - brightness/depth-source drives per-point depth, with density, threshold, point size and optional colour-from-image." },
+         { "Curve", "A generative parametric curve/tube (line, circle, spiral, helix and other presets) extruded into a mesh, with point count, smoothness, spread, height, twist and tube radius/taper controls." },
+         { "Mesh to Points", "Samples the input mesh's vertices as a point cloud, for feeding Instance on Points or Metaballs." },
+         { "Mesh to Edges", "Samples points along the input mesh's edges as a point cloud, for feeding Instance on Points or Metaballs." },
+         { "Mesh to Faces", "Samples each face's centre point of the input mesh as a point cloud, for feeding Instance on Points or Metaballs." },
+         { "Instance on Points", "Stamps a shape at every point of a point source, drawn in one instanced call. Input A is the points source (Faces/Edges/Points sampler, a point cloud, etc.), input B is the shape to stamp at each point - both are required before it draws anything." },
+         { "Wrap", "Bends or conforms the source input onto the target input. Cylindrical rolls it around one axis at the target's radius with no distortion at all - letterforms, spacing and extrusion depth survive intact, which is what curves 3D text around a sphere or cylinder. Spherical adds the same bend the other way so long text also curves over the poles. Nearest Surface snaps every vertex to the closest point on the target instead: right for conforming a dense mesh to irregular geometry, but it squashes flat text. With a target connected the bend radius follows the target's size, so scaling the target moves the source with it - radius scale tunes it as a multiplier. With no target, radius sets the bend outright." },
+         { "Camera", "A 3D viewpoint. Patch it into a Render 3D node's camera input to render from it instead of the default view." },
+         { "Light", "A light source for the 3D scene. Render 3D takes up to 3 lights - patch more in and only the first 3 are used." },
+         { "Render 3D", "Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. Needs a Select node upstream to drive per-object selection highlighting." },
+         { "Model 3D", "Loads a 3D model file - obj, ply, stl, usd or usdz." },
+         { "Null 3D", "A pass-through node for geometry: its output is exactly its input mesh, unchanged. Useful as a stable junction point to branch geometry to several destinations." },
+
+         // ---------------- Join Geometry boolean modes (also spawnable directly) ----------------
+         { "Union", "Boolean union: fuses two or more closed, manifold solids into one, keeping their combined outer surface." },
+         { "Intersect", "Boolean intersection: keeps only the volume where all the closed, manifold input solids overlap." },
+         { "Difference", "Boolean difference: subtracts every input after the first from the first, like a cookie cutter. Needs closed, manifold input." },
+
+         // ---------------- GeometryOp operators ----------------
+         { "Transform", "Moves, rotates and scales the input mesh by a fixed offset - the geometry equivalent of the 2D Transform effect." },
+         { "Array", "Duplicates the input mesh in a line or radial ring. Count sets how many copies; radial mode spaces them by Radius, linear mode by Offset X/Y/Z; each copy can additionally rotate/scale a step further than the last." },
+         { "Subdivide", "Subdivision surface. Each level roughly quadruples the triangle count, so higher levels get expensive fast; Smooth controls how much it rounds corners." },
+         { "Solidify", "Gives a flat or open surface real Thickness, turning it into a solid shell. 'keep original' also retains the source surface." },
+         { "Extrude", "Extrudes every face of the input mesh along its own normal by Distance, with Inset shrinking each face first." },
+         { "Wireframe", "Replaces solid faces with a wireframe tube running along each edge, at a chosen Thickness." },
+         { "Triangulate", "Re-triangulates the mesh; Jitter randomizes how each face is split, for a more organic, less uniform look." },
+         { "Normals", "Recomputes vertex normals - 'flat shade' gives hard per-face edges instead of smooth shading, 'flip' inverts which way every face points." },
+         { "Explode", "Pushes each face outward from the mesh's centre along its own normal, by Amount, randomized per-face by Seed." },
+         { "Twist", "Twists the mesh around a chosen Axis by Angle - the further a point is along that axis, the more it rotates." },
+         { "Smooth", "Iteratively averages each vertex toward its neighbours (a Laplacian smooth) - Iterations and Strength control how much it relaxes." },
+         { "Mirror", "Mirrors the mesh across a plane perpendicular to a chosen Axis, at a given plane offset. 'keep original' keeps the source geometry too, 'weld seam' merges the two halves where they meet." },
+         { "Screw", "Sweeps the input profile around an Axis in a helical path - Steps sets resolution, Turns the number of revolutions, Rise/turn the pitch, Radius offsets the sweep outward." },
+         { "Select", "Marks a subset of faces - by index range, position along an axis, normal direction, random chance, or within a radius - for downstream ops (Delete Selected / Transform Selected / Extrude Selected, or Render 3D's selection highlight) to act on. Invert flips the selection, 'add to selection' unions with whatever was already selected." },
+         { "Delete Selected", "Deletes the faces marked by an upstream Select op - or, with 'keep selected instead', deletes everything else and keeps only the selection." },
+         { "Transform Selected", "Moves, rotates and scales only the faces marked by an upstream Select op, optionally sliding them along their own normals instead of a fixed direction." },
+         { "Extrude Selected", "Extrudes only the faces marked by an upstream Select op along their own normals, by Distance, with Inset." },
+      };
+      auto it = kText.find(typeName);
+      return it != kText.end() ? it->second : nullptr;
+   }
+
+   // Every filter-table effect - see core/FilterDefs.cpp for the actual shader
+   // each of these names drives. Keyed by the raw (lowercase, spaceless-ish)
+   // FilterDef::name, which is what GraphNode::typeName actually holds for these.
+   const char* FilterHelpText(const std::string& typeName)
+   {
+      static const std::unordered_map<std::string, const char*> kText = {
+         { "gaussianblur", "Blurs the image with a Gaussian-weighted kernel - a smooth, natural blur. Radius sets how far it samples." },
+         { "boxblur", "Blurs by averaging a flat square of neighbouring pixels - cheaper and blockier than Gaussian Blur. Radius sets the box size." },
+         { "motionblur", "Smears the image along a straight line, like camera or subject motion. Angle sets the direction, Distance how far it smears." },
+         { "radialblur", "Blurs outward from a centre point, like a zoom or spin blur. Amount sets the strength, Center X/Y the origin." },
+         { "unsharpmask", "Unsharp mask: blurs a copy of the image and adds back the difference, exaggerating edges. Amount is the strength, Radius how wide an edge it reacts to." },
+         { "twirl", "Rotates pixels increasingly the closer they are to a centre point, like a whirlpool. Angle is the twist amount, Radius how far it reaches." },
+         { "pinchpunch", "Pulls pixels toward, or pushes them away from, a centre point. Amount above 1 punches outward, below 1 pinches inward." },
+         { "ripple", "Displaces pixels outward from a centre in concentric waves. Amplitude is wave height, Wavelength the spacing, Phase animates it." },
+         { "pixelate", "Chunks the image into flat colour blocks. Block Size sets how large each block is." },
+         { "addnoise", "Adds random per-pixel grain, re-randomised every frame. Amount sets how strong it is." },
+         { "vignette", "Darkens the image toward the edges, framing the centre. Radius and Softness shape the falloff, Center X/Y offsets it." },
+         { "transform", "Translates, scales and rotates the whole image. Scale X/Y let you stretch non-uniformly on top of the overall Scale." },
+         { "brightnesscontrast", "Basic exposure control: Brightness adds or subtracts a flat amount, Contrast steepens or flattens the curve around mid-grey." },
+         { "levels", "Remaps the input range: Black Point and White Point set what maps to pure black/white, Gamma curves the midtones." },
+         { "hsl", "Shifts Hue, scales Saturation and adds Lightness, independent of the underlying colour." },
+         { "invert", "Inverts every colour channel (alpha untouched) - a photographic negative. No parameters." },
+         { "posterize", "Reduces the image to a fixed number of tonal Levels per channel, producing flat colour bands." },
+         { "threshold", "Converts to pure black or white based on luminance, split at Threshold." },
+         { "vibrance", "Boosts or reduces saturation relative to each pixel's own average brightness - gentler and more selective than a flat saturation push." },
+         { "blackandwhite", "Converts to greyscale using per-channel Red/Green/Blue Weight, so you can control which colours read light or dark." },
+         { "colorbalance", "Shifts colour along three axes - Cyan-Red, Magenta-Green, Yellow-Blue - without touching overall brightness." },
+         { "exposure", "Multiplies brightness by powers of two, like a camera's exposure stop (compare Levels' linear/gamma remap)." },
+         { "bloom", "Isolates pixels above a brightness Threshold, blurs them outward by Radius, and adds the glow back at Intensity - classic HDR-style bloom." },
+         { "diffuseglow", "Screens a blurred copy of the whole image back over itself, glowing everything rather than just bright spots (compare Bloom, which is threshold-based)." },
+         { "glitch", "Six glitch algorithms behind one 'kind' dropdown: Slice Shift (blocky RGB-split rows), RGB Shift, Scanlines, Blocks (jittered tiles), Wave, and Datamosh (sliced/shuffled rows with colour smear). Amount/Detail control strength/scale, Speed animates it, Seed reseeds the randomness." },
+         { "lensdistortion", "Simulates a camera lens: Barrel bows the image in or out, Chromatic separates the colour channels' distortion for fringing, Zoom scales the result." },
+         { "displace", "Offsets each pixel using a second patched-in image's red/green channels as a displacement map, or a built-in animated wave if nothing is patched. Map Scale tiles the map." },
+         { "liquify", "Flows pixels around using animated Perlin-style noise, like a liquid warp. Scale sets the flow's feature size, Speed animates it." },
+         { "symmetry", "Mirrors the image about the X axis, Y axis, or both, from a chosen centre point. Flip additionally reverses the whole image before mirroring." },
+         { "kaleidoscope", "Slices the image into angular Segments around a centre and mirrors each one, kaleidoscope-style. Rotation spins the pattern, Zoom scales it." },
+         { "mirror tile", "Tiles the image and alternately mirrors each tile so the edges line up seamlessly, unlike a plain repeat. Tiles sets how many repeats." },
+         { "chroma key", "Removes a chosen Key Colour (green/blue-screen style), matched in a brightness-independent colour space. Tolerance/Softness shape the edge, Spill Removal desaturates colour-cast fringes, 'show: Matte' previews the alpha instead of the keyed result." },
+         { "luma key", "Keys out a brightness range (Low-High) instead of a colour, with Softness at the edges and Invert to flip which range is kept. 'show: Matte' previews the alpha." },
+         { "crop", "Crops in from each edge (Left/Right/Top/Bottom). 'outside' chooses what happens to the cropped-away area: stays transparent, the kept region zooms to fill the frame, or gets replaced with a Fill colour." },
+         { "emboss", "Turns edges into a relief/bump look by differencing the image against itself offset along Angle/Distance. 'style: Over colour' keeps the original colours and adds the emboss on top; 'Grey' replaces the image with a flat emboss." },
+         { "normal map", "Derives a tangent-space normal map from the image's luminance treated as a height field, for use as a bump/normal input elsewhere. 'output' can show the raw Normals, the source Height, or the gradient's Slope instead." },
+         { "convolve", "A user-editable 3x3 convolution kernel (k11-k33) - blur, sharpen, edge-detect and emboss are all just different numbers in this grid. Divisor and Bias adjust the result, Spread scales the sample distance, Mix blends with the original." },
+         { "lookup", "Recolors using a second patched-in image as a 1D palette strip - this pixel's Luminance (or a chosen channel) indexes across it. Offset shifts the index, Mix blends with the original." },
+         { "halftone", "Renders the image as a dot pattern like offset printing. Scale sets dot density, Angle rotates the dot grid, 'style: Colour' uses three angled CMY-style dot layers instead of one greyscale layer." },
+         { "edge sobel", "Classic Sobel edge detection: outputs the gradient magnitude as greyscale edges. Invert flips black and white." },
+         { "edge outline", "Detects edges via a luminance gradient and draws them as flat-Colour outlines at a chosen Thickness and Threshold, over the original image." },
+         { "tone shaper", "Lift/gamma/gain-style tone control via four blended curves: Shadows lift blacks, Highlights lift whites, Midtones bulge the middle, S-Curve blends in an S-shaped contrast curve." },
+         { "lut", "Grades the image through a second patched-in HALD/strip LUT image - an N x N-sliced colour cube encoded as a flat strip. LUT Size must match the LUT image's slice count, Mix blends with the original." },
+         { "gradientmap", "Remaps luminance onto a two-colour gradient (Shadow to Highlight), Photoshop Gradient Map-style. Mix blends with the original colour." },
+         { "channelmixer", "Rebuilds each output channel as a weighted mix of the input's Red/Green/Blue - e.g. set 'Red from RGB' to swap or blend channels." },
+         { "outerglow", "Adds a soft glow of a chosen Colour around the image's alpha edge, blurred outward. Amount controls strength." },
+         { "coloroverlay", "Flat-tints the image toward a chosen Colour at a given Opacity." },
+         { "dropshadow", "Offsets a blurred copy of the image's alpha behind it as a shadow, in a chosen Colour, Offset X/Y and Opacity." },
+      };
+      auto it = kText.find(typeName);
+      return it != kText.end() ? it->second : nullptr;
+   }
+
+   // The twenty 2D vector primitives spawned from ShapeNode::ShapeNames() (see
+   // nodes/ShapeNode.cpp) - all one shader/class, told apart only by this text
+   // since their on-node params are the shared fill/stroke/feather/background set.
+   const char* ShapeHelpText(const std::string& typeName)
+   {
+      static const std::unordered_map<std::string, const char*> kText = {
+         { "Circle", "A filled/stroked circle - one of the Shape vector primitives, with size, feather, stroke and background controls." },
+         { "Ellipse", "A filled/stroked ellipse - Aspect stretches it from a circle." },
+         { "Rectangle", "A filled/stroked rectangle, with an optional corner radius." },
+         { "Rounded Rect", "A rectangle with rounded corners - like Rectangle but with the corner radius exposed as its own control." },
+         { "Triangle", "A filled/stroked equilateral-style triangle." },
+         { "Polygon", "A regular polygon - Sides sets how many." },
+         { "Star", "A star with adjustable point count (Sides) and Inner Ratio for how deep the points cut in." },
+         { "Ring", "A donut / annulus - a circle with a hole; corner/thick controls the ring's thickness." },
+         { "Cross", "A plus-sign / cross shape." },
+         { "Line", "A straight stroked line, without a fill interior." },
+         { "Hexagon", "A six-sided regular polygon (a Polygon preset with Sides fixed to 6)." },
+         { "Heart", "A heart-shaped outline." },
+         { "Arrow", "An arrow shape - direction follows the Rotation control." },
+         { "Crescent", "A crescent-moon shape - two overlapping circles subtracted from each other." },
+         { "Gear", "A cogwheel silhouette - Sides sets tooth count." },
+         { "Superellipse", "A 'squircle' - a shape between a rectangle and an ellipse, tunable via Inner Ratio." },
+         { "Pie", "A circular wedge / pie-slice - Inner Ratio controls how much of the circle is cut away." },
+         { "Teardrop", "A teardrop / droplet outline." },
+         { "Chevron", "An angled bracket / chevron shape." },
+         { "Blob", "An organic, wobbly rounded shape - randomised per Seed-like controls rather than a precise geometric primitive." },
+      };
+      auto it = kText.find(typeName);
+      return it != kText.end() ? it->second : nullptr;
+   }
+
+   // The twenty-four 3D primitives spawned from GeometryNode::ShapeNames() (see
+   // nodes/Geometry3DNodes.cpp) - one class/shader, told apart by this text since
+   // their on-node params are the shared sides/tube/material set from DrawGeometryParams.
+   const char* Geometry3DHelpText(const std::string& typeName)
+   {
+      static const std::unordered_map<std::string, const char*> kText = {
+         { "Plane", "A flat subdivided plane - one of the Geometry 3D primitives." },
+         { "Cube", "A subdivided cube/box." },
+         { "Sphere", "A UV sphere - latitude/longitude subdivision." },
+         { "Icosphere", "A sphere built from subdivided triangles (an icosahedron refined outward) - more even triangle distribution than a UV Sphere." },
+         { "Torus", "A ring/donut solid - 'tube' sets the tube radius relative to the overall ring." },
+         { "Cylinder", "A cylinder - Sides sets how many-sided (low values give a prism)." },
+         { "Cone", "A cone - Sides sets how many-sided." },
+         { "Torus Knot", "A knotted torus - a tube swept along a (p,q) knot path rather than a plain circle." },
+         { "Capsule", "A cylinder with hemispherical caps - 'tube' sets the cap/body radius." },
+         { "Tube", "A hollow cylinder - 'tube' sets the wall's inner radius." },
+         { "Pyramid", "A pyramid - Sides sets the base's side count (4 = classic square pyramid)." },
+         { "Prism", "A prism - an extruded polygon with Sides sides." },
+         { "Helix", "A helical tube spiraling around an axis - 'tube' sets the tube's radius." },
+         { "Supershape", "A superformula-based shape - 'depth', 'tooth depth' and 'hub hole' warp it into gear-like or organic silhouettes." },
+         { "Tetrahedron", "A 4-faced platonic solid." },
+         { "Octahedron", "An 8-faced platonic solid." },
+         { "Dodecahedron", "A 12-faced platonic solid." },
+         { "Rounded Cube", "A cube with rounded edges/corners - 'corner radius' sets how rounded." },
+         { "Mobius Strip", "A one-sided, one-edge twisted strip - 'width' sets the strip's width." },
+         { "Klein Bottle", "A non-orientable closed surface - the classic self-intersecting 'bottle with no inside or outside'." },
+         { "Gear 3D", "A 3D cogwheel - 'depth' sets tooth depth, 'tooth depth'/'hub hole' shape the teeth and centre bore. Named with a '3D' suffix because the 2D Shape node already has its own 'Gear'." },
+         { "Star 3D", "A 3D extruded star - 'depth' sets extrusion depth, 'inner ratio' how deep the points cut in. Named with a '3D' suffix because the 2D Shape node already has its own 'Star'." },
+         { "Disc", "A flat filled circle/disc mesh (as opposed to Cylinder, which has height)." },
+         { "Arrow 3D", "A 3D arrow mesh - shaft plus arrowhead. Named with a '3D' suffix because the 2D Shape node already has its own 'Arrow'." },
+      };
+      auto it = kText.find(typeName);
+      return it != kText.end() ? it->second : nullptr;
+   }
+
+   const char* CategoryHelpText(const std::string& category)
+   {
+      if (category == "Source") return "A source node - generates or loads an image with no image input of its own.";
+      if (category == "Text") return "Renders text as an image.";
+      if (category == "Effects") return "Transforms one image into another. Its parameters (and the shape of its name) describe what it changes; see Menu > Help > Module reference for the effect families.";
+      if (category == "Color") return "Adjusts the colour of its input. See Menu > Help > Module reference, 'Color' section, for the full family.";
+      if (category == "Compositing") return "Combines images, or otherwise manages how they flow through the patch.";
+      if (category == "Modulators") return "Produces a changing number over time, not an image. Patch its output onto the small dot beside any slider to drive that parameter.";
+      if (category == "Feedback") return "Reads back a previous frame to build loops - trails, echoes, growth. See Menu > Help > 'Using Feedback'.";
+      if (category == "Mask") return "Produces a mask, or isolates part of the image by colour or luminance.";
+      if (category == "Resynth") return "Iteratively regenerates the image, each generation drifting from its source.";
+      if (category == "3D") return "Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights.";
+      if (category == "Output") return "Terminal node: shows, exports or records the final result.";
+      return "No additional notes for this node.";
+   }
+
+   const char* NodeHelpText(const GraphNode& gn)
+   {
+      if (const char* specific = SpecificNodeHelpText(gn.typeName))
+         return specific;
+      if (const char* filter = FilterHelpText(gn.typeName))
+         return filter;
+      if (const char* shape = ShapeHelpText(gn.typeName))
+         return shape;
+      if (const char* geo3d = Geometry3DHelpText(gn.typeName))
+         return geo3d;
+      return CategoryHelpText(gn.category);
    }
 
    void DrawHelpWindow(bool* open)
@@ -4263,6 +4607,13 @@ namespace
                for (int i = 0; i < JoinGeometryNode::kSlots; i++)
                   if (join->inputs[i] == dyingGeometry)
                      join->inputs[i] = nullptr;
+            if (auto* wrap = dynamic_cast<WrapNode*>(other.node.get()))
+            {
+               if (wrap->sourceInput == dyingGeometry)
+                  wrap->sourceInput = nullptr;
+               if (wrap->targetInput == dyingGeometry)
+                  wrap->targetInput = nullptr;
+            }
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
          {
@@ -4415,6 +4766,11 @@ namespace
             record(inst->pointSource, 0);
             record(inst->instanceShape, 1);
             record(inst->cloudSource, 2);
+         }
+         if (auto* w = dynamic_cast<WrapNode*>(gn.node.get()))
+         {
+            record(w->sourceInput, 0);
+            record(w->targetInput, 1);
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
             record(audio->fileSource, 0);
@@ -7403,6 +7759,154 @@ int main()
          printf("%s\n", ok ? "PHASE E OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_WRAPTEST") != nullptr && frameId == 4)
+      {
+         // The whole point of the cylindrical mode is that it is a coordinate
+         // remap, not a projection: it must preserve arc length exactly. A
+         // strip of known width W bent around a target of known radius R has
+         // an answer worked out in advance - every point at distance R from
+         // the axis, spanning exactly W/R radians - so this is a real check
+         // and not just "did something move".
+         const float R = 2.0f;
+         const float W = 3.0f;
+         const float H = 0.4f;
+
+         // Thin flat strip in the XY plane, W wide and H tall, at z = 0.
+         Mesh strip;
+         const int kCols = 40;
+         for (int i = 0; i <= kCols; i++)
+         {
+            const float x = -W * 0.5f + W * (float)i / (float)kCols;
+            Vertex a; a.px = x; a.py = -H * 0.5f; a.pz = 0.0f;
+            Vertex b; b.px = x; b.py =  H * 0.5f; b.pz = 0.0f;
+            strip.vertices.push_back(a);
+            strip.vertices.push_back(b);
+         }
+         for (int i = 0; i < kCols; i++)
+         {
+            const unsigned int base = (unsigned int)(i * 2);
+            strip.indices.push_back(base); strip.indices.push_back(base + 1); strip.indices.push_back(base + 2);
+            strip.indices.push_back(base + 1); strip.indices.push_back(base + 3); strip.indices.push_back(base + 2);
+         }
+
+         // Target: a sphere of radius R centred at the origin, so the bend
+         // radius is read from real geometry rather than the override. The
+         // primitive is unit *diameter*, hence the 2R scale.
+         const Mesh sphere = MeshOps::Transform(Primitives::Sphere(24, 32),
+                                                Mat4::Scale(2.0f * R, 2.0f * R, 2.0f * R));
+
+         auto spanOf = [](const Mesh& m, float& minR, float& maxR, float& minA, float& maxA) {
+            minR = 1e30f; maxR = -1e30f; minA = 1e30f; maxA = -1e30f;
+            for (const Vertex& v : m.vertices)
+            {
+               const float rad = std::sqrt(v.px * v.px + v.pz * v.pz);
+               const float ang = std::atan2(v.px, v.pz);
+               minR = std::min(minR, rad); maxR = std::max(maxR, rad);
+               minA = std::min(minA, ang); maxA = std::max(maxA, ang);
+            }
+         };
+
+         const Mesh cyl = MeshOps::Wrap(strip, Mat4::Identity(), sphere, Mat4::Identity(),
+                                        MeshOps::kWrapCylindrical, 0.0f, 1.0f, 0.0f, 1.0f, 1,
+                                        false, false, false);
+         float minR, maxR, minA, maxA;
+         spanOf(cyl, minR, maxR, minA, maxA);
+         const float radiusErr = std::max(std::fabs(minR - R), std::fabs(maxR - R));
+         const float span = maxA - minA;
+         const bool radiusOk = radiusErr < 1e-3f;
+         const bool spanOk = std::fabs(span - W / R) < 1e-3f;
+         printf("  cylindrical radius %.5f..%.5f (expect %.3f)  %s\n", minR, maxR, R,
+                radiusOk ? "OK" : "FAIL");
+         printf("  cylindrical span   %.5f rad (expect W/R = %.5f)  %s\n", span, W / R,
+                spanOk ? "OK" : "FAIL");
+
+         // fit around: the same strip must now close a full circle.
+         const Mesh fit = MeshOps::Wrap(strip, Mat4::Identity(), sphere, Mat4::Identity(),
+                                        MeshOps::kWrapCylindrical, 0.0f, 1.0f, 0.0f, 1.0f, 1,
+                                        true, false, false);
+         // atan2 wraps at +/-pi, so a full turn cannot be read off min/max.
+         // Walk the strip column by column instead and accumulate unwrapped
+         // angle deltas - that measures the real total sweep.
+         const float kPi = 3.14159265358979f;
+         float fitSweep = 0.0f, prevAng = std::atan2(fit.vertices[0].px, fit.vertices[0].pz);
+         float fitRadErr = 0.0f;
+         for (int i = 1; i <= kCols; i++)
+         {
+            const Vertex& v = fit.vertices[(size_t)i * 2];
+            const float ang = std::atan2(v.px, v.pz);
+            float d = ang - prevAng;
+            while (d >  kPi) d -= 2.0f * kPi;
+            while (d < -kPi) d += 2.0f * kPi;
+            fitSweep += d;
+            prevAng = ang;
+            fitRadErr = std::max(fitRadErr,
+                                 std::fabs(std::sqrt(v.px * v.px + v.pz * v.pz) - R));
+         }
+         const bool fitOk = std::fabs(std::fabs(fitSweep) - 2.0f * kPi) < 1e-3f && fitRadErr < 1e-3f;
+         printf("  fit around sweep   %.5f rad (expect 2pi = %.5f)  %s\n", fitSweep,
+                2.0f * kPi, fitOk ? "OK" : "FAIL");
+
+         // Spherical must not push anything outside the shell it bends onto:
+         // the strip is flat (zero depth), so R is the ceiling.
+         const Mesh sph = MeshOps::Wrap(strip, Mat4::Identity(), sphere, Mat4::Identity(),
+                                        MeshOps::kWrapSpherical, 0.0f, 1.0f, 0.0f, 1.0f, 1,
+                                        false, false, false);
+         float sphMax = 0.0f;
+         for (const Vertex& v : sph.vertices)
+            sphMax = std::max(sphMax, std::sqrt(v.px * v.px + v.py * v.py + v.pz * v.pz));
+         const bool sphOk = sphMax <= R + 1e-3f;
+         printf("  spherical max |p|  %.5f (expect <= %.3f)  %s\n", sphMax, R,
+                sphOk ? "OK" : "FAIL");
+
+         // A radius override with no target at all still has to bend, and the
+         // override is used verbatim as the radius (radiusScale is ignored -
+         // there is no derived radius for it to scale).
+         const Mesh noTarget = MeshOps::Wrap(strip, Mat4::Identity(), Mesh(), Mat4::Identity(),
+                                             MeshOps::kWrapCylindrical, 0.0f, 1.0f, R, 0.25f, 1,
+                                             false, false, false);
+         float ntMinR, ntMaxR, ntMinA, ntMaxA;
+         spanOf(noTarget, ntMinR, ntMaxR, ntMinA, ntMaxA);
+         const bool ntOk = std::fabs(ntMaxR - R) < 1e-3f && std::fabs((ntMaxA - ntMinA) - W / R) < 1e-3f;
+         printf("  no target, radius %.1f: span %.5f rad  %s\n", R, ntMaxA - ntMinA,
+                ntOk ? "OK" : "FAIL");
+
+         // Nearest surface still works, and (unlike the bend) collapses the
+         // strip's width - the behaviour the bend modes exist to avoid.
+         const Mesh nearest = MeshOps::Wrap(strip, Mat4::Identity(), sphere, Mat4::Identity(),
+                                            MeshOps::kWrapNearest, 0.0f, 1.0f, 0.0f, 1.0f, 1,
+                                            false, false, false);
+         const bool nearOk = nearest.vertices.size() == strip.vertices.size() && !nearest.Empty();
+         printf("  nearest surface    %zu verts  %s\n", nearest.vertices.size(),
+                nearOk ? "OK" : "FAIL");
+
+         // The bug this guards: the radius must never stop tracking the
+         // target. Scale the target's model matrix 2x with node params held
+         // identical and the bend radius has to double on its own.
+         const Mesh scaled = MeshOps::Wrap(strip, Mat4::Identity(), sphere, Mat4::Scale(2.0f, 2.0f, 2.0f),
+                                           MeshOps::kWrapCylindrical, 0.0f, 1.0f, 0.0f, 1.0f, 1,
+                                           false, false, false);
+         float scMinR, scMaxR, scMinA, scMaxA;
+         spanOf(scaled, scMinR, scMaxR, scMinA, scMaxA);
+         const bool trackOk = std::fabs(scMaxR - 2.0f * R) < 1e-3f && std::fabs(scMinR - 2.0f * R) < 1e-3f;
+         printf("  target scaled 2x:  radius %.5f..%.5f (was %.5f, expect %.3f)  %s\n",
+                scMinR, scMaxR, maxR, 2.0f * R, trackOk ? "OK" : "FAIL");
+
+         // And radius scale is a multiplier on that derived radius, not a
+         // replacement for it.
+         const Mesh halfScale = MeshOps::Wrap(strip, Mat4::Identity(), sphere, Mat4::Identity(),
+                                              MeshOps::kWrapCylindrical, 0.0f, 1.0f, 0.0f, 0.5f, 1,
+                                              false, false, false);
+         float hsMinR, hsMaxR, hsMinA, hsMaxA;
+         spanOf(halfScale, hsMinR, hsMaxR, hsMinA, hsMaxA);
+         const bool scaleOk = std::fabs(hsMaxR - 0.5f * R) < 1e-3f && std::fabs(hsMinR - 0.5f * R) < 1e-3f;
+         printf("  radius scale 0.5:  radius %.5f..%.5f (expect %.3f)  %s\n",
+                hsMinR, hsMaxR, 0.5f * R, scaleOk ? "OK" : "FAIL");
+
+         const bool ok = radiusOk && spanOk && fitOk && sphOk && ntOk && nearOk &&
+                         trackOk && scaleOk;
+         printf("%s\n", ok ? "WRAP OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_PHASEDTEST") != nullptr && frameId == 4)
       {
          // Curves of every kind must produce a usable polyline and a tube.
@@ -7689,9 +8193,310 @@ int main()
          printf("join rebuilds on input move: max x %.2f -> %.2f  %s\n",
                 joinBefore, joinAfter, joinAfter > joinBefore + 2.0f ? "OK" : "FAIL");
 
+         // 4. Instance on Points must follow both the point source's and the
+         //    shape's own transform - previously both were dropped, so
+         //    moving/scaling either object silently did nothing to the render.
+         GeometryNode pointsSrc;
+         pointsSrc.shape = 0; // plane
+         pointsSrc.detail = 4;
+         GeometryNode shapeSrc;
+         shapeSrc.shape = 2; // sphere
+
+         InstanceOnPointsNode inst;
+         inst.pointSource = &pointsSrc;
+         inst.instanceShape = &shapeSrc;
+         inst.pointMode = 0; // vertices
+         inst.maxPoints = 50;
+         inst.instanceScale = 1.0f;
+         inst.scaleRandom = 0.0f;
+         inst.rotationRandom = 0.0f;
+         inst.alignToNormal = false;
+         inst.CookIfNeeded(9500);
+         const bool hadInstances = inst.InstanceCount() > 0;
+         const Mat4 firstBefore = hadInstances ? inst.InstanceTransforms()[0] : Mat4::Identity();
+
+         pointsSrc.posX = 5.0f;
+         inst.CookIfNeeded(9501);
+         const Mat4 firstAfterPointMove = hadInstances ? inst.InstanceTransforms()[0] : Mat4::Identity();
+         const float pointDx = firstAfterPointMove.m[12] - firstBefore.m[12];
+
+         shapeSrc.posY = 7.0f;
+         inst.CookIfNeeded(9502);
+         const Mat4 firstAfterShapeMove = hadInstances ? inst.InstanceTransforms()[0] : Mat4::Identity();
+         const float shapeDy = firstAfterShapeMove.m[13] - firstAfterPointMove.m[13];
+
+         const bool instancingFollowsTransforms = hadInstances &&
+            std::fabs(pointDx - 5.0f) < 1e-3f && std::fabs(shapeDy - 7.0f) < 1e-3f;
+         printf("instance on points follows source transforms: point dx=%.2f (want 5.00) "
+                "shape dy=%.2f (want 7.00)  %s\n", pointDx, shapeDy,
+                instancingFollowsTransforms ? "OK" : "FAIL");
+
+         // 5. Cloth must drape from the input's transformed rest pose, not its
+         //    raw object-space one - previously the input's own transform was
+         //    dropped entirely when seeding the simulation.
+         GeometryNode clothSrc;
+         clothSrc.shape = 0; // plane
+         clothSrc.detail = 4;
+         ClothNode cloth;
+         cloth.input = &clothSrc;
+         cloth.pinMode = ClothNode::kPinNone;
+         cloth.gravityX = cloth.gravityY = cloth.gravityZ = 0.0f;
+         cloth.windX = cloth.windY = cloth.windZ = 0.0f;
+         cloth.CookIfNeeded(9500);
+         const bool hadClothVerts = !cloth.GetMesh().vertices.empty();
+         const float clothVxBefore = hadClothVerts ? cloth.GetMesh().vertices[0].px : 0.0f;
+
+         clothSrc.posX = 5.0f;
+         cloth.CookIfNeeded(9501);
+         const float clothVxAfter = hadClothVerts ? cloth.GetMesh().vertices[0].px : 0.0f;
+         const bool clothFollowsTransform = hadClothVerts &&
+            std::fabs((clothVxAfter - clothVxBefore) - 5.0f) < 1e-3f;
+         printf("cloth rest pose follows input transform: dx=%.2f (want 5.00)  %s\n",
+                clothVxAfter - clothVxBefore, clothFollowsTransform ? "OK" : "FAIL");
+
+         // 6. A path following a mesh boundary must follow it in world space -
+         //    previously the geometry source's transform was dropped, so the
+         //    followed contour stayed put when the source moved.
+         GeometryNode pathSrc;
+         pathSrc.shape = 0; // plane, open so it has a boundary loop
+         pathSrc.detail = 4;
+         PathNode path;
+         path.geometrySource = &pathSrc;
+         path.followMode = PathNode::kFollowBoundary;
+         path.speed = 0.0f;
+         path.phase = 0.0f;
+         path.pingPong = false;
+         path.sizeX = path.sizeY = path.sizeZ = 1.0f;
+         path.CookIfNeeded(9500);
+         float pathBefore[3]; path.CurrentPoint(pathBefore);
+         const bool pathHasFollow = path.IsFollowing();
+
+         pathSrc.posX = 5.0f;
+         path.CookIfNeeded(9501);
+         float pathAfter[3]; path.CurrentPoint(pathAfter);
+         const bool pathFollowsTransform = pathHasFollow &&
+            std::fabs((pathAfter[0] - pathBefore[0]) - 5.0f) < 1e-3f;
+         printf("path follow tracks geometry source transform: dx=%.2f (want 5.00)  %s\n",
+                pathAfter[0] - pathBefore[0], pathFollowsTransform ? "OK" : "FAIL");
+
          const bool allOk = saved && std::fabs(after - 2.5f) < 1e-4f &&
-                            joinAfter > joinBefore + 2.0f;
+                            joinAfter > joinBefore + 2.0f && instancingFollowsTransforms &&
+                            clothFollowsTransform && pathFollowsTransform;
          printf("%s\n", allOk ? "BUGFIXES OK" : "SUSPECT");
+      }
+
+      // Sweeps every node type that consumes an IGeometrySource, checking one
+      // thing: does moving/rotating/scaling its upstream source actually move
+      // the final world-space result? BUGTEST above proves specific fixtures
+      // stay fixed; this proves the same property for every node that takes a
+      // geometry input, generically, so a newly added node type is covered
+      // without anyone having to remember to hand-write a fixture for it.
+      if (getenv("INFINITE_TRANSFORMSWEEPTEST") != nullptr && frameId == 6)
+      {
+         // Stands in for any upstream source: forwards mesh/material/etc to a
+         // real node, but returns an arbitrary injected matrix from
+         // GetModelMatrix(). This decouples "does the consumer apply/track its
+         // input's transform" from needing to know that input's own field
+         // names (posX vs pos[0] vs no transform at all) - the one thing every
+         // IGeometrySource is required to answer is GetModelMatrix().
+         struct TransformProbeSource : public IGeometrySource
+         {
+            IGeometrySource* wrapped = nullptr;
+            Mat4 matrix;
+            const Mesh& GetMesh() override { return wrapped->GetMesh(); }
+            unsigned long long MeshRevision() override { return wrapped->MeshRevision(); }
+            Mat4 GetModelMatrix() const override { return matrix; }
+            Material GetMaterial() const override { return wrapped->GetMaterial(); }
+            unsigned int GetSurfaceTexture() override { return wrapped->GetSurfaceTexture(); }
+         };
+
+         GeometryNode probeMesh;
+         probeMesh.shape = 1; // cube: closed, several vertices, no degenerate cases
+         probeMesh.detail = 4;
+         TransformProbeSource probe;
+         probe.wrapped = &probeMesh;
+
+         int frame = 20000;
+         auto cook = [&](IGeometrySource* g) {
+            if (auto* n = dynamic_cast<INode*>(g)) n->CookIfNeeded(frame);
+            frame++;
+         };
+
+         struct Result { std::string name; bool ok; bool hadGeometry; float dx, dy, dz; };
+         std::vector<Result> results;
+
+         // The shared invariant: whatever a node's GetMesh() contains, once
+         // combined with its own GetModelMatrix() the result is where the
+         // object actually sits in the scene - that combination is exactly
+         // what Render 3D uses to draw it. Nudging the probe's matrix by a
+         // distinct, non-uniform amount per axis catches an axis swap or a
+         // dropped component, not just "moved by something".
+         auto checkGeneric = [&](const char* name, IGeometrySource* node)
+         {
+            probe.matrix = Mat4::Identity();
+            cook(node);
+            const Mesh before = MeshOps::Transform(node->GetMesh(), node->GetModelMatrix());
+
+            probe.matrix = Mat4::Translation(5.0f, 7.0f, 3.0f);
+            cook(node);
+            const Mesh after = MeshOps::Transform(node->GetMesh(), node->GetModelMatrix());
+
+            const bool hadGeometry = !before.vertices.empty() && !after.vertices.empty() &&
+                                     before.vertices.size() == after.vertices.size();
+            float dx = 0, dy = 0, dz = 0;
+            bool ok = false;
+            if (hadGeometry)
+            {
+               dx = after.vertices[0].px - before.vertices[0].px;
+               dy = after.vertices[0].py - before.vertices[0].py;
+               dz = after.vertices[0].pz - before.vertices[0].pz;
+               ok = std::fabs(dx - 5.0f) < 1e-3f && std::fabs(dy - 7.0f) < 1e-3f &&
+                    std::fabs(dz - 3.0f) < 1e-3f;
+            }
+            results.push_back({ name, ok, hadGeometry, dx, dy, dz });
+         };
+
+         GeometryOpNode opNode; opNode.op = GeometryOpNode::kTransform; opNode.input = &probe;
+         checkGeneric("GeometryOpNode", &opNode);
+
+         DisplacementNode dispNode; dispNode.input = &probe;
+         checkGeneric("DisplacementNode", &dispNode);
+
+         MeshResynthNode resynthNode; resynthNode.input = &probe;
+         checkGeneric("MeshResynthNode", &resynthNode);
+
+         MeshToPointsNode m2pNode; m2pNode.input = &probe; m2pNode.mode = 0;
+         checkGeneric("MeshToPointsNode", &m2pNode);
+
+         Null3DNode nullNode; nullNode.input = &probe;
+         checkGeneric("Null3DNode", &nullNode);
+
+         MaterialNode matNode; matNode.input = &probe;
+         checkGeneric("MaterialNode", &matNode);
+
+         MappingNode mapNode; mapNode.input = &probe;
+         checkGeneric("MappingNode", &mapNode);
+
+         JoinGeometryNode joinNode; joinNode.mode = JoinGeometryNode::kMerge; joinNode.inputs[0] = &probe;
+         checkGeneric("JoinGeometryNode", &joinNode);
+
+         // Wrap needs a real, non-degenerate target to project onto - a
+         // stand-in sphere, fixed in place (not run through the probe matrix,
+         // since the invariant under test is "does the *source* input's
+         // transform reach the output", not the target's).
+         GeometryNode probe2;
+         probe2.shape = 2; // sphere: real surface for the source to snap onto
+         probe2.detail = 4;
+         WrapNode wrapNode; wrapNode.sourceInput = &probe; wrapNode.targetInput = &probe2;
+         // Snapping onto a fixed target is inherently non-linear (the closest
+         // point on the target can change discontinuously as the source
+         // moves), so it would not reproduce the exact +5/+7/+3 shift this
+         // check looks for even when working correctly. Blend 0 isolates the
+         // one thing this sweep actually checks - that the source's own
+         // transform reaches the output - from the wrap projection itself,
+         // which has its own coverage.
+         wrapNode.blend = 0.0f;
+         checkGeneric("WrapNode", &wrapNode);
+
+         ClothNode clothNode;
+         clothNode.input = &probe;
+         clothNode.pinMode = ClothNode::kPinNone;
+         clothNode.gravityX = clothNode.gravityY = clothNode.gravityZ = 0.0f;
+         clothNode.windX = clothNode.windY = clothNode.windZ = 0.0f;
+         checkGeneric("ClothNode", &clothNode);
+
+         // Instance on Points draws through per-instance transforms rather
+         // than GetMesh()+GetModelMatrix(), so it needs its own probe on each
+         // of its two geometry slots instead of the generic check.
+         auto checkInstancing = [&](const char* name, bool probeIsPointSource)
+         {
+            GeometryNode otherSide;
+            otherSide.shape = 2; // sphere
+            InstanceOnPointsNode inst;
+            inst.pointSource = probeIsPointSource ? (IGeometrySource*)&probe : (IGeometrySource*)&otherSide;
+            inst.instanceShape = probeIsPointSource ? (IGeometrySource*)&otherSide : (IGeometrySource*)&probe;
+            inst.pointMode = 0; // vertices
+            inst.maxPoints = 50;
+            inst.instanceScale = 1.0f;
+            inst.scaleRandom = 0.0f;
+            inst.rotationRandom = 0.0f;
+            inst.alignToNormal = false;
+
+            probe.matrix = Mat4::Identity();
+            cook(&inst);
+            const bool hadBefore = inst.InstanceCount() > 0;
+            const Mat4 before = hadBefore ? inst.InstanceTransforms()[0] : Mat4::Identity();
+
+            probe.matrix = Mat4::Translation(5.0f, 7.0f, 3.0f);
+            cook(&inst);
+            const bool hadAfter = inst.InstanceCount() > 0;
+            const Mat4 after = hadAfter ? inst.InstanceTransforms()[0] : Mat4::Identity();
+
+            const bool hadGeometry = hadBefore && hadAfter;
+            float dx = 0, dy = 0, dz = 0;
+            bool ok = false;
+            if (hadGeometry)
+            {
+               dx = after.m[12] - before.m[12];
+               dy = after.m[13] - before.m[13];
+               dz = after.m[14] - before.m[14];
+               ok = std::fabs(dx - 5.0f) < 1e-3f && std::fabs(dy - 7.0f) < 1e-3f &&
+                    std::fabs(dz - 3.0f) < 1e-3f;
+            }
+            results.push_back({ name, ok, hadGeometry, dx, dy, dz });
+         };
+         checkInstancing("InstanceOnPointsNode(pointSource)", true);
+         checkInstancing("InstanceOnPointsNode(instanceShape)", false);
+
+         // Path-follow drives a modulator output rather than a mesh, so its
+         // check reads CurrentPoint() instead of GetMesh()+GetModelMatrix().
+         // Boundary-follow needs an open mesh (a closed cube has no boundary
+         // loop), so the probe is switched to wrap a plane for this one check
+         // - nothing after this reuses probeMesh/probe.
+         {
+            probeMesh.shape = 0; // plane
+            PathNode path;
+            path.geometrySource = &probe;
+            path.followMode = PathNode::kFollowBoundary;
+            path.speed = 0.0f; path.phase = 0.0f; path.pingPong = false;
+            path.sizeX = path.sizeY = path.sizeZ = 1.0f;
+
+            probe.matrix = Mat4::Identity();
+            path.CookIfNeeded(frame++);
+            float before[3]; path.CurrentPoint(before);
+            const bool hadBefore = path.IsFollowing();
+
+            probe.matrix = Mat4::Translation(5.0f, 7.0f, 3.0f);
+            path.CookIfNeeded(frame++);
+            float after[3]; path.CurrentPoint(after);
+            const bool hadAfter = path.IsFollowing();
+
+            const bool hadGeometry = hadBefore && hadAfter;
+            float dx = 0, dy = 0, dz = 0;
+            bool ok = false;
+            if (hadGeometry)
+            {
+               dx = after[0] - before[0]; dy = after[1] - before[1]; dz = after[2] - before[2];
+               ok = std::fabs(dx - 5.0f) < 1e-3f && std::fabs(dy - 7.0f) < 1e-3f &&
+                    std::fabs(dz - 3.0f) < 1e-3f;
+            }
+            results.push_back({ "PathNode(follow)", ok, hadGeometry, dx, dy, dz });
+         }
+
+         bool allOk = true;
+         for (const Result& r : results)
+         {
+            if (!r.hadGeometry)
+            {
+               printf("  [SKIP] %-32s — produced no comparable geometry\n", r.name.c_str());
+               continue;
+            }
+            printf("  [%s] %-32s dx=%.2f dy=%.2f dz=%.2f (want 5.00 7.00 3.00)\n",
+                   r.ok ? "pass" : "FAIL", r.name.c_str(), r.dx, r.dy, r.dz);
+            if (!r.ok)
+               allOk = false;
+         }
+         printf("%s\n", allOk ? "TRANSFORM SWEEP OK" : "TRANSFORM SWEEP FAIL");
       }
 
       if (getenv("INFINITE_FIXTEST") != nullptr && frameId == 6)
@@ -8903,6 +9708,7 @@ int main()
                   dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<WrapNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MeshResynthNode*>(gn.node.get()) != nullptr ||
@@ -8946,6 +9752,8 @@ int main()
                snprintf(line, sizeof(line), "%zu balls, %zu tris", mb->BallCount(), mb->TriangleCount());
             else if (auto* jn = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%d inputs, %zu tris", jn->ConnectedCount(), jn->TriangleCount());
+            else if (auto* wr = dynamic_cast<WrapNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu tris", wr->TriangleCount());
             else if (auto* cl = dynamic_cast<ClothNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu tris, %zu links", cl->TriangleCount(), cl->ConstraintCount());
             else if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get()))
@@ -9102,6 +9910,8 @@ int main()
                DrawDisplacementParams(n);
             else if (auto* n = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
                DrawInstanceParams(n);
+            else if (auto* n = dynamic_cast<WrapNode*>(gn.node.get()))
+               DrawWrapParams(n);
             else if (auto* n = dynamic_cast<CameraNode*>(gn.node.get()))
                DrawCameraParams(n);
             else if (auto* n = dynamic_cast<LightNode*>(gn.node.get()))
@@ -9301,6 +10111,11 @@ int main()
             linkFromNode(inst->instanceShape, 1);
             linkFromNode(inst->cloudSource, 2);
          }
+         if (auto* w = dynamic_cast<WrapNode*>(gn.node.get()))
+         {
+            linkFromNode(w->sourceInput, 0);
+            linkFromNode(w->targetInput, 1);
+         }
          if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
             linkFromNode(out->audioSource, 1);
 
@@ -9412,6 +10227,7 @@ int main()
                auto* dstRender = dstNode ? dynamic_cast<Render3DNode*>(dstNode->node.get()) : nullptr;
                auto* dstGeoOp = dstNode ? dynamic_cast<GeometryOpNode*>(dstNode->node.get()) : nullptr;
                auto* dstInstance = dstNode ? dynamic_cast<InstanceOnPointsNode*>(dstNode->node.get()) : nullptr;
+               auto* dstWrap = dstNode ? dynamic_cast<WrapNode*>(dstNode->node.get()) : nullptr;
                // Null 3D, Material and Mesh to Points all take a single
                // geometry input on slot 0 and are otherwise interchangeable
                // here, so they share one branch.
@@ -9463,6 +10279,8 @@ int main()
                         valid = (slot == 2) ? (srcCloud != nullptr) : (srcGeometry != nullptr);
                      else if (dstNull3D != nullptr || dstMapping != nullptr || dstMeshPoints != nullptr ||
                               dstMeshResynth != nullptr || dstCloth != nullptr || dstJoin != nullptr)
+                        valid = srcGeometry != nullptr;
+                     else if (dstWrap != nullptr)
                         valid = srcGeometry != nullptr;
                      else if (dstMeta != nullptr)
                         valid = srcCloud != nullptr;
@@ -9547,6 +10365,12 @@ int main()
                      const int jslot = GraphNode::InputSlotFromPin(b);
                      if (jslot >= 0 && jslot < JoinGeometryNode::kSlots)
                         dstJoin->inputs[jslot] = srcGeometry;
+                  }
+                  else if (dstWrap != nullptr)
+                  {
+                     const int wslot = GraphNode::InputSlotFromPin(b);
+                     if (wslot == 0) dstWrap->sourceInput = srcGeometry;
+                     else if (wslot == 1) dstWrap->targetInput = srcGeometry;
                   }
                   else if (dstMaterial != nullptr && GraphNode::InputSlotFromPin(b) == 0)
                      dstMaterial->input = srcGeometry;
@@ -10133,6 +10957,12 @@ int main()
                if (ImGui::MenuItem("Show params"))
                   gn->showParams = true;
             }
+            if (ImGui::MenuItem("Help"))
+            {
+               gHelpPopupNodeIndex = gn->index;
+               ImGui::CloseCurrentPopup();
+               gOpenNodeHelpPopup = true;
+            }
             if (GroupNode* owner = GroupOwning(gn->index))
             {
                // Unlike the group's own "Ungroup" (which dissolves the whole
@@ -10158,6 +10988,34 @@ int main()
                   }
                }
             }
+         }
+         ImGui::EndPopup();
+      }
+
+      // Node "Help" popup, opened via the context menu above. A separate
+      // OpenPopup call (rather than nesting it inside "##nodecontext") because
+      // that popup already closed itself this frame - reopening a still-being-
+      // closed popup by the same ID silently no-ops in Dear ImGui.
+      if (gOpenNodeHelpPopup)
+      {
+         ImGui::OpenPopup("##nodehelp");
+         gOpenNodeHelpPopup = false;
+      }
+      ImGui::SetNextWindowSizeConstraints(ImVec2(280, 0), ImVec2(420, FLT_MAX));
+      if (ImGui::BeginPopup("##nodehelp"))
+      {
+         GraphNode* gn = FindNodeByIndex(gHelpPopupNodeIndex);
+         if (gn == nullptr)
+         {
+            ImGui::CloseCurrentPopup();
+         }
+         else
+         {
+            ImGui::TextUnformatted(DisplayName(gn->typeName).c_str());
+            ImGui::Separator();
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
+            ImGui::TextWrapped("%s", NodeHelpText(*gn));
+            ImGui::PopTextWrapPos();
          }
          ImGui::EndPopup();
       }
@@ -10804,6 +11662,7 @@ int main()
                 dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<WrapNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr ||

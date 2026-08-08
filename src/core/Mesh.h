@@ -57,6 +57,14 @@ struct Mat4
 
    static Mat4 Identity() { return Mat4(); }
 
+   bool operator==(const Mat4& o) const
+   {
+      for (int i = 0; i < 16; i++)
+         if (m[i] != o.m[i])
+            return false;
+      return true;
+   }
+
    static Mat4 Multiply(const Mat4& a, const Mat4& b)
    {
       Mat4 r;
@@ -381,6 +389,45 @@ namespace MeshOps
    // Sampling for instancing: vertices, edge midpoints or face centres.
    std::vector<MeshPoint> ToPoints(const Mesh& in, int mode, int maxPoints);
    Mesh PointsToFaces(const std::vector<MeshPoint>& points, float size);
+
+   // Bends or conforms `source` onto `target`. Both inputs' transforms are
+   // baked in, so the result is in world space - there is no way back to
+   // source-local space without a matrix inverse, which this codebase does
+   // not have. The result is blended against the original world position by
+   // `blend` (0 = untouched, 1 = fully wrapped).
+   //
+   // kWrapCylindrical / kWrapSpherical are *coordinate remaps*, not
+   // projections: the source is rolled around `axis` at the target's radius,
+   // one radian of bend per `Reff` units travelled. That makes them exactly
+   // arc-length preserving, which is what keeps flat 3D text readable when it
+   // curves around a sphere - letterforms, letter spacing and extrusion depth
+   // all survive intact. Spherical adds the same bend in the perpendicular
+   // direction so long text also curves over the poles. With a target patched
+   // in, the bend radius is always WrapRadius(target) * `radiusScale`, so
+   // scaling the target always moves the source with it - a multiplier rather
+   // than an absolute value precisely so tuning the radius can never sever
+   // that link. `radiusOverride` is only consulted when there is no target at
+   // all, where the bend has nothing else to work from. `offset` lifts the
+   // source off that surface, and `fitAround` scales the bend so the source's
+   // full width spans exactly 360 degrees.
+   //
+   // kWrapNearest is Blender's Shrinkwrap "Nearest Surface Point": every
+   // source vertex moves to the closest point on target's nearest triangle,
+   // offset outward along that triangle's face normal. It is the right tool
+   // for conforming a dense mesh onto irregular geometry, where no parametric
+   // bend exists - but it squashes flat text, since distant vertices all
+   // share the same nearest silhouette point. Brute force over every target
+   // triangle per source vertex; no spatial acceleration structure exists
+   // here yet, same as every other op in this file.
+   enum { kWrapCylindrical = 0, kWrapSpherical, kWrapNearest, kWrapModeCount };
+   // Bend radius derived from a target: the mean of the two world-AABB
+   // half-extents perpendicular to `axis`, so a sphere gives exactly its
+   // radius and a cube its half-width. 0 for an empty target. Exported so the
+   // UI can show the live value without waiting on a mesh rebuild.
+   float WrapRadius(const Mesh& target, const Mat4& targetModel, int axis);
+   Mesh Wrap(const Mesh& source, const Mat4& sourceModel, const Mesh& target, const Mat4& targetModel,
+             int mode, float offset, float blend, float radiusOverride, float radiusScale, int axis,
+             bool fitAround, bool flatShade, bool flipNormals);
 }
 
 namespace Primitives

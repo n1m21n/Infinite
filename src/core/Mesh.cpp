@@ -1887,6 +1887,239 @@ namespace MeshOps
       }
       return out;
    }
+
+   // Closest point on triangle (abc) to point p, clamping barycentric
+   // coordinates to the triangle's interior/edges/corners - Ericson's
+   // Real-Time Collision Detection algorithm.
+   static void ClosestPointOnTriangle(const float p[3], const float a[3], const float b[3], const float c[3],
+                                       float out[3])
+   {
+      auto sub = [](const float* x, const float* y, float* r) { r[0]=x[0]-y[0]; r[1]=x[1]-y[1]; r[2]=x[2]-y[2]; };
+      auto dot = [](const float* x, const float* y) { return x[0]*y[0]+x[1]*y[1]+x[2]*y[2]; };
+
+      float ab[3], ac[3], ap[3];
+      sub(b, a, ab); sub(c, a, ac); sub(p, a, ap);
+      const float d1 = dot(ab, ap), d2 = dot(ac, ap);
+      if (d1 <= 0.0f && d2 <= 0.0f) { out[0]=a[0]; out[1]=a[1]; out[2]=a[2]; return; }
+
+      float bp[3]; sub(p, b, bp);
+      const float d3 = dot(ab, bp), d4 = dot(ac, bp);
+      if (d3 >= 0.0f && d4 <= d3) { out[0]=b[0]; out[1]=b[1]; out[2]=b[2]; return; }
+
+      const float vc = d1*d4 - d3*d2;
+      if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
+      {
+         const float v = d1 / (d1 - d3);
+         out[0] = a[0] + ab[0]*v; out[1] = a[1] + ab[1]*v; out[2] = a[2] + ab[2]*v;
+         return;
+      }
+
+      float cp[3]; sub(p, c, cp);
+      const float d5 = dot(ab, cp), d6 = dot(ac, cp);
+      if (d6 >= 0.0f && d5 <= d6) { out[0]=c[0]; out[1]=c[1]; out[2]=c[2]; return; }
+
+      const float vb = d5*d2 - d1*d6;
+      if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
+      {
+         const float w = d2 / (d2 - d6);
+         out[0] = a[0] + ac[0]*w; out[1] = a[1] + ac[1]*w; out[2] = a[2] + ac[2]*w;
+         return;
+      }
+
+      const float va = d3*d6 - d5*d4;
+      if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
+      {
+         const float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+         out[0] = b[0] + (c[0]-b[0])*w; out[1] = b[1] + (c[1]-b[1])*w; out[2] = b[2] + (c[2]-b[2])*w;
+         return;
+      }
+
+      const float denom = 1.0f / (va + vb + vc);
+      const float v = vb * denom, w = vc * denom;
+      out[0] = a[0] + ab[0]*v + ac[0]*w;
+      out[1] = a[1] + ab[1]*v + ac[1]*w;
+      out[2] = a[2] + ab[2]*v + ac[2]*w;
+   }
+
+   // (bend, horizontal, depth) component index per axis. One table instead of
+   // three copies of the same trigonometry: for axis 1 (the default, text
+   // around the equator) that is (Y, X, Z), and the other two are its cyclic
+   // rotations.
+   static const int kWrapAxes[3][3] = { { 0, 1, 2 }, { 1, 0, 2 }, { 2, 0, 1 } };
+
+   // Target centre and radius from its world bounding box. The radius is the
+   // mean of the two half-extents perpendicular to the bend axis, so a sphere
+   // gives exactly its radius and a cube its half-width.
+   static void WrapBounds(const Mesh& worldTarget, int axis, float centre[3], float& radius)
+   {
+      centre[0] = centre[1] = centre[2] = 0.0f;
+      radius = 0.0f;
+      if (worldTarget.Empty())
+         return;
+      if (axis < 0 || axis > 2) axis = 1;
+      const int hor = kWrapAxes[axis][1], dep = kWrapAxes[axis][2];
+      float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+      for (const Vertex& v : worldTarget.vertices)
+      {
+         const float p[3] = { v.px, v.py, v.pz };
+         for (int i = 0; i < 3; i++) { lo[i] = std::min(lo[i], p[i]); hi[i] = std::max(hi[i], p[i]); }
+      }
+      for (int i = 0; i < 3; i++) centre[i] = (lo[i] + hi[i]) * 0.5f;
+      radius = 0.5f * ((hi[hor] - lo[hor]) * 0.5f + (hi[dep] - lo[dep]) * 0.5f);
+   }
+
+   float WrapRadius(const Mesh& target, const Mat4& targetModel, int axis)
+   {
+      if (target.Empty())
+         return 0.0f;
+      float centre[3], radius;
+      WrapBounds(Transform(target, targetModel), axis, centre, radius);
+      return radius;
+   }
+
+   Mesh Wrap(const Mesh& source, const Mat4& sourceModel, const Mesh& target, const Mat4& targetModel,
+             int mode, float offset, float blend, float radiusOverride, float radiusScale, int axis,
+             bool fitAround, bool flatShade, bool flipNormals)
+   {
+      const Mesh worldSource = Transform(source, sourceModel);
+      if (worldSource.Empty())
+         return worldSource;
+      // Nearest-surface has nothing to snap to without a target. The bend
+      // modes can still run off `radiusOverride` alone.
+      if (target.Empty() && (mode == kWrapNearest || radiusOverride <= 0.0f))
+         return worldSource;
+
+      const Mesh worldTarget = Transform(target, targetModel);
+
+      if (mode == kWrapCylindrical || mode == kWrapSpherical)
+      {
+         if (axis < 0 || axis > 2) axis = 1;
+         const int up = kWrapAxes[axis][0], hor = kWrapAxes[axis][1], dep = kWrapAxes[axis][2];
+
+         float centre[3] = { 0.0f, 0.0f, 0.0f };
+         float radius = 0.0f;
+         WrapBounds(worldTarget, axis, centre, radius);
+         if (!worldTarget.Empty())
+         {
+            // With a target the derived radius is only ever *scaled*, never
+            // replaced, so scaling the target always moves the source.
+            radius *= std::max(radiusScale, 1e-4f);
+         }
+         else
+         {
+            // No target: nothing to derive from, so the override is the radius.
+            radius = radiusOverride;
+         }
+
+         const float reff = radius + offset;
+         if (!(reff > 1e-6f))
+            return worldSource;   // nothing sane to bend around
+
+         // 1.0 is what makes the bend arc-length preserving: one radian per
+         // `reff` units travelled, so the source's own metric is untouched.
+         float arcScale = 1.0f;
+         if (fitAround)
+         {
+            float wLo = 1e30f, wHi = -1e30f;
+            for (const Vertex& v : worldSource.vertices)
+            {
+               const float p[3] = { v.px, v.py, v.pz };
+               wLo = std::min(wLo, p[hor]); wHi = std::max(wHi, p[hor]);
+            }
+            const float width = wHi - wLo;
+            if (width > 1e-6f)
+               arcScale = (2.0f * 3.14159265358979f * reff) / width;
+         }
+
+         const float kHalfPi = 1.5707963267948966f;
+         Mesh out = worldSource;
+         for (Vertex& v : out.vertices)
+         {
+            const float orig[3] = { v.px, v.py, v.pz };
+            const float q[3] = { orig[0] - centre[0], orig[1] - centre[1], orig[2] - centre[2] };
+
+            const float theta = (q[hor] / reff) * arcScale;
+            const float r = reff + q[dep];   // extrusion depth becomes radial thickness
+
+            float bent[3];
+            if (mode == kWrapSpherical)
+            {
+               // Clamped so text longer than the circumference stops at the
+               // pole rather than folding back through itself.
+               float phi = (q[up] / reff) * arcScale;
+               phi = std::max(-kHalfPi, std::min(kHalfPi, phi));
+               const float rHoriz = r * std::cos(phi);
+               bent[up]  = r * std::sin(phi);
+               bent[hor] = rHoriz * std::sin(theta);
+               bent[dep] = rHoriz * std::cos(theta);
+            }
+            else
+            {
+               bent[up]  = q[up];           // height preserved exactly
+               bent[hor] = r * std::sin(theta);
+               bent[dep] = r * std::cos(theta);
+            }
+
+            float res[3];
+            for (int i = 0; i < 3; i++)
+            {
+               const float t = bent[i] + centre[i];
+               res[i] = orig[i] + (t - orig[i]) * blend;
+            }
+            v.px = res[0]; v.py = res[1]; v.pz = res[2];
+         }
+         return RecalculateNormals(out, flatShade, flipNormals);
+      }
+
+      const size_t triCount = worldTarget.FaceCount();
+
+      Mesh out = worldSource;
+      for (Vertex& v : out.vertices)
+      {
+         const float p[3] = { v.px, v.py, v.pz };
+         float bestPoint[3] = { p[0], p[1], p[2] };
+         float bestNormal[3] = { v.nx, v.ny, v.nz };
+         float bestDist = -1.0f;
+
+         for (size_t f = 0; f < triCount; f++)
+         {
+            const Vertex& va = worldTarget.vertices[worldTarget.indices[f * 3 + 0]];
+            const Vertex& vb = worldTarget.vertices[worldTarget.indices[f * 3 + 1]];
+            const Vertex& vc = worldTarget.vertices[worldTarget.indices[f * 3 + 2]];
+            const float a[3] = { va.px, va.py, va.pz };
+            const float b[3] = { vb.px, vb.py, vb.pz };
+            const float c[3] = { vc.px, vc.py, vc.pz };
+
+            float cp[3];
+            ClosestPointOnTriangle(p, a, b, c, cp);
+            const float dx = cp[0]-p[0], dy = cp[1]-p[1], dz = cp[2]-p[2];
+            const float dist = dx*dx + dy*dy + dz*dz;
+            if (bestDist < 0.0f || dist < bestDist)
+            {
+               bestDist = dist;
+               bestPoint[0] = cp[0]; bestPoint[1] = cp[1]; bestPoint[2] = cp[2];
+
+               float e1[3] = { b[0]-a[0], b[1]-a[1], b[2]-a[2] };
+               float e2[3] = { c[0]-a[0], c[1]-a[1], c[2]-a[2] };
+               float n[3] = { e1[1]*e2[2]-e1[2]*e2[1], e1[2]*e2[0]-e1[0]*e2[2], e1[0]*e2[1]-e1[1]*e2[0] };
+               const float len = std::sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+               if (len > 1e-8f) { n[0] /= len; n[1] /= len; n[2] /= len; }
+               bestNormal[0] = n[0]; bestNormal[1] = n[1]; bestNormal[2] = n[2];
+            }
+         }
+
+         const float target_[3] = {
+            bestPoint[0] + bestNormal[0] * offset,
+            bestPoint[1] + bestNormal[1] * offset,
+            bestPoint[2] + bestNormal[2] * offset
+         };
+         v.px = p[0] + (target_[0] - p[0]) * blend;
+         v.py = p[1] + (target_[1] - p[1]) * blend;
+         v.pz = p[2] + (target_[2] - p[2]) * blend;
+      }
+
+      return RecalculateNormals(out, flatShade, flipNormals);
+   }
 }
 
 // ============================================================ more primitives

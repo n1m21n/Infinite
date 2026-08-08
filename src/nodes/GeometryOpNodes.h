@@ -396,8 +396,126 @@ private:
    unsigned long long mBuiltCloudRevision = 0;
    unsigned long long mBuiltPointRevision = 0;
    unsigned long long mBuiltShapeRevision = 0;
+   // Baked into every instance transform in Rebuild(), so a pure transform edit
+   // (no revision bump - see GeometryNode::GetModelMatrix) still has to be
+   // caught here rather than falling through the revision checks above.
+   Mat4 mBuiltPointModel;
+   Mat4 mBuiltShapeModel;
    int mBuiltMode = -1, mBuiltMax = -1;
    float mBuiltScale = -1, mBuiltScaleRand = -1, mBuiltRotRand = -1, mBuiltSeed = -1, mBuiltOffset = -1;
    bool mBuiltAlign = false;
+   int mLastCookFrame = -1;
+};
+
+// --- Wrap (Shrinkwrap-style "Nearest Surface Point") ---------------------
+// Conforms one mesh onto the surface of another: every source vertex moves to
+// the closest point on the target's surface. Its own class, not a row in
+// GeometryOpNode's table, because it needs two geometry inputs rather than
+// the table's single geo (+ optional scalar) shape - the same reason
+// DisplacementNode got its own class for a texture input.
+class WrapNode : public INode, public IGeometrySource
+{
+public:
+   static INode* Create() { return new WrapNode(); }
+   INode* BypassSource() override { return dynamic_cast<INode*>(sourceInput); }
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   const Mesh& GetMesh() override;
+   unsigned long long MeshRevision() override;
+   // World transforms are baked into the output mesh (see MeshOps::Wrap), so
+   // this stays identity - same reasoning as InstanceOnPointsNode.
+   Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+   Material GetMaterial() const override;
+   unsigned int GetSurfaceTexture() override;
+   unsigned int GetMaterialTexture(int map) override { return sourceInput ? sourceInput->GetMaterialTexture(map) : 0; }
+   MappingTransform GetMappingTransform() const override { return sourceInput ? sourceInput->GetMappingTransform() : MappingTransform(); }
+
+   IGeometrySource* sourceInput = nullptr;
+   IGeometrySource* targetInput = nullptr;
+   const char* InputLabel(int slot) const override
+   {
+      static const char* kNames[] = { "source", "target" };
+      return (slot >= 0 && slot < 2) ? kNames[slot] : nullptr;
+   }
+   size_t TriangleCount() const { return mCache.indices.size() / 3; }
+   // The bend radius the current settings resolve to, live - the UI shows it
+   // so the link to the target's size is visible.
+   float ResolvedRadius() const;
+   static const std::vector<std::string>& ModeNames();
+
+   int mode = 0;                 // MeshOps::kWrapCylindrical
+   int axis = 1;                 // Y: text bends around the equator, upright
+   // With a target connected the bend radius is the target's derived radius
+   // times `radiusScale`, so it always tracks the target. `radiusOverride` is
+   // only used when no target is connected.
+   float radiusOverride = 1.0f;
+   float radiusScale = 1.0f;
+   bool fitAround = false;
+   // 0 sits exactly on the target's surface in the bend modes.
+   float offset = 0.0f;
+   float blend = 1.0f;
+   bool flatShade = false, flipNormals = false;
+   bool inheritMaterial = true;
+
+   // material used when not inheriting
+   float color[3] = { 0.8f, 0.82f, 0.9f };
+   float metallic = 0.1f;
+   float roughness = 0.45f;
+   float opacity = 1.0f;
+   int shading = 0;
+   float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
+   float emission = 0.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("mode", mode); v.Int("axis", axis);
+      v.Float("radius", radiusOverride); v.Float("radiusScale", radiusScale);
+      v.Bool("fitAround", fitAround);
+      v.Float("offset", offset); v.Float("blend", blend);
+      v.Bool("flat", flatShade); v.Bool("flip", flipNormals);
+      v.Bool("inherit", inheritMaterial);
+      v.Color("color", color); v.Float("metallic", metallic);
+      v.Float("roughness", roughness); v.Float("opacity", opacity);
+      v.Int("shading", shading);
+      v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+   }
+
+private:
+   struct Signature
+   {
+      int mode = 0, axis = 0;
+      float radiusOverride = 0, radiusScale = 0;
+      bool fitAround = false;
+      float offset = 0, blend = 0;
+      bool flat = false, flip = false;
+      const void* source = nullptr;
+      const void* target = nullptr;
+      unsigned long long sourceRevision = 0;
+      unsigned long long targetRevision = 0;
+      // Baked in world-space (see MeshOps::Wrap), and GetModelMatrix() is a
+      // live per-frame value with no revision stamp of its own, so both
+      // matrices are compared directly - same reasoning as
+      // InstanceOnPointsNode::CookIfNeeded.
+      Mat4 sourceModel;
+      Mat4 targetModel;
+      bool operator==(const Signature& o) const
+      {
+         return mode == o.mode && axis == o.axis && radiusOverride == o.radiusOverride &&
+                radiusScale == o.radiusScale && fitAround == o.fitAround &&
+                offset == o.offset && blend == o.blend && flat == o.flat && flip == o.flip &&
+                source == o.source && target == o.target &&
+                sourceRevision == o.sourceRevision && targetRevision == o.targetRevision &&
+                sourceModel == o.sourceModel && targetModel == o.targetModel;
+      }
+   };
+
+   Signature CurrentSignature() const;
+
+   Mesh mCache;
+   Signature mBuilt;
+   bool mHasBuilt = false;
+   unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
 };

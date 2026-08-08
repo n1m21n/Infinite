@@ -15,6 +15,7 @@ namespace
       "Select", "Delete Selected", "Transform Selected", "Extrude Selected"
    };
    const std::vector<std::string> kSourceNames = { "Vertices", "Edges", "Faces" };
+   const std::vector<std::string> kWrapModeNames = { "Cylindrical", "Spherical", "Nearest Surface" };
    const Mesh kEmptyMesh;
 
    float Rand01(float seed, int index)
@@ -348,6 +349,11 @@ void InstanceOnPointsNode::Rebuild()
    mTransforms.clear();
    mColors.clear();
 
+   // The stamp's own transform is baked into every instance as a baseline -
+   // move/scale/rotate the shape source and all copies follow, same as
+   // dragging its object-level sliders would in a single-instance graph.
+   const Mat4 shapeModel = instanceShape ? instanceShape->GetModelMatrix() : Mat4::Identity();
+
    // A patched point cloud replaces mesh sampling: the positions already exist,
    // so there is nothing to sample.
    if (cloudSource != nullptr)
@@ -362,7 +368,7 @@ void InstanceOnPointsNode::Rebuild()
          const float s = instanceScale * p.scale;
          Mat4 m = Mat4::Scale(s, s, s);
          m = Mat4::Multiply(Mat4::Translation(p.px, p.py, p.pz), m);
-         mTransforms.push_back(m);
+         mTransforms.push_back(Mat4::Multiply(m, shapeModel));
          mColors.push_back(p.r);
          mColors.push_back(p.g);
          mColors.push_back(p.b);
@@ -373,9 +379,15 @@ void InstanceOnPointsNode::Rebuild()
    if (pointSource == nullptr)
       return;
 
-   const Mesh& src = pointSource->GetMesh();
-   if (src.Empty())
+   const Mesh& srcLocal = pointSource->GetMesh();
+   if (srcLocal.Empty())
       return;
+
+   // Points are sampled from the source's own space, so its object-level
+   // transform (move/rotate/scale the Helix, say) has to be applied before
+   // sampling or it never reaches the instances scattered on it.
+   const Mat4 pointModel = pointSource->GetModelMatrix();
+   const Mesh src = MeshOps::Transform(srcLocal, pointModel);
 
    const std::vector<MeshPoint> points = MeshOps::ToPoints(src, pointMode, maxPoints);
    mTransforms.reserve(points.size());
@@ -420,7 +432,7 @@ void InstanceOnPointsNode::Rebuild()
       m = Mat4::Multiply(Mat4::Translation(p.px + p.nx * normalOffset,
                                            p.py + p.ny * normalOffset,
                                            p.pz + p.nz * normalOffset), m);
-      mTransforms.push_back(m);
+      mTransforms.push_back(Mat4::Multiply(m, shapeModel));
    }
 }
 
@@ -446,10 +458,16 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    const unsigned long long cloudRevision = cloudSource ? cloudSource->PointRevision() : 0;
    const unsigned long long pointRevision = pointSource ? pointSource->MeshRevision() : 0;
    const unsigned long long shapeRevision = instanceShape ? instanceShape->MeshRevision() : 0;
+   // Neither source bumps a revision for a pure transform edit (GetModelMatrix
+   // is evaluated live, including per-frame animation like spin/beat), so the
+   // matrices baked into Rebuild() have to be compared directly to catch that.
+   const Mat4 pointModel = pointSource ? pointSource->GetModelMatrix() : Mat4::Identity();
+   const Mat4 shapeModel = instanceShape ? instanceShape->GetModelMatrix() : Mat4::Identity();
    const bool dirty =
       mBuiltPointSource != pointSource || mBuiltShape != instanceShape ||
       mBuiltCloud != (const void*)cloudSource || mBuiltCloudRevision != cloudRevision ||
       mBuiltPointRevision != pointRevision || mBuiltShapeRevision != shapeRevision ||
+      !(mBuiltPointModel == pointModel) || !(mBuiltShapeModel == shapeModel) ||
       mBuiltMode != pointMode || mBuiltMax != maxPoints ||
       mBuiltScale != instanceScale || mBuiltScaleRand != scaleRandom ||
       mBuiltRotRand != rotationRandom || mBuiltSeed != seed ||
@@ -467,6 +485,8 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    mBuiltCloudRevision = cloudRevision;
    mBuiltPointRevision = pointRevision;
    mBuiltShapeRevision = shapeRevision;
+   mBuiltPointModel = pointModel;
+   mBuiltShapeModel = shapeModel;
    mBuiltMode = pointMode;
    mBuiltMax = maxPoints;
    mBuiltScale = instanceScale;
@@ -475,4 +495,108 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    mBuiltSeed = seed;
    mBuiltOffset = normalOffset;
    mBuiltAlign = alignToNormal;
+}
+
+// ============================================================== Wrap
+
+const std::vector<std::string>& WrapNode::ModeNames() { return kWrapModeNames; }
+
+WrapNode::Signature WrapNode::CurrentSignature() const
+{
+   Signature s;
+   s.mode = mode;
+   s.axis = axis;
+   s.radiusOverride = radiusOverride;
+   s.radiusScale = radiusScale;
+   s.fitAround = fitAround;
+   s.offset = offset;
+   s.blend = blend;
+   s.flat = flatShade;
+   s.flip = flipNormals;
+   s.source = sourceInput;
+   s.target = targetInput;
+   s.sourceRevision = sourceInput ? sourceInput->MeshRevision() : 0;
+   s.targetRevision = targetInput ? targetInput->MeshRevision() : 0;
+   s.sourceModel = sourceInput ? sourceInput->GetModelMatrix() : Mat4::Identity();
+   s.targetModel = targetInput ? targetInput->GetModelMatrix() : Mat4::Identity();
+   return s;
+}
+
+float WrapNode::ResolvedRadius() const
+{
+   if (targetInput == nullptr)
+      return radiusOverride;
+   return MeshOps::WrapRadius(targetInput->GetMesh(), targetInput->GetModelMatrix(), axis) *
+          radiusScale;
+}
+
+const Mesh& WrapNode::GetMesh()
+{
+   if (sourceInput == nullptr)
+      return kEmptyMesh;
+   if (bypassed)
+      return sourceInput->GetMesh();
+
+   const Signature sig = CurrentSignature();
+   if (mHasBuilt && sig == mBuilt)
+      return mCache;
+
+   const Mesh& src = sourceInput->GetMesh();
+   const Mat4 srcModel = sourceInput->GetModelMatrix();
+   // The target is optional in the bend modes - a radius override alone is
+   // enough to bend around nothing - so an empty target is passed straight
+   // through to Wrap, which decides whether it can proceed.
+   const Mesh& tgt = targetInput ? targetInput->GetMesh() : kEmptyMesh;
+   const Mat4 tgtModel = targetInput ? targetInput->GetModelMatrix() : Mat4::Identity();
+   mCache = MeshOps::Wrap(src, srcModel, tgt, tgtModel, mode, offset, blend,
+                          radiusOverride, radiusScale, axis, fitAround, flatShade, flipNormals);
+
+   mBuilt = sig;
+   mHasBuilt = true;
+   mMeshRevision = NextMeshRevision();
+   return mCache;
+}
+
+unsigned long long WrapNode::MeshRevision()
+{
+   if (sourceInput == nullptr)
+      return 0;
+   if (bypassed)
+      return sourceInput->MeshRevision();
+   GetMesh();
+   return mMeshRevision;
+}
+
+Material WrapNode::GetMaterial() const
+{
+   if (inheritMaterial && sourceInput != nullptr)
+      return sourceInput->GetMaterial();
+
+   Material m;
+   m.color[0] = color[0]; m.color[1] = color[1]; m.color[2] = color[2];
+   m.metallic = metallic;
+   m.roughness = roughness;
+   m.opacity = opacity;
+   m.shading = shading;
+   m.emissionColor[0] = emissionColor[0];
+   m.emissionColor[1] = emissionColor[1];
+   m.emissionColor[2] = emissionColor[2];
+   m.emission = emission;
+   return m;
+}
+
+unsigned int WrapNode::GetSurfaceTexture()
+{
+   return sourceInput ? sourceInput->GetSurfaceTexture() : 0;
+}
+
+void WrapNode::CookIfNeeded(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   mLastCookFrame = frameId;
+   if (auto* upstream = dynamic_cast<INode*>(sourceInput))
+      upstream->CookIfNeeded(frameId);
+   if (auto* upstream = dynamic_cast<INode*>(targetInput))
+      upstream->CookIfNeeded(frameId);
 }

@@ -6,11 +6,12 @@
 #include "INode.h"
 #include "GLUtil.h"
 
-// Blender-standard procedural texture set: Voronoi, Brick, Magic, Wave, and
-// Musgrave, each with its own dedicated parameter block (unlike NoiseNode's
-// single shared param set, these patterns don't share enough shape to make
-// one param list clean). One shader, branched on textureType, keeps this to
-// a single node class/registration the same way NoiseNode covers six modes.
+// Blender-standard procedural texture set: Voronoi, Brick, Magic, Wave,
+// Musgrave, Checker, Gradient, Clouds, Marble, and Wood, each with its own
+// dedicated parameter block (unlike NoiseNode's single shared param set,
+// these patterns don't share enough shape to make one param list clean). One
+// shader, branched on textureType, keeps this to a single node class/
+// registration the same way NoiseNode covers six modes.
 class TextureNode : public INode
 {
 public:
@@ -22,6 +23,9 @@ public:
    static const std::vector<std::string>& WaveProfileNames();
    static const std::vector<std::string>& WaveBandsDirectionNames();
    static const std::vector<std::string>& MusgraveTypeNames();
+   static const std::vector<std::string>& GradientTypeNames();
+   static const std::vector<std::string>& MarbleTypeNames();
+   static const std::vector<std::string>& WoodTypeNames();
 
    ~TextureNode() override;
 
@@ -30,7 +34,7 @@ public:
    int GetOutputHeight() const override { return mOut.h; }
    void CookIfNeeded(int frameId) override;
 
-   int textureType = 0; // Voronoi / Brick / Magic / Wave / Musgrave
+   int textureType = 0; // Voronoi / Brick / Magic / Wave / Musgrave / Checker / Gradient / Clouds / Marble / Wood
    float width = 1024.0f;
    float height = 1024.0f;
    float scale = 6.0f;
@@ -78,6 +82,24 @@ public:
    float musgraveGain = 1.0f;
    float musgraveOffset = 1.0f;
 
+   // Gradient
+   int gradientType = 0; // Linear / Quadratic / Easing / Diagonal / Radial / Spherical / Quadratic Sphere
+
+   // Clouds
+   float cloudsDepth = 4.0f;
+   bool cloudsHard = false;
+
+   // Marble
+   int marbleType = 0; // Soft / Sharp / Sharper
+   float marbleTurbulence = 5.0f;
+   float marbleNoiseScale = 1.0f;
+   float marbleNoiseDepth = 2.0f;
+
+   // Wood
+   int woodType = 0; // Bands / Rings / Band Noise / Ring Noise
+   float woodTurbulence = 5.0f;
+   float woodNoiseScale = 1.0f;
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("textureType", textureType);
@@ -118,6 +140,20 @@ public:
       v.Float("musgraveOctaves", musgraveOctaves);
       v.Float("musgraveGain", musgraveGain);
       v.Float("musgraveOffset", musgraveOffset);
+
+      v.Int("gradientType", gradientType);
+
+      v.Float("cloudsDepth", cloudsDepth);
+      v.Bool("cloudsHard", cloudsHard);
+
+      v.Int("marbleType", marbleType);
+      v.Float("marbleTurbulence", marbleTurbulence);
+      v.Float("marbleNoiseScale", marbleNoiseScale);
+      v.Float("marbleNoiseDepth", marbleNoiseDepth);
+
+      v.Int("woodType", woodType);
+      v.Float("woodTurbulence", woodTurbulence);
+      v.Float("woodNoiseScale", woodNoiseScale);
    }
 
 private:

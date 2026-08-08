@@ -274,9 +274,14 @@ void ClothNode::RebuildFromInput()
 
    if (input == nullptr)
       return;
-   const Mesh& src = input->GetMesh();
-   if (src.Empty())
+   const Mesh& srcLocal = input->GetMesh();
+   if (srcLocal.Empty())
       return;
+
+   // The input's own transform sets the rest pose the cloth drapes from - a
+   // draped cube that gets rotated upstream should re-drape rotated, not
+   // stay pinned to its old, now-stale, world-space shape.
+   const Mesh src = MeshOps::Transform(srcLocal, input->GetModelMatrix());
 
    mRest = src;
    mMesh = src;
@@ -545,13 +550,15 @@ void ClothNode::CookIfNeeded(int frameId)
    // The rest state is rebuilt when the incoming mesh changes at all: a
    // different topology invalidates every constraint index.
    const unsigned long long upstreamRevision = input ? input->MeshRevision() : 0;
+   const Mat4 inputModel = input ? input->GetModelMatrix() : Mat4::Identity();
    if (mBuiltInput != (const void*)input || mBuiltUpstream != upstreamRevision ||
-       mBuiltPinMode != pinMode)
+       mBuiltPinMode != pinMode || !(mBuiltInputModel == inputModel))
    {
       RebuildFromInput();
       mBuiltInput = input;
       mBuiltUpstream = upstreamRevision;
       mBuiltPinMode = pinMode;
+      mBuiltInputModel = inputModel;
       mLastBeats = -1.0;
       mElapsed = 0.0f;
       mAccumulator = 0.0f;

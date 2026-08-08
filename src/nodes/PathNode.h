@@ -113,6 +113,11 @@ private:
    unsigned long long mBuiltRevision = 0;
    int mBuiltFollowMode = -1, mBuiltSliceAxis = -1, mBuiltContour = -1;
    float mBuiltSlicePosition = -999.0f;
+   // The followed contour is extracted in world space (see
+   // RebuildFollowIfNeeded), and GetModelMatrix() is a live value with no
+   // revision of its own, so it must be compared directly to catch a pure
+   // transform edit on the geometry source.
+   Mat4 mBuiltGeometryModel;
 
    float mPoint[3] = { 0.0f, 0.0f, 0.0f };
    float mProgress = 0.0f;
