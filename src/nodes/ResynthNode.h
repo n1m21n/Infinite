@@ -79,6 +79,30 @@ public:
    bool loopPath = true;
    float seed = 0.0f;
 
+   // The recorded pad path is deliberately not persisted here - it is
+   // performance data captured live, the same reasoning DrawNode's stroke
+   // history and MacroXYNode's path use to stay out of the saved params.
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("mode", mode); v.Float("chaos", chaos); v.Float("mutation", mutation);
+      v.Float("feedback", feedback); v.Float("sourcePull", sourcePull);
+      v.Float("stepsPerBeat", stepsPerBeat);
+      v.Bool("autoIterate", autoIterate); v.Bool("loopPath", loopPath);
+      v.Float("seed", seed);
+      v.Float("padX", padX); v.Float("padY", padY);
+      static const char* kEffectKeys[kCorners] = {
+         "cornerEffect0", "cornerEffect1", "cornerEffect2", "cornerEffect3"
+      };
+      static const char* kAmountKeys[kCorners] = {
+         "cornerAmount0", "cornerAmount1", "cornerAmount2", "cornerAmount3"
+      };
+      for (int i = 0; i < kCorners; i++)
+      {
+         v.Int(kEffectKeys[i], cornerEffect[i]);
+         v.Float(kAmountKeys[i], cornerAmount[i]);
+      }
+   }
+
 private:
    bool EnsureShader();
    void RunGeneration(unsigned int srcTex, int w, int h);

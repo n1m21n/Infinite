@@ -37,6 +37,18 @@ public:
    float lowColor[3] = { 0.0f, 0.0f, 0.0f };
    float highColor[3] = { 1.0f, 1.0f, 1.0f };
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("noiseType", noiseType);
+      v.Float("width", width); v.Float("height", height);
+      v.Float("scale", scale); v.Float("octaves", octaves);
+      v.Float("lacunarity", lacunarity); v.Float("gain", gain);
+      v.Float("warp", warp); v.Float("speed", speed);
+      v.Float("contrast", contrast); v.Float("brightness", brightness);
+      v.Float("seed", seed); v.Bool("colorNoise", colorNoise);
+      v.Color("lowColor", lowColor); v.Color("highColor", highColor);
+   }
+
 private:
    bool EnsureShader();
 

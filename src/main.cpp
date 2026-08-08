@@ -826,88 +826,39 @@ namespace
       return &gNodes.back();
    }
 
-   // Copies user-visible parameters between two nodes of the same type. Deliberately
-   // field-by-field rather than a struct copy: the objects own GL texture/FBO handles
-   // that must not be shared or double-freed.
+   // File-backed and compiled-from-text nodes keep derived state (a loaded
+   // texture, a compiled GL program) that VisitParams deliberately does not
+   // touch - it declares settings, not the runtime side effects of restoring
+   // them. Both patch load and copy/paste restore a node from bare settings,
+   // so both call this afterwards rather than duplicating the same dynamic
+   // casts in two places.
+   void ReloadDerivedState(INode* node)
+   {
+      if (auto* img = dynamic_cast<ImageSourceNode*>(node))
+         img->ReloadFromPath();
+      if (auto* model = dynamic_cast<ModelSourceNode*>(node))
+         model->ReloadFromPath();
+      if (auto* audio = dynamic_cast<AudioFileNode*>(node))
+         audio->ReloadFromPath();
+      if (auto* video = dynamic_cast<VideoSourceNode*>(node))
+         video->ReloadFromPath();
+      if (auto* formula = dynamic_cast<FormulaNode*>(node))
+         formula->Apply();
+   }
+
+   // Copies every parameter VisitParams declares, for any node type, by
+   // routing through the same save/load format used for patch files: write src
+   // to an in-memory param list, then read it back into dst. This used to be a
+   // hand-maintained field-by-field switch covering 7 of roughly 50 node types;
+   // every type it didn't cover pasted a node whose values silently stayed at
+   // spawn defaults. Now paste and patch load share one source of truth, so a
+   // node that round-trips through Save also round-trips through Copy.
    void CopyParams(INode* dstNode, INode* srcNode)
    {
-      if (auto* d = dynamic_cast<ShapeNode*>(dstNode))
-      {
-         auto* s = static_cast<ShapeNode*>(srcNode);
-         d->shapeType = s->shapeType;
-         d->width = s->width;
-         d->height = s->height;
-         d->size = s->size;
-         d->aspect = s->aspect;
-         d->cornerRadius = s->cornerRadius;
-         d->sides = s->sides;
-         d->innerRatio = s->innerRatio;
-         d->rotation = s->rotation;
-         d->posX = s->posX;
-         d->posY = s->posY;
-         d->fillOpacity = s->fillOpacity;
-         d->strokeWidth = s->strokeWidth;
-         d->feather = s->feather;
-         d->bgOpacity = s->bgOpacity;
-         memcpy(d->fillColor, s->fillColor, sizeof(d->fillColor));
-         memcpy(d->strokeColor, s->strokeColor, sizeof(d->strokeColor));
-         memcpy(d->bgColor, s->bgColor, sizeof(d->bgColor));
-      }
-      else if (auto* d = dynamic_cast<FormulaNode*>(dstNode))
-      {
-         auto* s = static_cast<FormulaNode*>(srcNode);
-         d->formula = s->formula;
-         d->width = s->width;
-         d->height = s->height;
-         d->knobA = s->knobA;
-         d->knobB = s->knobB;
-         d->knobC = s->knobC;
-         d->knobD = s->knobD;
-         d->animate = s->animate;
-         d->Apply();
-      }
-      else if (auto* d = dynamic_cast<TextNode*>(dstNode))
-      {
-         auto* s = static_cast<TextNode*>(srcNode);
-         d->text = s->text;
-         d->fontName = s->fontName;
-         d->fontSize = s->fontSize;
-         d->tracking = s->tracking;
-         d->posX = s->posX;
-         d->posY = s->posY;
-         d->align = s->align;
-         d->width = s->width;
-         d->height = s->height;
-         memcpy(d->color, s->color, sizeof(d->color));
-      }
-      else if (auto* d = dynamic_cast<LayerStackNode*>(dstNode))
-      {
-         auto* s = static_cast<LayerStackNode*>(srcNode);
-         memcpy(d->modes, s->modes, sizeof(d->modes));
-         memcpy(d->opacities, s->opacities, sizeof(d->opacities));
-      }
-      else if (auto* d = dynamic_cast<BlendNode*>(dstNode))
-      {
-         auto* s = static_cast<BlendNode*>(srcNode);
-         d->ModeIndex() = s->ModeIndex();
-         d->Mix() = s->Mix();
-      }
-      else if (auto* d = dynamic_cast<FilterNode*>(dstNode))
-      {
-         auto* s = static_cast<FilterNode*>(srcNode);
-         for (size_t i = 0; i < d->Def().params.size() && i < s->Def().params.size(); i++)
-         {
-            for (int c = 0; c < 3; c++)
-               d->SetParamValue(i, c, s->GetParamValue(i, c));
-         }
-      }
-      else if (auto* d = dynamic_cast<ImageSourceNode*>(dstNode))
-      {
-         auto* s = static_cast<ImageSourceNode*>(srcNode);
-         d->pathInput = s->pathInput;
-         if (!s->LoadedPath().empty())
-            d->Load(s->LoadedPath());
-      }
+      std::vector<std::pair<std::string, std::string>> params;
+      Patch::SaveParams(srcNode, params);
+      Patch::LoadParams(dstNode, params);
+      ReloadDerivedState(dstNode);
    }
 
    // ---------------- per-node parameter UI ----------------
@@ -3554,15 +3505,7 @@ namespace
          spawned->showParams = rec.showParams;
          spawned->node->bypassed = rec.bypassed;
          Patch::LoadParams(spawned->node.get(), rec.params);
-
-         // Sources that reference a file have to re-read it; the patch stores
-         // the path, not the pixels or the mesh.
-         if (auto* img = dynamic_cast<ImageSourceNode*>(spawned->node.get()))
-            img->ReloadFromPath();
-         if (auto* model = dynamic_cast<ModelSourceNode*>(spawned->node.get()))
-            model->ReloadFromPath();
-         if (auto* audio = dynamic_cast<AudioFileNode*>(spawned->node.get()))
-            audio->ReloadFromPath();
+         ReloadDerivedState(spawned->node.get());
       }
 
       auto resolve = [&](int savedIndex) -> GraphNode*
@@ -4814,6 +4757,87 @@ int main()
                          cut.FaceCount() == cube.FaceCount() - 2 && kept.FaceCount() == 2 &&
                          movedOk && extruded.FaceCount() > cube.FaceCount() && reproducible;
          printf("%s\n", ok ? "SELECTION OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
+      {
+         // Every node type that declares params must survive both paths that
+         // restore a node from bare settings: copy/paste (CopyParams) and
+         // patch load (Patch::LoadParams). This is what caught FormulaNode,
+         // TextNode, NoiseNode and about eighteen others silently keeping the
+         // base INode::VisitParams no-op, so save/load and copy/paste dropped
+         // every value on them.
+         struct MutateVisitor : public ParamVisitor
+         {
+            int index = 0;
+            void Float(const char*, float& v) override { v += 1.0f + (float)(index++ % 5) * 0.1f; }
+            void Int(const char*, int& v) override { v += 1 + (index++ % 3); }
+            void Bool(const char*, bool& v) override { v = !v; index++; }
+            void Text(const char*, std::string& v) override { v += "_x"; index++; }
+            void Color(const char*, float rgb[3]) override
+            {
+               rgb[0] += 0.11f; rgb[1] += 0.07f; rgb[2] += 0.05f; index++;
+            }
+         };
+
+         int typesTested = 0, typesSkipped = 0, copyFails = 0, loadFails = 0;
+         std::vector<std::string> copyFailNames, loadFailNames;
+
+         for (const std::string& category : NodeFactory::Instance().GetCategories())
+         {
+            for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+            {
+               std::unique_ptr<INode> a(NodeFactory::Instance().MakeNode(name));
+               if (a == nullptr)
+                  continue;
+
+               MutateVisitor mutator;
+               a->VisitParams(mutator);
+               if (mutator.index == 0)
+               {
+                  // Legitimately no params (Null, Null 3D, the boolean-mode
+                  // Join Geometry variants) rather than a missed override -
+                  // nothing to round-trip.
+                  typesSkipped++;
+                  continue;
+               }
+               typesTested++;
+
+               std::vector<std::pair<std::string, std::string>> paramsA;
+               Patch::SaveParams(a.get(), paramsA);
+
+               std::unique_ptr<INode> b(NodeFactory::Instance().MakeNode(name));
+               CopyParams(b.get(), a.get());
+               std::vector<std::pair<std::string, std::string>> paramsB;
+               Patch::SaveParams(b.get(), paramsB);
+               if (paramsB != paramsA)
+               {
+                  copyFails++;
+                  copyFailNames.push_back(name);
+               }
+
+               std::unique_ptr<INode> c(NodeFactory::Instance().MakeNode(name));
+               Patch::LoadParams(c.get(), paramsA);
+               std::vector<std::pair<std::string, std::string>> paramsC;
+               Patch::SaveParams(c.get(), paramsC);
+               if (paramsC != paramsA)
+               {
+                  loadFails++;
+                  loadFailNames.push_back(name);
+               }
+            }
+         }
+
+         printf("round trip: %d types tested, %d with no params to test\n", typesTested, typesSkipped);
+         for (const std::string& n : copyFailNames)
+            printf("  copy/paste dropped values: %s\n", n.c_str());
+         for (const std::string& n : loadFailNames)
+            printf("  save/load dropped values: %s\n", n.c_str());
+         printf("copy/paste: %d/%d types round trip  %s\n",
+                typesTested - copyFails, typesTested, copyFails == 0 ? "OK" : "FAIL");
+         printf("save/load:  %d/%d types round trip  %s\n",
+                typesTested - loadFails, typesTested, loadFails == 0 ? "OK" : "FAIL");
+         printf("%s\n", (copyFails == 0 && loadFails == 0) ? "ROUND TRIP OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_PHASEFTEST") != nullptr && frameId == 4)

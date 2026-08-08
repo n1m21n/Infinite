@@ -28,6 +28,12 @@ public:
    float phase = 0.0f;     // 0..1
    float low = 0.0f;
    float high = 1.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("shape", shape); v.Float("rateBeats", rateBeats);
+      v.Float("phase", phase); v.Float("low", low); v.Float("high", high);
+   }
 };
 
 // A fixed value, as a modulator.
@@ -123,6 +129,18 @@ public:
    float low = 0.0f;
    float high = 1.0f;
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      static const char* kStepKeys[kSteps] = {
+         "step0", "step1", "step2", "step3", "step4", "step5", "step6", "step7"
+      };
+      for (int i = 0; i < kSteps; i++)
+         v.Float(kStepKeys[i], steps[i]);
+      v.Int("length", length); v.Float("stepBeats", stepBeats);
+      v.Bool("smoothSteps", smoothSteps);
+      v.Float("low", low); v.Float("high", high);
+   }
+
 private:
    int mCurrentStep = 0;
 };
@@ -152,4 +170,10 @@ public:
    float gain = 1.0f;
    float offset = 0.0f;
    bool clampOutput = true;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("op", op); v.Float("constantA", constantA); v.Float("constantB", constantB);
+      v.Float("gain", gain); v.Float("offset", offset); v.Bool("clampOutput", clampOutput);
+   }
 };

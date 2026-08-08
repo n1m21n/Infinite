@@ -33,6 +33,11 @@ public:
    int& ModeIndex() { return mModeIndex; }
    float& Mix() { return mMix; }
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("mode", mModeIndex); v.Float("mix", mMix);
+   }
+
 private:
    bool EnsureShader();
 

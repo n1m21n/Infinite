@@ -38,6 +38,21 @@ public:
    // Direct handle for widgets that edit in place (colour picker).
    float* ParamPtr(size_t paramIndex) { return mParamValues[paramIndex].data(); }
 
+   // Keyed by uniformName rather than by index: the FilterDef table is shared
+   // across every FilterNode of this kind, so the name is the one thing stable
+   // enough to survive across app versions if params are reordered.
+   void VisitParams(ParamVisitor& v) override
+   {
+      for (size_t i = 0; i < mDef.params.size(); i++)
+      {
+         const FilterParamDef& def = mDef.params[i];
+         if (def.type == FilterParamDef::Type::Color)
+            v.Color(def.uniformName.c_str(), mParamValues[i].data());
+         else
+            v.Float(def.uniformName.c_str(), mParamValues[i][0]);
+      }
+   }
+
 private:
    bool EnsureShader();
 

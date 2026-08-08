@@ -31,6 +31,22 @@ public:
    bool loop = true;
    float speed = 1.0f;
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Text("path", mLoadedPath);
+      v.Bool("loop", loop); v.Float("speed", speed);
+   }
+
+   // Reloads from whatever path a patch restored. Called after loading.
+   void ReloadFromPath()
+   {
+      if (!mLoadedPath.empty())
+      {
+         const std::string p = mLoadedPath;
+         Open(p);
+      }
+   }
+
 private:
    void EnsurePlaceholder();
 

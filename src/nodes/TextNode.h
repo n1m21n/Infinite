@@ -47,6 +47,23 @@ public:
    float width = 1024.0f;
    float height = 1024.0f;
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Text("text", text); v.Text("fontName", fontName);
+      v.Float("fontSize", fontSize); v.Color("color", color);
+      v.Float("tracking", tracking);
+      v.Float("posX", posX); v.Float("posY", posY);
+      v.Int("align", align);
+      v.Float("scaleX", scaleX); v.Float("scaleY", scaleY);
+      v.Bool("wordWrap", wordWrap);
+      v.Float("wrapWidth", wrapWidth); v.Float("wrapHeight", wrapHeight);
+      v.Bool("fitToBox", fitToBox);
+      v.Float("lineSpacing", lineSpacing);
+      v.Float("outlineWidth", outlineWidth); v.Color("outlineColor", outlineColor);
+      v.Bool("outlineOnly", outlineOnly);
+      v.Float("width", width); v.Float("height", height);
+   }
+
 private:
    unsigned int mTex = 0;
    int mWidth = 512;

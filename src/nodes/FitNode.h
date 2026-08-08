@@ -41,6 +41,13 @@ public:
    float bgColor[3] = { 0.0f, 0.0f, 0.0f };
    float bgOpacity = 0.0f;
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("mode", mode); v.Float("width", width); v.Float("height", height);
+      v.Bool("matchInput", matchInput);
+      v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
+   }
+
 private:
    bool EnsureShader();
 

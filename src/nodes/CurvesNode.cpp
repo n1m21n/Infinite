@@ -3,6 +3,8 @@
 #include <OpenGL/gl3.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 namespace
 {
@@ -47,6 +49,43 @@ CurvesNode::~CurvesNode()
       glDeleteTextures(1, &mLutTex);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
+}
+
+std::string CurvesNode::EncodePoints(const std::vector<Point>& pts)
+{
+   std::string out;
+   for (size_t i = 0; i < pts.size(); i++)
+   {
+      if (i > 0)
+         out += ";";
+      char buf[48];
+      snprintf(buf, sizeof(buf), "%.6g,%.6g", (double)pts[i].x, (double)pts[i].y);
+      out += buf;
+   }
+   return out;
+}
+
+std::vector<CurvesNode::Point> CurvesNode::DecodePoints(const std::string& s)
+{
+   std::vector<Point> pts;
+   size_t start = 0;
+   while (start < s.size())
+   {
+      size_t sep = s.find(';', start);
+      std::string term = s.substr(start, sep == std::string::npos ? std::string::npos : sep - start);
+      const size_t comma = term.find(',');
+      if (comma != std::string::npos)
+      {
+         Point p;
+         p.x = (float)atof(term.substr(0, comma).c_str());
+         p.y = (float)atof(term.substr(comma + 1).c_str());
+         pts.push_back(p);
+      }
+      if (sep == std::string::npos)
+         break;
+      start = sep + 1;
+   }
+   return pts;
 }
 
 void CurvesNode::ResetChannel(int channel)

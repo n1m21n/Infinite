@@ -42,6 +42,26 @@ public:
       { 1.0f, 0.3f, 0.2f }, { 0.2f, 0.5f, 1.0f }, { 1.0f, 0.9f, 0.3f }
    };
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("type", type); v.Int("repeat", repeat);
+      v.Float("width", width); v.Float("height", height);
+      v.Float("angle", angle);
+      v.Float("centerX", centerX); v.Float("centerY", centerY);
+      v.Float("scale", scale); v.Float("offset", offset);
+      v.Float("gamma", gamma); v.Float("dither", dither);
+      v.Int("stopCount", stopCount);
+      static const char* kPosKeys[kStops] = { "stop0", "stop1", "stop2", "stop3", "stop4" };
+      static const char* kColKeys[kStops] = {
+         "stopColor0", "stopColor1", "stopColor2", "stopColor3", "stopColor4"
+      };
+      for (int i = 0; i < kStops; i++)
+      {
+         v.Float(kPosKeys[i], stopPos[i]);
+         v.Color(kColKeys[i], stopColor[i]);
+      }
+   }
+
 private:
    bool EnsureShader();
 

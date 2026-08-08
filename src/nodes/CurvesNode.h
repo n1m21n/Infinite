@@ -59,7 +59,31 @@ public:
    int activeChannel = kRGB;
    float mix = 1.0f;
 
+   // Points are round-tripped as one "x0,y0;x1,y1;..." string per channel
+   // rather than adding array support to ParamVisitor for a shape used by only
+   // this node. Decoding runs on both save and load - on save the string was
+   // just encoded from mPoints, so decoding it back is a harmless no-op.
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("activeChannel", activeChannel);
+      v.Float("mix", mix);
+      static const char* kKeys[kChannelCount] = {
+         "curveRGB", "curveR", "curveG", "curveB"
+      };
+      for (int c = 0; c < kChannelCount; c++)
+      {
+         std::string encoded = EncodePoints(mPoints[c]);
+         v.Text(kKeys[c], encoded);
+         std::vector<Point> decoded = DecodePoints(encoded);
+         if (decoded.size() >= 2)
+            mPoints[c] = decoded;
+         mLutDirty = true;
+      }
+   }
+
 private:
+   static std::string EncodePoints(const std::vector<Point>& pts);
+   static std::vector<Point> DecodePoints(const std::string& s);
    bool EnsureShader();
    void RebuildLut();
 

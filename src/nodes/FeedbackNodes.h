@@ -30,6 +30,8 @@ public:
 
    float delayFrames = 1.0f; // held for information; the delay is always one frame
 
+   void VisitParams(ParamVisitor& v) override { v.Float("delayFrames", delayFrames); }
+
 private:
    bool EnsureShader();
 
@@ -68,6 +70,13 @@ public:
    float driftY = 0.0f;
    float hueShift = 0.0f;
    int blendMode = 0; // 0 = max, 1 = add, 2 = screen
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("decay", decay); v.Float("zoom", zoom); v.Float("rotate", rotate);
+      v.Float("driftX", driftX); v.Float("driftY", driftY);
+      v.Float("hueShift", hueShift); v.Int("blendMode", blendMode);
+   }
 
 private:
    bool EnsureShader();
@@ -114,6 +123,18 @@ public:
    float sourceInfluence = 0.0f;
    float lowColor[3] = { 0.02f, 0.02f, 0.06f };
    float highColor[3] = { 0.95f, 0.85f, 0.6f };
+
+   // The simulated chemical field itself is not persisted - like DrawNode's
+   // canvas, it is runtime state that reseeds from these params rather than a
+   // value to round-trip.
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("preset", preset); v.Float("width", width); v.Float("height", height);
+      v.Float("feed", feed); v.Float("kill", kill);
+      v.Float("diffuseA", diffuseA); v.Float("diffuseB", diffuseB);
+      v.Float("stepsPerFrame", stepsPerFrame); v.Float("sourceInfluence", sourceInfluence);
+      v.Color("lowColor", lowColor); v.Color("highColor", highColor);
+   }
 
 private:
    bool EnsureShaders();

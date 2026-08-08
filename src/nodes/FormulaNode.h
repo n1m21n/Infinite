@@ -37,6 +37,15 @@ public:
    void LoadPreset(int index);
    const std::string& LastError() const { return mLastError; }
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Text("formula", formula);
+      v.Float("width", width); v.Float("height", height);
+      v.Float("knobA", knobA); v.Float("knobB", knobB);
+      v.Float("knobC", knobC); v.Float("knobD", knobD);
+      v.Bool("animate", animate);
+   }
+
    // Bound directly by the ImGui params panel.
    std::string formula;
    float width = 1024.0f;

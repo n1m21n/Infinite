@@ -68,6 +68,19 @@ public:
    float canvasWidth = 1024.0f;
    float canvasHeight = 1024.0f;
 
+   // The painted canvas and stroke recording are runtime state, not settings -
+   // like a video frame, they are not reasonable to round-trip through a text
+   // patch file. Only the brush configuration is persisted.
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Bool("loopPlayback", loopPlayback); v.Float("playSpeed", playSpeed);
+      v.Int("brush", brush); v.Float("brushSize", brushSize);
+      v.Float("opacity", opacity); v.Float("hardness", hardness);
+      v.Float("spacing", spacing); v.Float("jitter", jitter);
+      v.Bool("eraser", eraser); v.Color("color", color);
+      v.Float("canvasWidth", canvasWidth); v.Float("canvasHeight", canvasHeight);
+   }
+
 private:
    struct Stamp
    {

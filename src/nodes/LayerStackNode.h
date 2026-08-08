@@ -37,6 +37,17 @@ public:
    int modes[kSlots] = { 0, 0, 0, 0 };
    float opacities[kSlots] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      static const char* kModeKeys[kSlots] = { "mode0", "mode1", "mode2", "mode3" };
+      static const char* kOpKeys[kSlots] = { "opacity0", "opacity1", "opacity2", "opacity3" };
+      for (int i = 0; i < kSlots; i++)
+      {
+         v.Int(kModeKeys[i], modes[i]);
+         v.Float(kOpKeys[i], opacities[i]);
+      }
+   }
+
 private:
    bool EnsureShader();
 

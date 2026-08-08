@@ -26,6 +26,12 @@ public:
    float curve = 1.0f;   // <1 eases in, >1 eases out
    bool invert = false;
    std::string label = "Macro";
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("value", value); v.Float("curve", curve);
+      v.Bool("invert", invert); v.Text("label", label);
+   }
 };
 
 // A macro XY pad: two independent normalised outputs (X and Y) from one
@@ -72,6 +78,14 @@ public:
    float padY = 0.5f;
    bool loopPath = true;
    float speed = 1.0f;
+
+   // Recorded path stays out of the saved params - see ResynthNode's pad for
+   // the same reasoning.
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("padX", padX); v.Float("padY", padY);
+      v.Bool("loopPath", loopPath); v.Float("speed", speed);
+   }
 
 private:
    // Adapter so the Y axis can be handed out as its own IModulator without a

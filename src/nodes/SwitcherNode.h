@@ -42,6 +42,13 @@ public:
    bool manual = false;      // ignore the clock and hold manualSlot
    int manualSlot = 0;
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("unit", unit); v.Float("interval", interval);
+      v.Float("crossfade", crossfade);
+      v.Bool("manual", manual); v.Int("manualSlot", manualSlot);
+   }
+
 private:
    bool EnsureShader();
 

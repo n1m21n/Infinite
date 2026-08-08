@@ -54,6 +54,12 @@ public:
    float sampleRate = 30.0f; // readbacks per second
    int sampleSize = 64;      // readback resolution
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("smoothing", smoothing); v.Float("gain", gain);
+      v.Float("sampleRate", sampleRate); v.Int("sampleSize", sampleSize);
+   }
+
 private:
    struct Tap : public IModulator
    {
@@ -192,6 +198,12 @@ public:
    float attack = 0.5f;
    float release = 0.12f;
    float onsetHold = 0.12f; // seconds the onset output stays high
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("gain", gain); v.Float("attack", attack);
+      v.Float("release", release); v.Float("onsetHold", onsetHold);
+   }
 
 private:
    struct Tap : public IModulator

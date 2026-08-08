@@ -45,6 +45,15 @@ public:
    float bgColor[3] = { 0.0f, 0.0f, 0.0f };
    float bgOpacity = 0.0f;
 
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("mode", mode); v.Int("outputMode", outputMode);
+      v.Float("feather", feather); v.Float("threshold", threshold);
+      v.Float("contrast", contrast);
+      v.Bool("autoRefresh", autoRefresh); v.Float("refreshBeats", refreshBeats);
+      v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
+   }
+
 private:
    bool EnsureShader();
    void ComputeMask(unsigned int srcTex, int w, int h);
