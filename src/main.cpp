@@ -225,6 +225,11 @@ namespace
    // a synthetic double-click at it. Inside a node ImGui draws in canvas space,
    // hence the explicit conversion where this is filled in.
    ImVec4 gCommentBodyRect(0, 0, 0, 0); // x, y, w, h
+   // Screen-space rect of whichever comment is currently open for editing,
+   // refreshed every frame so the edit popup can be pinned exactly on top of
+   // it - the point being that typing looks like it happens straight into the
+   // node's own box rather than in a separate window somewhere else on screen.
+   ImVec4 gCommentEditRect(0, 0, 0, 0); // x, y, w, h
    FormulaNode* gFormulaEditor = nullptr;
    bool gFormulaEditorOpen = false;
    bool gHelpOpen = false;
@@ -3138,6 +3143,8 @@ namespace
          const ImVec2 tl = ed::CanvasToScreen(origin);
          const ImVec2 rb = ed::CanvasToScreen(br);
          gCommentBodyRect = ImVec4(tl.x, tl.y, rb.x - tl.x, rb.y - tl.y);
+         if (n == gCommentEdit.target)
+            gCommentEditRect = gCommentBodyRect;
       }
 
       if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -9356,30 +9363,52 @@ int main()
             gCommentEdit.target = nullptr;
       }
 
-      if (ImGui::BeginPopup("##commentedit"))
+      // Pinned to the node's own on-screen box (refreshed every frame in
+      // DrawCommentPreview) so the editor lands exactly over the note instead
+      // of opening as a separate window elsewhere on screen - typing is meant
+      // to read as happening straight into the box you double-clicked.
+      if (gCommentEdit.target != nullptr && gCommentEditRect.z > 0.0f)
+      {
+         ImGui::SetNextWindowPos(ImVec2(gCommentEditRect.x, gCommentEditRect.y));
+         ImGui::SetNextWindowSize(ImVec2(gCommentEditRect.z, gCommentEditRect.w));
+      }
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 6));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 4.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.5f);
+      if (gCommentEdit.target != nullptr)
+      {
+         const float* col = gCommentEdit.target->color;
+         ImGui::PushStyleColor(ImGuiCol_PopupBg,
+                               ImVec4(col[0] * 0.16f, col[1] * 0.16f, col[2] * 0.16f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(col[0], col[1], col[2], 0.8f));
+      }
+      if (ImGui::BeginPopup("##commentedit", ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
       {
          if (gCommentEdit.target != nullptr)
          {
             CommentNode* c = gCommentEdit.target;
-            ImGui::TextDisabled("comment");
             gCommentEdit.framesOpen++;
             if (gCommentEdit.framesOpen <= 4) // see CommentEditRequest::framesOpen
             {
                ImGui::SetWindowFocus();
                ImGui::SetKeyboardFocusHere();
             }
-            // Sized from the comment's own box so what is typed lines up with
-            // what will be on the canvas, within limits that keep the popup on
-            // screen for a comment scaled right up.
-            ImGui::InputTextMultiline("##commenttext", &c->text,
-                                      ImVec2(std::min(600.0f, std::max(240.0f, c->width)),
-                                             std::min(400.0f, std::max(120.0f, c->height))));
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+            // Filling the whole popup rather than a fixed size: the popup is
+            // already pinned to the node's box, so the field just fills it.
+            ImGui::InputTextMultiline("##commenttext", &c->text, ImVec2(-FLT_MIN, -FLT_MIN));
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
             // The checkpoint was pushed when the editor opened, so every
             // keystroke here is part of that one undo step; all that is left is
             // to keep the patch marked unsaved.
             if (ImGui::IsItemEdited())
                gPatchDirty = true;
-            ImGui::TextDisabled("click outside to finish");
+            // Esc finishes the same way clicking outside does - no separate
+            // "done" step needed for a note this small.
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+               ImGui::CloseCurrentPopup();
          }
          else
          {
@@ -9387,7 +9416,10 @@ int main()
          }
          ImGui::EndPopup();
       }
-      else
+      if (gCommentEdit.target != nullptr)
+         ImGui::PopStyleColor(2);
+      ImGui::PopStyleVar(3);
+      if (!ImGui::IsPopupOpen("##commentedit"))
       {
          gCommentEdit.target = nullptr;
          gCommentEdit.framesOpen = 0;
