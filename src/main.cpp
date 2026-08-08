@@ -4759,6 +4759,166 @@ int main()
          printf("%s\n", ok ? "SELECTION OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_PADPATHTEST") != nullptr && frameId == 4)
+      {
+         // A real recorded performance, not the generic mutator's mangled
+         // text, round-tripping through both save/load and copy/paste.
+         ShapeNode src;
+         src.shapeType = 0;
+         src.width = 64; src.height = 64;
+         src.CookIfNeeded(9500);
+
+         ResynthNode a;
+         a.Input().Connect(&src);
+         Transport::Instance().SetPlaying(true);
+         Transport::Instance().Rewind();
+         a.StartRecording();
+         const float xs[] = { 0.1f, 0.3f, 0.6f, 0.9f, 0.2f };
+         for (int i = 0; i < 5; i++)
+         {
+            a.padX = xs[i];
+            a.padY = 1.0f - xs[i];
+            a.CookIfNeeded(9510 + i);
+            Transport::Instance().Tick(0.3f);
+         }
+         a.StopRecording();
+         const size_t recorded = a.Path().size();
+
+         auto pathsMatch = [](const std::vector<ResynthNode::PadPoint>& p,
+                              const std::vector<ResynthNode::PadPoint>& q) {
+            if (p.size() != q.size())
+               return false;
+            for (size_t i = 0; i < p.size(); i++)
+               if (std::fabs(p[i].x - q[i].x) > 1e-5f || std::fabs(p[i].y - q[i].y) > 1e-5f ||
+                   std::fabs(p[i].beat - q[i].beat) > 1e-6)
+                  return false;
+            return true;
+         };
+
+         ResynthNode b;
+         CopyParams(&b, &a);
+         const bool copyOk = pathsMatch(a.Path(), b.Path());
+         printf("resynth pad path: %zu points recorded, copy/paste preserved %zu  %s\n",
+                recorded, b.Path().size(), copyOk && recorded > 0 ? "OK" : "FAIL");
+
+         std::vector<std::pair<std::string, std::string>> params;
+         Patch::SaveParams(&a, params);
+         ResynthNode c;
+         Patch::LoadParams(&c, params);
+         const bool loadOk = pathsMatch(a.Path(), c.Path());
+         printf("resynth pad path: save/load preserved %zu  %s\n",
+                c.Path().size(), loadOk ? "OK" : "FAIL");
+
+         // Same check for Macro XY's pad, which records identically.
+         MacroXYNode m;
+         Transport::Instance().Rewind();
+         m.StartRecording();
+         for (int i = 0; i < 5; i++)
+         {
+            m.padX = xs[i];
+            m.padY = 1.0f - xs[i];
+            m.CookIfNeeded(9520 + i);
+            Transport::Instance().Tick(0.3f);
+         }
+         m.StopRecording();
+         const size_t mRecorded = m.Path().size();
+
+         auto macroPathsMatch = [](const std::vector<MacroXYNode::PadPoint>& p,
+                                   const std::vector<MacroXYNode::PadPoint>& q) {
+            if (p.size() != q.size())
+               return false;
+            for (size_t i = 0; i < p.size(); i++)
+               if (std::fabs(p[i].x - q[i].x) > 1e-5f || std::fabs(p[i].y - q[i].y) > 1e-5f ||
+                   std::fabs(p[i].beat - q[i].beat) > 1e-6)
+                  return false;
+            return true;
+         };
+         MacroXYNode m2;
+         CopyParams(&m2, &m);
+         const bool mCopyOk = macroPathsMatch(m.Path(), m2.Path());
+         printf("macro xy pad path: %zu points recorded, copy/paste preserved %zu  %s\n",
+                mRecorded, m2.Path().size(), mCopyOk && mRecorded > 0 ? "OK" : "FAIL");
+
+         const bool ok = copyOk && loadOk && recorded > 0 && mCopyOk && mRecorded > 0;
+         printf("%s\n", ok ? "PAD PATH OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_LIVETEST") != nullptr && frameId == 4)
+      {
+         // Reproduces the reported bug exactly: Cube -> Select -> Delete
+         // Selected, then reroll Select's random seed and confirm Delete
+         // Selected's output actually changes without touching the graph.
+         GeometryNode cube;
+         cube.shape = 1; // cube
+         cube.CookIfNeeded(9400);
+
+         auto select = std::make_unique<GeometryOpNode>();
+         select->op = GeometryOpNode::kSelect;
+         select->input = &cube;
+         select->selectMode = MeshOps::kSelectRandom;
+         select->selectA = 0.5f;
+         select->selectSeed = 1.0f;
+
+         auto del = std::make_unique<GeometryOpNode>();
+         del->op = GeometryOpNode::kDeleteSelected;
+         del->input = select.get();
+
+         // Copied by value: GetMesh() returns a reference into the node's own
+         // cache, so holding two "const Mesh&" across the second call would
+         // alias the same mutated object instead of comparing before/after.
+         const Mesh firstOut = del->GetMesh();
+         const size_t firstTris = firstOut.indices.size() / 3;
+
+         select->selectSeed = 42.0f;
+         const Mesh secondOut = del->GetMesh();
+         const size_t secondTris = secondOut.indices.size() / 3;
+
+         auto sameVertices = [](const Mesh& a, const Mesh& b) {
+            if (a.vertices.size() != b.vertices.size() || a.indices.size() != b.indices.size())
+               return false;
+            for (size_t i = 0; i < a.vertices.size(); i++)
+               if (std::fabs(a.vertices[i].px - b.vertices[i].px) > 1e-6f ||
+                   std::fabs(a.vertices[i].py - b.vertices[i].py) > 1e-6f ||
+                   std::fabs(a.vertices[i].pz - b.vertices[i].pz) > 1e-6f)
+                  return false;
+            return true;
+         };
+         const bool changed = !sameVertices(firstOut, secondOut);
+         printf("delete selected: seed 1 -> %zu tris, seed 42 -> %zu tris, output changed=%d  %s\n",
+                firstTris, secondTris, (int)changed, changed ? "OK" : "FAIL");
+
+         // Same check one hop further downstream, through a second operator -
+         // the bug would still be live if only the immediate child re-read the
+         // revision and a grandchild did not.
+         auto transform = std::make_unique<GeometryOpNode>();
+         transform->op = GeometryOpNode::kTransformSelected;
+         transform->input = select.get();
+         select->selectSeed = 1.0f;
+         const Mesh t1 = transform->GetMesh();
+         select->selectSeed = 42.0f;
+         const Mesh t2 = transform->GetMesh();
+         const bool changed2 = !sameVertices(t1, t2);
+         printf("transform selected also reacts to reselection  %s\n", changed2 ? "OK" : "FAIL");
+
+         // And InstanceOnPointsNode, which had the identical bug on its own
+         // point-source and instance-shape inputs.
+         auto inst = std::make_unique<InstanceOnPointsNode>();
+         inst->pointSource = select.get();
+         inst->instanceShape = &cube;
+         inst->pointMode = 2; // faces
+         select->selectSeed = 1.0f;
+         inst->CookIfNeeded(9401);
+         const size_t instCount1 = inst->InstanceCount();
+         select->selectSeed = 42.0f;
+         inst->CookIfNeeded(9402);
+         const size_t instCount2 = inst->InstanceCount();
+         printf("instance on points: seed 1 -> %zu instances, seed 42 -> %zu instances  %s\n",
+                instCount1, instCount2, instCount1 != instCount2 ? "OK" : "FAIL");
+
+         const bool ok = changed && changed2 && instCount1 != instCount2;
+         printf("%s\n", ok ? "LIVE UPDATE OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
       {
          // Every node type that declares params must survive both paths that

@@ -79,15 +79,20 @@ public:
    bool loopPath = true;
    float speed = 1.0f;
 
-   // Recorded path stays out of the saved params - see ResynthNode's pad for
-   // the same reasoning.
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("padX", padX); v.Float("padY", padY);
       v.Bool("loopPath", loopPath); v.Float("speed", speed);
+      // Encoded the same way as ResynthNode's pad path - see there for why the
+      // decode-on-save is a harmless no-op.
+      std::string encoded = EncodePath(mPath);
+      v.Text("path", encoded);
+      mPath = DecodePath(encoded);
    }
 
 private:
+   static std::string EncodePath(const std::vector<PadPoint>& path);
+   static std::vector<PadPoint> DecodePath(const std::string& s);
    // Adapter so the Y axis can be handed out as its own IModulator without a
    // second node.
    struct YAxis : public IModulator

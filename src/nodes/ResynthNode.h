@@ -79,9 +79,10 @@ public:
    bool loopPath = true;
    float seed = 0.0f;
 
-   // The recorded pad path is deliberately not persisted here - it is
-   // performance data captured live, the same reasoning DrawNode's stroke
-   // history and MacroXYNode's path use to stay out of the saved params.
+   // The recorded pad path is a performance, encoded the same way CurvesNode
+   // encodes its point arrays: as one "x,y,beat;x,y,beat;..." string, decoded
+   // back on both save and load (the decode on save is a harmless no-op since
+   // it was just encoded from mPath).
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("mode", mode); v.Float("chaos", chaos); v.Float("mutation", mutation);
@@ -101,12 +102,17 @@ public:
          v.Int(kEffectKeys[i], cornerEffect[i]);
          v.Float(kAmountKeys[i], cornerAmount[i]);
       }
+      std::string encoded = EncodePath(mPath);
+      v.Text("path", encoded);
+      mPath = DecodePath(encoded);
    }
 
 private:
    bool EnsureShader();
    void RunGeneration(unsigned int srcTex, int w, int h);
    void UpdatePathPlayback();
+   static std::string EncodePath(const std::vector<PadPoint>& path);
+   static std::vector<PadPoint> DecodePath(const std::string& s);
 
    ImageCable mInput;
    GLUtil::Fbo mBuffers[2];

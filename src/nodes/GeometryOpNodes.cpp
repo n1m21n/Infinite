@@ -48,9 +48,10 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.radiusOffset = radiusOffset;
    s.weldSeam = weldSeam;
    s.upstream = input;
-   // Upstream triangle count stands in for "the mesh changed": cheap, and it
-   // catches a primitive being switched or resubdivided upstream.
-   s.upstreamTris = input ? input->GetMesh().indices.size() : 0;
+   // The upstream's own revision stamp, not its triangle count: Select and
+   // other mask-only operators leave the vertex/index count unchanged, so a
+   // count was blind to exactly the changes those nodes make.
+   s.upstreamRevision = input ? input->MeshRevision() : 0;
    return s;
 }
 
@@ -322,12 +323,18 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
 
    // A simulated cloud changes every frame while it is running, so its own
    // revision stamp is what decides dirtiness rather than any parameter here.
+   // pointSource and instanceShape get the same treatment for the same
+   // reason a triangle count was tried and dropped in GeometryOpNode: a
+   // Select or Transform Selected upstream can change which vertices move,
+   // or where they end up, without changing how many there are.
    const unsigned long long cloudRevision = cloudSource ? cloudSource->PointRevision() : 0;
-   const size_t pointTris = pointSource ? pointSource->GetMesh().indices.size() : 0;
+   const unsigned long long pointRevision = pointSource ? pointSource->MeshRevision() : 0;
+   const unsigned long long shapeRevision = instanceShape ? instanceShape->MeshRevision() : 0;
    const bool dirty =
       mBuiltPointSource != pointSource || mBuiltShape != instanceShape ||
       mBuiltCloud != (const void*)cloudSource || mBuiltCloudRevision != cloudRevision ||
-      mBuiltPointTris != pointTris || mBuiltMode != pointMode || mBuiltMax != maxPoints ||
+      mBuiltPointRevision != pointRevision || mBuiltShapeRevision != shapeRevision ||
+      mBuiltMode != pointMode || mBuiltMax != maxPoints ||
       mBuiltScale != instanceScale || mBuiltScaleRand != scaleRandom ||
       mBuiltRotRand != rotationRandom || mBuiltSeed != seed ||
       mBuiltOffset != normalOffset || mBuiltAlign != alignToNormal;
@@ -342,7 +349,8 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    mBuiltShape = instanceShape;
    mBuiltCloud = cloudSource;
    mBuiltCloudRevision = cloudRevision;
-   mBuiltPointTris = pointTris;
+   mBuiltPointRevision = pointRevision;
+   mBuiltShapeRevision = shapeRevision;
    mBuiltMode = pointMode;
    mBuiltMax = maxPoints;
    mBuiltScale = instanceScale;

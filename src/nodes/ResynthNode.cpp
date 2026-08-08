@@ -3,6 +3,8 @@
 #include <OpenGL/gl3.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 #include "Transport.h"
 
@@ -150,6 +152,46 @@ const char* ResynthNode::CornerLabel(int corner) const
 {
    const int e = std::max(0, std::min(cornerEffect[corner], kEffectCount - 1));
    return kEffectNames[e].c_str();
+}
+
+std::string ResynthNode::EncodePath(const std::vector<PadPoint>& path)
+{
+   std::string out;
+   for (size_t i = 0; i < path.size(); i++)
+   {
+      if (i > 0)
+         out += ";";
+      char buf[64];
+      snprintf(buf, sizeof(buf), "%.6g,%.6g,%.9g",
+               (double)path[i].x, (double)path[i].y, path[i].beat);
+      out += buf;
+   }
+   return out;
+}
+
+std::vector<ResynthNode::PadPoint> ResynthNode::DecodePath(const std::string& s)
+{
+   std::vector<PadPoint> path;
+   size_t start = 0;
+   while (start < s.size())
+   {
+      size_t sep = s.find(';', start);
+      std::string term = s.substr(start, sep == std::string::npos ? std::string::npos : sep - start);
+      const size_t c1 = term.find(',');
+      const size_t c2 = c1 == std::string::npos ? std::string::npos : term.find(',', c1 + 1);
+      if (c1 != std::string::npos && c2 != std::string::npos)
+      {
+         PadPoint p;
+         p.x = (float)atof(term.substr(0, c1).c_str());
+         p.y = (float)atof(term.substr(c1 + 1, c2 - c1 - 1).c_str());
+         p.beat = atof(term.substr(c2 + 1).c_str());
+         path.push_back(p);
+      }
+      if (sep == std::string::npos)
+         break;
+      start = sep + 1;
+   }
+   return path;
 }
 
 ResynthNode::~ResynthNode()

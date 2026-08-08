@@ -157,7 +157,11 @@ private:
       bool selectInvert = false, selectAppend = false, keepSelected = false;
       bool moveAlongNormals = false;
       const void* upstream = nullptr;
-      size_t upstreamTris = 0;
+      // The global mesh revision stamp, not a triangle count: Select changes
+      // only a face mask, leaving the vertex/index count identical, so a
+      // triangle-count proxy cannot see a reselection and a downstream
+      // Delete/Transform/Extrude Selected kept its stale cached output.
+      unsigned long long upstreamRevision = 0;
       bool operator==(const Signature& o) const
       {
          return op == o.op && count == o.count && levels == o.levels && axis == o.axis &&
@@ -173,7 +177,7 @@ private:
                 selectInvert == o.selectInvert && selectAppend == o.selectAppend &&
                 keepSelected == o.keepSelected &&
                 moveAlongNormals == o.moveAlongNormals &&
-                upstream == o.upstream && upstreamTris == o.upstreamTris;
+                upstream == o.upstream && upstreamRevision == o.upstreamRevision;
       }
    };
 
@@ -274,7 +278,8 @@ private:
    const void* mBuiltShape = nullptr;
    const void* mBuiltCloud = nullptr;
    unsigned long long mBuiltCloudRevision = 0;
-   size_t mBuiltPointTris = 0;
+   unsigned long long mBuiltPointRevision = 0;
+   unsigned long long mBuiltShapeRevision = 0;
    int mBuiltMode = -1, mBuiltMax = -1;
    float mBuiltScale = -1, mBuiltScaleRand = -1, mBuiltRotRand = -1, mBuiltSeed = -1, mBuiltOffset = -1;
    bool mBuiltAlign = false;

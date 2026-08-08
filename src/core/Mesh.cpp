@@ -1659,20 +1659,64 @@ namespace MeshOps
       std::vector<MeshPoint> points;
       const int cap = std::max(1, std::min(maxPoints, 100000));
 
+      // An empty faceMask means "everything selected" (Mesh's own convention),
+      // so an unselected mesh takes the fast unfiltered path below and a
+      // selected one is narrowed to just the chosen faces - a Select feeding
+      // this node, directly or through Instance on Points, actually changes
+      // what gets sampled instead of the selection being silently ignored.
+      const bool hasSelection = !in.faceMask.empty();
+
       if (mode == 0) // vertices
       {
-         const int stride = std::max(1, (int)(in.vertices.size() / cap) + ((int)in.vertices.size() > cap ? 1 : 0));
-         for (size_t i = 0; i < in.vertices.size(); i += stride)
+         if (!hasSelection)
          {
-            const Vertex& v = in.vertices[i];
-            points.push_back({ v.px, v.py, v.pz, v.nx, v.ny, v.nz, 1.0f, (int)i });
+            const int stride = std::max(1, (int)(in.vertices.size() / cap) + ((int)in.vertices.size() > cap ? 1 : 0));
+            for (size_t i = 0; i < in.vertices.size(); i += stride)
+            {
+               const Vertex& v = in.vertices[i];
+               points.push_back({ v.px, v.py, v.pz, v.nx, v.ny, v.nz, 1.0f, (int)i });
+            }
+         }
+         else
+         {
+            // A vertex counts as selected if any face touching it is selected,
+            // the same "touches the selection" rule a face-select tool implies
+            // for its corners.
+            std::vector<char> touched(in.vertices.size(), 0);
+            const int faces = (int)(in.indices.size() / 3);
+            for (int f = 0; f < faces; f++)
+            {
+               if (!in.FaceSelected((size_t)f))
+                  continue;
+               const size_t t = (size_t)f * 3;
+               touched[in.indices[t]] = 1;
+               touched[in.indices[t + 1]] = 1;
+               touched[in.indices[t + 2]] = 1;
+            }
+            std::vector<size_t> selected;
+            for (size_t i = 0; i < touched.size(); i++)
+               if (touched[i])
+                  selected.push_back(i);
+
+            const int n = (int)selected.size();
+            const int stride = std::max(1, n / cap + (n > cap ? 1 : 0));
+            for (int i = 0; i < n; i += stride)
+            {
+               const size_t idx = selected[(size_t)i];
+               const Vertex& v = in.vertices[idx];
+               points.push_back({ v.px, v.py, v.pz, v.nx, v.ny, v.nz, 1.0f, (int)idx });
+            }
          }
       }
       else if (mode == 1) // edge midpoints
       {
          std::map<std::pair<unsigned int, unsigned int>, bool> seen;
-         for (size_t t = 0; t + 2 < in.indices.size() && (int)points.size() < cap; t += 3)
+         const int faces = (int)(in.indices.size() / 3);
+         for (int f = 0; f < faces && (int)points.size() < cap; f++)
          {
+            if (!in.FaceSelected((size_t)f))
+               continue;
+            const size_t t = (size_t)f * 3;
             const unsigned int tri[3] = { in.indices[t], in.indices[t + 1], in.indices[t + 2] };
             for (int e = 0; e < 3 && (int)points.size() < cap; e++)
             {
@@ -1691,9 +1735,25 @@ namespace MeshOps
       else // face centres
       {
          const int faces = (int)(in.indices.size() / 3);
-         const int stride = std::max(1, faces / cap + (faces > cap ? 1 : 0));
-         for (int f = 0; f < faces; f += stride)
+         std::vector<int> selectedFaces;
+         if (!hasSelection)
          {
+            selectedFaces.reserve(faces);
+            for (int f = 0; f < faces; f++)
+               selectedFaces.push_back(f);
+         }
+         else
+         {
+            for (int f = 0; f < faces; f++)
+               if (in.FaceSelected((size_t)f))
+                  selectedFaces.push_back(f);
+         }
+
+         const int n = (int)selectedFaces.size();
+         const int stride = std::max(1, n / cap + (n > cap ? 1 : 0));
+         for (int i = 0; i < n; i += stride)
+         {
+            const int f = selectedFaces[(size_t)i];
             const size_t t = (size_t)f * 3;
             const Vertex& a = in.vertices[in.indices[t]];
             const Vertex& b = in.vertices[in.indices[t + 1]];
