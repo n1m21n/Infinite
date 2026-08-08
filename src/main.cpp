@@ -91,6 +91,14 @@ namespace
       return out;
    }
 
+   // Undo/redo. Snapshots are whole-graph Patch::Data - the same format a
+   // patch file uses - captured just before a mutation rather than diffed
+   // after one, so restoring one is exactly LoadPatchFrom's job. Defined near
+   // SavePatchTo/LoadPatchFrom, far below; forward-declared here because
+   // ModSlider and friends (the widgets that call it) are among the first
+   // functions in the file.
+   void PushUndoCheckpoint();
+
    std::vector<GraphNode> gNodes;
    // Starts at 1, not 0: node index 0 would give NodeId 0, and the node editor
    // reserves 0 as its Invalid id. A node with that id still draws, but every
@@ -227,6 +235,10 @@ namespace
       if (ImGui::ColorButton(label, ImVec4(col[0], col[1], col[2], 1.0f),
                              ImGuiColorEditFlags_NoTooltip, ImVec2(38, 0)))
       {
+         // Captured once, at the moment the picker opens rather than per-frame
+         // while it's being dragged - the picker writes into *col continuously,
+         // so anywhere later would already see the edited value.
+         PushUndoCheckpoint();
          gColor.target = col;
          gColor.owner = owner;
          gColor.label = label;
@@ -310,6 +322,12 @@ namespace
          changed = ImGui::InputFloat(label, value, 0.0f, 0.0f, fmt,
                                      ImGuiInputTextFlags_EnterReturnsTrue |
                                      ImGuiInputTextFlags_AutoSelectAll);
+         // IsItemActivated() has to be queried right after its widget, and it
+         // fires on the frame focus begins - before any edit is applied that
+         // same frame - so the checkpoint still captures the pre-edit value
+         // even though the check reads textually "after" InputFloat here.
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
          if (changed || ImGui::IsItemDeactivated())
             gTypedParam.erase(editKey);
       }
@@ -328,6 +346,10 @@ namespace
       {
          ImGui::SetNextItemWidth(kParamWidth - box - 4.0f);
          changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
+         // Activation is the first frame of the drag, before that frame's own
+         // delta is applied, so this is still the pre-drag value.
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          {
             gTypedParam.insert(editKey);
@@ -814,6 +836,8 @@ namespace
       INode* node = NodeFactory::Instance().MakeNode(typeName);
       if (node == nullptr)
          return nullptr;
+
+      PushUndoCheckpoint();
 
       GraphNode gn;
       gn.node.reset(node);
@@ -3317,6 +3341,7 @@ namespace
       GraphNode* victim = FindNodeByIndex(index);
       if (victim == nullptr)
          return;
+      PushUndoCheckpoint();
       Modulation::Instance().UnbindAllFor(index);
       gModHistory.erase(index);
       DisconnectAllTo(victim->node.get());
@@ -3329,7 +3354,10 @@ namespace
    std::string gPatchStatus;
 
    // ---- saving ----
-   bool SavePatchTo(const std::string& path)
+   // Everything SavePatchTo used to build in place, minus the file write -
+   // shared with undo/redo, which snapshots this same in-memory shape rather
+   // than round-tripping through disk.
+   Patch::Data BuildPatchData()
    {
       Patch::Data data;
       for (GraphNode& gn : gNodes)
@@ -3449,7 +3477,12 @@ namespace
       for (const auto& link : Modulation::Instance().Links())
          data.modulation.push_back({ link.first.first, link.first.second,
                                      link.second.nodeIndex, link.second.outputIndex });
+      return data;
+   }
 
+   bool SavePatchTo(const std::string& path)
+   {
+      Patch::Data data = BuildPatchData();
       std::string error;
       if (!Patch::Write(path, data, error))
       {
@@ -3464,6 +3497,15 @@ namespace
       return true;
    }
 
+   // Set while ApplyPatchData is repopulating the graph from a snapshot, so
+   // the SpawnNode/connect calls it makes don't themselves push new undo
+   // checkpoints - that would corrupt the very stack an undo/redo is reading
+   // from, and turn opening a 50-node patch into 50 checkpoints.
+   bool gSuppressUndoCheckpoints = false;
+   std::vector<Patch::Data> gUndoStack;
+   std::vector<Patch::Data> gRedoStack;
+   const size_t kMaxUndoDepth = 200;
+
    void NewPatch()
    {
       gNodes.clear();
@@ -3473,18 +3515,23 @@ namespace
       gPatchPath.clear();
       gPatchDirty = false;
       gPatchStatus = "New patch";
+      // Only for a genuine "start a fresh document" - not when NewPatch is
+      // called from inside ApplyPatchData as the first step of restoring a
+      // snapshot, which must leave the stacks alone.
+      if (!gSuppressUndoCheckpoints)
+      {
+         gUndoStack.clear();
+         gRedoStack.clear();
+      }
    }
 
-   bool LoadPatchFrom(const std::string& path)
+   // Rebuilds the live graph from a snapshot - shared by LoadPatchFrom (from
+   // disk) and Undo/Redo (from the in-memory stacks). Callers decide what
+   // happens to gPatchPath/gUndoStack/gRedoStack afterwards; a loaded file is
+   // a new document boundary, an undo is not.
+   void ApplyPatchData(const Patch::Data& data)
    {
-      Patch::Data data;
-      std::string error;
-      if (!Patch::Read(path, data, error))
-      {
-         gPatchStatus = "Open failed: " + error;
-         return false;
-      }
-
+      gSuppressUndoCheckpoints = true;
       NewPatch();
 
       // Saved indices are remapped rather than reused: they only have to be
@@ -3538,12 +3585,92 @@ namespace
             Modulation::Instance().Bind(dst->index, m.dstParam, src->index, m.srcOutput);
       }
 
+      gSuppressUndoCheckpoints = false;
+   }
+
+   bool LoadPatchFrom(const std::string& path)
+   {
+      Patch::Data data;
+      std::string error;
+      if (!Patch::Read(path, data, error))
+      {
+         gPatchStatus = "Open failed: " + error;
+         return false;
+      }
+
+      ApplyPatchData(data);
+
+      // A freshly opened file is a new-document boundary: undoing back into
+      // whatever was open before this file is not a thing anyone wants.
+      gUndoStack.clear();
+      gRedoStack.clear();
+
       gPatchPath = path;
       gPatchDirty = false;
       gPatchStatus = "Opened";
       Patch::NoteRecent(path);
       gRequestFitView = true;
       return true;
+   }
+
+   // Shared by PushUndoCheckpoint (freshly captured) and the node-drag
+   // checkpoint (captured earlier, at mouse-down, before the drag moved
+   // anything - by the time a drag is detected the live positions have
+   // already changed, so that caller can't use BuildPatchData() at the point
+   // it decides to push).
+   void PushUndoSnapshot(Patch::Data snapshot)
+   {
+      if (gSuppressUndoCheckpoints)
+         return;
+      gUndoStack.push_back(std::move(snapshot));
+      if (gUndoStack.size() > kMaxUndoDepth)
+         gUndoStack.erase(gUndoStack.begin());
+      // A fresh action invalidates whatever redo history pointed at a future
+      // that no longer follows from the graph's current state.
+      gRedoStack.clear();
+      gPatchDirty = true;
+   }
+
+   // Captures the graph as it is RIGHT NOW, before the caller's mutation runs.
+   // Undo restores this; Redo re-applies whatever the mutation was about to do.
+   void PushUndoCheckpoint()
+   {
+      if (gSuppressUndoCheckpoints)
+         return;
+      PushUndoSnapshot(BuildPatchData());
+   }
+
+   // Node-drag checkpoint state. A drag gesture spans many frames of
+   // liveX/liveY already having changed, so the pre-drag snapshot has to be
+   // taken speculatively at mouse-down and only actually pushed once real
+   // movement is confirmed - otherwise a plain click-to-select would push a
+   // checkpoint identical to the current state.
+   Patch::Data gDragStartSnapshot;
+   bool gDragSnapshotValid = false;
+   bool gDragSnapshotPushed = false;
+
+   void Undo()
+   {
+      if (gUndoStack.empty())
+         return;
+      gRedoStack.push_back(BuildPatchData());
+      Patch::Data prev = gUndoStack.back();
+      gUndoStack.pop_back();
+      ApplyPatchData(prev);
+      gPatchDirty = true;
+      gPatchStatus = "Undo";
+   }
+
+   void Redo()
+   {
+      if (gRedoStack.empty())
+         return;
+      gUndoStack.push_back(BuildPatchData());
+      Patch::Data next = gRedoStack.back();
+      gRedoStack.pop_back();
+      ApplyPatchData(next);
+      gPatchDirty = true;
+      gPatchStatus = "Redo";
    }
 
    void SavePatchInteractive(bool forceDialog)
@@ -3965,6 +4092,170 @@ int main()
          static_cast<Render3DNode*>(gNodes[1].node.get())->geometry[0] =
             static_cast<Text3DNode*>(gNodes[0].node.get());
       }
+      else if (const char* samplePath = getenv("INFINITE_BUILDSAMPLE"))
+      {
+         // A demo patch: a source cube continuously reshaped by Resynthesize
+         // 3D, instanced onto a slow-drifting particle field so many
+         // independent "floating cubes" share one animated source shape, then
+         // graded through a five-stage 2D chain before Output.
+         SpawnNode("Cube", "3D", 40.0f, 40.0f);                    // 0 source shape
+         SpawnNode("Resynthesize 3D", "3D", 320.0f, 40.0f);        // 1 continuous morph
+         SpawnNode("Particle System", "3D", 40.0f, 420.0f);        // 2 drift field
+         SpawnNode("Instance on Points", "3D", 320.0f, 420.0f);    // 3 stamp shape at each particle
+         SpawnNode("Camera", "3D", 40.0f, 760.0f);                 // 4
+         SpawnNode("Light", "3D", 40.0f, 920.0f);                  // 5 key
+         SpawnNode("Light", "3D", 40.0f, 1080.0f);                 // 6 fill/rim
+         SpawnNode("Render 3D", "3D", 620.0f, 420.0f);             // 7
+         SpawnNode("vibrance", "Color", 900.0f, 420.0f);           // 8
+         SpawnNode("colorbalance", "Color", 900.0f, 560.0f);       // 9
+         SpawnNode("bloom", "Effects", 900.0f, 700.0f);            // 10
+         SpawnNode("vignette", "Effects", 900.0f, 840.0f);         // 11
+         SpawnNode("brightnesscontrast", "Color", 900.0f, 980.0f); // 12
+         SpawnNode("Output", "Output", 1180.0f, 420.0f);           // 13
+
+         auto* cube = static_cast<GeometryNode*>(gNodes[0].node.get());
+         cube->detail = 32;
+
+         auto* resynth = static_cast<MeshResynthNode*>(gNodes[1].node.get());
+         resynth->input = cube;
+         resynth->weight[MeshResynthNode::kDisplace] = 0.55f;
+         resynth->weight[MeshResynthNode::kJitter] = 0.10f;
+         resynth->weight[MeshResynthNode::kSmooth] = 0.40f;
+         resynth->weight[MeshResynthNode::kTwist] = 0.30f;
+         resynth->weight[MeshResynthNode::kBulge] = 0.40f;
+         resynth->weight[MeshResynthNode::kExtrudeFaces] = 0.05f;
+         resynth->weight[MeshResynthNode::kSubdivide] = 0.05f;
+         resynth->weight[MeshResynthNode::kSquash] = 0.15f;
+         resynth->chaos = 0.4f;
+         resynth->autoStep = true;
+         resynth->stepsPerBeat = 0.5f;
+         resynth->seed = 17.0f;
+         resynth->triangleBudget = 40000;
+
+         auto* particles = static_cast<ParticleSystemNode*>(gNodes[2].node.get());
+         particles->maxParticles = 10;
+         particles->emitRate = 4.0f;
+         particles->emitShape = ParticleSystemNode::kSphere;
+         particles->emitRadius = 1.6f;
+         particles->lifetime = 60.0f;
+         particles->lifetimeRandom = 8.0f;
+         particles->initialSpeed = 0.15f;
+         particles->speedRandom = 0.10f;
+         particles->spread = 1.0f; // omnidirectional - "floating", not "launched"
+         particles->gravityX = 0.0f; particles->gravityY = -0.02f; particles->gravityZ = 0.0f;
+         particles->drag = 0.15f;
+         particles->turbulence = 0.35f;
+         particles->turbulenceScale = 0.8f;
+         particles->startSize = 1.0f;
+         particles->endSize = 1.0f; // constant - reads as floating cubes, not dying particles
+         particles->startColor[0] = 1.0f; particles->startColor[1] = 0.55f; particles->startColor[2] = 0.25f;
+         particles->endColor[0] = 0.25f; particles->endColor[1] = 0.55f; particles->endColor[2] = 1.0f;
+         particles->seed = 4.0f;
+
+         auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[3].node.get());
+         inst->instanceShape = resynth;
+         inst->cloudSource = particles;
+         inst->instanceScale = 0.32f;
+         inst->scaleRandom = 0.5f;
+         inst->rotationRandom = 1.0f;
+         inst->alignToNormal = true; // orients each cube along its drift direction
+         inst->metallic = 0.35f;
+         inst->roughness = 0.35f;
+         inst->emissionColor[0] = 1.0f; inst->emissionColor[1] = 0.85f; inst->emissionColor[2] = 0.6f;
+         inst->emission = 0.02f; // let lighting and bloom's own threshold define the highlights,
+                                  // not a flat self-glow blowing out the whole surface
+         inst->seed = 9.0f;
+
+         auto* cam = static_cast<CameraNode*>(gNodes[4].node.get());
+         cam->distance = 3.4f; cam->azimuth = 0.7f; cam->elevation = 0.35f;
+         cam->fov = 46.0f; cam->orbitPerBeat = 0.05f; // slow cinematic turntable, no keyframing needed
+
+         auto* keyLight = static_cast<LightNode*>(gNodes[5].node.get());
+         keyLight->azimuth = 0.9f; keyLight->elevation = 1.0f;
+         keyLight->color[0] = 1.0f; keyLight->color[1] = 0.92f; keyLight->color[2] = 0.8f;
+         keyLight->intensity = 1.4f; keyLight->orbitPerBeat = 0.02f;
+
+         auto* fillLight = static_cast<LightNode*>(gNodes[6].node.get());
+         fillLight->azimuth = -2.2f; fillLight->elevation = 0.5f;
+         fillLight->color[0] = 0.55f; fillLight->color[1] = 0.7f; fillLight->color[2] = 1.0f;
+         fillLight->intensity = 0.6f; fillLight->orbitPerBeat = -0.015f; // drifts the opposite way for parallax
+
+         auto* render = static_cast<Render3DNode*>(gNodes[7].node.get());
+         render->geometry[0] = inst;
+         render->camera = cam;
+         render->lights[0] = keyLight;
+         render->lights[1] = fillLight;
+         render->width = 1280.0f; render->height = 720.0f;
+         render->samples = 2; render->tonemap = 1; render->exposure = 1.1f;
+         // A dark teal, not pure black: the warm cube light/emission needs a cool
+         // backdrop to read as graded contrast rather than glowing blobs on a void.
+         render->bgColor[0] = 0.03f; render->bgColor[1] = 0.045f; render->bgColor[2] = 0.07f;
+         render->envSky[0] = 0.14f; render->envSky[1] = 0.20f; render->envSky[2] = 0.32f;
+         render->envHorizon[0] = 0.07f; render->envHorizon[1] = 0.09f; render->envHorizon[2] = 0.13f;
+         render->envGround[0] = 0.02f; render->envGround[1] = 0.025f; render->envGround[2] = 0.035f;
+         render->envIntensity = 0.9f;
+         render->ambientColor[0] = 0.10f; render->ambientColor[1] = 0.16f; render->ambientColor[2] = 0.26f;
+         render->rimIntensity = 0.5f;
+         render->shadowsEnabled = true;
+         render->shadowQuality = 1;
+         render->shadowStrength = 0.5f;
+
+         auto* vibrance = static_cast<FilterNode*>(gNodes[8].node.get());
+         vibrance->Input().Connect(render);
+         vibrance->SetParamValue(0, 0, 0.5f); // Amount
+
+         auto* colorbalance = static_cast<FilterNode*>(gNodes[9].node.get());
+         colorbalance->Input().Connect(vibrance);
+         colorbalance->SetParamValue(0, 0, 0.05f);  // Cyan-Red: push warm
+         colorbalance->SetParamValue(1, 0, 0.0f);   // Magenta-Green
+         colorbalance->SetParamValue(2, 0, -0.05f); // Yellow-Blue: push toward yellow
+
+         auto* bloom = static_cast<FilterNode*>(gNodes[10].node.get());
+         bloom->Input().Connect(colorbalance);
+         bloom->SetParamValue(0, 0, 0.72f); // Threshold - only genuine highlights bloom
+         bloom->SetParamValue(1, 0, 0.9f);  // Intensity
+         bloom->SetParamValue(2, 0, 4.0f);  // Radius
+
+         auto* vignette = static_cast<FilterNode*>(gNodes[11].node.get());
+         vignette->Input().Connect(bloom);
+
+         auto* bc = static_cast<FilterNode*>(gNodes[12].node.get());
+         bc->Input().Connect(vignette);
+         bc->SetParamValue(0, 0, 0.02f); // Brightness
+         bc->SetParamValue(1, 0, 0.15f); // Contrast
+
+         auto* out = static_cast<OutputNode*>(gNodes[13].node.get());
+         out->Input().Connect(bc);
+
+         for (GraphNode& gn : gNodes)
+            gn.showParams = false;
+
+         // Fast-forward the transport so particles have already spread out and
+         // the cube has already morphed a few generations before the first
+         // frame anyone sees, rather than opening on an empty, unshaped scene.
+         Transport::Instance().SetPlaying(true);
+         Transport::Instance().Rewind();
+         for (int i = 0; i < 240; i++)
+         {
+            out->CookIfNeeded(9600 + i);
+            Transport::Instance().Tick(1.0f / 30.0f);
+         }
+
+         std::string error;
+         if (!SavePatchTo(samplePath))
+            fprintf(stderr, "sample patch: failed to write %s\n", samplePath);
+         else
+         {
+            Patch::NoteRecent(samplePath);
+            printf("sample patch written: %s\n", samplePath);
+         }
+
+         if (const char* pngPath = getenv("INFINITE_BUILDSAMPLE_PNG"))
+         {
+            ExportPng(out, pngPath);
+            printf("sample preview written: %s\n", pngPath);
+         }
+      }
       else if (getenv("INFINITE_MODELTEST") != nullptr)
       {
          SpawnNode("Model 3D", "3D", 40.0f, 40.0f);
@@ -4299,6 +4590,15 @@ int main()
                if (!gPatchStatus.empty())
                   ImGui::TextDisabled("%s", gPatchStatus.c_str());
             }
+            ImGui::EndMenu();
+         }
+
+         if (ImGui::BeginMenu("Edit"))
+         {
+            if (ImGui::MenuItem("Undo", "Cmd+Z", false, !gUndoStack.empty()))
+               Undo();
+            if (ImGui::MenuItem("Redo", "Cmd+Shift+Z", false, !gRedoStack.empty()))
+               Redo();
             ImGui::EndMenu();
          }
 
@@ -4841,6 +5141,91 @@ int main()
 
          const bool ok = copyOk && loadOk && recorded > 0 && mCopyOk && mRecorded > 0;
          printf("%s\n", ok ? "PAD PATH OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_UNDOTEST") != nullptr && frameId == 4)
+      {
+         NewPatch(); // also clears the undo/redo stacks - a clean baseline
+
+         bool ok = true;
+
+         // --- spawn / undo / redo ---
+         GraphNode* cube = SpawnNode("Cube", "3D", 0.0f, 0.0f);
+         const bool spawnedOne = gNodes.size() == 1 && cube != nullptr;
+         Undo();
+         const bool undoRemovedIt = gNodes.empty();
+         Redo();
+         const bool redoBroughtItBack = gNodes.size() == 1;
+         printf("spawn: 1 node -> undo -> %zu nodes -> redo -> %zu nodes  %s\n",
+                (size_t)0, gNodes.size(),
+                (spawnedOne && undoRemovedIt && redoBroughtItBack) ? "OK" : "FAIL");
+         ok = ok && spawnedOne && undoRemovedIt && redoBroughtItBack;
+
+         // --- param edit / undo / redo, via the same checkpoint the UI widgets use ---
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         geo->detail = 24; // known starting value
+         PushUndoCheckpoint(); // what ModSlider does on IsItemActivated, before the edit
+         geo->detail = 91;
+         Undo();
+         const int afterUndo = geo->detail;
+         const bool undoRestoredParam = afterUndo == 24;
+         Redo();
+         const int afterRedo = geo->detail;
+         const bool redoReappliedParam = afterRedo == 91;
+         printf("param edit: 24 -> 91 -> undo -> %d -> redo -> %d  %s\n",
+                afterUndo, afterRedo,
+                (undoRestoredParam && redoReappliedParam) ? "OK" : "FAIL");
+         ok = ok && undoRestoredParam && redoReappliedParam;
+
+         // --- delete (with a connection) / undo restores both the node and the wire ---
+         GraphNode* smoothGn = SpawnNode("Smooth", "3D", 200.0f, 0.0f);
+         auto* smooth = static_cast<GeometryOpNode*>(smoothGn->node.get());
+         smooth->input = geo;
+         const int smoothIndex = smoothGn->index;
+         RemoveNodeByIndex(smoothIndex);
+         const bool deleted = FindNodeByIndex(smoothIndex) == nullptr;
+         Undo();
+         GraphNode* restored = nullptr;
+         for (GraphNode& gn : gNodes)
+            if (gn.typeName == "Smooth")
+               restored = &gn;
+         const bool nodeRestored = restored != nullptr;
+         const bool connectionRestored = nodeRestored &&
+            static_cast<GeometryOpNode*>(restored->node.get())->input ==
+               dynamic_cast<IGeometrySource*>(gNodes[0].node.get());
+         printf("delete with connection: deleted=%d, undo restores node=%d and wire=%d  %s\n",
+                (int)deleted, (int)nodeRestored, (int)connectionRestored,
+                (deleted && nodeRestored && connectionRestored) ? "OK" : "FAIL");
+         ok = ok && deleted && nodeRestored && connectionRestored;
+
+         // --- a new action after an undo must drop the stale redo history ---
+         Undo(); // back to just the cube, no Smooth
+         const size_t redoDepthBeforeNewAction = gRedoStack.size();
+         SpawnNode("Sphere", "3D", 400.0f, 0.0f);
+         const bool redoClearedByNewAction = gRedoStack.empty();
+         printf("redo stack: %zu entries before a new action -> %zu after  %s\n",
+                redoDepthBeforeNewAction, gRedoStack.size(),
+                (redoDepthBeforeNewAction > 0 && redoClearedByNewAction) ? "OK" : "FAIL");
+         ok = ok && redoDepthBeforeNewAction > 0 && redoClearedByNewAction;
+
+         // --- undo/redo themselves must not pollute the stacks they read from ---
+         const size_t depthBefore = gUndoStack.size();
+         Undo();
+         Redo();
+         const bool statOfSizeUnaffected = gUndoStack.size() == depthBefore;
+         printf("undo/redo do not grow their own stacks: %zu -> %zu  %s\n",
+                depthBefore, gUndoStack.size(), statOfSizeUnaffected ? "OK" : "FAIL");
+         ok = ok && statOfSizeUnaffected;
+
+         // --- opening a patch from disk clears history; undoing past it is not a thing ---
+         SavePatchTo("/tmp/infinite_undotest.infinite");
+         LoadPatchFrom("/tmp/infinite_undotest.infinite");
+         const bool loadClearsUndo = gUndoStack.empty() && gRedoStack.empty();
+         printf("loading a patch clears undo history: %zu undo, %zu redo  %s\n",
+                gUndoStack.size(), gRedoStack.size(), loadClearsUndo ? "OK" : "FAIL");
+         ok = ok && loadClearsUndo;
+
+         printf("%s\n", ok ? "UNDO REDO OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_LIVETEST") != nullptr && frameId == 4)
@@ -6669,7 +7054,10 @@ int main()
             gn.showParams = !gn.showParams;
          ImGui::SameLine();
          if (BypassToggle(!gn.node->bypassed))
+         {
+            PushUndoCheckpoint();
             gn.node->bypassed = !gn.node->bypassed;
+         }
          // No text label: the power icon turning red already reads as bypassed,
          // and a word beside it is noise on every node in the patch.
          if (!gn.showParams && gn.hasModulatedParams)
@@ -7095,6 +7483,7 @@ int main()
 
                if (valid && ed::AcceptNewItem())
                {
+                  PushUndoCheckpoint();
                   if (GraphNode::IsParamPin(b))
                   {
                      Modulation::Instance().Bind(dstNode->index,
@@ -7185,6 +7574,14 @@ int main()
       const bool typing = io.WantTextInput;
       const bool cmdOrCtrl = io.KeyCtrl || io.KeySuper;
 
+      // Shift+Cmd+Z is the Mac convention for redo; Ctrl+Y also works for
+      // anyone used to the Windows/Linux binding.
+      if (!typing && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+         Undo();
+      if (!typing && ((cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
+                      (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))))
+         Redo();
+
       if (!typing && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
                       ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
       {
@@ -7198,6 +7595,7 @@ int main()
 
             for (int i = 0; i < linkCount; i++)
             {
+               PushUndoCheckpoint();
                DisconnectLinkById((int)selLinks[i].Get());
                ed::DeleteLink(selLinks[i]);
             }
@@ -7298,7 +7696,10 @@ int main()
          while (ed::QueryDeletedLink(&linkId))
          {
             if (ed::AcceptDeletedItem())
+            {
+               PushUndoCheckpoint();
                DisconnectLinkById((int)linkId.Get());
+            }
          }
 
          ed::NodeId nodeId;
@@ -7309,6 +7710,36 @@ int main()
          }
       }
       ed::EndDelete();
+
+      // ---- undo checkpoint for node drags ----
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      {
+         gDragStartSnapshot = BuildPatchData();
+         gDragSnapshotValid = true;
+         gDragSnapshotPushed = false;
+      }
+      if (gDragSnapshotValid && !gDragSnapshotPushed &&
+          ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+      {
+         bool moved = false;
+         for (const Patch::NodeRecord& rec : gDragStartSnapshot.nodes)
+         {
+            GraphNode* gn = FindNodeByIndex(rec.index);
+            if (gn != nullptr &&
+                (std::fabs(gn->liveX - rec.x) > 0.5f || std::fabs(gn->liveY - rec.y) > 0.5f))
+            {
+               moved = true;
+               break;
+            }
+         }
+         if (moved)
+         {
+            PushUndoSnapshot(gDragStartSnapshot);
+            gDragSnapshotPushed = true;
+         }
+      }
+      if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+         gDragSnapshotValid = false;
 
       // ---- snap to grid once the drag finishes ----
       if (gSnapToGrid && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
@@ -7495,8 +7926,11 @@ int main()
                bool selected = (i == gDropdown.current);
                if (ImGui::Selectable((*gDropdown.options)[i].c_str(), selected))
                {
-                  if (gDropdown.onSelect)
+                  if (gDropdown.onSelect && i != gDropdown.current)
+                  {
+                     PushUndoCheckpoint();
                      gDropdown.onSelect(i);
+                  }
                   ImGui::CloseCurrentPopup();
                }
                if (selected && ImGui::IsWindowAppearing())
