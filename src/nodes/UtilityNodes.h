@@ -5,6 +5,49 @@
 
 #include "Geometry3DNodes.h"
 
+// --- Group ------------------------------------------------------------------
+// A resizable backdrop that maps onto the node-editor library's own notion of
+// a "group" (see ax::NodeEditor::Group()): any node whose bounds currently sit
+// inside its rectangle is dragged along when the group's header is dragged,
+// and it renders with its own highlight color so a cluster of nodes reads as
+// one unit. The drag-together behavior is purely geometric and lives entirely
+// in the library; what main.cpp adds on top is an explicit member list the box
+// auto-fits itself to, so dragging a node towards the edge stretches the box
+// and dragging it back shrinks it again, and a node can never quietly fall out
+// of a group by being moved. That bookkeeping (which node indices belong, the
+// last measured header height) lives in main.cpp next to the drawing code, not
+// here, since it is keyed by GraphNode::index, which this header knows nothing
+// about.
+class GroupNode : public INode
+{
+public:
+   static INode* Create() { return new GroupNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   std::string label = "Group";
+   float width = 320.0f;
+   float height = 220.0f;
+   float color[3] = { 0.45f, 0.65f, 0.95f };
+
+   // Rename-in-place state and the last measured header height. Neither is
+   // saveable data - VisitParams deliberately leaves them out - they are UI
+   // state that starts fresh every time a patch loads.
+   bool renaming = false;
+   bool renameJustStarted = false;
+   float headerH = 28.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Text("label", label);
+      v.Float("width", width); v.Float("height", height);
+      v.Color("color", color);
+   }
+};
+
 // --- Null (2D) ----------------------------------------------------------
 // Reroute point for tidying cable runs. It owns no framebuffer and does no
 // work: it simply reports its input's texture as its own, so inserting one

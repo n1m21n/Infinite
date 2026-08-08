@@ -6,6 +6,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_node_editor.h"
+#include "imgui_stdlib.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -100,6 +101,13 @@ namespace
    void PushUndoCheckpoint();
 
    std::vector<GraphNode> gNodes;
+
+   // Which node indices each Group considers its own, once-in-always-in. Kept
+   // outside GroupNode because it is keyed by GraphNode::index, not anything
+   // the node itself knows about. Membership only grows (see DrawGroupNode) -
+   // a stale index (its node deleted, or undo/redo having rewound past it) is
+   // simply skipped wherever this is read, never treated as an error.
+   std::map<GroupNode*, std::set<int>> gGroupMembers;
    // Starts at 1, not 0: node index 0 would give NodeId 0, and the node editor
    // reserves 0 as its Invalid id. A node with that id still draws, but every
    // `if (ed::NodeId n = ed::GetHoveredNode())` silently reads false for it, so
@@ -137,6 +145,12 @@ namespace
    int gTargetFps = 60;       // 0 = uncapped; otherwise the frame limiter's budget
    bool gVsync = true;
    bool gRequestFitView = false;
+   // Set by the Edit menu, consumed next to the matching keyboard shortcuts.
+   // The menu bar draws outside ed::Begin/End, and grouping needs the live
+   // selection, so both routes meet in one place inside the editor frame
+   // rather than the menu reaching into the editor from outside it.
+   bool gRequestGroup = false;
+   bool gRequestUngroup = false;
    // The node browser lives in a docked panel rather than only the canvas popup,
    // so modules can be found without knowing the double-click gesture exists.
    bool gNodePanelOpen = false;
@@ -578,6 +592,7 @@ namespace
       REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");
+      REGISTER_NODE(GroupNode, Group, "Compositing");
       REGISTER_NODE(NullNode, Null, "Compositing");
       REGISTER_NODE(ViewportNode, Viewport, "Compositing");
       REGISTER_NODE(CurvesNode, Curves, "Color");
@@ -2825,6 +2840,214 @@ namespace
                   IM_COL32(90, 130, 190, 255), 4.0f, 0, 2.0f);
    }
 
+   // Padding kept between a group's members and the edge of its box.
+   const float kGroupPadding = 24.0f;
+
+   // Which group, if any, currently owns a node. Membership is exclusive: a
+   // node belongs to at most one group, which is what stops two groups from
+   // both auto-fitting around the same nodes and ending up drawn inside one
+   // another.
+   GroupNode* GroupOwning(int nodeIndex)
+   {
+      for (const auto& entry : gGroupMembers)
+      {
+         if (entry.second.count(nodeIndex) != 0)
+            return entry.first;
+      }
+      return nullptr;
+   }
+
+   // Drops membership sets whose group no longer exists. Deleting a node goes
+   // through RemoveNodeByIndex, which cleans up as it goes, but undo/redo
+   // rebuilds gNodes wholesale without ever calling it - and a stale
+   // GroupNode* key is not merely wasted memory, it is an address the
+   // allocator can hand back to a brand new group, which would then inherit a
+   // stranger's member list.
+   void PruneDeadGroups()
+   {
+      std::set<GroupNode*> live;
+      for (GraphNode& gn : gNodes)
+      {
+         if (auto* g = dynamic_cast<GroupNode*>(gn.node.get()))
+            live.insert(g);
+      }
+      for (auto it = gGroupMembers.begin(); it != gGroupMembers.end(); )
+         it = (live.count(it->first) != 0) ? std::next(it) : gGroupMembers.erase(it);
+   }
+
+   // Fits a group's box to exactly its members' bounding box plus padding,
+   // every frame, in both directions - so dragging a node towards the edge
+   // stretches the box and dragging it back shrinks the box down again.
+   //
+   // Because the box is fully derived from the member set, a manual resize
+   // does not survive as a size; what it does instead is decide membership.
+   // Dragging an edge out over a loose node adopts that node on the next
+   // frame, and the box then refits around the enlarged set - so resizing
+   // still reads as "reach out and grab that one too", which is the only
+   // thing resizing a group is ever really for.
+   //
+   // Runs before the group draws itself, using last frame's box (this node's
+   // position plus the width/height/headerH already synced onto n) against
+   // every other node's current position. Drag deltas for the frame are
+   // applied before this per-node loop runs, so every position read here is
+   // this frame's live one.
+   void AutoFitGroupToMembers(GraphNode& gn, GroupNode* n)
+   {
+      const ImVec2 nodePos = ed::GetNodePosition(gn.NodeId());
+      const ImVec2 boxMin(nodePos.x, nodePos.y + n->headerH);
+      const ImVec2 boxMax(boxMin.x + n->width, boxMin.y + n->height);
+
+      std::set<int>& members = gGroupMembers[n];
+
+      // Adopt anything now fully inside the box. A group never adopts another
+      // group (nesting is not supported), nor a node another group already
+      // owns.
+      for (GraphNode& other : gNodes)
+      {
+         if (other.index == gn.index || dynamic_cast<GroupNode*>(other.node.get()) != nullptr)
+            continue;
+         GroupNode* owner = GroupOwning(other.index);
+         if (owner != nullptr && owner != n)
+            continue;
+         const ImVec2 p = ed::GetNodePosition(other.NodeId());
+         const ImVec2 s = ed::GetNodeSize(other.NodeId());
+         if (p.x >= boxMin.x && p.y >= boxMin.y && p.x + s.x <= boxMax.x && p.y + s.y <= boxMax.y)
+            members.insert(other.index);
+      }
+
+      // Union the members' bounds, dropping any whose node has been deleted.
+      ImVec2 fitMin(0.0f, 0.0f), fitMax(0.0f, 0.0f);
+      bool any = false;
+      for (auto it = members.begin(); it != members.end(); )
+      {
+         GraphNode* member = FindNodeByIndex(*it);
+         if (member == nullptr)
+         {
+            it = members.erase(it);
+            continue;
+         }
+         const ImVec2 p = ed::GetNodePosition(member->NodeId());
+         const ImVec2 s = ed::GetNodeSize(member->NodeId());
+         if (!any)
+         {
+            fitMin = p;
+            fitMax = ImVec2(p.x + s.x, p.y + s.y);
+            any = true;
+         }
+         else
+         {
+            fitMin.x = std::min(fitMin.x, p.x);
+            fitMin.y = std::min(fitMin.y, p.y);
+            fitMax.x = std::max(fitMax.x, p.x + s.x);
+            fitMax.y = std::max(fitMax.y, p.y + s.y);
+         }
+         ++it;
+      }
+
+      // An empty group has nothing to fit to, so it keeps whatever size the
+      // user gave it - otherwise it would collapse the moment it was spawned
+      // and there would be no box left to drag over anything.
+      if (!any)
+         return;
+
+      fitMin.x -= kGroupPadding; fitMin.y -= kGroupPadding;
+      fitMax.x += kGroupPadding; fitMax.y += kGroupPadding;
+
+      const ImVec2 size(fitMax.x - fitMin.x, fitMax.y - fitMin.y);
+      // Both setters no-op when the value already matches, so this does not
+      // mark the patch dirty every frame just by sitting there.
+      ed::SetNodePosition(gn.NodeId(), ImVec2(fitMin.x, fitMin.y - n->headerH));
+      ed::SetGroupSize(gn.NodeId(), size);
+      n->width = size.x;
+      n->height = size.y;
+   }
+
+   // Drawn as an ed::Group() rather than through the normal pin/param flow: a
+   // group has no image in or out, and it needs the library's own notion of
+   // "group" (a node the editor drags its geometric contents along with) to
+   // get the stick-together behavior at all. The label sits above the
+   // resizable box as the node's only ordinary content, so it becomes the
+   // group's Header region - the part the editor lets you drag by.
+   //
+   // The header is plain text, not a text field: an ImGui widget spanning
+   // most of the header would capture clicks itself (the same reason a
+   // slider inside an ordinary node's body doesn't drag the node), leaving
+   // almost nowhere on the header for the editor's own drag-to-move to ever
+   // trigger. Renaming instead happens in-place on double-click.
+   //
+   // ed::Group(size) only honors `size` the first frame a node becomes a
+   // group; after that the library tracks the user's own resize (and our own
+   // growth, via SetGroupSize) internally and ignores whatever we pass. So
+   // width/height here exist purely to seed that first frame and to survive
+   // save/load - every subsequent frame they are overwritten from the node's
+   // actual measured size, the same pattern liveX/liveY use for position.
+   void DrawGroupNode(GraphNode& gn, GroupNode* n)
+   {
+      AutoFitGroupToMembers(gn, n);
+
+      ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(0, 0, 0, 0));
+      ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0, 0, 0, 0));
+      ed::PushStyleColor(ed::StyleColor_GroupBg,
+                         ImColor(n->color[0], n->color[1], n->color[2], 0.10f));
+      ed::PushStyleColor(ed::StyleColor_GroupBorder,
+                         ImColor(n->color[0], n->color[1], n->color[2], 0.85f));
+
+      ed::BeginNode(gn.NodeId());
+      ImGui::PushID(gn.index);
+      ImGui::BeginGroup();
+      if (ImGui::ColorButton("##groupcolor", ImVec4(n->color[0], n->color[1], n->color[2], 1.0f),
+                             ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder,
+                             ImVec2(14, 14)))
+      {
+         PushUndoCheckpoint();
+         gColor.target = n->color;
+         gColor.owner = n;
+         gColor.label = "colour";
+         gColor.justOpened = true;
+      }
+      ImGui::SameLine();
+      ImGui::PushStyleColor(ImGuiCol_Text,
+                            ImVec4(n->color[0] * 0.4f + 0.6f, n->color[1] * 0.4f + 0.6f,
+                                   n->color[2] * 0.4f + 0.6f, 1.0f));
+      if (n->renaming)
+      {
+         if (n->renameJustStarted)
+         {
+            ImGui::SetKeyboardFocusHere();
+            n->renameJustStarted = false;
+         }
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0.35f));
+         ImGui::SetNextItemWidth(std::max(60.0f, n->width - 40.0f));
+         if (ImGui::InputText("##grouprename", &n->label, ImGuiInputTextFlags_EnterReturnsTrue) ||
+             ImGui::IsItemDeactivated())
+            n->renaming = false;
+         ImGui::PopStyleColor();
+      }
+      else
+      {
+         ImGui::TextUnformatted(n->label.c_str());
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+         {
+            PushUndoCheckpoint();
+            n->renaming = true;
+            n->renameJustStarted = true;
+         }
+      }
+      ImGui::PopStyleColor();
+      ImGui::EndGroup();
+      const ImVec2 headerSize = ImGui::GetItemRectSize();
+      ed::Group(ImVec2(n->width, n->height));
+      ImGui::PopID();
+      ed::EndNode();
+
+      ed::PopStyleColor(4);
+
+      const ImVec2 total = ed::GetNodeSize(gn.NodeId());
+      n->width = std::max(120.0f, total.x);
+      n->headerH = headerSize.y + ImGui::GetStyle().ItemSpacing.y;
+      n->height = std::max(60.0f, total.y - n->headerH);
+   }
+
    void DrawDrawParams(DrawNode* n)
    {
       DropdownButton("brush", DrawNode::BrushNames(), n->brush, [n](int i) { n->brush = i; });
@@ -3351,6 +3574,15 @@ namespace
       Modulation::Instance().UnbindAllFor(index);
       gModHistory.erase(index);
       DisconnectAllTo(victim->node.get());
+      // A deleted Group's membership set must go with it - otherwise its
+      // GroupNode* stays around as a dangling map key that a future
+      // allocation could reuse, silently handing a stranger's members to a
+      // brand new group. Every other group also drops the index in case it
+      // was one of its members.
+      if (auto* deadGroup = dynamic_cast<GroupNode*>(victim->node.get()))
+         gGroupMembers.erase(deadGroup);
+      for (auto& entry : gGroupMembers)
+         entry.second.erase(index);
       gNodes.erase(std::remove_if(gNodes.begin(), gNodes.end(),
                                   [index](const GraphNode& g) { return g.index == index; }),
                    gNodes.end());
@@ -4212,6 +4444,13 @@ int main()
          static_cast<Render3DNode*>(gNodes[1].node.get())->geometry[0] =
             static_cast<Text3DNode*>(gNodes[0].node.get());
       }
+      else if (getenv("INFINITE_GROUPTEST") != nullptr)
+      {
+         // Three nodes in a row for the group auto-fit check driven below.
+         SpawnNode("Shape", "Source", 100.0f, 100.0f);  // 0
+         SpawnNode("Shape", "Source", 400.0f, 100.0f);  // 1
+         SpawnNode("Shape", "Source", 700.0f, 100.0f);  // 2
+      }
       else if (const char* samplePath = getenv("INFINITE_BUILDSAMPLE"))
       {
          // A demo patch: a source cube continuously reshaped by Resynthesize
@@ -4719,6 +4958,11 @@ int main()
                Undo();
             if (ImGui::MenuItem("Redo", "Cmd+Shift+Z", false, !gRedoStack.empty()))
                Redo();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Group selection", "Cmd+G"))
+               gRequestGroup = true;
+            if (ImGui::MenuItem("Ungroup", "Cmd+Shift+G"))
+               gRequestUngroup = true;
             ImGui::EndMenu();
          }
 
@@ -5369,6 +5613,113 @@ int main()
          ok = ok && loadClearsUndo;
 
          printf("%s\n", ok ? "UNDO REDO OK" : "SUSPECT");
+      }
+
+      // Group auto-fit: the box must track its members in BOTH directions, so
+      // dragging one out stretches it and dragging that one back shrinks it
+      // to the size it had before. Driven here rather than by hand because
+      // the whole behaviour is a fixed point between our own fitting pass and
+      // the editor's group geometry, and eyeballing a screenshot cannot tell
+      // "shrank back exactly" from "shrank back nearly".
+      if (getenv("INFINITE_GROUPTEST") != nullptr && gNodes.size() >= 3)
+      {
+         static float baselineW = 0.0f;
+         GraphNode* group = nullptr;
+         for (GraphNode& g : gNodes)
+         {
+            if (dynamic_cast<GroupNode*>(g.node.get()) != nullptr)
+               group = &g;
+         }
+
+         if (frameId == 4)
+         {
+            GraphNode* gn = SpawnNode("Group", "Compositing", 60.0f, 60.0f);
+            auto* g = static_cast<GroupNode*>(gn->node.get());
+            gGroupMembers[g] = { gNodes[0].index, gNodes[1].index, gNodes[2].index };
+         }
+         else if (frameId == 8 && group != nullptr)
+         {
+            auto* g = static_cast<GroupNode*>(group->node.get());
+            baselineW = g->width;
+            printf("baseline box: %.0f x %.0f\n", g->width, g->height);
+            ed::SetNodePosition(gNodes[2].NodeId(), ImVec2(1600.0f, 100.0f));
+         }
+         else if (frameId == 12 && group != nullptr)
+         {
+            auto* g = static_cast<GroupNode*>(group->node.get());
+            printf("after dragging a member out: %.0f wide  %s\n", g->width,
+                   g->width > baselineW + 500.0f ? "GREW" : "FAIL");
+            ed::SetNodePosition(gNodes[2].NodeId(), ImVec2(700.0f, 100.0f));
+         }
+         else if (frameId == 16 && group != nullptr)
+         {
+            auto* g = static_cast<GroupNode*>(group->node.get());
+            printf("after dragging it back: %.0f wide  %s\n", g->width,
+                   std::fabs(g->width - baselineW) < 1.0f ? "SHRANK BACK OK" : "FAIL");
+            printf("members still owned: %zu\n", gGroupMembers[g].size());
+
+            // A second group dropped right on top of the first must come up
+            // empty: every node down there already belongs to group one, and
+            // a group is never a member of a group. Both together are what
+            // stop one group from swallowing another.
+            GraphNode* second = SpawnNode("Group", "Compositing", 0.0f, 0.0f);
+            auto* g2 = static_cast<GroupNode*>(second->node.get());
+            g2->width = 2000.0f;
+            g2->height = 800.0f;
+         }
+         else if (frameId == 20)
+         {
+            GroupNode* first = nullptr;
+            GroupNode* second = nullptr;
+            int secondIndex = -1;
+            for (GraphNode& g : gNodes)
+            {
+               if (auto* asGroup = dynamic_cast<GroupNode*>(g.node.get()))
+               {
+                  if (first == nullptr)
+                     first = asGroup;
+                  else
+                  {
+                     second = asGroup;
+                     secondIndex = g.index;
+                  }
+               }
+            }
+            printf("overlapping second group stole: %zu members  %s\n",
+                   gGroupMembers[second].size(),
+                   gGroupMembers[second].empty() && gGroupMembers[first].size() == 3
+                      ? "NO STEALING OK" : "FAIL");
+
+            // Ungroup is driven through the real path: select a *member*, not
+            // the group's header, and let the shortcut handler find the owner.
+            const int memberId = gNodes[0].NodeId();
+            // The overlapping group goes first, otherwise it simply adopts the
+            // nodes the moment ungroup frees them and the check below cannot
+            // tell "freed" apart from "handed straight to the other group".
+            ed::DeleteNode(ed::NodeId(secondIndex * GraphNode::kStride));
+            RemoveNodeByIndex(secondIndex);
+            ed::SelectNode(ed::NodeId(memberId));
+         }
+         else if (frameId == 22)
+         {
+            gRequestUngroup = true;
+         }
+         else if (frameId == 26)
+         {
+            size_t groupsLeft = 0;
+            for (GraphNode& g : gNodes)
+            {
+               if (dynamic_cast<GroupNode*>(g.node.get()) != nullptr)
+                  groupsLeft++;
+            }
+            // The group is gone, its three member nodes are untouched, and
+            // they are unowned again rather than still bound to a dead group.
+            const bool freed = GroupOwning(gNodes[0].index) == nullptr;
+            printf("after ungroup: %zu groups left, %zu nodes, member freed=%d  %s\n",
+                   groupsLeft, gNodes.size(), (int)freed,
+                   (groupsLeft == 0 && gNodes.size() == 3 && freed) ? "UNGROUP OK" : "FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
       }
 
       if (getenv("INFINITE_LIVETEST") != nullptr && frameId == 4)
@@ -7050,6 +7401,8 @@ int main()
          }
       }
 
+      PruneDeadGroups();
+
       for (GraphNode& gn : gNodes)
       {
          if (gn.needsPosition)
@@ -7064,6 +7417,12 @@ int main()
             const ImVec2 live = ed::GetNodePosition(gn.NodeId());
             gn.liveX = live.x;
             gn.liveY = live.y;
+         }
+
+         if (auto* group = dynamic_cast<GroupNode*>(gn.node.get()))
+         {
+            DrawGroupNode(gn, group);
+            continue;
          }
 
          ed::BeginNode(gn.NodeId());
@@ -7781,6 +8140,132 @@ int main()
                   CopyParams(copy->node.get(), item.src);
                   copy->showParams = item.params;
                   gPendingSelect.push_back(copy->NodeId());
+               }
+            }
+         }
+      }
+
+      const bool doGroup =
+         gRequestGroup ||
+         (!typing && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_G, false));
+      const bool doUngroup =
+         gRequestUngroup ||
+         (!typing && cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_G, false));
+      gRequestGroup = false;
+      gRequestUngroup = false;
+
+      // Cmd/Ctrl+Shift+G dissolves a group, leaving its nodes exactly where
+      // they sit. Only the group node goes away - RemoveNodeByIndex drops the
+      // membership set with it, so the freed nodes are immediately available
+      // for another group to adopt.
+      //
+      // Selecting a member counts as selecting its group: having to click the
+      // header first would mean the one gesture that says "this cluster" is
+      // not the gesture that can dissolve it.
+      if (doUngroup)
+      {
+         const int count = ed::GetSelectedObjectCount();
+         if (count > 0)
+         {
+            std::vector<ed::NodeId> selNodes(count);
+            const int nodeCount = ed::GetSelectedNodes(selNodes.data(), count);
+
+            // Resolved up front: RemoveNodeByIndex erases from gNodes, which
+            // invalidates every GraphNode* taken before it.
+            std::set<int> doomed;
+            for (int i = 0; i < nodeCount; i++)
+            {
+               GraphNode* sel = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+               if (sel == nullptr)
+                  continue;
+               if (dynamic_cast<GroupNode*>(sel->node.get()) != nullptr)
+               {
+                  doomed.insert(sel->index);
+                  continue;
+               }
+               if (GroupNode* owner = GroupOwning(sel->index))
+               {
+                  for (GraphNode& g : gNodes)
+                  {
+                     if (g.node.get() == owner)
+                        doomed.insert(g.index);
+                  }
+               }
+            }
+
+            for (int index : doomed)
+            {
+               ed::DeleteNode(ed::NodeId(index * GraphNode::kStride));
+               RemoveNodeByIndex(index);
+            }
+            if (!doomed.empty())
+               ed::ClearSelection();
+         }
+      }
+
+      // Cmd/Ctrl+G wraps the current selection in a Group node sized to its
+      // bounding box, so a cluster of existing nodes sticks together and
+      // drags as one without having to hand-drag the group's edges around
+      // them first.
+      if (doGroup)
+      {
+         const int count = ed::GetSelectedObjectCount();
+         if (count > 0)
+         {
+            std::vector<ed::NodeId> selNodes(count);
+            const int nodeCount = ed::GetSelectedNodes(selNodes.data(), count);
+
+            bool any = false;
+            ImVec2 bmin(0.0f, 0.0f), bmax(0.0f, 0.0f);
+            std::set<int> picked;
+            for (int i = 0; i < nodeCount; i++)
+            {
+               GraphNode* member = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+               if (member == nullptr || dynamic_cast<GroupNode*>(member->node.get()) != nullptr)
+                  continue; // grouping a group isn't supported
+               // Membership is exclusive, so a node that already belongs
+               // somewhere stays where it is rather than being pulled into a
+               // second group that would then fight the first one for it.
+               if (GroupOwning(member->index) != nullptr)
+                  continue;
+               picked.insert(member->index);
+               const ImVec2 p = ed::GetNodePosition(member->NodeId());
+               const ImVec2 s = ed::GetNodeSize(member->NodeId());
+               if (!any)
+               {
+                  bmin = p;
+                  bmax = ImVec2(p.x + s.x, p.y + s.y);
+                  any = true;
+               }
+               else
+               {
+                  bmin.x = std::min(bmin.x, p.x);
+                  bmin.y = std::min(bmin.y, p.y);
+                  bmax.x = std::max(bmax.x, p.x + s.x);
+                  bmax.y = std::max(bmax.y, p.y + s.y);
+               }
+            }
+
+            if (any)
+            {
+               // Space for the label row above the box - AutoFitGroupToMembers
+               // corrects both this and the size from the real measured header
+               // on the group's first drawn frame, so it only has to be close.
+               const float headerAllowance = 34.0f;
+               if (GraphNode* gn = SpawnNode("Group", "Compositing",
+                                             bmin.x - kGroupPadding,
+                                             bmin.y - kGroupPadding - headerAllowance))
+               {
+                  auto* g = static_cast<GroupNode*>(gn->node.get());
+                  g->width = (bmax.x - bmin.x) + kGroupPadding * 2.0f;
+                  g->height = (bmax.y - bmin.y) + kGroupPadding * 2.0f;
+                  // Claim the selection explicitly rather than leaving it to
+                  // the geometric adoption pass: these are the nodes the user
+                  // pointed at, whether or not the initial box happens to
+                  // cover every one of them exactly.
+                  gGroupMembers[g] = picked;
+                  ed::ClearSelection();
+                  gPendingSelect.push_back(gn->NodeId());
                }
             }
          }

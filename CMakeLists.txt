@@ -83,6 +83,7 @@ add_executable(Infinite MACOSX_BUNDLE
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 
@@ -94,7 +95,7 @@ add_executable(Infinite MACOSX_BUNDLE
 
 target_include_directories(Infinite PRIVATE
     src src/core src/nodes src/platform
-    ${IMGUI_DIR} ${IMGUI_DIR}/backends
+    ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
     ${STB_DIR}
 )
