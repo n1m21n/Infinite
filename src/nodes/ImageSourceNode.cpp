@@ -44,6 +44,7 @@ void ImageSourceNode::EnsurePlaceholder()
    mWidth = kSize;
    mHeight = kSize;
    mHasPlaceholder = true;
+   mRevision = NextTextureRevision();
 }
 
 bool ImageSourceNode::Load(const std::string& path)
@@ -82,6 +83,7 @@ bool ImageSourceNode::Load(const std::string& path)
    pathInput = path;
    mLastError.clear();
    mHasPlaceholder = false;
+   mRevision = NextTextureRevision();
    return true;
 }
 

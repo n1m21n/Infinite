@@ -34,6 +34,12 @@ struct GraphNode
    std::string category;
    int index = 0;
    bool showParams = false; // params start collapsed so the preview leads
+   // Per-node mini 3D viewport (geometry-producing nodes only). On by default
+   // for a new node - seeing what a node actually produced is worth more than
+   // the render cost, and NodeViewport::Render already skips redrawing when
+   // nothing changed, so an idle viewport is cheap. Still a per-node toggle
+   // (via ViewportToggle/context menu) for anyone who wants to turn it off.
+   bool showMiniViewport = true;
    bool hasModulatedParams = false; // recomputed each frame, drives the collapsed "mod" tag
    bool hasPaletteColors = false;   // ditto, for the collapsed "pal" tag
 

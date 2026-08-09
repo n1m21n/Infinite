@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "GLUtil.h"
+#include "Transport.h"
 
 namespace
 {
@@ -23,9 +24,57 @@ namespace
       const float x = std::sin((seed + 1.0f) * (float)(index + 1) * 12.9898f) * 43758.5453f;
       return x - std::floor(x);
    }
+
+   // FNV-1a over the raw pixel bytes, so DisplacementNode can tell a texture
+   // that merely re-read the same as last frame (the common, static case) from
+   // one that actually changed (an animated Noise/Voronoi) - see
+   // DisplacementNode::CookIfNeeded.
+   unsigned long long HashFloats(const std::vector<float>& v)
+   {
+      unsigned long long h = 1469598103934665603ull;
+      const unsigned char* bytes = reinterpret_cast<const unsigned char*>(v.data());
+      const size_t n = v.size() * sizeof(float);
+      for (size_t i = 0; i < n; i++)
+      {
+         h ^= bytes[i];
+         h *= 1099511628211ull;
+      }
+      return h;
+   }
+
+   // Whether a source is, or sits behind a chain of mesh-transforming wrapper
+   // nodes on top of, an InstanceOnPoints - see IGeometrySource::PassthroughSource.
+   bool WrapsInstancer(IGeometrySource* s)
+   {
+      for (; s != nullptr; s = s->PassthroughSource())
+      {
+         if (dynamic_cast<InstanceOnPointsNode*>(s) != nullptr)
+            return true;
+      }
+      return false;
+   }
 }
 
 const std::vector<std::string>& GeometryOpNode::OpNames() { return kOpNames; }
+
+Mat4 GeometryOpNode::TransformMatrix() const
+{
+   const float spinPhase = spin * (float)Transport::Instance().Beats();
+   Mat4 m = Mat4::Scale(scaleX, scaleY, scaleZ);
+   m = Mat4::Multiply(Mat4::RotationZ(rotZ), m);
+   m = Mat4::Multiply(Mat4::RotationY(rotY + spinPhase), m);
+   m = Mat4::Multiply(Mat4::RotationX(rotX), m);
+   m = Mat4::Multiply(Mat4::Translation(offsetX, offsetY, offsetZ), m);
+   return m;
+}
+
+Mat4 GeometryOpNode::GetInstanceGroupMatrix() const
+{
+   const Mat4 upstream = input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   if (op == kTransform && !bypassed && WrapsInstancer(input))
+      return Mat4::Multiply(TransformMatrix(), upstream);
+   return upstream;
+}
 
 GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
 {
@@ -38,6 +87,12 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.ox = offsetX; s.oy = offsetY; s.oz = offsetZ;
    s.rs = rotStep; s.ss = scaleStep; s.rad = radius;
    s.sm = smooth; s.th = thickness; s.ins = inset; s.sd = seed;
+   s.rx = rotX; s.ry = rotY; s.rz = rotZ;
+   s.sx = scaleX; s.sy = scaleY; s.sz = scaleZ;
+   // Forces a rebuild every cook while spinning, since the baked-in rotation
+   // (TransformMatrix()) would otherwise freeze at whichever beat happened to
+   // be live the first time this signature matched.
+   s.spinBeats = (spin != 0.0f) ? (float)Transport::Instance().Beats() : 0.0f;
    s.radial = radial; s.keep = keepOriginal; s.flat = flatShade; s.flip = flipNormals;
    s.selectMode = selectMode;
    s.selectA = selectA; s.selectB = selectB; s.selectC = selectC;
@@ -74,13 +129,14 @@ const Mesh& GeometryOpNode::GetMesh()
    switch (op)
    {
       case kTransform:
-      {
-         Mat4 m = Mat4::Scale(scaleStep, scaleStep, scaleStep);
-         m = Mat4::Multiply(Mat4::RotationY(rotStep), m);
-         m = Mat4::Multiply(Mat4::Translation(offsetX, offsetY, offsetZ), m);
-         mCache = MeshOps::Transform(src, m);
+         // Downstream of an instancer, each "copy" is a stamp placed by its own
+         // instance transform, not a mesh of its own - baking the move/rotate/
+         // scale into the stamp's vertices here would apply it once per instance
+         // in the stamp's *local* frame (inflating/smearing every copy) instead
+         // of moving the whole scattered result as one rigid group. Leave the
+         // stamp mesh untouched and let GetInstanceGroupMatrix() carry it.
+         mCache = WrapsInstancer(input) ? src : MeshOps::Transform(src, TransformMatrix());
          break;
-      }
       case kArray:
          mCache = MeshOps::Array(src, count, offsetX, offsetY, offsetZ,
                                  rotStep, scaleStep, radial, radius);
@@ -107,7 +163,11 @@ const Mesh& GeometryOpNode::GetMesh()
          mCache = MeshOps::Explode(src, amount * 0.3f, seed);
          break;
       case kSmooth:
-         mCache = MeshOps::Smooth(src, iterations, amount);
+         // Laplacian relaxation alone barely moves a low-poly primitive like a
+         // Cube - it has no extra vertices between the corners to round out.
+         // Subdividing first gives it geometry to actually smooth.
+         mCache = MeshOps::Smooth(levels > 0 ? MeshOps::Subdivide(src, levels, 1.0f) : src,
+                                  iterations, amount);
          break;
       case kMirror:
          mCache = MeshOps::Mirror(src, axis, mirrorOffset, weldSeam, keepOriginal);
@@ -123,13 +183,8 @@ const Mesh& GeometryOpNode::GetMesh()
          mCache = MeshOps::DeleteSelected(src, keepSelected);
          break;
       case kTransformSelected:
-      {
-         Mat4 m = Mat4::Scale(scaleStep, scaleStep, scaleStep);
-         m = Mat4::Multiply(Mat4::RotationY(rotStep), m);
-         m = Mat4::Multiply(Mat4::Translation(offsetX, offsetY, offsetZ), m);
-         mCache = MeshOps::TransformSelected(src, m, moveAlongNormals, normalAmount);
+         mCache = MeshOps::TransformSelected(src, TransformMatrix(), moveAlongNormals, normalAmount);
          break;
-      }
       case kExtrudeSelected:
          mCache = MeshOps::ExtrudeSelected(src, thickness, inset);
          break;
@@ -171,6 +226,17 @@ Material GeometryOpNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 
@@ -256,6 +322,17 @@ Material DisplacementNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 
@@ -287,17 +364,27 @@ void DisplacementNode::CookIfNeeded(int frameId)
          mTexPixels.clear();
          mTexW = mTexH = 0;
       }
-      // Bumped every frame the texture is patched in - an animated source
-      // (Noise with time, Voronoi with a modulated seed) needs the mesh to
-      // rebuild every frame it changes, and there is no per-texture revision
-      // stamp to compare against instead.
-      mTexGeneration++;
+      // Bumped only when the pixels actually differ from last frame - there is
+      // no per-texture revision stamp to compare against instead, so content
+      // is hashed directly. A static texture (Clouds with no animated seed,
+      // the common case) now leaves the signature alone instead of forcing a
+      // mesh rebuild - and resetting any simulation downstream, like Cloth -
+      // every single frame. An animated source (Noise with time, Voronoi with
+      // a modulated seed) still drives the mesh every frame its pixels change.
+      const unsigned long long hash = HashFloats(mTexPixels);
+      if (!mHasTexHash || hash != mTexHash)
+      {
+         mTexGeneration++;
+         mTexHash = hash;
+         mHasTexHash = true;
+      }
    }
    else if (mTexW != 0 || mTexH != 0)
    {
       mTexPixels.clear();
       mTexW = mTexH = 0;
       mTexGeneration++;
+      mHasTexHash = false;
    }
 }
 
@@ -326,6 +413,9 @@ size_t InstanceOnPointsNode::TriangleCount() const
 
 Material InstanceOnPointsNode::GetMaterial() const
 {
+   if (inheritMaterial && instanceShape != nullptr)
+      return instanceShape->GetMaterial();
+
    Material m;
    m.color[0] = color[0]; m.color[1] = color[1]; m.color[2] = color[2];
    m.metallic = metallic;
@@ -336,6 +426,17 @@ Material InstanceOnPointsNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 
@@ -582,6 +683,17 @@ Material WrapNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 

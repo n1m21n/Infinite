@@ -6,6 +6,15 @@
 // Thin macOS shims kept out of the C++ translation units.
 namespace Platform
 {
+   // Holds an NSProcessInfo activity token that opts the process out of App
+   // Nap for as long as the app runs. Without this, macOS treats a window
+   // that isn't receiving input as idle/background and throttles its timer
+   // sources - GLFW's event-polling and vsync among them - so a clock-driven
+   // redraw (e.g. Switcher 3D's auto-switch) stalls until a mouse event
+   // wakes the process back up, then bursts through the backlog at once.
+   // Call once at startup and keep the app running for the token to matter.
+   void PreventAppNap();
+
    // Native open panel filtered to image types. Returns "" if cancelled.
    std::string OpenImageDialog();
 
@@ -14,6 +23,20 @@ namespace Platform
    // texture convention. Returns false and fills outError on failure.
    bool LoadImageRGBA(const std::string& path, std::vector<unsigned char>& outPixels,
                       int& outWidth, int& outHeight, std::string& outError);
+
+   // Native open panel filtered to HDR equirectangular formats. ImageIO/NSImage
+   // do not recognise .hdr, so this needs its own panel rather than reusing
+   // OpenImageDialog - the same reason OpenModelDialog is separate from it.
+   std::string OpenHdrDialog();
+
+   // Decodes anything ImageIO can open (notably .exr, which macOS has read
+   // natively since Ventura) into linear float RGB, via a CGBitmapContext in
+   // the extended-linear-sRGB colour space so values above 1.0 survive rather
+   // than clamping the way LoadImageRGBA's 8-bit path does. Not used for
+   // .hdr: ImageIO does not read Radiance HDR, which is why that format goes
+   // through stb_image instead.
+   bool LoadImageFloatRGB(const std::string& path, std::vector<float>& outPixels,
+                          int& outWidth, int& outHeight, std::string& outError);
 
    // ---- 3D model loading --------------------------------------------------
    // Goes through ModelIO for the same reason image decoding goes through

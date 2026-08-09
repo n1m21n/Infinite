@@ -4,6 +4,7 @@
 #include <array>
 #include <map>
 #include <set>
+#include <unordered_map>
 #include <memory>
 
 // Zero is reserved as "nothing uploaded yet", so the first real stamp is 1.
@@ -1495,52 +1496,185 @@ namespace MeshOps
    Mesh Extrude(const Mesh& in, float distance, float inset)
    {
       Mesh out;
-      // Each triangle becomes a capped prism: its own top face plus three sides.
-      for (size_t t = 0; t + 2 < in.indices.size(); t += 3)
+      const size_t faces = in.FaceCount();
+      if (faces == 0)
+         return out;
+
+      // Per-triangle face normal, used to tell where the mesh was actually
+      // triangulated from an n-gon (coplanar neighbours) versus a real edge.
+      std::vector<std::array<float, 3>> faceNormals(faces);
+      for (size_t f = 0; f < faces; f++)
       {
-         const Vertex& a = in.vertices[in.indices[t]];
-         const Vertex& b = in.vertices[in.indices[t + 1]];
-         const Vertex& c = in.vertices[in.indices[t + 2]];
+         const Vertex& a = in.vertices[in.indices[f * 3]];
+         const Vertex& b = in.vertices[in.indices[f * 3 + 1]];
+         const Vertex& c = in.vertices[in.indices[f * 3 + 2]];
+         const float ux = b.px - a.px, uy = b.py - a.py, uz = b.pz - a.pz;
+         const float vx = c.px - a.px, vy = c.py - a.py, vz = c.pz - a.pz;
+         float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+         const float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+         if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
+         faceNormals[f] = { nx, ny, nz };
+      }
 
-         const float cx = (a.px + b.px + c.px) / 3.0f;
-         const float cy = (a.py + b.py + c.py) / 3.0f;
-         const float cz = (a.pz + b.pz + c.pz) / 3.0f;
-         const float nx = (a.nx + b.nx + c.nx) / 3.0f;
-         const float ny = (a.ny + b.ny + c.ny) / 3.0f;
-         const float nz = (a.nz + b.nz + c.nz) / 3.0f;
+      // Union-find over selected triangles: two triangles sharing an edge
+      // and facing the same way are the same source face, so no wall goes
+      // between them (e.g. the diagonal inside a triangulated quad).
+      std::vector<int> parent(faces);
+      for (size_t f = 0; f < faces; f++) parent[f] = (int)f;
+      auto find = [&](int x) {
+         while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+         return x;
+      };
+      auto unite = [&](int a, int b) {
+         a = find(a); b = find(b);
+         if (a != b) parent[a] = b;
+      };
 
-         const unsigned int base = (unsigned int)out.vertices.size();
-         const Vertex* src[3] = { &a, &b, &c };
-         for (int i = 0; i < 3; i++)
+      std::map<std::pair<unsigned int, unsigned int>, std::vector<unsigned int>> edgeTris;
+      for (size_t f = 0; f < faces; f++)
+      {
+         if (!in.FaceSelected(f))
+            continue;
+         for (int k = 0; k < 3; k++)
          {
-            Vertex low = *src[i];
-            low.px += (cx - low.px) * inset;
-            low.py += (cy - low.py) * inset;
-            low.pz += (cz - low.pz) * inset;
-            out.vertices.push_back(low);
-         }
-         for (int i = 0; i < 3; i++)
-         {
-            Vertex high = out.vertices[base + i];
-            high.px += nx * distance;
-            high.py += ny * distance;
-            high.pz += nz * distance;
-            out.vertices.push_back(high);
-         }
-
-         // top cap
-         out.indices.push_back(base + 3); out.indices.push_back(base + 4); out.indices.push_back(base + 5);
-         // walls
-         for (int i = 0; i < 3; i++)
-         {
-            const unsigned int i0 = base + i;
-            const unsigned int i1 = base + (i + 1) % 3;
-            const unsigned int j0 = i0 + 3;
-            const unsigned int j1 = i1 + 3;
-            out.indices.push_back(i0); out.indices.push_back(j0); out.indices.push_back(j1);
-            out.indices.push_back(i0); out.indices.push_back(j1); out.indices.push_back(i1);
+            const unsigned int a = in.indices[f * 3 + k];
+            const unsigned int b = in.indices[f * 3 + (k + 1) % 3];
+            const auto key = std::minmax(a, b);
+            edgeTris[{ key.first, key.second }].push_back((unsigned int)f);
          }
       }
+      for (auto& entry : edgeTris)
+      {
+         const auto& tris = entry.second;
+         if (tris.size() != 2)
+            continue;
+         const auto& n0 = faceNormals[tris[0]];
+         const auto& n1 = faceNormals[tris[1]];
+         const float dot = n0[0] * n1[0] + n0[1] * n1[1] + n0[2] * n1[2];
+         if (dot > 0.9998f)
+            unite((int)tris[0], (int)tris[1]);
+      }
+
+      // Region normal + centroid, averaged from every triangle merged into it.
+      std::map<int, std::array<float, 3>> regionNormal;
+      std::map<int, std::array<double, 3>> regionCentroidSum;
+      std::map<int, int> regionCentroidCount;
+      for (size_t f = 0; f < faces; f++)
+      {
+         if (!in.FaceSelected(f))
+            continue;
+         const int r = find((int)f);
+         auto& rn = regionNormal[r];
+         rn[0] += faceNormals[f][0]; rn[1] += faceNormals[f][1]; rn[2] += faceNormals[f][2];
+         auto& cs = regionCentroidSum[r];
+         for (int k = 0; k < 3; k++)
+         {
+            const Vertex& v = in.vertices[in.indices[f * 3 + k]];
+            cs[0] += v.px; cs[1] += v.py; cs[2] += v.pz;
+            regionCentroidCount[r]++;
+         }
+      }
+      for (auto& entry : regionNormal)
+      {
+         auto& n = entry.second;
+         const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+         if (len > 1e-8f) { n[0] /= len; n[1] /= len; n[2] /= len; }
+      }
+
+      // Unselected faces (when a selection exists) pass through unchanged.
+      std::vector<int> remap(in.vertices.size(), -1);
+      auto copyVertex = [&](unsigned int index) {
+         if (remap[index] < 0)
+         {
+            remap[index] = (int)out.vertices.size();
+            out.vertices.push_back(in.vertices[index]);
+         }
+         return (unsigned int)remap[index];
+      };
+      for (size_t f = 0; f < faces; f++)
+      {
+         if (in.FaceSelected(f))
+            continue;
+         for (int k = 0; k < 3; k++)
+            out.indices.push_back(copyVertex(in.indices[f * 3 + k]));
+      }
+
+      // Cap vertices (inset toward the region centroid, lifted along the
+      // region normal) and rim vertices (original position), both keyed
+      // per-region so neighbouring regions don't bleed into each other.
+      std::map<std::pair<int, unsigned int>, unsigned int> regionCap;
+      auto capVertex = [&](int region, unsigned int srcIndex) {
+         const auto key = std::make_pair(region, srcIndex);
+         const auto it = regionCap.find(key);
+         if (it != regionCap.end())
+            return it->second;
+         const auto& n = regionNormal[region];
+         const auto& cs = regionCentroidSum[region];
+         const int count = regionCentroidCount[region];
+         const float cx = (float)(cs[0] / count), cy = (float)(cs[1] / count), cz = (float)(cs[2] / count);
+         Vertex v = in.vertices[srcIndex];
+         v.px += (cx - v.px) * inset + n[0] * distance;
+         v.py += (cy - v.py) * inset + n[1] * distance;
+         v.pz += (cz - v.pz) * inset + n[2] * distance;
+         const unsigned int idx = (unsigned int)out.vertices.size();
+         out.vertices.push_back(v);
+         regionCap[key] = idx;
+         return idx;
+      };
+      std::map<std::pair<int, unsigned int>, unsigned int> regionRim;
+      auto rimVertex = [&](int region, unsigned int srcIndex) {
+         const auto key = std::make_pair(region, srcIndex);
+         const auto it = regionRim.find(key);
+         if (it != regionRim.end())
+            return it->second;
+         const unsigned int idx = (unsigned int)out.vertices.size();
+         out.vertices.push_back(in.vertices[srcIndex]);
+         regionRim[key] = idx;
+         return idx;
+      };
+
+      // Top caps, using each region's own triangulation.
+      for (size_t f = 0; f < faces; f++)
+      {
+         if (!in.FaceSelected(f))
+            continue;
+         const int region = find((int)f);
+         const unsigned int cap0 = capVertex(region, in.indices[f * 3]);
+         const unsigned int cap1 = capVertex(region, in.indices[f * 3 + 1]);
+         const unsigned int cap2 = capVertex(region, in.indices[f * 3 + 2]);
+         out.indices.push_back(cap0); out.indices.push_back(cap1); out.indices.push_back(cap2);
+      }
+
+      // Walls, only on edges that bound a region (true mesh boundary, or the
+      // seam between two differently-facing regions) — never on the interior
+      // diagonals introduced by triangulating an n-gon.
+      for (size_t f = 0; f < faces; f++)
+      {
+         if (!in.FaceSelected(f))
+            continue;
+         const int region = find((int)f);
+         for (int k = 0; k < 3; k++)
+         {
+            const unsigned int a = in.indices[f * 3 + k];
+            const unsigned int b = in.indices[f * 3 + (k + 1) % 3];
+            const auto key = std::minmax(a, b);
+            const auto& tris = edgeTris[{ key.first, key.second }];
+            int sameRegionCount = 0;
+            for (unsigned int t : tris)
+               if (find((int)t) == region)
+                  sameRegionCount++;
+            if (sameRegionCount != 1)
+               continue;
+
+            const unsigned int r0 = rimVertex(region, a);
+            const unsigned int r1 = rimVertex(region, b);
+            const unsigned int c0 = capVertex(region, a);
+            const unsigned int c1 = capVertex(region, b);
+            out.indices.push_back(r0); out.indices.push_back(c0); out.indices.push_back(c1);
+            out.indices.push_back(r0); out.indices.push_back(c1); out.indices.push_back(r1);
+         }
+      }
+
       return RecalculateNormals(out, true, false);
    }
 
@@ -1795,26 +1929,39 @@ namespace MeshOps
       }
       else if (mode == 1) // edge midpoints
       {
+         // Collect every unique edge first, then stride-sample across all of
+         // them - the same even-coverage scheme vertices/faces use below,
+         // rather than stopping as soon as the cap is hit, which would leave
+         // the sample clustered wherever face traversal happened to be.
          std::map<std::pair<unsigned int, unsigned int>, bool> seen;
+         std::vector<std::pair<unsigned int, unsigned int>> edges;
          const int faces = (int)(in.indices.size() / 3);
-         for (int f = 0; f < faces && (int)points.size() < cap; f++)
+         for (int f = 0; f < faces; f++)
          {
             if (!in.FaceSelected((size_t)f))
                continue;
             const size_t t = (size_t)f * 3;
             const unsigned int tri[3] = { in.indices[t], in.indices[t + 1], in.indices[t + 2] };
-            for (int e = 0; e < 3 && (int)points.size() < cap; e++)
+            for (int e = 0; e < 3; e++)
             {
                auto key = std::minmax(tri[e], tri[(e + 1) % 3]);
                if (seen.count({ key.first, key.second }))
                   continue;
                seen[{ key.first, key.second }] = true;
-               const Vertex& a = in.vertices[key.first];
-               const Vertex& b = in.vertices[key.second];
-               points.push_back({ (a.px+b.px)*0.5f, (a.py+b.py)*0.5f, (a.pz+b.pz)*0.5f,
-                                  (a.nx+b.nx)*0.5f, (a.ny+b.ny)*0.5f, (a.nz+b.nz)*0.5f,
-                                  1.0f, (int)points.size() });
+               edges.push_back({ key.first, key.second });
             }
+         }
+
+         const int n = (int)edges.size();
+         const int stride = std::max(1, n / cap + (n > cap ? 1 : 0));
+         for (int i = 0; i < n; i += stride)
+         {
+            const auto& key = edges[(size_t)i];
+            const Vertex& a = in.vertices[key.first];
+            const Vertex& b = in.vertices[key.second];
+            points.push_back({ (a.px+b.px)*0.5f, (a.py+b.py)*0.5f, (a.pz+b.pz)*0.5f,
+                               (a.nx+b.nx)*0.5f, (a.ny+b.ny)*0.5f, (a.nz+b.nz)*0.5f,
+                               1.0f, (int)points.size() });
          }
       }
       else // face centres
@@ -1855,6 +2002,7 @@ namespace MeshOps
    {
       Mesh out;
       const float h = std::max(0.001f, size) * 0.5f;
+      unsigned int pointIdx = 0;
       for (const MeshPoint& p : points)
       {
          // billboard-ish quad oriented to the point normal
@@ -1884,6 +2032,9 @@ namespace MeshOps
          }
          out.indices.push_back(base); out.indices.push_back(base + 1); out.indices.push_back(base + 2);
          out.indices.push_back(base); out.indices.push_back(base + 2); out.indices.push_back(base + 3);
+         out.selectionGroup.push_back(pointIdx);
+         out.selectionGroup.push_back(pointIdx);
+         pointIdx++;
       }
       return out;
    }
@@ -3860,54 +4011,73 @@ Mesh Select(const Mesh& in, int mode, float a, float b, float c, int axis,
    out.faceMask.assign(faces, 0);
    const int k = std::max(0, std::min(axis, 2));
 
+   // Faces carrying the same selectionGroup tag (e.g. the two triangles of a
+   // Mesh to Points billboard quad) are one atomic selection unit: the test
+   // below runs once on the group's first face and the result is broadcast to
+   // every face sharing that tag, so a quad is never torn into one selected
+   // and one unselected triangle.
+   const bool grouped = out.selectionGroup.size() == faces;
+   std::unordered_map<unsigned int, bool> groupHit;
+
    for (size_t f = 0; f < faces; f++)
    {
-      bool hit = false;
-      switch (mode)
+      const unsigned int groupId = grouped ? out.selectionGroup[f] : (unsigned int)f;
+      bool hit;
+      auto cached = grouped ? groupHit.find(groupId) : groupHit.end();
+      if (grouped && cached != groupHit.end())
       {
-         case kSelectIndex:
+         hit = cached->second;
+      }
+      else
+      {
+         switch (mode)
          {
-            // Start, count and stride, so "every third face from face 10" is
-            // expressible without a second node.
-            const long long start = (long long)a;
-            const long long count = (long long)b;
-            const long long stride = std::max(1LL, (long long)c);
-            const long long rel = (long long)f - start;
-            hit = rel >= 0 && (count <= 0 || rel < count * stride) && (rel % stride) == 0;
-            break;
+            case kSelectIndex:
+            {
+               // Start, count and stride, so "every third face from face 10" is
+               // expressible without a second node.
+               const long long start = (long long)a;
+               const long long count = (long long)b;
+               const long long stride = std::max(1LL, (long long)c);
+               const long long rel = (long long)f - start;
+               hit = rel >= 0 && (count <= 0 || rel < count * stride) && (rel % stride) == 0;
+               break;
+            }
+            case kSelectAxis:
+            {
+               float centre[3];
+               FaceCentre(out, f, centre);
+               hit = centre[k] >= a && centre[k] <= b;
+               break;
+            }
+            case kSelectNormal:
+            {
+               // Faces whose normal points within a threshold of an axis - which
+               // is how "the top of the cube" gets said.
+               float normal[3];
+               FaceNormal(out, f, normal);
+               const float sign = (c >= 0.0f) ? 1.0f : -1.0f;
+               hit = (normal[k] * sign) >= a;
+               break;
+            }
+            case kSelectRandom:
+               hit = SelectHash(seed, groupId) < a;
+               break;
+            case kSelectRadius:
+            {
+               float centre[3];
+               FaceCentre(out, f, centre);
+               const float dx = centre[0] - a, dy = centre[1] - b, dz = centre[2] - c;
+               hit = std::sqrt(dx*dx + dy*dy + dz*dz) <= seed;
+               break;
+            }
+            case kSelectAll:
+            default:
+               hit = true;
+               break;
          }
-         case kSelectAxis:
-         {
-            float centre[3];
-            FaceCentre(out, f, centre);
-            hit = centre[k] >= a && centre[k] <= b;
-            break;
-         }
-         case kSelectNormal:
-         {
-            // Faces whose normal points within a threshold of an axis - which
-            // is how "the top of the cube" gets said.
-            float normal[3];
-            FaceNormal(out, f, normal);
-            const float sign = (c >= 0.0f) ? 1.0f : -1.0f;
-            hit = (normal[k] * sign) >= a;
-            break;
-         }
-         case kSelectRandom:
-            hit = SelectHash(seed, f) < a;
-            break;
-         case kSelectRadius:
-         {
-            float centre[3];
-            FaceCentre(out, f, centre);
-            const float dx = centre[0] - a, dy = centre[1] - b, dz = centre[2] - c;
-            hit = std::sqrt(dx*dx + dy*dy + dz*dz) <= seed;
-            break;
-         }
-         case kSelectAll:
-         default:
-            hit = true;
-            break;
+         if (grouped)
+            groupHit.emplace(groupId, hit);
       }
 
       if (invert)

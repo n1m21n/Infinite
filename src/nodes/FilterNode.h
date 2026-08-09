@@ -25,6 +25,7 @@ public:
    int GetOutputWidth() const override { return mOut.w; }
    int GetOutputHeight() const override { return mOut.h; }
    void CookIfNeeded(int frameId) override;
+   unsigned long long TextureRevision() const override { return mRevision; }
 
    ImageCable& Input() { return mInput; }
    INode* BypassSource() override { return mInput.GetSource(); }
@@ -56,6 +57,24 @@ public:
 private:
    bool EnsureShader();
 
+   // Everything the shader pass's output depends on. Reusing mOut's contents
+   // is only safe when all of this is identical to the last time it ran -
+   // mirrors GeometryOpNode::Signature (GeometryOpNodes.cpp).
+   struct Signature
+   {
+      unsigned long long upstreamRev = 0;
+      unsigned long long upstreamRev2 = 0;
+      int width = 0;
+      int height = 0;
+      std::vector<std::array<float, 3>> params;
+
+      bool operator==(const Signature& o) const
+      {
+         return upstreamRev == o.upstreamRev && upstreamRev2 == o.upstreamRev2 &&
+                width == o.width && height == o.height && params == o.params;
+      }
+   };
+
    const FilterDef& mDef;
    std::vector<std::array<float, 3>> mParamValues;
 
@@ -65,4 +84,12 @@ private:
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
+
+   // Filters whose shader reads uTime are inherently animated - caching them
+   // on a param/upstream signature alone would freeze the animation, so they
+   // always re-render (same as the pre-caching behavior).
+   bool mUsesTime = false;
+   bool mHasBuilt = false;
+   Signature mBuilt;
+   unsigned long long mRevision = 0;
 };

@@ -530,6 +530,17 @@ Material ClothNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 
@@ -547,11 +558,24 @@ void ClothNode::CookIfNeeded(int frameId)
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
 
-   // The rest state is rebuilt when the incoming mesh changes at all: a
-   // different topology invalidates every constraint index.
+   // The rest state is rebuilt when the incoming *topology* changes: a
+   // different vertex/index count invalidates every constraint index. A mesh
+   // revision bump with the same counts (the input just moved its vertices -
+   // a Transform, a Displace, an animated texture driving one) is left alone,
+   // so the simulation keeps draping instead of snapping back to rest every
+   // time its upstream re-cooks.
    const unsigned long long upstreamRevision = input ? input->MeshRevision() : 0;
    const Mat4 inputModel = input ? input->GetModelMatrix() : Mat4::Identity();
-   if (mBuiltInput != (const void*)input || mBuiltUpstream != upstreamRevision ||
+   size_t vertexCount = 0, indexCount = 0;
+   if (input != nullptr)
+   {
+      const Mesh& peek = input->GetMesh();
+      vertexCount = peek.vertices.size();
+      indexCount = peek.indices.size();
+   }
+   const bool topologyChanged = vertexCount != mBuiltVertexCount || indexCount != mBuiltIndexCount;
+   if (!mHasBuilt || mBuiltInput != (const void*)input ||
+       (mBuiltUpstream != upstreamRevision && topologyChanged) ||
        mBuiltPinMode != pinMode || !(mBuiltInputModel == inputModel))
    {
       RebuildFromInput();
@@ -559,9 +583,19 @@ void ClothNode::CookIfNeeded(int frameId)
       mBuiltUpstream = upstreamRevision;
       mBuiltPinMode = pinMode;
       mBuiltInputModel = inputModel;
+      mBuiltVertexCount = vertexCount;
+      mBuiltIndexCount = indexCount;
+      mHasBuilt = true;
       mLastBeats = -1.0;
       mElapsed = 0.0f;
       mAccumulator = 0.0f;
+   }
+   else
+   {
+      // Topology held but the upstream still re-cooked (new positions, or just
+      // a re-evaluation with nothing to report) - track its revision so the
+      // next real topology change is still detected correctly.
+      mBuiltUpstream = upstreamRevision;
    }
 
    if (mPinned.empty())

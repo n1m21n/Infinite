@@ -13,14 +13,14 @@ this skill directory.
 ```
 
 This builds the app, takes a rendered screenshot, then drives the compiled
-`.app` binary through 30 self-test fixtures via env vars — real ImGui frames
+`.app` binary through 32 self-test fixtures via env vars — real ImGui frames
 and GL draws, not a mock. It prints `[pass]`/`[FAIL]`/`[CRASH]` per check and
 exits non-zero if anything failed. Full raw output per check is saved to
 `/tmp/infinite_test_<NAME>.log` so a failure can be read in full.
 
 Flags:
 - `--skip-build` — reuse the existing `build/` tree (fast iteration once you've built once)
-- `--shot-only` — just build + screenshot, skip the 30-check suite (quick visual spot-check)
+- `--shot-only` — just build + screenshot, skip the 32-check suite (quick visual spot-check)
 
 Read the screenshot it writes (`/tmp/infinite_hygiene_shot.png`) with the
 Read tool to eyeball that node previews, chrome, and text are actually
@@ -34,21 +34,23 @@ rendering — the suite's pass/fail lines don't catch "renders blank" or
 separate test binary. Each one spawns a small fixture node graph, steps it
 for N frames (`INFINITE_EXITAFTER=N` closes the GLFW window and flushes
 stdout at frame N), and `printf`s a verdict line ending in `OK`, containing
-`FAIL`, or ending in `BUG`. `driver.sh` runs a curated 30 of these — the ones
+`FAIL`, or ending in `BUG`. `driver.sh` runs a curated 36 of these — the ones
 with an unambiguous machine-checkable verdict — and greps for the failure
 markers. See `ARCHITECTURE.md`'s "Dev/Test Harness" section for where this
 code lives.
 
-The 30 were picked to cover, category by category:
+The 35 were picked to cover, category by category:
 
 | Area | Checks |
 |---|---|
 | Core engine (undo, patch format) | UNDOTEST, PATCHTEST, ROUNDTRIPTEST (163 node types, copy/paste + save/load) |
-| Editor UI | GROUPTEST, COMMENTTEST, HIDETEST, SELECTTEST, SELECTVIZTEST, DRAGTEST |
+| Editor UI | GROUPTEST, COMMENTTEST, HIDETEST, SELECTTEST, DRAGTEST |
+| Per-node mini viewport | MINIVIEWPORTTEST (NodeViewport solo-renders a Select node's own mesh + selection overlay, independent of a plain untouched sibling) |
 | Params / modulation / color | COLORTEST, MACROTEST, PALETTETEST, BYPASSTEST |
 | Node math — geometry/mesh | GEOTEST, MESHOPTEST, TEXT3DTEST, FIXTEST, PHASEA/C/D/E/F |
-| Node math — 3D render | 3DTEST, SHADOWTEST, MATFRAMETEST, MAPTEST, PATHOCEANTEST |
+| Node math — 3D render | 3DTEST, SHADOWTEST, MATFRAMETEST, MAPTEST, PATHOCEANTEST, ENVTEST |
 | Regression fixtures | BUGTEST, LIVETEST |
+| Geometry-node sweeps — generic across every `IGeometrySource`-consuming node type, not one hand-written fixture per node (see `geometry-transform-sweep` skill for the full writeup) | TRANSFORMSWEEPTEST (upstream `GetModelMatrix()` reaches the output), MAPPINGSWEEPTEST (upstream `GetMappingTransform()` reaches the output), REVISIONSWEEPTEST (a node's revision/generation stamp doesn't move when nothing actually changed — the class of bug that made Cloth reset to rest pose every frame downstream of a textured Displacement) |
 
 Excluded from the auto-verdict suite because they only `printf` raw numbers
 with no pass/fail line (would need a human to eyeball the log) — run them
@@ -79,7 +81,7 @@ INFINITE_UNDOTEST=1 INFINITE_EXITAFTER=10 ./build/Infinite.app/Contents/MacOS/In
 Any `INFINITE_<NAME>TEST=1` from the table above works the same way — set it,
 give `INFINITE_EXITAFTER` enough frames (driver.sh's `TESTS` array has the
 verified frame count for each), read stdout. This is the fastest way to
-re-check one area after a fix, without the full 30-check sweep.
+re-check one area after a fix, without the full 32-check sweep.
 
 ## Run (human path)
 

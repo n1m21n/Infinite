@@ -9,6 +9,7 @@
 #include "SceneNodes.h"
 #include "GeometryOpNodes.h"
 #include "UtilityNodes.h"
+#include "EnvironmentNode.h"
 
 namespace
 {
@@ -27,6 +28,39 @@ namespace
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const int kShadowSizes[] = { 1024, 2048, 4096 };
+
+   // Reads (never writes) every field a node declares through VisitParams
+   // into a flat, comparable vector - used to build Render3DNode's scene
+   // cache signature from an arbitrary node (itself, a CameraNode, a
+   // LightNode) without hand-listing each one's fields separately.
+   struct SnapshotVisitor : ParamVisitor
+   {
+      std::vector<float> values;
+      void Float(const char*, float& v) override { values.push_back(v); }
+      void Int(const char*, int& v) override { values.push_back((float)v); }
+      void Bool(const char*, bool& v) override { values.push_back(v ? 1.0f : 0.0f); }
+      void Text(const char*, std::string&) override {}
+      void Color(const char*, float rgb[3]) override
+      {
+         values.push_back(rgb[0]); values.push_back(rgb[1]); values.push_back(rgb[2]);
+      }
+   };
+
+   // Finds the InstanceOnPoints feeding a geometry source, even if it's
+   // wrapped in one or more mesh-transforming nodes (Transform, Subdivide, ...
+   // - see IGeometrySource::PassthroughSource). Without this, patching a
+   // Transform node between InstanceOnPoints and Render 3D silently dropped
+   // every instance but the first, since the direct dynamic_cast only ever
+   // saw the wrapping node.
+   InstanceOnPointsNode* FindInstancer(IGeometrySource* source)
+   {
+      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
+      {
+         if (auto* instancer = dynamic_cast<InstanceOnPointsNode*>(s))
+            return instancer;
+      }
+      return nullptr;
+   }
 
    // Depth-only pass from the light's point of view. Shares the instancing
    // attribute layout with the main shader so an instanced source casts shadows
@@ -109,6 +143,24 @@ namespace
       return sTex;
    }
 
+   // Bound to the environment sampler when no HDRI is patched in, so the
+   // sampler is never left pointed at an incomplete texture. uHasEnvMap gates
+   // every read of it, so its content is irrelevant.
+   unsigned int DummyEnvTexture()
+   {
+      static unsigned int sTex = 0;
+      if (sTex == 0)
+      {
+         const unsigned char black[4] = { 0, 0, 0, 255 };
+         glGenTextures(1, &sTex);
+         glBindTexture(GL_TEXTURE_2D, sTex);
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, black);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      }
+      return sTex;
+   }
+
    // Bound to the shadow sampler when shadows are off. A depth sampler pointed
    // at texture 0 is incomplete, and the driver warns about it - the same issue
    // the white texture solves for the colour sampler.
@@ -130,27 +182,71 @@ namespace
       return sTex;
    }
 
-   // Selection overlay. Deliberately unlit and untonemapped: the point is to
-   // read as an annotation rather than as a material, so it stays the same
-   // colour whichever way the face is turned to the light.
-   const char* kSelectVertSrc =
+   // HDRI background pass: a single big triangle covering the screen, drawn
+   // just after the clear and before any geometry. Each fragment unprojects
+   // its own NDC position back to a world-space ray through the inverse
+   // view-projection matrix, rather than carrying the camera's basis vectors
+   // through as separate uniforms - one matrix instead of three vectors plus
+   // fov math, and it stays correct for both perspective and orthographic
+   // projections without a branch.
+   const char* kEnvBgVertSrc =
       "#version 150\n"
-      "in vec3 aPos;\n"
-      "in mat4 aInstance;\n"
-      "uniform mat4 uModel;\n"
-      "uniform mat4 uViewProj;\n"
-      "uniform int uInstanced;\n"
+      "out vec2 vNdc;\n"
       "void main() {\n"
-      "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
-      "   gl_Position = uViewProj * model * vec4(aPos, 1.0);\n"
+      "   vec2 p = vec2((gl_VertexID == 2) ? 3.0 : -1.0, (gl_VertexID == 1) ? 3.0 : -1.0);\n"
+      "   vNdc = p;\n"
+      // Just inside the far plane so it survives a depth test against the
+      // 1.0 the colour buffer was cleared to.
+      "   gl_Position = vec4(p, 0.999999, 1.0);\n"
       "}\n";
 
-   const char* kSelectFragSrc =
+   const char* kEnvBgFragSrc =
       "#version 150\n"
+      "in vec2 vNdc;\n"
       "out vec4 fragColor;\n"
-      "uniform vec3 uColor;\n"
-      "uniform float uOpacity;\n"
-      "void main() { fragColor = vec4(uColor, uOpacity); }\n";
+      "uniform mat4 uInvViewProj;\n"
+      "uniform vec3 uCamPos;\n"
+      "uniform sampler2D uEnvMap;\n"
+      "uniform int uHasEnvMap;\n"
+      "uniform float uEnvRotation;\n"
+      "uniform vec3 uEnvSky;\n"
+      "uniform vec3 uEnvHorizon;\n"
+      "uniform vec3 uEnvGround;\n"
+      "uniform float uEnvIntensity;\n"
+      "uniform float uExposure;\n"
+      "uniform int uTonemap;\n"
+      "uniform float uBgOpacity;\n"
+      "vec3 toLinear(vec3 c) { return pow(max(c, vec3(0.0)), vec3(2.2)); }\n"
+      "vec3 toSrgb(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }\n"
+      "vec3 acesFilm(vec3 x) {\n"
+      "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
+      "}\n"
+      "vec2 dirToEquirect(vec3 d, float rot) {\n"
+      "   float phi = atan(d.z, d.x) + rot;\n"
+      "   float theta = acos(clamp(d.y, -1.0, 1.0));\n"
+      // The loaded HDRI's row 0 is the image's top (sky/zenith) but that row
+      // lands at texture v=0 on upload, which GL treats as the *bottom* of
+      // its own coordinate space - so a naive theta/pi here samples ground
+      // for "look up" and sky for "look down". Flipping v corrects it.
+      "   return vec2(phi / 6.28318530718 + 0.5, 1.0 - theta / 3.14159265359);\n"
+      "}\n"
+      "void main() {\n"
+      "   vec4 worldH = uInvViewProj * vec4(vNdc, 1.0, 1.0);\n"
+      "   vec3 worldPos = worldH.xyz / worldH.w;\n"
+      "   vec3 dir = normalize(worldPos - uCamPos);\n"
+      "   vec3 col;\n"
+      "   if (uHasEnvMap == 1) {\n"
+      "      col = texture(uEnvMap, dirToEquirect(dir, uEnvRotation)).rgb * uEnvIntensity;\n"
+      "   } else {\n"
+      "      float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);\n"
+      "      vec3 lower = mix(toLinear(uEnvGround), toLinear(uEnvHorizon), smoothstep(0.0, 0.5, t));\n"
+      "      col = mix(lower, toLinear(uEnvSky), smoothstep(0.5, 1.0, t)) * uEnvIntensity;\n"
+      "   }\n"
+      "   col *= uExposure;\n"
+      "   if (uTonemap == 1) col = acesFilm(col);\n"
+      "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
+      "   fragColor = vec4(toSrgb(col), uBgOpacity);\n"
+      "}\n";
 
    const char* kVertSrc =
       "#version 150\n"
@@ -196,11 +292,24 @@ namespace
       "in vec3 vInstanceColor;\n"
       "in vec4 vLightSpacePos;\n"
       "out vec4 fragColor;\n"
+      "uniform mat4 uViewProj;\n"
       "uniform vec3 uBaseColor;\n"
       "uniform float uMetallic;\n"
       "uniform float uRoughness;\n"
       "uniform float uOpacity;\n"
       "uniform int uShading;\n"
+      "uniform float uIor;\n"
+      "uniform float uSpecular;\n"
+      "uniform float uClearcoat;\n"
+      "uniform float uClearcoatRoughness;\n"
+      "uniform float uSubsurface;\n"
+      "uniform vec3 uSubsurfaceColor;\n"
+      "uniform float uSubsurfaceRadius;\n"
+      "uniform float uTransmission;\n"
+      "uniform float uTransmissionRoughness;\n"
+      "uniform sampler2D uSceneColor;\n"
+      "uniform float uSceneMaxLod;\n"
+      "uniform vec2 uScreenSize;\n"
       "uniform vec3 uLightDir[3];\n"
       "uniform vec3 uLightColor[3];\n"
       "uniform float uLightIntensity[3];\n"
@@ -238,6 +347,10 @@ namespace
       "uniform vec3 uEnvHorizon;\n"
       "uniform vec3 uEnvGround;\n"
       "uniform float uEnvIntensity;\n"
+      "uniform sampler2D uEnvMap;\n"
+      "uniform int uHasEnvMap;\n"
+      "uniform float uEnvRotation;\n"
+      "uniform float uEnvMaxLod;\n"
       "uniform sampler2DShadow uShadowMap;\n"
       "uniform int uShadowsOn;\n"
       "uniform float uShadowBias;\n"
@@ -297,12 +410,34 @@ namespace
       "   return (v - 0.5) / 255.0;\n"
       "}\n"
       "\n"
-      // A three-stop vertical gradient standing in for a sky. Metal with nothing
-      // to reflect reads as flat grey plastic no matter how good the BRDF is,
-      // and this is the cheapest thing that gives it something. Roughness fades
-      // the sample toward the horizon colour, which approximates a blurred
-      // reflection without any mip chain or IBL precompute.
+      // Equirectangular lookup: longitude wraps around Y (rotatable so a scene
+      // can be turned to face a sun in the image), latitude runs top-to-bottom.
+      "vec2 dirToEquirect(vec3 d) {\n"
+      "   float phi = atan(d.z, d.x) + uEnvRotation;\n"
+      "   float theta = acos(clamp(d.y, -1.0, 1.0));\n"
+      // Same vertical-flip correction as the background quad's copy of this
+      // function - see its comment. Reflections and diffuse IBL both read
+      // this one.
+      "   return vec2(phi / 6.28318530718 + 0.5, 1.0 - theta / 3.14159265359);\n"
+      "}\n"
+      "\n"
+      // When an HDRI is patched in, its mip chain stands in for both blurred
+      // reflections and diffuse irradiance: rough*uEnvMaxLod walks from a sharp
+      // mirror sample at mip 0 to a heavily averaged, near-uniform sample at the
+      // top of the chain. That is an averaged-mip approximation rather than a
+      // real GGX prefilter (each mip is a box-ish downsample, not
+      // importance-sampled against the specular lobe), so very glossy metal
+      // reads softer than a proper split-sum IBL renderer would give it - a
+      // deliberate cut, not an oversight, to keep this a single texture upload.
+      //
+      // With no HDRI this falls back to the original three-stop vertical
+      // gradient: sky/horizon/ground, blending toward the horizon colour as
+      // roughness rises to fake the same blur without any texture at all.
       "vec3 sampleEnv(vec3 dir, float rough) {\n"
+      "   if (uHasEnvMap == 1) {\n"
+      "      float lod = clamp(rough, 0.0, 1.0) * uEnvMaxLod;\n"
+      "      return textureLod(uEnvMap, dirToEquirect(dir), lod).rgb * uEnvIntensity;\n"
+      "   }\n"
       "   float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);\n"
       "   vec3 lower = mix(toLinear(uEnvGround), toLinear(uEnvHorizon), smoothstep(0.0, 0.5, t));\n"
       "   vec3 env = mix(lower, toLinear(uEnvSky), smoothstep(0.5, 1.0, t));\n"
@@ -417,9 +552,13 @@ namespace
       "   if (uHasNormalMap == 1) n = applyNormalMap(n, viewDir, mapUv);\n"
       "   float ao = (uHasAoMap == 1) ? texture(uAoMap, mapUv).r : 1.0;\n"
       "   float nDotV = max(dot(n, viewDir), 1e-4);\n"
-      // Dielectrics reflect ~4% head-on; metals reflect their own albedo and
-      // have no diffuse lobe at all.
-      "   vec3 f0 = mix(vec3(0.04), base, metal);\n"
+      // Dielectrics reflect ~4% head-on at IOR 1.5 (glass/Blender default);
+      // uSpecular is Blender's "Specular Level" - a 0..1 multiplier on that
+      // Fresnel-derived reflectance, independent of the metallic split below.
+      // Metals reflect their own albedo and have no diffuse lobe at all.
+      "   float iorF0 = pow((uIor - 1.0) / (uIor + 1.0), 2.0);\n"
+      "   vec3 dielectricF0 = vec3(clamp(iorF0 * 2.0 * uSpecular, 0.0, 1.0));\n"
+      "   vec3 f0 = mix(dielectricF0, base, metal);\n"
       "   vec3 col = vec3(0.0);\n"
       "\n"
       "   for (int i = 0; i < 3; i++) {\n"
@@ -452,6 +591,16 @@ namespace
       "      } else {\n"
       "         nDotL = max(dot(n, lightDir), 0.0);\n"
       "      }\n"
+      // Fake subsurface scattering: wrap lighting extended much further past
+      // the terminator than the sun's own soft wrap above, tinted by
+      // subsurfaceColor. Computed before the nDotL<=0 cull below so a thin
+      // shape lit from directly behind still picks up bleed-through - real
+      // multi-scatter would trace through the volume; this just lies about
+      // which side of the surface the light landed on.
+      "      float sssWrap = uSubsurfaceRadius * 2.0;\n"
+      "      float sssNdotL = clamp((dot(n, lightDir) + sssWrap) / (1.0 + sssWrap), 0.0, 1.0);\n"
+      "      vec3 sssRadiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
+      "      col += base * uSubsurfaceColor * sssNdotL * uSubsurface * sssRadiance;\n"
       "      if (nDotL <= 0.0) continue;\n"
       "      float nDotH = max(dot(n, halfway), 0.0);\n"
       "\n"
@@ -459,13 +608,21 @@ namespace
       "      float g = geometrySchlickGGX(nDotV, rough) * geometrySchlickGGX(nDotL, rough);\n"
       "      vec3 f = fresnelSchlick(max(dot(halfway, viewDir), 0.0), f0);\n"
       "      vec3 specular = (d * g * f) / max(4.0 * nDotV * nDotL, 1e-7);\n"
+      // Second, untinted Fresnel-weighted lobe on top - clearcoat/lacquer.
+      // Fixed IOR 1.5 dielectric response (0.04 F0): a clearcoat is its own
+      // material layer, not tinted by uIor/uSpecular below it.
+      "      float ccRough = clamp(uClearcoatRoughness, 0.02, 1.0);\n"
+      "      float ccD = distributionGGX(nDotH, ccRough);\n"
+      "      float ccG = geometrySchlickGGX(nDotV, ccRough) * geometrySchlickGGX(nDotL, ccRough);\n"
+      "      float ccF = 0.04 + 0.96 * pow(clamp(1.0 - max(dot(halfway, viewDir), 0.0), 0.0, 1.0), 5.0);\n"
+      "      float clearcoatSpec = (ccD * ccG * ccF) / max(4.0 * nDotV * nDotL, 1e-7) * uClearcoat;\n"
       // Whatever is not reflected is refracted and available to scatter, so the
       // two lobes together never return more energy than arrived.
       "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal);\n"
       "      vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
       // Only light 0 casts: one depth map is rendered, from that light.
       "      float shadow = (i == 0) ? shadowFactor(n, lightDir) : 1.0;\n"
-      "      col += (kD * base / 3.14159265 + specular) * radiance * nDotL * shadow;\n"
+      "      col += (kD * base / 3.14159265 + specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow;\n"
       "   }\n"
       "\n"
       // Ambient, from the environment rather than a flat constant: the diffuse
@@ -488,6 +645,26 @@ namespace
       "   if (uTonemap == 1) col = acesFilm(col);\n"
       "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
       "   col = toSrgb(col) + ditherOffset();\n"
+      "\n"
+      // Screen-space transmission: bend the background sample by how far this
+      // fragment's clip-space position would move if pushed along its own
+      // normal, an image-space proxy for real refraction. Mixed in display
+      // space, after tonemapping, against a snapshot of the opaque pass taken
+      // before this draw - so it is exactly as approximate as that snapshot:
+      // no thickness, no light re-entering the medium, and nothing behind
+      // another transmissive surface is captured correctly.
+      "   if (uTransmission > 0.0) {\n"
+      "      vec4 clipA = uViewProj * vec4(vWorldPos, 1.0);\n"
+      "      vec4 clipB = uViewProj * vec4(vWorldPos + n * 0.1, 1.0);\n"
+      "      vec2 uvA = (clipA.xy / max(clipA.w, 1e-5)) * 0.5 + 0.5;\n"
+      "      vec2 uvB = (clipB.xy / max(clipB.w, 1e-5)) * 0.5 + 0.5;\n"
+      "      vec2 bendDir = uvB - uvA;\n"
+      "      float bendStrength = (uIor - 1.0) * 4.0 * uTransmission;\n"
+      "      vec2 refractUv = clamp(gl_FragCoord.xy / uScreenSize + bendDir * bendStrength, 0.0, 1.0);\n"
+      "      float lod = clamp(uTransmissionRoughness, 0.0, 1.0) * uSceneMaxLod;\n"
+      "      vec3 refracted = textureLod(uSceneColor, refractUv, lod).rgb * mix(vec3(1.0), toSrgb(base), 0.4);\n"
+      "      col = mix(col, refracted, uTransmission);\n"
+      "   }\n"
       "   fragColor = vec4(col, uOpacity);\n"
       "}\n";
 }
@@ -596,6 +773,17 @@ Material GeometryNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 
@@ -734,6 +922,55 @@ bool Render3DNode::EnsureShadowResources(int size)
    return true;
 }
 
+bool Render3DNode::EnsureEnvBgShader()
+{
+   if (mEnvBgShaderTried)
+      return mEnvBgProgram != 0;
+   mEnvBgShaderTried = true;
+
+   auto compile = [](GLenum type, const char* src) -> unsigned int {
+      unsigned int shader = glCreateShader(type);
+      glShaderSource(shader, 1, &src, nullptr);
+      glCompileShader(shader);
+      GLint ok = 0;
+      glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+      if (!ok)
+      {
+         char log[1024];
+         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+         fprintf(stderr, "Render3D env background shader error: %s\n", log);
+         glDeleteShader(shader);
+         return 0u;
+      }
+      return shader;
+   };
+
+   const unsigned int vert = compile(GL_VERTEX_SHADER, kEnvBgVertSrc);
+   const unsigned int frag = compile(GL_FRAGMENT_SHADER, kEnvBgFragSrc);
+   if (vert == 0 || frag == 0)
+      return false;
+
+   mEnvBgProgram = glCreateProgram();
+   glAttachShader(mEnvBgProgram, vert);
+   glAttachShader(mEnvBgProgram, frag);
+   glLinkProgram(mEnvBgProgram);
+   glDeleteShader(vert);
+   glDeleteShader(frag);
+
+   GLint linked = 0;
+   glGetProgramiv(mEnvBgProgram, GL_LINK_STATUS, &linked);
+   if (!linked)
+   {
+      char log[1024];
+      glGetProgramInfoLog(mEnvBgProgram, sizeof(log), nullptr, log);
+      fprintf(stderr, "Render3D env background link error: %s\n", log);
+      glDeleteProgram(mEnvBgProgram);
+      mEnvBgProgram = 0;
+      return false;
+   }
+   return true;
+}
+
 bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
 {
    outLo[0] = outLo[1] = outLo[2] = 1e30f;
@@ -769,6 +1006,8 @@ bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
 
 void Render3DNode::ReleaseTargets()
 {
+   if (mSceneColorTex != 0) { glDeleteTextures(1, &mSceneColorTex); mSceneColorTex = 0; }
+   if (mSceneColorFbo != 0) { glDeleteFramebuffers(1, &mSceneColorFbo); mSceneColorFbo = 0; }
    if (mColorTex != 0) { glDeleteTextures(1, &mColorTex); mColorTex = 0; }
    if (mDepthBuffer != 0) { glDeleteRenderbuffers(1, &mDepthBuffer); mDepthBuffer = 0; }
    if (mFbo != 0) { glDeleteFramebuffers(1, &mFbo); mFbo = 0; }
@@ -785,127 +1024,18 @@ Render3DNode::~Render3DNode()
       ReleaseGpuMesh(mGpu[i]);
    if (mProgram != 0) glDeleteProgram(mProgram);
    if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
-   if (mSelectionProgram != 0) glDeleteProgram(mSelectionProgram);
+   if (mEnvBgProgram != 0) glDeleteProgram(mEnvBgProgram);
+   if (mEnvBgVao != 0) glDeleteVertexArrays(1, &mEnvBgVao);
 }
 
 void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
 {
    if (gpu.vbo != 0) glDeleteBuffers(1, &gpu.vbo);
    if (gpu.ibo != 0) glDeleteBuffers(1, &gpu.ibo);
-   if (gpu.selIbo != 0) glDeleteBuffers(1, &gpu.selIbo);
    if (gpu.instanceVbo != 0) glDeleteBuffers(1, &gpu.instanceVbo);
    if (gpu.instanceColorVbo != 0) glDeleteBuffers(1, &gpu.instanceColorVbo);
    if (gpu.vao != 0) glDeleteVertexArrays(1, &gpu.vao);
-   if (gpu.selVao != 0) glDeleteVertexArrays(1, &gpu.selVao);
    gpu = GpuMesh();
-}
-
-bool Render3DNode::EnsureSelectionShader()
-{
-   if (mSelectionShaderTried)
-      return mSelectionProgram != 0;
-   mSelectionShaderTried = true;
-
-   auto compile = [](GLenum type, const char* src) -> unsigned int {
-      unsigned int shader = glCreateShader(type);
-      glShaderSource(shader, 1, &src, nullptr);
-      glCompileShader(shader);
-      GLint ok = 0;
-      glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
-      if (!ok)
-      {
-         char log[1024];
-         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
-         fprintf(stderr, "Selection overlay shader error: %s\n", log);
-         glDeleteShader(shader);
-         return 0u;
-      }
-      return shader;
-   };
-
-   const unsigned int vert = compile(GL_VERTEX_SHADER, kSelectVertSrc);
-   const unsigned int frag = compile(GL_FRAGMENT_SHADER, kSelectFragSrc);
-   if (vert == 0 || frag == 0)
-      return false;
-
-   mSelectionProgram = glCreateProgram();
-   // Same attribute slots as the main program, so the overlay VAO is laid out
-   // identically and the instance buffer can be shared as-is.
-   glBindAttribLocation(mSelectionProgram, 0, "aPos");
-   glBindAttribLocation(mSelectionProgram, 3, "aInstance"); // occupies 3..6
-   glAttachShader(mSelectionProgram, vert);
-   glAttachShader(mSelectionProgram, frag);
-   glLinkProgram(mSelectionProgram);
-   glDeleteShader(vert);
-   glDeleteShader(frag);
-
-   GLint linked = 0;
-   glGetProgramiv(mSelectionProgram, GL_LINK_STATUS, &linked);
-   if (!linked)
-   {
-      char log[1024];
-      glGetProgramInfoLog(mSelectionProgram, sizeof(log), nullptr, log);
-      fprintf(stderr, "Selection overlay link error: %s\n", log);
-      glDeleteProgram(mSelectionProgram);
-      mSelectionProgram = 0;
-      return false;
-   }
-
-   return true;
-}
-
-void Render3DNode::UpdateSelectionBuffer(GpuMesh& gpu, const Mesh& mesh,
-                                         unsigned long long revision)
-{
-   if (gpu.selRevision == revision && gpu.selValid)
-      return;
-   gpu.selRevision = revision;
-   gpu.selIndexCount = 0;
-   gpu.selValid = false;
-
-   // An empty mask means "no Select upstream", which is a different thing from
-   // "a Select that chose nothing" - the first has nothing to annotate, and
-   // tinting the whole mesh for it would light up every existing patch.
-   if (mesh.faceMask.empty())
-      return;
-
-   const size_t faces = mesh.FaceCount();
-   std::vector<unsigned int> selected;
-   selected.reserve(faces * 3);
-   for (size_t f = 0; f < faces; f++)
-   {
-      // Read through the mask directly rather than FaceSelected(), whose
-      // empty-means-all rule is the case already excluded above.
-      if (f >= mesh.faceMask.size() || mesh.faceMask[f] == 0)
-         continue;
-      selected.push_back(mesh.indices[f * 3]);
-      selected.push_back(mesh.indices[f * 3 + 1]);
-      selected.push_back(mesh.indices[f * 3 + 2]);
-   }
-   if (selected.empty())
-   {
-      // Still valid: a selection of nothing is a real answer, and recomputing
-      // it every frame because the buffer came out empty would be a waste.
-      gpu.selValid = true;
-      return;
-   }
-
-   if (gpu.selVao == 0)
-      glGenVertexArrays(1, &gpu.selVao);
-   if (gpu.selIbo == 0)
-      glGenBuffers(1, &gpu.selIbo);
-
-   glBindVertexArray(gpu.selVao);
-   glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
-   glEnableVertexAttribArray(0);
-   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpu.selIbo);
-   glBufferData(GL_ELEMENT_ARRAY_BUFFER, selected.size() * sizeof(unsigned int),
-                selected.data(), GL_STATIC_DRAW);
-   glBindVertexArray(0);
-
-   gpu.selIndexCount = (int)selected.size();
-   gpu.selValid = true;
 }
 
 bool Render3DNode::EnsureShader()
@@ -1056,7 +1186,79 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
    mActiveSamples = resolved;
    mWidth = w;
    mHeight = h;
+
+   // Mipmapped snapshot target for screen-space transmission. Plain colour
+   // attachment, no depth: it only exists to be blitted into and sampled.
+   glGenTextures(1, &mSceneColorTex);
+   glBindTexture(GL_TEXTURE_2D, mSceneColorTex);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glGenerateMipmap(GL_TEXTURE_2D);
+
+   glGenFramebuffers(1, &mSceneColorFbo);
+   glBindFramebuffer(GL_FRAMEBUFFER, mSceneColorFbo);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mSceneColorTex, 0);
+   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+   glBindTexture(GL_TEXTURE_2D, 0);
+
+   mSceneMaxLod = std::floor(std::log2((float)std::max(w, h)));
    return true;
+}
+
+Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
+{
+   SceneSignature sig;
+
+   SnapshotVisitor ownSnap;
+   VisitParams(ownSnap);
+   sig.own = ownSnap.values;
+
+   if (camera != nullptr)
+   {
+      sig.hasCamera = true;
+      SnapshotVisitor camSnap;
+      camera->VisitParams(camSnap);
+      sig.camera = camSnap.values;
+      if (camera->orbitPerBeat != 0.0f)
+         sig.animated = true;
+   }
+
+   for (int i = 0; i < kLightSlots; i++)
+   {
+      if (lights[i] == nullptr)
+         continue;
+      sig.hasLight[i] = true;
+      SnapshotVisitor lightSnap;
+      lights[i]->VisitParams(lightSnap);
+      sig.light[i] = lightSnap.values;
+      if (lights[i]->orbitPerBeat != 0.0f)
+         sig.animated = true;
+   }
+
+   for (int i = 0; i < kSlots; i++)
+   {
+      IGeometrySource* source = geometry[i];
+      if (source == nullptr)
+         continue;
+      sig.hasGeom[i] = true;
+      sig.geomRev[i] = source->MeshRevision();
+      sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
+      sig.material[i] = source->GetMaterial();
+      for (int m = kMapRoughness; m < kMapCount; m++)
+      {
+         if (source->GetMaterialTexture(m) != 0)
+            sig.texturedMaterial = true;
+      }
+   }
+
+   sig.envConnected = envInput.IsConnected();
+   if (sig.envConnected)
+      sig.envRev = envInput.Revision();
+
+   return sig;
 }
 
 void Render3DNode::CookIfNeeded(int frameId)
@@ -1081,6 +1283,39 @@ void Render3DNode::CookIfNeeded(int frameId)
       if (auto* node = dynamic_cast<INode*>(geometry[i]))
          node->CookIfNeeded(frameId);
    }
+
+   // An Environment node patched into the env slot. envInput is an ordinary
+   // image cable, but the environment sample needs more than a texture handle
+   // - rotation, its own intensity, and the mip count for the roughness-to-LOD
+   // approximation - so the source is resolved and read directly rather than
+   // going through Pull().
+   unsigned int envTex = 0;
+   float envRotationRad = 0.0f;
+   float envHdriIntensity = 1.0f;
+   float envMaxLod = 0.0f;
+   if (envInput.IsConnected())
+   {
+      INode* envNode = envInput.Resolved();
+      if (auto* env = dynamic_cast<EnvironmentNode*>(envNode))
+      {
+         env->CookIfNeeded(frameId);
+         envTex = env->GetEnvironmentTexture();
+         envRotationRad = env->rotation;
+         envHdriIntensity = env->intensity;
+         envMaxLod = env->MaxLod();
+      }
+   }
+   const bool hasEnvMap = envTex != 0;
+
+   // Nothing that could change a pixel has moved since the last cook -
+   // mColorTex (and mSceneColorTex) already hold the right image, so skip
+   // the shadow/opaque/transmissive passes entirely and reuse them.
+   SceneSignature sceneSig = BuildSceneSignature();
+   if (mHasSceneBuilt && sceneSig == mSceneBuilt)
+      return;
+   mSceneBuilt = sceneSig;
+   mHasSceneBuilt = true;
+   NodeWorkCounter()++;
 
    const float aspect = (float)w / (float)h;
 
@@ -1213,7 +1448,7 @@ void Render3DNode::CookIfNeeded(int frameId)
                continue;
             glBindVertexArray(mGpu[i].vao);
             const Mat4 model = source->GetModelMatrix();
-            auto* instancer = dynamic_cast<InstanceOnPointsNode*>(source);
+            auto* instancer = FindInstancer(source);
             const bool instanced = instancer != nullptr && mGpu[i].instanceCount > 0 &&
                                    mGpu[i].instanceAttribsOn;
             glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uModel"), 1, GL_FALSE, model.m);
@@ -1262,6 +1497,43 @@ void Render3DNode::CookIfNeeded(int frameId)
    glClearColor(bgColor[0], bgColor[1], bgColor[2], bgOpacity);
    glClearDepth(1.0);
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+   // HDRI background: drawn first, into the just-cleared buffer, so it needs
+   // neither depth testing nor a depth write - every geometry draw that
+   // follows simply paints over it in the usual way.
+   if (hasEnvMap && envAsBackground && EnsureEnvBgShader())
+   {
+      if (mEnvBgVao == 0)
+         glGenVertexArrays(1, &mEnvBgVao);
+      const Mat4 invViewProj = Mat4::Inverse(viewProj);
+
+      glDisable(GL_DEPTH_TEST);
+      glDisable(GL_CULL_FACE);
+      glDisable(GL_BLEND);
+      glDepthMask(GL_FALSE);
+
+      glUseProgram(mEnvBgProgram);
+      glUniformMatrix4fv(glGetUniformLocation(mEnvBgProgram, "uInvViewProj"), 1, GL_FALSE, invViewProj.m);
+      glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uCamPos"), 1, eye);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, envTex);
+      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uEnvMap"), 0);
+      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uHasEnvMap"), 1);
+      glUniform1f(glGetUniformLocation(mEnvBgProgram, "uEnvRotation"), envRotationRad);
+      glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvSky"), 1, envSky);
+      glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvHorizon"), 1, envHorizon);
+      glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvGround"), 1, envGround);
+      glUniform1f(glGetUniformLocation(mEnvBgProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
+      glUniform1f(glGetUniformLocation(mEnvBgProgram, "uExposure"), exposure);
+      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uTonemap"), tonemap);
+      glUniform1f(glGetUniformLocation(mEnvBgProgram, "uBgOpacity"), bgOpacity);
+
+      glBindVertexArray(mEnvBgVao);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glBindVertexArray(0);
+      glUseProgram(0);
+      glDepthMask(GL_TRUE);
+   }
 
    if (depthTest)
    {
@@ -1319,16 +1591,26 @@ void Render3DNode::CookIfNeeded(int frameId)
    glUniform3fv(glGetUniformLocation(mProgram, "uEnvSky"), 1, envSky);
    glUniform3fv(glGetUniformLocation(mProgram, "uEnvHorizon"), 1, envHorizon);
    glUniform3fv(glGetUniformLocation(mProgram, "uEnvGround"), 1, envGround);
-   glUniform1f(glGetUniformLocation(mProgram, "uEnvIntensity"), envIntensity);
+   glUniform1f(glGetUniformLocation(mProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
+   glUniform1i(glGetUniformLocation(mProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
+   glUniform1f(glGetUniformLocation(mProgram, "uEnvRotation"), envRotationRad);
+   glUniform1f(glGetUniformLocation(mProgram, "uEnvMaxLod"), envMaxLod);
+   glActiveTexture(GL_TEXTURE6);
+   glBindTexture(GL_TEXTURE_2D, hasEnvMap ? envTex : DummyEnvTexture());
+   glUniform1i(glGetUniformLocation(mProgram, "uEnvMap"), 6);
+   glActiveTexture(GL_TEXTURE0);
 
-   for (int i = 0; i < kSlots; i++)
+   // Drawing one slot is factored into a lambda so it can be called for the
+   // opaque pass and, when anything in the scene is transmissive, again for
+   // the transmissive pass below - see the two-pass driver after this lambda.
+   auto drawSlot = [&](int i)
    {
       IGeometrySource* source = geometry[i];
       if (source == nullptr)
-         continue;
+         return;
       const Mesh& mesh = source->GetMesh();
       if (mesh.Empty())
-         continue;
+         return;
 
       GpuMesh& gpu = mGpu[i];
       if (gpu.vao == 0)
@@ -1346,7 +1628,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       {
          gpu.meshRevision = 0;
          gpu.instanceRevision = 0;
-         gpu.selValid = false;
+         gpu.instanceGroupMatrix = Mat4::Identity();
          gpu.source = source;
       }
 
@@ -1446,7 +1728,7 @@ void Render3DNode::CookIfNeeded(int frameId)
 
       // Instanced sources upload a transform per copy and draw them all at
       // once; ten thousand instances stay a single draw call.
-      auto* instancer = dynamic_cast<InstanceOnPointsNode*>(source);
+      auto* instancer = FindInstancer(source);
       const bool instanced = instancer != nullptr && instancer->InstanceCount() > 0;
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), instanced ? 1 : 0);
       if (instanced)
@@ -1455,11 +1737,26 @@ void Render3DNode::CookIfNeeded(int frameId)
             glGenBuffers(1, &gpu.instanceVbo);
 
          const unsigned long long instanceRevision = instancer->InstanceRevision();
-         if (gpu.instanceRevision != instanceRevision || !gpu.instanceAttribsOn)
+         // A wrapping Transform node's move/rotate/scale (see
+         // GeometryOpNode::GetInstanceGroupMatrix) doesn't bump the instancer's
+         // own revision, since it never touches the instancer - so it has to be
+         // compared on its own to catch a param edit with no other change.
+         const Mat4 groupMatrix = source->GetInstanceGroupMatrix();
+         if (gpu.instanceRevision != instanceRevision || !gpu.instanceAttribsOn ||
+             !(gpu.instanceGroupMatrix == groupMatrix))
          {
             const std::vector<Mat4>& xforms = instancer->InstanceTransforms();
+            std::vector<Mat4> composed;
+            const std::vector<Mat4>* uploadXforms = &xforms;
+            if (!(groupMatrix == Mat4::Identity()))
+            {
+               composed.reserve(xforms.size());
+               for (const Mat4& x : xforms)
+                  composed.push_back(Mat4::Multiply(groupMatrix, x));
+               uploadXforms = &composed;
+            }
             glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVbo);
-            glBufferData(GL_ARRAY_BUFFER, xforms.size() * sizeof(Mat4), xforms.data(),
+            glBufferData(GL_ARRAY_BUFFER, uploadXforms->size() * sizeof(Mat4), uploadXforms->data(),
                          GL_STATIC_DRAW);
             // a mat4 attribute is four consecutive vec4 slots
             for (int col = 0; col < 4; col++)
@@ -1493,6 +1790,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             gpu.instanceColored = !colors.empty();
 
             gpu.instanceRevision = instanceRevision;
+            gpu.instanceGroupMatrix = groupMatrix;
             gpu.instanceCount = (int)xforms.size();
             gpu.instanceAttribsOn = true;
             mLastUploads++;
@@ -1523,6 +1821,15 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uShading"), material.shading);
       glUniform3fv(glGetUniformLocation(mProgram, "uEmissionColor"), 1, material.emissionColor);
       glUniform1f(glGetUniformLocation(mProgram, "uEmission"), material.emission);
+      glUniform1f(glGetUniformLocation(mProgram, "uIor"), material.ior);
+      glUniform1f(glGetUniformLocation(mProgram, "uSpecular"), material.specular);
+      glUniform1f(glGetUniformLocation(mProgram, "uClearcoat"), material.clearcoat);
+      glUniform1f(glGetUniformLocation(mProgram, "uClearcoatRoughness"), material.clearcoatRoughness);
+      glUniform1f(glGetUniformLocation(mProgram, "uSubsurface"), material.subsurface);
+      glUniform3fv(glGetUniformLocation(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
+      glUniform1f(glGetUniformLocation(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
+      glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), material.transmission);
+      glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), material.transmissionRoughness);
 
       if (instanced)
       {
@@ -1543,106 +1850,74 @@ void Render3DNode::CookIfNeeded(int frameId)
          glBindTexture(GL_TEXTURE_2D, surface);
          RestoreSurfaceTexture();
       }
+   };
+
+   bool anyTransmissive = false;
+   for (int i = 0; i < kSlots; i++)
+   {
+      IGeometrySource* s = geometry[i];
+      if (s != nullptr && s->GetMaterial().transmission > 0.001f)
+      {
+         anyTransmissive = true;
+         break;
+      }
+   }
+
+   for (int i = 0; i < kSlots; i++)
+   {
+      IGeometrySource* s = geometry[i];
+      if (s == nullptr)
+         continue;
+      // Transmissive slots are deferred to the pass below, which needs a
+      // snapshot of everything opaque drawn first - sampling the buffer this
+      // same draw is writing to would be a feedback loop.
+      if (anyTransmissive && s->GetMaterial().transmission > 0.001f)
+         continue;
+      drawSlot(i);
+   }
+
+   if (anyTransmissive)
+   {
+      // Snapshot what's been drawn so far into a mipmapped, non-multisampled
+      // texture: transmissionRoughness picks a mip the same way sampleEnv()
+      // does for reflections, and a multisampled renderbuffer can't be
+      // texture-sampled at all.
+      const unsigned int currentFbo = multisampling ? mMsFbo : mFbo;
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, currentFbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mSceneColorFbo);
+      glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, currentFbo);
+
+      glBindTexture(GL_TEXTURE_2D, mSceneColorTex);
+      glGenerateMipmap(GL_TEXTURE_2D);
+      glBindTexture(GL_TEXTURE_2D, 0);
+
+      glUseProgram(mProgram);
+      glActiveTexture(GL_TEXTURE7);
+      glBindTexture(GL_TEXTURE_2D, mSceneColorTex);
+      glUniform1i(glGetUniformLocation(mProgram, "uSceneColor"), 7);
+      glActiveTexture(GL_TEXTURE0);
+      glUniform1f(glGetUniformLocation(mProgram, "uSceneMaxLod"), mSceneMaxLod);
+      glUniform2f(glGetUniformLocation(mProgram, "uScreenSize"), (float)w, (float)h);
+
+      // No depth write: two overlapping transmissive surfaces both sample the
+      // same pre-transmission snapshot rather than compositing against each
+      // other correctly - the known thick/overlapping-glass limitation noted
+      // on Material::transmission.
+      glDepthMask(GL_FALSE);
+      for (int i = 0; i < kSlots; i++)
+      {
+         IGeometrySource* s = geometry[i];
+         if (s == nullptr || s->GetMaterial().transmission <= 0.001f)
+            continue;
+         drawSlot(i);
+      }
+      glDepthMask(GL_TRUE);
    }
 
    glBindVertexArray(0);
    glUseProgram(0);
-
-   // --- selection overlay ---
-   // Drawn after the lit pass rather than folded into it: the alternative is a
-   // per-vertex selected flag, which would widen the vertex format for every
-   // mesh in the graph to annotate the few that carry a mask.
-   mLastHighlighted = 0;
-   if (highlightSelection && selectionOpacity > 0.001f && EnsureSelectionShader())
-   {
-      glUseProgram(mSelectionProgram);
-      glUniformMatrix4fv(glGetUniformLocation(mSelectionProgram, "uViewProj"), 1, GL_FALSE,
-                         viewProj.m);
-      glUniform3fv(glGetUniformLocation(mSelectionProgram, "uColor"), 1, selectionColor);
-      glUniform1f(glGetUniformLocation(mSelectionProgram, "uOpacity"),
-                  std::min(1.0f, std::max(0.0f, selectionOpacity)));
-
-      // The overlay is coplanar with the geometry it annotates, so an unmodified
-      // depth test would z-fight it into stipple. Pulling it a hair toward the
-      // camera and comparing with LEQUAL keeps it hidden behind anything genuinely
-      // in front while letting it win its own surface outright.
-      if (depthTest)
-      {
-         glDepthFunc(GL_LEQUAL);
-         glEnable(GL_POLYGON_OFFSET_FILL);
-         glPolygonOffset(-1.0f, -1.0f);
-      }
-      // Never written to the depth buffer: this is an annotation on top of the
-      // scene, and letting it occlude is not something a tint should do.
-      glDepthMask(GL_FALSE);
-
-      for (int i = 0; i < kSlots; i++)
-      {
-         IGeometrySource* source = geometry[i];
-         if (source == nullptr)
-            continue;
-         const Mesh& mesh = source->GetMesh();
-         if (mesh.Empty() || mesh.faceMask.empty())
-            continue;
-
-         GpuMesh& gpu = mGpu[i];
-         if (gpu.vao == 0 || gpu.vbo == 0)
-            continue;
-         UpdateSelectionBuffer(gpu, mesh, gpu.meshRevision);
-         if (gpu.selIndexCount == 0 || gpu.selVao == 0)
-            continue;
-
-         glBindVertexArray(gpu.selVao);
-
-         auto* instancer = dynamic_cast<InstanceOnPointsNode*>(source);
-         const bool instanced = instancer != nullptr && instancer->InstanceCount() > 0 &&
-                                gpu.instanceVbo != 0 && gpu.instanceCount > 0;
-         glUniform1i(glGetUniformLocation(mSelectionProgram, "uInstanced"), instanced ? 1 : 0);
-         if (instanced)
-         {
-            // Pointed at the buffer the main pass already filled, and re-pointed
-            // every frame rather than cached: this VAO is only touched when there
-            // is a selection to draw, so there is nothing to gain from tracking
-            // whether the instance buffer moved underneath it.
-            glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVbo);
-            for (int col = 0; col < 4; col++)
-            {
-               const unsigned int loc = 3 + col;
-               glEnableVertexAttribArray(loc);
-               glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
-                                     (void*)(size_t)(col * 4 * sizeof(float)));
-               glVertexAttribDivisor(loc, 1);
-            }
-         }
-
-         const Mat4 model = source->GetModelMatrix();
-         glUniformMatrix4fv(glGetUniformLocation(mSelectionProgram, "uModel"), 1, GL_FALSE,
-                            model.m);
-
-         if (instanced)
-         {
-            glDrawElementsInstanced(GL_TRIANGLES, gpu.selIndexCount, GL_UNSIGNED_INT,
-                                    nullptr, (GLsizei)gpu.instanceCount);
-            mLastHighlighted += (size_t)(gpu.selIndexCount / 3) * (size_t)gpu.instanceCount;
-         }
-         else
-         {
-            glDrawElements(GL_TRIANGLES, gpu.selIndexCount, GL_UNSIGNED_INT, nullptr);
-            mLastHighlighted += gpu.selIndexCount / 3;
-         }
-         mLastDrawCalls++;
-      }
-
-      glBindVertexArray(0);
-      glUseProgram(0);
-      glDepthMask(GL_TRUE);
-      if (depthTest)
-      {
-         glDisable(GL_POLYGON_OFFSET_FILL);
-         glPolygonOffset(0.0f, 0.0f);
-         glDepthFunc(GL_LESS);
-      }
-   }
 
    // Resolve the multisampled buffer down into the texture the graph reads.
    // Scissor is already off, which matters here: a blit is clipped by it too.
@@ -1666,4 +1941,6 @@ void Render3DNode::CookIfNeeded(int frameId)
    }
    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+
+   mRevision = NextTextureRevision();
 }

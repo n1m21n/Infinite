@@ -126,6 +126,14 @@ public:
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return input ? input->SurfaceTextureRevision() : 0;
+   }
+   MappingTransform GetMappingTransform() const override
+   {
+      return input ? input->GetMappingTransform() : MappingTransform();
+   }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
@@ -164,6 +172,28 @@ public:
    int shading = 0;
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -182,6 +212,12 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 
 private:
@@ -209,6 +245,15 @@ private:
    unsigned long long mBuiltUpstream = 0;
    const void* mBuiltInput = nullptr;
    int mBuiltPinMode = -1;
+   // Topology fingerprint the constraints were last built from. A revision
+   // bump alone does not justify wiping the running simulation back to rest -
+   // an input that only moved its vertices (a Transform, a Displace, an
+   // animated texture driving one) should keep draping, not snap back every
+   // time it re-cooks. Only a real vertex/index count change means the old
+   // constraint indices are no longer valid.
+   size_t mBuiltVertexCount = 0;
+   size_t mBuiltIndexCount = 0;
+   bool mHasBuilt = false;
    // The input's transform is baked into the rest state (see RebuildFromInput),
    // and it never bumps mBuiltUpstream on its own - GetModelMatrix() is a live
    // value, not a revision - so it has to be compared directly to catch a

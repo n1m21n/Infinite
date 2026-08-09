@@ -18,6 +18,10 @@ public:
    int GetOutputWidth() const override { return mWidth; }
    int GetOutputHeight() const override { return mHeight; }
    void CookIfNeeded(int frameId) override;
+   // Loaded (or placeholder) texture only changes when Load()/EnsurePlaceholder()
+   // actually re-upload it - not every frame - so downstream FilterNode chains
+   // can cache against a stable stamp instead of always assuming new pixels.
+   unsigned long long TextureRevision() const override { return mRevision; }
 
    // Loads `path` into the texture. Returns false and sets LastError() on failure.
    bool Load(const std::string& path);
@@ -52,4 +56,5 @@ private:
    bool mHasPlaceholder = false;
    std::string mLoadedPath;
    std::string mLastError;
+   unsigned long long mRevision = 0;
 };

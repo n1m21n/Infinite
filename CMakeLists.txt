@@ -42,6 +42,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
+    src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
     src/core/Palette.cpp
@@ -68,6 +69,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/PaletteNode.cpp
     src/nodes/AnalyzeNodes.cpp
     src/nodes/Geometry3DNodes.cpp
+    src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
     src/nodes/Text3DNode.cpp
     src/nodes/UtilityNodes.cpp
@@ -80,6 +82,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp
     src/nodes/SwitcherNode.cpp
+    src/nodes/Switcher3DNode.cpp
     src/nodes/TextNode.cpp
     src/nodes/OutputNode.cpp
 

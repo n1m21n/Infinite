@@ -159,6 +159,10 @@ public:
    {
       return input ? input->GetMaterialTexture(map) : 0;
    }
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return input ? input->SurfaceTextureRevision() : 0;
+   }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
@@ -198,12 +202,14 @@ public:
    unsigned int GetSurfaceTexture() override;
 
    unsigned int GetMaterialTexture(int map) override;
+   unsigned long long SurfaceTextureRevision() const override;
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
    }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
+   IGeometrySource* PassthroughSource() const override { return input; }
    IGeometrySource* input = nullptr;
    ImageCable& TextureInput() { return mMaps[kMapAlbedo]; }
    // Slot 0 is geometry; slots 1..5 are the material channels, in MaterialMap
@@ -226,6 +232,28 @@ public:
    int shading = 0;
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
 
    void VisitParams(ParamVisitor& v) override
@@ -234,6 +262,12 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
       v.Float("normalStrength", normalStrength);
    }
 private:
@@ -283,6 +317,10 @@ public:
    unsigned int GetMaterialTexture(int map) override
    {
       return input ? input->GetMaterialTexture(map) : 0;
+   }
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return input ? input->SurfaceTextureRevision() : 0;
    }
    MappingTransform GetMappingTransform() const override;
 
@@ -350,6 +388,8 @@ public:
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
+   unsigned long long SurfaceTextureRevision() const override;
+   MappingTransform GetMappingTransform() const override;
 
    IGeometrySource* inputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
    const char* InputLabel(int slot) const override
@@ -375,6 +415,28 @@ public:
    int shading = 0;
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -386,6 +448,12 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 
 private:
@@ -449,6 +517,28 @@ public:
    int shading = 0;
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -462,6 +552,12 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 
 private:
@@ -516,6 +612,14 @@ public:
    {
       return input ? input->GetMaterialTexture(map) : 0;
    }
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return input ? input->SurfaceTextureRevision() : 0;
+   }
+   MappingTransform GetMappingTransform() const override
+   {
+      return input ? input->GetMappingTransform() : MappingTransform();
+   }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
@@ -535,6 +639,28 @@ public:
    int shading = 0;
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
 
    void VisitParams(ParamVisitor& v) override
@@ -545,6 +671,12 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 private:
    void RebuildIfNeeded();

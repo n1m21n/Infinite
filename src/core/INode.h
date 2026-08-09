@@ -30,6 +30,27 @@ public:
    virtual void Color(const char* name, float rgb[3]) = 0;
 };
 
+// Zero is reserved as "nothing produced yet", so the first real stamp is 1.
+// Analogous to NextMeshRevision() (Mesh.h) on the geometry side; kept as an
+// inline function-local static rather than a Mesh.cpp-style free function
+// since INode has no matching .cpp to define one in.
+inline unsigned long long NextTextureRevision()
+{
+   static unsigned long long sCounter = 0;
+   return ++sCounter;
+}
+
+// Bumped once by each node that does real re-render work this frame (a
+// cache hit does not bump it) - FilterNode's RunShaderPass, Render3DNode's
+// draw passes, and so on. main.cpp compares this frame-over-frame to detect
+// a fully idle patch (no node did new work) and log it, the same way a
+// static Blender viewport eventually settles into "not re-rendering".
+inline unsigned long long& NodeWorkCounter()
+{
+   static unsigned long long counter = 0;
+   return counter;
+}
+
 class INode
 {
 public:
@@ -42,6 +63,15 @@ public:
    // Ensure this node has produced its output for the given frame (memoized).
    // Nodes with inputs should pull their inputs' CookIfNeeded() before rendering themselves.
    virtual void CookIfNeeded(int frameId) = 0;
+
+   // Revision stamp for this node's current output texture: changes only when
+   // the pixels actually change, mirroring IGeometrySource::MeshRevision() on
+   // the mesh side. A node that tracks this for real lets downstream FilterNode
+   // caches skip re-rendering when nothing upstream moved. The default hands
+   // back a fresh value on every call - i.e. "always changed" - so any node
+   // that doesn't override this stays exactly as conservative (and correct)
+   // as the no-caching behavior that predates this mechanism.
+   virtual unsigned long long TextureRevision() const { return NextTextureRevision(); }
 
    // Most nodes emit a single output. Modulators that carry more than one value
    // (an XY pad, say) report a higher count and hand back a different modulator

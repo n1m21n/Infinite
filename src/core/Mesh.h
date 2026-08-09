@@ -28,6 +28,14 @@ struct Mesh
    // act on it two nodes later, without rewiring anything.
    std::vector<unsigned char> faceMask;
 
+   // Optional grouping of faces into atomic selection units, one entry per
+   // triangle, matched by value (not index - just an opaque tag). Empty means
+   // every face is its own unit. Mesh to Points sets this so a point's two
+   // billboard triangles always share a value, letting Select choose or skip
+   // the whole point instead of tearing it into one selected + one
+   // unselected triangle.
+   std::vector<unsigned int> selectionGroup;
+
    bool Empty() const { return vertices.empty() || indices.empty(); }
    size_t FaceCount() const { return indices.size() / 3; }
 
@@ -185,6 +193,41 @@ struct Mat4
       out[0] = (e*i - f*h) * inv; out[1] = (c*h - b*i) * inv; out[2] = (b*f - c*e) * inv;
       out[3] = (f*g - d*i) * inv; out[4] = (a*i - c*g) * inv; out[5] = (c*d - a*f) * inv;
       out[6] = (d*h - e*g) * inv; out[7] = (b*g - a*h) * inv; out[8] = (a*e - b*d) * inv;
+   }
+
+   // General 4x4 inverse via cofactor expansion. Used to unproject screen space
+   // back to world space (the HDRI background pass), which is the one place in
+   // this codebase that needs a full inverse rather than the cheaper
+   // transpose-of-rotation trick that works for view matrices alone.
+   static Mat4 Inverse(const Mat4& in)
+   {
+      const float* a = in.m;
+      float inv[16];
+      inv[0] = a[5]*a[10]*a[15] - a[5]*a[11]*a[14] - a[9]*a[6]*a[15] + a[9]*a[7]*a[14] + a[13]*a[6]*a[11] - a[13]*a[7]*a[10];
+      inv[4] = -a[4]*a[10]*a[15] + a[4]*a[11]*a[14] + a[8]*a[6]*a[15] - a[8]*a[7]*a[14] - a[12]*a[6]*a[11] + a[12]*a[7]*a[10];
+      inv[8] = a[4]*a[9]*a[15] - a[4]*a[11]*a[13] - a[8]*a[5]*a[15] + a[8]*a[7]*a[13] + a[12]*a[5]*a[11] - a[12]*a[7]*a[9];
+      inv[12] = -a[4]*a[9]*a[14] + a[4]*a[10]*a[13] + a[8]*a[5]*a[14] - a[8]*a[6]*a[13] - a[12]*a[5]*a[10] + a[12]*a[6]*a[9];
+      inv[1] = -a[1]*a[10]*a[15] + a[1]*a[11]*a[14] + a[9]*a[2]*a[15] - a[9]*a[3]*a[14] - a[13]*a[2]*a[11] + a[13]*a[3]*a[10];
+      inv[5] = a[0]*a[10]*a[15] - a[0]*a[11]*a[14] - a[8]*a[2]*a[15] + a[8]*a[3]*a[14] + a[12]*a[2]*a[11] - a[12]*a[3]*a[10];
+      inv[9] = -a[0]*a[9]*a[15] + a[0]*a[11]*a[13] + a[8]*a[1]*a[15] - a[8]*a[3]*a[13] - a[12]*a[1]*a[11] + a[12]*a[3]*a[9];
+      inv[13] = a[0]*a[9]*a[14] - a[0]*a[10]*a[13] - a[8]*a[1]*a[14] + a[8]*a[2]*a[13] + a[12]*a[1]*a[10] - a[12]*a[2]*a[9];
+      inv[2] = a[1]*a[6]*a[15] - a[1]*a[7]*a[14] - a[5]*a[2]*a[15] + a[5]*a[3]*a[14] + a[13]*a[2]*a[7] - a[13]*a[3]*a[6];
+      inv[6] = -a[0]*a[6]*a[15] + a[0]*a[7]*a[14] + a[4]*a[2]*a[15] - a[4]*a[3]*a[14] - a[12]*a[2]*a[7] + a[12]*a[3]*a[6];
+      inv[10] = a[0]*a[5]*a[15] - a[0]*a[7]*a[13] - a[4]*a[1]*a[15] + a[4]*a[3]*a[13] + a[12]*a[1]*a[7] - a[12]*a[3]*a[5];
+      inv[14] = -a[0]*a[5]*a[14] + a[0]*a[6]*a[13] + a[4]*a[1]*a[14] - a[4]*a[2]*a[13] - a[12]*a[1]*a[6] + a[12]*a[2]*a[5];
+      inv[3] = -a[1]*a[6]*a[11] + a[1]*a[7]*a[10] + a[5]*a[2]*a[11] - a[5]*a[3]*a[10] - a[9]*a[2]*a[7] + a[9]*a[3]*a[6];
+      inv[7] = a[0]*a[6]*a[11] - a[0]*a[7]*a[10] - a[4]*a[2]*a[11] + a[4]*a[3]*a[10] + a[8]*a[2]*a[7] - a[8]*a[3]*a[6];
+      inv[11] = -a[0]*a[5]*a[11] + a[0]*a[7]*a[9] + a[4]*a[1]*a[11] - a[4]*a[3]*a[9] - a[8]*a[1]*a[7] + a[8]*a[3]*a[5];
+      inv[15] = a[0]*a[5]*a[10] - a[0]*a[6]*a[9] - a[4]*a[1]*a[10] + a[4]*a[2]*a[9] + a[8]*a[1]*a[6] - a[8]*a[2]*a[5];
+
+      float det = a[0]*inv[0] + a[1]*inv[4] + a[2]*inv[8] + a[3]*inv[12];
+      Mat4 r;
+      if (std::fabs(det) < 1e-12f)
+         return r; // identity: degenerate, nothing sane to return
+      det = 1.0f / det;
+      for (int i = 0; i < 16; i++)
+         r.m[i] = inv[i] * det;
+      return r;
    }
 };
 

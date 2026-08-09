@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,28 @@ struct Material
    // simply clipping.
    float emissionColor[3] = { 1.0f, 1.0f, 1.0f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own
@@ -92,9 +115,33 @@ public:
    {
       return map == kMapAlbedo ? GetSurfaceTexture() : 0;
    }
+   // Content version stamp for whatever GetSurfaceTexture()/GetMaterialTexture()
+   // currently return - unlike the GL handle, this changes when a texture
+   // producer recooks new pixels into the same persistent FBO texture. 0 by
+   // default (matches GetSurfaceTexture()'s "no texture" default); a source
+   // with a real texture input should forward its ImageCable::Revision(), and
+   // a passthrough wrapper (Transform, Array, Twist, Mapping, ...) should
+   // forward its upstream source's SurfaceTextureRevision().
+   virtual unsigned long long SurfaceTextureRevision() const { return 0; }
    // How material maps are looked up on the surface. Identity/UV by default,
    // so nothing changes for a chain with no Mapping node in it.
    virtual MappingTransform GetMappingTransform() const { return MappingTransform(); }
+
+   // The upstream source this node derives its mesh from, for nodes whose
+   // GetMesh() is built by transforming a single upstream mesh (Transform,
+   // Array, Subdivide, ...). Render3D walks this chain to find an
+   // InstanceOnPoints further upstream, so e.g. instance on points ->
+   // transform -> render still draws every instance instead of falling back
+   // to a single un-instanced copy. Nullptr by default, meaning "this is
+   // where the mesh actually comes from".
+   virtual IGeometrySource* PassthroughSource() const { return nullptr; }
+
+   // An extra rigid transform to compose onto each of an upstream instancer's
+   // per-instance matrices, for a wrapper (Transform) that sits between an
+   // InstanceOnPoints and whatever's drawing it - see GeometryOpNode's
+   // override. Identity by default: only a source that actually redirects a
+   // transform this way needs to return anything else.
+   virtual Mat4 GetInstanceGroupMatrix() const { return Mat4::Identity(); }
 };
 
 // --- Geometry -----------------------------------------------------------
@@ -128,6 +175,7 @@ public:
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
+   unsigned long long SurfaceTextureRevision() const override { return mTextureInput.Revision(); }
 
    ImageCable& TextureInput() { return mTextureInput; }
    const char* InputLabel(int) const override { return "texture"; }
@@ -163,6 +211,28 @@ public:
    int shading = 0;      // lit / normals / uv / wireframe-ish flat
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -180,6 +250,12 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 
 private:
@@ -218,6 +294,7 @@ public:
    int GetOutputWidth() const override { return mWidth; }
    int GetOutputHeight() const override { return mHeight; }
    void CookIfNeeded(int frameId) override;
+   unsigned long long TextureRevision() const override { return mRevision; }
 
    IGeometrySource* geometry[kSlots] = { nullptr, nullptr, nullptr, nullptr };
 
@@ -227,19 +304,29 @@ public:
    class CameraNode* camera = nullptr;
    class LightNode* lights[kLightSlots] = { nullptr, nullptr, nullptr };
 
+   // An HDRI node feeds this. Unlike geometry/camera/light, this is an
+   // ordinary image cable rather than a raw pointer - an Environment node is
+   // just another texture source as far as connection plumbing is concerned.
+   static const int kEnvSlot = kSlots + 1 + kLightSlots;
+   ImageCable envInput;
+   ImageCable& EnvironmentInput() { return envInput; }
+   // When an HDRI is patched in, draw it as the background too. Off leaves
+   // the flat bgColor clear while still using the HDRI for lighting and
+   // reflections - useful when compositing the render over something else.
+   bool envAsBackground = true;
+
    const char* InputLabel(int slot) const override
    {
       static const char* kNames[] = { "geo A", "geo B", "geo C", "geo D",
-                                      "camera", "light 1", "light 2", "light 3" };
-      return (slot >= 0 && slot < 8) ? kNames[slot] : nullptr;
+                                      "camera", "light 1", "light 2", "light 3",
+                                      "env" };
+      return (slot >= 0 && slot < 9) ? kNames[slot] : nullptr;
    }
 
    size_t LastTriangleCount() const { return mLastTriangles; }
    size_t LastDrawCalls() const { return mLastDrawCalls; }
    // Slots that had to re-upload this frame; 0 means everything came from cache.
    size_t LastUploads() const { return mLastUploads; }
-   // Faces tinted by the selection overlay last frame, summed across slots.
-   size_t LastHighlighted() const { return mLastHighlighted; }
 
    float width = 1024.0f;
    float height = 1024.0f;
@@ -272,17 +359,6 @@ public:
    float bgOpacity = 1.0f;
    bool depthTest = true;
    bool backfaceCull = true;
-
-   // Tints the faces a Select node chose, so dialling in a selection is
-   // something you watch rather than infer from a triangle count.
-   //
-   // On by default and still a no-op for every patch that has no Select in it:
-   // a mesh that has never been through one carries an empty face mask, which
-   // means "all faces" everywhere else and is skipped outright here. Nothing
-   // renders differently until there is a selection to show.
-   bool highlightSelection = true;
-   float selectionColor[3] = { 1.0f, 0.42f, 0.12f };
-   float selectionOpacity = 0.55f;
 
    // Shadows. Rendered from the first directional or sun light, or from the
    // built-in light when none is patched in. Point lights are deliberately not
@@ -324,12 +400,10 @@ public:
       v.Color("ambient", ambientColor); v.Float("rim", rimIntensity);
       v.Color("envSky", envSky); v.Color("envHorizon", envHorizon);
       v.Color("envGround", envGround); v.Float("envIntensity", envIntensity);
+      v.Bool("envAsBackground", envAsBackground);
       v.Color("bg", bgColor); v.Float("bgOpacity", bgOpacity);
       v.Bool("depthTest", depthTest); v.Bool("cull", backfaceCull);
       v.Int("samples", samples); v.Int("tonemap", tonemap); v.Float("exposure", exposure);
-      v.Bool("highlightSelection", highlightSelection);
-      v.Color("selectionColor", selectionColor);
-      v.Float("selectionOpacity", selectionOpacity);
       v.Bool("shadows", shadowsEnabled); v.Int("shadowQuality", shadowQuality);
       v.Float("shadowBias", shadowBias); v.Float("shadowSoftness", shadowSoftness);
       v.Float("shadowStrength", shadowStrength);
@@ -360,30 +434,79 @@ private:
       int instanceCount = 0;
       bool instanceAttribsOn = false;
       bool instanceColored = false;
-
-      // The selected faces as their own index buffer, in their own VAO. A
-      // second VAO rather than rebinding the element buffer on the first: the
-      // element binding is VAO state, so swapping it for the overlay would
-      // leave the main pass drawing the selection subset on the next frame.
-      //
-      // Built from the same mesh stamp as the vertices, so a Select whose
-      // parameters moved re-derives it and nothing else re-uploads.
-      unsigned int selVao = 0, selIbo = 0;
-      int selIndexCount = 0;
-      unsigned long long selRevision = 0;
-      bool selValid = false;
+      // The GetInstanceGroupMatrix() baked into the uploaded instance buffer
+      // last time it was rebuilt, so a Transform node's own params changing -
+      // which doesn't bump the instancer's own InstanceRevision() - still
+      // triggers a re-upload.
+      Mat4 instanceGroupMatrix;
    };
 
    bool EnsureResources(int w, int h, int sampleCount);
    bool EnsureShader();
-   bool EnsureSelectionShader();
-   // Rebuilds gpu.selIbo from the mesh's face mask when the stamp has moved.
-   void UpdateSelectionBuffer(GpuMesh& gpu, const Mesh& mesh, unsigned long long revision);
    bool EnsureShadowResources(int size);
    bool EnsureShadowShader();
+   bool EnsureEnvBgShader();
    void ReleaseGpuMesh(GpuMesh& gpu);
    void ReleaseTargets();
    void ReleaseShadowTargets();
+
+   // Everything the actual draw (shadow + opaque + transmissive passes)
+   // depends on. When this is identical to the last cook, the previous
+   // mColorTex/mSceneColorTex contents are still correct and the whole
+   // draw can be skipped - mirrors GeometryOpNode::Signature on the mesh
+   // side, just gathered from more places (own params, an optional camera
+   // node, up to kLightSlots optional light nodes, each geometry slot's
+   // mesh revision + material, and the optional env map).
+   //
+   // Deliberately conservative in one place rather than tracking it exactly:
+   // a camera/light with orbitPerBeat != 0 moves continuously from Transport
+   // beats alone, with no param edit to detect, so that always forces a
+   // redraw - a correctness-safe no-op for the non-orbiting case this cache
+   // actually targets. The surface/albedo texture used to need the same
+   // treatment (IGeometrySource had no revision stamp for a texture's
+   // *contents*, only GetSurfaceTexture()'s GL handle, which a persistent-FBO
+   // producer like Formula/Filter keeps unchanged across recooks), but
+   // SurfaceTextureRevision() now provides that stamp, so it's tracked like
+   // geomRev below instead of forcing a redraw. The remaining per-channel
+   // material maps (roughness/metallic/normal/ao) still have no revision
+   // stamp of their own, so any of those being bound still forces a redraw.
+   struct SceneSignature
+   {
+      std::vector<float> own;
+      bool hasCamera = false;
+      std::vector<float> camera;
+      bool hasLight[kLightSlots] = { false, false, false };
+      std::vector<float> light[kLightSlots];
+      bool hasGeom[kSlots] = { false, false, false, false };
+      unsigned long long geomRev[kSlots] = { 0, 0, 0, 0 };
+      unsigned long long surfaceTexRev[kSlots] = { 0, 0, 0, 0 };
+      Material material[kSlots];
+      bool envConnected = false;
+      unsigned long long envRev = 0;
+      bool animated = false;
+      bool texturedMaterial = false;
+
+      bool operator==(const SceneSignature& o) const
+      {
+         if (animated || o.animated || texturedMaterial || o.texturedMaterial)
+            return false; // never treated as a cache hit
+         if (own != o.own || hasCamera != o.hasCamera || camera != o.camera)
+            return false;
+         for (int i = 0; i < kLightSlots; i++)
+            if (hasLight[i] != o.hasLight[i] || light[i] != o.light[i])
+               return false;
+         for (int i = 0; i < kSlots; i++)
+         {
+            if (hasGeom[i] != o.hasGeom[i] || geomRev[i] != o.geomRev[i] ||
+                surfaceTexRev[i] != o.surfaceTexRev[i])
+               return false;
+            if (hasGeom[i] && memcmp(&material[i], &o.material[i], sizeof(Material)) != 0)
+               return false;
+         }
+         return envConnected == o.envConnected && envRev == o.envRev;
+      }
+   };
+   SceneSignature BuildSceneSignature();
    // World-space bounds of everything patched in, from the cached per-slot
    // object-space boxes pushed through each source's model matrix.
    bool SceneBounds(float outLo[3], float outHi[3]);
@@ -399,10 +522,24 @@ private:
    int mActiveSamples = 0;
    int mWidth = 0, mHeight = 0;
 
+   // Snapshot of the opaque pass, sampled by the transmissive pass below for
+   // screen-space refraction. Mipmapped so transmissionRoughness can blur the
+   // sample the same way sampleEnv() blurs a reflection - a cheap stand-in for
+   // a real rough-refraction filter. This is a screen-space approximation, not
+   // raytraced glass: geometry hidden behind other transmissive geometry, or
+   // seen only through it, is not captured and will look wrong for thick or
+   // overlapping transmissive objects.
+   unsigned int mSceneColorFbo = 0;
+   unsigned int mSceneColorTex = 0;
+   float mSceneMaxLod = 0.0f;
+
    unsigned int mProgram = 0;
    bool mShaderTried = false;
-   unsigned int mSelectionProgram = 0;
-   bool mSelectionShaderTried = false;
+   unsigned int mEnvBgProgram = 0;
+   bool mEnvBgShaderTried = false;
+   // Empty VAO for the background's vertexless "big triangle" - core profile
+   // requires one bound to draw at all, even when no attribute is read.
+   unsigned int mEnvBgVao = 0;
    unsigned int mShadowProgram = 0;
    bool mShadowShaderTried = false;
    unsigned int mShadowFbo = 0;
@@ -414,5 +551,7 @@ private:
    size_t mLastTriangles = 0;
    size_t mLastDrawCalls = 0;
    size_t mLastUploads = 0;
-   size_t mLastHighlighted = 0;
+   bool mHasSceneBuilt = false;
+   SceneSignature mSceneBuilt;
+   unsigned long long mRevision = 0;
 };

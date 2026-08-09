@@ -61,6 +61,17 @@ Material MaterialNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 
@@ -78,6 +89,13 @@ unsigned int MaterialNode::GetMaterialTexture(int map)
    if (mMaps[map].IsConnected() && mMaps[map].GetSource())
       return mMaps[map].GetSource()->GetOutputTexture();
    return input ? input->GetMaterialTexture(map) : 0;
+}
+
+unsigned long long MaterialNode::SurfaceTextureRevision() const
+{
+   if (mMaps[kMapAlbedo].IsConnected() && mMaps[kMapAlbedo].GetSource())
+      return mMaps[kMapAlbedo].Revision();
+   return input ? input->SurfaceTextureRevision() : 0;
 }
 
 void MaterialNode::CookIfNeeded(int frameId)
@@ -253,6 +271,17 @@ Material JoinGeometryNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 
@@ -265,6 +294,31 @@ unsigned int JoinGeometryNode::GetSurfaceTexture()
       if (inputs[i] != nullptr)
          return inputs[i]->GetSurfaceTexture();
    return 0;
+}
+
+unsigned long long JoinGeometryNode::SurfaceTextureRevision() const
+{
+   const int pick = std::max(0, std::min(materialFrom, kSlots - 1));
+   if (inputs[pick] != nullptr)
+      return inputs[pick]->SurfaceTextureRevision();
+   for (int i = 0; i < kSlots; i++)
+      if (inputs[i] != nullptr)
+         return inputs[i]->SurfaceTextureRevision();
+   return 0;
+}
+
+MappingTransform JoinGeometryNode::GetMappingTransform() const
+{
+   // Same "which input wins" choice already exposed for material/texture,
+   // rather than always identity - a merged mesh draws with one Mapping
+   // setting, so it may as well be the one the user already picked.
+   const int pick = std::max(0, std::min(materialFrom, kSlots - 1));
+   if (inputs[pick] != nullptr)
+      return inputs[pick]->GetMappingTransform();
+   for (int i = 0; i < kSlots; i++)
+      if (inputs[i] != nullptr)
+         return inputs[i]->GetMappingTransform();
+   return MappingTransform();
 }
 
 void JoinGeometryNode::CookIfNeeded(int frameId)
@@ -342,6 +396,17 @@ Material MeshToPointsNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 
@@ -462,6 +527,17 @@ Material MetaBallNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 

@@ -48,6 +48,15 @@ public:
       return node ? node->GetOutputHeight() : 0;
    }
 
+   // Current revision of whatever this cable resolves to. Call after Pull()
+   // has cooked it this frame, so a node that just re-rendered has already
+   // bumped its stamp before this is read for a downstream cache signature.
+   unsigned long long Revision() const
+   {
+      INode* node = Resolved();
+      return node ? node->TextureRevision() : 0;
+   }
+
 private:
    INode* mSource = nullptr;
 };

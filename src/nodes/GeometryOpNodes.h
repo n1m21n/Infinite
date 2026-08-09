@@ -60,10 +60,24 @@ public:
    {
       return input ? input->GetMaterialTexture(map) : 0;
    }
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return input ? input->SurfaceTextureRevision() : 0;
+   }
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
    }
+   IGeometrySource* PassthroughSource() const override { return input; }
+   // When this node (or the chain of GeometryOpNodes it's wired through) sits
+   // downstream of an InstanceOnPoints and op is kTransform, GetMesh() leaves
+   // the stamp mesh alone and this returns the move/rotate/scale as a matrix
+   // instead - see the kTransform comment in GetMesh() for why.
+   Mat4 GetInstanceGroupMatrix() const override;
+   // Shared by kTransform and kTransformSelected: move/rotate/scale built
+   // from the offsetX/Y/Z, rotX/Y/Z, scaleX/Y/Z fields the UI exposes as
+   // "move x/y/z", "rotate x/y/z", "scale x/y/z" for those two operations.
+   Mat4 TransformMatrix() const;
 
    IGeometrySource* input = nullptr;
    const char* InputLabel(int) const override { return "geo"; }
@@ -78,6 +92,19 @@ public:
    int count = 5;
    float offsetX = 0.6f, offsetY = 0.0f, offsetZ = 0.0f;
    float rotStep = 0.0f, scaleStep = 1.0f;
+   // Transform / Transform Selected only: per-axis rotate and scale, used by
+   // TransformMatrix() instead of the single-axis rotStep/scaleStep above
+   // (those stay Array-only, where a per-step Y rotation and uniform scale
+   // are what "rot / step" and "scale / step" mean).
+   float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
+   float scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
+   // Transform / Transform Selected only: extra Y-axis rotation per beat, on
+   // top of rotY, so a shape can spin on its own - same idea as GeometryNode's
+   // spinY. TransformMatrix() bakes this into the mesh cache when not
+   // downstream of an instancer, so CurrentSignature() has to fold the live
+   // beat count in whenever spin != 0, or the baked rotation would freeze at
+   // whatever beat it happened to be built on.
+   float spin = 0.0f;
    bool radial = false;
    float radius = 1.0f;
    int levels = 1;
@@ -120,6 +147,28 @@ public:
    int shading = 0;
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -127,6 +176,9 @@ public:
       v.Float("amount", amount); v.Int("count", count);
       v.Float("offsetX", offsetX); v.Float("offsetY", offsetY); v.Float("offsetZ", offsetZ);
       v.Float("rotStep", rotStep); v.Float("scaleStep", scaleStep);
+      v.Float("rotX", rotX); v.Float("rotY", rotY); v.Float("rotZ", rotZ);
+      v.Float("scaleX", scaleX); v.Float("scaleY", scaleY); v.Float("scaleZ", scaleZ);
+      v.Float("spin", spin);
       v.Bool("radial", radial); v.Float("radius", radius);
       v.Int("levels", levels); v.Float("smooth", smooth);
       v.Float("thickness", thickness); v.Bool("keepOriginal", keepOriginal);
@@ -144,6 +196,12 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 
 private:
@@ -152,6 +210,11 @@ private:
       int op = -1, count = 0, levels = 0, axis = 0;
       float a = 0, ox = 0, oy = 0, oz = 0, rs = 0, ss = 0, rad = 0;
       float sm = 0, th = 0, ins = 0, sd = 0;
+      float rx = 0, ry = 0, rz = 0, sx = 0, sy = 0, sz = 0;
+      // Only meaningful (and only ever set) while spin != 0 - see the comment
+      // on GeometryOpNode::spin. Zero the rest of the time so two builds with
+      // spin == 0 still compare equal regardless of when each ran.
+      float spinBeats = 0;
       bool radial = false, keep = false, flat = false, flip = false;
       int iter = 0, screwSteps = 0;
       float mirrorOffset = 0, turns = 0, rise = 0, radiusOffset = 0;
@@ -181,6 +244,8 @@ private:
                 selectInvert == o.selectInvert && selectAppend == o.selectAppend &&
                 keepSelected == o.keepSelected &&
                 moveAlongNormals == o.moveAlongNormals &&
+                rx == o.rx && ry == o.ry && rz == o.rz &&
+                sx == o.sx && sy == o.sy && sz == o.sz && spinBeats == o.spinBeats &&
                 upstream == o.upstream && upstreamRevision == o.upstreamRevision;
       }
    };
@@ -230,6 +295,10 @@ public:
    {
       return input ? input->GetMaterialTexture(map) : 0;
    }
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return input ? input->SurfaceTextureRevision() : 0;
+   }
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
@@ -258,6 +327,28 @@ public:
    int shading = 0;
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -268,6 +359,12 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 
 private:
@@ -278,9 +375,9 @@ private:
       bool flat = false, flip = false;
       const void* upstream = nullptr;
       unsigned long long upstreamRevision = 0;
-      // Bumped every frame the texture is patched in (see CookIfNeeded) so a
-      // Noise/Voronoi feeding this keeps animating the mesh; there is no
-      // per-texture revision counter to compare against instead.
+      // Bumped when the texture's pixel content actually changes (see
+      // CookIfNeeded), so a static texture doesn't fake a change every frame
+      // while a Noise/Voronoi with real animation still keeps driving the mesh.
       unsigned long long texGeneration = 0;
       bool operator==(const Signature& o) const
       {
@@ -304,6 +401,8 @@ private:
    int mTexW = 0, mTexH = 0;
    unsigned int mReadFbo = 0;
    unsigned long long mTexGeneration = 0;
+   unsigned long long mTexHash = 0;
+   bool mHasTexHash = false;
 };
 
 // --- Mesh to Points / Instance on Points --------------------------------
@@ -327,6 +426,14 @@ public:
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
+   unsigned int GetMaterialTexture(int map) override
+   {
+      return instanceShape ? instanceShape->GetMaterialTexture(map) : 0;
+   }
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return instanceShape ? instanceShape->SurfaceTextureRevision() : 0;
+   }
 
    // Slot 0 supplies the points, slot 1 the shape stamped on them, and slot 2
    // an optional point cloud that replaces the mesh sampling entirely. A cloud
@@ -363,6 +470,8 @@ public:
    float normalOffset = 0.0f;
    float seed = 0.0f;
 
+   bool inheritMaterial = true;
+
    float color[3] = { 0.9f, 0.75f, 0.5f };
    float metallic = 0.2f;
    float roughness = 0.4f;
@@ -370,6 +479,28 @@ public:
    int shading = 0;
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -377,10 +508,17 @@ public:
       v.Float("instanceScale", instanceScale); v.Float("scaleRandom", scaleRandom);
       v.Float("rotationRandom", rotationRandom); v.Bool("alignToNormal", alignToNormal);
       v.Float("normalOffset", normalOffset); v.Float("seed", seed);
+      v.Bool("inheritMaterial", inheritMaterial);
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 
 private:
@@ -430,6 +568,10 @@ public:
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned int GetMaterialTexture(int map) override { return sourceInput ? sourceInput->GetMaterialTexture(map) : 0; }
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return sourceInput ? sourceInput->SurfaceTextureRevision() : 0;
+   }
    MappingTransform GetMappingTransform() const override { return sourceInput ? sourceInput->GetMappingTransform() : MappingTransform(); }
 
    IGeometrySource* sourceInput = nullptr;
@@ -467,6 +609,28 @@ public:
    int shading = 0;
    float emissionColor[3] = { 1.0f, 0.85f, 0.6f };
    float emission = 0.0f;
+   // Fresnel/dielectric response, independent of metallic/roughness - 1.5
+   // matches glass and Blender's Principled BSDF default.
+   float ior = 1.5f;
+   // See-through / refractive path. Distinct from `opacity`, which stays a
+   // cutout/dither alpha - transmission is the actual glass-like blend.
+   // Screen-space approximated (see Render3D's transmission pass), not
+   // raytraced: it will not look correct through thick or overlapping
+   // transmissive geometry.
+   float transmission = 0.0f;
+   float transmissionRoughness = 0.0f;
+   // Dielectric specular reflectance at normal incidence, independent of
+   // metallic - Blender's "Specular" / "Specular IOR Level" slider.
+   float specular = 0.5f;
+   // Second, untinted Fresnel-weighted specular lobe layered on top - car
+   // paint / lacquer.
+   float clearcoat = 0.0f;
+   float clearcoatRoughness = 0.03f;
+   // Fake subsurface scattering via wrap lighting (N.L extended past the
+   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   float subsurface = 0.0f;
+   float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
+   float subsurfaceRadius = 0.5f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -480,6 +644,12 @@ public:
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
+      v.Float("ior", ior); v.Float("transmission", transmission);
+      v.Float("transmissionRoughness", transmissionRoughness);
+      v.Float("specular", specular);
+      v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
+      v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
+      v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 
 private:

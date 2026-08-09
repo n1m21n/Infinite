@@ -39,6 +39,7 @@ FilterNode::FilterNode(const FilterDef& def)
       mParamValues[i][1] = def.params[i].defaultVal[1];
       mParamValues[i][2] = def.params[i].defaultVal[2];
    }
+   mUsesTime = mDef.fragmentBody.find("uTime") != std::string::npos;
 }
 
 bool FilterNode::EnsureShader()
@@ -62,6 +63,7 @@ void FilterNode::CookIfNeeded(int frameId)
    if (srcTex == 0)
    {
       GLUtil::DestroyFbo(mOut);
+      mHasBuilt = false;
       return;
    }
    unsigned int srcTex2 = (mDef.inputs > 1) ? mInput2.Pull(frameId) : 0;
@@ -71,6 +73,17 @@ void FilterNode::CookIfNeeded(int frameId)
    if (!GLUtil::EnsureFbo(mOut, mInput.Width(), mInput.Height()))
       return;
 
+   Signature sig;
+   sig.upstreamRev = mInput.Revision();
+   sig.upstreamRev2 = (mDef.inputs > 1) ? mInput2.Revision() : 0;
+   sig.width = mInput.Width();
+   sig.height = mInput.Height();
+   sig.params = mParamValues;
+
+   if (!mUsesTime && mHasBuilt && sig == mBuilt)
+      return; // nothing changed since the last cook - reuse mOut as-is
+
+   NodeWorkCounter()++;
    GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, srcTex2]()
    {
       GLint locSrc = glGetUniformLocation(mProgram, "uSrc");
@@ -114,4 +127,8 @@ void FilterNode::CookIfNeeded(int frameId)
          }
       }
    });
+
+   mBuilt = sig;
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

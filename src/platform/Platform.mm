@@ -2,6 +2,7 @@
 
 #import <Cocoa/Cocoa.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <AVFoundation/AVFoundation.h>
 #import <ModelIO/ModelIO.h>
@@ -17,6 +18,19 @@
 
 namespace Platform
 {
+   void PreventAppNap()
+   {
+      // The returned token must be retained for the activity to stay in
+      // effect - letting it deallocate ends the opt-out immediately, so it
+      // is stashed in a static rather than a local.
+      static id sActivityToken = nil;
+      if (sActivityToken != nil)
+         return;
+      sActivityToken = [[NSProcessInfo processInfo]
+         beginActivityWithOptions:(NSActivityUserInitiated | NSActivityLatencyCritical)
+                            reason:@"continuous node-graph rendering"];
+   }
+
    std::string OpenImageDialog()
    {
       @autoreleasepool
@@ -50,6 +64,122 @@ namespace Platform
          if (url == nil)
             return std::string();
          return std::string([[url path] UTF8String]);
+      }
+   }
+
+   std::string OpenHdrDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Open HDRI"];
+
+         if (@available(macOS 11.0, *))
+         {
+            NSMutableArray<UTType*>* types = [NSMutableArray array];
+            for (NSString* ext in @[ @"hdr", @"exr" ])
+            {
+               UTType* t = [UTType typeWithFilenameExtension:ext];
+               if (t != nil)
+                  [types addObject:t];
+            }
+            if ([types count] > 0)
+               [panel setAllowedContentTypes:types];
+         }
+
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         if (url == nil)
+            return std::string();
+         return std::string([[url path] UTF8String]);
+      }
+   }
+
+   bool LoadImageFloatRGB(const std::string& path, std::vector<float>& outPixels,
+                          int& outWidth, int& outHeight, std::string& outError)
+   {
+      @autoreleasepool
+      {
+         NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
+         if (nsPath == nil)
+         {
+            outError = "bad path";
+            return false;
+         }
+         NSURL* url = [NSURL fileURLWithPath:nsPath];
+
+         CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)url, NULL);
+         if (source == NULL)
+         {
+            outError = "not an image this Mac can read";
+            return false;
+         }
+         CGImageRef cgImage = CGImageSourceCreateImageAtIndex(source, 0, NULL);
+         CFRelease(source);
+         if (cgImage == NULL)
+         {
+            outError = "could not decode image";
+            return false;
+         }
+
+         const int w = (int)CGImageGetWidth(cgImage);
+         const int h = (int)CGImageGetHeight(cgImage);
+         if (w <= 0 || h <= 0)
+         {
+            CGImageRelease(cgImage);
+            outError = "empty image";
+            return false;
+         }
+
+         CGColorSpaceRef linearSpace = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
+         if (linearSpace == NULL)
+         {
+            CGImageRelease(cgImage);
+            outError = "no extended-range linear colour space available";
+            return false;
+         }
+
+         std::vector<float> topDown((size_t)w * h * 4, 0.0f);
+         CGContextRef ctx = CGBitmapContextCreate(topDown.data(), w, h, 32, (size_t)w * 4 * sizeof(float),
+                                                  linearSpace,
+                                                  kCGImageAlphaPremultipliedLast | kCGBitmapFloatComponents |
+                                                     kCGBitmapByteOrder32Host);
+         CGColorSpaceRelease(linearSpace);
+         if (ctx == NULL)
+         {
+            CGImageRelease(cgImage);
+            outError = "could not allocate float bitmap";
+            return false;
+         }
+
+         CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), cgImage);
+         CGContextRelease(ctx);
+         CGImageRelease(cgImage);
+
+         // Same bottom-up flip as LoadImageRGBA, and drop the alpha channel -
+         // it was only there because CGBitmapContext requires one.
+         outPixels.assign((size_t)w * h * 3, 0.0f);
+         const size_t srcStride = (size_t)w * 4;
+         for (int y = 0; y < h; y++)
+         {
+            const float* srcRow = &topDown[(size_t)(h - 1 - y) * srcStride];
+            float* dstRow = &outPixels[(size_t)y * w * 3];
+            for (int x = 0; x < w; x++)
+            {
+               dstRow[x * 3 + 0] = srcRow[x * 4 + 0];
+               dstRow[x * 3 + 1] = srcRow[x * 4 + 1];
+               dstRow[x * 3 + 2] = srcRow[x * 4 + 2];
+            }
+         }
+
+         outWidth = w;
+         outHeight = h;
+         outError.clear();
+         return true;
       }
    }
 

@@ -26,6 +26,11 @@ struct FilterParamDef
    float maxVal = 1.0f;
    float defaultVal[3] = { 0.0f, 0.0f, 0.0f };
    std::vector<std::string> options; // Enum only
+
+   // When non-empty, the params panel draws a section header before this
+   // param - for filters (like a combined color-adjustments node) whose
+   // param list is long enough that a flat list stops being readable.
+   std::string sectionLabel;
 };
 
 struct FilterDef

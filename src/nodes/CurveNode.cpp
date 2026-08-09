@@ -126,6 +126,17 @@ Material CurveNode::GetMaterial() const
    m.emissionColor[1] = emissionColor[1];
    m.emissionColor[2] = emissionColor[2];
    m.emission = emission;
+   m.ior = ior;
+   m.transmission = transmission;
+   m.transmissionRoughness = transmissionRoughness;
+   m.specular = specular;
+   m.clearcoat = clearcoat;
+   m.clearcoatRoughness = clearcoatRoughness;
+   m.subsurface = subsurface;
+   m.subsurfaceColor[0] = subsurfaceColor[0];
+   m.subsurfaceColor[1] = subsurfaceColor[1];
+   m.subsurfaceColor[2] = subsurfaceColor[2];
+   m.subsurfaceRadius = subsurfaceRadius;
    return m;
 }
 

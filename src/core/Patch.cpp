@@ -183,7 +183,8 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
    {
       file << "node " << node.index << " " << node.category << " " << node.typeName << "\n";
       file << "  pos " << FloatToString(node.x) << " " << FloatToString(node.y) << "\n";
-      file << "  flags " << (node.showParams ? 1 : 0) << " " << (node.bypassed ? 1 : 0) << "\n";
+      file << "  flags " << (node.showParams ? 1 : 0) << " " << (node.bypassed ? 1 : 0) << " "
+           << (node.showMiniViewport ? 1 : 0) << "\n";
       for (const auto& p : node.params)
          file << "  " << p.first << " " << p.second << "\n";
       file << "end\n";
@@ -275,10 +276,11 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       }
       else if (tag == "flags" && inNode)
       {
-         int show = 0, bypass = 0;
-         in >> show >> bypass;
+         int show = 0, bypass = 0, miniViewport = 0;
+         in >> show >> bypass >> miniViewport;
          current.showParams = show != 0;
          current.bypassed = bypass != 0;
+         current.showMiniViewport = miniViewport != 0;
       }
       else if (inNode && (tag == "f" || tag == "i" || tag == "b" || tag == "c" || tag == "s"))
       {

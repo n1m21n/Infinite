@@ -16,7 +16,7 @@ class INode;
 //   infinite-patch 1
 //   node <index> <category> <type name to end of line>
 //     pos <x> <y>
-//     flags <showParams> <bypassed>
+//     flags <showParams> <bypassed> <showMiniViewport>
 //     f <name> <value>          float
 //     i <name> <value>          int
 //     b <name> <0|1>            bool
@@ -39,6 +39,7 @@ namespace Patch
       float x = 0.0f, y = 0.0f;
       bool showParams = false;
       bool bypassed = false;
+      bool showMiniViewport = false;
       // Raw key/value lines, replayed into the node through its ParamVisitor.
       std::vector<std::pair<std::string, std::string>> params;
    };

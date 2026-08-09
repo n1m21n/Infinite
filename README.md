@@ -12,7 +12,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**113 node types across ten categories.**
+**114 node types across ten categories.**
 
 | Category | Nodes |
 |---|---|
@@ -23,7 +23,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 | Compositing | Blend (31 modes), Layer Stack (4 reorderable layers), Switcher, Fit, outer glow, colour overlay, drop shadow |
 | Feedback | Feedback (one-frame delay, makes cycles legal), Trails, Reaction-Diffusion |
 | Mask | Remove Background (on-device Vision segmentation), Chroma Key, Luma Key |
-| 3D | Geometry (8 primitives), Model 3D (obj/ply/stl/usd), Text 3D (extruded glyphs), Ocean (Gerstner waves), Transform, Array, Subdivide (Loop), Smooth (Taubin), Mirror, Screw, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Join Geometry, Material, Null 3D, Mesh to Points/Edges/Faces, Instance on Points, Wrap (cylindrical/spherical arc-length-preserving bend whose radius follows the target's size, tuned by a radius scale multiplier - or nearest-surface conform), **Particle System**, **Cloth**, Camera, Light (directional/point/sun/ambient), Render 3D |
+| 3D | Geometry (8 primitives), Model 3D (obj/ply/stl/usd), Text 3D (extruded glyphs), Ocean (Gerstner waves), Transform, Array, Subdivide (Loop), Smooth (Taubin), Mirror, Screw, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Join Geometry, Material, Null 3D, Mesh to Points/Edges/Faces, Instance on Points, Wrap (cylindrical/spherical arc-length-preserving bend whose radius follows the target's size, tuned by a radius scale multiplier - or nearest-surface conform), **Particle System**, **Cloth**, Camera, Light (directional/point/sun/ambient), **HDRI** (equirectangular .hdr/.exr environment - background, reflections and ambient light for Render 3D), Render 3D |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
 | Modulators | LFO, Random, Pattern (8-step), Path (6 shapes), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio File**, **Audio Analyze** |
 | Output | Output (PNG export + H.264 recording, with an optional audio track) |

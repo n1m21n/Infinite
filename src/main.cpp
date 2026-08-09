@@ -37,6 +37,7 @@
 #include "core/Modulation.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
+#include "core/NodeViewport.h"
 #include "nodes/ImageSourceNode.h"
 #include "nodes/ShapeNode.h"
 #include "nodes/FormulaNode.h"
@@ -59,6 +60,7 @@
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/SceneNodes.h"
+#include "nodes/EnvironmentNode.h"
 #include "nodes/ModelSourceNode.h"
 #include "nodes/Text3DNode.h"
 #include "nodes/UtilityNodes.h"
@@ -70,6 +72,7 @@
 #include "nodes/DrawNode.h"
 #include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
+#include "nodes/Switcher3DNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/OutputNode.h"
 
@@ -96,6 +99,39 @@ namespace
       std::transform(out.begin(), out.end(), out.begin(),
                      [](unsigned char c) { return (char)std::tolower(c); });
       return out;
+   }
+
+   // GeometryOpNode shares one node type across every mesh operator, and its
+   // dropdown lets the operator change after spawn - so unlike most other
+   // nodes, its title can't be read from the type name frozen at spawn time.
+   // GeometryNode and ShapeNode have the identical problem: each primitive is
+   // registered as its own searchable spawn entry (typeName == "Torus Knot",
+   // "Tube", ...) so the type name frozen at spawn matches the shape you
+   // picked, but the node keeps a live "shape" dropdown that can change it
+   // afterwards without ever updating typeName - so the title has to track
+   // the live shape field the same way, or picking a new shape leaves the
+   // header reading whatever primitive was spawned first.
+   std::string NodeTitle(const GraphNode& gn)
+   {
+      if (auto* opNode = dynamic_cast<GeometryOpNode*>(gn.node.get()))
+      {
+         const auto& names = GeometryOpNode::OpNames();
+         if (opNode->op >= 0 && opNode->op < (int)names.size())
+            return DisplayName(names[opNode->op]);
+      }
+      if (auto* geoNode = dynamic_cast<GeometryNode*>(gn.node.get()))
+      {
+         const auto& names = GeometryNode::ShapeNames();
+         if (geoNode->shape >= 0 && geoNode->shape < (int)names.size())
+            return DisplayName(names[geoNode->shape]);
+      }
+      if (auto* shapeNode = dynamic_cast<ShapeNode*>(gn.node.get()))
+      {
+         const auto& names = ShapeNode::ShapeNames();
+         if (shapeNode->shapeType >= 0 && shapeNode->shapeType < (int)names.size())
+            return DisplayName(names[shapeNode->shapeType]);
+      }
+      return DisplayName(gn.typeName);
    }
 
    // Undo/redo. Snapshots are whole-graph Patch::Data - the same format a
@@ -642,26 +678,35 @@ namespace
       return pressed;
    }
 
-   // Power toggle. Drawn rather than typed for the same reason as the eye: the
-   // UI font has no power glyph.
-   bool BypassToggle(bool enabled)
+   // Small monitor/screen toggle for a node's own mini 3D viewport. Deliberately
+   // distinct from EyeToggle (params visibility) - this switches on a live
+   // render pass, not just a UI panel, so it gets its own affordance rather
+   // than overloading the eye icon.
+   bool ViewportToggle(bool shown)
    {
-      const float w = 24.0f;
+      const float w = 22.0f;
       const float h = 18.0f;
       ImVec2 origin = ImGui::GetCursorScreenPos();
-      const bool pressed = ImGui::InvisibleButton("##bypass", ImVec2(w, h));
+      const bool pressed = ImGui::InvisibleButton("##miniviewport", ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      const ImU32 col = hovered ? IM_COL32(235, 240, 255, 255)
-                                : (enabled ? IM_COL32(120, 210, 150, 255)
-                                           : IM_COL32(210, 120, 110, 255));
+      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
+      ImU32 col = hovered ? IM_COL32(235, 240, 255, 255)
+                          : (shown ? IM_COL32(150, 190, 255, 255) : IM_COL32(120, 124, 140, 255));
 
-      // circle broken at the top, with a stem through the gap
-      dl->PathArcTo(c, 6.0f, -1.15f, 4.3f, 20);
-      dl->PathStroke(col, 0, 1.7f);
-      dl->AddLine(ImVec2(c.x, c.y - 8.0f), ImVec2(c.x, c.y - 1.5f), col, 1.7f);
+      // A little screen/monitor glyph: rounded rect body plus a stand, filled
+      // when the viewport is on so it reads at a glance in a busy graph.
+      const float bw = 13.0f, bh = 9.0f;
+      ImVec2 tl(c.x - bw * 0.5f, c.y - bh * 0.5f - 1.0f);
+      ImVec2 br(c.x + bw * 0.5f, c.y + bh * 0.5f - 1.0f);
+      if (shown)
+         dl->AddRectFilled(tl, br, col, 1.5f);
+      else
+         dl->AddRect(tl, br, col, 1.5f, 0, 1.4f);
+      dl->AddLine(ImVec2(c.x, br.y), ImVec2(c.x, br.y + 2.5f), col, 1.4f);
+      dl->AddLine(ImVec2(c.x - 3.5f, br.y + 2.5f), ImVec2(c.x + 3.5f, br.y + 2.5f), col, 1.4f);
+
       return pressed;
    }
 
@@ -757,8 +802,10 @@ namespace
       }
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
       REGISTER_NODE(WrapNode, Wrap, "3D");
+      REGISTER_NODE(Switcher3DNode, Switcher 3D, "3D");
       REGISTER_NODE(CameraNode, Camera, "3D");
       REGISTER_NODE(LightNode, Light, "3D");
+      REGISTER_NODE(EnvironmentNode, HDRI, "3D");
       REGISTER_NODE(Render3DNode, Render 3D, "3D");
       REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
@@ -892,7 +939,7 @@ namespace
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
          return 1 + kMapCount; // geometry, then one pin per material channel
       if (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr)
-         return Render3DNode::kSlots + 1 + Render3DNode::kLightSlots; // geo, camera, lights
+         return Render3DNode::kEnvSlot + 1; // geo, camera, lights, env
       if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr)
@@ -901,6 +948,8 @@ namespace
          return 3; // points, shape, cloud
       if (dynamic_cast<WrapNode*>(gn.node.get()) != nullptr)
          return 2; // source, target
+      if (dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr)
+         return Switcher3DNode::kSlots;
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
@@ -914,6 +963,10 @@ namespace
 
    ImageCable* CableFor(GraphNode& gn, int slot)
    {
+      // Every other Render3D input (geometry/camera/light) is a raw pointer
+      // handled by ConnectGeometrySlot; only the env slot is an ImageCable.
+      if (auto* render = dynamic_cast<Render3DNode*>(gn.node.get()))
+         return (slot == Render3DNode::kEnvSlot) ? &render->envInput : nullptr;
       if (auto* stack = dynamic_cast<LayerStackNode*>(gn.node.get()))
          return (slot >= 0 && slot < LayerStackNode::kSlots) ? &stack->Input(slot) : nullptr;
       if (auto* sw = dynamic_cast<SwitcherNode*>(gn.node.get()))
@@ -1036,6 +1089,12 @@ namespace
          else if (slot == 1) wrap->targetInput = geo;
          return;
       }
+      if (auto* sw3 = dynamic_cast<Switcher3DNode*>(dst.node.get()))
+      {
+         if (slot >= 0 && slot < Switcher3DNode::kSlots)
+            sw3->inputs[slot] = geo;
+         return;
+      }
       if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst.node.get()))
       {
          audio->fileSource = dynamic_cast<AudioFileNode*>(src.node.get());
@@ -1087,6 +1146,8 @@ namespace
    {
       if (auto* img = dynamic_cast<ImageSourceNode*>(node))
          img->ReloadFromPath();
+      if (auto* env = dynamic_cast<EnvironmentNode*>(node))
+         env->ReloadFromPath();
       if (auto* model = dynamic_cast<ModelSourceNode*>(node))
          model->ReloadFromPath();
       if (auto* audio = dynamic_cast<AudioFileNode*>(node))
@@ -1139,6 +1200,37 @@ namespace
          ImGui::TextDisabled("%s  (%dx%d)", file.c_str(), n->GetOutputWidth(), n->GetOutputHeight());
          ImGui::PopTextWrapPos();
       }
+   }
+
+   void DrawEnvironmentParams(EnvironmentNode* n)
+   {
+      if (ImGui::Button("Choose HDRI...", ImVec2(kPreviewSize, 0)))
+         n->LoadViaDialog();
+
+      if (!n->LastError().empty())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::PopTextWrapPos();
+      }
+      else if (!n->LoadedPath().empty())
+      {
+         std::string file = n->LoadedPath();
+         size_t slash = file.find_last_of('/');
+         if (slash != std::string::npos)
+            file = file.substr(slash + 1);
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("%s  (%dx%d)", file.c_str(), n->GetOutputWidth(), n->GetOutputHeight());
+         ImGui::PopTextWrapPos();
+      }
+      else
+      {
+         ImGui::TextDisabled("no image - patch into Render 3D's env pin anyway");
+         ImGui::TextDisabled("to use its procedural sky instead");
+      }
+
+      ModSlider("intensity", &n->intensity, 0.0f, 8.0f);
+      ModSlider("rotation", &n->rotation, -3.1416f, 3.1416f);
    }
 
    void DrawShapeParams(ShapeNode* n)
@@ -2331,21 +2423,6 @@ namespace
       ModSlider("direction", &n->direction, -3.1416f, 3.1416f);
       ModSliderInt("octaves", &n->octaves, 1, 8);
       ModSlider("speed", &n->speed, -3.0f, 3.0f);
-
-      NodeSeparator("transform");
-      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
-      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
-      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
-      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
-
-      NodeSeparator("material");
-      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-      ColorSwatch("colour", n->color, n);
-      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
    void DrawCurveParams(CurveNode* n)
@@ -2368,21 +2445,6 @@ namespace
       ModSlider("radius", &n->radius, 0.0f, 0.5f);
       ModSliderInt("sides", &n->sides, 3, 32);
       ModSlider("taper", &n->taper, 0.0f, 1.0f);
-
-      NodeSeparator("transform");
-      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
-      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
-      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
-      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
-
-      NodeSeparator("material");
-      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-      ColorSwatch("colour", n->color, n);
-      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
    void DrawMetaBallParams(MetaBallNode* n)
@@ -2403,51 +2465,32 @@ namespace
       ModSlider("threshold", &n->threshold, 0.5f, 40.0f);
       ModSlider("bounds", &n->bounds, 0.5f, 6.0f);
       ModSliderInt("resolution", &n->resolution, 8, 96);
-
-      NodeSeparator("transform");
-      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
-      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
-      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
-      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
-
-      NodeSeparator("material");
-      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-      ColorSwatch("colour", n->color, n);
-      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
    void DrawJoinGeometryParams(JoinGeometryNode* n)
    {
       ImGui::TextDisabled("%d inputs, %zu triangles", n->ConnectedCount(), n->TriangleCount());
       DropdownButton("mode", JoinGeometryNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
+      // A merged mesh is one draw call, so it can only wear one material -
+      // picked from an input rather than authored here, since editing colour
+      // and shading now lives on the dedicated Material node.
+      ModSliderInt("material from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
+   }
 
-      NodeSeparator("material");
-      ImGui::Checkbox("inherit material", &n->inheritMaterial);
-      if (n->inheritMaterial)
+   void DrawSwitcher3DParams(Switcher3DNode* n)
+   {
+      DropdownButton("unit", Switcher3DNode::UnitNames(), n->unit, [n](int i) { n->unit = i; });
+      ModSlider("every", &n->interval, 0.05f, 32.0f);
+      ImGui::Checkbox("manual", &n->manual);
+      if (n->manual)
       {
-         // A merged mesh is one draw call, so it can only wear one material.
-         ModSliderInt("from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
+         ImGui::SetNextItemWidth(kParamWidth);
+         ImGui::SliderInt("slot", &n->manualSlot, 0, Switcher3DNode::kSlots - 1);
       }
       else
       {
-         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-         ColorSwatch("colour", n->color, n);
-         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-         ColorSwatch("emission", n->emissionColor, n);
-         ModSlider("emission", &n->emission, 0.0f, 8.0f);
+         ImGui::TextDisabled("showing input %c", 'A' + n->ActiveSlot());
       }
-
-      NodeSeparator("transform");
-      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
-      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
-      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
-      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
    }
 
    void DrawWrapParams(WrapNode* n)
@@ -2478,19 +2521,6 @@ namespace
       ModSlider("blend", &n->blend, 0.0f, 1.0f);
       ImGui::Checkbox("flat shade", &n->flatShade);
       ImGui::Checkbox("flip normals", &n->flipNormals);
-
-      NodeSeparator("material");
-      ImGui::Checkbox("inherit material", &n->inheritMaterial);
-      if (!n->inheritMaterial)
-      {
-         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-         ColorSwatch("colour", n->color, n);
-         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-         ColorSwatch("emission", n->emissionColor, n);
-         ModSlider("emission", &n->emission, 0.0f, 8.0f);
-      }
    }
 
    void DrawClothParams(ClothNode* n)
@@ -2523,25 +2553,6 @@ namespace
          ModSlider("height", &n->groundHeight, -5.0f, 5.0f);
          ModSlider("bounce", &n->bounce, 0.0f, 1.0f);
          ModSlider("friction", &n->friction, 0.0f, 1.0f);
-      }
-
-      NodeSeparator("transform");
-      ModSlider("pos x", &n->posX, -5.0f, 5.0f);
-      ModSlider("pos y", &n->posY, -5.0f, 5.0f);
-      ModSlider("pos z", &n->posZ, -5.0f, 5.0f);
-      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
-
-      NodeSeparator("material");
-      ImGui::Checkbox("inherit material", &n->inheritMaterial);
-      if (!n->inheritMaterial)
-      {
-         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-         ColorSwatch("colour", n->color, n);
-         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-         ColorSwatch("emission", n->emissionColor, n);
-         ModSlider("emission", &n->emission, 0.0f, 8.0f);
       }
    }
 
@@ -2679,19 +2690,6 @@ namespace
       ImGui::TextDisabled("%zu points, %zu triangles", n->PointCount(), n->TriangleCount());
       ModSliderInt("max points", &n->maxPoints, 16, 20000);
       ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
-
-      NodeSeparator("material");
-      ImGui::Checkbox("inherit material", &n->inheritMaterial);
-      if (!n->inheritMaterial)
-      {
-         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-         ColorSwatch("colour", n->color, n);
-         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-         ColorSwatch("emission", n->emissionColor, n);
-         ModSlider("emission", &n->emission, 0.0f, 8.0f);
-      }
    }
 
    void DrawText3DParams(Text3DNode* n)
@@ -2724,25 +2722,6 @@ namespace
       ModSlider("depth", &n->depth, 0.0f, 1.5f);
       ModSlider("bevel", &n->bevel, 0.0f, 0.45f);
       ModSlider("tracking", &n->letterSpacing, -0.1f, 0.5f);
-
-      NodeSeparator("transform");
-      ModSlider("pos x", &n->posX, -3.0f, 3.0f);
-      ModSlider("pos y", &n->posY, -3.0f, 3.0f);
-      ModSlider("pos z", &n->posZ, -3.0f, 3.0f);
-      ModSlider("rot x", &n->rotX, -3.1416f, 3.1416f);
-      ModSlider("rot y", &n->rotY, -3.1416f, 3.1416f);
-      ModSlider("rot z", &n->rotZ, -3.1416f, 3.1416f);
-      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
-      ModSlider("spin / beat", &n->spinY, -1.0f, 1.0f);
-
-      NodeSeparator("material");
-      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-      ColorSwatch("colour", n->color, n);
-      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
    void DrawModelParams(ModelSourceNode* n)
@@ -2772,25 +2751,6 @@ namespace
          if (!n->Path().empty())
             n->Load(n->Path());
       }
-
-      NodeSeparator("transform");
-      ModSlider("pos x", &n->posX, -3.0f, 3.0f);
-      ModSlider("pos y", &n->posY, -3.0f, 3.0f);
-      ModSlider("pos z", &n->posZ, -3.0f, 3.0f);
-      ModSlider("rot x", &n->rotX, -3.1416f, 3.1416f);
-      ModSlider("rot y", &n->rotY, -3.1416f, 3.1416f);
-      ModSlider("rot z", &n->rotZ, -3.1416f, 3.1416f);
-      ModSlider("scale", &n->uniformScale, 0.05f, 5.0f);
-      ModSlider("spin / beat", &n->spinY, -1.0f, 1.0f);
-
-      NodeSeparator("material");
-      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-      ColorSwatch("colour", n->color, n);
-      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
    void DrawGeometryParams(GeometryNode* n)
@@ -2849,28 +2809,6 @@ namespace
          ModSliderInt(n->shape == 12 ? "turns" : "knot p", &n->knotP, 1, 8);
          ModSliderInt(n->shape == 12 ? "height" : "knot q", &n->knotQ, 1, 8);
       }
-
-      NodeSeparator("transform");
-      ModSlider("pos x", &n->posX, -3.0f, 3.0f);
-      ModSlider("pos y", &n->posY, -3.0f, 3.0f);
-      ModSlider("pos z", &n->posZ, -3.0f, 3.0f);
-      ModSlider("rot x", &n->rotX, -3.1416f, 3.1416f);
-      ModSlider("rot y", &n->rotY, -3.1416f, 3.1416f);
-      ModSlider("rot z", &n->rotZ, -3.1416f, 3.1416f);
-      ModSlider("scale", &n->uniformScale, 0.05f, 4.0f);
-      ModSlider("scale x", &n->scaleX, 0.05f, 4.0f);
-      ModSlider("scale y", &n->scaleY, 0.05f, 4.0f);
-      ModSlider("scale z", &n->scaleZ, 0.05f, 4.0f);
-      ModSlider("spin / beat", &n->spinY, -3.1416f, 3.1416f);
-
-      NodeSeparator("material");
-      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-      ColorSwatch("colour", n->color, n);
-      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
    void DrawGeometryOpParams(GeometryOpNode* n)
@@ -2885,8 +2823,13 @@ namespace
             ModSlider("move x", &n->offsetX, -3.0f, 3.0f);
             ModSlider("move y", &n->offsetY, -3.0f, 3.0f);
             ModSlider("move z", &n->offsetZ, -3.0f, 3.0f);
-            ModSlider("rotate", &n->rotStep, -3.1416f, 3.1416f);
-            ModSlider("scale", &n->scaleStep, 0.05f, 4.0f);
+            ModSlider("rotate x", &n->rotX, -3.1416f, 3.1416f);
+            ModSlider("rotate y", &n->rotY, -3.1416f, 3.1416f);
+            ModSlider("rotate z", &n->rotZ, -3.1416f, 3.1416f);
+            ModSlider("scale x", &n->scaleX, 0.05f, 4.0f);
+            ModSlider("scale y", &n->scaleY, 0.05f, 4.0f);
+            ModSlider("scale z", &n->scaleZ, 0.05f, 4.0f);
+            ModSlider("spin / beat", &n->spin, -2.0f, 2.0f);
             break;
          case GeometryOpNode::kArray:
             ModSliderInt("count", &n->count, 1, 128);
@@ -2929,6 +2872,7 @@ namespace
             ModSlider("seed", &n->seed, 0.0f, 100.0f);
             break;
          case GeometryOpNode::kSmooth:
+            ModSliderInt("pre-subdivide", &n->levels, 0, 3);
             ModSliderInt("iterations", &n->iterations, 1, 20);
             ModSlider("strength", &n->amount, 0.0f, 1.0f);
             break;
@@ -2989,8 +2933,13 @@ namespace
             ModSlider("move x", &n->offsetX, -3.0f, 3.0f);
             ModSlider("move y", &n->offsetY, -3.0f, 3.0f);
             ModSlider("move z", &n->offsetZ, -3.0f, 3.0f);
-            ModSlider("rotate", &n->rotStep, -3.1416f, 3.1416f);
-            ModSlider("scale", &n->scaleStep, 0.1f, 3.0f);
+            ModSlider("rotate x", &n->rotX, -3.1416f, 3.1416f);
+            ModSlider("rotate y", &n->rotY, -3.1416f, 3.1416f);
+            ModSlider("rotate z", &n->rotZ, -3.1416f, 3.1416f);
+            ModSlider("scale x", &n->scaleX, 0.1f, 3.0f);
+            ModSlider("scale y", &n->scaleY, 0.1f, 3.0f);
+            ModSlider("scale z", &n->scaleZ, 0.1f, 3.0f);
+            ModSlider("spin / beat", &n->spin, -2.0f, 2.0f);
             break;
          case GeometryOpNode::kExtrudeSelected:
             ModSlider("distance", &n->thickness, -1.0f, 1.0f);
@@ -3008,19 +2957,6 @@ namespace
             ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
             break;
       }
-
-      NodeSeparator("material");
-      ImGui::Checkbox("inherit from input", &n->inheritMaterial);
-      if (!n->inheritMaterial)
-      {
-         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-         ColorSwatch("colour", n->color, n);
-         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-         ColorSwatch("emission", n->emissionColor, n);
-         ModSlider("emission", &n->emission, 0.0f, 8.0f);
-      }
    }
 
    void DrawDisplacementParams(DisplacementNode* n)
@@ -3035,19 +2971,6 @@ namespace
          ModSlider("midlevel", &n->midlevel, 0.0f, 1.0f);
       ImGui::Checkbox("flat shade", &n->flatShade);
       ImGui::Checkbox("flip normals", &n->flipNormals);
-
-      NodeSeparator("material");
-      ImGui::Checkbox("inherit from input", &n->inheritMaterial);
-      if (!n->inheritMaterial)
-      {
-         DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-         ColorSwatch("colour", n->color, n);
-         ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-         ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-         ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-         ColorSwatch("emission", n->emissionColor, n);
-         ModSlider("emission", &n->emission, 0.0f, 8.0f);
-      }
    }
 
    void DrawInstanceParams(InstanceOnPointsNode* n)
@@ -3064,15 +2987,6 @@ namespace
       ModSlider("normal offset", &n->normalOffset, -0.5f, 0.5f);
       ImGui::Checkbox("align to normal", &n->alignToNormal);
       ModSlider("seed", &n->seed, 0.0f, 100.0f);
-
-      NodeSeparator("material");
-      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
-      ColorSwatch("colour", n->color, n);
-      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f);
    }
 
    void DrawCameraParams(CameraNode* n)
@@ -3275,33 +3189,23 @@ namespace
       ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f);
 
       NodeSeparator("environment");
-      ColorSwatch("sky", n->envSky, n);
-      ColorSwatch("horizon", n->envHorizon, n);
-      ColorSwatch("ground", n->envGround, n);
+      const bool envConnected = n->envInput.IsConnected();
+      if (envConnected)
+      {
+         ImGui::TextDisabled("driven by an HDRI node");
+         ImGui::Checkbox("use as background", &n->envAsBackground);
+      }
+      else
+      {
+         ColorSwatch("sky", n->envSky, n);
+         ColorSwatch("horizon", n->envHorizon, n);
+         ColorSwatch("ground", n->envGround, n);
+      }
       ModSlider("env intensity", &n->envIntensity, 0.0f, 3.0f);
 
       NodeSeparator("raster");
       ImGui::Checkbox("depth test", &n->depthTest);
       ImGui::Checkbox("cull backfaces", &n->backfaceCull);
-
-      NodeSeparator("selection");
-      ImGui::Checkbox("highlight selected faces", &n->highlightSelection);
-      if (n->highlightSelection)
-      {
-         ColorSwatch("highlight", n->selectionColor, n);
-         ModSlider("highlight opacity", &n->selectionOpacity, 0.0f, 1.0f);
-         // Says which of the three states you are in: no Select upstream at
-         // all, a Select that matched nothing, or a live selection. Without it
-         // an empty highlight and an absent one look identical.
-         bool anyMask = false;
-         for (int slot = 0; slot < Render3DNode::kSlots; slot++)
-            if (n->geometry[slot] != nullptr && !n->geometry[slot]->GetMesh().faceMask.empty())
-               anyMask = true;
-         if (!anyMask)
-            ImGui::TextDisabled("no Select node upstream");
-         else
-            ImGui::TextDisabled("%zu faces highlighted", n->LastHighlighted());
-      }
    }
 
    void DrawBlendParams(BlendNode* n)
@@ -3414,6 +3318,8 @@ namespace
       for (size_t i = 0; i < def.params.size(); i++)
       {
          const FilterParamDef& p = def.params[i];
+         if (!p.sectionLabel.empty())
+            ImGui::SeparatorText(p.sectionLabel.c_str());
          ImGui::PushID((int)i);
          if (p.type == FilterParamDef::Type::Color)
          {
@@ -3424,6 +3330,13 @@ namespace
             float* slot = n->ParamPtr(i);
             DropdownButton(p.label.c_str(), p.options, (int)(*slot + 0.5f),
                            [slot](int choice) { *slot = (float)choice; });
+         }
+         else if (p.type == FilterParamDef::Type::Bool)
+         {
+            float* slot = n->ParamPtr(i);
+            bool checked = *slot != 0.0f;
+            if (ImGui::Checkbox(p.label.c_str(), &checked))
+               *slot = checked ? 1.0f : 0.0f;
          }
          else
          {
@@ -3976,6 +3889,67 @@ namespace
    // Rolling history so a modulator reads like a scope rather than a number.
    std::map<int, std::vector<float>> gModHistory;
 
+   // Per-node mini 3D viewport GL state, keyed by GraphNode::index - same
+   // per-index-map pattern as gModHistory above. Lazily created the first time
+   // a node's viewport toggle is switched on; nothing is allocated for a node
+   // that never opts in.
+   std::map<int, NodeViewport> gNodeViewports;
+
+   // A geometry-producing node's own solo render, independent of whatever a
+   // downstream Render 3D shows - the point is seeing what *this* node
+   // produced (e.g. what a Select actually selected) without having to wire
+   // it all the way to the end of the graph. Off by default per node
+   // (GraphNode::showMiniViewport); only drawn/rendered at all when a node
+   // opts in, so patches that never touch the toggle pay nothing for it.
+   void DrawMiniViewport(GraphNode& gn, IGeometrySource* geo)
+   {
+      NodeViewport& viewport = gNodeViewports[gn.index];
+
+      const float size = kPreviewSize;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + size),
+                        IM_COL32(18, 18, 24, 255), 4.0f);
+
+      const unsigned int tex = viewport.Render(geo, (int)size, (int)size);
+      if (tex != 0)
+      {
+         dl->AddImage((ImTextureID)(intptr_t)tex, origin, ImVec2(origin.x + size, origin.y + size),
+                      ImVec2(0, 1), ImVec2(1, 0));
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 10, origin.y + size * 0.5f - 8),
+                     IM_COL32(120, 120, 135, 255), "no geometry");
+      }
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
+                  IM_COL32(70, 74, 90, 255), 4.0f);
+
+      // Same drag-to-orbit / scroll-to-zoom feel as DrawPreview's embedded
+      // Render3DNode viewport, driving this node's own NodeViewport camera
+      // instead.
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##miniviewportcanvas", ImVec2(size, size));
+
+      if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+      {
+         const ImVec2 drag = ImGui::GetIO().MouseDelta;
+         viewport.Orbit(drag.x * 0.012f, drag.y * 0.012f);
+      }
+      if (ImGui::IsItemHovered())
+      {
+         ImGuiIO& vio = ImGui::GetIO();
+         if (vio.MouseWheel != 0.0f)
+         {
+            viewport.Zoom(vio.MouseWheel);
+            vio.MouseWheel = 0.0f;
+         }
+      }
+      if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+         dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
+                     IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
+   }
+
    void DrawModulatorMeter(IModulator* mod, int nodeIndex)
    {
       const float value = mod->Value01();
@@ -4031,7 +4005,9 @@ namespace
             render->geometry[slot] = nullptr;
          else if (slot == Render3DNode::kSlots)
             render->camera = nullptr;
-         else if (slot > Render3DNode::kSlots)
+         else if (slot == Render3DNode::kEnvSlot)
+            render->envInput.Disconnect();
+         else if (slot > Render3DNode::kSlots && slot < Render3DNode::kEnvSlot)
             render->lights[slot - Render3DNode::kSlots - 1] = nullptr;
       }
       else if (auto* geoOp = dynamic_cast<GeometryOpNode*>(dst->node.get()))
@@ -4044,6 +4020,12 @@ namespace
             inst->pointSource = nullptr;
          else
             inst->instanceShape = nullptr;
+      }
+      else if (auto* sw3 = dynamic_cast<Switcher3DNode*>(dst->node.get()))
+      {
+         const int slot = GraphNode::InputSlotFromPin(dstPin);
+         if (slot >= 0 && slot < Switcher3DNode::kSlots)
+            sw3->inputs[slot] = nullptr;
       }
       else if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst->node.get()))
       {
@@ -4146,9 +4128,11 @@ namespace
          { "Wrap", "Bends or conforms the source input onto the target input. Cylindrical rolls it around one axis at the target's radius with no distortion at all - letterforms, spacing and extrusion depth survive intact, which is what curves 3D text around a sphere or cylinder. Spherical adds the same bend the other way so long text also curves over the poles. Nearest Surface snaps every vertex to the closest point on the target instead: right for conforming a dense mesh to irregular geometry, but it squashes flat text. With a target connected the bend radius follows the target's size, so scaling the target moves the source with it - radius scale tunes it as a multiplier. With no target, radius sets the bend outright." },
          { "Camera", "A 3D viewpoint. Patch it into a Render 3D node's camera input to render from it instead of the default view." },
          { "Light", "A light source for the 3D scene. Render 3D takes up to 3 lights - patch more in and only the first 3 are used." },
-         { "Render 3D", "Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. Needs a Select node upstream to drive per-object selection highlighting." },
+         { "HDRI", "Loads an equirectangular .hdr or .exr image and patches into Render 3D's env input, replacing the fixed sky gradient with a real image for the background and for reflections/ambient light. Rotation turns the image around Y; intensity scales it independently of Render 3D's own env intensity. Reflections use the image's own mip chain scaled by roughness as a cheap stand-in for a proper blurred prefilter - very glossy metal will read a little softer than a full IBL renderer would give it. Use this node rather than Image Source for HDRIs - Image Source clamps to 8-bit sRGB, which throws away exactly the above-1.0 highlight range an HDRI needs." },
+         { "Render 3D", "Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. An HDRI node patched into the env input replaces the procedural sky gradient for background, reflections and ambient light." },
          { "Model 3D", "Loads a 3D model file - obj, ply, stl, usd or usdz." },
          { "Null 3D", "A pass-through node for geometry: its output is exactly its input mesh, unchanged. Useful as a stable junction point to branch geometry to several destinations." },
+         { "Switcher 3D", "Cycles between up to four connected geometry inputs every N beats or seconds, forwarding whichever one is active. Can be pinned to one input with 'manual'. Unlike the 2D Switcher, there is no crossfade - it always hard-cuts, since interpolating between two arbitrary meshes' topology isn't generally well-defined." },
 
          // ---------------- Join Geometry boolean modes (also spawnable directly) ----------------
          { "Union", "Boolean union: fuses two or more closed, manifold solids into one, keeping their combined outer surface." },
@@ -4166,10 +4150,10 @@ namespace
          { "Normals", "Recomputes vertex normals - 'flat shade' gives hard per-face edges instead of smooth shading, 'flip' inverts which way every face points." },
          { "Explode", "Pushes each face outward from the mesh's centre along its own normal, by Amount, randomized per-face by Seed." },
          { "Twist", "Twists the mesh around a chosen Axis by Angle - the further a point is along that axis, the more it rotates." },
-         { "Smooth", "Iteratively averages each vertex toward its neighbours (a Laplacian smooth) - Iterations and Strength control how much it relaxes." },
+         { "Smooth", "Iteratively averages each vertex toward its neighbours (a Laplacian smooth) - Iterations and Strength control how much it relaxes. On a low-poly mesh like a Cube there's no extra geometry between the corners to round out, so raise Pre-subdivide first to see rounded edges." },
          { "Mirror", "Mirrors the mesh across a plane perpendicular to a chosen Axis, at a given plane offset. 'keep original' keeps the source geometry too, 'weld seam' merges the two halves where they meet." },
          { "Screw", "Sweeps the input profile around an Axis in a helical path - Steps sets resolution, Turns the number of revolutions, Rise/turn the pitch, Radius offsets the sweep outward." },
-         { "Select", "Marks a subset of faces - by index range, position along an axis, normal direction, random chance, or within a radius - for downstream ops (Delete Selected / Transform Selected / Extrude Selected, or Render 3D's selection highlight) to act on. Invert flips the selection, 'add to selection' unions with whatever was already selected." },
+         { "Select", "Marks a subset of faces - by index range, position along an axis, normal direction, random chance, or within a radius - for downstream ops (Delete Selected / Transform Selected / Extrude Selected) to act on. Invert flips the selection, 'add to selection' unions with whatever was already selected." },
          { "Delete Selected", "Deletes the faces marked by an upstream Select op - or, with 'keep selected instead', deletes everything else and keeps only the selection." },
          { "Transform Selected", "Moves, rotates and scales only the faces marked by an upstream Select op, optionally sliding them along their own normals instead of a fixed direction." },
          { "Extrude Selected", "Extrudes only the faces marked by an upstream Select op along their own normals, by Distance, with Inset." },
@@ -4371,7 +4355,6 @@ namespace
                { "Modulate a parameter", "Drag a modulator's 'out' onto the small dot beside any slider" },
                { "Colour from a photo", "Add a Palette node, give it a reference image, then drag its 'out' onto the square dot beside any colour swatch. Each new cable takes the next swatch; click a bound swatch to step it." },
                { "Type an exact value", "Double-click a slider" },
-               { "Bypass a node", "Click the power icon next to the eye - the node is skipped and its input passes straight through" },
                { "Pan the canvas", "Drag empty canvas" },
                { "Rubber-band select", "Shift + drag" },
                { "Duplicate", "Cmd+C / Cmd+V, or Shift+D to duplicate in place" },
@@ -4614,6 +4597,10 @@ namespace
                if (wrap->targetInput == dyingGeometry)
                   wrap->targetInput = nullptr;
             }
+            if (auto* sw3 = dynamic_cast<Switcher3DNode*>(other.node.get()))
+               for (int i = 0; i < Switcher3DNode::kSlots; i++)
+                  if (sw3->inputs[i] == dyingGeometry)
+                     sw3->inputs[i] = nullptr;
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
          {
@@ -4653,6 +4640,7 @@ namespace
       Modulation::Instance().UnbindAllFor(index);
       PaletteBinding::Instance().UnbindAllFor(index);
       gModHistory.erase(index);
+      gNodeViewports.erase(index);
       DisconnectAllTo(victim->node.get());
       // A deleted Group's membership set must go with it - otherwise its
       // GroupNode* stays around as a dangling map key that a future
@@ -4691,6 +4679,7 @@ namespace
          rec.y = gn.liveY;
          rec.showParams = gn.showParams;
          rec.bypassed = gn.node->bypassed;
+         rec.showMiniViewport = gn.showMiniViewport;
          Patch::SaveParams(gn.node.get(), rec.params);
          data.nodes.push_back(std::move(rec));
 
@@ -4772,6 +4761,9 @@ namespace
             record(w->sourceInput, 0);
             record(w->targetInput, 1);
          }
+         if (auto* sw3 = dynamic_cast<Switcher3DNode*>(gn.node.get()))
+            for (int i = 0; i < Switcher3DNode::kSlots; i++)
+               record(sw3->inputs[i], i);
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
             record(audio->fileSource, 0);
          if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
@@ -4881,6 +4873,7 @@ namespace
          remap[rec.index] = spawned->index;
          spawned->showParams = rec.showParams;
          spawned->node->bypassed = rec.bypassed;
+         spawned->showMiniViewport = rec.showMiniViewport;
          Patch::LoadParams(spawned->node.get(), rec.params);
          ReloadDerivedState(spawned->node.get());
       }
@@ -5171,6 +5164,7 @@ int main()
 
    glfwMakeContextCurrent(window);
    glfwSwapInterval(1);
+   Platform::PreventAppNap();
 
    IMGUI_CHECKVERSION();
    ImGui::CreateContext();
@@ -5300,13 +5294,12 @@ int main()
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[2], 0)->Connect(gNodes[1].node.get());
       }
-      else if (getenv("INFINITE_SELECTVIZTEST") != nullptr)
+      else if (getenv("INFINITE_MINIVIEWPORTTEST") != nullptr)
       {
-         // Cube -> Select (the +Y side, by normal) -> Transform Selected, the
-         // exact chain the highlight exists to make legible. Slot B is the same
-         // cube with no Select in front of it, so one frame shows both that the
-         // overlay lands on the right faces and that a mesh without a mask is
-         // left completely alone.
+         // Cube -> Select (the +Y side, by normal) -> Transform Selected. Slot B
+         // is the same cube with no Select in front of it, so the mini viewport
+         // test can compare a mesh carrying a face mask against one that never
+         // went through a Select at all.
          // Render first and closest to the origin: the canvas opens at the
          // top-left, and the point of this fixture is to look at its output.
          SpawnNode("Render 3D", "3D", 40.0f, 40.0f);            // 0
@@ -5330,17 +5323,8 @@ int main()
          move->moveAlongNormals = true;
          move->normalAmount = 0.35f;
          move->offsetX = move->offsetY = move->offsetZ = 0.0f;
-         move->rotStep = 0.0f; move->scaleStep = 1.0f;
-
-         // Selects the underside and leaves it in place, so the overlay is
-         // sitting on a face the camera cannot see: it must be hidden by the
-         // cube's own front faces rather than painted over them.
-         if (getenv("INFINITE_SELECTVIZ_HIDDEN") != nullptr)
-         {
-            select->axis = 1;
-            select->selectC = -1.0f;
-            move->normalAmount = 0.0f;
-         }
+         move->rotX = move->rotY = move->rotZ = 0.0f;
+         move->scaleX = move->scaleY = move->scaleZ = 1.0f;
 
          auto* plain = static_cast<GeometryNode*>(gNodes[4].node.get());
          plain->shape = 1; plain->detail = 24;
@@ -5352,8 +5336,6 @@ int main()
          r->width = 700.0f; r->height = 700.0f;
          r->camDistance = 4.2f;
          r->targetX = 0.7f;
-         if (getenv("INFINITE_SELECTVIZ_OFF") != nullptr)
-            r->highlightSelection = false;
          for (GraphNode& gn : gNodes)
             gn.showParams = false;
       }
@@ -5657,6 +5639,50 @@ int main()
          geo->posX = 4.0f; geo->posY = 2.0f; geo->uniformScale = 2.0f;
          mat->input = geo;
          static_cast<Render3DNode*>(gNodes[2].node.get())->geometry[0] = mat;
+      }
+      else if (getenv("INFINITE_ENVTEST") != nullptr)
+      {
+         // A tiny synthetic equirectangular HDR, one flat bright warm colour
+         // across the whole sphere of directions - deterministic regardless
+         // of which way the test camera happens to be looking - written to a
+         // real .hdr file so this exercises the actual stb_image decode path
+         // rather than poking EnvironmentNode's private texture upload
+         // directly.
+         const int ew = 16, eh = 8;
+         std::vector<float> envPixels((size_t)ew * eh * 3);
+         for (int i = 0; i < ew * eh; i++)
+         {
+            envPixels[i * 3 + 0] = 8.0f;
+            envPixels[i * 3 + 1] = 5.0f;
+            envPixels[i * 3 + 2] = 2.0f;
+         }
+         // One blown-out "sun" texel, far above half-float range, exactly like
+         // the sun in a real HDRI. It survives the float32 file fine but turns
+         // into +Inf when converted into the 16F texture unless Upload clamps
+         // it - and glGenerateMipmap then averages that Inf up into every
+         // higher mip as NaN, which is what used to render the lit geometry
+         // solid black (the diffuse term always samples the topmost mip).
+         envPixels[0] = envPixels[1] = envPixels[2] = 1.0e30f;
+         const std::string envPath = "/tmp/infinite_envtest.hdr";
+         stbi_write_hdr(envPath.c_str(), ew, eh, 3, envPixels.data());
+
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);     // 0 - the reflective sphere
+         SpawnNode("Material", "3D", 320.0f, 40.0f);    // 1
+         SpawnNode("HDRI", "3D", 40.0f, 400.0f);        // 2
+         SpawnNode("Render 3D", "3D", 620.0f, 40.0f);   // 3
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* mat = static_cast<MaterialNode*>(gNodes[1].node.get());
+         auto* env = static_cast<EnvironmentNode*>(gNodes[2].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
+         geo->shape = 2; // sphere
+         mat->input = geo;
+         mat->metallic = 1.0f;
+         mat->roughness = 0.03f; // near-mirror, so mip 0 dominates the reflection
+         env->Load(envPath);
+         render->geometry[0] = mat;
+         render->envInput.Connect(env);
+         render->width = 400.0f; render->height = 400.0f;
+         render->samples = 0;
       }
       else if (getenv("INFINITE_PATHOCEANTEST") != nullptr)
       {
@@ -6827,9 +6853,25 @@ int main()
          const bool reproducible = r1.faceMask == r2.faceMask && r1.faceMask != r3.faceMask;
          printf("random selection reproducible from seed: %d\n", (int)reproducible);
 
+         // Mesh to Points billboards each point as two triangles. Selecting at
+         // ~50% must choose or skip both triangles of a point together - never
+         // one triangle selected and its partner not, which is what tore
+         // points in half before points carried a selectionGroup tag.
+         const std::vector<MeshPoint> cloud = MeshOps::ToPoints(cube, 0, 10000);
+         const Mesh billboards = MeshOps::PointsToFaces(cloud, 0.2f);
+         const Mesh pointSel = MeshOps::Select(billboards, MeshOps::kSelectRandom,
+                                                0.5f, 0, 0, 1, 3.0f, false, false);
+         bool quadsIntact = !pointSel.faceMask.empty();
+         for (size_t f = 0; f + 1 < pointSel.FaceCount(); f += 2)
+            if (pointSel.faceMask[f] != pointSel.faceMask[f + 1])
+               quadsIntact = false;
+         printf("point selection keeps quads whole: %zu points, %zu tris  %s\n",
+                cloud.size(), pointSel.FaceCount(), quadsIntact ? "OK" : "FAIL");
+
          const bool ok = defaultAll && top.SelectedCount() == 2 &&
                          cut.FaceCount() == cube.FaceCount() - 2 && kept.FaceCount() == 2 &&
-                         movedOk && extruded.FaceCount() > cube.FaceCount() && reproducible;
+                         movedOk && extruded.FaceCount() > cube.FaceCount() && reproducible &&
+                         quadsIntact;
          printf("%s\n", ok ? "SELECTION OK" : "SUSPECT");
       }
 
@@ -8405,6 +8447,14 @@ int main()
          clothNode.windX = clothNode.windY = clothNode.windZ = 0.0f;
          checkGeneric("ClothNode", &clothNode);
 
+         // Pinned to the probe's slot so the sweep exercises the forwarding
+         // path, not the clock-driven switching itself (covered separately).
+         Switcher3DNode sw3Node;
+         sw3Node.inputs[0] = &probe;
+         sw3Node.manual = true;
+         sw3Node.manualSlot = 0;
+         checkGeneric("Switcher3DNode", &sw3Node);
+
          // Instance on Points draws through per-instance transforms rather
          // than GetMesh()+GetModelMatrix(), so it needs its own probe on each
          // of its two geometry slots instead of the generic check.
@@ -8497,6 +8547,290 @@ int main()
                allOk = false;
          }
          printf("%s\n", allOk ? "TRANSFORM SWEEP OK" : "TRANSFORM SWEEP FAIL");
+      }
+
+      // Sibling of TRANSFORMSWEEPTEST, same generic-probe approach, checking a
+      // different side-channel: does GetMappingTransform() reach a node's
+      // output from its input? Found via a real bug: ClothNode, MeshResynthNode
+      // and MeshToPointsNode forwarded every other side-channel (material,
+      // textures, model matrix) from their single geo input but not this one,
+      // so a Mapping node patched upstream of any of them had its space/
+      // translate/rotate/scale silently dropped before Render 3D ever saw it.
+      if (getenv("INFINITE_MAPPINGSWEEPTEST") != nullptr && frameId == 6)
+      {
+         struct MappingProbeSource : public IGeometrySource
+         {
+            IGeometrySource* wrapped = nullptr;
+            MappingTransform mapping;
+            const Mesh& GetMesh() override { return wrapped->GetMesh(); }
+            unsigned long long MeshRevision() override { return wrapped->MeshRevision(); }
+            Mat4 GetModelMatrix() const override { return wrapped->GetModelMatrix(); }
+            Material GetMaterial() const override { return wrapped->GetMaterial(); }
+            unsigned int GetSurfaceTexture() override { return wrapped->GetSurfaceTexture(); }
+            MappingTransform GetMappingTransform() const override { return mapping; }
+         };
+
+         GeometryNode probeMesh;
+         probeMesh.shape = 1; // cube
+         probeMesh.detail = 4;
+         MappingProbeSource probe;
+         probe.wrapped = &probeMesh;
+         // Non-identity and non-uniform on every field, so a node that forwards
+         // only part of MappingTransform (say space but not scale) still fails.
+         probe.mapping.space = kMapSpaceGenerated;
+         probe.mapping.translate[0] = 1.5f; probe.mapping.translate[1] = -2.5f; probe.mapping.translate[2] = 0.75f;
+         probe.mapping.rotate[0] = 0.3f; probe.mapping.rotate[1] = 0.6f; probe.mapping.rotate[2] = 0.9f;
+         probe.mapping.scale[0] = 2.0f; probe.mapping.scale[1] = 3.0f; probe.mapping.scale[2] = 4.0f;
+
+         int frame = 21000;
+         auto cook = [&](IGeometrySource* g) {
+            if (auto* n = dynamic_cast<INode*>(g)) n->CookIfNeeded(frame);
+            frame++;
+         };
+         auto matches = [&](const MappingTransform& a, const MappingTransform& b) {
+            if (a.space != b.space)
+               return false;
+            for (int i = 0; i < 3; i++)
+            {
+               if (std::fabs(a.translate[i] - b.translate[i]) > 1e-4f) return false;
+               if (std::fabs(a.rotate[i] - b.rotate[i]) > 1e-4f) return false;
+               if (std::fabs(a.scale[i] - b.scale[i]) > 1e-4f) return false;
+            }
+            return true;
+         };
+
+         struct Result { std::string name; bool ok; };
+         std::vector<Result> results;
+         auto checkForwarding = [&](const char* name, IGeometrySource* node)
+         {
+            cook(node);
+            results.push_back({ name, matches(node->GetMappingTransform(), probe.mapping) });
+         };
+
+         GeometryOpNode opNode; opNode.op = GeometryOpNode::kTransform; opNode.input = &probe;
+         checkForwarding("GeometryOpNode", &opNode);
+
+         DisplacementNode dispNode; dispNode.input = &probe;
+         checkForwarding("DisplacementNode", &dispNode);
+
+         MeshResynthNode resynthNode; resynthNode.input = &probe;
+         checkForwarding("MeshResynthNode", &resynthNode);
+
+         MeshToPointsNode m2pNode; m2pNode.input = &probe; m2pNode.mode = 0;
+         checkForwarding("MeshToPointsNode", &m2pNode);
+
+         Null3DNode nullNode; nullNode.input = &probe;
+         checkForwarding("Null3DNode", &nullNode);
+
+         MaterialNode matNode; matNode.input = &probe;
+         checkForwarding("MaterialNode", &matNode);
+
+         JoinGeometryNode joinNode; joinNode.mode = JoinGeometryNode::kMerge; joinNode.inputs[0] = &probe;
+         checkForwarding("JoinGeometryNode", &joinNode);
+
+         GeometryNode probe2;
+         probe2.shape = 2; // sphere
+         probe2.detail = 4;
+         WrapNode wrapNode; wrapNode.sourceInput = &probe; wrapNode.targetInput = &probe2; wrapNode.blend = 0.0f;
+         checkForwarding("WrapNode", &wrapNode);
+
+         ClothNode clothNode;
+         clothNode.input = &probe;
+         clothNode.pinMode = ClothNode::kPinNone;
+         clothNode.gravityX = clothNode.gravityY = clothNode.gravityZ = 0.0f;
+         clothNode.windX = clothNode.windY = clothNode.windZ = 0.0f;
+         checkForwarding("ClothNode", &clothNode);
+
+         Switcher3DNode sw3Node;
+         sw3Node.inputs[0] = &probe;
+         sw3Node.manual = true;
+         sw3Node.manualSlot = 0;
+         checkForwarding("Switcher3DNode", &sw3Node);
+
+         // MappingNode itself is excluded on purpose: it *sets* the mapping
+         // transform from its own params rather than forwarding one, so it is
+         // not a passthrough case this check applies to. InstanceOnPointsNode
+         // and PathNode are excluded for the same reason TRANSFORMSWEEPTEST
+         // gives them their own variant - neither reduces to a plain
+         // GetMappingTransform() a caller would read.
+         bool allOk = true;
+         for (const Result& r : results)
+         {
+            printf("  [%s] %-24s\n", r.ok ? "pass" : "FAIL", r.name.c_str());
+            if (!r.ok)
+               allOk = false;
+         }
+         printf("%s\n", allOk ? "MAPPING SWEEP OK" : "MAPPING SWEEP FAIL");
+      }
+
+      // A different bug class from the two sweeps above: not a dropped
+      // side-channel, but a revision/generation stamp that bumps when nothing
+      // actually changed. Found via a real bug: DisplacementNode bumped
+      // mTexGeneration on every single cook while a texture was connected,
+      // even when the texture's pixels were identical to last frame, which
+      // made MeshRevision() change every frame and forced ClothNode
+      // downstream to treat every frame as a topology change - the cloth sim
+      // reset to rest pose continuously instead of ever draping.
+      //
+      // The check: cook the same node twice in a row with nothing about its
+      // inputs changed, and assert MeshRevision() (or the equivalent stamp)
+      // did not move between the two cooks. Any node with a texture input
+      // gets a *connected, static* texture for the same reason the Displace
+      // bug only showed up with one patched in - the bug is invisible with no
+      // texture connected at all.
+      if (getenv("INFINITE_REVISIONSWEEPTEST") != nullptr && frameId == 6)
+      {
+         GeometryNode probeMesh;
+         probeMesh.shape = 1; // cube
+         probeMesh.detail = 4;
+
+         int frame = 22000;
+
+         struct Result { std::string name; bool ok; };
+         std::vector<Result> results;
+
+         GeometryOpNode opNode; opNode.op = GeometryOpNode::kTransform; opNode.input = &probeMesh;
+         opNode.CookIfNeeded(frame++);
+         const unsigned long long opFirst = opNode.MeshRevision();
+         opNode.CookIfNeeded(frame++);
+         results.push_back({ "GeometryOpNode", opFirst == opNode.MeshRevision() });
+
+         // The case that actually caught the bug: Displacement with a real,
+         // static (speed=0, so no transport-time animation) texture connected.
+         NoiseNode noise;
+         noise.speed = 0.0f;
+         noise.width = 64.0f; noise.height = 64.0f;
+         noise.CookIfNeeded(frame++);
+
+         DisplacementNode dispNode;
+         dispNode.input = &probeMesh;
+         dispNode.TextureInput().Connect(&noise);
+         dispNode.CookIfNeeded(frame++);
+         const unsigned long long dispFirst = dispNode.MeshRevision();
+         dispNode.CookIfNeeded(frame++);
+         const unsigned long long dispSecond = dispNode.MeshRevision();
+         dispNode.CookIfNeeded(frame++);
+         const unsigned long long dispThird = dispNode.MeshRevision();
+         results.push_back({ "DisplacementNode(static texture)", dispFirst == dispSecond && dispSecond == dispThird });
+
+         MeshResynthNode resynthNode;
+         resynthNode.input = &probeMesh;
+         resynthNode.CookIfNeeded(frame++);
+         const unsigned long long resynthFirst = resynthNode.MeshRevision();
+         resynthNode.CookIfNeeded(frame++);
+         results.push_back({ "MeshResynthNode", resynthFirst == resynthNode.MeshRevision() });
+
+         // Cloth's stamp is its own mMesh revision, bumped by Step() every
+         // physics tick even while draping correctly, so it is not expected to
+         // stay put between two cooks - what actually matters for Cloth is
+         // covered by the topology-vs-position distinction directly, not a
+         // stable-revision check. It is included with the *input's* revision
+         // instead: confirms a static input doesn't force a rebuild by proxy.
+         ClothNode clothNode;
+         clothNode.input = &probeMesh;
+         clothNode.pinMode = ClothNode::kPinNone;
+         clothNode.gravityX = clothNode.gravityY = clothNode.gravityZ = 0.0f;
+         clothNode.windX = clothNode.windY = clothNode.windZ = 0.0f;
+         clothNode.CookIfNeeded(frame++);
+         const size_t clothConstraintsFirst = clothNode.ConstraintCount();
+         clothNode.CookIfNeeded(frame++);
+         clothNode.CookIfNeeded(frame++);
+         results.push_back({ "ClothNode(constraint count stable)", clothConstraintsFirst == clothNode.ConstraintCount() && clothConstraintsFirst > 0 });
+
+         // Switcher3DNode's own bug class to guard against: bumping its
+         // revision on every cook just because it has a live clock, rather
+         // than only when the active slot (or that slot's own mesh) actually
+         // changes. Pinned via manual/manualSlot so the clock plays no part
+         // in either half of this check.
+         GeometryNode probeMeshB;
+         probeMeshB.shape = 2; // sphere: distinct from probeMesh's cube
+         probeMeshB.detail = 4;
+         Switcher3DNode sw3Static;
+         sw3Static.inputs[0] = &probeMesh;
+         sw3Static.inputs[1] = &probeMeshB;
+         sw3Static.manual = true;
+         sw3Static.manualSlot = 0;
+         sw3Static.CookIfNeeded(frame++);
+         const unsigned long long sw3First = sw3Static.MeshRevision();
+         sw3Static.CookIfNeeded(frame++);
+         sw3Static.CookIfNeeded(frame++);
+         results.push_back({ "Switcher3DNode(static slot stable)", sw3First == sw3Static.MeshRevision() });
+
+         // The other half of the same invariant: a real switch must bump the
+         // revision, so a downstream cache actually re-cooks when the input
+         // it's reading from changes underneath it.
+         const unsigned long long sw3BeforeSwitch = sw3Static.MeshRevision();
+         sw3Static.manualSlot = 1;
+         sw3Static.CookIfNeeded(frame++);
+         results.push_back({ "Switcher3DNode(switch bumps revision)", sw3Static.MeshRevision() != sw3BeforeSwitch });
+
+         // The actual bug-report scenario, not covered by the manual/
+         // manualSlot checks above: manual=false, letting Transport's clock
+         // itself drive the switch across repeated idle cooks (no param
+         // touched between them, the same as a user just sitting there).
+         // Confirms both halves of the idle path - a bump when the clock
+         // crosses an interval boundary, and no bump on an idle cook that
+         // doesn't cross one - since a switcher that never advances live and
+         // one that free-runs every frame would both slip past the
+         // manual-only checks above.
+         {
+            const bool savedPlaying = Transport::Instance().IsPlaying();
+            const float savedBpm = Transport::Instance().Tempo();
+            Transport::Instance().SetPlaying(true);
+            Transport::Instance().SetTempo(120.0f);
+            Transport::Instance().Rewind();
+
+            Switcher3DNode sw3Clock;
+            sw3Clock.inputs[0] = &probeMesh;
+            sw3Clock.inputs[1] = &probeMeshB;
+            sw3Clock.manual = false;
+            sw3Clock.unit = 1; // seconds
+            sw3Clock.interval = 0.05f;
+
+            Transport::Instance().Tick(0.01f);
+            sw3Clock.CookIfNeeded(frame++);
+            const unsigned long long clockFirst = sw3Clock.MeshRevision();
+            const int slotFirst = sw3Clock.ActiveSlot();
+
+            // Several idle cooks within the same interval bucket: no clock
+            // advance worth crossing a boundary, so the revision must hold.
+            Transport::Instance().Tick(0.001f);
+            sw3Clock.CookIfNeeded(frame++);
+            Transport::Instance().Tick(0.001f);
+            sw3Clock.CookIfNeeded(frame++);
+            results.push_back({ "Switcher3DNode(clock idle, no boundary crossed -> stable)",
+                                 sw3Clock.MeshRevision() == clockFirst });
+
+            // Now tick past several interval boundaries with nothing else
+            // touched, exactly like the app sitting idle while the clock
+            // free-runs - the revision and active slot must both move.
+            bool sawBump = false;
+            bool sawSlotChange = false;
+            for (int i = 0; i < 20; i++)
+            {
+               Transport::Instance().Tick(0.02f);
+               sw3Clock.CookIfNeeded(frame++);
+               if (sw3Clock.MeshRevision() != clockFirst)
+                  sawBump = true;
+               if (sw3Clock.ActiveSlot() != slotFirst)
+                  sawSlotChange = true;
+            }
+            results.push_back({ "Switcher3DNode(clock idle, boundary crossed -> revision bumps)", sawBump });
+            results.push_back({ "Switcher3DNode(clock idle, boundary crossed -> active slot moves)", sawSlotChange });
+
+            Transport::Instance().SetTempo(savedBpm);
+            Transport::Instance().SetPlaying(savedPlaying);
+            Transport::Instance().Rewind();
+         }
+
+         bool allOk = true;
+         for (const Result& r : results)
+         {
+            printf("  [%s] %-32s\n", r.ok ? "pass" : "FAIL", r.name.c_str());
+            if (!r.ok)
+               allOk = false;
+         }
+         printf("%s\n", allOk ? "REVISION SWEEP OK" : "REVISION SWEEP FAIL");
       }
 
       if (getenv("INFINITE_FIXTEST") != nullptr && frameId == 6)
@@ -8829,6 +9163,97 @@ int main()
                 render->targetX, render->targetY, render->targetZ, render->camDistance);
          printf("%s\n", (overrides && meshUntouched && centred && pulledBack)
                            ? "MATERIAL + FRAME OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_ENVTEST") != nullptr &&
+          (frameId == 4 || frameId == 8 || frameId == 12))
+      {
+         auto* env = static_cast<EnvironmentNode*>(gNodes[2].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
+         const int w = render->GetOutputWidth(), h = render->GetOutputHeight();
+         std::vector<unsigned char> px((size_t)w * h * 4);
+         GLuint fbo = 0;
+         glGenFramebuffers(1, &fbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                render->GetOutputTexture(), 0);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+         glDeleteFramebuffers(1, &fbo);
+
+         // Top-left corner, well away from the centred sphere: pure background.
+         const size_t corner = ((size_t)(h - 4) * w + 4) * 4;
+         const int bgR = px[corner], bgG = px[corner + 1], bgB = px[corner + 2];
+
+         if (frameId == 4)
+         {
+            // HDRI patched in, used as background: the loaded sky (warm,
+            // R>G>B) should read back, not the flat near-black default bgColor.
+            const bool loaded = env->HasImage() && env->GetEnvironmentTexture() != 0;
+            const bool sawSky = bgR > 60 && bgR > bgB;
+            printf("env loaded=%d corner=(%d,%d,%d)  %s\n", loaded, bgR, bgG, bgB,
+                   (loaded && sawSky) ? "HDRI BACKGROUND OK" : "SUSPECT");
+
+            const GLenum err = glGetError();
+            printf("gl error after env render: 0x%x  %s\n", err,
+                   err == GL_NO_ERROR ? "CLEAN" : "SUSPECT");
+
+            // A near-mirror sphere over a bright sky should read back brighter
+            // than a flat grey ambient bake would ever give it - proof the
+            // reflection actually sampled the HDRI rather than falling back to
+            // the procedural gradient.
+            const size_t centre = ((size_t)(h / 2) * w + w / 2) * 4;
+            const int sphereR = px[centre], sphereG = px[centre + 1];
+            printf("sphere centre=(%d,%d,%d)  %s\n", sphereR, sphereG, px[centre + 2],
+                   (sphereR > 40) ? "REFLECTION SAMPLED HDRI OK" : "SUSPECT");
+
+            // Every mip must be finite, not just mip 0. A single Inf/NaN texel
+            // anywhere spreads under box-downsampling until the top of the
+            // chain is entirely NaN, and the diffuse irradiance term reads
+            // exactly that top mip - so a poisoned chain renders geometry
+            // solid black or a flat garbage colour while the thumbnail and
+            // background quad (both mip 0) still look perfect.
+            int badMips = 0;
+            glBindTexture(GL_TEXTURE_2D, env->GetEnvironmentTexture());
+            for (int level = 0; level <= (int)env->MaxLod(); level++)
+            {
+               int lw = 0, lh = 0;
+               glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_WIDTH, &lw);
+               glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_HEIGHT, &lh);
+               if (lw <= 0 || lh <= 0) { badMips++; continue; }
+               std::vector<float> mip((size_t)lw * lh * 4);
+               glGetTexImage(GL_TEXTURE_2D, level, GL_RGBA, GL_FLOAT, mip.data());
+               for (float v : mip)
+                  if (!std::isfinite(v)) { badMips++; break; }
+            }
+            glBindTexture(GL_TEXTURE_2D, 0);
+            printf("env mip chain: %d level(s) non-finite  %s\n", badMips,
+                   badMips == 0 ? "MIP CHAIN FINITE OK" : "SUSPECT");
+
+            render->envAsBackground = false; // checked at frame 8
+         }
+         else if (frameId == 8)
+         {
+            // Same HDRI still drives lighting, but the background toggle is
+            // off: the corner should fall back to the flat bgColor clear.
+            const bool flatBg = bgR < 20 && bgG < 20 && bgB < 30;
+            printf("background off: corner=(%d,%d,%d)  %s\n", bgR, bgG, bgB,
+                   flatBg ? "BACKGROUND TOGGLE OK" : "SUSPECT");
+            render->envAsBackground = true;
+            render->envInput.Disconnect();
+         }
+         else if (frameId == 12)
+         {
+            // Env input fully disconnected: no HDRI texture is bound at all
+            // any more, so the background quad is skipped outright and this
+            // is back to the original flat bgColor clear - proving the HDRI
+            // path is additive rather than a rewrite that left state behind
+            // once its source node goes away.
+            const bool flatBg = bgR < 20 && bgG < 20 && bgB < 30;
+            printf("disconnected: corner=(%d,%d,%d)  %s\n", bgR, bgG, bgB,
+                   flatBg ? "DISCONNECT FALLBACK OK" : "SUSPECT");
+         }
       }
 
       if (getenv("INFINITE_PATHOCEANTEST") != nullptr && frameId == 4)
@@ -9384,51 +9809,85 @@ int main()
                            ? "DISPLACEMENT OK" : "SUSPECT");
       }
 
-      // Frame 4 renders with antialiasing off, frame 8 with it on, and the two
-      // are compared. Counting "soft" pixels in a single image cannot tell an
-      // The selection overlay, checked by counting warm-tinted pixels in the
-      // render rather than by eye. Three states have to be distinguishable, and
-      // the failure this guards against is the middle one silently becoming one
-      // of the outer two: a mesh with no Select untouched, a visible selection
-      // tinted, and a selection facing away from the camera still occluded.
-      if (getenv("INFINITE_SELECTVIZTEST") != nullptr && frameId == 10)
+      // NodeViewport (per-node mini viewport) exercised directly rather than
+      // through the ImGui toggle/icon plumbing: this is the part that
+      // actually uploads a mesh, renders it and draws the selection overlay,
+      // so it is what is worth an automated check. gNodes[2] is the Select
+      // node (has a face mask), gNodes[4] is the plain untouched cube (none).
+      if (getenv("INFINITE_MINIVIEWPORTTEST") != nullptr && frameId == 10)
       {
-         auto* r = static_cast<Render3DNode*>(gNodes[0].node.get());
-         const int w = r->GetOutputWidth(), h = r->GetOutputHeight();
-         std::vector<unsigned char> px((size_t)w * h * 4);
-         GLuint fbo = 0;
-         glGenFramebuffers(1, &fbo);
-         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                                r->GetOutputTexture(), 0);
-         glPixelStorei(GL_PACK_ALIGNMENT, 1);
-         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
-         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-         glDeleteFramebuffers(1, &fbo);
+         auto* select = dynamic_cast<IGeometrySource*>(gNodes[2].node.get());
+         auto* plain = dynamic_cast<IGeometrySource*>(gNodes[4].node.get());
 
-         // The scene is otherwise neutral grey on black, so "red clearly ahead
-         // of blue" identifies overlay pixels without needing an exact colour.
-         size_t tinted = 0;
-         for (size_t i = 0; i < px.size(); i += 4)
-            if (px[i] > 90 && px[i] > px[i + 2] + 40)
-               tinted++;
+         static NodeViewport selectViewport;
+         static NodeViewport plainViewport;
+         const int vw = 256, vh = 256;
+         const unsigned int selectTex = selectViewport.Render(select, vw, vh, true);
+         const unsigned int plainTex = plainViewport.Render(plain, vw, vh, true);
 
-         const bool off = getenv("INFINITE_SELECTVIZ_OFF") != nullptr;
-         const bool hidden = getenv("INFINITE_SELECTVIZ_HIDDEN") != nullptr;
-         // A cube side is 18 of 108 triangles and the camera sees roughly a
-         // twentieth of the frame as that face, so a live highlight lands in the
-         // thousands of pixels while both negative cases must be flat zero.
-         const bool expectTint = !off && !hidden;
-         const bool ok = expectTint ? tinted > 500 : tinted == 0;
-         printf("selection overlay: %zu tinted px, highlight=%s selection=%s  %s\n",
-                tinted, off ? "off" : "on", hidden ? "facing away" : "visible",
-                ok ? "OK" : "FAIL");
-         printf("faces highlighted: %zu of %zu drawn  %s\n",
-                r->LastHighlighted(), r->LastTriangleCount(),
-                // Slot B has no Select in front of it, so a mask that leaked
-                // into an unselected mesh would show up as far too many faces.
-                (off ? r->LastHighlighted() == 0 : r->LastHighlighted() == 18) ? "OK" : "FAIL");
-         printf("%s\n", ok ? "SELECTION OVERLAY OK" : "SUSPECT");
+         auto countTinted = [&](unsigned int tex) -> size_t {
+            if (tex == 0)
+               return 0;
+            std::vector<unsigned char> px((size_t)vw * vh * 4);
+            GLuint fbo = 0;
+            glGenFramebuffers(1, &fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glReadPixels(0, 0, vw, vh, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDeleteFramebuffers(1, &fbo);
+            size_t tinted = 0;
+            for (size_t i = 0; i < px.size(); i += 4)
+               if (px[i] > 90 && px[i] > px[i + 2] + 40)
+                  tinted++;
+            return tinted;
+         };
+
+         const size_t selectTinted = countTinted(selectTex);
+         const size_t plainTinted = countTinted(plainTex);
+
+         // A pos/rot/scale slider moves GetModelMatrix() without rebuilding
+         // the mesh at all, so MeshRevision() alone would miss it - the exact
+         // bug where the viewport froze on a live torus's transform sliders.
+         // Confirmed here by moving the plain cube far off-frame with no
+         // mesh rebuild and checking the render actually follows: mostly
+         // background where it used to be mostly cube.
+         auto countMesh = [&](unsigned int tex) -> size_t {
+            if (tex == 0)
+               return 0;
+            std::vector<unsigned char> px((size_t)vw * vh * 4);
+            GLuint fbo = 0;
+            glGenFramebuffers(1, &fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glReadPixels(0, 0, vw, vh, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDeleteFramebuffers(1, &fbo);
+            // Clear colour is (18,18,23)ish; anything meaningfully brighter is
+            // the lit mesh rather than background.
+            size_t mesh = 0;
+            for (size_t i = 0; i < px.size(); i += 4)
+               if (px[i] > 40 || px[i + 1] > 40 || px[i + 2] > 45)
+                  mesh++;
+            return mesh;
+         };
+         const size_t plainMeshBefore = countMesh(plainTex);
+
+         auto* plainGeo = static_cast<GeometryNode*>(gNodes[4].node.get());
+         plainGeo->posX += 20.0f; // far outside any reasonable auto-framing
+         const unsigned int plainTexAfter = plainViewport.Render(plain, vw, vh, false);
+         const size_t plainMeshAfter = countMesh(plainTexAfter);
+
+         const bool transformTracked = plainMeshBefore > 500 && plainMeshAfter < 50;
+         const bool ok = selectTex != 0 && plainTex != 0 && selectTinted > 50 && plainTinted == 0 &&
+                        transformTracked;
+         printf("mini viewport: select tex=%u tinted=%zu, plain tex=%u tinted=%zu\n",
+                selectTex, selectTinted, plainTex, plainTinted);
+         printf("transform tracking: plain mesh px before move=%zu after move=%zu\n",
+                plainMeshBefore, plainMeshAfter);
+         printf("%s\n", ok ? "MINI VIEWPORT OK" : "SUSPECT");
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
@@ -9683,7 +10142,7 @@ int main()
          // covered the canvas and swallowed every click.
          ImGui::BeginGroup();
 
-         ImGui::TextUnformatted(DisplayName(gn.typeName).c_str());
+         ImGui::TextUnformatted(NodeTitle(gn).c_str());
          ImGui::TextDisabled("%s", gn.category.c_str());
 
          // --- preview: image for image nodes, a value meter for modulators ---
@@ -9691,10 +10150,13 @@ int main()
             dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr;
+         IGeometrySource* geoSourceForViewport = dynamic_cast<IGeometrySource*>(gn.node.get());
          if (multiOutModulator)
             ; // these draw their own meters in the params panel
          else if (auto* mod = dynamic_cast<IModulator*>(gn.node.get()))
             DrawModulatorMeter(mod, gn.index);
+         else if (gn.showMiniViewport && geoSourceForViewport != nullptr)
+            DrawMiniViewport(gn, geoSourceForViewport);
          else if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<InstanceOnPointsNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ModelSourceNode*>(gn.node.get()) != nullptr ||
@@ -9709,6 +10171,7 @@ int main()
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<WrapNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MeshResynthNode*>(gn.node.get()) != nullptr ||
@@ -9754,6 +10217,8 @@ int main()
                snprintf(line, sizeof(line), "%d inputs, %zu tris", jn->ConnectedCount(), jn->TriangleCount());
             else if (auto* wr = dynamic_cast<WrapNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu tris", wr->TriangleCount());
+            else if (auto* sw3 = dynamic_cast<Switcher3DNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "showing input %c", 'A' + sw3->ActiveSlot());
             else if (auto* cl = dynamic_cast<ClothNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu tris, %zu links", cl->TriangleCount(), cl->ConstraintCount());
             else if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get()))
@@ -9763,7 +10228,7 @@ int main()
             else
                snprintf(line, sizeof(line), "scene node");
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255),
-                        DisplayName(gn.typeName).c_str());
+                        NodeTitle(gn).c_str());
             dl->AddText(ImVec2(origin.x + 12, origin.y + 28), IM_COL32(130, 136, 156, 255), line);
          }
          else if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
@@ -9794,23 +10259,24 @@ int main()
          else
             DrawPreview(gn.node.get());
 
-         // --- params (eye) and bypass (power) ---
+         // --- params (eye) ---
+         // The bypass (power) toggle used to live here; removed because it was
+         // confusing and unreliable. The underlying bypassed flag, its cable-walk
+         // logic, and patch serialization are untouched, so patches saved with a
+         // bypassed node still load and dim correctly - there just isn't a UI
+         // control to set it anymore.
          const bool isComment = dynamic_cast<CommentNode*>(gn.node.get()) != nullptr;
          if (EyeToggle(gn.showParams))
             gn.showParams = !gn.showParams;
-         // A comment carries no signal, so there is nothing for a power button
-         // to switch off; it gets the eye on its own.
-         if (!isComment)
+         // Mini viewport toggle, only for nodes that actually have a mesh to
+         // show - excludes CameraNode/LightNode, which appear in the stat-box
+         // branch above but implement no geometry interface.
+         if (geoSourceForViewport != nullptr)
          {
             ImGui::SameLine();
-            if (BypassToggle(!gn.node->bypassed))
-            {
-               PushUndoCheckpoint();
-               gn.node->bypassed = !gn.node->bypassed;
-            }
+            if (ViewportToggle(gn.showMiniViewport))
+               gn.showMiniViewport = !gn.showMiniViewport;
          }
-         // No text label: the power icon turning red already reads as bypassed,
-         // and a word beside it is noise on every node in the patch.
          ImVec2 modTagMin(0.0f, 0.0f), modTagMax(0.0f, 0.0f);
          ImVec2 palTagMin(0.0f, 0.0f), palTagMax(0.0f, 0.0f);
          const bool modTag = !gn.showParams && gn.hasModulatedParams;
@@ -9841,6 +10307,8 @@ int main()
          {
             if (auto* n = dynamic_cast<ImageSourceNode*>(gn.node.get()))
                DrawImageSourceParams(n);
+            else if (auto* n = dynamic_cast<EnvironmentNode*>(gn.node.get()))
+               DrawEnvironmentParams(n);
             else if (auto* n = dynamic_cast<VideoSourceNode*>(gn.node.get()))
                DrawVideoParams(n);
             else if (auto* n = dynamic_cast<FitNode*>(gn.node.get()))
@@ -9912,6 +10380,8 @@ int main()
                DrawInstanceParams(n);
             else if (auto* n = dynamic_cast<WrapNode*>(gn.node.get()))
                DrawWrapParams(n);
+            else if (auto* n = dynamic_cast<Switcher3DNode*>(gn.node.get()))
+               DrawSwitcher3DParams(n);
             else if (auto* n = dynamic_cast<CameraNode*>(gn.node.get()))
                DrawCameraParams(n);
             else if (auto* n = dynamic_cast<LightNode*>(gn.node.get()))
@@ -10116,6 +10586,9 @@ int main()
             linkFromNode(w->sourceInput, 0);
             linkFromNode(w->targetInput, 1);
          }
+         if (auto* sw3 = dynamic_cast<Switcher3DNode*>(gn.node.get()))
+            for (int i = 0; i < Switcher3DNode::kSlots; i++)
+               linkFromNode(sw3->inputs[i], i);
          if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
             linkFromNode(out->audioSource, 1);
 
@@ -10239,6 +10712,7 @@ int main()
                auto* dstMeshResynth = dstNode ? dynamic_cast<MeshResynthNode*>(dstNode->node.get()) : nullptr;
                auto* dstCloth = dstNode ? dynamic_cast<ClothNode*>(dstNode->node.get()) : nullptr;
                auto* dstJoin = dstNode ? dynamic_cast<JoinGeometryNode*>(dstNode->node.get()) : nullptr;
+               auto* dstSwitcher3D = dstNode ? dynamic_cast<Switcher3DNode*>(dstNode->node.get()) : nullptr;
                auto* dstMeta = dstNode ? dynamic_cast<MetaBallNode*>(dstNode->node.get()) : nullptr;
                auto* dstPath = dstNode ? dynamic_cast<PathNode*>(dstNode->node.get()) : nullptr;
                auto* srcCurve = srcNode ? dynamic_cast<ICurveSource*>(srcNode->node.get()) : nullptr;
@@ -10269,6 +10743,17 @@ int main()
                            valid = srcGeometry != nullptr;
                         else if (slot == Render3DNode::kSlots)
                            valid = srcCamera != nullptr;
+                        else if (slot == Render3DNode::kEnvSlot)
+                           // Only an HDRI node: Render 3D reads this pin's
+                           // rotation/intensity/mip-chain, which only an
+                           // EnvironmentNode has. Any other image source would
+                           // connect but be silently ignored at render time -
+                           // rejecting it here instead means a mistaken drag
+                           // (e.g. an Image Source, which clamps to 8-bit and
+                           // cannot supply those extras anyway) shows as a
+                           // refused link rather than a pin that does nothing.
+                           valid = srcNode != nullptr &&
+                                   dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
                         else
                            valid = srcLight != nullptr;
                      }
@@ -10278,7 +10763,8 @@ int main()
                         // Slot 2 is the point-cloud pin; 0 and 1 take geometry.
                         valid = (slot == 2) ? (srcCloud != nullptr) : (srcGeometry != nullptr);
                      else if (dstNull3D != nullptr || dstMapping != nullptr || dstMeshPoints != nullptr ||
-                              dstMeshResynth != nullptr || dstCloth != nullptr || dstJoin != nullptr)
+                              dstMeshResynth != nullptr || dstCloth != nullptr || dstJoin != nullptr ||
+                              dstSwitcher3D != nullptr)
                         valid = srcGeometry != nullptr;
                      else if (dstWrap != nullptr)
                         valid = srcGeometry != nullptr;
@@ -10334,6 +10820,8 @@ int main()
                         dstRender->geometry[slot] = srcGeometry;
                      else if (slot == Render3DNode::kSlots)
                         dstRender->camera = srcCamera;
+                     else if (slot == Render3DNode::kEnvSlot)
+                        dstRender->envInput.Connect(srcNode->node.get());
                      else
                         dstRender->lights[slot - Render3DNode::kSlots - 1] = srcLight;
                   }
@@ -10365,6 +10853,12 @@ int main()
                      const int jslot = GraphNode::InputSlotFromPin(b);
                      if (jslot >= 0 && jslot < JoinGeometryNode::kSlots)
                         dstJoin->inputs[jslot] = srcGeometry;
+                  }
+                  else if (dstSwitcher3D != nullptr)
+                  {
+                     const int sslot = GraphNode::InputSlotFromPin(b);
+                     if (sslot >= 0 && sslot < Switcher3DNode::kSlots)
+                        dstSwitcher3D->inputs[sslot] = srcGeometry;
                   }
                   else if (dstWrap != nullptr)
                   {
@@ -10549,6 +11043,7 @@ int main()
             struct DupItem
             {
                std::string type; std::string category; INode* src; ImVec2 pos; bool params;
+               bool miniViewport;
                int origIndex; int origGroup;
             };
             std::vector<DupItem> items;
@@ -10559,6 +11054,7 @@ int main()
                   const ImVec2 p = ed::GetNodePosition(gn->NodeId());
                   items.push_back({ gn->typeName, gn->category, gn->node.get(),
                                     ImVec2(p.x + off.x, p.y + off.y), gn->showParams,
+                                    gn->showMiniViewport,
                                     gn->index, IndexOfGroupNode(GroupOwning(gn->index)) });
                }
             }
@@ -10577,6 +11073,7 @@ int main()
                {
                   CopyParams(copy->node.get(), item.src);
                   copy->showParams = item.params;
+                  copy->showMiniViewport = item.miniViewport;
                   newByOrig[item.origIndex] = copy;
                   gPendingSelect.push_back(copy->NodeId());
                }
@@ -10957,6 +11454,19 @@ int main()
                if (ImGui::MenuItem("Show params"))
                   gn->showParams = true;
             }
+            if (dynamic_cast<IGeometrySource*>(gn->node.get()) != nullptr)
+            {
+               if (gn->showMiniViewport)
+               {
+                  if (ImGui::MenuItem("Hide viewport"))
+                     gn->showMiniViewport = false;
+               }
+               else
+               {
+                  if (ImGui::MenuItem("Show viewport"))
+                     gn->showMiniViewport = true;
+               }
+            }
             if (ImGui::MenuItem("Help"))
             {
                gHelpPopupNodeIndex = gn->index;
@@ -11011,7 +11521,7 @@ int main()
          }
          else
          {
-            ImGui::TextUnformatted(DisplayName(gn->typeName).c_str());
+            ImGui::TextUnformatted(NodeTitle(*gn).c_str());
             ImGui::Separator();
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
             ImGui::TextWrapped("%s", NodeHelpText(*gn));
@@ -11615,6 +12125,27 @@ int main()
       for (GraphNode& gn : gNodes)
          gn.node->CookIfNeeded(frameId);
 
+      // Top-level idle gate: NodeWorkCounter() only advances when some node
+      // actually redid real work this frame (FilterNode's RunShaderPass,
+      // Render3DNode's draw passes, ...) - a cache hit leaves it alone. A
+      // patch with nothing left to compute settles into idle==true every
+      // frame within a couple frames of its last real edit, the same way a
+      // static Blender viewport stops re-rendering. This only observes that;
+      // it deliberately does not skip glfwSwapBuffers/ImGui's own redraw,
+      // since those still have to run for UI responsiveness (hover states,
+      // cursor, animated widgets) regardless of whether the node graph is idle.
+      if (getenv("INFINITE_CACHETEST") != nullptr)
+      {
+         static unsigned long long sPrevWork = 0;
+         static int sIdleStreak = 0;
+         const unsigned long long work = NodeWorkCounter();
+         const bool idle = (work == sPrevWork);
+         sIdleStreak = idle ? sIdleStreak + 1 : 0;
+         sPrevWork = work;
+         printf("CACHETEST frame=%d work=%llu idle=%d idleStreak=%d\n",
+                frameId, work, idle ? 1 : 0, sIdleStreak);
+      }
+
       if (getenv("INFINITE_TEXTFIT") != nullptr && frameId == 4 && !gNodes.empty())
       {
          if (auto* t = dynamic_cast<TextNode*>(gNodes[0].node.get()))
@@ -11663,6 +12194,7 @@ int main()
                 dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<WrapNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr ||

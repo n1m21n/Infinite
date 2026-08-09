@@ -67,6 +67,38 @@ What each node type does: math, state, per-node parameter UI.
 | TextNode | Typography via CoreText/CoreGraphics |
 | OutputNode | Terminal node — identity-pass FBO, drives recording |
 
+### Invariants for `IGeometrySource`-consuming nodes
+
+Two rules every node with a single `IGeometrySource*` input (or `sourceInput`/
+`instanceShape`/etc.) is expected to follow, each backed by an automated
+sweep in `geometry-transform-sweep` (also run as part of
+`run-infinite-hygiene`) rather than left to manual review:
+
+1. **Forward every side-channel you don't explicitly change.** `GetMesh()`,
+   `GetModelMatrix()`, `GetMaterial()`, `GetSurfaceTexture()`,
+   `GetMaterialTexture()`, `GetMappingTransform()` — a node that bakes its
+   input's mesh but forgets to forward one of these silently drops it
+   somewhere downstream with no error. This has happened three times
+   (`ClothNode`, `MeshResynthNode`, `MeshToPointsNode` all forwarded material
+   and textures but not `GetMappingTransform()`) because each accessor is a
+   separate manual override with nothing enforcing "forward all or none."
+   `MAPPINGSWEEPTEST` checks this for `GetMappingTransform()` specifically;
+   there is currently no sweep for the others, so a new one dropping
+   `GetMaterialTexture()` wouldn't be caught automatically yet.
+2. **Only bump a revision/generation stamp when your actual output changed.**
+   `MeshRevision()` (or any node-local generation counter that feeds into it)
+   must not move just because `CookIfNeeded` ran again — it has to reflect a
+   real change in what `GetMesh()`/`GetPoints()`/etc. would return.
+   `DisplacementNode` violated this by bumping `mTexGeneration` on every cook
+   while a texture was connected, whether or not its pixels changed; any
+   stateful node downstream (`ClothNode`) that keys a full state reset off
+   "did the input's revision move" then resets every frame instead of ever
+   settling. `REVISIONSWEEPTEST` checks this generically.
+
+If you add a new node type in this category, wire it into both sweeps rather
+than hand-writing a one-off check — see `geometry-transform-sweep`'s SKILL.md,
+"Adding a new node type to a sweep."
+
 **File:** `src/main.cpp` — registration, per-node UI, and node-graph wiring
 (as opposed to the *rendering* of pins/links, which is Editor UI)
 

@@ -63,6 +63,14 @@ public:
    {
       return input ? input->GetMaterialTexture(map) : 0;
    }
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return input ? input->SurfaceTextureRevision() : 0;
+   }
+   MappingTransform GetMappingTransform() const override
+   {
+      return input ? input->GetMappingTransform() : MappingTransform();
+   }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;

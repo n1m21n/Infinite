@@ -32,6 +32,15 @@ namespace
       return p;
    }
 
+   // Tags a param with a section header, drawn above it in the params panel -
+   // for filters whose param list is long enough that a flat list stops being
+   // readable (e.g. a combined color-adjustments node).
+   FilterParamDef S(const char* section, FilterParamDef p)
+   {
+      p.sectionLabel = section;
+      return p;
+   }
+
    // Shared helpers available to every filter body (hue/sat conversions used by HSL).
    const char* kSharedHelpers =
       "vec3 rgb2hsv(vec3 c) {\n"
@@ -918,6 +927,98 @@ const std::vector<FilterDef>& GetFilterDefs()
         { P("Red from RGB", "uRedRow", T::Color, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f),
           P("Green from RGB", "uGreenRow", T::Color, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f),
           P("Blue from RGB", "uBlueRow", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f) } },
+
+      { "color adjustments", "Color",
+        // All-in-one grading node consolidating the separate brightness/contrast,
+        // levels, color balance, hsl, tone shaper, channelmixer and blackandwhite
+        // nodes into a single chain, so a common grade doesn't need seven nodes
+        // wired in series. Pipeline order follows the usual DaVinci
+        // Resolve / Photoshop primaries -> HSL -> channel mixer -> B&W stacking:
+        //   1) Brightness/contrast   4) HSL (hue/sat/lightness)
+        //   2) Levels (black/white point + gamma)   5) Tone shaper (S-curve)
+        //   3) Color balance (cyan-red/magenta-green/yellow-blue)   6) Channel mixer
+        //   7) Black & white (optional, always last - grading after a desaturate
+        //      step would be pointless, so it only runs when enabled)
+        // Each stage's math is copied verbatim from its standalone FilterDef.
+        std::string(kSharedHelpers) +
+        "uniform float uBrightness;\n"
+        "uniform float uContrast;\n"
+        "uniform float uBlackPoint;\n"
+        "uniform float uWhitePoint;\n"
+        "uniform float uGamma;\n"
+        "uniform float uCyanRed;\n"
+        "uniform float uMagentaGreen;\n"
+        "uniform float uYellowBlue;\n"
+        "uniform float uHueShift;\n"
+        "uniform float uSaturation;\n"
+        "uniform float uLightness;\n"
+        "uniform float uShadows;\n"
+        "uniform float uMidtones;\n"
+        "uniform float uHighlights;\n"
+        "uniform float uContrastPivot;\n"
+        "uniform vec3 uRedRow;\n"
+        "uniform vec3 uGreenRow;\n"
+        "uniform vec3 uBlueRow;\n"
+        "uniform int uBWEnabled;\n"
+        "uniform float uRedWeight;\n"
+        "uniform float uGreenWeight;\n"
+        "uniform float uBlueWeight;\n"
+        "float toneCurve(float x) {\n"
+        "   float s = mix(x, x*x*(3.0-2.0*x), uContrastPivot);\n"
+        "   float lift = uShadows * (1.0 - x) * (1.0 - x);\n"
+        "   float gain = uHighlights * x * x;\n"
+        "   float mid = uMidtones * 4.0 * x * (1.0 - x);\n"
+        "   return clamp(s + lift + gain + mid, 0.0, 1.0);\n"
+        "}\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   vec3 col = c.rgb;\n"
+        "\n"
+        "   col = clamp((col - 0.5) * (uContrast + 1.0) + 0.5 + uBrightness, 0.0, 1.0);\n"
+        "\n"
+        "   col = clamp((col - uBlackPoint) / max(uWhitePoint - uBlackPoint, 0.0001), 0.0, 1.0);\n"
+        "   col = pow(col, vec3(1.0 / max(uGamma, 0.0001)));\n"
+        "\n"
+        "   col = clamp(col + vec3(uCyanRed, uMagentaGreen, uYellowBlue), 0.0, 1.0);\n"
+        "\n"
+        "   vec3 hsv = rgb2hsv(col);\n"
+        "   hsv.x = fract(hsv.x + uHueShift);\n"
+        "   hsv.y = clamp(hsv.y * uSaturation, 0.0, 1.0);\n"
+        "   col = clamp(hsv2rgb(hsv) + uLightness, 0.0, 1.0);\n"
+        "\n"
+        "   col = vec3(toneCurve(col.r), toneCurve(col.g), toneCurve(col.b));\n"
+        "\n"
+        "   col = clamp(vec3(dot(col, uRedRow), dot(col, uGreenRow), dot(col, uBlueRow)), 0.0, 1.0);\n"
+        "\n"
+        "   if (uBWEnabled == 1) {\n"
+        "      float lum = col.r*uRedWeight + col.g*uGreenWeight + col.b*uBlueWeight;\n"
+        "      col = vec3(lum);\n"
+        "   }\n"
+        "\n"
+        "   fragColor = vec4(col, c.a);\n"
+        "}\n",
+        { S("-- Brightness / Contrast --", P("Brightness", "uBrightness", T::Float, -1.0f, 1.0f, 0.0f)),
+          P("Contrast", "uContrast", T::Float, -1.0f, 3.0f, 0.0f),
+          S("-- Levels --", P("Black Point", "uBlackPoint", T::Float, 0.0f, 1.0f, 0.0f)),
+          P("White Point", "uWhitePoint", T::Float, 0.0f, 1.0f, 1.0f),
+          P("Gamma", "uGamma", T::Float, 0.1f, 4.0f, 1.0f),
+          S("-- Color Balance --", P("Cyan-Red", "uCyanRed", T::Float, -0.5f, 0.5f, 0.0f)),
+          P("Magenta-Green", "uMagentaGreen", T::Float, -0.5f, 0.5f, 0.0f),
+          P("Yellow-Blue", "uYellowBlue", T::Float, -0.5f, 0.5f, 0.0f),
+          S("-- HSL --", P("Hue Shift", "uHueShift", T::Float, 0.0f, 1.0f, 0.0f)),
+          P("Saturation", "uSaturation", T::Float, 0.0f, 3.0f, 1.0f),
+          P("Lightness", "uLightness", T::Float, -1.0f, 1.0f, 0.0f),
+          S("-- Tone Shaper --", P("Shadows", "uShadows", T::Float, -0.5f, 0.5f, 0.0f)),
+          P("Midtones", "uMidtones", T::Float, -0.5f, 0.5f, 0.0f),
+          P("Highlights", "uHighlights", T::Float, -0.5f, 0.5f, 0.0f),
+          P("S-Curve", "uContrastPivot", T::Float, 0.0f, 1.0f, 0.0f),
+          S("-- Channel Mixer --", P("Red from RGB", "uRedRow", T::Color, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f)),
+          P("Green from RGB", "uGreenRow", T::Color, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f),
+          P("Blue from RGB", "uBlueRow", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f),
+          S("-- Black & White --", P("Enable", "uBWEnabled", T::Bool, 0.0f, 1.0f, 0.0f)),
+          P("Red Weight", "uRedWeight", T::Float, 0.0f, 2.0f, 0.299f),
+          P("Green Weight", "uGreenWeight", T::Float, 0.0f, 2.0f, 0.587f),
+          P("Blue Weight", "uBlueWeight", T::Float, 0.0f, 2.0f, 0.114f) } },
 
       // ---------------- Compositing: layer-effect style filters ----------------
       { "outerglow", "Compositing",
