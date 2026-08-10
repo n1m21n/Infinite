@@ -58,11 +58,30 @@ public:
 
    const std::map<Key, Source>& Links() const { return mLinks; }
 
+   // Inline algebraic expressions typed directly into a parameter field
+   // (e.g. "sin(t) * 0.5 + 0.5"), keyed the same way as mLinks. A parameter
+   // can be driven by a wired modulator or by a typed expression, but not
+   // both at once: if a link exists for a param that also carries an
+   // expression, the wired modulator wins (see the apply loop in main.cpp),
+   // which matches the UI already locking the field read-only the moment
+   // something is patched into its pin - the expression is left stored, just
+   // not evaluated, so re-patching the cable away brings it straight back.
+   void SetExpression(int nodeIndex, int paramIndex, const std::string& expr) { mExpressions[Key(nodeIndex, paramIndex)] = expr; }
+   void ClearExpression(int nodeIndex, int paramIndex) { mExpressions.erase(Key(nodeIndex, paramIndex)); mExpressionErrors.erase(Key(nodeIndex, paramIndex)); }
+   const std::string* ExpressionFor(int nodeIndex, int paramIndex) const;
+   bool HasExpression(int nodeIndex, int paramIndex) const { return ExpressionFor(nodeIndex, paramIndex) != nullptr; }
+   const std::map<Key, std::string>& Expressions() const { return mExpressions; }
+
+   // Set by the per-frame evaluation pass when an expression fails to parse
+   // or evaluate, so the UI can surface it instead of just freezing silently.
+   void SetExpressionError(int nodeIndex, int paramIndex, const std::string& error);
+   const std::string* ExpressionErrorFor(int nodeIndex, int paramIndex) const;
+
    // Dropping the whole graph must drop the bindings with it. Node indices
    // restart from 1 on a new patch, so a link left over from the previous one
    // does not go stale - it silently re-attaches to whichever node happens to
    // land on that index next.
-   void Clear() { mLinks.clear(); }
+   void Clear() { mLinks.clear(); mExpressions.clear(); mExpressionErrors.clear(); }
 
    // Parameters registered during the current frame's node drawing.
    void ClearFrameParams() { mFrameParams.clear(); }
@@ -71,5 +90,7 @@ public:
 
 private:
    std::map<Key, Source> mLinks;
+   std::map<Key, std::string> mExpressions;
+   std::map<Key, std::string> mExpressionErrors;
    std::vector<ParamRef> mFrameParams;
 };

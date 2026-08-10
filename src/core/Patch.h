@@ -27,6 +27,7 @@ class INode;
 //   geo <dstIndex> <dstSlot> <srcIndex>
 //   mod <dstIndex> <dstParam> <srcIndex> <srcOutput>
 //   pal <dstIndex> <dstColor> <srcIndex> <srcSwatch>
+//   expr <dstIndex> <dstParam> <expression text to end of line>
 //
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
@@ -68,6 +69,15 @@ namespace Patch
       int srcSwatch = 0;
    };
 
+   // A typed algebraic expression driving one parameter directly, with no
+   // modulator node involved - see Modulation::SetExpression.
+   struct ExprRecord
+   {
+      int dstIndex = 0;
+      int dstParam = 0;
+      std::string text;
+   };
+
    struct Data
    {
       std::vector<NodeRecord> nodes;
@@ -75,6 +85,7 @@ namespace Patch
       std::vector<CableRecord> geometry; // geometry, camera and light pins
       std::vector<ModRecord> modulation;
       std::vector<PaletteRecord> palette;
+      std::vector<ExprRecord> expressions;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

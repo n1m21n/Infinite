@@ -199,7 +199,10 @@ namespace Primitives
       {
          const float t = (float)i / r;
          const float y = 0.5f - t;
-         const float radius = 0.5f * (1.0f - t) + (0.5f * topRadius) * t;
+         // t runs top (y=+0.5) to bottom (y=-0.5), so topRadius scales t=0.
+         // The caps below key off the same end; if the two ever disagree a
+         // cone tapers to a point at one end and gets capped at the other.
+         const float radius = (0.5f * topRadius) * (1.0f - t) + 0.5f * t;
          for (int j = 0; j <= s; j++)
          {
             const float theta = 2.0f * kPi * (float)j / s;
@@ -2353,10 +2356,16 @@ namespace Primitives
                const unsigned int b = base + (unsigned int)(i * stride + j + 1);
                const unsigned int c = base + (unsigned int)((i + 1) * stride + j + 1);
                const unsigned int d = base + (unsigned int)((i + 1) * stride + j);
+               // (a,b,c,d) walks the ring the same way the angle does, which
+               // winds the triangles clockwise seen from outside - backface
+               // culling then eats the near wall and leaves the far wall's
+               // inside showing through, notching the rim. Reverse it so the
+               // winding matches the outward normals, as the end caps already
+               // do.
                if (facingOut)
-                  PushQuad(mesh, a, b, c, d);
-               else
                   PushQuad(mesh, a, d, c, b);
+               else
+                  PushQuad(mesh, a, b, c, d);
             }
       };
 

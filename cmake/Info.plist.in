@@ -26,5 +26,49 @@
 	<string>Infinite listens to an audio input so the node graph can react to sound.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Infinite can use a camera as a live image source.</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Infinite Patch</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>inf</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>InfinitePatch</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.namansoni.infinite.patch</string>
+			</array>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+		</dict>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.namansoni.infinite.patch</string>
+			<key>UTTypeDescription</key>
+			<string>Infinite Patch</string>
+			<key>UTTypeIconFile</key>
+			<string>InfinitePatch</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.content</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>inf</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

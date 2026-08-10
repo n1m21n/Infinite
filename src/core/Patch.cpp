@@ -36,6 +36,46 @@ namespace
       return buf;
    }
 
+   // Same escaping as Writer::Text/Reader::Text below, factored out for the
+   // "expr" record - free text on a single line, outside of any node.
+   std::string EscapeLine(const std::string& value)
+   {
+      std::string clean;
+      for (char c : value)
+      {
+         if (c == '\\')
+            clean += "\\\\";
+         else if (c == '\n')
+            clean += "\\n";
+         else if (c != '\r')
+            clean += c;
+      }
+      return clean;
+   }
+
+   std::string UnescapeLine(const std::string& raw)
+   {
+      std::string out;
+      for (size_t i = 0; i < raw.size(); i++)
+      {
+         if (raw[i] == '\\' && i + 1 < raw.size() && raw[i + 1] == 'n')
+         {
+            out += '\n';
+            i++;
+         }
+         else if (raw[i] == '\\' && i + 1 < raw.size() && raw[i + 1] == '\\')
+         {
+            out += '\\';
+            i++;
+         }
+         else
+         {
+            out += raw[i];
+         }
+      }
+      return out;
+   }
+
    class Writer : public ParamVisitor
    {
    public:
@@ -62,17 +102,7 @@ namespace
          // undo/redo and copy/paste use: folding lost a comment's shape on the
          // next undo, not just on the next save. Backslash is escaped too, so
          // unescaping on load has exactly one reading.
-         std::string clean;
-         for (char c : value)
-         {
-            if (c == '\\')
-               clean += "\\\\";
-            else if (c == '\n')
-               clean += "\\n";
-            else if (c != '\r') // a lone CR carries nothing worth keeping
-               clean += c;
-         }
-         out.push_back({ std::string("s ") + name, clean });
+         out.push_back({ std::string("s ") + name, EscapeLine(value) });
       }
       void Color(const char* name, float rgb[3]) override
       {
@@ -116,26 +146,7 @@ namespace
          // Undoes Writer::Text. Any other escape is left exactly as written:
          // patches saved before text was escaped at all never contain "\\n" or
          // "\\\\", so they read back unchanged.
-         const std::string& raw = it->second;
-         std::string out;
-         for (size_t i = 0; i < raw.size(); i++)
-         {
-            if (raw[i] == '\\' && i + 1 < raw.size() && raw[i + 1] == 'n')
-            {
-               out += '\n';
-               i++;
-            }
-            else if (raw[i] == '\\' && i + 1 < raw.size() && raw[i + 1] == '\\')
-            {
-               out += '\\';
-               i++;
-            }
-            else
-            {
-               out += raw[i];
-            }
-         }
-         value = out;
+         value = UnescapeLine(it->second);
       }
       void Color(const char* name, float rgb[3]) override
       {
@@ -199,6 +210,8 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
    for (const PaletteRecord& p : data.palette)
       file << "pal " << p.dstIndex << " " << p.dstColor << " "
            << p.srcIndex << " " << p.srcSwatch << "\n";
+   for (const ExprRecord& e : data.expressions)
+      file << "expr " << e.dstIndex << " " << e.dstParam << " " << EscapeLine(e.text) << "\n";
 
    if (!file.good())
    {
@@ -312,6 +325,17 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          PaletteRecord p;
          in >> p.dstIndex >> p.dstColor >> p.srcIndex >> p.srcSwatch;
          outData.palette.push_back(p);
+      }
+      else if (tag == "expr")
+      {
+         ExprRecord e;
+         in >> e.dstIndex >> e.dstParam;
+         std::string raw;
+         std::getline(in, raw);
+         if (!raw.empty() && raw[0] == ' ')
+            raw.erase(0, 1);
+         e.text = UnescapeLine(raw);
+         outData.expressions.push_back(e);
       }
       // Anything else is from a newer version and is deliberately ignored.
    }

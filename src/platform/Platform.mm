@@ -369,9 +369,18 @@ namespace Platform
          [panel setTitle:@"Open patch"];
          if (@available(macOS 11.0, *))
          {
-            UTType* type = [UTType typeWithFilenameExtension:@"infinite"];
-            if (type != nil)
-               [panel setAllowedContentTypes:@[ type ]];
+            // ".infinite" is accepted too so patches saved by older builds
+            // still open - the app now only writes ".inf", but never stops
+            // reading its own prior format.
+            NSMutableArray<UTType*>* types = [NSMutableArray array];
+            UTType* infType = [UTType typeWithIdentifier:@"com.namansoni.infinite.patch"];
+            if (infType != nil)
+               [types addObject:infType];
+            UTType* legacyType = [UTType typeWithFilenameExtension:@"infinite"];
+            if (legacyType != nil)
+               [types addObject:legacyType];
+            if (types.count > 0)
+               [panel setAllowedContentTypes:types];
          }
          if ([panel runModal] != NSModalResponseOK)
             return std::string();
@@ -387,11 +396,11 @@ namespace Platform
          NSSavePanel* panel = [NSSavePanel savePanel];
          [panel setTitle:@"Save patch"];
          [panel setNameFieldStringValue:
-            [NSString stringWithUTF8String:suggestedName.empty() ? "Untitled.infinite"
+            [NSString stringWithUTF8String:suggestedName.empty() ? "Untitled.inf"
                                                                  : suggestedName.c_str()]];
          if (@available(macOS 11.0, *))
          {
-            UTType* type = [UTType typeWithFilenameExtension:@"infinite"];
+            UTType* type = [UTType typeWithIdentifier:@"com.namansoni.infinite.patch"];
             if (type != nil)
                [panel setAllowedContentTypes:@[ type ]];
          }

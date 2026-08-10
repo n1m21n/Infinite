@@ -7,6 +7,12 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_node_editor.h"
 #include "imgui_stdlib.h"
+// For direct ImGuiInputTextState access: ImGui's own AutoSelectAll flag (and
+// the select-all it triggers implicitly whenever focus arrives through
+// SetKeyboardFocusHere's nav-activation path) can't be trusted to land
+// before a same-frame keystroke is processed, so typed-param entry sets the
+// cursor/selection state explicitly once the field is confirmed active.
+#include "imgui_internal.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -35,6 +41,7 @@
 #include "core/BlendModes.h"
 #include "core/Transport.h"
 #include "core/Modulation.h"
+#include "core/Expression.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
 #include "core/NodeViewport.h"
@@ -342,6 +349,27 @@ namespace
    // Defined further down, once the gNodes lookup exists.
    IPaletteSource* PaletteSourceByIndex(int nodeIndex);
    std::set<std::pair<int, int>> gTypedParam;                 // params showing a text field
+   // Params that entered typing mode via hover+type rather than double-click;
+   // these get the cursor placed at the end instead of a full selection, so
+   // the seeded digit is appended to rather than replaced by the next keystroke.
+   std::set<std::pair<int, int>> gTypedParamNoAutoSelect;
+   // Params whose InputFloat selection/cursor state still needs to be forced
+   // once the field is confirmed active (see the comment at its use site).
+   std::set<std::pair<int, int>> gTypedParamPendingInit;
+   // Live text for the field currently being typed into. A plain number
+   // commits as a value and clears any expression; text starting with '='
+   // commits as an expression (see ModSlider) - the same field doubles as
+   // both, like a spreadsheet cell.
+   std::map<std::pair<int, int>, std::string> gTypedParamText;
+
+   std::string TrimCopy(const std::string& s)
+   {
+      size_t start = s.find_first_not_of(" \t");
+      if (start == std::string::npos)
+         return std::string();
+      size_t end = s.find_last_not_of(" \t");
+      return s.substr(start, end - start + 1);
+   }
    // Param pins declared this frame. A node with its params collapsed declares
    // none, and emitting a link to an undeclared pin makes the editor treat the
    // link as dead and delete it - which silently dropped the modulation.
@@ -375,6 +403,10 @@ namespace
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex;
       const bool modulated = Modulation::Instance().IsModulated(nodeIndex, paramIndex);
+      // An expression only actually drives the field while nothing is wired
+      // into its pin - see Modulation::SetExpression. It stays stored either
+      // way, so unpatching the cable brings it straight back.
+      const bool hasExpr = !modulated && Modulation::Instance().HasExpression(nodeIndex, paramIndex);
       gDrawnParamPins.insert(pinId);
 
       ImGui::PushID(paramIndex + 5000);
@@ -386,13 +418,16 @@ namespace
       ImGui::Dummy(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
-      dl->AddCircleFilled(c, 4.0f, modulated ? IM_COL32(255, 190, 90, 255) : IM_COL32(95, 100, 120, 255));
+      const ImU32 pinColor = modulated ? IM_COL32(255, 190, 90, 255)
+                            : hasExpr  ? IM_COL32(170, 130, 255, 255)
+                                       : IM_COL32(95, 100, 120, 255);
+      dl->AddCircleFilled(c, 4.0f, pinColor);
       ed::EndPin();
       ImGui::SameLine(0.0f, 4.0f);
 
-      // Double-clicking swaps the slider for a text field so an exact value can
-      // be typed. ImGui's built-in Ctrl+click does this too, but double-click is
-      // what people reach for.
+      // Double-clicking swaps the slider for a text field so an exact value
+      // (or, prefixed with '=', an expression) can be typed. ImGui's built-in
+      // Ctrl+click does this too, but double-click is what people reach for.
       const std::pair<int, int> editKey(nodeIndex, paramIndex);
       bool typing = gTypedParam.count(editKey) > 0;
 
@@ -405,17 +440,76 @@ namespace
             ImGui::SetKeyboardFocusHere();
             gTypedParamJustOpened = std::pair<int, int>(-1, -1);
          }
-         changed = ImGui::InputFloat(label, value, 0.0f, 0.0f, fmt,
-                                     ImGuiInputTextFlags_EnterReturnsTrue |
-                                     ImGuiInputTextFlags_AutoSelectAll);
+         char buf[256];
+         snprintf(buf, sizeof(buf), "%s", gTypedParamText[editKey].c_str());
+         // A plain InputText rather than InputFloat: the field has to accept
+         // letters too, so a typed expression like "sin(t)" is not filtered
+         // out character-by-character the way InputFloat's numeric-only input
+         // would filter it.
+         //
+         // ImGuiInputTextFlags_AutoSelectAll only selects on a *mouse* click;
+         // this field is focused programmatically via SetKeyboardFocusHere,
+         // which instead runs through ImGui's nav-activation path and forces
+         // its own select-all the moment the field actually goes active
+         // (which can land a frame after SetKeyboardFocusHere is called) -
+         // regardless of any flag we pass. So don't rely on flags for
+         // selection at all: drive it explicitly below once the field is
+         // confirmed active, which also lets the hover+type path leave the
+         // cursor at the end instead of selecting the seeded digit.
+         const bool entered = ImGui::InputText(label, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
+         gTypedParamText[editKey] = buf;
+         if (gTypedParamPendingInit.count(editKey) && ImGui::IsItemActive())
+         {
+            if (ImGuiInputTextState* state = ImGui::GetInputTextState(ImGui::GetItemID()))
+            {
+               if (gTypedParamNoAutoSelect.count(editKey))
+               {
+                  state->Stb.cursor = state->CurLenW;
+                  state->ClearSelection();
+               }
+               else
+               {
+                  state->SelectAll();
+               }
+            }
+            gTypedParamPendingInit.erase(editKey);
+         }
          // IsItemActivated() has to be queried right after its widget, and it
          // fires on the frame focus begins - before any edit is applied that
          // same frame - so the checkpoint still captures the pre-edit value
-         // even though the check reads textually "after" InputFloat here.
+         // even though the check reads textually "after" InputText here.
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
-         if (changed || ImGui::IsItemDeactivated())
+         if (entered || ImGui::IsItemDeactivated())
+         {
+            const std::string trimmed = TrimCopy(gTypedParamText[editKey]);
+            if (!trimmed.empty() && trimmed[0] == '=')
+            {
+               const std::string exprText = TrimCopy(trimmed.substr(1));
+               if (exprText.empty())
+                  Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
+               else
+                  Modulation::Instance().SetExpression(nodeIndex, paramIndex, exprText);
+            }
+            else
+            {
+               Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
+               if (!trimmed.empty())
+               {
+                  char* end = nullptr;
+                  float parsed = strtof(trimmed.c_str(), &end);
+                  if (end != trimmed.c_str())
+                  {
+                     *value = parsed;
+                     changed = true;
+                  }
+               }
+            }
             gTypedParam.erase(editKey);
+            gTypedParamText.erase(editKey);
+            gTypedParamNoAutoSelect.erase(editKey);
+            gTypedParamPendingInit.erase(editKey);
+         }
       }
       else if (modulated)
       {
@@ -428,6 +522,41 @@ namespace
          ImGui::SliderFloat(label, &shown, minV, maxV, fmt, ImGuiSliderFlags_NoInput);
          ImGui::PopStyleColor(2);
       }
+      else if (hasExpr)
+      {
+         // Driven by a typed expression, re-evaluated every frame by the
+         // apply pass in the main loop. Read-only like the modulated state,
+         // but a distinct colour, plus an fx badge and a tooltip showing the
+         // formula (and its last error, if it has one). Double-click reopens
+         // the expression text for editing, same as any other field.
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.20f, 0.15f, 0.32f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.66f, 0.51f, 0.98f, 1.0f));
+         float shown = *value;
+         ImGui::SetNextItemWidth(kParamWidth - box - 4.0f);
+         ImGui::SliderFloat(label, &shown, minV, maxV, fmt, ImGuiSliderFlags_NoInput);
+         const bool sliderHovered = ImGui::IsItemHovered();
+         ImGui::PopStyleColor(2);
+         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::TextColored(ImVec4(0.66f, 0.51f, 0.98f, 1.0f), "\xC6\x92x");
+         const bool hovered = sliderHovered || ImGui::IsItemHovered();
+         if (hovered)
+         {
+            const std::string* expr = Modulation::Instance().ExpressionFor(nodeIndex, paramIndex);
+            const std::string* err = Modulation::Instance().ExpressionErrorFor(nodeIndex, paramIndex);
+            std::string tip = std::string("= ") + (expr != nullptr ? *expr : std::string());
+            if (err != nullptr && !err->empty())
+               tip += std::string("\nerror: ") + *err;
+            ImGui::SetTooltip("%s", tip.c_str());
+         }
+         if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+         {
+            const std::string* expr = Modulation::Instance().ExpressionFor(nodeIndex, paramIndex);
+            gTypedParamText[editKey] = std::string("=") + (expr != nullptr ? *expr : std::string());
+            gTypedParam.insert(editKey);
+            gTypedParamJustOpened = editKey;
+            gTypedParamPendingInit.insert(editKey);
+         }
+      }
       else
       {
          ImGui::SetNextItemWidth(kParamWidth - box - 4.0f);
@@ -438,8 +567,50 @@ namespace
             PushUndoCheckpoint();
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          {
+            char seed[64];
+            snprintf(seed, sizeof(seed), fmt, *value);
+            gTypedParamText[editKey] = seed;
             gTypedParam.insert(editKey);
             gTypedParamJustOpened = editKey;
+            gTypedParamPendingInit.insert(editKey);
+         }
+         // Hovering (not dragging) and pressing a digit/'-'/'.'/'=' starts a
+         // fresh typed value (or expression) immediately, without needing to
+         // double-click first. IsItemActive() guards against a mouse-drag
+         // coinciding with a keypress from stealing the drag into typing mode.
+         if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
+         {
+            ImGuiIO& io = ImGui::GetIO();
+            for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+            {
+               ImWchar ch = io.InputQueueCharacters[i];
+               if ((ch >= '0' && ch <= '9') || ch == '-' || ch == '.' || ch == '=')
+               {
+                  PushUndoCheckpoint();
+                  if (ch == '=')
+                     gTypedParamText[editKey] = "=";
+                  else if (ch >= '0' && ch <= '9')
+                  {
+                     *value = (float)(ch - '0');
+                     gTypedParamText[editKey] = std::string(1, (char)ch);
+                  }
+                  else if (ch == '-')
+                  {
+                     *value = -0.0f;
+                     gTypedParamText[editKey] = "-";
+                  }
+                  else
+                  {
+                     *value = 0.0f;
+                     gTypedParamText[editKey] = ".";
+                  }
+                  gTypedParam.insert(editKey);
+                  gTypedParamJustOpened = editKey;
+                  gTypedParamNoAutoSelect.insert(editKey);
+                  gTypedParamPendingInit.insert(editKey);
+                  break;
+               }
+            }
          }
       }
 
@@ -4797,6 +4968,8 @@ namespace
       for (const auto& link : PaletteBinding::Instance().Links())
          data.palette.push_back({ link.first.first, link.first.second,
                                   link.second.nodeIndex, link.second.swatchIndex });
+      for (const auto& expr : Modulation::Instance().Expressions())
+         data.expressions.push_back({ expr.first.first, expr.first.second, expr.second });
       return data;
    }
 
@@ -4913,6 +5086,12 @@ namespace
          GraphNode* src = resolve(c.srcIndex);
          if (dst != nullptr && src != nullptr)
             PaletteBinding::Instance().Bind(dst->index, c.dstColor, src->index, c.srcSwatch);
+      }
+      for (const Patch::ExprRecord& e : data.expressions)
+      {
+         GraphNode* dst = resolve(e.dstIndex);
+         if (dst != nullptr)
+            Modulation::Instance().SetExpression(dst->index, e.dstParam, e.text);
       }
 
       gSuppressUndoCheckpoints = false;
@@ -5122,7 +5301,7 @@ namespace
       std::string path = gPatchPath;
       if (path.empty() || forceDialog)
       {
-         std::string suggested = "Untitled.infinite";
+         std::string suggested = "Untitled.inf";
          if (!gPatchPath.empty())
          {
             const size_t slash = gPatchPath.find_last_of('/');
@@ -5133,10 +5312,34 @@ namespace
             return; // cancelled
          // The dialog does not force an extension, and a patch without one is
          // awkward to find again.
-         if (path.size() < 9 || path.compare(path.size() - 9, 9, ".infinite") != 0)
-            path += ".infinite";
+         if (path.size() < 4 || path.compare(path.size() - 4, 4, ".inf") != 0)
+            path += ".inf";
       }
       SavePatchTo(path);
+   }
+
+   // Set for one frame when a close/quit was deferred because the patch has
+   // unsaved changes, so the UI pass knows to pop the confirmation modal.
+   bool gShowUnsavedChangesModal = false;
+
+   // The single gate every real close path (Quit menu, Cmd+Q, red button)
+   // routes through. Dev-harness exits (INFINITE_EXITAFTER, selftest modes,
+   // screenshot mode) call glfwSetWindowShouldClose directly and deliberately
+   // skip this - a scripted run should never block on a modal nobody can see.
+   void RequestClose(GLFWwindow* window)
+   {
+      if (gPatchDirty)
+      {
+         // GLFW already set shouldClose before invoking the close callback
+         // that leads here (see _glfwInputWindowCloseRequest) - undo that so
+         // the app stays open until the modal is resolved.
+         glfwSetWindowShouldClose(window, GLFW_FALSE);
+         gShowUnsavedChangesModal = true;
+      }
+      else
+      {
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
    }
 
 }
@@ -5165,6 +5368,11 @@ int main()
    glfwMakeContextCurrent(window);
    glfwSwapInterval(1);
    Platform::PreventAppNap();
+
+   // Covers both the red close button and Cmd+Q: GLFW's Cocoa backend routes
+   // applicationShouldTerminate: through the same _glfwInputWindowCloseRequest
+   // as the window's own close button, so one callback gates both.
+   glfwSetWindowCloseCallback(window, [](GLFWwindow* w) { RequestClose(w); });
 
    IMGUI_CHECKVERSION();
    ImGui::CreateContext();
@@ -6455,7 +6663,7 @@ int main()
 
             ImGui::Separator();
             if (ImGui::MenuItem("Quit"))
-               glfwSetWindowShouldClose(window, GLFW_TRUE);
+               RequestClose(window);
             ImGui::EndMenu();
          }
          ImGui::Separator();
@@ -11930,26 +12138,111 @@ int main()
       if (gHelpOpen)
          DrawHelpWindow(&gHelpOpen);
 
-      // ---- apply modulation, then cook ----
+      if (gShowUnsavedChangesModal)
+      {
+         ImGui::OpenPopup("Unsaved Changes");
+         gShowUnsavedChangesModal = false;
+      }
+      if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+      {
+         ImGui::Text("This patch has unsaved changes.");
+         ImGui::Text("Save before closing?");
+         ImGui::Separator();
+         if (ImGui::Button("Save", ImVec2(100, 0)))
+         {
+            SavePatchInteractive(false);
+            // Only proceed if the save actually went through - a cancelled
+            // Save As dialog or a write failure leaves gPatchDirty set, and
+            // the modal should stay up so the user can try again.
+            if (!gPatchDirty)
+            {
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+               ImGui::CloseCurrentPopup();
+            }
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Don't Save", ImVec2(100, 0)))
+         {
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+            ImGui::CloseCurrentPopup();
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Cancel", ImVec2(100, 0)))
+            ImGui::CloseCurrentPopup();
+         ImGui::EndPopup();
+      }
+
+      // Keep the title bar in sync with the open document. GLFW has no
+      // native "dirty dot" hook, so the bullet is just part of the string -
+      // the same convention every other non-native-document-model app uses.
+      {
+         static std::string sLastTitle;
+         std::string base = gPatchPath.empty()
+            ? std::string("Untitled")
+            : gPatchPath.substr(gPatchPath.find_last_of('/') + 1);
+         std::string title = (gPatchDirty ? std::string("\xE2\x80\xA2 ") : std::string()) +
+            base + " \xE2\x80\x94 Infinite";
+         if (title != sLastTitle)
+         {
+            glfwSetWindowTitle(window, title.c_str());
+            sLastTitle = title;
+         }
+      }
+
+      // ---- apply modulation and expressions, then cook ----
       // Deliberately after the UI: the parameter registry is rebuilt every frame
       // while nodes draw, so every pointer here belongs to a node that still
       // exists. Cooking before the UI would mean writing through last frame's
       // pointers, which dangle the moment a node is deleted.
       {
          Modulation& modulation = Modulation::Instance();
+         // Snapshot every registered parameter's current value, keyed by node,
+         // before any of this frame's writes land. This is what lets an
+         // expression reference a sibling parameter by name ("width * 0.5")
+         // without depending on the order params happened to draw in - and it
+         // means a cycle between two expressions just settles a frame late
+         // rather than reading half-updated state mid-pass.
+         std::map<int, std::map<std::string, float>> paramSnapshot;
+         for (const ParamRef& ref : modulation.FrameParams())
+            if (ref.value != nullptr)
+               paramSnapshot[ref.nodeIndex][ref.name] = *ref.value;
+
+         const double t = Transport::Instance().Seconds();
          for (const ParamRef& ref : modulation.FrameParams())
          {
+            if (ref.value == nullptr)
+               continue;
             const Modulation::Source src = modulation.ModulatorFor(ref.nodeIndex, ref.paramIndex);
-            if (src.nodeIndex < 0 || ref.value == nullptr)
+            if (src.nodeIndex >= 0)
+            {
+               // A wired modulator always wins over a typed expression - see
+               // Modulation::SetExpression.
+               GraphNode* modNode = FindNodeByIndex(src.nodeIndex);
+               if (modNode == nullptr)
+                  continue;
+               auto* modulator = ModulatorForOutput(modNode->node.get(), src.outputIndex);
+               if (modulator == nullptr)
+                  continue;
+               const float v01 = modulator->Value01();
+               *ref.value = ref.minValue + (ref.maxValue - ref.minValue) * v01;
                continue;
-            GraphNode* modNode = FindNodeByIndex(src.nodeIndex);
-            if (modNode == nullptr)
+            }
+            const std::string* expr = modulation.ExpressionFor(ref.nodeIndex, ref.paramIndex);
+            if (expr == nullptr)
                continue;
-            auto* modulator = ModulatorForOutput(modNode->node.get(), src.outputIndex);
-            if (modulator == nullptr)
-               continue;
-            const float v01 = modulator->Value01();
-            *ref.value = ref.minValue + (ref.maxValue - ref.minValue) * v01;
+            float result = 0.0f;
+            std::string error;
+            if (Expression::Evaluate(*expr, t, &paramSnapshot[ref.nodeIndex], result, error))
+            {
+               *ref.value = std::min(std::max(result, ref.minValue), ref.maxValue);
+               modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, std::string());
+            }
+            else
+            {
+               // Leave the last good value in place rather than snapping to 0 -
+               // a typo mid-edit should not blank out the render.
+               modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, error);
+            }
          }
       }
 

@@ -45,6 +45,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
+    src/core/Expression.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp
     src/platform/Platform.mm
@@ -159,7 +160,11 @@ if(APPLE)
         COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:Infinite>"
         COMMENT "Ad-hoc signing the bundle")
 
-    target_sources(Infinite PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns")
-    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns"
+    target_sources(Infinite PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/InfinitePatch.icns")
+    set_source_files_properties(
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/InfinitePatch.icns"
         PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 endif()
