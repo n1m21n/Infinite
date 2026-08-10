@@ -149,7 +149,10 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override;
-   unsigned int GetSurfaceTexture() override { return mSmall.tex; }
+   // No texture at all when useImageColor is off, same condition that makes
+   // CookIfNeeded fall back to a flat p.r/g/b = tint per point - the swatch
+   // then shows GetMaterial()'s tint color instead of the raw image.
+   unsigned int GetSurfaceTexture() override { return useImageColor ? mSmall.tex : 0; }
    unsigned long long SurfaceTextureRevision() const override { return mRevision; }
 
    ImageCable& Input() { return mInput; }

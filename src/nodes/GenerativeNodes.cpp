@@ -406,8 +406,10 @@ unsigned long long ImageToPointsNode::MeshRevision()
 
 Material ImageToPointsNode::GetMaterial() const
 {
+   // Matches CookIfNeeded's p.r/g/b: tint always multiplies, the raw texture
+   // (see GetSurfaceTexture) only enters the mix when useImageColor is on.
    Material m;
-   m.color[0] = m.color[1] = m.color[2] = 1.0f;
+   m.color[0] = tint[0]; m.color[1] = tint[1]; m.color[2] = tint[2];
    return m;
 }
 
