@@ -125,7 +125,7 @@ private:
 // Turns an image into a point cloud: one particle per sampled pixel, positioned
 // on a plane with luminance pushing it out of that plane. The result feeds
 // Instance on Points, so an image becomes a field of shapes.
-class ImageToPointsNode : public INode, public IPointCloudSource, public IGeometrySource
+class ImageToPointsNode : public INode, public IGeometrySource
 {
 public:
    enum DepthSource { kLuminance = 0, kRed, kAlpha, kFlat, kDepthSourceCount };
@@ -139,8 +139,10 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
-   const std::vector<Particle>& GetPoints() override { return mPoints; }
-   unsigned long long PointRevision() override { return mRevision; }
+   const std::vector<Particle>& GetPoints() { return mPoints; }
+   unsigned long long PointRevision() { return mRevision; }
+   const std::vector<Particle>* GetPointCloud() override { return &mPoints; }
+   unsigned long long PointCloudRevision() override { return mRevision; }
 
    // IGeometrySource: a swatch quad per point, each sampling its own texel of
    // the downsampled source image rather than the whole image tiled per-quad

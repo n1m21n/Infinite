@@ -39,8 +39,10 @@ public:
    void CookIfNeeded(int frameId) override;
 
    // A patched curve or mesh replaces the parametric shape entirely: it is the
-   // more specific instruction. Curve wins over geometry when both are present.
-   ICurveSource* curveSource = nullptr;
+   // more specific instruction. Curve wins over geometry when both are
+   // present. Read via GetCurve() - a plain mesh source with no curve of its
+   // own returns nullptr, same as an unconnected pin.
+   IGeometrySource* curveSource = nullptr;
    IGeometrySource* geometrySource = nullptr;
    const char* InputLabel(int slot) const override
    {

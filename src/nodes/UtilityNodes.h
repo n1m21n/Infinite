@@ -493,7 +493,9 @@ public:
    Material GetMaterial() const override;
 
    // A cloud drives the balls when patched, so particles can be surfaced.
-   IPointCloudSource* cloudSource = nullptr;
+   // Read via GetPointCloud() - a plain mesh source with no point cloud of its
+   // own returns nullptr, same as an unconnected pin.
+   IGeometrySource* cloudSource = nullptr;
    const char* InputLabel(int) const override { return "cloud"; }
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
    size_t BallCount() const { return mBallCount; }
@@ -579,7 +581,7 @@ private:
 // small quad at each. The sampling itself already existed inside Instance on
 // Points; this exposes it as geometry in its own right, so a point set can be
 // looked at, operated on, or fed onwards.
-class MeshToPointsNode : public INode, public IGeometrySource, public IPointCloudSource
+class MeshToPointsNode : public INode, public IGeometrySource
 {
 public:
    static INode* Create() { return new MeshToPointsNode(); }
@@ -601,11 +603,13 @@ public:
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
 
-   // IPointCloudSource: the same samples GetMesh() bakes into billboard
-   // quads, as particles a renderer can draw as camera-facing sprites
-   // instead. Built together in RebuildIfNeeded so the two never disagree.
-   const std::vector<Particle>& GetPoints() override;
-   unsigned long long PointRevision() override;
+   // The same samples GetMesh() bakes into billboard quads, as particles a
+   // renderer can draw as camera-facing sprites instead. Built together in
+   // RebuildIfNeeded so the two never disagree.
+   const std::vector<Particle>& GetPoints();
+   unsigned long long PointRevision();
+   const std::vector<Particle>* GetPointCloud() override { return &GetPoints(); }
+   unsigned long long PointCloudRevision() override { return PointRevision(); }
 
    // Forwarded for the same reason the geometry operators forward it: sampling
    // a mesh does not relocate it.

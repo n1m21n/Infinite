@@ -257,19 +257,6 @@ struct Particle
    bool alive = true;
 };
 
-// A node that emits a point cloud. Distinct from IGeometrySource: a cloud has
-// no triangles of its own, only positions. Instance on Points can take one
-// directly, stamping its shape at every point without the mesh-sampling step.
-class IPointCloudSource
-{
-public:
-   virtual ~IPointCloudSource() {}
-   virtual const std::vector<Particle>& GetPoints() = 0;
-   // Bumped whenever the cloud changes, using the same stamp counter as meshes
-   // so the renderer's upload cache works identically for both.
-   virtual unsigned long long PointRevision() = 0;
-};
-
 // An ordered chain of points in space. Curves, extracted mesh boundaries and
 // plane-slice contours all reduce to this, so anything that can follow one can
 // follow all of them.
@@ -280,17 +267,6 @@ struct Polyline
 
    size_t Count() const { return points.size() / 3; }
    bool Empty() const { return Count() < 2; }
-};
-
-// A node that emits a curve. Kept separate from IGeometrySource because a curve
-// is a path through space, not a surface - what a follower wants from it is a
-// position and a heading at a parameter, which a mesh cannot answer.
-class ICurveSource
-{
-public:
-   virtual ~ICurveSource() {}
-   virtual const Polyline& GetPolyline() = 0;
-   virtual unsigned long long CurveRevision() = 0;
 };
 
 // A point sampled off a mesh, used by the instancing nodes.

@@ -458,12 +458,12 @@ void InstanceOnPointsNode::Rebuild()
 
    // A patched point cloud replaces mesh sampling: the positions already exist,
    // so there is nothing to sample.
-   if (cloudSource != nullptr)
+   const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
+   if (cloud != nullptr)
    {
-      const std::vector<Particle>& cloud = cloudSource->GetPoints();
-      mTransforms.reserve(cloud.size());
-      mColors.reserve(cloud.size() * 3);
-      for (const Particle& p : cloud)
+      mTransforms.reserve(cloud->size());
+      mColors.reserve(cloud->size() * 3);
+      for (const Particle& p : *cloud)
       {
          if (!p.alive)
             continue;
@@ -557,7 +557,7 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    // reason a triangle count was tried and dropped in GeometryOpNode: a
    // Select or Transform Selected upstream can change which vertices move,
    // or where they end up, without changing how many there are.
-   const unsigned long long cloudRevision = cloudSource ? cloudSource->PointRevision() : 0;
+   const unsigned long long cloudRevision = cloudSource ? cloudSource->PointCloudRevision() : 0;
    const unsigned long long pointRevision = pointSource ? pointSource->MeshRevision() : 0;
    const unsigned long long shapeRevision = instanceShape ? instanceShape->MeshRevision() : 0;
    // Neither source bumps a revision for a pure transform edit (GetModelMatrix

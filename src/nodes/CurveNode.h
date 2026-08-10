@@ -7,11 +7,11 @@
 
 // A curve through space, as both something to look at and something to follow.
 //
-// It is an IGeometrySource so it can be seen - swept into a tube and rendered
-// like any mesh - and an ICurveSource so a Path can travel along it. Those are
+// It can be seen - swept into a tube and rendered like any mesh, via GetMesh()
+// - and followed, via GetCurve(), so a Path can travel along it. Those are
 // genuinely different questions: a mesh cannot answer "where am I at t and
 // which way am I heading", and a curve has no surface until one is built.
-class CurveNode : public INode, public IGeometrySource, public ICurveSource
+class CurveNode : public INode, public IGeometrySource
 {
 public:
    static const int kMaxPoints = 8;
@@ -30,8 +30,10 @@ public:
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
 
-   const Polyline& GetPolyline() override;
-   unsigned long long CurveRevision() override;
+   const Polyline& GetPolyline();
+   unsigned long long CurveRevision();
+   const Polyline* GetCurve() override { return &GetPolyline(); }
+   unsigned long long CurveStamp() override { return CurveRevision(); }
 
    size_t PointCount() const { return mLine.Count(); }
    size_t TriangleCount() const { return mMesh.indices.size() / 3; }

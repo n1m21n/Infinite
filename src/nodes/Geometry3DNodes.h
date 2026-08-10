@@ -142,6 +142,16 @@ public:
    // override. Identity by default: only a source that actually redirects a
    // transform this way needs to return anything else.
    virtual Mat4 GetInstanceGroupMatrix() const { return Mat4::Identity(); }
+
+   // Optional components alongside (or instead of) the mesh above. A source
+   // with no point cloud / curve of its own returns nullptr, which callers
+   // treat identically to "not connected to the right kind of thing" - the
+   // same guard they already used for a plain null pointer before every
+   // geometry-ish source shared one interface.
+   virtual const std::vector<Particle>* GetPointCloud() { return nullptr; }
+   virtual unsigned long long PointCloudRevision() { return 0; }
+   virtual const Polyline* GetCurve() { return nullptr; }
+   virtual unsigned long long CurveStamp() { return 0; }
 };
 
 // --- Geometry -----------------------------------------------------------
@@ -297,12 +307,6 @@ public:
    unsigned long long TextureRevision() const override { return mRevision; }
 
    IGeometrySource* geometry[kSlots] = { nullptr, nullptr, nullptr, nullptr };
-   // Set alongside geometry[] whenever the connected source also implements
-   // IPointCloudSource (Mesh to Points, Image to Points, a Particle System).
-   // A slot with a cloud draws camera-facing sprites instead of geometry[]'s
-   // triangles - see drawSlot's cloud branch - since a cloud has no mesh of
-   // its own to fall back on when both are present.
-   IPointCloudSource* clouds[kSlots] = { nullptr, nullptr, nullptr, nullptr };
 
    // Optional scene nodes. When null, the built-in camera/light values below
    // are used, so a Render node works on its own.
@@ -366,9 +370,9 @@ public:
    bool depthTest = true;
    bool backfaceCull = true;
 
-   // How a connected point cloud slot draws - see clouds[] above. Applies to
-   // every cloud slot uniformly, since it's a property of how this node
-   // renders points, not of any one source.
+   // How a connected point cloud slot draws (when GetPointCloud() returns
+   // non-null for that slot). Applies to every cloud slot uniformly, since
+   // it's a property of how this node renders points, not of any one source.
    static const std::vector<std::string>& SpriteShapeNames();
    int spriteShape = 0;      // circle / square
    static const std::vector<std::string>& SpriteSizeModeNames();

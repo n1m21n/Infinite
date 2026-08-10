@@ -440,7 +440,7 @@ public:
    // wins when both are patched: it is the more specific instruction.
    IGeometrySource* pointSource = nullptr;
    IGeometrySource* instanceShape = nullptr;
-   IPointCloudSource* cloudSource = nullptr;
+   IGeometrySource* cloudSource = nullptr;
 
    const char* InputLabel(int slot) const override
    {

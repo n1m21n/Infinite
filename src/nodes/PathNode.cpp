@@ -25,12 +25,13 @@ void PathNode::RebuildFollowIfNeeded()
 {
    // A curve is already a polyline, so following one is free; a mesh has to be
    // reduced to one, which is not, hence the cache.
-   if (curveSource != nullptr)
+   const Polyline* curve = curveSource ? curveSource->GetCurve() : nullptr;
+   if (curve != nullptr)
    {
-      const unsigned long long revision = curveSource->CurveRevision();
+      const unsigned long long revision = curveSource->CurveStamp();
       if (mBuiltCurve != (const void*)curveSource || mBuiltRevision != revision)
       {
-         mFollow = curveSource->GetPolyline();
+         mFollow = *curve;
          mBuiltCurve = curveSource;
          mBuiltGeometry = nullptr;
          mBuiltRevision = revision;

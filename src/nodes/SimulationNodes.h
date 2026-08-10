@@ -23,7 +23,7 @@
 // Emits a point cloud. Patch it into the "cloud" pin of Instance on Points to
 // stamp a shape at every particle - the renderer draws all of them in a single
 // instanced call, so the practical limit is the simulation, not the drawing.
-class ParticleSystemNode : public INode, public IPointCloudSource
+class ParticleSystemNode : public INode, public IGeometrySource
 {
 public:
    enum EmitShape { kPoint = 0, kSphere, kBox, kDisc, kEmitShapeCount };
@@ -36,8 +36,17 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
-   const std::vector<Particle>& GetPoints() override { return mParticles; }
-   unsigned long long PointRevision() override { return mRevision; }
+   // No mesh of its own - a pure point cloud. See GetPointCloud() below for
+   // the component that actually carries its data.
+   const Mesh& GetMesh() override { static Mesh empty; return empty; }
+   unsigned long long MeshRevision() override { return 0; }
+   Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+   Material GetMaterial() const override { return Material(); }
+
+   const std::vector<Particle>& GetPoints() { return mParticles; }
+   unsigned long long PointRevision() { return mRevision; }
+   const std::vector<Particle>* GetPointCloud() override { return &mParticles; }
+   unsigned long long PointCloudRevision() override { return mRevision; }
 
    size_t AliveCount() const { return mAliveCount; }
    void Reset();

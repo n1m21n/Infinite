@@ -475,7 +475,8 @@ void MetaBallNode::RebuildIfNeeded()
    // sub-pixel change, so the orbit is quantised and every parameter is checked.
    const double beat = Transport::Instance().Beats() * (double)spin;
    const double quantised = std::floor(beat * 60.0) / 60.0;
-   const unsigned long long cloudRevision = cloudSource ? cloudSource->PointRevision() : 0;
+   const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
+   const unsigned long long cloudRevision = cloudSource ? cloudSource->PointCloudRevision() : 0;
 
    if (mBuiltCount == ballCount && mBuiltRes == resolution &&
        mBuiltThreshold == threshold && mBuiltBounds == bounds &&
@@ -485,14 +486,13 @@ void MetaBallNode::RebuildIfNeeded()
       return;
 
    std::vector<Primitives::MetaBall> balls;
-   if (cloudSource != nullptr)
+   if (cloud != nullptr)
    {
       // Surfacing a particle system. Capped, because the field cost is the ball
       // count times the whole grid - a thousand particles would be unusable.
-      const std::vector<Particle>& cloud = cloudSource->GetPoints();
       const int cap = std::max(1, std::min(maxFromCloud, 64));
       int taken = 0;
-      for (const Particle& p : cloud)
+      for (const Particle& p : *cloud)
       {
          if (!p.alive)
             continue;

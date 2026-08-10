@@ -1019,13 +1019,14 @@ bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
    {
       if (!mGpu[i].hasBounds)
          continue;
+      if (geometry[i] == nullptr)
+         continue;
       // A cloud slot's bounds are already world-space (drawCloudSlot bakes
       // its source's model matrix into every particle position before ever
       // touching mGpu[i].lo/hi), so pushing them through geometry[i]'s model
       // matrix here too would double-transform them.
-      if (geometry[i] == nullptr && clouds[i] == nullptr)
-         continue;
-      const Mat4 model = clouds[i] != nullptr ? Mat4::Identity() : geometry[i]->GetModelMatrix();
+      const bool isCloud = geometry[i]->GetPointCloud() != nullptr;
+      const Mat4 model = isCloud ? Mat4::Identity() : geometry[i]->GetModelMatrix();
       // The eight corners through the matrix: a rotated box's true extent
       // cannot be had from transforming the min and max alone.
       for (int corner = 0; corner < 8; corner++)
@@ -1285,31 +1286,21 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
    for (int i = 0; i < kSlots; i++)
    {
       IGeometrySource* source = geometry[i];
-      IPointCloudSource* cloud = clouds[i];
-      if (source == nullptr && cloud == nullptr)
+      if (source == nullptr)
          continue;
       sig.hasGeom[i] = true;
-      // Cloud wins when a source offers both (see clouds[] comment) - keyed
-      // on PointRevision() rather than MeshRevision() so an animated cloud
-      // (a Particle System stepping every frame) keeps invalidating the
-      // cache instead of freezing on its first drawn frame.
-      if (cloud != nullptr)
+      // A pure cloud (a Particle System) has no triangles of its own worth
+      // revving on MeshRevision() - it reports a constant 0 there - so every
+      // component's revision is folded in together. Whichever one the source
+      // actually implements is the one that changes, and an unimplemented
+      // component's stamp is a constant 0 that contributes nothing.
+      sig.geomRev[i] = source->MeshRevision() ^ source->PointCloudRevision() ^ source->CurveStamp();
+      sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
+      sig.material[i] = source->GetMaterial();
+      for (int m = kMapRoughness; m < kMapCount; m++)
       {
-         sig.geomRev[i] = cloud->PointRevision();
-         auto* asGeom = dynamic_cast<IGeometrySource*>(cloud);
-         sig.material[i] = asGeom ? asGeom->GetMaterial() : Material();
-         sig.surfaceTexRev[i] = asGeom ? asGeom->SurfaceTextureRevision() : 0;
-      }
-      else
-      {
-         sig.geomRev[i] = source->MeshRevision();
-         sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
-         sig.material[i] = source->GetMaterial();
-         for (int m = kMapRoughness; m < kMapCount; m++)
-         {
-            if (source->GetMaterialTexture(m) != 0)
-               sig.texturedMaterial = true;
-         }
+         if (source->GetMaterialTexture(m) != 0)
+            sig.texturedMaterial = true;
       }
    }
 
@@ -1674,13 +1665,13 @@ void Render3DNode::CookIfNeeded(int frameId)
 
    // Point-cloud slots draw an instanced unit quad, billboarded against the
    // camera in the vertex shader (uIsSprite), instead of geometry[]'s
-   // triangles - see clouds[]'s comment for why cloud wins when both are
-   // present. Shares the mesh path's instance-buffer layout (aInstance /
+   // triangles - a cloud wins over triangles when a source offers both.
+   // Shares the mesh path's instance-buffer layout (aInstance /
    // aInstanceColor) so it needs no new GPU upload machinery, just a
    // different way of filling that buffer.
-   auto drawCloudSlot = [&](int i, IPointCloudSource* cloud)
+   auto drawCloudSlot = [&](int i, IGeometrySource* cloud)
    {
-      const std::vector<Particle>& points = cloud->GetPoints();
+      const std::vector<Particle>& points = *cloud->GetPointCloud();
       GpuMesh& gpu = mGpu[i];
 
       const bool sourceChanged = gpu.source != (const void*)cloud;
@@ -1720,16 +1711,15 @@ void Render3DNode::CookIfNeeded(int frameId)
          gpu.indexCount = 6;
       }
 
-      // A pure cloud source (Particle System) has no separate object space -
-      // its particles already simulate in world space. A dual source (Mesh
-      // to Points, Image to Points) samples in its mesh's local space, same
-      // as GetMesh(), so its model matrix still has to be applied here.
-      auto* asGeom = dynamic_cast<IGeometrySource*>(cloud);
-      const Mat4 model = asGeom ? asGeom->GetModelMatrix() : Mat4::Identity();
-      const Material material = asGeom ? asGeom->GetMaterial() : Material();
-      const unsigned int surface = asGeom ? asGeom->GetSurfaceTexture() : 0;
+      // A pure cloud source (Particle System) reports Identity() here - its
+      // particles already simulate in world space. A dual source (Mesh to
+      // Points, Image to Points) samples in its mesh's local space, same as
+      // GetMesh(), so its model matrix still has to be applied.
+      const Mat4 model = cloud->GetModelMatrix();
+      const Material material = cloud->GetMaterial();
+      const unsigned int surface = cloud->GetSurfaceTexture();
 
-      const unsigned long long revision = cloud->PointRevision();
+      const unsigned long long revision = cloud->PointCloudRevision();
       if (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model))
       {
          // A billboard has no orientation of its own to carry the rest of the
@@ -1853,19 +1843,19 @@ void Render3DNode::CookIfNeeded(int frameId)
    // the transmissive pass below - see the two-pass driver after this lambda.
    auto drawSlot = [&](int i)
    {
-      // A source offering both interfaces (Mesh to Points, Image to Points)
-      // draws as sprites, not triangles - see clouds[]'s comment.
-      IPointCloudSource* cloud = clouds[i];
-      if (cloud != nullptr)
+      IGeometrySource* source = geometry[i];
+      if (source == nullptr)
+         return;
+
+      // A source with both a mesh and a point cloud (Mesh to Points, Image
+      // to Points) draws as sprites, not triangles - the cloud wins.
+      if (source->GetPointCloud() != nullptr)
       {
-         drawCloudSlot(i, cloud);
+         drawCloudSlot(i, source);
          return;
       }
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 0);
 
-      IGeometrySource* source = geometry[i];
-      if (source == nullptr)
-         return;
       const Mesh& mesh = source->GetMesh();
       if (mesh.Empty())
          return;
@@ -2118,7 +2108,7 @@ void Render3DNode::CookIfNeeded(int frameId)
    for (int i = 0; i < kSlots; i++)
    {
       IGeometrySource* s = geometry[i];
-      if (clouds[i] == nullptr && s != nullptr && s->GetMaterial().transmission > 0.001f)
+      if (s != nullptr && s->GetPointCloud() == nullptr && s->GetMaterial().transmission > 0.001f)
       {
          anyTransmissive = true;
          break;
@@ -2128,12 +2118,12 @@ void Render3DNode::CookIfNeeded(int frameId)
    for (int i = 0; i < kSlots; i++)
    {
       IGeometrySource* s = geometry[i];
-      if (clouds[i] == nullptr && s == nullptr)
+      if (s == nullptr)
          continue;
       // Transmissive slots are deferred to the pass below, which needs a
       // snapshot of everything opaque drawn first - sampling the buffer this
       // same draw is writing to would be a feedback loop.
-      if (clouds[i] == nullptr && anyTransmissive && s->GetMaterial().transmission > 0.001f)
+      if (s->GetPointCloud() == nullptr && anyTransmissive && s->GetMaterial().transmission > 0.001f)
          continue;
       drawSlot(i);
    }
