@@ -60,10 +60,11 @@ const std::vector<std::string>& GeometryOpNode::OpNames() { return kOpNames; }
 Mat4 GeometryOpNode::TransformMatrix() const
 {
    const float spinPhase = spin * (float)Transport::Instance().Beats();
+   const float d2r = 3.14159265f / 180.0f;
    Mat4 m = Mat4::Scale(scaleX, scaleY, scaleZ);
-   m = Mat4::Multiply(Mat4::RotationZ(rotZ), m);
-   m = Mat4::Multiply(Mat4::RotationY(rotY + spinPhase), m);
-   m = Mat4::Multiply(Mat4::RotationX(rotX), m);
+   m = Mat4::Multiply(Mat4::RotationZ(rotZ * d2r), m);
+   m = Mat4::Multiply(Mat4::RotationY(rotY * d2r + spinPhase), m);
+   m = Mat4::Multiply(Mat4::RotationX(rotX * d2r), m);
    m = Mat4::Multiply(Mat4::Translation(offsetX, offsetY, offsetZ), m);
    return m;
 }
@@ -139,7 +140,7 @@ const Mesh& GeometryOpNode::GetMesh()
          break;
       case kArray:
          mCache = MeshOps::Array(src, count, offsetX, offsetY, offsetZ,
-                                 rotStep, scaleStep, radial, radius);
+                                 rotStep * 3.14159265f / 180.0f, scaleStep, radial, radius);
          break;
       case kSubdivide:
          mCache = MeshOps::Subdivide(src, levels, smooth);
@@ -189,7 +190,7 @@ const Mesh& GeometryOpNode::GetMesh()
          mCache = MeshOps::ExtrudeSelected(src, thickness, inset);
          break;
       default:
-         mCache = MeshOps::Twist(src, amount * 3.0f, axis);
+         mCache = MeshOps::Twist(src, amount * 3.14159265f / 180.0f * 3.0f, axis);
          break;
    }
 

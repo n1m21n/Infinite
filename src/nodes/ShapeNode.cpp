@@ -2,6 +2,7 @@
 
 #include <OpenGL/gl3.h>
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -205,7 +206,7 @@ void ShapeNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uCornerRadius"), cornerRadius);
       glUniform1i(glGetUniformLocation(mProgram, "uSides"), sides);
       glUniform1f(glGetUniformLocation(mProgram, "uInnerRatio"), innerRatio);
-      glUniform1f(glGetUniformLocation(mProgram, "uRotation"), rotation);
+      glUniform1f(glGetUniformLocation(mProgram, "uRotation"), rotation * (float)M_PI / 180.0f);
       glUniform2f(glGetUniformLocation(mProgram, "uPos"), posX, posY);
       glUniform3f(glGetUniformLocation(mProgram, "uFillColor"), fillColor[0], fillColor[1], fillColor[2]);
       glUniform1f(glGetUniformLocation(mProgram, "uFillOpacity"), fillOpacity);

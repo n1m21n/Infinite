@@ -37,7 +37,7 @@ public:
    float amplitude = 0.12f;
    float wavelength = 2.0f;
    float steepness = 1.0f;
-   float direction = 0.6f;
+   float direction = 34.3775f;
    float choppiness = 1.0f;
    int octaves = 4;
    float speed = 1.0f;

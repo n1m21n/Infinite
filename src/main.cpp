@@ -93,6 +93,19 @@ namespace
    // Render 3D's preview is a viewport you actually work in - orbiting and
    // framing a scene through a thumbnail is not workable.
    const float kViewportSize = 340.0f;
+   // The dockable viewport panel (right-click a node -> "Open in viewport
+   // panel"), separate from both the inline preview above and the inline
+   // per-node mini 3D viewport toggle. Not const: the panel's canvas-facing
+   // edge is a drag handle, so these are starting sizes, not fixed ones.
+   // Clamped against the window every frame - see the layout section.
+   float gViewportPanelWidth = 320.0f;
+   float gViewportPanelHeight = 260.0f;
+   const float kViewportPanelMinWidth = 160.0f;
+   // Taller than the width floor's equivalent margin: a top/bottom card gives
+   // up two full rows (the dock combo/close row, then its own title row)
+   // before the image even starts, so a floor sized like the width one left
+   // next to nothing for the image itself - see the "so small" screenshot.
+   const float kViewportPanelMinHeight = 190.0f;
    const float kParamWidth = 168.0f;
    const float kPinRadius = 7.0f;
    const float kPinHit = 20.0f; // generous click target - small dots were unhittable
@@ -209,10 +222,17 @@ namespace
    // The node browser lives in a docked panel rather than only the canvas popup,
    // so modules can be found without knowing the double-click gesture exists.
    bool gNodePanelOpen = false;
+   // The dockable viewport panel: every node index in this list gets its own
+   // card, stacked left-to-right when bottom-docked or top-to-bottom when
+   // right/left-docked (see DrawViewportPanelContainer). The panel is showing
+   // at all iff this is non-empty. Session UI state only, like gNodePanelOpen
+   // above - not serialized to patch data or tracked by undo.
+   std::vector<int> gViewportPanelNodes;
+   int gViewportPanelDock = 1;        // 0 = bottom, 1 = right, 2 = left
    ImVec2 gViewCenterCanvas(0.0f, 0.0f); // captured inside the editor for spawning
    ImVec2 gGraphScreenTL(0.0f, 0.0f);    // graph canvas's screen-space rect,
    ImVec2 gGraphScreenSize(0.0f, 0.0f);  // captured the same way, for the minimap overlay
-   bool gMinimapEnabled = true;
+   bool gMinimapEnabled = false;
    // Bottom-left by default: the module browser docks on the right, and the
    // minimap draws (and takes its clicks) on the foreground draw list, so a
    // right-hand corner would sit on top of the panel and swallow clicks meant
@@ -1547,7 +1567,7 @@ namespace
       }
 
       ModSlider("intensity", &n->intensity, 0.0f, 8.0f);
-      ModSlider("rotation", &n->rotation, -3.1416f, 3.1416f);
+      ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
    }
 
    void DrawShapeParams(ShapeNode* n)
@@ -1561,7 +1581,7 @@ namespace
       ModSlider("corner/thick", &n->cornerRadius, 0.0f, 0.3f);
       ModSliderInt("sides", &n->sides, 3, 20);
       ModSlider("inner ratio", &n->innerRatio, 0.05f, 1.0f);
-      ModSlider("rotation", &n->rotation, -3.1416f, 3.1416f);
+      ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
       ModSlider("pos x", &n->posX, 0.0f, 1.0f);
       ModSlider("pos y", &n->posY, 0.0f, 1.0f);
       ColorSwatch("fill", n->fillColor, n);
@@ -2232,7 +2252,7 @@ namespace
       DropdownButton("blend", kBlends, n->blendMode, [n](int i) { n->blendMode = i; });
       ModSlider("decay", &n->decay, 0.5f, 0.999f);
       ModSlider("zoom", &n->zoom, 0.9f, 1.1f);
-      ModSlider("rotate", &n->rotate, -0.1f, 0.1f);
+      ModSlider("rotate", &n->rotate, -5.7296f, 5.7296f, "%.1f\xC2\xB0");
       ModSlider("drift x", &n->driftX, -0.02f, 0.02f);
       ModSlider("drift y", &n->driftY, -0.02f, 0.02f);
       ModSlider("hue shift", &n->hueShift, -0.05f, 0.05f);
@@ -2372,7 +2392,7 @@ namespace
       DropdownButton("repeat", RampNode::RepeatNames(), n->repeat, [n](int i) { n->repeat = i; });
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
-      ModSlider("angle", &n->angle, -3.1416f, 3.1416f);
+      ModSlider("angle", &n->angle, -180.0f, 180.0f, "%.1f\xC2\xB0");
       ModSlider("center x", &n->centerX, -0.5f, 1.5f);
       ModSlider("center y", &n->centerY, -0.5f, 1.5f);
       ModSlider("scale", &n->scale, 0.05f, 8.0f);
@@ -2737,7 +2757,7 @@ namespace
       ModSlider("wavelength", &n->wavelength, 0.1f, 8.0f);
       ModSlider("steepness", &n->steepness, 0.0f, 2.0f);
       ModSlider("choppiness", &n->choppiness, 0.0f, 2.0f);
-      ModSlider("direction", &n->direction, -3.1416f, 3.1416f);
+      ModSlider("direction", &n->direction, -180.0f, 180.0f, "%.1f\xC2\xB0");
       ModSliderInt("octaves", &n->octaves, 1, 8);
       ModSlider("speed", &n->speed, -3.0f, 3.0f);
    }
@@ -2754,7 +2774,7 @@ namespace
       ImGui::Checkbox("closed", &n->closed);
       ModSlider("spread", &n->spread, 0.0f, 4.0f);
       ModSlider("height", &n->height, -3.0f, 3.0f);
-      ModSlider("twist", &n->twist, -3.1416f, 3.1416f);
+      ModSlider("twist", &n->twist, -180.0f, 180.0f, "%.1f\xC2\xB0");
       if (n->preset == 3)
          ModSlider("seed", &n->seed, 0.0f, 100.0f);
 
@@ -2943,13 +2963,13 @@ namespace
       NodeSeparator("rotate");
       if (n->space == kMapSpaceUv)
       {
-         ModSlider("z", &n->rotateZ, -3.1416f, 3.1416f);
+         ModSlider("z", &n->rotateZ, -180.0f, 180.0f, "%.1f\xC2\xB0");
       }
       else
       {
-         ModSlider("x", &n->rotateX, -3.1416f, 3.1416f);
-         ModSlider("y", &n->rotateY, -3.1416f, 3.1416f);
-         ModSlider("z", &n->rotateZ, -3.1416f, 3.1416f);
+         ModSlider("x", &n->rotateX, -180.0f, 180.0f, "%.1f\xC2\xB0");
+         ModSlider("y", &n->rotateY, -180.0f, 180.0f, "%.1f\xC2\xB0");
+         ModSlider("z", &n->rotateZ, -180.0f, 180.0f, "%.1f\xC2\xB0");
       }
 
       NodeSeparator("scale");
@@ -3140,9 +3160,9 @@ namespace
             ModSlider("move x", &n->offsetX, -3.0f, 3.0f);
             ModSlider("move y", &n->offsetY, -3.0f, 3.0f);
             ModSlider("move z", &n->offsetZ, -3.0f, 3.0f);
-            ModSlider("rotate x", &n->rotX, -3.1416f, 3.1416f);
-            ModSlider("rotate y", &n->rotY, -3.1416f, 3.1416f);
-            ModSlider("rotate z", &n->rotZ, -3.1416f, 3.1416f);
+            ModSlider("rotate x", &n->rotX, -180.0f, 180.0f, "%.1f\xC2\xB0");
+            ModSlider("rotate y", &n->rotY, -180.0f, 180.0f, "%.1f\xC2\xB0");
+            ModSlider("rotate z", &n->rotZ, -180.0f, 180.0f, "%.1f\xC2\xB0");
             ModSlider("scale x", &n->scaleX, 0.05f, 4.0f);
             ModSlider("scale y", &n->scaleY, 0.05f, 4.0f);
             ModSlider("scale z", &n->scaleZ, 0.05f, 4.0f);
@@ -3159,7 +3179,7 @@ namespace
                ModSlider("offset y", &n->offsetY, -2.0f, 2.0f);
                ModSlider("offset z", &n->offsetZ, -2.0f, 2.0f);
             }
-            ModSlider("rot / step", &n->rotStep, -1.5f, 1.5f);
+            ModSlider("rot / step", &n->rotStep, -85.9437f, 85.9437f, "%.1f\xC2\xB0");
             ModSlider("scale / step", &n->scaleStep, 0.5f, 1.5f);
             break;
          case GeometryOpNode::kSubdivide:
@@ -3250,9 +3270,9 @@ namespace
             ModSlider("move x", &n->offsetX, -3.0f, 3.0f);
             ModSlider("move y", &n->offsetY, -3.0f, 3.0f);
             ModSlider("move z", &n->offsetZ, -3.0f, 3.0f);
-            ModSlider("rotate x", &n->rotX, -3.1416f, 3.1416f);
-            ModSlider("rotate y", &n->rotY, -3.1416f, 3.1416f);
-            ModSlider("rotate z", &n->rotZ, -3.1416f, 3.1416f);
+            ModSlider("rotate x", &n->rotX, -180.0f, 180.0f, "%.1f\xC2\xB0");
+            ModSlider("rotate y", &n->rotY, -180.0f, 180.0f, "%.1f\xC2\xB0");
+            ModSlider("rotate z", &n->rotZ, -180.0f, 180.0f, "%.1f\xC2\xB0");
             ModSlider("scale x", &n->scaleX, 0.1f, 3.0f);
             ModSlider("scale y", &n->scaleY, 0.1f, 3.0f);
             ModSlider("scale z", &n->scaleZ, 0.1f, 3.0f);
@@ -3270,7 +3290,7 @@ namespace
             ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
             break;
          default:
-            ModSlider("angle", &n->amount, -3.0f, 3.0f);
+            ModSlider("angle", &n->amount, -171.8873f, 171.8873f, "%.1f\xC2\xB0");
             ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
             break;
       }
@@ -3315,9 +3335,9 @@ namespace
       else
          ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f);
       ModSlider("distance", &n->distance, 0.3f, 20.0f);
-      ModSlider("orbit", &n->azimuth, -3.1416f, 3.1416f);
-      ModSlider("elevation", &n->elevation, -1.5f, 1.5f);
-      ModSlider("roll", &n->roll, -3.1416f, 3.1416f);
+      ModSlider("orbit", &n->azimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("elevation", &n->elevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0");
+      ModSlider("roll", &n->roll, -180.0f, 180.0f, "%.1f\xC2\xB0");
       ModSlider("orbit / beat", &n->orbitPerBeat, -1.0f, 1.0f);
       ModSlider("target x", &n->targetX, -3.0f, 3.0f);
       ModSlider("target y", &n->targetY, -3.0f, 3.0f);
@@ -3329,8 +3349,8 @@ namespace
    void DrawLightParams(LightNode* n)
    {
       DropdownButton("type", LightNode::TypeNames(), n->type, [n](int i) { n->type = i; });
-      ModSlider("orbit", &n->azimuth, -3.1416f, 3.1416f);
-      ModSlider("elevation", &n->elevation, -1.5f, 1.5f);
+      ModSlider("orbit", &n->azimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("elevation", &n->elevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0");
       if (n->type == 1)
          ModSlider("distance", &n->distance, 0.2f, 20.0f);
       ColorSwatch("colour", n->color, n);
@@ -3470,8 +3490,8 @@ namespace
       else
          ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f);
       ModSlider("distance", &n->camDistance, 0.3f, 20.0f);
-      ModSlider("orbit", &n->camAzimuth, -3.1416f, 3.1416f);
-      ModSlider("elevation", &n->camElevation, -1.5f, 1.5f);
+      ModSlider("orbit", &n->camAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("elevation", &n->camElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0");
       ModSlider("target x", &n->targetX, -3.0f, 3.0f);
       ModSlider("target y", &n->targetY, -3.0f, 3.0f);
       ModSlider("target z", &n->targetZ, -3.0f, 3.0f);
@@ -3497,8 +3517,8 @@ namespace
          ImGui::TextDisabled("%d Light node%s patched", patchedLights, patchedLights == 1 ? "" : "s");
       else
       {
-      ModSlider("light orbit", &n->lightAzimuth, -3.1416f, 3.1416f);
-      ModSlider("light height", &n->lightElevation, -1.5f, 1.5f);
+      ModSlider("light orbit", &n->lightAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("light height", &n->lightElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0");
       ColorSwatch("light", n->lightColor, n);
       ModSlider("intensity", &n->lightIntensity, 0.0f, 4.0f);
       }
@@ -4181,10 +4201,12 @@ namespace
       if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
       {
          const ImVec2 drag = ImGui::GetIO().MouseDelta;
-         *azimuth -= drag.x * 0.012f;
+         // azimuth/elevation are stored in degrees; 0.6875 deg/px matches the
+         // drag feel of the old 0.012 rad/px (0.012 * 180/pi).
+         *azimuth -= drag.x * 0.6875f;
          // Clamped just short of the poles: straight overhead makes the view
          // matrix's up vector parallel to the view direction and the image rolls.
-         *elevation = std::max(-1.5f, std::min(*elevation + drag.y * 0.012f, 1.5f));
+         *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * 0.6875f, 85.9437f));
       }
 
       if (ImGui::IsItemHovered())
@@ -4211,6 +4233,16 @@ namespace
    // a node's viewport toggle is switched on; nothing is allocated for a node
    // that never opts in.
    std::map<int, NodeViewport> gNodeViewports;
+
+   // Nodes/viewports retired by RemoveNodeByIndex this frame, held until the
+   // start of the next frame - see RemoveNodeByIndex for why teardown can't
+   // happen synchronously. NodeViewport has a user-declared destructor (which
+   // suppresses its implicit move ctor), so it can't live in a
+   // vector<NodeViewport> without a copy that would double-free its GL
+   // texture; map::node_type from extract() moves the whole tree node instead
+   // of the mapped value, sidestepping that.
+   std::vector<std::unique_ptr<INode>> gRetiredNodes;
+   std::vector<std::map<int, NodeViewport>::node_type> gRetiredViewports;
 
    // A geometry-producing node's own solo render, independent of whatever a
    // downstream Render 3D shows - the point is seeing what *this* node
@@ -4265,6 +4297,291 @@ namespace
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
+   }
+
+   // Viewport-panel 3D renders, kept in their own map rather than sharing
+   // gNodeViewports with the inline per-node toggle above: the two draw at
+   // different sizes, and one NodeViewport reallocates its FBO whenever the
+   // requested size changes - sharing would make a node that is open in both
+   // places thrash its FBO every frame.
+   std::map<int, NodeViewport> gPanelViewports;
+
+   // One node's card inside the viewport panel: a title row and the render,
+   // nothing else. Deliberately non-interactive - unlike the inline
+   // mini-viewport, there is no drag-to-orbit or scroll-to-zoom here, so
+   // dragging across the panel can never knock a render askew. imageSize is
+   // the exact box the render fills, so the card never has leftover space for
+   // a scrollbar to appear in.
+   // Whether a node has anything the viewport panel could actually show.
+   // Mirrors the branches DrawPreview's dispatch takes in the node body: a
+   // modulator is a value with a scope trace, not an image; Camera/Light show
+   // a stat box and implement no geometry interface at all; a Comment is
+   // text. All of those would render as a permanent "no input" box, so they
+   // don't get offered the menu item in the first place.
+   bool CanShowInViewportPanel(const GraphNode& gn)
+   {
+      INode* n = gn.node.get();
+      if (dynamic_cast<IGeometrySource*>(n) != nullptr)
+         return true; // meshes render as their own solo viewport
+      if (dynamic_cast<IModulator*>(n) != nullptr)
+         return false;
+      // The multi-output modulators, which draw their meters in the params
+      // panel rather than producing an image.
+      if (dynamic_cast<ImageAnalyzeNode*>(n) != nullptr ||
+          dynamic_cast<AudioFileNode*>(n) != nullptr ||
+          dynamic_cast<AudioAnalyzeNode*>(n) != nullptr)
+         return false;
+      if (dynamic_cast<CameraNode*>(n) != nullptr || dynamic_cast<LightNode*>(n) != nullptr)
+         return false;
+      if (dynamic_cast<CommentNode*>(n) != nullptr || dynamic_cast<GroupNode*>(n) != nullptr)
+         return false;
+      return true;
+   }
+
+   // The dock picker, shared by the panel's own header and the Menu dropdown
+   // so the two can't drift apart.
+   void ViewportPanelDockCombo()
+   {
+      static const char* kDockLabels[] = { "Bottom", "Right", "Left", "Top" };
+      if (ImGui::BeginCombo("##viewportdock", kDockLabels[gViewportPanelDock]))
+      {
+         for (int i = 0; i < 4; i++)
+            if (ImGui::Selectable(kDockLabels[i], i == gViewportPanelDock))
+               gViewportPanelDock = i;
+         ImGui::EndCombo();
+      }
+   }
+
+   // The title row's exact height: SmallButton is a text-height control (it
+   // zeroes FramePadding.y), so this is what the row above the render costs.
+   // Card and container both size against it, or the render overflows its
+   // card by a few pixels and gets clipped.
+   float ViewportPanelTitleHeight()
+   {
+      return ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y;
+   }
+
+   void DrawViewportPanelCard(GraphNode& gn, const ImVec2& imageSize)
+   {
+      const float titleH = ViewportPanelTitleHeight();
+      char childId[32];
+      snprintf(childId, sizeof(childId), "##viewportcard%d", gn.index);
+      ImGui::BeginChild(childId, ImVec2(imageSize.x, imageSize.y + titleH), false,
+                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+      const bool closeRequested = ImGui::SmallButton("X");
+      ImGui::SameLine();
+      ImGui::TextUnformatted(NodeTitle(gn).c_str());
+
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + imageSize.x, origin.y + imageSize.y);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
+
+      if (auto* geo = dynamic_cast<IGeometrySource*>(gn.node.get()))
+      {
+         // Same solo mesh render as the inline mini viewport, minus its
+         // orbit/zoom input handling.
+         const unsigned int tex =
+            gPanelViewports[gn.index].Render(geo, (int)imageSize.x, (int)imageSize.y);
+         if (tex != 0)
+            dl->AddImage((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
+         else
+            dl->AddText(ImVec2(origin.x + 10, origin.y + imageSize.y * 0.5f - 8),
+                        IM_COL32(120, 120, 135, 255), "no geometry");
+      }
+      else
+      {
+         // Everything else: blit the node's output texture, letterboxed to
+         // its own aspect, mirroring DrawPreview's blit/"no input" fallback.
+         const unsigned int tex = gn.node->GetOutputTexture();
+         if (tex != 0 && gn.node->GetOutputWidth() > 0)
+         {
+            const float w = (float)gn.node->GetOutputWidth();
+            const float h = (float)gn.node->GetOutputHeight();
+            const float scale = std::min(imageSize.x / w, imageSize.y / h);
+            const float dw = w * scale;
+            const float dh = h * scale;
+            const ImVec2 tl(origin.x + (imageSize.x - dw) * 0.5f,
+                            origin.y + (imageSize.y - dh) * 0.5f);
+            dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dw, tl.y + dh),
+                         ImVec2(0, 1), ImVec2(1, 0));
+         }
+         else
+         {
+            dl->AddText(ImVec2(origin.x + 10, origin.y + imageSize.y * 0.5f - 8),
+                        IM_COL32(120, 120, 135, 255), "no input");
+         }
+      }
+
+      ImGui::Dummy(imageSize);
+      ImGui::EndChild();
+
+      if (closeRequested)
+      {
+         gViewportPanelNodes.erase(
+            std::remove(gViewportPanelNodes.begin(), gViewportPanelNodes.end(), gn.index),
+            gViewportPanelNodes.end());
+         // Note: this node's NodeViewport is NOT destroyed here - see the
+         // deferred prune in the frame loop. Its texture has already been
+         // submitted to this frame's draw list.
+      }
+   }
+
+   // The dockable global viewport panel (see gViewportPanelNodes), opened via
+   // a node's right-click menu -> "Open in viewport panel". Unlike the inline
+   // per-node preview/mini-viewport above, this holds any number of nodes at
+   // once - stacked left-to-right when docked top/bottom, or top-to-bottom
+   // when docked left/right - in a single shared strip.
+   //
+   // Every render is sized to exactly fill the strip's short axis, so cards
+   // butt up against each other with no dead space between them, and no card
+   // ever has room left over for a scrollbar of its own.
+   void DrawViewportPanelContainer()
+   {
+      ImGui::SetNextItemWidth(110.0f);
+      ViewportPanelDockCombo();
+      // Closing the last card is one way out of the panel, but that means N
+      // clicks to dismiss N cards - this is the one that always works.
+      ImGui::SameLine();
+      // Returns before the cards child is opened, so the caller's own
+      // Begin/EndChild pairing stays balanced.
+      if (ImGui::SmallButton("close panel"))
+      {
+         gViewportPanelNodes.clear();
+         return;
+      }
+
+      const bool horizontal = (gViewportPanelDock == 0 || gViewportPanelDock == 3);
+
+      // The render's fixed axis: the strip's height when cards run across it,
+      // its width when they run down it. Squared off, since a mesh render has
+      // no aspect of its own and an image is letterboxed into it anyway.
+      //
+      // Measured HERE, outside the scrolling child, and with the scroll
+      // axis's scrollbar reserved unconditionally. Both matter: sizing cards
+      // from the region *inside* the scrolling child feeds back on itself -
+      // enough cards make a scrollbar appear, which shrinks the region, which
+      // shrinks the cards, which can drop the total back under the scroll
+      // threshold, which removes the scrollbar again. That loop is what makes
+      // the panel flicker once a certain number of cards is open.
+      const float titleH = ViewportPanelTitleHeight();
+      const float bar = ImGui::GetStyle().ScrollbarSize;
+      const ImVec2 strip = ImGui::GetContentRegionAvail();
+      const float box = horizontal ? std::max(48.0f, strip.y - titleH - bar)
+                                   : std::max(48.0f, strip.x - bar);
+
+      ImGui::BeginChild("##viewportcards", strip, false,
+                        horizontal ? ImGuiWindowFlags_HorizontalScrollbar : 0);
+
+      // Snapshot before drawing: a card's own close button mutates
+      // gViewportPanelNodes, which would otherwise invalidate this loop.
+      const std::vector<int> nodes = gViewportPanelNodes;
+      bool first = true;
+      for (int idx : nodes)
+      {
+         GraphNode* gn = FindNodeByIndex(idx);
+         if (gn == nullptr)
+         {
+            // Stale - the node was deleted, or undo/redo rewound past it.
+            // Drop silently rather than show stale content.
+            gViewportPanelNodes.erase(
+               std::remove(gViewportPanelNodes.begin(), gViewportPanelNodes.end(), idx),
+               gViewportPanelNodes.end());
+            continue;
+         }
+
+         if (!first && horizontal)
+            ImGui::SameLine();
+         first = false;
+
+         DrawViewportPanelCard(*gn, ImVec2(box, box));
+      }
+
+      ImGui::EndChild();
+   }
+
+   // The panel's outer frame at every dock position: a borderless child plus
+   // exactly one hairline along the canvas-facing edge. One line is all the
+   // separation this needs - a full border here (and another around every
+   // card inside it) just stacked up rules for no extra information.
+   //
+   // That same canvas-facing edge is the panel's resize handle: a thin strip
+   // reserved inside the panel, so it belongs to the panel's own window and
+   // reliably takes the hover (a strip drawn just outside would be over the
+   // node canvas, whose window would win the hover instead).
+   void DrawViewportPanelDocked(const char* id, const ImVec2& size)
+   {
+      const float kGrip = 6.0f;
+      const int dock = gViewportPanelDock;
+      const bool vertical = (dock == 1 || dock == 2);  // grip is a column, not a row
+      const bool gripFirst = (dock == 0 || dock == 1); // canvas is above / to the left
+
+      ImGui::BeginChild(id, size, false);
+      const ImVec2 inner = ImGui::GetContentRegionAvail();
+
+      auto grip = [&]()
+      {
+         ImGui::InvisibleButton("##viewportgrip",
+                                vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
+                                         : ImVec2(std::max(1.0f, inner.x), kGrip));
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
+         if (ImGui::IsItemActive())
+         {
+            // Each dock grows toward the canvas, so the sign flips with the
+            // side the panel is on.
+            const ImVec2 d = ImGui::GetIO().MouseDelta;
+            switch (dock)
+            {
+               case 0: gViewportPanelHeight -= d.y; break;
+               case 1: gViewportPanelWidth -= d.x; break;
+               case 2: gViewportPanelWidth += d.x; break;
+               default: gViewportPanelHeight += d.y; break;
+            }
+            gViewportPanelWidth = std::max(kViewportPanelMinWidth, gViewportPanelWidth);
+            gViewportPanelHeight = std::max(kViewportPanelMinHeight, gViewportPanelHeight);
+         }
+      };
+
+      if (gripFirst)
+      {
+         grip();
+         if (vertical)
+            ImGui::SameLine();
+      }
+
+      // The grip and the content sit on one layout axis with ImGui's item
+      // spacing between them, so the content has to give up that spacing as
+      // well as the grip itself - otherwise the two together overrun the
+      // panel and the panel grows a scrollbar of its own.
+      const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+      ImGui::BeginChild("##viewportpanelcontent",
+                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), 0)
+                                 : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
+                        false);
+      DrawViewportPanelContainer();
+      ImGui::EndChild();
+
+      if (!gripFirst)
+      {
+         if (vertical)
+            ImGui::SameLine();
+         grip();
+      }
+      ImGui::EndChild();
+
+      const ImVec2 tl = ImGui::GetItemRectMin();
+      const ImVec2 br = ImGui::GetItemRectMax();
+      const ImU32 line = IM_COL32(70, 74, 90, 255);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      switch (dock)
+      {
+         case 0: dl->AddLine(tl, ImVec2(br.x, tl.y), line); break;          // bottom dock -> top edge
+         case 1: dl->AddLine(tl, ImVec2(tl.x, br.y), line); break;          // right dock -> left edge
+         case 2: dl->AddLine(ImVec2(br.x, tl.y), br, line); break;          // left dock -> right edge
+         default: dl->AddLine(ImVec2(tl.x, br.y), br, line); break;         // top dock -> bottom edge
+      }
    }
 
    void DrawModulatorMeter(IModulator* mod, int nodeIndex)
@@ -4957,7 +5274,6 @@ namespace
       Modulation::Instance().UnbindAllFor(index);
       PaletteBinding::Instance().UnbindAllFor(index);
       gModHistory.erase(index);
-      gNodeViewports.erase(index);
       DisconnectAllTo(victim->node.get());
       // A deleted Group's membership set must go with it - otherwise its
       // GroupNode* stays around as a dangling map key that a future
@@ -4968,6 +5284,22 @@ namespace
          gGroupMembers.erase(deadGroup);
       for (auto& entry : gGroupMembers)
          entry.second.erase(index);
+
+      // Don't destroy the node/viewport here: this frame's ImGui draw list may
+      // already contain AddImage() calls (queued while drawing this node's
+      // body/mini-viewport earlier this frame) referencing their GL output
+      // textures. Deleting those textures now, before
+      // ImGui_ImplOpenGL3_RenderDrawData() actually submits the draw list at
+      // the end of the frame, frees a GL name that the pending draw commands
+      // still reference - producing a one-frame flash of garbage/reused-texture
+      // content. Retire ownership instead; actual teardown happens at the top
+      // of the next frame's loop, once this frame is fully rendered and
+      // presented (see gRetiredNodes/gRetiredViewports drain next to
+      // glfwPollEvents()).
+      if (auto vp = gNodeViewports.extract(index); !vp.empty())
+         gRetiredViewports.push_back(std::move(vp));
+      gRetiredNodes.push_back(std::move(victim->node));
+
       gNodes.erase(std::remove_if(gNodes.begin(), gNodes.end(),
                                   [index](const GraphNode& g) { return g.index == index; }),
                    gNodes.end());
@@ -5723,7 +6055,7 @@ int main()
          op->inheritMaterial = false;
          op->color[0] = 0.35f; op->color[1] = 0.7f; op->color[2] = 1.0f;
          auto* cam = static_cast<CameraNode*>(gNodes[4].node.get());
-         cam->distance = 5.0f; cam->elevation = 0.45f;
+         cam->distance = 5.0f; cam->elevation = 25.7831f;
          auto* light = static_cast<LightNode*>(gNodes[5].node.get());
          light->intensity = 1.6f;
          auto* r = static_cast<Render3DNode*>(gNodes[6].node.get());
@@ -5823,8 +6155,8 @@ int main()
          render->width = 900.0f; render->height = 500.0f;
          render->samples = 0;
          render->camDistance = 6.0f;
-         render->camAzimuth = 0.7f;
-         render->camElevation = 0.35f;
+         render->camAzimuth = 40.107f;
+         render->camElevation = 20.0535f;
          render->targetX = 1.25f;
          gNodes[6].showParams = true;
       }
@@ -5845,7 +6177,7 @@ int main()
          ball->posY = 0.4f;
          auto* light = static_cast<LightNode*>(gNodes[2].node.get());
          light->type = 0;              // directional
-         light->elevation = 1.1f;      // high, so the shadow lands on the plane
+         light->elevation = 63.0254f;  // high, so the shadow lands on the plane
          light->intensity = 2.0f;
 
          auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
@@ -5855,7 +6187,7 @@ int main()
          render->width = 400.0f; render->height = 400.0f;
          render->samples = 0;
          render->shadowsEnabled = false; // turned on mid-test to compare
-         render->camElevation = 0.7f;
+         render->camElevation = 40.107f;
          render->camDistance = 7.0f;
       }
       else if (getenv("INFINITE_BUGTEST") != nullptr)
@@ -6207,16 +6539,16 @@ int main()
          inst->seed = 9.0f;
 
          auto* cam = static_cast<CameraNode*>(gNodes[4].node.get());
-         cam->distance = 3.4f; cam->azimuth = 0.7f; cam->elevation = 0.35f;
+         cam->distance = 3.4f; cam->azimuth = 40.107f; cam->elevation = 20.0535f;
          cam->fov = 46.0f; cam->orbitPerBeat = 0.05f; // slow cinematic turntable, no keyframing needed
 
          auto* keyLight = static_cast<LightNode*>(gNodes[5].node.get());
-         keyLight->azimuth = 0.9f; keyLight->elevation = 1.0f;
+         keyLight->azimuth = 51.5662f; keyLight->elevation = 57.2958f;
          keyLight->color[0] = 1.0f; keyLight->color[1] = 0.92f; keyLight->color[2] = 0.8f;
          keyLight->intensity = 1.4f; keyLight->orbitPerBeat = 0.02f;
 
          auto* fillLight = static_cast<LightNode*>(gNodes[6].node.get());
-         fillLight->azimuth = -2.2f; fillLight->elevation = 0.5f;
+         fillLight->azimuth = -126.0507f; fillLight->elevation = 28.6479f;
          fillLight->color[0] = 0.55f; fillLight->color[1] = 0.7f; fillLight->color[2] = 1.0f;
          fillLight->intensity = 0.6f; fillLight->orbitPerBeat = -0.015f; // drifts the opposite way for parallax
 
@@ -6365,7 +6697,7 @@ int main()
          cv->AddPoint(CurvesNode::kRGB, 0.35f, 0.75f);
          cv->AddPoint(CurvesNode::kRGB, 0.7f, 0.2f);
          auto* tr = static_cast<TrailsNode*>(gNodes[3].node.get());
-         tr->zoom = 1.02f; tr->rotate = 0.01f; tr->decay = 0.96f;
+         tr->zoom = 1.02f; tr->rotate = 0.5730f; tr->decay = 0.96f;
          auto* rd = static_cast<ReactionDiffusionNode*>(gNodes[0].node.get());
          rd->ApplyPreset(0);
          rd->stepsPerFrame = 24.0f;
@@ -6487,6 +6819,12 @@ int main()
    {
       gFrameStart = glfwGetTime();
       glfwPollEvents();
+
+      // Actually tear down anything retired by RemoveNodeByIndex last frame.
+      // Safe here: the frame that queued draw commands referencing these
+      // textures has already been submitted and presented.
+      gRetiredNodes.clear();
+      gRetiredViewports.clear();
 
       // dev-only: drive copy/paste/delete with synthetic key events so the
       // shortcuts can be verified without a human at the keyboard
@@ -6663,10 +7001,20 @@ int main()
       const ImGuiViewport* vp = ImGui::GetMainViewport();
       ImGui::SetNextWindowPos(vp->WorkPos);
       ImGui::SetNextWindowSize(vp->WorkSize);
+      // NoScrollbar/NoScrollWithMouse: this window is a fixed full-screen
+      // shell (also NoResize/NoMove) whose every region is meant to be
+      // divided exactly among the menu bar, canvas and docked panels, never
+      // scrolled as a whole. Without this flag, being even a few pixels over
+      // budget in that division - e.g. the item spacing ImGui inserts between
+      // a top/bottom-docked viewport panel and the canvas row below/above it,
+      // easy to undercount by hand - grows a scrollbar on THIS window, which
+      // reads as "a slider that moves the entire app" rather than as a
+      // rounding error in one panel's layout.
       ImGui::Begin("Infinite", nullptr,
                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                   ImGuiWindowFlags_MenuBar);
+                   ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar |
+                   ImGuiWindowFlags_NoScrollWithMouse);
 
       if (ImGui::BeginMenuBar())
       {
@@ -6767,6 +7115,26 @@ int main()
                ImGui::SliderFloat("Opacity", &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
             }
 
+            // The whole section only exists once something is open - with
+            // nothing open there is nothing here to configure.
+            if (!gViewportPanelNodes.empty())
+            {
+               ImGui::SeparatorText("Viewport panel");
+               ImGui::SetNextItemWidth(170);
+               ViewportPanelDockCombo();
+               ImGui::SetNextItemWidth(170);
+               // Only the axis the current dock actually reserves - the other
+               // one has no effect from here, and a dead slider reads as broken.
+               if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
+                  ImGui::SliderFloat("Width", &gViewportPanelWidth,
+                                     kViewportPanelMinWidth, 900.0f, "%.0f px");
+               else
+                  ImGui::SliderFloat("Height", &gViewportPanelHeight,
+                                     kViewportPanelMinHeight, 800.0f, "%.0f px");
+               if (ImGui::MenuItem("Close viewport panel"))
+                  gViewportPanelNodes.clear();
+            }
+
             ImGui::SeparatorText("Performance");
             {
                // A cap is useful in both directions: it stops a light patch
@@ -6792,7 +7160,6 @@ int main()
 
                if (ImGui::Checkbox("Vsync", &gVsync))
                   glfwSwapInterval(gVsync ? 1 : 0);
-               ImGui::TextDisabled("Vsync also caps to the display's refresh");
             }
 
             ImGui::SeparatorText("Theme");
@@ -6924,17 +7291,84 @@ int main()
       }
 
       const float kNodePanelWidth = 270.0f;
-      const float graphWidth = gNodePanelOpen
-                                  ? std::max(200.0f, ImGui::GetContentRegionAvail().x - kNodePanelWidth)
+      const bool viewportPanelOpen = !gViewportPanelNodes.empty();
+      const bool viewportBottom = viewportPanelOpen && gViewportPanelDock == 0;
+      const bool viewportRight = viewportPanelOpen && gViewportPanelDock == 1;
+      const bool viewportLeft = viewportPanelOpen && gViewportPanelDock == 2;
+      const bool viewportTop = viewportPanelOpen && gViewportPanelDock == 3;
+
+      // Drop the 3D render state of any node no longer in the panel. Done
+      // here, at the top of the next frame, rather than at the moment its
+      // card was closed: that card had already submitted its texture to that
+      // frame's draw list, and destroying the FBO first would leave the draw
+      // list blitting a deleted texture.
+      for (auto it = gPanelViewports.begin(); it != gPanelViewports.end(); )
+      {
+         const bool stillShown = std::find(gViewportPanelNodes.begin(), gViewportPanelNodes.end(),
+                                           it->first) != gViewportPanelNodes.end();
+         it = stillShown ? std::next(it) : gPanelViewports.erase(it);
+      }
+
+      // Clamp the (drag-resizable) panel against the window before anything
+      // reserves space from it, so dragging the grip can never squeeze the
+      // canvas out of existence or push a panel off the far edge. Runs every
+      // frame regardless of whether a drag is in progress - previously the
+      // floor (kViewportPanelMin*) was only re-applied inside the grip's own
+      // active-drag branch, so this upper-bound-only clamp could hold the
+      // panel below its minimum indefinitely once something pushed it there.
+      {
+         const ImVec2 room = ImGui::GetContentRegionAvail();
+         const float maxHeight = std::max(kViewportPanelMinHeight, room.y - 150.0f);
+         const float maxWidth = std::max(kViewportPanelMinWidth,
+                                         room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f));
+         gViewportPanelHeight = std::min(std::max(gViewportPanelHeight, kViewportPanelMinHeight), maxHeight);
+         gViewportPanelWidth = std::min(std::max(gViewportPanelWidth, kViewportPanelMinWidth), maxWidth);
+      }
+
+      // Measured before the top/left panels below consume any of it, so the
+      // canvas gets what is left after every reservation rather than after
+      // only the ones that happen to draw first.
+      //
+      // A top/bottom-docked panel is its own row, separate from the canvas
+      // row below/above it - unlike right/left, which share the canvas's row
+      // via SameLine() - so it costs one extra ItemSpacing.y that a same-line
+      // dock never does. That gap is easy to forget in this budget; forgetting
+      // it is exactly what grows the outer window's own scrollbar (see the
+      // NoScrollbar comment on its Begin() call above).
+      const float topBottomGap = (viewportTop || viewportBottom) ? ImGui::GetStyle().ItemSpacing.y : 0.0f;
+      const float graphHeight =
+         std::max(150.0f, ImGui::GetContentRegionAvail().y -
+                             ((viewportTop || viewportBottom) ? gViewportPanelHeight + topBottomGap : 0.0f));
+
+      // Top- and left-docked viewport panels draw before the canvas: nothing
+      // else in this window reserves space above or left of it, so each has
+      // to consume its own room here, before the canvas cursor position (and
+      // gGraphScreenTL below) reflect it.
+      if (viewportTop)
+         DrawViewportPanelDocked("##viewportpanel_top", ImVec2(0, gViewportPanelHeight));
+      if (viewportLeft)
+      {
+         DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));
+         ImGui::SameLine();
+      }
+
+      // One combined reservation for both right-docked panels, computed
+      // together so ImGui's SameLine() chaining after ed::End() lays them out
+      // side by side instead of one clipping the other or the two overlapping.
+      float rightReserved = 0.0f;
+      if (gNodePanelOpen) rightReserved += kNodePanelWidth;
+      if (viewportRight) rightReserved += gViewportPanelWidth;
+      const float graphWidth = rightReserved > 0.0f
+                                  ? std::max(200.0f, ImGui::GetContentRegionAvail().x - rightReserved)
                                   : 0.0f;
-      const float graphHeight = ImGui::GetContentRegionAvail().y;
 
       // The canvas rect, captured here rather than from inside the editor:
       // ed::Begin does not open a child window (ImGuiEx::Canvas draws straight
       // into the current one), so GetWindowPos/GetWindowSize in there report
       // the whole app window - menu bar and docked module panel included.
       // Anything positioned against that, the minimap especially, would sit
-      // outside the graph and over the panel.
+      // outside the graph and over a panel - which is also why the left panel
+      // above has to draw before this capture rather than after.
       gGraphScreenTL = ImGui::GetCursorScreenPos();
       gGraphScreenSize = ImVec2(graphWidth > 0.0f ? graphWidth : ImGui::GetContentRegionAvail().x,
                                 graphHeight);
@@ -11868,6 +12302,18 @@ int main()
                      gn->showMiniViewport = true;
                }
             }
+            if (CanShowInViewportPanel(*gn))
+            {
+               // Adds a card rather than replacing whatever is already shown -
+               // the panel holds any number of nodes at once, each closable
+               // on its own. A no-op if this node already has a card open.
+               if (ImGui::MenuItem("Open in viewport panel"))
+               {
+                  if (std::find(gViewportPanelNodes.begin(), gViewportPanelNodes.end(), gn->index) ==
+                      gViewportPanelNodes.end())
+                     gViewportPanelNodes.push_back(gn->index);
+               }
+            }
             if (ImGui::MenuItem("Help"))
             {
                gHelpPopupNodeIndex = gn->index;
@@ -12214,10 +12660,18 @@ int main()
       // ---- node browser panel ----
       // The same catalogue as the canvas popup, but persistent: it can be left
       // open while building a patch, which the popup cannot.
+      //
+      // Drawn at an explicit width AND height (rather than the (0,0) "fill
+      // remaining" it used before the viewport panel existed). Width, because
+      // with the right-docked viewport panel also open, "remaining" would
+      // include its space too - see the combined rightReserved calc above
+      // ed::Begin(). Height, because "remaining" runs to the bottom of the
+      // window, which swallows the row a bottom-docked viewport panel is
+      // about to be drawn into and leaves that panel clipped out of sight.
       if (gNodePanelOpen)
       {
          ImGui::SameLine();
-         ImGui::BeginChild("##nodepanel", ImVec2(0, 0), true);
+         ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight), true);
 
          static char panelSearch[128] = "";
          ImGui::SetNextItemWidth(-1.0f);
@@ -12271,6 +12725,22 @@ int main()
 
          ImGui::EndChild();
       }
+
+      // Right-docked viewport panel, chained via SameLine right after the
+      // node browser panel above (whether or not that one is open) so the
+      // two sit side by side instead of overlapping.
+      if (viewportRight)
+      {
+         ImGui::SameLine();
+         DrawViewportPanelDocked("##viewportpanel_right", ImVec2(gViewportPanelWidth, graphHeight));
+      }
+
+      // Bottom-docked viewport panel: a fresh, full-width row below the
+      // canvas (and below the row above, if that one drew anything) rather
+      // than same-line - see the graphHeight calc above ed::Begin(), which
+      // already reserved this space.
+      if (viewportBottom)
+         DrawViewportPanelDocked("##viewportpanel_bottom", ImVec2(0, gViewportPanelHeight));
 
       ImGui::End();
 
@@ -12519,14 +12989,14 @@ int main()
          if (frameId == 5)
          {
             printf("padX=%.2f -> size=%.4f (expect %.4f)\n", xy->padX, sh->size, 0.01f + 0.49f * 0.25f);
-            printf("padY=%.2f -> rotation=%.4f (expect %.4f)\n", xy->padY, sh->rotation, -3.1416f + 6.2832f * 0.75f);
+            printf("padY=%.2f -> rotation=%.4f (expect %.4f)\n", xy->padY, sh->rotation, -180.0f + 360.0f * 0.75f);
             xy->padX = 0.9f; xy->padY = 0.1f;
          }
          if (frameId == 8)
          {
             printf("after move: size=%.4f rotation=%.4f  %s\n", sh->size, sh->rotation,
                    (std::fabs(sh->size - (0.01f + 0.49f * 0.9f)) < 0.01f &&
-                    std::fabs(sh->rotation - (-3.1416f + 6.2832f * 0.1f)) < 0.05f)
+                    std::fabs(sh->rotation - (-180.0f + 360.0f * 0.1f)) < 3.0f)
                       ? "INDEPENDENT OUTPUTS OK" : "MISMATCH");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }

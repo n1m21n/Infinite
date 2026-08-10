@@ -1300,7 +1300,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       {
          env->CookIfNeeded(frameId);
          envTex = env->GetEnvironmentTexture();
-         envRotationRad = env->rotation;
+         envRotationRad = env->rotation * (float)M_PI / 180.0f;
          envHdriIntensity = env->intensity;
          envMaxLod = env->MaxLod();
       }
@@ -1329,10 +1329,12 @@ void Render3DNode::CookIfNeeded(int frameId)
    }
    else
    {
-      const float ce = std::cos(camElevation);
-      eye[0] = targetX + camDistance * ce * std::cos(camAzimuth);
-      eye[1] = targetY + camDistance * std::sin(camElevation);
-      eye[2] = targetZ + camDistance * ce * std::sin(camAzimuth);
+      const float camAzimuthRad = camAzimuth * (float)M_PI / 180.0f;
+      const float camElevationRad = camElevation * (float)M_PI / 180.0f;
+      const float ce = std::cos(camElevationRad);
+      eye[0] = targetX + camDistance * ce * std::cos(camAzimuthRad);
+      eye[1] = targetY + camDistance * std::sin(camElevationRad);
+      eye[2] = targetZ + camDistance * ce * std::sin(camAzimuthRad);
       const float target[3] = { targetX, targetY, targetZ };
       const float up[3] = { 0.0f, 1.0f, 0.0f };
       view = Mat4::LookAt(eye, target, up);
@@ -1366,10 +1368,12 @@ void Render3DNode::CookIfNeeded(int frameId)
    }
    if (lightCount == 0)
    {
-      const float le = std::cos(lightElevation);
-      lightDirs[0] = le * std::cos(lightAzimuth);
-      lightDirs[1] = std::sin(lightElevation);
-      lightDirs[2] = le * std::sin(lightAzimuth);
+      const float lightAzimuthRad = lightAzimuth * (float)M_PI / 180.0f;
+      const float lightElevationRad = lightElevation * (float)M_PI / 180.0f;
+      const float le = std::cos(lightElevationRad);
+      lightDirs[0] = le * std::cos(lightAzimuthRad);
+      lightDirs[1] = std::sin(lightElevationRad);
+      lightDirs[2] = le * std::sin(lightAzimuthRad);
       lightCols[0] = lightColor[0]; lightCols[1] = lightColor[1]; lightCols[2] = lightColor[2];
       lightPower[0] = lightIntensity;
       lightTypes[0] = 0;

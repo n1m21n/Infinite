@@ -18,7 +18,7 @@ void OceanNode::RebuildIfNeeded()
       return;
 
    mMesh = MeshOps::Ocean(resolution, size, amplitude, wavelength, steepness,
-                          direction, choppiness, octaves, (float)quantised);
+                          direction * 3.14159265f / 180.0f, choppiness, octaves, (float)quantised);
 
    mBuiltResolution = resolution;
    mBuiltOctaves = octaves;

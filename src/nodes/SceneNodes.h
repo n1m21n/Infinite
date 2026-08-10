@@ -29,8 +29,8 @@ public:
    float fov = 45.0f;
    float orthoHeight = 1.5f;
    float distance = 3.0f;
-   float azimuth = 0.6f;
-   float elevation = 0.4f;
+   float azimuth = 34.3775f;
+   float elevation = 22.9183f;
    float targetX = 0.0f, targetY = 0.0f, targetZ = 0.0f;
    float roll = 0.0f;
    float nearPlane = 0.05f;
@@ -62,8 +62,8 @@ public:
    void ComputeVector(float out[3]) const;
 
    int type = 0; // directional / point
-   float azimuth = 0.9f;
-   float elevation = 0.9f;
+   float azimuth = 51.5662f;
+   float elevation = 51.5662f;
    float distance = 4.0f;
    float color[3] = { 1.0f, 0.98f, 0.94f };
    float intensity = 1.2f;

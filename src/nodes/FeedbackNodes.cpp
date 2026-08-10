@@ -165,7 +165,7 @@ void TrailsNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uPrev"), 1);
       glUniform1f(glGetUniformLocation(mProgram, "uDecay"), decay);
       glUniform1f(glGetUniformLocation(mProgram, "uZoom"), zoom);
-      glUniform1f(glGetUniformLocation(mProgram, "uRotate"), rotate);
+      glUniform1f(glGetUniformLocation(mProgram, "uRotate"), rotate * (float)M_PI / 180.0f);
       glUniform2f(glGetUniformLocation(mProgram, "uDrift"), driftX, driftY);
       glUniform1f(glGetUniformLocation(mProgram, "uHueShift"), hueShift);
       glUniform1i(glGetUniformLocation(mProgram, "uBlend"), blendMode);

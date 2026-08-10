@@ -35,10 +35,11 @@ void CurveNode::RebuildIfNeeded()
    std::vector<float> control;
    control.reserve((size_t)count * 3);
 
+   const float twistRad = twist * 3.14159265f / 180.0f;
    for (int i = 0; i < count; i++)
    {
       const float t = (count > 1) ? (float)i / (float)(count - 1) : 0.0f;
-      const float angle = t * 6.28318530718f + twist;
+      const float angle = t * 6.28318530718f + twistRad;
       float x = 0, y = 0, z = 0;
       switch (preset)
       {
@@ -58,9 +59,9 @@ void CurveNode::RebuildIfNeeded()
             z = Hash(seed, i * 3 + 2) * spread;
             break;
          case 4: // circle
-            x = std::cos(t * 6.28318530718f + twist) * spread;
+            x = std::cos(t * 6.28318530718f + twistRad) * spread;
             y = 0.0f;
-            z = std::sin(t * 6.28318530718f + twist) * spread;
+            z = std::sin(t * 6.28318530718f + twistRad) * spread;
             break;
          case 0:
          default: // arc

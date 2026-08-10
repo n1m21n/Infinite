@@ -334,14 +334,14 @@ public:
    float fov = 45.0f;
    float orthoHeight = 1.5f;
    float camDistance = 3.0f;
-   float camAzimuth = 0.6f;
-   float camElevation = 0.4f;
+   float camAzimuth = 34.3775f;
+   float camElevation = 22.9183f;
    float targetX = 0.0f, targetY = 0.0f, targetZ = 0.0f;
    float nearPlane = 0.05f;
    float farPlane = 100.0f;
 
-   float lightAzimuth = 0.9f;
-   float lightElevation = 0.9f;
+   float lightAzimuth = 51.5662f;
+   float lightElevation = 51.5662f;
    float lightColor[3] = { 1.0f, 0.98f, 0.94f };
    float lightIntensity = 1.2f;
    float ambientColor[3] = { 0.28f, 0.32f, 0.42f };

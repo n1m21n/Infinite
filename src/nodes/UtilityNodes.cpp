@@ -136,7 +136,8 @@ MappingTransform MappingNode::GetMappingTransform() const
    MappingTransform t;
    t.space = space;
    t.translate[0] = translateX; t.translate[1] = translateY; t.translate[2] = translateZ;
-   t.rotate[0] = rotateX; t.rotate[1] = rotateY; t.rotate[2] = rotateZ;
+   const float d2r = 3.14159265f / 180.0f;
+   t.rotate[0] = rotateX * d2r; t.rotate[1] = rotateY * d2r; t.rotate[2] = rotateZ * d2r;
    t.scale[0] = scaleX; t.scale[1] = scaleY; t.scale[2] = scaleZ;
    return t;
 }

@@ -65,7 +65,7 @@ public:
    bool HasImage() const { return mHasImage; }
 
    float intensity = 1.0f;
-   float rotation = 0.0f; // radians, about the world Y axis
+   float rotation = 0.0f; // degrees, about the world Y axis
 
    std::string pathInput; // bound to the ImGui text field
 

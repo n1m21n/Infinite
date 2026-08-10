@@ -2,6 +2,7 @@
 
 #include <OpenGL/gl3.h>
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -124,7 +125,7 @@ void RampNode::CookIfNeeded(int frameId)
    {
       glUniform1i(glGetUniformLocation(mProgram, "uType"), type);
       glUniform1i(glGetUniformLocation(mProgram, "uRepeat"), repeat);
-      glUniform1f(glGetUniformLocation(mProgram, "uAngle"), angle);
+      glUniform1f(glGetUniformLocation(mProgram, "uAngle"), angle * (float)M_PI / 180.0f);
       glUniform2f(glGetUniformLocation(mProgram, "uCenter"), centerX, centerY);
       glUniform1f(glGetUniformLocation(mProgram, "uScale"), scale);
       glUniform1f(glGetUniformLocation(mProgram, "uOffset"), offset);
