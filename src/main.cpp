@@ -1453,6 +1453,80 @@ namespace
       }
    }
 
+   // Finds a spawn position near `center` that doesn't land on top of any
+   // existing node. Tries the exact center first (the common case: an empty
+   // canvas, or a center that has scrolled clear), then walks outward ring by
+   // ring over a grid of node-sized slots until it finds one whose padded box
+   // clears every current node - so the first free slot returned is always
+   // the one closest to where the user was actually looking.
+   //
+   // Reads node boxes via ed::GetNodePosition/GetNodeSize, which need a
+   // current editor context; this runs from the node panel, after that
+   // frame's ed::End() has already cleared it (see ed::SetCurrentEditor(nullptr)
+   // at the bottom of the graph draw), so the context is set/restored
+   // explicitly here rather than relying on caller state - same pattern as
+   // ApplyTheme's ed::GetStyle() call above.
+   ImVec2 FindFreeSpawnPosition(const ImVec2& center)
+   {
+      const float kFootprintW = 260.0f;
+      const float kFootprintH = 300.0f;
+      const float kMargin = 24.0f;
+
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+
+      std::vector<std::pair<ImVec2, ImVec2>> occupied;
+      occupied.reserve(gNodes.size());
+      for (GraphNode& gn : gNodes)
+      {
+         ImVec2 p = ed::GetNodePosition(gn.NodeId());
+         ImVec2 s = ed::GetNodeSize(gn.NodeId());
+         if (s.x <= 0.0f || s.y <= 0.0f)
+            continue; // never laid out (e.g. this frame's spawn) - nothing to avoid yet
+         occupied.emplace_back(ImVec2(p.x - kMargin, p.y - kMargin),
+                                ImVec2(p.x + s.x + kMargin, p.y + s.y + kMargin));
+      }
+
+      ed::SetCurrentEditor(prevEditor);
+
+      auto overlapsAny = [&](const ImVec2& candMin, const ImVec2& candMax)
+      {
+         for (const auto& box : occupied)
+         {
+            if (candMax.x > box.first.x && candMin.x < box.second.x &&
+                candMax.y > box.first.y && candMin.y < box.second.y)
+               return true;
+         }
+         return false;
+      };
+
+      for (int ring = 0; ring < 12; ++ring)
+      {
+         if (ring == 0)
+         {
+            if (!overlapsAny(center, ImVec2(center.x + kFootprintW, center.y + kFootprintH)))
+               return center;
+            continue;
+         }
+         for (int gx = -ring; gx <= ring; ++gx)
+         {
+            for (int gy = -ring; gy <= ring; ++gy)
+            {
+               // Only the new outer ring of the square - the interior was
+               // already tried by earlier, smaller rings.
+               if (std::abs(gx) != ring && std::abs(gy) != ring)
+                  continue;
+               ImVec2 cand(center.x + gx * (kFootprintW + kMargin),
+                           center.y + gy * (kFootprintH + kMargin));
+               ImVec2 candMax(cand.x + kFootprintW, cand.y + kFootprintH);
+               if (!overlapsAny(cand, candMax))
+                  return cand;
+            }
+         }
+      }
+      return center; // exhausted the search area - stack rather than fail
+   }
+
    GraphNode* SpawnNode(const std::string& typeName, const std::string& category,
                         float x = 0.0f, float y = 0.0f)
    {
@@ -3092,7 +3166,20 @@ namespace
 
    void DrawGeometryParams(GeometryNode* n)
    {
-      DropdownButton("shape", GeometryNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
+      DropdownButton("shape", GeometryNode::ShapeNames(), n->shape,
+         [n](int i)
+         {
+            // Pyramid and Prism are Cylinder/Cone under the hood, told apart
+            // only by `sides` - at the high facet counts those default to
+            // (left over from a round shape, or just never touched) they
+            // read as a cone/cylinder instead of the flat-faced primitive
+            // the name promises. Snap to a canonical low count on selection
+            // so the dropdown pick is recognizable immediately; the user can
+            // still dial `sides` back up afterward for a rounder look.
+            if (i == 10 && n->shape != 10) n->sides = 4;       // Pyramid -> square pyramid
+            else if (i == 11 && n->shape != 11) n->sides = 3;  // Prism -> triangular prism
+            n->shape = i;
+         });
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
 
       NodeSeparator("form");
@@ -3656,7 +3743,7 @@ namespace
       {
          const FilterParamDef& p = def.params[i];
          if (!p.sectionLabel.empty())
-            ImGui::SeparatorText(p.sectionLabel.c_str());
+            NodeSeparator(p.sectionLabel.c_str());
          ImGui::PushID((int)i);
          if (p.type == FilterParamDef::Type::Color)
          {
@@ -4439,19 +4526,6 @@ namespace
    // ever has room left over for a scrollbar of its own.
    void DrawViewportPanelContainer()
    {
-      ImGui::SetNextItemWidth(110.0f);
-      ViewportPanelDockCombo();
-      // Closing the last card is one way out of the panel, but that means N
-      // clicks to dismiss N cards - this is the one that always works.
-      ImGui::SameLine();
-      // Returns before the cards child is opened, so the caller's own
-      // Begin/EndChild pairing stays balanced.
-      if (ImGui::SmallButton("close panel"))
-      {
-         gViewportPanelNodes.clear();
-         return;
-      }
-
       const bool horizontal = (gViewportPanelDock == 0 || gViewportPanelDock == 3);
 
       // The render's fixed axis: the strip's height when cards run across it,
@@ -4465,10 +4539,10 @@ namespace
       // shrinks the cards, which can drop the total back under the scroll
       // threshold, which removes the scrollbar again. That loop is what makes
       // the panel flicker once a certain number of cards is open.
-      const float titleH = ViewportPanelTitleHeight();
       const float bar = ImGui::GetStyle().ScrollbarSize;
+      const ImVec2 panelOrigin = ImGui::GetCursorScreenPos();
       const ImVec2 strip = ImGui::GetContentRegionAvail();
-      const float box = horizontal ? std::max(48.0f, strip.y - titleH - bar)
+      const float box = horizontal ? std::max(48.0f, strip.y - bar)
                                    : std::max(48.0f, strip.x - bar);
 
       ImGui::BeginChild("##viewportcards", strip, false,
@@ -4499,6 +4573,33 @@ namespace
       }
 
       ImGui::EndChild();
+
+      // Right-click anywhere on the panel - empty space or a card - to
+      // reposition or close it. Replaces the dock-combo/close-button header
+      // row, which cost a whole line of chrome for controls used rarely.
+      //
+      // A plain rect test against the mouse, not BeginPopupContextWindow:
+      // the cards above are nested child windows, and ImGui's window-hover
+      // test only sees the topmost window under the cursor, so a
+      // context-window helper attached here would only fire in the gaps
+      // between cards, not over the renders themselves.
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      const bool overPanel = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + strip.x &&
+                             mouse.y >= panelOrigin.y && mouse.y < panelOrigin.y + strip.y;
+      if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+         ImGui::OpenPopup("##viewportpanelctx");
+
+      if (ImGui::BeginPopup("##viewportpanelctx"))
+      {
+         static const char* kDockLabels[] = { "Bottom", "Right", "Left", "Top" };
+         for (int i = 0; i < 4; i++)
+            if (ImGui::MenuItem(kDockLabels[i], nullptr, i == gViewportPanelDock))
+               gViewportPanelDock = i;
+         ImGui::Separator();
+         if (ImGui::MenuItem("Close panel"))
+            gViewportPanelNodes.clear();
+         ImGui::EndPopup();
+      }
    }
 
    // The panel's outer frame at every dock position: a borderless child plus
@@ -7222,47 +7323,56 @@ int main()
                              1 + (int)(transport.Beats() / 4.0),
                              std::fmod(transport.Beats(), 4.0) + 1.0);
 
+         // Frame cost, pinned right. Measured from the swap-to-swap wall clock
+         // rather than ImGui's smoothed rate, so a heavy patch shows its real
+         // cost immediately instead of easing into it over a second.
+         static double sSmoothedMs = 0.0;
+         // A gentle EMA: raw frame times jitter too much to read, but the
+         // window is short enough that dragging a slider shows up at once.
+         sSmoothedMs = (sSmoothedMs <= 0.0)
+                          ? gLastFrameMs
+                          : sSmoothedMs * 0.9 + gLastFrameMs * 0.1;
+         const double fps = sSmoothedMs > 0.0001 ? 1000.0 / sSmoothedMs : 0.0;
+
+         char readout[80];
+         if (gTargetFps > 0)
+            snprintf(readout, sizeof(readout), "%.1f / %d fps   %.1f ms",
+                     fps, gTargetFps, sSmoothedMs);
+         else
+            snprintf(readout, sizeof(readout), "%.1f fps   %.1f ms", fps, sSmoothedMs);
+
+         // Reserve space using a worst-case template rather than the live
+         // string's width, so the search button doesn't jitter as the digit
+         // count of the fps/ms readout changes frame to frame.
+         char readoutTemplate[80];
+         if (gTargetFps > 0)
+            snprintf(readoutTemplate, sizeof(readoutTemplate), "888.8 / %d fps   888.8 ms", gTargetFps);
+         else
+            snprintf(readoutTemplate, sizeof(readoutTemplate), "888.8 fps   888.8 ms");
+         const float reservedWidth = ImGui::CalcTextSize(readoutTemplate).x;
+         const float readoutX = ImGui::GetWindowWidth() - reservedWidth - ImGui::GetStyle().WindowPadding.x * 2.0f;
+
          {
-            // Sits just left of the frame readout, so the two right-hand
-            // controls stay together.
-            const char* label = gNodePanelOpen ? "> modules" : "search modules";
+            // Sits left of the frame readout with a bit of breathing room,
+            // so it reads as its own control rather than glued to the fps text.
+            const char* label = "search";
             const float w = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-            ImGui::SameLine(ImGui::GetWindowWidth() - w - 200.0f);
+            ImGui::SameLine(readoutX - w - ImGui::GetStyle().ItemSpacing.x * 4.0f);
             if (ImGui::Button(label))
                gNodePanelOpen = !gNodePanelOpen;
          }
 
-         // Frame cost, pinned right. Measured from the swap-to-swap wall clock
-         // rather than ImGui's smoothed rate, so a heavy patch shows its real
-         // cost immediately instead of easing into it over a second.
-         {
-            static double sSmoothedMs = 0.0;
-            // A gentle EMA: raw frame times jitter too much to read, but the
-            // window is short enough that dragging a slider shows up at once.
-            sSmoothedMs = (sSmoothedMs <= 0.0)
-                             ? gLastFrameMs
-                             : sSmoothedMs * 0.9 + gLastFrameMs * 0.1;
-            const double fps = sSmoothedMs > 0.0001 ? 1000.0 / sSmoothedMs : 0.0;
+         ImGui::SameLine(readoutX);
 
-            char readout[80];
-            if (gTargetFps > 0)
-               snprintf(readout, sizeof(readout), "%.1f / %d fps   %.1f ms",
-                        fps, gTargetFps, sSmoothedMs);
-            else
-               snprintf(readout, sizeof(readout), "%.1f fps   %.1f ms", fps, sSmoothedMs);
-            const float textWidth = ImGui::CalcTextSize(readout).x;
-            ImGui::SameLine(ImGui::GetWindowWidth() - textWidth - ImGui::GetStyle().WindowPadding.x * 2.0f);
-
-            // Judged against the target when there is one, so hitting a
-            // deliberate 30fps cap reads as green rather than as a problem.
-            // Otherwise against 50/25, where dragging a slider stops feeling live.
-            const double good = gTargetFps > 0 ? gTargetFps * 0.95 : 50.0;
-            const double poor = gTargetFps > 0 ? gTargetFps * 0.5 : 25.0;
-            const ImVec4 color = (fps >= good) ? ImVec4(0.45f, 0.85f, 0.5f, 1.0f)
-                               : (fps >= poor) ? ImVec4(0.95f, 0.75f, 0.35f, 1.0f)
-                                               : ImVec4(0.95f, 0.45f, 0.4f, 1.0f);
-            ImGui::TextColored(color, "%s", readout);
-         }
+         // Judged against the target when there is one, so hitting a
+         // deliberate 30fps cap reads as green rather than as a problem.
+         // Otherwise against 50/25, where dragging a slider stops feeling live.
+         const double good = gTargetFps > 0 ? gTargetFps * 0.95 : 50.0;
+         const double poor = gTargetFps > 0 ? gTargetFps * 0.5 : 25.0;
+         const ImVec4 color = (fps >= good) ? ImVec4(0.45f, 0.85f, 0.5f, 1.0f)
+                            : (fps >= poor) ? ImVec4(0.95f, 0.75f, 0.35f, 1.0f)
+                                            : ImVec4(0.95f, 0.45f, 0.4f, 1.0f);
+         ImGui::TextColored(color, "%s", readout);
 
          ImGui::EndMenuBar();
       }
@@ -12717,9 +12827,13 @@ int main()
 
          if (!spawnName.empty())
          {
-            // Dropped at the middle of the view rather than at the mouse: the
-            // click happened over the panel, not over the canvas.
-            SpawnNode(spawnName, spawnCategory, gViewCenterCanvas.x, gViewCenterCanvas.y);
+            // Aimed at the middle of the view rather than at the mouse: the
+            // click happened over the panel, not over the canvas. Landing
+            // exactly on the center every time would stack repeated clicks on
+            // top of each other, so nudge to the nearest spot around the
+            // center that isn't already covered by another node.
+            ImVec2 pos = FindFreeSpawnPosition(gViewCenterCanvas);
+            SpawnNode(spawnName, spawnCategory, pos.x, pos.y);
             gPatchDirty = true;
          }
 
@@ -12806,6 +12920,7 @@ int main()
          ImGui::OpenPopup("Unsaved Changes");
          gShowUnsavedChangesModal = false;
       }
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
       {
          ImGui::Text("This patch has unsaved changes.");

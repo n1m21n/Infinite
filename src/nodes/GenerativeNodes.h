@@ -125,7 +125,7 @@ private:
 // Turns an image into a point cloud: one particle per sampled pixel, positioned
 // on a plane with luminance pushing it out of that plane. The result feeds
 // Instance on Points, so an image becomes a field of shapes.
-class ImageToPointsNode : public INode, public IPointCloudSource
+class ImageToPointsNode : public INode, public IPointCloudSource, public IGeometrySource
 {
 public:
    enum DepthSource { kLuminance = 0, kRed, kAlpha, kFlat, kDepthSourceCount };
@@ -141,6 +141,16 @@ public:
 
    const std::vector<Particle>& GetPoints() override { return mPoints; }
    unsigned long long PointRevision() override { return mRevision; }
+
+   // IGeometrySource: a swatch quad per point, each sampling its own texel of
+   // the downsampled source image rather than the whole image tiled per-quad
+   // (which is what MeshOps::PointsToFaces's 0..1 corner UVs would give).
+   const Mesh& GetMesh() override;
+   unsigned long long MeshRevision() override;
+   Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+   Material GetMaterial() const override;
+   unsigned int GetSurfaceTexture() override { return mSmall.tex; }
+   unsigned long long SurfaceTextureRevision() const override { return mRevision; }
 
    ImageCable& Input() { return mInput; }
    INode* BypassSource() override { return mInput.GetSource(); }
@@ -176,9 +186,14 @@ private:
    // Resolves the source into a density x density target before reading back,
    // so the CPU never sees the full-resolution image.
    bool EnsureDownsampler(int n);
+   void RebuildMeshIfNeeded();
 
    ImageCable mInput;
    std::vector<Particle> mPoints;
+   // Grid-cell UV for each entry in mPoints, in the same order, so the mini-
+   // viewport mesh can give each swatch quad its own single texel to sample
+   // instead of spreading the whole image across it.
+   std::vector<std::pair<float, float>> mPointUv;
    std::vector<unsigned char> mPixels;
    unsigned long long mRevision = 0;
 
@@ -186,4 +201,8 @@ private:
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
+
+   Mesh mCookedMesh;
+   unsigned long long mCookedMeshRevision = 0;
+   unsigned long long mBuiltMeshRevision = (unsigned long long)-1;
 };

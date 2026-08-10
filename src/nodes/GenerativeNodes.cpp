@@ -244,6 +244,7 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
       if (!mPoints.empty())
       {
          mPoints.clear();
+         mPointUv.clear();
          mRevision = NextMeshRevision();
       }
       return;
@@ -276,6 +277,8 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
 
    mPoints.clear();
    mPoints.reserve((size_t)n * (size_t)n);
+   mPointUv.clear();
+   mPointUv.reserve((size_t)n * (size_t)n);
 
    for (int gy = 0; gy < n; gy++)
    {
@@ -321,10 +324,91 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
          p.life = 0.0f;
          p.alive = true;
          mPoints.push_back(p);
+         mPointUv.push_back({ u, v });
       }
    }
 
    mRevision = NextMeshRevision();
+}
+
+void ImageToPointsNode::RebuildMeshIfNeeded()
+{
+   if (mBuiltMeshRevision == mRevision)
+      return;
+   mBuiltMeshRevision = mRevision;
+
+   mCookedMesh = Mesh();
+   mCookedMesh.vertices.reserve(mPoints.size() * 4);
+   mCookedMesh.indices.reserve(mPoints.size() * 6);
+
+   // p.scale is a relative multiplier meant to be combined with an external
+   // instance size (see InstanceOnPointsNode::Rebuild, which multiplies it by
+   // its own instanceScale) - on its own it is not a world-space size. For a
+   // standalone swatch quad here, anchor the *base* size to the grid spacing
+   // so points read as a cloud of distinct dice instead of one overlapping
+   // slab, and let p.scale still scale that up/down around the base.
+   const int n = std::max(2, std::min(density, 512));
+   const float cell = std::min(width, height) / (float)n;
+   const float baseHalf = cell * 0.45f;
+
+   for (size_t i = 0; i < mPoints.size(); i++)
+   {
+      const Particle& p = mPoints[i];
+      const float u = mPointUv[i].first;
+      const float v = mPointUv[i].second;
+
+      // Billboard-ish quad oriented to the point normal, same construction as
+      // MeshOps::PointsToFaces (Mesh.cpp) - but every corner gets this point's
+      // own single (u, v) instead of a 0..1 spread, so the quad samples one
+      // texel of the source image rather than the whole thing.
+      float n[3] = { p.nx, p.ny, p.nz };
+      const float len = std::sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+      if (len > 1e-6f) { n[0] /= len; n[1] /= len; n[2] /= len; }
+      float up[3] = { 0, 1, 0 };
+      if (std::fabs(n[1]) > 0.9f) { up[0] = 1; up[1] = 0; }
+      float sx[3] = { n[1]*up[2] - n[2]*up[1], n[2]*up[0] - n[0]*up[2], n[0]*up[1] - n[1]*up[0] };
+      const float sl = std::sqrt(sx[0]*sx[0] + sx[1]*sx[1] + sx[2]*sx[2]);
+      if (sl < 1e-6f) continue;
+      sx[0] /= sl; sx[1] /= sl; sx[2] /= sl;
+      const float sy[3] = { n[1]*sx[2] - n[2]*sx[1], n[2]*sx[0] - n[0]*sx[2], n[0]*sx[1] - n[1]*sx[0] };
+
+      const float h = baseHalf * p.scale;
+      const unsigned int base = (unsigned int)mCookedMesh.vertices.size();
+      const float corners[4][2] = { { -h, -h }, { h, -h }, { h, h }, { -h, h } };
+      for (int c = 0; c < 4; c++)
+      {
+         Vertex vtx;
+         vtx.px = p.px + sx[0]*corners[c][0] + sy[0]*corners[c][1];
+         vtx.py = p.py + sx[1]*corners[c][0] + sy[1]*corners[c][1];
+         vtx.pz = p.pz + sx[2]*corners[c][0] + sy[2]*corners[c][1];
+         vtx.nx = n[0]; vtx.ny = n[1]; vtx.nz = n[2];
+         vtx.u = u; vtx.v = v;
+         mCookedMesh.vertices.push_back(vtx);
+      }
+      mCookedMesh.indices.push_back(base); mCookedMesh.indices.push_back(base + 1); mCookedMesh.indices.push_back(base + 2);
+      mCookedMesh.indices.push_back(base); mCookedMesh.indices.push_back(base + 2); mCookedMesh.indices.push_back(base + 3);
+   }
+
+   mCookedMeshRevision = NextMeshRevision();
+}
+
+const Mesh& ImageToPointsNode::GetMesh()
+{
+   RebuildMeshIfNeeded();
+   return mCookedMesh;
+}
+
+unsigned long long ImageToPointsNode::MeshRevision()
+{
+   RebuildMeshIfNeeded();
+   return mCookedMeshRevision;
+}
+
+Material ImageToPointsNode::GetMaterial() const
+{
+   Material m;
+   m.color[0] = m.color[1] = m.color[2] = 1.0f;
+   return m;
 }
 
 ImageToPointsNode::~ImageToPointsNode()

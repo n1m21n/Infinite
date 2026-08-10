@@ -9,6 +9,14 @@
 
 namespace
 {
+   // A longer "lens" than Render3DNode's main-viewport default (45 deg) -
+   // this solo thumbnail auto-frames every mesh snugly against the frustum
+   // edge, and at a wide FOV that snug framing visibly keystones tall
+   // symmetric shapes (a Cylinder's near rim projects wider than its far
+   // rim). Narrower FOV + a proportionally longer auto-frame distance keeps
+   // the object the same apparent size while reading closer to orthographic.
+   constexpr float kFovDegrees = 28.0f;
+
    // Same chain-walk as Render3DNode's FindInstancer (Geometry3DNodes.cpp): an
    // InstanceOnPoints wrapped in Transform/Subdivide/etc. is still an instancer
    // as far as the preview is concerned, so the thumbnail shows every instance
@@ -467,7 +475,13 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, int w, int h, bool force
       const float dx = hi[0] - lo[0], dy = hi[1] - lo[1], dz = hi[2] - lo[2];
       const float radius = std::max(0.05f, 0.5f * std::sqrt(dx * dx + dy * dy + dz * dz));
       mTarget[0] = cx; mTarget[1] = cy; mTarget[2] = cz;
-      mDistance = radius * 2.6f;
+      // Distance to just fit `radius` inside kFovDegrees, plus 10% headroom.
+      // Framing this snugly at a wide FOV is what made symmetric shapes
+      // (a Cylinder, a Prism) read as tapered/conical in the thumbnail: the
+      // near rim sits noticeably closer to the eye than the far rim, so
+      // perspective scales them differently even though the mesh itself has
+      // no taper at all. See kFovDegrees below.
+      mDistance = radius / std::tan(kFovDegrees * 0.5f * 3.14159265f / 180.0f) * 1.1f;
       mFramed = true;
    }
 
@@ -484,7 +498,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, int w, int h, bool force
    const float up[3] = { 0.0f, 1.0f, 0.0f };
    const Mat4 view = Mat4::LookAt(eye, mTarget, up);
    const float farPlane = std::max(50.0f, mDistance * 4.0f);
-   const Mat4 proj = Mat4::Perspective(45.0f * 3.14159265f / 180.0f, aspect, 0.05f, farPlane);
+   const Mat4 proj = Mat4::Perspective(kFovDegrees * 3.14159265f / 180.0f, aspect, 0.05f, farPlane);
    const Mat4 viewProj = Mat4::Multiply(proj, view);
 
    // --- save the GL state the rest of the app relies on, same pattern as
