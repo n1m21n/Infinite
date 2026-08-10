@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "core/NodeFactory.h"
+#include "core/CategoryColors.h"
 #include "core/GLUtil.h"
 #include "core/GraphNode.h"
 #include "core/FilterDefs.h"
@@ -1053,6 +1054,81 @@ namespace
             [defPtr]() -> INode* { return FilterNode::CreateFor(*defPtr); },
             def.category);
       }
+   }
+
+   // Restyles ImGui's whole palette plus the node-editor canvas from the
+   // active CategoryColors preset, so switching presets re-themes the app
+   // rather than just the graph. Mutates ImGuiStyle/ed::Style directly
+   // (like StyleColorsDark() itself), not a push/pop - it's meant to stick
+   // until the user picks a different preset. Node header/border tinting
+   // is separate, applied per-node from the same preset's category table.
+   void ApplyTheme()
+   {
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      auto vec = [](const CategoryColors::Color& c, float a = 1.0f) {
+         return ImVec4(c.r, c.g, c.b, a);
+      };
+      auto lighten = [](const CategoryColors::Color& c, float amt) {
+         return ImVec4(c.r + (1.0f - c.r) * amt, c.g + (1.0f - c.g) * amt,
+                       c.b + (1.0f - c.b) * amt, 1.0f);
+      };
+
+      ImGuiStyle& style = ImGui::GetStyle();
+      style.Colors[ImGuiCol_Text] = vec(t.text);
+      style.Colors[ImGuiCol_TextDisabled] = vec(t.textDim);
+      style.Colors[ImGuiCol_WindowBg] = vec(t.windowBg);
+      style.Colors[ImGuiCol_ChildBg] = vec(t.panelBg, 0.0f);
+      style.Colors[ImGuiCol_PopupBg] = vec(t.panelBg, 0.98f);
+      style.Colors[ImGuiCol_Border] = vec(t.border);
+      style.Colors[ImGuiCol_FrameBg] = vec(t.panelBg);
+      style.Colors[ImGuiCol_FrameBgHovered] = lighten(t.panelBg, 0.12f);
+      style.Colors[ImGuiCol_FrameBgActive] = lighten(t.panelBg, 0.20f);
+      style.Colors[ImGuiCol_TitleBg] = vec(t.windowBg);
+      style.Colors[ImGuiCol_TitleBgActive] = vec(t.windowBg);
+      style.Colors[ImGuiCol_TitleBgCollapsed] = vec(t.windowBg, 0.75f);
+      style.Colors[ImGuiCol_MenuBarBg] = vec(t.panelBg);
+      style.Colors[ImGuiCol_ScrollbarBg] = vec(t.windowBg);
+      style.Colors[ImGuiCol_ScrollbarGrab] = vec(t.border);
+      style.Colors[ImGuiCol_ScrollbarGrabHovered] = lighten(t.border, 0.25f);
+      style.Colors[ImGuiCol_ScrollbarGrabActive] = vec(t.accent);
+      style.Colors[ImGuiCol_CheckMark] = vec(t.accent);
+      style.Colors[ImGuiCol_SliderGrab] = vec(t.accent, 0.85f);
+      style.Colors[ImGuiCol_SliderGrabActive] = vec(t.accent);
+      style.Colors[ImGuiCol_Button] = vec(t.panelBg);
+      style.Colors[ImGuiCol_ButtonHovered] = lighten(t.panelBg, 0.18f);
+      style.Colors[ImGuiCol_ButtonActive] = vec(t.accent, 0.65f);
+      style.Colors[ImGuiCol_Header] = vec(t.accent, 0.30f);
+      style.Colors[ImGuiCol_HeaderHovered] = vec(t.accent, 0.45f);
+      style.Colors[ImGuiCol_HeaderActive] = vec(t.accent, 0.60f);
+      style.Colors[ImGuiCol_Separator] = vec(t.border);
+      style.Colors[ImGuiCol_SeparatorHovered] = vec(t.accent, 0.6f);
+      style.Colors[ImGuiCol_SeparatorActive] = vec(t.accent);
+      style.Colors[ImGuiCol_ResizeGrip] = vec(t.border, 0.4f);
+      style.Colors[ImGuiCol_ResizeGripHovered] = vec(t.accent, 0.6f);
+      style.Colors[ImGuiCol_ResizeGripActive] = vec(t.accent);
+      style.Colors[ImGuiCol_Tab] = vec(t.panelBg);
+      style.Colors[ImGuiCol_TabHovered] = vec(t.accent, 0.5f);
+      style.Colors[ImGuiCol_TabActive] = lighten(t.panelBg, 0.15f);
+      style.Colors[ImGuiCol_TabUnfocused] = vec(t.windowBg);
+      style.Colors[ImGuiCol_TabUnfocusedActive] = vec(t.panelBg);
+      style.Colors[ImGuiCol_TextSelectedBg] = vec(t.accent, 0.35f);
+      style.Colors[ImGuiCol_DragDropTarget] = vec(t.accent);
+      style.Colors[ImGuiCol_NavHighlight] = vec(t.accent);
+
+      // The node-graph canvas itself is drawn by imgui-node-editor from its
+      // own style table, not ImGui's - Bg/Grid are the two slots visible
+      // behind every node regardless of category. ed::GetStyle() reads
+      // through the *current* editor context, which is null here when this
+      // runs from the menu bar (that frame's ed::SetCurrentEditor(gEditor)
+      // happens later, after the menu bar) - set/restore it explicitly
+      // rather than relying on caller state, since the startup call and the
+      // menu-bar call have different current-editor state at the time.
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+      ed::Style& edStyle = ed::GetStyle();
+      edStyle.Colors[ed::StyleColor_Bg] = vec(t.windowBg, 0.784f);
+      edStyle.Colors[ed::StyleColor_Grid] = vec(t.border, 0.35f);
+      ed::SetCurrentEditor(prevEditor);
    }
 
    IModulator* ModulatorForOutput(INode* node, int outputIndex)
@@ -5478,10 +5554,13 @@ int main()
    config.SettingsFile = graphPath.c_str();
    config.EnableSmoothZoom = true; // trackpad momentum made stepped zoom feel jumpy
    Patch::LoadRecents();
+   CategoryColors::LoadPreference();
 
    gEditor = ed::CreateEditor(&config);
+   ed::SetCurrentEditor(gEditor); // ed::GetStyle() below needs a current editor
 
    RegisterNodes();
+   ApplyTheme();
 
    // Flat list of every registered type, for the double-click search box.
    std::vector<std::pair<std::string, std::string>> allTypes; // (name, category)
@@ -6678,6 +6757,23 @@ int main()
                if (ImGui::Checkbox("Vsync", &gVsync))
                   glfwSwapInterval(gVsync ? 1 : 0);
                ImGui::TextDisabled("Vsync also caps to the display's refresh");
+            }
+
+            ImGui::SeparatorText("Theme");
+            {
+               const std::vector<std::string>& presets = CategoryColors::PresetNames();
+               const int current = CategoryColors::CurrentPreset();
+               ImGui::SetNextItemWidth(170);
+               if (ImGui::BeginCombo("Theme", presets[current].c_str()))
+               {
+                  for (int i = 0; i < (int)presets.size(); i++)
+                     if (ImGui::Selectable(presets[i].c_str(), current == i))
+                     {
+                        CategoryColors::SetPreset(i);
+                        ApplyTheme();
+                     }
+                  ImGui::EndCombo();
+               }
             }
 
             ImGui::SeparatorText("Nodes");
@@ -10357,6 +10453,21 @@ int main()
             continue;
          }
 
+         // Category tint: same idea as DrawGroupNode's stored colour, but from
+         // the static per-category table since categories are a fixed
+         // vocabulary, not something a user repicks per node. Blended into the
+         // library's own default NodeBg rather than replacing it outright, so
+         // a node still reads as "the same kind of card", just tinted.
+         const CategoryColors::Color& catColor = CategoryColors::ColorFor(gn.category);
+         const float kTintWeight = 0.16f;
+         ed::PushStyleColor(ed::StyleColor_NodeBg,
+                            ImColor(0.125f * (1.0f - kTintWeight) + catColor.r * kTintWeight,
+                                    0.125f * (1.0f - kTintWeight) + catColor.g * kTintWeight,
+                                    0.125f * (1.0f - kTintWeight) + catColor.b * kTintWeight,
+                                    0.784f));
+         ed::PushStyleColor(ed::StyleColor_NodeBorder,
+                            ImColor(catColor.r, catColor.g, catColor.b, 0.55f));
+
          ed::BeginNode(gn.NodeId());
          ImGui::PushID(gn.index);
          const bool dimmed = gn.node->bypassed;
@@ -10386,7 +10497,13 @@ int main()
          ImGui::BeginGroup();
 
          ImGui::TextUnformatted(NodeTitle(gn).c_str());
-         ImGui::TextDisabled("%s", gn.category.c_str());
+         // Lightened toward white so the label stays legible at small sizes,
+         // the same blend DrawGroupNode uses for its own colour-tinted label.
+         ImGui::PushStyleColor(ImGuiCol_Text,
+                               ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f,
+                                      catColor.b * 0.6f + 0.4f, 1.0f));
+         ImGui::TextUnformatted(gn.category.c_str());
+         ImGui::PopStyleColor();
 
          // --- preview: image for image nodes, a value meter for modulators ---
          const bool multiOutModulator =
@@ -10736,6 +10853,7 @@ int main()
             ImGui::PopStyleVar();
          ImGui::PopID();
          ed::EndNode();
+         ed::PopStyleColor(2);
       }
 
       // ---- draw existing links ----

@@ -39,6 +39,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/main.cpp
     src/core/GLUtil.cpp
     src/core/NodeFactory.cpp
+    src/core/CategoryColors.cpp
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
