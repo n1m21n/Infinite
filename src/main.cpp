@@ -639,8 +639,11 @@ namespace
          // is writing to *value while that's true (see the apply pass), so
          // there's nothing unsafe about just falling back to a plain,
          // fully-interactive slider on the real value - no special colour,
-         // no lock. The fx/x controls stay put so the broken formula can
-         // still be reopened (to fix it) or cleared outright.
+         // no lock, and no fx/x badge either: it looks exactly like a param
+         // with no expression at all. The stored (broken) formula is still
+         // reachable to fix or clear via double-click, right-click, or
+         // hovering and typing '=' - see HandleParamTypeHotkeys - same as it
+         // would be if this were a fresh, non-expression param.
          ImGui::SetNextItemWidth(kParamWidth - box - 4.0f);
          changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
          if (ImGui::IsItemActivated())
@@ -655,11 +658,6 @@ namespace
          }
          if (hovered && !ImGui::IsItemActive())
             HandleParamTypeHotkeys(editKey, value);
-         ImGui::SameLine(0.0f, 4.0f);
-         ImGui::TextDisabled("fx");
-         ImGui::SameLine(0.0f, 4.0f);
-         if (ImGui::SmallButton("x"))
-            Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
       }
       else
       {
