@@ -475,6 +475,16 @@ namespace
       // into its pin - see Modulation::SetExpression. It stays stored either
       // way, so unpatching the cable brings it straight back.
       const bool hasExpr = !modulated && Modulation::Instance().HasExpression(nodeIndex, paramIndex);
+      // A stored expression that currently fails to parse/evaluate (bad
+      // syntax, unknown function, division by zero) still counts as
+      // "has an expression" - it stays queued for the moment it's fixed -
+      // but nothing is overwriting *value while it's broken (see the apply
+      // pass), so it's safe to just fall back to the plain, fully-interactive
+      // slider look rather than a special locked/coloured state. The fx/x
+      // controls stay so the stored formula can still be reopened or cleared.
+      const std::string* hasExprErr = hasExpr ? Modulation::Instance().ExpressionErrorFor(nodeIndex, paramIndex)
+                                               : nullptr;
+      const bool exprErrored = hasExprErr != nullptr && !hasExprErr->empty();
       gDrawnParamPins.insert(pinId);
 
       ImGui::PushID(paramIndex + 5000);
@@ -486,9 +496,9 @@ namespace
       ImGui::Dummy(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
-      const ImU32 pinColor = modulated ? IM_COL32(255, 190, 90, 255)
-                            : hasExpr  ? IM_COL32(170, 130, 255, 255)
-                                       : IM_COL32(95, 100, 120, 255);
+      const ImU32 pinColor = modulated              ? IM_COL32(255, 190, 90, 255)
+                            : hasExpr && !exprErrored ? IM_COL32(170, 130, 255, 255)
+                                                      : IM_COL32(95, 100, 120, 255);
       dl->AddCircleFilled(c, 4.0f, pinColor);
       ed::EndPin();
       ImGui::SameLine(0.0f, 4.0f);
@@ -590,7 +600,7 @@ namespace
          ImGui::SliderFloat(label, &shown, minV, maxV, fmt, ImGuiSliderFlags_NoInput);
          ImGui::PopStyleColor(2);
       }
-      else if (hasExpr)
+      else if (hasExpr && !exprErrored)
       {
          // Driven by a typed expression, re-evaluated every frame by the
          // apply pass in the main loop. Read-only like the modulated state,
@@ -622,6 +632,34 @@ namespace
          if (ImGui::SmallButton("x"))
             Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
          ImGui::PopStyleColor(3);
+      }
+      else if (hasExpr) // exprErrored
+      {
+         // The stored expression is currently failing to evaluate. Nothing
+         // is writing to *value while that's true (see the apply pass), so
+         // there's nothing unsafe about just falling back to a plain,
+         // fully-interactive slider on the real value - no special colour,
+         // no lock. The fx/x controls stay put so the broken formula can
+         // still be reopened (to fix it) or cleared outright.
+         ImGui::SetNextItemWidth(kParamWidth - box - 4.0f);
+         changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         const bool hovered = ImGui::IsItemHovered();
+         if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
+         if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         {
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
+            gParamRightClickConsumedThisFrame = true;
+         }
+         if (hovered && !ImGui::IsItemActive())
+            HandleParamTypeHotkeys(editKey, value);
+         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::TextDisabled("fx");
+         ImGui::SameLine(0.0f, 4.0f);
+         if (ImGui::SmallButton("x"))
+            Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
       }
       else
       {
