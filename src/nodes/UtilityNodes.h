@@ -166,6 +166,7 @@ public:
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
    size_t TriangleCount() const;
 
@@ -211,6 +212,7 @@ public:
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* PassthroughSource() const override { return input; }
    IGeometrySource* input = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    ImageCable& TextureInput() { return mMaps[kMapAlbedo]; }
    // Slot 0 is geometry; slots 1..5 are the material channels, in MaterialMap
    // order, so the existing 2D generators can author a whole surface.
@@ -326,6 +328,7 @@ public:
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
    size_t TriangleCount() const;
 
@@ -392,6 +395,10 @@ public:
    MappingTransform GetMappingTransform() const override;
 
    IGeometrySource* inputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      return (slot >= 0 && slot < kSlots) ? &inputs[slot] : nullptr;
+   }
    const char* InputLabel(int slot) const override
    {
       static const char* kNames[] = { "geo A", "geo B", "geo C", "geo D" };
@@ -496,6 +503,7 @@ public:
    // Read via GetPointCloud() - a plain mesh source with no point cloud of its
    // own returns nullptr, same as an unconnected pin.
    IGeometrySource* cloudSource = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &cloudSource : nullptr; }
    const char* InputLabel(int) const override { return "cloud"; }
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
    size_t BallCount() const { return mBallCount; }
@@ -634,6 +642,7 @@ public:
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
    size_t PointCount() const { return mPointCount; }

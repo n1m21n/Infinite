@@ -146,6 +146,7 @@ public:
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
    size_t TriangleCount() const { return mMesh.indices.size() / 3; }
    size_t ConstraintCount() const { return mConstraints.size(); }

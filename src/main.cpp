@@ -1363,6 +1363,12 @@ namespace
       return nullptr;
    }
 
+   // Upper bound on how many geometry-input slots any single node exposes via
+   // GeometryInputSlot() - the widest today is JoinGeometryNode/Switcher3DNode
+   // at 4. Generic loops over "every geometry slot this node might have" stop
+   // here rather than walking off into unrelated pins.
+   const int kMaxGeometrySlots = 4;
+
    // Which geometry-ish pin a node exposes at a given slot, and how to set it.
    // Geometry, camera and light connections are raw pointers rather than
    // ImageCables, so saving and loading them needs this one place that knows
@@ -1383,53 +1389,9 @@ namespace
             render->lights[slot - Render3DNode::kSlots - 1] = light;
          return;
       }
-      if (auto* op = dynamic_cast<GeometryOpNode*>(dst.node.get())) { op->input = geo; return; }
-      if (auto* disp = dynamic_cast<DisplacementNode*>(dst.node.get())) { if (slot == 0) disp->input = geo; return; }
-      if (auto* n3d = dynamic_cast<Null3DNode*>(dst.node.get())) { n3d->input = geo; return; }
-      if (auto* mapn = dynamic_cast<MappingNode*>(dst.node.get())) { mapn->input = geo; return; }
-      if (auto* mat = dynamic_cast<MaterialNode*>(dst.node.get())) { mat->input = geo; return; }
-      if (auto* m2p = dynamic_cast<MeshToPointsNode*>(dst.node.get())) { m2p->input = geo; return; }
-      if (auto* mrs = dynamic_cast<MeshResynthNode*>(dst.node.get())) { mrs->input = geo; return; }
-      if (auto* cloth = dynamic_cast<ClothNode*>(dst.node.get())) { cloth->input = geo; return; }
-      if (auto* join = dynamic_cast<JoinGeometryNode*>(dst.node.get()))
+      if (IGeometrySource** field = dst.node->GeometryInputSlot(slot))
       {
-         if (slot >= 0 && slot < JoinGeometryNode::kSlots)
-            join->inputs[slot] = geo;
-         return;
-      }
-      if (auto* meta = dynamic_cast<MetaBallNode*>(dst.node.get()))
-      {
-         meta->cloudSource = geo;
-         return;
-      }
-      if (auto* path = dynamic_cast<PathNode*>(dst.node.get()))
-      {
-         if (slot == 0)
-            path->curveSource = geo;
-         else
-            path->geometrySource = geo;
-         return;
-      }
-      if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(dst.node.get()))
-      {
-         if (slot == 0)
-            inst->pointSource = geo;
-         else if (slot == 1)
-            inst->instanceShape = geo;
-         else
-            inst->cloudSource = geo;
-         return;
-      }
-      if (auto* wrap = dynamic_cast<WrapNode*>(dst.node.get()))
-      {
-         if (slot == 0) wrap->sourceInput = geo;
-         else if (slot == 1) wrap->targetInput = geo;
-         return;
-      }
-      if (auto* sw3 = dynamic_cast<Switcher3DNode*>(dst.node.get()))
-      {
-         if (slot >= 0 && slot < Switcher3DNode::kSlots)
-            sw3->inputs[slot] = geo;
+         *field = geo;
          return;
       }
       if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst.node.get()))
@@ -5282,70 +5244,18 @@ namespace
                if ((const void*)render->lights[i] == (const void*)dying)
                   render->lights[i] = nullptr;
          }
-         if (auto* geoOp = dynamic_cast<GeometryOpNode*>(other.node.get()))
-         {
-            if (dyingGeometry != nullptr && geoOp->input == dyingGeometry)
-               geoOp->input = nullptr;
-         }
-         if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(other.node.get()))
-         {
-            if (dyingGeometry != nullptr && inst->pointSource == dyingGeometry)
-               inst->pointSource = nullptr;
-            if (dyingGeometry != nullptr && inst->instanceShape == dyingGeometry)
-               inst->instanceShape = nullptr;
-            if (dyingGeometry != nullptr && inst->cloudSource == dyingGeometry)
-               inst->cloudSource = nullptr;
-         }
-         if (auto* meta = dynamic_cast<MetaBallNode*>(other.node.get()))
-            if (dyingGeometry != nullptr && meta->cloudSource == dyingGeometry)
-               meta->cloudSource = nullptr;
-         if (auto* path = dynamic_cast<PathNode*>(other.node.get()))
-         {
-            if (dyingGeometry != nullptr && path->geometrySource == dyingGeometry)
-               path->geometrySource = nullptr;
-            if (dyingGeometry != nullptr && path->curveSource == dyingGeometry)
-               path->curveSource = nullptr;
-         }
-         // The single-geometry-input nodes. Missing one here would leave a
-         // pointer to a freed node and crash on the next cook.
+         // Every other geometry-consuming node, whatever it calls its field(s)
+         // internally - GeometryInputSlot(slot) finds it generically, so a new
+         // node type can't forget to register here and leave a pointer to a
+         // freed node that crashes on the next cook.
          if (dyingGeometry != nullptr)
          {
-            if (auto* n3d = dynamic_cast<Null3DNode*>(other.node.get()))
-               if (n3d->input == dyingGeometry)
-                  n3d->input = nullptr;
-            if (auto* mapn = dynamic_cast<MappingNode*>(other.node.get()))
-               if (mapn->input == dyingGeometry)
-                  mapn->input = nullptr;
-            if (auto* mat = dynamic_cast<MaterialNode*>(other.node.get()))
-               if (mat->input == dyingGeometry)
-                  mat->input = nullptr;
-            if (auto* disp = dynamic_cast<DisplacementNode*>(other.node.get()))
-               if (disp->input == dyingGeometry)
-                  disp->input = nullptr;
-            if (auto* m2p = dynamic_cast<MeshToPointsNode*>(other.node.get()))
-               if (m2p->input == dyingGeometry)
-                  m2p->input = nullptr;
-            if (auto* mrs = dynamic_cast<MeshResynthNode*>(other.node.get()))
-               if (mrs->input == dyingGeometry)
-                  mrs->input = nullptr;
-            if (auto* cloth = dynamic_cast<ClothNode*>(other.node.get()))
-               if (cloth->input == dyingGeometry)
-                  cloth->input = nullptr;
-            if (auto* join = dynamic_cast<JoinGeometryNode*>(other.node.get()))
-               for (int i = 0; i < JoinGeometryNode::kSlots; i++)
-                  if (join->inputs[i] == dyingGeometry)
-                     join->inputs[i] = nullptr;
-            if (auto* wrap = dynamic_cast<WrapNode*>(other.node.get()))
+            for (int slot = 0; slot < kMaxGeometrySlots; slot++)
             {
-               if (wrap->sourceInput == dyingGeometry)
-                  wrap->sourceInput = nullptr;
-               if (wrap->targetInput == dyingGeometry)
-                  wrap->targetInput = nullptr;
+               if (IGeometrySource** field = other.node->GeometryInputSlot(slot))
+                  if (*field == dyingGeometry)
+                     *field = nullptr;
             }
-            if (auto* sw3 = dynamic_cast<Switcher3DNode*>(other.node.get()))
-               for (int i = 0; i < Switcher3DNode::kSlots; i++)
-                  if (sw3->inputs[i] == dyingGeometry)
-                     sw3->inputs[i] = nullptr;
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
          {
@@ -5483,46 +5393,18 @@ namespace
             }
          };
 
+         // Render3DNode's geometry slots are found generically below via
+         // GeometryInputSlot() too - only its camera/light pins, which aren't
+         // geometry, need special-casing here.
          if (auto* render = dynamic_cast<Render3DNode*>(gn.node.get()))
          {
-            for (int i = 0; i < Render3DNode::kSlots; i++)
-               record(render->geometry[i], i);
             record(render->camera, Render3DNode::kSlots);
             for (int i = 0; i < Render3DNode::kLightSlots; i++)
                record(render->lights[i], Render3DNode::kSlots + 1 + i);
          }
-         if (auto* op = dynamic_cast<GeometryOpNode*>(gn.node.get())) record(op->input, 0);
-         if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get())) record(n3d->input, 0);
-         if (auto* mapn = dynamic_cast<MappingNode*>(gn.node.get())) record(mapn->input, 0);
-         if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get())) record(mat->input, 0);
-         if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get())) record(disp->input, 0);
-         if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get())) record(m2p->input, 0);
-         if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get())) record(mrs->input, 0);
-         if (auto* cloth = dynamic_cast<ClothNode*>(gn.node.get())) record(cloth->input, 0);
-         if (auto* join = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
-            for (int i = 0; i < JoinGeometryNode::kSlots; i++)
-               record(join->inputs[i], i);
-         if (auto* meta = dynamic_cast<MetaBallNode*>(gn.node.get()))
-            record(meta->cloudSource, 0);
-         if (auto* path = dynamic_cast<PathNode*>(gn.node.get()))
-         {
-            record(path->curveSource, 0);
-            record(path->geometrySource, 1);
-         }
-         if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
-         {
-            record(inst->pointSource, 0);
-            record(inst->instanceShape, 1);
-            record(inst->cloudSource, 2);
-         }
-         if (auto* w = dynamic_cast<WrapNode*>(gn.node.get()))
-         {
-            record(w->sourceInput, 0);
-            record(w->targetInput, 1);
-         }
-         if (auto* sw3 = dynamic_cast<Switcher3DNode*>(gn.node.get()))
-            for (int i = 0; i < Switcher3DNode::kSlots; i++)
-               record(sw3->inputs[i], i);
+         for (int slot = 0; slot < kMaxGeometrySlots; slot++)
+            if (IGeometrySource** field = gn.node->GeometryInputSlot(slot))
+               record(*field, slot);
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
             record(audio->fileSource, 0);
          if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
@@ -6387,7 +6269,13 @@ int main()
       else if (getenv("INFINITE_PATCHTEST") != nullptr)
       {
          // A patch touching every kind of connection: image cables, a geometry
-         // chain, camera and light pins, and a modulation binding.
+         // chain, camera and light pins, a modulation binding, and - since
+         // Phase 2 collapsed IGeometrySource/IPointCloudSource/ICurveSource
+         // into one interface - every shape that unification could get wrong:
+         // two geometry slots on one Render 3D, both slots of Instance on
+         // Points plus its cloud slot, Metaballs fed by a cloud, and Path
+         // fed by a curve. CableRecord carries no type info, so a slot
+         // numbering slip here would load silently wrong rather than failing.
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);        // 0
          SpawnNode("Smooth", "3D", 320.0f, 40.0f);         // 1
          SpawnNode("Material", "3D", 600.0f, 40.0f);       // 2
@@ -6398,6 +6286,11 @@ int main()
          SpawnNode("Output", "Output", 1440.0f, 40.0f);    // 7
          SpawnNode("Path", "Modulators", 40.0f, 800.0f);   // 8
          SpawnNode("Audio File", "Modulators", 40.0f, 1000.0f); // 9
+         SpawnNode("Particle System", "3D", 40.0f, 1200.0f);    // 10
+         SpawnNode("Metaballs", "3D", 320.0f, 1200.0f);         // 11
+         SpawnNode("Curve", "3D", 40.0f, 1400.0f);              // 12
+         SpawnNode("Instance on Points", "3D", 600.0f, 1200.0f); // 13
+         SpawnNode("Geometry", "3D", 880.0f, 1200.0f);          // 14: instance shape
 
          auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
          auto* smooth = static_cast<GeometryOpNode*>(gNodes[1].node.get());
@@ -6405,6 +6298,11 @@ int main()
          auto* render = static_cast<Render3DNode*>(gNodes[5].node.get());
          auto* path = static_cast<PathNode*>(gNodes[8].node.get());
          auto* audioFile = static_cast<AudioFileNode*>(gNodes[9].node.get());
+         auto* particles = static_cast<ParticleSystemNode*>(gNodes[10].node.get());
+         auto* meta = static_cast<MetaBallNode*>(gNodes[11].node.get());
+         auto* curve = static_cast<CurveNode*>(gNodes[12].node.get());
+         auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[13].node.get());
+         auto* shape = static_cast<GeometryNode*>(gNodes[14].node.get());
          audioFile->Open("/tmp/models/tone.wav");
          audioFile->monitor = false;
 
@@ -6419,6 +6317,7 @@ int main()
          smooth->input = geo;
          mat->input = smooth;
          render->geometry[0] = mat;
+         render->geometry[1] = inst; // second geometry slot: an instanced cloud
          render->camera = static_cast<CameraNode*>(gNodes[3].node.get());
          render->lights[0] = static_cast<LightNode*>(gNodes[4].node.get());
          CableFor(gNodes[6], 0)->Connect(gNodes[5].node.get());
@@ -6427,6 +6326,40 @@ int main()
          outNode->includeAudio = true;
          outNode->audioSource = audioFile;
          Modulation::Instance().Bind(gNodes[0].index, 6, gNodes[8].index, 2);
+
+         meta->cloudSource = particles;
+         path->curveSource = curve;
+         inst->pointSource = geo;
+         inst->instanceShape = shape;
+         inst->cloudSource = particles;
+      }
+      else if (getenv("INFINITE_DELETECRASHTEST") != nullptr)
+      {
+         // One source feeding every kind of geometry-ish pin at once - Render
+         // 3D, all three Instance on Points pins, Metaballs' cloud, and both
+         // of Path's pins - then deleted, to prove DisconnectAllTo's generic
+         // GeometryInputSlot loop (Phase 2b) finds every one of them. Missing
+         // a field here is exactly the bug class this refactor removes: a
+         // dangling pointer to a freed node that crashes on the next cook.
+         SpawnNode("Particle System", "3D", 40.0f, 40.0f);       // 0: the shared source
+         SpawnNode("Render 3D", "3D", 320.0f, 40.0f);            // 1
+         SpawnNode("Instance on Points", "3D", 320.0f, 260.0f);  // 2
+         SpawnNode("Metaballs", "3D", 320.0f, 480.0f);           // 3
+         SpawnNode("Path", "Modulators", 320.0f, 700.0f);        // 4
+
+         auto* src = static_cast<ParticleSystemNode*>(gNodes[0].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
+         auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[2].node.get());
+         auto* meta = static_cast<MetaBallNode*>(gNodes[3].node.get());
+         auto* path = static_cast<PathNode*>(gNodes[4].node.get());
+
+         render->geometry[0] = src;
+         inst->pointSource = src;
+         inst->instanceShape = src;
+         inst->cloudSource = src;
+         meta->cloudSource = src;
+         path->curveSource = src;
+         path->geometrySource = src;
       }
       else if (getenv("INFINITE_MATFRAMETEST") != nullptr)
       {
@@ -10059,6 +9992,8 @@ int main()
          Render3DNode* render = nullptr;
          PathNode* path3d = nullptr;
          OutputNode* out = nullptr;
+         MetaBallNode* meta = nullptr;
+         InstanceOnPointsNode* inst = nullptr;
          for (GraphNode& gn : gNodes)
          {
             if (!geo) geo = dynamic_cast<GeometryNode*>(gn.node.get());
@@ -10067,10 +10002,12 @@ int main()
             if (!render) render = dynamic_cast<Render3DNode*>(gn.node.get());
             if (!path3d) path3d = dynamic_cast<PathNode*>(gn.node.get());
             if (!out) out = dynamic_cast<OutputNode*>(gn.node.get());
+            if (!meta) meta = dynamic_cast<MetaBallNode*>(gn.node.get());
+            if (!inst) inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get());
          }
 
-         const bool haveAll = geo && smooth && mat && render && path3d && out;
-         bool params = false, wiring = false, mods = false;
+         const bool haveAll = geo && smooth && mat && render && path3d && out && meta && inst;
+         bool params = false, wiring = false, mods = false, geomLinks = false;
          if (haveAll)
          {
             params = geo->shape == 4 && geo->detail == 33 &&
@@ -10090,13 +10027,50 @@ int main()
                      render->lights[0] != nullptr && out->Input().IsConnected() &&
                      out->audioSource != nullptr && out->audioSource->IsLoaded();
 
+            // Every link this interface collapse touches: two geometry slots
+            // on one Render 3D, both mesh-sampling pins plus the cloud pin on
+            // Instance on Points, Metaballs' cloud, and Path's curve pin.
+            geomLinks = render->geometry[1] == inst &&
+                        inst->pointSource != nullptr && inst->instanceShape != nullptr &&
+                        inst->cloudSource != nullptr &&
+                        meta->cloudSource != nullptr &&
+                        path3d->curveSource != nullptr;
+
             mods = !Modulation::Instance().Links().empty();
          }
 
-         printf("params=%d wiring=%d modulation=%d\n", params, wiring, mods);
+         printf("params=%d wiring=%d geomLinks=%d modulation=%d\n", params, wiring, geomLinks, mods);
          printf("%s\n", (saved && cleared && loaded && nodesBefore == gNodes.size() &&
-                         haveAll && params && wiring && mods)
+                         haveAll && params && wiring && geomLinks && mods)
                            ? "PATCH ROUND TRIP OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_DELETECRASHTEST") != nullptr && frameId == 4)
+      {
+         RemoveNodeByIndex(gNodes[0].index);
+      }
+      if (getenv("INFINITE_DELETECRASHTEST") != nullptr && frameId == 6)
+      {
+         Render3DNode* render = nullptr;
+         InstanceOnPointsNode* inst = nullptr;
+         MetaBallNode* meta = nullptr;
+         PathNode* path = nullptr;
+         for (GraphNode& gn : gNodes)
+         {
+            if (!render) render = dynamic_cast<Render3DNode*>(gn.node.get());
+            if (!inst) inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get());
+            if (!meta) meta = dynamic_cast<MetaBallNode*>(gn.node.get());
+            if (!path) path = dynamic_cast<PathNode*>(gn.node.get());
+            gn.node->CookIfNeeded(frameId); // must not crash on the freed source
+         }
+         const bool cleared = render && inst && meta && path &&
+                              render->geometry[0] == nullptr &&
+                              inst->pointSource == nullptr && inst->instanceShape == nullptr &&
+                              inst->cloudSource == nullptr &&
+                              meta->cloudSource == nullptr &&
+                              path->curveSource == nullptr && path->geometrySource == nullptr;
+         printf("delete-crash: 4 nodes survived cook, every field cleared=%d  %s\n",
+                cleared, (render && inst && meta && path && cleared) ? "OK" : "FAIL");
       }
 
       if (getenv("INFINITE_MATFRAMETEST") != nullptr && frameId == 4)
@@ -11601,54 +11575,18 @@ int main()
             }
          };
 
+         // Render3DNode's geometry slots are found generically below via
+         // GeometryInputSlot() too - only its camera/light pins, which aren't
+         // geometry, need special-casing here.
          if (auto* render = dynamic_cast<Render3DNode*>(gn.node.get()))
          {
-            for (int slot = 0; slot < Render3DNode::kSlots; slot++)
-               linkFromNode(render->geometry[slot], slot);
             linkFromNode(render->camera, Render3DNode::kSlots);
             for (int i = 0; i < Render3DNode::kLightSlots; i++)
                linkFromNode(render->lights[i], Render3DNode::kSlots + 1 + i);
          }
-         if (auto* geoOp = dynamic_cast<GeometryOpNode*>(gn.node.get()))
-            linkFromNode(geoOp->input, 0);
-         if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get()))
-            linkFromNode(n3d->input, 0);
-         if (auto* mapn = dynamic_cast<MappingNode*>(gn.node.get()))
-            linkFromNode(mapn->input, 0);
-         if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
-            linkFromNode(m2p->input, 0);
-         if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get()))
-            linkFromNode(mrs->input, 0);
-         if (auto* cloth = dynamic_cast<ClothNode*>(gn.node.get()))
-            linkFromNode(cloth->input, 0);
-         if (auto* join = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
-            for (int i = 0; i < JoinGeometryNode::kSlots; i++)
-               linkFromNode(join->inputs[i], i);
-         if (auto* meta = dynamic_cast<MetaBallNode*>(gn.node.get()))
-            linkFromNode(meta->cloudSource, 0);
-         if (auto* path = dynamic_cast<PathNode*>(gn.node.get()))
-         {
-            linkFromNode(path->curveSource, 0);
-            linkFromNode(path->geometrySource, 1);
-         }
-         if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
-            linkFromNode(mat->input, 0);
-         if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
-            linkFromNode(disp->input, 0);
-         if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
-         {
-            linkFromNode(inst->pointSource, 0);
-            linkFromNode(inst->instanceShape, 1);
-            linkFromNode(inst->cloudSource, 2);
-         }
-         if (auto* w = dynamic_cast<WrapNode*>(gn.node.get()))
-         {
-            linkFromNode(w->sourceInput, 0);
-            linkFromNode(w->targetInput, 1);
-         }
-         if (auto* sw3 = dynamic_cast<Switcher3DNode*>(gn.node.get()))
-            for (int i = 0; i < Switcher3DNode::kSlots; i++)
-               linkFromNode(sw3->inputs[i], i);
+         for (int slot = 0; slot < kMaxGeometrySlots; slot++)
+            if (IGeometrySource** field = gn.node->GeometryInputSlot(slot))
+               linkFromNode(*field, slot);
          if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
             linkFromNode(out->audioSource, 1);
 
@@ -11758,23 +11696,12 @@ int main()
                auto* dstAudio = dstNode ? dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) : nullptr;
                auto* srcAudioFile = srcNode ? dynamic_cast<AudioFileNode*>(srcNode->node.get()) : nullptr;
                auto* dstRender = dstNode ? dynamic_cast<Render3DNode*>(dstNode->node.get()) : nullptr;
-               auto* dstGeoOp = dstNode ? dynamic_cast<GeometryOpNode*>(dstNode->node.get()) : nullptr;
-               auto* dstInstance = dstNode ? dynamic_cast<InstanceOnPointsNode*>(dstNode->node.get()) : nullptr;
-               auto* dstWrap = dstNode ? dynamic_cast<WrapNode*>(dstNode->node.get()) : nullptr;
-               // Null 3D, Material and Mesh to Points all take a single
-               // geometry input on slot 0 and are otherwise interchangeable
-               // here, so they share one branch.
-               auto* dstNull3D = dstNode ? dynamic_cast<Null3DNode*>(dstNode->node.get()) : nullptr;
-               auto* dstMapping = dstNode ? dynamic_cast<MappingNode*>(dstNode->node.get()) : nullptr;
+               // Material and Displacement are the only geometry-consuming
+               // nodes with a non-geometry pin too (their texture map slots),
+               // so they still need their own dynamic_cast: everything else
+               // geometry-shaped is found generically via GeometryInputSlot().
                auto* dstMaterial = dstNode ? dynamic_cast<MaterialNode*>(dstNode->node.get()) : nullptr;
                auto* dstDisplacement = dstNode ? dynamic_cast<DisplacementNode*>(dstNode->node.get()) : nullptr;
-               auto* dstMeshPoints = dstNode ? dynamic_cast<MeshToPointsNode*>(dstNode->node.get()) : nullptr;
-               auto* dstMeshResynth = dstNode ? dynamic_cast<MeshResynthNode*>(dstNode->node.get()) : nullptr;
-               auto* dstCloth = dstNode ? dynamic_cast<ClothNode*>(dstNode->node.get()) : nullptr;
-               auto* dstJoin = dstNode ? dynamic_cast<JoinGeometryNode*>(dstNode->node.get()) : nullptr;
-               auto* dstSwitcher3D = dstNode ? dynamic_cast<Switcher3DNode*>(dstNode->node.get()) : nullptr;
-               auto* dstMeta = dstNode ? dynamic_cast<MetaBallNode*>(dstNode->node.get()) : nullptr;
-               auto* dstPath = dstNode ? dynamic_cast<PathNode*>(dstNode->node.get()) : nullptr;
                auto* dstOutput = dstNode ? dynamic_cast<OutputNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
                auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
@@ -11815,26 +11742,19 @@ int main()
                         else
                            valid = srcLight != nullptr;
                      }
-                     else if (dstGeoOp != nullptr)
-                        valid = srcGeometry != nullptr;
-                     else if (dstInstance != nullptr)
-                        valid = srcGeometry != nullptr;
-                     else if (dstNull3D != nullptr || dstMapping != nullptr || dstMeshPoints != nullptr ||
-                              dstMeshResynth != nullptr || dstCloth != nullptr || dstJoin != nullptr ||
-                              dstSwitcher3D != nullptr)
-                        valid = srcGeometry != nullptr;
-                     else if (dstWrap != nullptr)
-                        valid = srcGeometry != nullptr;
-                     else if (dstMeta != nullptr)
-                        valid = srcGeometry != nullptr;
-                     else if (dstPath != nullptr)
+                     else if (dstNode->node->GeometryInputSlot(slot) != nullptr)
+                        // Whatever this slot's field is called internally
+                        // (input, pointSource, inputs[N], cloudSource, ...),
+                        // GeometryInputSlot says it wants a geometry source.
+                        // Covers dstGeoOp, dstInstance, dstNull3D, dstMapping,
+                        // dstMeshPoints, dstMeshResynth, dstCloth, dstJoin,
+                        // dstSwitcher3D, dstWrap, dstMeta, dstPath, and slot 0
+                        // of dstMaterial/dstDisplacement.
                         valid = srcGeometry != nullptr;
                      else if (dstMaterial != nullptr)
-                        // Slot 0 takes geometry; the rest are ordinary images.
-                        valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
+                        valid = !srcIsModulator; // an ordinary material-map image slot
                      else if (dstDisplacement != nullptr)
-                        // Slot 0 takes geometry; slot 1 the displacement texture.
-                        valid = (slot == 0) ? (srcGeometry != nullptr) : !srcIsModulator;
+                        valid = !srcIsModulator; // the displacement texture slot
                      else if (dstOutput != nullptr && slot == 1)
                         valid = srcAudioFile != nullptr; // slot 1 is the audio pin
                      else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
@@ -11881,60 +11801,15 @@ int main()
                      else
                         dstRender->lights[slot - Render3DNode::kSlots - 1] = srcLight;
                   }
-                  else if (dstGeoOp != nullptr)
+                  else if (IGeometrySource** field =
+                              dstNode->node->GeometryInputSlot(GraphNode::InputSlotFromPin(b)))
                   {
-                     dstGeoOp->input = srcGeometry;
-                  }
-                  else if (dstNull3D != nullptr)
-                     dstNull3D->input = srcGeometry;
-                  else if (dstMapping != nullptr)
-                     dstMapping->input = srcGeometry;
-                  else if (dstMeshPoints != nullptr)
-                     dstMeshPoints->input = srcGeometry;
-                  else if (dstMeshResynth != nullptr)
-                     dstMeshResynth->input = srcGeometry;
-                  else if (dstCloth != nullptr)
-                     dstCloth->input = srcGeometry;
-                  else if (dstMeta != nullptr)
-                     dstMeta->cloudSource = srcGeometry;
-                  else if (dstPath != nullptr)
-                  {
-                     if (GraphNode::InputSlotFromPin(b) == 0)
-                        dstPath->curveSource = srcGeometry;
-                     else
-                        dstPath->geometrySource = srcGeometry;
-                  }
-                  else if (dstJoin != nullptr)
-                  {
-                     const int jslot = GraphNode::InputSlotFromPin(b);
-                     if (jslot >= 0 && jslot < JoinGeometryNode::kSlots)
-                        dstJoin->inputs[jslot] = srcGeometry;
-                  }
-                  else if (dstSwitcher3D != nullptr)
-                  {
-                     const int sslot = GraphNode::InputSlotFromPin(b);
-                     if (sslot >= 0 && sslot < Switcher3DNode::kSlots)
-                        dstSwitcher3D->inputs[sslot] = srcGeometry;
-                  }
-                  else if (dstWrap != nullptr)
-                  {
-                     const int wslot = GraphNode::InputSlotFromPin(b);
-                     if (wslot == 0) dstWrap->sourceInput = srcGeometry;
-                     else if (wslot == 1) dstWrap->targetInput = srcGeometry;
-                  }
-                  else if (dstMaterial != nullptr && GraphNode::InputSlotFromPin(b) == 0)
-                     dstMaterial->input = srcGeometry;
-                  else if (dstDisplacement != nullptr && GraphNode::InputSlotFromPin(b) == 0)
-                     dstDisplacement->input = srcGeometry;
-                  else if (dstInstance != nullptr)
-                  {
-                     const int islot = GraphNode::InputSlotFromPin(b);
-                     if (islot == 0)
-                        dstInstance->pointSource = srcGeometry;
-                     else if (islot == 1)
-                        dstInstance->instanceShape = srcGeometry;
-                     else
-                        dstInstance->cloudSource = srcGeometry;
+                     // Whatever this slot's field is called internally, set it
+                     // directly - covers dstGeoOp, dstInstance, dstNull3D,
+                     // dstMapping, dstMeshPoints, dstMeshResynth, dstCloth,
+                     // dstJoin, dstSwitcher3D, dstWrap, dstMeta, dstPath, and
+                     // slot 0 of dstMaterial/dstDisplacement.
+                     *field = srcGeometry;
                   }
                   else if (dstAudio != nullptr)
                   {

@@ -44,6 +44,12 @@ public:
    // own returns nullptr, same as an unconnected pin.
    IGeometrySource* curveSource = nullptr;
    IGeometrySource* geometrySource = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      if (slot == 0) return &curveSource;
+      if (slot == 1) return &geometrySource;
+      return nullptr;
+   }
    const char* InputLabel(int slot) const override
    {
       return slot == 0 ? "curve" : "geo";

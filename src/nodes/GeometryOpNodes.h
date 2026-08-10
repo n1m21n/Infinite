@@ -80,6 +80,7 @@ public:
    Mat4 TransformMatrix() const;
 
    IGeometrySource* input = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
    size_t SelectedCount() const { return mCache.SelectedCount(); }
@@ -305,6 +306,7 @@ public:
    }
 
    IGeometrySource* input = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    ImageCable& TextureInput() { return mTextureInput; }
    const char* InputLabel(int slot) const override
    {
@@ -441,6 +443,13 @@ public:
    IGeometrySource* pointSource = nullptr;
    IGeometrySource* instanceShape = nullptr;
    IGeometrySource* cloudSource = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      if (slot == 0) return &pointSource;
+      if (slot == 1) return &instanceShape;
+      if (slot == 2) return &cloudSource;
+      return nullptr;
+   }
 
    const char* InputLabel(int slot) const override
    {
@@ -576,6 +585,12 @@ public:
 
    IGeometrySource* sourceInput = nullptr;
    IGeometrySource* targetInput = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      if (slot == 0) return &sourceInput;
+      if (slot == 1) return &targetInput;
+      return nullptr;
+   }
    const char* InputLabel(int slot) const override
    {
       static const char* kNames[] = { "source", "target" };

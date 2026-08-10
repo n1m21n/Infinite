@@ -39,7 +39,7 @@ with an unambiguous machine-checkable verdict — and greps for the failure
 markers. See `ARCHITECTURE.md`'s "Dev/Test Harness" section for where this
 code lives.
 
-The 35 were picked to cover, category by category:
+The 37 were picked to cover, category by category:
 
 | Area | Checks |
 |---|---|
@@ -51,6 +51,7 @@ The 35 were picked to cover, category by category:
 | Node math — 3D render | 3DTEST, SHADOWTEST, MATFRAMETEST, MAPTEST, PATHOCEANTEST, ENVTEST |
 | Regression fixtures | BUGTEST, LIVETEST |
 | Point clouds as Render 3D sprites (Phase 1) | PHASE1TEST — Mesh to Points and Image to Points draw as clouds (not just meshes), a Particle System connects directly to Render 3D with no `IGeometrySource` on either side, and the render keeps advancing (`TextureRevision()` moves) instead of freezing on the animated cloud's first frame |
+| One geometry interface, generic connect/disconnect/rebuild (Phase 2) | PATCHTEST also covers a second Render 3D geometry slot, both mesh-sampling pins plus the cloud pin on Instance on Points, Metaballs' cloud, and Path's curve pin surviving a save/load round trip; DELETECRASHTEST — one source feeds Render 3D, all three Instance on Points pins, Metaballs' cloud and both of Path's pins at once, gets deleted, and every consumer cooks without crashing on the freed pointer (the bug class `DisconnectAllTo`'s generic `GeometryInputSlot` loop removes structurally) |
 | Geometry-node sweeps — generic across every `IGeometrySource`-consuming node type, not one hand-written fixture per node (see `geometry-transform-sweep` skill for the full writeup) | TRANSFORMSWEEPTEST (upstream `GetModelMatrix()` reaches the output), MAPPINGSWEEPTEST (upstream `GetMappingTransform()` reaches the output), REVISIONSWEEPTEST (a node's revision/generation stamp doesn't move when nothing actually changed — the class of bug that made Cloth reset to rest pose every frame downstream of a textured Displacement) |
 
 Excluded from the auto-verdict suite because they only `printf` raw numbers

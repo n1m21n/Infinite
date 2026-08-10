@@ -60,6 +60,10 @@ public:
    }
 
    IGeometrySource* inputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      return (slot >= 0 && slot < kSlots) ? &inputs[slot] : nullptr;
+   }
    const char* InputLabel(int slot) const override
    {
       static const char* kNames[] = { "geo A", "geo B", "geo C", "geo D" };

@@ -7,6 +7,7 @@
 // via GetOutputTexture(). Cooking is pull-based and memoized per frame so a node
 // feeding several consumers only renders once.
 class IModulator;
+class IGeometrySource;
 
 // Visits a node's saveable parameters.
 //
@@ -99,4 +100,11 @@ public:
    // A node that does not override this saves its connections and position but
    // none of its settings.
    virtual void VisitParams(ParamVisitor& /*visitor*/) {}
+
+   // Address of the pointer field backing geometry input `slot`, or nullptr if
+   // this node has no geometry input there. Lets connect/disconnect/rebuild be
+   // generic instead of a per-class dynamic_cast chain: a caller that wants to
+   // wire slot N just does `*node->GeometryInputSlot(N) = source` instead of
+   // knowing which of `input`/`pointSource`/`inputs[N]`/... to reach for.
+   virtual IGeometrySource** GeometryInputSlot(int /*slot*/) { return nullptr; }
 };

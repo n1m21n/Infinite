@@ -307,6 +307,10 @@ public:
    unsigned long long TextureRevision() const override { return mRevision; }
 
    IGeometrySource* geometry[kSlots] = { nullptr, nullptr, nullptr, nullptr };
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      return (slot >= 0 && slot < kSlots) ? &geometry[slot] : nullptr;
+   }
 
    // Optional scene nodes. When null, the built-in camera/light values below
    // are used, so a Render node works on its own.
