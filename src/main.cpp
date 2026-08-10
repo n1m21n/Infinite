@@ -379,12 +379,79 @@ namespace
    std::vector<int> gPendingSelect;
    std::pair<int, int> gTypedParamJustOpened(-1, -1);
    std::vector<int> gParamPinsThisFrame;
+   // Set when a right-click on a param already opened its text field this
+   // frame, so the node-level right-click context menu (checked later, after
+   // ed::Suspend()) knows to stay closed instead of covering the field.
+   bool gParamRightClickConsumedThisFrame = false;
 
    void BeginNodeParams(int nodeIndex)
    {
       gCurrentNodeIndex = nodeIndex;
       gParamCounter = 0;
       gColorCounter = 0;
+   }
+
+   // Opens the text field for a param, seeded either from its current numeric
+   // value or (if it's already driven by an expression) from that expression
+   // text with its '=' prefix - used by both double-click and right-click.
+   void BeginTypedEditFromCurrent(const std::pair<int, int>& editKey, int nodeIndex, int paramIndex,
+                                   float* value, const char* fmt, bool hasExpr)
+   {
+      if (hasExpr)
+      {
+         const std::string* expr = Modulation::Instance().ExpressionFor(nodeIndex, paramIndex);
+         gTypedParamText[editKey] = std::string("=") + (expr != nullptr ? *expr : std::string());
+      }
+      else
+      {
+         char seed[64];
+         snprintf(seed, sizeof(seed), fmt, *value);
+         gTypedParamText[editKey] = seed;
+      }
+      gTypedParam.insert(editKey);
+      gTypedParamJustOpened = editKey;
+      gTypedParamPendingInit.insert(editKey);
+   }
+
+   // Hovering a param (whether it's a plain slider or already showing an
+   // expression) and pressing a digit/'-'/'.'/'=' jumps straight into typing
+   // mode with that keystroke seeded, without needing to double-click first.
+   // '=' always starts a blank formula - even over an existing one, so typing
+   // '=' is a reliable way back into formula mode - and a digit always starts
+   // a blank numeric entry, overriding whatever mode the param was already in.
+   void HandleParamTypeHotkeys(const std::pair<int, int>& editKey, float* value)
+   {
+      ImGuiIO& io = ImGui::GetIO();
+      for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+      {
+         ImWchar ch = io.InputQueueCharacters[i];
+         if ((ch >= '0' && ch <= '9') || ch == '-' || ch == '.' || ch == '=')
+         {
+            PushUndoCheckpoint();
+            if (ch == '=')
+               gTypedParamText[editKey] = "=";
+            else if (ch >= '0' && ch <= '9')
+            {
+               *value = (float)(ch - '0');
+               gTypedParamText[editKey] = std::string(1, (char)ch);
+            }
+            else if (ch == '-')
+            {
+               *value = -0.0f;
+               gTypedParamText[editKey] = "-";
+            }
+            else
+            {
+               *value = 0.0f;
+               gTypedParamText[editKey] = ".";
+            }
+            gTypedParam.insert(editKey);
+            gTypedParamJustOpened = editKey;
+            gTypedParamNoAutoSelect.insert(editKey);
+            gTypedParamPendingInit.insert(editKey);
+            break;
+         }
+      }
    }
 
    bool ModSlider(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f")
@@ -526,9 +593,8 @@ namespace
       {
          // Driven by a typed expression, re-evaluated every frame by the
          // apply pass in the main loop. Read-only like the modulated state,
-         // but a distinct colour, plus an fx badge and a tooltip showing the
-         // formula (and its last error, if it has one). Double-click reopens
-         // the expression text for editing, same as any other field.
+         // but a distinct colour and an fx badge. Double-click reopens the
+         // expression text for editing, same as any other field.
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.20f, 0.15f, 0.32f, 1.0f));
          ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.66f, 0.51f, 0.98f, 1.0f));
          float shown = *value;
@@ -537,25 +603,24 @@ namespace
          const bool sliderHovered = ImGui::IsItemHovered();
          ImGui::PopStyleColor(2);
          ImGui::SameLine(0.0f, 4.0f);
-         ImGui::TextColored(ImVec4(0.66f, 0.51f, 0.98f, 1.0f), "\xC6\x92x");
+         ImGui::TextColored(ImVec4(0.66f, 0.51f, 0.98f, 1.0f), "fx");
          const bool hovered = sliderHovered || ImGui::IsItemHovered();
-         if (hovered)
-         {
-            const std::string* expr = Modulation::Instance().ExpressionFor(nodeIndex, paramIndex);
-            const std::string* err = Modulation::Instance().ExpressionErrorFor(nodeIndex, paramIndex);
-            std::string tip = std::string("= ") + (expr != nullptr ? *expr : std::string());
-            if (err != nullptr && !err->empty())
-               tip += std::string("\nerror: ") + *err;
-            ImGui::SetTooltip("%s", tip.c_str());
-         }
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
+         if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          {
-            const std::string* expr = Modulation::Instance().ExpressionFor(nodeIndex, paramIndex);
-            gTypedParamText[editKey] = std::string("=") + (expr != nullptr ? *expr : std::string());
-            gTypedParam.insert(editKey);
-            gTypedParamJustOpened = editKey;
-            gTypedParamPendingInit.insert(editKey);
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
+            gParamRightClickConsumedThisFrame = true;
          }
+         if (hovered)
+            HandleParamTypeHotkeys(editKey, value);
+         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
+         if (ImGui::SmallButton("x"))
+            Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
+         ImGui::PopStyleColor(3);
       }
       else
       {
@@ -566,52 +631,21 @@ namespace
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
+         // Right-click also jumps straight into the text field, same as
+         // double-click - and marks the click consumed so the node-level
+         // right-click context menu doesn't also try to open over it.
+         if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          {
-            char seed[64];
-            snprintf(seed, sizeof(seed), fmt, *value);
-            gTypedParamText[editKey] = seed;
-            gTypedParam.insert(editKey);
-            gTypedParamJustOpened = editKey;
-            gTypedParamPendingInit.insert(editKey);
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
+            gParamRightClickConsumedThisFrame = true;
          }
          // Hovering (not dragging) and pressing a digit/'-'/'.'/'=' starts a
          // fresh typed value (or expression) immediately, without needing to
          // double-click first. IsItemActive() guards against a mouse-drag
          // coinciding with a keypress from stealing the drag into typing mode.
          if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
-         {
-            ImGuiIO& io = ImGui::GetIO();
-            for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
-            {
-               ImWchar ch = io.InputQueueCharacters[i];
-               if ((ch >= '0' && ch <= '9') || ch == '-' || ch == '.' || ch == '=')
-               {
-                  PushUndoCheckpoint();
-                  if (ch == '=')
-                     gTypedParamText[editKey] = "=";
-                  else if (ch >= '0' && ch <= '9')
-                  {
-                     *value = (float)(ch - '0');
-                     gTypedParamText[editKey] = std::string(1, (char)ch);
-                  }
-                  else if (ch == '-')
-                  {
-                     *value = -0.0f;
-                     gTypedParamText[editKey] = "-";
-                  }
-                  else
-                  {
-                     *value = 0.0f;
-                     gTypedParamText[editKey] = ".";
-                  }
-                  gTypedParam.insert(editKey);
-                  gTypedParamJustOpened = editKey;
-                  gTypedParamNoAutoSelect.insert(editKey);
-                  gTypedParamPendingInit.insert(editKey);
-                  break;
-               }
-            }
-         }
+            HandleParamTypeHotkeys(editKey, value);
       }
 
       ImGui::PopID();
@@ -6490,6 +6524,7 @@ int main()
       PaletteBinding::Instance().ClearFrameColors();
       gDrawnParamPins.clear();
       gDrawnColorPins.clear();
+      gParamRightClickConsumedThisFrame = false;
       {
          Modulation& modulation = Modulation::Instance();
          for (GraphNode& gn : gNodes)
@@ -11622,7 +11657,11 @@ int main()
       // menu-bar/shortcut routes to the same operations.
       {
          ed::NodeId contextNodeId = 0;
-         if (ed::ShowNodeContextMenu(&contextNodeId))
+         // A right-click already claimed by a param this frame (see
+         // gParamRightClickConsumedThisFrame) opens that param's text field
+         // instead - node editor still reports the click as a node context
+         // menu request, so it has to be swallowed here rather than upstream.
+         if (ed::ShowNodeContextMenu(&contextNodeId) && !gParamRightClickConsumedThisFrame)
          {
             gContextMenuNodeIndex = (int)contextNodeId.Get() / GraphNode::kStride;
             ImGui::OpenPopup("##nodecontext");
