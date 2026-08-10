@@ -1370,13 +1370,17 @@ namespace
    void ConnectGeometrySlot(GraphNode& dst, int slot, GraphNode& src)
    {
       auto* geo = dynamic_cast<IGeometrySource*>(src.node.get());
+      auto* cloud = dynamic_cast<IPointCloudSource*>(src.node.get());
       auto* cam = dynamic_cast<CameraNode*>(src.node.get());
       auto* light = dynamic_cast<LightNode*>(src.node.get());
 
       if (auto* render = dynamic_cast<Render3DNode*>(dst.node.get()))
       {
          if (slot < Render3DNode::kSlots)
+         {
             render->geometry[slot] = geo;
+            render->clouds[slot] = cloud;
+         }
          else if (slot == Render3DNode::kSlots)
             render->camera = cam;
          else if (slot - Render3DNode::kSlots - 1 < Render3DNode::kLightSlots)
@@ -3538,7 +3542,7 @@ namespace
    {
       int connected = 0;
       for (int i = 0; i < Render3DNode::kSlots; i++)
-         if (n->geometry[i] != nullptr)
+         if (n->geometry[i] != nullptr || n->clouds[i] != nullptr)
             connected++;
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
       ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
@@ -3567,6 +3571,12 @@ namespace
       ModSlider("exposure", &n->exposure, 0.1f, 4.0f);
       ColorSwatch("background", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
+
+      NodeSeparator("points");
+      DropdownButton("sprite shape", Render3DNode::SpriteShapeNames(), n->spriteShape,
+                     [n](int i) { n->spriteShape = i; });
+      DropdownButton("sprite size", Render3DNode::SpriteSizeModeNames(), n->spriteSizeMode,
+                     [n](int i) { n->spriteSizeMode = i; });
 
       NodeSeparator("camera");
       if (n->camera != nullptr)
@@ -4740,7 +4750,10 @@ namespace
       {
          const int slot = GraphNode::InputSlotFromPin(dstPin);
          if (slot >= 0 && slot < Render3DNode::kSlots)
+         {
             render->geometry[slot] = nullptr;
+            render->clouds[slot] = nullptr;
+         }
          else if (slot == Render3DNode::kSlots)
             render->camera = nullptr;
          else if (slot == Render3DNode::kEnvSlot)
@@ -5266,8 +5279,12 @@ namespace
          if (auto* render = dynamic_cast<Render3DNode*>(other.node.get()))
          {
             for (int slot = 0; slot < Render3DNode::kSlots; slot++)
+            {
                if (dyingGeometry != nullptr && render->geometry[slot] == dyingGeometry)
                   render->geometry[slot] = nullptr;
+               if (dyingCloud != nullptr && render->clouds[slot] == dyingCloud)
+                  render->clouds[slot] = nullptr;
+            }
             if ((const void*)render->camera == (const void*)dying)
                render->camera = nullptr;
             for (int i = 0; i < Render3DNode::kLightSlots; i++)
@@ -5480,7 +5497,16 @@ namespace
          if (auto* render = dynamic_cast<Render3DNode*>(gn.node.get()))
          {
             for (int i = 0; i < Render3DNode::kSlots; i++)
-               record(render->geometry[i], i);
+            {
+               // A pure cloud source (no IGeometrySource) has nothing in
+               // geometry[i] to record from - fall back to clouds[i]. A dual
+               // source is fully found via geometry[i] already; recording
+               // both would push the same cable twice.
+               if (render->geometry[i] != nullptr)
+                  record(render->geometry[i], i);
+               else
+                  record(render->clouds[i], i);
+            }
             record(render->camera, Render3DNode::kSlots);
             for (int i = 0; i < Render3DNode::kLightSlots; i++)
                record(render->lights[i], Render3DNode::kSlots + 1 + i);
@@ -6771,6 +6797,45 @@ int main()
             gn.showParams = true;
          gNodes[0].showParams = false;
          gNodes[1].showParams = false;
+      }
+      else if (getenv("INFINITE_PHASE1TEST") != nullptr)
+      {
+         // Points-render-as-points, phase 1: a point cloud reaches Render 3D
+         // as points and draws as camera-facing sprites.
+         //
+         // Slot 0: Cube -> Mesh to Points -> Render 3D. Dual-interface source
+         // (IGeometrySource + IPointCloudSource); the cloud must win the draw.
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);              // 0: cube
+         SpawnNode("Mesh to Points", "3D", 300.0f, 40.0f);       // 1
+         // Slot 1: Particle System -> Render 3D directly, no IGeometrySource
+         // on either side - this connection could not exist before this
+         // change, and the render must not freeze on its first frame.
+         SpawnNode("Particle System", "3D", 40.0f, 300.0f);      // 2
+         // Slot 2: Image to Points -> Render 3D - still shows image colours
+         // per point once drawn as sprites rather than swatch quads.
+         SpawnNode("Noise", "Source", 40.0f, 560.0f);            // 3
+         SpawnNode("Image to Points", "3D", 300.0f, 560.0f);     // 4
+         SpawnNode("Render 3D", "3D", 560.0f, 300.0f);           // 5
+
+         auto* cube = static_cast<GeometryNode*>(gNodes[0].node.get());
+         cube->shape = 1; // Cube
+         auto* m2p = static_cast<MeshToPointsNode*>(gNodes[1].node.get());
+         m2p->input = cube;
+         m2p->pointSize = 0.3f; // large enough to be visible at the default camera distance
+         auto* particles = static_cast<ParticleSystemNode*>(gNodes[2].node.get());
+         particles->emitRate = 400.0f;
+         particles->startSize = 0.5f; particles->endSize = 0.5f;
+         auto* i2p = static_cast<ImageToPointsNode*>(gNodes[4].node.get());
+         i2p->Input().Connect(gNodes[3].node.get());
+         i2p->pointSize = 0.3f;
+         auto* r = static_cast<Render3DNode*>(gNodes[5].node.get());
+         r->geometry[0] = m2p; r->clouds[0] = m2p;
+         r->clouds[1] = particles; // cloud-only: geometry[1] intentionally left null
+         r->geometry[2] = i2p; r->clouds[2] = i2p;
+         r->width = 400.0f; r->height = 400.0f;
+         r->samples = 0;
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
       }
       else if (getenv("INFINITE_TEXTFIT") != nullptr)
       {
@@ -10832,6 +10897,57 @@ int main()
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
+      // Points-render-as-points, phase 1 - see the INFINITE_PHASE1TEST spawn
+      // block above for the scene. Checked at two points in time so the
+      // Particle System check can prove the render keeps advancing rather
+      // than freezing on its first frame (the exact bug a missing PointRevision()
+      // in the scene cache signature would cause).
+      static unsigned long long sPhase1FirstTextureRev = 0;
+      static unsigned long long sPhase1FirstParticleRev = 0;
+      if (getenv("INFINITE_PHASE1TEST") != nullptr && (frameId == 6 || frameId == 30))
+      {
+         auto* m2p = static_cast<MeshToPointsNode*>(gNodes[1].node.get());
+         auto* particles = static_cast<ParticleSystemNode*>(gNodes[2].node.get());
+         auto* i2p = static_cast<ImageToPointsNode*>(gNodes[4].node.get());
+         auto* r = static_cast<Render3DNode*>(gNodes[5].node.get());
+
+         const unsigned long long textureRev = r->TextureRevision();
+         const unsigned long long particleRev = particles->PointRevision();
+
+         if (frameId == 6)
+         {
+            sPhase1FirstTextureRev = textureRev;
+            sPhase1FirstParticleRev = particleRev;
+
+            const bool cloudsWired = r->clouds[0] == static_cast<IPointCloudSource*>(m2p) &&
+                                     r->clouds[1] == static_cast<IPointCloudSource*>(particles) &&
+                                     r->clouds[2] == static_cast<IPointCloudSource*>(i2p) &&
+                                     r->geometry[1] == nullptr; // cloud-only slot stays ungeometried
+            printf("phase1 clouds wired: slot0=%d slot1(cloud-only, no geometry)=%d slot2=%d  %s\n",
+                   (int)(r->clouds[0] != nullptr), (int)(r->clouds[1] != nullptr && r->geometry[1] == nullptr),
+                   (int)(r->clouds[2] != nullptr), cloudsWired ? "OK" : "FAIL");
+
+            const size_t pointCount = m2p->GetPoints().size();
+            printf("phase1 mesh to points sprites: %zu points, drawcalls=%zu triangles=%zu  %s\n",
+                   pointCount, r->LastDrawCalls(), r->LastTriangleCount(),
+                   (pointCount > 0 && r->LastDrawCalls() >= 3 && r->LastTriangleCount() > 0)
+                      ? "OK" : "FAIL");
+
+            printf("phase1 image to points: %zu points  %s\n", i2p->PointCount(),
+                   i2p->PointCount() > 0 ? "OK" : "FAIL");
+         }
+         else // frameId == 30
+         {
+            const bool particleAdvanced = particleRev != sPhase1FirstParticleRev;
+            const bool renderAdvanced = textureRev != sPhase1FirstTextureRev;
+            printf("phase1 particle system animates through render: particleRev %llu->%llu, "
+                   "renderRev %llu->%llu  %s\n",
+                   sPhase1FirstParticleRev, particleRev, sPhase1FirstTextureRev, textureRev,
+                   (particleAdvanced && renderAdvanced) ? "OK" : "FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       // antialiased silhouette from ordinary shading gradients; differencing
       // two renders of an identical scene can, because only the edges move.
       if (getenv("INFINITE_3DTEST") != nullptr &&
@@ -11703,7 +11819,7 @@ int main()
                      if (dstRender != nullptr)
                      {
                         if (slot < Render3DNode::kSlots)
-                           valid = srcGeometry != nullptr;
+                           valid = srcGeometry != nullptr || srcCloud != nullptr;
                         else if (slot == Render3DNode::kSlots)
                            valid = srcCamera != nullptr;
                         else if (slot == Render3DNode::kEnvSlot)
@@ -11780,7 +11896,10 @@ int main()
                   {
                      const int slot = GraphNode::InputSlotFromPin(b);
                      if (slot < Render3DNode::kSlots)
+                     {
                         dstRender->geometry[slot] = srcGeometry;
+                        dstRender->clouds[slot] = srcCloud;
+                     }
                      else if (slot == Render3DNode::kSlots)
                         dstRender->camera = srcCamera;
                      else if (slot == Render3DNode::kEnvSlot)

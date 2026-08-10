@@ -579,7 +579,7 @@ private:
 // small quad at each. The sampling itself already existed inside Instance on
 // Points; this exposes it as geometry in its own right, so a point set can be
 // looked at, operated on, or fed onwards.
-class MeshToPointsNode : public INode, public IGeometrySource
+class MeshToPointsNode : public INode, public IGeometrySource, public IPointCloudSource
 {
 public:
    static INode* Create() { return new MeshToPointsNode(); }
@@ -600,6 +600,13 @@ public:
 
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
+
+   // IPointCloudSource: the same samples GetMesh() bakes into billboard
+   // quads, as particles a renderer can draw as camera-facing sprites
+   // instead. Built together in RebuildIfNeeded so the two never disagree.
+   const std::vector<Particle>& GetPoints() override;
+   unsigned long long PointRevision() override;
+
    // Forwarded for the same reason the geometry operators forward it: sampling
    // a mesh does not relocate it.
    Mat4 GetModelMatrix() const override
@@ -687,6 +694,7 @@ private:
    void RebuildIfNeeded();
 
    Mesh mCache;
+   std::vector<Particle> mPoints;
    size_t mPointCount = 0;
    unsigned long long mMeshRevision = 0;
 

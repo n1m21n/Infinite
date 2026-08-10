@@ -27,6 +27,8 @@ namespace
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
+   const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
+   const std::vector<std::string> kSpriteSizeModeNames = { "World", "Screen" };
    const int kShadowSizes[] = { 1024, 2048, 4096 };
 
    // Reads (never writes) every field a node declares through VisitParams
@@ -261,6 +263,16 @@ namespace
       "uniform mat4 uViewProj;\n"
       "uniform mat3 uNormalMatrix;\n"
       "uniform mat4 uLightViewProj;\n"
+      // Point-cloud sprites: aInstance carries translation + uniform scale
+      // only (see the Render3D drawSlot cloud branch), not a full orientation,
+      // so the quad is billboarded here against the camera's own right/up
+      // axes rather than baking a fixed orientation on the CPU.
+      "uniform int uIsSprite;\n"
+      "uniform vec3 uCamRight;\n"
+      "uniform vec3 uCamUp;\n"
+      "uniform vec3 uCamPos;\n"
+      "uniform int uSpriteSizeMode;\n" // 0 world, 1 screen (constant pixel size)
+      "uniform mat4 uView;\n"
       "out vec4 vLightSpacePos;\n"
       "out vec3 vWorldPos;\n"
       "out vec3 vLocalPos;\n"
@@ -268,19 +280,35 @@ namespace
       "out vec2 vUv;\n"
       "out vec3 vInstanceColor;\n"
       "void main() {\n"
-      "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
-      "   vec4 world = model * vec4(aPos, 1.0);\n"
-      "   vWorldPos = world.xyz;\n"
+      "   vec3 worldPos;\n"
+      "   vec3 worldNormal;\n"
+      "   if (uIsSprite == 1) {\n"
+      "      vec3 instancePos = aInstance[3].xyz;\n"
+      "      float instanceScale = aInstance[0][0];\n"
+      "      float sizeScale = instanceScale;\n"
+      "      if (uSpriteSizeMode == 1) {\n"
+      "         vec3 viewPos = (uView * vec4(instancePos, 1.0)).xyz;\n"
+      "         sizeScale *= max(-viewPos.z, 0.01);\n"
+      "      }\n"
+      "      worldPos = instancePos + (uCamRight * aPos.x + uCamUp * aPos.y) * sizeScale;\n"
+      "      worldNormal = normalize(uCamPos - worldPos);\n"
+      "   } else {\n"
+      "      mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "      vec4 world = model * vec4(aPos, 1.0);\n"
+      "      worldPos = world.xyz;\n"
+      "      worldNormal = (uInstanced == 1)\n"
+      "         ? normalize(mat3(model) * aNormal)\n"
+      "         : normalize(uNormalMatrix * aNormal);\n"
+      "   }\n"
+      "   vWorldPos = worldPos;\n"
       "   vLocalPos = aPos;\n"
-      "   vNormal = (uInstanced == 1)\n"
-      "      ? normalize(mat3(model) * aNormal)\n"
-      "      : normalize(uNormalMatrix * aNormal);\n"
+      "   vNormal = worldNormal;\n"
       "   vUv = aUv;\n"
       // White when there is no per-instance colour, so the fragment shader can
       // multiply unconditionally rather than branching on it.
       "   vInstanceColor = (uInstanceColored == 1) ? aInstanceColor : vec3(1.0);\n"
-      "   vLightSpacePos = uLightViewProj * world;\n"
-      "   gl_Position = uViewProj * world;\n"
+      "   vLightSpacePos = uLightViewProj * vec4(worldPos, 1.0);\n"
+      "   gl_Position = uViewProj * vec4(worldPos, 1.0);\n"
       "}\n";
 
    const char* kFragSrc =
@@ -357,6 +385,8 @@ namespace
       "uniform float uShadowSoftness;\n"
       "uniform float uShadowStrength;\n"
       "uniform float uShadowTexel;\n"
+      "uniform int uIsSprite;\n"
+      "uniform int uSpriteShape;\n" // 0 circle, 1 square
       "\n"
       // 3x3 percentage-closer filter. A single depth comparison gives a hard,
       // stair-stepped edge at any shadow map resolution; averaging several
@@ -529,6 +559,12 @@ namespace
       "}\n"
       "\n"
       "void main() {\n"
+      // A point should read as a point, not a flat plane seen edge-on - the
+      // single highest-impact visual difference from the old CPU-baked quads.
+      "   if (uIsSprite == 1 && uSpriteShape == 0) {\n"
+      "      vec2 d = vUv * 2.0 - 1.0;\n"
+      "      if (dot(d, d) > 1.0) discard;\n"
+      "   }\n"
       "   vec3 n = normalize(vNormal);\n"
       // Normals and UVs are data being visualised, not light - they must not be
       // tonemapped or gamma-encoded on the way out.
@@ -818,6 +854,8 @@ const std::vector<std::string>& Render3DNode::ProjectionNames() { return kProjec
 const std::vector<std::string>& Render3DNode::SampleNames() { return kSampleNames; }
 const std::vector<std::string>& Render3DNode::TonemapNames() { return kTonemapNames; }
 const std::vector<std::string>& Render3DNode::ShadowQualityNames() { return kShadowQualityNames; }
+const std::vector<std::string>& Render3DNode::SpriteShapeNames() { return kSpriteShapeNames; }
+const std::vector<std::string>& Render3DNode::SpriteSizeModeNames() { return kSpriteSizeModeNames; }
 
 void Render3DNode::ReleaseShadowTargets()
 {
@@ -979,9 +1017,15 @@ bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
 
    for (int i = 0; i < kSlots; i++)
    {
-      if (geometry[i] == nullptr || !mGpu[i].hasBounds)
+      if (!mGpu[i].hasBounds)
          continue;
-      const Mat4 model = geometry[i]->GetModelMatrix();
+      // A cloud slot's bounds are already world-space (drawCloudSlot bakes
+      // its source's model matrix into every particle position before ever
+      // touching mGpu[i].lo/hi), so pushing them through geometry[i]'s model
+      // matrix here too would double-transform them.
+      if (geometry[i] == nullptr && clouds[i] == nullptr)
+         continue;
+      const Mat4 model = clouds[i] != nullptr ? Mat4::Identity() : geometry[i]->GetModelMatrix();
       // The eight corners through the matrix: a rotated box's true extent
       // cannot be had from transforming the min and max alone.
       for (int corner = 0; corner < 8; corner++)
@@ -1241,16 +1285,31 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
    for (int i = 0; i < kSlots; i++)
    {
       IGeometrySource* source = geometry[i];
-      if (source == nullptr)
+      IPointCloudSource* cloud = clouds[i];
+      if (source == nullptr && cloud == nullptr)
          continue;
       sig.hasGeom[i] = true;
-      sig.geomRev[i] = source->MeshRevision();
-      sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
-      sig.material[i] = source->GetMaterial();
-      for (int m = kMapRoughness; m < kMapCount; m++)
+      // Cloud wins when a source offers both (see clouds[] comment) - keyed
+      // on PointRevision() rather than MeshRevision() so an animated cloud
+      // (a Particle System stepping every frame) keeps invalidating the
+      // cache instead of freezing on its first drawn frame.
+      if (cloud != nullptr)
       {
-         if (source->GetMaterialTexture(m) != 0)
-            sig.texturedMaterial = true;
+         sig.geomRev[i] = cloud->PointRevision();
+         auto* asGeom = dynamic_cast<IGeometrySource*>(cloud);
+         sig.material[i] = asGeom ? asGeom->GetMaterial() : Material();
+         sig.surfaceTexRev[i] = asGeom ? asGeom->SurfaceTextureRevision() : 0;
+      }
+      else
+      {
+         sig.geomRev[i] = source->MeshRevision();
+         sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
+         sig.material[i] = source->GetMaterial();
+         for (int m = kMapRoughness; m < kMapCount; m++)
+         {
+            if (source->GetMaterialTexture(m) != 0)
+               sig.texturedMaterial = true;
+         }
       }
    }
 
@@ -1343,6 +1402,10 @@ void Render3DNode::CookIfNeeded(int frameId)
          : Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
    }
    const Mat4 viewProj = Mat4::Multiply(proj, view);
+   // Camera basis in world space for billboarding point-cloud sprites - rows
+   // of the view matrix's rotation part (see Mat4::LookAt), not columns.
+   const float camRight[3] = { view.m[0], view.m[4], view.m[8] };
+   const float camUp[3] = { view.m[1], view.m[5], view.m[9] };
 
    // Gather lights: patched Light nodes win, otherwise the built-in one.
    float lightDirs[kLightSlots * 3] = { 0 };
@@ -1569,6 +1632,11 @@ void Render3DNode::CookIfNeeded(int frameId)
    mLastUploads = 0;
 
    glUniformMatrix4fv(glGetUniformLocation(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+   glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, view.m);
+   glUniform3fv(glGetUniformLocation(mProgram, "uCamRight"), 1, camRight);
+   glUniform3fv(glGetUniformLocation(mProgram, "uCamUp"), 1, camUp);
+   glUniform1i(glGetUniformLocation(mProgram, "uSpriteShape"), spriteShape);
+   glUniform1i(glGetUniformLocation(mProgram, "uSpriteSizeMode"), spriteSizeMode);
    glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kLightSlots, lightDirs);
    glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kLightSlots, lightCols);
    glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kLightSlots, lightPower);
@@ -1604,11 +1672,197 @@ void Render3DNode::CookIfNeeded(int frameId)
    glUniform1i(glGetUniformLocation(mProgram, "uEnvMap"), 6);
    glActiveTexture(GL_TEXTURE0);
 
+   // Point-cloud slots draw an instanced unit quad, billboarded against the
+   // camera in the vertex shader (uIsSprite), instead of geometry[]'s
+   // triangles - see clouds[]'s comment for why cloud wins when both are
+   // present. Shares the mesh path's instance-buffer layout (aInstance /
+   // aInstanceColor) so it needs no new GPU upload machinery, just a
+   // different way of filling that buffer.
+   auto drawCloudSlot = [&](int i, IPointCloudSource* cloud)
+   {
+      const std::vector<Particle>& points = cloud->GetPoints();
+      GpuMesh& gpu = mGpu[i];
+
+      const bool sourceChanged = gpu.source != (const void*)cloud;
+      if (gpu.vao == 0)
+      {
+         glGenVertexArrays(1, &gpu.vao);
+         glGenBuffers(1, &gpu.vbo);
+         glGenBuffers(1, &gpu.ibo);
+      }
+      glBindVertexArray(gpu.vao);
+
+      if (sourceChanged)
+      {
+         gpu.meshRevision = 0;
+         gpu.instanceRevision = 0;
+         gpu.instanceGroupMatrix = Mat4::Identity();
+         gpu.source = cloud;
+
+         struct SpriteVertex { float px, py, pz, nx, ny, nz, u, v; };
+         static const SpriteVertex kQuad[4] = {
+            { -1, -1, 0,  0, 0, 1,  0, 0 },
+            {  1, -1, 0,  0, 0, 1,  1, 0 },
+            {  1,  1, 0,  0, 0, 1,  1, 1 },
+            { -1,  1, 0,  0, 0, 1,  0, 1 },
+         };
+         static const unsigned int kQuadIdx[6] = { 0, 1, 2, 0, 2, 3 };
+         glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
+         glBufferData(GL_ARRAY_BUFFER, sizeof(kQuad), kQuad, GL_STATIC_DRAW);
+         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpu.ibo);
+         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(kQuadIdx), kQuadIdx, GL_STATIC_DRAW);
+         glEnableVertexAttribArray(0);
+         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(SpriteVertex), (void*)0);
+         glEnableVertexAttribArray(1);
+         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(SpriteVertex), (void*)(3 * sizeof(float)));
+         glEnableVertexAttribArray(2);
+         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteVertex), (void*)(6 * sizeof(float)));
+         gpu.indexCount = 6;
+      }
+
+      // A pure cloud source (Particle System) has no separate object space -
+      // its particles already simulate in world space. A dual source (Mesh
+      // to Points, Image to Points) samples in its mesh's local space, same
+      // as GetMesh(), so its model matrix still has to be applied here.
+      auto* asGeom = dynamic_cast<IGeometrySource*>(cloud);
+      const Mat4 model = asGeom ? asGeom->GetModelMatrix() : Mat4::Identity();
+      const Material material = asGeom ? asGeom->GetMaterial() : Material();
+      const unsigned int surface = asGeom ? asGeom->GetSurfaceTexture() : 0;
+
+      const unsigned long long revision = cloud->PointRevision();
+      if (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model))
+      {
+         // A billboard has no orientation of its own to carry the rest of the
+         // matrix, so only a uniform-ish scale - the length of the model's
+         // own X basis vector - survives a Scale node upstream.
+         const float scaleX = std::sqrt(model.m[0]*model.m[0] + model.m[1]*model.m[1] + model.m[2]*model.m[2]);
+
+         std::vector<Mat4> xforms;
+         std::vector<float> colors;
+         xforms.reserve(points.size());
+         colors.reserve(points.size() * 3);
+         for (const Particle& p : points)
+         {
+            if (!p.alive)
+               continue;
+            const float wx = model.m[0]*p.px + model.m[4]*p.py + model.m[8]*p.pz + model.m[12];
+            const float wy = model.m[1]*p.px + model.m[5]*p.py + model.m[9]*p.pz + model.m[13];
+            const float wz = model.m[2]*p.px + model.m[6]*p.py + model.m[10]*p.pz + model.m[14];
+            const float s = p.scale * scaleX;
+            xforms.push_back(Mat4::Multiply(Mat4::Translation(wx, wy, wz), Mat4::Scale(s, s, s)));
+            colors.push_back(p.r); colors.push_back(p.g); colors.push_back(p.b);
+         }
+
+         if (gpu.instanceVbo == 0)
+            glGenBuffers(1, &gpu.instanceVbo);
+         glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVbo);
+         glBufferData(GL_ARRAY_BUFFER, xforms.size() * sizeof(Mat4), xforms.data(), GL_DYNAMIC_DRAW);
+         for (int col = 0; col < 4; col++)
+         {
+            const unsigned int loc = 3 + col;
+            glEnableVertexAttribArray(loc);
+            glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
+                                  (void*)(size_t)(col * 4 * sizeof(float)));
+            glVertexAttribDivisor(loc, 1);
+         }
+         if (gpu.instanceColorVbo == 0)
+            glGenBuffers(1, &gpu.instanceColorVbo);
+         glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceColorVbo);
+         glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), colors.data(), GL_DYNAMIC_DRAW);
+         glEnableVertexAttribArray(7);
+         glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+         glVertexAttribDivisor(7, 1);
+
+         gpu.instanceCount = (int)xforms.size();
+         gpu.instanceAttribsOn = true;
+         gpu.instanceColored = true;
+         gpu.instanceRevision = revision;
+         gpu.instanceGroupMatrix = model;
+
+         // Bounds for shadow-volume fitting (SceneBounds), expanded by each
+         // sprite's radius - computed here, the one place the points are
+         // already being walked. Already world-space, so SceneBounds must
+         // not push these through a model matrix a second time.
+         gpu.lo[0] = gpu.lo[1] = gpu.lo[2] = 1e30f;
+         gpu.hi[0] = gpu.hi[1] = gpu.hi[2] = -1e30f;
+         for (const Mat4& x : xforms)
+         {
+            const float px = x.m[12], py = x.m[13], pz = x.m[14];
+            const float r = x.m[0];
+            gpu.lo[0] = std::min(gpu.lo[0], px - r); gpu.hi[0] = std::max(gpu.hi[0], px + r);
+            gpu.lo[1] = std::min(gpu.lo[1], py - r); gpu.hi[1] = std::max(gpu.hi[1], py + r);
+            gpu.lo[2] = std::min(gpu.lo[2], pz - r); gpu.hi[2] = std::max(gpu.hi[2], pz + r);
+         }
+         gpu.hasBounds = !xforms.empty() && gpu.lo[0] <= gpu.hi[0];
+         mLastUploads++;
+      }
+
+      if (gpu.instanceCount == 0)
+         return;
+
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, surface != 0 ? surface : WhiteTexture());
+      if (surface != 0)
+         PrepareSurfaceTexture();
+      glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
+      glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
+      // Per-channel material maps (roughness/metallic/normal/ao) don't apply
+      // to a swatch-less billboard; explicitly off rather than left however
+      // the previous slot's draw call last set them.
+      static const char* kHasUniform[] = { "", "uHasRoughnessMap", "uHasMetallicMap",
+                                           "uHasNormalMap", "uHasAoMap" };
+      for (int map = kMapRoughness; map < kMapCount; map++)
+         glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), 0);
+
+      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, Mat4::Identity().m);
+      glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
+      glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"), 1);
+      glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 1);
+      glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
+      glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
+      glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
+      glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), material.opacity);
+      glUniform1i(glGetUniformLocation(mProgram, "uShading"), material.shading);
+      glUniform3fv(glGetUniformLocation(mProgram, "uEmissionColor"), 1, material.emissionColor);
+      glUniform1f(glGetUniformLocation(mProgram, "uEmission"), material.emission);
+      glUniform1f(glGetUniformLocation(mProgram, "uIor"), material.ior);
+      glUniform1f(glGetUniformLocation(mProgram, "uSpecular"), material.specular);
+      glUniform1f(glGetUniformLocation(mProgram, "uClearcoat"), material.clearcoat);
+      glUniform1f(glGetUniformLocation(mProgram, "uClearcoatRoughness"), material.clearcoatRoughness);
+      glUniform1f(glGetUniformLocation(mProgram, "uSubsurface"), material.subsurface);
+      glUniform3fv(glGetUniformLocation(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
+      glUniform1f(glGetUniformLocation(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
+      glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), 0.0f);
+      glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), 0.0f);
+
+      glDrawElementsInstanced(GL_TRIANGLES, gpu.indexCount, GL_UNSIGNED_INT,
+                              nullptr, (GLsizei)gpu.instanceCount);
+      mLastTriangles += (size_t)(gpu.indexCount / 3) * (size_t)gpu.instanceCount;
+      mLastDrawCalls++;
+
+      if (surface != 0)
+      {
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, surface);
+         RestoreSurfaceTexture();
+      }
+   };
+
    // Drawing one slot is factored into a lambda so it can be called for the
    // opaque pass and, when anything in the scene is transmissive, again for
    // the transmissive pass below - see the two-pass driver after this lambda.
    auto drawSlot = [&](int i)
    {
+      // A source offering both interfaces (Mesh to Points, Image to Points)
+      // draws as sprites, not triangles - see clouds[]'s comment.
+      IPointCloudSource* cloud = clouds[i];
+      if (cloud != nullptr)
+      {
+         drawCloudSlot(i, cloud);
+         return;
+      }
+      glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 0);
+
       IGeometrySource* source = geometry[i];
       if (source == nullptr)
          return;
@@ -1856,11 +2110,15 @@ void Render3DNode::CookIfNeeded(int frameId)
       }
    };
 
+   // Cloud slots always draw opaque (drawCloudSlot hardcodes uTransmission to
+   // 0 - sorted alpha / refraction for overlapping sprites is its own piece
+   // of work, left for later), so they're excluded from both the detection
+   // and the deferral below.
    bool anyTransmissive = false;
    for (int i = 0; i < kSlots; i++)
    {
       IGeometrySource* s = geometry[i];
-      if (s != nullptr && s->GetMaterial().transmission > 0.001f)
+      if (clouds[i] == nullptr && s != nullptr && s->GetMaterial().transmission > 0.001f)
       {
          anyTransmissive = true;
          break;
@@ -1870,12 +2128,12 @@ void Render3DNode::CookIfNeeded(int frameId)
    for (int i = 0; i < kSlots; i++)
    {
       IGeometrySource* s = geometry[i];
-      if (s == nullptr)
+      if (clouds[i] == nullptr && s == nullptr)
          continue;
       // Transmissive slots are deferred to the pass below, which needs a
       // snapshot of everything opaque drawn first - sampling the buffer this
       // same draw is writing to would be a feedback loop.
-      if (anyTransmissive && s->GetMaterial().transmission > 0.001f)
+      if (clouds[i] == nullptr && anyTransmissive && s->GetMaterial().transmission > 0.001f)
          continue;
       drawSlot(i);
    }

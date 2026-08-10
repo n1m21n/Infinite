@@ -344,6 +344,7 @@ void MeshToPointsNode::RebuildIfNeeded()
       if (!mCache.vertices.empty())
       {
          mCache = Mesh();
+         mPoints.clear();
          mPointCount = 0;
          mMeshRevision = NextMeshRevision();
       }
@@ -363,6 +364,31 @@ void MeshToPointsNode::RebuildIfNeeded()
    mPointCount = points.size();
    mCache = MeshOps::PointsToFaces(points, pointSize);
 
+   // Same samples as the billboard mesh above, as particles: half-extent
+   // pointSize * 0.5 * p.scale so a sprite renderer draws them at the same
+   // size PointsToFaces bakes into its quads (see Mesh.cpp's h = size * 0.5).
+   float tint[3];
+   if (inheritMaterial && input != nullptr)
+   {
+      Material m = input->GetMaterial();
+      tint[0] = m.color[0]; tint[1] = m.color[1]; tint[2] = m.color[2];
+   }
+   else
+   {
+      tint[0] = color[0]; tint[1] = color[1]; tint[2] = color[2];
+   }
+   mPoints.clear();
+   mPoints.reserve(points.size());
+   for (const MeshPoint& p : points)
+   {
+      Particle particle;
+      particle.px = p.px; particle.py = p.py; particle.pz = p.pz;
+      particle.nx = p.nx; particle.ny = p.ny; particle.nz = p.nz;
+      particle.scale = pointSize * 0.5f * p.scale;
+      particle.r = tint[0]; particle.g = tint[1]; particle.b = tint[2];
+      mPoints.push_back(particle);
+   }
+
    mBuiltInput = input;
    mBuiltUpstream = upstream;
    mBuiltMode = mode;
@@ -380,6 +406,18 @@ const Mesh& MeshToPointsNode::GetMesh()
 }
 
 unsigned long long MeshToPointsNode::MeshRevision()
+{
+   RebuildIfNeeded();
+   return mMeshRevision;
+}
+
+const std::vector<Particle>& MeshToPointsNode::GetPoints()
+{
+   RebuildIfNeeded();
+   return mPoints;
+}
+
+unsigned long long MeshToPointsNode::PointRevision()
 {
    RebuildIfNeeded();
    return mMeshRevision;

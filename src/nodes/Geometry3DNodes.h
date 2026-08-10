@@ -297,6 +297,12 @@ public:
    unsigned long long TextureRevision() const override { return mRevision; }
 
    IGeometrySource* geometry[kSlots] = { nullptr, nullptr, nullptr, nullptr };
+   // Set alongside geometry[] whenever the connected source also implements
+   // IPointCloudSource (Mesh to Points, Image to Points, a Particle System).
+   // A slot with a cloud draws camera-facing sprites instead of geometry[]'s
+   // triangles - see drawSlot's cloud branch - since a cloud has no mesh of
+   // its own to fall back on when both are present.
+   IPointCloudSource* clouds[kSlots] = { nullptr, nullptr, nullptr, nullptr };
 
    // Optional scene nodes. When null, the built-in camera/light values below
    // are used, so a Render node works on its own.
@@ -360,6 +366,14 @@ public:
    bool depthTest = true;
    bool backfaceCull = true;
 
+   // How a connected point cloud slot draws - see clouds[] above. Applies to
+   // every cloud slot uniformly, since it's a property of how this node
+   // renders points, not of any one source.
+   static const std::vector<std::string>& SpriteShapeNames();
+   int spriteShape = 0;      // circle / square
+   static const std::vector<std::string>& SpriteSizeModeNames();
+   int spriteSizeMode = 0;   // world / screen
+
    // Shadows. Rendered from the first directional or sun light, or from the
    // built-in light when none is patched in. Point lights are deliberately not
    // supported: an omnidirectional light needs a depth cube map and six passes,
@@ -403,6 +417,7 @@ public:
       v.Bool("envAsBackground", envAsBackground);
       v.Color("bg", bgColor); v.Float("bgOpacity", bgOpacity);
       v.Bool("depthTest", depthTest); v.Bool("cull", backfaceCull);
+      v.Int("spriteShape", spriteShape); v.Int("spriteSizeMode", spriteSizeMode);
       v.Int("samples", samples); v.Int("tonemap", tonemap); v.Float("exposure", exposure);
       v.Bool("shadows", shadowsEnabled); v.Int("shadowQuality", shadowQuality);
       v.Float("shadowBias", shadowBias); v.Float("shadowSoftness", shadowSoftness);

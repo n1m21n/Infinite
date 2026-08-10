@@ -50,6 +50,7 @@ The 35 were picked to cover, category by category:
 | Node math — geometry/mesh | GEOTEST, MESHOPTEST, TEXT3DTEST, FIXTEST, PHASEA/C/D/E/F |
 | Node math — 3D render | 3DTEST, SHADOWTEST, MATFRAMETEST, MAPTEST, PATHOCEANTEST, ENVTEST |
 | Regression fixtures | BUGTEST, LIVETEST |
+| Point clouds as Render 3D sprites (Phase 1) | PHASE1TEST — Mesh to Points and Image to Points draw as clouds (not just meshes), a Particle System connects directly to Render 3D with no `IGeometrySource` on either side, and the render keeps advancing (`TextureRevision()` moves) instead of freezing on the animated cloud's first frame |
 | Geometry-node sweeps — generic across every `IGeometrySource`-consuming node type, not one hand-written fixture per node (see `geometry-transform-sweep` skill for the full writeup) | TRANSFORMSWEEPTEST (upstream `GetModelMatrix()` reaches the output), MAPPINGSWEEPTEST (upstream `GetMappingTransform()` reaches the output), REVISIONSWEEPTEST (a node's revision/generation stamp doesn't move when nothing actually changed — the class of bug that made Cloth reset to rest pose every frame downstream of a textured Displacement) |
 
 Excluded from the auto-verdict suite because they only `printf` raw numbers
