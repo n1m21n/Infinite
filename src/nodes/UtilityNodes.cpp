@@ -354,11 +354,12 @@ void MeshToPointsNode::RebuildIfNeeded()
    // can change a mesh's shape without changing how many triangles it has.
    const unsigned long long upstream = input->MeshRevision();
    if (mBuiltInput == input && mBuiltUpstream == upstream && mBuiltMode == mode &&
-       mBuiltMax == maxPoints && mBuiltSize == pointSize)
+       mBuiltMax == maxPoints && mBuiltSize == pointSize && mBuiltWeld == weld &&
+       mBuiltDissolve == dissolveAngleDegrees)
       return;
 
    const Mesh& src = input->GetMesh();
-   const std::vector<MeshPoint> points = MeshOps::ToPoints(src, mode, maxPoints);
+   const std::vector<MeshPoint> points = MeshOps::ToPoints(src, mode, maxPoints, weld, dissolveAngleDegrees);
    mPointCount = points.size();
    mCache = MeshOps::PointsToFaces(points, pointSize);
 
@@ -367,6 +368,8 @@ void MeshToPointsNode::RebuildIfNeeded()
    mBuiltMode = mode;
    mBuiltMax = maxPoints;
    mBuiltSize = pointSize;
+   mBuiltWeld = weld;
+   mBuiltDissolve = dissolveAngleDegrees;
    mMeshRevision = NextMeshRevision();
 }
 

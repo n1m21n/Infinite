@@ -1876,7 +1876,23 @@ namespace MeshOps
       return RecalculateNormals(out, flat, flip);
    }
 
-   std::vector<MeshPoint> ToPoints(const Mesh& in, int mode, int maxPoints)
+   // Averages three (or two) component-wise normals and renormalises, falling
+   // back to the un-normalised sum (or +Y) when opposed normals cancel out.
+   static void NormalizeOrFallback(float& nx, float& ny, float& nz)
+   {
+      const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
+      if (len > 1e-6f)
+      {
+         nx /= len; ny /= len; nz /= len;
+      }
+      else if (nx == 0.0f && ny == 0.0f && nz == 0.0f)
+      {
+         ny = 1.0f;
+      }
+   }
+
+   std::vector<MeshPoint> ToPoints(const Mesh& in, int mode, int maxPoints,
+                                    bool weld, float dissolveAngleDegrees)
    {
       std::vector<MeshPoint> points;
       const int cap = std::max(1, std::min(maxPoints, 100000));
@@ -1888,15 +1904,38 @@ namespace MeshOps
       // what gets sampled instead of the selection being silently ignored.
       const bool hasSelection = !in.faceMask.empty();
 
+      // Primitives duplicate vertices at every UV seam and flat-shaded edge
+      // (PushGrid gives Cube(1) 24 vertices for 8 corners), so sampling the
+      // raw index space over-counts every seam. Weld first so vertex/edge
+      // sampling reasons about topology, not the duplicated index space.
+      std::vector<unsigned int> weldMap;
+      if (weld)
+         weldMap = BuildWeldMap(in);
+      else
+      {
+         weldMap.resize(in.vertices.size());
+         for (size_t i = 0; i < weldMap.size(); i++)
+            weldMap[i] = (unsigned int)i;
+      }
+
       if (mode == 0) // vertices
       {
          if (!hasSelection)
          {
-            const int stride = std::max(1, (int)(in.vertices.size() / cap) + ((int)in.vertices.size() > cap ? 1 : 0));
-            for (size_t i = 0; i < in.vertices.size(); i += stride)
+            // The representative of each weld group is the first vertex that
+            // claimed its position, i.e. the indices where weldMap[i] == i.
+            std::vector<size_t> reps;
+            for (size_t i = 0; i < in.vertices.size(); i++)
+               if (weldMap[i] == i)
+                  reps.push_back(i);
+
+            const int n = (int)reps.size();
+            const int stride = std::max(1, n / cap + (n > cap ? 1 : 0));
+            for (int i = 0; i < n; i += stride)
             {
-               const Vertex& v = in.vertices[i];
-               points.push_back({ v.px, v.py, v.pz, v.nx, v.ny, v.nz, 1.0f, (int)i });
+               const size_t idx = reps[(size_t)i];
+               const Vertex& v = in.vertices[idx];
+               points.push_back({ v.px, v.py, v.pz, v.nx, v.ny, v.nz, 1.0f, (int)idx });
             }
          }
          else
@@ -1915,9 +1954,15 @@ namespace MeshOps
                touched[in.indices[t + 1]] = 1;
                touched[in.indices[t + 2]] = 1;
             }
-            std::vector<size_t> selected;
+
+            std::vector<char> repSelected(in.vertices.size(), 0);
             for (size_t i = 0; i < touched.size(); i++)
                if (touched[i])
+                  repSelected[weldMap[i]] = 1;
+
+            std::vector<size_t> selected;
+            for (size_t i = 0; i < in.vertices.size(); i++)
+               if (weldMap[i] == i && repSelected[i])
                   selected.push_back(i);
 
             const int n = (int)selected.size();
@@ -1936,23 +1981,89 @@ namespace MeshOps
          // them - the same even-coverage scheme vertices/faces use below,
          // rather than stopping as soon as the cap is hit, which would leave
          // the sample clustered wherever face traversal happened to be.
-         std::map<std::pair<unsigned int, unsigned int>, bool> seen;
-         std::vector<std::pair<unsigned int, unsigned int>> edges;
+         //
+         // The dedup key is built on welded indices, or the two triangles of
+         // every quad face (the only ones that actually share raw indices)
+         // are the only "duplicates" ever found, while every adjoining face -
+         // which has entirely separate raw indices - is never recognised as
+         // sharing the edge.
+         struct EdgeInfo
+         {
+            unsigned int a, b;
+            int faces[2] = { -1, -1 };
+            int faceCount = 0;
+         };
+         std::map<std::pair<unsigned int, unsigned int>, size_t> edgeIndex;
+         std::vector<EdgeInfo> edgeList;
          const int faces = (int)(in.indices.size() / 3);
          for (int f = 0; f < faces; f++)
          {
             if (!in.FaceSelected((size_t)f))
                continue;
             const size_t t = (size_t)f * 3;
-            const unsigned int tri[3] = { in.indices[t], in.indices[t + 1], in.indices[t + 2] };
+            const unsigned int rawTri[3] = { in.indices[t], in.indices[t + 1], in.indices[t + 2] };
+            const unsigned int tri[3] = { weldMap[rawTri[0]], weldMap[rawTri[1]], weldMap[rawTri[2]] };
             for (int e = 0; e < 3; e++)
             {
                auto key = std::minmax(tri[e], tri[(e + 1) % 3]);
-               if (seen.count({ key.first, key.second }))
-                  continue;
-               seen[{ key.first, key.second }] = true;
-               edges.push_back({ key.first, key.second });
+               auto it = edgeIndex.find(key);
+               size_t idx;
+               if (it == edgeIndex.end())
+               {
+                  idx = edgeList.size();
+                  edgeIndex[key] = idx;
+                  edgeList.push_back({ key.first, key.second });
+               }
+               else
+                  idx = it->second;
+
+               EdgeInfo& info = edgeList[idx];
+               if (info.faceCount < 2)
+                  info.faces[info.faceCount++] = f;
             }
+         }
+
+         // Of the welded edges, some are triangulation diagonals rather than
+         // real edges - after welding there is no data left to tell them
+         // apart except that a diagonal's two adjacent triangles are
+         // (near-)coplanar, unlike a real edge's. `dissolveAngleDegrees == 0`
+         // disables this filter entirely; a boundary edge (one adjacent
+         // triangle) is never dissolved. NOTE: this degrades on dense smooth
+         // meshes - adjacent triangle normals on a ~200-segment sphere differ
+         // by under a degree, so a low threshold there would start dissolving
+         // real edges, not just diagonals. Do not raise the default to make a
+         // cube look better; that trades a real artifact on dense meshes for
+         // a cosmetic win on primitives.
+         auto faceNormal = [&](int f) {
+            const size_t t = (size_t)f * 3;
+            const Vertex& a = in.vertices[in.indices[t]];
+            const Vertex& b = in.vertices[in.indices[t + 1]];
+            const Vertex& c = in.vertices[in.indices[t + 2]];
+            const float ux = b.px - a.px, uy = b.py - a.py, uz = b.pz - a.pz;
+            const float vx = c.px - a.px, vy = c.py - a.py, vz = c.pz - a.pz;
+            float nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx;
+            const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
+            if (len > 1e-9f) { nx /= len; ny /= len; nz /= len; }
+            return std::array<float, 3>{ nx, ny, nz };
+         };
+
+         std::vector<std::pair<unsigned int, unsigned int>> edges;
+         edges.reserve(edgeList.size());
+         for (const EdgeInfo& info : edgeList)
+         {
+            bool keep = true;
+            if (dissolveAngleDegrees > 0.0f && info.faceCount == 2)
+            {
+               const auto n0 = faceNormal(info.faces[0]);
+               const auto n1 = faceNormal(info.faces[1]);
+               const float dot = std::max(-1.0f, std::min(1.0f,
+                  n0[0]*n1[0] + n0[1]*n1[1] + n0[2]*n1[2]));
+               const float angleDeg = std::acos(dot) * (180.0f / 3.14159265f);
+               if (angleDeg < dissolveAngleDegrees)
+                  keep = false;
+            }
+            if (keep)
+               edges.push_back({ info.a, info.b });
          }
 
          const int n = (int)edges.size();
@@ -1962,9 +2073,10 @@ namespace MeshOps
             const auto& key = edges[(size_t)i];
             const Vertex& a = in.vertices[key.first];
             const Vertex& b = in.vertices[key.second];
+            float nx = (a.nx+b.nx)*0.5f, ny = (a.ny+b.ny)*0.5f, nz = (a.nz+b.nz)*0.5f;
+            NormalizeOrFallback(nx, ny, nz);
             points.push_back({ (a.px+b.px)*0.5f, (a.py+b.py)*0.5f, (a.pz+b.pz)*0.5f,
-                               (a.nx+b.nx)*0.5f, (a.ny+b.ny)*0.5f, (a.nz+b.nz)*0.5f,
-                               1.0f, (int)points.size() });
+                               nx, ny, nz, 1.0f, i });
          }
       }
       else // face centres
@@ -1993,9 +2105,10 @@ namespace MeshOps
             const Vertex& a = in.vertices[in.indices[t]];
             const Vertex& b = in.vertices[in.indices[t + 1]];
             const Vertex& c = in.vertices[in.indices[t + 2]];
+            float nx = (a.nx+b.nx+c.nx)/3.0f, ny = (a.ny+b.ny+c.ny)/3.0f, nz = (a.nz+b.nz+c.nz)/3.0f;
+            NormalizeOrFallback(nx, ny, nz);
             points.push_back({ (a.px+b.px+c.px)/3.0f, (a.py+b.py+c.py)/3.0f, (a.pz+b.pz+c.pz)/3.0f,
-                               (a.nx+b.nx+c.nx)/3.0f, (a.ny+b.ny+c.ny)/3.0f, (a.nz+b.nz+c.nz)/3.0f,
-                               1.0f, f });
+                               nx, ny, nz, 1.0f, f });
          }
       }
       return points;

@@ -430,7 +430,23 @@ namespace MeshOps
                  int mode, float strength, float midlevel, bool flat, bool flip);
 
    // Sampling for instancing: vertices, edge midpoints or face centres.
-   std::vector<MeshPoint> ToPoints(const Mesh& in, int mode, int maxPoints);
+   //
+   // `weld` deduplicates coincident vertices (see BuildWeldMap) before
+   // sampling in all three modes, so a hard-shaded primitive's seams don't
+   // read as denser/brighter from stacked coincident points. Defaults on
+   // because it's the correct behaviour, but it changes point density in
+   // existing patches, so it's exposed as a parameter rather than switched
+   // unconditionally.
+   //
+   // `dissolveAngleDegrees` (edge mode only) drops an interior edge whose two
+   // adjacent triangle normals differ by less than this angle - it is the
+   // only way, short of n-gon tracking, to tell a triangulation diagonal from
+   // a real edge once vertices are welded. 0 disables the filter. This
+   // degrades on dense smooth meshes: adjacent triangle normals on a
+   // 200-segment sphere differ by under 1 degree, so the default of 1 degree
+   // is safe on primitives but would start dissolving real edges there.
+   std::vector<MeshPoint> ToPoints(const Mesh& in, int mode, int maxPoints,
+                                    bool weld = true, float dissolveAngleDegrees = 1.0f);
    Mesh PointsToFaces(const std::vector<MeshPoint>& points, float size);
 
    // Bends or conforms `source` onto `target`. Both inputs' transforms are

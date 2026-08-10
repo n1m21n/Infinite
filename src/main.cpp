@@ -3101,6 +3101,9 @@ namespace
       ImGui::TextDisabled("%zu points, %zu triangles", n->PointCount(), n->TriangleCount());
       ModSliderInt("max points", &n->maxPoints, 16, 20000);
       ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
+      ImGui::Checkbox("weld seams", &n->weld);
+      if (n->mode == 1)
+         ModSlider("dissolve angle", &n->dissolveAngleDegrees, 0.0f, 30.0f);
    }
 
    void DrawText3DParams(Text3DNode* n)
@@ -10645,6 +10648,25 @@ int main()
          printf("smoothing 20x: radius %.4f -> %.4f (%.1f%% retained)\n", r0, r1, 100.0f * r1 / r0);
          printf("%s\n", (r1 > r0 * 0.9f) ? "TAUBIN NO-SHRINK OK"
                                          : "SUSPECT - smoothing is collapsing the mesh");
+
+         // ToPoints weld/dissolve: pin detail=1 so unwelded duplicate corners
+         // (24 verts / 30 tri-edges for Cube(1)) don't get mistaken for the
+         // welded topology (8 verts / 12 real edges / 12 faces).
+         {
+            const Mesh cube1 = Primitives::Cube(1);
+            const size_t unweldedVerts = MeshOps::ToPoints(cube1, 0, 100000, false).size();
+            const size_t weldedVerts = MeshOps::ToPoints(cube1, 0, 100000, true).size();
+            const size_t unweldedEdges = MeshOps::ToPoints(cube1, 1, 100000, false, 0.0f).size();
+            const size_t weldedEdgesNoFilter = MeshOps::ToPoints(cube1, 1, 100000, true, 0.0f).size();
+            const size_t weldedEdgesFiltered = MeshOps::ToPoints(cube1, 1, 100000, true, 1.0f).size();
+            const size_t faceCentres = MeshOps::ToPoints(cube1, 2, 100000, true).size();
+            const bool toPointsOk = unweldedVerts == 24 && weldedVerts == 8 &&
+                                     unweldedEdges == 30 && weldedEdgesNoFilter == 18 &&
+                                     weldedEdgesFiltered == 12 && faceCentres == 12;
+            printf("to points (Cube(1)): verts %zu->%zu, edges %zu->%zu->%zu, faces %zu  %s\n",
+                   unweldedVerts, weldedVerts, unweldedEdges, weldedEdgesNoFilter, weldedEdgesFiltered,
+                   faceCentres, toPointsOk ? "OK" : "FAIL");
+         }
       }
 
       // Frame limiter check: run uncapped, then at 30fps, and compare. Vsync is

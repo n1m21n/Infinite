@@ -630,6 +630,9 @@ public:
    int mode = 0;          // vertices / edges / faces
    int maxPoints = 4000;
    float pointSize = 0.03f;
+   bool weld = true;
+   // Edge mode only - see MeshOps::ToPoints. 0 disables the dissolve filter.
+   float dissolveAngleDegrees = 1.0f;
 
    bool inheritMaterial = true;
    float color[3] = { 0.95f, 0.8f, 0.45f };
@@ -666,7 +669,9 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("mode", mode); v.Int("maxPoints", maxPoints);
-      v.Float("pointSize", pointSize); v.Bool("inherit", inheritMaterial);
+      v.Float("pointSize", pointSize); v.Bool("weld", weld);
+      v.Float("dissolveAngleDegrees", dissolveAngleDegrees);
+      v.Bool("inherit", inheritMaterial);
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
@@ -689,5 +694,7 @@ private:
    unsigned long long mBuiltUpstream = 0;
    int mBuiltMode = -1, mBuiltMax = -1;
    float mBuiltSize = -1.0f;
+   bool mBuiltWeld = true;
+   float mBuiltDissolve = -1.0f;
    int mLastCookFrame = -1;
 };
