@@ -40,14 +40,17 @@ namespace
       "in vec3 aPos;\n"
       "in vec3 aNormal;\n"
       "in vec2 aUv;\n"
+      "in vec3 aVertexColor;\n"
       "in mat4 aInstance;\n"
       "uniform mat4 uModel;\n"
       "uniform mat4 uViewProj;\n"
       "uniform mat3 uNormalMatrix;\n"
       "uniform int uInstanced;\n"
+      "uniform int uHasVertexColor;\n"
       "out vec3 vNormal;\n"
       "out vec3 vWorldPos;\n"
       "out vec2 vUv;\n"
+      "out vec3 vVertexColor;\n"
       "void main() {\n"
       "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
       "   vec4 world = model * vec4(aPos, 1.0);\n"
@@ -58,6 +61,7 @@ namespace
       "   mat3 nrm = (uInstanced == 1) ? mat3(model) : uNormalMatrix;\n"
       "   vNormal = normalize(nrm * aNormal);\n"
       "   vUv = aUv;\n"
+      "   vVertexColor = (uHasVertexColor == 1) ? aVertexColor : vec3(1.0);\n"
       "   gl_Position = uViewProj * world;\n"
       "}\n";
 
@@ -66,6 +70,7 @@ namespace
       "in vec3 vNormal;\n"
       "in vec3 vWorldPos;\n"
       "in vec2 vUv;\n"
+      "in vec3 vVertexColor;\n"
       "out vec4 fragColor;\n"
       "uniform vec3 uBaseColor;\n"
       "uniform vec3 uLightDir;\n"
@@ -75,7 +80,7 @@ namespace
       "void main() {\n"
       "   vec3 n = normalize(vNormal);\n"
       "   if (!gl_FrontFacing) n = -n;\n"
-      "   vec3 base = uBaseColor;\n"
+      "   vec3 base = uBaseColor * vVertexColor;\n"
       "   if (uHasTexture == 1) base *= texture(uTexture, vUv).rgb;\n"
       "   vec3 l = normalize(uLightDir);\n"
       "   float ndl = max(dot(n, l), 0.0);\n"
@@ -153,6 +158,7 @@ namespace
       // layout Render3DNode uses for its instance transform attribute.
       glBindAttribLocation(program, 2, "aInstance");
       glBindAttribLocation(program, 6, "aUv");
+      glBindAttribLocation(program, 7, "aVertexColor");
       glAttachShader(program, vert);
       glAttachShader(program, frag);
       glLinkProgram(program);
@@ -210,6 +216,7 @@ NodeViewport::~NodeViewport()
    if (mSelIbo != 0) glDeleteBuffers(1, &mSelIbo);
    if (mSelVao != 0) glDeleteVertexArrays(1, &mSelVao);
    if (mInstanceVbo != 0) glDeleteBuffers(1, &mInstanceVbo);
+   if (mVertexColorVbo != 0) glDeleteBuffers(1, &mVertexColorVbo);
 }
 
 bool NodeViewport::EnsureFbo(int w, int h)
@@ -287,6 +294,22 @@ void NodeViewport::UploadMesh(const Mesh& mesh, unsigned long long revision)
    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
    glEnableVertexAttribArray(6);
    glVertexAttribPointer(6, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(6 * sizeof(float)));
+
+   mHasVertexColor = mesh.HasVertexColor();
+   if (mHasVertexColor)
+   {
+      if (mVertexColorVbo == 0)
+         glGenBuffers(1, &mVertexColorVbo);
+      glBindBuffer(GL_ARRAY_BUFFER, mVertexColorVbo);
+      glBufferData(GL_ARRAY_BUFFER, mesh.vertexColor.size() * sizeof(float),
+                   mesh.vertexColor.data(), GL_STATIC_DRAW);
+      glEnableVertexAttribArray(7);
+      glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+   }
+   else
+   {
+      glDisableVertexAttribArray(7);
+   }
    glBindVertexArray(0);
 
    mLo[0] = mLo[1] = mLo[2] = 1e30f;
@@ -543,6 +566,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    const float lightDir[3] = { 0.4f, 0.85f, 0.35f };
    glUniform3fv(glGetUniformLocation(program, "uLightDir"), 1, lightDir);
    glUniform1i(glGetUniformLocation(program, "uInstanced"), instanced ? 1 : 0);
+   glUniform1i(glGetUniformLocation(program, "uHasVertexColor"), mHasVertexColor ? 1 : 0);
    glActiveTexture(GL_TEXTURE0);
    glBindTexture(GL_TEXTURE_2D, surfaceTexture != 0 ? surfaceTexture : WhiteTexture());
    glUniform1i(glGetUniformLocation(program, "uTexture"), 0);

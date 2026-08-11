@@ -1570,6 +1570,12 @@ namespace
       else if (dstSetColor != nullptr && slot == 2)
       {
          dstSetColor->paletteInput = srcPalette;
+         dstSetColor->source = SetColorNode::kPalette;
+      }
+      else if (dstSetColor != nullptr && slot == 1)
+      {
+         dstSetColor->TextureInput().Connect(srcNode.node.get());
+         dstSetColor->source = SetColorNode::kTexture;
       }
       else if (dstAudio != nullptr)
       {
@@ -5162,6 +5168,11 @@ namespace
             math->inputA = nullptr;
          else
             math->inputB = nullptr;
+      }
+      else if (auto* setColor = dynamic_cast<SetColorNode*>(dst->node.get());
+               setColor != nullptr && GraphNode::InputSlotFromPin(dstPin) == 2)
+      {
+         setColor->paletteInput = nullptr;
       }
       else if (ImageCable* cable = CableFor(*dst, GraphNode::InputSlotFromPin(dstPin)))
       {
@@ -12258,6 +12269,17 @@ int main()
                linkFromNode(*field, slot);
          if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
             linkFromNode(out->audioSource, 1);
+         if (auto* setColor = dynamic_cast<SetColorNode*>(gn.node.get()))
+         {
+            if (setColor->paletteInput != nullptr)
+               for (GraphNode& src : gNodes)
+                  if (dynamic_cast<IPaletteSource*>(src.node.get()) == setColor->paletteInput)
+                  {
+                     gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
+                                         src.OutputPinId(), gn.InputPinId(2) });
+                     break;
+                  }
+         }
 
          auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get());
          if (audio != nullptr && audio->fileSource != nullptr)

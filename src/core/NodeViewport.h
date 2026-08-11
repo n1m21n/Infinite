@@ -50,6 +50,12 @@ private:
    unsigned int mVao = 0, mVbo = 0, mIbo = 0;
    int mIndexCount = 0;
    unsigned long long mMeshRevision = 0;
+   // Per-vertex colour from a Set Color upstream, same technique as
+   // Render3DNode::GpuMesh::vertexColorVbo (Geometry3DNodes.h/.cpp) - a mesh
+   // with no Set Color leaves this disabled and the shader falls back to
+   // vec3(1.0) via uHasVertexColor.
+   unsigned int mVertexColorVbo = 0;
+   bool mHasVertexColor = false;
    float mLo[3] = { 0, 0, 0 };
    float mHi[3] = { 0, 0, 0 };
    bool mHasBounds = false;
