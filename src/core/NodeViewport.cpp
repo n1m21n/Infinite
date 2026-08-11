@@ -329,6 +329,7 @@ void NodeViewport::UploadMesh(const Mesh& mesh, unsigned long long revision)
 
    mMeshRevision = revision;
    mIndexCount = (int)mesh.indices.size();
+   mVertexCount = (int)mesh.vertices.size();
 }
 
 void NodeViewport::UpdateSelectionBuffer(const Mesh& mesh, unsigned long long revision)
@@ -395,7 +396,10 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    if (geo == nullptr)
       return 0;
    const Mesh& mesh = geo->GetMesh();
-   if (mesh.Empty())
+   // HasGeometry(), not Empty(): a vertices-only mesh (Points to Vertices'
+   // output, indices empty) has nothing to preview as triangles but is still
+   // drawn below as GL_POINTS.
+   if (!mesh.HasGeometry())
       return 0;
 
    w = std::max(16, w);
@@ -620,7 +624,10 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          }
          mInstanceAttribsOn = false;
       }
-      glDrawElements(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, nullptr);
+      if (mIndexCount == 0)
+         glDrawArrays(GL_POINTS, 0, mVertexCount);
+      else
+         glDrawElements(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, nullptr);
    }
    glBindVertexArray(0);
    glUseProgram(0);

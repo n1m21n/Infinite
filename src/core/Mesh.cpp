@@ -505,6 +505,96 @@ namespace MeshOps
       return weld;
    }
 
+   // Same idea, but the snap distance is a caller-supplied threshold instead
+   // of the hardcoded near-exact quantum above. threshold <= 0 is a no-op
+   // (every vertex keeps its own index), matching "Merge by Distance" at zero
+   // doing nothing.
+   std::vector<unsigned int> BuildWeldMap(const Mesh& in, float threshold)
+   {
+      std::vector<unsigned int> weld(in.vertices.size());
+      for (size_t i = 0; i < weld.size(); i++)
+         weld[i] = (unsigned int)i;
+      if (threshold <= 0.0f)
+         return weld;
+
+      std::map<std::array<long long, 3>, unsigned int> unique;
+      const double quantum = 1.0 / (double)threshold;
+
+      for (size_t i = 0; i < in.vertices.size(); i++)
+      {
+         const Vertex& v = in.vertices[i];
+         const std::array<long long, 3> key = {
+            (long long)std::llround((double)v.px * quantum),
+            (long long)std::llround((double)v.py * quantum),
+            (long long)std::llround((double)v.pz * quantum)
+         };
+         auto it = unique.find(key);
+         if (it == unique.end())
+         {
+            unique[key] = (unsigned int)i;
+            weld[i] = (unsigned int)i;
+         }
+         else
+         {
+            weld[i] = it->second;
+         }
+      }
+      return weld;
+   }
+
+   Mesh MergeByDistance(const Mesh& in, float threshold)
+   {
+      if (threshold <= 0.0f || in.vertices.empty())
+         return in;
+
+      const std::vector<unsigned int> weldMap = BuildWeldMap(in, threshold);
+
+      // Compact to one vertex per weld group, in first-encountered order, so
+      // downstream index buffers still read front-to-back sensibly.
+      std::vector<unsigned int> oldToNew(in.vertices.size());
+      std::vector<unsigned int> newToOld;
+      newToOld.reserve(in.vertices.size());
+      for (size_t i = 0; i < in.vertices.size(); i++)
+      {
+         if (weldMap[i] == i)
+         {
+            oldToNew[i] = (unsigned int)newToOld.size();
+            newToOld.push_back((unsigned int)i);
+         }
+      }
+      for (size_t i = 0; i < in.vertices.size(); i++)
+         if (weldMap[i] != i)
+            oldToNew[i] = oldToNew[weldMap[i]];
+
+      Mesh out;
+      out.vertices.reserve(newToOld.size());
+      for (unsigned int oldIdx : newToOld)
+         out.vertices.push_back(in.vertices[oldIdx]);
+
+      const bool hasSelection = !in.faceMask.empty();
+      const bool hasGroups = !in.selectionGroup.empty();
+      const size_t faceCount = in.indices.size() / 3;
+      out.indices.reserve(in.indices.size());
+      for (size_t f = 0; f < faceCount; f++)
+      {
+         const size_t t = f * 3;
+         const unsigned int a = oldToNew[in.indices[t]];
+         const unsigned int b = oldToNew[in.indices[t + 1]];
+         const unsigned int c = oldToNew[in.indices[t + 2]];
+         if (a == b || b == c || a == c)
+            continue; // degenerate once its corners land on the same weld group
+         out.indices.push_back(a);
+         out.indices.push_back(b);
+         out.indices.push_back(c);
+         if (hasSelection)
+            out.faceMask.push_back(f < in.faceMask.size() ? in.faceMask[f] : (unsigned char)1);
+         if (hasGroups)
+            out.selectionGroup.push_back(f < in.selectionGroup.size() ? in.selectionGroup[f] : 0u);
+      }
+      out.vertexColor = RemapVertexColor(in.vertexColor, newToOld, out.vertices.size());
+      return out;
+   }
+
    std::vector<float> RemapVertexColor(const std::vector<float>& srcColor,
                                         const std::vector<unsigned int>& mapping,
                                         size_t outVertexCount)
@@ -2260,6 +2350,183 @@ namespace MeshOps
          pointIdx++;
       }
       return out;
+   }
+
+   // Deterministic per-candidate hash, same shape as MeshOps::Select's
+   // SelectHash but with a channel argument so one point can draw several
+   // independent values (which triangle, then where inside it) without them
+   // correlating. Same seed + same index always gives the same draw, which is
+   // what lets a reopened patch scatter identically.
+   static float DistributeHash(float seed, size_t index, int channel)
+   {
+      const float x = std::sin((seed + 1.0f) * ((float)(index + 1) * 12.9898f +
+                                                  (float)(channel + 1) * 78.233f)) * 43758.5453f;
+      return x - std::floor(x);
+   }
+
+   std::vector<MeshPoint> DistributeOnFaces(const Mesh& in, float density, float seed,
+                                             int method, float minDistance)
+   {
+      std::vector<MeshPoint> points;
+      const int faceCount = (int)(in.indices.size() / 3);
+      if (faceCount == 0)
+         return points;
+
+      const bool hasSelection = !in.faceMask.empty();
+      std::vector<int> faces;
+      faces.reserve(faceCount);
+      for (int f = 0; f < faceCount; f++)
+         if (!hasSelection || in.FaceSelected((size_t)f))
+            faces.push_back(f);
+      if (faces.empty())
+         return points;
+
+      // Prefix sum of triangle areas - picking a triangle by binary search on
+      // a uniform draw over [0, totalArea) samples each triangle in
+      // proportion to its area, which is what makes coverage uniform in
+      // world space regardless of how densely the mesh is tessellated.
+      std::vector<double> prefixArea(faces.size());
+      double totalArea = 0.0;
+      for (size_t i = 0; i < faces.size(); i++)
+      {
+         const size_t t = (size_t)faces[i] * 3;
+         const Vertex& a = in.vertices[in.indices[t]];
+         const Vertex& b = in.vertices[in.indices[t + 1]];
+         const Vertex& c = in.vertices[in.indices[t + 2]];
+         const float ux = b.px - a.px, uy = b.py - a.py, uz = b.pz - a.pz;
+         const float vx = c.px - a.px, vy = c.py - a.py, vz = c.pz - a.pz;
+         const float cx = uy*vz - uz*vy, cy = uz*vx - ux*vz, cz = ux*vy - uy*vx;
+         totalArea += 0.5 * std::sqrt((double)cx*cx + (double)cy*cy + (double)cz*cz);
+         prefixArea[i] = totalArea;
+      }
+      if (totalArea <= 1e-12)
+         return points;
+
+      const int wanted = (int)std::lround((double)std::max(0.0f, density) * totalArea);
+      const int cap = std::min(wanted, 200000);
+      if (cap <= 0)
+         return points;
+
+      auto pickFace = [&](float r) -> size_t {
+         const double target = (double)r * totalArea;
+         size_t lo = 0, hi = prefixArea.size() - 1;
+         while (lo < hi)
+         {
+            const size_t mid = lo + (hi - lo) / 2;
+            if (prefixArea[mid] < target)
+               lo = mid + 1;
+            else
+               hi = mid;
+         }
+         return lo;
+      };
+
+      // Standard sqrt barycentric warp: uniform (r1, r2) over the unit square
+      // maps to a uniform point inside the triangle.
+      auto samplePoint = [&](size_t faceIdx, float r1, float r2) -> MeshPoint {
+         const int f = faces[faceIdx];
+         const size_t t = (size_t)f * 3;
+         const unsigned int ia = in.indices[t], ib = in.indices[t + 1], ic = in.indices[t + 2];
+         const Vertex& a = in.vertices[ia];
+         const Vertex& b = in.vertices[ib];
+         const Vertex& c = in.vertices[ic];
+         const float sq = std::sqrt(std::max(0.0f, r1));
+         const float wa = 1.0f - sq, wb = (1.0f - r2) * sq, wc = r2 * sq;
+
+         MeshPoint p;
+         p.px = wa*a.px + wb*b.px + wc*c.px;
+         p.py = wa*a.py + wb*b.py + wc*c.py;
+         p.pz = wa*a.pz + wb*b.pz + wc*c.pz;
+         // Interpolated from the three vertex normals, not the face normal -
+         // otherwise a smooth-shaded surface scatters with faceted
+         // orientation instead of following the surface it was sampled from.
+         float nx = wa*a.nx + wb*b.nx + wc*c.nx;
+         float ny = wa*a.ny + wb*b.ny + wc*c.ny;
+         float nz = wa*a.nz + wb*b.nz + wc*c.nz;
+         NormalizeOrFallback(nx, ny, nz);
+         p.nx = nx; p.ny = ny; p.nz = nz;
+         p.scale = 1.0f;
+         p.index = f;
+         if (in.HasVertexColor())
+         {
+            p.r = wa*in.vertexColor[ia*3+0] + wb*in.vertexColor[ib*3+0] + wc*in.vertexColor[ic*3+0];
+            p.g = wa*in.vertexColor[ia*3+1] + wb*in.vertexColor[ib*3+1] + wc*in.vertexColor[ic*3+1];
+            p.b = wa*in.vertexColor[ia*3+2] + wb*in.vertexColor[ib*3+2] + wc*in.vertexColor[ic*3+2];
+         }
+         return p;
+      };
+
+      if (method != kDistributePoisson)
+      {
+         points.reserve((size_t)cap);
+         for (int i = 0; i < cap; i++)
+         {
+            const size_t face = pickFace(DistributeHash(seed, (size_t)i, 0));
+            points.push_back(samplePoint(face, DistributeHash(seed, (size_t)i, 1),
+                                          DistributeHash(seed, (size_t)i, 2)));
+         }
+         return points;
+      }
+
+      // Poisson disk: generate candidates the same way as random mode, but
+      // reject any candidate within minDistance of an already-accepted point.
+      // A spatial hash grid (cell size == minDistance) keeps the rejection
+      // check O(1) per candidate rather than O(n) against every prior point.
+      const float cell = std::max(minDistance, 1e-5f);
+      std::unordered_map<long long, std::vector<int>> grid;
+      auto cellCoord = [&](float v) { return (long long)std::floor(v / cell); };
+      auto cellHash = [](long long cx, long long cy, long long cz) {
+         return (cx * 73856093LL) ^ (cy * 19349663LL) ^ (cz * 83492791LL);
+      };
+
+      const float minDistSq = minDistance * minDistance;
+      // A generous candidate budget: Poisson rejection needs far more draws
+      // than accepted points once packing tightens. `saturationLimit`
+      // consecutive rejects (spacing has nowhere left to add a point) stops
+      // early instead of burning the whole budget on a saturated surface.
+      const int maxCandidates = std::min(std::max(cap * 40, 4000), 2000000);
+      const int saturationLimit = std::max(2000, cap * 30);
+      int consecutiveRejects = 0;
+
+      for (int i = 0; i < maxCandidates && (int)points.size() < cap; i++)
+      {
+         const size_t face = pickFace(DistributeHash(seed, (size_t)i, 0));
+         const MeshPoint p = samplePoint(face, DistributeHash(seed, (size_t)i, 1),
+                                          DistributeHash(seed, (size_t)i, 2));
+
+         const long long cx = cellCoord(p.px), cy = cellCoord(p.py), cz = cellCoord(p.pz);
+         bool ok = true;
+         for (long long dz = -1; dz <= 1 && ok; dz++)
+         for (long long dy = -1; dy <= 1 && ok; dy++)
+         for (long long dx = -1; dx <= 1 && ok; dx++)
+         {
+            auto it = grid.find(cellHash(cx+dx, cy+dy, cz+dz));
+            if (it == grid.end())
+               continue;
+            for (int idx : it->second)
+            {
+               const MeshPoint& q = points[(size_t)idx];
+               const float ddx = q.px-p.px, ddy = q.py-p.py, ddz = q.pz-p.pz;
+               if (ddx*ddx + ddy*ddy + ddz*ddz < minDistSq)
+               {
+                  ok = false;
+                  break;
+               }
+            }
+         }
+
+         if (ok)
+         {
+            points.push_back(p);
+            grid[cellHash(cx, cy, cz)].push_back((int)points.size() - 1);
+            consecutiveRejects = 0;
+         }
+         else if (++consecutiveRejects > saturationLimit)
+         {
+            break;
+         }
+      }
+      return points;
    }
 
    // Closest point on triangle (abc) to point p, clamping barycentric

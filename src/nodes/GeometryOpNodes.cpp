@@ -549,7 +549,11 @@ void InstanceOnPointsNode::Rebuild()
       return;
 
    const Mesh& srcLocal = pointSource->GetMesh();
-   if (srcLocal.Empty())
+   // HasGeometry(), not Empty(): a vertices-only mesh (Points to Vertices'
+   // output) has no faces/edges to sample in modes 1/2, but pointMode 0
+   // (vertices) works directly off vertex positions and doesn't touch
+   // indices at all - see MeshOps::ToPoints.
+   if (!srcLocal.HasGeometry())
       return;
 
    // Points are sampled from the source's own space, so its object-level

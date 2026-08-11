@@ -45,6 +45,10 @@ struct Mesh
    std::vector<float> vertexColor;
 
    bool Empty() const { return vertices.empty() || indices.empty(); }
+   // Unlike Empty(), true for a vertices-only mesh with no faces (Points to
+   // Vertices' output) - use this where "has any drawable-as-points data" is
+   // the question being asked, not "has drawable triangles".
+   bool HasGeometry() const { return !vertices.empty(); }
    size_t FaceCount() const { return indices.size() / 3; }
 
    bool FaceSelected(size_t face) const
@@ -330,6 +334,20 @@ namespace MeshOps
    // vertices at UV seams and flat-shaded edges, and treating those as separate
    // points tears a surface open along its seams.
    std::vector<unsigned int> BuildWeldMap(const Mesh& in);
+   // Same as BuildWeldMap(in), but with the weld quantum exposed as a distance
+   // threshold rather than the hardcoded ~0.00001-unit snap the no-arg version
+   // uses - lets Merge by Distance dial the weld radius instead of only ever
+   // deduplicating exact seam coincidences.
+   std::vector<unsigned int> BuildWeldMap(const Mesh& in, float threshold);
+
+   // Welds every vertex pair closer than `threshold`, compacts the vertex
+   // array to one entry per weld group (the group's first-encountered
+   // vertex - position, normal and uv all come from that representative, not
+   // an average), remaps every triangle's indices, and drops any triangle
+   // whose three indices are no longer distinct after welding. threshold <= 0
+   // is a no-op. faceMask/selectionGroup entries follow their surviving
+   // triangle; a dropped triangle drops its entries too.
+   Mesh MergeByDistance(const Mesh& in, float threshold);
 
    // Rebuilds a vertexColor array for `outVertexCount` new vertices, each
    // sourced from `mapping[i]` in `srcColor` (an rgb-triple array sized for
@@ -482,6 +500,23 @@ namespace MeshOps
    std::vector<MeshPoint> ToPoints(const Mesh& in, int mode, int maxPoints,
                                     bool weld = true, float dissolveAngleDegrees = 1.0f);
    Mesh PointsToFaces(const std::vector<MeshPoint>& points, float size);
+
+   // Area-weighted scatter. `density` is points per square unit of surface
+   // area, so coverage is uniform regardless of how the mesh is tessellated -
+   // unlike ToPoints, which samples in index order and therefore clumps
+   // wherever the topology is dense (visible as dark caps at a UV sphere's
+   // poles, where Primitives::Sphere bunches its rings). Honours `faceMask`
+   // the same way ToPoints does. `seed` is hashed per-candidate the same way
+   // MeshOps::Select's random mode is, so reopening a saved patch scatters
+   // identically.
+   //
+   // `method` is kDistributeRandom or kDistributePoisson. Poisson mode
+   // additionally rejects any candidate within `minDistance` of an already
+   // accepted point (ignored in random mode) - once minimum spacing is
+   // saturated, no further points are added no matter how high `density` is.
+   enum { kDistributeRandom = 0, kDistributePoisson, kDistributeMethodCount };
+   std::vector<MeshPoint> DistributeOnFaces(const Mesh& in, float density, float seed,
+                                             int method, float minDistance);
 
    // Bends or conforms `source` onto `target`. Both inputs' transforms are
    // baked in, so the result is in world space - there is no way back to

@@ -49,6 +49,10 @@ private:
 
    unsigned int mVao = 0, mVbo = 0, mIbo = 0;
    int mIndexCount = 0;
+   // Vertex count, used instead of mIndexCount to preview a vertices-only
+   // mesh (Points to Vertices' output - no edges, no faces) as GL_POINTS
+   // rather than the blank "no geometry" placeholder.
+   int mVertexCount = 0;
    unsigned long long mMeshRevision = 0;
    // Per-vertex colour from a Set Color upstream, same technique as
    // Render3DNode::GpuMesh::vertexColorVbo (Geometry3DNodes.h/.cpp) - a mesh

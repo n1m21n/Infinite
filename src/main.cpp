@@ -72,6 +72,7 @@
 #include "nodes/ModelSourceNode.h"
 #include "nodes/Text3DNode.h"
 #include "nodes/UtilityNodes.h"
+#include "nodes/PointDistributionNodes.h"
 #include "nodes/PathNode.h"
 #include "nodes/CurveNode.h"
 #include "nodes/OceanNode.h"
@@ -1092,6 +1093,10 @@ namespace
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
       REGISTER_NODE(SetColorNode, Set Color, "3D");
       REGISTER_NODE(WrapNode, Wrap, "3D");
+      REGISTER_NODE(DistributePointsOnFacesNode, Distribute Points on Faces, "3D");
+      REGISTER_NODE(PointsToVerticesNode, Points to Vertices, "3D");
+      REGISTER_NODE(DistributePointsInGridNode, Distribute Points in Grid, "3D");
+      REGISTER_NODE(MergeByDistanceNode, Merge by Distance, "3D");
       REGISTER_NODE(Switcher3DNode, Switcher 3D, "3D");
       REGISTER_NODE(CameraNode, Camera, "3D");
       REGISTER_NODE(LightNode, Light, "3D");
@@ -1315,6 +1320,13 @@ namespace
          return 3; // points, shape, cloud
       if (dynamic_cast<WrapNode*>(gn.node.get()) != nullptr)
          return 2; // source, target
+      if (dynamic_cast<DistributePointsOnFacesNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<PointsToVerticesNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<MergeByDistanceNode*>(gn.node.get()) != nullptr)
+         return 1;
+      // DistributePointsInGridNode has no inputs - falls through to 0 below.
       if (dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr)
          return Switcher3DNode::kSlots;
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
@@ -3307,6 +3319,44 @@ namespace
       ImGui::Checkbox("weld seams", &n->weld);
       if (n->mode == 1)
          ModSlider("dissolve angle", &n->dissolveAngleDegrees, 0.0f, 30.0f);
+   }
+
+   void DrawDistributePointsOnFacesParams(DistributePointsOnFacesNode* n)
+   {
+      ImGui::TextDisabled("%zu points", n->PointCount());
+      ModSlider("density", &n->density, 1.0f, 500.0f);
+      DropdownButton("method", DistributePointsOnFacesNode::MethodNames(), n->method,
+                     [n](int i) { n->method = i; });
+      if (n->method == MeshOps::kDistributePoisson)
+         ModSlider("min distance", &n->minDistance, 0.005f, 1.0f);
+      ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+   }
+
+   void DrawPointsToVerticesParams(PointsToVerticesNode* n)
+   {
+      ImGui::TextDisabled("%zu vertices", n->VertexCount());
+      ImGui::Checkbox("alive only", &n->aliveOnly);
+   }
+
+   void DrawDistributePointsInGridParams(DistributePointsInGridNode* n)
+   {
+      ImGui::TextDisabled("%zu points", n->PointCount());
+      ModSliderInt("count x", &n->countX, 1, 200);
+      ModSliderInt("count y", &n->countY, 1, 200);
+      ModSlider("spacing x", &n->spacingX, 0.01f, 2.0f);
+      ModSlider("spacing y", &n->spacingY, 0.01f, 2.0f);
+      ModSlider("jitter", &n->jitter, 0.0f, 1.0f);
+      ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ColorSwatch("tint", n->tint, n);
+   }
+
+   void DrawMergeByDistanceParams(MergeByDistanceNode* n)
+   {
+      if (n->input != nullptr)
+         ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      ModSlider("threshold", &n->threshold, 0.0f, 0.5f, "%.4f");
    }
 
    void DrawText3DParams(Text3DNode* n)
@@ -8244,6 +8294,190 @@ int main()
          printf("%s\n", ok ? "SELECTION OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_DISTRIBUTETEST") != nullptr && frameId == 4)
+      {
+         // Phase 6: point distribution. A UV sphere so pole clumping (the bug
+         // Distribute Points on Faces exists to fix) has something to show up
+         // on; a coarse one so the check runs fast.
+         const Mesh sphere = Primitives::Sphere(24, 24);
+
+         // Coverage should be roughly uniform per unit area: split the sphere
+         // by hemisphere (near the pole vs. near the equator band) using the
+         // sampled points' own y, and the two counts should be much closer to
+         // each other than ToPoints' index-stride sampling would give, since
+         // Primitives::Sphere bunches rings toward the poles.
+         const std::vector<MeshPoint> scattered =
+            MeshOps::DistributeOnFaces(sphere, 400.0f, 1.0f, MeshOps::kDistributeRandom, 0.0f);
+         // Primitives::Sphere bakes radius 0.5 into its positions (py in
+         // -0.5..0.5), so the pole/equator split is relative to that, not 1.0.
+         int poleCount = 0, equatorCount = 0;
+         for (const MeshPoint& p : scattered)
+         {
+            if (std::fabs(p.py) > 0.35f) poleCount++;
+            else if (std::fabs(p.py) < 0.15f) equatorCount++;
+         }
+         // Both bands cover a comparable fraction of the sphere's surface
+         // area, so a uniform scatter should land within roughly 2x of each
+         // other; the old index-stride sampler leaves the poles nearly empty
+         // by comparison.
+         const bool uniformCoverage = poleCount > 0 && equatorCount > 0 &&
+            (float)poleCount / (float)equatorCount > 0.4f &&
+            (float)poleCount / (float)equatorCount < 2.5f;
+         printf("distribute on faces: %zu points, pole=%d equator=%d  %s\n",
+                scattered.size(), poleCount, equatorCount, uniformCoverage ? "OK" : "FAIL");
+
+         // Same seed -> identical scatter (a reopened patch must not reshuffle
+         // its points); a different seed -> a different one.
+         const std::vector<MeshPoint> s1 =
+            MeshOps::DistributeOnFaces(sphere, 200.0f, 5.0f, MeshOps::kDistributeRandom, 0.0f);
+         const std::vector<MeshPoint> s2 =
+            MeshOps::DistributeOnFaces(sphere, 200.0f, 5.0f, MeshOps::kDistributeRandom, 0.0f);
+         const std::vector<MeshPoint> s3 =
+            MeshOps::DistributeOnFaces(sphere, 200.0f, 6.0f, MeshOps::kDistributeRandom, 0.0f);
+         bool sameSeedIdentical = s1.size() == s2.size() && !s1.empty();
+         for (size_t i = 0; sameSeedIdentical && i < s1.size(); i++)
+            if (s1[i].px != s2[i].px || s1[i].py != s2[i].py || s1[i].pz != s2[i].pz)
+               sameSeedIdentical = false;
+         bool diffSeedDiffers = s1.size() != s3.size();
+         if (!diffSeedDiffers)
+            for (size_t i = 0; i < s1.size(); i++)
+               if (s1[i].px != s3[i].px || s1[i].py != s3[i].py || s1[i].pz != s3[i].pz)
+                  { diffSeedDiffers = true; break; }
+         printf("scatter reproducible from seed: same=%d diff=%d  %s\n",
+                (int)sameSeedIdentical, (int)diffSeedDiffers,
+                (sameSeedIdentical && diffSeedDiffers) ? "OK" : "FAIL");
+
+         // Poisson disk must respect minDistance (no two accepted points
+         // closer than it) and must stop adding points once spacing
+         // saturates, rather than packing them arbitrarily tight.
+         const std::vector<MeshPoint> poisson =
+            MeshOps::DistributeOnFaces(sphere, 5000.0f, 2.0f, MeshOps::kDistributePoisson, 0.15f);
+         bool minDistanceHeld = true;
+         for (size_t i = 0; minDistanceHeld && i < poisson.size(); i++)
+            for (size_t j = i + 1; minDistanceHeld && j < poisson.size(); j++)
+            {
+               const float dx = poisson[i].px - poisson[j].px;
+               const float dy = poisson[i].py - poisson[j].py;
+               const float dz = poisson[i].pz - poisson[j].pz;
+               if (std::sqrt(dx*dx + dy*dy + dz*dz) < 0.15f - 1e-4f)
+                  minDistanceHeld = false;
+            }
+         // A far higher density than the packing can actually hold - if
+         // saturation didn't stop the search, this would either hang or spill
+         // past what minDistance allows.
+         const std::vector<MeshPoint> poissonSaturated =
+            MeshOps::DistributeOnFaces(sphere, 200000.0f, 2.0f, MeshOps::kDistributePoisson, 0.15f);
+         const bool saturates = poissonSaturated.size() < 5000;
+         printf("poisson disk: %zu points, min-distance held=%d, saturates at high density=%d (%zu)  %s\n",
+                poisson.size(), (int)minDistanceHeld, (int)saturates, poissonSaturated.size(),
+                (minDistanceHeld && saturates) ? "OK" : "FAIL");
+
+         // Merge by Distance: zero threshold is a no-op; a large one collapses
+         // a subdivided cube's duplicated seam vertices.
+         const Mesh cube = Primitives::Cube(1);
+         const Mesh subdivided = MeshOps::Subdivide(cube, 2, 0.0f);
+         const Mesh noOp = MeshOps::MergeByDistance(subdivided, 0.0f);
+         const Mesh merged = MeshOps::MergeByDistance(subdivided, 2.0f);
+         const bool mergeNoOp = noOp.vertices.size() == subdivided.vertices.size() &&
+                                noOp.indices.size() == subdivided.indices.size();
+         const bool mergeCollapses = merged.vertices.size() < subdivided.vertices.size() &&
+                                     merged.indices.size() < subdivided.indices.size();
+         printf("merge by distance: %zu verts -> noop %zu, threshold=2 %zu  %s\n",
+                subdivided.vertices.size(), noOp.vertices.size(), merged.vertices.size(),
+                (mergeNoOp && mergeCollapses) ? "OK" : "FAIL");
+
+         // Points to Vertices: a vertices-only mesh trips Mesh::Empty() (no
+         // indices) but must still report HasGeometry(), carry every alive
+         // particle's position/colour, and drop dead ones when asked to.
+         struct CloudProbe : public IGeometrySource
+         {
+            std::vector<Particle> cloud;
+            Mesh dummy;
+            const Mesh& GetMesh() override { return dummy; }
+            unsigned long long MeshRevision() override { return 1; }
+            const std::vector<Particle>* GetPointCloud() override { return &cloud; }
+            unsigned long long PointCloudRevision() override { return 1; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+            unsigned int GetSurfaceTexture() override { return 0; }
+         };
+         CloudProbe cloudProbe;
+         for (int i = 0; i < 5; i++)
+         {
+            Particle p;
+            p.px = (float)i; p.r = 0.25f * i;
+            p.alive = (i != 2); // one dead particle in the middle
+            cloudProbe.cloud.push_back(p);
+         }
+         PointsToVerticesNode p2v;
+         p2v.input = &cloudProbe;
+         p2v.aliveOnly = true;
+         p2v.CookIfNeeded(40000);
+         const Mesh& p2vMesh = p2v.GetMesh();
+         const bool p2vOk = p2vMesh.Empty() && p2vMesh.HasGeometry() &&
+                            p2vMesh.vertices.size() == 4 && p2vMesh.HasVertexColor();
+         printf("points to vertices: %zu verts (want 4, dead dropped), Empty=%d HasGeometry=%d  %s\n",
+                p2vMesh.vertices.size(), (int)p2vMesh.Empty(), (int)p2vMesh.HasGeometry(),
+                p2vOk ? "OK" : "FAIL");
+
+         // Distribute Points in Grid: exact count, and row-major/cell-centre
+         // ordering matching ImageToPointsNode's convention (see
+         // GenerativeNodes.cpp) so the two correspond point-for-point.
+         DistributePointsInGridNode grid;
+         grid.countX = 4; grid.countY = 3;
+         grid.spacingX = 0.5f; grid.spacingY = 0.5f;
+         grid.jitter = 0.0f;
+         grid.CookIfNeeded(41000);
+         const std::vector<Particle>& gridPoints = grid.GetPoints();
+         bool gridOrderOk = gridPoints.size() == 12;
+         if (gridOrderOk)
+         {
+            // Index 1 is (gx=1, gy=0): one spacing right of index 0, same row.
+            const float dx = gridPoints[1].px - gridPoints[0].px;
+            const float dy = gridPoints[1].py - gridPoints[0].py;
+            // Index 4 is (gx=0, gy=1): one spacing up from index 0, same column.
+            const float dxRow = gridPoints[4].px - gridPoints[0].px;
+            const float dyRow = gridPoints[4].py - gridPoints[0].py;
+            gridOrderOk = std::fabs(dx - 0.5f) < 1e-3f && std::fabs(dy) < 1e-3f &&
+                          std::fabs(dxRow) < 1e-3f && std::fabs(dyRow - 0.5f) < 1e-3f;
+         }
+         printf("distribute in grid: %zu points (want 12), row-major order=%d  %s\n",
+                gridPoints.size(), (int)gridOrderOk, gridOrderOk ? "OK" : "FAIL");
+
+         // Render3D's cloud sprite path scales its unit quad by Particle::scale
+         // directly (drawCloudSlot), not by pointSize - a node that forgets to
+         // derive scale from pointSize renders every sprite at a fixed size
+         // regardless of the param, which the mini-viewport preview (built off
+         // GetMesh(), a different code path) would not have caught either.
+         const bool gridScaleOk = !gridPoints.empty() &&
+            std::fabs(gridPoints[0].scale - grid.pointSize * 0.5f) < 1e-4f;
+         printf("distribute in grid: particle scale %.4f (want %.4f from pointSize)  %s\n",
+                gridPoints.empty() ? -1.0f : gridPoints[0].scale, grid.pointSize * 0.5f,
+                gridScaleOk ? "OK" : "FAIL");
+
+         // Same check for Distribute Points on Faces' own particle output, not
+         // just the raw MeshOps::DistributeOnFaces samples checked above.
+         GeometryNode probeMeshForGrid;
+         probeMeshForGrid.shape = 2; // sphere
+         probeMeshForGrid.detail = 4;
+         DistributePointsOnFacesNode distFacesScaleNode;
+         distFacesScaleNode.input = &probeMeshForGrid;
+         distFacesScaleNode.pointSize = 0.2f;
+         distFacesScaleNode.density = 20.0f;
+         distFacesScaleNode.CookIfNeeded(42000);
+         const std::vector<Particle>& facesPoints = distFacesScaleNode.GetPoints();
+         const bool facesScaleOk = !facesPoints.empty() &&
+            std::fabs(facesPoints[0].scale - distFacesScaleNode.pointSize * 0.5f) < 1e-4f;
+         printf("distribute on faces: particle scale %.4f (want %.4f from pointSize)  %s\n",
+                facesPoints.empty() ? -1.0f : facesPoints[0].scale,
+                distFacesScaleNode.pointSize * 0.5f, facesScaleOk ? "OK" : "FAIL");
+
+         const bool ok = uniformCoverage && sameSeedIdentical && diffSeedDiffers &&
+                         minDistanceHeld && saturates && mergeNoOp && mergeCollapses &&
+                         p2vOk && gridOrderOk && gridScaleOk && facesScaleOk;
+         printf("%s\n", ok ? "DISTRIBUTE OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_PHASE4TEST") != nullptr && frameId == 4)
       {
          // Phase 4 (selection as an input): GeometryOpNode::selectionOnly.
@@ -9984,6 +10218,15 @@ int main()
          JoinGeometryNode joinNode; joinNode.mode = JoinGeometryNode::kMerge; joinNode.inputs[0] = &probe;
          checkGeneric("JoinGeometryNode", &joinNode);
 
+         DistributePointsOnFacesNode distFacesNode; distFacesNode.input = &probe;
+         checkGeneric("DistributePointsOnFacesNode", &distFacesNode);
+
+         PointsToVerticesNode p2vNode; p2vNode.input = &probe;
+         checkGeneric("PointsToVerticesNode", &p2vNode);
+
+         MergeByDistanceNode mergeNode; mergeNode.input = &probe; mergeNode.threshold = 0.0f;
+         checkGeneric("MergeByDistanceNode", &mergeNode);
+
          // Wrap needs a real, non-degenerate target to project onto - a
          // stand-in sphere, fixed in place (not run through the probe matrix,
          // since the invariant under test is "does the *source* input's
@@ -10193,6 +10436,15 @@ int main()
          JoinGeometryNode joinNode; joinNode.mode = JoinGeometryNode::kMerge; joinNode.inputs[0] = &probe;
          checkForwarding("JoinGeometryNode", &joinNode);
 
+         DistributePointsOnFacesNode distFacesNode; distFacesNode.input = &probe;
+         checkForwarding("DistributePointsOnFacesNode", &distFacesNode);
+
+         PointsToVerticesNode p2vNode; p2vNode.input = &probe;
+         checkForwarding("PointsToVerticesNode", &p2vNode);
+
+         MergeByDistanceNode mergeNode; mergeNode.input = &probe; mergeNode.threshold = 0.0f;
+         checkForwarding("MergeByDistanceNode", &mergeNode);
+
          GeometryNode probe2;
          probe2.shape = 2; // sphere
          probe2.detail = 4;
@@ -10291,6 +10543,27 @@ int main()
          const unsigned long long setColorFirst = setColorNode.MeshRevision();
          setColorNode.CookIfNeeded(frame++);
          results.push_back({ "SetColorNode", setColorFirst == setColorNode.MeshRevision() });
+
+         DistributePointsOnFacesNode distFacesNode;
+         distFacesNode.input = &probeMesh;
+         distFacesNode.CookIfNeeded(frame++);
+         const unsigned long long distFacesFirst = distFacesNode.MeshRevision();
+         distFacesNode.CookIfNeeded(frame++);
+         results.push_back({ "DistributePointsOnFacesNode", distFacesFirst == distFacesNode.MeshRevision() });
+
+         PointsToVerticesNode p2vNode;
+         p2vNode.input = &probeMesh;
+         p2vNode.CookIfNeeded(frame++);
+         const unsigned long long p2vFirst = p2vNode.MeshRevision();
+         p2vNode.CookIfNeeded(frame++);
+         results.push_back({ "PointsToVerticesNode", p2vFirst == p2vNode.MeshRevision() });
+
+         MergeByDistanceNode mergeNode;
+         mergeNode.input = &probeMesh;
+         mergeNode.CookIfNeeded(frame++);
+         const unsigned long long mergeFirst = mergeNode.MeshRevision();
+         mergeNode.CookIfNeeded(frame++);
+         results.push_back({ "MergeByDistanceNode", mergeFirst == mergeNode.MeshRevision() });
 
          // Cloth's stamp is its own mMesh revision, bumped by Step() every
          // physics tick even while draping correctly, so it is not expected to
@@ -12094,6 +12367,14 @@ int main()
                DrawInstanceParams(n);
             else if (auto* n = dynamic_cast<WrapNode*>(gn.node.get()))
                DrawWrapParams(n);
+            else if (auto* n = dynamic_cast<DistributePointsOnFacesNode*>(gn.node.get()))
+               DrawDistributePointsOnFacesParams(n);
+            else if (auto* n = dynamic_cast<PointsToVerticesNode*>(gn.node.get()))
+               DrawPointsToVerticesParams(n);
+            else if (auto* n = dynamic_cast<DistributePointsInGridNode*>(gn.node.get()))
+               DrawDistributePointsInGridParams(n);
+            else if (auto* n = dynamic_cast<MergeByDistanceNode*>(gn.node.get()))
+               DrawMergeByDistanceParams(n);
             else if (auto* n = dynamic_cast<Switcher3DNode*>(gn.node.get()))
                DrawSwitcher3DParams(n);
             else if (auto* n = dynamic_cast<CameraNode*>(gn.node.get()))

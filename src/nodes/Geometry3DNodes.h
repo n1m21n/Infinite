@@ -454,6 +454,10 @@ private:
       unsigned long long meshRevision = 0;
       unsigned long long instanceRevision = 0;
       int indexCount = 0;
+      // Vertex count, used instead of indexCount to draw a vertices-only mesh
+      // (Points to Vertices' output - no edges, no faces) as GL_POINTS rather
+      // than silently drawing nothing.
+      int vertexCount = 0;
       int instanceCount = 0;
       bool instanceAttribsOn = false;
       bool instanceColored = false;

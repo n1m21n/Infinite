@@ -81,6 +81,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/SimulationNodes.cpp
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
+    src/nodes/PointDistributionNodes.cpp
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp
     src/nodes/SwitcherNode.cpp

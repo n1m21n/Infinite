@@ -1866,7 +1866,10 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 0);
 
       const Mesh& mesh = source->GetMesh();
-      if (mesh.Empty())
+      // HasGeometry(), not Empty(): a vertices-only mesh (Points to
+      // Vertices' output, indices empty) has nothing to draw as triangles
+      // but is still drawn below as GL_POINTS.
+      if (!mesh.HasGeometry())
          return;
 
       GpuMesh& gpu = mGpu[i];
@@ -1946,6 +1949,7 @@ void Render3DNode::CookIfNeeded(int frameId)
 
          gpu.meshRevision = revision;
          gpu.indexCount = (int)mesh.indices.size();
+         gpu.vertexCount = (int)mesh.vertices.size();
          mLastUploads++;
       }
 
@@ -2109,7 +2113,16 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), material.transmission);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), material.transmissionRoughness);
 
-      if (instanced)
+      if (gpu.indexCount == 0)
+      {
+         // Vertices-only mesh (Points to Vertices, with nothing after it that
+         // added faces) - draw as points instead of the empty triangle list
+         // Empty() used to reject outright. Not handled for the instanced
+         // case; instancing a point cloud already has its own path via
+         // InstanceOnPointsNode/drawCloudSlot.
+         glDrawArrays(GL_POINTS, 0, gpu.vertexCount);
+      }
+      else if (instanced)
       {
          glDrawElementsInstanced(GL_TRIANGLES, gpu.indexCount, GL_UNSIGNED_INT,
                                  nullptr, (GLsizei)gpu.instanceCount);

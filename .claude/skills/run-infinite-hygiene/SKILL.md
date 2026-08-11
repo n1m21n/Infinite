@@ -1,6 +1,6 @@
 ---
 name: run-infinite-hygiene
-description: Build, launch, and drive Infinite (the macOS node compositor) through its built-in self-test harness before committing/pushing — checks undo/redo, patch save/load, node groups, comments, color picker, macros, palette, bypass, geometry ops, 3D shading, materials, ocean/path, selection UI, and a full 163-node-type round trip. Use when asked to "run the tests", "hygiene check", "pre-commit check", "sanity check before pushing", or "verify the build" for this project.
+description: Build, launch, and drive Infinite (the macOS node compositor) through its built-in self-test harness before committing/pushing — checks undo/redo, patch save/load, node groups, comments, color picker, macros, palette, bypass, geometry ops, 3D shading, materials, ocean/path, selection UI, and a full 167-node-type round trip. Use when asked to "run the tests", "hygiene check", "pre-commit check", "sanity check before pushing", or "verify the build" for this project.
 ---
 
 Paths below are relative to the repo root (`/Users/namansoni/infinite`), not
@@ -13,7 +13,7 @@ this skill directory.
 ```
 
 This builds the app, takes a rendered screenshot, then drives the compiled
-`.app` binary through 32 self-test fixtures via env vars — real ImGui frames
+`.app` binary through 39 self-test fixtures via env vars — real ImGui frames
 and GL draws, not a mock. It prints `[pass]`/`[FAIL]`/`[CRASH]` per check and
 exits non-zero if anything failed. Full raw output per check is saved to
 `/tmp/infinite_test_<NAME>.log` so a failure can be read in full.
@@ -39,15 +39,16 @@ with an unambiguous machine-checkable verdict — and greps for the failure
 markers. See `ARCHITECTURE.md`'s "Dev/Test Harness" section for where this
 code lives.
 
-The 37 were picked to cover, category by category:
+The 39 were picked to cover, category by category:
 
 | Area | Checks |
 |---|---|
-| Core engine (undo, patch format) | UNDOTEST, PATCHTEST, ROUNDTRIPTEST (163 node types, copy/paste + save/load) |
+| Core engine (undo, patch format) | UNDOTEST, PATCHTEST, ROUNDTRIPTEST (167 node types, copy/paste + save/load) |
 | Editor UI | GROUPTEST, COMMENTTEST, HIDETEST, SELECTTEST, DRAGTEST |
 | Per-node mini viewport | MINIVIEWPORTTEST (NodeViewport solo-renders a Select node's own mesh + selection overlay, independent of a plain untouched sibling) |
 | Params / modulation / color | COLORTEST, MACROTEST, PALETTETEST, BYPASSTEST |
 | Node math — geometry/mesh | GEOTEST, MESHOPTEST, TEXT3DTEST, FIXTEST, PHASEA/C/D/E/F |
+| Real point distribution (Phase 6) | DISTRIBUTETEST — `MeshOps::DistributeOnFaces` covers the sphere's poles uniformly (unlike `ToPoints`' index-stride sampling) and is seed-reproducible; Poisson disk mode holds `minDistance` and saturates instead of packing tighter at high density; `MeshOps::MergeByDistance` is a no-op at threshold 0 and collapses seam vertices at a large one; `PointsToVerticesNode` trips `Mesh::Empty()` on purpose but reports `HasGeometry()`, carries colour, and drops dead particles; `DistributePointsInGridNode` produces the exact count in `ImageToPointsNode`'s row-major/cell-centre order |
 | Node math — 3D render | 3DTEST, SHADOWTEST, MATFRAMETEST, MAPTEST, PATHOCEANTEST, ENVTEST |
 | Regression fixtures | BUGTEST, LIVETEST |
 | Point clouds as Render 3D sprites (Phase 1) | PHASE1TEST — Mesh to Points and Image to Points draw as clouds (not just meshes), a Particle System connects directly to Render 3D with no `IGeometrySource` on either side, and the render keeps advancing (`TextureRevision()` moves) instead of freezing on the animated cloud's first frame |
