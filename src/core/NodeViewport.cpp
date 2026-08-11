@@ -552,7 +552,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
 
    glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
    glViewport(0, 0, w, h);
-   glClearColor(0.07f, 0.07f, 0.09f, 1.0f);
+   glClearColor(0.07f, 0.07f, 0.09f, 0.0f);
    glClearDepth(1.0);
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
    glEnable(GL_DEPTH_TEST);

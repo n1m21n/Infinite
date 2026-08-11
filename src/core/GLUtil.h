@@ -34,8 +34,16 @@ namespace GLUtil
    void RunShaderPass(const Fbo& out, unsigned int program, const std::function<void()>& setup);
 
    // Draws `tex` as a fullscreen quad into whatever framebuffer is currently
-   // bound (used to blit the final node's output to the window).
-   void DrawTextureToScreen(unsigned int tex, int windowW, int windowH);
+   // bound (used to blit a node's output to a window). Clears the full
+   // windowW x windowH area first, then draws into a letterboxed viewport
+   // sized to preserve texW/texH's aspect ratio when given (texW/texH <= 0
+   // skips letterboxing and just fills the whole window, matching the
+   // original stretch-to-fill behavior). checkerBg composites the texture's
+   // own alpha over the same checkerboard pattern the node editor draws
+   // behind a transparent preview, instead of showing raw (unpremultiplied)
+   // color where alpha is 0.
+   void DrawTextureToScreen(unsigned int tex, int windowW, int windowH,
+                             int texW = 0, int texH = 0, bool checkerBg = false);
 
    // Reads an existing GPU texture's pixels back to the CPU as RGBA floats,
    // for nodes that need to sample a texture per-vertex rather than per-pixel

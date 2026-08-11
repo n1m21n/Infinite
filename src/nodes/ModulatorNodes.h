@@ -69,11 +69,12 @@ class RandomNode : public INode, public IModulator
 public:
    // Each spawned Random starts on a different seed. Two of them dropped on the
    // canvas should not march in lockstep, which is what a shared default does.
+   static float NextSeed() { static int sSpawnCounter = 0; return (float)(++sSpawnCounter) * 7.3f; }
+
    static INode* Create()
    {
-      static int sSpawnCounter = 0;
       auto* node = new RandomNode();
-      node->seed = (float)(++sSpawnCounter) * 7.3f;
+      node->seed = NextSeed();
       return node;
    }
 
@@ -163,6 +164,8 @@ public:
    // case the corresponding constant is used instead.
    IModulator* inputA = nullptr;
    IModulator* inputB = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &inputA : (slot == 1 ? &inputB : nullptr); }
+   int ModulatorInputCount() const override { return 2; }
 
    int op = 0;
    float constantA = 0.5f; // used when nothing is patched into A
@@ -175,5 +178,125 @@ public:
    {
       v.Int("op", op); v.Float("constantA", constantA); v.Float("constantB", constantB);
       v.Float("gain", gain); v.Float("offset", offset); v.Bool("clampOutput", clampOutput);
+   }
+};
+
+// Outputs 1 or 0 based on a comparison between two other modulators.
+class CompareNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new CompareNode(); }
+   static const std::vector<std::string>& OpNames();
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   float Value01() override;
+
+   IModulator* inputA = nullptr;
+   IModulator* inputB = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &inputA : (slot == 1 ? &inputB : nullptr); }
+   int ModulatorInputCount() const override { return 2; }
+
+   int op = 0;
+   float constantA = 0.5f; // used when nothing is patched into A
+   float constantB = 0.5f;
+   float tolerance = 0.001f; // equality/inequality treat |A-B| <= tolerance as equal
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("op", op); v.Float("constantA", constantA); v.Float("constantB", constantB);
+      v.Float("tolerance", tolerance);
+   }
+};
+
+// Remaps a modulator from one range to another.
+class RangeToRangeNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new RangeToRangeNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   const char* InputLabel(int) const override { return "in"; }
+
+   float Value01() override;
+
+   IModulator* input = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
+   int ModulatorInputCount() const override { return 1; }
+
+   float constantIn = 0.5f; // used when nothing is patched
+   float inLow = 0.0f, inHigh = 1.0f;
+   float outLow = 0.0f, outHigh = 1.0f;
+   bool clampOutput = true;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("constantIn", constantIn); v.Float("inLow", inLow); v.Float("inHigh", inHigh);
+      v.Float("outLow", outLow); v.Float("outHigh", outHigh); v.Bool("clampOutput", clampOutput);
+   }
+};
+
+// Exponential moving average over another modulator, to damp jittery sources.
+class SmoothNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new SmoothNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   const char* InputLabel(int) const override { return "in"; }
+
+   float Value01() override;
+
+   IModulator* input = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
+   int ModulatorInputCount() const override { return 1; }
+
+   float constantIn = 0.5f;
+   float amount = 0.85f; // 0 = pass-through, close to 1 = heavy smoothing
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("constantIn", constantIn); v.Float("amount", amount);
+   }
+
+private:
+   float mLast = -1.0f;      // sentinel: not yet initialized
+   double mLastBeats = -1.0; // beat at which mLast was last updated
+};
+
+// Mirrors a modulator around a low/high pivot. Not a flat 1-v, so it does the
+// right thing fed something already outside 0..1 (e.g. an unclamped Math output).
+class InvertNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new InvertNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   const char* InputLabel(int) const override { return "in"; }
+
+   float Value01() override;
+
+   IModulator* input = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
+   int ModulatorInputCount() const override { return 1; }
+
+   float constantIn = 0.5f;
+   float low = 0.0f, high = 1.0f; // default 0..1 gives classic 1-v
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("constantIn", constantIn); v.Float("low", low); v.Float("high", high);
    }
 };

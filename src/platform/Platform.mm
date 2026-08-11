@@ -10,11 +10,16 @@
 #import <Accelerate/Accelerate.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
+#import <CoreMIDI/CoreMIDI.h>
 
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
+#include <deque>
+#include <functional>
 #include <mutex>
+#include <unordered_map>
 
 namespace Platform
 {
@@ -1918,5 +1923,369 @@ namespace Platform
          return;
       std::lock_guard<std::mutex> lock(handle->analyser.mutex);
       handle->analyser.gain = std::max(0.0f, gain);
+   }
+}
+
+// ================================================================ midi input
+
+namespace Platform
+{
+   namespace
+   {
+      struct MidiKey
+      {
+         MidiDeviceId device = 0;
+         int channel = 0;
+         int controller = 0;
+         bool isNote = false;
+
+         bool operator==(const MidiKey& o) const
+         {
+            return device == o.device && channel == o.channel && controller == o.controller && isNote == o.isNote;
+         }
+      };
+
+      struct MidiKeyHash
+      {
+         size_t operator()(const MidiKey& k) const
+         {
+            size_t h = std::hash<MidiDeviceId>()(k.device);
+            h ^= (size_t)((k.channel << 16) | (k.isNote ? 0x100 : 0) | k.controller) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            return h;
+         }
+      };
+
+      struct MidiDeviceChannelKey
+      {
+         MidiDeviceId device = 0;
+         int channel = 0;
+
+         bool operator==(const MidiDeviceChannelKey& o) const
+         {
+            return device == o.device && channel == o.channel;
+         }
+      };
+
+      struct MidiDeviceChannelKeyHash
+      {
+         size_t operator()(const MidiDeviceChannelKey& k) const
+         {
+            return std::hash<MidiDeviceId>()(k.device) ^ ((size_t)k.channel << 1);
+         }
+      };
+
+      struct MidiState
+      {
+         std::mutex mutex;
+         std::unordered_map<MidiKey, float, MidiKeyHash> values;
+         std::unordered_map<MidiKey, unsigned int, MidiKeyHash> noteHitCounts;
+         std::unordered_map<MidiDeviceChannelKey, MidiLastNote, MidiDeviceChannelKeyHash> lastNotePerChannel;
+         std::unordered_map<MidiDeviceId, std::string> deviceNames;
+         MidiCCValue lastTouched;
+         bool lastTouchedPending = false;
+      };
+
+      MidiState gMidiState;
+      MIDIClientRef gMidiClient = 0;
+      MIDIPortRef gMidiInPort = 0;
+      bool gMidiRunning = false;
+      std::string gMidiDeviceSummary;
+
+      // MIDI Clock (0xF8) pulse timestamps, for deriving BPM from pulse spacing.
+      // A window of 24 pulses is one quarter note - enough to smooth out jitter
+      // between individual pulses without lagging a real tempo change for long.
+      constexpr size_t kMidiClockWindow = 24;
+      constexpr double kMidiClockTimeoutSeconds = 2.0;
+
+      struct MidiClockState
+      {
+         std::mutex mutex;
+         std::deque<std::chrono::steady_clock::time_point> pulseTimes;
+         std::chrono::steady_clock::time_point lastPulseTime{};
+      };
+      MidiClockState gMidiClockState;
+
+      void HandleMidiRealtimeByte(unsigned char status)
+      {
+         if (status == 0xF8) // Clock pulse
+         {
+            const auto now = std::chrono::steady_clock::now();
+            std::lock_guard<std::mutex> lock(gMidiClockState.mutex);
+            gMidiClockState.pulseTimes.push_back(now);
+            if (gMidiClockState.pulseTimes.size() > kMidiClockWindow)
+               gMidiClockState.pulseTimes.pop_front();
+            gMidiClockState.lastPulseTime = now;
+         }
+         else if (status == 0xFA || status == 0xFC) // Start / Stop
+         {
+            // A stopped-then-restarted clock shouldn't average its BPM across
+            // the gap; Continue (0xFB) deliberately leaves the window alone.
+            std::lock_guard<std::mutex> lock(gMidiClockState.mutex);
+            gMidiClockState.pulseTimes.clear();
+         }
+      }
+
+      void HandleMidiBytes(const unsigned char* data, size_t len, MidiDeviceId device)
+      {
+         if (len < 2)
+            return;
+         const unsigned char status = data[0];
+         const unsigned char hiNibble = status & 0xF0;
+         const int channel = status & 0x0F;
+
+         if (hiNibble == 0xB0 && len >= 3)
+         {
+            // Control Change
+            MidiKey key{ device, channel, (int)data[1], false };
+            const float v = (float)data[2] / 127.0f;
+            std::lock_guard<std::mutex> lock(gMidiState.mutex);
+            gMidiState.values[key] = v;
+            gMidiState.lastTouched = MidiCCValue{ device, channel, (int)data[1], false, v };
+            gMidiState.lastTouchedPending = true;
+         }
+         else if (hiNibble == 0x90 && len >= 3)
+         {
+            // Note On; velocity 0 is treated as Note Off and ignored for tracking,
+            // so the held value stays where it was - same as every DAW's MIDI learn.
+            if (data[2] == 0)
+               return;
+            MidiKey key{ device, channel, (int)data[1], true };
+            const float v = (float)data[2] / 127.0f;
+            std::lock_guard<std::mutex> lock(gMidiState.mutex);
+            gMidiState.values[key] = v;
+            gMidiState.noteHitCounts[key]++;
+            MidiLastNote& last = gMidiState.lastNotePerChannel[MidiDeviceChannelKey{ device, channel }];
+            last.note = (int)data[1];
+            last.velocity01 = v;
+            last.hitSeq++;
+            gMidiState.lastTouched = MidiCCValue{ device, channel, (int)data[1], true, v };
+            gMidiState.lastTouchedPending = true;
+         }
+      }
+
+      void HandleMidiPacketList(const MIDIPacketList* pktList, MidiDeviceId device)
+      {
+         const MIDIPacket* packet = &pktList->packet[0];
+         for (UInt32 i = 0; i < pktList->numPackets; i++)
+         {
+            // A single packet can contain more than one MIDI message back to
+            // back; walk it a status byte at a time.
+            size_t offset = 0;
+            while (offset < packet->length)
+            {
+               const unsigned char status = packet->data[offset];
+               if ((status & 0x80) == 0)
+                  break; // not a status byte - malformed / running status we don't handle
+               if (status >= 0xF8)
+               {
+                  // System realtime (Clock/Start/Continue/Stop/...): always a
+                  // single byte, and can be interleaved anywhere in the stream,
+                  // even inside another message - handle it and keep walking.
+                  HandleMidiRealtimeByte(status);
+                  offset += 1;
+                  continue;
+               }
+               size_t msgLen = 3;
+               if ((status & 0xF0) == 0xC0 || (status & 0xF0) == 0xD0)
+                  msgLen = 2;
+               if (offset + msgLen > packet->length)
+                  break;
+               HandleMidiBytes(packet->data + offset, msgLen, device);
+               offset += msgLen;
+            }
+            packet = MIDIPacketNext(packet);
+         }
+      }
+
+      std::string SourceDisplayName(MIDIEndpointRef source)
+      {
+         CFStringRef name = nullptr;
+         if (MIDIObjectGetStringProperty(source, kMIDIPropertyDisplayName, &name) != noErr || name == nullptr)
+         {
+            if (MIDIObjectGetStringProperty(source, kMIDIPropertyName, &name) != noErr || name == nullptr)
+               return "unknown device";
+         }
+         std::string result = [(__bridge NSString*)name UTF8String];
+         CFRelease(name);
+         return result;
+      }
+
+      void ConnectAllSources()
+      {
+         std::vector<std::string> names;
+         std::unordered_map<MidiDeviceId, std::string> deviceNames;
+         const ItemCount count = MIDIGetNumberOfSources();
+         for (ItemCount i = 0; i < count; i++)
+         {
+            MIDIEndpointRef source = MIDIGetSource(i);
+            if (source == 0)
+               continue;
+            // The endpoint ref itself, passed back as connRefCon on every packet
+            // from this source, is what lets HandleMidiBytes tell two connected
+            // controllers apart even when both broadcast on the same channel.
+            MIDIPortConnectSource(gMidiInPort, source, (void*)(uintptr_t)source);
+            std::string name = SourceDisplayName(source);
+            deviceNames[(MidiDeviceId)source] = name;
+            names.push_back(name);
+         }
+         std::string summary;
+         for (size_t i = 0; i < names.size(); i++)
+         {
+            if (i > 0)
+               summary += ", ";
+            summary += names[i];
+         }
+         gMidiDeviceSummary = summary;
+         std::lock_guard<std::mutex> lock(gMidiState.mutex);
+         gMidiState.deviceNames = std::move(deviceNames);
+      }
+   }
+
+   bool MidiStart(std::string& outError)
+   {
+      if (gMidiRunning)
+         return true;
+
+      OSStatus st = MIDIClientCreateWithBlock(CFSTR("Infinite"), &gMidiClient,
+         ^(const MIDINotification* message) {
+            if (message->messageID == kMIDIMsgObjectAdded || message->messageID == kMIDIMsgObjectRemoved)
+               ConnectAllSources();
+         });
+      if (st != noErr)
+      {
+         outError = "failed to create Core MIDI client";
+         gMidiClient = 0;
+         return false;
+      }
+
+      st = MIDIInputPortCreateWithBlock(gMidiClient, CFSTR("Infinite Input"), &gMidiInPort,
+         ^(const MIDIPacketList* pktList, void* srcConnRefCon) {
+            HandleMidiPacketList(pktList, (MidiDeviceId)(uintptr_t)srcConnRefCon);
+         });
+      if (st != noErr)
+      {
+         outError = "failed to create Core MIDI input port";
+         MIDIClientDispose(gMidiClient);
+         gMidiClient = 0;
+         return false;
+      }
+
+      ConnectAllSources();
+      gMidiRunning = true;
+      outError.clear();
+      return true;
+   }
+
+   void MidiStop()
+   {
+      if (!gMidiRunning)
+         return;
+      if (gMidiInPort != 0)
+      {
+         MIDIPortDispose(gMidiInPort);
+         gMidiInPort = 0;
+      }
+      if (gMidiClient != 0)
+      {
+         MIDIClientDispose(gMidiClient);
+         gMidiClient = 0;
+      }
+      gMidiRunning = false;
+      gMidiDeviceSummary.clear();
+      {
+         std::lock_guard<std::mutex> lock(gMidiState.mutex);
+         gMidiState.values.clear();
+         gMidiState.noteHitCounts.clear();
+         gMidiState.lastNotePerChannel.clear();
+         gMidiState.deviceNames.clear();
+         gMidiState.lastTouchedPending = false;
+      }
+      {
+         std::lock_guard<std::mutex> lock(gMidiClockState.mutex);
+         gMidiClockState.pulseTimes.clear();
+      }
+   }
+
+   bool MidiIsRunning() { return gMidiRunning; }
+
+   std::string MidiDeviceSummary() { return gMidiDeviceSummary; }
+
+   std::string MidiDeviceName(MidiDeviceId device)
+   {
+      std::lock_guard<std::mutex> lock(gMidiState.mutex);
+      auto it = gMidiState.deviceNames.find(device);
+      return it == gMidiState.deviceNames.end() ? "" : it->second;
+   }
+
+   bool MidiRead(MidiDeviceId device, int channel, int controller, bool isNote, float& outValue01)
+   {
+      if (!gMidiRunning)
+      {
+         outValue01 = 0.0f;
+         return false;
+      }
+      MidiKey key{ device, channel, controller, isNote };
+      std::lock_guard<std::mutex> lock(gMidiState.mutex);
+      auto it = gMidiState.values.find(key);
+      if (it == gMidiState.values.end())
+      {
+         outValue01 = 0.0f;
+         return false;
+      }
+      outValue01 = it->second;
+      return true;
+   }
+
+   bool MidiPollLastTouched(MidiCCValue& outLast)
+   {
+      std::lock_guard<std::mutex> lock(gMidiState.mutex);
+      if (!gMidiState.lastTouchedPending)
+         return false;
+      outLast = gMidiState.lastTouched;
+      gMidiState.lastTouchedPending = false;
+      return true;
+   }
+
+   unsigned int MidiNoteHitCount(MidiDeviceId device, int channel, int note)
+   {
+      MidiKey key{ device, channel, note, true };
+      std::lock_guard<std::mutex> lock(gMidiState.mutex);
+      auto it = gMidiState.noteHitCounts.find(key);
+      return it == gMidiState.noteHitCounts.end() ? 0 : it->second;
+   }
+
+   bool MidiChannelLastNote(MidiDeviceId device, int channel, MidiLastNote& out)
+   {
+      std::lock_guard<std::mutex> lock(gMidiState.mutex);
+      auto it = gMidiState.lastNotePerChannel.find(MidiDeviceChannelKey{ device, channel });
+      if (it == gMidiState.lastNotePerChannel.end())
+         return false;
+      out = it->second;
+      return true;
+   }
+
+   bool MidiClockIsPresent()
+   {
+      std::lock_guard<std::mutex> lock(gMidiClockState.mutex);
+      if (gMidiClockState.pulseTimes.empty())
+         return false;
+      const auto now = std::chrono::steady_clock::now();
+      const double secondsSinceLastPulse =
+         std::chrono::duration<double>(now - gMidiClockState.lastPulseTime).count();
+      return secondsSinceLastPulse < kMidiClockTimeoutSeconds;
+   }
+
+   float MidiClockBpm()
+   {
+      std::lock_guard<std::mutex> lock(gMidiClockState.mutex);
+      if (gMidiClockState.pulseTimes.size() < 2)
+         return 0.0f;
+      const double totalSeconds =
+         std::chrono::duration<double>(gMidiClockState.pulseTimes.back() - gMidiClockState.pulseTimes.front()).count();
+      if (totalSeconds <= 0.0)
+         return 0.0f;
+      const size_t intervals = gMidiClockState.pulseTimes.size() - 1;
+      const double secondsPerPulse = totalSeconds / (double)intervals;
+      return (float)(60.0 / (24.0 * secondsPerPulse));
    }
 }

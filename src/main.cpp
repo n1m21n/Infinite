@@ -83,6 +83,7 @@
 #include "nodes/SwitcherNode.h"
 #include "nodes/Switcher3DNode.h"
 #include "nodes/ModulatorNodes.h"
+#include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
 
 namespace ed = ax::NodeEditor;
@@ -111,6 +112,32 @@ namespace
    const float kPinRadius = 7.0f;
    const float kPinHit = 20.0f; // generous click target - small dots were unhittable
 
+   // Backdrop for any node preview about to blit a texture: a flat dark rect
+   // reads as solid black wherever that texture is actually transparent, so
+   // this paints a checkerboard instead, matching image editors' convention.
+   void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f)
+   {
+      dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), rounding);
+      const float cell = 12.0f;
+      const int cols = (int)std::ceil((br.x - origin.x) / cell);
+      const int rows = (int)std::ceil((br.y - origin.y) / cell);
+      for (int y = 0; y < rows; y++)
+      {
+         for (int x = 0; x < cols; x++)
+         {
+            if ((x + y) % 2)
+               continue;
+            const ImVec2 tl(origin.x + x * cell, origin.y + y * cell);
+            const ImVec2 cbr(std::min(br.x, tl.x + cell), std::min(br.y, tl.y + cell));
+            dl->AddRectFilled(tl, cbr, IM_COL32(30, 30, 38, 255));
+         }
+      }
+   }
+
+   void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float rounding = 4.0f)
+   {
+      DrawCheckerboardBackdrop(dl, origin, ImVec2(origin.x + size, origin.y + size), rounding);
+   }
 
    // Registered node names are the patch-file keys and must not change, so
    // casing is a display concern only - lowering it here keeps saved patches
@@ -253,6 +280,21 @@ namespace
    ImVec2 gGraphScreenTL(0.0f, 0.0f);    // graph canvas's screen-space rect,
    ImVec2 gGraphScreenSize(0.0f, 0.0f);  // captured the same way, for the minimap overlay
    bool gMinimapEnabled = false;
+
+   // Projector output: extra ordinary GLFW windows (sharing the main context)
+   // that each blit one node's texture live, for driving a projector or
+   // second screen at a show while the editor stays on the laptop panel. The
+   // user drags a window to whichever display and fullscreens it with the
+   // OS's own controls - we don't pick a monitor or go fullscreen ourselves.
+   // Opened/closed per-node via each node's right-click menu ("Open in new
+   // window" / "Close window"), not from any settings panel. Any number of
+   // nodes can have their own window open at once.
+   struct ProjectorWindow
+   {
+      GLFWwindow* window = nullptr;
+      int nodeIndex = -1; // GraphNode::index this window shows
+   };
+   std::vector<ProjectorWindow> gProjectorWindows;
    // Bottom-left by default: the module browser docks on the right, and the
    // minimap draws (and takes its clicks) on the foreground draw list, so a
    // right-hand corner would sit on top of the panel and swallow clicks meant
@@ -1123,8 +1165,14 @@ namespace
       REGISTER_NODE(RandomNode, Random, "Modulators");
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
       REGISTER_NODE(MathNode, Math, "Modulators");
+      REGISTER_NODE(CompareNode, Compare, "Modulators");
+      REGISTER_NODE(RangeToRangeNode, Range to Range, "Modulators");
+      REGISTER_NODE(SmoothNode, Smooth, "Modulators");
+      REGISTER_NODE(InvertNode, Invert, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Modulators");
       REGISTER_NODE(MacroXYNode, Macro XY, "Modulators");
+      REGISTER_NODE(MidiCCNode, MIDI CC, "Modulators");
+      REGISTER_NODE(MidiTriggerNode, MIDI Trigger, "Modulators");
       REGISTER_NODE(PathNode, Path, "Modulators");
       REGISTER_NODE(ConstantNode, Constant, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
@@ -1252,10 +1300,11 @@ namespace
          return LayerStackNode::kSlots;
       if (dynamic_cast<SwitcherNode*>(gn.node.get()) != nullptr)
          return SwitcherNode::kSlots;
-      // Math takes two modulator cables rather than images, but they are still
-      // ordinary input pins as far as the editor is concerned.
-      if (dynamic_cast<MathNode*>(gn.node.get()) != nullptr)
-         return 2;
+      // Modulator input nodes (Math, Range to Range, Smooth, ...) take modulator
+      // cables rather than images, but they are still ordinary input pins as far
+      // as the editor is concerned.
+      if (int c = gn.node->ModulatorInputCount())
+         return c;
       if (dynamic_cast<BlendNode*>(gn.node.get()) != nullptr)
          return 2;
       if (auto* filter = dynamic_cast<FilterNode*>(gn.node.get()))
@@ -1480,7 +1529,6 @@ namespace
                                LightNode* srcLight, AudioFileNode* srcAudioFile,
                                bool srcIsEnvironment)
    {
-      auto* dstMath = dstNode ? dynamic_cast<MathNode*>(dstNode->node.get()) : nullptr;
       auto* dstAudio = dstNode ? dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) : nullptr;
       auto* dstRender = dstNode ? dynamic_cast<Render3DNode*>(dstNode->node.get()) : nullptr;
       // Material and Displacement are the only geometry-consuming nodes with a
@@ -1537,7 +1585,7 @@ namespace
       else if (dstAudio != nullptr)
          return srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
       else
-         return (dstMath != nullptr && !dstWantsImage) ? srcIsModulator : !srcIsModulator;
+         return (dstNode->node->ModulatorInputSlot(slot) != nullptr && !dstWantsImage) ? srcIsModulator : !srcIsModulator;
    }
 
    // Performs the connection once IsInputSlotCompatible (or the caller's own
@@ -1548,7 +1596,6 @@ namespace
    // one that was actually dragged from.
    void WireInputSlot(GraphNode& srcNode, GraphNode& dstNode, int slot, int srcOutputIndex = 0)
    {
-      auto* dstMath = dynamic_cast<MathNode*>(dstNode.node.get());
       auto* dstAudio = dynamic_cast<AudioAnalyzeNode*>(dstNode.node.get());
       auto* dstRender = dynamic_cast<Render3DNode*>(dstNode.node.get());
       auto* dstSetColor = dynamic_cast<SetColorNode*>(dstNode.node.get());
@@ -1597,13 +1644,9 @@ namespace
       {
          dstOutput->audioSource = srcAudioFile;
       }
-      else if (dstMath != nullptr)
+      else if (IModulator** slotField = dstNode.node->ModulatorInputSlot(slot))
       {
-         auto* mod = ModulatorForOutput(srcNode.node.get(), srcOutputIndex);
-         if (slot == 0)
-            dstMath->inputA = mod;
-         else
-            dstMath->inputB = mod;
+         *slotField = ModulatorForOutput(srcNode.node.get(), srcOutputIndex);
       }
       else
       {
@@ -2054,6 +2097,53 @@ namespace
       ImGui::Checkbox("clamp to 0..1", &n->clampOutput);
    }
 
+   void DrawCompareParams(CompareNode* n)
+   {
+      DropdownButton("operation", CompareNode::OpNames(), n->op, [n](int i) { n->op = i; });
+      if (n->inputA == nullptr)
+         ModSlider("A (no cable)", &n->constantA, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("A: patched");
+      if (n->inputB == nullptr)
+         ModSlider("B (no cable)", &n->constantB, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("B: patched");
+      if (n->op == 4 || n->op == 5) // == or !=
+         ModSlider("tolerance", &n->tolerance, 0.0f, 0.1f);
+   }
+
+   void DrawRangeToRangeParams(RangeToRangeNode* n)
+   {
+      if (n->input == nullptr)
+         ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("in: patched");
+      ModSlider("in low", &n->inLow, -4.0f, 4.0f);
+      ModSlider("in high", &n->inHigh, -4.0f, 4.0f);
+      ModSlider("out low", &n->outLow, -4.0f, 4.0f);
+      ModSlider("out high", &n->outHigh, -4.0f, 4.0f);
+      ImGui::Checkbox("clamp to out range", &n->clampOutput);
+   }
+
+   void DrawSmoothParams(SmoothNode* n)
+   {
+      if (n->input == nullptr)
+         ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("in: patched");
+      ModSlider("amount", &n->amount, 0.0f, 0.99f);
+   }
+
+   void DrawInvertParams(InvertNode* n)
+   {
+      if (n->input == nullptr)
+         ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("in: patched");
+      ModSlider("low", &n->low, -4.0f, 4.0f);
+      ModSlider("high", &n->high, -4.0f, 4.0f);
+   }
+
    void DrawNoiseParams(NoiseNode* n)
    {
       DropdownButton("type", NoiseNode::TypeNames(), n->noiseType, [n](int i) { n->noiseType = i; });
@@ -2328,6 +2418,70 @@ namespace
       ImGui::SliderFloat("##macro", &n->value, 0.0f, 1.0f, "%.3f");
       ModSlider("curve", &n->curve, 0.2f, 4.0f);
       ImGui::Checkbox("invert", &n->invert);
+   }
+
+   void DrawMidiCCParams(MidiCCNode* n)
+   {
+      if (n->IsLearning())
+      {
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.1f, 1.0f));
+         if (ImGui::Button("Listening... move a control", ImVec2(kPreviewSize, 0)))
+            n->CancelLearn();
+         ImGui::PopStyleColor();
+      }
+      else if (ImGui::Button(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
+      {
+         n->StartLearn();
+      }
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      ImGui::TextDisabled("%s", n->Status().c_str());
+      ImGui::PopTextWrapPos();
+
+      ImGui::Text("bound: %s", n->BindingLabel().c_str());
+      ImGui::ProgressBar(n->Value01(), ImVec2(kPreviewSize * 0.6f, 0), "");
+
+      ModSlider("low", &n->low, 0.0f, 1.0f);
+      ModSlider("high", &n->high, 0.0f, 1.0f);
+      ImGui::Checkbox("invert", &n->invert);
+   }
+
+   void DrawMidiTriggerParams(MidiTriggerNode* n)
+   {
+      DropdownButton("device type", MidiTriggerNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
+
+      if (n->IsLearning())
+      {
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.1f, 1.0f));
+         if (ImGui::Button("Listening... hit a pad", ImVec2(kPreviewSize, 0)))
+            n->CancelLearn();
+         ImGui::PopStyleColor();
+      }
+      else
+      {
+         const bool lit = n->Value01() > 0.01f;
+         if (lit)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.85f, 0.35f, 1.0f));
+         if (ImGui::Button(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
+            n->StartLearn();
+         if (lit)
+            ImGui::PopStyleColor();
+      }
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      ImGui::TextDisabled("%s", n->Status().c_str());
+      ImGui::PopTextWrapPos();
+
+      ImGui::Text("bound: %s", n->BindingLabel().c_str());
+      ImGui::ProgressBar(n->Value01(), ImVec2(kPreviewSize * 0.6f, 0), "");
+
+      if (n->mode == MidiTriggerNode::kKeyboard)
+      {
+         ImGui::TextDisabled("value = note number / 127, held until the next key");
+      }
+      else
+      {
+         ModSlider("hold", &n->hold, 0.02f, 2.0f);
+         ImGui::Checkbox("velocity sensitive", &n->velocitySensitive);
+      }
    }
 
    void DrawMacroXYParams(MacroXYNode* n)
@@ -4602,8 +4756,7 @@ namespace
          render != nullptr || dynamic_cast<ViewportNode*>(node) != nullptr;
       const float size = wantsBigCanvas ? kViewportSize : kPreviewSize;
 
-      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + size),
-                        IM_COL32(18, 18, 24, 255), 4.0f);
+      DrawCheckerboardBackdrop(dl, origin, size);
 
       if (tex != 0 && node->GetOutputWidth() > 0)
       {
@@ -4718,8 +4871,7 @@ namespace
       const float size = kPreviewSize;
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + size),
-                        IM_COL32(18, 18, 24, 255), 4.0f);
+      DrawCheckerboardBackdrop(dl, origin, size);
 
       const unsigned int tex = viewport.Render(geo, cam, (int)size, (int)size);
       if (tex != 0)
@@ -4770,6 +4922,14 @@ namespace
    // requested size changes - sharing would make a node that is open in both
    // places thrash its FBO every frame.
    std::map<int, NodeViewport> gPanelViewports;
+
+   // Same reasoning as gPanelViewports above, one more map for projector
+   // windows: a geometry node has no meaningful GetOutputTexture() of its own
+   // (see GeometryNode::GetOutputTexture's comment - "geometry itself
+   // produces no image"), so a projector window showing one needs its own
+   // solo render, same mechanism the viewport panel/mini-viewport use, sized
+   // to that window rather than thrashing a shared FBO.
+   std::map<int, NodeViewport> gProjectorViewports;
 
    // One node's card inside the viewport panel: a title row and the render.
    // Same drag-to-orbit / scroll-to-zoom as the inline mini-viewport - it
@@ -4844,7 +5004,7 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + imageSize.x, origin.y + imageSize.y);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
+      DrawCheckerboardBackdrop(dl, origin, br);
 
       if (auto* geo = dynamic_cast<IGeometrySource*>(gn.node.get()))
       {
@@ -4893,15 +5053,17 @@ namespace
          // Everything else: blit the node's output texture, letterboxed to
          // its own aspect, mirroring DrawPreview's blit/"no input" fallback.
          const unsigned int tex = gn.node->GetOutputTexture();
+         float dw = imageSize.x, dh = imageSize.y;
+         ImVec2 tl = origin;
          if (tex != 0 && gn.node->GetOutputWidth() > 0)
          {
             const float w = (float)gn.node->GetOutputWidth();
             const float h = (float)gn.node->GetOutputHeight();
             const float scale = std::min(imageSize.x / w, imageSize.y / h);
-            const float dw = w * scale;
-            const float dh = h * scale;
-            const ImVec2 tl(origin.x + (imageSize.x - dw) * 0.5f,
-                            origin.y + (imageSize.y - dh) * 0.5f);
+            dw = w * scale;
+            dh = h * scale;
+            tl = ImVec2(origin.x + (imageSize.x - dw) * 0.5f,
+                       origin.y + (imageSize.y - dh) * 0.5f);
             dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dw, tl.y + dh),
                          ImVec2(0, 1), ImVec2(1, 0));
          }
@@ -4909,6 +5071,35 @@ namespace
          {
             dl->AddText(ImVec2(origin.x + 10, origin.y + imageSize.y * 0.5f - 8),
                         IM_COL32(120, 120, 135, 255), "no input");
+         }
+
+         // A Draw node's panel card is paintable, same as its inline preview
+         // (DrawPaintablePreview) - mouse drags map to canvas u/v against the
+         // letterboxed tl/dw/dh computed above, since the card isn't a fixed
+         // square like the inline preview.
+         if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
+         {
+            ImGui::SetCursorScreenPos(origin);
+            char btnId[32];
+            snprintf(btnId, sizeof(btnId), "##drawviewportcanvas%d", gn.index);
+            ImGui::InvisibleButton(btnId, imageSize);
+
+            if (ImGui::IsItemActive())
+            {
+               const ImVec2 m = ImGui::GetIO().MousePos;
+               const float u = (m.x - tl.x) / std::max(1.0f, dw);
+               const float v = 1.0f - (m.y - tl.y) / std::max(1.0f, dh); // texture space is bottom-up
+               if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                  draw->BeginStroke(u, v);
+               else
+                  draw->ContinueStroke(u, v);
+            }
+            else if (ImGui::IsItemDeactivated())
+            {
+               draw->EndStroke();
+            }
+
+            ImGui::SetCursorScreenPos(origin);
          }
 
          // A Render 3D card gets the same drag-to-orbit/scroll-to-zoom as its
@@ -5139,20 +5330,31 @@ namespace
       if (history.size() > 160)
          history.erase(history.begin());
 
+      // Autoscale to the window's actual range rather than assuming 0..1: an
+      // unclamped Math node can sit at 60 or -12, and a fixed 0..1 mapping
+      // either pins the line off the box (if clipped) or off the visible edge
+      // (if just clamped) - neither shows the wiggle the meter exists to show.
+      float lo = history.empty() ? 0.0f : history[0];
+      float hi = lo;
+      for (float v : history) { lo = std::min(lo, v); hi = std::max(hi, v); }
+      const float range = std::max(1e-4f, hi - lo); // epsilon floor: flat signal shouldn't divide by ~0
+
       ImVec2 origin = ImGui::GetCursorScreenPos();
       const float h = 90.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
                         IM_COL32(18, 18, 24, 255), 4.0f);
 
+      dl->PushClipRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), true); // backstop, not the primary fix
       for (size_t i = 1; i < history.size(); i++)
       {
          float x0 = origin.x + kPreviewSize * (float)(i - 1) / 160.0f;
          float x1 = origin.x + kPreviewSize * (float)i / 160.0f;
-         float y0 = origin.y + h - history[i - 1] * h;
-         float y1 = origin.y + h - history[i] * h;
+         float y0 = origin.y + h - (history[i - 1] - lo) / range * h;
+         float y1 = origin.y + h - (history[i] - lo) / range * h;
          dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), IM_COL32(255, 190, 90, 255), 1.6f);
       }
+      dl->PopClipRect();
 
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
                   IM_COL32(70, 74, 90, 255), 4.0f);
@@ -5212,12 +5414,9 @@ namespace
       {
          audio->fileSource = nullptr;
       }
-      else if (auto* math = dynamic_cast<MathNode*>(dst->node.get()))
+      else if (IModulator** slotField = dst->node->ModulatorInputSlot(GraphNode::InputSlotFromPin(dstPin)))
       {
-         if (GraphNode::InputSlotFromPin(dstPin) == 0)
-            math->inputA = nullptr;
-         else
-            math->inputB = nullptr;
+         *slotField = nullptr;
       }
       else if (auto* setColor = dynamic_cast<SetColorNode*>(dst->node.get());
                setColor != nullptr && GraphNode::InputSlotFromPin(dstPin) == 2)
@@ -5270,6 +5469,9 @@ namespace
          { "Random", "A new random value every N beats, with adjustable smoothing between steps. Deterministic, so rewinding replays the same sequence." },
          { "Pattern", "An eight-step sequencer. Set the eight sliders, choose how many steps to use, and it loops through them one step every N beats. Optional glide between steps." },
          { "Math", "Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant, shown as an editable slider; a patched input just shows as 'patched'." },
+         { "Compare", "Outputs 1 when the comparison holds, 0 otherwise - >, >=, <, <=, ==, != between two modulators, with a tolerance for the equality checks." },
+         { "Range to Range", "Remaps one modulator's input range onto a different output range - patch in a 0..1 LFO and remap it to -2..2, for example." },
+         { "Smooth", "An exponential moving average over another modulator, to damp jittery or steppy sources like Random or Pattern." },
          { "Macro Knob", "A single named slider (0-1, with a response curve and invert) meant to be patched out to several other sliders at once - one control that fans out to many parameters." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
          { "Path", "Outputs a moving 3D point (X/Y/Z, each patchable separately) travelling around a built-in shape (circle, helix, spiral, lissajous, etc.) at a beat-synced speed, or along the points of a patched-in geometry/curve source instead." },
@@ -5655,6 +5857,10 @@ namespace
                { "Random", "A new random value every N beats, with adjustable smoothing between steps. Deterministic, so rewinding replays the same sequence." },
                { "Pattern", "An eight-step sequencer. Set the eight sliders, choose how many steps to use, and it loops through them one step every N beats. Optional glide." },
                { "Math", "Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant." },
+               { "Compare", "Outputs 1 when the comparison holds, 0 otherwise." },
+               { "Range to Range", "Remaps one modulator's input range onto a different output range." },
+               { "Smooth", "An exponential moving average over another modulator, to damp jitter." },
+               { "Invert", "Mirrors a modulator around a low/high pivot. Defaults to 0..1 for a classic 1-v flip; set low/high to match an unclamped source to mirror it correctly." },
             } },
             { "Feedback", {
                { "Feedback", "Outputs the previous frame. Nothing visible on its own - it is the delay that makes a loop legal. See 'Using Feedback' above." },
@@ -5746,14 +5952,12 @@ namespace
             if (dyingFile != nullptr && out->audioSource == dyingFile)
                out->audioSource = nullptr;
          }
-         if (auto* math = dynamic_cast<MathNode*>(other.node.get()))
+         for (int slot = 0, modCount = other.node->ModulatorInputCount(); slot < modCount; slot++)
          {
-            if ((dyingMod != nullptr && math->inputA == dyingMod) ||
-                (dyingY != nullptr && math->inputA == dyingY))
-               math->inputA = nullptr;
-            if ((dyingMod != nullptr && math->inputB == dyingMod) ||
-                (dyingY != nullptr && math->inputB == dyingY))
-               math->inputB = nullptr;
+            IModulator** slotField = other.node->ModulatorInputSlot(slot);
+            if ((dyingMod != nullptr && *slotField == dyingMod) ||
+                (dyingY != nullptr && *slotField == dyingY))
+               *slotField = nullptr;
          }
          int inputs = InputCountFor(other);
          for (int slot = 0; slot < inputs; slot++)
@@ -5904,11 +6108,11 @@ namespace
             record(audio->fileSource, 0);
          if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
             record(out->audioSource, 1);
-         if (auto* math = dynamic_cast<MathNode*>(gn.node.get()))
+         if (int count = gn.node->ModulatorInputCount())
          {
-            for (int slot = 0; slot < 2; slot++)
+            for (int slot = 0; slot < count; slot++)
             {
-               IModulator* wanted = (slot == 0) ? math->inputA : math->inputB;
+               IModulator* wanted = *gn.node->ModulatorInputSlot(slot);
                if (wanted == nullptr)
                   continue;
                for (GraphNode& src : gNodes)
@@ -6329,6 +6533,76 @@ namespace
       {
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
+   }
+
+   // Closes and forgets one projector window by its position in gProjectorWindows.
+   void CloseProjectorWindow(size_t i)
+   {
+      if (i >= gProjectorWindows.size())
+         return;
+      // Drop this node's solo-render FBO too, if it had one (geometry nodes
+      // only - see gProjectorViewports). Safe to erase immediately: unlike
+      // gRetiredViewports, nothing queues this texture into an ImGui draw
+      // list, it's only ever read by our own immediate GL blit this frame.
+      gProjectorViewports.erase(gProjectorWindows[i].nodeIndex);
+      glfwDestroyWindow(gProjectorWindows[i].window);
+      gProjectorWindows.erase(gProjectorWindows.begin() + (ptrdiff_t)i);
+   }
+
+   // Closes the projector window showing this node index, if any is open.
+   void CloseProjectorWindowFor(int nodeIndex)
+   {
+      for (size_t i = 0; i < gProjectorWindows.size(); i++)
+         if (gProjectorWindows[i].nodeIndex == nodeIndex)
+         {
+            CloseProjectorWindow(i);
+            return;
+         }
+   }
+
+   void CloseAllProjectorWindows()
+   {
+      for (ProjectorWindow& pw : gProjectorWindows)
+         glfwDestroyWindow(pw.window);
+      gProjectorWindows.clear();
+      gProjectorViewports.clear();
+   }
+
+   // Opens a new projector window on `gn`. An ordinary decorated/resizable
+   // window, not tied to any monitor - the user drags it to a projector or
+   // second screen and fullscreens it themselves with the OS's own window
+   // controls, same as they would any other app window. Any number of these
+   // can be open at once, one per node. `mainWindow` is passed in as the GL
+   // share context so the projector window sees the exact same textures/FBOs
+   // the editor already produced - no cross-context copy.
+   void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn)
+   {
+      // Already have one open for this node - nothing to do (the context menu
+      // offers "Close window" instead once one exists).
+      for (const ProjectorWindow& pw : gProjectorWindows)
+         if (pw.nodeIndex == gn.index)
+            return;
+
+      int w = gn.node->GetOutputWidth();
+      int h = gn.node->GetOutputHeight();
+      if (w <= 0 || h <= 0)
+      {
+         w = 1280;
+         h = 720;
+      }
+
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+      glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+      glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
+      glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+      GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitle(gn).c_str(), nullptr, mainWindow);
+      glfwMakeContextCurrent(mainWindow);
+      if (projWindow == nullptr)
+         return;
+
+      gProjectorWindows.push_back({ projWindow, gn.index });
    }
 
 }
@@ -7421,6 +7695,14 @@ int main()
       gFrameStart = glfwGetTime();
       glfwPollEvents();
 
+      // Projector windows are ordinary decorated windows - closing one via the
+      // OS's own close button only sets its should-close flag, it doesn't
+      // destroy it. Poll for that here so it gets cleaned up the same way the
+      // "Close window" menu item does. Iterate backwards since closing erases.
+      for (size_t i = gProjectorWindows.size(); i-- > 0; )
+         if (glfwWindowShouldClose(gProjectorWindows[i].window))
+            CloseProjectorWindow(i);
+
       // Actually tear down anything retired by RemoveNodeByIndex last frame.
       // Safe here: the frame that queued draw commands referencing these
       // textures has already been submitted and presented.
@@ -7573,6 +7855,16 @@ int main()
 
       ImGui::NewFrame();
 
+      // Feed the transport a fresh MIDI Clock BPM estimate once a frame, same
+      // pattern as AudioAnalyzeNode/MidiCCNode pulling smoothed values from
+      // Platform rather than the Core MIDI callback writing into Transport
+      // directly from a background thread.
+      if (Transport::Instance().ExternalSyncEnabled() && Platform::MidiClockIsPresent())
+      {
+         const float clockBpm = Platform::MidiClockBpm();
+         if (clockBpm > 0.0f)
+            Transport::Instance().ReportExternalTempo(clockBpm);
+      }
       Transport::Instance().Tick(ImGui::GetIO().DeltaTime);
       Modulation::Instance().ClearFrameParams();
       PaletteBinding::Instance().ClearFrameColors();
@@ -7814,10 +8106,34 @@ int main()
          if (ImGui::Button("Rewind"))
             transport.Rewind();
 
+         const bool externalSync = transport.ExternalSyncEnabled();
+         ImGui::PushStyleColor(ImGuiCol_Button, externalSync
+                                                    ? ImVec4(0.16f, 0.40f, 0.52f, 1.0f)
+                                                    : ImVec4(0.30f, 0.30f, 0.34f, 1.0f));
+         if (ImGui::Button(externalSync ? "Sync: MIDI Clock" : "Sync: Manual"))
+         {
+            transport.SetExternalSyncEnabled(!externalSync);
+            if (!externalSync)
+            {
+               // Ensure the Core MIDI engine is up so clock pulses actually
+               // arrive - same lazy-start MidiCCNode's Learn button uses.
+               std::string error;
+               Platform::MidiStart(error);
+            }
+         }
+         ImGui::PopStyleColor();
+
          float bpm = transport.Tempo();
          ImGui::SetNextItemWidth(130);
+         ImGui::BeginDisabled(externalSync);
          if (ImGui::SliderFloat("BPM", &bpm, 20.0f, 300.0f, "%.1f"))
             transport.SetTempo(bpm);
+         ImGui::EndDisabled();
+
+         if (externalSync && !transport.IsExternalClockPresent())
+         {
+            ImGui::TextColored(ImVec4(0.90f, 0.65f, 0.20f, 1.0f), "waiting for MIDI clock...");
+         }
 
          ImGui::TextDisabled("bar %d  beat %.2f",
                              1 + (int)(transport.Beats() / 4.0),
@@ -12306,10 +12622,22 @@ int main()
                DrawPatternParams(n);
             else if (auto* n = dynamic_cast<MathNode*>(gn.node.get()))
                DrawMathParams(n);
+            else if (auto* n = dynamic_cast<CompareNode*>(gn.node.get()))
+               DrawCompareParams(n);
+            else if (auto* n = dynamic_cast<RangeToRangeNode*>(gn.node.get()))
+               DrawRangeToRangeParams(n);
+            else if (auto* n = dynamic_cast<SmoothNode*>(gn.node.get()))
+               DrawSmoothParams(n);
+            else if (auto* n = dynamic_cast<InvertNode*>(gn.node.get()))
+               DrawInvertParams(n);
             else if (auto* n = dynamic_cast<MacroKnobNode*>(gn.node.get()))
                DrawMacroKnobParams(n);
             else if (auto* n = dynamic_cast<MacroXYNode*>(gn.node.get()))
                DrawMacroXYParams(n);
+            else if (auto* n = dynamic_cast<MidiCCNode*>(gn.node.get()))
+               DrawMidiCCParams(n);
+            else if (auto* n = dynamic_cast<MidiTriggerNode*>(gn.node.get()))
+               DrawMidiTriggerParams(n);
             else if (auto* n = dynamic_cast<NoiseNode*>(gn.node.get()))
                DrawNoiseParams(n);
             else if (auto* n = dynamic_cast<TextureNode*>(gn.node.get()))
@@ -12576,12 +12904,12 @@ int main()
             }
          }
 
-         auto* math = dynamic_cast<MathNode*>(gn.node.get());
-         if (math == nullptr)
+         int modCount = gn.node->ModulatorInputCount();
+         if (modCount == 0)
             continue;
-         for (int slot = 0; slot < 2; slot++)
+         for (int slot = 0; slot < modCount; slot++)
          {
-            IModulator* wanted = (slot == 0) ? math->inputA : math->inputB;
+            IModulator* wanted = *gn.node->ModulatorInputSlot(slot);
             if (wanted == nullptr)
                continue;
             bool found = false;
@@ -12787,6 +13115,13 @@ int main()
          }
       }
 
+      // Space toggles play/pause on the transport, mirroring the Play/Pause
+      // button, so the timeline can be started or paused without reaching
+      // for the mouse.
+      if (!typing && !cmdOrCtrl && !io.KeyShift &&
+          ImGui::IsKeyPressed(ImGuiKey_Space, false))
+         Transport::Instance().TogglePlay();
+
       if (!typing && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
                       ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
       {
@@ -12900,6 +13235,8 @@ int main()
                if (GraphNode* copy = SpawnNode(item.type, item.category, item.pos.x, item.pos.y))
                {
                   CopyParams(copy->node.get(), item.src);
+                  if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
+                     rn->seed = RandomNode::NextSeed();
                   copy->showParams = item.params;
                   copy->showMiniViewport = item.miniViewport;
                   newByOrig[item.origIndex] = copy;
@@ -13139,6 +13476,8 @@ int main()
             if (copy != nullptr)
             {
                CopyParams(copy->node.get(), item.src);
+               if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
+                  rn->seed = RandomNode::NextSeed();
                newByOrig[item.origIndex] = copy;
             }
          }
@@ -13310,6 +13649,23 @@ int main()
                       gViewportPanelNodes.end())
                      gViewportPanelNodes.push_back(gn->index);
                }
+            }
+            // Same gate as "Open in viewport panel": modulators, meters,
+            // cameras/lights and comments don't produce an image, so opening
+            // one in its own window would just show a blank/garbage texture.
+            bool hasProjectorWindow = false;
+            for (const ProjectorWindow& pw : gProjectorWindows)
+               if (pw.nodeIndex == gn->index)
+                  hasProjectorWindow = true;
+            if (CanShowInViewportPanel(*gn) && hasProjectorWindow)
+            {
+               if (ImGui::MenuItem("Close window"))
+                  CloseProjectorWindowFor(gn->index);
+            }
+            else if (CanShowInViewportPanel(*gn))
+            {
+               if (ImGui::MenuItem("Open in new window"))
+                  OpenProjectorWindow(window, *gn);
             }
             if (ImGui::MenuItem("Help"))
             {
@@ -14320,6 +14676,59 @@ int main()
       }
 
       glfwSwapBuffers(window);
+
+      // Projector output: blit this frame's cooked result of each open
+      // window's node into that window. Runs after the editor's own swap so
+      // it never shows last frame's texture a frame behind the graph.
+      // Iterate backwards since a dead source erases its window mid-loop.
+      for (size_t i = gProjectorWindows.size(); i-- > 0; )
+      {
+         GraphNode* src = FindNodeByIndex(gProjectorWindows[i].nodeIndex);
+         if (src == nullptr)
+         {
+            // Its node was deleted out from under it - close rather than sit
+            // there showing a permanently blank window.
+            CloseProjectorWindow(i);
+            continue;
+         }
+
+         GLFWwindow* projWindow = gProjectorWindows[i].window;
+         glfwMakeContextCurrent(projWindow);
+         int pw, ph;
+         glfwGetFramebufferSize(projWindow, &pw, &ph);
+
+         // A geometry node's own GetOutputTexture() isn't a real preview (it
+         // produces a mesh, not pixels) - render it the same way its
+         // mini-viewport/viewport-panel card does instead, sharing that
+         // node's own orbit camera so all three agree on framing.
+         unsigned int tex = 0;
+         int texW = 0, texH = 0;
+         if (auto* geo = dynamic_cast<IGeometrySource*>(src->node.get()))
+         {
+            NodeViewport& viewport = gProjectorViewports[src->index];
+            SharedViewportCamera& cam = gNodeCameras[src->index];
+            tex = viewport.Render(geo, cam, pw, ph);
+         }
+         else
+         {
+            tex = src->node->GetOutputTexture();
+            texW = src->node->GetOutputWidth();
+            texH = src->node->GetOutputHeight();
+         }
+
+         if (tex != 0)
+            GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+         else
+         {
+            glViewport(0, 0, pw, ph);
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+         }
+         glfwSwapBuffers(projWindow);
+      }
+      if (!gProjectorWindows.empty())
+         glfwMakeContextCurrent(window);
+
       ++frameId;
 
       // Patch shortcuts. Handled outside the node editor so its own Cmd-key
@@ -14377,6 +14786,7 @@ int main()
       }
    }
 
+   CloseAllProjectorWindows();
    gNodes.clear();
    ed::DestroyEditor(gEditor);
    ImGui_ImplOpenGL3_Shutdown();

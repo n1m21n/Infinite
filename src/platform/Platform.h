@@ -163,6 +163,77 @@ namespace Platform
    void AudioSetSmoothing(float attack, float release);
    void AudioSetGain(float gain);
 
+   // ---- MIDI input ----
+   // Listens to every connected class-compliant MIDI source (Akai/Nektar/Pioneer
+   // controllers all enumerate this way on macOS, no vendor driver needed) and
+   // keeps a running table of the last value received for every (device,
+   // channel, controller) triple seen, plus which one arrived most recently —
+   // that's what MIDI Learn polls. Computed on Core MIDI's callback thread,
+   // read the same lock-free-ish way as AudioLevels above.
+   //
+   // `device` identifies the physical source endpoint (its MIDIEndpointRef,
+   // opaque otherwise) - two controllers both defaulting to channel 1 would
+   // otherwise be indistinguishable, which is exactly the bug this fixes:
+   // every binding is now scoped to the device it was learned on, not just
+   // its channel/controller number. 0 = no device / wildcard-unbound.
+   using MidiDeviceId = unsigned int;
+
+   struct MidiCCValue
+   {
+      MidiDeviceId device = 0;
+      int channel = -1;    // 0-15, -1 = none seen yet
+      int controller = -1; // CC number 0-127, or note number for Note-On/Off
+      bool isNote = false; // true if this came from a Note-On rather than a CC
+      float value01 = 0.0f;
+   };
+
+   bool MidiStart(std::string& outError);
+   void MidiStop();
+   bool MidiIsRunning();
+   std::string MidiDeviceSummary(); // comma-joined names of connected sources, for status text
+   std::string MidiDeviceName(MidiDeviceId device); // "" if not currently connected
+
+   // Current value for a specific (device, channel, controller) binding.
+   // Returns false (value left at 0) if that binding has never been seen.
+   bool MidiRead(MidiDeviceId device, int channel, int controller, bool isNote, float& outValue01);
+
+   // The most recent CC/note touched on ANY connected source since the last
+   // call — this is what a node in "Learn" mode polls each frame. Returns false
+   // if nothing has moved since the last poll (consumed on read, like a queue
+   // of depth 1, so two Learn-mode nodes don't both grab the same event and one
+   // doesn't silently miss it while learning).
+   bool MidiPollLastTouched(MidiCCValue& outLast);
+
+   // Monotonically increasing count of Note-On events seen for a specific
+   // (device, channel, note), for nodes that need to know *when* a new hit
+   // happened rather than just the currently-held velocity (MidiRead only
+   // reports the latter). Returns 0 if that note has never been hit.
+   unsigned int MidiNoteHitCount(MidiDeviceId device, int channel, int note);
+
+   // The most recent Note-On seen on a whole (device, channel), regardless of
+   // which note - for "keyboard" nodes that report whichever key is currently
+   // being played rather than one fixed pad note. hitSeq increments on every
+   // Note-On so callers can tell a repeat of the same note from a held one.
+   // Returns false (out left default) if that device/channel has never seen a note.
+   struct MidiLastNote
+   {
+      int note = -1;
+      float velocity01 = 0.0f;
+      unsigned int hitSeq = 0;
+   };
+
+   bool MidiChannelLastNote(MidiDeviceId device, int channel, MidiLastNote& out);
+
+   // ---- MIDI clock ---------------------------------------------------------
+   // MIDI Clock (status byte 0xF8) is a realtime system message sent 24 times
+   // per quarter note by a clock source (DJ mixer, drum machine, DAW) whenever
+   // it's running - distinct from the CC/Note messages above. BPM isn't sent
+   // directly; it's derived from the wall-clock spacing between pulses, smoothed
+   // over a rolling window. 0xFA/0xFC (Start/Stop) reset that window so a
+   // stopped-then-restarted clock doesn't average across the gap.
+   bool MidiClockIsPresent(); // pulses seen within the last couple of seconds
+   float MidiClockBpm();      // smoothed estimate; 0 if not enough pulses yet
+
    // ---- video recording ---------------------------------------------------
    struct RecorderHandle;
 

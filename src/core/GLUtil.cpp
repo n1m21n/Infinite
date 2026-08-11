@@ -190,7 +190,8 @@ namespace GLUtil
       glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
    }
 
-   void DrawTextureToScreen(unsigned int tex, int windowW, int windowH)
+   void DrawTextureToScreen(unsigned int tex, int windowW, int windowH, int texW, int texH,
+                             bool checkerBg)
    {
       static const char* kBlitFragSrc =
          "#version 150\n"
@@ -199,25 +200,78 @@ namespace GLUtil
          "uniform sampler2D uTex;\n"
          "void main() { fragColor = texture(uTex, vUv); }\n";
 
+      // Composites the texture's own alpha over the same dark checkerboard
+      // pattern the node editor draws behind a transparent preview (see
+      // DrawCheckerboardBackdrop in main.cpp), so a node with a transparent
+      // background reads the same way here as it does inline/in the viewport
+      // panel instead of just showing solid black where alpha is 0.
+      static const char* kBlitCheckerFragSrc =
+         "#version 150\n"
+         "in vec2 vUv;\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uTex;\n"
+         "void main()\n"
+         "{\n"
+         "   vec4 c = texture(uTex, vUv);\n"
+         "   vec2 cell = floor(gl_FragCoord.xy / 12.0);\n"
+         "   float parity = mod(cell.x + cell.y, 2.0);\n"
+         "   vec3 bg = mix(vec3(30.0, 30.0, 38.0) / 255.0, vec3(18.0, 18.0, 24.0) / 255.0, parity);\n"
+         "   fragColor = vec4(mix(bg, c.rgb, c.a), 1.0);\n"
+         "}\n";
+
       static unsigned int sBlitProgram = 0;
       static int sLocTex = -1;
+      static unsigned int sCheckerProgram = 0;
+      static int sLocTexChecker = -1;
       if (sBlitProgram == 0)
       {
          sBlitProgram = CompileProgram(kBlitFragSrc);
          sLocTex = glGetUniformLocation(sBlitProgram, "uTex");
       }
-      if (sBlitProgram == 0)
+      if (sCheckerProgram == 0)
+      {
+         sCheckerProgram = CompileProgram(kBlitCheckerFragSrc);
+         sLocTexChecker = glGetUniformLocation(sCheckerProgram, "uTex");
+      }
+      const unsigned int program = checkerBg ? sCheckerProgram : sBlitProgram;
+      const int locTex = checkerBg ? sLocTexChecker : sLocTex;
+      if (program == 0)
          return;
 
+      // Clear the full window first (letterbox bars, if any, show this).
       glViewport(0, 0, windowW, windowH);
       glClearColor(0.1f, 0.1f, 0.1f, 1);
       glClear(GL_COLOR_BUFFER_BIT);
 
-      glUseProgram(sBlitProgram);
+      int vpX = 0, vpY = 0, vpW = windowW, vpH = windowH;
+      if (texW > 0 && texH > 0 && windowW > 0 && windowH > 0)
+      {
+         const float srcAspect = (float)texW / (float)texH;
+         const float dstAspect = (float)windowW / (float)windowH;
+         if (srcAspect > dstAspect)
+         {
+            // Source is relatively wider than the window - full width, bars top/bottom.
+            vpW = windowW;
+            vpH = (int)(windowW / srcAspect + 0.5f);
+            vpX = 0;
+            vpY = (windowH - vpH) / 2;
+         }
+         else
+         {
+            // Source is relatively taller than the window - full height, bars left/right.
+            vpH = windowH;
+            vpW = (int)(windowH * srcAspect + 0.5f);
+            vpY = 0;
+            vpX = (windowW - vpW) / 2;
+         }
+      }
+      glViewport(vpX, vpY, vpW, vpH);
+
+      glUseProgram(program);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, tex);
-      if (sLocTex >= 0)
-         glUniform1i(sLocTex, 0);
+      if (locTex >= 0)
+         glUniform1i(locTex, 0);
 
       DrawQuad();
 

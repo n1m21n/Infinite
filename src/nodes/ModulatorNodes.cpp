@@ -157,3 +157,72 @@ float MathNode::Value01()
    r = r * gain + offset;
    return clampOutput ? std::min(1.0f, std::max(0.0f, r)) : r;
 }
+
+// ---------------------------------------------------------------- Compare
+
+namespace
+{
+   const std::vector<std::string> kCompareOps = {
+      "A > B", "A >= B", "A < B", "A <= B", "A == B", "A != B"
+   };
+}
+
+const std::vector<std::string>& CompareNode::OpNames()
+{
+   return kCompareOps;
+}
+
+float CompareNode::Value01()
+{
+   const float a = inputA ? inputA->Value01() : constantA;
+   const float b = inputB ? inputB->Value01() : constantB;
+   const float tol = std::max(0.0f, tolerance);
+
+   bool result;
+   switch (op)
+   {
+      case 0: result = a > b; break;
+      case 1: result = a >= b - tol; break;
+      case 2: result = a < b; break;
+      case 3: result = a <= b + tol; break;
+      case 4: result = std::fabs(a - b) <= tol; break;
+      default: result = std::fabs(a - b) > tol; break; // A != B
+   }
+
+   return result ? 1.0f : 0.0f;
+}
+
+// ---------------------------------------------------------------- Range to Range
+
+float RangeToRangeNode::Value01()
+{
+   const float v = input ? input->Value01() : constantIn;
+   const float span = inHigh - inLow;
+   const float t = std::fabs(span) > 1e-6f ? (v - inLow) / span : 0.0f;
+   const float r = outLow + (outHigh - outLow) * t;
+   if (!clampOutput) return r;
+   return std::min(std::max(outLow, outHigh), std::max(std::min(outLow, outHigh), r));
+}
+
+// ---------------------------------------------------------------- Smooth
+
+float SmoothNode::Value01()
+{
+   const float target = input ? input->Value01() : constantIn;
+   const double beats = Transport::Instance().Beats();
+   if (mLast >= 0.0f && beats == mLastBeats)
+      return mLast; // already advanced this tick - don't double-apply the filter
+
+   const float k = std::min(1.0f, std::max(0.0f, amount));
+   mLast = (mLast < 0.0f) ? target : mLast + (target - mLast) * (1.0f - k);
+   mLastBeats = beats;
+   return mLast;
+}
+
+// ---------------------------------------------------------------- Invert
+
+float InvertNode::Value01()
+{
+   const float v = input ? input->Value01() : constantIn;
+   return low + high - v;
+}

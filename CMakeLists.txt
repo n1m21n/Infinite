@@ -70,6 +70,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/ColorRampNode.cpp
     src/nodes/PaletteNode.cpp
     src/nodes/AnalyzeNodes.cpp
+    src/nodes/MidiNodes.cpp
     src/nodes/Geometry3DNodes.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
@@ -142,6 +143,7 @@ if(APPLE)
         "-framework Accelerate"
         "-framework CoreMedia"
         "-framework CoreVideo"
+        "-framework CoreMIDI"
     )
     target_compile_definitions(Infinite PRIVATE GL_SILENCE_DEPRECATION)
 

@@ -107,4 +107,8 @@ public:
    // wire slot N just does `*node->GeometryInputSlot(N) = source` instead of
    // knowing which of `input`/`pointSource`/`inputs[N]`/... to reach for.
    virtual IGeometrySource** GeometryInputSlot(int /*slot*/) { return nullptr; }
+
+   // Same idea as GeometryInputSlot, but for modulator input pins (see MathNode).
+   virtual IModulator** ModulatorInputSlot(int /*slot*/) { return nullptr; }
+   virtual int ModulatorInputCount() const { return 0; }
 };
