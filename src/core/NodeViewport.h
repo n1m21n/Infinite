@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Geometry3DNodes.h"
+#include "SharedViewportCamera.h"
 
 // A tiny, cheap solo-render of one geometry-producing node's own mesh -
 // independent of whatever Render 3D shows downstream. Deliberately far
@@ -22,11 +23,19 @@ public:
    // actually changed since the last call (mesh revision, camera, or size) -
    // otherwise reuses last frame's texture at the cost of a few comparisons.
    // Returns the color texture, or 0 if geo is null or its mesh is empty.
-   unsigned int Render(IGeometrySource* geo, int w, int h, bool forceRedraw = false);
+   // `cam` is owned by the caller (main.cpp keys one per GraphNode, shared
+   // between a node's inline mini-viewport and its viewport-panel card so
+   // the two agree, but never shared across different nodes) - this instance
+   // only reads it and tracks the value it last rendered.
+   unsigned int Render(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h,
+                       bool forceRedraw = false);
 
    // Drag-to-orbit / scroll-to-zoom, matched to DrawPreview's feel for
-   // Render3DNode's embedded viewport in main.cpp.
-   void Orbit(float dAzimuth, float dElevation);
+   // Render3DNode's embedded viewport in main.cpp. Orbit takes degree deltas
+   // (same convention as DrawPreview's drag math) and mutates the caller-owned
+   // `cam` directly. Zoom mutates this instance's own mDistance - see
+   // SharedViewportCamera.h for why that stays out of the shared struct.
+   void Orbit(SharedViewportCamera& cam, float dAzimuth, float dElevation);
    void Zoom(float wheelDelta);
 
 private:
@@ -59,9 +68,14 @@ private:
    int mSelIndexCount = 0;
    unsigned long long mSelRevision = (unsigned long long)-1;
 
-   // Orbit camera, auto-framed to the mesh bounds the first time a mesh
-   // arrives, then left alone so a user's own drag/zoom sticks across frames.
-   float mAzimuth = 0.7f, mElevation = 0.45f, mDistance = 3.0f;
+   // Orbit camera. Distance/target are auto-framed to the mesh bounds the
+   // first time a mesh arrives, then left alone so a user's own zoom sticks
+   // across frames - both stay per-instance since they depend on this node's
+   // own mesh scale. Azimuth/elevation are NOT stored here - they live in the
+   // caller-owned SharedViewportCamera passed into Render()/Orbit(), so a
+   // node's own camera survives independently of which NodeViewport instance
+   // (inline vs panel) happens to be rendering it right now.
+   float mDistance = 3.0f;
    float mTarget[3] = { 0, 0, 0 };
    bool mFramed = false;
 

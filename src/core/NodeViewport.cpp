@@ -351,13 +351,14 @@ void NodeViewport::UpdateSelectionBuffer(const Mesh& mesh, unsigned long long re
    mSelIndexCount = (int)selected.size();
 }
 
-void NodeViewport::Orbit(float dAzimuth, float dElevation)
+void NodeViewport::Orbit(SharedViewportCamera& cam, float dAzimuth, float dElevation)
 {
-   mAzimuth -= dAzimuth;
+   cam.azimuth -= dAzimuth;
    // Clamped short of the poles, same reason as Render3DNode's embedded
    // preview in main.cpp: at the poles the view matrix's up vector goes
-   // parallel to the view direction and the image rolls.
-   mElevation = std::max(-1.5f, std::min(mElevation + dElevation, 1.5f));
+   // parallel to the view direction and the image rolls. 85.9437 deg is the
+   // old 1.5 rad clamp converted to this struct's degree convention.
+   cam.elevation = std::max(-85.9437f, std::min(cam.elevation + dElevation, 85.9437f));
 }
 
 void NodeViewport::Zoom(float wheelDelta)
@@ -365,7 +366,8 @@ void NodeViewport::Zoom(float wheelDelta)
    mDistance = std::max(0.05f, std::min(mDistance * (1.0f - wheelDelta * 0.15f), 500.0f));
 }
 
-unsigned int NodeViewport::Render(IGeometrySource* geo, int w, int h, bool forceRedraw)
+unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h,
+                                  bool forceRedraw)
 {
    if (geo == nullptr)
       return 0;
@@ -409,7 +411,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, int w, int h, bool force
       material.subsurfaceColor[1] != mLastMaterial.subsurfaceColor[1] ||
       material.subsurfaceColor[2] != mLastMaterial.subsurfaceColor[2] ||
       material.subsurfaceRadius != mLastMaterial.subsurfaceRadius;
-   const bool cameraChanged = mAzimuth != mLastAzimuth || mElevation != mLastElevation ||
+   const bool cameraChanged = cam.azimuth != mLastAzimuth || cam.elevation != mLastElevation ||
                               mDistance != mLastDistance;
    const bool instancingChanged = instanced != mInstanceAttribsOn ||
       (instanced && (instanceRevision != mInstanceRevision || !(instanceGroupMatrix == mInstanceGroupMatrix)));
@@ -489,11 +491,15 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, int w, int h, bool force
    model.NormalMatrix(normalMatrix);
 
    const float aspect = (float)w / (float)h;
-   const float ce = std::cos(mElevation);
+   // cam stores degrees (matched to Render3DNode's own camAzimuth/camElevation
+   // convention) - convert to radians for the trig.
+   const float azimuthRad = cam.azimuth * 3.14159265f / 180.0f;
+   const float elevationRad = cam.elevation * 3.14159265f / 180.0f;
+   const float ce = std::cos(elevationRad);
    const float eye[3] = {
-      mTarget[0] + mDistance * ce * std::cos(mAzimuth),
-      mTarget[1] + mDistance * std::sin(mElevation),
-      mTarget[2] + mDistance * ce * std::sin(mAzimuth)
+      mTarget[0] + mDistance * ce * std::cos(azimuthRad),
+      mTarget[1] + mDistance * std::sin(elevationRad),
+      mTarget[2] + mDistance * ce * std::sin(azimuthRad)
    };
    const float up[3] = { 0.0f, 1.0f, 0.0f };
    const Mat4 view = Mat4::LookAt(eye, mTarget, up);
@@ -640,8 +646,8 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, int w, int h, bool force
    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
 
    mLastRenderedRevision = revision;
-   mLastAzimuth = mAzimuth;
-   mLastElevation = mElevation;
+   mLastAzimuth = cam.azimuth;
+   mLastElevation = cam.elevation;
    mLastDistance = mDistance;
    mLastModel = model;
    mLastMaterial = material;

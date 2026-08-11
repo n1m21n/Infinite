@@ -196,6 +196,12 @@ namespace
    bool gPaletteTestPending = false;
    ImVec2 gSpawnPos(0.0f, 0.0f);
 
+   // Set when a cable drag is released on empty canvas (link-drag search):
+   // the output pin the drag started from, and the node types the search
+   // popup should suggest first because they're compatible with it.
+   int gLinkDragSourcePin = -1;
+   std::vector<std::pair<std::string, std::string>> gLinkDragSuggestions;
+
    struct LinkInfo
    {
       int id = 0;
@@ -1448,6 +1454,199 @@ namespace
          else
             math->inputB = mod;
       }
+   }
+
+   // Whether an output pin carrying the given src-side facts may connect into
+   // `dstNode`'s input `slot`. Mirrors the geometry/camera/light/audio/render
+   // input-pin rules every drag validation and drop-to-spawn suggestion needs,
+   // in one place, so the two stay in sync. Param pins (IsParamPin) and colour
+   // pins (IsColorPin) are handled by the caller before this is ever reached -
+   // this only covers ordinary input pins.
+   bool IsInputSlotCompatible(GraphNode* dstNode, int slot,
+                               bool srcIsModulator, IPaletteSource* srcPalette,
+                               IGeometrySource* srcGeometry, CameraNode* srcCamera,
+                               LightNode* srcLight, AudioFileNode* srcAudioFile,
+                               bool srcIsEnvironment)
+   {
+      auto* dstMath = dstNode ? dynamic_cast<MathNode*>(dstNode->node.get()) : nullptr;
+      auto* dstAudio = dstNode ? dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) : nullptr;
+      auto* dstRender = dstNode ? dynamic_cast<Render3DNode*>(dstNode->node.get()) : nullptr;
+      // Material and Displacement are the only geometry-consuming nodes with a
+      // non-geometry pin too (their texture map slots), so they still need
+      // their own dynamic_cast: everything else geometry-shaped is found
+      // generically via GeometryInputSlot().
+      auto* dstMaterial = dstNode ? dynamic_cast<MaterialNode*>(dstNode->node.get()) : nullptr;
+      auto* dstDisplacement = dstNode ? dynamic_cast<DisplacementNode*>(dstNode->node.get()) : nullptr;
+      // Set Color is a third geometry-consuming node with non-geometry pins:
+      // slot 1 (texture) behaves like Displacement's, slot 2 (palette) wants
+      // an IPaletteSource specifically.
+      auto* dstSetColor = dstNode ? dynamic_cast<SetColorNode*>(dstNode->node.get()) : nullptr;
+      auto* dstOutput = dstNode ? dynamic_cast<OutputNode*>(dstNode->node.get()) : nullptr;
+      const bool dstWantsImage = dstNode && dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) != nullptr;
+
+      if (dstRender != nullptr)
+      {
+         if (slot < Render3DNode::kSlots)
+            return srcGeometry != nullptr;
+         else if (slot == Render3DNode::kSlots)
+            return srcCamera != nullptr;
+         else if (slot == Render3DNode::kEnvSlot)
+            // Only an HDRI node: Render 3D reads this pin's rotation/intensity/
+            // mip-chain, which only an EnvironmentNode has. Any other image
+            // source would connect but be silently ignored at render time -
+            // rejecting it here instead means a mistaken drag (e.g. an Image
+            // Source, which clamps to 8-bit and cannot supply those extras
+            // anyway) shows as a refused link rather than a pin that does
+            // nothing.
+            return srcIsEnvironment;
+         else
+            return srcLight != nullptr;
+      }
+      else if (dstNode->node->GeometryInputSlot(slot) != nullptr)
+         // Whatever this slot's field is called internally (input,
+         // pointSource, inputs[N], cloudSource, ...), GeometryInputSlot says
+         // it wants a geometry source. Covers dstGeoOp, dstInstance,
+         // dstNull3D, dstMapping, dstMeshPoints, dstMeshResynth, dstCloth,
+         // dstJoin, dstSwitcher3D, dstWrap, dstMeta, dstPath, and slot 0 of
+         // dstMaterial/dstDisplacement.
+         return srcGeometry != nullptr;
+      else if (dstMaterial != nullptr)
+         return !srcIsModulator; // an ordinary material-map image slot
+      else if (dstDisplacement != nullptr)
+         return !srcIsModulator; // the displacement texture slot
+      else if (dstSetColor != nullptr && slot == 2)
+         return srcPalette != nullptr; // the palette slot
+      else if (dstSetColor != nullptr)
+         return !srcIsModulator; // the colour source texture slot
+      else if (dstOutput != nullptr && slot == 1)
+         return srcAudioFile != nullptr; // slot 1 is the audio pin
+      else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
+         return false; // 3D cables only go into 3D nodes
+      else if (dstAudio != nullptr)
+         return srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
+      else
+         return (dstMath != nullptr && !dstWantsImage) ? srcIsModulator : !srcIsModulator;
+   }
+
+   // Performs the connection once IsInputSlotCompatible (or the caller's own
+   // equivalent check) has already said `slot` on `dstNode` accepts whatever
+   // `srcNode`'s output produces. `srcOutputIndex` only matters for the
+   // modulator-cable-into-Math case, where a src node with more than one
+   // modulator output (Path, Audio/Image Analyze, Macro) needs the specific
+   // one that was actually dragged from.
+   void WireInputSlot(GraphNode& srcNode, GraphNode& dstNode, int slot, int srcOutputIndex = 0)
+   {
+      auto* dstMath = dynamic_cast<MathNode*>(dstNode.node.get());
+      auto* dstAudio = dynamic_cast<AudioAnalyzeNode*>(dstNode.node.get());
+      auto* dstRender = dynamic_cast<Render3DNode*>(dstNode.node.get());
+      auto* dstSetColor = dynamic_cast<SetColorNode*>(dstNode.node.get());
+      auto* dstOutput = dynamic_cast<OutputNode*>(dstNode.node.get());
+
+      auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode.node.get());
+      auto* srcCamera = dynamic_cast<CameraNode*>(srcNode.node.get());
+      auto* srcLight = dynamic_cast<LightNode*>(srcNode.node.get());
+      auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode.node.get());
+      auto* srcAudioFile = dynamic_cast<AudioFileNode*>(srcNode.node.get());
+
+      if (dstRender != nullptr)
+      {
+         if (slot < Render3DNode::kSlots)
+            dstRender->geometry[slot] = srcGeometry;
+         else if (slot == Render3DNode::kSlots)
+            dstRender->camera = srcCamera;
+         else if (slot == Render3DNode::kEnvSlot)
+            dstRender->envInput.Connect(srcNode.node.get());
+         else
+            dstRender->lights[slot - Render3DNode::kSlots - 1] = srcLight;
+      }
+      else if (IGeometrySource** field = dstNode.node->GeometryInputSlot(slot))
+      {
+         // Whatever this slot's field is called internally, set it directly -
+         // covers dstGeoOp, dstInstance, dstNull3D, dstMapping, dstMeshPoints,
+         // dstMeshResynth, dstCloth, dstJoin, dstSwitcher3D, dstWrap, dstMeta,
+         // dstPath, and slot 0 of dstMaterial/dstDisplacement.
+         *field = srcGeometry;
+      }
+      else if (dstSetColor != nullptr && slot == 2)
+      {
+         dstSetColor->paletteInput = srcPalette;
+      }
+      else if (dstAudio != nullptr)
+      {
+         dstAudio->fileSource = srcAudioFile;
+      }
+      else if (dstOutput != nullptr && slot == 1)
+      {
+         dstOutput->audioSource = srcAudioFile;
+      }
+      else if (dstMath != nullptr)
+      {
+         auto* mod = ModulatorForOutput(srcNode.node.get(), srcOutputIndex);
+         if (slot == 0)
+            dstMath->inputA = mod;
+         else
+            dstMath->inputB = mod;
+      }
+      else
+      {
+         ImageCable* cable = CableFor(dstNode, slot);
+         if (cable != nullptr)
+            cable->Connect(srcNode.node.get());
+      }
+   }
+
+   // Node types worth suggesting first in the search popup when a cable was
+   // dragged out of `srcNode`'s output and dropped on empty canvas: every
+   // registered, user-spawnable type that has at least one input slot
+   // IsInputSlotCompatible would accept from this source. Only input-pin
+   // compatibility drives this (not param/colour pins, which nearly every
+   // node accepts and so wouldn't narrow anything down) - a plain image
+   // source correctly yields no geometry/camera/light/audio matches here,
+   // since those pins still show unfiltered below the suggestions. Builds a
+   // throwaway, unregistered GraphNode per candidate type to probe its input
+   // slots; this runs once per drag-to-empty-space, not per frame.
+   std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForOutput(GraphNode* srcNode)
+   {
+      std::vector<std::pair<std::string, std::string>> result;
+      if (srcNode == nullptr)
+         return result;
+
+      const bool srcIsModulator = dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr;
+      auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode->node.get());
+      auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode->node.get());
+      auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
+      auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
+      auto* srcAudioFile = dynamic_cast<AudioFileNode*>(srcNode->node.get());
+      const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
+
+      for (const std::string& category : NodeFactory::Instance().GetCategories())
+      {
+         for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+         {
+            if (!IsUserSpawnable(name))
+               continue;
+
+            GraphNode probe;
+            probe.node.reset(NodeFactory::Instance().MakeNode(name));
+            if (!probe.node)
+               continue;
+
+            const int slotCount = InputCountFor(probe);
+            bool compatible = false;
+            for (int slot = 0; slot < slotCount; ++slot)
+            {
+               if (IsInputSlotCompatible(&probe, slot, srcIsModulator, srcPalette, srcGeometry,
+                                          srcCamera, srcLight, srcAudioFile, srcIsEnvironment))
+               {
+                  compatible = true;
+                  break;
+               }
+            }
+            if (compatible)
+               result.emplace_back(name, category);
+         }
+      }
+      return result;
    }
 
    // Finds a spawn position near `center` that doesn't land on top of any
@@ -3677,6 +3876,10 @@ namespace
       else
          ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f);
       ModSlider("distance", &n->camDistance, 0.3f, 20.0f);
+      // This render's own camera, entirely separate from any node's
+      // mini-viewport/panel camera (SharedViewportCamera.h/gNodeCameras):
+      // the final output framing is a deliberate setup, not something
+      // casual node-viewport orbiting should ever move.
       ModSlider("orbit", &n->camAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
       ModSlider("elevation", &n->camElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0");
       ModSlider("target x", &n->targetX, -3.0f, 3.0f);
@@ -4380,7 +4583,11 @@ namespace
       ImGui::InvisibleButton("##viewport", ImVec2(size, size));
 
       // A patched Camera node owns the view, so drive that instead of the
-      // built-in values; otherwise the drag would appear to do nothing.
+      // built-in values; otherwise the drag would appear to do nothing. This
+      // is this Render3DNode's own camera, entirely separate from any node's
+      // mini-viewport/panel camera (SharedViewportCamera.h/gNodeCameras): the
+      // final output framing is a deliberate setup, not something casual
+      // node-viewport orbiting should ever move.
       float* azimuth = render->camera ? &render->camera->azimuth : &render->camAzimuth;
       float* elevation = render->camera ? &render->camera->elevation : &render->camElevation;
       float* distance = render->camera ? &render->camera->distance : &render->camDistance;
@@ -4421,6 +4628,16 @@ namespace
    // that never opts in.
    std::map<int, NodeViewport> gNodeViewports;
 
+   // Every node's own default-camera rotation (SharedViewportCamera.h),
+   // keyed by GraphNode::index. A node's inline mini-viewport (above) and its
+   // viewport-panel card (gPanelViewports below) both read/write the same
+   // entry here, so the two agree on rotation even though they're separate
+   // NodeViewport/FBO instances; two different nodes never share an entry.
+   // Render3DNode keeps its own completely separate camAzimuth/camElevation
+   // fields (Geometry3DNodes.h) - the final output's framing is a deliberate
+   // setup, not something casual node-viewport orbiting should ever move.
+   std::map<int, SharedViewportCamera> gNodeCameras;
+
    // Nodes/viewports retired by RemoveNodeByIndex this frame, held until the
    // start of the next frame - see RemoveNodeByIndex for why teardown can't
    // happen synchronously. NodeViewport has a user-declared destructor (which
@@ -4440,6 +4657,7 @@ namespace
    void DrawMiniViewport(GraphNode& gn, IGeometrySource* geo)
    {
       NodeViewport& viewport = gNodeViewports[gn.index];
+      SharedViewportCamera& cam = gNodeCameras[gn.index];
 
       const float size = kPreviewSize;
       ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -4447,7 +4665,7 @@ namespace
       dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + size),
                         IM_COL32(18, 18, 24, 255), 4.0f);
 
-      const unsigned int tex = viewport.Render(geo, (int)size, (int)size);
+      const unsigned int tex = viewport.Render(geo, cam, (int)size, (int)size);
       if (tex != 0)
       {
          dl->AddImage((ImTextureID)(intptr_t)tex, origin, ImVec2(origin.x + size, origin.y + size),
@@ -4462,15 +4680,19 @@ namespace
                   IM_COL32(70, 74, 90, 255), 4.0f);
 
       // Same drag-to-orbit / scroll-to-zoom feel as DrawPreview's embedded
-      // Render3DNode viewport, driving this node's own NodeViewport camera
-      // instead.
+      // Render3DNode viewport. Orbit rotates this node's own entry in
+      // gNodeCameras (SharedViewportCamera.h) - shared with this same node's
+      // viewport-panel card and with any camera-less Render3DNode this node
+      // feeds directly, but not with any other node; Zoom stays local to this
+      // NodeViewport instance's own distance.
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##miniviewportcanvas", ImVec2(size, size));
 
       if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
       {
          const ImVec2 drag = ImGui::GetIO().MouseDelta;
-         viewport.Orbit(drag.x * 0.012f, drag.y * 0.012f);
+         // Degrees per pixel, matching DrawPreview's drag feel (0.6875 deg/px).
+         viewport.Orbit(cam, drag.x * 0.6875f, drag.y * 0.6875f);
       }
       if (ImGui::IsItemHovered())
       {
@@ -4493,12 +4715,15 @@ namespace
    // places thrash its FBO every frame.
    std::map<int, NodeViewport> gPanelViewports;
 
-   // One node's card inside the viewport panel: a title row and the render,
-   // nothing else. Deliberately non-interactive - unlike the inline
-   // mini-viewport, there is no drag-to-orbit or scroll-to-zoom here, so
-   // dragging across the panel can never knock a render askew. imageSize is
-   // the exact box the render fills, so the card never has leftover space for
-   // a scrollbar to appear in.
+   // One node's card inside the viewport panel: a title row and the render.
+   // Same drag-to-orbit / scroll-to-zoom as the inline mini-viewport - it
+   // rotates this node's own gNodeCameras entry (SharedViewportCamera.h), the
+   // same one its inline mini-viewport uses, so the two stay in agreement;
+   // a camera-less Render3DNode fed directly by this node mirrors it too.
+   // Other nodes' viewports are unaffected. Zoom stays local to this card's
+   // own NodeViewport distance, same as elsewhere. imageSize is the exact box
+   // the render fills, so the card never has leftover space for a scrollbar
+   // to appear in.
    // Whether a node has anything the viewport panel could actually show.
    // Mirrors the branches DrawPreview's dispatch takes in the node body: a
    // modulator is a value with a scope trace, not an image; Camera/Light show
@@ -4567,15 +4792,45 @@ namespace
 
       if (auto* geo = dynamic_cast<IGeometrySource*>(gn.node.get()))
       {
-         // Same solo mesh render as the inline mini viewport, minus its
-         // orbit/zoom input handling.
-         const unsigned int tex =
-            gPanelViewports[gn.index].Render(geo, (int)imageSize.x, (int)imageSize.y);
+         // Same solo mesh render as the inline mini viewport, including its
+         // orbit/zoom input handling. cam is the same gNodeCameras entry the
+         // inline mini-viewport for this node index uses, so the two agree
+         // even though they're separate NodeViewport/FBO instances.
+         NodeViewport& viewport = gPanelViewports[gn.index];
+         SharedViewportCamera& cam = gNodeCameras[gn.index];
+         const unsigned int tex = viewport.Render(geo, cam, (int)imageSize.x, (int)imageSize.y);
          if (tex != 0)
             dl->AddImage((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
          else
             dl->AddText(ImVec2(origin.x + 10, origin.y + imageSize.y * 0.5f - 8),
                         IM_COL32(120, 120, 135, 255), "no geometry");
+
+         ImGui::SetCursorScreenPos(origin);
+         char btnId[32];
+         snprintf(btnId, sizeof(btnId), "##viewportcanvas%d", gn.index);
+         ImGui::InvisibleButton(btnId, imageSize);
+
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+         {
+            const ImVec2 drag = ImGui::GetIO().MouseDelta;
+            viewport.Orbit(cam, drag.x * 0.6875f, drag.y * 0.6875f);
+         }
+         if (ImGui::IsItemHovered())
+         {
+            ImGuiIO& vio = ImGui::GetIO();
+            if (vio.MouseWheel != 0.0f)
+            {
+               viewport.Zoom(vio.MouseWheel);
+               vio.MouseWheel = 0.0f;
+            }
+         }
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            dl->AddRect(origin, br, IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
+         // Layout cursor already sits at origin+imageSize from the
+         // InvisibleButton above; the trailing Dummy(imageSize) below is
+         // shared with the non-geometry branch, so rewind rather than
+         // double-reserve space in this child.
+         ImGui::SetCursorScreenPos(origin);
       }
       else
       {
@@ -4598,6 +4853,41 @@ namespace
          {
             dl->AddText(ImVec2(origin.x + 10, origin.y + imageSize.y * 0.5f - 8),
                         IM_COL32(120, 120, 135, 255), "no input");
+         }
+
+         // A Render 3D card gets the same drag-to-orbit/scroll-to-zoom as its
+         // inline preview (DrawPreview), driving that render's own camera -
+         // separate from any node's mini-viewport/panel camera, see
+         // SharedViewportCamera.h. Every other node stays a plain, static image.
+         if (auto* render = dynamic_cast<Render3DNode*>(gn.node.get()))
+         {
+            ImGui::SetCursorScreenPos(origin);
+            char btnId[32];
+            snprintf(btnId, sizeof(btnId), "##render3dviewportcanvas%d", gn.index);
+            ImGui::InvisibleButton(btnId, imageSize);
+
+            float* azimuth = render->camera ? &render->camera->azimuth : &render->camAzimuth;
+            float* elevation = render->camera ? &render->camera->elevation : &render->camElevation;
+            float* distance = render->camera ? &render->camera->distance : &render->camDistance;
+
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+            {
+               const ImVec2 drag = ImGui::GetIO().MouseDelta;
+               *azimuth -= drag.x * 0.6875f;
+               *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * 0.6875f, 85.9437f));
+            }
+            if (ImGui::IsItemHovered())
+            {
+               ImGuiIO& vio = ImGui::GetIO();
+               if (vio.MouseWheel != 0.0f)
+               {
+                  *distance = std::max(0.2f, std::min(*distance * (1.0f - vio.MouseWheel * 0.15f), 60.0f));
+                  vio.MouseWheel = 0.0f;
+               }
+            }
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+               dl->AddRect(origin, br, IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
+            ImGui::SetCursorScreenPos(origin);
          }
       }
 
@@ -5615,6 +5905,19 @@ namespace
 
    void NewPatch()
    {
+      // Retire rather than destroy outright: NewPatch can run mid-frame (it's
+      // the first step of ApplyPatchData, which Undo/Redo call), after this
+      // frame's ImGui draw list has already queued AddImage() calls
+      // referencing these nodes' GL output textures. Destroying them
+      // synchronously here - same hazard RemoveNodeByIndex guards against -
+      // would free a GL name pending draw commands still reference, flashing
+      // garbage/reused-texture content for one frame right before the node
+      // disappears. Actual teardown happens next frame (see
+      // gRetiredNodes/gRetiredViewports drain next to glfwPollEvents()).
+      for (GraphNode& gn : gNodes)
+         gRetiredNodes.push_back(std::move(gn.node));
+      while (!gNodeViewports.empty())
+         gRetiredViewports.push_back(gNodeViewports.extract(gNodeViewports.begin()));
       gNodes.clear();
       gLinks.clear();
       gModHistory.clear();
@@ -8215,14 +8518,22 @@ int main()
          ok = ok && spawnedOne && undoRemovedIt && redoBroughtItBack;
 
          // --- param edit / undo / redo, via the same checkpoint the UI widgets use ---
+         // Re-fetched after every Undo()/Redo(): each one runs ApplyPatchData,
+         // which rebuilds the graph from scratch via NewPatch() + respawn, so
+         // gNodes[0] is a genuinely new GeometryNode object each time - a
+         // pointer captured before the call is stale afterward (NewPatch
+         // retires rather than frees its old nodes immediately, precisely so
+         // a stale pointer like that stays inert instead of dangling).
          auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
          geo->detail = 24; // known starting value
          PushUndoCheckpoint(); // what ModSlider does on IsItemActivated, before the edit
          geo->detail = 91;
          Undo();
+         geo = static_cast<GeometryNode*>(gNodes[0].node.get());
          const int afterUndo = geo->detail;
          const bool undoRestoredParam = afterUndo == 24;
          Redo();
+         geo = static_cast<GeometryNode*>(gNodes[0].node.get());
          const int afterRedo = geo->detail;
          const bool redoReappliedParam = afterRedo == 91;
          printf("param edit: 24 -> 91 -> undo -> %d -> redo -> %d  %s\n",
@@ -8233,7 +8544,7 @@ int main()
          // --- delete (with a connection) / undo restores both the node and the wire ---
          GraphNode* smoothGn = SpawnNode("Smooth", "3D", 200.0f, 0.0f);
          auto* smooth = static_cast<GeometryOpNode*>(smoothGn->node.get());
-         smooth->input = geo;
+         smooth->input = geo; // the live Cube, re-fetched just above
          const int smoothIndex = smoothGn->index;
          RemoveNodeByIndex(smoothIndex);
          const bool deleted = FindNodeByIndex(smoothIndex) == nullptr;
@@ -11131,9 +11442,11 @@ int main()
 
          static NodeViewport selectViewport;
          static NodeViewport plainViewport;
+         static SharedViewportCamera selectCam;
+         static SharedViewportCamera plainCam;
          const int vw = 256, vh = 256;
-         const unsigned int selectTex = selectViewport.Render(select, vw, vh, true);
-         const unsigned int plainTex = plainViewport.Render(plain, vw, vh, true);
+         const unsigned int selectTex = selectViewport.Render(select, selectCam, vw, vh, true);
+         const unsigned int plainTex = plainViewport.Render(plain, plainCam, vw, vh, true);
 
          auto countTinted = [&](unsigned int tex) -> size_t {
             if (tex == 0)
@@ -11187,7 +11500,7 @@ int main()
 
          auto* plainGeo = static_cast<GeometryNode*>(gNodes[4].node.get());
          plainGeo->posX += 20.0f; // far outside any reasonable auto-framing
-         const unsigned int plainTexAfter = plainViewport.Render(plain, vw, vh, false);
+         const unsigned int plainTexAfter = plainViewport.Render(plain, plainCam, vw, vh, false);
          const size_t plainMeshAfter = countMesh(plainTexAfter);
 
          const bool transformTracked = plainMeshBefore > 500 && plainMeshAfter < 50;
@@ -12047,87 +12360,26 @@ int main()
                const bool srcIsModulator = srcNode != nullptr &&
                                            dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr;
                auto* srcPalette = srcNode ? dynamic_cast<IPaletteSource*>(srcNode->node.get()) : nullptr;
-
-               auto* dstMath = dstNode ? dynamic_cast<MathNode*>(dstNode->node.get()) : nullptr;
-               auto* dstAudio = dstNode ? dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) : nullptr;
                auto* srcAudioFile = srcNode ? dynamic_cast<AudioFileNode*>(srcNode->node.get()) : nullptr;
-               auto* dstRender = dstNode ? dynamic_cast<Render3DNode*>(dstNode->node.get()) : nullptr;
-               // Material and Displacement are the only geometry-consuming
-               // nodes with a non-geometry pin too (their texture map slots),
-               // so they still need their own dynamic_cast: everything else
-               // geometry-shaped is found generically via GeometryInputSlot().
-               auto* dstMaterial = dstNode ? dynamic_cast<MaterialNode*>(dstNode->node.get()) : nullptr;
-               auto* dstDisplacement = dstNode ? dynamic_cast<DisplacementNode*>(dstNode->node.get()) : nullptr;
-               // Set Color is a third geometry-consuming node with non-geometry
-               // pins: slot 1 (texture) behaves like Displacement's, slot 2
-               // (palette) wants an IPaletteSource specifically.
-               auto* dstSetColor = dstNode ? dynamic_cast<SetColorNode*>(dstNode->node.get()) : nullptr;
-               auto* dstOutput = dstNode ? dynamic_cast<OutputNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
                auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
                auto* srcLight = srcNode ? dynamic_cast<LightNode*>(srcNode->node.get()) : nullptr;
+               const bool srcIsEnvironment = srcNode != nullptr &&
+                                             dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
 
                bool valid = false;
                if (GraphNode::IsOutputPin(a) && srcNode != nullptr && dstNode != nullptr && differentNodes)
                {
                   // modulators patch into parameters and into Math's inputs;
                   // image nodes patch into image inputs
-                  const bool dstWantsImage =
-                     dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) != nullptr;
-
                   if (GraphNode::IsParamPin(b))
                      valid = srcIsModulator;
                   else if (GraphNode::IsColorPin(b))
                      valid = srcPalette != nullptr;
                   else if (GraphNode::IsInputPin(b))
-                  {
-                     const int slot = GraphNode::InputSlotFromPin(b);
-                     if (dstRender != nullptr)
-                     {
-                        if (slot < Render3DNode::kSlots)
-                           valid = srcGeometry != nullptr;
-                        else if (slot == Render3DNode::kSlots)
-                           valid = srcCamera != nullptr;
-                        else if (slot == Render3DNode::kEnvSlot)
-                           // Only an HDRI node: Render 3D reads this pin's
-                           // rotation/intensity/mip-chain, which only an
-                           // EnvironmentNode has. Any other image source would
-                           // connect but be silently ignored at render time -
-                           // rejecting it here instead means a mistaken drag
-                           // (e.g. an Image Source, which clamps to 8-bit and
-                           // cannot supply those extras anyway) shows as a
-                           // refused link rather than a pin that does nothing.
-                           valid = srcNode != nullptr &&
-                                   dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
-                        else
-                           valid = srcLight != nullptr;
-                     }
-                     else if (dstNode->node->GeometryInputSlot(slot) != nullptr)
-                        // Whatever this slot's field is called internally
-                        // (input, pointSource, inputs[N], cloudSource, ...),
-                        // GeometryInputSlot says it wants a geometry source.
-                        // Covers dstGeoOp, dstInstance, dstNull3D, dstMapping,
-                        // dstMeshPoints, dstMeshResynth, dstCloth, dstJoin,
-                        // dstSwitcher3D, dstWrap, dstMeta, dstPath, and slot 0
-                        // of dstMaterial/dstDisplacement.
-                        valid = srcGeometry != nullptr;
-                     else if (dstMaterial != nullptr)
-                        valid = !srcIsModulator; // an ordinary material-map image slot
-                     else if (dstDisplacement != nullptr)
-                        valid = !srcIsModulator; // the displacement texture slot
-                     else if (dstSetColor != nullptr && slot == 2)
-                        valid = srcPalette != nullptr; // the palette slot
-                     else if (dstSetColor != nullptr)
-                        valid = !srcIsModulator; // the colour source texture slot
-                     else if (dstOutput != nullptr && slot == 1)
-                        valid = srcAudioFile != nullptr; // slot 1 is the audio pin
-                     else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
-                        valid = false; // 3D cables only go into 3D nodes
-                     else if (dstAudio != nullptr)
-                        valid = srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
-                     else
-                        valid = (dstMath != nullptr && !dstWantsImage) ? srcIsModulator : !srcIsModulator;
-                  }
+                     valid = IsInputSlotCompatible(dstNode, GraphNode::InputSlotFromPin(b),
+                                                    srcIsModulator, srcPalette, srcGeometry, srcCamera,
+                                                    srcLight, srcAudioFile, srcIsEnvironment);
                }
 
                if (valid && ed::AcceptNewItem())
@@ -12153,53 +12405,10 @@ int main()
                      palette.Bind(dstNode->index, GraphNode::ColorIndexFromPin(b),
                                   srcNode->index, used % count);
                   }
-                  else if (dstRender != nullptr)
-                  {
-                     const int slot = GraphNode::InputSlotFromPin(b);
-                     if (slot < Render3DNode::kSlots)
-                        dstRender->geometry[slot] = srcGeometry;
-                     else if (slot == Render3DNode::kSlots)
-                        dstRender->camera = srcCamera;
-                     else if (slot == Render3DNode::kEnvSlot)
-                        dstRender->envInput.Connect(srcNode->node.get());
-                     else
-                        dstRender->lights[slot - Render3DNode::kSlots - 1] = srcLight;
-                  }
-                  else if (IGeometrySource** field =
-                              dstNode->node->GeometryInputSlot(GraphNode::InputSlotFromPin(b)))
-                  {
-                     // Whatever this slot's field is called internally, set it
-                     // directly - covers dstGeoOp, dstInstance, dstNull3D,
-                     // dstMapping, dstMeshPoints, dstMeshResynth, dstCloth,
-                     // dstJoin, dstSwitcher3D, dstWrap, dstMeta, dstPath, and
-                     // slot 0 of dstMaterial/dstDisplacement.
-                     *field = srcGeometry;
-                  }
-                  else if (dstSetColor != nullptr && GraphNode::InputSlotFromPin(b) == 2)
-                  {
-                     dstSetColor->paletteInput = srcPalette;
-                  }
-                  else if (dstAudio != nullptr)
-                  {
-                     dstAudio->fileSource = srcAudioFile;
-                  }
-                  else if (dstOutput != nullptr && GraphNode::InputSlotFromPin(b) == 1)
-                  {
-                     dstOutput->audioSource = srcAudioFile;
-                  }
-                  else if (dstMath != nullptr)
-                  {
-                     auto* mod = ModulatorForOutput(srcNode->node.get(), GraphNode::OutputIndexFromPin(a));
-                     if (GraphNode::InputSlotFromPin(b) == 0)
-                        dstMath->inputA = mod;
-                     else
-                        dstMath->inputB = mod;
-                  }
                   else
                   {
-                     ImageCable* cable = CableFor(*dstNode, GraphNode::InputSlotFromPin(b));
-                     if (cable != nullptr)
-                        cable->Connect(srcNode->node.get());
+                     WireInputSlot(*srcNode, *dstNode, GraphNode::InputSlotFromPin(b),
+                                   GraphNode::OutputIndexFromPin(a));
                   }
                }
                else if (!valid)
@@ -12207,6 +12416,23 @@ int main()
                   ed::RejectNewItem(ImColor(255, 80, 80), 2.0f);
                }
             }
+         }
+
+         ed::PinId newNodePin;
+         if (ed::QueryNewNode(&newNodePin) && ed::AcceptNewItem())
+         {
+            gLinkDragSourcePin = (int)newNodePin.Get();
+            gLinkDragSuggestions.clear();
+            if (GraphNode::IsOutputPin(gLinkDragSourcePin))
+            {
+               GraphNode* dragSrc = FindNodeByIndex(GraphNode::NodeIndexFromPin(gLinkDragSourcePin));
+               if (dragSrc != nullptr)
+                  gLinkDragSuggestions = RecommendedNodeTypesForOutput(dragSrc);
+            }
+            gSpawnPos = ed::ScreenToCanvas(ImGui::GetMousePos());
+            searchBuf[0] = '\0';
+            searchJustOpened = true;
+            ImGui::OpenPopup("search");
          }
       }
       ed::EndCreate();
@@ -13029,6 +13255,23 @@ int main()
 
          if (q.empty())
          {
+            // Link-drag search: a cable was just dropped on empty canvas, so
+            // lead with the node types compatible with the pin it came from
+            // rather than making the user scroll every category to find one.
+            if (!gLinkDragSuggestions.empty())
+            {
+               ImGui::SeparatorText("Suggested");
+               for (const auto& t : gLinkDragSuggestions)
+               {
+                  ++shown;
+                  if (ImGui::Selectable(DisplayName(t.first).c_str()))
+                  {
+                     spawnName = t.first;
+                     spawnCategory = t.second;
+                  }
+               }
+            }
+
             // no query yet: browse by category
             for (const std::string& category : NodeFactory::Instance().GetCategories())
             {
@@ -13071,10 +13314,51 @@ int main()
 
          if (!spawnName.empty())
          {
-            SpawnNode(spawnName, spawnCategory, gSpawnPos.x, gSpawnPos.y);
+            GraphNode* spawned = SpawnNode(spawnName, spawnCategory, gSpawnPos.x, gSpawnPos.y);
+            if (gLinkDragSourcePin >= 0 && spawned != nullptr)
+            {
+               GraphNode* dragSrcNode = FindNodeByIndex(GraphNode::NodeIndexFromPin(gLinkDragSourcePin));
+               if (dragSrcNode != nullptr)
+               {
+                  const bool srcIsModulator = dynamic_cast<IModulator*>(dragSrcNode->node.get()) != nullptr;
+                  auto* srcPalette = dynamic_cast<IPaletteSource*>(dragSrcNode->node.get());
+                  auto* srcGeometry = dynamic_cast<IGeometrySource*>(dragSrcNode->node.get());
+                  auto* srcCamera = dynamic_cast<CameraNode*>(dragSrcNode->node.get());
+                  auto* srcLight = dynamic_cast<LightNode*>(dragSrcNode->node.get());
+                  auto* srcAudioFile = dynamic_cast<AudioFileNode*>(dragSrcNode->node.get());
+                  const bool srcIsEnvironment =
+                     dynamic_cast<EnvironmentNode*>(dragSrcNode->node.get()) != nullptr;
+
+                  const int slotCount = InputCountFor(*spawned);
+                  for (int slot = 0; slot < slotCount; ++slot)
+                  {
+                     if (IsInputSlotCompatible(spawned, slot, srcIsModulator, srcPalette, srcGeometry,
+                                                srcCamera, srcLight, srcAudioFile, srcIsEnvironment))
+                     {
+                        // No PushUndoCheckpoint() here: SpawnNode() above already
+                        // pushed one capturing the state before the node existed,
+                        // so a single Undo removes the spawn and the wire
+                        // together, as one user action - not two separate steps.
+                        WireInputSlot(*dragSrcNode, *spawned, slot,
+                                      GraphNode::OutputIndexFromPin(gLinkDragSourcePin));
+                        break;
+                     }
+                  }
+               }
+            }
+            gLinkDragSourcePin = -1;
+            gLinkDragSuggestions.clear();
             ImGui::CloseCurrentPopup();
          }
          ImGui::EndPopup();
+      }
+      else
+      {
+         // Popup closed without a pick (Escape, click-away, or the manual
+         // spawn-menu paths below) - clear so a later unrelated spawn doesn't
+         // inherit a stale suggestion list from an earlier drag.
+         gLinkDragSourcePin = -1;
+         gLinkDragSuggestions.clear();
       }
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(220, 0), ImVec2(420, 400));
