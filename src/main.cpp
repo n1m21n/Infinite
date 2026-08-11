@@ -122,6 +122,19 @@ namespace
       return out;
    }
 
+   // True for a NodeFactory-registered name a user should be able to spawn
+   // going forward. Currently only excludes GeometryOpNode's three deprecated
+   // `*Selected` ops (see the Op enum comment in GeometryOpNodes.h) - they
+   // stay registered so old patches and internal test fixtures can still name
+   // them, but a fresh graph should reach for the general op + selectionOnly
+   // instead. Every spawn-menu / search-list enumeration site should filter
+   // through this rather than NodeFactory's raw listing.
+   bool IsUserSpawnable(const std::string& name)
+   {
+      return name != "Delete Selected" && name != "Transform Selected" &&
+             name != "Extrude Selected";
+   }
+
    // GeometryOpNode shares one node type across every mesh operator, and its
    // dropdown lets the operator change after spawn - so unlike most other
    // nodes, its title can't be read from the type name frozen at spawn time.
@@ -1054,7 +1067,15 @@ namespace
          NodeFactory::Instance().Register(
             kNames[i], [i]() -> INode* { return MeshToPointsNode::CreateFor(i); }, "3D");
       }
-      // Ten named operator nodes, all backed by GeometryOpNode.
+      // Named operator nodes, all backed by GeometryOpNode. All kOpCount
+      // ops stay registered with NodeFactory - old patches resolve
+      // "Delete Selected" etc. by name, and internal test fixtures spawn
+      // nodes the same way NodeFactory does. GeometryOpNode::IsSpawnable
+      // instead filters the three deprecated `*Selected` ops out of the
+      // interactive spawn popup and the operation dropdown (see the spawn
+      // popup's category loop and DrawGeometryOpParams), so a user can no
+      // longer choose one going forward while everything that names one
+      // programmatically keeps working.
       for (int i = 0; i < GeometryOpNode::kOpCount; i++)
       {
          NodeFactory::Instance().Register(
@@ -3215,15 +3236,71 @@ namespace
       }
    }
 
+   // Which ops "only affects selected faces" is even meaningful for - group 1
+   // (per-face independent) and kTwist (per-vertex) from
+   // docs/plans/phase4-selection-as-input.md. Connectivity-dependent ops
+   // (Subdivide/Smooth/Screw) and whole-mesh-duplicating ones (Array/Mirror)
+   // are left out - showing a toggle that does nothing is worse than no
+   // toggle. kSelect and the deprecated `*Selected` ops are left out too:
+   // Select produces the mask rather than consuming one, and the `*Selected`
+   // ops are selection-restricted unconditionally already.
+   bool GeometryOpSupportsSelectionOnly(int op)
+   {
+      switch (op)
+      {
+         case GeometryOpNode::kTransform:
+         case GeometryOpNode::kSolidify:
+         case GeometryOpNode::kExtrude:
+         case GeometryOpNode::kWireframe:
+         case GeometryOpNode::kTriangulate:
+         case GeometryOpNode::kNormals:
+         case GeometryOpNode::kExplode:
+         case GeometryOpNode::kTwist:
+         case GeometryOpNode::kDelete:
+            return true;
+         default:
+            return false;
+      }
+   }
+
    void DrawGeometryOpParams(GeometryOpNode* n)
    {
-      DropdownButton("operation", GeometryOpNode::OpNames(), n->op, [n](int i) { n->op = i; });
+      // Dropdown shows only spawnable ops (GeometryOpNode::IsSpawnable), kept
+      // as a name+real-index pair since the underlying `op` enum still has
+      // gaps at the three deprecated indices.
+      static std::vector<std::string> sVisibleOpNames;
+      static std::vector<int> sVisibleOpIndices;
+      if (sVisibleOpNames.empty())
+      {
+         const auto& names = GeometryOpNode::OpNames();
+         for (int i = 0; i < GeometryOpNode::kOpCount; i++)
+         {
+            if (!GeometryOpNode::IsSpawnable(i))
+               continue;
+            sVisibleOpNames.push_back(names[i]);
+            sVisibleOpIndices.push_back(i);
+         }
+      }
+      int visibleCurrent = 0;
+      for (size_t i = 0; i < sVisibleOpIndices.size(); i++)
+         if (sVisibleOpIndices[i] == n->op) { visibleCurrent = (int)i; break; }
+      DropdownButton("operation", sVisibleOpNames, visibleCurrent,
+         [n](int i) { n->op = sVisibleOpIndices[i]; });
       if (n->input != nullptr)
          ImGui::TextDisabled("%zu triangles out", n->TriangleCount());
+      if (GeometryOpSupportsSelectionOnly(n->op))
+         ImGui::Checkbox("selection only", &n->selectionOnly);
 
       switch (n->op)
       {
          case GeometryOpNode::kTransform:
+            if (n->selectionOnly)
+            {
+               ImGui::TextDisabled("%zu of %zu faces selected", n->SelectedCount(), n->TriangleCount());
+               ImGui::Checkbox("move along normals", &n->moveAlongNormals);
+               if (n->moveAlongNormals)
+                  ModSlider("normal amount", &n->normalAmount, -2.0f, 2.0f);
+            }
             ModSlider("move x", &n->offsetX, -3.0f, 3.0f);
             ModSlider("move y", &n->offsetY, -3.0f, 3.0f);
             ModSlider("move z", &n->offsetZ, -3.0f, 3.0f);
@@ -3326,8 +3403,10 @@ namespace
             ImGui::Checkbox("add to selection", &n->selectAppend);
             break;
          }
+         case GeometryOpNode::kDelete:
          case GeometryOpNode::kDeleteSelected:
-            ImGui::TextDisabled("%zu of %zu faces selected", n->SelectedCount(), n->TriangleCount());
+            if (n->selectionOnly)
+               ImGui::TextDisabled("%zu of %zu faces selected", n->SelectedCount(), n->TriangleCount());
             ImGui::Checkbox("keep selected instead", &n->keepSelected);
             break;
          case GeometryOpNode::kTransformSelected:
@@ -3375,6 +3454,7 @@ namespace
          ModSlider("midlevel", &n->midlevel, 0.0f, 1.0f);
       ImGui::Checkbox("flat shade", &n->flatShade);
       ImGui::Checkbox("flip normals", &n->flipNormals);
+      ImGui::Checkbox("selection only", &n->selectionOnly);
    }
 
    void DrawSetColorParams(SetColorNode* n)
@@ -5583,6 +5663,17 @@ namespace
          spawned->showMiniViewport = rec.showMiniViewport;
          Patch::LoadParams(spawned->node.get(), rec.params);
          ReloadDerivedState(spawned->node.get());
+         // Phase 4 (selection as an input): rewrites a saved kDeleteSelected/
+         // kTransformSelected/kExtrudeSelected `op` integer to its general
+         // form + selectionOnly, in place on the live node. Deliberately not
+         // in ReloadDerivedState (which CopyParams/paste also call) - once a
+         // node is migrated here it stays migrated, so copy/paste of an
+         // already-loaded node never needs to re-normalize it, and the
+         // round-trip self-test's synthetic param fuzzing (which can drive
+         // `op` into the deprecated range on a plain Select node) doesn't
+         // mistake this normalization for dropped values.
+         if (auto* geomOp = dynamic_cast<GeometryOpNode*>(spawned->node.get()))
+            geomOp->MigrateDeprecatedOp();
       }
 
       auto resolve = [&](int savedIndex) -> GraphNode*
@@ -5991,7 +6082,8 @@ int main()
    for (const std::string& category : NodeFactory::Instance().GetCategories())
    {
       for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
-         allTypes.emplace_back(name, category);
+         if (IsUserSpawnable(name))
+            allTypes.emplace_back(name, category);
    }
 
    const bool selfTest = getenv("IMAGERESYNTH_SELFTEST") != nullptr;
@@ -7836,6 +7928,188 @@ int main()
                          movedOk && extruded.FaceCount() > cube.FaceCount() && reproducible &&
                          quadsIntact;
          printf("%s\n", ok ? "SELECTION OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_PHASE4TEST") != nullptr && frameId == 4)
+      {
+         // Phase 4 (selection as an input): GeometryOpNode::selectionOnly.
+         GeometryNode cube;
+         cube.shape = 1; cube.detail = 0; // plain 12-triangle cube
+         cube.CookIfNeeded(30000);
+
+         GeometryOpNode select;
+         select.input = &cube;
+         select.op = GeometryOpNode::kSelect;
+         select.selectMode = MeshOps::kSelectNormal;
+         select.axis = 1; select.selectA = 0.9f; select.selectC = 1.0f; // +Y top
+
+         auto rangeY = [](const Mesh& m) {
+            float lo = 1e30f, hi = -1e30f;
+            for (const Vertex& v : m.vertices) { lo = std::min(lo, v.py); hi = std::max(hi, v.py); }
+            return std::pair<float, float>(lo, hi);
+         };
+
+         // Done means #6: Cube -> Select(+Y) -> Transform, selectionOnly on
+         // moves only the top; off moves the whole cube.
+         GeometryOpNode moveOn;
+         moveOn.input = &select; moveOn.op = GeometryOpNode::kTransform;
+         moveOn.selectionOnly = true; moveOn.offsetY = 0.5f;
+         // Isolate the matrix-only effect being checked below - the default
+         // moveAlongNormals=true would add its own +0.2 on top of offsetY.
+         moveOn.moveAlongNormals = false;
+         moveOn.CookIfNeeded(30001);
+         const auto onRange = rangeY(moveOn.GetMesh());
+         const auto baseRange = rangeY(cube.GetMesh());
+         const bool onOk = std::fabs(onRange.second - (baseRange.second + 0.5f)) < 0.01f &&
+                           std::fabs(onRange.first - baseRange.first) < 0.01f;
+
+         GeometryOpNode moveOff;
+         moveOff.input = &select; moveOff.op = GeometryOpNode::kTransform;
+         moveOff.selectionOnly = false; moveOff.offsetY = 0.5f;
+         moveOff.CookIfNeeded(30002);
+         const auto offRange = rangeY(moveOff.GetMesh());
+         const bool offOk = std::fabs(offRange.second - (baseRange.second + 0.5f)) < 0.01f &&
+                            std::fabs(offRange.first - (baseRange.first + 0.5f)) < 0.01f;
+         printf("transform: selectionOnly on moves top only (%.2f..%.2f), off moves whole cube (%.2f..%.2f)  %s\n",
+                onRange.first, onRange.second, offRange.first, offRange.second,
+                (onOk && offOk) ? "OK" : "FAIL");
+
+         // kDelete: on removes just the 2 selected faces, off removes all 12
+         // (see the Op enum comment - "useless but consistent").
+         GeometryOpNode delOn;
+         delOn.input = &select; delOn.op = GeometryOpNode::kDelete; delOn.selectionOnly = true;
+         delOn.CookIfNeeded(30003);
+         const size_t delOnFaces = delOn.GetMesh().FaceCount();
+
+         GeometryOpNode delOff;
+         delOff.input = &select; delOff.op = GeometryOpNode::kDelete; delOff.selectionOnly = false;
+         delOff.CookIfNeeded(30004);
+         const size_t delOffFaces = delOff.GetMesh().FaceCount();
+         const bool deleteOk = delOnFaces == cube.GetMesh().FaceCount() - 2 && delOffFaces == 0;
+         printf("delete: selectionOnly on -> %zu faces, off -> %zu faces  %s\n",
+                delOnFaces, delOffFaces, deleteOk ? "OK" : "FAIL");
+
+         // kExtrude: on only extrudes the top (small triangle gain), off
+         // extrudes the entire mesh as one region (bigger gain, and the two
+         // must differ - both use MeshOps::Extrude, gated by whether the mask
+         // reaches it or gets cleared first).
+         GeometryOpNode extOn;
+         extOn.input = &select; extOn.op = GeometryOpNode::kExtrude;
+         extOn.selectionOnly = true; extOn.thickness = 0.3f;
+         extOn.CookIfNeeded(30005);
+         const size_t extOnFaces = extOn.GetMesh().FaceCount();
+
+         GeometryOpNode extOff;
+         extOff.input = &select; extOff.op = GeometryOpNode::kExtrude;
+         extOff.selectionOnly = false; extOff.thickness = 0.3f;
+         extOff.CookIfNeeded(30006);
+         const size_t extOffFaces = extOff.GetMesh().FaceCount();
+         const bool extrudeOk = extOnFaces > cube.GetMesh().FaceCount() &&
+                                extOffFaces > cube.GetMesh().FaceCount() &&
+                                extOnFaces != extOffFaces;
+         printf("extrude: selectionOnly on -> %zu faces, off -> %zu faces  %s\n",
+                extOnFaces, extOffFaces, extrudeOk ? "OK" : "FAIL");
+
+         // Done means #5, the highest-risk check in the phase: a patch saved
+         // before this change used the (now-deprecated) kTransformSelected/
+         // kDeleteSelected/kExtrudeSelected ops with no `selectionOnly` key at
+         // all - that param didn't exist yet. Simulate exactly that save,
+         // load it the way ApplyPatchData does (LoadParams then
+         // MigrateDeprecatedOp), and check both that the migration lands on
+         // the right (op, selectionOnly) and that the geometry it produces
+         // matches what the old deprecated op (still handled in GetMesh's
+         // switch, for defence in depth) would have produced.
+         auto stripSelectionOnly = [](std::vector<std::pair<std::string, std::string>>& params) {
+            params.erase(std::remove_if(params.begin(), params.end(),
+               [](const std::pair<std::string, std::string>& kv) { return kv.first == "selectionOnly"; }),
+               params.end());
+         };
+         auto sameMesh = [](const Mesh& a, const Mesh& b) {
+            if (a.vertices.size() != b.vertices.size() || a.indices.size() != b.indices.size())
+               return false;
+            for (size_t i = 0; i < a.vertices.size(); i++)
+               if (std::fabs(a.vertices[i].px - b.vertices[i].px) > 1e-5f ||
+                   std::fabs(a.vertices[i].py - b.vertices[i].py) > 1e-5f ||
+                   std::fabs(a.vertices[i].pz - b.vertices[i].pz) > 1e-5f)
+                  return false;
+            return true;
+         };
+
+         bool migrationOk = true;
+         {
+            GeometryOpNode oldNode;
+            oldNode.input = &select; oldNode.op = GeometryOpNode::kTransformSelected;
+            oldNode.offsetY = 0.5f; oldNode.moveAlongNormals = true; oldNode.normalAmount = 0.3f;
+            oldNode.CookIfNeeded(30010);
+            const Mesh preMigration = oldNode.GetMesh();
+
+            std::vector<std::pair<std::string, std::string>> params;
+            Patch::SaveParams(&oldNode, params);
+            stripSelectionOnly(params);
+
+            GeometryOpNode migrated;
+            Patch::LoadParams(&migrated, params);
+            migrated.MigrateDeprecatedOp();
+            migrated.input = &select;
+            const bool fieldsOk = migrated.op == GeometryOpNode::kTransform && migrated.selectionOnly;
+            migrated.CookIfNeeded(30011);
+            const bool meshOk = sameMesh(preMigration, migrated.GetMesh());
+            migrationOk = migrationOk && fieldsOk && meshOk;
+            printf("migrate Transform Selected -> Transform+selectionOnly: fields=%d mesh=%d  %s\n",
+                   fieldsOk, meshOk, (fieldsOk && meshOk) ? "OK" : "FAIL");
+         }
+         {
+            GeometryOpNode oldNode;
+            oldNode.input = &select; oldNode.op = GeometryOpNode::kDeleteSelected;
+            oldNode.keepSelected = true;
+            oldNode.CookIfNeeded(30012);
+            const Mesh preMigration = oldNode.GetMesh();
+
+            std::vector<std::pair<std::string, std::string>> params;
+            Patch::SaveParams(&oldNode, params);
+            stripSelectionOnly(params);
+
+            GeometryOpNode migrated;
+            Patch::LoadParams(&migrated, params);
+            migrated.MigrateDeprecatedOp();
+            migrated.input = &select;
+            const bool fieldsOk = migrated.op == GeometryOpNode::kDelete && migrated.selectionOnly;
+            migrated.CookIfNeeded(30013);
+            const bool meshOk = sameMesh(preMigration, migrated.GetMesh());
+            migrationOk = migrationOk && fieldsOk && meshOk;
+            printf("migrate Delete Selected -> Delete+selectionOnly: fields=%d mesh=%d  %s\n",
+                   fieldsOk, meshOk, (fieldsOk && meshOk) ? "OK" : "FAIL");
+         }
+         {
+            GeometryOpNode oldNode;
+            oldNode.input = &select; oldNode.op = GeometryOpNode::kExtrudeSelected;
+            oldNode.thickness = 0.3f; oldNode.inset = 0.1f;
+            oldNode.CookIfNeeded(30014);
+            const Mesh preMigration = oldNode.GetMesh();
+
+            std::vector<std::pair<std::string, std::string>> params;
+            Patch::SaveParams(&oldNode, params);
+            stripSelectionOnly(params);
+
+            GeometryOpNode migrated;
+            Patch::LoadParams(&migrated, params);
+            migrated.MigrateDeprecatedOp();
+            migrated.input = &select;
+            const bool fieldsOk = migrated.op == GeometryOpNode::kExtrude && migrated.selectionOnly;
+            migrated.CookIfNeeded(30015);
+            // kExtrude (general) is region-merged while ExtrudeSelected is a
+            // simpler per-face wall - not byte-identical, but must select the
+            // same faces and add geometry rather than silently no-op.
+            const Mesh& migratedMesh = migrated.GetMesh();
+            const bool meshOk = migratedMesh.FaceCount() > cube.GetMesh().FaceCount() &&
+                                preMigration.FaceCount() > cube.GetMesh().FaceCount();
+            migrationOk = migrationOk && fieldsOk && meshOk;
+            printf("migrate Extrude Selected -> Extrude+selectionOnly: fields=%d mesh=%d  %s\n",
+                   fieldsOk, meshOk, (fieldsOk && meshOk) ? "OK" : "FAIL");
+         }
+
+         const bool phase4Ok = onOk && offOk && deleteOk && extrudeOk && migrationOk;
+         printf("%s\n", phase4Ok ? "PHASE 4 OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_PADPATHTEST") != nullptr && frameId == 4)
@@ -12761,6 +13035,8 @@ int main()
                ImGui::SeparatorText(DisplayName(category).c_str());
                for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                {
+                  if (!IsUserSpawnable(name))
+                     continue;
                   ++shown;
                   if (ImGui::Selectable(DisplayName(name).c_str()))
                   {
@@ -12884,6 +13160,8 @@ int main()
             std::vector<std::string> matches;
             for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
             {
+               if (!IsUserSpawnable(name))
+                  continue;
                if (q.empty())
                {
                   matches.push_back(name);

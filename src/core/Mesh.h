@@ -402,6 +402,30 @@ namespace MeshOps
    Mesh TransformSelected(const Mesh& in, const Mat4& m, bool alongNormals, float normalAmount);
    Mesh ExtrudeSelected(const Mesh& in, float distance, float inset);
 
+   // Phase 4 (selection as an input): the generic plumbing every operator's
+   // `selectionOnly` toggle is built from, so each op doesn't invent its own.
+   //
+   // Splits `in` into its selected and unselected faces as two independent
+   // meshes with no shared vertex indices - the same trade-off
+   // ExtrudeSelected already makes at the wall it inserts, a possible seam at
+   // the boundary rather than a weld.
+   struct SelectionSplit { Mesh selected, unselected; };
+   SelectionSplit SplitBySelection(const Mesh& in);
+   // Concatenates b's vertices/indices onto a in place, no welding - the
+   // inverse of SplitBySelection, used to stitch an operator's selected-only
+   // result back together with the unselected part it didn't touch.
+   void AppendMesh(Mesh& a, const Mesh& b);
+   // A copy of `in` with faceMask cleared, so a selection-aware operator can
+   // be told to ignore whatever mask arrived on its input - the
+   // `selectionOnly == false` half of every operator this phase touches.
+   Mesh ClearSelection(const Mesh& in);
+   // A vertex counts as selected if any face touching it is selected - the
+   // same rule ToPoints already uses to decide which vertices survive a face
+   // selection (src/core/Mesh.cpp, the point-mode `touched` loop). Shared here
+   // rather than reimplemented so Twist/Displace's `selectionOnly` uses the
+   // one rule that already exists.
+   std::vector<unsigned char> VertexSelectionFromFaces(const Mesh& in);
+
    // Contour where a mesh crosses an axis-aligned plane. This is what gives a
    // closed object something to be followed "around", since it has no boundary.
    std::vector<Polyline> SliceContours(const Mesh& in, int axis, float position);
@@ -411,7 +435,10 @@ namespace MeshOps
    Mesh Triangulate(const Mesh& in, float jitter);
    Mesh RecalculateNormals(const Mesh& in, bool flat, bool flip);
    Mesh Explode(const Mesh& in, float amount, float seed);
-   Mesh Twist(const Mesh& in, float angle, int axis);
+   // `vertexMask`, when non-null, restricts the twist to vertices marked 1 -
+   // see VertexSelectionFromFaces. Null (the default) twists every vertex,
+   // unchanged from before this parameter existed.
+   Mesh Twist(const Mesh& in, float angle, int axis, const std::vector<unsigned char>* vertexMask = nullptr);
 
    // Moves each vertex using a texture sampled at its UV, the 3D counterpart
    // to the 2D `displace`/`liquify` filters - those warp an image's UVs, this
@@ -429,8 +456,12 @@ namespace MeshOps
    // per-vertex offsets averaged and applied as one, so seams stay closed
    // instead of tearing open as each duplicate is pushed along its own
    // (different) normal.
+   // `vertexMask`, when non-null, restricts the displacement to vertices
+   // marked 1 - see VertexSelectionFromFaces. Null (the default) displaces
+   // every vertex, unchanged from before this parameter existed.
    Mesh Displace(const Mesh& in, const std::vector<float>& texRGBA, int texW, int texH,
-                 int mode, float strength, float midlevel, bool flat, bool flip);
+                 int mode, float strength, float midlevel, bool flat, bool flip,
+                 const std::vector<unsigned char>* vertexMask = nullptr);
 
    // Sampling for instancing: vertices, edge midpoints or face centres.
    //

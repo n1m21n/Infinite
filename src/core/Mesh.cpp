@@ -1858,11 +1858,14 @@ namespace MeshOps
       return out;
    }
 
-   Mesh Twist(const Mesh& in, float angle, int axis)
+   Mesh Twist(const Mesh& in, float angle, int axis, const std::vector<unsigned char>* vertexMask)
    {
       Mesh out = in;
-      for (Vertex& v : out.vertices)
+      for (size_t i = 0; i < out.vertices.size(); i++)
       {
+         if (vertexMask != nullptr && (i >= vertexMask->size() || !(*vertexMask)[i]))
+            continue;
+         Vertex& v = out.vertices[i];
          const float along = (axis == 0) ? v.px : (axis == 1) ? v.py : v.pz;
          const float a = angle * along;
          const float s = std::sin(a), c = std::cos(a);
@@ -1889,7 +1892,8 @@ namespace MeshOps
    }
 
    Mesh Displace(const Mesh& in, const std::vector<float>& texRGBA, int texW, int texH,
-                 int mode, float strength, float midlevel, bool flat, bool flip)
+                 int mode, float strength, float midlevel, bool flat, bool flip,
+                 const std::vector<unsigned char>* vertexMask)
    {
       Mesh out = in;
       if (!texRGBA.empty() && texW > 0 && texH > 0 && !out.vertices.empty())
@@ -1909,6 +1913,8 @@ namespace MeshOps
 
          for (size_t i = 0; i < n; i++)
          {
+            if (vertexMask != nullptr && (i >= vertexMask->size() || !(*vertexMask)[i]))
+               continue;
             const Vertex& v = out.vertices[i];
             float s[4];
             SampleBilinearRGBA(texRGBA, texW, texH, v.u, v.v, s);
@@ -1932,6 +1938,8 @@ namespace MeshOps
 
          for (size_t i = 0; i < n; i++)
          {
+            if (vertexMask != nullptr && (i >= vertexMask->size() || !(*vertexMask)[i]))
+               continue;
             const unsigned int w = weld[i];
             const float c = (float)std::max(1, count[w]);
             out.vertices[i].px += accum[w * 3 + 0] / c;
@@ -4308,6 +4316,78 @@ Mesh Select(const Mesh& in, int mode, float a, float b, float c, int axis,
       out.faceMask[f] = hit ? 1 : 0;
    }
    return out;
+}
+
+SelectionSplit SplitBySelection(const Mesh& in)
+{
+   SelectionSplit r;
+   const size_t faces = in.FaceCount();
+   std::vector<int> selRemap(in.vertices.size(), -1), unselRemap(in.vertices.size(), -1);
+   std::vector<unsigned int> selMapping, unselMapping;
+   for (size_t f = 0; f < faces; f++)
+   {
+      const bool sel = in.FaceSelected(f);
+      Mesh& out = sel ? r.selected : r.unselected;
+      std::vector<int>& remap = sel ? selRemap : unselRemap;
+      std::vector<unsigned int>& mapping = sel ? selMapping : unselMapping;
+      for (int k = 0; k < 3; k++)
+      {
+         const unsigned int index = in.indices[f * 3 + k];
+         if (remap[index] < 0)
+         {
+            remap[index] = (int)out.vertices.size();
+            out.vertices.push_back(in.vertices[index]);
+            mapping.push_back(index);
+         }
+         out.indices.push_back((unsigned int)remap[index]);
+      }
+   }
+   r.selected.vertexColor = RemapVertexColor(in.vertexColor, selMapping, r.selected.vertices.size());
+   r.unselected.vertexColor = RemapVertexColor(in.vertexColor, unselMapping, r.unselected.vertices.size());
+   return r;
+}
+
+void AppendMesh(Mesh& a, const Mesh& b)
+{
+   if (b.vertices.empty())
+      return;
+   const unsigned int base = (unsigned int)a.vertices.size();
+   const bool hadColorA = a.HasVertexColor();
+   const bool hadColorB = b.HasVertexColor();
+   a.vertices.insert(a.vertices.end(), b.vertices.begin(), b.vertices.end());
+   for (unsigned int idx : b.indices)
+      a.indices.push_back(base + idx);
+   if (hadColorA || hadColorB)
+   {
+      if (!hadColorA)
+         a.vertexColor.assign((size_t)base * 3, 1.0f);
+      if (hadColorB)
+         a.vertexColor.insert(a.vertexColor.end(), b.vertexColor.begin(), b.vertexColor.end());
+      else
+         a.vertexColor.insert(a.vertexColor.end(), b.vertices.size() * 3, 1.0f);
+   }
+}
+
+Mesh ClearSelection(const Mesh& in)
+{
+   Mesh out = in;
+   out.faceMask.clear();
+   return out;
+}
+
+std::vector<unsigned char> VertexSelectionFromFaces(const Mesh& in)
+{
+   std::vector<unsigned char> touched(in.vertices.size(), 0);
+   const size_t faces = in.FaceCount();
+   for (size_t f = 0; f < faces; f++)
+   {
+      if (!in.FaceSelected(f))
+         continue;
+      touched[in.indices[f * 3 + 0]] = 1;
+      touched[in.indices[f * 3 + 1]] = 1;
+      touched[in.indices[f * 3 + 2]] = 1;
+   }
+   return touched;
 }
 
 Mesh DeleteSelected(const Mesh& in, bool keepSelected)

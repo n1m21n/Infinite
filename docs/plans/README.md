@@ -17,7 +17,7 @@ number — the substrate is what makes conversions compose.
 | 1 — points render as camera-facing sprites | — | **done**, `f47a942` |
 | 2 — one geometry interface, no per-class ladders | `phase2-one-geometry-interface.md` | not started |
 | 3 — per-element colour attributes | `phase3-per-element-color.md` | not started |
-| 4 — selection as an input, not four operators | `phase4-selection-as-input.md` | not started |
+| 4 — selection as an input, not four operators | `phase4-selection-as-input.md` | **done** |
 | 5 — curves first-class (3 conversion nodes) | `phase5-curves-first-class.md` | not started |
 | 6 — real point distribution (4 nodes) | `phase6-point-distribution.md` | not started |
 

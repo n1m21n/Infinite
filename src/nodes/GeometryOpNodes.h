@@ -22,7 +22,18 @@ public:
       kWireframe, kTriangulate, kNormals, kExplode, kTwist,
       kSmooth, kMirror, kScrew,
       // Selection: one node chooses faces, the rest act only on what is chosen.
+      //
+      // kDeleteSelected/kTransformSelected/kExtrudeSelected are deprecated -
+      // kept at their saved-patch indices only so old `op` integers keep
+      // meaning something; ReloadDerivedState remaps them to
+      // (kDelete/kTransform/kExtrude, selectionOnly=true) on load and they no
+      // longer appear in the spawn menu or the operation dropdown. Do not
+      // reuse or reorder these four indices - see docs/plans/phase4-selection-as-input.md.
       kSelect, kDeleteSelected, kTransformSelected, kExtrudeSelected,
+      // General form of kDeleteSelected: with `selectionOnly` off it deletes
+      // every face, which is a legitimate (if unexciting) way to empty a
+      // mesh; turn `selectionOnly` on to restrict it to a Select node's mask.
+      kDelete,
       kOpCount
    };
 
@@ -37,6 +48,15 @@ public:
       return node;
    }
    static const std::vector<std::string>& OpNames();
+   // False for the three deprecated `*Selected` ops (see the Op enum comment)
+   // - they stay registered under NodeFactory for old patches to resolve by
+   // name, but shouldn't appear as spawnable choices going forward.
+   static bool IsSpawnable(int op);
+   // Rewrites a deprecated `*Selected` op to its general form + selectionOnly,
+   // in place. A no-op for any other op. Called from ReloadDerivedState after
+   // both patch load and copy/paste, so a saved integer never has to be
+   // reinterpreted anywhere else.
+   void MigrateDeprecatedOp();
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
 
@@ -88,6 +108,13 @@ public:
 
    int op = kArray;
    bool inheritMaterial = true;
+   // When set and the incoming mesh carries a selection (Mesh::faceMask
+   // non-empty), this operator only affects selected faces and passes the
+   // rest through untouched. Ignored when the input has no selection, so
+   // nothing changes for a chain with no Select node in it. Hidden in the
+   // params panel for operators where "only these faces" isn't well defined
+   // - see DrawGeometryOpParams and docs/plans/phase4-selection-as-input.md.
+   bool selectionOnly = false;
 
    // shared
    float amount = 1.0f;
@@ -175,6 +202,7 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("op", op); v.Bool("inherit", inheritMaterial);
+      v.Bool("selectionOnly", selectionOnly);
       v.Float("amount", amount); v.Int("count", count);
       v.Float("offsetX", offsetX); v.Float("offsetY", offsetY); v.Float("offsetZ", offsetZ);
       v.Float("rotStep", rotStep); v.Float("scaleStep", scaleStep);
@@ -218,6 +246,7 @@ private:
       // spin == 0 still compare equal regardless of when each ran.
       float spinBeats = 0;
       bool radial = false, keep = false, flat = false, flip = false;
+      bool selectionOnly = false;
       int iter = 0, screwSteps = 0;
       float mirrorOffset = 0, turns = 0, rise = 0, radiusOffset = 0;
       bool weldSeam = false;
@@ -237,6 +266,7 @@ private:
                 a == o.a && ox == o.ox && oy == o.oy && oz == o.oz && rs == o.rs &&
                 ss == o.ss && rad == o.rad && sm == o.sm && th == o.th && ins == o.ins &&
                 sd == o.sd && radial == o.radial && keep == o.keep && flat == o.flat &&
+                selectionOnly == o.selectionOnly &&
                 flip == o.flip && iter == o.iter && screwSteps == o.screwSteps &&
                 mirrorOffset == o.mirrorOffset && turns == o.turns && rise == o.rise &&
                 radiusOffset == o.radiusOffset && weldSeam == o.weldSeam &&
@@ -321,6 +351,10 @@ public:
    float midlevel = 0.5f;
    bool flatShade = false, flipNormals = false;
    bool inheritMaterial = true;
+   // See GeometryOpNode::selectionOnly - same convention, restricted here to
+   // vertices touching a selected face (MeshOps::VertexSelectionFromFaces),
+   // since displacement is inherently per-vertex.
+   bool selectionOnly = false;
 
    // material used when not inheriting
    float color[3] = { 0.8f, 0.82f, 0.9f };
@@ -358,6 +392,7 @@ public:
       v.Int("mode", mode); v.Float("strength", strength); v.Float("midlevel", midlevel);
       v.Bool("flat", flatShade); v.Bool("flip", flipNormals);
       v.Bool("inherit", inheritMaterial);
+      v.Bool("selectionOnly", selectionOnly);
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
@@ -376,6 +411,7 @@ private:
       int mode = -1;
       float strength = 0, midlevel = 0;
       bool flat = false, flip = false;
+      bool selectionOnly = false;
       const void* upstream = nullptr;
       unsigned long long upstreamRevision = 0;
       // Bumped when the texture's pixel content actually changes (see
@@ -385,7 +421,7 @@ private:
       bool operator==(const Signature& o) const
       {
          return mode == o.mode && strength == o.strength && midlevel == o.midlevel &&
-                flat == o.flat && flip == o.flip &&
+                flat == o.flat && flip == o.flip && selectionOnly == o.selectionOnly &&
                 upstream == o.upstream && upstreamRevision == o.upstreamRevision &&
                 texGeneration == o.texGeneration;
       }

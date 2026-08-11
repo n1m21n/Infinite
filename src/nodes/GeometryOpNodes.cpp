@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <functional>
 
 #include "GLUtil.h"
 #include "Transport.h"
@@ -14,7 +15,11 @@ namespace
       "Transform", "Array", "Subdivide", "Solidify", "Extrude",
       "Wireframe", "Triangulate", "Normals", "Explode", "Twist",
       "Smooth", "Mirror", "Screw",
-      "Select", "Delete Selected", "Transform Selected", "Extrude Selected"
+      // The last three are deprecated (GeometryOpNode::kOpCount comment) -
+      // still named here so a saved index still has a label, just not spawned
+      // or offered in the operation dropdown (GeometryOpNode::IsSpawnable).
+      "Select", "Delete Selected", "Transform Selected", "Extrude Selected",
+      "Delete"
    };
    const std::vector<std::string> kSourceNames = { "Vertices", "Edges", "Faces" };
    const std::vector<std::string> kWrapModeNames = { "Cylindrical", "Spherical", "Nearest Surface" };
@@ -58,6 +63,22 @@ namespace
 
 const std::vector<std::string>& GeometryOpNode::OpNames() { return kOpNames; }
 
+bool GeometryOpNode::IsSpawnable(int op)
+{
+   return op != kDeleteSelected && op != kTransformSelected && op != kExtrudeSelected;
+}
+
+void GeometryOpNode::MigrateDeprecatedOp()
+{
+   switch (op)
+   {
+      case kDeleteSelected:    op = kDelete;    selectionOnly = true; break;
+      case kTransformSelected: op = kTransform; selectionOnly = true; break;
+      case kExtrudeSelected:   op = kExtrude;   selectionOnly = true; break;
+      default: break;
+   }
+}
+
 Mat4 GeometryOpNode::TransformMatrix() const
 {
    const float spinPhase = spin * (float)Transport::Instance().Beats();
@@ -96,6 +117,7 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    // be live the first time this signature matched.
    s.spinBeats = (spin != 0.0f) ? (float)Transport::Instance().Beats() : 0.0f;
    s.radial = radial; s.keep = keepOriginal; s.flat = flatShade; s.flip = flipNormals;
+   s.selectionOnly = selectionOnly;
    s.selectMode = selectMode;
    s.selectA = selectA; s.selectB = selectB; s.selectC = selectC;
    s.selectSeed = selectSeed; s.normalAmount = normalAmount;
@@ -128,6 +150,21 @@ const Mesh& GeometryOpNode::GetMesh()
       return mCache;
 
    const Mesh& src = input->GetMesh();
+   // Per-face-independent operators (Explode, Triangulate, Normals, Solidify,
+   // Wireframe) get `selectionOnly` by running on the selected faces alone
+   // and stitching the untouched rest back on - see MeshOps::SplitBySelection.
+   // Delete/Transform/Extrude instead reuse the dedicated *Selected functions
+   // (or, for Extrude, its own built-in FaceSelected filter) since those
+   // already implement face-accurate restriction without a split/rejoin seam.
+   auto restricted = [&](const std::function<Mesh(const Mesh&)>& fn) -> Mesh
+   {
+      if (!selectionOnly || src.faceMask.empty())
+         return fn(src);
+      MeshOps::SelectionSplit split = MeshOps::SplitBySelection(src);
+      Mesh result = fn(split.selected);
+      MeshOps::AppendMesh(result, split.unselected);
+      return result;
+   };
    switch (op)
    {
       case kTransform:
@@ -137,34 +174,46 @@ const Mesh& GeometryOpNode::GetMesh()
          // in the stamp's *local* frame (inflating/smearing every copy) instead
          // of moving the whole scattered result as one rigid group. Leave the
          // stamp mesh untouched and let GetInstanceGroupMatrix() carry it.
-         mCache = WrapsInstancer(input) ? src : MeshOps::Transform(src, TransformMatrix());
+         if (WrapsInstancer(input))
+            mCache = src;
+         else if (selectionOnly)
+            mCache = MeshOps::TransformSelected(src, TransformMatrix(), moveAlongNormals, normalAmount);
+         else
+            mCache = MeshOps::Transform(src, TransformMatrix());
          break;
       case kArray:
          mCache = MeshOps::Array(src, count, offsetX, offsetY, offsetZ,
                                  rotStep * 3.14159265f / 180.0f, scaleStep, radial, radius);
          break;
       case kSubdivide:
+         // Connectivity-dependent - partially subdividing needs crease
+         // handling at the selection boundary to avoid cracks. Out of scope
+         // for this phase; selectionOnly is hidden for this op in the UI.
          mCache = MeshOps::Subdivide(src, levels, smooth);
          break;
       case kSolidify:
-         mCache = MeshOps::Solidify(src, thickness, keepOriginal);
+         mCache = restricted([&](const Mesh& m) { return MeshOps::Solidify(m, thickness, keepOriginal); });
          break;
       case kExtrude:
-         mCache = MeshOps::Extrude(src, thickness, inset);
+         // MeshOps::Extrude already filters on Mesh::FaceSelected internally
+         // (region-merged, handles n-gons) - selectionOnly just decides
+         // whether the incoming mask reaches it or gets cleared first.
+         mCache = MeshOps::Extrude(selectionOnly ? src : MeshOps::ClearSelection(src), thickness, inset);
          break;
       case kWireframe:
-         mCache = MeshOps::Wireframe(src, thickness);
+         mCache = restricted([&](const Mesh& m) { return MeshOps::Wireframe(m, thickness); });
          break;
       case kTriangulate:
-         mCache = MeshOps::Triangulate(src, amount * 0.05f);
+         mCache = restricted([&](const Mesh& m) { return MeshOps::Triangulate(m, amount * 0.05f); });
          break;
       case kNormals:
-         mCache = MeshOps::RecalculateNormals(src, flatShade, flipNormals);
+         mCache = restricted([&](const Mesh& m) { return MeshOps::RecalculateNormals(m, flatShade, flipNormals); });
          break;
       case kExplode:
-         mCache = MeshOps::Explode(src, amount * 0.3f, seed);
+         mCache = restricted([&](const Mesh& m) { return MeshOps::Explode(m, amount * 0.3f, seed); });
          break;
       case kSmooth:
+         // Connectivity-dependent - see kSubdivide. selectionOnly hidden.
          // Laplacian relaxation alone barely moves a low-poly primitive like a
          // Cube - it has no extra vertices between the corners to round out.
          // Subdividing first gives it geometry to actually smooth.
@@ -172,10 +221,16 @@ const Mesh& GeometryOpNode::GetMesh()
                                   iterations, amount);
          break;
       case kMirror:
+         // Duplicates the whole mesh - "only these faces" isn't meaningful.
+         // selectionOnly hidden.
          mCache = MeshOps::Mirror(src, axis, mirrorOffset, weldSeam, keepOriginal);
          break;
       case kScrew:
+         // Connectivity-dependent - see kSubdivide. selectionOnly hidden.
          mCache = MeshOps::Screw(src, screwSteps, turns, rise, radiusOffset, axis);
+         break;
+      case kDelete:
+         mCache = MeshOps::DeleteSelected(selectionOnly ? src : MeshOps::ClearSelection(src), keepSelected);
          break;
       case kSelect:
          mCache = MeshOps::Select(src, selectMode, selectA, selectB, selectC, axis,
@@ -191,8 +246,16 @@ const Mesh& GeometryOpNode::GetMesh()
          mCache = MeshOps::ExtrudeSelected(src, thickness, inset);
          break;
       default:
-         mCache = MeshOps::Twist(src, amount * 3.14159265f / 180.0f * 3.0f, axis);
+      {
+         // kTwist - per-vertex, so selectionOnly derives a vertex mask from
+         // the incoming face selection (a vertex counts as selected if any
+         // touching face does - MeshOps::VertexSelectionFromFaces), rather
+         // than the split/rejoin restricted() uses for per-face operators.
+         const std::vector<unsigned char> vertexMask = MeshOps::VertexSelectionFromFaces(src);
+         mCache = MeshOps::Twist(src, amount * 3.14159265f / 180.0f * 3.0f, axis,
+                                 (selectionOnly && !src.faceMask.empty()) ? &vertexMask : nullptr);
          break;
+      }
    }
 
    mBuilt = sig;
@@ -272,6 +335,7 @@ DisplacementNode::Signature DisplacementNode::CurrentSignature() const
    s.midlevel = midlevel;
    s.flat = flatShade;
    s.flip = flipNormals;
+   s.selectionOnly = selectionOnly;
    s.upstream = input;
    s.upstreamRevision = input ? input->MeshRevision() : 0;
    s.texGeneration = mTexGeneration;
@@ -290,8 +354,10 @@ const Mesh& DisplacementNode::GetMesh()
       return mCache;
 
    const Mesh& src = input->GetMesh();
+   const std::vector<unsigned char> vertexMask = MeshOps::VertexSelectionFromFaces(src);
    mCache = MeshOps::Displace(src, mTexPixels, mTexW, mTexH, mode, strength, midlevel,
-                              flatShade, flipNormals);
+                              flatShade, flipNormals,
+                              (selectionOnly && !src.faceMask.empty()) ? &vertexMask : nullptr);
 
    mBuilt = sig;
    mHasBuilt = true;
