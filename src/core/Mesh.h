@@ -36,6 +36,14 @@ struct Mesh
    // unselected triangle.
    std::vector<unsigned int> selectionGroup;
 
+   // Per-vertex linear RGB, three floats per vertex, parallel to `vertices`.
+   // Empty means "no per-vertex colour" - the material's flat colour is used
+   // instead, so no existing mesh grew a cost. A flat vector<float> rather
+   // than a vector<Color> struct, matching how InstanceOnPointsNode packs
+   // per-instance colour for upload - same shape means the same upload path
+   // works.
+   std::vector<float> vertexColor;
+
    bool Empty() const { return vertices.empty() || indices.empty(); }
    size_t FaceCount() const { return indices.size() / 3; }
 
@@ -43,6 +51,10 @@ struct Mesh
    {
       return faceMask.empty() || (face < faceMask.size() && faceMask[face] != 0);
    }
+   // Size-mismatched data is treated as absent, never indexed into - an
+   // operator that resizes `vertices` and forgets `vertexColor` would
+   // otherwise read out of bounds.
+   bool HasVertexColor() const { return vertexColor.size() == vertices.size() * 3; }
    size_t SelectedCount() const
    {
       if (faceMask.empty())
@@ -276,6 +288,10 @@ struct MeshPoint
    float nx = 0, ny = 1, nz = 0;
    float scale = 1.0f;
    int index = 0;
+   // Carried from Mesh::vertexColor when the source had it, 1,1,1 otherwise -
+   // ToPoints() fills this so a Set Color upstream of Mesh to Points survives
+   // the conversion into the point domain.
+   float r = 1.0f, g = 1.0f, b = 1.0f;
 };
 
 namespace MeshOps
@@ -314,6 +330,17 @@ namespace MeshOps
    // vertices at UV seams and flat-shaded edges, and treating those as separate
    // points tears a surface open along its seams.
    std::vector<unsigned int> BuildWeldMap(const Mesh& in);
+
+   // Rebuilds a vertexColor array for `outVertexCount` new vertices, each
+   // sourced from `mapping[i]` in `srcColor` (an rgb-triple array sized for
+   // some old vertex count). Returns empty if `srcColor` is empty (no colour
+   // to propagate) or any mapping index is out of range for it. Shared by
+   // every operator that remaps vertices one-to-one, so the "size mismatch
+   // means absent" convention is enforced in one place rather than open-coded
+   // per operator.
+   std::vector<float> RemapVertexColor(const std::vector<float>& srcColor,
+                                        const std::vector<unsigned int>& mapping,
+                                        size_t outVertexCount);
 
    // Rounds off hard edges by pulling every vertex toward the average of its
    // neighbours, then re-splitting so the flat regions stay flat. Not a true

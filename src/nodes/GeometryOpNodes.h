@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "Geometry3DNodes.h"
+#include "Palette.h"
 
 // One class for every mesh -> mesh operator, chosen by a dropdown - the same
 // table-driven approach FilterNode uses for image effects, so adding an
@@ -552,6 +553,131 @@ private:
    float mBuiltScale = -1, mBuiltScaleRand = -1, mBuiltRotRand = -1, mBuiltSeed = -1, mBuiltOffset = -1;
    bool mBuiltAlign = false;
    int mLastCookFrame = -1;
+};
+
+// --- Set Color -------------------------------------------------------------
+// Writes per-element colour: Mesh::vertexColor for a mesh, Particle::r/g/b for
+// a point cloud, whichever the input actually carries (both, if it carries
+// both - see MeshToPointsNode). Its own class rather than a GeometryOpNode
+// row, same reasoning as DisplacementNode/WrapNode: it needs two extra pins
+// (texture, palette) the table's single geo input doesn't have room for.
+//
+// Deliberately NOT a generic named-attribute writer - see docs/plans -
+// "source" is a fixed dropdown, not free text.
+class SetColorNode : public INode, public IGeometrySource
+{
+public:
+   enum Source { kFlat = 0, kPosition, kNormal, kIndex, kRandom, kPalette, kTexture, kSourceCount };
+
+   static INode* Create() { return new SetColorNode(); }
+   ~SetColorNode() override;
+   static const std::vector<std::string>& SourceNames();
+
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+
+   const Mesh& GetMesh() override;
+   unsigned long long MeshRevision() override;
+   const std::vector<Particle>* GetPointCloud() override;
+   unsigned long long PointCloudRevision() override;
+   // Forwarded, not identity - see DisplacementNode for why.
+   Mat4 GetModelMatrix() const override
+   {
+      return input ? input->GetModelMatrix() : Mat4::Identity();
+   }
+   Material GetMaterial() const override { return input ? input->GetMaterial() : Material(); }
+   unsigned int GetSurfaceTexture() override { return input ? input->GetSurfaceTexture() : 0; }
+   unsigned int GetMaterialTexture(int map) override
+   {
+      return input ? input->GetMaterialTexture(map) : 0;
+   }
+   unsigned long long SurfaceTextureRevision() const override
+   {
+      return input ? input->SurfaceTextureRevision() : 0;
+   }
+   MappingTransform GetMappingTransform() const override
+   {
+      return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   IGeometrySource* PassthroughSource() const override { return input; }
+
+   IGeometrySource* input = nullptr;
+   IPaletteSource* paletteInput = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
+   ImageCable& TextureInput() { return mTextureInput; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* kNames[] = { "geo", "texture", "palette" };
+      return (slot >= 0 && slot < 3) ? kNames[slot] : nullptr;
+   }
+   size_t TriangleCount() const { return mCache.indices.size() / 3; }
+
+   int source = kFlat;
+   float flatColor[3] = { 1.0f, 1.0f, 1.0f };
+   // Ramp endpoints for Position/Normal/Index.
+   float rampA[3] = { 0.0f, 0.0f, 0.0f };
+   float rampB[3] = { 1.0f, 1.0f, 1.0f };
+   float seed = 0.0f;                  // Random
+   int paletteOffset = 0;              // Palette: rotates which swatch element 0 gets
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("source", source);
+      v.Color("flatColor", flatColor);
+      v.Color("rampA", rampA); v.Color("rampB", rampB);
+      v.Float("seed", seed);
+      v.Int("paletteOffset", paletteOffset);
+   }
+
+private:
+   struct Signature
+   {
+      int source = -1;
+      float flatColor[3] = { 0, 0, 0 };
+      float rampA[3] = { 0, 0, 0 };
+      float rampB[3] = { 0, 0, 0 };
+      float seed = 0;
+      int paletteOffset = 0;
+      const void* upstream = nullptr;
+      unsigned long long upstreamMeshRevision = 0;
+      unsigned long long upstreamCloudRevision = 0;
+      unsigned long long texGeneration = 0;
+      unsigned long long paletteHash = 0;
+      bool operator==(const Signature& o) const
+      {
+         return source == o.source && seed == o.seed && paletteOffset == o.paletteOffset &&
+                flatColor[0] == o.flatColor[0] && flatColor[1] == o.flatColor[1] && flatColor[2] == o.flatColor[2] &&
+                rampA[0] == o.rampA[0] && rampA[1] == o.rampA[1] && rampA[2] == o.rampA[2] &&
+                rampB[0] == o.rampB[0] && rampB[1] == o.rampB[1] && rampB[2] == o.rampB[2] &&
+                upstream == o.upstream && upstreamMeshRevision == o.upstreamMeshRevision &&
+                upstreamCloudRevision == o.upstreamCloudRevision &&
+                texGeneration == o.texGeneration && paletteHash == o.paletteHash;
+      }
+   };
+
+   Signature CurrentSignature() const;
+   void Rebuild();
+
+   Mesh mCache;
+   std::vector<Particle> mPointCache;
+   bool mHasPointCache = false;
+   Signature mBuilt;
+   bool mHasBuilt = false;
+   unsigned long long mMeshRevision = 0;
+   unsigned long long mCloudRevision = 0;
+   int mLastCookFrame = -1;
+
+   ImageCable mTextureInput;
+   std::vector<float> mTexPixels;
+   int mTexW = 0, mTexH = 0;
+   unsigned int mReadFbo = 0;
+   unsigned long long mTexGeneration = 0;
+   unsigned long long mTexHash = 0;
+   bool mHasTexHash = false;
 };
 
 // --- Wrap (Shrinkwrap-style "Nearest Surface Point") ---------------------

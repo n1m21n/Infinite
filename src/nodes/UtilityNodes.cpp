@@ -385,7 +385,10 @@ void MeshToPointsNode::RebuildIfNeeded()
       particle.px = p.px; particle.py = p.py; particle.pz = p.pz;
       particle.nx = p.nx; particle.ny = p.ny; particle.nz = p.nz;
       particle.scale = pointSize * 0.5f * p.scale;
-      particle.r = tint[0]; particle.g = tint[1]; particle.b = tint[2];
+      // p.r/g/b carries src.vertexColor sampled at this point (1,1,1 when the
+      // source mesh has none), so a Set Color upstream of Mesh to Points
+      // multiplies into the uniform tint instead of being lost in translation.
+      particle.r = tint[0] * p.r; particle.g = tint[1] * p.g; particle.b = tint[2] * p.b;
       mPoints.push_back(particle);
    }
 

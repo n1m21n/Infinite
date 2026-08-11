@@ -1063,6 +1063,7 @@ namespace
             "3D");
       }
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
+      REGISTER_NODE(SetColorNode, Set Color, "3D");
       REGISTER_NODE(WrapNode, Wrap, "3D");
       REGISTER_NODE(Switcher3DNode, Switcher 3D, "3D");
       REGISTER_NODE(CameraNode, Camera, "3D");
@@ -1281,6 +1282,8 @@ namespace
          return 1;
       if (dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr)
          return 2; // geometry, then the displacement texture
+      if (dynamic_cast<SetColorNode*>(gn.node.get()) != nullptr)
+         return 3; // geometry, texture, palette
       if (dynamic_cast<InstanceOnPointsNode*>(gn.node.get()) != nullptr)
          return 3; // points, shape, cloud
       if (dynamic_cast<WrapNode*>(gn.node.get()) != nullptr)
@@ -1350,6 +1353,11 @@ namespace
       // slot 1 is the height/vector displacement texture.
       if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
          return slot == 1 ? &disp->TextureInput() : nullptr;
+      // Slot 0 is the geometry pin, wired by pointer in ConnectGeometrySlot;
+      // slot 1 is the colour source texture; slot 2 (palette) is a raw
+      // IPaletteSource* pointer, also wired in ConnectGeometrySlot.
+      if (auto* setColor = dynamic_cast<SetColorNode*>(gn.node.get()))
+         return slot == 1 ? &setColor->TextureInput() : nullptr;
       if (auto* geo = dynamic_cast<GeometryNode*>(gn.node.get()))
          return slot == 0 ? &geo->TextureInput() : nullptr;
       if (auto* fb = dynamic_cast<FeedbackNode*>(gn.node.get()))
@@ -1392,6 +1400,12 @@ namespace
       if (IGeometrySource** field = dst.node->GeometryInputSlot(slot))
       {
          *field = geo;
+         return;
+      }
+      if (auto* setColor = dynamic_cast<SetColorNode*>(dst.node.get()))
+      {
+         if (slot == 2)
+            setColor->paletteInput = dynamic_cast<IPaletteSource*>(src.node.get());
          return;
       }
       if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst.node.get()))
@@ -3361,6 +3375,40 @@ namespace
          ModSlider("midlevel", &n->midlevel, 0.0f, 1.0f);
       ImGui::Checkbox("flat shade", &n->flatShade);
       ImGui::Checkbox("flip normals", &n->flipNormals);
+   }
+
+   void DrawSetColorParams(SetColorNode* n)
+   {
+      if (n->input != nullptr)
+         ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+
+      DropdownButton("source", SetColorNode::SourceNames(), n->source, [n](int i) { n->source = i; });
+      switch (n->source)
+      {
+      case SetColorNode::kFlat:
+         ColorSwatch("colour", n->flatColor, n);
+         break;
+      case SetColorNode::kIndex:
+         ColorSwatch("ramp start", n->rampA, n);
+         ColorSwatch("ramp end", n->rampB, n);
+         break;
+      case SetColorNode::kRandom:
+         ModSlider("seed", &n->seed, 0.0f, 100.0f);
+         break;
+      case SetColorNode::kPalette:
+         ModSliderInt("palette offset", &n->paletteOffset, 0, 32);
+         if (n->paletteInput == nullptr)
+            ImGui::TextDisabled("patch a Palette into the palette pin");
+         break;
+      case SetColorNode::kTexture:
+         if (!n->TextureInput().IsConnected())
+            ImGui::TextDisabled("patch an image into the texture pin");
+         break;
+      case SetColorNode::kPosition:
+      case SetColorNode::kNormal:
+      default:
+         break;
+      }
    }
 
    void DrawInstanceParams(InstanceOnPointsNode* n)
@@ -5405,6 +5453,22 @@ namespace
          for (int slot = 0; slot < kMaxGeometrySlots; slot++)
             if (IGeometrySource** field = gn.node->GeometryInputSlot(slot))
                record(*field, slot);
+         if (auto* setColor = dynamic_cast<SetColorNode*>(gn.node.get()))
+         {
+            // paletteInput is an IPaletteSource*, not an IGeometrySource*, so
+            // it needs its own comparison the same way camera/light do above.
+            if (setColor->paletteInput != nullptr)
+            {
+               for (GraphNode& src : gNodes)
+               {
+                  if (dynamic_cast<IPaletteSource*>(src.node.get()) == setColor->paletteInput)
+                  {
+                     data.geometry.push_back({ gn.index, 2, src.index });
+                     break;
+                  }
+               }
+            }
+         }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
             record(audio->fileSource, 0);
          if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
@@ -9303,6 +9367,9 @@ int main()
          DisplacementNode dispNode; dispNode.input = &probe;
          checkGeneric("DisplacementNode", &dispNode);
 
+         SetColorNode setColorNode; setColorNode.input = &probe;
+         checkGeneric("SetColorNode", &setColorNode);
+
          MeshResynthNode resynthNode; resynthNode.input = &probe;
          checkGeneric("MeshResynthNode", &resynthNode);
 
@@ -9512,6 +9579,9 @@ int main()
          DisplacementNode dispNode; dispNode.input = &probe;
          checkForwarding("DisplacementNode", &dispNode);
 
+         SetColorNode setColorNode; setColorNode.input = &probe;
+         checkForwarding("SetColorNode", &setColorNode);
+
          MeshResynthNode resynthNode; resynthNode.input = &probe;
          checkForwarding("MeshResynthNode", &resynthNode);
 
@@ -9618,6 +9688,13 @@ int main()
          const unsigned long long resynthFirst = resynthNode.MeshRevision();
          resynthNode.CookIfNeeded(frame++);
          results.push_back({ "MeshResynthNode", resynthFirst == resynthNode.MeshRevision() });
+
+         SetColorNode setColorNode;
+         setColorNode.input = &probeMesh;
+         setColorNode.CookIfNeeded(frame++);
+         const unsigned long long setColorFirst = setColorNode.MeshRevision();
+         setColorNode.CookIfNeeded(frame++);
+         results.push_back({ "SetColorNode", setColorFirst == setColorNode.MeshRevision() });
 
          // Cloth's stamp is its own mMesh revision, bumped by Step() every
          // physics tick even while draping correctly, so it is not expected to
@@ -11201,6 +11278,7 @@ int main()
                   dynamic_cast<OceanNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<SetColorNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
@@ -11241,6 +11319,8 @@ int main()
                snprintf(line, sizeof(line), "%zu triangles", mat->TriangleCount());
             else if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu triangles", disp->TriangleCount());
+            else if (auto* setColor = dynamic_cast<SetColorNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", setColor->TriangleCount());
             else if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu particles", ps->AliveCount());
             else if (auto* cv = dynamic_cast<CurveNode*>(gn.node.get()))
@@ -11410,6 +11490,8 @@ int main()
                DrawGeometryOpParams(n);
             else if (auto* n = dynamic_cast<DisplacementNode*>(gn.node.get()))
                DrawDisplacementParams(n);
+            else if (auto* n = dynamic_cast<SetColorNode*>(gn.node.get()))
+               DrawSetColorParams(n);
             else if (auto* n = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
                DrawInstanceParams(n);
             else if (auto* n = dynamic_cast<WrapNode*>(gn.node.get()))
@@ -11702,6 +11784,10 @@ int main()
                // geometry-shaped is found generically via GeometryInputSlot().
                auto* dstMaterial = dstNode ? dynamic_cast<MaterialNode*>(dstNode->node.get()) : nullptr;
                auto* dstDisplacement = dstNode ? dynamic_cast<DisplacementNode*>(dstNode->node.get()) : nullptr;
+               // Set Color is a third geometry-consuming node with non-geometry
+               // pins: slot 1 (texture) behaves like Displacement's, slot 2
+               // (palette) wants an IPaletteSource specifically.
+               auto* dstSetColor = dstNode ? dynamic_cast<SetColorNode*>(dstNode->node.get()) : nullptr;
                auto* dstOutput = dstNode ? dynamic_cast<OutputNode*>(dstNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
                auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
@@ -11755,6 +11841,10 @@ int main()
                         valid = !srcIsModulator; // an ordinary material-map image slot
                      else if (dstDisplacement != nullptr)
                         valid = !srcIsModulator; // the displacement texture slot
+                     else if (dstSetColor != nullptr && slot == 2)
+                        valid = srcPalette != nullptr; // the palette slot
+                     else if (dstSetColor != nullptr)
+                        valid = !srcIsModulator; // the colour source texture slot
                      else if (dstOutput != nullptr && slot == 1)
                         valid = srcAudioFile != nullptr; // slot 1 is the audio pin
                      else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
@@ -11810,6 +11900,10 @@ int main()
                      // dstJoin, dstSwitcher3D, dstWrap, dstMeta, dstPath, and
                      // slot 0 of dstMaterial/dstDisplacement.
                      *field = srcGeometry;
+                  }
+                  else if (dstSetColor != nullptr && GraphNode::InputSlotFromPin(b) == 2)
+                  {
+                     dstSetColor->paletteInput = srcPalette;
                   }
                   else if (dstAudio != nullptr)
                   {

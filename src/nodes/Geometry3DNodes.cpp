@@ -257,9 +257,11 @@ namespace
       "in vec2 aUv;\n"
       "in mat4 aInstance;\n"      // per-instance transform, divisor 1
       "in vec3 aInstanceColor;\n" // per-instance tint, divisor 1
+      "in vec3 aVertexColor;\n"   // per-vertex tint, from Mesh::vertexColor
       "uniform mat4 uModel;\n"
       "uniform int uInstanced;\n"
       "uniform int uInstanceColored;\n"
+      "uniform int uHasVertexColor;\n"
       "uniform mat4 uViewProj;\n"
       "uniform mat3 uNormalMatrix;\n"
       "uniform mat4 uLightViewProj;\n"
@@ -279,6 +281,7 @@ namespace
       "out vec3 vNormal;\n"
       "out vec2 vUv;\n"
       "out vec3 vInstanceColor;\n"
+      "out vec3 vVertexColor;\n"
       "void main() {\n"
       "   vec3 worldPos;\n"
       "   vec3 worldNormal;\n"
@@ -307,6 +310,9 @@ namespace
       // White when there is no per-instance colour, so the fragment shader can
       // multiply unconditionally rather than branching on it.
       "   vInstanceColor = (uInstanceColored == 1) ? aInstanceColor : vec3(1.0);\n"
+      // Sprites carry their colour on aInstanceColor, not aVertexColor - the
+      // mesh domain and the point-cloud domain never mix on the same draw.
+      "   vVertexColor = (uHasVertexColor == 1 && uIsSprite == 0) ? aVertexColor : vec3(1.0);\n"
       "   vLightSpacePos = uLightViewProj * vec4(worldPos, 1.0);\n"
       "   gl_Position = uViewProj * vec4(worldPos, 1.0);\n"
       "}\n";
@@ -318,6 +324,7 @@ namespace
       "in vec3 vNormal;\n"
       "in vec2 vUv;\n"
       "in vec3 vInstanceColor;\n"
+      "in vec3 vVertexColor;\n"
       "in vec4 vLightSpacePos;\n"
       "out vec4 fragColor;\n"
       "uniform mat4 uViewProj;\n"
@@ -572,7 +579,7 @@ namespace
       "   if (uShading == 2) { fragColor = vec4(vUv, 0.0, uOpacity); return; }\n"
       "\n"
       "   vec2 mapUv = computeMapUv(n);\n"
-      "   vec3 base = toLinear(uBaseColor) * vInstanceColor;\n"
+      "   vec3 base = toLinear(uBaseColor) * vInstanceColor * vVertexColor;\n"
       "   if (uHasTexture == 1) base *= toLinear(texture(uTexture, mapUv).rgb);\n"
       "   if (uShading == 3) { fragColor = vec4(toSrgb(base), uOpacity); return; }\n"
       "\n"
@@ -1079,6 +1086,7 @@ void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
    if (gpu.ibo != 0) glDeleteBuffers(1, &gpu.ibo);
    if (gpu.instanceVbo != 0) glDeleteBuffers(1, &gpu.instanceVbo);
    if (gpu.instanceColorVbo != 0) glDeleteBuffers(1, &gpu.instanceColorVbo);
+   if (gpu.vertexColorVbo != 0) glDeleteBuffers(1, &gpu.vertexColorVbo);
    if (gpu.vao != 0) glDeleteVertexArrays(1, &gpu.vao);
    gpu = GpuMesh();
 }
@@ -1117,6 +1125,7 @@ bool Render3DNode::EnsureShader()
    glBindAttribLocation(mProgram, 2, "aUv");
    glBindAttribLocation(mProgram, 3, "aInstance"); // occupies locations 3..6
    glBindAttribLocation(mProgram, 7, "aInstanceColor");
+   glBindAttribLocation(mProgram, 8, "aVertexColor");
    glAttachShader(mProgram, vert);
    glAttachShader(mProgram, frag);
    glLinkProgram(mProgram);
@@ -1898,6 +1907,26 @@ void Render3DNode::CookIfNeeded(int frameId)
          glEnableVertexAttribArray(2);
          glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(6 * sizeof(float)));
 
+         // Location 8: per-vertex colour, uploaded only when the mesh actually
+         // carries one - a mesh with no Set Color upstream disables the attrib
+         // array instead, and the shader falls back to vec3(1.0) via
+         // uHasVertexColor rather than paying for a buffer of ones.
+         gpu.hasVertexColor = mesh.HasVertexColor();
+         if (gpu.hasVertexColor)
+         {
+            if (gpu.vertexColorVbo == 0)
+               glGenBuffers(1, &gpu.vertexColorVbo);
+            glBindBuffer(GL_ARRAY_BUFFER, gpu.vertexColorVbo);
+            glBufferData(GL_ARRAY_BUFFER, mesh.vertexColor.size() * sizeof(float),
+                         mesh.vertexColor.data(), GL_STATIC_DRAW);
+            glEnableVertexAttribArray(8);
+            glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+         }
+         else
+         {
+            glDisableVertexAttribArray(8);
+         }
+
          // Bounds computed here rather than per frame: this is the one place
          // the vertices are already being walked.
          gpu.lo[0] = gpu.lo[1] = gpu.lo[2] = 1e30f;
@@ -2059,6 +2088,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       }
       glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"),
                   (instanced && gpu.instanceColored) ? 1 : 0);
+      glUniform1i(glGetUniformLocation(mProgram, "uHasVertexColor"), gpu.hasVertexColor ? 1 : 0);
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);

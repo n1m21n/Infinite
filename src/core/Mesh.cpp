@@ -459,6 +459,12 @@ namespace MeshOps
          out.vertices.insert(out.vertices.end(), copy.vertices.begin(), copy.vertices.end());
          for (unsigned int idx : copy.indices)
             out.indices.push_back(base + idx);
+         // Each repetition is a straight copy of `in`, in the same order -
+         // Transform() carries copy.vertexColor through unchanged - so the
+         // repetitions' colour blocks just concatenate.
+         if (!copy.vertexColor.empty())
+            out.vertexColor.insert(out.vertexColor.end(),
+                                   copy.vertexColor.begin(), copy.vertexColor.end());
       }
       return out;
    }
@@ -497,6 +503,26 @@ namespace MeshOps
          }
       }
       return weld;
+   }
+
+   std::vector<float> RemapVertexColor(const std::vector<float>& srcColor,
+                                        const std::vector<unsigned int>& mapping,
+                                        size_t outVertexCount)
+   {
+      if (srcColor.empty())
+         return {};
+      const size_t srcVertexCount = srcColor.size() / 3;
+      std::vector<float> out(outVertexCount * 3, 1.0f);
+      for (size_t i = 0; i < outVertexCount && i < mapping.size(); i++)
+      {
+         const unsigned int src = mapping[i];
+         if (src >= srcVertexCount)
+            return {}; // out-of-range mapping: treat as absent rather than read garbage
+         out[i * 3 + 0] = srcColor[src * 3 + 0];
+         out[i * 3 + 1] = srcColor[src * 3 + 1];
+         out[i * 3 + 2] = srcColor[src * 3 + 2];
+      }
+      return out;
    }
 
    // Neighbour sets over welded indices, built from triangle edges.
@@ -633,6 +659,10 @@ namespace MeshOps
 
          Mesh next;
          next.vertices = current.vertices;
+         // Repositioned original vertices only move - they keep whatever
+         // colour they entered the pass with, so the array carries straight
+         // across before any edge points are appended below.
+         next.vertexColor = current.vertexColor;
          for (size_t i = 0; i < next.vertices.size(); i++)
          {
             auto it = movedVertex.find(weld[i]);
@@ -693,6 +723,15 @@ namespace MeshOps
             m.pz = mid[2] + (limit[2] - mid[2]) * blend;
 
             next.vertices.push_back(m);
+            // Plain midpoint, same reasoning as the UV/normal average just
+            // above - and it has to run every time a vertex is pushed here,
+            // or next.vertexColor falls out of parallel with next.vertices.
+            if (current.HasVertexColor())
+            {
+               for (int k = 0; k < 3; k++)
+                  next.vertexColor.push_back(
+                     (current.vertexColor[ia * 3 + k] + current.vertexColor[ib * 3 + k]) * 0.5f);
+            }
             const unsigned int index = (unsigned int)next.vertices.size() - 1;
             edgePoint[e] = index;
             return index;
@@ -807,6 +846,19 @@ namespace MeshOps
          out.vertices.push_back(v);
       }
 
+      // The mirrored block is `in`'s vertices in the same order, so its colour
+      // is just `in.vertexColor` again - appended after the kept original when
+      // keepOriginal already carried it via `out = in` above, or set outright
+      // when there is no original block ahead of it.
+      if (!in.vertexColor.empty())
+      {
+         if (keepOriginal)
+            out.vertexColor.insert(out.vertexColor.end(),
+                                   in.vertexColor.begin(), in.vertexColor.end());
+         else
+            out.vertexColor = in.vertexColor;
+      }
+
       // Reflection reverses handedness, so the winding has to be reversed too
       // or every mirrored triangle faces backwards and backface culling eats it.
       for (size_t t = 0; t + 2 < in.indices.size(); t += 3)
@@ -875,6 +927,9 @@ namespace MeshOps
       const int segments = std::max(2, std::min(steps, 512));
       const float totalAngle = turns * 6.28318530718f;
       const int a = std::max(0, std::min(axis, 2));
+      // Every pushed vertex derives from exactly one profile-edge endpoint,
+      // tracked here so vertexColor can be remapped afterward.
+      std::vector<unsigned int> mapping;
 
       auto rotateAbout = [a](float p[3], float angle) {
          const float s = std::sin(angle), c = std::cos(angle);
@@ -923,6 +978,7 @@ namespace MeshOps
                nv.u = t;
                nv.v = (float)end;
                out.vertices.push_back(nv);
+               mapping.push_back((end == 0) ? edge.first : edge.second);
             }
          }
 
@@ -932,6 +988,7 @@ namespace MeshOps
             PushQuad(out, q, q + 2, q + 3, q + 1);
          }
       }
+      out.vertexColor = RemapVertexColor(in.vertexColor, mapping, out.vertices.size());
       return RecalculateNormals(out, false, false);
    }
 
@@ -1421,6 +1478,11 @@ namespace MeshOps
          Mesh expanded;
          expanded.vertices.reserve(in.indices.size());
          expanded.indices.reserve(in.indices.size());
+         // Each new vertex derives from exactly one original vertex - tracked
+         // here so vertexColor can be remapped the same way, rather than
+         // silently dropped by the expansion.
+         std::vector<unsigned int> mapping;
+         mapping.reserve(in.indices.size());
          for (size_t t = 0; t + 2 < in.indices.size(); t += 3)
          {
             const Vertex& a = in.vertices[in.indices[t]];
@@ -1432,14 +1494,18 @@ namespace MeshOps
             const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
             if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
             if (flip) { nx = -nx; ny = -ny; nz = -nz; }
+            const unsigned int srcIndex[3] = { in.indices[t], in.indices[t + 1], in.indices[t + 2] };
+            int k = 0;
             for (const Vertex* src : { &a, &b, &c })
             {
                Vertex v = *src;
                v.nx = nx; v.ny = ny; v.nz = nz;
                expanded.vertices.push_back(v);
                expanded.indices.push_back((unsigned int)expanded.vertices.size() - 1);
+               mapping.push_back(srcIndex[k++]);
             }
          }
+         expanded.vertexColor = RemapVertexColor(in.vertexColor, mapping, expanded.vertices.size());
          return expanded;
       }
 
@@ -1936,6 +2002,12 @@ namespace MeshOps
                const size_t idx = reps[(size_t)i];
                const Vertex& v = in.vertices[idx];
                points.push_back({ v.px, v.py, v.pz, v.nx, v.ny, v.nz, 1.0f, (int)idx });
+               if (in.HasVertexColor())
+               {
+                  MeshPoint& mp = points.back();
+                  mp.r = in.vertexColor[idx * 3 + 0]; mp.g = in.vertexColor[idx * 3 + 1];
+                  mp.b = in.vertexColor[idx * 3 + 2];
+               }
             }
          }
          else
@@ -1972,6 +2044,12 @@ namespace MeshOps
                const size_t idx = selected[(size_t)i];
                const Vertex& v = in.vertices[idx];
                points.push_back({ v.px, v.py, v.pz, v.nx, v.ny, v.nz, 1.0f, (int)idx });
+               if (in.HasVertexColor())
+               {
+                  MeshPoint& mp = points.back();
+                  mp.r = in.vertexColor[idx * 3 + 0]; mp.g = in.vertexColor[idx * 3 + 1];
+                  mp.b = in.vertexColor[idx * 3 + 2];
+               }
             }
          }
       }
@@ -2077,6 +2155,13 @@ namespace MeshOps
             NormalizeOrFallback(nx, ny, nz);
             points.push_back({ (a.px+b.px)*0.5f, (a.py+b.py)*0.5f, (a.pz+b.pz)*0.5f,
                                nx, ny, nz, 1.0f, i });
+            if (in.HasVertexColor())
+            {
+               MeshPoint& mp = points.back();
+               mp.r = (in.vertexColor[key.first * 3 + 0] + in.vertexColor[key.second * 3 + 0]) * 0.5f;
+               mp.g = (in.vertexColor[key.first * 3 + 1] + in.vertexColor[key.second * 3 + 1]) * 0.5f;
+               mp.b = (in.vertexColor[key.first * 3 + 2] + in.vertexColor[key.second * 3 + 2]) * 0.5f;
+            }
          }
       }
       else // face centres
@@ -2109,6 +2194,14 @@ namespace MeshOps
             NormalizeOrFallback(nx, ny, nz);
             points.push_back({ (a.px+b.px+c.px)/3.0f, (a.py+b.py+c.py)/3.0f, (a.pz+b.pz+c.pz)/3.0f,
                                nx, ny, nz, 1.0f, f });
+            if (in.HasVertexColor())
+            {
+               const unsigned int ia = in.indices[t], ib = in.indices[t + 1], ic = in.indices[t + 2];
+               MeshPoint& mp = points.back();
+               mp.r = (in.vertexColor[ia * 3 + 0] + in.vertexColor[ib * 3 + 0] + in.vertexColor[ic * 3 + 0]) / 3.0f;
+               mp.g = (in.vertexColor[ia * 3 + 1] + in.vertexColor[ib * 3 + 1] + in.vertexColor[ic * 3 + 1]) / 3.0f;
+               mp.b = (in.vertexColor[ia * 3 + 2] + in.vertexColor[ib * 3 + 2] + in.vertexColor[ic * 3 + 2]) / 3.0f;
+            }
          }
       }
       return points;
@@ -2145,6 +2238,12 @@ namespace MeshOps
             v.u = (corners[c][0] / h + 1.0f) * 0.5f;
             v.v = (corners[c][1] / h + 1.0f) * 0.5f;
             out.vertices.push_back(v);
+            // Every corner of a point's billboard shares that point's colour -
+            // 1,1,1 when the point has none, so this is a true no-op unless a
+            // Set Color upstream actually wrote something.
+            out.vertexColor.push_back(p.r);
+            out.vertexColor.push_back(p.g);
+            out.vertexColor.push_back(p.b);
          }
          out.indices.push_back(base); out.indices.push_back(base + 1); out.indices.push_back(base + 2);
          out.indices.push_back(base); out.indices.push_back(base + 2); out.indices.push_back(base + 3);
@@ -4221,6 +4320,9 @@ Mesh DeleteSelected(const Mesh& in, bool keepSelected)
    // Vertices are remapped rather than copied wholesale, so deleting most of a
    // mesh actually frees the vertices too rather than leaving them orphaned.
    std::vector<int> remap(in.vertices.size(), -1);
+   // Inverse of `remap`, built alongside it, so vertexColor can be remapped
+   // the same way the vertices themselves were.
+   std::vector<unsigned int> mapping;
    for (size_t f = 0; f < faces; f++)
    {
       // Named for what is kept, not what is dropped. The flag previously read
@@ -4236,10 +4338,12 @@ Mesh DeleteSelected(const Mesh& in, bool keepSelected)
          {
             remap[index] = (int)out.vertices.size();
             out.vertices.push_back(in.vertices[index]);
+            mapping.push_back(index);
          }
          out.indices.push_back((unsigned int)remap[index]);
       }
    }
+   out.vertexColor = RemapVertexColor(in.vertexColor, mapping, out.vertices.size());
    return out;
 }
 

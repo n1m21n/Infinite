@@ -2,6 +2,7 @@
 
 #include <OpenGL/gl3.h>
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 
 #include "GLUtil.h"
@@ -712,4 +713,295 @@ void WrapNode::CookIfNeeded(int frameId)
       upstream->CookIfNeeded(frameId);
    if (auto* upstream = dynamic_cast<INode*>(targetInput))
       upstream->CookIfNeeded(frameId);
+}
+
+// ======================================================== Set Color
+
+namespace
+{
+   const std::vector<std::string> kSetColorSourceNames = {
+      "Flat", "Position", "Normal", "Index", "Random", "Palette", "Texture"
+   };
+
+   // Hashes the swatches a palette source currently offers, so SetColorNode
+   // can tell "the palette actually changed" from "nothing changed" the same
+   // way DisplacementNode hashes texture pixels - IPaletteSource has no
+   // revision stamp of its own to compare against instead.
+   unsigned long long HashPalette(IPaletteSource* palette)
+   {
+      if (palette == nullptr)
+         return 0;
+      unsigned long long h = 1469598103934665603ull;
+      const int count = palette->SwatchCount();
+      for (int i = 0; i < count; i++)
+      {
+         float rgb[3];
+         palette->GetSwatch(i, rgb);
+         const unsigned char* bytes = reinterpret_cast<const unsigned char*>(rgb);
+         for (size_t b = 0; b < sizeof(rgb); b++)
+         {
+            h ^= bytes[b];
+            h *= 1099511628211ull;
+         }
+      }
+      return h;
+   }
+
+   void SetColorElement(int source, size_t index, size_t count,
+                        const float pos[3], const float normal[3], float u, float v, bool hasUV,
+                        const float bboxMin[3], const float bboxMax[3],
+                        const float flatColor[3], const float rampA[3], const float rampB[3],
+                        float seed, IPaletteSource* palette, int paletteOffset,
+                        const std::vector<float>& texPixels, int texW, int texH,
+                        float outRgb[3])
+   {
+      switch (source)
+      {
+      case SetColorNode::kPosition:
+         for (int c = 0; c < 3; c++)
+         {
+            const float span = bboxMax[c] - bboxMin[c];
+            outRgb[c] = (span > 1e-8f) ? (pos[c] - bboxMin[c]) / span : 0.5f;
+         }
+         break;
+      case SetColorNode::kNormal:
+         outRgb[0] = normal[0] * 0.5f + 0.5f;
+         outRgb[1] = normal[1] * 0.5f + 0.5f;
+         outRgb[2] = normal[2] * 0.5f + 0.5f;
+         break;
+      case SetColorNode::kIndex:
+      {
+         const float t = (count > 1) ? (float)index / (float)(count - 1) : 0.0f;
+         for (int c = 0; c < 3; c++)
+            outRgb[c] = rampA[c] + (rampB[c] - rampA[c]) * t;
+         break;
+      }
+      case SetColorNode::kRandom:
+         outRgb[0] = Rand01(seed, (int)index * 3 + 0);
+         outRgb[1] = Rand01(seed, (int)index * 3 + 1);
+         outRgb[2] = Rand01(seed, (int)index * 3 + 2);
+         break;
+      case SetColorNode::kPalette:
+      {
+         const int swatchCount = palette ? palette->SwatchCount() : 0;
+         if (swatchCount <= 0)
+         {
+            outRgb[0] = flatColor[0]; outRgb[1] = flatColor[1]; outRgb[2] = flatColor[2];
+         }
+         else
+         {
+            int swatch = ((int)index + paletteOffset) % swatchCount;
+            if (swatch < 0)
+               swatch += swatchCount;
+            palette->GetSwatch(swatch, outRgb);
+         }
+         break;
+      }
+      case SetColorNode::kTexture:
+         if (hasUV && texW > 0 && texH > 0 && (size_t)texW * texH * 4 <= texPixels.size())
+         {
+            int ix = (int)(u * (float)texW);
+            int iy = (int)(v * (float)texH); // row 0 = bottom, matches Displace's texRGBA
+            ix = std::max(0, std::min(ix, texW - 1));
+            iy = std::max(0, std::min(iy, texH - 1));
+            const size_t idx = ((size_t)iy * texW + ix) * 4;
+            outRgb[0] = texPixels[idx + 0]; outRgb[1] = texPixels[idx + 1]; outRgb[2] = texPixels[idx + 2];
+         }
+         else
+         {
+            outRgb[0] = flatColor[0]; outRgb[1] = flatColor[1]; outRgb[2] = flatColor[2];
+         }
+         break;
+      case SetColorNode::kFlat:
+      default:
+         outRgb[0] = flatColor[0]; outRgb[1] = flatColor[1]; outRgb[2] = flatColor[2];
+         break;
+      }
+   }
+}
+
+const std::vector<std::string>& SetColorNode::SourceNames() { return kSetColorSourceNames; }
+
+SetColorNode::~SetColorNode()
+{
+   if (mReadFbo != 0)
+      glDeleteFramebuffers(1, &mReadFbo);
+}
+
+SetColorNode::Signature SetColorNode::CurrentSignature() const
+{
+   Signature s;
+   s.source = source;
+   s.flatColor[0] = flatColor[0]; s.flatColor[1] = flatColor[1]; s.flatColor[2] = flatColor[2];
+   s.rampA[0] = rampA[0]; s.rampA[1] = rampA[1]; s.rampA[2] = rampA[2];
+   s.rampB[0] = rampB[0]; s.rampB[1] = rampB[1]; s.rampB[2] = rampB[2];
+   s.seed = seed;
+   s.paletteOffset = paletteOffset;
+   s.upstream = input;
+   s.upstreamMeshRevision = input ? input->MeshRevision() : 0;
+   s.upstreamCloudRevision = input ? input->PointCloudRevision() : 0;
+   s.texGeneration = mTexGeneration;
+   s.paletteHash = (source == kPalette) ? HashPalette(paletteInput) : 0;
+   return s;
+}
+
+void SetColorNode::Rebuild()
+{
+   mCache = input ? input->GetMesh() : Mesh();
+   const std::vector<Particle>* cloud = input ? input->GetPointCloud() : nullptr;
+   mHasPointCache = cloud != nullptr;
+   mPointCache = mHasPointCache ? *cloud : std::vector<Particle>();
+
+   if (!mCache.vertices.empty())
+   {
+      float bboxMin[3] = { FLT_MAX, FLT_MAX, FLT_MAX };
+      float bboxMax[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+      if (source == kPosition)
+      {
+         for (const Vertex& vert : mCache.vertices)
+         {
+            bboxMin[0] = std::min(bboxMin[0], vert.px); bboxMax[0] = std::max(bboxMax[0], vert.px);
+            bboxMin[1] = std::min(bboxMin[1], vert.py); bboxMax[1] = std::max(bboxMax[1], vert.py);
+            bboxMin[2] = std::min(bboxMin[2], vert.pz); bboxMax[2] = std::max(bboxMax[2], vert.pz);
+         }
+      }
+      mCache.vertexColor.assign(mCache.vertices.size() * 3, 1.0f);
+      const size_t n = mCache.vertices.size();
+      for (size_t i = 0; i < n; i++)
+      {
+         const Vertex& vert = mCache.vertices[i];
+         const float pos[3] = { vert.px, vert.py, vert.pz };
+         const float normal[3] = { vert.nx, vert.ny, vert.nz };
+         float rgb[3];
+         SetColorElement(source, i, n, pos, normal, vert.u, vert.v, true, bboxMin, bboxMax,
+                         flatColor, rampA, rampB, seed, paletteInput, paletteOffset,
+                         mTexPixels, mTexW, mTexH, rgb);
+         mCache.vertexColor[i * 3 + 0] = rgb[0];
+         mCache.vertexColor[i * 3 + 1] = rgb[1];
+         mCache.vertexColor[i * 3 + 2] = rgb[2];
+      }
+   }
+   else
+   {
+      mCache.vertexColor.clear();
+   }
+
+   if (mHasPointCache && !mPointCache.empty())
+   {
+      float bboxMin[3] = { FLT_MAX, FLT_MAX, FLT_MAX };
+      float bboxMax[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+      if (source == kPosition)
+      {
+         for (const Particle& p : mPointCache)
+         {
+            bboxMin[0] = std::min(bboxMin[0], p.px); bboxMax[0] = std::max(bboxMax[0], p.px);
+            bboxMin[1] = std::min(bboxMin[1], p.py); bboxMax[1] = std::max(bboxMax[1], p.py);
+            bboxMin[2] = std::min(bboxMin[2], p.pz); bboxMax[2] = std::max(bboxMax[2], p.pz);
+         }
+      }
+      const size_t n = mPointCache.size();
+      for (size_t i = 0; i < n; i++)
+      {
+         Particle& p = mPointCache[i];
+         const float pos[3] = { p.px, p.py, p.pz };
+         const float normal[3] = { p.nx, p.ny, p.nz };
+         float rgb[3];
+         // Particles carry no UV, so Texture has nothing to sample and falls
+         // back to the flat colour - the hasUV=false branch in SetColorElement.
+         SetColorElement(source, i, n, pos, normal, 0.0f, 0.0f, false, bboxMin, bboxMax,
+                         flatColor, rampA, rampB, seed, paletteInput, paletteOffset,
+                         mTexPixels, mTexW, mTexH, rgb);
+         p.r = rgb[0]; p.g = rgb[1]; p.b = rgb[2];
+      }
+   }
+}
+
+const Mesh& SetColorNode::GetMesh()
+{
+   static const Mesh kEmptySetColorMesh;
+   if (input == nullptr)
+      return kEmptySetColorMesh;
+   if (bypassed)
+      return input->GetMesh();
+
+   const Signature sig = CurrentSignature();
+   if (mHasBuilt && sig == mBuilt)
+      return mCache;
+
+   Rebuild();
+   mBuilt = sig;
+   mHasBuilt = true;
+   mMeshRevision = NextMeshRevision();
+   mCloudRevision = NextMeshRevision();
+   return mCache;
+}
+
+unsigned long long SetColorNode::MeshRevision()
+{
+   if (input == nullptr)
+      return 0;
+   if (bypassed)
+      return input->MeshRevision();
+   GetMesh();
+   return mMeshRevision;
+}
+
+const std::vector<Particle>* SetColorNode::GetPointCloud()
+{
+   if (input == nullptr)
+      return nullptr;
+   if (bypassed)
+      return input->GetPointCloud();
+   GetMesh(); // shared rebuild path keeps mesh and point cache in sync
+   return mHasPointCache ? &mPointCache : nullptr;
+}
+
+unsigned long long SetColorNode::PointCloudRevision()
+{
+   if (input == nullptr)
+      return 0;
+   if (bypassed)
+      return input->PointCloudRevision();
+   GetMesh();
+   return mHasPointCache ? mCloudRevision : 0;
+}
+
+void SetColorNode::CookIfNeeded(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   mLastCookFrame = frameId;
+   if (auto* upstream = dynamic_cast<INode*>(input))
+      upstream->CookIfNeeded(frameId);
+
+   if (source == kTexture && mTextureInput.IsConnected())
+   {
+      const unsigned int tex = mTextureInput.Pull(frameId);
+      const int w = mTextureInput.Width();
+      const int h = mTextureInput.Height();
+      if (tex != 0 && w > 0 && h > 0 &&
+          GLUtil::ReadTexturePixels(mReadFbo, tex, w, h, mTexPixels))
+      {
+         mTexW = w; mTexH = h;
+      }
+      else
+      {
+         mTexPixels.clear();
+         mTexW = mTexH = 0;
+      }
+      const unsigned long long hash = HashFloats(mTexPixels);
+      if (!mHasTexHash || hash != mTexHash)
+      {
+         mTexGeneration++;
+         mTexHash = hash;
+         mHasTexHash = true;
+      }
+   }
+   else if (mTexW != 0 || mTexH != 0)
+   {
+      mTexPixels.clear();
+      mTexW = mTexH = 0;
+      mTexGeneration++;
+      mHasTexHash = false;
+   }
 }
