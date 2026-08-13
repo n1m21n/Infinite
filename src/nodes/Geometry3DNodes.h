@@ -511,6 +511,8 @@ private:
       Material material[kSlots];
       bool envConnected = false;
       unsigned long long envRev = 0;
+      float envRotation = 0.0f;
+      float envIntensity = 1.0f;
       bool animated = false;
       bool texturedMaterial = false;
 
@@ -531,7 +533,8 @@ private:
             if (hasGeom[i] && memcmp(&material[i], &o.material[i], sizeof(Material)) != 0)
                return false;
          }
-         return envConnected == o.envConnected && envRev == o.envRev;
+         return envConnected == o.envConnected && envRev == o.envRev && envRotation == o.envRotation &&
+                envIntensity == o.envIntensity;
       }
    };
    SceneSignature BuildSceneSignature();

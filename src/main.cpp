@@ -1929,7 +1929,7 @@ namespace
       REGISTER_NODE(MathNode, Math, "Modulators");
       REGISTER_NODE(CompareNode, Compare, "Modulators");
       REGISTER_NODE(RangeToRangeNode, Range to Range, "Modulators");
-      REGISTER_NODE(SmoothNode, Smooth, "Modulators");
+      REGISTER_NODE(SmoothNode, Smoothing, "Modulators");
       REGISTER_NODE(InvertNode, Invert, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Modulators");
       REGISTER_NODE(MacroXYNode, Macro XY, "Modulators");
@@ -8437,7 +8437,7 @@ namespace
          { "Math", "Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant, shown as an editable slider; a patched input just shows as 'patched'." },
          { "Compare", "Outputs 1 when the comparison holds, 0 otherwise - >, >=, <, <=, ==, != between two modulators, with a tolerance for the equality checks." },
          { "Range to Range", "Remaps one modulator's input range onto a different output range - patch in a 0..1 LFO and remap it to -2..2, for example." },
-         { "Smooth", "An exponential moving average over another modulator, to damp jittery or steppy sources like Random or Pattern." },
+         { "Smoothing", "An exponential moving average over another modulator, to damp jittery or steppy sources like Random or Pattern." },
          { "Macro Knob", "A single named slider (0-1, with a response curve and invert) meant to be patched out to several other sliders at once - one control that fans out to many parameters." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
          { "Path", "Outputs a moving 3D point (X/Y/Z, each patchable separately) travelling around a built-in shape (circle, helix, spiral, lissajous, etc.) at a beat-synced speed, or along the points of a patched-in geometry/curve source instead." },
@@ -8544,8 +8544,6 @@ namespace
          { "invert", "Inverts every colour channel (alpha untouched) - a photographic negative. No parameters." },
          { "posterize", "Reduces the image to a fixed number of tonal Levels per channel, producing flat colour bands." },
          { "threshold", "Converts to pure black or white based on luminance, split at Threshold." },
-         { "vibrance", "Boosts or reduces saturation relative to each pixel's own average brightness - gentler and more selective than a flat saturation push." },
-         { "blackandwhite", "Converts to greyscale using per-channel Red/Green/Blue Weight, so you can control which colours read light or dark." },
          { "colorbalance", "Shifts colour along three axes - Cyan-Red, Magenta-Green, Yellow-Blue - without touching overall brightness." },
          { "exposure", "Multiplies brightness by powers of two, like a camera's exposure stop (compare Levels' linear/gamma remap)." },
          { "bloom", "Isolates pixels above a brightness Threshold, blurs them outward by Radius, and adds the glow back at Intensity - classic HDR-style bloom." },
@@ -8567,10 +8565,10 @@ namespace
          { "halftone", "Renders the image as a dot pattern like offset printing. Scale sets dot density, Angle rotates the dot grid, 'style: Colour' uses three angled CMY-style dot layers instead of one greyscale layer." },
          { "edge sobel", "Classic Sobel edge detection: outputs the gradient magnitude as greyscale edges. Invert flips black and white." },
          { "edge outline", "Detects edges via a luminance gradient and draws them as flat-Colour outlines at a chosen Thickness and Threshold, over the original image." },
-         { "tone shaper", "Lift/gamma/gain-style tone control via four blended curves: Shadows lift blacks, Highlights lift whites, Midtones bulge the middle, S-Curve blends in an S-shaped contrast curve." },
          { "lut", "Grades the image through a second patched-in HALD/strip LUT image - an N x N-sliced colour cube encoded as a flat strip. LUT Size must match the LUT image's slice count, Mix blends with the original." },
          { "gradientmap", "Remaps luminance onto a two-colour gradient (Shadow to Highlight), Photoshop Gradient Map-style. Mix blends with the original colour." },
-         { "channelmixer", "Rebuilds each output channel as a weighted mix of the input's Red/Green/Blue - e.g. set 'Red from RGB' to swap or blend channels." },
+         { "channelmixer", "Rebuilds each output channel as a weighted mix of the input's Red/Green/Blue - e.g. set 'Red from RGB' to swap or blend channels, or set all three rows equal for a weighted greyscale." },
+         { "color adjustments", "All-in-one grading chain: Brightness/Contrast, Levels, Colour Balance, HSL, Vibrance, Tone Shaper (lift/gamma/gain-style S-curve), Channel Mixer, then an optional Black & White stage - so a common grade doesn't need eight separate nodes wired in series." },
          { "outerglow", "Adds a soft glow of a chosen Colour around the image's alpha edge, blurred outward. Amount controls strength." },
          { "coloroverlay", "Flat-tints the image toward a chosen Colour at a given Opacity." },
          { "dropshadow", "Offsets a blurred copy of the image's alpha behind it as a shadow, in a chosen Colour, Offset X/Y and Opacity." },
@@ -8807,12 +8805,13 @@ namespace
                { "Pixelate / Noise / Vignette", "Block pixelation, additive grain and a vignette with its own centre." },
             } },
             { "Color", {
-               { "Basic", "Brightness/contrast, exposure, levels (black/white point + gamma), invert, posterize, threshold, vibrance." },
-               { "Curves", "Shadow / midtone / highlight lift plus an S-curve control." },
+               { "Basic", "Brightness/contrast, exposure, levels (black/white point + gamma), invert, posterize, threshold." },
+               { "Curves", "Per-channel spline curve editor - drag control points on Red/Green/Blue/Luminance, Photoshop Curves-style." },
                { "LUT", "Applies a lookup-table image patched into the second input." },
                { "Gradient Map", "Remaps luminance onto a two-colour gradient." },
-               { "Channel Mixer", "Rebuilds each output channel from a weighted mix of the input channels." },
-               { "HSL / Colour Balance / Black & White", "Hue, saturation and lightness; per-axis colour shifts; weighted greyscale." },
+               { "Channel Mixer", "Rebuilds each output channel from a weighted mix of the input channels - set all three rows equal for a weighted greyscale." },
+               { "HSL / Colour Balance", "Hue, saturation and lightness; per-axis colour shifts." },
+               { "Color Adjustments", "All-in-one grading chain - brightness/contrast, levels, colour balance, HSL, vibrance, tone shaper, channel mixer and an optional black & white stage - so a common grade doesn't need eight nodes wired in series." },
                { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
             } },
             { "Compositing", {
@@ -8829,7 +8828,7 @@ namespace
                { "Math", "Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant." },
                { "Compare", "Outputs 1 when the comparison holds, 0 otherwise." },
                { "Range to Range", "Remaps one modulator's input range onto a different output range." },
-               { "Smooth", "An exponential moving average over another modulator, to damp jitter." },
+               { "Smoothing", "An exponential moving average over another modulator, to damp jitter." },
                { "Invert", "Mirrors a modulator around a low/high pivot. Defaults to 0..1 for a classic 1-v flip; set low/high to match an unclamped source to mirror it correctly." },
             } },
             { "Feedback", {
@@ -12923,7 +12922,7 @@ int main()
          SpawnNode("Light", "3D", 40.0f, 920.0f);                  // 5 key
          SpawnNode("Light", "3D", 40.0f, 1080.0f);                 // 6 fill/rim
          SpawnNode("Render 3D", "3D", 620.0f, 420.0f);             // 7
-         SpawnNode("vibrance", "Color", 900.0f, 420.0f);           // 8
+         SpawnNode("hsl", "Color", 900.0f, 420.0f);                // 8
          SpawnNode("colorbalance", "Color", 900.0f, 560.0f);       // 9
          SpawnNode("bloom", "Effects", 900.0f, 700.0f);            // 10
          SpawnNode("vignette", "Effects", 900.0f, 840.0f);         // 11
@@ -13017,12 +13016,12 @@ int main()
          render->shadowQuality = 1;
          render->shadowStrength = 0.5f;
 
-         auto* vibrance = static_cast<FilterNode*>(gNodes[8].node.get());
-         vibrance->Input().Connect(render);
-         vibrance->SetParamValue(0, 0, 0.5f); // Amount
+         auto* hsl = static_cast<FilterNode*>(gNodes[8].node.get());
+         hsl->Input().Connect(render);
+         hsl->SetParamValue(1, 0, 1.5f); // Saturation - stands in for the old standalone vibrance step
 
          auto* colorbalance = static_cast<FilterNode*>(gNodes[9].node.get());
-         colorbalance->Input().Connect(vibrance);
+         colorbalance->Input().Connect(hsl);
          colorbalance->SetParamValue(0, 0, 0.05f);  // Cyan-Red: push warm
          colorbalance->SetParamValue(1, 0, 0.0f);   // Magenta-Green
          colorbalance->SetParamValue(2, 0, -0.05f); // Yellow-Blue: push toward yellow
@@ -17540,8 +17539,9 @@ int main()
       }
 
       if (getenv("INFINITE_ENVTEST") != nullptr &&
-          (frameId == 4 || frameId == 8 || frameId == 12))
+          (frameId == 4 || frameId == 5 || frameId == 7 || frameId == 8 || frameId == 12))
       {
+         static int sEnvTestBaselineSphereR = 0;
          auto* env = static_cast<EnvironmentNode*>(gNodes[2].node.get());
          auto* render = static_cast<Render3DNode*>(gNodes[3].node.get());
          const int w = render->GetOutputWidth(), h = render->GetOutputHeight();
@@ -17606,6 +17606,30 @@ int main()
                    badMips == 0 ? "MIP CHAIN FINITE OK" : "SUSPECT");
 
             render->envAsBackground = false; // checked at frame 8
+            sEnvTestBaselineSphereR = sphereR;
+         }
+         else if (frameId == 5)
+         {
+            // Regression check: dragging intensity must invalidate the cached
+            // scene even though it doesn't touch TextureRevision() at all -
+            // only the file load path does. No reconnect, no new texture,
+            // same HDRI, and - unlike frame 4's envAsBackground flip above -
+            // nothing else about the scene changes this frame, so this
+            // isolates the intensity edit from any other cache-busting change.
+            // Baseline is already blown out to 255 at intensity 1 (the fixture
+            // HDRI is deliberately very bright), so a further increase
+            // wouldn't show up in 8-bit readback - dim it down instead, which
+            // has headroom to prove either direction of change. Checked at
+            // frame 7, one frame after this one's own cook has run.
+            env->intensity = 0.02f;
+         }
+         else if (frameId == 7)
+         {
+            const size_t centre = ((size_t)(h / 2) * w + w / 2) * 4;
+            const int sphereR = px[centre];
+            printf("intensity dim (no reconnect): sphere centre R %d -> %d  %s\n",
+                   sEnvTestBaselineSphereR, sphereR,
+                   (sphereR < sEnvTestBaselineSphereR) ? "INTENSITY LIVE-UPDATE OK" : "SUSPECT");
          }
          else if (frameId == 8)
          {

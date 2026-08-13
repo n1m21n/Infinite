@@ -108,6 +108,33 @@ namespace
       "uniform float uOpacity;\n"
       "void main() { fragColor = vec4(uColor, uOpacity); }\n";
 
+   // Unlit round point sprites for a pure point-cloud source (Particle
+   // System) - no normals to light, so this skips kVertSrc/kFragSrc entirely
+   // rather than faking a normal. Colour comes straight from each Particle
+   // (already carries the start/end colour gradient the sim computed).
+   const char* kPointVertSrc =
+      "#version 150\n"
+      "in vec3 aPos;\n"
+      "in vec3 aColor;\n"
+      "uniform mat4 uViewProj;\n"
+      "uniform float uPointSize;\n"
+      "out vec3 vColor;\n"
+      "void main() {\n"
+      "   gl_Position = uViewProj * vec4(aPos, 1.0);\n"
+      "   gl_PointSize = uPointSize;\n"
+      "   vColor = aColor;\n"
+      "}\n";
+
+   const char* kPointFragSrc =
+      "#version 150\n"
+      "in vec3 vColor;\n"
+      "out vec4 fragColor;\n"
+      "void main() {\n"
+      "   vec2 c = gl_PointCoord - vec2(0.5);\n"
+      "   if (dot(c, c) > 0.25) discard;\n"
+      "   fragColor = vec4(vColor, 1.0);\n"
+      "}\n";
+
    // Bound in place of a real surface texture when a geometry has none, same
    // reason and technique as Render3DNode's WhiteTexture() (Geometry3DNodes.cpp)
    // - an unbound sampler reads as a driver warning on macOS.
@@ -205,6 +232,35 @@ namespace
       }
       return program;
    }
+
+   unsigned int LinkPointProgram()
+   {
+      const unsigned int vert = CompileShader(GL_VERTEX_SHADER, kPointVertSrc, "point");
+      const unsigned int frag = CompileShader(GL_FRAGMENT_SHADER, kPointFragSrc, "point");
+      if (vert == 0 || frag == 0)
+         return 0u;
+
+      unsigned int program = glCreateProgram();
+      glBindAttribLocation(program, 0, "aPos");
+      glBindAttribLocation(program, 1, "aColor");
+      glAttachShader(program, vert);
+      glAttachShader(program, frag);
+      glLinkProgram(program);
+      glDeleteShader(vert);
+      glDeleteShader(frag);
+
+      GLint linked = 0;
+      glGetProgramiv(program, GL_LINK_STATUS, &linked);
+      if (!linked)
+      {
+         char log[1024];
+         glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+         fprintf(stderr, "NodeViewport point link error: %s\n", log);
+         glDeleteProgram(program);
+         return 0u;
+      }
+      return program;
+   }
 }
 
 NodeViewport::~NodeViewport()
@@ -217,6 +273,8 @@ NodeViewport::~NodeViewport()
    if (mSelVao != 0) glDeleteVertexArrays(1, &mSelVao);
    if (mInstanceVbo != 0) glDeleteBuffers(1, &mInstanceVbo);
    if (mVertexColorVbo != 0) glDeleteBuffers(1, &mVertexColorVbo);
+   if (mPointVbo != 0) glDeleteBuffers(1, &mPointVbo);
+   if (mPointVao != 0) glDeleteVertexArrays(1, &mPointVao);
 }
 
 bool NodeViewport::EnsureFbo(int w, int h)
@@ -332,6 +390,52 @@ void NodeViewport::UploadMesh(const Mesh& mesh, unsigned long long revision)
    mVertexCount = (int)mesh.vertices.size();
 }
 
+void NodeViewport::UploadPoints(const std::vector<Particle>& points, unsigned long long revision)
+{
+   if (mPointVao == 0)
+   {
+      glGenVertexArrays(1, &mPointVao);
+      glGenBuffers(1, &mPointVbo);
+   }
+
+   if (mLastPointRevision == revision)
+      return;
+
+   struct PointVertex { float px, py, pz, r, g, b; };
+   std::vector<PointVertex> verts;
+   verts.reserve(points.size());
+
+   mLo[0] = mLo[1] = mLo[2] = 1e30f;
+   mHi[0] = mHi[1] = mHi[2] = -1e30f;
+   for (const Particle& p : points)
+   {
+      if (!p.alive)
+         continue;
+      verts.push_back({ p.px, p.py, p.pz, p.r, p.g, p.b });
+      const float pos[3] = { p.px, p.py, p.pz };
+      for (int k = 0; k < 3; k++)
+      {
+         if (!std::isfinite(pos[k]))
+            continue;
+         mLo[k] = std::min(mLo[k], pos[k]);
+         mHi[k] = std::max(mHi[k], pos[k]);
+      }
+   }
+   mHasBounds = mLo[0] <= mHi[0];
+
+   glBindVertexArray(mPointVao);
+   glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+   glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(PointVertex), verts.data(), GL_DYNAMIC_DRAW);
+   glEnableVertexAttribArray(0);
+   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(PointVertex), (void*)0);
+   glEnableVertexAttribArray(1);
+   glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(PointVertex), (void*)(3 * sizeof(float)));
+   glBindVertexArray(0);
+
+   mLastPointRevision = revision;
+   mPointCount = (int)verts.size();
+}
+
 void NodeViewport::UpdateSelectionBuffer(const Mesh& mesh, unsigned long long revision)
 {
    if (mSelRevision == revision)
@@ -399,13 +503,33 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    // HasGeometry(), not Empty(): a vertices-only mesh (Points to Vertices'
    // output, indices empty) has nothing to preview as triangles but is still
    // drawn below as GL_POINTS.
-   if (!mesh.HasGeometry())
+   const bool hasMesh = mesh.HasGeometry();
+
+   // A pure point-cloud source (Particle System) has no mesh at all -
+   // GetMesh() is a permanently-empty stub (SimulationNodes.h) - so it has to
+   // be read through GetPointCloud() instead, same interface Render3DNode
+   // uses for its own billboard-sprite draw. A dual source (Mesh to Points)
+   // offers both; the mesh wins there, matching drawCloudSlot's "a cloud wins
+   // over triangles" rule being moot since this thumbnail has no triangles to
+   // lose in that case anyway - hasMesh already covers it.
+   const std::vector<Particle>* cloud = hasMesh ? nullptr : geo->GetPointCloud();
+   bool hasCloud = false;
+   if (cloud != nullptr)
+   {
+      for (const Particle& p : *cloud)
+      {
+         if (p.alive) { hasCloud = true; break; }
+      }
+   }
+   const bool usePointCloud = !hasMesh && hasCloud;
+
+   if (!hasMesh && !hasCloud)
       return 0;
 
    w = std::max(16, w);
    h = std::max(16, h);
 
-   const unsigned long long revision = geo->MeshRevision();
+   const unsigned long long revision = usePointCloud ? geo->PointCloudRevision() : geo->MeshRevision();
    const Mat4 model = geo->GetModelMatrix();
    const Material material = geo->GetMaterial();
    const unsigned int surfaceTexture = geo->GetSurfaceTexture();
@@ -457,14 +581,18 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    // Compiled once for the process and shared read-only by every viewport -
    // not per instance, so N nodes with viewports open cost one compile total.
    static const unsigned int program = LinkLitProgram();
-   if (program == 0)
+   static const unsigned int pointProgram = LinkPointProgram();
+   if ((usePointCloud && pointProgram == 0) || (!usePointCloud && program == 0))
       return 0;
    static const unsigned int selectionProgram = LinkSelectionProgram();
 
    if (!EnsureFbo(w, h))
       return 0;
 
-   UploadMesh(mesh, revision);
+   if (usePointCloud)
+      UploadPoints(*cloud, revision);
+   else
+      UploadMesh(mesh, revision);
 
    if (!mFramed && mHasBounds)
    {
@@ -561,6 +689,23 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    glCullFace(GL_BACK);
    glDisable(GL_BLEND);
 
+   if (usePointCloud)
+   {
+      glUseProgram(pointProgram);
+      glUniformMatrix4fv(glGetUniformLocation(pointProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+      // Fixed screen-space size rather than deriving one from mDistance/fov:
+      // this is a thumbnail, not a size-accurate preview, and a fixed size
+      // keeps the cloud legible whether it's zoomed in or auto-framed wide.
+      glUniform1f(glGetUniformLocation(pointProgram, "uPointSize"), 6.0f);
+      glEnable(GL_PROGRAM_POINT_SIZE);
+      glBindVertexArray(mPointVao);
+      glDrawArrays(GL_POINTS, 0, mPointCount);
+      glBindVertexArray(0);
+      glDisable(GL_PROGRAM_POINT_SIZE);
+      glUseProgram(0);
+   }
+   else
+   {
    glUseProgram(program);
    glUniformMatrix4fv(glGetUniformLocation(program, "uModel"), 1, GL_FALSE, model.m);
    glUniformMatrix4fv(glGetUniformLocation(program, "uViewProj"), 1, GL_FALSE, viewProj.m);
@@ -631,8 +776,9 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    }
    glBindVertexArray(0);
    glUseProgram(0);
+   } // !usePointCloud
 
-   if (selectionProgram != 0 && !mesh.faceMask.empty())
+   if (!usePointCloud && selectionProgram != 0 && !mesh.faceMask.empty())
    {
       UpdateSelectionBuffer(mesh, revision);
       if (mSelIndexCount > 0)
