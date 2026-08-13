@@ -1315,7 +1315,18 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
 
    sig.envConnected = envInput.IsConnected();
    if (sig.envConnected)
+   {
       sig.envRev = envInput.Revision();
+      // Revision() only bumps when the HDRI texture itself is (re)uploaded, not
+      // when intensity/rotation change - those are read directly as uniforms in
+      // CookIfNeeded(), so fold them into the signature too or dragging them
+      // wouldn't invalidate the cached render.
+      if (auto* env = dynamic_cast<EnvironmentNode*>(envInput.Resolved()))
+      {
+         sig.envRotation = env->rotation;
+         sig.envIntensity = env->intensity;
+      }
+   }
 
    return sig;
 }

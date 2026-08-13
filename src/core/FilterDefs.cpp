@@ -334,29 +334,6 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { P("Threshold", "uThreshold", T::Float, 0.0f, 1.0f, 0.5f) } },
 
-      { "vibrance", "Color",
-        "uniform float uAmount;\n"
-        "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   float avgc = (c.r + c.g + c.b) / 3.0;\n"
-        "   vec3 boosted = mix(vec3(avgc), c.rgb, 1.0 + uAmount);\n"
-        "   fragColor = vec4(clamp(boosted, 0.0, 1.0), c.a);\n"
-        "}\n",
-        { P("Amount", "uAmount", T::Float, -1.0f, 2.0f, 0.3f) } },
-
-      { "blackandwhite", "Color",
-        "uniform float uRedWeight;\n"
-        "uniform float uGreenWeight;\n"
-        "uniform float uBlueWeight;\n"
-        "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   float lum = c.r*uRedWeight + c.g*uGreenWeight + c.b*uBlueWeight;\n"
-        "   fragColor = vec4(vec3(lum), c.a);\n"
-        "}\n",
-        { P("Red Weight", "uRedWeight", T::Float, 0.0f, 2.0f, 0.299f),
-          P("Green Weight", "uGreenWeight", T::Float, 0.0f, 2.0f, 0.587f),
-          P("Blue Weight", "uBlueWeight", T::Float, 0.0f, 2.0f, 0.114f) } },
-
       { "colorbalance", "Color",
         "uniform float uCyanRed;\n"
         "uniform float uMagentaGreen;\n"
@@ -854,30 +831,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Threshold", "uThreshold", T::Float, 0.01f, 1.0f, 0.15f),
           P("Colour", "uColor", T::Color, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f) } },
 
-      // ---------------- Color: curves + LUT ----------------
-      { "tone shaper", "Color",
-        // Four control points shaped into a smooth response per channel. Not a
-        // spline editor, but it covers the usual lift/gamma/gain style moves.
-        "uniform float uShadows;\n"
-        "uniform float uMidtones;\n"
-        "uniform float uHighlights;\n"
-        "uniform float uContrastPivot;\n"
-        "float curve(float x) {\n"
-        "   float s = mix(x, x*x*(3.0-2.0*x), uContrastPivot);\n"
-        "   float lift = uShadows * (1.0 - x) * (1.0 - x);\n"
-        "   float gain = uHighlights * x * x;\n"
-        "   float mid = uMidtones * 4.0 * x * (1.0 - x);\n"
-        "   return clamp(s + lift + gain + mid, 0.0, 1.0);\n"
-        "}\n"
-        "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   fragColor = vec4(curve(c.r), curve(c.g), curve(c.b), c.a);\n"
-        "}\n",
-        { P("Shadows", "uShadows", T::Float, -0.5f, 0.5f, 0.0f),
-          P("Midtones", "uMidtones", T::Float, -0.5f, 0.5f, 0.0f),
-          P("Highlights", "uHighlights", T::Float, -0.5f, 0.5f, 0.0f),
-          P("S-Curve", "uContrastPivot", T::Float, 0.0f, 1.0f, 0.0f) } },
-
+      // ---------------- Color: LUT ----------------
       { "lut", "Color",
         // Second input is a HALD/strip LUT image: an N*N by N grid of slices.
         "uniform float uSize;\n"
@@ -930,16 +884,22 @@ const std::vector<FilterDef>& GetFilterDefs()
 
       { "color adjustments", "Color",
         // All-in-one grading node consolidating the separate brightness/contrast,
-        // levels, color balance, hsl, tone shaper, channelmixer and blackandwhite
-        // nodes into a single chain, so a common grade doesn't need seven nodes
-        // wired in series. Pipeline order follows the usual DaVinci
-        // Resolve / Photoshop primaries -> HSL -> channel mixer -> B&W stacking:
-        //   1) Brightness/contrast   4) HSL (hue/sat/lightness)
-        //   2) Levels (black/white point + gamma)   5) Tone shaper (S-curve)
-        //   3) Color balance (cyan-red/magenta-green/yellow-blue)   6) Channel mixer
-        //   7) Black & white (optional, always last - grading after a desaturate
-        //      step would be pointless, so it only runs when enabled)
-        // Each stage's math is copied verbatim from its standalone FilterDef.
+        // levels, color balance, hsl, vibrance, tone shaper, channelmixer and
+        // blackandwhite nodes into a single chain, so a common grade doesn't
+        // need eight nodes wired in series. Pipeline order follows the usual
+        // DaVinci Resolve / Photoshop primaries -> HSL -> channel mixer -> B&W
+        // stacking:
+        //   1) Brightness/contrast   5) Vibrance (saturation relative to grey)
+        //   2) Levels (black/white point + gamma)   6) Tone shaper (S-curve)
+        //   3) Color balance (cyan-red/magenta-green/yellow-blue)   7) Channel mixer
+        //   4) HSL (hue/sat/lightness)   8) Black & white (optional, always last -
+        //      grading after a desaturate step would be pointless, so it only
+        //      runs when enabled)
+        // Each stage's math is copied verbatim from its standalone FilterDef
+        // (vibrance, tone shaper and blackandwhite no longer exist standalone -
+        // vibrance duplicated HSL's saturation slider, tone shaper duplicated
+        // the real per-channel Curves node, and blackandwhite was a special
+        // case of Channel Mixer with all three rows set equal).
         std::string(kSharedHelpers) +
         "uniform float uBrightness;\n"
         "uniform float uContrast;\n"
@@ -952,6 +912,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "uniform float uHueShift;\n"
         "uniform float uSaturation;\n"
         "uniform float uLightness;\n"
+        "uniform float uVibrance;\n"
         "uniform float uShadows;\n"
         "uniform float uMidtones;\n"
         "uniform float uHighlights;\n"
@@ -986,6 +947,9 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   hsv.y = clamp(hsv.y * uSaturation, 0.0, 1.0);\n"
         "   col = clamp(hsv2rgb(hsv) + uLightness, 0.0, 1.0);\n"
         "\n"
+        "   float avgc = (col.r + col.g + col.b) / 3.0;\n"
+        "   col = clamp(mix(vec3(avgc), col, 1.0 + uVibrance), 0.0, 1.0);\n"
+        "\n"
         "   col = vec3(toneCurve(col.r), toneCurve(col.g), toneCurve(col.b));\n"
         "\n"
         "   col = clamp(vec3(dot(col, uRedRow), dot(col, uGreenRow), dot(col, uBlueRow)), 0.0, 1.0);\n"
@@ -1008,6 +972,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           S("HSL", P("Hue Shift", "uHueShift", T::Float, 0.0f, 1.0f, 0.0f)),
           P("Saturation", "uSaturation", T::Float, 0.0f, 3.0f, 1.0f),
           P("Lightness", "uLightness", T::Float, -1.0f, 1.0f, 0.0f),
+          S("Vibrance", P("Amount", "uVibrance", T::Float, -1.0f, 2.0f, 0.0f)),
           S("Tone Shaper", P("Shadows", "uShadows", T::Float, -0.5f, 0.5f, 0.0f)),
           P("Midtones", "uMidtones", T::Float, -0.5f, 0.5f, 0.0f),
           P("Highlights", "uHighlights", T::Float, -0.5f, 0.5f, 0.0f),

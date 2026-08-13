@@ -12,14 +12,14 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**114 node types across ten categories.**
+**111 node types across ten categories.**
 
 | Category | Nodes |
 |---|---|
 | Source | Image, Video, Shape (10 primitives), Noise (6 kinds), Ramp (5 gradient types), Texture (Voronoi/Brick/Magic/Wave/Musgrave), Draw (paintable canvas), Formula (live GLSL, 16 presets) |
 | Text | Text (any installed system font) |
 | Effects | Blur family (gaussian/box/motion/radial), bloom, diffuse glow, unsharp mask, twirl, pinch-punch, ripple, lens distortion, displace, liquify, 6 glitch types, symmetry, kaleidoscope, mirror tile, halftone, sobel edge, edge outline, pixelate, noise, vignette, transform |
-| Color | Brightness/contrast, levels, Curves (interactive spline editor), LUT, gradient map, Color Ramp (up to 32 stops), channel mixer, HSL, invert, posterize, threshold, vibrance, black & white, colour balance, exposure |
+| Color | Brightness/contrast, levels, Curves (interactive spline editor), LUT, gradient map, Color Ramp (up to 32 stops), channel mixer, HSL, invert, posterize, threshold, colour balance, exposure, Color Adjustments (all-in-one grading chain) |
 | Compositing | Blend (31 modes), Layer Stack (4 reorderable layers), Switcher, Fit, outer glow, colour overlay, drop shadow |
 | Feedback | Feedback (one-frame delay, makes cycles legal), Trails, Reaction-Diffusion |
 | Mask | Remove Background (on-device Vision segmentation), Chroma Key, Luma Key |

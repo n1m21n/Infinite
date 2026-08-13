@@ -43,6 +43,7 @@ private:
    void ReleaseFbo();
    void UploadMesh(const Mesh& mesh, unsigned long long revision);
    void UpdateSelectionBuffer(const Mesh& mesh, unsigned long long revision);
+   void UploadPoints(const std::vector<Particle>& points, unsigned long long revision);
 
    unsigned int mFbo = 0, mColorTex = 0, mDepthBuffer = 0;
    int mWidth = 0, mHeight = 0;
@@ -77,6 +78,17 @@ private:
    unsigned int mSelVao = 0, mSelIbo = 0;
    int mSelIndexCount = 0;
    unsigned long long mSelRevision = (unsigned long long)-1;
+
+   // A pure point-cloud source (Particle System) has no mesh at all - GetMesh()
+   // is a permanently-empty stub, see ParticleSystemNode::GetMesh
+   // (SimulationNodes.h). Render3DNode draws that case as camera-facing
+   // billboard sprites (Geometry3DNodes.cpp's drawCloudSlot); this thumbnail
+   // takes the much cheaper route of plain round GL_POINTS, which is enough to
+   // tell a preview apart from the "no geometry" placeholder without a second
+   // sprite/instancing pipeline.
+   unsigned int mPointVao = 0, mPointVbo = 0;
+   int mPointCount = 0;
+   unsigned long long mLastPointRevision = (unsigned long long)-1;
 
    // Orbit camera. Distance/target are auto-framed to the mesh bounds the
    // first time a mesh arrives, then left alone so a user's own zoom sticks
