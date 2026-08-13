@@ -39,6 +39,10 @@ const std::vector<Preset>& Presets()
          { "Effects",     { 0.980f, 0.800f, 0.082f } }, // #FACC15
          { "Modulators",  { 0.639f, 0.902f, 0.208f } }, // #A3E635
          { "Output",      { 0.886f, 0.910f, 0.941f } }, // #E2E8F0
+         { "Notes",       { 0.298f, 0.851f, 0.392f } }, // #4CD964 green
+         { "Synths",      { 0.412f, 0.573f, 0.965f } }, // #6992F6 blue
+         { "AudioEffects", { 0.325f, 0.780f, 0.890f } }, // #53C7E3 cyan-blue
+         { "AudioUtility",  { 0.639f, 0.663f, 0.729f } }, // #A3A9BA muted grey-blue
       },
       { { 0.039f, 0.043f, 0.059f },  // window  #0A0B0F
         { 0.094f, 0.106f, 0.137f },  // panel   #181B23
@@ -59,6 +63,10 @@ const std::vector<Preset>& Presets()
          { "Effects",     { 0.922f, 0.796f, 0.545f } }, // #EBCB8B
          { "Modulators",  { 0.369f, 0.506f, 0.675f } }, // #5E81AC
          { "Output",      { 0.925f, 0.937f, 0.957f } }, // #ECEFF4
+         { "Notes",       { 0.639f, 0.745f, 0.549f } }, // #A3BE8C (reuses Source)
+         { "Synths",      { 0.533f, 0.753f, 0.816f } }, // #88C0D0 (reuses 3D)
+         { "AudioEffects", { 0.506f, 0.631f, 0.757f } }, // #81A1C1 (reuses Compositing)
+         { "AudioUtility",  { 0.369f, 0.506f, 0.675f } }, // #5E81AC (reuses Modulators)
       },
       { { 0.180f, 0.204f, 0.251f },  // window  nord0 #2E3440
         { 0.231f, 0.259f, 0.322f },  // panel   nord1 #3B4252
@@ -79,6 +87,10 @@ const std::vector<Preset>& Presets()
          { "Effects",     { 0.945f, 0.980f, 0.549f } }, // #F1FA8C
          { "Modulators",  { 0.384f, 0.447f, 0.643f } }, // #6272A4 (reuses 3D)
          { "Output",      { 0.973f, 0.973f, 0.949f } }, // #F8F8F2
+         { "Notes",       { 0.314f, 0.980f, 0.482f } }, // #50FA7B (reuses Source)
+         { "Synths",      { 0.545f, 0.914f, 0.992f } }, // #8BE9FD (reuses Text)
+         { "AudioEffects", { 0.741f, 0.576f, 0.976f } }, // #BD93F9 (reuses Compositing)
+         { "AudioUtility",  { 0.384f, 0.447f, 0.643f } }, // #6272A4 (reuses 3D/Modulators)
       },
       { { 0.157f, 0.165f, 0.212f },  // window  #282A36
         { 0.204f, 0.212f, 0.271f },  // panel   between bg and selection
@@ -99,6 +111,10 @@ const std::vector<Preset>& Presets()
          { "Effects",     { 0.976f, 0.886f, 0.686f } }, // #F9E2AF
          { "Modulators",  { 0.455f, 0.780f, 0.925f } }, // #74C7EC
          { "Output",      { 0.804f, 0.839f, 0.957f } }, // #CDD6F4
+         { "Notes",       { 0.651f, 0.890f, 0.631f } }, // #A6E3A1 (reuses Source)
+         { "Synths",      { 0.537f, 0.706f, 0.980f } }, // #89B4FA (reuses Compositing)
+         { "AudioEffects", { 0.537f, 0.863f, 0.922f } }, // #89DCEB (reuses 3D)
+         { "AudioUtility",  { 0.455f, 0.780f, 0.925f } }, // #74C7EC (reuses Modulators)
       },
       { { 0.118f, 0.118f, 0.180f },  // window  Base    #1E1E2E
         { 0.192f, 0.196f, 0.267f },  // panel   Surface0 #313244
@@ -119,6 +135,10 @@ const std::vector<Preset>& Presets()
          { "Effects",     { 0.051f, 0.725f, 0.843f } }, // #0DB9D7
          { "Modulators",  { 0.267f, 0.616f, 0.671f } }, // #449DAB
          { "Output",      { 0.753f, 0.792f, 0.961f } }, // #C0CAF5
+         { "Notes",       { 0.620f, 0.808f, 0.416f } }, // #9ECE6A (reuses Source)
+         { "Synths",      { 0.478f, 0.635f, 0.969f } }, // #7AA2F7 (reuses 3D)
+         { "AudioEffects", { 0.490f, 0.812f, 1.000f } }, // #7DCFFF (reuses Text)
+         { "AudioUtility",  { 0.267f, 0.616f, 0.671f } }, // #449DAB (reuses Modulators)
       },
       { { 0.102f, 0.106f, 0.149f },  // window  Background #1A1B26
         { 0.122f, 0.137f, 0.208f },  // panel   Sidebar bg #1F2335

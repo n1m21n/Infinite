@@ -80,7 +80,11 @@ TESTS=(
   "LIVETEST:35"
   "PHASE1TEST:35"
   "DELETECRASHTEST:8"
+  "AUDIOGRAPHTEST:8"
   "DRAGTEST:35"
+  "WTDRAGTEST:35"
+  "AUDIOPARAMSWEEPTEST:1"
+  "AUDIOTEARDOWNSWEEPTEST:10"
 )
 
 step() { printf '\n== %s ==\n' "$1"; }
@@ -161,7 +165,24 @@ if [ $FAIL -gt 0 ]; then
   echo "failing checks: ${FAILED_NAMES[*]}"
   echo
   echo "known baseline (not a regression unless it changes): DRAGTEST's canvas-pan"
-  echo "sub-check prints \"... : BUG\" on a clean tree — see SKILL.md Gotchas."
+  echo "sub-check prints \"... : BUG\" on a clean tree — see SKILL.md Gotchas. PHASE1TEST"
+  echo "is occasionally flaky on particle-system timing; rerun once before treating it"
+  echo "as a regression. PHASEATEST currently fails on a pre-existing \"Smooth\" node-"
+  echo "name collision unrelated to audio work — see the spawned task to fix it."
+  echo "known baseline: AUDIOPARAMSWEEPTEST currently reports [FAIL] on one Dynamics"
+  echo "param (sidechainExternal — both audio input slots get the identical drive tone"
+  echo "in the sweep's generic rig, so switching which one the detector reads from"
+  echo "can never change the signature), two Delay params (sync, rateDiv — both"
+  echo "gate the base delay time itself, whose musical default (250ms) is longer than"
+  echo "the sweep's ~70ms warmup window), and three Reverb params (decay, damping,"
+  echo "predelay — all only change what the FDN's 8 lines *write*, and a line's own"
+  echo "read trails its write by ~600-1100 samples at the default size, longer than"
+  echo "the sweep's post-alteration measurement window). All hand-confirmed correct —"
+  echo "see EffectDefs.cpp's comments on each param and .claude/skills/audio-node-sweep/"
+  echo "SKILL.md's blind-spots section. Dynamics and Delay were cut down from a much"
+  echo "larger control surface to match KHS Audio's reference plugins per"
+  echo ".claude/skills/new-audio-node/SKILL.md's minimalism rule, which is also why"
+  echo "this list is now much shorter than it used to be."
   exit 1
 fi
 echo "all checks green."

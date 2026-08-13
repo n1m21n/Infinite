@@ -1,4 +1,5 @@
 #include "Platform.h"
+#include <atomic>
 
 #import <Cocoa/Cocoa.h>
 #import <CoreGraphics/CoreGraphics.h>
@@ -11,6 +12,8 @@
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
 #import <CoreMIDI/CoreMIDI.h>
+#import <CoreAudio/CoreAudio.h>
+#import <AudioToolbox/AudioToolbox.h>
 
 #include <cstring>
 #include <cmath>
@@ -1681,6 +1684,403 @@ namespace Platform
       return ReadFrom(gLiveAnalyser, out);
    }
 
+   // ------------------------------------------------- synthesis spike (P0)
+
+   struct AudioSpikeHandle
+   {
+      AVAudioEngine* engine = nil;
+      AVAudioSourceNode* source = nil;
+      double phase = 0.0;
+      double sampleRate = 44100.0;
+
+      std::atomic<double> sampleRateOut { 0.0 };
+      std::atomic<int> blockSize { 0 };
+      std::atomic<double> maxJitterMs { 0.0 };
+      std::atomic<uint64_t> callbackCount { 0 };
+      std::atomic<double> lastEntryMs { -1.0 };
+   };
+
+   namespace
+   {
+      AudioSpikeHandle* gSpikeHandle = nullptr;
+
+      double NowMs()
+      {
+         using namespace std::chrono;
+         return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
+      }
+   }
+
+   bool AudioSpikeStart(std::string& outError)
+   {
+      if (gSpikeHandle != nullptr)
+         return true;
+
+      @autoreleasepool
+      {
+         AudioSpikeHandle* h = new AudioSpikeHandle();
+         h->engine = [[AVAudioEngine alloc] init];
+         AVAudioMixerNode* mixer = [h->engine mainMixerNode];
+         AVAudioFormat* format = [mixer outputFormatForBus:0];
+         if (format == nil || format.sampleRate <= 0)
+            format = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100.0 channels:2];
+
+         h->sampleRate = format.sampleRate;
+         const double sampleRate = h->sampleRate;
+         AudioSpikeHandle* raw = h;
+
+         h->source = [[AVAudioSourceNode alloc]
+             initWithFormat:format
+             renderBlock:^OSStatus(BOOL* isSilence, const AudioTimeStamp* timestamp,
+                                    AVAudioFrameCount frameCount, AudioBufferList* outputData) {
+            const double nowMs = NowMs();
+            const double lastMs = raw->lastEntryMs.load(std::memory_order_relaxed);
+            if (lastMs >= 0.0)
+            {
+               const double expectedGapMs = 1000.0 * (double)frameCount / sampleRate;
+               const double actualGapMs = nowMs - lastMs;
+               const double jitterMs = std::fabs(actualGapMs - expectedGapMs);
+               double prevMax = raw->maxJitterMs.load(std::memory_order_relaxed);
+               if (jitterMs > prevMax)
+                  raw->maxJitterMs.store(jitterMs, std::memory_order_relaxed);
+            }
+            raw->lastEntryMs.store(nowMs, std::memory_order_relaxed);
+            raw->blockSize.store((int)frameCount, std::memory_order_relaxed);
+            raw->callbackCount.fetch_add(1, std::memory_order_relaxed);
+
+            *isSilence = NO;
+            const double phaseStep = 2.0 * M_PI * 440.0 / sampleRate;
+            double phase = raw->phase;
+            for (UInt32 ch = 0; ch < outputData->mNumberBuffers; ++ch)
+            {
+               float* buf = (float*)outputData->mBuffers[ch].mData;
+               double p = phase;
+               for (AVAudioFrameCount i = 0; i < frameCount; ++i)
+               {
+                  buf[i] = (float)(0.2 * sin(p));
+                  p += phaseStep;
+               }
+            }
+            phase += phaseStep * frameCount;
+            phase = fmod(phase, 2.0 * M_PI);
+            raw->phase = phase;
+
+            return noErr;
+         }];
+
+         [h->engine attachNode:h->source];
+         [h->engine connect:h->source to:mixer format:format];
+
+         NSError* err = nil;
+         [h->engine prepare];
+         if (![h->engine startAndReturnError:&err])
+         {
+            outError = err ? std::string([[err localizedDescription] UTF8String]) : "audio spike engine failed to start";
+            [h->engine detachNode:h->source];
+            delete h;
+            return false;
+         }
+
+         h->sampleRateOut.store(sampleRate, std::memory_order_relaxed);
+         gSpikeHandle = h;
+         outError.clear();
+         return true;
+      }
+   }
+
+   void AudioSpikeStop()
+   {
+      if (gSpikeHandle == nullptr)
+         return;
+      AudioSpikeHandle* h = gSpikeHandle;
+      gSpikeHandle = nullptr;
+      @autoreleasepool
+      {
+         // Same teardown hazard as AudioFileClose above: AVAudioEngine throws
+         // an NSException on bad teardown state instead of returning an
+         // error, and an uncaught one aborts the process.
+         @try
+         {
+            [h->engine stop];
+            [h->engine detachNode:h->source];
+         }
+         @catch (NSException* exception)
+         {
+            fprintf(stderr, "audio spike teardown: %s\n",
+                    [[exception reason] UTF8String] ? [[exception reason] UTF8String] : "unknown");
+         }
+         h->source = nil;
+         h->engine = nil;
+      }
+      delete h;
+   }
+
+   AudioSpikeStats AudioSpikeGetStats()
+   {
+      AudioSpikeStats stats;
+      if (gSpikeHandle == nullptr)
+         return stats;
+      stats.sampleRate = gSpikeHandle->sampleRateOut.load(std::memory_order_relaxed);
+      stats.blockSize = gSpikeHandle->blockSize.load(std::memory_order_relaxed);
+      stats.maxJitterMs = gSpikeHandle->maxJitterMs.load(std::memory_order_relaxed);
+      stats.callbackCount = gSpikeHandle->callbackCount.load(std::memory_order_relaxed);
+      return stats;
+   }
+
+   // ------------------------------------------------- engine render bridge
+
+   struct AudioDeviceHandle
+   {
+      AVAudioEngine* engine = nil;
+      AVAudioSourceNode* source = nil;
+   };
+
+   namespace
+   {
+      AudioDeviceHandle* gDeviceHandle = nullptr;
+      AudioRenderCallback gDeviceCallback = nullptr;
+      void* gDeviceUserData = nullptr;
+
+      // AVAudioSourceNode hands us AudioBufferList, not a float**; cap the
+      // channel count so unpacking it into the C-callback shape needs no
+      // heap allocation on the audio thread.
+      constexpr int kMaxDeviceChannels = 8;
+   }
+
+   namespace
+   {
+   // Returns true (and > 0 channels on the given scope) if the device
+   // participates in that scope at all - a device with 0 input streams is
+   // output-only and vice versa. Used both by AudioListDevices to classify
+   // each device and to size AudioObjectGetPropertyDataSize's buffer.
+   bool DeviceHasScope(AudioObjectID deviceId, AudioObjectPropertyScope scope, uint32_t& outChannels)
+   {
+      outChannels = 0;
+      AudioObjectPropertyAddress addr {
+         kAudioDevicePropertyStreamConfiguration, scope, kAudioObjectPropertyElementMain
+      };
+      UInt32 dataSize = 0;
+      if (AudioObjectGetPropertyDataSize(deviceId, &addr, 0, nullptr, &dataSize) != noErr || dataSize == 0)
+         return false;
+
+      std::vector<uint8_t> buf(dataSize);
+      AudioBufferList* list = reinterpret_cast<AudioBufferList*>(buf.data());
+      if (AudioObjectGetPropertyData(deviceId, &addr, 0, nullptr, &dataSize, list) != noErr)
+         return false;
+
+      uint32_t channels = 0;
+      for (UInt32 i = 0; i < list->mNumberBuffers; i++)
+         channels += list->mBuffers[i].mNumberChannels;
+      outChannels = channels;
+      return channels > 0;
+   }
+
+   std::string DeviceName(AudioObjectID deviceId)
+   {
+      AudioObjectPropertyAddress addr {
+         kAudioObjectPropertyName, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain
+      };
+      CFStringRef name = nullptr;
+      UInt32 size = sizeof(name);
+      if (AudioObjectGetPropertyData(deviceId, &addr, 0, nullptr, &size, &name) != noErr || name == nullptr)
+         return "Unknown device";
+
+      char buf[256] = {};
+      CFStringGetCString(name, buf, sizeof(buf), kCFStringEncodingUTF8);
+      CFRelease(name);
+      return std::string(buf);
+   }
+   }
+
+   std::vector<AudioDeviceInfo> AudioListDevices()
+   {
+      std::vector<AudioDeviceInfo> result;
+
+      AudioObjectPropertyAddress addr {
+         kAudioHardwarePropertyDevices, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain
+      };
+      UInt32 dataSize = 0;
+      if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &addr, 0, nullptr, &dataSize) != noErr)
+         return result;
+
+      const size_t count = dataSize / sizeof(AudioObjectID);
+      std::vector<AudioObjectID> deviceIds(count);
+      if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, nullptr, &dataSize, deviceIds.data()) != noErr)
+         return result;
+
+      for (AudioObjectID deviceId : deviceIds)
+      {
+         uint32_t inChannels = 0, outChannels = 0;
+         const bool isInput = DeviceHasScope(deviceId, kAudioObjectPropertyScopeInput, inChannels);
+         const bool isOutput = DeviceHasScope(deviceId, kAudioObjectPropertyScopeOutput, outChannels);
+         if (!isInput && !isOutput)
+            continue;
+
+         AudioDeviceInfo info;
+         info.name = DeviceName(deviceId);
+         info.deviceId = (uint32_t)deviceId;
+         info.isInput = isInput;
+         info.isOutput = isOutput;
+         result.push_back(std::move(info));
+      }
+
+      return result;
+   }
+
+   uint32_t AudioDeviceBufferFrames(uint32_t deviceId)
+   {
+      AudioObjectID target = (AudioObjectID)deviceId;
+      if (target == 0)
+      {
+         AudioObjectPropertyAddress defaultAddr {
+            kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
+            kAudioObjectPropertyElementMain
+         };
+         UInt32 idSize = sizeof(target);
+         if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &defaultAddr, 0, nullptr, &idSize, &target) != noErr)
+            return 0;
+      }
+
+      AudioObjectPropertyAddress bufferAddr {
+         kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain
+      };
+      UInt32 frames = 0;
+      UInt32 size = sizeof(frames);
+      if (AudioObjectGetPropertyData(target, &bufferAddr, 0, nullptr, &size, &frames) != noErr)
+         return 0;
+      return (uint32_t)frames;
+   }
+
+   bool AudioDeviceOpen(AudioRenderCallback callback, void* userData, double& outSampleRate, std::string& outError,
+                        uint32_t requestedDeviceId, double requestedSampleRate, int requestedBufferFrames)
+   {
+      if (gDeviceHandle != nullptr)
+         return true;
+
+      @autoreleasepool
+      {
+         AudioDeviceHandle* h = new AudioDeviceHandle();
+         h->engine = [[AVAudioEngine alloc] init];
+         AVAudioMixerNode* mixer = [h->engine mainMixerNode];
+
+         // Device/rate/buffer selection all act on the underlying
+         // AudioObjectID, so they must happen before the engine (and its
+         // output AudioUnit) starts pulling format info from it.
+         AudioObjectID targetDevice = (AudioObjectID)requestedDeviceId;
+         if (targetDevice != 0)
+         {
+            AudioUnit outputUnit = h->engine.outputNode.audioUnit;
+            AudioUnitSetProperty(outputUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                                 &targetDevice, sizeof(targetDevice));
+         }
+         else
+         {
+            AudioObjectPropertyAddress defaultAddr {
+               kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
+               kAudioObjectPropertyElementMain
+            };
+            UInt32 idSize = sizeof(targetDevice);
+            AudioObjectGetPropertyData(kAudioObjectSystemObject, &defaultAddr, 0, nullptr, &idSize, &targetDevice);
+         }
+
+         if (targetDevice != 0 && requestedSampleRate > 0.0)
+         {
+            AudioObjectPropertyAddress rateAddr {
+               kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal,
+               kAudioObjectPropertyElementMain
+            };
+            Float64 rate = requestedSampleRate;
+            AudioObjectSetPropertyData(targetDevice, &rateAddr, 0, nullptr, sizeof(rate), &rate);
+         }
+
+         if (targetDevice != 0 && requestedBufferFrames > 0)
+         {
+            AudioObjectPropertyAddress bufferAddr {
+               kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeGlobal,
+               kAudioObjectPropertyElementMain
+            };
+            UInt32 frames = (UInt32)requestedBufferFrames;
+            AudioObjectSetPropertyData(targetDevice, &bufferAddr, 0, nullptr, sizeof(frames), &frames);
+         }
+
+         AVAudioFormat* format = [mixer outputFormatForBus:0];
+         if (format == nil || format.sampleRate <= 0)
+            format = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100.0 channels:2];
+
+         const double sampleRate = format.sampleRate;
+         gDeviceCallback = callback;
+         gDeviceUserData = userData;
+
+         h->source = [[AVAudioSourceNode alloc]
+             initWithFormat:format
+             renderBlock:^OSStatus(BOOL* isSilence, const AudioTimeStamp* timestamp,
+                                    AVAudioFrameCount frameCount, AudioBufferList* outputData) {
+            *isSilence = NO;
+
+            float* chans[kMaxDeviceChannels];
+            int numChannels = (int)outputData->mNumberBuffers;
+            if (numChannels > kMaxDeviceChannels)
+               numChannels = kMaxDeviceChannels;
+            for (int ch = 0; ch < numChannels; ++ch)
+               chans[ch] = (float*)outputData->mBuffers[ch].mData;
+
+            if (gDeviceCallback != nullptr)
+               gDeviceCallback(chans, numChannels, (int)frameCount, gDeviceUserData);
+
+            return noErr;
+         }];
+
+         [h->engine attachNode:h->source];
+         [h->engine connect:h->source to:mixer format:format];
+
+         NSError* err = nil;
+         [h->engine prepare];
+         if (![h->engine startAndReturnError:&err])
+         {
+            outError = err ? std::string([[err localizedDescription] UTF8String]) : "audio engine failed to start";
+            [h->engine detachNode:h->source];
+            gDeviceCallback = nullptr;
+            gDeviceUserData = nullptr;
+            delete h;
+            return false;
+         }
+
+         gDeviceHandle = h;
+         outSampleRate = sampleRate;
+         outError.clear();
+         return true;
+      }
+   }
+
+   void AudioDeviceClose()
+   {
+      if (gDeviceHandle == nullptr)
+         return;
+      AudioDeviceHandle* h = gDeviceHandle;
+      gDeviceHandle = nullptr;
+      @autoreleasepool
+      {
+         // Same teardown hazard as AudioSpikeStop/AudioFileClose: AVAudioEngine
+         // throws an NSException on bad teardown state instead of returning an
+         // error, and an uncaught one aborts the process.
+         @try
+         {
+            [h->engine stop];
+            [h->engine detachNode:h->source];
+         }
+         @catch (NSException* exception)
+         {
+            fprintf(stderr, "audio device teardown: %s\n",
+                    [[exception reason] UTF8String] ? [[exception reason] UTF8String] : "unknown");
+         }
+         h->source = nil;
+         h->engine = nil;
+      }
+      gDeviceCallback = nullptr;
+      gDeviceUserData = nullptr;
+      delete h;
+   }
+
    // ---------------------------------------------------------- file players
 
    struct AudioPlayerHandle
@@ -1986,6 +2386,33 @@ namespace Platform
       };
 
       MidiState gMidiState;
+
+      // Live note ring - see Platform.h's "live note stream" section for why
+      // this sits outside gMidiState's mutex entirely. Producer: the CoreMIDI
+      // read thread (single). Consumers: any number, each holding its own
+      // cursor. 512 entries is ~40 seconds of the fastest realistic playing.
+      constexpr size_t kMidiNoteRingCapacity = 512;
+      struct MidiNoteRing
+      {
+         MidiNoteMessage entries[kMidiNoteRingCapacity];
+         std::atomic<unsigned long long> write { 0 };
+      };
+      MidiNoteRing gMidiNoteRing;
+
+      void PushMidiNote(MidiDeviceId device, int channel, int note, float velocity01, bool isNoteOn)
+      {
+         const unsigned long long w = gMidiNoteRing.write.load(std::memory_order_relaxed);
+         MidiNoteMessage& slot = gMidiNoteRing.entries[w % kMidiNoteRingCapacity];
+         slot.device = device;
+         slot.channel = channel;
+         slot.note = note;
+         slot.velocity01 = velocity01;
+         slot.isNoteOn = isNoteOn;
+         // Release: everything written to the slot above is visible to any
+         // consumer that acquires this counter and then reads the slot.
+         gMidiNoteRing.write.store(w + 1, std::memory_order_release);
+      }
+
       MIDIClientRef gMidiClient = 0;
       MIDIPortRef gMidiInPort = 0;
       bool gMidiRunning = false;
@@ -2043,12 +2470,25 @@ namespace Platform
             gMidiState.lastTouched = MidiCCValue{ device, channel, (int)data[1], false, v };
             gMidiState.lastTouchedPending = true;
          }
+         else if (hiNibble == 0x80 && len >= 3)
+         {
+            // Note Off. Deliberately absent from the polled maps above (a
+            // modulator's "held value" should stay where the key left it), but
+            // the note stream must carry it or every voice it opened sticks on.
+            PushMidiNote(device, channel, (int)data[1], (float)data[2] / 127.0f, false);
+         }
          else if (hiNibble == 0x90 && len >= 3)
          {
-            // Note On; velocity 0 is treated as Note Off and ignored for tracking,
-            // so the held value stays where it was - same as every DAW's MIDI learn.
+            // Note On; velocity 0 is the standard running-status spelling of a
+            // Note Off, so it reaches the note stream as one and is ignored for
+            // the polled maps - the held value stays where it was, same as
+            // every DAW's MIDI learn.
             if (data[2] == 0)
+            {
+               PushMidiNote(device, channel, (int)data[1], 0.0f, false);
                return;
+            }
+            PushMidiNote(device, channel, (int)data[1], (float)data[2] / 127.0f, true);
             MidiKey key{ device, channel, (int)data[1], true };
             const float v = (float)data[2] / 127.0f;
             std::lock_guard<std::mutex> lock(gMidiState.mutex);
@@ -2262,6 +2702,31 @@ namespace Platform
          return false;
       out = it->second;
       return true;
+   }
+
+   unsigned long long MidiNoteStreamPosition()
+   {
+      return gMidiNoteRing.write.load(std::memory_order_acquire);
+   }
+
+   int MidiReadNotesSince(unsigned long long& cursor, MidiNoteMessage* out, int maxCount)
+   {
+      const unsigned long long w = gMidiNoteRing.write.load(std::memory_order_acquire);
+      // Fallen further behind than the ring is long (or a fresh cursor of 0
+      // against a long-running stream): skip to the oldest entry still intact
+      // rather than reading slots the producer has already recycled.
+      if (cursor + kMidiNoteRingCapacity < w)
+         cursor = w - kMidiNoteRingCapacity;
+      if (cursor > w)
+         cursor = w; // ring was reset under us (MidiStop/MidiStart)
+
+      int n = 0;
+      while (cursor < w && n < maxCount)
+      {
+         out[n++] = gMidiNoteRing.entries[cursor % kMidiNoteRingCapacity];
+         cursor++;
+      }
+      return n;
    }
 
    bool MidiClockIsPresent()

@@ -1,6 +1,6 @@
 ---
 name: run-infinite-hygiene
-description: Build, launch, and drive Infinite (the macOS node compositor) through its built-in self-test harness before committing/pushing — checks undo/redo, patch save/load, node groups, comments, color picker, macros, palette, bypass, geometry ops, 3D shading, materials, ocean/path, selection UI, and a full 167-node-type round trip. Use when asked to "run the tests", "hygiene check", "pre-commit check", "sanity check before pushing", or "verify the build" for this project.
+description: Build, launch, and drive Infinite (the macOS node compositor) through its built-in self-test harness before committing/pushing — checks undo/redo, patch save/load, node groups, comments, color picker, macros, palette, bypass, geometry ops, 3D shading, materials, ocean/path, selection UI, audio param/teardown sweeps, and a full 167-node-type round trip. Use when asked to "run the tests", "hygiene check", "pre-commit check", "sanity check before pushing", or "verify the build" for this project.
 ---
 
 Paths below are relative to the repo root (`/Users/namansoni/infinite`), not
@@ -13,7 +13,7 @@ this skill directory.
 ```
 
 This builds the app, takes a rendered screenshot, then drives the compiled
-`.app` binary through 39 self-test fixtures via env vars — real ImGui frames
+`.app` binary through 43 self-test fixtures via env vars — real ImGui frames
 and GL draws, not a mock. It prints `[pass]`/`[FAIL]`/`[CRASH]` per check and
 exits non-zero if anything failed. Full raw output per check is saved to
 `/tmp/infinite_test_<NAME>.log` so a failure can be read in full.
@@ -34,12 +34,12 @@ rendering — the suite's pass/fail lines don't catch "renders blank" or
 separate test binary. Each one spawns a small fixture node graph, steps it
 for N frames (`INFINITE_EXITAFTER=N` closes the GLFW window and flushes
 stdout at frame N), and `printf`s a verdict line ending in `OK`, containing
-`FAIL`, or ending in `BUG`. `driver.sh` runs a curated 36 of these — the ones
+`FAIL`, or ending in `BUG`. `driver.sh` runs a curated 43 of these — the ones
 with an unambiguous machine-checkable verdict — and greps for the failure
 markers. See `ARCHITECTURE.md`'s "Dev/Test Harness" section for where this
 code lives.
 
-The 39 were picked to cover, category by category:
+The 43 were picked to cover, category by category:
 
 | Area | Checks |
 |---|---|
@@ -55,6 +55,7 @@ The 39 were picked to cover, category by category:
 | One geometry interface, generic connect/disconnect/rebuild (Phase 2) | PATCHTEST also covers a second Render 3D geometry slot, both mesh-sampling pins plus the cloud pin on Instance on Points, Metaballs' cloud, and Path's curve pin surviving a save/load round trip; DELETECRASHTEST — one source feeds Render 3D, all three Instance on Points pins, Metaballs' cloud and both of Path's pins at once, gets deleted, and every consumer cooks without crashing on the freed pointer (the bug class `DisconnectAllTo`'s generic `GeometryInputSlot` loop removes structurally) |
 | Geometry-node sweeps — generic across every `IGeometrySource`-consuming node type, not one hand-written fixture per node (see `geometry-transform-sweep` skill for the full writeup) | TRANSFORMSWEEPTEST (upstream `GetModelMatrix()` reaches the output), MAPPINGSWEEPTEST (upstream `GetMappingTransform()` reaches the output), REVISIONSWEEPTEST (a node's revision/generation stamp doesn't move when nothing actually changed — the class of bug that made Cloth reset to rest pose every frame downstream of a textured Displacement) |
 | Selection as an input, not four operators (Phase 4) | PHASE4TEST — `GeometryOpNode::selectionOnly` moves/deletes/extrudes only a Select node's masked faces when on and the whole mesh when off; a patch saved before this phase (kDeleteSelected/kTransformSelected/kExtrudeSelected, no `selectionOnly` key at all) still loads to the same geometry after `MigrateDeprecatedOp` rewrites it to the general op + `selectionOnly=true` |
+| Audio-node sweeps — generic across every audio/note node type registered in `NodeFactory`, not one hand-written fixture per node (see `audio-node-sweep` skill for the full writeup) | AUDIOPARAMSWEEPTEST (every `VisitParams` param survives save/load and reaches the audio thread within one block of its own `CookIfNeeded`; headless, runs before `glfwInit()`), AUDIOTEARDOWNSWEEPTEST (`DELETECRASHTEST` for the audio graph — spawn, wire, delete mid-playback via the real `RemoveNodeByIndex`, keep rendering, cables cleared) |
 
 Excluded from the auto-verdict suite because they only `printf` raw numbers
 with no pass/fail line (would need a human to eyeball the log) — run them

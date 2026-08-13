@@ -195,7 +195,7 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "node " << node.index << " " << node.category << " " << node.typeName << "\n";
       file << "  pos " << FloatToString(node.x) << " " << FloatToString(node.y) << "\n";
       file << "  flags " << (node.showParams ? 1 : 0) << " " << (node.bypassed ? 1 : 0) << " "
-           << (node.showMiniViewport ? 1 : 0) << "\n";
+           << (node.showMiniViewport ? 1 : 0) << " " << (node.showAdvancedParams ? 1 : 0) << "\n";
       for (const auto& p : node.params)
          file << "  " << p.first << " " << p.second << "\n";
       file << "end\n";
@@ -204,6 +204,10 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "cable " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
    for (const CableRecord& c : data.geometry)
       file << "geo " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
+   for (const CableRecord& c : data.audio)
+      file << "aud " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
+   for (const CableRecord& c : data.notes)
+      file << "note " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
    for (const ModRecord& m : data.modulation)
       file << "mod " << m.dstIndex << " " << m.dstParam << " "
            << m.srcIndex << " " << m.srcOutput << "\n";
@@ -212,6 +216,8 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
            << p.srcIndex << " " << p.srcSwatch << "\n";
    for (const ExprRecord& e : data.expressions)
       file << "expr " << e.dstIndex << " " << e.dstParam << " " << EscapeLine(e.text) << "\n";
+   for (const GlobalRecord& g : data.globals)
+      file << "glob " << g.name << " " << EscapeLine(g.expr) << "\n";
 
    if (!file.good())
    {
@@ -289,11 +295,17 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       }
       else if (tag == "flags" && inNode)
       {
-         int show = 0, bypass = 0, miniViewport = 0;
-         in >> show >> bypass >> miniViewport;
+         // advanced defaults to 0 (via >>'s C++11 failed-extraction behaviour)
+         // when reading a patch written before showAdvancedParams existed -
+         // `in` is a fresh istringstream over just this line (see the
+         // getline loop above), so a missing 4th token cannot corrupt any
+         // later line's parsing the way it would on a shared whole-file stream.
+         int show = 0, bypass = 0, miniViewport = 0, advanced = 0;
+         in >> show >> bypass >> miniViewport >> advanced;
          current.showParams = show != 0;
          current.bypassed = bypass != 0;
          current.showMiniViewport = miniViewport != 0;
+         current.showAdvancedParams = advanced != 0;
       }
       else if (inNode && (tag == "f" || tag == "i" || tag == "b" || tag == "c" || tag == "s"))
       {
@@ -313,6 +325,15 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
             outData.cables.push_back(c);
          else
             outData.geometry.push_back(c);
+      }
+      else if (tag == "aud" || tag == "note")
+      {
+         CableRecord c;
+         in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
+         if (tag == "aud")
+            outData.audio.push_back(c);
+         else
+            outData.notes.push_back(c);
       }
       else if (tag == "mod")
       {
@@ -336,6 +357,18 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
             raw.erase(0, 1);
          e.text = UnescapeLine(raw);
          outData.expressions.push_back(e);
+      }
+      else if (tag == "glob")
+      {
+         GlobalRecord g;
+         in >> g.name;
+         std::string raw;
+         std::getline(in, raw);
+         if (!raw.empty() && raw[0] == ' ')
+            raw.erase(0, 1);
+         g.expr = UnescapeLine(raw);
+         if (!g.name.empty())
+            outData.globals.push_back(g);
       }
       // Anything else is from a newer version and is deliberately ignored.
    }

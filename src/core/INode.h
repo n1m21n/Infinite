@@ -8,6 +8,40 @@
 // feeding several consumers only renders once.
 class IModulator;
 class IGeometrySource;
+class AudioNode;
+class AudioCable;
+class NoteCable;
+
+// Mix-in for a node whose output is real-time audio (owns an AudioNode - see
+// the two-object rule in docs/plans/audio/README.md). Lets audio-consuming
+// dispatch (IsInputSlotCompatible, the topology builder, ...) find "is this
+// an audio source" generically via dynamic_cast<IAudioSource*>, the same way
+// IGeometrySource already lets geometry dispatch avoid a per-node-type
+// dynamic_cast chain.
+class IAudioSource
+{
+public:
+   virtual ~IAudioSource() {}
+   virtual AudioNode* GetAudioNode() = 0;
+};
+
+// Mix-in for a node that produces or forwards note events (Note Sequencer;
+// later MIDI In, Arpeggiator, Note Filter/Modify/Echo). Mirrors
+// IAudioSource exactly, for exactly the same reason: it lets note-consuming
+// dispatch (IsInputSlotCompatible, the three srcIsNoteSource call sites in
+// main.cpp) find "is this a note source" generically via
+// dynamic_cast<INoteSource*>, rather than a per-node-type chain that a new
+// note node type could be added without updating. GetAudioNode() (not a
+// GetNoteNode() of its own) is deliberate - the note-producing/consuming
+// audio-thread object is still an AudioNode, just one that also overrides
+// the note ports declared on AudioNode itself (NoteOutbox/SetNoteInbox);
+// see docs/plans/audio/P3a-notes-prompt.md.
+class INoteSource
+{
+public:
+   virtual ~INoteSource() {}
+   virtual AudioNode* GetAudioNode() = 0;
+};
 
 // Visits a node's saveable parameters.
 //
@@ -111,4 +145,27 @@ public:
    // Same idea as GeometryInputSlot, but for modulator input pins (see MathNode).
    virtual IModulator** ModulatorInputSlot(int /*slot*/) { return nullptr; }
    virtual int ModulatorInputCount() const { return 0; }
+
+   // Same idea as GeometryInputSlot, but for audio/note input pins. Unlike
+   // GeometryInputSlot (address of a raw pointer field), these hand back the
+   // AudioCable/NoteCable object itself, since AudioCable/NoteCable aren't
+   // raw pointer types - matching how CableFor hands back an ImageCable*.
+   virtual AudioCable* AudioInputSlot(int /*slot*/) { return nullptr; }
+   virtual NoteCable* NoteInputSlot(int /*slot*/) { return nullptr; }
+
+   // Address of this node's underlying AudioNode, for wiring note ports
+   // only - distinct from IAudioSource::GetAudioNode(), which additionally
+   // means "this node participates in the audio *buffer* DAG" (makes it a
+   // valid cable-connectable audio source as far as IsInputSlotCompatible
+   // et al are concerned). A node that owns an AudioNode purely to step
+   // note-driven state on the real-time thread, but whose output is not an
+   // audio buffer (Envelope: its output is a modulator value, read via
+   // IModulator::Value01()), overrides this instead - it lets the topology
+   // builder (main.cpp's RebuildAudioTopology) find its AudioNode to call
+   // PrepareToPlay/ProcessBlock/SetNoteInbox on, without also making it
+   // wireable as an audio source. Every IAudioSource already satisfies the
+   // same need through its own GetAudioNode(); the topology builder checks
+   // that first and only falls back to this for the note-only types that
+   // need it.
+   virtual AudioNode* AudioNodeForNotePorts() { return nullptr; }
 };

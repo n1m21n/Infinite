@@ -47,9 +47,20 @@ add_executable(Infinite MACOSX_BUNDLE
     src/core/Transport.cpp
     src/core/Modulation.cpp
     src/core/Expression.cpp
+    src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp
     src/platform/Platform.mm
+    src/audio/AudioEngine.cpp
+    src/audio/ParamMailbox.cpp
+    src/audio/MeterRing.cpp
+    src/audio/AudioVoice.cpp
+    src/audio/Wavetable.cpp
+    src/audio/EffectDefs.cpp
+    src/audio/dsp/AudioFilterKernel.cpp
+    src/audio/dsp/DynamicsKernel.cpp
+    src/audio/dsp/DelayKernel.cpp
+    src/audio/dsp/ReverbKernel.cpp
     src/nodes/ImageSourceNode.cpp
     src/nodes/ShapeNode.cpp
     src/nodes/FormulaNode.cpp
@@ -89,6 +100,10 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/Switcher3DNode.cpp
     src/nodes/TextNode.cpp
     src/nodes/OutputNode.cpp
+    src/nodes/AudioNodes.cpp
+    src/nodes/NoteNodes.cpp
+    src/nodes/WavetableNode.cpp
+    src/nodes/AudioEffectNode.cpp
 
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
@@ -105,7 +120,7 @@ add_executable(Infinite MACOSX_BUNDLE
 )
 
 target_include_directories(Infinite PRIVATE
-    src src/core src/nodes src/platform
+    src src/core src/nodes src/platform src/audio
     ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
     ${STB_DIR}
@@ -144,6 +159,8 @@ if(APPLE)
         "-framework CoreMedia"
         "-framework CoreVideo"
         "-framework CoreMIDI"
+        "-framework CoreAudio"
+        "-framework AudioToolbox"
     )
     target_compile_definitions(Infinite PRIVATE GL_SILENCE_DEPRECATION)
 

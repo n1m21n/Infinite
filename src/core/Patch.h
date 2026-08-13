@@ -16,7 +16,7 @@ class INode;
 //   infinite-patch 1
 //   node <index> <category> <type name to end of line>
 //     pos <x> <y>
-//     flags <showParams> <bypassed> <showMiniViewport>
+//     flags <showParams> <bypassed> <showMiniViewport> <showAdvancedParams>
 //     f <name> <value>          float
 //     i <name> <value>          int
 //     b <name> <0|1>            bool
@@ -25,9 +25,12 @@ class INode;
 //   end
 //   cable <dstIndex> <dstSlot> <srcIndex>
 //   geo <dstIndex> <dstSlot> <srcIndex>
+//   aud <dstIndex> <dstSlot> <srcIndex>
+//   note <dstIndex> <dstSlot> <srcIndex>
 //   mod <dstIndex> <dstParam> <srcIndex> <srcOutput>
 //   pal <dstIndex> <dstColor> <srcIndex> <srcSwatch>
 //   expr <dstIndex> <dstParam> <expression text to end of line>
+//   glob <name> <expression text to end of line>
 //
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
@@ -41,6 +44,7 @@ namespace Patch
       bool showParams = false;
       bool bypassed = false;
       bool showMiniViewport = false;
+      bool showAdvancedParams = false; // audio nodes only, see GraphNode.h
       // Raw key/value lines, replayed into the node through its ParamVisitor.
       std::vector<std::pair<std::string, std::string>> params;
    };
@@ -78,14 +82,26 @@ namespace Patch
       std::string text;
    };
 
+   // One patch-wide named value an expression can read - see
+   // core/ExprGlobals.h. Order is meaningful (a global may reference the ones
+   // declared before it), so these are written and read as a list.
+   struct GlobalRecord
+   {
+      std::string name;
+      std::string expr;
+   };
+
    struct Data
    {
       std::vector<NodeRecord> nodes;
       std::vector<CableRecord> cables;   // image cables
       std::vector<CableRecord> geometry; // geometry, camera and light pins
+      std::vector<CableRecord> audio;    // audio cables
+      std::vector<CableRecord> notes;    // note cables
       std::vector<ModRecord> modulation;
       std::vector<PaletteRecord> palette;
       std::vector<ExprRecord> expressions;
+      std::vector<GlobalRecord> globals;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

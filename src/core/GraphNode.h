@@ -40,6 +40,12 @@ struct GraphNode
    // nothing changed, so an idle viewport is cheap. Still a per-node toggle
    // (via ViewportToggle/context menu) for anyone who wants to turn it off.
    bool showMiniViewport = true;
+   // Audio nodes only (see docs/plans/audio/audio-node-ui-system.md §1):
+   // Tier 1 params sit in an always-visible compact grid, so "params visible
+   // at all" (showParams, above - unused by audio nodes) and "showing the
+   // full Tier 2 set" are two different questions. Starts collapsed, same
+   // reasoning as showParams.
+   bool showAdvancedParams = false;
    bool hasModulatedParams = false; // recomputed each frame, drives the collapsed "mod" tag
    bool hasPaletteColors = false;   // ditto, for the collapsed "pal" tag
 

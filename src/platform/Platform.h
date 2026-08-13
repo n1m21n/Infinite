@@ -163,6 +163,60 @@ namespace Platform
    void AudioSetSmoothing(float attack, float release);
    void AudioSetGain(float gain);
 
+   // ---- audio synthesis spike (P0 feasibility test, throwaway) ----
+   // Raw AVAudioSourceNode generating a 440 Hz sine directly in its render
+   // block, to measure whether a live synthesis callback coexists with the
+   // render loop without glitches or a measurable FPS hit. Not a real node
+   // type - see docs/plans/audio/P0-feasibility-prompt.md.
+   struct AudioSpikeStats
+   {
+      double sampleRate = 0.0;
+      int blockSize = 0;
+      double maxJitterMs = 0.0;
+      uint64_t callbackCount = 0;
+   };
+
+   bool AudioSpikeStart(std::string& outError);
+   void AudioSpikeStop();
+   AudioSpikeStats AudioSpikeGetStats();
+
+   // ---- audio engine render callback bridge ----
+   // Render callback bridge: called on the real-time audio thread. Must obey
+   // every audio-thread prohibition in docs/plans/audio/P1a-engine-prompt.md -
+   // no allocation, no locks, no std::function/map/string, no GL/ImGui/file I/O.
+   // buffers is planar: buffers[ch][0..numFrames) for channel ch.
+   typedef void (*AudioRenderCallback)(float** buffers, int numChannels, int numFrames, void* userData);
+
+   // requestedDeviceId == 0 means "system default output device" (existing
+   // behavior). requestedSampleRate == 0.0 / requestedBufferFrames == 0 mean
+   // "use whatever the device is already running at" (also existing
+   // behavior). A requested value the device rejects or clamps is not an
+   // error - outSampleRate (and Platform::AudioDeviceBufferFrames below)
+   // reflect what was actually negotiated, the same way the sample rate
+   // readback already worked before this was added.
+   bool AudioDeviceOpen(AudioRenderCallback callback, void* userData, double& outSampleRate, std::string& outError,
+                        uint32_t requestedDeviceId = 0, double requestedSampleRate = 0.0,
+                        int requestedBufferFrames = 0);
+   void AudioDeviceClose();
+
+   // Actual buffer frame size CoreAudio reports for the given device right
+   // now (0 = system default output device). Buffer size is a device-wide
+   // property, not something AVAudioEngine hands back per-open, so this
+   // queries the hardware directly - lets the UI show what was really
+   // negotiated after a requestedBufferFrames the device may have clamped.
+   uint32_t AudioDeviceBufferFrames(uint32_t deviceId = 0);
+
+   // ---- audio device enumeration (CoreAudio HAL) ----
+   struct AudioDeviceInfo
+   {
+      std::string name;
+      uint32_t deviceId = 0;
+      bool isInput = false;
+      bool isOutput = false;
+   };
+
+   std::vector<AudioDeviceInfo> AudioListDevices();
+
    // ---- MIDI input ----
    // Listens to every connected class-compliant MIDI source (Akai/Nektar/Pioneer
    // controllers all enumerate this way on macOS, no vendor driver needed) and
@@ -223,6 +277,40 @@ namespace Platform
    };
 
    bool MidiChannelLastNote(MidiDeviceId device, int channel, MidiLastNote& out);
+
+   // ---- live note stream ---------------------------------------------------
+   // Every Note-On and Note-Off, in order, for the MIDI Notes node to turn
+   // into NoteEvents. This is a different shape of data from everything above
+   // it: MidiRead/MidiChannelLastNote sample a *current value* under a mutex,
+   // which is right for a modulator polled once a frame and wrong for a synth,
+   // where a missed note-off is a stuck voice. So the note stream is its own
+   // lock-free ring, written by the CoreMIDI read thread and readable from the
+   // audio thread with no lock at all.
+   //
+   // Multiple consumers are supported by giving each one its own cursor rather
+   // than a shared read index: the ring's write counter is monotonic, and a
+   // consumer that has fallen more than the ring's capacity behind is skipped
+   // forward to the oldest still-valid entry (dropping what it missed) instead
+   // of reading torn data. Note-Off (0x80) and Note-On-with-velocity-0 both
+   // arrive here as isNoteOn == false.
+   struct MidiNoteMessage
+   {
+      MidiDeviceId device = 0;
+      int channel = 0; // 0-15
+      int note = 0;    // 0-127
+      float velocity01 = 0.0f;
+      bool isNoteOn = false;
+   };
+
+   // Pass the same `cursor` back on every call; initialise it to 0 and it will
+   // be fast-forwarded to the live window on the first read. Returns how many
+   // messages were written to `out`. Audio-thread safe: no locks, no
+   // allocation.
+   int MidiReadNotesSince(unsigned long long& cursor, MidiNoteMessage* out, int maxCount);
+
+   // Current write position of the note ring - the value a consumer that only
+   // wants *future* notes should seed its cursor with.
+   unsigned long long MidiNoteStreamPosition();
 
    // ---- MIDI clock ---------------------------------------------------------
    // MIDI Clock (status byte 0xF8) is a realtime system message sent 24 times
