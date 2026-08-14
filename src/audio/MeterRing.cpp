@@ -31,3 +31,19 @@ int MeterRing::Read(float* out, int maxCount)
    mHead.store(head, std::memory_order_release);
    return n;
 }
+
+bool MeterRing::ReadLatest(float& out)
+{
+   size_t head = mHead.load(std::memory_order_relaxed);
+   const size_t tail = mTail.load(std::memory_order_acquire);
+
+   bool found = false;
+   while (head != tail)
+   {
+      out = mEntries[head];
+      found = true;
+      head = (head + 1) % kCapacity;
+   }
+   mHead.store(head, std::memory_order_release);
+   return found;
+}

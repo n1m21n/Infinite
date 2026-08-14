@@ -124,6 +124,16 @@ public:
    float frequency = 220.0f; // free-running pitch (ignored when note-driven)
    float glide = 0.0f;       // portamento, seconds
 
+   // Continuous pitch offset in semitones, applied every sample to every
+   // currently-sounding voice (both engines, free-running or note-driven) -
+   // unlike octave/semi/fine above, this is read fresh every block rather
+   // than latched per voice at note-on, so it actually bends notes that are
+   // already playing. Drawn as a ModKnob so Pitch Bend (a live-turned knob,
+   // see NoteNodes.h) can be wired into it for real hardware-style bend; see
+   // that node's comment for why the bend can't ride on the note stream
+   // itself. Default range +/-2 st matches the standard MIDI wheel range.
+   float pitchBend = 0.0f;   // -2..2 semitones
+
    NoteCable noteInput;
 
    // UI-only scope cache - not a saved param, not touched by VisitParams.

@@ -36,10 +36,12 @@ public:
    void RemoveFolder(const std::string& path);
    const std::vector<std::string>& Folders() const { return mFolders; }
 
-   // Kicks off (or restarts) a scan of every added folder on a background
-   // thread. A scan already in flight is left to finish; call IsScanning()
-   // to gate the UI's Refresh button instead of queuing another one.
-   void StartScan();
+   // Kicks off a scan on a background thread: every added folder by default,
+   // or just `folder` when given, in which case the other folders' existing
+   // index entries are left untouched (see PollResults). A scan already in
+   // flight is left to finish; call IsScanning() to gate the UI's Refresh
+   // buttons instead of queuing another one.
+   void StartScan(const std::string& folder = std::string());
    bool IsScanning() const { return mScanning.load(std::memory_order_relaxed); }
    int FilesFoundSoFar() const { return mFilesFound.load(std::memory_order_relaxed); }
 
@@ -63,6 +65,11 @@ private:
 
    std::vector<std::string> mFolders;
    std::vector<Entry> mIndex;
+
+   // Which folders the in-flight (or just-finished) scan covers - main
+   // thread only, set in StartScan and read back in PollResults to know
+   // which part of mIndex to replace vs. leave alone.
+   std::vector<std::string> mScanningFolders;
 
    std::thread mScanThread;
    std::mutex mResultMutex;

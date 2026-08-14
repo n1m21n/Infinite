@@ -517,7 +517,11 @@ private:
         int c;
         while (accept_character(c))
         {
-            CRUDE_ASSERT(c < 128); // #todo: convert characters > 127 to UTF-8
+            // dump() (below) already writes UTF-8 strings as raw bytes with
+            // no \uXXXX escaping, byte-for-byte - so accepting c up to 255
+            // here, not just 127, is what actually round-trips it; the old
+            // ASCII-only assert just hadn't caught up to that.
+            CRUDE_ASSERT(c < 256);
             result.push_back(static_cast<char>(c));
         }
 
@@ -791,7 +795,16 @@ private:
     int peek() const
     {
         if (!eof())
-            return *m_Cursor;
+            // *m_Cursor is a plain (signed on this ABI) char, so any raw
+            // UTF-8 byte >= 0x80 - routine in file paths/names once anyone's
+            // library has non-ASCII samples - sign-extends to a negative
+            // int. Every caller here treats negative as EOF/no-match, so an
+            // unescaped multi-byte character silently truncated string
+            // parsing and, via that, the whole enclosing array (e.g. a
+            // SampleIndex.json entry with an accented filename blanked the
+            // entire sample index back to empty on next load). Widen through
+            // unsigned char first so real byte values 0-255 stay >= 0.
+            return static_cast<unsigned char>(*m_Cursor);
         else
             return -1;
     }

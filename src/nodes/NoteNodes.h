@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <memory>
 
 #include "core/INode.h"
@@ -273,10 +274,12 @@ private:
 // A single semitone offset applied to every note that passes through,
 // applied at note-on and remembered per input note so the matching note-off
 // lands on the same output pitch even if the knob moves while the note is
-// held. Backs both NoteTransposeNode (+/-48, "octave-and-then-some") and
-// PitchBendNode (+/-24, a finer offset) - NoteEvent carries no continuous
-// pitch channel (see NoteToCVNode's class comment), so both are a discrete
-// semitone shift rather than a true continuous bend.
+// held. This is a deliberate, quantised transpose - octave/key changes, not
+// a performance gesture - which is exactly why it's the wrong shape for
+// Pitch Bend (see that class's comment below): NoteEvent carries no
+// continuous pitch channel for a value to keep sliding a note that's
+// already sounding, so anything built on this class can only ever re-pitch
+// notes as they attack.
 class NoteTransposeNode : public INode, public INoteSource
 {
 public:
@@ -304,31 +307,43 @@ private:
    int mLastCookFrame = -1;
 };
 
-class PitchBendNode : public INode, public INoteSource
+// A hand-driven bend, exposed as a modulator rather than a note processor -
+// same reasoning as VibratoNode just below, and for the same underlying
+// cause: NoteEvent has no continuous pitch channel for a per-note bend to
+// ride on (see NoteToCVNode's class comment), so a note-chain version of
+// this (what it used to be - a discrete semitone shift baked in at note-on,
+// sharing AudioSemitoneShiftNode with NoteTransposeNode above) can only
+// snap a *new* note to a different pitch. It can never slide a note that's
+// already sounding, which is the entire point of a pitch-bend wheel.
+//
+// So instead this is a live knob you wire into a synth's own pitch input
+// (Wavetable's "bend" master knob, or any other ModKnob-drawn pitch/fine
+// param) - that knob is read fresh every sample on the audio thread, so
+// moving this one continuously bends whatever is currently held, cents and
+// all, exactly like a hardware wheel. `bendSemitones` is stored and drawn
+// in real semitones (not the usual 0..1) the same way VibratoNode stores
+// `rateHz` in real Hz - Value01() just normalises it for the generic
+// modulator contract. Default range +/-2 st matches the standard MIDI wheel;
+// turn the destination knob's own range up for a wider bend.
+class PitchBendNode : public INode, public IModulator
 {
 public:
    static INode* Create() { return new PitchBendNode(); }
-   PitchBendNode();
-   ~PitchBendNode() override;
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
-   void CookIfNeeded(int frameId) override;
-   void VisitParams(ParamVisitor& v) override;
+   void CookIfNeeded(int /*frameId*/) override {}
+   void VisitParams(ParamVisitor& v) override { v.Float("bendSemitones", bendSemitones); }
 
-   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
-   AudioNode* GetAudioNode() override;
+   float Value01() override
+   {
+      return std::clamp((bendSemitones + kRange) / (2.0f * kRange), 0.0f, 1.0f);
+   }
 
-   int semitones = 0; // -24..24
-   NoteCable noteInput;
+   static constexpr float kRange = 2.0f; // +/-2 st, the standard wheel range
 
-   int LastNoteOut() const;
-
-private:
-   std::unique_ptr<AudioSemitoneShiftNode> mAudioNode;
-   int mLastCookFrame = -1;
+   float bendSemitones = 0.0f; // -2..2
 };
 
 // pow(velocity, curve) on every note-on; note-off passes through unchanged.

@@ -157,7 +157,7 @@ void AudioEffectNode::CookIfNeeded(int frameId)
    mAudioNode->Kernel().PushParams(*this, sampleRate > 0.0 ? sampleRate : 44100.0);
 
    float peak = 0.0f;
-   if (mAudioNode->Meter().Read(&peak, 1) > 0)
+   if (mAudioNode->Meter().ReadLatest(peak))
       mLevel = peak;
 
    if (MeterRing* extra = mAudioNode->KernelExtraMeter())

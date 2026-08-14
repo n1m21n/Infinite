@@ -19,11 +19,10 @@ namespace
    constexpr int kFinetuneParam = 1;
    constexpr int kSpeedParam = 2;
    constexpr int kVolumeParam = 3;
-   constexpr int kStartParam = 4;
-   constexpr int kEndParam = 5;
-   constexpr int kLoopParam = 6;     // pushed as 0.0/1.0, no smoothing needed but the mailbox has no per-param opt-out
-   constexpr int kReverseParam = 7;  // ditto
-   constexpr int kPingpongParam = 8; // ditto
+   // start/end travel via the plain mStart/mEnd atomics instead - see ProcessBlock/TriggerVoice.
+   constexpr int kLoopParam = 4;     // pushed as 0.0/1.0, no smoothing needed but the mailbox has no per-param opt-out
+   constexpr int kPingpongParam = 5; // ditto
+   // reverse travels via the plain mReverse atomic instead - see ProcessBlock/TriggerVoice.
 
    constexpr int kMaxVoices = 8;
    constexpr int kFreeRunningNote = 60; // sample's own recorded pitch plays back at rate 1.0
@@ -104,10 +103,7 @@ public:
       mMailbox.SetImmediate(kFinetuneParam, mFinetune.load(std::memory_order_relaxed));
       mMailbox.SetImmediate(kSpeedParam, mSpeed.load(std::memory_order_relaxed));
       mMailbox.SetImmediate(kVolumeParam, mVolume.load(std::memory_order_relaxed));
-      mMailbox.SetImmediate(kStartParam, mStart.load(std::memory_order_relaxed));
-      mMailbox.SetImmediate(kEndParam, mEnd.load(std::memory_order_relaxed));
       mMailbox.SetImmediate(kLoopParam, mLoop.load(std::memory_order_relaxed) ? 1.0f : 0.0f);
-      mMailbox.SetImmediate(kReverseParam, mReverse.load(std::memory_order_relaxed) ? 1.0f : 0.0f);
       mMailbox.SetImmediate(kPingpongParam, mPingpong.load(std::memory_order_relaxed) ? 1.0f : 0.0f);
       // No envelope shaping to speak of - fast fixed attack/release just
       // enough to avoid a click on trigger/steal, not a musical parameter.
@@ -153,10 +149,7 @@ public:
       mMailbox.Push(kFinetuneParam, finetune);
       mMailbox.Push(kSpeedParam, speed);
       mMailbox.Push(kVolumeParam, volume);
-      mMailbox.Push(kStartParam, start);
-      mMailbox.Push(kEndParam, end);
       mMailbox.Push(kLoopParam, loop ? 1.0f : 0.0f);
-      mMailbox.Push(kReverseParam, reverse ? 1.0f : 0.0f);
       mMailbox.Push(kPingpongParam, pingpong ? 1.0f : 0.0f);
    }
 
@@ -168,6 +161,14 @@ public:
    // trigger rather than queuing two, which is the right behaviour for a
    // "play from here" gesture.
    void TriggerPreviewFromMainThread(float frac) { mPreviewFrac.store(frac, std::memory_order_release); }
+
+   // Main thread. Silences the free-running/preview voice (kFreeRunningNote)
+   // on the next block - the Stop half of the Play/Stop button.
+   void RequestStopFromMainThread() { mStopRequested.store(true, std::memory_order_release); }
+
+   // Main thread. Whether the most recently triggered preview voice is
+   // still sounding, published once per block from ProcessBlock.
+   bool IsPlaying() const { return mIsPlaying.load(std::memory_order_relaxed); }
 
    // Main thread. Recording is a plain state flip - see the class comment
    // on kMaxRecordSeconds for why this never allocates.
@@ -195,6 +196,11 @@ public:
          if (mActiveBuffer != nullptr)
             mRetireRing.Retire(mActiveBuffer);
          mActiveBuffer = fresh;
+         // A newly loaded/recorded buffer should audition on its own, the
+         // way SamplerNode.h's class comment describes - without this a
+         // one-shot free-running node that already finished playing would
+         // stay permanently silent after loading a different file.
+         mFreeRunningStarted = false;
       }
 
       // Slot 1, not 0 - slot 0 is the note pin's slot in the shared pin
@@ -216,6 +222,9 @@ public:
       if (mActiveBuffer == nullptr || mActiveBuffer->numFrames <= 0)
          return;
 
+      if (mStopRequested.exchange(false, std::memory_order_acq_rel))
+         mVoices.NoteOff(kFreeRunningNote);
+
       const bool noteDriven = mNoteInbox != nullptr;
 
       NoteEvent evts[64];
@@ -227,7 +236,7 @@ public:
       {
          // Same convention as Wavetable/Oscillator: patched with no note
          // cable, it just sounds - one permanently-open voice at note 60.
-         TriggerVoice(kFreeRunningNote, 1.0f, -1.0f);
+         TriggerVoice(kFreeRunningNote, 1.0f, -1.0f, true);
          mFreeRunningStarted = true;
       }
 
@@ -236,7 +245,7 @@ public:
       // from here" the user just asked for.
       const float previewFrac = mPreviewFrac.exchange(-1.0f, std::memory_order_acq_rel);
       if (previewFrac >= 0.0f)
-         TriggerVoice(kFreeRunningNote, 1.0f, previewFrac);
+         TriggerVoice(kFreeRunningNote, 1.0f, previewFrac, true);
 
       float playheadOut = -1.0f;
 
@@ -254,10 +263,11 @@ public:
          const float pitchSemis = mMailbox.SmoothedValue(kPitchParam) + mMailbox.SmoothedValue(kFinetuneParam) / 100.0f;
          const float speed = mMailbox.SmoothedValue(kSpeedParam);
          const float volume = mMailbox.SmoothedValue(kVolumeParam);
-         const float startFrac = mMailbox.SmoothedValue(kStartParam);
-         const float endFrac = std::max(startFrac + 0.001f, mMailbox.SmoothedValue(kEndParam));
+         const float startFrac = mStart.load(std::memory_order_relaxed);
+         const float endFrac = std::max(startFrac + 0.001f, mEnd.load(std::memory_order_relaxed));
          const bool loop = mMailbox.SmoothedValue(kLoopParam) > 0.5f;
          const bool pingpong = mMailbox.SmoothedValue(kPingpongParam) > 0.5f;
+         const bool reverseOn = mReverse.load(std::memory_order_relaxed);
          const double startPos = (double)startFrac * mActiveBuffer->numFrames;
          const double endPos = (double)endFrac * mActiveBuffer->numFrames;
          const float speedSign = speed < 0.0f ? -1.0f : 1.0f;
@@ -268,6 +278,16 @@ public:
          {
             if (!mVoices.IsVoiceActive(v))
                continue;
+
+            // Outside a ping-pong bounce, direction tracks the live reverse
+            // toggle every sample rather than only at trigger time - without
+            // this, flipping "rev" mid-playback did nothing until the next
+            // retrigger, and turning "p-p" off after a bounce left a voice
+            // stuck playing backward forever (nothing else ever re-synced
+            // it). Once a bounce is in progress, the edge-hit logic below
+            // owns direction until the next edge.
+            if (!pingpong)
+               mVoiceDir[v] = reverseOn ? -1 : 1;
 
             const float rate = NoteToRate(mVoices.NoteAt(v), pitchSemis) * std::fabs(speed);
             const float dirSign = (float)mVoiceDir[v] * speedSign;
@@ -298,6 +318,12 @@ public:
                }
             }
 
+            // One-shot voices keep advancing through their release (see the
+            // NoteOff above) and a handle drag can move the range under a
+            // voice already in flight - clamp unconditionally rather than
+            // only in the loop/ping-pong branches above.
+            mVoicePos[v] = std::clamp(mVoicePos[v], startPos, endPos);
+
             if (v == mLastTriggeredVoice)
                playheadOut = (float)(mVoicePos[v] / std::max(1, mActiveBuffer->numFrames));
          }
@@ -306,8 +332,16 @@ public:
             buffer.channels[ch][i] = (ch == 0 ? sampleL : sampleR) * volume;
       }
 
-      if (playheadOut >= 0.0f)
-         mPlayheadRing.Write(&playheadOut, 1);
+      // No voice contributed a position this block (nothing triggered, or the
+      // last-triggered voice finished its release) - park the yellow line on
+      // the start marker rather than freezing it wherever it last was.
+      if (playheadOut < 0.0f)
+         playheadOut = mStart.load(std::memory_order_relaxed);
+
+      mPlayheadRing.Write(&playheadOut, 1);
+
+      mIsPlaying.store(mLastTriggeredVoice >= 0 && mVoices.IsVoiceActive(mLastTriggeredVoice),
+                        std::memory_order_relaxed);
    }
 
 private:
@@ -327,22 +361,42 @@ private:
 
    // overrideStartFrac >= 0 forces the trigger position (a manual preview
    // click); < 0 uses the configured start/end/reverse range like an
-   // ordinary note-on.
-   void TriggerVoice(int note, float velocity, float overrideStartFrac)
+   // ordinary note-on. isPreview marks the free-running/waveform-click path:
+   // those retrigger the same voice slot in place (see mPreviewVoice) instead
+   // of allocating a fresh one, so repeated clicks don't stack up to 8
+   // simultaneous copies of the same sample. Note-cable-driven notes always
+   // pass isPreview=false and keep normal polyphonic allocation.
+   void TriggerVoice(int note, float velocity, float overrideStartFrac, bool isPreview = false)
    {
-      const bool reverseOn = mMailbox.SmoothedValue(kReverseParam) > 0.5f;
+      const bool reverseOn = mReverse.load(std::memory_order_relaxed);
       const float speed = mMailbox.SmoothedValue(kSpeedParam);
-      const float startFrac = mMailbox.SmoothedValue(kStartParam);
-      const float endFrac = std::max(startFrac + 0.001f, mMailbox.SmoothedValue(kEndParam));
+      const float startFrac = mStart.load(std::memory_order_relaxed);
+      const float endFrac = std::max(startFrac + 0.001f, mEnd.load(std::memory_order_relaxed));
 
-      const int idx = mVoices.NoteOn(note, velocity);
+      int idx;
+      if (isPreview && mPreviewVoice >= 0 && mVoices.IsVoiceActive(mPreviewVoice))
+      {
+         // Reuse the same slot in place rather than allocating a new one -
+         // VoiceAllocator has no same-note stealing (by design: Wavetable and
+         // other synths rely on genuine polyphonic same-note retriggering),
+         // so without this every click/free-run trigger would round-robin to
+         // a fresh voice and stack up to kMaxVoices copies of the sample.
+         idx = mPreviewVoice;
+         mVoices.EnvelopeAt(idx).NoteOn();
+      }
+      else
+      {
+         idx = mVoices.NoteOn(note, velocity);
+         if (isPreview)
+            mPreviewVoice = idx;
+      }
       const int baseDir = reverseOn ? -1 : 1;
       mVoiceDir[idx] = baseDir;
       const float initialDirSign = (float)baseDir * (speed < 0.0f ? -1.0f : 1.0f);
 
       float frac;
       if (overrideStartFrac >= 0.0f)
-         frac = overrideStartFrac;
+         frac = std::clamp(overrideStartFrac, startFrac, endFrac); // manual preview click - never start outside the range
       else
          frac = initialDirSign < 0.0f ? endFrac : startFrac;
 
@@ -361,8 +415,11 @@ private:
    std::vector<int> mVoiceNote;
    std::vector<int> mVoiceDir; // +1 forward, -1 backward; ping-pong flips this at each edge
    int mLastTriggeredVoice = -1;
+   int mPreviewVoice = -1; // voice slot reused in place by free-running/preview triggers - see TriggerVoice
    bool mFreeRunningStarted = false;
    std::atomic<float> mPreviewFrac { -1.0f };
+   std::atomic<bool> mStopRequested { false };
+   std::atomic<bool> mIsPlaying { false };
 
    Platform::SampleBuffer* mActiveBuffer = nullptr;
    std::atomic<Platform::SampleBuffer*> mPendingBuffer { nullptr };
@@ -397,8 +454,9 @@ void SamplerNode::CookIfNeeded(int frameId)
    mAudioNode->DrainRetired();
 
    float playhead = 0.0f;
-   if (mAudioNode->PlayheadRing().Read(&playhead, 1) > 0)
+   if (mAudioNode->PlayheadRing().ReadLatest(playhead))
       mPlayhead = playhead;
+   mIsPlaying = mAudioNode->IsPlaying();
 }
 
 void SamplerNode::VisitParams(ParamVisitor& v)
@@ -427,6 +485,12 @@ void SamplerNode::TriggerPreview(float frac)
    if (!mAudioNode)
       return;
    mAudioNode->TriggerPreviewFromMainThread(std::clamp(frac, 0.0f, 1.0f));
+}
+
+void SamplerNode::StopPreview()
+{
+   if (mAudioNode)
+      mAudioNode->RequestStopFromMainThread();
 }
 
 void SamplerNode::StartRecording()

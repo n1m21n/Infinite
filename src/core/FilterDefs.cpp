@@ -266,48 +266,6 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Rotation", "uRotation", T::Float, -6.2832f, 6.2832f, 0.0f) } },
 
       // ---------------- Color adjustments ----------------
-      { "brightnesscontrast", "Color",
-        "uniform float uBrightness;\n"
-        "uniform float uContrast;\n"
-        "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   vec3 col = (c.rgb - 0.5) * (uContrast + 1.0) + 0.5 + uBrightness;\n"
-        "   fragColor = vec4(clamp(col, 0.0, 1.0), c.a);\n"
-        "}\n",
-        { P("Brightness", "uBrightness", T::Float, -1.0f, 1.0f, 0.0f),
-          P("Contrast", "uContrast", T::Float, -1.0f, 3.0f, 0.0f) } },
-
-      { "levels", "Color",
-        "uniform float uBlackPoint;\n"
-        "uniform float uWhitePoint;\n"
-        "uniform float uGamma;\n"
-        "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   vec3 col = clamp((c.rgb - uBlackPoint) / max(uWhitePoint - uBlackPoint, 0.0001), 0.0, 1.0);\n"
-        "   col = pow(col, vec3(1.0 / max(uGamma, 0.0001)));\n"
-        "   fragColor = vec4(col, c.a);\n"
-        "}\n",
-        { P("Black Point", "uBlackPoint", T::Float, 0.0f, 1.0f, 0.0f),
-          P("White Point", "uWhitePoint", T::Float, 0.0f, 1.0f, 1.0f),
-          P("Gamma", "uGamma", T::Float, 0.1f, 4.0f, 1.0f) } },
-
-      { "hsl", "Color",
-        std::string(kSharedHelpers) +
-        "uniform float uHueShift;\n"
-        "uniform float uSaturation;\n"
-        "uniform float uLightness;\n"
-        "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   vec3 hsv = rgb2hsv(c.rgb);\n"
-        "   hsv.x = fract(hsv.x + uHueShift);\n"
-        "   hsv.y = clamp(hsv.y * uSaturation, 0.0, 1.0);\n"
-        "   vec3 rgb = hsv2rgb(hsv) + uLightness;\n"
-        "   fragColor = vec4(clamp(rgb, 0.0, 1.0), c.a);\n"
-        "}\n",
-        { P("Hue Shift", "uHueShift", T::Float, 0.0f, 1.0f, 0.0f),
-          P("Saturation", "uSaturation", T::Float, 0.0f, 3.0f, 1.0f),
-          P("Lightness", "uLightness", T::Float, -1.0f, 1.0f, 0.0f) } },
-
       { "invert", "Color",
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
@@ -333,19 +291,6 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   fragColor = vec4(vec3(step(uThreshold, lum)), c.a);\n"
         "}\n",
         { P("Threshold", "uThreshold", T::Float, 0.0f, 1.0f, 0.5f) } },
-
-      { "colorbalance", "Color",
-        "uniform float uCyanRed;\n"
-        "uniform float uMagentaGreen;\n"
-        "uniform float uYellowBlue;\n"
-        "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   vec3 col = c.rgb + vec3(uCyanRed, uMagentaGreen, uYellowBlue);\n"
-        "   fragColor = vec4(clamp(col, 0.0, 1.0), c.a);\n"
-        "}\n",
-        { P("Cyan-Red", "uCyanRed", T::Float, -0.5f, 0.5f, 0.0f),
-          P("Magenta-Green", "uMagentaGreen", T::Float, -0.5f, 0.5f, 0.0f),
-          P("Yellow-Blue", "uYellowBlue", T::Float, -0.5f, 0.5f, 0.0f) } },
 
       { "exposure", "Color",
         "uniform float uExposure;\n"
@@ -869,19 +814,6 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Highlight", "uHighlightColor", T::Color, 0.0f, 1.0f, 1.0f, 0.85f, 0.4f),
           P("Mix", "uMix", T::Float, 0.0f, 1.0f, 1.0f) } },
 
-      { "channelmixer", "Color",
-        "uniform vec3 uRedRow;\n"
-        "uniform vec3 uGreenRow;\n"
-        "uniform vec3 uBlueRow;\n"
-        "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   vec3 o = vec3(dot(c.rgb, uRedRow), dot(c.rgb, uGreenRow), dot(c.rgb, uBlueRow));\n"
-        "   fragColor = vec4(clamp(o, 0.0, 1.0), c.a);\n"
-        "}\n",
-        { P("Red from RGB", "uRedRow", T::Color, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f),
-          P("Green from RGB", "uGreenRow", T::Color, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f),
-          P("Blue from RGB", "uBlueRow", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f) } },
-
       { "color adjustments", "Color",
         // All-in-one grading node consolidating the separate brightness/contrast,
         // levels, color balance, hsl, vibrance, tone shaper, channelmixer and
@@ -895,11 +827,14 @@ const std::vector<FilterDef>& GetFilterDefs()
         //   4) HSL (hue/sat/lightness)   8) Black & white (optional, always last -
         //      grading after a desaturate step would be pointless, so it only
         //      runs when enabled)
-        // Each stage's math is copied verbatim from its standalone FilterDef
-        // (vibrance, tone shaper and blackandwhite no longer exist standalone -
-        // vibrance duplicated HSL's saturation slider, tone shaper duplicated
-        // the real per-channel Curves node, and blackandwhite was a special
-        // case of Channel Mixer with all three rows set equal).
+        // Each stage's math is copied verbatim from its former standalone
+        // FilterDef - brightnesscontrast, levels, hsl, colorbalance and
+        // channelmixer no longer exist standalone (this node fully supersedes
+        // them); vibrance and tone shaper never existed standalone (vibrance
+        // duplicated HSL's saturation slider, tone shaper duplicated the real
+        // per-channel Curves node), and blackandwhite never existed standalone
+        // either (it was a special case of Channel Mixer with all three rows
+        // set equal).
         std::string(kSharedHelpers) +
         "uniform float uBrightness;\n"
         "uniform float uContrast;\n"

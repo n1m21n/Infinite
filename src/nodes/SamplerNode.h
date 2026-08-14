@@ -74,6 +74,17 @@ public:
    // play interaction. A no-op with nothing loaded.
    void TriggerPreview(float frac);
 
+   // Stops whatever the Play/preview button most recently triggered - the
+   // explicit counterpart to TriggerPreview, for a loop/free-running sample
+   // that would otherwise keep sounding forever with no way to silence it
+   // short of unloading the file.
+   void StopPreview();
+
+   // True while the most recently triggered preview voice is still sounding
+   // (attack through release, not just "held") - drives the Play/Stop
+   // button's label. Drained from the audio thread each CookIfNeeded.
+   bool IsPlaying() const { return mIsPlaying; }
+
    const std::string& FilePath() const { return mFilePath; }
    const std::string& FileName() const { return mFileName; }
    const std::string& Status() const { return mStatus; }
@@ -115,5 +126,6 @@ private:
    std::string mFileName;
    std::string mStatus = "no sample loaded";
    float mPlayhead = 0.0f;
+   bool mIsPlaying = false;
    bool mRecording = false;
 };

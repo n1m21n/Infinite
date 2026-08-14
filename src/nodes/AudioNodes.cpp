@@ -71,7 +71,7 @@ void GainNode::CookIfNeeded(int frameId)
    mAudioNode->PushParams(gainDb);
 
    float peak = 0.0f;
-   if (mAudioNode->Meter().Read(&peak, 1) > 0)
+   if (mAudioNode->Meter().ReadLatest(peak))
       mLevel = peak;
 }
 
@@ -191,7 +191,7 @@ void MixerNode::CookIfNeeded(int frameId)
    mAudioNode->PushParams(*this);
 
    float peak = 0.0f;
-   if (mAudioNode->Meter().Read(&peak, 1) > 0)
+   if (mAudioNode->Meter().ReadLatest(peak))
       mLevel = peak;
    for (int s = 0; s < kSlots; s++)
       mChannelLevel[s] = mAudioNode->ChannelPeak(s);
@@ -322,7 +322,7 @@ void AudioInputNode::CookIfNeeded(int frameId)
    Platform::AudioInputCapturePump(error); // no-op once the tap is already live
 
    float peak = 0.0f;
-   if (mAudioNode->Meter().Read(&peak, 1) > 0)
+   if (mAudioNode->Meter().ReadLatest(peak))
       mLevel = peak;
 }
 

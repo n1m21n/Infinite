@@ -175,6 +175,14 @@ namespace
    // because every param of both engines is now drawn every frame.
    const float kAudioWideWidth = 960.0f;
    const float kAudioHalfWidth = 214.0f;
+   // Mixer needs a wider body than the standard 440: with 8 strips, cellW =
+   // gAudioContentW / MixerNode::kSlots must leave room for both a 56px knob
+   // and its modulation pin's left-margin gutter (ModKnob needs
+   // (cell - knob) / 2 >= 20px). Solving (cell - 56) / 2 >= 20 => cell >= 96
+   // => body >= 768. 800 is the smallest round number above that floor -
+   // don't shrink this back toward 440, the pin-clamp bug it fixes re-engages
+   // below 768.
+   const float kAudioMixerWidth = 800.0f;
    // Knobs come in two sizes so a row has a visual hierarchy: large for the
    // one or two params that define what the node is doing, small for the
    // rest. A row of identical dials reads as a spreadsheet, which is what v2
@@ -1409,7 +1417,7 @@ namespace
       const float cell = cellW > 0.0f ? cellW : diameter;
       const ImU32 pinColor = modulated              ? IM_COL32(255, 190, 90, 255)
                             : hasExpr && !exprErrored ? IM_COL32(170, 130, 255, 255)
-                                                      : IM_COL32(95, 100, 120, 255);
+                                                      : IM_COL32(130, 138, 162, 255);
 
       const std::pair<int, int> editKey(nodeIndex, paramIndex);
       bool typing = gTypedParam.count(editKey) > 0;
@@ -1572,7 +1580,7 @@ namespace
          // A ring rather than a bare dot: at 4px a filled dot beside a 56px
          // knob reads as a rendering artifact, not an affordance.
          dl->AddCircleFilled(c, 4.0f, IM_COL32(18, 19, 25, 255));
-         dl->AddCircle(c, 4.0f, pinColor, 12, modulated || hasExpr ? 2.0f : 1.5f);
+         dl->AddCircle(c, modulated || hasExpr ? 4.0f : 4.5f, pinColor, 12, 2.0f);
          if (modulated || hasExpr)
             dl->AddCircleFilled(c, 2.0f, pinColor);
          ed::EndPin();
@@ -4600,15 +4608,26 @@ namespace
       const bool hasSample = n->waveformCacheCount > 0;
 
       // Body click-catcher first, so it owns hover/active by default; the
-      // handle grab-zones are added afterwards at the same screen position
-      // and win the hit test over it wherever they overlap (ImGui resolves
-      // overlapping items in submission order - last drawn wins).
+      // handle grab-zones are added afterwards at the same screen position.
+      // Overlap resolution in ImGui is NOT "last submitted wins" - a later
+      // item is blocked from becoming hovered/active while an earlier item
+      // already holds g.HoveredId, unless the earlier item opts in via
+      // SetNextItemAllowOverlap() (called before it, not after). Without
+      // this the two handle buttons below never receive mouse input at all.
+      ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##samplerwavebody", ImVec2(w, h));
       if (hasSample && ImGui::IsItemActivated())
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
-         n->TriggerPreview(frac);
+         // A click outside the start/end range starts from the range's
+         // start rather than from the click point - clicking past the red
+         // marker used to trigger a voice already past its own end bound,
+         // which either played silently for a frame or two before stopping
+         // (reads as "unresponsive") or, for a click left of the green
+         // marker in reverse/pingpong, played audibly outside the range.
+         const float target = (frac < n->start || frac > n->end) ? n->start : frac;
+         n->TriggerPreview(target);
       }
 
       dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
@@ -4661,12 +4680,28 @@ namespace
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
 
+         // Triangle grips at top and bottom of each marker, anchored a few
+         // pixels in from the true edge so they stay visible/grabbable even
+         // at the default start=0/end=1 - at those values the marker line
+         // sits flush on the border and is otherwise unreadable as a handle.
+         const float grip = 8.0f;
+         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const ImU32 startCol = IM_COL32(120, 220, 150, 255);
+         const ImU32 endCol = IM_COL32(220, 120, 150, 255);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
+
          ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
          ImGui::InvisibleButton("##samplerstarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
             n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
          ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
          ImGui::InvisibleButton("##samplerendhandle", ImVec2(handleW, h));
@@ -4674,6 +4709,8 @@ namespace
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
             n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
       }
 
       ImGui::SetCursorScreenPos(origin);
@@ -5253,7 +5290,7 @@ namespace
       DrawWavetableScope(n, 48.0f, gAudioContentW);
       ImGui::Dummy(ImVec2(0.0f, 5.0f));
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(5);
          row.Knob("mix  a-b", &n->mix, 0.0f, 1.0f, "%.2f");
          row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f");
          // Free-running pitch is meaningless once notes drive pitch - greyed
@@ -5264,6 +5301,11 @@ namespace
          if (noteDriven)
             ImGui::EndDisabled();
          row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s");
+         // Continuous, not latched at note-on - wire Pitch Bend's live knob
+         // into this pin (drag from its output dot) for real bend of notes
+         // already sounding; dragging it here directly does the same thing
+         // by hand.
+         row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
          row.End();
       }
       EndAudioSection();
@@ -5355,6 +5397,25 @@ namespace
       if (recording)
          ImGui::PopStyleColor();
 
+      // Explicit Play/Stop, independent of the click-the-waveform preview
+      // gesture - with loop (or free-running/no note cable) a triggered
+      // voice sounds forever, and clicking the waveform again only
+      // retriggers from a new point rather than silencing it, so there
+      // needs to be a dedicated way to stop it.
+      ImGui::SameLine();
+      const bool playing = n->IsPlaying();
+      if (playing)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(playing ? "Stop" : "Play", ImVec2(60, 0)))
+      {
+         if (playing)
+            n->StopPreview();
+         else
+            n->TriggerPreview(n->start);
+      }
+      if (playing)
+         ImGui::PopStyleColor();
+
       // loop/reverse/ping-pong right-aligned on the same row, so the top of
       // the body reads as one bar rather than stacked controls fighting for
       // the same strip of height. Pill toggles (AudioToggleButton), not
@@ -5402,13 +5463,21 @@ namespace
 
       // finetune/pitch and speed/volume pair up at half-width each, the
       // same two-per-row rhythm every other slider body in this file uses.
-      // start/end are set on the picture above, not duplicated as sliders.
+      // start/end duplicate the two waveform handles as exact numeric
+      // fields - the picture is for "roughly where", these are for "exactly
+      // where", and each stays in sync with the other since both write the
+      // same n->start/n->end.
       AudioSlider("finetune", &n->finetune, -50.0f, 50.0f, "%.0f c", AudioHalfWidth());
       ImGui::SameLine();
       AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
       AudioSlider("speed", &n->speed, -2.0f, 2.0f, "%.2fx", AudioHalfWidth());
       ImGui::SameLine();
       AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+         n->start = std::min(n->start, n->end - 0.01f);
+      ImGui::SameLine();
+      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+         n->end = std::max(n->end, n->start + 0.01f);
 
       EndAudioBody();
    }
@@ -5429,20 +5498,31 @@ namespace
             gSampleScanner.AddFolder(path);
       }
 
-      // Folders list, each with its own remove button. Kept short (no
-      // scroll region of its own) since a handful of library folders is the
-      // expected case - the result list below is where scrolling matters.
+      // Folders list, each with its own refresh and remove button. Kept
+      // short (no scroll region of its own) since a handful of library
+      // folders is the expected case - the result list below is where
+      // scrolling matters.
       std::string folderToRemove;
+      std::string folderToScan;
+      bool scanAll = false;
+      const bool scanning = gSampleScanner.IsScanning();
       const float panelW = ImGui::GetContentRegionAvail().x;
       for (const std::string& folder : gSampleScanner.Folders())
       {
          ImGui::PushID(folder.c_str());
-         const float removeW = ImGui::GetFrameHeight();
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + panelW - removeW - 10.0f);
+         const float btnW = ImGui::GetFrameHeight();
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + panelW - 2.0f * btnW - 14.0f);
          ImGui::TextDisabled("%s", folder.c_str());
          ImGui::PopTextWrapPos();
-         ImGui::SameLine(panelW - removeW);
-         if (ImGui::Button("x", ImVec2(removeW, 0)))
+         ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
+         if (scanning)
+            ImGui::BeginDisabled();
+         if (ImGui::Button("\xe2\x86\xbb", ImVec2(btnW, 0))) // U+21BB clockwise open circle arrow
+            folderToScan = folder;
+         if (scanning)
+            ImGui::EndDisabled();
+         ImGui::SameLine(panelW - btnW);
+         if (ImGui::Button("x", ImVec2(btnW, 0)))
             folderToRemove = folder;
          ImGui::PopID();
       }
@@ -5451,16 +5531,19 @@ namespace
 
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
       {
-         const bool scanning = gSampleScanner.IsScanning();
          if (scanning)
             ImGui::BeginDisabled();
-         if (ImGui::Button("Refresh", ImVec2(-1.0f, 0)))
-            gSampleScanner.StartScan();
+         if (ImGui::Button("Refresh all", ImVec2(-1.0f, 0)))
+            scanAll = true;
          if (scanning)
             ImGui::EndDisabled();
          if (scanning)
             ImGui::TextDisabled("scanning... (%d found)", gSampleScanner.FilesFoundSoFar());
       }
+      if (scanAll)
+         gSampleScanner.StartScan();
+      else if (!folderToScan.empty())
+         gSampleScanner.StartScan(folderToScan);
 
       ImGui::Separator();
 
@@ -5546,7 +5629,7 @@ namespace
       char stat[64];
       snprintf(stat, sizeof(stat), "8 in -> 1 out   sum %+.1f dB",
                DspMath::LinearToDb(std::max(n->Level(), 1e-5f)));
-      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      BeginAudioBody(gn.index, gn.category, kAudioMixerWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       const float cellW = gAudioContentW / (float)MixerNode::kSlots;
@@ -5946,10 +6029,9 @@ namespace
    void DrawPitchBendBody(GraphNode& gn, PitchBendNode* n)
    {
       char stat[48];
-      snprintf(stat, sizeof(stat), "%+d st", n->semitones);
-      float semi = (float)n->semitones;
-      DrawSingleKnobAudioBody(gn, stat, "pitch", &semi, -24.0f, 24.0f, "%.0f st");
-      n->semitones = (int)lroundf(semi);
+      snprintf(stat, sizeof(stat), "%+.1f st", n->bendSemitones);
+      DrawSingleKnobAudioBody(gn, stat, "pitch", &n->bendSemitones, -PitchBendNode::kRange, PitchBendNode::kRange,
+                               "%.1f st");
    }
 
    void DrawGateBody(GraphNode& gn, GateNode* n)
@@ -7924,6 +8006,18 @@ namespace
    // live transient-amount (ExtraMeterValue(0)) riding on the curve as a
    // dot - the same "picture from params, dot from the kernel" split
    // Dynamics' transfer curve uses.
+   // Local dB range for this visualizer only - deliberately not shared with
+   // Dynamics' kDynVizMinDb/kDynVizMaxDb (-60..+6), which would clip a
+   // +24 dB attack boost off the top of the plot.
+   const float kTsVizMinDb = -48.0f;
+   const float kTsVizMaxDb = 24.0f;
+
+   float TsVizDbToY(float db, float y0, float h)
+   {
+      const float t = (db - kTsVizMinDb) / (kTsVizMaxDb - kTsVizMinDb);
+      return y0 + h - std::clamp(t, 0.0f, 1.0f) * h;
+   }
+
    void DrawTransientShaperVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -7935,31 +8029,79 @@ namespace
       dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
       dl->PushClipRect(origin, br, true);
 
-      const float baseY = br.y - 6.0f;
-      dl->PathClear();
+      const float attackDb = n->Param("attack");
+      const float sustainDb = n->Param("sustain");
+
+      // Fixed ~400 ms window so the kernel's 30 ms/300 ms follower
+      // constants are both legible on the curve.
+      const float kWindowSec = 0.4f;
       const int kNumPoints = 96;
+
+      // env(t): the unshaped "hit" being fed into the shaper - fast rise,
+      // exponential decay - same shape as before, now just the input
+      // signal rather than the whole picture.
+      auto envAt = [](float t) {
+         return t < 0.08f ? (t / 0.08f) : expf(-(t - 0.08f) * 6.0f);
+      };
+
+      // tau(t): transient weight, 1 at the hit decaying with the fast
+      // follower's 30 ms release as the slow follower catches up. This is
+      // an analytic approximation of the kernel's actual dual-peak-follower
+      // detector (TransientShaperKernel::ProcessBlock), not a step of the
+      // real recursion - stepping the real fastAtk/fastRel/slowAtk/slowRel
+      // filters here would mean ~17k iterations per frame per visible node.
+      auto tauAt = [](float tSec) {
+         return expf(-tSec / 0.030f);
+      };
+
+      float peakDb = -1000.0f;
+      float peakX = origin.x, peakY = origin.y;
+
+      // Dim reference line: the unshaped envelope with both params at 0 dB.
+      dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
       {
          const float t = (float)i / (float)(kNumPoints - 1);
-         const float env = t < 0.08f ? (t / 0.08f) : expf(-(t - 0.08f) * 6.0f);
+         const float env = envAt(t);
+         const float ampDb = 20.0f * log10f(std::max(env, 1e-4f));
          const float x = origin.x + t * w;
-         const float y = baseY - env * (h - 14.0f);
+         const float y = TsVizDbToY(ampDb, origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
+      }
+      dl->PathStroke(IM_COL32(150, 214, 255, 60), 0, 1.5f);
+
+      // Live curve: env(t) shaped by the attack/sustain crossfade.
+      dl->PathClear();
+      for (int i = 0; i < kNumPoints; i++)
+      {
+         const float t = (float)i / (float)(kNumPoints - 1);
+         const float tSec = t * kWindowSec;
+         const float env = envAt(t);
+         const float tau = tauAt(tSec);
+         const float gainDb = attackDb * tau + sustainDb * (1.0f - tau);
+         const float ampDb = 20.0f * log10f(std::max(env, 1e-4f)) + gainDb;
+         const float x = origin.x + t * w;
+         const float y = TsVizDbToY(ampDb, origin.y, h);
+         dl->PathLineTo(ImVec2(x, y));
+         if (ampDb > peakDb)
+         {
+            peakDb = ampDb;
+            peakX = x;
+            peakY = y;
+         }
       }
       dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       const float transientAmount = std::clamp(n->ExtraMeterValue(0), 0.0f, 1.0f);
-      const float dotX = origin.x + 0.08f * w;
-      const float dotY = baseY - (h - 14.0f);
-      dl->AddCircleFilled(ImVec2(dotX, dotY), 3.0f + transientAmount * 4.0f, IM_COL32(255, 196, 120, 230));
+      dl->AddCircleFilled(ImVec2(peakX, peakY), 3.0f + transientAmount * 4.0f, IM_COL32(255, 196, 120, 230));
 
       dl->PopClipRect();
       dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
-         char buf[48];
-         snprintf(buf, sizeof(buf), "attack %.1f dB - sustain %.1f dB", n->Param("attack"), n->Param("sustain"));
+         char buf[80];
+         snprintf(buf, sizeof(buf), "attack %+.1f dB - sustain %+.1f dB - peak %+.1f dB", attackDb, sustainDb, peakDb);
          SetAudioReadout("transient shaper", buf);
       }
 
@@ -7975,14 +8117,13 @@ namespace
       DrawTransientShaperVisualizer(n);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      AudioKnobRow row(2);
-      row.Knob("attack", n->ParamPtr("attack"), -24.0f, 24.0f, "%.1f dB", kKnobLarge);
-      row.Knob("sustain", n->ParamPtr("sustain"), -24.0f, 24.0f, "%.1f dB", kKnobLarge);
-      row.End();
-
-      BeginAudioSection("output");
-      AudioSlider("mix", &n->mix, 0.0f, 1.0f, "%.3f", AudioHalfWidth());
-      EndAudioSection();
+      {
+         AudioKnobRow row(3);
+         row.Knob("attack", n->ParamPtr("attack"), -24.0f, 24.0f, "%.1f dB", kKnobLarge);
+         row.Knob("sustain", n->ParamPtr("sustain"), -24.0f, 24.0f, "%.1f dB", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
 
       EndAudioBody();
    }

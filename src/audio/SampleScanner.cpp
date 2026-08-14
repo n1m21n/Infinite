@@ -95,7 +95,7 @@ void SampleScanner::RemoveFolder(const std::string& path)
    // folder-list edit), same as the plan's Refresh-button-only contract.
 }
 
-void SampleScanner::StartScan()
+void SampleScanner::StartScan(const std::string& folder)
 {
    if (mScanning.exchange(true, std::memory_order_relaxed))
       return; // already in flight
@@ -104,7 +104,8 @@ void SampleScanner::StartScan()
       mScanThread.join(); // previous scan already finished; reap it before starting a new one
 
    mFilesFound.store(0, std::memory_order_relaxed);
-   mScanThread = std::thread(&SampleScanner::ScanThreadMain, this, mFolders);
+   mScanningFolders = folder.empty() ? mFolders : std::vector<std::string> { folder };
+   mScanThread = std::thread(&SampleScanner::ScanThreadMain, this, mScanningFolders);
 }
 
 void SampleScanner::ScanThreadMain(std::vector<std::string> folders)
@@ -151,7 +152,18 @@ void SampleScanner::PollResults()
    if (!lock.owns_lock())
       return; // worker thread mid-write to mPendingResult; try again next frame
 
-   mIndex = std::move(mPendingResult);
+   // Replace only the entries that came from a folder this scan covered;
+   // a single-folder Refresh must leave every other folder's index alone
+   // rather than wiping the whole thing down to just what it found.
+   std::vector<Entry> merged;
+   merged.reserve(mIndex.size() + mPendingResult.size());
+   for (Entry& e : mIndex)
+      if (std::find(mScanningFolders.begin(), mScanningFolders.end(), e.folderRoot) == mScanningFolders.end())
+         merged.push_back(std::move(e));
+   for (Entry& e : mPendingResult)
+      merged.push_back(std::move(e));
+
+   mIndex = std::move(merged);
    mPendingResult.clear();
    mResultReady.store(false, std::memory_order_relaxed);
    lock.unlock();

@@ -1034,32 +1034,10 @@ int NoteTransposeNode::LastNoteOut() const
    return mAudioNode ? mAudioNode->LastNoteOut() : -1;
 }
 
-PitchBendNode::PitchBendNode() = default;
-PitchBendNode::~PitchBendNode() = default;
-
-void PitchBendNode::CookIfNeeded(int frameId)
-{
-   if (frameId == mLastCookFrame)
-      return;
-   mLastCookFrame = frameId;
-   if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioSemitoneShiftNode>();
-   mAudioNode->SetSemitones(semitones);
-}
-
-void PitchBendNode::VisitParams(ParamVisitor& v) { v.Int("semitones", semitones); }
-
-AudioNode* PitchBendNode::GetAudioNode()
-{
-   if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioSemitoneShiftNode>();
-   return mAudioNode.get();
-}
-
-int PitchBendNode::LastNoteOut() const
-{
-   return mAudioNode ? mAudioNode->LastNoteOut() : -1;
-}
+// PitchBendNode is now a plain IModulator - see its class comment in
+// NoteNodes.h - so it needs none of the two-object machinery below; its
+// CookIfNeeded/VisitParams/Value01 are trivial enough to live inline in the
+// header, the same as ConstantNode/MacroKnobNode.
 
 // ---- Velocity Curve ----
 class AudioVelocityCurveNode : public AudioNode

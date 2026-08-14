@@ -309,6 +309,35 @@ public:
    }
 };
 
+// A stable junction point for a modulator cable, mirroring Null and Null 3D:
+// zero-cost pass-through, useful for branching one modulator to several
+// destinations or as a placeholder while rewiring. Existing as its own node
+// (rather than telling people to just look at the source) matters because the
+// value meter is drawn per-node - dropping one mid-chain lets you read a
+// modulator's current value at that specific point in a longer pipeline.
+class NullModulatorNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new NullModulatorNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   const char* InputLabel(int) const override { return "in"; }
+
+   float Value01() override { return input ? input->Value01() : constantIn; }
+
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
+   IModulator* input = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
+   int ModulatorInputCount() const override { return 1; }
+
+   float constantIn = 0.5f; // used when nothing is patched
+
+   void VisitParams(ParamVisitor& v) override { v.Float("constantIn", constantIn); }
+};
+
 // Mirrors a modulator around a low/high pivot. Not a flat 1-v, so it does the
 // right thing fed something already outside 0..1 (e.g. an unclamped Math output).
 class InvertNode : public INode, public IModulator

@@ -34,6 +34,7 @@ namespace
       kVolume,
       kMix,
       kGlide,
+      kPitchBend,
       kNumGlobalParams
    };
 
@@ -309,6 +310,7 @@ public:
          sm.volume = mMailbox.SmoothedValue(kVolume);
          sm.mix = std::clamp(mMailbox.SmoothedValue(kMix), 0.0f, 1.0f);
          sm.glide = mMailbox.SmoothedValue(kGlide);
+         sm.pitchBend = mMailbox.SmoothedValue(kPitchBend);
          for (int e = 0; e < kEngines; e++)
          {
             sm.eng[e].position = std::clamp(mMailbox.SmoothedValue(EngineParamId(e, kEngPosition)), 0.0f, 1.0f);
@@ -348,7 +350,8 @@ public:
                   mFreeEngine[e].lastOut = 0.0f;
                   continue;
                }
-               const float semitones = (float)(eng[e].octave * 12 + eng[e].semi) * 100.0f + sm.eng[e].fine;
+               const float semitones = (float)(eng[e].octave * 12 + eng[e].semi) * 100.0f + sm.eng[e].fine +
+                                       sm.pitchBend * 100.0f;
                const float freq = base * powf(2.0f, semitones / 1200.0f);
                float l = 0.0f, r = 0.0f;
                RenderEngine(eng[e], sm.eng[e], freq, mFreeEngine[e], eng[1 - e].on ? prevOut[1 - e] : 0.0f,
@@ -401,7 +404,8 @@ public:
                   }
 
                   const float semitones = (float)(eng[e].octave * 12 + eng[e].semi) * 100.0f +
-                                          sm.eng[e].fine + eng[e].pitchAmount * pitchEnv * 100.0f;
+                                          sm.eng[e].fine + eng[e].pitchAmount * pitchEnv * 100.0f +
+                                          sm.pitchBend * 100.0f;
                   const float freq = base * powf(2.0f, semitones / 1200.0f);
                   float l = 0.0f, r = 0.0f;
                   RenderEngine(eng[e], sm.eng[e], freq, v.eng[e], eng[1 - e].on ? prevOut[1 - e] : 0.0f,
@@ -466,6 +470,7 @@ public:
       values[kVolume] = n.volume;
       values[kMix] = n.mix;
       values[kGlide] = n.glide;
+      values[kPitchBend] = n.pitchBend;
 
       for (int e = 0; e < kEngines; e++)
       {
@@ -538,7 +543,7 @@ private:
 
    struct SmoothedBlock
    {
-      float frequency, volume, mix, glide;
+      float frequency, volume, mix, glide, pitchBend;
       SmoothedEngine eng[kEngines];
    };
 
@@ -886,6 +891,7 @@ void WavetableNode::VisitParams(ParamVisitor& v)
    v.Float("volume", volume);
    v.Float("frequency", frequency);
    v.Float("glide", glide);
+   v.Float("pitchBend", pitchBend);
 
    // Per-engine names are prefixed rather than indexed generically so a saved
    // patch stays readable and a future third engine can't silently renumber

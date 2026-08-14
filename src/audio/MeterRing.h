@@ -18,6 +18,12 @@ public:
    // Main thread only. Returns the number of samples actually read.
    int Read(float* out, int maxCount);
 
+   // Main thread only. Drains everything queued and returns only the most recent
+   // value. For latest-value signals (playheads, level meters) where a backlog is
+   // staleness, not history - Read() one-per-frame against a producer that writes
+   // once per audio block accumulates unbounded lag.
+   bool ReadLatest(float& out);
+
 private:
    float mEntries[kCapacity] {};
    std::atomic<size_t> mHead { 0 }; // consumer reads from here
