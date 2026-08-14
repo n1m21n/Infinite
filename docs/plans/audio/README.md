@@ -94,7 +94,7 @@ not use it as a reading list.
 
 | Bespoke module | Lands in | Behaviour worth specifying |
 |---|---|---|
-| MolderSampler | **Sampler** | 5 engines: classic / slice / repitch / granular / spectral. Global play region with loop, ping-pong, reverse. Onset detection for auto-slicing. Live recording into the buffer. |
+| MolderSampler | **Sampler**, displayed as "sample player" (shipped) | Shipped minimal first (load/tune/start/loop/volume + waveform+playhead), then grew on direct user request: pitch+finetune (coarse/fine tuning), a -2..2 varispeed `speed` control, a record input pin (captures whatever's cabled in, becomes the loaded buffer), an interactive waveform (click anywhere to audition from that point; drag its two edge handles to set the loop range), and independent reverse/ping-pong toggles for what happens at the range edges. Registered type name stays "Sampler" for patch compatibility - only DisplayName() changed, same pattern "Dynamics" -> "compressor" already uses. Still not the 5-engine/onset-detection spectral spec below - that's left here as a still-open idea, not a to-do this covered. |
 | Wavetable | **Wavetable** | dual A/B oscillators, per-oscillator filter + envelope, unison, waveform preview drawing |
 | Tracker | **Drum Sequencer** | step sequencer with per-step sample, volume, decay, pitch and repeat; transport sync; randomise |
 | PaulStretch | **Pitch Time** | extreme spectral time-stretch |
@@ -342,11 +342,18 @@ exists at the time.
 - **P3d — Utility** (7 nodes) + the visual bridge (Scope's spectrum → texture,
   Envelope Follower → modulator). **Enforce the §1 drawing rules here** —
   decimated rings, 30 Hz redraw, scopes collapsed by default.
-- **P3e — Sample browser.** Extend the existing docked node-browser panel
-  (`main.cpp`, the popup/side-panel layer) with a **Samples mode**: background
-  indexing thread, filter-as-you-type, disk-persisted index, per-location
-  rescan, drag-a-sample-to-spawn-a-Sampler. Indexing runs on a worker thread
-  and touches neither the audio nor the render thread.
+- **P3e — Sample browser (shipped).** Extended the existing docked
+  node-browser panel with a **Samples mode**: per-folder add/remove,
+  filter-as-you-type, a `SampleScanner` background `std::thread` scan (the
+  first of its kind in this codebase - see its header comment), disk-
+  persisted index (`SampleFolders.json`/`SampleIndex.json` via crude_json,
+  loaded on startup with no rescan - only an explicit Refresh triggers one),
+  and drag-and-drop onto either empty canvas (spawns a loaded Sampler) or an
+  existing Sampler's body (swaps its file). The drag itself is hand-tracked
+  (`gSampleDragActive` in `main.cpp`), not ImGui's native drag-drop API,
+  because the drop target is imgui_node_editor's internally-managed canvas.
+  Shipped alongside a minimal **Sampler** node (see the table above) as its
+  prerequisite drop target.
 
 ### P4 — Test design
 

@@ -18,6 +18,7 @@
 class AudioGainNode;
 class AudioMixerNode;
 class AudioSplitterNode;
+class AudioCaptureNode;
 
 class GainNode : public INode, public IAudioSource
 {
@@ -137,6 +138,42 @@ public:
 private:
    std::unique_ptr<AudioSplitterNode> mAudioNode;
    int mLastCookFrame = -1;
+};
+
+// Mirror image of AudioOutputNode: a pure source with no audio input pin of
+// its own, whose audio-thread twin (AudioCaptureNode) drains the live input
+// device instead of generating anything - see Platform::AudioInputCapture*
+// for the tap and the lock-free ring that gets it across threads. The
+// constructor/destructor register this instance's want with
+// AddRef/RemoveRef; CookIfNeeded pumps the tap into existence each frame
+// (main thread only, since that touches AVAudioEngine) so it self-heals if
+// the output device gets stopped and restarted. ProcessBlock itself only
+// ever calls the lock-free Platform::AudioInputCaptureRead.
+class AudioInputNode : public INode, public IAudioSource
+{
+public:
+   static INode* Create() { return new AudioInputNode(); }
+   AudioInputNode();
+   ~AudioInputNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   AudioNode* GetAudioNode() override;
+   bool IsHardwareDriven() const override { return true; }
+
+   // Current input level (0..1, post-trim), for the inline meter visualizer.
+   float Level() const { return mLevel; }
+
+   float gainDb = 0.0f;
+
+private:
+   std::unique_ptr<AudioCaptureNode> mAudioNode;
+   int mLastCookFrame = -1;
+   float mLevel = 0.0f;
 };
 
 // Terminal node: no audio-thread counterpart of its own. It exists purely as

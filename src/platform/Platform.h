@@ -217,6 +217,57 @@ namespace Platform
 
    std::vector<AudioDeviceInfo> AudioListDevices();
 
+   // ---- sample library ----
+   // Native open panel restricted to picking a single directory (no files).
+   // Returns "" if cancelled. Used by the Samples search panel to add a
+   // folder to scan.
+   std::string OpenFolderDialog();
+
+   // A whole audio file decoded to planar float PCM, ready for an audio-
+   // thread node to read directly (no further per-block decoding). Decoding
+   // itself only ever happens on the main thread, at load time.
+   struct SampleBuffer
+   {
+      std::vector<float> channelData; // interleaved-free: channel 0 then channel 1, each numFrames long
+      int channels = 0;
+      int numFrames = 0;
+      double sampleRate = 0.0;
+   };
+
+   // Decodes whatever AVFoundation reads natively (wav/aiff/caf/m4a/mp3/alac).
+   // Returns false and fills outError on failure (missing file, unsupported
+   // codec, etc). Main-thread only - not real-time safe.
+   bool DecodeAudioFileToBuffer(const std::string& path, SampleBuffer& outBuffer, std::string& outError);
+
+   // ---- audio input capture (for the node graph's Audio In node) ----
+   // Taps the render device's own AVAudioEngine input node (the same engine
+   // AudioDeviceOpen already runs) and buffers raw samples into a lock-free
+   // ring, so AudioInputNode's audio-thread ProcessBlock can drain them each
+   // block without touching Objective-C, taking a lock, or allocating.
+   // Independent of AudioStart/AudioRead above, which is a separate node
+   // (Audio Analyze) on its own separate engine instance.
+   //
+   // AddRef/RemoveRef just count how many AudioInputNode instances are alive
+   // (call from the node's constructor/destructor - cheap, no Objective-C).
+   // Pump (call every CookIfNeeded, main thread only) installs the tap once
+   // the want-count is > 0 and the output device is open, and tears it down
+   // once it drops to 0. Pumping every frame rather than once is what makes
+   // this self-healing across the user stopping/restarting the output device
+   // from the menu's audio toggle: AudioDeviceClose tears the tap down with
+   // the rest of that engine, and the next Pump reinstalls it on the new one
+   // without any node needing to notice the device came back.
+   void AudioInputCaptureAddRef();
+   void AudioInputCaptureRemoveRef();
+   void AudioInputCapturePump(std::string& outError);
+   bool AudioInputCaptureIsRunning();
+
+   // Reads up to numFrames of the most recently captured audio into planar
+   // per-channel buffers (outChannels[ch][0..numFrames)). Underrun frames are
+   // zero-filled. Returns the channel count actually captured (0 if capture
+   // isn't running yet, e.g. still waiting on the device to open or on mic
+   // permission). Audio-thread safe: lock-free, no allocation.
+   int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels);
+
    // ---- MIDI input ----
    // Listens to every connected class-compliant MIDI source (Akai/Nektar/Pioneer
    // controllers all enumerate this way on macOS, no vendor driver needed) and

@@ -12,8 +12,15 @@
 // through param pushes - CookIfNeeded does no DSP.
 class AudioMidiNotesNode;
 class AudioEnvelopeNode;
+class AudioNoteToCVNode;
 class AudioNoteFilterNode;
 class AudioNoteModifyNode;
+class AudioSemitoneShiftNode;
+class AudioVelocityCurveNode;
+class AudioGateNode;
+class AudioHumanizerNode;
+class AudioQuantizerNode;
+class AudioGlideNode;
 class AudioNoteEchoNode;
 class AudioNoteRouterNode;
 class AudioArpeggiatorNode;
@@ -102,14 +109,63 @@ public:
    // IModulator - reads the audio-thread-published current envelope level.
    float Value01() override;
 
+   enum Trigger { kTriggerNote = 0, kTriggerPulse };
+
    float attackMs = 10.0f;
    float decayMs = 200.0f;
    float sustainLevel = 0.6f;
    float releaseMs = 400.0f;
+   // kTriggerNote (default): unchanged, driven by incoming note events.
+   // kTriggerPulse: free-runs off the transport - no note input needed - by
+   // re-firing NoteOn/NoteOff itself every `rateDiv` beats, gated to `gatePct`
+   // of that period, so the node can drive a synth param on its own clock
+   // rather than needing something wired into its note input first.
+   int trigger = kTriggerNote;
+   int rateDiv = 6; // index into MusicTime::RateDivisionList - MusicTime::kQuarter
+   float gatePct = 0.5f; // 0..1, fraction of the pulse period held high
    NoteCable noteInput;
 
 private:
    std::unique_ptr<AudioEnvelopeNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// Note pitch -> normalized modulation value, so a note stream can drive a
+// synth param (cutoff, warp, pan, ...) the same way an LFO or Envelope does,
+// the same "note consumer whose output is a modulator value" shape as
+// EnvelopeNode above. Unlike Envelope, this doesn't gate on note-on/off -
+// it's a pitch tracker, not an amplitude stage - so the CV holds the last
+// played note's pitch rather than falling back toward 0 on release; that's
+// the useful behaviour for "modulate a filter by which note is playing".
+class NoteToCVNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new NoteToCVNode(); }
+   NoteToCVNode();
+   ~NoteToCVNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* AudioNodeForNotePorts() override;
+
+   // IModulator - normalized 0..1, (lastNote - rangeLow) / (rangeHigh - rangeLow).
+   float Value01() override;
+
+   int rangeLow = 0;    // MIDI note mapped to output 0.0
+   int rangeHigh = 127; // MIDI note mapped to output 1.0
+   float glideMs = 20.0f; // one-pole smoothing time toward a newly played note
+   NoteCable noteInput;
+
+   int LastNote() const; // -1 if nothing has played yet
+
+private:
+   std::unique_ptr<AudioNoteToCVNode> mAudioNode;
    int mLastCookFrame = -1;
 };
 
@@ -203,6 +259,243 @@ public:
 private:
    std::unique_ptr<AudioNoteModifyNode> mAudioNode;
    int mLastCookFrame = -1;
+};
+
+// ---------------------------------------------------------------------------
+// The eight single-purpose nodes below replace Note Modify's fused control
+// surface with one node per concern - each small enough to be one or two
+// knobs, standing in a chain wherever only one of these was ever needed.
+// Note Modify itself is untouched (existing patches keep working); these are
+// the new, composable alternative for new patches. Transpose/Pitch Bend
+// share one DSP class (AudioSemitoneShiftNode) since they are the same
+// passthrough-with-a-semitone-offset behaviour at two different ranges.
+
+// A single semitone offset applied to every note that passes through,
+// applied at note-on and remembered per input note so the matching note-off
+// lands on the same output pitch even if the knob moves while the note is
+// held. Backs both NoteTransposeNode (+/-48, "octave-and-then-some") and
+// PitchBendNode (+/-24, a finer offset) - NoteEvent carries no continuous
+// pitch channel (see NoteToCVNode's class comment), so both are a discrete
+// semitone shift rather than a true continuous bend.
+class NoteTransposeNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new NoteTransposeNode(); }
+   NoteTransposeNode();
+   ~NoteTransposeNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* GetAudioNode() override;
+
+   int semitones = 0; // -48..48
+   NoteCable noteInput;
+
+   int LastNoteOut() const;
+
+private:
+   std::unique_ptr<AudioSemitoneShiftNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+class PitchBendNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new PitchBendNode(); }
+   PitchBendNode();
+   ~PitchBendNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* GetAudioNode() override;
+
+   int semitones = 0; // -24..24
+   NoteCable noteInput;
+
+   int LastNoteOut() const;
+
+private:
+   std::unique_ptr<AudioSemitoneShiftNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// pow(velocity, curve) on every note-on; note-off passes through unchanged.
+// curve < 1 boosts soft hits, curve > 1 favours hard ones, 1 = linear/off.
+class VelocityCurveNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new VelocityCurveNode(); }
+   VelocityCurveNode();
+   ~VelocityCurveNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* GetAudioNode() override;
+
+   float curve = 1.0f; // 0.25..4, exponent; 1 = linear/unchanged
+   NoteCable noteInput;
+
+   float LastVelocityIn() const;
+   float LastVelocityOut() const;
+
+private:
+   std::unique_ptr<AudioVelocityCurveNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// gateHoldMs == 0 passes note-off through unchanged (default, i.e. off). > 0
+// ignores the real note-off and instead schedules an internal one that many
+// ms after the note-on - fixed note duration regardless of how long the key
+// was actually held.
+class GateNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new GateNode(); }
+   GateNode();
+   ~GateNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* GetAudioNode() override;
+
+   float holdMs = 0.0f; // 0..3000, 0 = passthrough note-off
+   NoteCable noteInput;
+
+private:
+   std::unique_ptr<AudioGateNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// Random jitter on note-on timing and velocity - two knobs, both 0 = off.
+class HumanizerNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new HumanizerNode(); }
+   HumanizerNode();
+   ~HumanizerNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* GetAudioNode() override;
+
+   float timingMs = 0.0f; // 0..100, random jitter on note-on timing
+   float velocityPct = 0.0f; // 0..100, random jitter on velocity
+   NoteCable noteInput;
+
+private:
+   std::unique_ptr<AudioHumanizerNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// Snaps note-on timing forward to the nearest grid line at `div` - never
+// earlier than the note actually arrived. div 0 = off.
+class QuantizerNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new QuantizerNode(); }
+   QuantizerNode();
+   ~QuantizerNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* GetAudioNode() override;
+
+   int div = 0; // 0 = off, else index into kQuantizeDivisions (see .cpp)
+   NoteCable noteInput;
+
+private:
+   std::unique_ptr<AudioQuantizerNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// A fast chromatic run from the previously played note into each new one -
+// NoteEvent carries no continuous pitch, so this approximates portamento as
+// a glissando (a burst of very short intermediate notes) rather than a true
+// pitch ramp. 0 = off (immediate note-on, no run).
+class GlideNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new GlideNode(); }
+   GlideNode();
+   ~GlideNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* GetAudioNode() override;
+
+   float glideMs = 0.0f; // 0..2000
+   NoteCable noteInput;
+
+private:
+   std::unique_ptr<AudioGlideNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// A free-running sine LFO exposed as a modulator, not a note processor -
+// NoteEvent has no continuous pitch channel for a real per-note vibrato to
+// ride on (see NoteToCVNode's class comment), so this is the practical
+// substitute: wire its output into a synth's own pitch/fine/detune knob
+// (anything ModKnob's modulation pin accepts) for the same audible wobble.
+// One knob: rate in Hz. Output is bipolar sine rescaled to 0..1, matching
+// every other modulator's Value01() contract.
+class VibratoNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new VibratoNode(); }
+   VibratoNode();
+   ~VibratoNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   float Value01() override;
+
+   float rateHz = 5.0f; // 0.5..12
 };
 
 // Generates new notes over time from an incoming one - genuinely distinct

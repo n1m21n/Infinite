@@ -34,9 +34,9 @@ Generic since 2026-08-13: `InputCountFor` counts audio/note pins by probing
 per-node ladder left is `DrawAudioNodeBody` (and, for `AudioEffectNode`, a
 second dispatch on `EffectDef::name` inside that same branch).
 
-## Nodes — 22 of 30-plus-8 shipped (effects list expanded past the original 30, see P3c below)
+## Nodes — 23 of 30-plus-8 shipped (effects list expanded past the original 30, see P3c below)
 
-**Shipped:** Wavetable · Gain · Audio Out · Mixer · Splitter · MIDI Notes ·
+**Shipped:** Wavetable · Gain · Audio Out · Audio In · Mixer · Splitter · MIDI Notes ·
 Envelope · Audio Filter · Dynamics · Delay · Reverb · Drive · Stereo ·
 Pitch Shifter · Chorus · Flanger · Phaser · Bitcrush · Transient Shaper ·
 Stutter · Ring Mod · Formant Filter
@@ -132,12 +132,11 @@ now generic rather than Dynamics-specific:
   gated param's dependencies before testing it in isolation, instead of
   reporting a real-but-uninformative FAIL - see the P4 note below.
 
-### P3d Utility — 3 of 7 (Gain, Audio Out, Mixer, Splitter shipped = 4)
+### P3d Utility — 2 of 7 (Gain, Audio Out, Mixer, Splitter, Audio In shipped = 5)
 
 | Node | State |
 |---|---|
-| Gain, Audio Out, Mixer, Splitter | shipped |
-| Audio In | **left** |
+| Gain, Audio Out, Mixer, Splitter, Audio In | shipped |
 | Scope | **left** — waveform / spectrum / meter; spectrum mode emits a texture (the audio→visual bridge) |
 | Recorder | **left** |
 

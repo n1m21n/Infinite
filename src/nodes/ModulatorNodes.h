@@ -273,6 +273,42 @@ private:
    double mLastBeats = -1.0; // beat at which mLast was last updated
 };
 
+// Scales how much of a modulator's swing reaches its destination, without
+// needing to know the destination's own range or resting value: a modulation
+// binding always overrides the destination outright (see Modulation.h), so
+// "depth" can't mean "add a fraction of this on top of the knob" the way a
+// hardware synth's env-depth knob does - the knob's own position is gone the
+// moment something is patched in. Collapsing toward 0.5 instead achieves the
+// same practical effect: at depth 0 the destination sits at its own
+// mid-range value (the modulator has no say), and at depth 1 the source
+// passes through unchanged. Negative depth inverts the source, so one knob
+// covers "how much" and "which direction" both.
+class ModDepthNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new ModDepthNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   const char* InputLabel(int) const override { return "in"; }
+
+   float Value01() override;
+
+   IModulator* input = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
+   int ModulatorInputCount() const override { return 1; }
+
+   float constantIn = 0.5f;
+   float depth = 1.0f; // -1..1: 0 = no effect (holds at 0.5), 1 = full swing, negative = inverted
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("constantIn", constantIn); v.Float("depth", depth);
+   }
+};
+
 // Mirrors a modulator around a low/high pivot. Not a flat 1-v, so it does the
 // right thing fed something already outside 0..1 (e.g. an unclamped Math output).
 class InvertNode : public INode, public IModulator

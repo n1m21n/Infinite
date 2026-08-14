@@ -219,6 +219,14 @@ float SmoothNode::Value01()
    return mLast;
 }
 
+// ---------------------------------------------------------------- Mod Depth
+
+float ModDepthNode::Value01()
+{
+   const float v = input ? input->Value01() : constantIn;
+   return std::clamp(0.5f + (v - 0.5f) * depth, 0.0f, 1.0f);
+}
+
 // ---------------------------------------------------------------- Invert
 
 float InvertNode::Value01()

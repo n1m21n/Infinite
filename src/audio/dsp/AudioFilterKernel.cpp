@@ -44,4 +44,11 @@ void AudioFilterKernel::PushParams(const AudioEffectNode& node, double sampleRat
          mMailbox.Push(s * kCoeffsPerStage + c, coeffs[s][c]);
 
    mMailbox.Push(kOutputGainSlot, node.Param("outputGainDb"));
+
+   // Raw freq/Q/gain, for ProcessBlock's per-sample recompute when the env
+   // knob is driving the cutoff - see the class comment on kFreqSlot.
+   mMailbox.Push(kFreqSlot, freq);
+   mMailbox.Push(kQSlot, q);
+   mMailbox.Push(kGainSlot, gainDb);
+   mMailbox.Push(kEnvAmountSlot, node.Param("envAmount"));
 }

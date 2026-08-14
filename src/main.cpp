@@ -26,6 +26,8 @@
 #include <sys/stat.h>
 #include <functional>
 #include <chrono>
+#include <cstdint>
+#include <fstream>
 #include <map>
 #include <unordered_map>
 #include <set>
@@ -93,6 +95,8 @@
 #include "nodes/WavetableNode.h"
 #include "audio/Wavetable.h"
 #include "nodes/NoteNodes.h"
+#include "nodes/SamplerNode.h"
+#include "audio/SampleScanner.h"
 
 #include "audio/AudioEngine.h"
 #include "audio/AudioNode.h"
@@ -234,6 +238,12 @@ namespace
       // string) stays "Dynamics" so existing patches keep loading.
       if (name == "Dynamics")
          return "compressor";
+      // Registered type key stays "Sampler" (patches/undo/copy-paste key off
+      // it), but it grew a record input, an interactive draggable loop
+      // range, and reverse/ping-pong - "sample player" reads as what it now
+      // is rather than as a bare one-shot playback node.
+      if (name == "Sampler")
+         return "sample player";
       std::string out = name;
       std::transform(out.begin(), out.end(), out.begin(),
                      [](unsigned char c) { return (char)std::tolower(c); });
@@ -313,6 +323,31 @@ namespace
    bool gPaletteTestOk = false;    // dev test only
    bool gPaletteTestPending = false;
    ImVec2 gSpawnPos(0.0f, 0.0f);
+
+   // Manual drag-and-drop for the Samples search panel: the panel is a
+   // plain ImGui child window, but the node canvas it drops onto is managed
+   // internally by imgui_node_editor (ed::), which has no public "accept a
+   // dropped item anywhere on empty canvas" API the way a normal ImGui
+   // window does. Tracking the drag by hand and resolving the drop with
+   // ed::GetHoveredNode()/ScreenToCanvas - the same primitives the existing
+   // "double-click empty canvas" search popup already uses - avoids fighting
+   // ed::'s own item/hover system with an invisible full-canvas button.
+   bool gSampleDragActive = false;
+   std::string gSampleDragPath;
+   std::string gSampleDragName;
+   SampleScanner gSampleScanner;
+   int gSearchPanelMode = 0; // 0 = Modules, 1 = Samples
+   // INFINITE_SAMPLERDRAGTEST only: the Samples panel's result row screen
+   // rect, captured live each frame it's drawn so the synthetic drag driver
+   // can aim at the real widget rather than a guessed position.
+   ImVec4 gSamplerDragTestRowRect(-1.0f, -1.0f, -1.0f, -1.0f);
+   // INFINITE_SAMPLERDRAGTEST only: the target Sampler's screen-space
+   // centre, recomputed once per frame from ed::GetNodePosition/GetNodeSize
+   // *after* ed::End() (those calls need a live editor context - calling
+   // them from the pre-ed::Begin() input driver, like the row rect above
+   // is read from, segfaults on a null current-editor pointer).
+   ImVec2 gSamplerDragTestTargetScreen(-1.0f, -1.0f);
+   bool gSamplerDragTestTargetValid = false;
 
    // Set when a cable drag is released on empty canvas (link-drag search):
    // the output pin the drag started from, and the node types the search
@@ -441,7 +476,14 @@ namespace
    // the canvas (inside ed::Suspend) as a normal, scrollable ImGui popup.
    struct DropdownRequest
    {
-      const std::vector<std::string>* options = nullptr;
+      // Stored BY VALUE, not as a pointer to the caller's vector: several call
+      // sites pass an inline temporary (e.g. `{ "Free", "Synced" }`), which is
+      // destroyed at the end of that statement. The popup itself doesn't
+      // render until later - ImGui::OpenPopup here just flags it, and
+      // BeginPopup happens further down this same frame - so a stored pointer
+      // would already be dangling by then. This was the Stutter "Synced"
+      // crash: its sync dropdown is exactly such a temporary.
+      std::vector<std::string> options;
       std::function<void(int)> onSelect;
       int current = 0;
       bool justOpened = false;
@@ -528,7 +570,7 @@ namespace
       std::string caption = options[safeCurrent] + "##" + label;
       if (ImGui::Button(caption.c_str(), ImVec2(width, 0)))
       {
-         gDropdown.options = &options;
+         gDropdown.options = options;
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
@@ -1959,6 +2001,7 @@ namespace
       REGISTER_NODE(RangeToRangeNode, Range to Range, "Modulators");
       REGISTER_NODE(SmoothNode, Smoothing, "Modulators");
       REGISTER_NODE(InvertNode, Invert, "Modulators");
+      REGISTER_NODE(ModDepthNode, Mod Depth, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Modulators");
       REGISTER_NODE(MacroXYNode, Macro XY, "Modulators");
       REGISTER_NODE(MidiCCNode, MIDI CC, "Modulators");
@@ -1977,7 +2020,9 @@ namespace
       // one word for exactly that reason, and a space in a new one corrupts
       // the save format (confirmed: it silently ate the type name on load).
       REGISTER_NODE(WavetableNode, Wavetable, "Synths");
+      REGISTER_NODE(SamplerNode, Sampler, "Synths");
       REGISTER_NODE(GainNode, Gain, "AudioUtility");
+      REGISTER_NODE(AudioInputNode, Audio In, "AudioUtility");
       REGISTER_NODE(AudioOutputNode, Audio Out, "AudioUtility");
       // P2.8 routing nodes - the system's only summing/fan-out points, see
       // docs/plans/audio/audio-graph-semantics.md §1/§2.
@@ -1990,6 +2035,16 @@ namespace
       REGISTER_NODE(MidiNotesNode, MIDI Notes, "Notes");
       REGISTER_NODE(NoteFilterNode, Note Filter, "Notes");
       REGISTER_NODE(NoteModifyNode, Note Modify, "Notes");
+      // Note Modify's controls, split one-per-node - see the class comments
+      // on their declarations in NoteNodes.h.
+      REGISTER_NODE(NoteTransposeNode, Note Transpose, "Notes");
+      REGISTER_NODE(PitchBendNode, Pitch Bend, "Notes");
+      REGISTER_NODE(VelocityCurveNode, Velocity Curve, "Notes");
+      REGISTER_NODE(GateNode, Gate, "Notes");
+      REGISTER_NODE(HumanizerNode, Humanizer, "Notes");
+      REGISTER_NODE(QuantizerNode, Quantizer, "Notes");
+      REGISTER_NODE(GlideNode, Glide, "Notes");
+      REGISTER_NODE(VibratoNode, Vibrato, "Modulators");
       REGISTER_NODE(NoteEchoNode, Note Echo, "Notes");
       REGISTER_NODE(NoteRouterNode, Note Router, "Notes");
       REGISTER_NODE(ArpeggiatorNode, Arpeggiator, "Notes");
@@ -2000,6 +2055,7 @@ namespace
       REGISTER_NODE(BouncingBallsNode, Bouncing Balls, "Notes");
       REGISTER_NODE(ScaleNotesNode, Scale Notes, "Notes");
       REGISTER_NODE(EnvelopeNode, Envelope, "Modulators");
+      REGISTER_NODE(NoteToCVNode, Note to CV, "Modulators");
 
       // P3c effects - one AudioEffectNode class serves every EffectDef table
       // entry, the same pattern the filter-table loop above uses for
@@ -2809,6 +2865,8 @@ namespace
          model->ReloadFromPath();
       if (auto* audio = dynamic_cast<AudioFileNode*>(node))
          audio->ReloadFromPath();
+      if (auto* sampler = dynamic_cast<SamplerNode*>(node))
+         sampler->ReloadFromPath();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
          video->ReloadFromPath();
       if (auto* palette = dynamic_cast<PaletteNode*>(node))
@@ -3131,6 +3189,15 @@ namespace
          ImGui::TextDisabled("in: patched");
       ModSlider("low", &n->low, -4.0f, 4.0f);
       ModSlider("high", &n->high, -4.0f, 4.0f);
+   }
+
+   void DrawModDepthParams(ModDepthNode* n)
+   {
+      if (n->input == nullptr)
+         ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("in: patched");
+      ModSlider("depth", &n->depth, -1.0f, 1.0f);
    }
 
    void DrawNoiseParams(NoiseNode* n)
@@ -4332,7 +4399,7 @@ namespace
          const std::string caption = options[safe] + "##" + label;
          if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)))
          {
-            gDropdown.options = &options;
+            gDropdown.options = options;
             gDropdown.onSelect = std::move(onSelect);
             gDropdown.current = safe;
             gDropdown.justOpened = true;
@@ -4365,7 +4432,7 @@ namespace
             const std::string caption = options[safe] + "##" + dropId;
             if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)))
             {
-               gDropdown.options = &options;
+               gDropdown.options = options;
                gDropdown.onSelect = std::move(onSelect);
                gDropdown.current = safe;
                gDropdown.justOpened = true;
@@ -4404,6 +4471,35 @@ namespace
       return ModSliderInt(label, v, lo, hi, width, /*audioStyle=*/true);
    }
 
+   // A small pill toggle for boolean mods (loop/reverse/ping-pong) - not
+   // ImGui::Checkbox, whose frame draws in the theme's FrameBg, and not a
+   // plain ImGui::Button either. Pixel-sampling the render showed *both*
+   // are only a handful of RGB values different from the node body
+   // background (theme default, ~45,50,62 vs ~48,50,67) - visible on a wide
+   // 90px "Load..." button by sheer surface area, imperceptible on a
+   // narrow ~40px "loop" pill. Rather than lean on that subtle theme
+   // contrast at all, this picks explicit, clearly-different fill colours
+   // and adds a real border stroke - a guaranteed-visible backstop the way
+   // the waveform box and slider fields already draw their own explicit
+   // AddRect borders instead of trusting a themed background.
+   bool AudioToggleButton(const char* label, bool* value, float width = 44.0f)
+   {
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+      ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(130, 138, 160, 200));
+      ImGui::PushStyleColor(ImGuiCol_Button, *value ? IM_COL32(90, 115, 205, 255) : IM_COL32(58, 64, 82, 255));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                            *value ? IM_COL32(108, 132, 220, 255) : IM_COL32(76, 83, 104, 255));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                            *value ? IM_COL32(120, 144, 230, 255) : IM_COL32(88, 96, 118, 255));
+      const bool clicked = ImGui::Button(label, ImVec2(width, 0));
+      ImGui::PopStyleColor(3);
+      ImGui::PopStyleColor();
+      ImGui::PopStyleVar();
+      if (clicked)
+         *value = !*value;
+      return clicked;
+   }
+
    // ---- audio node body (docs/plans/audio/audio-node-ui-system.md) -------
    // Whether `node` should draw through DrawAudioNodeBody rather than the
    // generic DrawPreview/DrawXxxParams path every visual node uses - mirrors
@@ -4417,8 +4513,15 @@ namespace
       // P3a's note nodes. A node whose only input is a note pin would
       // otherwise fall through to DrawPreview and try to show a blank
       // GetOutputTexture()==0 image.
+      // VibratoNode is the one pin-less exception: a free-running modulator
+      // (like LFONode) with no note/audio pin at all, drawn through this
+      // same v3 body so it looks like the rest of the one-knob Note Modify
+      // family it ships alongside rather than dropping to the older
+      // DrawXParams path every other pin-less modulator (LFO, Constant,
+      // Random, ...) still uses.
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
-             dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr;
+             dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
+             dynamic_cast<VibratoNode*>(node) != nullptr;
    }
 
    // Drains WavetableNode's MeterRing into a small cache on the node itself
@@ -4475,6 +4578,105 @@ namespace
 
       dl->PopClipRect();
       dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   // Sampler's waveform + playhead: a static min/max envelope (the sample
+   // data never changes during playback, so there's nothing to redecimate
+   // per frame - unlike DrawWavetableScope's live trace) with a moving
+   // playhead line drawn on top from SamplerNode::Playhead().
+   // Interactive: clicking anywhere on the body auditions the sample from
+   // that point (SamplerNode::TriggerPreview, independent of any note
+   // cable), and the two edge handles drag the loop range (start/end)
+   // directly on the picture rather than through separate numeric fields -
+   // "where does this loop start/end" is a question the waveform answers
+   // immediately and a 0..1 fraction doesn't.
+   void DrawSamplerWaveform(SamplerNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool hasSample = n->waveformCacheCount > 0;
+
+      // Body click-catcher first, so it owns hover/active by default; the
+      // handle grab-zones are added afterwards at the same screen position
+      // and win the hit test over it wherever they overlap (ImGui resolves
+      // overlapping items in submission order - last drawn wins).
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##samplerwavebody", ImVec2(w, h));
+      if (hasSample && ImGui::IsItemActivated())
+      {
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         n->TriggerPreview(frac);
+      }
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+
+      if (hasSample)
+      {
+         const int count = n->waveformCacheCount;
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - n->waveformMax[i] * h * 0.45f;
+            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom), IM_COL32(150, 214, 255, 200));
+         }
+
+         // Dim whatever the start/end range excludes, so the active loop
+         // region reads at a glance rather than needing the two handles
+         // read numerically against each other.
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         if (startX > origin.x)
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), IM_COL32(0, 0, 0, 130));
+         if (endX < br.x)
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, IM_COL32(0, 0, 0, 130));
+
+         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
+         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), IM_COL32(255, 200, 90, 230), 2.0f);
+
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y), IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y), IM_COL32(220, 120, 150, 235), 2.0f);
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(120, 128, 150, 255), "no sample loaded");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+
+      if (hasSample)
+      {
+         // Narrow grab-zones centred on each marker, drawn (and therefore
+         // hit-tested) after the body button above.
+         const float handleW = 10.0f;
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+
+         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
+         ImGui::InvisibleButton("##samplerstarthandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
+
+         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
+         ImGui::InvisibleButton("##samplerendhandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
+      }
+
+      ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -4799,7 +5001,7 @@ namespace
       const std::string caption = options[safe] + "##" + id;
       if (ImGui::Button(caption.c_str(), ImVec2(width, 0)))
       {
-         gDropdown.options = &options;
+         gDropdown.options = options;
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safe;
          gDropdown.justOpened = true;
@@ -5096,6 +5298,233 @@ namespace
       // through whatever sits above the row.
       AudioKnobRow row(1, faderH);
       row.Fader("gain", &n->gainDb, -60.0f, 12.0f, "%.1f dB", faderH);
+      row.End();
+      EndAudioBody();
+   }
+
+   // A sample player: load a file, record from the audio input pin, scrub/
+   // audition by clicking the waveform, drag its two edge handles to trim
+   // the playback/loop range, and play back one-shot or looping (forward,
+   // reversed, or ping-ponging) with independent pitch/finetune/speed/
+   // volume. Also the drop target when a sample is dragged onto this node's
+   // body from the Samples search panel (see gSampleDragActive) - same
+   // LoadFile() either way.
+   //
+   // Sliders rather than knobs (per reference: Amigo/Bespoke-style sample
+   // players read as one flat control strip, not a cluster of dials), and a
+   // waveform tall enough to actually judge a transient against - a sampler
+   // lives or dies on "where does this sample start", and a 64px strip was
+   // too short to place that by eye.
+   void DrawSamplerBody(GraphNode& gn, SamplerNode* n)
+   {
+      char stat[160];
+      if (!n->FileName().empty())
+         snprintf(stat, sizeof(stat), "%s  -  %s", n->FileName().c_str(), n->Status().c_str());
+      else
+         snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      if (ImGui::Button("Load...", ImVec2(90, 0)))
+      {
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            n->LoadFile(path);
+         }
+      }
+      // Dropping a sample from the Samples search panel directly onto this
+      // node's body is handled at the canvas level (see gSampleDragActive),
+      // not through ImGui's native drag-drop payload API - the drag source
+      // is a manually-tracked mouse drag, not a BeginDragDropSource/
+      // SetDragDropPayload pair, since the drop target here is really
+      // "whichever node the drop lands on", resolved once in one place
+      // rather than duplicated as a per-node-type accept.
+      ImGui::SameLine();
+      const bool recording = n->IsRecording();
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
+      {
+         PushUndoCheckpoint();
+         if (recording)
+            n->StopRecording();
+         else
+            n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+
+      // loop/reverse/ping-pong right-aligned on the same row, so the top of
+      // the body reads as one bar rather than stacked controls fighting for
+      // the same strip of height. Pill toggles (AudioToggleButton), not
+      // checkboxes - see its comment for why.
+      //
+      // Anchored off gAudioContentX/gAudioContentW (the node's fixed
+      // declared width from BeginAudioBody), not GetContentRegionAvail() -
+      // avail tracks the node's *live* current width, which sits flush
+      // against imgui-node-editor's own resize-drag hit-zone at the node's
+      // right edge. A row right-justified against that live edge overlaps
+      // that hit-zone, so a drag starting on/near these buttons got read as
+      // a node-resize instead of a click, and the row (laid out from the
+      // stale pre-resize width) visibly lagged behind it. Every other
+      // control in this file already anchors off the fixed content width
+      // for exactly this reason.
+      ImGui::SameLine();
+      const float toggleW = 44.0f;
+      const float modsW = toggleW * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+      const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
+      ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - modsW, rowScreenPos.y));
+      bool loopBool = n->loop;
+      if (AudioToggleButton("loop##samplerLoop", &loopBool))
+      {
+         PushUndoCheckpoint();
+         n->loop = loopBool;
+      }
+      ImGui::SameLine();
+      bool reverseBool = n->reverse;
+      if (AudioToggleButton("rev##samplerReverse", &reverseBool))
+      {
+         PushUndoCheckpoint();
+         n->reverse = reverseBool;
+      }
+      ImGui::SameLine();
+      bool pingpongBool = n->pingpong;
+      if (AudioToggleButton("p-p##samplerPingpong", &pingpongBool))
+      {
+         PushUndoCheckpoint();
+         n->pingpong = pingpongBool;
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      DrawSamplerWaveform(n, 140.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      // finetune/pitch and speed/volume pair up at half-width each, the
+      // same two-per-row rhythm every other slider body in this file uses.
+      // start/end are set on the picture above, not duplicated as sliders.
+      AudioSlider("finetune", &n->finetune, -50.0f, 50.0f, "%.0f c", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      AudioSlider("speed", &n->speed, -2.0f, 2.0f, "%.2fx", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+
+      EndAudioBody();
+   }
+
+   // The Samples mode of the docked node-browser panel (docs/plans/audio/
+   // README.md P3e): folder list management, a background-thread scan
+   // (SampleScanner), filter-as-you-type over the persisted index, and a
+   // drag source per result row that gSampleDragActive (above) resolves on
+   // release into either a new Sampler node or an existing one's file.
+   void DrawSamplesSearchPanel()
+   {
+      gSampleScanner.PollResults();
+
+      if (ImGui::Button("Add folder...", ImVec2(-1.0f, 0)))
+      {
+         const std::string path = Platform::OpenFolderDialog();
+         if (!path.empty())
+            gSampleScanner.AddFolder(path);
+      }
+
+      // Folders list, each with its own remove button. Kept short (no
+      // scroll region of its own) since a handful of library folders is the
+      // expected case - the result list below is where scrolling matters.
+      std::string folderToRemove;
+      const float panelW = ImGui::GetContentRegionAvail().x;
+      for (const std::string& folder : gSampleScanner.Folders())
+      {
+         ImGui::PushID(folder.c_str());
+         const float removeW = ImGui::GetFrameHeight();
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + panelW - removeW - 10.0f);
+         ImGui::TextDisabled("%s", folder.c_str());
+         ImGui::PopTextWrapPos();
+         ImGui::SameLine(panelW - removeW);
+         if (ImGui::Button("x", ImVec2(removeW, 0)))
+            folderToRemove = folder;
+         ImGui::PopID();
+      }
+      if (!folderToRemove.empty())
+         gSampleScanner.RemoveFolder(folderToRemove);
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      {
+         const bool scanning = gSampleScanner.IsScanning();
+         if (scanning)
+            ImGui::BeginDisabled();
+         if (ImGui::Button("Refresh", ImVec2(-1.0f, 0)))
+            gSampleScanner.StartScan();
+         if (scanning)
+            ImGui::EndDisabled();
+         if (scanning)
+            ImGui::TextDisabled("scanning... (%d found)", gSampleScanner.FilesFoundSoFar());
+      }
+
+      ImGui::Separator();
+
+      static char sampleSearch[128] = "";
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint("##samplesearch", "search samples...", sampleSearch, sizeof(sampleSearch));
+
+      std::string q = sampleSearch;
+      std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+
+      ImGui::BeginChild("##samplepanellist", ImVec2(0, 0), false);
+      for (const SampleScanner::Entry& entry : gSampleScanner.Index())
+      {
+         if (!q.empty())
+         {
+            std::string hay = entry.fileName;
+            std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+            if (hay.find(q) == std::string::npos)
+               continue;
+         }
+
+         ImGui::Selectable(entry.fileName.c_str());
+         if (getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
+         {
+            const ImVec2 mn = ImGui::GetItemRectMin();
+            const ImVec2 mx = ImGui::GetItemRectMax();
+            gSamplerDragTestRowRect = ImVec4(mn.x, mn.y, mx.x, mx.y);
+         }
+         // A drag starts once the mouse has moved a few pixels past the
+         // click - matching ImGui's own drag threshold - rather than on the
+         // first frame the button goes active, so a plain click still just
+         // clicks (Selectable has no useful action of its own here today,
+         // but a click-drag distinction matters the moment one is added).
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
+         {
+            gSampleDragActive = true;
+            gSampleDragPath = entry.path;
+            gSampleDragName = entry.fileName;
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", entry.path.c_str());
+      }
+      ImGui::EndChild();
+   }
+
+   // Mirror image of Audio Out's body (a terminal with no controls at all) -
+   // Audio In has exactly one control, a trim fader, drawn the same way
+   // Gain's is. The stat line reports whether the mic tap is actually live
+   // (Platform::AudioInputCaptureIsRunning), since silence could otherwise
+   // mean either "nothing arriving" or "not listening yet".
+   void DrawAudioInBody(GraphNode& gn, AudioInputNode* n)
+   {
+      char stat[48];
+      snprintf(stat, sizeof(stat), "%+.1f dB   %s",
+               n->gainDb, Platform::AudioInputCaptureIsRunning() ? "mic in - live" : "mic in - idle");
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      const float faderH = 132.0f;
+      const float stripTop = ImGui::GetCursorScreenPos().y;
+      DrawStripMeter(gAudioContentX + gAudioContentW * 0.5f + 26.0f, stripTop + 6.0f, 10.0f, faderH - 12.0f,
+                     n->Level());
+      AudioKnobRow row(1, faderH);
+      row.Fader("trim", &n->gainDb, -24.0f, 24.0f, "%.1f dB", faderH);
       row.End();
       EndAudioBody();
    }
@@ -5429,6 +5858,23 @@ namespace
             PushUndoCheckpoint();
             *rateBeats = kRateDivisionBeats[std::clamp(i, 0, 5)];
          });
+         // The rate knob isn't drawn in Synced mode, but it still must consume
+         // a paramIndex ordinal (see ModKnob's comment on gParamCounter):
+         // ordinals are assigned by draw order, so skipping this one would
+         // shift every later knob (e.g. "gate") down into it, silently
+         // repointing any cable that's patched into rate onto gate. Registering
+         // the param without drawing it keeps the ordinal reserved and the
+         // link alive-but-invisible - same trick as a collapsed node's hidden
+         // knobs (CollapsedBindingPins) - so it comes right back once the user
+         // flips back to Free instead of jumping to a different parameter.
+         ParamRef rateSlot;
+         rateSlot.nodeIndex = gCurrentNodeIndex;
+         rateSlot.paramIndex = gParamCounter++;
+         rateSlot.value = rateSeconds;
+         rateSlot.minValue = 0.02f;
+         rateSlot.maxValue = 2.0f;
+         rateSlot.name = "rate";
+         Modulation::Instance().RegisterParam(rateSlot);
       }
       else
       {
@@ -5469,6 +5915,146 @@ namespace
          row.End();
       }
 
+      EndAudioBody();
+   }
+
+   // Standard shape for a one-knob note node (Note Transpose, Pitch Bend,
+   // Gate, Glide, Vibrato below) - narrow body, one big centred knob, no
+   // second row. Standardised per the request that drove splitting Note
+   // Modify apart: whatever the next one-knob node is, it should look like
+   // these rather than each inventing its own compact layout.
+   void DrawSingleKnobAudioBody(GraphNode& gn, const char* stat, const char* label, float* v, float lo, float hi,
+                                const char* fmt)
+   {
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      AudioKnobRow row(1, kKnobLarge);
+      row.Knob(label, v, lo, hi, fmt, kKnobLarge);
+      row.End();
+      EndAudioBody();
+   }
+
+   void DrawNoteTransposeBody(GraphNode& gn, NoteTransposeNode* n)
+   {
+      char stat[48];
+      snprintf(stat, sizeof(stat), "%+d st", n->semitones);
+      float semi = (float)n->semitones;
+      DrawSingleKnobAudioBody(gn, stat, "transpose", &semi, -48.0f, 48.0f, "%.0f st");
+      n->semitones = (int)lroundf(semi);
+   }
+
+   void DrawPitchBendBody(GraphNode& gn, PitchBendNode* n)
+   {
+      char stat[48];
+      snprintf(stat, sizeof(stat), "%+d st", n->semitones);
+      float semi = (float)n->semitones;
+      DrawSingleKnobAudioBody(gn, stat, "pitch", &semi, -24.0f, 24.0f, "%.0f st");
+      n->semitones = (int)lroundf(semi);
+   }
+
+   void DrawGateBody(GraphNode& gn, GateNode* n)
+   {
+      char stat[48];
+      snprintf(stat, sizeof(stat), "%s", n->holdMs > 0.0f ? "gated" : "off (passthrough)");
+      DrawSingleKnobAudioBody(gn, stat, "hold", &n->holdMs, 0.0f, 3000.0f, "%.0f ms");
+   }
+
+   void DrawGlideBody(GraphNode& gn, GlideNode* n)
+   {
+      char stat[48];
+      snprintf(stat, sizeof(stat), "%s", n->glideMs > 0.0f ? "gliding" : "off");
+      DrawSingleKnobAudioBody(gn, stat, "glide", &n->glideMs, 0.0f, 2000.0f, "%.0f ms");
+   }
+
+   void DrawVibratoBody(GraphNode& gn, VibratoNode* n)
+   {
+      char stat[48];
+      snprintf(stat, sizeof(stat), "%.1f Hz", n->rateHz);
+      DrawSingleKnobAudioBody(gn, stat, "rate", &n->rateHz, 0.5f, 12.0f, "%.1f Hz");
+   }
+
+   // Velocity Curve's chart: y = x^curve over 0..1, both axes normalized -
+   // the same "show the transfer function" idea as Audio Filter's response
+   // curve or Dynamics' operating-point dot, scaled to this node's narrow
+   // body. Read-only (the curve is fully determined by the one knob below
+   // it), but redrawn from the live curve value every frame like every
+   // other params-only visualizer in this file.
+   void DrawVelocityCurveChart(float curve)
+   {
+      const float w = gAudioBodyW;
+      const float h = w; // square, like Bouncing Balls' canvas
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      for (int i = 1; i < 4; i++)
+      {
+         dl->AddLine(ImVec2(origin.x, origin.y + h * i / 4.0f), ImVec2(br.x, origin.y + h * i / 4.0f),
+                     IM_COL32(255, 255, 255, 10), 1.0f);
+         dl->AddLine(ImVec2(origin.x + w * i / 4.0f, origin.y), ImVec2(origin.x + w * i / 4.0f, br.y),
+                     IM_COL32(255, 255, 255, 10), 1.0f);
+      }
+      // The linear reference (curve == 1) as a dim diagonal, so the knob's
+      // effect reads relative to "unchanged" rather than in isolation.
+      dl->AddLine(ImVec2(origin.x, br.y), ImVec2(br.x, origin.y), IM_COL32(255, 255, 255, 30), 1.0f);
+
+      dl->PathClear();
+      const int kSteps = 32;
+      for (int i = 0; i <= kSteps; i++)
+      {
+         const float x = (float)i / (float)kSteps;
+         const float y = std::pow(x, curve);
+         dl->PathLineTo(ImVec2(origin.x + x * w, br.y - y * h));
+      }
+      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawVelocityCurveBody(GraphNode& gn, VelocityCurveNode* n)
+   {
+      char stat[64];
+      snprintf(stat, sizeof(stat), "in %.0f%% -> out %.0f%%", n->LastVelocityIn() * 100.0f,
+               n->LastVelocityOut() * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      DrawVelocityCurveChart(n->curve);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      AudioKnobRow row(1, kKnobLarge);
+      row.Knob("curve", &n->curve, 0.25f, 4.0f, "%.2f", kKnobLarge);
+      row.End();
+      EndAudioBody();
+   }
+
+   void DrawHumanizerBody(GraphNode& gn, HumanizerNode* n)
+   {
+      char stat[64];
+      snprintf(stat, sizeof(stat), "%.0f ms, %.0f%% vel", n->timingMs, n->velocityPct);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      AudioKnobRow row(2, kKnobLarge);
+      row.Knob("hu.time", &n->timingMs, 0.0f, 100.0f, "%.0f ms", kKnobLarge);
+      row.Knob("hu.vel", &n->velocityPct, 0.0f, 100.0f, "%.0f%%", kKnobLarge);
+      row.End();
+      EndAudioBody();
+   }
+
+   void DrawQuantizerBody(GraphNode& gn, QuantizerNode* n)
+   {
+      char stat[48];
+      snprintf(stat, sizeof(stat), "%s", kQuantizeLabels[std::clamp(n->div, 0, 4)].c_str());
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      AudioKnobRow row(1, kKnobLarge);
+      row.Dropdown("quantize", kQuantizeLabels, n->div, [n](int i) {
+         PushUndoCheckpoint();
+         n->div = i;
+      });
+      row.End();
       EndAudioBody();
    }
 
@@ -5528,6 +6114,55 @@ namespace
       EndAudioBody();
    }
 
+   // A small static shape per arp mode - the same glance-read Ableton's own
+   // arp mode icons give: a rising staircase for Up, a peak for Up/Down, an
+   // hourglass-ish converge/diverge shape, and so on. Purely decorative and
+   // computed straight from `mode`, so (like DrawADSRVisualizer) it can
+   // redraw every frame for free - no audio-thread data involved.
+   void DrawArpModeVisualizer(int mode)
+   {
+      // 8 x-positions; y in 0 (bottom) .. 1 (top) - one canonical shape per
+      // mode, not a literal note trace (the real note order depends on how
+      // many keys are held and octaves), just enough to read the pattern.
+      static const float kShapes[8][8] = {
+         { 0.00f, 0.14f, 0.29f, 0.43f, 0.57f, 0.71f, 0.86f, 1.00f }, // Up
+         { 1.00f, 0.86f, 0.71f, 0.57f, 0.43f, 0.29f, 0.14f, 0.00f }, // Down
+         { 0.00f, 0.33f, 0.66f, 1.00f, 0.66f, 0.33f, 0.00f, 0.33f }, // Up/Down
+         { 1.00f, 0.66f, 0.33f, 0.00f, 0.33f, 0.66f, 1.00f, 0.66f }, // Down/Up
+         { 0.00f, 1.00f, 0.14f, 0.86f, 0.29f, 0.71f, 0.43f, 0.57f }, // Converge
+         { 0.43f, 0.57f, 0.29f, 0.71f, 0.14f, 0.86f, 0.00f, 1.00f }, // Diverge
+         { 0.50f, 0.10f, 0.80f, 0.30f, 0.65f, 0.05f, 0.95f, 0.40f }, // Random
+         { 0.20f, 0.60f, 0.40f, 0.90f, 0.10f, 0.70f, 0.30f, 0.50f }, // As Played
+      };
+      const int safe = std::clamp(mode, 0, 7);
+
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH; // standard visualizer height, matches every other node's viz
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float pad = 8.0f;
+      const float innerH = h - pad * 2.0f;
+      const float stepW = (w - pad * 2.0f) / 7.0f;
+      ImVec2 pts[8];
+      for (int i = 0; i < 8; i++)
+         pts[i] = ImVec2(origin.x + pad + stepW * (float)i, br.y - pad - kShapes[safe][i] * innerH);
+
+      dl->PathClear();
+      for (const ImVec2& p : pts)
+         dl->PathLineTo(p);
+      dl->PathStroke(IM_COL32(150, 214, 255, 200), 0, 1.6f);
+      for (const ImVec2& p : pts)
+         dl->AddCircleFilled(p, 2.5f, IM_COL32(200, 232, 255, 255), 8);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
    void DrawArpeggiatorBody(GraphNode& gn, ArpeggiatorNode* n)
    {
       static const std::vector<std::string> kModes = { "Up", "Down", "Up/Down", "Down/Up", "Converge",
@@ -5540,6 +6175,9 @@ namespace
          snprintf(stat, sizeof(stat), "%s%d", NoteNameList()[cur % 12].c_str(), cur / 12 - 1);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      DrawArpModeVisualizer(n->mode);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       {
          AudioKnobRow row(2);
@@ -5787,6 +6425,14 @@ namespace
       const ImU32 outlineCol = IM_COL32(150, 165, 190, 255);
       const float outlineThickness = 5.0f;
       const float b = BouncingBallsNode::kBound;
+      // Triangle-only: the physics sim's vertices (kVx/kVy in
+      // AudioBouncingBallsNode) are centroid-centred, so a ball's raw
+      // (x, y) is in that same centroid-centred frame. The drawn outline
+      // below is shifted down by bboxCenterY to look bbox-centred instead -
+      // applying that same shift to ball positions keeps the drawn boundary
+      // and the physics boundary the same triangle, so balls stop bouncing
+      // off empty space above the outline / clipping past it below.
+      const float triBboxCenterY = (b + -0.5f * b) * 0.5f;
       if (n->shape == BouncingBallsNode::kSquare)
       {
          dl->AddRect(ToScreen(-b, b), ToScreen(b, -b), outlineCol, 2.0f, 0, outlineThickness);
@@ -5797,10 +6443,9 @@ namespace
          // equilateral triangle's mass sits high in its own bbox), which
          // reads as off-centre even though it's centred on centroid - shift
          // down by the bbox/centroid gap so it visually centers instead.
-         const float bboxCenterY = (b + -0.5f * b) * 0.5f;
-         const ImVec2 p0 = ToScreen(0.0f, b - bboxCenterY);
-         const ImVec2 p1 = ToScreen(-0.8660254f * b, -0.5f * b - bboxCenterY);
-         const ImVec2 p2 = ToScreen(0.8660254f * b, -0.5f * b - bboxCenterY);
+         const ImVec2 p0 = ToScreen(0.0f, b - triBboxCenterY);
+         const ImVec2 p1 = ToScreen(-0.8660254f * b, -0.5f * b - triBboxCenterY);
+         const ImVec2 p2 = ToScreen(0.8660254f * b, -0.5f * b - triBboxCenterY);
          dl->AddTriangle(p0, p1, p2, outlineCol, outlineThickness);
       }
       else
@@ -5810,9 +6455,10 @@ namespace
 
       float bx[BouncingBallsNode::kMaxBalls], by[BouncingBallsNode::kMaxBalls], bf[BouncingBallsNode::kMaxBalls];
       const int count = n->BallPositions(bx, by, bf);
+      const float ballShiftY = (n->shape == BouncingBallsNode::kTriangle) ? triBboxCenterY : 0.0f;
       for (int i = 0; i < count; i++)
       {
-         const ImVec2 p = ToScreen(bx[i], by[i]);
+         const ImVec2 p = ToScreen(bx[i], by[i] - ballShiftY);
          // Flash bright orange for a moment right after a wall hit, settling
          // back to the resting blue as the flash decays.
          const float flash = std::clamp(bf[i], 0.0f, 1.0f);
@@ -5866,7 +6512,7 @@ namespace
          snprintf(stat, sizeof(stat), "last: %s%d", NoteNameList()[n->LastNoteOut() % 12].c_str(),
                   n->LastNoteOut() / 12 - 1);
 
-      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
       {
          AudioKnobRow row(2);
@@ -5880,72 +6526,70 @@ namespace
       EndAudioBody();
    }
 
-   // Envelope's visualizer is the one case audio-node-ui-system.md §3 calls
-   // out as computed purely from param values, no audio-thread data needed -
-   // a static ADSR shape, redrawn every frame since redrawing it costs
-   // nothing (a handful of AddLine calls, not a decimated audio trace).
-   void DrawADSRVisualizer(EnvelopeNode* n)
-   {
-      const float w = gAudioBodyW;
-      const float h = 60.0f;
-      const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const ImVec2 br(origin.x + w, origin.y + h);
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
-      dl->PushClipRect(origin, br, true);
-      for (int i = 1; i < 4; i++)
-         dl->AddLine(ImVec2(origin.x, origin.y + h * i / 4.0f), ImVec2(br.x, origin.y + h * i / 4.0f),
-                     IM_COL32(255, 255, 255, 10), 1.0f);
-
-      const float kSustainVisualMs = 80.0f; // sustain has no duration of its own - a fixed-width hold segment for the shape to read as ADSR, not just AD+R
-      const float total = std::max(1.0f, n->attackMs + n->decayMs + kSustainVisualMs + n->releaseMs);
-      const float aw = w * (n->attackMs / total);
-      const float dw = w * (n->decayMs / total);
-      const float sw = w * (kSustainVisualMs / total);
-      const float rw = w * (n->releaseMs / total);
-      const float baseY = origin.y + h - 3.0f;
-      const float topY = origin.y + 3.0f;
-      const float susY = origin.y + 3.0f + (1.0f - n->sustainLevel) * (h - 6.0f);
-
-      // Filled under the curve, then stroked over it - the shape reads as an
-      // envelope at a glance rather than as four disconnected line segments.
-      float cx = origin.x;
-      const ImVec2 pts[5] = { ImVec2(cx, baseY),
-                              ImVec2(cx + aw, topY),
-                              ImVec2(cx + aw + dw, susY),
-                              ImVec2(cx + aw + dw + sw, susY),
-                              ImVec2(cx + aw + dw + sw + rw, baseY) };
-      dl->PathClear();
-      for (const ImVec2& pt : pts)
-         dl->PathLineTo(pt);
-      dl->PathLineTo(ImVec2(pts[4].x, baseY));
-      dl->PathFillConvex(IM_COL32(120, 200, 255, 34));
-      dl->PathClear();
-      for (const ImVec2& pt : pts)
-         dl->PathLineTo(pt);
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
-      for (const ImVec2& pt : pts)
-         dl->AddCircleFilled(pt, 2.5f, IM_COL32(200, 232, 255, 255), 10);
-
-      dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
-      ImGui::Dummy(ImVec2(w, h));
-   }
-
    void DrawEnvelopeBody(GraphNode& gn, EnvelopeNode* n)
    {
-      char stat[48];
-      snprintf(stat, sizeof(stat), "level %.2f", n->Value01());
+      char stat[64];
+      if (n->trigger == EnvelopeNode::kTriggerPulse)
+         snprintf(stat, sizeof(stat), "%s pulse - level %.2f",
+                  MusicTime::RateDivisionName(n->rateDiv), n->Value01());
+      else
+         snprintf(stat, sizeof(stat), "level %.2f", n->Value01());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-      DrawADSRVisualizer(n);
+      // Same editable-ADSR panel the wavetable engines use (DrawEditableADSR /
+      // DrawEnvelopePanel) rather than a bespoke read-only shape - one
+      // envelope-editing look across the app instead of two that behave
+      // differently. No `amount`: this node's whole output *is* the depth,
+      // there's nothing else for a depth control to scale here.
+      DrawEnvelopePanel("envelope  -  drag the handles", "##envAdsr", &n->attackMs, &n->decayMs,
+                        &n->sustainLevel, &n->releaseMs, nullptr, 0.0f, 0.0f, "%.2f",
+                        IM_COL32(150, 214, 255, 245));
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
-      // 4 params = every param this node has - no expand affordance (§7).
-      AudioKnobRow row(4);
-      row.Knob("attack", &n->attackMs, 0.0f, 4000.0f, "%.0f ms", kKnobLarge);
-      row.Knob("decay", &n->decayMs, 0.0f, 4000.0f, "%.0f ms", kKnobLarge);
-      row.Knob("sustain", &n->sustainLevel, 0.0f, 1.0f, "%.2f", kKnobLarge);
-      row.Knob("release", &n->releaseMs, 0.0f, 8000.0f, "%.0f ms", kKnobLarge);
+
+      // Trigger: "Note" (default) is driven by whatever's wired into the
+      // note input, unchanged. "Pulse" free-runs off the transport instead -
+      // no note input needed - so this node can modulate a synth param on
+      // its own clock. Rate/gate are greyed, not hidden, in Note mode: they
+      // are meaningless there, but the row must not resize when the mode
+      // changes (audio-node-ui-system.md's "never resize on mode change").
+      const bool pulseMode = n->trigger == EnvelopeNode::kTriggerPulse;
+      AudioKnobRow row2(3);
+      row2.Dropdown("trigger", { "Note", "Pulse" }, n->trigger, [n](int i) {
+         PushUndoCheckpoint();
+         n->trigger = i;
+      });
+      if (!pulseMode)
+         ImGui::BeginDisabled();
+      row2.Dropdown("rate", MusicTime::RateDivisionList(), n->rateDiv, [n](int i) {
+         PushUndoCheckpoint();
+         n->rateDiv = i;
+      });
+      row2.Knob("gate", &n->gatePct, 0.05f, 1.0f, "%.2f", kKnobSmall);
+      if (!pulseMode)
+         ImGui::EndDisabled();
+      row2.End();
+
+      EndAudioBody();
+   }
+
+   // ---- Note to CV ---------------------------------------------------
+   void DrawNoteToCVBody(GraphNode& gn, NoteToCVNode* n)
+   {
+      char stat[64];
+      const int last = n->LastNote();
+      if (last < 0)
+         snprintf(stat, sizeof(stat), "%d..%d -> 0..1", n->rangeLow, n->rangeHigh);
+      else
+         snprintf(stat, sizeof(stat), "last: %s%d -> %.2f", NoteNameList()[last % 12].c_str(), last / 12 - 1,
+                  n->Value01());
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      AudioKnobRow row(3);
+      row.KnobInt("range lo", &n->rangeLow, 0, 126);
+      row.KnobInt("range hi", &n->rangeHigh, 1, 127);
+      row.Knob("glide", &n->glideMs, 0.0f, 500.0f, "%.0f ms", kKnobLarge);
       row.End();
+
       EndAudioBody();
    }
 
@@ -6170,9 +6814,13 @@ namespace
       }
 
       BeginAudioSection("output");
-      AudioSlider("output gain", n->ParamPtr("outputGainDb"), -24.0f, 12.0f, "%.1f dB", AudioHalfWidth());
-      ImGui::SameLine();
-      AudioSlider("mix", &n->mix, 0.0f, 1.0f, "%.3f", AudioHalfWidth());
+      {
+         AudioKnobRow row(3);
+         row.Knob("output gain", n->ParamPtr("outputGainDb"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("env", n->ParamPtr("envAmount"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
       EndAudioSection();
 
       EndAudioBody();
@@ -7340,21 +7988,72 @@ namespace
    }
 
    // ---- Stutter --------------------------------------------------------
+   // One square per repeat in the cycle ("1/8 -> 8 steps"), click to mute
+   // that repeat - a gate over the beat-repeat loop, same idea as Ableton
+   // Beat Repeat's per-slice mute grid. Works at any rate/steps setting:
+   // the grid always redraws at exactly `steps` squares.
+   void DrawStutterGateGrid(AudioEffectNode* n, int steps)
+   {
+      const float w = gAudioBodyW;
+      const float h = 30.0f;
+      const float gap = 3.0f;
+      const float cellW = (w - gap * (float)(steps - 1)) / (float)steps;
+      const ImVec2 rowOrigin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const int mask = (int)(n->Param("gateMask") + 0.5f);
+
+      for (int i = 0; i < steps; i++)
+      {
+         const ImVec2 p0(rowOrigin.x + (float)i * (cellW + gap), rowOrigin.y);
+         const ImVec2 p1(p0.x + cellW, p0.y + h);
+         ImGui::PushID(i);
+         ImGui::SetCursorScreenPos(p0);
+         ImGui::InvisibleButton("step", ImVec2(cellW, h));
+         if (ImGui::IsItemClicked())
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("gateMask") = (float)(mask ^ (1 << i));
+         }
+         const bool on = (mask & (1 << i)) != 0;
+         const bool hovered = ImGui::IsItemHovered();
+         const ImU32 col = on ? IM_COL32(120, 200, 255, hovered ? 255 : 215)
+                               : IM_COL32(56, 60, 74, hovered ? 210 : 160);
+         dl->AddRectFilled(p0, p1, col, 3.0f);
+         dl->AddRect(p0, p1, IM_COL32(64, 68, 84, 255), 3.0f, 0, 1.0f);
+         ImGui::PopID();
+      }
+
+      ImGui::SetCursorScreenPos(rowOrigin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
    void DrawStutterBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool sync = n->Param("sync") != 0.0f;
+      const int steps = std::clamp((int)(n->Param("steps") + 0.5f), 2, StutterKernel::kMaxGateSteps);
 
       char stat[80];
       if (sync)
-         snprintf(stat, sizeof(stat), "%s - %.0f%% grain", MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)),
-                  n->Param("chunk") * 100.0f);
+         snprintf(stat, sizeof(stat), "%s - %d steps", MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)),
+                  steps);
       else
-         snprintf(stat, sizeof(stat), "%.0f ms - %.0f%% grain", n->Param("timeMs"), n->Param("chunk") * 100.0f);
+         snprintf(stat, sizeof(stat), "%.0f ms - %d steps", n->Param("timeMs"), steps);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
+      DrawStutterGateGrid(n, steps);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
       {
-         AudioKnobRow row(2);
+         // "sync" folded into the row itself (was a standalone checkbox
+         // line below the knobs) - one compact row instead of a row plus a
+         // line, and rate/time already live right next to the toggle that
+         // picks which of the two is showing.
+         AudioKnobRow row(3);
+         row.Dropdown("sync", { "Free", "Synced" }, sync ? 1 : 0, [n](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr("sync") = i != 0 ? 1.0f : 0.0f;
+         });
          if (sync)
          {
             row.Dropdown("rate", MusicTime::RateDivisionList(), (int)(n->Param("rateDiv") + 0.5f), [n](int i) {
@@ -7366,15 +8065,8 @@ namespace
          {
             row.Knob("time", n->ParamPtr("timeMs"), 20.0f, 2000.0f, "%.0f ms", kKnobLarge);
          }
-         row.Knob("grain", n->ParamPtr("chunk"), 0.02f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("steps", n->ParamPtr("steps"), 2.0f, (float)StutterKernel::kMaxGateSteps, "%.0f", kKnobLarge);
          row.End();
-      }
-
-      bool syncBool = sync;
-      if (ImGui::Checkbox("sync to tempo##stutterSync", &syncBool))
-      {
-         PushUndoCheckpoint();
-         *n->ParamPtr("sync") = syncBool ? 1.0f : 0.0f;
       }
 
       EndAudioBody();
@@ -7535,12 +8227,16 @@ namespace
    {
       if (auto* n = dynamic_cast<WavetableNode*>(gn.node.get()))
          DrawWavetableBody(gn, n);
+      else if (auto* n = dynamic_cast<SamplerNode*>(gn.node.get()))
+         DrawSamplerBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))
          DrawGainBody(gn, n);
       else if (auto* n = dynamic_cast<MixerNode*>(gn.node.get()))
          DrawMixerBody(gn, n);
       else if (auto* n = dynamic_cast<SplitterNode*>(gn.node.get()))
          DrawSplitterBody(gn, n);
+      else if (auto* n = dynamic_cast<AudioInputNode*>(gn.node.get()))
+         DrawAudioInBody(gn, n);
       else if (dynamic_cast<AudioOutputNode*>(gn.node.get()) != nullptr)
       {
          BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth,
@@ -7553,6 +8249,22 @@ namespace
          DrawNoteFilterBody(gn, n);
       else if (auto* n = dynamic_cast<NoteModifyNode*>(gn.node.get()))
          DrawNoteModifyBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteTransposeNode*>(gn.node.get()))
+         DrawNoteTransposeBody(gn, n);
+      else if (auto* n = dynamic_cast<PitchBendNode*>(gn.node.get()))
+         DrawPitchBendBody(gn, n);
+      else if (auto* n = dynamic_cast<VelocityCurveNode*>(gn.node.get()))
+         DrawVelocityCurveBody(gn, n);
+      else if (auto* n = dynamic_cast<GateNode*>(gn.node.get()))
+         DrawGateBody(gn, n);
+      else if (auto* n = dynamic_cast<HumanizerNode*>(gn.node.get()))
+         DrawHumanizerBody(gn, n);
+      else if (auto* n = dynamic_cast<QuantizerNode*>(gn.node.get()))
+         DrawQuantizerBody(gn, n);
+      else if (auto* n = dynamic_cast<GlideNode*>(gn.node.get()))
+         DrawGlideBody(gn, n);
+      else if (auto* n = dynamic_cast<VibratoNode*>(gn.node.get()))
+         DrawVibratoBody(gn, n);
       else if (auto* n = dynamic_cast<NoteEchoNode*>(gn.node.get()))
          DrawNoteEchoBody(gn, n);
       else if (auto* n = dynamic_cast<NoteRouterNode*>(gn.node.get()))
@@ -7573,6 +8285,8 @@ namespace
          DrawScaleNotesBody(gn, n);
       else if (auto* n = dynamic_cast<EnvelopeNode*>(gn.node.get()))
          DrawEnvelopeBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteToCVNode*>(gn.node.get()))
+         DrawNoteToCVBody(gn, n);
       else if (auto* n = dynamic_cast<AudioEffectNode*>(gn.node.get()))
       {
          // Every EffectDefs.cpp entry shares this one C++ class (§0.4), so
@@ -10087,6 +10801,8 @@ namespace
          { "Audio File", "Loads an audio file for playback and Audio Analyze to read. Keeps analysing even while muted - the 'audible' checkbox only controls monitoring." },
          { "Image Analyze", "Turns an image into control values. Patch any of its outputs into any slider's modulation dot - a video can drive a blur. Sample res readback is rate-limited because it stalls the GPU." },
          { "Audio Analyze", "Extracts level/frequency-band values from an Audio File for modulation." },
+         { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point; drag its two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. Free-running (no note cable) plays continuously the moment it's patched; connect a note cable and it becomes polyphonic, each note played back at the pitch offset from middle C." },
+         { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
          { "Dynamics", "A compressor: threshold, ratio, attack, release, makeup, a peak/RMS detector switch, and a sidechain switch that feeds the detector from the second input pin instead of the main signal. The graph shows the static transfer curve - input dB in, output dB out." },
          { "Delay", "A fractional delay line: time (tempo-synced by default, or free ms with 'sync to tempo' off), tone (bipolar tilt on the repeats), feedback (past 100% on purpose for self-oscillation - the output is soft-clipped, not the feedback itself), pan, duck (sidechains the wet signal off the dry input) and a bounce switch that cross-feeds left/right instead of repeating in place." },
@@ -10670,11 +11386,19 @@ namespace
       visited.insert(node);
 
       AudioTopologyEntry entry;
+      // No early break on the first null slot: audio and note pins share one
+      // slot index space (see the "a node with a note pin at slot 0 and an
+      // audio pin at slot 1" comment a few hundred lines up), so a node like
+      // Sample Player - note pin at slot 0, its recording input at slot 1 -
+      // has a real gap at slot 0 that isn't "past its declared slot count".
+      // Scanning the full range costs nothing (kMaxAudioSlots is 8) and
+      // matches the equally-generic teardown loop nearby, which never
+      // assumed contiguity either.
       for (int slot = 0; slot < kMaxAudioSlots && slot < kAudioMaxNodeInputs; slot++)
       {
          AudioCable* cable = node->AudioInputSlot(slot);
          if (cable == nullptr)
-            break; // past this node's own declared slot count
+            continue;
          entry.numInputs = slot + 1;
          if (cable->IsConnected())
          {
@@ -13220,6 +13944,255 @@ static bool RunReverbFixture()
    return all;
 }
 
+// Sampler's DSP fixture (new-audio-node/SKILL.md §5): loads a real WAV
+// through the actual Platform::DecodeAudioFileToBuffer path (not a synthetic
+// in-memory buffer, so the decoder itself is exercised too), triggers
+// playback via a real NoteEventQueue the way a note cable would, and asserts
+// each param produces a measurable difference in the rendered samples - the
+// same signature-diffing approach AUDIOPARAMSWEEPTEST uses, but against a
+// Sampler that actually has a file loaded, which the generic sweep's bare
+// throwaway instance never does (see driver.sh's Sampler baseline note for
+// why the sweep alone reports [FAIL] on this node).
+static bool RunSamplerFixture()
+{
+   const int numFrames = 4410;    // 0.1s @ 44100 Hz
+   const int sampleRate = 44100;
+   std::vector<int16_t> pcm(numFrames);
+   for (int i = 0; i < numFrames; i++)
+   {
+      const float t = (float)i / (float)(numFrames - 1); // 0..1 ramp
+      pcm[i] = (int16_t)((t * 2.0f - 1.0f) * 32000.0f);
+   }
+
+   const std::string path = "/tmp/infinite_sampler_fixture.wav";
+   {
+      std::ofstream f(path, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+      writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)pcm.data(), dataSize);
+   }
+
+   bool ok = true;
+
+   struct Params
+   {
+      float pitch = 0.0f, finetune = 0.0f, speed = 1.0f, volume = 0.8f, start = 0.0f, end = 1.0f;
+      bool loop = false, reverse = false, pingpong = false;
+   };
+
+   // Triggers one note-on through a real NoteEventQueue (the same path a
+   // connected note cable drives) and renders `frames` samples.
+   auto trigger = [&](const Params& p, int frames) -> std::vector<float>
+   {
+      SamplerNode node;
+      if (!node.LoadFile(path))
+      {
+         ok = false;
+         return {};
+      }
+      node.pitch = p.pitch;
+      node.finetune = p.finetune;
+      node.speed = p.speed;
+      node.volume = p.volume;
+      node.start = p.start;
+      node.end = p.end;
+      node.loop = p.loop;
+      node.reverse = p.reverse;
+      node.pingpong = p.pingpong;
+      node.CookIfNeeded(1);
+
+      AudioNode* an = node.GetAudioNode();
+      an->PrepareToPlay((double)sampleRate, frames);
+
+      NoteEventQueue queue;
+      NoteEvent on;
+      on.note = 60;
+      on.velocity = 1.0f;
+      on.isNoteOn = true;
+      on.frameOffset = 0;
+      queue.Push(on);
+      an->SetNoteInbox(&queue);
+
+      std::vector<float> l(frames, 0.0f), r(frames, 0.0f);
+      float* chans[2] = { l.data(), r.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = frames;
+      an->ProcessBlock(nullptr, 0, buf);
+      return l;
+   };
+
+   auto differs = [](const std::vector<float>& a, const std::vector<float>& b)
+   {
+      if (a.size() != b.size())
+         return true;
+      for (size_t i = 0; i < a.size(); i++)
+         if (std::fabs(a[i] - b[i]) > 1e-4f)
+            return true;
+      return false;
+   };
+
+   Params base;
+   const auto baseline = trigger(base, 64);
+   Params withPitch = base; withPitch.pitch = 12.0f;        // +1 octave: rate doubles
+   Params withFinetune = base; withFinetune.finetune = 50.0f; // +50c: same direction as pitch, smaller
+   Params withSpeed = base; withSpeed.speed = 2.0f;          // varispeed: rate doubles like +1 octave
+   Params withStart = base; withStart.start = 0.5f;          // trigger halfway through the ramp
+   Params withVolume = base; withVolume.volume = 0.2f;       // quarter volume
+
+   const auto pitched = trigger(withPitch, 64);
+   const auto finetuned = trigger(withFinetune, 64);
+   const auto sped = trigger(withSpeed, 64);
+   const auto started = trigger(withStart, 64);
+   const auto quiet = trigger(withVolume, 64);
+
+   if (baseline.empty() || pitched.empty() || finetuned.empty() || sped.empty() || started.empty() || quiet.empty())
+   {
+      printf("SAMPLERTEST BUG (fixture failed to load its own test file)\n");
+      return false;
+   }
+   if (!differs(baseline, pitched)) { printf("SAMPLERTEST pitch param had no effect FAIL\n"); ok = false; }
+   if (!differs(baseline, finetuned)) { printf("SAMPLERTEST finetune param had no effect FAIL\n"); ok = false; }
+   if (!differs(baseline, sped)) { printf("SAMPLERTEST speed param had no effect FAIL\n"); ok = false; }
+   if (!differs(baseline, started)) { printf("SAMPLERTEST start param had no effect FAIL\n"); ok = false; }
+   if (!differs(baseline, quiet)) { printf("SAMPLERTEST volume param had no effect FAIL\n"); ok = false; }
+
+   // Reverse: triggering with reverse=true starts at `end` and plays toward
+   // `start`, so on this monotonic ramp its first samples should sit near
+   // the ramp's *top* rather than its bottom - the opposite of forward.
+   {
+      Params fwd = base;
+      Params rev = base; rev.reverse = true;
+      const auto f = trigger(fwd, 4);
+      const auto r = trigger(rev, 4);
+      if (f.empty() || r.empty() || !(r[0] > f[0]))
+      {
+         printf("SAMPLERTEST reverse param had no effect FAIL\n");
+         ok = false;
+      }
+   }
+
+   // Loop vs. end vs. ping-pong: render well past the sample's natural end
+   // and check each shapes the tail differently - loop wraps back to
+   // silence-then-ramp-up again, ping-pong instead keeps descending from
+   // wherever it bounced, so the two must diverge past the wrap point.
+   {
+      auto renderWholeFile = [&](const Params& p) -> std::vector<float>
+      {
+         SamplerNode node;
+         node.LoadFile(path);
+         node.pitch = p.pitch; node.finetune = p.finetune; node.speed = p.speed; node.volume = p.volume;
+         node.start = p.start; node.end = p.end; node.loop = p.loop; node.reverse = p.reverse;
+         node.pingpong = p.pingpong;
+         node.CookIfNeeded(1);
+         AudioNode* an = node.GetAudioNode();
+         const int frames = numFrames + 200;
+         an->PrepareToPlay((double)sampleRate, frames);
+         NoteEventQueue queue;
+         NoteEvent on;
+         on.note = 60;
+         on.velocity = 1.0f;
+         on.isNoteOn = true;
+         on.frameOffset = 0;
+         queue.Push(on);
+         an->SetNoteInbox(&queue);
+         std::vector<float> l(frames, 0.0f), r(frames, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = frames;
+         an->ProcessBlock(nullptr, 0, buf);
+         return l;
+      };
+
+      Params looped = base; looped.loop = true;
+      Params oneShot = base;
+      Params pingponged = base; pingponged.loop = true; pingponged.pingpong = true;
+
+      const auto loopedTail = renderWholeFile(looped);
+      const auto oneShotTail = renderWholeFile(oneShot);
+      const auto pingpongTail = renderWholeFile(pingponged);
+      if (!(std::fabs(loopedTail[numFrames + 100]) > 0.05f && std::fabs(oneShotTail[numFrames + 100]) < 0.05f))
+      {
+         printf("SAMPLERTEST loop param had no effect (looped=%.3f oneshot=%.3f) FAIL\n",
+                loopedTail[numFrames + 100], oneShotTail[numFrames + 100]);
+         ok = false;
+      }
+      if (!differs(loopedTail, pingpongTail))
+      {
+         printf("SAMPLERTEST pingpong param had no effect FAIL\n");
+         ok = false;
+      }
+   }
+
+   // end: shrinking the loop range must change where playback wraps, so a
+   // looped voice with end=0.5 must sound different past the halfway point
+   // than the full-range loop above once both have wrapped at least once.
+   {
+      Params fullLoop = base; fullLoop.loop = true;
+      Params shortLoop = base; shortLoop.loop = true; shortLoop.end = 0.5f;
+      const auto full = trigger(fullLoop, numFrames / 2 + 50);
+      const auto shortR = trigger(shortLoop, numFrames / 2 + 50);
+      if (!differs(full, shortR)) { printf("SAMPLERTEST end param had no effect FAIL\n"); ok = false; }
+   }
+
+   // Record: arm recording, feed one block of a known synthetic tone
+   // through the audio input pin (slot 1 - see AudioSamplerNode::
+   // ProcessBlock's comment on why it's 1, not 0), stop, and confirm the
+   // captured audio became the loaded buffer.
+   {
+      SamplerNode node;
+      node.StartRecording();
+      if (!node.IsRecording())
+      {
+         printf("SAMPLERTEST record param had no effect (StartRecording didn't arm) FAIL\n");
+         ok = false;
+      }
+      else
+      {
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay((double)sampleRate, 128);
+         std::vector<float> toneL(128), toneR(128);
+         for (int i = 0; i < 128; i++)
+            toneL[i] = toneR[i] = sinf((float)i * 0.3f);
+         float* srcChans[2] = { toneL.data(), toneR.data() };
+         AudioBuffer srcBuf;
+         srcBuf.channels = srcChans;
+         srcBuf.numChannels = 2;
+         srcBuf.numFrames = 128;
+
+         std::vector<float> outL(128, 0.0f), outR(128, 0.0f);
+         float* outChans[2] = { outL.data(), outR.data() };
+         AudioBuffer outBuf;
+         outBuf.channels = outChans;
+         outBuf.numChannels = 2;
+         outBuf.numFrames = 128;
+
+         const AudioBuffer* inputs[2] = { nullptr, &srcBuf };
+         an->ProcessBlock(inputs, 2, outBuf);
+
+         node.StopRecording();
+         if (node.FileName() != "recorded audio" || node.waveformCacheCount <= 0)
+         {
+            printf("SAMPLERTEST record param had no effect (nothing captured) FAIL\n");
+            ok = false;
+         }
+      }
+   }
+
+   remove(path.c_str());
+
+   printf("%s\n", ok ? "SAMPLERTEST OK" : "SAMPLERTEST FAIL");
+   return ok;
+}
+
 static int RunDspTest()
 {
    const bool gainOk = RunGainFixture();
@@ -13233,8 +14206,9 @@ static int RunDspTest()
    const bool dynamicsOk = RunDynamicsFixture();
    const bool delayOk = RunDelayFixture();
    const bool reverbOk = RunReverbFixture();
+   const bool samplerOk = RunSamplerFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
-                    musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk;
+                    musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
    return all ? 0 : 1;
 }
@@ -13369,7 +14343,12 @@ namespace AudioParamSweep
       if (dynamic_cast<IModulator*>(node) != nullptr)
          return ReadMode::kModulator;
       if (shape.isAudioSource)
+      {
+         auto* src = dynamic_cast<IAudioSource*>(node);
+         if (src != nullptr && src->IsHardwareDriven())
+            return ReadMode::kUnobservable; // Audio In: nothing to capture headless
          return ReadMode::kPcm;
+      }
       if (shape.isNoteSource && shape.noteInputSlots > 0)
          return ReadMode::kNoteOutbox;
       return ReadMode::kUnobservable;
@@ -13880,6 +14859,9 @@ int main()
       settingsDir = std::string(home) + "/Library/Application Support/Infinite";
       mkdir(settingsDir.c_str(), 0755); // fine if it already exists
    }
+   // Restores whatever was indexed last run with no rescan - scanning only
+   // ever happens from an explicit Refresh click in the Samples panel.
+   gSampleScanner.LoadFromDisk();
    static std::string iniPath = settingsDir.empty() ? std::string("imgui.ini")
                                                     : settingsDir + "/imgui.ini";
    static std::string graphPath = settingsDir.empty() ? std::string("Infinite.json")
@@ -13984,6 +14966,53 @@ int main()
          SpawnNode("Dynamics", "AudioEffects", 1650.0f, 780.0f);    // 8
          SpawnNode("Delay", "AudioEffects", 2160.0f, 20.0f);        // 9
          SpawnNode("Reverb", "AudioEffects", 2160.0f, 780.0f);      // 10
+         SpawnNode("Stutter", "AudioEffects", 2470.0f, 20.0f);      // 11
+         SpawnNode("Arpeggiator", "Notes", 2470.0f, 500.0f);        // 12
+         SpawnNode("Scale Notes", "Notes", 2470.0f, 900.0f);        // 13
+         SpawnNode("Bouncing Balls", "Notes", 2720.0f, 900.0f);     // 14
+         SpawnNode("Note to CV", "Modulators", 2960.0f, 900.0f);    // 15
+         SpawnNode("Note Transpose", "Notes", 2960.0f, 20.0f);      // 16
+         SpawnNode("Pitch Bend", "Notes", 3170.0f, 20.0f);          // 17
+         SpawnNode("Velocity Curve", "Notes", 3380.0f, 20.0f);      // 18
+         SpawnNode("Gate", "Notes", 2960.0f, 300.0f);               // 19
+         SpawnNode("Humanizer", "Notes", 3170.0f, 300.0f);          // 20
+         SpawnNode("Quantizer", "Notes", 3380.0f, 300.0f);          // 21
+         SpawnNode("Glide", "Notes", 2960.0f, 500.0f);              // 22
+         SpawnNode("Vibrato", "Modulators", 3170.0f, 500.0f);       // 23
+         SpawnNode("Sampler", "Synths", 3380.0f, 500.0f);           // 24
+         {
+            // A tiny synthetic WAV, loaded immediately, so the visual smoke
+            // test's screenshot shows the interactive waveform (bars, the
+            // start/end handles, the loop-range dimming) rather than the
+            // empty "no sample loaded" placeholder every other run of this
+            // fixture would otherwise show forever.
+            const std::string fixtureWav = "/tmp/infinite_audiouitest_sampler.wav";
+            const int fixtureFrames = 2205;
+            std::vector<int16_t> fixturePcm(fixtureFrames);
+            for (int i = 0; i < fixtureFrames; i++)
+            {
+               const float t = (float)i / (float)(fixtureFrames - 1);
+               fixturePcm[i] = (int16_t)(sinf(t * 30.0f) * 30000.0f);
+            }
+            std::ofstream f(fixtureWav, std::ios::binary);
+            auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+            auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+            const uint32_t dataSize = (uint32_t)(fixturePcm.size() * sizeof(int16_t));
+            f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+            f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+            writeU32(44100); writeU32(44100 * 2); writeU16(2); writeU16(16);
+            f.write("data", 4); writeU32(dataSize);
+            f.write((const char*)fixturePcm.data(), dataSize);
+            f.close();
+            if (auto* samplerFixture = dynamic_cast<SamplerNode*>(gNodes.back().node.get()))
+               samplerFixture->LoadFile(fixtureWav);
+         }
+         // Triangle, not the default Circle: the drawn outline and the
+         // physics boundary used to disagree by exactly the centroid/bbox
+         // shift below the shape's vertices (see DrawBouncingBallsVisualizer's
+         // comment) - showing Triangle here means that regression can't
+         // silently come back unnoticed the way Circle/Square wouldn't catch it.
+         static_cast<BouncingBallsNode*>(gNodes[14].node.get())->shape = BouncingBallsNode::kTriangle;
 
          auto* osc = static_cast<WavetableNode*>(gNodes[1].node.get());
          // Both engines on, each cross-modulated by the other, so the fixture
@@ -14027,6 +15056,48 @@ int main()
          // One Wavetable, nothing else on the canvas, so the synthetic mouse
          // below can only be landing on it.
          SpawnNode("Wavetable", "Synths", 20.0f, 20.0f); // 0
+      }
+      else if (getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
+      {
+         // One Sampler far from the docked panel, and a folder holding
+         // exactly one real, decodable file, so the synthetic drag below
+         // has an unambiguous source (the panel row) and destination (the
+         // node) - proving the gSampleDragActive release handling actually
+         // resolves onto the node under the cursor rather than assuming it.
+         SpawnNode("Sampler", "Synths", 900.0f, 60.0f); // 0
+         gNodePanelOpen = true;
+         gSearchPanelMode = 1;
+
+         // Drop whatever folders/index a real prior session persisted to
+         // disk (SampleFolders.json/SampleIndex.json, loaded at startup) -
+         // otherwise the panel lists every previously-indexed file, not
+         // just this fixture's one sample, and the row-rect capture below
+         // can land on an unrelated entry.
+         for (const std::string& stale : std::vector<std::string>(gSampleScanner.Folders()))
+            gSampleScanner.RemoveFolder(stale);
+
+         mkdir("/tmp/infinite_samplerdrag", 0755);
+         const std::string wavPath = "/tmp/infinite_samplerdrag/sample.wav";
+         const int numFrames = 4410;
+         std::vector<int16_t> pcm(numFrames);
+         for (int i = 0; i < numFrames; i++)
+         {
+            const float t = (float)i / (float)(numFrames - 1);
+            pcm[i] = (int16_t)((t * 2.0f - 1.0f) * 32000.0f);
+         }
+         std::ofstream f(wavPath, std::ios::binary);
+         auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+         auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+         const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+         f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+         f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+         writeU32(44100); writeU32(44100 * 2); writeU16(2); writeU16(16);
+         f.write("data", 4); writeU32(dataSize);
+         f.write((const char*)pcm.data(), dataSize);
+         f.close();
+
+         gSampleScanner.AddFolder("/tmp/infinite_samplerdrag");
+         gSampleScanner.StartScan();
       }
       else if (getenv("INFINITE_BYPASSTEST") != nullptr)
       {
@@ -15227,6 +16298,76 @@ int main()
             default: break;
          }
          if (frameId >= 3)
+            tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
+      }
+
+      if (getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
+      {
+         // Drives the exact real-world gesture the fix targets: press down
+         // on the panel's sample row (a real Selectable going ImGui-active,
+         // the same mechanism gSampleDragActive relies on to detect drag
+         // start), drag across onto the Sampler's own canvas rect, release.
+         // If the release handling still depended on ed::GetHoveredNode()/
+         // ImGui::IsWindowHovered() the way it used to, this active item
+         // held in a different window would make the drop silently miss -
+         // see the drag-release comment by ed::ScreenToCanvas above.
+         static bool sUnbuffered = false;
+         if (!sUnbuffered) { setvbuf(stdout, nullptr, _IONBF, 0); sUnbuffered = true; }
+         ImGuiIO& tio = ImGui::GetIO();
+         tio.ConfigInputTrickleEventQueue = false;
+         auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
+
+         static int sPhase = 0; // 0=waiting for the scan+row, 1=pressed, 2=dragging, 3=released
+         static int sPhaseFrame = 0;
+         static ImVec2 sRowCenter(-1.0f, -1.0f);
+         static ImVec2 sTargetScreen(-1.0f, -1.0f);
+
+         if (sPhase == 0 && gSamplerDragTestRowRect.x >= 0.0f && gSamplerDragTestTargetValid)
+         {
+            sRowCenter = ImVec2((gSamplerDragTestRowRect.x + gSamplerDragTestRowRect.z) * 0.5f,
+                                (gSamplerDragTestRowRect.y + gSamplerDragTestRowRect.w) * 0.5f);
+            sTargetScreen = gSamplerDragTestTargetScreen;
+            sPhase = 1;
+            sPhaseFrame = frameId;
+            gTestMouse = sRowCenter;
+         }
+         else if (sPhase == 1)
+         {
+            gTestMouse = sRowCenter;
+            if (frameId >= sPhaseFrame + 2)
+            {
+               btn(true);
+               sPhase = 2;
+               sPhaseFrame = frameId;
+            }
+         }
+         else if (sPhase == 2)
+         {
+            const float f = std::min(1.0f, (float)(frameId - sPhaseFrame) / 6.0f);
+            gTestMouse = ImVec2(sRowCenter.x + (sTargetScreen.x - sRowCenter.x) * f,
+                                sRowCenter.y + (sTargetScreen.y - sRowCenter.y) * f);
+            if (frameId >= sPhaseFrame + 8)
+            {
+               btn(false);
+               sPhase = 3;
+               sPhaseFrame = frameId;
+            }
+         }
+         else if (sPhase == 3)
+         {
+            gTestMouse = sTargetScreen;
+            if (frameId >= sPhaseFrame + 3)
+            {
+               auto* samplerNode = static_cast<SamplerNode*>(gNodes[0].node.get());
+               const bool ok = samplerNode->FilePath() == "/tmp/infinite_samplerdrag/sample.wav";
+               printf("SAMPLERDRAG drop onto node: path='%s' %s\n", samplerNode->FilePath().c_str(),
+                      ok ? "OK" : "FAIL");
+               printf("%s\n", ok ? "SAMPLERDRAGTEST OK" : "SAMPLERDRAGTEST FAIL");
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+            }
+         }
+
+         if (sPhase != 0)
             tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
       }
 
@@ -20264,6 +21405,26 @@ int main()
             glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
+      if (getenv("INFINITE_SAMPLERDRAGTEST") != nullptr && !gNodes.empty())
+      {
+         // Recomputed every frame, post-ed::End() where GetNodePosition/
+         // GetNodeSize have a live editor context (see the global's
+         // comment) - the pre-Begin() input driver above only ever reads
+         // this cached value, never calls these itself.
+         const ImVec2 p = ed::GetNodePosition(gNodes[0].NodeId());
+         const ImVec2 s = ed::GetNodeSize(gNodes[0].NodeId());
+         // A freshly spawned node reports a sentinel/placeholder size for its
+         // first frame or two, before ed:: has actually measured its content
+         // - same reason SIZETEST above only trusts sizes from frameId>=2.
+         // Skip those, leaving the sentinel -1 in place, rather than latch a
+         // garbage target the driver would then aim the whole gesture at.
+         if (s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f)
+         {
+            gSamplerDragTestTargetScreen = ed::CanvasToScreen(ImVec2(p.x + s.x * 0.5f, p.y + s.y * 0.5f));
+            gSamplerDragTestTargetValid = true;
+         }
+      }
+
       if (getenv("INFINITE_WTDRAGTEST") != nullptr)
       {
          // Unbuffered: this hook is watched from a pipe, and a run that hangs
@@ -20687,6 +21848,8 @@ int main()
                DrawSmoothParams(n);
             else if (auto* n = dynamic_cast<InvertNode*>(gn.node.get()))
                DrawInvertParams(n);
+            else if (auto* n = dynamic_cast<ModDepthNode*>(gn.node.get()))
+               DrawModDepthParams(n);
             else if (auto* n = dynamic_cast<MacroKnobNode*>(gn.node.get()))
                DrawMacroKnobParams(n);
             else if (auto* n = dynamic_cast<MacroXYNode*>(gn.node.get()))
@@ -21917,6 +23080,78 @@ int main()
          ImGui::OpenPopup("search");
       }
 
+      // Samples panel drag-and-drop landing here (see gSampleDragActive's
+      // comment). A floating label follows the cursor as feedback since
+      // there's no native ImGui drag source/payload backing this drag to
+      // draw one automatically.
+      if (gSampleDragActive)
+      {
+         const ImVec2 mp = ImGui::GetMousePos();
+         ImGui::GetForegroundDrawList()->AddText(ImVec2(mp.x + 14.0f, mp.y + 14.0f),
+                                                  IM_COL32(230, 235, 245, 255), gSampleDragName.c_str());
+
+         if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+         {
+            // Deliberately NOT ed::GetHoveredNode()/GetHoveredPin()/
+            // GetHoveredLink(): those ride on ImGui::IsWindowHovered(),
+            // which ImGui suppresses for every window except the one
+            // holding the active item - and the active item for this
+            // entire drag is the Selectable back in the Samples panel (see
+            // gSampleDragActive's comment; that's the whole mechanism the
+            // drag-start detection relies on). So above, without
+            // AllowWhenBlockedByActiveItem, hovered-node/pin/link would
+            // read empty for the full gesture regardless of where the
+            // mouse actually is. A plain canvas-space rect test against
+            // each node's own bounds sidesteps that ImGui active-item gate
+            // entirely.
+            const ImVec2 canvasMouse = ed::ScreenToCanvas(mp);
+            SamplerNode* targetSampler = nullptr;
+            for (GraphNode& gnHit : gNodes)
+            {
+               auto* sampler = gnHit.node ? dynamic_cast<SamplerNode*>(gnHit.node.get()) : nullptr;
+               if (sampler == nullptr)
+                  continue;
+               const ImVec2 p = ed::GetNodePosition(gnHit.NodeId());
+               const ImVec2 s = ed::GetNodeSize(gnHit.NodeId());
+               if (canvasMouse.x >= p.x && canvasMouse.x <= p.x + s.x &&
+                   canvasMouse.y >= p.y && canvasMouse.y <= p.y + s.y)
+               {
+                  targetSampler = sampler;
+                  break;
+               }
+            }
+
+            if (targetSampler != nullptr)
+            {
+               // Dropped onto an existing Sampler: swap its file.
+               PushUndoCheckpoint();
+               targetSampler->LoadFile(gSampleDragPath);
+               gPatchDirty = true;
+            }
+            else if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+            {
+               // No Sampler under the cursor but still over the canvas:
+               // spawn a loaded one there, same "click happened over the
+               // canvas" position rule the double-click search popup above
+               // uses. AllowWhenBlockedByActiveItem for the same reason as
+               // above - plain IsWindowHovered() would read false for the
+               // whole drag.
+               const ImVec2 pos = canvasMouse;
+               GraphNode* spawned = SpawnNode("Sampler", "Synths", pos.x, pos.y);
+               if (spawned != nullptr)
+               {
+                  if (auto* sampler = dynamic_cast<SamplerNode*>(spawned->node.get()))
+                     sampler->LoadFile(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+            }
+
+            gSampleDragActive = false;
+            gSampleDragPath.clear();
+            gSampleDragName.clear();
+         }
+      }
+
       // dev-only: force the picker open (optionally with a query) to verify layout
       if (const char* pk = getenv("INFINITE_PICKERTEST"))
       {
@@ -22209,12 +23444,11 @@ int main()
       ImGui::SetNextWindowSizeConstraints(ImVec2(220, 0), ImVec2(420, 400));
       if (ImGui::BeginPopup("##dropdown"))
       {
-         if (gDropdown.options != nullptr)
          {
-            for (int i = 0; i < (int)gDropdown.options->size(); i++)
+            for (int i = 0; i < (int)gDropdown.options.size(); i++)
             {
                bool selected = (i == gDropdown.current);
-               if (ImGui::Selectable((*gDropdown.options)[i].c_str(), selected))
+               if (ImGui::Selectable(gDropdown.options[i].c_str(), selected))
                {
                   if (gDropdown.onSelect && i != gDropdown.current)
                   {
@@ -22274,60 +23508,78 @@ int main()
          ImGui::SameLine();
          ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight), true);
 
-         static char panelSearch[128] = "";
-         ImGui::SetNextItemWidth(-1.0f);
-         ImGui::InputTextWithHint("##panelsearch", "search modules...", panelSearch, sizeof(panelSearch));
-
-         std::string q = panelSearch;
-         std::transform(q.begin(), q.end(), q.begin(), ::tolower);
-
-         std::string spawnName, spawnCategory;
+         // Mode switcher: Modules is the original, always-present catalogue;
+         // Samples extends it per docs/plans/audio/README.md P3e. Kept as two
+         // plain selectable-style buttons rather than an ImGui tab bar so the
+         // active mode reads clearly against the panel's own dark background.
+         if (ImGui::Selectable("Modules", gSearchPanelMode == 0, 0, ImVec2(kNodePanelWidth * 0.46f, 0)))
+            gSearchPanelMode = 0;
+         ImGui::SameLine();
+         if (ImGui::Selectable("Samples", gSearchPanelMode == 1, 0, ImVec2(kNodePanelWidth * 0.46f, 0)))
+            gSearchPanelMode = 1;
          ImGui::Separator();
-         ImGui::BeginChild("##nodepanellist", ImVec2(0, 0), false);
-         for (const std::string& category : NodeFactory::Instance().GetCategories())
-         {
-            // With a query the categories are only drawn when something in them
-            // matches, so an empty heading never sits there on its own.
-            std::vector<std::string> matches;
-            for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
-            {
-               if (!IsUserSpawnable(name))
-                  continue;
-               if (q.empty())
-               {
-                  matches.push_back(name);
-                  continue;
-               }
-               std::string hay = name + " " + category;
-               std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
-               if (hay.find(q) != std::string::npos)
-                  matches.push_back(name);
-            }
-            if (matches.empty())
-               continue;
 
-            ImGui::SeparatorText(DisplayName(category).c_str());
-            for (const std::string& name : matches)
+         if (gSearchPanelMode == 0)
+         {
+            static char panelSearch[128] = "";
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::InputTextWithHint("##panelsearch", "search modules...", panelSearch, sizeof(panelSearch));
+
+            std::string q = panelSearch;
+            std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+
+            std::string spawnName, spawnCategory;
+            ImGui::Separator();
+            ImGui::BeginChild("##nodepanellist", ImVec2(0, 0), false);
+            for (const std::string& category : NodeFactory::Instance().GetCategories())
             {
-               if (ImGui::Selectable(DisplayName(name).c_str()))
+               // With a query the categories are only drawn when something in them
+               // matches, so an empty heading never sits there on its own.
+               std::vector<std::string> matches;
+               for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                {
-                  spawnName = name;
-                  spawnCategory = category;
+                  if (!IsUserSpawnable(name))
+                     continue;
+                  if (q.empty())
+                  {
+                     matches.push_back(name);
+                     continue;
+                  }
+                  std::string hay = name + " " + category;
+                  std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+                  if (hay.find(q) != std::string::npos)
+                     matches.push_back(name);
                }
+               if (matches.empty())
+                  continue;
+
+               ImGui::SeparatorText(DisplayName(category).c_str());
+               for (const std::string& name : matches)
+               {
+                  if (ImGui::Selectable(DisplayName(name).c_str()))
+                  {
+                     spawnName = name;
+                     spawnCategory = category;
+                  }
+               }
+            }
+            ImGui::EndChild();
+
+            if (!spawnName.empty())
+            {
+               // Aimed at the middle of the view rather than at the mouse: the
+               // click happened over the panel, not over the canvas. Landing
+               // exactly on the center every time would stack repeated clicks on
+               // top of each other, so nudge to the nearest spot around the
+               // center that isn't already covered by another node.
+               ImVec2 pos = FindFreeSpawnPosition(gViewCenterCanvas);
+               SpawnNode(spawnName, spawnCategory, pos.x, pos.y);
+               gPatchDirty = true;
             }
          }
-         ImGui::EndChild();
-
-         if (!spawnName.empty())
+         else
          {
-            // Aimed at the middle of the view rather than at the mouse: the
-            // click happened over the panel, not over the canvas. Landing
-            // exactly on the center every time would stack repeated clicks on
-            // top of each other, so nudge to the nearest spot around the
-            // center that isn't already covered by another node.
-            ImVec2 pos = FindFreeSpawnPosition(gViewCenterCanvas);
-            SpawnNode(spawnName, spawnCategory, pos.x, pos.y);
-            gPatchDirty = true;
+            DrawSamplesSearchPanel();
          }
 
          ImGui::EndChild();

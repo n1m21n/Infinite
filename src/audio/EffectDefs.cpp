@@ -44,6 +44,10 @@ namespace
          def.params.push_back({ "gain", -24.0f, 24.0f, 0.0f, false,
                                  { { "type", (float)AudioFilterDsp::kPeak } } });
          def.params.push_back({ "outputGainDb", -24.0f, 12.0f, 0.0f });
+         // Bipolar octaves of cutoff shift, scaled by an internal envelope
+         // follower on the input signal - the classic envelope-filter/
+         // auto-wah control. 0 = off, the kernel's unmodified fast path.
+         def.params.push_back({ "envAmount", -1.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<AudioFilterKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -391,14 +395,21 @@ namespace
       // (3ms, gated behind `sync=0`) purely so AUDIOPARAMSWEEPTEST's short
       // warmup window can reach a full record+loop cycle at all - the
       // musical default anyone actually hears is `sync=1` @ quarter notes,
-      // unaffected by this. `chunk` is additionally gated behind
+      // unaffected by this. `steps`/`gateMask` are additionally gated behind
       // `sync=0` for the same reason: at the musical default's ~500ms
       // period, the sweep's probe block never leaves the record phase (a
-      // straight passthrough regardless of `chunk`'s value), so `chunk`
-      // is unobservable without also forcing the short free-ms path.
+      // straight passthrough regardless of either value), so neither is
+      // observable without also forcing the short free-ms path.
       // `sync`/`rateDiv` themselves stay confirmed (by hand) blind spots,
       // the same way Delay's own `sync`/`rateDiv` do - they can't be gated
       // around their own effect.
+      //
+      // `steps` is a discrete repeat count (one square of the UI's gate grid
+      // per repeat) rather than a free-floating grain fraction - see
+      // StutterKernel.h. `gateMask` is that grid's on/off state, one bit per
+      // repeat up to StutterKernel::kMaxGateSteps; stored as a plain float
+      // (exact for any int up to 2^24) rather than a dedicated bitmask param
+      // type, since EffectDef's param table only speaks float.
       {
          EffectDef def;
          def.name = "Stutter";
@@ -410,7 +421,8 @@ namespace
          def.params.push_back(
             { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
          def.params.push_back({ "timeMs", 1.0f, 2000.0f, 3.0f, false, kStutterShortPathPrereq });
-         def.params.push_back({ "chunk", 0.02f, 1.0f, 0.35f, false, kStutterShortPathPrereq });
+         def.params.push_back({ "steps", 2.0f, 16.0f, 8.0f, false, kStutterShortPathPrereq });
+         def.params.push_back({ "gateMask", 0.0f, 65535.0f, 65535.0f, false, kStutterShortPathPrereq });
          def.makeKernel = []() { return std::make_unique<StutterKernel>(); };
          defs.push_back(std::move(def));
       }

@@ -176,9 +176,12 @@ class AudioEnvelopeNode : public AudioNode
 public:
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
+      mSampleRate = sampleRate;
       mEnv.SetSampleRate(sampleRate);
       mEnv.SetADSR(mAttackMs.load(std::memory_order_relaxed), mDecayMs.load(std::memory_order_relaxed),
                    mSustainLevel.load(std::memory_order_relaxed), mReleaseMs.load(std::memory_order_relaxed));
+      mLastPulseStep = -1;
+      mGateOpen = false;
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -187,22 +190,57 @@ public:
                    mSustainLevel.load(std::memory_order_relaxed), mReleaseMs.load(std::memory_order_relaxed));
 
       const int numFrames = output.numFrames;
-      NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
-      int evtIdx = 0;
+      const int trigger = mTrigger.load(std::memory_order_relaxed);
       float level = mEnv.Process(); // in case numFrames==0, still publish something sane
 
-      for (int i = 0; i < numFrames; i++)
+      if (trigger == EnvelopeNode::kTriggerPulse)
       {
-         while (evtIdx < n && evts[evtIdx].frameOffset == i)
+         // Free-runs off the transport, exactly like Chorder's "groove" step
+         // clock (NoteNodes.cpp's AudioChorderNode) - no note input needed.
+         // One NoteOn/NoteOff pair per rateDiv-beats period, held open for
+         // gatePct of that period. Step/gate checked once per block (the
+         // same ~block-length granularity Chorder/Stutter already use for
+         // their own tempo-synced triggers), not per sample.
+         const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
+         const double beatsPerDiv = std::max(0.015625, MusicTime::BeatsFor((MusicTime::RateDivision)rateDiv));
+         const double gatePct = std::clamp((double)mGatePct.load(std::memory_order_relaxed), 0.01, 1.0);
+         const double stepPos = Transport::Instance().Beats() / beatsPerDiv;
+         const long long step = (long long)std::floor(stepPos);
+         const double phase = stepPos - (double)step; // 0..1 through the current pulse
+
+         if (step != mLastPulseStep)
          {
-            if (evts[evtIdx].isNoteOn)
-               mEnv.NoteOn();
-            else
-               mEnv.NoteOff();
-            evtIdx++;
+            mLastPulseStep = step;
+            mEnv.NoteOn();
+            mGateOpen = true;
          }
-         level = mEnv.Process();
+         if (mGateOpen && phase >= gatePct)
+         {
+            mEnv.NoteOff();
+            mGateOpen = false;
+         }
+
+         for (int i = 0; i < numFrames; i++)
+            level = mEnv.Process();
+      }
+      else
+      {
+         NoteEvent evts[64];
+         const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+         int evtIdx = 0;
+
+         for (int i = 0; i < numFrames; i++)
+         {
+            while (evtIdx < n && evts[evtIdx].frameOffset == i)
+            {
+               if (evts[evtIdx].isNoteOn)
+                  mEnv.NoteOn();
+               else
+                  mEnv.NoteOff();
+               evtIdx++;
+            }
+            level = mEnv.Process();
+         }
       }
       mLevel.store(level, std::memory_order_relaxed);
    }
@@ -216,6 +254,9 @@ public:
       mDecayMs.store(n.decayMs, std::memory_order_relaxed);
       mSustainLevel.store(n.sustainLevel, std::memory_order_relaxed);
       mReleaseMs.store(n.releaseMs, std::memory_order_relaxed);
+      mTrigger.store(n.trigger, std::memory_order_relaxed);
+      mRateDiv.store(n.rateDiv, std::memory_order_relaxed);
+      mGatePct.store(n.gatePct, std::memory_order_relaxed);
    }
 
    float Level() const { return mLevel.load(std::memory_order_relaxed); }
@@ -228,6 +269,12 @@ private:
    std::atomic<float> mDecayMs { 200.0f };
    std::atomic<float> mSustainLevel { 0.6f };
    std::atomic<float> mReleaseMs { 400.0f };
+   std::atomic<int> mTrigger { EnvelopeNode::kTriggerNote };
+   std::atomic<int> mRateDiv { 6 };
+   std::atomic<float> mGatePct { 0.5f };
+   double mSampleRate = 44100.0;
+   bool mGateOpen = false;
+   long long mLastPulseStep = -1;
 };
 
 EnvelopeNode::EnvelopeNode() = default;
@@ -249,6 +296,9 @@ void EnvelopeNode::VisitParams(ParamVisitor& v)
    v.Float("decayMs", decayMs);
    v.Float("sustainLevel", sustainLevel);
    v.Float("releaseMs", releaseMs);
+   v.Int("trigger", trigger);
+   v.Int("rateDiv", rateDiv);
+   v.Float("gatePct", gatePct);
 }
 
 AudioNode* EnvelopeNode::AudioNodeForNotePorts()
@@ -263,6 +313,106 @@ float EnvelopeNode::Value01()
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioEnvelopeNode>();
    return mAudioNode->Level();
+}
+
+// ---------------------------------------------------------------- Note to CV
+class AudioNoteToCVNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mSampleRate = sampleRate;
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
+   {
+      const int numFrames = output.numFrames;
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      // Only note-on moves the target - note-off is ignored entirely so the
+      // CV holds the last played pitch instead of falling back toward 0 on
+      // release (see the class comment on NoteToCVNode).
+      for (int i = 0; i < n; i++)
+         if (evts[i].isNoteOn)
+            mLastNote.store(evts[i].note, std::memory_order_relaxed);
+
+      const int rangeLow = mRangeLow.load(std::memory_order_relaxed);
+      const int rangeHigh = std::max(rangeLow + 1, mRangeHigh.load(std::memory_order_relaxed));
+      const int lastNote = mLastNote.load(std::memory_order_relaxed);
+      const float target =
+         lastNote < 0 ? 0.0f : std::clamp((float)(lastNote - rangeLow) / (float)(rangeHigh - rangeLow), 0.0f, 1.0f);
+
+      const float glideMs = std::max(0.0f, mGlideMs.load(std::memory_order_relaxed));
+      // One-pole time-constant coefficient, recomputed per block (glideMs
+      // changes rarely, at knob-turn rate - not worth per-sample recompute).
+      const float coef = glideMs > 0.0f ? expf(-1.0f / (float)(mSampleRate * 0.001 * glideMs)) : 0.0f;
+
+      float level = mLevel.load(std::memory_order_relaxed);
+      for (int i = 0; i < numFrames; i++)
+         level = target + coef * (level - target);
+      mLevel.store(level, std::memory_order_relaxed);
+   }
+
+   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+
+   // Main thread only.
+   void PushParams(const NoteToCVNode& n)
+   {
+      mRangeLow.store(n.rangeLow, std::memory_order_relaxed);
+      mRangeHigh.store(n.rangeHigh, std::memory_order_relaxed);
+      mGlideMs.store(n.glideMs, std::memory_order_relaxed);
+   }
+
+   float Level() const { return mLevel.load(std::memory_order_relaxed); }
+   int LastNote() const { return mLastNote.load(std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue* mInbox = nullptr;
+   double mSampleRate = 44100.0;
+   std::atomic<float> mLevel { 0.0f };
+   std::atomic<int> mLastNote { -1 };
+   std::atomic<int> mRangeLow { 0 };
+   std::atomic<int> mRangeHigh { 127 };
+   std::atomic<float> mGlideMs { 20.0f };
+};
+
+NoteToCVNode::NoteToCVNode() = default;
+NoteToCVNode::~NoteToCVNode() = default;
+
+void NoteToCVNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteToCVNode>();
+   mAudioNode->PushParams(*this);
+}
+
+void NoteToCVNode::VisitParams(ParamVisitor& v)
+{
+   v.Int("rangeLow", rangeLow);
+   v.Int("rangeHigh", rangeHigh);
+   v.Float("glideMs", glideMs);
+}
+
+AudioNode* NoteToCVNode::AudioNodeForNotePorts()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteToCVNode>();
+   return mAudioNode.get();
+}
+
+float NoteToCVNode::Value01()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteToCVNode>();
+   return mAudioNode->Level();
+}
+
+int NoteToCVNode::LastNote() const
+{
+   return mAudioNode ? mAudioNode->LastNote() : -1;
 }
 
 // ---------------------------------------------------------------- Note Filter
@@ -735,6 +885,769 @@ int NoteModifyNode::LastNoteOut() const
 float NoteModifyNode::LastVelocityOut() const
 {
    return mAudioNode ? mAudioNode->LastVelocityOut() : 0.0f;
+}
+
+// ------------------------------------------------------- Note Modify, split up
+// The eight nodes below are Note Modify's controls, one concern per node -
+// see the class comments on their declarations in NoteNodes.h. A small
+// shared helper for the four that need to delay a note-on into a future
+// block (Gate's internal note-off, Humanizer/Quantizer's delayed onset,
+// Glide's glissando steps) - the same Pending-slot mechanism
+// AudioNoteModifyNode uses above, pulled out since four separate nodes need
+// it rather than one.
+namespace
+{
+   struct DeferredNote
+   {
+      bool active = false;
+      int note = 0;
+      float velocity = 0.0f;
+      bool isNoteOn = false;
+      uint64_t targetSample = 0;
+   };
+
+   template <int N>
+   struct DeferredNoteQueue
+   {
+      DeferredNote slots[N];
+
+      DeferredNote* FreeSlot()
+      {
+         for (auto& s : slots)
+            if (!s.active)
+               return &s;
+         return nullptr;
+      }
+
+      // Emits, and clears, every slot whose target sample falls inside
+      // [samplePos, samplePos + numFrames).
+      void FireDue(uint64_t samplePos, int numFrames, NoteEventQueue& outbox, const void* source)
+      {
+         for (auto& s : slots)
+         {
+            if (!s.active)
+               continue;
+            if (s.targetSample >= samplePos && s.targetSample < samplePos + (uint64_t)numFrames)
+            {
+               NoteEvent out;
+               out.note = s.note;
+               out.velocity = s.velocity;
+               out.isNoteOn = s.isNoteOn;
+               out.frameOffset = (int)(s.targetSample - samplePos);
+               out.source = source;
+               outbox.Push(out);
+               s.active = false;
+            }
+         }
+      }
+   };
+}
+
+// ---- Transpose / Pitch Bend: shared semitone-shift DSP ----
+class AudioSemitoneShiftNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
+   {
+      for (int i = 0; i < 128; i++)
+         mOutNote[i] = -1;
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      const int semi = mSemitones.load(std::memory_order_relaxed);
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+
+      for (int i = 0; i < n; i++)
+      {
+         const NoteEvent& in = evts[i];
+         if (in.note < 0 || in.note > 127)
+            continue;
+
+         NoteEvent out;
+         out.frameOffset = in.frameOffset;
+         out.source = this;
+
+         if (in.isNoteOn)
+         {
+            const int outNote = std::clamp(in.note + semi, 0, 127);
+            mOutNote[in.note] = outNote;
+            out.note = outNote;
+            out.velocity = in.velocity;
+            out.isNoteOn = true;
+            mOutbox.Push(out);
+            mLastNoteOut.store(outNote, std::memory_order_relaxed);
+         }
+         else
+         {
+            const int outNote = mOutNote[in.note];
+            if (outNote < 0)
+               continue;
+            out.note = outNote;
+            out.velocity = in.velocity;
+            out.isNoteOn = false;
+            mOutbox.Push(out);
+            mOutNote[in.note] = -1;
+         }
+      }
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+
+   void SetSemitones(int semi) { mSemitones.store(semi, std::memory_order_relaxed); }
+   int LastNoteOut() const { return mLastNoteOut.load(std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox = nullptr;
+   int mOutNote[128] = {};
+   std::atomic<int> mSemitones { 0 };
+   std::atomic<int> mLastNoteOut { -1 };
+};
+
+NoteTransposeNode::NoteTransposeNode() = default;
+NoteTransposeNode::~NoteTransposeNode() = default;
+
+void NoteTransposeNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioSemitoneShiftNode>();
+   mAudioNode->SetSemitones(semitones);
+}
+
+void NoteTransposeNode::VisitParams(ParamVisitor& v) { v.Int("semitones", semitones); }
+
+AudioNode* NoteTransposeNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioSemitoneShiftNode>();
+   return mAudioNode.get();
+}
+
+int NoteTransposeNode::LastNoteOut() const
+{
+   return mAudioNode ? mAudioNode->LastNoteOut() : -1;
+}
+
+PitchBendNode::PitchBendNode() = default;
+PitchBendNode::~PitchBendNode() = default;
+
+void PitchBendNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioSemitoneShiftNode>();
+   mAudioNode->SetSemitones(semitones);
+}
+
+void PitchBendNode::VisitParams(ParamVisitor& v) { v.Int("semitones", semitones); }
+
+AudioNode* PitchBendNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioSemitoneShiftNode>();
+   return mAudioNode.get();
+}
+
+int PitchBendNode::LastNoteOut() const
+{
+   return mAudioNode ? mAudioNode->LastNoteOut() : -1;
+}
+
+// ---- Velocity Curve ----
+class AudioVelocityCurveNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override {}
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      const float curve = mCurve.load(std::memory_order_relaxed);
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+
+      for (int i = 0; i < n; i++)
+      {
+         NoteEvent out = evts[i];
+         out.source = this;
+         if (out.isNoteOn)
+         {
+            const float vIn = std::clamp(out.velocity, 0.0f, 1.0f);
+            const float vOut = std::pow(vIn, curve);
+            mLastVelocityIn.store(vIn, std::memory_order_relaxed);
+            mLastVelocityOut.store(vOut, std::memory_order_relaxed);
+            out.velocity = vOut;
+         }
+         mOutbox.Push(out);
+      }
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+
+   void SetCurve(float c) { mCurve.store(c, std::memory_order_relaxed); }
+   float LastVelocityIn() const { return mLastVelocityIn.load(std::memory_order_relaxed); }
+   float LastVelocityOut() const { return mLastVelocityOut.load(std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox = nullptr;
+   std::atomic<float> mCurve { 1.0f };
+   std::atomic<float> mLastVelocityIn { 0.0f };
+   std::atomic<float> mLastVelocityOut { 0.0f };
+};
+
+VelocityCurveNode::VelocityCurveNode() = default;
+VelocityCurveNode::~VelocityCurveNode() = default;
+
+void VelocityCurveNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioVelocityCurveNode>();
+   mAudioNode->SetCurve(curve);
+}
+
+void VelocityCurveNode::VisitParams(ParamVisitor& v) { v.Float("curve", curve); }
+
+AudioNode* VelocityCurveNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioVelocityCurveNode>();
+   return mAudioNode.get();
+}
+
+float VelocityCurveNode::LastVelocityIn() const
+{
+   return mAudioNode ? mAudioNode->LastVelocityIn() : 0.0f;
+}
+
+float VelocityCurveNode::LastVelocityOut() const
+{
+   return mAudioNode ? mAudioNode->LastVelocityOut() : 0.0f;
+}
+
+// ---- Gate ----
+class AudioGateNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mSampleRate = sampleRate;
+      mSamplePos = 0;
+      for (int i = 0; i < 128; i++)
+      {
+         mSuppressOff[i] = false;
+         mScheduledActive[i] = false;
+      }
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
+   {
+      const int numFrames = output.numFrames;
+      const float holdMs = mHoldMs.load(std::memory_order_relaxed);
+      const double holdSamples = holdMs * 0.001 * mSampleRate;
+
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+
+      for (int i = 0; i < n; i++)
+      {
+         const NoteEvent& in = evts[i];
+         if (in.note < 0 || in.note > 127)
+            continue;
+
+         if (in.isNoteOn)
+         {
+            NoteEvent out = in;
+            out.source = this;
+            mOutbox.Push(out);
+
+            if (holdMs > 0.0f)
+            {
+               mSuppressOff[in.note] = true;
+               mScheduledActive[in.note] = true;
+               mScheduledTarget[in.note] = mSamplePos + (uint64_t)in.frameOffset + (uint64_t)holdSamples;
+            }
+            else
+            {
+               mSuppressOff[in.note] = false;
+               mScheduledActive[in.note] = false;
+            }
+         }
+         else
+         {
+            if (mSuppressOff[in.note])
+               continue; // the scheduled internal note-off will close this voice
+            NoteEvent out = in;
+            out.source = this;
+            mOutbox.Push(out);
+         }
+      }
+
+      for (int note = 0; note < 128; note++)
+      {
+         if (!mScheduledActive[note])
+            continue;
+         const uint64_t target = mScheduledTarget[note];
+         if (target >= mSamplePos && target < mSamplePos + (uint64_t)numFrames)
+         {
+            NoteEvent out;
+            out.note = note;
+            out.velocity = 0.0f;
+            out.isNoteOn = false;
+            out.frameOffset = (int)(target - mSamplePos);
+            out.source = this;
+            mOutbox.Push(out);
+            mScheduledActive[note] = false;
+            mSuppressOff[note] = false;
+         }
+      }
+
+      mSamplePos += (uint64_t)numFrames;
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+
+   void SetHoldMs(float ms) { mHoldMs.store(ms, std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox = nullptr;
+   double mSampleRate = 48000.0;
+   uint64_t mSamplePos = 0;
+   bool mSuppressOff[128] = {};
+   bool mScheduledActive[128] = {};
+   uint64_t mScheduledTarget[128] = {};
+   std::atomic<float> mHoldMs { 0.0f };
+};
+
+GateNode::GateNode() = default;
+GateNode::~GateNode() = default;
+
+void GateNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioGateNode>();
+   mAudioNode->SetHoldMs(holdMs);
+}
+
+void GateNode::VisitParams(ParamVisitor& v) { v.Float("holdMs", holdMs); }
+
+AudioNode* GateNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioGateNode>();
+   return mAudioNode.get();
+}
+
+// ---- Humanizer ----
+class AudioHumanizerNode : public AudioNode
+{
+public:
+   static constexpr int kMaxPending = 32;
+
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mSampleRate = sampleRate;
+      mSamplePos = 0;
+      for (int i = 0; i < 128; i++)
+         mOutNote[i] = -1;
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
+   {
+      const int numFrames = output.numFrames;
+      const float timingMs = mTimingMs.load(std::memory_order_relaxed);
+      const float velocityPct = mVelocityPct.load(std::memory_order_relaxed);
+
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+
+      for (int i = 0; i < n; i++)
+      {
+         const NoteEvent& in = evts[i];
+         if (in.note < 0 || in.note > 127)
+            continue;
+
+         if (in.isNoteOn)
+         {
+            float v = std::clamp(in.velocity, 0.0f, 1.0f);
+            v += mRng.Next() * (velocityPct / 100.0f) * 0.5f;
+            v = std::clamp(v, 0.0f, 1.0f);
+
+            int offset = in.frameOffset;
+            if (timingMs > 0.0f)
+            {
+               const int jitterSamples = (int)(mRng.Next() * timingMs * 0.001 * mSampleRate);
+               offset = std::clamp(offset + jitterSamples, 0, std::max(0, numFrames - 1));
+            }
+            const uint64_t onsetAbs = mSamplePos + (uint64_t)offset;
+            mOutNote[in.note] = in.note; // no pitch change - just bookkeeping for the matching note-off
+
+            if (onsetAbs < mSamplePos + (uint64_t)numFrames)
+            {
+               NoteEvent out;
+               out.note = in.note;
+               out.velocity = v;
+               out.isNoteOn = true;
+               out.frameOffset = (int)(onsetAbs - mSamplePos);
+               out.source = this;
+               mOutbox.Push(out);
+            }
+            else if (DeferredNote* slot = mPending.FreeSlot())
+            {
+               slot->active = true;
+               slot->note = in.note;
+               slot->velocity = v;
+               slot->isNoteOn = true;
+               slot->targetSample = onsetAbs;
+            }
+         }
+         else
+         {
+            if (mOutNote[in.note] < 0)
+               continue;
+            NoteEvent out = in;
+            out.source = this;
+            mOutbox.Push(out);
+            mOutNote[in.note] = -1;
+         }
+      }
+
+      mPending.FireDue(mSamplePos, numFrames, mOutbox, this);
+      mSamplePos += (uint64_t)numFrames;
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+
+   void SetParams(float timingMs, float velocityPct)
+   {
+      mTimingMs.store(timingMs, std::memory_order_relaxed);
+      mVelocityPct.store(velocityPct, std::memory_order_relaxed);
+   }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox = nullptr;
+   double mSampleRate = 48000.0;
+   uint64_t mSamplePos = 0;
+   DspMath::WhiteNoise mRng;
+   int mOutNote[128] = {};
+   DeferredNoteQueue<kMaxPending> mPending;
+   std::atomic<float> mTimingMs { 0.0f };
+   std::atomic<float> mVelocityPct { 0.0f };
+};
+
+HumanizerNode::HumanizerNode() = default;
+HumanizerNode::~HumanizerNode() = default;
+
+void HumanizerNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioHumanizerNode>();
+   mAudioNode->SetParams(timingMs, velocityPct);
+}
+
+void HumanizerNode::VisitParams(ParamVisitor& v)
+{
+   v.Float("timingMs", timingMs);
+   v.Float("velocityPct", velocityPct);
+}
+
+AudioNode* HumanizerNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioHumanizerNode>();
+   return mAudioNode.get();
+}
+
+// ---- Quantizer ----
+class AudioQuantizerNode : public AudioNode
+{
+public:
+   static constexpr int kMaxPending = 32;
+
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mSampleRate = sampleRate;
+      mSamplePos = 0;
+      for (int i = 0; i < 128; i++)
+         mOutNote[i] = -1;
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
+   {
+      const int numFrames = output.numFrames;
+      const int div = std::clamp(mDiv.load(std::memory_order_relaxed), 0, kNumQuantizeDiv - 1);
+      const double bpm = (double)Transport::Instance().Tempo();
+      const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
+
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+
+      for (int i = 0; i < n; i++)
+      {
+         const NoteEvent& in = evts[i];
+         if (in.note < 0 || in.note > 127)
+            continue;
+
+         if (in.isNoteOn)
+         {
+            uint64_t onsetAbs = mSamplePos + (uint64_t)in.frameOffset;
+            if (div > 0)
+            {
+               const double gridSamples = std::max(1.0, kQuantizeBeats[div] * samplesPerBeat);
+               onsetAbs = (uint64_t)(std::ceil((double)onsetAbs / gridSamples) * gridSamples);
+            }
+            mOutNote[in.note] = in.note;
+
+            if (onsetAbs < mSamplePos + (uint64_t)numFrames)
+            {
+               NoteEvent out;
+               out.note = in.note;
+               out.velocity = in.velocity;
+               out.isNoteOn = true;
+               out.frameOffset = (int)(onsetAbs - mSamplePos);
+               out.source = this;
+               mOutbox.Push(out);
+            }
+            else if (DeferredNote* slot = mPending.FreeSlot())
+            {
+               slot->active = true;
+               slot->note = in.note;
+               slot->velocity = in.velocity;
+               slot->isNoteOn = true;
+               slot->targetSample = onsetAbs;
+            }
+         }
+         else
+         {
+            if (mOutNote[in.note] < 0)
+               continue;
+            NoteEvent out = in;
+            out.source = this;
+            mOutbox.Push(out);
+            mOutNote[in.note] = -1;
+         }
+      }
+
+      mPending.FireDue(mSamplePos, numFrames, mOutbox, this);
+      mSamplePos += (uint64_t)numFrames;
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+
+   void SetDiv(int d) { mDiv.store(d, std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox = nullptr;
+   double mSampleRate = 48000.0;
+   uint64_t mSamplePos = 0;
+   int mOutNote[128] = {};
+   DeferredNoteQueue<kMaxPending> mPending;
+   std::atomic<int> mDiv { 0 };
+};
+
+QuantizerNode::QuantizerNode() = default;
+QuantizerNode::~QuantizerNode() = default;
+
+void QuantizerNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioQuantizerNode>();
+   mAudioNode->SetDiv(div);
+}
+
+void QuantizerNode::VisitParams(ParamVisitor& v) { v.Int("div", div); }
+
+AudioNode* QuantizerNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioQuantizerNode>();
+   return mAudioNode.get();
+}
+
+// ---- Glide ----
+class AudioGlideNode : public AudioNode
+{
+public:
+   static constexpr int kMaxPending = 64; // up to 16 glide steps x 2 events + headroom
+
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mSampleRate = sampleRate;
+      mSamplePos = 0;
+      mLastOutNote = -1;
+      for (int i = 0; i < 128; i++)
+         mOutNote[i] = -1;
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
+   {
+      const int numFrames = output.numFrames;
+      const float glideMs = std::max(0.0f, mGlideMs.load(std::memory_order_relaxed));
+
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+
+      for (int i = 0; i < n; i++)
+      {
+         const NoteEvent& in = evts[i];
+         if (in.note < 0 || in.note > 127)
+            continue;
+
+         if (in.isNoteOn)
+         {
+            uint64_t onsetAbs = mSamplePos + (uint64_t)in.frameOffset;
+
+            if (glideMs > 0.0f && mLastOutNote >= 0 && mLastOutNote != in.note)
+            {
+               const int steps = std::clamp(std::abs(in.note - mLastOutNote), 1, 16);
+               const int dir = in.note > mLastOutNote ? 1 : -1;
+               const double stepSamples = std::max(1.0, (glideMs * 0.001 * mSampleRate) / (double)steps);
+               const uint64_t stepBase = onsetAbs;
+               for (int k = 0; k < steps - 1; k++)
+               {
+                  const int stepNote = std::clamp(mLastOutNote + dir * (k + 1), 0, 127);
+                  const uint64_t onSample = stepBase + (uint64_t)((double)k * stepSamples);
+                  const uint64_t offSample = stepBase + (uint64_t)((double)(k + 1) * stepSamples);
+                  if (DeferredNote* on = mPending.FreeSlot())
+                  {
+                     on->active = true;
+                     on->note = stepNote;
+                     on->velocity = in.velocity;
+                     on->isNoteOn = true;
+                     on->targetSample = onSample;
+                  }
+                  if (DeferredNote* off = mPending.FreeSlot())
+                  {
+                     off->active = true;
+                     off->note = stepNote;
+                     off->velocity = 0.0f;
+                     off->isNoteOn = false;
+                     off->targetSample = offSample;
+                  }
+               }
+               onsetAbs = stepBase + (uint64_t)((double)(steps - 1) * stepSamples);
+            }
+
+            mLastOutNote = in.note;
+            mOutNote[in.note] = in.note;
+
+            if (onsetAbs < mSamplePos + (uint64_t)numFrames)
+            {
+               NoteEvent out;
+               out.note = in.note;
+               out.velocity = in.velocity;
+               out.isNoteOn = true;
+               out.frameOffset = (int)(onsetAbs - mSamplePos);
+               out.source = this;
+               mOutbox.Push(out);
+            }
+            else if (DeferredNote* on = mPending.FreeSlot())
+            {
+               on->active = true;
+               on->note = in.note;
+               on->velocity = in.velocity;
+               on->isNoteOn = true;
+               on->targetSample = onsetAbs;
+            }
+         }
+         else
+         {
+            if (mOutNote[in.note] < 0)
+               continue;
+            NoteEvent out = in;
+            out.source = this;
+            mOutbox.Push(out);
+            mOutNote[in.note] = -1;
+         }
+      }
+
+      mPending.FireDue(mSamplePos, numFrames, mOutbox, this);
+      mSamplePos += (uint64_t)numFrames;
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+
+   void SetGlideMs(float ms) { mGlideMs.store(ms, std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox = nullptr;
+   double mSampleRate = 48000.0;
+   uint64_t mSamplePos = 0;
+   int mOutNote[128] = {};
+   int mLastOutNote = -1;
+   DeferredNoteQueue<kMaxPending> mPending;
+   std::atomic<float> mGlideMs { 0.0f };
+};
+
+GlideNode::GlideNode() = default;
+GlideNode::~GlideNode() = default;
+
+void GlideNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioGlideNode>();
+   mAudioNode->SetGlideMs(glideMs);
+}
+
+void GlideNode::VisitParams(ParamVisitor& v) { v.Float("glideMs", glideMs); }
+
+AudioNode* GlideNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioGlideNode>();
+   return mAudioNode.get();
+}
+
+// ---- Vibrato ----
+// No AudioNode/two-object pair here, deliberately - like LFONode
+// (ModulatorNodes.cpp), a pin-less modulator's ProcessBlock would never get
+// ticked (nothing in the audio graph calls it; only downstream consumers
+// sample Value01()), so this computes straight off Transport::Seconds() on
+// whichever thread reads it, the same way LFONode reads Transport::Beats().
+VibratoNode::VibratoNode() = default;
+VibratoNode::~VibratoNode() = default;
+
+void VibratoNode::CookIfNeeded(int /*frameId*/) {}
+
+void VibratoNode::VisitParams(ParamVisitor& v) { v.Float("rateHz", rateHz); }
+
+float VibratoNode::Value01()
+{
+   const double seconds = Transport::Instance().Seconds();
+   const double hz = (double)std::max(0.01f, rateHz);
+   const double phase = std::fmod(seconds * hz, 1.0);
+   return (float)(0.5 + 0.5 * std::sin(phase * 2.0 * M_PI));
 }
 
 // ------------------------------------------------------------------ Note Echo

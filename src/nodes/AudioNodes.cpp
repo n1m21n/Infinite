@@ -8,6 +8,7 @@
 #include "audio/DspMath.h"
 #include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
+#include "platform/Platform.h"
 
 namespace
 {
@@ -253,5 +254,86 @@ AudioNode* SplitterNode::GetAudioNode()
 {
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioSplitterNode>();
+   return mAudioNode.get();
+}
+
+// ----------------------------------------------------------------------- In
+class AudioCaptureNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mMailbox.PrepareToPlay(sampleRate);
+      mMailbox.SetImmediate(kGainDbParam, mGainDb.load(std::memory_order_relaxed));
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
+   {
+      // Platform::AudioInputCaptureRead is lock-free and zero-fills on
+      // underrun, so this is safe to call unconditionally even before the
+      // tap has produced its first block (or if mic permission was denied).
+      float* chans[2] = { buffer.channels[0], buffer.numChannels > 1 ? buffer.channels[1] : buffer.channels[0] };
+      const int captured = Platform::AudioInputCaptureRead(chans, buffer.numFrames, 2);
+
+      float peak = 0.0f;
+      for (int i = 0; i < buffer.numFrames; i++)
+      {
+         const float linear = DspMath::DbToLinear(mMailbox.SmoothedValue(kGainDbParam));
+         for (int ch = 0; ch < buffer.numChannels; ch++)
+         {
+            const float s = (captured > 0) ? buffer.channels[std::min(ch, captured - 1)][i] : 0.0f;
+            const float v = s * linear;
+            buffer.channels[ch][i] = v;
+            peak = std::max(peak, std::fabs(v));
+         }
+      }
+      mMeter.Write(&peak, 1);
+   }
+
+   // Main thread only.
+   void PushParams(float gainDb)
+   {
+      mGainDb.store(gainDb, std::memory_order_relaxed);
+      mMailbox.Push(kGainDbParam, gainDb);
+   }
+
+   MeterRing& Meter() { return mMeter; }
+
+private:
+   ParamMailbox mMailbox;
+   MeterRing mMeter;
+   std::atomic<float> mGainDb { 0.0f };
+};
+
+AudioInputNode::AudioInputNode() { Platform::AudioInputCaptureAddRef(); }
+
+AudioInputNode::~AudioInputNode() { Platform::AudioInputCaptureRemoveRef(); }
+
+void AudioInputNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioCaptureNode>();
+   mAudioNode->PushParams(gainDb);
+
+   std::string error;
+   Platform::AudioInputCapturePump(error); // no-op once the tap is already live
+
+   float peak = 0.0f;
+   if (mAudioNode->Meter().Read(&peak, 1) > 0)
+      mLevel = peak;
+}
+
+void AudioInputNode::VisitParams(ParamVisitor& v)
+{
+   v.Float("gainDb", gainDb);
+}
+
+AudioNode* AudioInputNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioCaptureNode>();
    return mAudioNode.get();
 }

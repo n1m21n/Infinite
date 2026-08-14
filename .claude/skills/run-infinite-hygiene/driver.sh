@@ -85,6 +85,7 @@ TESTS=(
   "WTDRAGTEST:35"
   "AUDIOPARAMSWEEPTEST:1"
   "AUDIOTEARDOWNSWEEPTEST:10"
+  "SAMPLERDRAGTEST:600"
 )
 
 step() { printf '\n== %s ==\n' "$1"; }
@@ -183,6 +184,16 @@ if [ $FAIL -gt 0 ]; then
   echo "larger control surface to match KHS Audio's reference plugins per"
   echo ".claude/skills/new-audio-node/SKILL.md's minimalism rule, which is also why"
   echo "this list is now much shorter than it used to be."
+  echo "known baseline: AUDIOPARAMSWEEPTEST also reports [FAIL] on all nine Sample"
+  echo "Player params (pitch, finetune, speed, start, end, volume, loop, reverse,"
+  echo "pingpong - registered type name is still \"Sampler\"). The sweep's generic rig"
+  echo "constructs a bare throwaway instance with no file loaded, and an unloaded"
+  echo "Sample Player is silent by design (matching Audio File's \"no file loaded\""
+  echo "behaviour) - with nothing playing, no param can ever produce a measurable"
+  echo "difference in the rendered signature. Confirmed correct by loading a real"
+  echo "sample and checking each param (plus reverse/pingpong/end behaviour and the"
+  echo "record input) audibly/visibly changes playback; see SAMPLERTEST inside"
+  echo "RunSamplerFixture in main.cpp, and SamplerNode.cpp's ProcessBlock."
   exit 1
 fi
 echo "all checks green."

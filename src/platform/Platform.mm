@@ -1951,6 +1951,141 @@ namespace Platform
       return (uint32_t)frames;
    }
 
+   // ------------------------------------------- input capture (Audio In node)
+   namespace
+   {
+      // Lock-free single-producer (the tap block, called on whatever thread
+      // AVAudioEngine services its input node from)/single-consumer (the
+      // device's real-time render thread, inside AudioCaptureNode::ProcessBlock)
+      // ring - same head/tail-mod-capacity shape as MeterRing, just sized for
+      // raw waveform rather than decimated meter data. One per channel; a mono
+      // input device writes the same sample into both so a consumer can always
+      // ask for stereo.
+      constexpr size_t kInputRingCapacity = 1 << 15; // ~0.74s at 44.1kHz - generous cushion, cheap to hold
+      struct InputRing
+      {
+         float entries[kInputRingCapacity] {};
+         std::atomic<size_t> head { 0 };
+         std::atomic<size_t> tail { 0 };
+
+         void Write(const float* samples, int count)
+         {
+            size_t t = tail.load(std::memory_order_relaxed);
+            const size_t h = head.load(std::memory_order_acquire);
+            for (int i = 0; i < count; i++)
+            {
+               const size_t next = (t + 1) % kInputRingCapacity;
+               if (next == h)
+                  break; // full: consumer isn't draining fast enough, drop the rest
+               entries[t] = samples[i];
+               t = next;
+            }
+            tail.store(t, std::memory_order_release);
+         }
+
+         int Read(float* out, int maxCount)
+         {
+            size_t h = head.load(std::memory_order_relaxed);
+            const size_t t = tail.load(std::memory_order_acquire);
+            int n = 0;
+            while (h != t && n < maxCount)
+            {
+               out[n++] = entries[h];
+               h = (h + 1) % kInputRingCapacity;
+            }
+            head.store(h, std::memory_order_release);
+            return n;
+         }
+
+         void Clear()
+         {
+            head.store(0, std::memory_order_relaxed);
+            tail.store(0, std::memory_order_relaxed);
+         }
+      };
+
+      InputRing gInputRing[2];
+      int gInputCaptureWantCount = 0; // how many AudioInputNode instances are alive
+      bool gInputTapInstalled = false; // whether the tap is actually live on the CURRENT engine
+   }
+
+   void AudioInputCaptureAddRef() { gInputCaptureWantCount++; }
+
+   void AudioInputCaptureRemoveRef()
+   {
+      if (gInputCaptureWantCount > 0)
+         gInputCaptureWantCount--;
+   }
+
+   void AudioInputCapturePump(std::string& outError)
+   {
+      if (gInputCaptureWantCount <= 0)
+      {
+         if (gInputTapInstalled && gDeviceHandle != nullptr)
+         {
+            @autoreleasepool
+            {
+               [[gDeviceHandle->engine inputNode] removeTapOnBus:0];
+            }
+         }
+         gInputTapInstalled = false;
+         return;
+      }
+
+      if (gInputTapInstalled)
+         return; // already live on the current engine - nothing to do
+
+      if (gDeviceHandle == nullptr)
+      {
+         outError = "output device not open yet";
+         return;
+      }
+
+      @autoreleasepool
+      {
+         AVAudioInputNode* input = [gDeviceHandle->engine inputNode];
+         AVAudioFormat* format = [input inputFormatForBus:0];
+         if (format == nil || format.sampleRate <= 0 || format.channelCount == 0)
+         {
+            outError = "no audio input available (check System Settings > Privacy > Microphone)";
+            return;
+         }
+
+         gInputRing[0].Clear();
+         gInputRing[1].Clear();
+
+         [input installTapOnBus:0 bufferSize:1024 format:format
+                          block:^(AVAudioPCMBuffer* buffer, AVAudioTime*) {
+            const float* const* channels = buffer.floatChannelData;
+            if (channels == nullptr)
+               return;
+            const int numFrames = (int)buffer.frameLength;
+            gInputRing[0].Write(channels[0], numFrames);
+            gInputRing[1].Write(buffer.format.channelCount > 1 ? channels[1] : channels[0], numFrames);
+         }];
+
+         gInputTapInstalled = true;
+         outError.clear();
+      }
+   }
+
+   bool AudioInputCaptureIsRunning() { return gInputTapInstalled; }
+
+   int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels)
+   {
+      if (!gInputTapInstalled)
+         return 0;
+
+      const int channels = std::min(maxChannels, 2);
+      for (int ch = 0; ch < channels; ch++)
+      {
+         const int got = gInputRing[ch].Read(outChannels[ch], numFrames);
+         for (int i = got; i < numFrames; i++)
+            outChannels[ch][i] = 0.0f; // underrun tail: zero-fill rather than repeat stale samples
+      }
+      return channels;
+   }
+
    bool AudioDeviceOpen(AudioRenderCallback callback, void* userData, double& outSampleRate, std::string& outError,
                         uint32_t requestedDeviceId, double requestedSampleRate, int requestedBufferFrames)
    {
@@ -2065,6 +2200,14 @@ namespace Platform
          // error, and an uncaught one aborts the process.
          @try
          {
+            // Any live AudioInputCaptureStart tap is on this same engine's
+            // inputNode - drop it before the engine goes away, or the tap
+            // block would keep firing (or dangle) against a stopped engine.
+            if (gInputTapInstalled)
+            {
+               [[h->engine inputNode] removeTapOnBus:0];
+               gInputTapInstalled = false;
+            }
             [h->engine stop];
             [h->engine detachNode:h->source];
          }
@@ -2142,6 +2285,79 @@ namespace Platform
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
+   std::string OpenFolderDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:NO];
+         [panel setCanChooseDirectories:YES];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Add sample folder"];
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
+   bool DecodeAudioFileToBuffer(const std::string& path, SampleBuffer& outBuffer, std::string& outError)
+   {
+      @autoreleasepool
+      {
+         NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
+         NSURL* url = [NSURL fileURLWithPath:nsPath];
+         NSError* err = nil;
+         AVAudioFile* file = [[AVAudioFile alloc] initForReading:url error:&err];
+         if (file == nil)
+         {
+            outError = err ? std::string([[err localizedDescription] UTF8String]) : "could not open audio file";
+            return false;
+         }
+
+         AVAudioFormat* format = file.processingFormat;
+         const AVAudioFrameCount numFrames = (AVAudioFrameCount)file.length;
+         if (numFrames == 0)
+         {
+            outError = "empty audio file";
+            return false;
+         }
+
+         AVAudioPCMBuffer* buffer = [[AVAudioPCMBuffer alloc] initWithPCMFormat:format frameCapacity:numFrames];
+         if (buffer == nil)
+         {
+            outError = "could not allocate decode buffer";
+            return false;
+         }
+
+         if (![file readIntoBuffer:buffer error:&err])
+         {
+            outError = err ? std::string([[err localizedDescription] UTF8String]) : "failed to decode audio file";
+            return false;
+         }
+
+         const int channels = (int)format.channelCount;
+         const int frames = (int)buffer.frameLength;
+         const float* const* channelData = buffer.floatChannelData;
+         if (channelData == nullptr || channels <= 0 || frames <= 0)
+         {
+            outError = "decoded buffer had no float channel data";
+            return false;
+         }
+
+         outBuffer.channels = channels;
+         outBuffer.numFrames = frames;
+         outBuffer.sampleRate = format.sampleRate;
+         outBuffer.channelData.resize((size_t)channels * (size_t)frames);
+         for (int ch = 0; ch < channels; ++ch)
+            std::copy(channelData[ch], channelData[ch] + frames,
+                      outBuffer.channelData.begin() + (size_t)ch * (size_t)frames);
+
+         outError.clear();
+         return true;
       }
    }
 

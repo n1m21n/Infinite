@@ -182,6 +182,14 @@ public:
    static constexpr int kStages = 3;
    static constexpr int kCoeffsPerStage = 5; // b0,b1,b2,a1,a2 (SVF only uses slots 0,1 as g,k)
    static constexpr int kOutputGainSlot = kStages * kCoeffsPerStage;
+   // Raw freq/Q/gain are pushed too (not just the precomputed coeffs above) so
+   // ProcessBlock can recompute coefficients per-sample when the envelope
+   // knob is in use - the fast path (envAmount == 0) still just applies the
+   // precomputed coeffs and never touches these.
+   static constexpr int kFreqSlot = kOutputGainSlot + 1;
+   static constexpr int kQSlot = kFreqSlot + 1;
+   static constexpr int kGainSlot = kQSlot + 1;
+   static constexpr int kEnvAmountSlot = kGainSlot + 1;
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
@@ -200,6 +208,7 @@ public:
             svf.Reset();
       for (auto& bq : mBiquad)
          bq.Reset();
+      mEnvFollower = 0.0f;
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -209,15 +218,71 @@ public:
       const int numChannels = std::min({ in.numChannels, out.numChannels, kMaxChannels });
       const int type = mType.load(std::memory_order_relaxed);
 
+      // Envelope-follower time constants for the "env" knob's auto-wah style
+      // cutoff sweep - fast attack, slower release, the standard envelope
+      // filter shape. Computed once per block; mSampleRate is set in
+      // PrepareToPlay/PushParams and doesn't change mid-block.
+      const float attackCoef = expf(-1.0f / (float)(mSampleRate * 0.003));
+      const float releaseCoef = expf(-1.0f / (float)(mSampleRate * 0.080));
+
       for (int i = 0; i < out.numFrames; i++)
       {
-         // Per-sample smoothed coefficients, read once per sample and shared
-         // across channels (the coefficients don't vary per channel; only the
-         // filter *state* below does).
+         const float envAmount = mMailbox.SmoothedValue(kEnvAmountSlot);
+         const bool envActive = std::fabs(envAmount) > 1.0e-4f;
+
+         // Envelope follower runs on the input's peak magnitude across
+         // channels, once per sample, regardless of envActive - so the
+         // follower is already settled the moment the knob is turned up
+         // rather than starting cold.
+         float peak = 0.0f;
+         for (int ch = 0; ch < numChannels; ch++)
+            peak = std::max(peak, std::fabs(in.channels[ch][i]));
+         const float coef = peak > mEnvFollower ? attackCoef : releaseCoef;
+         mEnvFollower = peak + coef * (mEnvFollower - peak);
+
          float coeffs[kStages][kCoeffsPerStage];
-         for (int s = 0; s < kStages; s++)
-            for (int c = 0; c < kCoeffsPerStage; c++)
-               coeffs[s][c] = mMailbox.SmoothedValue(s * kCoeffsPerStage + c);
+         if (!envActive)
+         {
+            // Fast path: precomputed, smoothed coefficients from PushParams -
+            // unchanged behaviour for every patch that leaves env at 0.
+            for (int s = 0; s < kStages; s++)
+               for (int c = 0; c < kCoeffsPerStage; c++)
+                  coeffs[s][c] = mMailbox.SmoothedValue(s * kCoeffsPerStage + c);
+         }
+         else
+         {
+            // Recompute this sample's coefficients from the modulated
+            // cutoff - envAmount is in octaves of shift, scaled by the
+            // follower's 0-1 envelope.
+            const float freq = mMailbox.SmoothedValue(kFreqSlot);
+            const float q = mMailbox.SmoothedValue(kQSlot);
+            const float gainDb = mMailbox.SmoothedValue(kGainSlot);
+            const float freqMod =
+               std::clamp(freq * powf(2.0f, envAmount * mEnvFollower * 4.0f), 20.0f, 20000.0f);
+
+            if (AudioFilterDsp::IsSvf(type))
+            {
+               const float g = tanf((float)M_PI * freqMod / (float)mSampleRate);
+               const float k = 1.0f / std::max(0.01f, q);
+               const int stages = AudioFilterDsp::SvfStageCount(type);
+               for (int s = 0; s < stages; s++)
+               {
+                  coeffs[s][0] = g;
+                  coeffs[s][1] = k;
+               }
+            }
+            else
+            {
+               DspMath::Biquad bq;
+               AudioFilterDsp::ConfigureBiquad(bq, type, freqMod, q, gainDb, mSampleRate);
+               coeffs[0][0] = bq.b0;
+               coeffs[0][1] = bq.b1;
+               coeffs[0][2] = bq.b2;
+               coeffs[0][3] = bq.a1;
+               coeffs[0][4] = bq.a2;
+            }
+         }
+
          const float outputGain =
             DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputGainSlot));
 
@@ -268,4 +333,5 @@ private:
 
    DspMath::TptSvf mSvf[kStages][kMaxChannels];
    DspMath::Biquad mBiquad[kMaxChannels];
+   float mEnvFollower = 0.0f;
 };

@@ -9,8 +9,10 @@ void StutterKernel::PushParams(const AudioEffectNode& node, double sampleRate)
    mSync.store(node.Param("sync") != 0.0f ? 1 : 0, std::memory_order_relaxed);
    mRateDiv.store(std::clamp((int)(node.Param("rateDiv") + 0.5f), 0, MusicTime::kNumRateDivisions - 1),
                   std::memory_order_relaxed);
+   mSteps.store(std::clamp((int)(node.Param("steps") + 0.5f), 2, kMaxGateSteps), std::memory_order_relaxed);
+   mGateMask.store(std::clamp((int)(node.Param("gateMask") + 0.5f), 0, (1 << kMaxGateSteps) - 1),
+                   std::memory_order_relaxed);
    mMailbox.Push(kFreeMs, node.Param("timeMs"));
-   mMailbox.Push(kChunkFrac, node.Param("chunk"));
 }
 
 void StutterKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
@@ -18,12 +20,14 @@ void StutterKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
    const int numChannels = std::min(in.numChannels, std::min(out.numChannels, 2));
    const bool sync = mSync.load(std::memory_order_relaxed) != 0;
    const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
+   const int steps = mSteps.load(std::memory_order_relaxed);
+   const int gateMask = mGateMask.load(std::memory_order_relaxed);
+   const float chunkFrac = 1.0f / (float)steps;
    const int grainCapacity = (int)mGrainL.size();
 
    for (int i = 0; i < out.numFrames; i++)
    {
       const float freeMs = mMailbox.SmoothedValue(kFreeMs);
-      const float chunkFrac = std::clamp(mMailbox.SmoothedValue(kChunkFrac), 0.02f, 1.0f);
 
       float periodSeconds;
       if (sync)
@@ -40,25 +44,31 @@ void StutterKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
       if (mCyclePos == 0)
          mCurrentChunkSamples = std::clamp((int)(chunkFrac * (float)periodSamples), 1, periodSamples);
 
+      // Which repeat-in-cycle this sample falls in - index 0 is the
+      // record-phase repeat itself, so gateMask can mute it too.
+      const int stepIdx = std::clamp(mCyclePos / std::max(1, mCurrentChunkSamples), 0, kMaxGateSteps - 1);
+      const bool audible = (gateMask & (1 << stepIdx)) != 0;
+
       const float inL = in.channels[0][i];
       const float inR = numChannels >= 2 ? in.channels[1][i] : inL;
 
       float outL, outR;
       if (mCyclePos < mCurrentChunkSamples)
       {
-         // Record phase: pass live audio through and capture it into the
-         // grain buffer for the loop phase that follows.
+         // Record phase: capture live audio into the grain buffer for the
+         // loop phase that follows - unconditionally, so a later un-muted
+         // repeat can still play it even if this repeat itself is muted.
          mGrainL[(size_t)mCyclePos] = inL;
          mGrainR[(size_t)mCyclePos] = inR;
-         outL = inL;
-         outR = inR;
+         outL = audible ? inL : 0.0f;
+         outR = audible ? inR : 0.0f;
       }
       else
       {
          // Loop phase: replay the captured grain on repeat.
          const int idx = mCyclePos % mCurrentChunkSamples;
-         outL = mGrainL[(size_t)idx];
-         outR = mGrainR[(size_t)idx];
+         outL = audible ? mGrainL[(size_t)idx] : 0.0f;
+         outR = audible ? mGrainR[(size_t)idx] : 0.0f;
       }
 
       out.channels[0][i] = outL;

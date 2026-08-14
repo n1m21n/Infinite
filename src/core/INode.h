@@ -23,6 +23,16 @@ class IAudioSource
 public:
    virtual ~IAudioSource() {}
    virtual AudioNode* GetAudioNode() = 0;
+
+   // True for a source whose signal comes from outside the process entirely
+   // (Audio In: a live mic/line-in tap) rather than from its own params
+   // (Wavetable, Gain's passthrough of an upstream cable). AUDIOPARAMSWEEPTEST
+   // uses this to know a param can't be shown to reach the audio thread by
+   // rendering a block headless - there's no hardware to capture from - the
+   // same reason a note source with no note-input pin (MIDI Notes) is
+   // unobservable there. Default false: the overwhelming majority of audio
+   // sources generate their own signal and are perfectly testable this way.
+   virtual bool IsHardwareDriven() const { return false; }
 };
 
 // Mix-in for a node that produces or forwards note events (Note Sequencer;

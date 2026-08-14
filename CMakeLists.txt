@@ -115,6 +115,8 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/NoteNodes.cpp
     src/nodes/WavetableNode.cpp
     src/nodes/AudioEffectNode.cpp
+    src/nodes/SamplerNode.cpp
+    src/audio/SampleScanner.cpp
 
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
