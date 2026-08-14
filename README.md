@@ -12,7 +12,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 
 ## Features
 
-**111 node types across ten categories.**
+**130+ node types across eleven categories.**
 
 | Category | Nodes |
 |---|---|
@@ -26,6 +26,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 | 3D | Geometry (8 primitives), Model 3D (obj/ply/stl/usd), Text 3D (extruded glyphs), Ocean (Gerstner waves), Transform, Array, Subdivide (Loop), Smooth (Taubin), Mirror, Screw, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Join Geometry, Material, Null 3D, Mesh to Points/Edges/Faces, Instance on Points, Wrap (cylindrical/spherical arc-length-preserving bend whose radius follows the target's size, tuned by a radius scale multiplier - or nearest-surface conform), **Particle System**, **Cloth**, Camera, Light (directional/point/sun/ambient), **HDRI** (equirectangular .hdr/.exr environment - background, reflections and ambient light for Render 3D), Render 3D |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
 | Modulators | LFO, Random, Pattern (8-step), Path (6 shapes), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio File**, **Audio Analyze** |
+| Audio / Note | **Wavetable** synth, **MIDI Notes** (live MIDI input), **Envelope**, **Gain**, **Audio Out**, **Mixer**, **Splitter**, and 15 effect nodes — Audio Filter, Dynamics, Delay, Reverb, Drive, Stereo, Pitch Shifter, Chorus, Flanger, Phaser, Bitcrush, Transient Shaper, Stutter, Ring Mod, Formant Filter |
 | Output | Output (PNG export + H.264 recording, with an optional audio track) |
 
 - **Live 1:1 preview on every node**, including effects and compositing.
@@ -79,6 +80,17 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 - **Draw** — paint straight onto the node with six procedural brushes, an
   eraser, and optional image underneath. Strokes can be recorded and replayed
   as an animation, in time with the transport.
+- **Audio / note engine** — a second, dedicated cable type and DAG runs
+  alongside the image graph, built on a Bespoke-style pull-based audio
+  callback. **Wavetable** is the synth source, **MIDI Notes** brings in a
+  live MIDI controller with the transport clock-synced to it, and 15 effect
+  nodes (filter, compression, delay, reverb, drive, stereo imaging, pitch
+  shift, chorus, flanger, phaser, bitcrush, transient shaping, stutter, ring
+  mod, formant filter) chain after it — each rendered as a real
+  plugin-style control surface with knobs, switches and a live visualizer
+  rather than a generic parameter list. Every audio param is patchable by
+  the same modulators that drive the image graph, so a **Macro Knob** or an
+  **LFO** can sweep a filter cutoff exactly like it sweeps a blur radius.
 
 ## Install
 

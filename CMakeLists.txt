@@ -61,6 +61,17 @@ add_executable(Infinite MACOSX_BUNDLE
     src/audio/dsp/DynamicsKernel.cpp
     src/audio/dsp/DelayKernel.cpp
     src/audio/dsp/ReverbKernel.cpp
+    src/audio/dsp/DriveKernel.cpp
+    src/audio/dsp/StereoKernel.cpp
+    src/audio/dsp/PitchShiftKernel.cpp
+    src/audio/dsp/ChorusKernel.cpp
+    src/audio/dsp/FlangerKernel.cpp
+    src/audio/dsp/PhaserKernel.cpp
+    src/audio/dsp/BitcrushKernel.cpp
+    src/audio/dsp/TransientShaperKernel.cpp
+    src/audio/dsp/StutterKernel.cpp
+    src/audio/dsp/RingModKernel.cpp
+    src/audio/dsp/FormantFilterKernel.cpp
     src/nodes/ImageSourceNode.cpp
     src/nodes/ShapeNode.cpp
     src/nodes/FormulaNode.cpp

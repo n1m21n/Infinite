@@ -48,6 +48,13 @@ struct EffectParamDef
    // Every entry must hold simultaneously for this param to be observable in
    // isolation. Empty = always live (most params).
    std::vector<EffectParamPrereq> prerequisites;
+   // Explicit alternate values to try in the sweep's Check B, in order,
+   // instead of the generic AlternateInts/AlternateFloats sequence. Empty
+   // (the default) uses the generic sequence, which is right for most
+   // params. Needed when a param's meaningful range is wider than the
+   // generic small-number sequence reaches relative to the sweep rig's fixed
+   // probe note (69) - Note Filter's rangeLow (0..127) is the first case.
+   std::vector<float> testCandidates;
 };
 
 // Selects a node's visualizer draw function - the visualizer is the one
@@ -63,6 +70,17 @@ enum class EffectVisualizerId
    kDynamicsTransfer,
    kDelayTaps,
    kReverbDecay,
+   kDriveCurve,
+   kStereoGoniometer,
+   kPitchShiftDisplay,
+   kChorusScatter,
+   kFlangerScatter,
+   kPhaserScatter,
+   kBitcrushWave,
+   kTransientEnvelope,
+   kStutterGrid,
+   kRingModWave,
+   kFormantVowel,
 };
 
 struct EffectDef

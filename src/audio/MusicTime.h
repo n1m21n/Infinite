@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -73,6 +74,17 @@ namespace MusicTime
          case kSixtyFourth: return 0.0625;
          default: return 1.0;
       }
+   }
+
+   // Hz for one full cycle at rate division `d`, at `bpm` - the inverse of
+   // BeatsFor's period, used by Chorus/Flanger/Phaser's sync-to-tempo rate
+   // mode so their LFO can lock to the same rate-division table Delay/Stutter
+   // already use for their tempo-synced time, rather than a separate Hz
+   // conversion living in each kernel.
+   inline double HzForRateDivision(RateDivision d, double bpm)
+   {
+      const double periodSeconds = BeatsFor(d) * 60.0 / std::max(1.0, bpm);
+      return periodSeconds > 0.0 ? 1.0 / periodSeconds : 0.0;
    }
 
    // Labels every DAW uses, in the same slowest-to-fastest order as the enum.

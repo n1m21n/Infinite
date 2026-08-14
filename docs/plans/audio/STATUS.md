@@ -34,10 +34,12 @@ Generic since 2026-08-13: `InputCountFor` counts audio/note pins by probing
 per-node ladder left is `DrawAudioNodeBody` (and, for `AudioEffectNode`, a
 second dispatch on `EffectDef::name` inside that same branch).
 
-## Nodes — 11 of 30 shipped
+## Nodes — 22 of 30-plus-8 shipped (effects list expanded past the original 30, see P3c below)
 
 **Shipped:** Wavetable · Gain · Audio Out · Mixer · Splitter · MIDI Notes ·
-Envelope · Audio Filter · Dynamics · Delay · Reverb
+Envelope · Audio Filter · Dynamics · Delay · Reverb · Drive · Stereo ·
+Pitch Shifter · Chorus · Flanger · Phaser · Bitcrush · Transient Shaper ·
+Stutter · Ring Mod · Formant Filter
 
 ### P3a Notes — 1 of 7 (+ Envelope)
 
@@ -62,7 +64,13 @@ Envelope · Audio Filter · Dynamics · Delay · Reverb
 | Resonator | **left** — metallic / modal / string / plate |
 | Sampler | **left** — classic/slice/repitch/granular/spectral, one session of its own |
 
-### P3c Effects — 4 of 7
+### P3c Effects — 15 of 7 (original consolidation exceeded per 2026-08-14 user request)
+
+The user asked to expand past the README §3 7-effect consolidation and add 8
+more, specifying the exact list and pointing at a screenshot of the KHS Audio
+plugin suite as the params/knobs reference for all of them (the same
+reference the minimalism rule already treats as the control-surface bar).
+All 15 are `AudioEffectNode` table entries — no new node class, per §0.4.
 
 | Node | State |
 |---|---|
@@ -70,9 +78,27 @@ Envelope · Audio Filter · Dynamics · Delay · Reverb
 | Dynamics | shipped — `DynamicsKernel` (`src/audio/dsp/`), Giannoulis/Massberg/Reiss soft-knee gain computer + branching detector, sidechain input (slot 1), transfer-curve visualizer with live operating point + GR bar. Compressor only (threshold/ratio/attack/release/makeup + peak-RMS switch + sidechain switch, 8 params) — cut down from an earlier 4-mode/17-param version to match KHS Audio Compressor's control surface, see `.claude/skills/new-audio-node/SKILL.md`'s minimalism rule |
 | Delay | shipped — `DelayKernel` (`src/audio/dsp/`), Hermite-interpolated fractional delay line, one mode plus a Bounce (ping-pong) on/off switch, single-knob tone tilt, tempo sync via `MusicTime`, decaying-tap-bars visualizer with a wet/dry level pair. 9 params — cut down from an earlier 4-mode/39-param version (multiband, multitap, saturation, HP/LP, mod rate/depth, L/R offset all removed, not hidden) to match KHS Audio Delay's control surface (time/tone/feedback/pan/duck/bounce/mix) |
 | Reverb | shipped — `ReverbKernel` (`src/audio/dsp/`), 8-line FDN with a Hadamard mixing matrix (Jot & Chaigne), Schroeder allpass diffusion, per-line one-pole damping, RT60-envelope visualizer with a wet/dry level pair. Algorithmic only (no convolution engine) — size/decay/damping/predelay + universal mix, 5 params, one mode. `decay`/`damping`/`predelay` are confirmed AUDIOPARAMSWEEPTEST blind spots (structural: they only affect what an FDN line *writes*, and a line's read trails its write by ~600-1100 samples at the default `size`, longer than the sweep's post-alteration window — see the comment on `EffectDefs.cpp`'s Reverb entry), hand-verified instead via `RunReverbFixture` (RT60 accuracy, predelay landing, damping-shortens-decay, no denormal/NaN spike on a long tail) |
-| Drive | **left** |
-| Pitch Time | **left** |
-| Stereo | **left** |
+| Drive | shipped — `DriveKernel` (`src/audio/dsp/`), tanh saturator (drive/bias/tone/color/output) with an always-on DC blocker. `color` (2026-08-14) blends tanh toward a harder arctan saturator for a warm-to-aggressive character axis distinct from `tone`'s spectral tilt — see `DriveDsp::RawShape`. One curve family, not the design doc's 6-mode dropdown, per the minimalism rule — see `DriveKernel.h`'s class comment |
+| Stereo | shipped — `StereoKernel`, M/S width/pan/bass-mono, polar stereo-field imager visualizer (2026-08-14, apex-centered dB-ring arcs + dB baseline scale + a filled width/pan wedge, matching the reference hardware-plugin goniometer layout — replaces the earlier rotated-45deg vectorscope). `width` is a confirmed AUDIOPARAMSWEEPTEST blind spot (the sweep's rig feeds identical L/R, so side is already zero) — see `EffectDefs.cpp`'s comment |
+| Pitch Shifter | shipped — `PitchShiftKernel`, classic two-tap crossfaded delay-line shifter (pitch, grain) |
+| Chorus | shipped — `ChorusKernel`, 2-3 tap modulated delay voices (delay/spread/taps/depth/feedback), sync-to-tempo rate (sync/rateDiv, mirrors Delay/Stutter) or free Hz. Knob rows are now 3-over-3 (delay/spread/depth, then feedback/mix/rate) so the rate control (dropdown or knob) sits in the row with the others instead of on its own. `rateDiv` is a confirmed blind spot, same category as Delay's — see `EffectDefs.cpp`'s comment |
+| Flanger | shipped — `FlangerKernel`, one modulated delay line with feedback (delay/depth/feedback), same sync-to-tempo rate mode as Chorus. Knob rows are 3-over-2 (delay/depth/feedback, then mix/rate). `rateDiv` confirmed blind spot, same category |
+| Phaser | shipped — `PhaserKernel`, cascaded first-order allpass stages (cutoff/depth/order/spread), same sync-to-tempo rate mode as Chorus. Knob rows are 3-over-3 (cutoff/depth/order, then spread/mix/rate). `rateDiv` confirmed blind spot, same category |
+| Bitcrush | shipped — `BitcrushKernel`, sample-rate reduction + bit quantization (rate, labelled "downsample" in the UI/bits). Visualizer redrawn (2026-08-14) as a filled, sample-and-held quantized arch (single hump, solid fill to baseline) matching the reference bitcrusher's staircase-fill look, replacing the earlier centered oscillating line |
+| Transient Shaper | shipped — `TransientShaperKernel`, dual-envelope difference detector (attack/sustain) |
+| Stutter | shipped — `StutterKernel`, tempo-synced beat-repeat/glitch loop (sync/rateDiv/timeMs/chunk). No visualizer (removed 2026-08-14 per explicit request — the card is knobs + sync toggle only now). `rateDiv` is a confirmed blind spot, same category as Delay's — see `EffectDefs.cpp`'s comment |
+| Ring Mod | shipped — `RingModKernel`, multiplies by a `DspMath::PolyBlepOsc` (freq/waveform/mix, mix is now a knob alongside freq/wave rather than a separate slider) |
+| Formant Filter | shipped — `FormantFilterKernel`, three parallel bandpass resonators morphed A-E-I-O-U (vowel/Q) |
+
+All 15 are green under `AUDIOTEARDOWNSWEEPTEST`. `AUDIOPARAMSWEEPTEST` is
+green except the pre-existing Dynamics/Delay/Reverb blind spots, Stereo's
+`width`, and Chorus/Flanger/Phaser/Stutter's `rateDiv` above — all
+confirmed-by-hand structural, not dropped mailbox pushes (Chorus/Flanger/
+Phaser's sync-to-tempo mode, added 2026-08-14, hits the exact same blind
+spot Delay/Stutter's own `rateDiv` already does, for the same reason). No
+per-node `RunXxxFixture` DSP fixture yet for Drive/Stereo/Pitch Shifter/
+Chorus/Flanger/Phaser/Bitcrush/Transient Shaper/Stutter/Ring Mod/Formant
+Filter — **left**, same as most of P3b/P3a below.
 
 `AudioEffectNode` (§0.4) is built and proven by Audio Filter's use, and now by
 Dynamics reusing the same table for a second, unrelated kernel: one

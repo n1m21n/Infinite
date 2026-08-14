@@ -54,6 +54,10 @@ namespace Patch
       int dstIndex = 0;
       int dstSlot = 0;
       int srcIndex = 0;
+      // Which of the source's note outputs this cable reads (NoteCable::
+      // GetOutputSlot()). Unused (always 0) for cable/geo/aud records - only
+      // Note Router has more than one note output.
+      int srcOutput = 0;
    };
 
    struct ModRecord

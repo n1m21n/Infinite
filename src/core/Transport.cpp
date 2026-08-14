@@ -33,16 +33,6 @@ void Transport::Tick(float deltaSeconds)
    if (deltaSeconds > 0.25f)
       deltaSeconds = 0.25f;
 
-   // External clock freshness ages regardless of play state or clock source -
-   // a MIDI clock source dropping out (deck unplugged, pause on the mixer)
-   // should still be detected while the transport itself is paused.
-   if (mExternalSync && mExternalClockFresh)
-   {
-      mExternalClockAge += deltaSeconds;
-      if (mExternalClockAge > kExternalClockTimeoutSeconds)
-         mExternalClockFresh = false;
-   }
-
    if (mAudioSampleRate.load(std::memory_order_relaxed) > 0.0)
       return; // audio-driven: Beats()/Seconds() compute live, nothing to accumulate here
 

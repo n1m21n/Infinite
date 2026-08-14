@@ -15,19 +15,30 @@
 class AudioEffectRuntime : public AudioNode
 {
 public:
-   explicit AudioEffectRuntime(const EffectDef& def) : mKernel(def.makeKernel()) {}
+   // Prepared here too, not just in PrepareToPlay: RebuildAudioTopology only
+   // calls PrepareToPlay when a real device is open (sampleRate > 0), but
+   // ProcessOffline (video export, and every offline self-test) will still
+   // run whatever topology is published regardless of device state. Without
+   // this, mSilence/mWetStorage and the kernel's own internal buffers
+   // (DelayKernel's line, ReverbKernel's FDN, ...) stay default-empty and
+   // the very first block dereferences a null vector<float>::data() - see
+   // AUDIOTEARDOWNSWEEPTEST, which runs with no device open at all. The real
+   // PrepareToPlay (with the device's actual sample rate) always follows
+   // once a topology rebuild sees sampleRate > 0, so this fallback rate only
+   // matters for the window before that, or when no device ever opens.
+   explicit AudioEffectRuntime(const EffectDef& def) : mKernel(def.makeKernel())
+   {
+      static constexpr double kFallbackSampleRate = 48000.0;
+      mKernel->PrepareToPlay(kFallbackSampleRate, kAudioMaxBlockFrames);
+      ResizeBuffers(kAudioMaxBlockFrames);
+   }
 
    void PrepareToPlay(double sampleRate, int maxBlockSize) override
    {
       mMixSmoother.SetTimeConstant(0.005f, sampleRate);
       mMixSmoother.SetImmediate(mMixTarget.load(std::memory_order_relaxed));
       mKernel->PrepareToPlay(sampleRate, maxBlockSize);
-
-      mMaxBlockSize = std::max(1, maxBlockSize);
-      mWetStorage.assign((size_t)mMaxBlockSize * kMaxChannels, 0.0f);
-      mSilence.assign((size_t)mMaxBlockSize, 0.0f);
-      for (int ch = 0; ch < kMaxChannels; ch++)
-         mWetChannels[ch] = mWetStorage.data() + (size_t)ch * mMaxBlockSize;
+      ResizeBuffers(maxBlockSize);
    }
 
    void Reset() override { mKernel->Reset(); }
@@ -90,6 +101,15 @@ public:
 
 private:
    static constexpr int kMaxChannels = 8;
+
+   void ResizeBuffers(int maxBlockSize)
+   {
+      mMaxBlockSize = std::max(1, maxBlockSize);
+      mWetStorage.assign((size_t)mMaxBlockSize * kMaxChannels, 0.0f);
+      mSilence.assign((size_t)mMaxBlockSize, 0.0f);
+      for (int ch = 0; ch < kMaxChannels; ch++)
+         mWetChannels[ch] = mWetStorage.data() + (size_t)ch * mMaxBlockSize;
+   }
 
    std::unique_ptr<IEffectKernel> mKernel;
    DspMath::OnePole mMixSmoother;

@@ -9,6 +9,13 @@ menu — not a proposal, a spec. Verified against the live tree
 (`src/main.cpp`, `GraphNode.h`, `INode.h`, `AudioNodes.h/.cpp`,
 `NoteNodes.h/.cpp`); line numbers drift, function/field names do not.
 
+**v6 (current) settles the compact-effect grammar** — Dynamics/Compressor,
+Delay and Reverb had each grown its own knob-row shape and visualizer height
+by accretion (one wide row of 5-6 knobs vs two rows of 3, 88px vs 90px
+graphs), which read as three different nodes rather than one family. See §1l
+for the settled numbers; every `AudioEffects`-category node built after this
+point uses them.
+
 The full critique that produced v3, with the verified defect list and the
 benchmark comparison behind each decision, is in
 [`audio-node-ui-review.md`](audio-node-ui-review.md). Read it before
@@ -59,8 +66,11 @@ Regions, top to bottom, fixed order:
 4. **Knob rows** — Tier 1 from the node's param inventory (§5), via
    `AudioKnobRow`. Cell width is `contentWidth / cellCount`, so a row is
    exactly the content width by construction. Prefer **two rows of four**
-   over one row of six or more. Every control in a row is a knob or a
-   `Dropdown` cell of the same pitch — v1's knob-for-some/slider-for-others
+   over one row of six or more, for a larger multi-mode node (Wavetable's
+   per-engine rows); the small single-mode `AudioEffects` nodes (Dynamics,
+   Delay, Reverb) use **two rows of three** specifically, with `mix` always
+   the last cell of the last row — see §1l. Every control in a row is a knob
+   or a `Dropdown` cell of the same pitch — v1's knob-for-some/slider-for-others
    Tier 1 was the thing that read as inconsistent, and v2's
    `DropdownButton` (which drew its label to the *right* of the button)
    broke the row's rhythm.
@@ -126,6 +136,67 @@ own `ItemSize` and moves it.
 
 Regression cover: `INFINITE_WTDRAGTEST=1`.
 
+### 1l. The compact-effect grammar: two rows of three, mix bottom-right (v6)
+
+Dynamics (Compressor), Delay and Reverb are the small, single-mode
+`AudioEffects` nodes — no engine dropdown, no per-band table, a handful of
+knobs and one graph. They all share `kAudioNodeWidth` (440), so a difference
+between them was never a width problem; it was that each picked its own row
+shape and graph height independently:
+
+| | knob rows (before) | graph height (before) |
+|---|---|---|
+| Dynamics | 1 row of 5 | 90px |
+| Delay | 1 row of 6 | 88px |
+| Reverb | 1 row of 5 | 88px |
+
+A single row spread 5-6 knobs across the full 440px with wide, sparse gaps
+between them and left the node much wider-looking than it was tall — the
+"why does this look so wide" complaint. **Settled shape for this node
+family:**
+
+- **Two `AudioKnobRow(3)` rows**, never one wide row. A node with 5 params
+  (Reverb) pads the second row's spare cell with `row.Skip()` rather than
+  stretching to fill it, *unless* there's a natural sixth control to add
+  (Reverb's `width` filled exactly this gap — see below); a node with 6
+  (Delay, Dynamics) splits evenly, 3 and 3.
+- **`mix` is always the last cell of the last row** — bottom-right, full
+  stop, in every `AudioEffects` node regardless of how many params come
+  before it. This is the standard, not a per-node choice: a user scanning
+  for "how wet is this" should find it in the same spot on Reverb, Delay,
+  Dynamics and any effect added after them.
+- **`kAudioTimeVizH` (150px)`** is the shared visualizer height for a
+  time-domain effect graph (Dynamics' transfer curve, Delay's tap graph,
+  Reverb's decay envelope) — one number so the three read as the same
+  instrument family. `Audio Filter`'s frequency response keeps its own
+  taller 190px (`kFilterVizH`-equivalent, still a local constant): a curve
+  read for precision at a glance needs more vertical resolution than these
+  three, which are read for overall shape. Give a time-domain graph a few
+  faint reference gridlines (amplitude at 25% steps, or the param's own
+  natural ticks like Dynamics' dB scale) rather than a bare curve on black —
+  cheap to draw, and it's most of what "reads as clear" actually means here.
+- **`kKnobStd` is 56px**, not 50. Bumped once, for every knob in every audio
+  node at once, because it is the single constant every `ModKnob` call
+  already derived from (§2's "one knob size" call already made mixed sizes
+  the wrong move — this just moved the shared value up for more presence at
+  440px body width).
+
+A `Dropdown` cell (Delay's tempo-synced `rate`) sits in the same
+`AudioKnobRow` as knobs and must match their vertical weight: the button
+is vertically **centred** in the knob-height cell (`y0 + (maxDia - btnH) *
+0.5f`), not bottom-aligned. Bottom-aligning left a tall empty gap above the
+button that read as the control "hanging low" next to knobs whose visual
+centre sits mid-cell.
+
+**Do not add a knob just to fill a row.** Reverb went from 5 params to 6
+(`width`, 0-1, stereo spread of the FDN's L/R split, default 1.0 reproducing
+the previous hardcoded behaviour exactly) because there was a real,
+previously-cut Tier 1 control sitting in the kernel's own "no width control
+in Tier 1" comment — not because 5 didn't divide evenly into two rows of 3.
+`row.Skip()` for a genuine 5-param node (see Reverb's row-1/row-2 split
+before `width` existed) is the correct move when there's nothing real left to
+add.
+
 ### 1k. The third width, and why it exists (v4)
 
 `kAudioWideWidth` was added for Wavetable and is not a licence for a wide
@@ -162,7 +233,7 @@ a column with no changes.
 | Section panel | Grouping Tier 2 params | `BeginAudioSection(label)` … `EndAudioSection()` |
 | Visualizer | Exactly one per node type, see §3 | Custom per catalogue entry, drawn straight to the node's `ImDrawList` at `gAudioBodyW` (no ImGui plot widget — matches the hand-rolled spectrum bars `DrawAudioAnalyzeParams` already uses) |
 
-**One knob size: `kKnobStd` (50).** v3 used `kKnobLarge`/`kKnobSmall` on the
+**One knob size: `kKnobStd` (56, bumped from 50 in v6 — see §1l).** v3 used `kKnobLarge`/`kKnobSmall` on the
 theory that size carries hierarchy. In practice mixed sizes in one body read as
 an inconsistency, not a ranking — the first thing a fresh pair of eyes asked
 was "why are all the knobs different sizes". `kKnobLarge`/`kKnobSmall` are now
@@ -606,3 +677,5 @@ Acceptance test for any new audio node, in order:
 4. The visualizer shows something meaningful with no audio running.
 5. Hovering any control puts its value in the readout strip, and nothing
    floats near the cursor.
+6. For a compact `AudioEffects` node (§1l): knobs are laid out as two rows of
+   three, not one wide row, and `mix` is the last cell of the last row.

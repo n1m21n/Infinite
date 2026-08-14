@@ -17,9 +17,9 @@
 // here. Convolution reverb is a second engine with its own file-loading,
 // worker-thread IR swap and FFT-partition kernel - the kind of "more capable,
 // closer to the spec doc" addition §0.5 explicitly calls out as not a reason
-// to build it. Tier 1 only: size, decay, damping, predelay, mix - 5 controls,
-// one processing mode, matching the KHS Audio Delay/Compressor control-
-// surface bar.
+// to build it. Tier 1 only: size, decay, damping, predelay, width, mix - 6
+// controls, one processing mode, matching the KHS Audio Delay/Compressor
+// control-surface bar's two rows of three.
 //
 // Kernel: 8-line FDN with a Hadamard mixing matrix (lossless, so the overall
 // output RT60 tracks the per-line target gain formula below), mutually-
@@ -166,6 +166,7 @@ public:
       kDecaySeconds,
       kDamping,
       kPredelayMs,
+      kWidth,
       kNumSlots
    };
 

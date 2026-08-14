@@ -6,6 +6,17 @@
 #include "dsp/DynamicsKernel.h"
 #include "dsp/DelayKernel.h"
 #include "dsp/ReverbKernel.h"
+#include "dsp/DriveKernel.h"
+#include "dsp/StereoKernel.h"
+#include "dsp/PitchShiftKernel.h"
+#include "dsp/ChorusKernel.h"
+#include "dsp/FlangerKernel.h"
+#include "dsp/PhaserKernel.h"
+#include "dsp/BitcrushKernel.h"
+#include "dsp/TransientShaperKernel.h"
+#include "dsp/StutterKernel.h"
+#include "dsp/RingModKernel.h"
+#include "dsp/FormantFilterKernel.h"
 #include "MusicTime.h"
 
 namespace
@@ -135,10 +146,10 @@ namespace
       // ---------------------------------------------------------------- Reverb
       // Algorithmic only - the design doc's `engine` dropdown (algorithmic /
       // convolution) and its whole Tier 2 table (diffusion, mod, early/late
-      // balance, tone shaping, width, freeze, and convolution's own IR-file
+      // balance, tone shaping, freeze, and convolution's own IR-file
       // sub-panel) are cut per .claude/skills/new-audio-node/SKILL.md's
-      // minimalism rule - see ReverbKernel.h's class comment. Tier 1 only:
-      // size, decay, damping, predelay - 4 params + the universal mix.
+      // minimalism rule - see ReverbKernel.h's class comment. Tier 1: size,
+      // decay, damping, predelay, width - 5 params + the universal mix.
       {
          EffectDef def;
          def.name = "Reverb";
@@ -168,10 +179,271 @@ namespace
          def.params.push_back({ "decay", 0.1f, 20.0f, 2.0f });
          def.params.push_back({ "damping", 0.0f, 1.0f, 0.4f });
          def.params.push_back({ "predelay", 0.0f, 500.0f, 20.0f });
+         // Stereo width: blends the FDN's even/odd-line L/R split back toward
+         // mono. Default 1.0 reproduces the fixed 0.6 cross-mix the kernel
+         // used before this param existed (see ReverbKernel.cpp), so adding
+         // it doesn't change any existing patch's sound.
+         def.params.push_back({ "width", 0.0f, 1.0f, 1.0f });
          // mix is AudioEffectNode's universal field (defaultMix above), not
          // a table row.
 
          def.makeKernel = []() { return std::make_unique<ReverbKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ----------------------------------------------------------------- Drive
+      // One saturator (tanh + bias), not the design doc's 6-mode curve
+      // dropdown - a mode selector with more than two choices is itself the
+      // smell .claude/skills/new-audio-node/SKILL.md's minimalism rule calls
+      // out, and tanh's own character sweeps from warm to fuzzy across the
+      // drive knob's own range. See DriveKernel.h's class comment.
+      {
+         EffectDef def;
+         def.name = "Drive";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kDriveCurve;
+
+         def.params.push_back({ "drive", 0.0f, 40.0f, 6.0f });
+         // bias only audibly matters once drive pushes the shaper into its
+         // nonlinear region - near-zero drive is close enough to linear
+         // that an offset barely warps the curve at all, but there's no
+         // clean binary gate for "audibly matters" the way Audio Filter's
+         // gain has (peak/shelf only) - left ungated, matches Reverb's
+         // `width` in staying a plain always-live param.
+         def.params.push_back({ "bias", -1.0f, 1.0f, 0.0f });
+         def.params.push_back({ "tone", -1.0f, 1.0f, 0.0f });
+         // color: 0 = pure tanh (warm), 1 = blended toward a harder arctan
+         // saturator (aggressive) - see DriveDsp::RawShape. Default 0 keeps
+         // every existing patch's sound identical to before this param
+         // existed.
+         def.params.push_back({ "color", 0.0f, 1.0f, 0.0f });
+         def.params.push_back({ "output", -24.0f, 12.0f, 0.0f });
+         // mix is AudioEffectNode's universal field, not a table row.
+
+         def.makeKernel = []() { return std::make_unique<DriveKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ---------------------------------------------------------------- Stereo
+      // Replaces stereo/panning/mono. Cut from the design doc's `mode`
+      // dropdown (stereo/mono/mid-side/swap) down to one always-on M/S
+      // width control - width=0 already gives mono, matches the KHS Audio
+      // Stereo module's three knobs. See StereoKernel.h's class comment.
+      {
+         EffectDef def;
+         def.name = "Stereo";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kStereoGoniometer;
+         // `width` is a confirmed (by hand) AUDIOPARAMSWEEPTEST blind spot,
+         // structural like Dynamics' `sidechainExternal`: the sweep's
+         // generic rig (BuildRig/FillDriveTone, main.cpp) writes the
+         // identical tone to both channels of every input slot, so
+         // side = 0.5*(L-R) is already exactly zero before `width` ever
+         // scales it - no prerequisite can fix an L==R rig. Hand-verified:
+         // width=0 collapses a real stereo source to mono, width=2 widens
+         // it, by inspection of the mid/side matrix in ProcessBlock.
+         def.params.push_back({ "width", 0.0f, 2.0f, 1.0f });
+         def.params.push_back({ "pan", -1.0f, 1.0f, 0.0f });
+         def.params.push_back({ "bassMono", 0.0f, 500.0f, 0.0f });
+         def.makeKernel = []() { return std::make_unique<StereoKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ---------------------------------------------------------- Pitch Shifter
+      // The two-tap crossfaded delay-line pitch shifter (see
+      // PitchShiftKernel.h). `pitch`/`grain` matches the KHS Audio Pitch
+      // Shifter module's big display + Grain Size knob; `jitter`/
+      // `correlate` from the reference image are cut per
+      // .claude/skills/new-audio-node/SKILL.md's minimalism rule.
+      {
+         EffectDef def;
+         def.name = "Pitch Shifter";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kPitchShiftDisplay;
+         def.params.push_back({ "pitch", -24.0f, 24.0f, 0.0f });
+         def.params.push_back({ "grain", 10.0f, 250.0f, 80.0f });
+         def.makeKernel = []() { return std::make_unique<PitchShiftKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ---------------------------------------------------------------- Chorus
+      // Matches the KHS Audio Chorus module's Delay/Spread/Taps/Depth/Rate/
+      // Mix control set, plus Feedback (BLEASS Chorus's own control set adds
+      // this too) and a sync-to-tempo mode for rate, mirroring Delay/
+      // Stutter's own sync/rateDiv pair exactly (same MusicTime table, same
+      // free-Hz fallback). See ChorusKernel.h's class comment.
+      {
+         EffectDef def;
+         def.name = "Chorus";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kChorusScatter;
+         def.defaultMix = 0.5f;
+         def.params.push_back({ "delay", 1.0f, 30.0f, 7.0f });
+         def.params.push_back({ "spread", 0.0f, 1.0f, 0.5f });
+         def.params.push_back({ "taps", 2.0f, 3.0f, 2.0f });
+         def.params.push_back({ "depth", 0.0f, 15.0f, 5.0f });
+         def.params.push_back({ "feedback", 0.0f, 0.9f, 0.0f });
+         def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f });
+         def.params.push_back(
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+         // `rate` (free Hz) is only read while sync is off - same
+         // prerequisite-gating precedent as Delay/Stutter's own free-time
+         // param, for the same reason (AUDIOPARAMSWEEPTEST's short probe
+         // window). `sync`/`rateDiv` stay confirmed (by hand) blind spots,
+         // same as Delay's.
+         def.params.push_back({ "rate", 0.02f, 5.0f, 0.5f, false, { { "sync", 0.0f } } });
+         def.makeKernel = []() { return std::make_unique<ChorusKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // --------------------------------------------------------------- Flanger
+      // Matches the KHS Audio Flanger module's Delay/Depth/Rate/Mix knobs,
+      // plus Feedback (the control that actually makes it flange rather
+      // than chorus) in place of Scroll/Offset/Motion, cut per
+      // .claude/skills/new-audio-node/SKILL.md's minimalism rule, and the
+      // same sync-to-tempo rate mode Chorus/Delay/Stutter share. See
+      // FlangerKernel.h's class comment.
+      {
+         EffectDef def;
+         def.name = "Flanger";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kFlangerScatter;
+         def.defaultMix = 0.5f;
+         def.params.push_back({ "delay", 0.2f, 15.0f, 3.0f });
+         def.params.push_back({ "depth", 0.0f, 10.0f, 4.0f });
+         def.params.push_back({ "feedback", -0.95f, 0.95f, 0.5f });
+         def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f });
+         def.params.push_back(
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+         def.params.push_back({ "rate", 0.02f, 5.0f, 0.2f, false, { { "sync", 0.0f } } });
+         def.makeKernel = []() { return std::make_unique<FlangerKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ---------------------------------------------------------------- Phaser
+      // Matches the KHS Audio Phaser module's Cutoff/Rate/Depth/Order/
+      // Spread/Mix control set, plus the same sync-to-tempo rate mode
+      // Chorus/Flanger/Delay/Stutter share. See PhaserKernel.h's class
+      // comment.
+      {
+         EffectDef def;
+         def.name = "Phaser";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kPhaserScatter;
+         def.defaultMix = 0.5f;
+         def.params.push_back({ "cutoff", 100.0f, 4000.0f, 800.0f });
+         def.params.push_back({ "depth", 0.0f, 1.0f, 0.7f });
+         def.params.push_back({ "order", 2.0f, (float)PhaserKernel::kMaxStages, 4.0f });
+         def.params.push_back({ "spread", 0.0f, 1.0f, 0.5f });
+         def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f });
+         def.params.push_back(
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+         def.params.push_back({ "rate", 0.02f, 5.0f, 0.3f, false, { { "sync", 0.0f } } });
+         def.makeKernel = []() { return std::make_unique<PhaserKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // -------------------------------------------------------------- Bitcrush
+      // Cut from the design doc's Quantize/Bits/Dither/ADC-Q/DAC-Q panel
+      // down to rate + bits + mix per
+      // .claude/skills/new-audio-node/SKILL.md's minimalism rule. See
+      // BitcrushKernel.h's class comment.
+      {
+         EffectDef def;
+         def.name = "Bitcrush";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kBitcrushWave;
+         def.params.push_back({ "rate", 200.0f, 44100.0f, 6000.0f });
+         def.params.push_back({ "bits", 1.0f, 16.0f, 8.0f });
+         def.makeKernel = []() { return std::make_unique<BitcrushKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ------------------------------------------------------- Transient Shaper
+      // Matches the KHS Audio Transient Shaper module's own two knobs
+      // (Attack, Sustain) - `pump`/`sidechain` from the reference image are
+      // cut per .claude/skills/new-audio-node/SKILL.md's minimalism rule.
+      // See TransientShaperKernel.h's class comment.
+      {
+         EffectDef def;
+         def.name = "Transient Shaper";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kTransientEnvelope;
+         def.params.push_back({ "attack", -24.0f, 24.0f, 0.0f });
+         def.params.push_back({ "sustain", -24.0f, 24.0f, 0.0f });
+         def.makeKernel = []() { return std::make_unique<TransientShaperKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // --------------------------------------------------------------- Stutter
+      // Tempo-synced (or free-ms) beat-repeat/glitch loop - see
+      // StutterKernel.h's class comment. `sync`/`rateDiv`/`timeMs` mirror
+      // Delay's own tempo-sync controls exactly (same MusicTime table),
+      // including the same blind-spot mitigation: `timeMs` defaults short
+      // (3ms, gated behind `sync=0`) purely so AUDIOPARAMSWEEPTEST's short
+      // warmup window can reach a full record+loop cycle at all - the
+      // musical default anyone actually hears is `sync=1` @ quarter notes,
+      // unaffected by this. `chunk` is additionally gated behind
+      // `sync=0` for the same reason: at the musical default's ~500ms
+      // period, the sweep's probe block never leaves the record phase (a
+      // straight passthrough regardless of `chunk`'s value), so `chunk`
+      // is unobservable without also forcing the short free-ms path.
+      // `sync`/`rateDiv` themselves stay confirmed (by hand) blind spots,
+      // the same way Delay's own `sync`/`rateDiv` do - they can't be gated
+      // around their own effect.
+      {
+         EffectDef def;
+         def.name = "Stutter";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kStutterGrid;
+         static const std::vector<EffectParamPrereq> kStutterShortPathPrereq = { { "sync", 0.0f } };
+         def.params.push_back({ "sync", 0.0f, 1.0f, 1.0f });
+         def.params.push_back(
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+         def.params.push_back({ "timeMs", 1.0f, 2000.0f, 3.0f, false, kStutterShortPathPrereq });
+         def.params.push_back({ "chunk", 0.02f, 1.0f, 0.35f, false, kStutterShortPathPrereq });
+         def.makeKernel = []() { return std::make_unique<StutterKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // --------------------------------------------------------------- Ring Mod
+      // Multiplies by a band-limited oscillator - see RingModKernel.h's
+      // class comment. `waveform` is the modulator's identity, matching
+      // Audio Filter's `type` dropdown carve-out, not a processing mode.
+      {
+         EffectDef def;
+         def.name = "Ring Mod";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kRingModWave;
+         def.params.push_back({ "freq", 1.0f, 5000.0f, 220.0f });
+         def.params.push_back({ "waveform", 0.0f, (float)DspMath::kWaveSquare, (float)DspMath::kWaveSine });
+         def.makeKernel = []() { return std::make_unique<RingModKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // --------------------------------------------------------------- Formant
+      // Three parallel bandpass resonators tuned to a vowel's formants,
+      // morphed continuously A-E-I-O-U - see FormantFilterKernel.h's class
+      // comment.
+      {
+         EffectDef def;
+         def.name = "Formant Filter";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kFormantVowel;
+         def.params.push_back({ "vowel", 0.0f, 4.0f, 0.0f });
+         def.params.push_back({ "q", 2.0f, 30.0f, 10.0f });
+         def.makeKernel = []() { return std::make_unique<FormantFilterKernel>(); };
          defs.push_back(std::move(def));
       }
 
@@ -185,6 +457,30 @@ const std::vector<EffectDef>& GetEffectDefs()
    return defs;
 }
 
+namespace
+{
+   // Sweep-only prerequisite/candidate declarations for nodes that are NOT
+   // AudioEffectNode instances (Note Filter, and any future note-only node) -
+   // kept out of BuildEffectDefs() because every entry there gets registered
+   // as a spawnable AudioEffectNode (see main.cpp's GetEffectDefs() loop),
+   // which these node types must never be.
+   const std::vector<std::pair<std::string, EffectParamDef>>& ExtraParamDefs()
+   {
+      static const std::vector<std::pair<std::string, EffectParamDef>> extra = {
+         // root only affects anything once a non-chromatic scale is chosen -
+         // chromatic (Note Filter's default) contains every pitch class, so
+         // SnapToScale is a no-op regardless of root.
+         { "Note Filter", { "root", 0.0f, 11.0f, 0.0f, false, { { "scale", 0.0f /* MusicTime::kMajor */ } } } },
+         // rangeLow's meaningful span (0..127) is wider than the sweep's
+         // generic int candidates reach relative to the rig's fixed probe
+         // note (69) - none of them push rangeLow above it, so the note
+         // never actually gets blocked and no difference is ever observed.
+         { "Note Filter", { "rangeLow", 0.0f, 127.0f, 0.0f, false, {}, { 90.0f } } },
+      };
+      return extra;
+   }
+}
+
 const EffectParamDef* FindEffectParamDef(const std::string& nodeName, const std::string& paramName)
 {
    for (const EffectDef& def : GetEffectDefs())
@@ -196,5 +492,8 @@ const EffectParamDef* FindEffectParamDef(const std::string& nodeName, const std:
             return &p;
       return nullptr;
    }
+   for (const auto& entry : ExtraParamDefs())
+      if (entry.first == nodeName && entry.second.name == paramName)
+         return &entry.second;
    return nullptr;
 }

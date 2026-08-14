@@ -12,6 +12,7 @@ void ReverbKernel::PushParams(const AudioEffectNode& node, double sampleRate)
    mMailbox.Push(kDecaySeconds, node.Param("decay"));
    mMailbox.Push(kDamping, node.Param("damping"));
    mMailbox.Push(kPredelayMs, node.Param("predelay"));
+   mMailbox.Push(kWidth, node.Param("width"));
 }
 
 void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
@@ -30,6 +31,7 @@ void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       const float decaySeconds = std::max(0.05f, mMailbox.SmoothedValue(kDecaySeconds));
       const float damping = std::clamp(mMailbox.SmoothedValue(kDamping), 0.0f, 1.0f);
       const float predelayMs = std::max(0.0f, mMailbox.SmoothedValue(kPredelayMs));
+      const float width = std::clamp(mMailbox.SmoothedValue(kWidth), 0.0f, 1.0f);
 
       const float inMono = numChannels >= 2 ? 0.5f * (in.channels[0][i] + in.channels[1][i]) : in.channels[0][i];
 
@@ -90,8 +92,10 @@ void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
          l.Write(FlushDenormal(inject + l.dampState));
       }
 
-      // Cheap fixed stereo spread (no width control in Tier 1): even lines
-      // biased left, odd lines biased right.
+      // Stereo spread: even lines biased left, odd lines biased right, with
+      // `width` controlling how much of the opposite side's sum bleeds
+      // across. width=1 keeps the original fixed 0.6 cross-mix (full
+      // stereo); width=0 sums both sides equally into mono.
       float sumEven = 0.0f, sumOdd = 0.0f;
       for (int line = 0; line < kNumLines; line++)
       {
@@ -100,8 +104,9 @@ void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
          else
             sumOdd += delayedOut[line];
       }
-      const float wetL = (sumEven + 0.6f * sumOdd) * outScale;
-      const float wetR = (sumOdd + 0.6f * sumEven) * outScale;
+      const float crossGain = 1.0f - width * 0.4f;
+      const float wetL = (sumEven + crossGain * sumOdd) * outScale;
+      const float wetR = (sumOdd + crossGain * sumEven) * outScale;
 
       out.channels[0][i] = wetL;
       if (numChannels >= 2)

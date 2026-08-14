@@ -152,7 +152,17 @@ that already works today via `Modulation::Bind`, no new code needed.
 | *(extend)* **Audio Analyze** | audio→modulator, pitch→modulator | existing node: add pitch-track and envelope-follower outputs to its 13 taps. **No new node.** |
 | *(moves)* waveform viewer | → **Scope**, in Utility | it is a display, not a modulator |
 
-### Effects: 15 → 7
+### Effects: 15 → 7 (superseded 2026-08-14 — see below)
+
+**2026-08-14 update: expanded back out to 15 effects per explicit user
+request**, pointing at a screenshot of the KHS Audio plugin suite as the
+params/knobs reference. Bitcrush, Transient Shaper, Stutter, Ring Mod and
+Formant Filter, none of which appear in the table below, were added as new
+standalone `AudioEffectNode` entries rather than folded into an existing
+node — see `STATUS.md`'s P3c section for the shipped list and each kernel's
+own class-comment for its DSP reference. The consolidation reasoning below
+(Bitcrush → part of Drive's `curve`, Stutter → a Delay `mode`) is what this
+session overrode, not what shipped.
 
 | One node | Replaces | Why it's one node |
 |---|---|---|

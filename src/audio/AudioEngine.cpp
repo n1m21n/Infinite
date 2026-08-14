@@ -52,6 +52,7 @@ bool AudioEngine::Start(std::string& outError)
 void AudioEngine::Stop()
 {
    Platform::AudioDeviceClose();
+   mSampleRate.store(0.0, std::memory_order_relaxed);
    Transport::Instance().NotifyAudioEngineStopped();
 }
 
@@ -107,7 +108,13 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
       for (int i = 0; i < deviceBuffer.numFrames; i++)
          deviceBuffer.channels[ch][i] = 0.0f;
 
-   if (list == nullptr || list->topology.terminalBufferIndices.empty())
+   // Note: gated on `order` being empty, not `terminalBufferIndices` - a
+   // note-only chain (a generator feeding a Note Capturer/Router/etc with no
+   // Audio Out anywhere downstream) has entries in `order` but never adds a
+   // terminal, and still needs ProcessBlock called every callback so its
+   // beat-synced generators actually free-run instead of sitting frozen
+   // until some unrelated Audio-Out-reaching chain also exists.
+   if (list == nullptr || list->topology.order.empty())
       return;
 
    const int numFrames = std::min(deviceBuffer.numFrames, kAudioMaxBlockFrames);

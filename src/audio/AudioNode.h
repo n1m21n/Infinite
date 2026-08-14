@@ -45,6 +45,11 @@ public:
    // never on the audio thread mid-block.
    virtual NoteEventQueue* NoteOutbox() { return nullptr; }
 
+   // Same, for a node with more than one note output (Note Router - see
+   // NoteCable::GetOutputSlot()). Defaults to the single-outbox case so every
+   // other producer is unaffected.
+   virtual NoteEventQueue* NoteOutbox(int /*outputSlot*/) { return NoteOutbox(); }
+
    // A node that CONSUMES note events (Oscillator's note input, Envelope)
    // overrides SetNoteInbox(), called once by the topology builder with a
    // pointer to its upstream producer's outbox, or nullptr if this node's

@@ -207,7 +207,7 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
    for (const CableRecord& c : data.audio)
       file << "aud " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
    for (const CableRecord& c : data.notes)
-      file << "note " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
+      file << "note " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const ModRecord& m : data.modulation)
       file << "mod " << m.dstIndex << " " << m.dstParam << " "
            << m.srcIndex << " " << m.srcOutput << "\n";
@@ -333,7 +333,13 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          if (tag == "aud")
             outData.audio.push_back(c);
          else
+         {
+            // srcOutput is a later addition (Note Router); missing on older
+            // patches, where >>'s failed-extraction behaviour leaves it 0 -
+            // every note source but Router only ever has output 0 anyway.
+            in >> c.srcOutput;
             outData.notes.push_back(c);
+         }
       }
       else if (tag == "mod")
       {

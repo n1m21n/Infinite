@@ -107,6 +107,17 @@
 #include "audio/dsp/AudioFilterKernel.h"
 #include "audio/dsp/DynamicsKernel.h"
 #include "audio/dsp/DelayKernel.h"
+#include "audio/dsp/DriveKernel.h"
+#include "audio/dsp/StereoKernel.h"
+#include "audio/dsp/PitchShiftKernel.h"
+#include "audio/dsp/ChorusKernel.h"
+#include "audio/dsp/FlangerKernel.h"
+#include "audio/dsp/PhaserKernel.h"
+#include "audio/dsp/BitcrushKernel.h"
+#include "audio/dsp/TransientShaperKernel.h"
+#include "audio/dsp/StutterKernel.h"
+#include "audio/dsp/RingModKernel.h"
+#include "audio/dsp/FormantFilterKernel.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -169,10 +180,17 @@ namespace
    // theory that size carries hierarchy; in practice it just made every row
    // look unfinished, because the mixed sizes read as an inconsistency rather
    // than as a ranking. Hierarchy comes from grouping and ordering instead.
-   const float kKnobStd = 50.0f;
+   const float kKnobStd = 56.0f;
    const float kKnobLarge = kKnobStd;
    const float kKnobSmall = kKnobStd;
    const float kKnobDiameter = kKnobSmall;
+   // Shared height for a time-domain effect graph (Dynamics' transfer
+   // curve, Delay's tap graph, Reverb's decay envelope) - one number so the
+   // three read as the same instrument family instead of each picking its
+   // own. AudioFilter's frequency response keeps its own taller 190px (a
+   // curve read for precision at a glance needs more vertical resolution
+   // than these three, which are read for overall shape).
+   const float kAudioTimeVizH = 150.0f;
    // Inset padding inside a section panel (AudioSection).
    const float kAudioSectionPad = 8.0f;
    const float kPinRadius = 7.0f;
@@ -210,6 +228,12 @@ namespace
    // loading while the UI reads the way the user asked for.
    std::string DisplayName(const std::string& name)
    {
+      // "Dynamics" reads as "compressor" everywhere a user sees it - search,
+      // spawn menu, node header, help popup - but the registered type key
+      // (gn.typeName, NodeFactory's lookup, every saved patch's node-type
+      // string) stays "Dynamics" so existing patches keep loading.
+      if (name == "Dynamics")
+         return "compressor";
       std::string out = name;
       std::transform(out.begin(), out.end(), out.begin(),
                      [](unsigned char c) { return (char)std::tolower(c); });
@@ -329,6 +353,10 @@ namespace
    // kernels are the intended future consumer (see README.md's Effects
    // table); this phase just makes the setting exist and be visible.
    float gAudioOversample = 1.0f;
+   // Set whenever a Start() call from the toolbar toggle or "Apply audio
+   // settings" fails, so the toggle button can surface why on hover instead
+   // of just silently staying off. Cleared on a successful Start().
+   std::string gAudioStartError;
    double gLastFrameMs = 0.0; // wall clock across the previous whole frame
    double gFrameStart = 0.0;  // when the current frame began, for the limiter
    // 60 by default: a light patch spinning the GPU at 400fps costs power for
@@ -1960,6 +1988,17 @@ namespace
       // docs/plans/audio/P3a-notes-prompt.md; Part 2 adds Note Filter/
       // Modify/Echo/Router/Display and the Arpeggiator.
       REGISTER_NODE(MidiNotesNode, MIDI Notes, "Notes");
+      REGISTER_NODE(NoteFilterNode, Note Filter, "Notes");
+      REGISTER_NODE(NoteModifyNode, Note Modify, "Notes");
+      REGISTER_NODE(NoteEchoNode, Note Echo, "Notes");
+      REGISTER_NODE(NoteRouterNode, Note Router, "Notes");
+      REGISTER_NODE(ArpeggiatorNode, Arpeggiator, "Notes");
+      REGISTER_NODE(NoteSequencerNode, Note Sequencer, "Notes");
+      REGISTER_NODE(RandomNoteGeneratorNode, Random Note Generator, "Notes");
+      REGISTER_NODE(ChorderNode, Chorder, "Notes");
+      REGISTER_NODE(NoteCapturerNode, Note Capturer, "Notes");
+      REGISTER_NODE(BouncingBallsNode, Bouncing Balls, "Notes");
+      REGISTER_NODE(ScaleNotesNode, Scale Notes, "Notes");
       REGISTER_NODE(EnvelopeNode, Envelope, "Modulators");
 
       // P3c effects - one AudioEffectNode class serves every EffectDef table
@@ -2518,7 +2557,7 @@ namespace
       }
       else if (NoteCable* noteCable = dstNode.node->NoteInputSlot(slot))
       {
-         noteCable->Connect(srcNode.node.get());
+         noteCable->Connect(srcNode.node.get(), srcOutputIndex);
       }
       else
       {
@@ -2601,33 +2640,6 @@ namespace
          }
       }
       return false;
-   }
-
-   // Rule 1 (docs/plans/audio/audio-graph-semantics.md §1): an audio output
-   // pin feeds exactly one destination. Counts how many audio-input cables
-   // anywhere in the graph currently source from `src`.
-   int AudioFanoutCountOf(INode* src)
-   {
-      int count = 0;
-      for (GraphNode& gn : gNodes)
-      {
-         for (int slot = 0; slot < kMaxAudioSlots; slot++)
-         {
-            AudioCable* cable = gn.node->AudioInputSlot(slot);
-            if (cable != nullptr && cable->GetSource() == src)
-               count++;
-         }
-      }
-      return count;
-   }
-
-   // Whether `src` (an audio source) still has a free output to cable from.
-   // Splitter is Rule 1's explicit exception - its own output may fan out to
-   // up to kMaxFanout consumers; every other audio source gets exactly one.
-   bool AudioSourceHasFreeOutput(INode* src)
-   {
-      const int limit = (dynamic_cast<SplitterNode*>(src) != nullptr) ? SplitterNode::kMaxFanout : 1;
-      return AudioFanoutCountOf(src) < limit;
    }
 
    // Node types worth suggesting first in the search popup when a cable was
@@ -4312,7 +4324,10 @@ namespace
          const float btnW = std::min(cellW - 8.0f, 118.0f);
          const float btnH = ImGui::GetFrameHeight();
          const float cx = x0 + (float)index * cellW + cellW * 0.5f;
-         ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, y0 + maxDia - btnH));
+         // Vertically centred in the knob-height cell, not bottom-aligned -
+         // bottom-aligning left a tall empty gap above the button and made
+         // it read as sitting low relative to the knobs sharing its row.
+         ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, y0 + (maxDia - btnH) * 0.5f));
          const int safe = std::max(0, std::min(current, (int)options.size() - 1));
          const std::string caption = options[safe] + "##" + label;
          if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)))
@@ -5261,11 +5276,606 @@ namespace
       }
 
       BeginAudioSection("input");
-      ImGui::TextUnformatted(Platform::MidiIsRunning()
-                                ? Platform::MidiDeviceSummary().c_str()
-                                : "MIDI input is not running");
+      if (!Platform::MidiIsRunning())
+      {
+         if (ImGui::Button("MIDI Learn", ImVec2(kPreviewSize, 0)))
+            n->StartListening();
+         ImGui::TextDisabled("click to start listening for a connected controller");
+      }
+      else
+      {
+         ImGui::TextUnformatted(Platform::MidiDeviceSummary().c_str());
+      }
       ImGui::TextDisabled("%s", n->channel < 0 ? "channel: omni (-1)" : "channel: filtered");
       EndAudioSection();
+
+      EndAudioBody();
+   }
+
+   const std::vector<std::string>& NoteNameList()
+   {
+      static std::vector<std::string> list = { "C", "C#", "D", "D#", "E", "F",
+                                                "F#", "G", "G#", "A", "A#", "B" };
+      return list;
+   }
+
+   // Two-octave keyboard centred on the filter's root, coloured by what the
+   // gate would do to each pitch - computed purely from params (main thread
+   // only, redraws every frame like DrawADSRVisualizer), plus one live marker
+   // for the last note the audio thread actually saw: a ring around the key,
+   // coloured by whether it passed. That marker is the only thing read from
+   // the audio side, via the same two-atomic publish LastNote() uses.
+   void DrawNoteFilterVisualizer(NoteFilterNode* n)
+   {
+      const float w = gAudioBodyW, h = 58.0f;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      static const int kWhiteOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
+      static const int kBlackOffsets[5] = { 1, 3, 6, 8, 10 };
+      static const float kBlackSlot[5] = { 0.0f, 1.0f, 3.0f, 4.0f, 5.0f };
+      const int octaves = 2;
+      const int lowNote = std::clamp(48 + n->root, 0, 108); // one octave below/above middle C, centred on root
+      const int whiteCount = 7 * octaves;
+      const float keyW = (w - 4.0f) / (float)whiteCount;
+      const int lastIn = n->LastNoteIn();
+      const bool lastPassed = n->LastPassed();
+
+      auto KeyColor = [n](int note, bool isWhite) -> ImU32 {
+         const bool inRange = note >= n->rangeLow && note <= n->rangeHigh;
+         const int pc = ((note - n->root) % 12 + 12) % 12;
+         const bool inScale = MusicTime::ScaleContainsPitchClass(n->scale, pc);
+         const bool active = inRange && inScale;
+         if (isWhite)
+            return active ? IM_COL32(206, 210, 222, 255) : IM_COL32(72, 76, 90, 255);
+         return active ? IM_COL32(90, 170, 235, 255) : IM_COL32(26, 28, 36, 255);
+      };
+
+      for (int o = 0; o < octaves; o++)
+      {
+         for (int k = 0; k < 7; k++)
+         {
+            const int note = lowNote + o * 12 + kWhiteOffsets[k];
+            const float x = origin.x + 2.0f + (float)(o * 7 + k) * keyW;
+            dl->AddRectFilled(ImVec2(x + 0.5f, origin.y + 3.0f), ImVec2(x + keyW - 0.5f, br.y - 3.0f),
+                              KeyColor(note, true), 2.0f);
+            if (note == lastIn)
+               dl->AddRect(ImVec2(x + 1.0f, origin.y + 4.0f), ImVec2(x + keyW - 1.0f, br.y - 4.0f),
+                          lastPassed ? IM_COL32(120, 200, 255, 255) : IM_COL32(255, 96, 86, 255), 2.0f, 0, 2.0f);
+         }
+      }
+      for (int o = 0; o < octaves; o++)
+      {
+         for (int k = 0; k < 5; k++)
+         {
+            const int note = lowNote + o * 12 + kBlackOffsets[k];
+            const float x = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[k] + 1.0f) * keyW - keyW * 0.3f;
+            dl->AddRectFilled(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
+                              KeyColor(note, false), 2.0f);
+            if (note == lastIn)
+               dl->AddRect(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
+                          lastPassed ? IM_COL32(120, 200, 255, 255) : IM_COL32(255, 96, 86, 255), 2.0f, 0, 2.0f);
+         }
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawNoteFilterBody(GraphNode& gn, NoteFilterNode* n)
+   {
+      char stat[96];
+      if (n->LastNoteIn() < 0)
+         snprintf(stat, sizeof(stat), "%s in %s..%s",
+                  MusicTime::ScaleTable(n->scale).name, NoteNameList()[n->rangeLow % 12].c_str(),
+                  NoteNameList()[n->rangeHigh % 12].c_str());
+      else
+         snprintf(stat, sizeof(stat), "last: %s%d - %s", NoteNameList()[n->LastNoteIn() % 12].c_str(),
+                  n->LastNoteIn() / 12 - 1, n->LastPassed() ? "passed" : "blocked");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawNoteFilterVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+      {
+         AudioKnobRow row(5);
+         row.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
+                      [n](int i) { PushUndoCheckpoint(); n->scale = i; });
+         row.Dropdown("root", NoteNameList(), n->root,
+                      [n](int i) { PushUndoCheckpoint(); n->root = i; });
+         row.KnobInt("lo", &n->rangeLow, 0, 127, kKnobSmall);
+         row.KnobInt("hi", &n->rangeHigh, 0, 127, kKnobSmall);
+         row.Knob("chance", &n->chance, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   // Shared by every tempo-synced note generator (Arp, Note Sequencer,
+   // Random Note Generator): a rate expressed either as a note division
+   // (synced to tempo) or free seconds - see NoteModifyNode::quantizeDiv's
+   // header comment for the equivalent quantize-grid table.
+   static const std::vector<std::string> kRateDivisionLabels = { "1/1", "1/2", "1/4", "1/8", "1/16", "1/32" };
+   static const float kRateDivisionBeats[] = { 4.0f, 2.0f, 1.0f, 0.5f, 0.25f, 0.125f };
+   int NearestRateDivision(float beats)
+   {
+      int best = 2;
+      float bestDiff = 1e9f;
+      for (int i = 0; i < 6; i++)
+      {
+         const float d = std::fabs(kRateDivisionBeats[i] - beats);
+         if (d < bestDiff) { bestDiff = d; best = i; }
+      }
+      return best;
+   }
+
+   // Draws a "rateMode" toggle plus whichever rate control it selects -
+   // a division dropdown when synced, a seconds knob when free. `rowSlots`
+   // must match the AudioKnobRow this is called inside (it draws exactly 2
+   // controls: the mode toggle and the rate itself).
+   void DrawRateModeControls(AudioKnobRow& row, int* rateMode, float* rateBeats, float* rateSeconds)
+   {
+      static const std::vector<std::string> kRateModes = { "Synced", "Free" };
+      row.Dropdown("sync", kRateModes, *rateMode, [rateMode](int i) { PushUndoCheckpoint(); *rateMode = i; });
+      if (*rateMode == 0)
+      {
+         int div = NearestRateDivision(*rateBeats);
+         row.Dropdown("rate", kRateDivisionLabels, div, [rateBeats](int i) {
+            PushUndoCheckpoint();
+            *rateBeats = kRateDivisionBeats[std::clamp(i, 0, 5)];
+         });
+      }
+      else
+      {
+         row.Knob("rate", rateSeconds, 0.02f, 2.0f, "%.2fs", kKnobSmall);
+      }
+   }
+
+   // Shared "quantize to grid" dropdown - Off, 1/4, 1/8, 1/16, 1/32 - used by
+   // Note Modify (live note-on timing) and Note Capturer (recorded timing).
+   static const std::vector<std::string> kQuantizeLabels = { "Off", "1/4", "1/8", "1/16", "1/32" };
+
+   void DrawNoteModifyBody(GraphNode& gn, NoteModifyNode* n)
+   {
+      char stat[96];
+      if (n->LastNoteOut() < 0)
+         snprintf(stat, sizeof(stat), "%+d st%s", n->transposeSemi, n->gateHoldMs > 0.0f ? ", gated" : "");
+      else
+         snprintf(stat, sizeof(stat), "last: %s%d vel %.0f%%", NoteNameList()[n->LastNoteOut() % 12].c_str(),
+                  n->LastNoteOut() / 12 - 1, n->LastVelocityOut() * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         AudioKnobRow row(4);
+         row.KnobInt("transpose", &n->transposeSemi, -48, 48);
+         row.KnobInt("pitch", &n->pitchSemi, -24, 24);
+         row.Knob("vel curve", &n->velocityCurve, 0.25f, 4.0f, "%.2f", kKnobSmall);
+         row.Knob("gate", &n->gateHoldMs, 0.0f, 3000.0f, "%.0fms", kKnobSmall);
+         row.End();
+      }
+      {
+         AudioKnobRow row(4);
+         row.Knob("hu.time", &n->humanizeTimingMs, 0.0f, 100.0f, "%.0fms", kKnobSmall);
+         row.Knob("hu.vel", &n->humanizeVelocity, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.Dropdown("quantize", kQuantizeLabels, n->quantizeDiv,
+                      [n](int i) { PushUndoCheckpoint(); n->quantizeDiv = i; });
+         row.Knob("glide", &n->glideMs, 0.0f, 2000.0f, "%.0fms", kKnobSmall);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawNoteEchoBody(GraphNode& gn, NoteEchoNode* n)
+   {
+      char stat[64];
+      snprintf(stat, sizeof(stat), "%d repeats, %d pending", n->repeats, n->PendingCount());
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         AudioKnobRow row(4);
+         row.Knob("delay", &n->delayMs, 10.0f, 1000.0f, "%.0fms", kKnobSmall);
+         row.KnobInt("repeats", &n->repeats, 1, 8);
+         row.Knob("decay", &n->decay, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.KnobInt("transpose", &n->transposePerRepeat, -12, 12);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawNoteRouterBody(GraphNode& gn, NoteRouterNode* n)
+   {
+      static const std::vector<std::string> kModes = { "Round Robin", "Random", "Probability", "Chain" };
+      const int mask = n->LastRoutedMask();
+      char stat[64];
+      snprintf(stat, sizeof(stat), "%s%s", kModes[std::clamp(n->mode, 0, 3)].c_str(),
+               mask == 0 ? "" : " - active");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      // Four lit dots showing which outputs are currently carrying a held note.
+      {
+         const float w = gAudioBodyW;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float dia = 14.0f;
+         const float gap = (w - 4.0f * dia) / 5.0f;
+         for (int o = 0; o < 4; o++)
+         {
+            const float cx = origin.x + gap * (float)(o + 1) + dia * (float)o + dia * 0.5f;
+            const bool lit = (mask & (1 << o)) != 0;
+            dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f,
+                                lit ? IM_COL32(120, 200, 255, 255) : IM_COL32(50, 53, 64, 255));
+         }
+         ImGui::Dummy(ImVec2(w, dia + 6.0f));
+      }
+
+      {
+         AudioKnobRow row(2);
+         row.Dropdown("mode", kModes, n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; });
+         row.Knob("prob", &n->probability, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawArpeggiatorBody(GraphNode& gn, ArpeggiatorNode* n)
+   {
+      static const std::vector<std::string> kModes = { "Up", "Down", "Up/Down", "Down/Up", "Converge",
+                                                        "Diverge", "Random", "As Played" };
+      char stat[64];
+      const int cur = n->CurrentNote();
+      if (cur < 0)
+         snprintf(stat, sizeof(stat), "%d held", n->HeldCount());
+      else
+         snprintf(stat, sizeof(stat), "%s%d", NoteNameList()[cur % 12].c_str(), cur / 12 - 1);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         AudioKnobRow row(2);
+         row.Dropdown("mode", kModes, n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; });
+         row.KnobInt("octaves", &n->octaves, 1, 4);
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
+         row.Knob("gate", &n->gatePercent, 1.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawNoteSequencerBody(GraphNode& gn, NoteSequencerNode* n)
+   {
+      char stat[64];
+      const int cur = n->CurrentStep();
+      snprintf(stat, sizeof(stat), "step %d/%d", cur < 0 ? 0 : cur + 1, n->steps);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         const int steps = std::clamp(n->steps, 1, NoteSequencerNode::kMaxSteps);
+         const float w = gAudioBodyW;
+         const float pitchH = 70.0f;
+         const float velH = 16.0f;
+         const float gap = 2.0f;
+         const float barW = (w - gap * (float)(steps - 1)) / (float)steps;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const int kLow = 48, kHigh = 84; // C3..C6 drag window
+
+         for (int i = 0; i < steps; i++)
+         {
+            const float x0 = origin.x + (float)i * (barW + gap);
+            ImGui::PushID(i);
+
+            ImGui::SetCursorScreenPos(ImVec2(x0, origin.y));
+            ImGui::InvisibleButton("pitch", ImVec2(barW, pitchH));
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
+            {
+               const float my = ImGui::GetIO().MousePos.y;
+               const float t = 1.0f - std::clamp((my - origin.y) / pitchH, 0.0f, 1.0f);
+               n->stepNote[i] = kLow + (int)(t * (float)(kHigh - kLow) + 0.5f);
+            }
+            const bool isCurrent = (i == cur);
+            const float t = std::clamp((float)(n->stepNote[i] - kLow) / (float)(kHigh - kLow), 0.0f, 1.0f);
+            const float barTop = origin.y + (1.0f - t) * pitchH;
+            const ImU32 col = n->stepEnabled[i]
+               ? (isCurrent ? IM_COL32(255, 200, 100, 255) : IM_COL32(120, 200, 255, 255))
+               : IM_COL32(50, 53, 64, 255);
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, origin.y), ImVec2(x0 + barW - 1.0f, origin.y + pitchH),
+                              IM_COL32(20, 21, 26, 255), 2.0f);
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, barTop), ImVec2(x0 + barW - 1.0f, origin.y + pitchH), col, 2.0f);
+
+            const float vy0 = origin.y + pitchH + 2.0f;
+            ImGui::SetCursorScreenPos(ImVec2(x0, vy0));
+            if (ImGui::InvisibleButton("en", ImVec2(barW, velH)))
+               n->stepEnabled[i] = !n->stepEnabled[i];
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+            {
+               const float my = ImGui::GetIO().MousePos.y;
+               const float vt = 1.0f - std::clamp((my - vy0) / velH, 0.0f, 1.0f);
+               n->stepVelocity[i] = std::clamp(vt, 0.0f, 1.0f);
+            }
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, vy0), ImVec2(x0 + barW - 1.0f, vy0 + velH),
+                              IM_COL32(20, 21, 26, 255), 2.0f);
+            const float vFillTop = vy0 + (1.0f - n->stepVelocity[i]) * velH;
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, vFillTop), ImVec2(x0 + barW - 1.0f, vy0 + velH),
+                              n->stepEnabled[i] ? IM_COL32(90, 170, 120, 255) : IM_COL32(50, 53, 64, 255), 2.0f);
+
+            ImGui::PopID();
+         }
+         ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + pitchH + velH + 6.0f));
+         ImGui::Dummy(ImVec2(w, 1.0f));
+      }
+
+      {
+         AudioKnobRow row(4);
+         row.KnobInt("steps", &n->steps, 1, NoteSequencerNode::kMaxSteps);
+         DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
+         row.Knob("gate", &n->gatePercent, 1.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawRandomNoteGeneratorBody(GraphNode& gn, RandomNoteGeneratorNode* n)
+   {
+      char stat[64];
+      const int last = n->LastNote();
+      if (last < 0)
+         snprintf(stat, sizeof(stat), "%s in %s..%s", MusicTime::ScaleTable(n->scale).name,
+                  NoteNameList()[n->rangeLow % 12].c_str(), NoteNameList()[n->rangeHigh % 12].c_str());
+      else
+         snprintf(stat, sizeof(stat), "last: %s%d", NoteNameList()[last % 12].c_str(), last / 12 - 1);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         AudioKnobRow row(4);
+         row.KnobInt("lo", &n->rangeLow, 0, 127, kKnobSmall);
+         row.KnobInt("hi", &n->rangeHigh, 0, 127, kKnobSmall);
+         row.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
+                      [n](int i) { PushUndoCheckpoint(); n->scale = i; });
+         row.Dropdown("root", NoteNameList(), n->root,
+                      [n](int i) { PushUndoCheckpoint(); n->root = i; });
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
+         row.KnobInt("wander", &n->maxStep, 1, 12);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawChorderBody(GraphNode& gn, ChorderNode* n)
+   {
+      char stat[64];
+      snprintf(stat, sizeof(stat), "%s %s, %d-note chord", NoteNameList()[n->root].c_str(),
+               MusicTime::ScaleTable(n->scale).name, n->LastChordSize());
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         AudioKnobRow row(4);
+         row.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
+                      [n](int i) { PushUndoCheckpoint(); n->scale = i; });
+         row.Dropdown("root", NoteNameList(), n->root,
+                      [n](int i) { PushUndoCheckpoint(); n->root = i; });
+         row.KnobInt("chord", &n->chordSize, 2, 6);
+         row.Knob("groove", &n->rateBeats, 0.0625f, 4.0f, "%.3f beats", kKnobSmall);
+         row.End();
+      }
+      {
+         AudioKnobRow row(4);
+         row.Knob("strum", &n->strumMs, 0.0f, 200.0f, "%.0fms", kKnobSmall);
+         row.Knob("hu.time", &n->humanizeTimingMs, 0.0f, 100.0f, "%.0fms", kKnobSmall);
+         row.Knob("hu.vel", &n->humanizeVelocity, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.Knob("harmonics", &n->upperHarmonics, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+
+   void DrawNoteCapturerVisualizer(NoteCapturerNode* n)
+   {
+      bool held[128];
+      n->HeldKeys(held);
+      DrawMidiKeyboard(held, 48, 3);
+   }
+
+   void DrawNoteCapturerBody(GraphNode& gn, NoteCapturerNode* n)
+   {
+      const bool recording = n->IsRecording();
+      const bool playing = n->IsPlaying();
+      char stat[64];
+      if (recording)
+         snprintf(stat, sizeof(stat), "REC  %.1f beats", n->RecordedLengthBeats());
+      else if (playing)
+         snprintf(stat, sizeof(stat), "playing, %d notes", n->RecordedCount());
+      else
+         snprintf(stat, sizeof(stat), "%d notes recorded", n->RecordedCount());
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawNoteCapturerVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+      const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 3.0f) / 4.0f;
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+      if (ImGui::Button("Record", ImVec2(btnW, 0)))
+      {
+         if (recording) n->StopRecording();
+         else n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+      ImGui::SameLine();
+
+      if (playing)
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.5f, 0.2f, 1.0f));
+      ImGui::BeginDisabled(n->RecordedCount() == 0 && !playing);
+      if (ImGui::Button("Play", ImVec2(btnW, 0)))
+      {
+         if (playing) n->StopPlayback();
+         else n->StartPlayback();
+      }
+      ImGui::EndDisabled();
+      if (playing)
+         ImGui::PopStyleColor();
+      ImGui::SameLine();
+
+      if (ImGui::Button("Stop", ImVec2(btnW, 0)))
+      {
+         n->StopRecording();
+         n->StopPlayback();
+      }
+      ImGui::SameLine();
+
+      if (ImGui::Button("Clear", ImVec2(btnW, 0)))
+         n->ClearRecording();
+
+      ImGui::Checkbox("loop", &n->loop);
+      ImGui::SameLine();
+      {
+         // Applied once, on StopRecording - see NoteCapturerNode::quantizeDiv.
+         AudioKnobRow row(1);
+         row.Dropdown("quantize", kQuantizeLabels, n->quantizeDiv,
+                      [n](int i) { PushUndoCheckpoint(); n->quantizeDiv = i; });
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawBouncingBallsVisualizer(BouncingBallsNode* n)
+   {
+      const float fullW = gAudioBodyW;
+      // Shrunk well below the full card width (>=33% smaller than before)
+      // and centered in the row, rather than filling it edge to edge.
+      const float w = fullW * 0.6f;
+      const float h = w; // square canvas - the shape itself needs equal aspect
+      const ImVec2 rowOrigin = ImGui::GetCursorScreenPos();
+      const ImVec2 origin(rowOrigin.x + (fullW - w) * 0.5f, rowOrigin.y);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const ImVec2 center((origin.x + br.x) * 0.5f, (origin.y + br.y) * 0.5f);
+      const float scale = (w * 0.5f - 6.0f) / BouncingBallsNode::kBound;
+      auto ToScreen = [&](float x, float y) { return ImVec2(center.x + x * scale, center.y - y * scale); };
+
+      const ImU32 outlineCol = IM_COL32(150, 165, 190, 255);
+      const float outlineThickness = 5.0f;
+      const float b = BouncingBallsNode::kBound;
+      if (n->shape == BouncingBallsNode::kSquare)
+      {
+         dl->AddRect(ToScreen(-b, b), ToScreen(b, -b), outlineCol, 2.0f, 0, outlineThickness);
+      }
+      else if (n->shape == BouncingBallsNode::kTriangle)
+      {
+         // Vertices centroid is above the bounding-box centre (an
+         // equilateral triangle's mass sits high in its own bbox), which
+         // reads as off-centre even though it's centred on centroid - shift
+         // down by the bbox/centroid gap so it visually centers instead.
+         const float bboxCenterY = (b + -0.5f * b) * 0.5f;
+         const ImVec2 p0 = ToScreen(0.0f, b - bboxCenterY);
+         const ImVec2 p1 = ToScreen(-0.8660254f * b, -0.5f * b - bboxCenterY);
+         const ImVec2 p2 = ToScreen(0.8660254f * b, -0.5f * b - bboxCenterY);
+         dl->AddTriangle(p0, p1, p2, outlineCol, outlineThickness);
+      }
+      else
+      {
+         dl->AddCircle(center, b * scale, outlineCol, 48, outlineThickness);
+      }
+
+      float bx[BouncingBallsNode::kMaxBalls], by[BouncingBallsNode::kMaxBalls], bf[BouncingBallsNode::kMaxBalls];
+      const int count = n->BallPositions(bx, by, bf);
+      for (int i = 0; i < count; i++)
+      {
+         const ImVec2 p = ToScreen(bx[i], by[i]);
+         // Flash bright orange for a moment right after a wall hit, settling
+         // back to the resting blue as the flash decays.
+         const float flash = std::clamp(bf[i], 0.0f, 1.0f);
+         const ImU32 restCol = IM_COL32(120, 200, 255, 235);
+         const ImU32 hitCol = IM_COL32(255, 190, 90, 255);
+         const ImU32 col = ImGui::ColorConvertFloat4ToU32(
+            ImLerp(ImGui::ColorConvertU32ToFloat4(restCol), ImGui::ColorConvertU32ToFloat4(hitCol), flash));
+         dl->AddCircleFilled(p, n->ballSize * scale, col);
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      ImGui::SetCursorScreenPos(rowOrigin);
+      ImGui::Dummy(ImVec2(fullW, h));
+   }
+
+   void DrawBouncingBallsBody(GraphNode& gn, BouncingBallsNode* n)
+   {
+      static const std::vector<std::string> kShapes = { "Circle", "Square", "Triangle" };
+      char stat[64];
+      snprintf(stat, sizeof(stat), "%s, %d balls", kShapes[std::clamp(n->shape, 0, 2)].c_str(), n->numBalls);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawBouncingBallsVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+      {
+         AudioKnobRow row(3);
+         row.Dropdown("shape", kShapes, n->shape, [n](int i) { PushUndoCheckpoint(); n->shape = i; });
+         row.KnobInt("balls", &n->numBalls, 1, BouncingBallsNode::kMaxBalls);
+         row.Knob("speed", &n->ballSpeed, 0.05f, 2.0f, "%.2f", kKnobSmall);
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         row.Knob("size", &n->ballSize, 0.02f, 0.15f, "%.2f", kKnobSmall);
+         row.KnobInt("lo", &n->rangeLow, 0, 127, kKnobSmall);
+         row.KnobInt("hi", &n->rangeHigh, 0, 127, kKnobSmall);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawScaleNotesBody(GraphNode& gn, ScaleNotesNode* n)
+   {
+      char stat[64];
+      if (n->LastNoteOut() < 0)
+         snprintf(stat, sizeof(stat), "%s %s", NoteNameList()[n->root].c_str(), MusicTime::ScaleTable(n->scale).name);
+      else
+         snprintf(stat, sizeof(stat), "last: %s%d", NoteNameList()[n->LastNoteOut() % 12].c_str(),
+                  n->LastNoteOut() / 12 - 1);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         AudioKnobRow row(2);
+         row.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
+                      [n](int i) { PushUndoCheckpoint(); n->scale = i; });
+         row.Dropdown("root", NoteNameList(), n->root,
+                      [n](int i) { PushUndoCheckpoint(); n->root = i; });
+         row.End();
+      }
 
       EndAudioBody();
    }
@@ -5600,9 +6210,8 @@ namespace
    void DrawDynamicsVisualizer(AudioEffectNode* n, float threshold, float ratio, float makeupDb)
    {
       const float w = gAudioBodyW;
-      const float h = 90.0f;
-      const float barW = 10.0f;
-      const float curveW = w - barW - 6.0f;
+      const float h = kAudioTimeVizH;
+      const float curveW = w;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -5618,6 +6227,9 @@ namespace
          dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, db == 0.0f ? 30 : 10), 1.0f);
          dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + curveW, y),
                      IM_COL32(255, 255, 255, db == 0.0f ? 30 : 10), 1.0f);
+         char tickBuf[8];
+         snprintf(tickBuf, sizeof(tickBuf), "%.0f", db);
+         dl->AddText(ImVec2(origin.x + 3.0f, y - (db == 0.0f ? 14.0f : 1.0f)), IM_COL32(150, 158, 176, 130), tickBuf);
       }
 
       // 1:1 reference diagonal (unprocessed signal), dim.
@@ -5638,30 +6250,13 @@ namespace
       }
       dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
-      // Live operating point: {instantaneous input dB, current reduction dB}
-      // published by the kernel each block.
-      const float liveInDb = n->ExtraMeterValue(0);
-      const float liveReductionDb = n->ExtraMeterValue(1);
-      const float liveOutDb = liveInDb - liveReductionDb + makeupDb;
-      const float dotX = DynVizDbToX(liveInDb, origin.x, curveW);
-      const float dotY = DynVizDbToY(liveOutDb, origin.y, h);
-      dl->AddCircleFilled(ImVec2(dotX, dotY), 3.6f, IM_COL32(255, 205, 120, 255), 12);
-
-      // Gain-reduction bar down the right edge, 0-24 dB scale.
-      const float barX0 = origin.x + curveW + 4.0f;
-      const ImVec2 barTL(barX0, origin.y);
-      const ImVec2 barBR(barX0 + barW, br.y);
-      dl->AddRectFilled(barTL, barBR, IM_COL32(255, 255, 255, 14), 2.0f);
-      const float grFrac = std::clamp(liveReductionDb / 24.0f, 0.0f, 1.0f);
-      dl->AddRectFilled(ImVec2(barX0, origin.y + h * (1.0f - grFrac)), barBR, IM_COL32(235, 120, 110, 220), 2.0f);
-
       dl->PopClipRect();
       dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "in %.1f dB  GR %.1f dB", liveInDb, liveReductionDb);
+         snprintf(buf, sizeof(buf), "%.0f dB in -> %.0f dB out, %.0f:1", threshold, threshold + makeupDb, ratio);
          SetAudioReadout("dynamics", buf);
       }
 
@@ -5671,21 +6266,28 @@ namespace
    void DrawDynamicsBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[80];
-      snprintf(stat, sizeof(stat), "compress %.0f:1 - GR %.1f dB", n->Param("ratio"), n->ExtraMeterValue(1));
+      snprintf(stat, sizeof(stat), "compress %.0f:1 @ %.0f dB", n->Param("ratio"), n->Param("threshold"));
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawDynamicsVisualizer(n, n->Param("threshold"), n->Param("ratio"), n->Param("makeup"));
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
+      // KHS Audio Compressor's control surface: threshold, ratio, attack,
+      // release, makeup, mix - two rows of three so every knob (mix
+      // included) reads as one of the same row instead of mix living apart
+      // in its own slider section.
       {
-         // KHS Audio Compressor's control surface: threshold, ratio, attack,
-         // release, makeup - 5 knobs, one mode.
-         AudioKnobRow row(5);
+         AudioKnobRow row(3);
          row.Knob("threshold", n->ParamPtr("threshold"), -60.0f, 0.0f, "%.1f dB", kKnobLarge);
          row.Knob("ratio", n->ParamPtr("ratio"), 1.0f, 20.0f, "%.1f:1", kKnobLarge);
-         row.Knob("attack", n->ParamPtr("attack"), 0.05f, 200.0f, "%.2f ms");
-         row.Knob("release", n->ParamPtr("release"), 5.0f, 2000.0f, "%.0f ms");
-         row.Knob("makeup", n->ParamPtr("makeup"), -12.0f, 24.0f, "%.1f dB");
+         row.Knob("attack", n->ParamPtr("attack"), 0.05f, 200.0f, "%.2f ms", kKnobLarge);
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         row.Knob("release", n->ParamPtr("release"), 5.0f, 2000.0f, "%.0f ms", kKnobLarge);
+         row.Knob("makeup", n->ParamPtr("makeup"), -12.0f, 24.0f, "%.1f dB", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
 
@@ -5703,10 +6305,6 @@ namespace
          *n->ParamPtr("sidechainExternal") = external ? 1.0f : 0.0f;
       }
 
-      BeginAudioSection("output");
-      AudioSlider("mix", &n->mix, 0.0f, 1.0f, "%.3f", AudioFullWidth());
-      EndAudioSection();
-
       EndAudioBody();
    }
 
@@ -5719,14 +6317,21 @@ namespace
    void DrawDelayVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
-      const float h = 88.0f;
-      const float barsH = 70.0f;
+      const float h = kAudioTimeVizH;
+      const float barsH = h - 30.0f;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
       dl->PushClipRect(origin, br, true);
+
+      // Amplitude gridlines, same 25%-step reading aid Dynamics/Reverb use.
+      for (int i = 1; i < 4; i++)
+      {
+         const float y = origin.y + barsH - (float)i * 0.25f * barsH;
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), IM_COL32(255, 255, 255, 10), 1.0f);
+      }
 
       const bool sync = n->Param("sync") != 0.0f;
       const int rateDiv = std::clamp((int)(n->Param("rateDiv") + 0.5f), 0, MusicTime::kNumRateDivisions - 1);
@@ -5739,7 +6344,7 @@ namespace
       else
          baseSeconds = n->Param("timeMs") * 0.001f;
 
-      const float barHalfW = 2.0f;
+      const float barHalfW = 2.5f;
       const float feedback = std::min(1.0f, n->Param("feedback") / 100.0f); // visualize decay only
       const float windowSeconds = std::max(0.006f, baseSeconds * 6.0f);
       float amp = 1.0f;
@@ -5754,20 +6359,8 @@ namespace
          t += baseSeconds;
       }
 
-      dl->AddLine(ImVec2(origin.x, origin.y + barsH), ImVec2(br.x, origin.y + barsH), IM_COL32(255, 255, 255, 24),
+      dl->AddLine(ImVec2(origin.x, origin.y + barsH), ImVec2(br.x, origin.y + barsH), IM_COL32(255, 255, 255, 30),
                   1.0f);
-
-      // Wet/dry level pair beneath the tap graph - kernel-published block
-      // peaks (DelayKernel::mLevelMeter), same ExtraMeterValue() discipline
-      // Dynamics' GR bar uses.
-      const float dryPeak = std::clamp(n->ExtraMeterValue(0), 0.0f, 1.0f);
-      const float wetPeak = std::clamp(n->ExtraMeterValue(1), 0.0f, 1.0f);
-      const float meterY0 = origin.y + barsH + 6.0f;
-      const float meterH = 6.0f;
-      dl->AddRectFilled(ImVec2(origin.x, meterY0), ImVec2(origin.x + w * dryPeak, meterY0 + meterH),
-                        IM_COL32(150, 158, 176, 200));
-      dl->AddRectFilled(ImVec2(origin.x, meterY0 + meterH + 2.0f), ImVec2(origin.x + w * wetPeak, meterY0 + meterH * 2.0f + 2.0f),
-                        IM_COL32(150, 214, 255, 220));
 
       dl->PopClipRect();
       dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
@@ -5775,7 +6368,7 @@ namespace
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%.0f ms  dry %.2f  wet %.2f", baseSeconds * 1000.0f, dryPeak, wetPeak);
+         snprintf(buf, sizeof(buf), "%.0f ms  fb %.0f%%", baseSeconds * 1000.0f, feedback * 100.0f);
          SetAudioReadout("delay", buf);
       }
 
@@ -5800,12 +6393,15 @@ namespace
       DrawDelayVisualizer(n);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
+      // KHS Audio Delay's control surface: Time, Tone, Feedback, Pan, Duck,
+      // Mix - two rows of three (Bounce is the checkbox below, matching the
+      // reference's inline on/off switch). A single row of 6 spread the
+      // knobs across the full 440px body with wide, sparse gaps and left the
+      // node much wider than it was tall; matching Dynamics' two-row grammar
+      // fixes both at once. Rate is a dropdown when synced, a knob when
+      // free.
       {
-         // KHS Audio Delay's control surface: Time, Tone, Feedback, Pan,
-         // Duck, Mix - 6 cells (Bounce is the checkbox below, matching the
-         // reference's inline on/off switch). Rate is a dropdown when
-         // synced, a knob when free.
-         AudioKnobRow row(6);
+         AudioKnobRow row(3);
          if (sync)
          {
             row.Dropdown("rate", MusicTime::RateDivisionList(), (int)(n->Param("rateDiv") + 0.5f), [n](int i) {
@@ -5819,6 +6415,10 @@ namespace
          }
          row.Knob("tone", n->ParamPtr("tone"), -1.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("feedback", n->ParamPtr("feedback"), 0.0f, 110.0f, "%.0f%%", kKnobLarge);
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
          row.Knob("pan", n->ParamPtr("pan"), -1.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("duck", n->ParamPtr("ducking"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
@@ -5852,7 +6452,7 @@ namespace
    void DrawReverbVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
-      const float h = 88.0f;
+      const float h = kAudioTimeVizH;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -5863,7 +6463,28 @@ namespace
       const float predelaySeconds = n->Param("predelay") * 0.001f;
       const float decaySeconds = std::max(0.05f, n->Param("decay"));
       const float dampFrac = std::clamp(n->Param("damping"), 0.0f, 1.0f);
-      const float windowSeconds = std::max(0.05f, predelaySeconds + decaySeconds);
+      // Fixed axis, not proportional to decay: decay's range is 0.1-20s, and
+      // a window sized to predelay+decay renormalizes every value to the
+      // same on-screen shape (the curve is plotted as a function of
+      // t/windowSeconds, so scaling the window by decay cancels decay's
+      // visible effect entirely - the knob moved the param but the curve
+      // never looked different). A fixed window lets short decays visibly
+      // drop to the floor early and long decays visibly still be
+      // descending at the right edge.
+      const float windowSeconds = 5.0f;
+
+      // Time gridlines every second and amplitude gridlines every -20dB,
+      // same reading aid Dynamics' dB grid gives its transfer curve.
+      for (int sec = 1; sec < (int)windowSeconds; sec++)
+      {
+         const float x = origin.x + ((float)sec / windowSeconds) * w;
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 10), 1.0f);
+      }
+      for (int i = 1; i < 4; i++)
+      {
+         const float y = br.y - (float)i * 0.25f * (h - 6.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), IM_COL32(255, 255, 255, 10), 1.0f);
+      }
 
       const float predelayX = origin.x + std::clamp(predelaySeconds / windowSeconds, 0.0f, 1.0f) * w;
       dl->AddLine(ImVec2(predelayX, origin.y), ImVec2(predelayX, br.y), IM_COL32(255, 255, 255, 24), 1.0f);
@@ -5893,24 +6514,13 @@ namespace
       }
       dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
-      // Wet/dry level pair beneath the curve - same ExtraMeterValue()
-      // discipline as Delay's tap graph.
-      const float dryPeak = std::clamp(n->ExtraMeterValue(0), 0.0f, 1.0f);
-      const float wetPeak = std::clamp(n->ExtraMeterValue(1), 0.0f, 1.0f);
-      const float meterY0 = br.y - 14.0f;
-      const float meterH = 5.0f;
-      dl->AddRectFilled(ImVec2(origin.x, meterY0), ImVec2(origin.x + w * dryPeak, meterY0 + meterH),
-                        IM_COL32(150, 158, 176, 160));
-      dl->AddRectFilled(ImVec2(origin.x, meterY0 + meterH + 2.0f), ImVec2(origin.x + w * wetPeak, meterY0 + meterH * 2.0f + 2.0f),
-                        IM_COL32(150, 214, 255, 200));
-
       dl->PopClipRect();
       dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%.1f s RT60  dry %.2f  wet %.2f", decaySeconds, dryPeak, wetPeak);
+         snprintf(buf, sizeof(buf), "%.1f s RT60", decaySeconds);
          SetAudioReadout("reverb", buf);
       }
 
@@ -5926,17 +6536,993 @@ namespace
       DrawReverbVisualizer(n);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
+      // Tier 1: size, decay, damping, predelay, width, mix - one mode
+      // (algorithmic FDN, no engine dropdown). Two rows of 3, matching
+      // Dynamics and Delay's grammar. Mix is always the last cell of the
+      // last row across every AudioEffects node - the standard bottom-right
+      // spot, so it reads the same in every effect regardless of how many
+      // params sit ahead of it.
       {
-         // Tier 1 only: size, decay, damping, predelay, mix - 5 knobs, one
-         // mode (algorithmic FDN, no engine dropdown).
-         AudioKnobRow row(5);
+         AudioKnobRow row(3);
          row.Knob("size", n->ParamPtr("size"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("decay", n->ParamPtr("decay"), 0.1f, 20.0f, "%.2f s", kKnobLarge);
          row.Knob("damping", n->ParamPtr("damping"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
          row.Knob("predelay", n->ParamPtr("predelay"), 0.0f, 500.0f, "%.0f ms", kKnobLarge);
+         row.Knob("width", n->ParamPtr("width"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
+
+      EndAudioBody();
+   }
+
+   // ---- Drive ------------------------------------------------------------
+   // The transfer curve itself, input -1..+1 -> output -1..+1 - the node's
+   // identity, and (per §1.5's spec) main-thread from drive/bias alone, not
+   // the live running kernel - same discipline as Dynamics' curve. Tone is
+   // a post-shape filter, not part of the static curve, so it's left out
+   // here exactly as Delay's tone tilt is left out of the tap-bar view.
+   void DrawDriveVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      // Center gridlines (x=0, y=0) plus quarter-amplitude ticks, the same
+      // reading aid Dynamics/Reverb give their curves.
+      for (int i = -2; i <= 2; i++)
+      {
+         const float x = origin.x + (0.5f + 0.25f * (float)i) * w;
+         const float y = origin.y + (0.5f - 0.25f * (float)i) * h;
+         const bool center = (i == 0);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, center ? 30 : 10), 1.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), IM_COL32(255, 255, 255, center ? 30 : 10), 1.0f);
+      }
+
+      // 1:1 reference diagonal (unshaped signal), dim.
+      dl->AddLine(ImVec2(origin.x, br.y), ImVec2(br.x, origin.y), IM_COL32(255, 255, 255, 24), 1.0f);
+
+      const float driveDb = n->Param("drive");
+      const float bias = n->Param("bias");
+      const float color = n->Param("color");
+
+      dl->PathClear();
+      const int kNumPoints = 96;
+      for (int i = 0; i < kNumPoints; i++)
+      {
+         const float xIn = -1.0f + 2.0f * (float)i / (float)(kNumPoints - 1);
+         const float yOut = std::clamp(DriveDsp::Shape(xIn, driveDb, bias, color), -1.0f, 1.0f);
+         const float x = origin.x + (0.5f + 0.5f * xIn) * w;
+         const float y = origin.y + (0.5f - 0.5f * yOut) * h;
+         dl->PathLineTo(ImVec2(x, y));
+      }
+      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[64];
+         snprintf(buf, sizeof(buf), "%.1f dB drive, bias %.2f", driveDb, bias);
+         SetAudioReadout("drive", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawDriveBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      char stat[80];
+      snprintf(stat, sizeof(stat), "%.1f dB drive - %.0f%% wet", n->Param("drive"), n->mix * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawDriveVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Tier 1 only: drive, bias, tone, color, output, mix - one processing
+      // mode (tanh blended toward arctan via `color`), no curve dropdown.
+      // Two rows of three so mix lands in its standard bottom-right spot,
+      // matching Dynamics/Delay/Reverb's grammar.
+      {
+         AudioKnobRow row(3);
+         row.Knob("drive", n->ParamPtr("drive"), 0.0f, 40.0f, "%.1f dB", kKnobLarge);
+         row.Knob("bias", n->ParamPtr("bias"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("tone", n->ParamPtr("tone"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         row.Knob("color", n->ParamPtr("color"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("output", n->ParamPtr("output"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   // ---- Stereo -------------------------------------------------------------
+   // A polar stereo-field imager matching the classic hardware-plugin
+   // goniometer layout: concentric dB-ring arcs fanning up from a bottom-
+   // center apex, a dB scale along the baseline (loud at the outer edges,
+   // quiet toward center), and a filled wedge whose two edges swing left/
+   // right of vertical - `width` opens the wedge, `pan` shifts it - the
+   // same picture the reference plugin's stereo field display uses.
+   // `bassMono` is a frequency-domain effect a polar field can't depict, so
+   // it's shown as a text label instead.
+   void DrawStereoVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 apex(origin.x + w * 0.5f, br.y - 20.0f);
+      const float radius = std::min(w * 0.48f, h - 26.0f);
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      // Concentric dB rings, apex-centered, sweeping only the upper half.
+      const int kNumRings = 5;
+      for (int i = 1; i <= kNumRings; i++)
+      {
+         const float r = radius * (float)i / (float)kNumRings;
+         dl->PathClear();
+         dl->PathArcTo(apex, r, (float)M_PI, 2.0f * (float)M_PI, 32);
+         dl->PathStroke(IM_COL32(255, 255, 255, 22), 0, 1.0f);
+      }
+      dl->AddLine(ImVec2(apex.x, apex.y), ImVec2(apex.x, apex.y - radius), IM_COL32(255, 255, 255, 30), 1.0f);
+      dl->AddLine(ImVec2(apex.x - radius, apex.y), ImVec2(apex.x + radius, apex.y), IM_COL32(255, 255, 255, 22), 1.0f);
+
+      // dB scale along the baseline: loud (0 dB) at the outer edges, quiet
+      // (-24 dB) at the center apex, mirrored left/right.
+      static const char* kDbLabels[] = { "0", "-6", "-12", "-18", "-24" };
+      for (int i = 0; i < kNumRings; i++)
+      {
+         const float t = (float)i / (float)kNumRings;
+         const float x = apex.x - radius + t * radius;
+         dl->AddText(ImVec2(x - 6.0f, apex.y + 4.0f), IM_COL32(150, 158, 176, 160), kDbLabels[kNumRings - 1 - i]);
+         const float xr = apex.x + radius - t * radius;
+         dl->AddText(ImVec2(xr - 6.0f, apex.y + 4.0f), IM_COL32(150, 158, 176, 160), kDbLabels[kNumRings - 1 - i]);
+      }
+
+      const float width = std::clamp(n->Param("width"), 0.0f, 2.0f);
+      const float pan = std::clamp(n->Param("pan"), -1.0f, 1.0f);
+      const float bassMonoHz = std::max(0.0f, n->Param("bassMono"));
+
+      const float widthNorm = width * 0.5f;
+      const float maxHalfAngle = 75.0f * (float)M_PI / 180.0f;
+      const float panShift = pan * 30.0f * (float)M_PI / 180.0f;
+      const float leftAngle = panShift - maxHalfAngle * widthNorm;
+      const float rightAngle = panShift + maxHalfAngle * widthNorm;
+      const float wedgeR = radius * 0.92f;
+
+      auto polar = [&](float angle) {
+         return ImVec2(apex.x + wedgeR * sinf(angle), apex.y - wedgeR * cosf(angle));
+      };
+      const ImVec2 leftPt = polar(leftAngle);
+      const ImVec2 rightPt = polar(rightAngle);
+
+      dl->PathClear();
+      dl->PathLineTo(apex);
+      dl->PathLineTo(leftPt);
+      dl->PathLineTo(rightPt);
+      dl->PathFillConvex(IM_COL32(150, 130, 230, 90));
+
+      dl->PathClear();
+      dl->PathLineTo(leftPt);
+      dl->PathLineTo(apex);
+      dl->PathLineTo(rightPt);
+      dl->PathStroke(IM_COL32(190, 170, 255, 235), 0, 1.8f);
+
+      if (bassMonoHz > 0.0f)
+      {
+         char blo[24];
+         snprintf(blo, sizeof(blo), "mono <%.0f Hz", bassMonoHz);
+         dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), IM_COL32(255, 196, 120, 210), blo);
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[48];
+         const float corr = std::clamp(n->ExtraMeterValue(0), -1.0f, 1.0f);
+         snprintf(buf, sizeof(buf), "width %.2f - pan %+.2f - corr %.2f", width, pan, corr);
+         SetAudioReadout("stereo", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawStereoBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      char stat[80];
+      snprintf(stat, sizeof(stat), "width %.2f - pan %.2f", n->Param("width"), n->Param("pan"));
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawStereoVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      AudioKnobRow row(3);
+      row.Knob("width", n->ParamPtr("width"), 0.0f, 2.0f, "%.2f", kKnobLarge);
+      row.Knob("pan", n->ParamPtr("pan"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+      row.Knob("bass mono", n->ParamPtr("bassMono"), 0.0f, 500.0f, "%.0f Hz", kKnobLarge);
+      row.End();
+
+      EndAudioBody();
+   }
+
+   // ---- Pitch Shifter --------------------------------------------------
+   // A simple bipolar meter (-24..+24 semitones) rather than a spectrogram -
+   // the shift amount is the node's whole identity and a spectrogram would
+   // cost far more to draw than this effect's DSP itself (README §1).
+   void DrawPitchShiftVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 20), 1.0f);
+      const float centerX = origin.x + 0.5f * w;
+      dl->AddLine(ImVec2(centerX, origin.y), ImVec2(centerX, br.y), IM_COL32(255, 255, 255, 30), 1.0f);
+
+      const float pitch = std::clamp(n->Param("pitch"), -24.0f, 24.0f);
+      const float t = 0.5f + 0.5f * (pitch / 24.0f);
+      const float markX = origin.x + t * w;
+      dl->AddCircleFilled(ImVec2(markX, midY), 6.0f, IM_COL32(150, 214, 255, 245));
+
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%+.1f st", pitch);
+      dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), IM_COL32(220, 226, 236, 220), buf);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+         SetAudioReadout("pitch shifter", buf);
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawPitchShiftBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      char stat[80];
+      snprintf(stat, sizeof(stat), "%+.1f st - %.0f ms grain", n->Param("pitch"), n->Param("grain"));
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawPitchShiftVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      AudioKnobRow row(3);
+      row.Knob("pitch", n->ParamPtr("pitch"), -24.0f, 24.0f, "%+.1f st", kKnobLarge);
+      row.Knob("grain", n->ParamPtr("grain"), 10.0f, 250.0f, "%.0f ms", kKnobLarge);
+      row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+      row.End();
+
+      EndAudioBody();
+   }
+
+   // Shared rate control for Chorus/Flanger/Phaser - a rateDiv dropdown when
+   // synced, a free-Hz knob when not - added as the next cell of an
+   // already-open AudioKnobRow so it sits alongside the effect's other
+   // knobs instead of claiming a row of its own.
+   void AddSyncedRateCell(AudioKnobRow& row, AudioEffectNode* n)
+   {
+      const bool sync = n->Param("sync") != 0.0f;
+      if (sync)
+      {
+         row.Dropdown("rate", MusicTime::RateDivisionList(), (int)(n->Param("rateDiv") + 0.5f), [n](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr("rateDiv") = (float)i;
+         });
+      }
+      else
+      {
+         row.Knob("rate", n->ParamPtr("rate"), 0.02f, 5.0f, "%.2f Hz", kKnobLarge);
+      }
+   }
+
+   // "sync to tempo" toggle, drawn below the knob rows.
+   void DrawSyncToggle(AudioEffectNode* n, const char* checkboxId)
+   {
+      bool sync = n->Param("sync") != 0.0f;
+      if (ImGui::Checkbox(checkboxId, &sync))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("sync") = sync ? 1.0f : 0.0f;
+      }
+   }
+
+   // ---- Chorus -------------------------------------------------------------
+   // `taps` sine traces (one per voice), phase-offset by `spread` and
+   // amplitude-scaled by `depth` - the same "layered waves" picture the
+   // BLEASS/Ableton chorus references use, minus the color-per-voice (this
+   // codebase's accent color is used throughout, differentiated by alpha
+   // instead). `delay`/`feedback` show in the corner label/opacity; `rate`
+   // and `mix` are deliberately not reflected here (an animated live LFO
+   // costs more to draw than the effect it illustrates - README §1 - and
+   // mix never changes a wet effect's own shape).
+   void DrawChorusVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 16), 1.0f);
+
+      const int taps = n->Param("taps") >= 2.5f ? 3 : 2;
+      const float spread = std::clamp(n->Param("spread"), 0.0f, 1.0f);
+      const float depthMs = n->Param("depth");
+      const float delayMs = n->Param("delay");
+      const float feedback = std::clamp(n->Param("feedback"), 0.0f, 0.9f);
+      const float amp = std::clamp(depthMs / 15.0f, 0.08f, 1.0f) * (h * 0.5f - 8.0f);
+
+      for (int k = 0; k < taps; k++)
+      {
+         const float voiceOffset = (float)k / (float)taps;
+         const float phaseOffset = voiceOffset + spread * 0.5f * ((float)k / (float)std::max(1, taps - 1));
+         const int alpha = std::clamp(150 - k * 40 + (int)(feedback * 90.0f), 60, 255);
+         dl->PathClear();
+         const int kNumPoints = 96;
+         for (int i = 0; i < kNumPoints; i++)
+         {
+            const float t = (float)i / (float)(kNumPoints - 1);
+            const float x = origin.x + t * w;
+            const float y = midY - amp * sinf(2.0f * (float)M_PI * (t * 2.0f + phaseOffset));
+            dl->PathLineTo(ImVec2(x, y));
+         }
+         dl->PathStroke(IM_COL32(150, 214, 255, alpha), 0, 1.5f + feedback * 1.5f);
+      }
+
+      char buf[24];
+      snprintf(buf, sizeof(buf), "%.1f ms", delayMs);
+      dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), IM_COL32(220, 226, 236, 200), buf);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char hover[80];
+         snprintf(hover, sizeof(hover), "%.1f ms +/- %.1f ms, %d taps, %.0f%% fb", delayMs, depthMs, taps,
+                  feedback * 100.0f);
+         SetAudioReadout("chorus", hover);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawChorusBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      const bool sync = n->Param("sync") != 0.0f;
+      char stat[96];
+      if (sync)
+         snprintf(stat, sizeof(stat), "%.0f taps - %s - %.0f%% wet", n->Param("taps"),
+                  MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->mix * 100.0f);
+      else
+         snprintf(stat, sizeof(stat), "%.0f taps - %.2f Hz - %.0f%% wet", n->Param("taps"), n->Param("rate"),
+                  n->mix * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawChorusVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(3);
+         row.Knob("delay", n->ParamPtr("delay"), 1.0f, 30.0f, "%.1f ms", kKnobLarge);
+         row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("depth", n->ParamPtr("depth"), 0.0f, 15.0f, "%.1f ms", kKnobLarge);
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         row.Knob("feedback", n->ParamPtr("feedback"), 0.0f, 0.9f, "%.2f", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         AddSyncedRateCell(row, n);
+         row.End();
+      }
+
+      DrawSyncToggle(n, "sync to tempo##chorusSync");
+      ImGui::SameLine();
+      bool taps3 = n->Param("taps") >= 2.5f;
+      if (ImGui::Checkbox("3 taps##chorusTaps", &taps3))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("taps") = taps3 ? 3.0f : 2.0f;
+      }
+
+      EndAudioBody();
+   }
+
+   // ---- Flanger --------------------------------------------------------
+   // A dry reference line plus a modulated wet trace whose thickness and
+   // ripple sharpness scale with `feedback` - a flanger's resonant comb
+   // narrowing as feedback climbs is exactly the "jet swoosh" character the
+   // knob controls, so this is the one picture that reads that back
+   // directly (the Ableton flanger reference's own dual-wave look, adapted
+   // to this codebase's single accent color via a dim dry trace instead of
+   // a second hue).
+   void DrawFlangerVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      const float delayMs = n->Param("delay");
+      const float depthMs = n->Param("depth");
+      const float feedback = n->Param("feedback");
+      const float amp = std::clamp(depthMs / 10.0f, 0.08f, 1.0f) * (h * 0.5f - 10.0f);
+      const float rippleAmp = std::fabs(feedback) * (h * 0.16f);
+      const float rippleFreq = 3.0f + std::fabs(feedback) * 5.0f;
+
+      // Dry reference - a flat carrier ripple with no modulation envelope.
+      dl->PathClear();
+      for (int i = 0; i < 96; i++)
+      {
+         const float t = (float)i / 95.0f;
+         const float x = origin.x + t * w;
+         const float y = midY - (h * 0.1f) * sinf(2.0f * (float)M_PI * t * rippleFreq);
+         dl->PathLineTo(ImVec2(x, y));
+      }
+      dl->PathStroke(IM_COL32(255, 255, 255, 36), 0, 1.0f);
+
+      auto drawWet = [&](float phaseOffset, int alpha) {
+         dl->PathClear();
+         for (int i = 0; i < 96; i++)
+         {
+            const float t = (float)i / 95.0f;
+            const float x = origin.x + t * w;
+            const float envelope = amp * sinf(2.0f * (float)M_PI * (t * 2.0f + phaseOffset));
+            const float ripple = rippleAmp * sinf(2.0f * (float)M_PI * t * rippleFreq);
+            const float y = midY - envelope - ripple;
+            dl->PathLineTo(ImVec2(x, y));
+         }
+         dl->PathStroke(IM_COL32(150, 214, 255, alpha), 0, 1.4f + std::fabs(feedback) * 2.2f);
+      };
+      drawWet(0.0f, 235);
+      drawWet(0.25f, 120);
+
+      char buf[24];
+      snprintf(buf, sizeof(buf), "%.2f ms", delayMs);
+      dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), IM_COL32(220, 226, 236, 200), buf);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char hover[80];
+         snprintf(hover, sizeof(hover), "%.2f ms +/- %.2f ms, %+.0f%% fb", delayMs, depthMs, feedback * 100.0f);
+         SetAudioReadout("flanger", hover);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawFlangerBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      const bool sync = n->Param("sync") != 0.0f;
+      char stat[96];
+      if (sync)
+         snprintf(stat, sizeof(stat), "%s - %.0f%% fb - %.0f%% wet",
+                  MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->Param("feedback") * 100.0f,
+                  n->mix * 100.0f);
+      else
+         snprintf(stat, sizeof(stat), "%.1f ms - %.0f%% fb - %.0f%% wet", n->Param("delay"),
+                  n->Param("feedback") * 100.0f, n->mix * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawFlangerVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(3);
+         row.Knob("delay", n->ParamPtr("delay"), 0.2f, 15.0f, "%.2f ms", kKnobLarge);
+         row.Knob("depth", n->ParamPtr("depth"), 0.0f, 10.0f, "%.2f ms", kKnobLarge);
+         row.Knob("feedback", n->ParamPtr("feedback"), -0.95f, 0.95f, "%.2f", kKnobLarge);
+         row.End();
+      }
+      {
+         AudioKnobRow row(2);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         AddSyncedRateCell(row, n);
+         row.End();
+      }
+
+      DrawSyncToggle(n, "sync to tempo##flangerSync");
+
+      EndAudioBody();
+   }
+
+   // ---- Phaser -----------------------------------------------------------
+   // An illustrative magnitude-response curve on a log-frequency axis with
+   // `order/2` notches spaced between cutoff*2^-depth and cutoff*2^+depth -
+   // the same sweep range PhaserKernel::ProcessBlock itself computes for
+   // its allpass coefficients, just static rather than animated (rate is
+   // deliberately not reflected - see DrawChorusVisualizer's comment). A
+   // second, dimmer trace offset by `spread` shows the right channel's
+   // widened sweep.
+   void DrawPhaserVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float logMin = log10f(50.0f), logMax = log10f(8000.0f);
+      auto freqToX = [&](float hz) {
+         const float t = std::clamp((log10f(std::max(hz, 1.0f)) - logMin) / (logMax - logMin), 0.0f, 1.0f);
+         return origin.x + t * w;
+      };
+      for (float hz : { 100.0f, 300.0f, 1000.0f, 3000.0f })
+      {
+         const float x = freqToX(hz);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 12), 1.0f);
+      }
+
+      const float cutoff = n->Param("cutoff");
+      const float depth = std::clamp(n->Param("depth"), 0.0f, 1.0f);
+      const int order = std::clamp((int)(n->Param("order") + 0.5f), 2, PhaserKernel::kMaxStages);
+      const int notches = std::max(1, order / 2);
+      const float spread = std::clamp(n->Param("spread"), 0.0f, 1.0f);
+      const float fcLo = std::max(20.0f, cutoff * powf(2.0f, -depth));
+      const float fcHi = cutoff * powf(2.0f, depth);
+      const float notchWidthLog = std::max(0.05f, 0.55f / (float)notches);
+
+      auto drawTrace = [&](float freqScale, int alpha) {
+         dl->PathClear();
+         const int kNumPoints = 128;
+         for (int i = 0; i < kNumPoints; i++)
+         {
+            const float t = (float)i / (float)(kNumPoints - 1);
+            const float logHz = logMin + t * (logMax - logMin);
+            float mag = 1.0f;
+            for (int k = 0; k < notches; k++)
+            {
+               const float frac = notches > 1 ? (float)k / (float)(notches - 1) : 0.5f;
+               const float centerHz = std::clamp(fcLo * powf(fcHi / fcLo, frac) * freqScale, 20.0f, 19000.0f);
+               const float logDist = (logHz - log10f(centerHz)) / notchWidthLog;
+               mag *= 1.0f - 0.85f * expf(-logDist * logDist * 4.0f);
+            }
+            const float x = origin.x + t * w;
+            const float y = br.y - 6.0f - mag * (h - 16.0f);
+            dl->PathLineTo(ImVec2(x, y));
+         }
+         dl->PathStroke(IM_COL32(150, 214, 255, alpha), 0, 1.6f);
+      };
+      drawTrace(1.0f, 235);
+      if (spread > 0.01f)
+         drawTrace(powf(2.0f, spread * 0.5f), 110);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[80];
+         snprintf(buf, sizeof(buf), "%.0f Hz +/- %.1f oct, %d notches", cutoff, depth, notches);
+         SetAudioReadout("phaser", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawPhaserBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      const bool sync = n->Param("sync") != 0.0f;
+      char stat[96];
+      if (sync)
+         snprintf(stat, sizeof(stat), "%.0f-stage - %s - %.0f%% wet", n->Param("order"),
+                  MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->mix * 100.0f);
+      else
+         snprintf(stat, sizeof(stat), "%.0f-stage - %.0f Hz - %.0f%% wet", n->Param("order"), n->Param("cutoff"),
+                  n->mix * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawPhaserVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(3);
+         row.Knob("cutoff", n->ParamPtr("cutoff"), 100.0f, 4000.0f, "%.0f Hz", kKnobLarge);
+         row.Knob("depth", n->ParamPtr("depth"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("order", n->ParamPtr("order"), 2.0f, (float)PhaserKernel::kMaxStages, "%.0f", kKnobLarge);
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         AddSyncedRateCell(row, n);
+         row.End();
+      }
+
+      DrawSyncToggle(n, "sync to tempo##phaserSync");
+
+      EndAudioBody();
+   }
+
+   // ---- Bitcrush -----------------------------------------------------------
+   // A quantized, sample-and-held sine arch with a solid fill down to the
+   // baseline, matching the reference bitcrusher's single-hump filled-
+   // staircase look (rather than a centered oscillating line) - `bits`
+   // sets the step height (levels on the vertical stairs), `rate` sets the
+   // step width (how long each hold lasts).
+   void DrawBitcrushVisualizer(AudioEffectNode* n, double sampleRate)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float rateHz = std::max(100.0f, n->Param("rate"));
+      const float bits = std::max(1.0f, n->Param("bits"));
+      const float levels = powf(2.0f, bits) - 1.0f;
+      const float holdSamples = std::max(1.0f, (float)sampleRate / rateHz);
+      const float cycleSamples = (float)sampleRate; // one second of illustrative arch at 1 Hz
+      const float top = origin.y + 8.0f;
+      const float baseY = br.y - 4.0f;
+
+      const int kNumSteps = 160;
+      ImVec2 pts[kNumSteps];
+      float lastHeld = 0.0f;
+      for (int i = 0; i < kNumSteps; i++)
+      {
+         const float sampleIdx = (float)i / (float)(kNumSteps - 1) * cycleSamples;
+         const bool tick = fmodf(sampleIdx, holdSamples) < (cycleSamples / (float)kNumSteps);
+         float v = fabsf(sinf((float)M_PI * sampleIdx / cycleSamples));
+         if (tick || i == 0)
+         {
+            v = roundf(v * levels) / levels;
+            lastHeld = v;
+         }
+         else
+            v = lastHeld;
+         const float x = origin.x + (float)i / (float)(kNumSteps - 1) * w;
+         const float y = baseY - v * (baseY - top);
+         pts[i] = ImVec2(x, y);
+      }
+
+      dl->PathClear();
+      for (int i = 0; i < kNumSteps; i++)
+         dl->PathLineTo(pts[i]);
+      dl->PathLineTo(ImVec2(pts[kNumSteps - 1].x, baseY));
+      dl->PathLineTo(ImVec2(pts[0].x, baseY));
+      dl->PathFillConvex(IM_COL32(150, 110, 230, 110));
+
+      dl->PathClear();
+      for (int i = 0; i < kNumSteps; i++)
+         dl->PathLineTo(pts[i]);
+      dl->PathStroke(IM_COL32(190, 160, 255, 245), 0, 1.8f);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      char buf[48];
+      snprintf(buf, sizeof(buf), "%.0f Hz - %.0f bit", rateHz, bits);
+      if (ImGui::IsMouseHoveringRect(origin, br))
+         SetAudioReadout("bitcrush", buf);
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawBitcrushBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      char stat[80];
+      snprintf(stat, sizeof(stat), "%.0f Hz - %.0f bit - %.0f%% wet", n->Param("rate"), n->Param("bits"),
+               n->mix * 100.0f);
+
+      const double sampleRate =
+         AudioEngine::Instance().SampleRate() > 0.0 ? AudioEngine::Instance().SampleRate() : 44100.0;
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawBitcrushVisualizer(n, sampleRate);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      AudioKnobRow row(3);
+      // Labelled "downsample" (not "rate") to match the BLEASS-style
+      // reference's own naming - this is the same sample-and-hold rate
+      // param as before (BitcrushKernel::kRateHz), a cosmetic relabel only.
+      row.Knob("downsample", n->ParamPtr("rate"), 200.0f, 44100.0f, "%.0f Hz", kKnobLarge);
+      row.Knob("bits", n->ParamPtr("bits"), 1.0f, 16.0f, "%.0f", kKnobLarge);
+      row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+      row.End();
+
+      EndAudioBody();
+   }
+
+   // ---- Transient Shaper -----------------------------------------------
+   // A stylized transient spike (fast rise, slow decay) with the attack/
+   // sustain knobs shown as gain bars either side, and the kernel's own
+   // live transient-amount (ExtraMeterValue(0)) riding on the curve as a
+   // dot - the same "picture from params, dot from the kernel" split
+   // Dynamics' transfer curve uses.
+   void DrawTransientShaperVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float baseY = br.y - 6.0f;
+      dl->PathClear();
+      const int kNumPoints = 96;
+      for (int i = 0; i < kNumPoints; i++)
+      {
+         const float t = (float)i / (float)(kNumPoints - 1);
+         const float env = t < 0.08f ? (t / 0.08f) : expf(-(t - 0.08f) * 6.0f);
+         const float x = origin.x + t * w;
+         const float y = baseY - env * (h - 14.0f);
+         dl->PathLineTo(ImVec2(x, y));
+      }
+      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+
+      const float transientAmount = std::clamp(n->ExtraMeterValue(0), 0.0f, 1.0f);
+      const float dotX = origin.x + 0.08f * w;
+      const float dotY = baseY - (h - 14.0f);
+      dl->AddCircleFilled(ImVec2(dotX, dotY), 3.0f + transientAmount * 4.0f, IM_COL32(255, 196, 120, 230));
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[48];
+         snprintf(buf, sizeof(buf), "attack %.1f dB - sustain %.1f dB", n->Param("attack"), n->Param("sustain"));
+         SetAudioReadout("transient shaper", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawTransientShaperBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      char stat[80];
+      snprintf(stat, sizeof(stat), "atk %+.1f dB - sus %+.1f dB", n->Param("attack"), n->Param("sustain"));
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawTransientShaperVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      AudioKnobRow row(2);
+      row.Knob("attack", n->ParamPtr("attack"), -24.0f, 24.0f, "%.1f dB", kKnobLarge);
+      row.Knob("sustain", n->ParamPtr("sustain"), -24.0f, 24.0f, "%.1f dB", kKnobLarge);
+      row.End();
+
+      BeginAudioSection("output");
+      AudioSlider("mix", &n->mix, 0.0f, 1.0f, "%.3f", AudioHalfWidth());
+      EndAudioSection();
+
+      EndAudioBody();
+   }
+
+   // ---- Stutter --------------------------------------------------------
+   void DrawStutterBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      const bool sync = n->Param("sync") != 0.0f;
+
+      char stat[80];
+      if (sync)
+         snprintf(stat, sizeof(stat), "%s - %.0f%% grain", MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)),
+                  n->Param("chunk") * 100.0f);
+      else
+         snprintf(stat, sizeof(stat), "%.0f ms - %.0f%% grain", n->Param("timeMs"), n->Param("chunk") * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         AudioKnobRow row(2);
+         if (sync)
+         {
+            row.Dropdown("rate", MusicTime::RateDivisionList(), (int)(n->Param("rateDiv") + 0.5f), [n](int i) {
+               PushUndoCheckpoint();
+               *n->ParamPtr("rateDiv") = (float)i;
+            });
+         }
+         else
+         {
+            row.Knob("time", n->ParamPtr("timeMs"), 20.0f, 2000.0f, "%.0f ms", kKnobLarge);
+         }
+         row.Knob("grain", n->ParamPtr("chunk"), 0.02f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      bool syncBool = sync;
+      if (ImGui::Checkbox("sync to tempo##stutterSync", &syncBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("sync") = syncBool ? 1.0f : 0.0f;
+      }
+
+      EndAudioBody();
+   }
+
+   // ---- Ring Mod ---------------------------------------------------------
+   // The modulator waveform itself, one static cycle - the ring-modding
+   // oscillator's shape is the node's whole identity (its frequency and
+   // waveform, not the input signal, define the sidebands).
+   void DrawRingModVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 16), 1.0f);
+
+      const int waveform = std::clamp((int)(n->Param("waveform") + 0.5f), 0, (int)DspMath::kWaveSquare);
+      const float amp = h * 0.5f - 6.0f;
+
+      dl->PathClear();
+      const int kNumPoints = 128;
+      DspMath::PolyBlepOsc previewOsc;
+      previewOsc.phaseInc = 2.0 / (double)kNumPoints; // two static cycles across the panel
+      for (int i = 0; i < kNumPoints; i++)
+      {
+         const double phase = (double)i * previewOsc.phaseInc;
+         const float v = previewOsc.Generate(waveform, 0.5f, phase);
+         const float x = origin.x + (float)i / (float)(kNumPoints - 1) * w;
+         const float y = midY - v * amp;
+         dl->PathLineTo(ImVec2(x, y));
+      }
+      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[32];
+         snprintf(buf, sizeof(buf), "%.0f Hz", n->Param("freq"));
+         SetAudioReadout("ring mod", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawRingModBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      char stat[64];
+      snprintf(stat, sizeof(stat), "%.0f Hz - %.0f%% wet", n->Param("freq"), n->mix * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawRingModVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(3);
+         row.Knob("freq", n->ParamPtr("freq"), 1.0f, 5000.0f, "%.0f Hz", kKnobLarge);
+         const int waveform = (int)(n->Param("waveform") + 0.5f);
+         static const std::vector<std::string> kWaveNames = { "sine", "triangle", "saw", "square" };
+         row.Dropdown("wave", kWaveNames, waveform, [n](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr("waveform") = (float)i;
+         });
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   // ---- Formant Filter -----------------------------------------------------
+   // The three formant resonators' frequencies as markers on a log axis -
+   // the picture a filter's own frequency-response curve would give, but
+   // for three narrow bandpass peaks rather than one broad shape, so three
+   // labelled markers reads more clearly than a busy triple-peaked curve.
+   void DrawFormantFilterVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float logMin = log10f(100.0f), logMax = log10f(5000.0f);
+      auto freqToX = [&](float hz) {
+         const float t = std::clamp((log10f(hz) - logMin) / (logMax - logMin), 0.0f, 1.0f);
+         return origin.x + t * w;
+      };
+
+      for (float hz : { 100.0f, 300.0f, 1000.0f, 3000.0f })
+      {
+         const float x = freqToX(hz);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 12), 1.0f);
+      }
+
+      const FormantDsp::Formants f = FormantDsp::VowelFormants(n->Param("vowel"));
+      const float formants[3] = { f.f1, f.f2, f.f3 };
+      const float weights[3] = { 1.0f, 0.7f, 0.5f };
+      static const char* kFormantLabels[3] = { "F1", "F2", "F3" };
+      for (int i = 0; i < 3; i++)
+      {
+         const float x = freqToX(formants[i]);
+         const float peakY = br.y - 6.0f - weights[i] * (h - 20.0f);
+         dl->AddLine(ImVec2(x, br.y - 6.0f), ImVec2(x, peakY), IM_COL32(150, 214, 255, 220), 3.0f);
+         dl->AddText(ImVec2(x - 7.0f, peakY - 14.0f), IM_COL32(220, 226, 236, 200), kFormantLabels[i]);
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[64];
+         snprintf(buf, sizeof(buf), "F1 %.0f - F2 %.0f - F3 %.0f Hz", f.f1, f.f2, f.f3);
+         SetAudioReadout("formant filter", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawFormantFilterBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      static const char* kVowelNames[] = { "A", "E", "I", "O", "U" };
+      const int vowelIdx = std::clamp((int)(n->Param("vowel") + 0.5f), 0, 4);
+
+      char stat[64];
+      snprintf(stat, sizeof(stat), "%s - Q %.1f - %.0f%% wet", kVowelNames[vowelIdx], n->Param("q"), n->mix * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawFormantFilterVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      AudioKnobRow row(3);
+      row.Knob("vowel", n->ParamPtr("vowel"), 0.0f, 4.0f, "%.2f", kKnobLarge);
+      row.Knob("Q", n->ParamPtr("q"), 2.0f, 30.0f, "%.1f", kKnobLarge);
+      row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+      row.End();
 
       EndAudioBody();
    }
@@ -5963,6 +7549,28 @@ namespace
       }
       else if (auto* n = dynamic_cast<MidiNotesNode*>(gn.node.get()))
          DrawMidiNotesBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteFilterNode*>(gn.node.get()))
+         DrawNoteFilterBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteModifyNode*>(gn.node.get()))
+         DrawNoteModifyBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteEchoNode*>(gn.node.get()))
+         DrawNoteEchoBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteRouterNode*>(gn.node.get()))
+         DrawNoteRouterBody(gn, n);
+      else if (auto* n = dynamic_cast<ArpeggiatorNode*>(gn.node.get()))
+         DrawArpeggiatorBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteSequencerNode*>(gn.node.get()))
+         DrawNoteSequencerBody(gn, n);
+      else if (auto* n = dynamic_cast<RandomNoteGeneratorNode*>(gn.node.get()))
+         DrawRandomNoteGeneratorBody(gn, n);
+      else if (auto* n = dynamic_cast<ChorderNode*>(gn.node.get()))
+         DrawChorderBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteCapturerNode*>(gn.node.get()))
+         DrawNoteCapturerBody(gn, n);
+      else if (auto* n = dynamic_cast<BouncingBallsNode*>(gn.node.get()))
+         DrawBouncingBallsBody(gn, n);
+      else if (auto* n = dynamic_cast<ScaleNotesNode*>(gn.node.get()))
+         DrawScaleNotesBody(gn, n);
       else if (auto* n = dynamic_cast<EnvelopeNode*>(gn.node.get()))
          DrawEnvelopeBody(gn, n);
       else if (auto* n = dynamic_cast<AudioEffectNode*>(gn.node.get()))
@@ -5987,6 +7595,39 @@ namespace
             break;
          case EffectVisualizerId::kReverbDecay:
             DrawReverbBody(gn, n);
+            break;
+         case EffectVisualizerId::kDriveCurve:
+            DrawDriveBody(gn, n);
+            break;
+         case EffectVisualizerId::kStereoGoniometer:
+            DrawStereoBody(gn, n);
+            break;
+         case EffectVisualizerId::kPitchShiftDisplay:
+            DrawPitchShiftBody(gn, n);
+            break;
+         case EffectVisualizerId::kChorusScatter:
+            DrawChorusBody(gn, n);
+            break;
+         case EffectVisualizerId::kFlangerScatter:
+            DrawFlangerBody(gn, n);
+            break;
+         case EffectVisualizerId::kPhaserScatter:
+            DrawPhaserBody(gn, n);
+            break;
+         case EffectVisualizerId::kBitcrushWave:
+            DrawBitcrushBody(gn, n);
+            break;
+         case EffectVisualizerId::kTransientEnvelope:
+            DrawTransientShaperBody(gn, n);
+            break;
+         case EffectVisualizerId::kStutterGrid:
+            DrawStutterBody(gn, n);
+            break;
+         case EffectVisualizerId::kRingModWave:
+            DrawRingModBody(gn, n);
+            break;
+         case EffectVisualizerId::kFormantVowel:
+            DrawFormantFilterBody(gn, n);
             break;
          default:
             break;
@@ -8447,9 +10088,31 @@ namespace
          { "Image Analyze", "Turns an image into control values. Patch any of its outputs into any slider's modulation dot - a video can drive a blur. Sample res readback is rate-limited because it stalls the GPU." },
          { "Audio Analyze", "Extracts level/frequency-band values from an Audio File for modulation." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
-         { "Dynamics", "A compressor: threshold, ratio, attack, release, makeup, a peak/RMS detector switch, and a sidechain switch that feeds the detector from the second input pin instead of the main signal. The transfer curve shows a live dot riding your signal's operating point and a gain-reduction bar down the right edge." },
+         { "Dynamics", "A compressor: threshold, ratio, attack, release, makeup, a peak/RMS detector switch, and a sidechain switch that feeds the detector from the second input pin instead of the main signal. The graph shows the static transfer curve - input dB in, output dB out." },
          { "Delay", "A fractional delay line: time (tempo-synced by default, or free ms with 'sync to tempo' off), tone (bipolar tilt on the repeats), feedback (past 100% on purpose for self-oscillation - the output is soft-clipped, not the feedback itself), pan, duck (sidechains the wet signal off the dry input) and a bounce switch that cross-feeds left/right instead of repeating in place." },
-         { "Reverb", "An 8-line feedback delay network: size (room size), decay (RT60 in seconds), damping (darkens and speeds up the tail), predelay (gap before the reverb starts) and mix. Algorithmic only - no convolution engine." },
+         { "Reverb", "An 8-line feedback delay network: size (room size), decay (RT60 in seconds), damping (darkens and speeds up the tail), predelay (gap before the reverb starts), width (stereo spread, full at 1 down to mono at 0) and mix. Algorithmic only - no convolution engine." },
+         { "Drive", "A tanh saturator: drive (0-40dB into the shaper), bias (asymmetry - the difference between fuzzy and warm), tone (bipolar tilt after the shaper) and output trim. A DC blocker always runs since bias otherwise leaks a constant offset." },
+         { "Stereo", "Mid/side width control: width scales the side signal (0 = mono, 1 = unchanged, 2 = exaggerated), pan balances the result, bass mono folds everything below a frequency back to mono so low end survives a mono system. The bar shows live L/R correlation." },
+         { "Pitch Shifter", "A two-tap delay-line pitch shifter: pitch in semitones, grain size in ms (shorter grains track fast material better but sound more granular). No formant correction - octave shifts will chipmunk/deepen the timbre along with the pitch." },
+         { "Chorus", "2 or 3 detuned voices of one modulated delay line, LFO depth/rate, spread offsets the right channel's LFO phase for width." },
+         { "Flanger", "One short modulated delay line with feedback - the jet-swoosh comb filter. Feedback past zero flips the comb's polarity for a hollower sound; the right channel reads a quarter-cycle ahead of the left for width." },
+         { "Phaser", "A cascade of allpass stages (order, 2-8) sweeping around cutoff at rate/depth - each pair of stages adds one more notch to the comb. Spread offsets the right channel's sweep phase for width." },
+         { "Bitcrush", "Sample-rate reduction (rate, zero-order hold) and bit-depth quantization (bits) - the two classic lo-fi digital degradations, independent of each other." },
+         { "Transient Shaper", "Boosts or cuts a signal's transient hits (attack) separately from its sustained body (sustain), via a fast/slow envelope-difference detector - no threshold or ratio to set, unlike a compressor." },
+         { "Stutter", "Records the first `grain` fraction of each tempo-synced (or free-ms) cycle, then loops that captured slice for the rest of the cycle before recording fresh audio next cycle - a beat-repeat glitch effect." },
+         { "Ring Mod", "Multiplies the input by an oscillator (freq, waveform) - true ring modulation, not amplitude modulation, so the original frequencies are replaced by sum/difference sidebands rather than just scaled." },
+         { "Formant Filter", "Three parallel bandpass resonators tuned to a vowel's formants (F1/F2/F3), morphed continuously A-E-I-O-U by the vowel knob - a vocal-tract-shaped filter for any input, not just voice." },
+         { "Note Filter", "A gate on a note's pitch: scale snaps it to the nearest degree of the chosen scale/root, range drops anything outside lo..hi, and chance randomly drops the rest. A note that gets dropped has its note-off dropped with it, so nothing hangs." },
+         { "Note Modify", "Changes an attribute of a note in flight: transpose and a fine pitch offset in semitones, a velocity curve, and random humanise on timing and velocity. Gate above 0ms ignores the real note-off and instead ends the note itself that many ms after it starts - set this for a fixed note duration regardless of how long the source held it. Quantize snaps note-on timing forward to the nearest grid line; glide plays a fast chromatic run between the previous and new note as an approximation of portamento (NoteEvent has no continuous pitch, so this is a glissando, not a true pitch ramp)." },
+         { "Note Echo", "Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it." },
+         { "Note Router", "The system's only note fan-out point: one input, four distinct outputs. Round Robin cycles through them, Random picks one per note, Chain advances only when the pitch changes (a held note stays put), and Probability rolls each output independently - a note can end up on several outputs at once, or (rarely) none, in which case it falls back to output 1. A note's whole lifetime (on through off) always stays on the output(s) it started on." },
+         { "Arpeggiator", "Holds whatever notes are currently down and replays them one at a time on its own clock, either synced to tempo (a note division) or free-running in seconds. Up/Down/Up-Down/Down-Up/As Played order the held notes by pitch or by the order they were pressed; Converge alternates outside-in (lowest, highest, next-lowest...), Diverge alternates inside-out from the middle; Random picks one per step. Octaves stacks the pattern up to 3 octaves higher. Gate sets how much of each step the note actually sounds for before its off." },
+         { "Note Sequencer", "A self-playing step sequencer, up to 16 steps. Drag a bar's tall upper area to set that step's pitch, drag the thin strip below it to set velocity, click the strip to toggle the step on/off. Steps sets how many loop, rate is either synced to tempo (a note division) or free-running in seconds, gate is how much of each step the note actually sounds for." },
+         { "Random Note Generator", "A generative source that free-runs on its own clock (synced to tempo or free-running seconds) rather than only reacting to a knob edit: each new note is the previous one plus a small random step (wander sets the max semitones), clamped to lo..hi and snapped to the chosen scale - a bounded random walk, not independent-per-step randomness, so the line wanders rather than jumps around." },
+         { "Chorder", "A self-playing generative chord engine. Every groove step it picks a random scale degree and stacks chord-sized thirds on top of it, in key. Strum spaces each chord tone's onset apart instead of firing them all at once; humanise timing and velocity add per-note randomness on top; harmonics is the chance any given chord gets an extra note an octave above one of its tones." },
+         { "Note Capturer", "A MIDI recorder and looper. Record captures whatever plays into it (tempo-relative, so it stays in sync if the BPM changes); Play loops that phrase back on top of the live input, which always passes through regardless of transport state. Loop toggles whether playback repeats or stops after one pass. Quantize snaps every recorded onset to the nearest grid line the moment recording stops. A topology rebuild elsewhere in the patch (any cable connect/disconnect) no longer clears a take - only Clear does. Like every other recorder in this app, the recording itself doesn't survive save/load - only loop/quantize do." },
+         { "Bouncing Balls", "Balls bounce around inside a shape and emit a random note in lo..hi range every time one hits the wall, flashing orange briefly on the hit. Shape swaps the boundary between circle, square and triangle; size and speed are the balls' own; balls sets how many are simulated at once." },
+         { "Scale Notes", "Quantizes every incoming note's pitch to the nearest degree of the chosen scale/root - nothing else about the note (timing, velocity) changes. A plain inline gate, distinct from Note Filter's range/chance gating." },
 
          // ---------------- Feedback ----------------
          { "Feedback", "Outputs the previous frame - a one-frame delay, not an effect. It only does something visible inside a loop: patch a downstream node's output back into a Feedback node's input, then use that Feedback output upstream, without the graph recursing. See Menu > Help > 'Using Feedback' for the full patch." },
@@ -9110,7 +10773,7 @@ namespace
          if (cable->IsConnected())
          {
             if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
-               inbox = producer->NoteOutbox();
+               inbox = producer->NoteOutbox(cable->GetOutputSlot());
          }
          consumer->SetNoteInbox(inbox);
       }
@@ -9247,7 +10910,7 @@ namespace
             {
                if (src.node.get() == cable->GetSource())
                {
-                  data.notes.push_back({ gn.index, slot, src.index });
+                  data.notes.push_back({ gn.index, slot, src.index, cable->GetOutputSlot() });
                   break;
                }
             }
@@ -9488,7 +11151,7 @@ namespace
          if (dst == nullptr || src == nullptr)
             continue;
          if (NoteCable* cable = dst->node->NoteInputSlot(c.dstSlot))
-            cable->Connect(src->node.get());
+            cable->Connect(src->node.get(), c.srcOutput);
       }
       for (const Patch::ModRecord& m : data.modulation)
       {
@@ -11965,11 +13628,28 @@ namespace AudioParamSweep
       // A param declared uiOnly (no DSP meaning at all by design) has no
       // audio-thread effect by design - report it pass-with-a-note rather
       // than trying every alternate value and reporting a misleading FAIL.
-      if (const EffectParamDef* def = FindEffectParamDef(cand.name, probeSlot.name))
-         if (def->uiOnly)
-            return { true, false, true };
-
       const int kMaxCandidates = 4;
+      const EffectParamDef* def = FindEffectParamDef(cand.name, probeSlot.name);
+      if (def && def->uiOnly)
+         return { true, false, true };
+
+      // An explicit candidate list overrides the generic sequence below -
+      // see EffectParamDef::testCandidates.
+      if (def && !def->testCandidates.empty())
+      {
+         ParamTestResult last { false, true };
+         for (size_t i = 0; i < def->testCandidates.size() && (int)i < kMaxCandidates; i++)
+         {
+            const float v = def->testCandidates[i];
+            last = (probeSlot.kind == ParamSlot::kInt)
+               ? TestOneParamWithValue(cand, probeSlot, 0.0, (int)std::lround(v), false, sampleRate, blockSize, frame)
+               : TestOneParamWithValue(cand, probeSlot, v, 0, false, sampleRate, blockSize, frame);
+            if (last.skip || last.ok)
+               return last;
+         }
+         return last;
+      }
+
       if (probeSlot.kind == ParamSlot::kBool)
       {
          return TestOneParamWithValue(cand, probeSlot, 0.0, 0, !*probeSlot.b, sampleRate, blockSize, frame);
@@ -12230,14 +13910,11 @@ int main()
    RegisterNodes();
    ApplyTheme();
 
-   // Non-fatal: a machine with no usable audio device (e.g. a CI runner)
-   // still runs the app fine, just without sound - audio-graph nodes simply
-   // never get a topology and their output is silence.
-   {
-      std::string audioError;
-      if (!AudioEngine::Instance().Start(audioError))
-         fprintf(stderr, "audio device: %s\n", audioError.c_str());
-   }
+   // The audio engine no longer auto-starts at launch: someone opening the
+   // app to work on visuals shouldn't have audio hardware opened out from
+   // under them. It's started explicitly from the toolbar's Audio toggle
+   // (or "Apply audio settings" once it's already running) instead - see
+   // the "Start Audio"/"Stop Audio" button below.
 
    // Flat list of every registered type, for the double-click search box.
    std::vector<std::pair<std::string, std::string>> allTypes; // (name, category)
@@ -13555,16 +15232,6 @@ int main()
 
       ImGui::NewFrame();
 
-      // Feed the transport a fresh MIDI Clock BPM estimate once a frame, same
-      // pattern as AudioAnalyzeNode/MidiCCNode pulling smoothed values from
-      // Platform rather than the Core MIDI callback writing into Transport
-      // directly from a background thread.
-      if (Transport::Instance().ExternalSyncEnabled() && Platform::MidiClockIsPresent())
-      {
-         const float clockBpm = Platform::MidiClockBpm();
-         if (clockBpm > 0.0f)
-            Transport::Instance().ReportExternalTempo(clockBpm);
-      }
       Transport::Instance().Tick(ImGui::GetIO().DeltaTime);
 
       if (getenv("INFINITE_TRANSPORTCLOCKTEST") != nullptr)
@@ -13869,8 +15536,6 @@ int main()
                   }
                   ImGui::EndCombo();
                }
-               ImGui::TextDisabled("Input device isn't used yet - no audio-input nodes exist");
-
                static const double kSampleRates[] = { 44100.0, 48000.0, 88200.0, 96000.0 };
                std::string rateLabel = (gAudioSampleRate == 0.0) ? "Device default" : "";
                if (gAudioSampleRate != 0.0)
@@ -13909,9 +15574,6 @@ int main()
                   }
                   ImGui::EndCombo();
                }
-               ImGui::TextDisabled("Sample rate/buffer size are device-wide on macOS -");
-               ImGui::TextDisabled("changing them affects every app using this device.");
-
                static const float kOversampleValues[] = { 1.0f, 2.0f, 4.0f };
                static const char* kOversampleLabels[] = { "1x", "2x", "4x" };
                int oversampleIdx = 0;
@@ -13926,8 +15588,6 @@ int main()
                         gAudioOversample = kOversampleValues[i];
                   ImGui::EndCombo();
                }
-               ImGui::TextDisabled("Not used by any node yet - reserved for P3c effects.");
-
                if (audioRunning)
                {
                   const uint32_t actualBufferFrames = Platform::AudioDeviceBufferFrames(gAudioOutputDeviceId);
@@ -13947,9 +15607,9 @@ int main()
 
                   if (wasRunning)
                   {
-                     std::string audioError;
-                     if (!AudioEngine::Instance().Start(audioError))
-                        fprintf(stderr, "audio device: %s\n", audioError.c_str());
+                     gAudioStartError.clear();
+                     if (!AudioEngine::Instance().Start(gAudioStartError))
+                        fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
                   }
                }
             }
@@ -13990,29 +15650,48 @@ int main()
          if (ImGui::Button("Rewind"))
             transport.Rewind();
 
-         const bool externalSync = transport.ExternalSyncEnabled();
-         ImGui::PushStyleColor(ImGuiCol_Button, externalSync
-                                                    ? ImVec4(0.16f, 0.40f, 0.52f, 1.0f)
-                                                    : ImVec4(0.30f, 0.30f, 0.34f, 1.0f));
-         if (ImGui::Button(externalSync ? "Sync: MIDI Clock" : "Sync: Manual"))
-         {
-            transport.SetExternalSyncEnabled(!externalSync);
-            if (!externalSync)
-            {
-               // Ensure the Core MIDI engine is up so clock pulses actually
-               // arrive - same lazy-start MidiCCNode's Learn button uses.
-               std::string error;
-               Platform::MidiStart(error);
-            }
-         }
-         ImGui::PopStyleColor();
+         ImGui::Separator();
 
+         // Audio engine on/off, independent of Play/Pause above: Play just
+         // drives the timeline (what modulators/visuals read), so someone
+         // working on visuals shouldn't have audio hardware opened just to
+         // scrub a patch around - see the removed auto-start at startup.
+         // Audio-graph nodes read silence while this is off, same as a
+         // machine with no usable device.
+         {
+            const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
+            ImGui::PushStyleColor(ImGuiCol_Button, audioOn
+                                                       ? ImVec4(0.16f, 0.52f, 0.28f, 1.0f)
+                                                       : ImVec4(0.30f, 0.30f, 0.34f, 1.0f));
+            if (ImGui::Button(audioOn ? "Stop Audio" : "Start Audio"))
+            {
+               if (audioOn)
+                  AudioEngine::Instance().Stop();
+               else
+               {
+                  gAudioStartError.clear();
+                  if (!AudioEngine::Instance().Start(gAudioStartError))
+                     fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
+               }
+            }
+            ImGui::PopStyleColor();
+            if (!audioOn && !gAudioStartError.empty() && ImGui::IsItemHovered())
+               ImGui::SetTooltip("%s", gAudioStartError.c_str());
+         }
+
+         ImGui::Separator();
+
+         // Tempo: a plain text-entry field (not a slider) so typing an exact
+         // BPM is a direct click-and-type rather than a click-drag gesture.
          float bpm = transport.Tempo();
-         ImGui::SetNextItemWidth(130);
-         ImGui::BeginDisabled(externalSync);
-         if (ImGui::SliderFloat("BPM", &bpm, 20.0f, 300.0f, "%.1f"))
-            transport.SetTempo(bpm);
-         ImGui::EndDisabled();
+         ImGui::AlignTextToFramePadding();
+         ImGui::TextUnformatted("BPM");
+         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::SetNextItemWidth(52);
+         if (ImGui::InputFloat("##bpm", &bpm, 0.0f, 0.0f, "%.1f"))
+            transport.SetTempo(std::clamp(bpm, 20.0f, 300.0f));
+
+         ImGui::Separator();
 
          // Time signature (docs/plans/audio/P3c-P3a2-design.md §0.2): every
          // bar-relative rate (Note Sequencer length, arp retrigger-on-bar,
@@ -14048,10 +15727,7 @@ int main()
             }
          }
 
-         if (externalSync && !transport.IsExternalClockPresent())
-         {
-            ImGui::TextColored(ImVec4(0.90f, 0.65f, 0.20f, 1.0f), "waiting for MIDI clock...");
-         }
+         ImGui::Separator();
 
          ImGui::TextDisabled("bar %d  beat %.2f",
                              1 + (int)transport.Bars(),
@@ -14092,11 +15768,15 @@ int main()
          // from the fps number - a heavy patch can pin the render loop
          // without the audio thread being anywhere near its deadline, or
          // vice versa, since they run on separate threads.
+         const bool audioEngineOn = AudioEngine::Instance().SampleRate() > 0.0;
          const double audioLoad = AudioEngine::Instance().LastBlockLoad();
          const uint64_t xruns = AudioEngine::Instance().XrunCount();
          char audioReadout[64];
-         snprintf(audioReadout, sizeof(audioReadout), "audio %.0f%%%s",
-                  audioLoad * 100.0, xruns > 0 ? " !" : "");
+         if (audioEngineOn)
+            snprintf(audioReadout, sizeof(audioReadout), "audio %.0f%%%s",
+                     audioLoad * 100.0, xruns > 0 ? " !" : "");
+         else
+            snprintf(audioReadout, sizeof(audioReadout), "audio off");
          const float audioWidth = ImGui::CalcTextSize("audio 100% !").x;
 
          const char* searchLabel = "search";
@@ -14106,12 +15786,13 @@ int main()
          const float audioX = searchX - audioWidth - itemGap;
 
          {
-            const ImVec4 audioColor = (audioLoad < 0.7) ? ImVec4(0.45f, 0.85f, 0.5f, 1.0f)
+            const ImVec4 audioColor = !audioEngineOn ? ImVec4(0.55f, 0.55f, 0.58f, 1.0f)
+                                     : (audioLoad < 0.7) ? ImVec4(0.45f, 0.85f, 0.5f, 1.0f)
                                      : (audioLoad < 0.9) ? ImVec4(0.95f, 0.75f, 0.35f, 1.0f)
                                                           : ImVec4(0.95f, 0.45f, 0.4f, 1.0f);
             ImGui::SameLine(audioX);
             ImGui::TextColored(audioColor, "%s", audioReadout);
-            if (xruns > 0 && ImGui::IsItemHovered())
+            if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
                ImGui::SetTooltip("%llu buffer underrun%s detected this session",
                                   (unsigned long long)xruns, xruns == 1 ? "" : "s");
          }
@@ -19243,7 +20924,7 @@ int main()
                if (src.node.get() == cable->GetSource())
                {
                   gLinks.push_back({ kLinkIdBase + (int)gLinks.size(),
-                                     src.OutputPinId(), gn.InputPinId(slot) });
+                                     src.OutputPinId(cable->GetOutputSlot()), gn.InputPinId(slot) });
                   break;
                }
             }
@@ -19454,11 +21135,6 @@ int main()
                      if (valid && srcIsNoteSource &&
                          WouldCreateNoteCycle(srcNode->node.get(), dstNode->node.get()))
                         valid = false;
-                     // Rule 1 (audio-graph-semantics.md §1): one connection
-                     // per audio output, Splitter excepted. Checked last so
-                     // it doesn't mask a genuine type mismatch above.
-                     if (valid && srcIsAudioNode && !AudioSourceHasFreeOutput(srcNode->node.get()))
-                        valid = false;
                   }
                }
 
@@ -19479,8 +21155,6 @@ int main()
                         rejectReason = srcIsModulator
                            ? "A modulator can't drive an audio signal pin - only another audio source can"
                            : "This pin only accepts an audio source";
-                     else if (dstWantsAudio && srcIsAudioNode && !AudioSourceHasFreeOutput(srcNode->node.get()))
-                        rejectReason = "One connection per output - use a Splitter";
                      else if (dstWantsNote && !srcIsNoteSource)
                         rejectReason = "This pin only accepts a note source";
                      else if ((srcIsAudioNode || srcIsNoteSource) && !dstWantsAudio && !dstWantsNote)
@@ -20500,8 +22174,7 @@ int main()
                   {
                      if (IsInputSlotCompatible(spawned, slot, srcIsModulator, srcPalette, srcGeometry,
                                                 srcCamera, srcLight, srcAudioFile, srcIsEnvironment,
-                                                srcIsAudioNode, srcIsNoteSource) &&
-                         (!srcIsAudioNode || AudioSourceHasFreeOutput(dragSrcNode->node.get())))
+                                                srcIsAudioNode, srcIsNoteSource))
                      {
                         // No PushUndoCheckpoint() here: SpawnNode() above already
                         // pushed one capturing the state before the node existed,
