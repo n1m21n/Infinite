@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "AudioBuffer.h"
+#include "AudioCaptureRing.h"
 #include "AudioNode.h"
 
 // Ceilings shared by the topology builder (main.cpp's RebuildAudioTopology)
@@ -32,6 +33,16 @@ struct AudioTopologyEntry
    int outputBufferIndex = -1;
 };
 
+// One connected Audio Out: the pooled buffer its source writes into, and
+// (unconditionally) that Audio Out's own capture ring - RunTopology writes
+// into it whenever the ring's own `enabled` flag is set, so starting/
+// stopping a recording needs no topology rebuild.
+struct AudioTerminal
+{
+   int bufferIndex = -1;
+   AudioCaptureRing* capture = nullptr;
+};
+
 // A full audio-thread topology: nodes in a valid topological order (sources
 // before consumers - AudioEngine::Process relies on this, it does not sort),
 // plus which pooled buffers get summed into the device's own output each
@@ -41,7 +52,7 @@ struct AudioTopologyEntry
 struct AudioTopology
 {
    std::vector<AudioTopologyEntry> order;
-   std::vector<int> terminalBufferIndices;
+   std::vector<AudioTerminal> terminalBufferIndices;
    int numBuffers = 0; // buffer indices used across `order` span [0, numBuffers)
 };
 

@@ -100,6 +100,15 @@ private:
    float mDistance = 3.0f;
    float mTarget[3] = { 0, 0, 0 };
    bool mFramed = false;
+   // A growing point cloud (Particle System, Cloth) keeps expanding well past
+   // the tiny bounds it had on its first cook, so the one-shot mFramed latch
+   // above leaves the camera locked inside the emitter forever. For point
+   // clouds only, Render() re-runs the framing block whenever the bounds grow
+   // well past what was last framed - see mFramedRadius - but only until the
+   // user actually touches the camera themselves (Orbit/Zoom), tracked here so
+   // their manual framing always wins and never gets silently overridden.
+   bool mUserAdjusted = false;
+   float mFramedRadius = 0.0f;
 
    unsigned long long mLastRenderedRevision = (unsigned long long)-1;
    float mLastAzimuth = 0, mLastElevation = 0, mLastDistance = 0;

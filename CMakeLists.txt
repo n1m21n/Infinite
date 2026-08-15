@@ -54,6 +54,8 @@ add_executable(Infinite MACOSX_BUNDLE
     src/audio/AudioEngine.cpp
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp
+    src/audio/AudioCaptureRing.cpp
+    src/audio/WavWriter.cpp
     src/audio/AudioVoice.cpp
     src/audio/Wavetable.cpp
     src/audio/EffectDefs.cpp
@@ -74,6 +76,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/audio/dsp/RingModKernel.cpp
     src/audio/dsp/FormantFilterKernel.cpp
     src/audio/dsp/WavetableShaperKernel.cpp
+    src/audio/dsp/LimiterKernel.cpp
     src/nodes/ImageSourceNode.cpp
     src/nodes/ShapeNode.cpp
     src/nodes/FormulaNode.cpp

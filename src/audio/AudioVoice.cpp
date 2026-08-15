@@ -17,7 +17,7 @@ void VoiceAllocator::SetADSR(float attackMs, float decayMs, float sustainLevel, 
       voice.envelope.SetADSR(attackMs, decayMs, sustainLevel, releaseMs);
 }
 
-int VoiceAllocator::NoteOn(int midiNote, float velocity)
+int VoiceAllocator::NoteOn(int midiNote, float velocity, int voiceId)
 {
    // Round-robin first: cycle through voices starting at the cursor,
    // preferring one that's already inactive.
@@ -51,17 +51,18 @@ int VoiceAllocator::NoteOn(int midiNote, float velocity)
 
    Voice& voice = mVoices[chosen];
    voice.note = midiNote;
+   voice.voiceId = voiceId;
    voice.velocity = velocity;
    voice.age = mNextAge++;
    voice.envelope.NoteOn();
    return chosen;
 }
 
-void VoiceAllocator::NoteOff(int midiNote)
+void VoiceAllocator::NoteOff(int voiceId)
 {
    for (auto& voice : mVoices)
    {
-      if (voice.note == midiNote && voice.envelope.IsActive())
+      if (voice.voiceId == voiceId && voice.envelope.IsActive())
       {
          voice.envelope.NoteOff();
          return;

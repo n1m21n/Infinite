@@ -83,6 +83,7 @@ enum class EffectVisualizerId
    kFormantVowel,
    kWavetableShaperCurve,
    kEqCurve,
+   kLimiterMeter,
 };
 
 struct EffectDef

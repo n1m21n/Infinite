@@ -302,9 +302,11 @@ public:
          while (evtIdx < numEvts && evts[evtIdx].frameOffset <= i)
          {
             if (evts[evtIdx].isNoteOn)
-               NoteOn(evts[evtIdx].note, evts[evtIdx].velocity, eng);
+               NoteOn(evts[evtIdx].note, evts[evtIdx].velocity, evts[evtIdx].voiceId, evts[evtIdx].bendSemitones, eng);
+            else if (evts[evtIdx].bendUpdate)
+               BendUpdate(evts[evtIdx].voiceId, evts[evtIdx].bendSemitones);
             else
-               NoteOff(evts[evtIdx].note);
+               NoteOff(evts[evtIdx].voiceId);
             evtIdx++;
          }
 
@@ -408,7 +410,7 @@ public:
 
                   const float semitones = (float)(eng[e].octave * 12 + eng[e].semi) * 100.0f +
                                           sm.eng[e].fine + eng[e].pitchAmount * pitchEnv * 100.0f +
-                                          sm.pitchBend * 100.0f;
+                                          sm.pitchBend * 100.0f + v.bend * 100.0f;
                   const float freq = base * powf(2.0f, semitones / 1200.0f);
                   float l = 0.0f, r = 0.0f;
                   RenderEngine(eng[e], sm.eng[e], freq, v.eng[e], eng[1 - e].on ? prevOut[1 - e] : 0.0f,
@@ -582,7 +584,9 @@ private:
       bool active = false;
       bool held = false;
       int note = -1;
+      int voiceId = 0;
       float velocity = 0.0f;
+      float bend = 0.0f; // live bendSemitones from the note chain (Pitch Bend), updated in place on bendUpdate
       uint64_t age = 0;
       Envelope amp[kEngines];
       Envelope pitch[kEngines];
@@ -595,7 +599,9 @@ private:
          active = false;
          held = false;
          note = -1;
+         voiceId = 0;
          velocity = 0.0f;
+         bend = 0.0f;
          for (int e = 0; e < kEngines; e++)
          {
             amp[e].SetSampleRate(sampleRate);
@@ -727,7 +733,7 @@ private:
       outR = sumR;
    }
 
-   void NoteOn(int note, float velocity, const EngineBlock eng[kEngines])
+   void NoteOn(int note, float velocity, int voiceId, float bendSemitones, const EngineBlock eng[kEngines])
    {
       // Retrigger an existing voice on the same note before allocating a new
       // one: without this, a fast repeated note stacks two voices and doubles
@@ -771,7 +777,9 @@ private:
       v.active = true;
       v.held = true;
       v.note = note;
+      v.voiceId = voiceId;
       v.velocity = velocity;
+      v.bend = bendSemitones;
       v.age = mNextAge++;
       if (fresh)
       {
@@ -798,11 +806,11 @@ private:
       }
    }
 
-   void NoteOff(int note)
+   void NoteOff(int voiceId)
    {
       for (Voice& v : mVoices)
       {
-         if (!v.active || v.note != note || !v.held)
+         if (!v.active || v.voiceId != voiceId || !v.held)
             continue;
          v.held = false;
          for (int e = 0; e < kEngines; e++)
@@ -811,6 +819,21 @@ private:
             v.pitch[e].NoteOff();
             v.filt[e].NoteOff();
          }
+      }
+   }
+
+   // Slides a voice already sounding, without retriggering it - this is the
+   // whole point of Pitch Bend being a note-chain node now (see NoteEvent.h's
+   // bendUpdate field): a real note-on would restart envelopes and the
+   // wavetable read phase, both audible artifacts a bend wheel must not
+   // cause.
+   void BendUpdate(int voiceId, float bendSemitones)
+   {
+      for (Voice& v : mVoices)
+      {
+         if (!v.active || v.voiceId != voiceId)
+            continue;
+         v.bend = bendSemitones;
       }
    }
 

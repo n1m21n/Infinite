@@ -29,7 +29,7 @@ class PluginScanner
 public:
    // Bumped whenever Entry's shape or meaning changes; a cache written by a
    // different version is discarded rather than migrated.
-   static constexpr int kIndexSchemaVersion = 1;
+   static constexpr int kIndexSchemaVersion = 2; // bumped: Entry (PluginDesc) gained acceptsNotes
 
    using Entry = Platform::PluginDesc;
 

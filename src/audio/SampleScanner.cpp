@@ -146,24 +146,50 @@ void SampleScanner::ScanThreadMain(std::vector<std::string> folders)
 
    for (const std::string& root : folders)
    {
-      std::error_code ec;
-      fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec);
-      const fs::recursive_directory_iterator end;
-      for (; it != end && !ec; it.increment(ec))
-      {
-         const fs::directory_entry& entry = *it;
-         std::error_code fileEc;
-         if (!entry.is_regular_file(fileEc) || fileEc)
-            continue;
-         if (!HasExtensionForKind(mKind, entry.path()))
-            continue;
+      // Manual stack-based walk rather than recursive_directory_iterator:
+      // per LWG2723, libc++ sends the iterator straight to end() the moment
+      // increment() reports *any* error (not just permission-denied), which
+      // on exFAT/removable volumes (I/O quirks, odd names, broken symlinks)
+      // silently aborted the *entire* subtree scan after the first bad
+      // entry - explaining large undercounts on big external drives. Here a
+      // bad entry only ends that one directory's remaining siblings; every
+      // other directory already queued on the stack still gets scanned.
+      std::vector<fs::path> dirStack;
+      dirStack.push_back(root);
 
-         Entry e;
-         e.path = entry.path().string();
-         e.fileName = entry.path().filename().string();
-         e.folderRoot = root;
-         found.push_back(std::move(e));
-         mFilesFound.fetch_add(1, std::memory_order_relaxed);
+      while (!dirStack.empty())
+      {
+         fs::path dir = std::move(dirStack.back());
+         dirStack.pop_back();
+
+         std::error_code ec;
+         fs::directory_iterator it(dir, fs::directory_options::skip_permission_denied, ec);
+         const fs::directory_iterator end;
+         if (ec)
+            continue; // couldn't open this one directory; skip it, keep draining the stack
+
+         while (it != end)
+         {
+            const fs::directory_entry entry = *it;
+            std::error_code entryEc;
+            if (entry.is_directory(entryEc) && !entryEc)
+            {
+               dirStack.push_back(entry.path());
+            }
+            else if (entry.is_regular_file(entryEc) && !entryEc && HasExtensionForKind(mKind, entry.path()))
+            {
+               Entry e;
+               e.path = entry.path().string();
+               e.fileName = entry.path().filename().string();
+               e.folderRoot = root;
+               found.push_back(std::move(e));
+               mFilesFound.fetch_add(1, std::memory_order_relaxed);
+            }
+
+            it.increment(ec);
+            if (ec)
+               break; // this directory level ends here; sibling dirs on the stack are unaffected
+         }
       }
    }
 

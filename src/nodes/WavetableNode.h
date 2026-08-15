@@ -135,10 +135,14 @@ public:
    // currently-sounding voice (both engines, free-running or note-driven) -
    // unlike octave/semi/fine above, this is read fresh every block rather
    // than latched per voice at note-on, so it actually bends notes that are
-   // already playing. Drawn as a ModKnob so Pitch Bend (a live-turned knob,
-   // see NoteNodes.h) can be wired into it for real hardware-style bend; see
-   // that node's comment for why the bend can't ride on the note stream
-   // itself. Default range +/-2 st matches the standard MIDI wheel range.
+   // already playing. This is the manual/global bend, independent of a
+   // Pitch Bend node upstream in the note chain (see NoteNodes.h): that
+   // node's live bend rides in on each note's own NoteEvent::bendSemitones
+   // field instead (per-voice, see AudioWavetableNode::Voice::bend in the
+   // .cpp) and adds additively with this knob rather than through it.
+   // Drawn as a ModKnob so any other modulator can still be wired in for a
+   // hardware-style bend with nothing patched into the note chain. Default
+   // range +/-2 st matches the standard MIDI wheel range.
    float pitchBend = 0.0f;   // -2..2 semitones
 
    NoteCable noteInput;

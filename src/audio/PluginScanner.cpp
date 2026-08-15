@@ -132,6 +132,8 @@ void PluginScanner::LoadFromDisk()
          e.manufacturer = v["manufacturer"].get<crude_json::string>();
       if (v["identifier"].is_string())
          e.identifier = v["identifier"].get<crude_json::string>();
+      if (v["acceptsNotes"].is_boolean())
+         e.acceptsNotes = v["acceptsNotes"].get<crude_json::boolean>();
       if (!e.identifier.empty())
          mIndex.push_back(std::move(e));
    }
@@ -151,6 +153,7 @@ void PluginScanner::SaveIndexToDisk() const
       entry["name"] = e.name;
       entry["manufacturer"] = e.manufacturer;
       entry["identifier"] = e.identifier;
+      entry["acceptsNotes"] = e.acceptsNotes;
       plugins.push_back(std::move(entry));
    }
 

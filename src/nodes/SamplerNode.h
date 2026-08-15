@@ -16,11 +16,16 @@ namespace Platform
 // A sample player: load or record a buffer, scrub/audition it by clicking
 // the waveform, and play it back one-shot or looping (forward, reversed, or
 // ping-pong) with independent pitch/finetune/speed/volume controls.
-// Free-running (no note cable) plays continuously at MIDI note 60 the same
-// way Wavetable and Oscillator sound the moment they're patched with no
-// notes connected; with a note cable it becomes polyphonic over a plain
-// VoiceAllocator, one voice's playback position tracked alongside it since
-// VoiceAllocator itself only owns the envelope.
+//
+// Two independent sound lanes that never share a voice: a polyphonic "notes"
+// lane over a plain VoiceAllocator (one voice's playback position tracked
+// alongside it since VoiceAllocator itself only owns the envelope), and a
+// monophonic "self" lane with its own dedicated voice, used both for
+// transport-driven free-running (no note cable connected - the same
+// "sounds the moment it's patched" convention Wavetable/Oscillator use, but
+// gated on the transport) and for the node's own audition button/waveform
+// click. Spacebar-stop silences both lanes; the audition control only ever
+// touches the self lane, and works even while the transport is stopped.
 //
 // Registered node-type name stays "Sampler" (patch files key off this, and
 // NodeFactory/undo/copy-paste all use it as the lookup string) - only the
@@ -69,21 +74,39 @@ public:
    void StopRecording();
    bool IsRecording() const { return mRecording; }
 
+   // While recording, ProcessBlock must run every block to capture
+   // audioInput even if this Sampler has no path to an Audio Out and no note
+   // input - the two seeds RebuildAudioTopology otherwise uses.
+   bool RequiresAudioProcessing() const override { return IsRecording(); }
+
    // Auditions the loaded sample immediately from `frac` (0..1 of its
-   // length), independent of any note cable - the click-the-waveform-to-
-   // play interaction. A no-op with nothing loaded.
+   // length), independent of any note cable or the transport - the
+   // click-the-waveform-to-play interaction. Takes ownership of the self
+   // lane's dedicated voice. A no-op with nothing loaded.
    void TriggerPreview(float frac);
 
-   // Stops whatever the Play/preview button most recently triggered - the
-   // explicit counterpart to TriggerPreview, for a loop/free-running sample
-   // that would otherwise keep sounding forever with no way to silence it
-   // short of unloading the file.
+   // Stops the audition voice - the explicit counterpart to TriggerPreview,
+   // for a loop/free-running sample that would otherwise keep sounding
+   // forever with no way to silence it short of unloading the file.
    void StopPreview();
 
-   // True while the most recently triggered preview voice is still sounding
-   // (attack through release, not just "held") - drives the Play/Stop
-   // button's label. Drained from the audio thread each CookIfNeeded.
+   // True while the self lane's dedicated voice (auto/free-run or audition)
+   // is still sounding (attack through release, not just "held") - drives
+   // the audition button's label. Drained from the audio thread each
+   // CookIfNeeded.
    bool IsPlaying() const { return mIsPlaying; }
+
+   // True while any note-lane voice is sounding, and how many - the
+   // "notes · N" status word next to the audition button. Drained the same
+   // way as IsPlaying().
+   bool NotesSounding() const { return mNotesSounding; }
+   int ActiveNoteCount() const { return mActiveNoteCount; }
+
+   // True while the self lane's voice is currently held by the audition
+   // control rather than the transport - distinguishes "auditioning" from
+   // "auto · running" in the status word even though both sound the same
+   // voice.
+   bool IsAuditioning() const { return mIsPlaying && mSelfOwnedByUser; }
 
    const std::string& FilePath() const { return mFilePath; }
    const std::string& FileName() const { return mFileName; }
@@ -127,5 +150,8 @@ private:
    std::string mStatus = "no sample loaded";
    float mPlayhead = 0.0f;
    bool mIsPlaying = false;
+   bool mNotesSounding = false;
+   int mActiveNoteCount = 0;
+   bool mSelfOwnedByUser = false;
    bool mRecording = false;
 };

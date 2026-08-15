@@ -234,6 +234,15 @@ if [ $FAIL -gt 0 ]; then
   echo "by design, so nothing it can set could change the signature either way."
   echo "Confirmed by INFINITE_PLUGINSCANTEST (real AU: instantiate, render, set and"
   echo "read a parameter, save/restore fullState) and INFINITE_PLUGINDRAGTEST."
+  echo "known baseline: AUDIOPARAMSWEEPTEST also reports [FAIL] on Limiter's"
+  echo "release. Confirmed by direct simulation of the kernel's own math against"
+  echo "the sweep's exact probe/block timing: the probe tone is two channels in"
+  echo "phase quadrature (L=sin, R=cos), so the stereo-linked per-sample level"
+  echo "ripples with a ~40-sample period, but this kernel's peak detector takes"
+  echo "the max over its full ~72-sample lookahead window (wider than that"
+  echo "ripple), which lands on a fixed value once warmed up - nothing left for"
+  echo "release to chase. threshold has explicit testCandidates and passes; see"
+  echo "EffectDefs.cpp's comment on Limiter's release param."
   exit 1
 fi
 echo "all checks green."

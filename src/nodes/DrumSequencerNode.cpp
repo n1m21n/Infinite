@@ -92,11 +92,10 @@ public:
    // `start`/`end` composition with the global offsets already happened on
    // the main thread (DrumSequencerNode::PushDirtyParams) - this pushes the
    // final effective values, same as PushLaneContinuous/PushLaneEnvelope.
-   void PushLaneRange(int lane, float start, float end, float laneSwing)
+   void PushLaneRange(int lane, float start, float end)
    {
       mLaneStart[lane].store(start, std::memory_order_relaxed);
       mLaneEnd[lane].store(end, std::memory_order_relaxed);
-      mLaneSwing[lane].store(laneSwing, std::memory_order_relaxed);
    }
 
    // `decayCoeff` is the fully precomputed one-pole coefficient (never
@@ -180,19 +179,13 @@ public:
          const double span = rawPosNow - mPrevRawPos;
          const int kStart = (int)std::floor(mPrevRawPos - 0.5);
          const int kEnd = (int)std::ceil(rawPosNow);
-         // Per-lane swing (global `swing` + that lane's own offset, see
-         // DrumSequencerNode::laneSwing) means each lane's odd-step landmark
-         // can differ, so the scan is lane-outer/k-inner rather than the
-         // single shared-landmark loop this had when swing was global-only.
          for (int lane = 0; lane < kNumLanes && numStepEvts < 64; lane++)
          {
-            const float laneSw =
-               std::clamp(swing + mLaneSwing[lane].load(std::memory_order_relaxed), 0.0f, 1.0f);
             for (int k = kStart; k <= kEnd && numStepEvts < 64; k++)
             {
                const int stepIndex = ((k % numSteps) + numSteps) % numSteps;
                const bool odd = (stepIndex % 2) == 1;
-               const double landmark = (double)k + (odd ? (double)laneSw * 0.5 : 0.0);
+               const double landmark = (double)k + (odd ? (double)swing * 0.5 : 0.0);
                if (landmark > mPrevRawPos && landmark <= rawPosNow)
                {
                   const float v = mStepVel[lane][stepIndex].load(std::memory_order_relaxed);
@@ -411,7 +404,6 @@ private:
    std::atomic<float> mStepVel[kNumLanes][kMaxSteps] = {};
    std::atomic<float> mLaneStart[kNumLanes] = {};
    std::atomic<float> mLaneEnd[kNumLanes] = {};
-   std::atomic<float> mLaneSwing[kNumLanes] = {};
 
    std::atomic<int> mRate { 12 };
    std::atomic<int> mNumSteps { 8 };
@@ -434,7 +426,6 @@ DrumSequencerNode::DrumSequencerNode()
       laneTransient[lane] = 0.0f;
       laneStart[lane] = 0.0f;
       laneEnd[lane] = 1.0f;
-      laneSwing[lane] = 0.0f;
       laneMute[lane] = false;
       laneSolo[lane] = false;
       laneChoke[lane] = 0;
@@ -447,7 +438,6 @@ DrumSequencerNode::DrumSequencerNode()
       mLastLaneTransient[lane] = -99.0f;
       mLastLaneStart[lane] = -1.0f;
       mLastLaneEnd[lane] = -1.0f;
-      mLastLaneSwing[lane] = -1.0f;
       mLastLaneMute[lane] = false;
       mLastLaneSolo[lane] = false;
       mLastLaneChoke[lane] = -1;
@@ -559,17 +549,15 @@ void DrumSequencerNode::PushDirtyParams()
          // see it too; whichever of the two blocks runs second retires it.
       }
 
-      if (mFirstCook || laneStart[lane] != mLastLaneStart[lane] || laneEnd[lane] != mLastLaneEnd[lane] ||
-          laneSwing[lane] != mLastLaneSwing[lane])
+      if (mFirstCook || laneStart[lane] != mLastLaneStart[lane] || laneEnd[lane] != mLastLaneEnd[lane])
       {
          // end > start by at least one frame, clamped here (main thread),
          // not on the audio thread - see AudioDrumSequencerNode::TriggerLane.
          const float start = std::clamp(laneStart[lane], 0.0f, 1.0f);
          const float end = std::max(start + 0.0001f, std::clamp(laneEnd[lane], 0.0f, 1.0f));
-         mAudioNode->PushLaneRange(lane, start, end, laneSwing[lane]);
+         mAudioNode->PushLaneRange(lane, start, end);
          mLastLaneStart[lane] = laneStart[lane];
          mLastLaneEnd[lane] = laneEnd[lane];
-         mLastLaneSwing[lane] = laneSwing[lane];
       }
 
       if (mFirstCook || laneMute[lane] != mLastLaneMute[lane] || laneSolo[lane] != mLastLaneSolo[lane] ||
@@ -645,8 +633,6 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
       v.Float(name, laneStart[lane]);
       snprintf(name, sizeof(name), "lane%d_end", lane);
       v.Float(name, laneEnd[lane]);
-      snprintf(name, sizeof(name), "lane%d_swing", lane);
-      v.Float(name, laneSwing[lane]);
       for (int step = 0; step < kMaxSteps; step++)
       {
          snprintf(name, sizeof(name), "lane%d_step%d", lane, step);

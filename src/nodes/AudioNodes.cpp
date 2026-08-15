@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "audio/AudioBuffer.h"
+#include "audio/AudioEngine.h"
 #include "audio/AudioNode.h"
 #include "audio/DspMath.h"
 #include "audio/MeterRing.h"
@@ -223,6 +224,89 @@ AudioNode* MixerNode::GetAudioNode()
    return mAudioNode.get();
 }
 
+// ------------------------------------------------------------------- Blend
+namespace
+{
+   constexpr int kBlendParam = 0;
+}
+
+class AudioBlendNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mMailbox.PrepareToPlay(sampleRate);
+      mMailbox.SetImmediate(kBlendParam, mBlend.load(std::memory_order_relaxed));
+   }
+
+   void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
+   {
+      const AudioBuffer* a = (numInputs > 0) ? inputs[0] : nullptr;
+      const AudioBuffer* b = (numInputs > 1) ? inputs[1] : nullptr;
+
+      float peak = 0.0f;
+      for (int i = 0; i < output.numFrames; i++)
+      {
+         const float blend = mMailbox.SmoothedValue(kBlendParam);
+         float gainA, gainB;
+         DspMath::EqualPowerPan(blend * 2.0f - 1.0f, gainA, gainB);
+
+         for (int ch = 0; ch < output.numChannels; ch++)
+         {
+            const float sa = (a != nullptr) ? a->channels[ch][i] : 0.0f;
+            const float sb = (b != nullptr) ? b->channels[ch][i] : 0.0f;
+            const float v = sa * gainA + sb * gainB;
+            output.channels[ch][i] = v;
+            peak = std::max(peak, std::fabs(v));
+         }
+      }
+      mMeter.Write(&peak, 1);
+   }
+
+   // Main thread only.
+   void PushParams(float blend)
+   {
+      mBlend.store(blend, std::memory_order_relaxed);
+      mMailbox.Push(kBlendParam, blend);
+   }
+
+   MeterRing& Meter() { return mMeter; }
+
+private:
+   ParamMailbox mMailbox;
+   MeterRing mMeter;
+   std::atomic<float> mBlend { 0.5f };
+};
+
+BlendAudioNode::BlendAudioNode() = default;
+BlendAudioNode::~BlendAudioNode() = default;
+
+void BlendAudioNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioBlendNode>();
+   mAudioNode->PushParams(blend);
+
+   float peak = 0.0f;
+   if (mAudioNode->Meter().ReadLatest(peak))
+      mLevel = peak;
+}
+
+void BlendAudioNode::VisitParams(ParamVisitor& v)
+{
+   v.Float("blend", blend);
+}
+
+AudioNode* BlendAudioNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioBlendNode>();
+   return mAudioNode.get();
+}
+
 // ------------------------------------------------------------------- Splitter
 class AudioSplitterNode : public AudioNode
 {
@@ -336,4 +420,51 @@ AudioNode* AudioInputNode::GetAudioNode()
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioCaptureNode>();
    return mAudioNode.get();
+}
+
+// ------------------------------------------------------------------- Output
+
+AudioOutputNode::~AudioOutputNode()
+{
+   StopRecording(); // never leave a WAV with unpatched chunk sizes
+}
+
+void AudioOutputNode::CookIfNeeded(int /*frameId*/)
+{
+   if (!mWriter.IsOpen())
+      return;
+   // Interleaved stereo, matching AudioEngine::RunTopology's capture write.
+   float scratch[4096];
+   int n;
+   while ((n = mCaptureRing.Read(scratch, 4096)) > 0)
+      mWriter.Append(scratch, n / 2);
+}
+
+void AudioOutputNode::VisitParams(ParamVisitor& v)
+{
+   v.Text("recordDirectory", recordDirectory);
+}
+
+bool AudioOutputNode::StartRecording(const std::string& path)
+{
+   if (IsRecording())
+      return false;
+   const double sampleRate = AudioEngine::Instance().SampleRate();
+   if (sampleRate <= 0.0)
+      return false;
+   if (!mWriter.Open(path, sampleRate, 2))
+      return false;
+   mOpenSampleRate = sampleRate;
+   mCaptureRing.overflowCount.store(0, std::memory_order_relaxed);
+   mCaptureRing.enabled.store(true, std::memory_order_relaxed);
+   return true;
+}
+
+void AudioOutputNode::StopRecording()
+{
+   mCaptureRing.enabled.store(false, std::memory_order_relaxed);
+   // Drain whatever the ring still has queued before closing, so the last
+   // fraction of a second isn't silently dropped.
+   CookIfNeeded(0);
+   mWriter.Close();
 }

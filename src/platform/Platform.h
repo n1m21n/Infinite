@@ -251,9 +251,11 @@ namespace Platform
 
    // ---- sample library ----
    // Native open panel restricted to picking a single directory (no files).
-   // Returns "" if cancelled. Used by the Samples search panel to add a
-   // folder to scan.
-   std::string OpenFolderDialog();
+   // Returns "" if cancelled. `title` sets the panel's title (defaults to
+   // the Samples search panel's "Add sample folder" wording); `initialDir`
+   // seeds the panel's starting folder when non-empty.
+   std::string OpenFolderDialog(const char* title = "Add sample folder",
+                                const std::string& initialDir = std::string());
 
    // A whole audio file decoded to planar float PCM, ready for an audio-
    // thread node to read directly (no further per-block decoding). Decoding
@@ -332,14 +334,21 @@ namespace Platform
       // Two AUs never share type+subtype+manufacturer, so the version buys no
       // disambiguation and costs patch stability.
       std::string identifier;
+
+      // True for 'aumu' (instrument) and 'aumf' (music effect) components -
+      // the two component types that can meaningfully consume MIDI. This is
+      // what AudioPluginNode keys its note input pin's visibility off, and
+      // what PluginConfigure below uses to decide whether to expect an input
+      // bus at all.
+      bool acceptsNotes = false;
    };
 
-   // Every installed effect Audio Unit, via AVAudioUnitComponentManager (a
-   // registry query - there is no folder to walk, which is why PluginScanner
-   // has no user-managed folder list). Filtered to 'aufx' (effect) and 'aumf'
-   // (music effect); 'aumu' instruments are excluded because AudioPluginNode
-   // is audio-in/audio-out only until note input lands, and listing a synth
-   // that can only ever render silence is worse than not listing it.
+   // Every installed effect/music-effect/instrument Audio Unit, via
+   // AVAudioUnitComponentManager (a registry query - there is no folder to
+   // walk, which is why PluginScanner has no user-managed folder list).
+   // Filtered to 'aufx' (effect), 'aumf' (music effect) and 'aumu'
+   // (instrument) - AudioPluginNode accepts note input (see its note pin), so
+   // an instrument is no longer guaranteed to render silence.
    // Main thread only - the first call can take a second or two if the system
    // component registry is cold, which is exactly why PluginScanner runs it
    // on a background thread and caches the result to disk.
@@ -399,6 +408,16 @@ namespace Platform
    // channel, numFrames long.
    void PluginRender(PluginHandle* handle, const float* const* in, int inChannels,
                      float* const* out, int outChannels, int numFrames);
+
+   // ALSO real-time-safe, same discipline as PluginRender: schedules a MIDI
+   // event through a block cached on the main thread at prepare time (into
+   // AUAudioUnit.scheduleMIDIEventBlock), no Objective-C message send, no ARC,
+   // no allocation. `bytes` is a standard 1-3 byte MIDI message (note on/off,
+   // channel 0). A no-op if the plugin never published a schedule block (an
+   // effect with no MIDI input, or one that doesn't support it) - the node
+   // degrades to rendering with no note input rather than crashing.
+   void PluginScheduleMIDIEvent(PluginHandle* handle, int frameOffset, const unsigned char* bytes,
+                                int byteCount);
 
    struct PluginParamInfo
    {

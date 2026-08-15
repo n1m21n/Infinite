@@ -2387,7 +2387,7 @@ namespace Platform
       }
    }
 
-   std::string OpenFolderDialog()
+   std::string OpenFolderDialog(const char* title, const std::string& initialDir)
    {
       @autoreleasepool
       {
@@ -2395,7 +2395,13 @@ namespace Platform
          [panel setCanChooseFiles:NO];
          [panel setCanChooseDirectories:YES];
          [panel setAllowsMultipleSelection:NO];
-         [panel setTitle:@"Add sample folder"];
+         [panel setTitle:[NSString stringWithUTF8String:title]];
+         if (!initialDir.empty())
+         {
+            NSURL* dirURL = [NSURL fileURLWithPath:[NSString stringWithUTF8String:initialDir.c_str()]
+                                        isDirectory:YES];
+            [panel setDirectoryURL:dirURL];
+         }
          if ([panel runModal] != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
@@ -3125,11 +3131,18 @@ namespace Platform
          return true;
       }
 
-      // Only these two. 'aumu' (instrument) is deliberately excluded - see
+      // Effects, music effects, and instruments - the three component types
+      // AudioPluginNode can host now that it has a note input pin. See
       // EnumerateAudioUnits' doc comment in Platform.h.
-      bool IsHostableEffectType(OSType type)
+      bool IsHostablePluginType(OSType type)
       {
-         return type == kAudioUnitType_Effect || type == kAudioUnitType_MusicEffect;
+         return type == kAudioUnitType_Effect || type == kAudioUnitType_MusicEffect ||
+                type == kAudioUnitType_MusicDevice;
+      }
+
+      bool ComponentTypeAcceptsNotes(OSType type)
+      {
+         return type == kAudioUnitType_MusicEffect || type == kAudioUnitType_MusicDevice;
       }
 
       // AVAudioUnitComponent.name is usually "Manufacturer: Plugin"; the
@@ -3175,6 +3188,13 @@ namespace Platform
       AURenderBlock renderBlockStrong = nil;
       void* renderBlockRaw = nullptr;
 
+      // Same discipline, for note input: nil for a plugin that never
+      // publishes one (an effect with no MIDI input), in which case
+      // PluginScheduleMIDIEvent is a no-op and the node just renders with
+      // whatever the plugin does with no note input, rather than crashing.
+      AUScheduleMIDIEventBlock scheduleMIDIEventBlockStrong = nil;
+      void* scheduleMIDIEventBlockRaw = nullptr;
+
       double sampleRate = 0.0;
       int maxBlockFrames = 0;
       bool resourcesAllocated = false;
@@ -3209,10 +3229,26 @@ namespace Platform
       InfinitePluginEditorDelegate* editorDelegate = nil;
       bool editorRequestInFlight = false;
       std::atomic<bool> editorOpen { false };
+      // Watches the (possibly remote-view) editor for its real content size
+      // arriving after the view controller does - see PresentEditorWindow.
+      // Removed only on real teardown (PluginDestroy), not on a soft close,
+      // since the window/controller are cached across those.
+      id editorSizeObserver = nil;
+      // Sticky once the user drags the editor window themselves; suppresses
+      // the auto-resize-to-real-size logic from fighting a resize they did.
+      // Set from InfinitePluginEditorDelegate's windowDidResize:, which uses
+      // programmaticResize to tell its own resizes apart from the user's.
+      bool editorUserResized = false;
+      bool programmaticResize = false;
    };
 }
 
 @implementation InfinitePluginEditorDelegate
+// User clicked the window's own close button. Treated the same as the node's
+// "close" toggle (PluginCloseEditor): the window/controller are cached, not
+// torn down, so reopening shows the plugin's real editor again rather than
+// re-requesting a view controller a second time. Real teardown only happens
+// in PluginDestroy.
 - (void)windowWillClose:(NSNotification*)notification
 {
    (void)notification;
@@ -3220,9 +3256,18 @@ namespace Platform
    if (h == nullptr)
       return;
    h->editorOpen.store(false, std::memory_order_relaxed);
-   h->editorWindow = nil;
-   h->editorController = nil;
-   h->editorDelegate = nil;
+}
+
+// Distinguishes the user dragging the window's own resize handle from the
+// programmatic resize PresentEditorWindow's size observer performs once the
+// remote view's real size arrives.
+- (void)windowDidResize:(NSNotification*)notification
+{
+   (void)notification;
+   Platform::PluginHandle* h = (Platform::PluginHandle*)self.handle;
+   if (h == nullptr || h->programmaticResize)
+      return;
+   h->editorUserResized = true;
 }
 @end
 
@@ -3244,7 +3289,7 @@ namespace Platform
          for (AVAudioUnitComponent* component in components)
          {
             const AudioComponentDescription d = component.audioComponentDescription;
-            if (!IsHostableEffectType(d.componentType))
+            if (!IsHostablePluginType(d.componentType))
                continue;
 
             PluginDesc desc;
@@ -3256,6 +3301,7 @@ namespace Platform
                                                               : std::string();
             desc.name = StripManufacturerPrefix(rawName, desc.manufacturer);
             desc.identifier = MakeAuIdentifier(d);
+            desc.acceptsNotes = ComponentTypeAcceptsNotes(d.componentType);
             if (desc.name.empty() || desc.identifier.empty())
                continue;
             out.push_back(std::move(desc));
@@ -3296,12 +3342,13 @@ namespace Platform
             d.componentType = StringToFourCC(std::string([type UTF8String]));
             d.componentSubType = StringToFourCC(std::string([subtype UTF8String]));
             d.componentManufacturer = StringToFourCC(std::string([manu UTF8String]));
-            if (!IsHostableEffectType(d.componentType))
+            if (!IsHostablePluginType(d.componentType))
                continue;
 
             PluginDesc desc;
             desc.format = "au";
             desc.identifier = MakeAuIdentifier(d);
+            desc.acceptsNotes = ComponentTypeAcceptsNotes(d.componentType);
             NSString* name = dict[@"name"];
             const std::string rawName = [name isKindOfClass:[NSString class]]
                                            ? std::string([name UTF8String])
@@ -3447,6 +3494,11 @@ namespace Platform
             h->renderBlockStrong = au.renderBlock;
             h->renderBlockRaw = (__bridge void*)h->renderBlockStrong;
 
+            // Same, for MIDI scheduling - nil for a plugin that publishes none
+            // (see PluginScheduleMIDIEvent).
+            h->scheduleMIDIEventBlockStrong = au.scheduleMIDIEventBlock;
+            h->scheduleMIDIEventBlockRaw = (__bridge void*)h->scheduleMIDIEventBlockStrong;
+
             // Fixed-capacity render scratch, allocated here so the render path
             // never does. mBuffers is a trailing array, hence the manual size.
             if (h->outAbl == nullptr)
@@ -3563,7 +3615,27 @@ namespace Platform
       if (h == nullptr)
          return;
 
-      PluginCloseEditor(h);
+      // Real teardown of the editor window/controller/observer. PluginCloseEditor
+      // only hides the window (it is cached across open/close - see its
+      // comment), so this handle's last use has to release it for real.
+      if (h->editorSizeObserver != nil)
+      {
+         [[NSNotificationCenter defaultCenter] removeObserver:h->editorSizeObserver];
+         h->editorSizeObserver = nil;
+      }
+      if (h->editorWindow != nil)
+      {
+         NSWindow* window = h->editorWindow;
+         // Clearing the delegate first: -close fires windowWillClose, which
+         // would otherwise re-enter this handle's fields while we are tearing
+         // them down.
+         window.delegate = nil;
+         h->editorDelegate = nil;
+         h->editorWindow = nil;
+         h->editorController = nil;
+         h->editorOpen.store(false, std::memory_order_release);
+         [window close];
+      }
 
       // Main thread, so a bounded spin is legal (and this is the only place
       // the audio thread's use of the handle is actually fenced off - the
@@ -3586,6 +3658,8 @@ namespace Platform
       h->learnToken = nullptr;
       h->renderBlockRaw = nullptr;
       h->renderBlockStrong = nil;
+      h->scheduleMIDIEventBlockRaw = nullptr;
+      h->scheduleMIDIEventBlockStrong = nil;
       h->unit = nil;
       h->arrivedUnit = nil;
       h->arrivedError = nil;
@@ -3742,6 +3816,15 @@ namespace Platform
       h->inRender.store(false, std::memory_order_release);
    }
 
+   void PluginScheduleMIDIEvent(PluginHandle* h, int frameOffset, const unsigned char* bytes, int byteCount)
+   {
+      if (h == nullptr || h->scheduleMIDIEventBlockRaw == nullptr || bytes == nullptr || byteCount <= 0)
+         return;
+      __unsafe_unretained AUScheduleMIDIEventBlock schedule =
+         (__bridge AUScheduleMIDIEventBlock)h->scheduleMIDIEventBlockRaw;
+      schedule((AUEventSampleTime)frameOffset, 0, byteCount, bytes);
+   }
+
    int PluginParameterCount(PluginHandle* h)
    {
       if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
@@ -3845,6 +3928,13 @@ namespace Platform
    {
       // Shared tail of the editor-open path: wraps whatever view controller we
       // ended up with in an NSWindow. Main thread only.
+      // True if `size` is usable as a window content size - the shared
+      // rejection test for every candidate in the preference order below.
+      bool IsUsableEditorSize(NSSize size)
+      {
+         return size.width >= 120.0 && size.height >= 80.0;
+      }
+
       void PresentEditorWindow(PluginHandle* h, NSViewController* controller)
       {
          if (h == nullptr || controller == nil)
@@ -3852,19 +3942,31 @@ namespace Platform
          if (h->editorWindow != nil)
          {
             [h->editorWindow makeKeyAndOrderFront:nil];
+            h->editorOpen.store(true, std::memory_order_release);
             return;
          }
 
          NSView* view = controller.view;
-         NSSize size = view.fittingSize;
-         if (size.width < 120.0 || size.height < 80.0)
+
+         // Preference order: preferredContentSize (what a well-behaved AUv3
+         // sets) -> the view's own frame -> fittingSize -> a hard floor. For
+         // an out-of-process AUv3 the view handed back at this instant is
+         // often an NSRemoteView placeholder whose fittingSize is not yet the
+         // plugin's real editor size, which is why fittingSize alone (the old
+         // behaviour) produced a cropped window.
+         NSSize size = controller.preferredContentSize;
+         if (!IsUsableEditorSize(size))
+            size = view.frame.size;
+         if (!IsUsableEditorSize(size))
+            size = view.fittingSize;
+         if (!IsUsableEditorSize(size))
             size = NSMakeSize(std::max(size.width, 480.0), std::max(size.height, 320.0));
          [view setFrameSize:size];
 
          NSWindow* window = [[NSWindow alloc]
              initWithContentRect:NSMakeRect(0, 0, size.width, size.height)
                        styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
-                                  NSWindowStyleMaskMiniaturizable)
+                                  NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
                          backing:NSBackingStoreBuffered
                            defer:NO];
          window.releasedWhenClosed = NO;
@@ -3882,6 +3984,31 @@ namespace Platform
          h->editorController = controller;
          h->editorDelegate = delegate;
          h->editorOpen.store(true, std::memory_order_release);
+
+         // The remote view's real size for an out-of-process AUv3 typically
+         // arrives after the view controller does. Watch for it and resize +
+         // re-center the window once, unless the user has since resized the
+         // window themselves (editorUserResized).
+         view.postsFrameChangedNotifications = YES;
+         PluginHandle* raw = h;
+         h->editorSizeObserver = [[NSNotificationCenter defaultCenter]
+             addObserverForName:NSViewFrameDidChangeNotification
+                         object:view
+                          queue:nil
+                     usingBlock:^(NSNotification* note) {
+                        (void)note;
+                        if (raw->editorWindow == nil || raw->editorUserResized)
+                           return;
+                        NSSize newSize = controller.preferredContentSize;
+                        if (!IsUsableEditorSize(newSize))
+                           newSize = view.frame.size;
+                        if (!IsUsableEditorSize(newSize))
+                           return;
+                        raw->programmaticResize = true;
+                        [raw->editorWindow setContentSize:newSize];
+                        [raw->editorWindow center];
+                        raw->programmaticResize = false;
+                     }];
       }
    }
 
@@ -3892,9 +4019,17 @@ namespace Platform
          outError = "plugin not loaded";
          return false;
       }
+      // Cached from a previous open (still open, or soft-closed by
+      // PluginCloseEditor): reuse it rather than requesting a view controller
+      // a second time. For an out-of-process AUv3, a second
+      // requestViewControllerWithCompletionHandler: after the first one was
+      // released commonly delivers nil, which used to fall back to the
+      // generic AUGenericViewController slider list instead of the plugin's
+      // real GUI.
       if (h->editorWindow != nil)
       {
          [h->editorWindow makeKeyAndOrderFront:nil];
+         h->editorOpen.store(true, std::memory_order_release);
          return true;
       }
       if (h->editorRequestInFlight)
@@ -3934,15 +4069,12 @@ namespace Platform
    {
       if (h == nullptr || h->editorWindow == nil)
          return;
-      NSWindow* window = h->editorWindow;
-      // Clearing the delegate first: -close fires windowWillClose, which would
-      // otherwise re-enter this handle's fields while we are tearing them down.
-      window.delegate = nil;
-      h->editorDelegate = nil;
-      h->editorWindow = nil;
-      h->editorController = nil;
+      // Soft close: hide the window but keep it (and its view controller)
+      // alive so the next PluginOpenEditor shows the plugin's real GUI again
+      // instead of re-requesting a view controller. Real teardown - closing
+      // the window for good - only happens in PluginDestroy.
+      [h->editorWindow orderOut:nil];
       h->editorOpen.store(false, std::memory_order_release);
-      [window close];
    }
 
    bool PluginEditorIsOpen(PluginHandle* h)

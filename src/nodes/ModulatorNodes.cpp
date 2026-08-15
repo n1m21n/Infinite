@@ -30,7 +30,12 @@ namespace
 
    float Remap(float v01, float low, float high)
    {
-      return low + (high - low) * std::min(1.0f, std::max(0.0f, v01));
+      // Value01() is contractually 0..1 regardless of what low/high were
+      // typed as, so the mapped result is clamped back into that range too -
+      // low > high (an inverted swing) stays legitimate, but low/high outside
+      // 0..1 must not leak out of contract.
+      float mapped = low + (high - low) * std::min(1.0f, std::max(0.0f, v01));
+      return std::min(1.0f, std::max(0.0f, mapped));
    }
 }
 

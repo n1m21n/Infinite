@@ -125,17 +125,26 @@ dropdown that swaps the entire UI is a worse node than two nodes.
 | One node | Replaces | How |
 |---|---|---|
 | **Note Sequencer** | note sequencer, euclidean sequencer, polyrhythmic, note recorder | `pattern` = Grid / Euclidean / Polyrhythm — all three are "choose steps on a grid", only the step-selection rule differs. Note recorder becomes a **record-arm button** on the grid, which is how every DAW does it and is better UX than a separate node. |
-| **Arpeggiator** | arp | up/down/updown/random/as-played, octaves, rate |
+| **Arpeggiator** | arp | 15 modes (up/down/updown/downup/random/as-played/repeat x2/repeat x4/join/spread/join-spread/stairs up/stairs down/diverge/converge), octaves, rate, 8-step gate grid, presets |
 | **Note Filter** | scaling, quantiser, note range filter, note chance | All four are *gates on a note's pitch*: snap-to-scale, pass-if-in-range, pass-if-lucky. Scale and quantiser are the same operation. |
 | **Note Modify** | transposing, note duration, note panning, velocity expressions, note expressions | All are *"change an attribute in flight"*: pitch offset, octave, velocity curve, gate length, pan, humanise. You almost never want just one. **Biggest single win.** |
 | **Note Echo** | note echo | generates new notes over time — genuinely distinct from Modify |
 | **Note Router** | note distributor, note chain | `mode` = round-robin / random / probability / chain. 1-in, 4-out. |
 | **Note Display** | note displayer, keyboard displayer | `view` = piano roll / keyboard. Same data, two skins. |
 
-**Dropped as nodes, folded into params:** *pitch bend* and *portamento* are
-per-voice synth behaviour (`glide` is an Oscillator param); pitch-bend from
-hardware is a modulator output on **MIDI In** (upgrade of the existing
-`MidiTriggerNode`, which already has a keyboard mode).
+**Dropped as a node, folded into params:** *portamento* is per-voice synth
+behaviour (`glide` is an Oscillator/Wavetable param).
+
+**Pitch Bend (superseded — it's a real note-chain node again):** this was
+originally dropped as a node and shipped as a pin-less `IModulator` knob you
+wired onto a synth's own bend/fine input, because `NoteEvent` only carried an
+integer note number - there was nowhere for a continuous bend to live.
+`NoteEvent` now carries a `bendSemitones` field plus a `bendUpdate`
+re-emission flag (see `src/audio/NoteEvent.h`), so Pitch Bend is back to
+being a `notes in -> notes out` node like Note Transpose: every note-on adds
+the current knob value into its bend, and moving the knob while notes are
+held re-emits a `bendUpdate` for each one, sliding it in place with no
+retrigger - the one thing the old modulator-only version could never do.
 
 ### Modulators: 10 → 4 new, 2 extended
 

@@ -39,6 +39,25 @@ public:
          return;
       }
 
+      // Notes go through the note queue, not ParamMailbox - see the class
+      // comment's mapped-params exception, which is unrelated to this. Drained
+      // before the render call so every event lands in the same block its
+      // frameOffset was scheduled against.
+      if (mNoteInbox != nullptr)
+      {
+         NoteEvent evts[64];
+         const int numEvts = mNoteInbox->Pop(evts, 64);
+         for (int i = 0; i < numEvts; i++)
+         {
+            const unsigned char status = (unsigned char)((evts[i].isNoteOn ? 0x90 : 0x80));
+            const unsigned char note = (unsigned char)std::clamp(evts[i].note, 0, 127);
+            const unsigned char velocity =
+               (unsigned char)std::clamp((int)std::lround(evts[i].velocity * 127.0f), 0, 127);
+            const unsigned char bytes[3] = { status, note, velocity };
+            Platform::PluginScheduleMIDIEvent(handle, evts[i].frameOffset, bytes, 3);
+         }
+      }
+
       const float* inChannels[kAudioMaxChannels] = {};
       int inCount = 0;
       if (in != nullptr && in->channels != nullptr && in->numFrames > 0)
@@ -55,6 +74,12 @@ public:
    // Deliberately no Reset() override: AudioNode::Reset means "clear DSP
    // state", and dropping the published plugin handle there would silently
    // unload the plugin. The plugin's own state is the plugin's business.
+
+   // A note-consuming node's inbox, wired by RebuildAudioTopology's note pass
+   // (main.cpp) - see AudioNode::SetNoteInbox's comment. nullptr (the
+   // default) when the note pin is unconnected or this plugin doesn't accept
+   // notes at all; ProcessBlock just skips the drain in that case.
+   void SetNoteInbox(NoteEventQueue* inbox) override { mNoteInbox = inbox; }
 
    // Main thread only.
    void SetHandle(Platform::PluginHandle* handle) { mHandle.store(handle, std::memory_order_release); }
@@ -91,6 +116,7 @@ private:
 
    std::atomic<Platform::PluginHandle*> mHandle { nullptr };
    std::atomic<bool> mBypass { false };
+   NoteEventQueue* mNoteInbox = nullptr; // set by SetNoteInbox; see its comment
    std::atomic<double> mSampleRate { 0.0 };
    std::atomic<int> mMaxBlockSize { 0 };
 };
@@ -173,6 +199,9 @@ void AudioPluginNode::LoadPlugin(const Platform::PluginDesc& desc)
    pluginFormat = desc.format;
    pluginId = desc.identifier;
    pluginName = desc.name;
+   mAcceptsNotes = desc.acceptsNotes;
+   if (!mAcceptsNotes)
+      noteInput.Disconnect();
 
    // Unpublish before creating: the previous plugin must stop being reachable
    // from the audio thread the moment the user asks for a different one, not
@@ -208,6 +237,11 @@ void AudioPluginNode::ReloadFromIdentity()
    desc.format = pluginFormat.empty() ? std::string("au") : pluginFormat;
    desc.identifier = pluginId;
    desc.name = pluginName;
+   // Restored from the just-loaded VisitParams (see its v.Bool call) rather
+   // than re-derived - LoadPlugin below assigns mAcceptsNotes straight from
+   // this, so leaving it default-false here would silently drop the note pin
+   // off a reloaded instrument/music-effect patch.
+   desc.acceptsNotes = mAcceptsNotes;
 
    // Keep the restored mapping list and fullState - unlike LoadPlugin, this is
    // the *same* plugin coming back, so its addresses still mean what they did.
@@ -233,6 +267,8 @@ void AudioPluginNode::Unload()
    pluginFormat.clear();
    pluginId.clear();
    pluginName.clear();
+   mAcceptsNotes = false;
+   noteInput.Disconnect();
    mPluginState.clear();
    mPendingStateRestore = false;
    mAvailableParams.clear();
@@ -495,6 +531,7 @@ void AudioPluginNode::VisitParams(ParamVisitor& v)
    v.Text("plugin_format", pluginFormat);
    v.Text("plugin_id", pluginId);
    v.Text("plugin_name", pluginName);
+   v.Bool("plugin_accepts_notes", mAcceptsNotes);
    v.Text("plugin_state", mPluginState);
    v.Bool("bypass", bypass);
 

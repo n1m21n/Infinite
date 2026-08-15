@@ -1306,6 +1306,13 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       sig.geomRev[i] = source->MeshRevision() ^ source->PointCloudRevision() ^ source->CurveStamp();
       sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
       sig.material[i] = source->GetMaterial();
+      sig.modelMatrix[i] = source->GetModelMatrix();
+      if (auto* instancer = FindInstancer(source))
+      {
+         sig.instanceRev[i] = instancer->InstanceRevision();
+         sig.instanceCount[i] = instancer->InstanceCount();
+         sig.instanceGroupMatrix[i] = source->GetInstanceGroupMatrix();
+      }
       for (int m = kMapRoughness; m < kMapCount; m++)
       {
          if (source->GetMaterialTexture(m) != 0)

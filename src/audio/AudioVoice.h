@@ -119,12 +119,12 @@ public:
 
    // Returns the voice index used (steals the oldest active voice if every
    // voice is already busy).
-   int NoteOn(int midiNote, float velocity);
+   int NoteOn(int midiNote, float velocity, int voiceId);
 
-   // Releases the envelope of whichever voice currently holds midiNote (a
+   // Releases the envelope of whichever voice currently holds voiceId (a
    // no-op if no voice holds it). Does not free the slot immediately - the
    // envelope's release stage does that once IsActive() goes false.
-   void NoteOff(int midiNote);
+   void NoteOff(int voiceId);
 
    int NumVoices() const { return (int)mVoices.size(); }
    int NoteAt(int voiceIndex) const { return mVoices[voiceIndex].note; }
@@ -136,6 +136,7 @@ private:
    struct Voice
    {
       int note = -1;
+      int voiceId = 0;
       float velocity = 0.0f;
       uint64_t age = 0; // higher = more recently triggered
       Envelope envelope;

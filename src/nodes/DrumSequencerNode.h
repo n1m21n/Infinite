@@ -91,7 +91,6 @@ public:
    float laneTransient[kNumLanes];
    float laneStart[kNumLanes];  // 0..1, left edge of the playback range
    float laneEnd[kNumLanes];    // 0..1, right edge of the playback range
-   float laneSwing[kNumLanes];  // 0..1, added to the global swing for this lane
    bool laneMute[kNumLanes];
    bool laneSolo[kNumLanes];
    int laneChoke[kNumLanes]; // 0 = no choke group
@@ -195,7 +194,6 @@ private:
    float mLastLaneTransient[kNumLanes];
    float mLastLaneStart[kNumLanes];
    float mLastLaneEnd[kNumLanes];
-   float mLastLaneSwing[kNumLanes];
    bool mLastLaneMute[kNumLanes];
    bool mLastLaneSolo[kNumLanes];
    int mLastLaneChoke[kNumLanes];

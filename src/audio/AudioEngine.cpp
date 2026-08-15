@@ -183,12 +183,33 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
       entry.node->ProcessBlock(inputPtrs, entry.numInputs, output);
    }
 
-   for (int bufIdx : list->topology.terminalBufferIndices)
+   // Scratch interleave buffer for capture rings - thread_local so it's
+   // allocated once per real-time thread rather than per block, and never
+   // touched off the audio thread.
+   static thread_local std::vector<float> sInterleaveScratch;
+
+   for (const AudioTerminal& terminal : list->topology.terminalBufferIndices)
    {
-      AudioBuffer src = list->buffers[bufIdx].View(numFrames, numChannels);
+      AudioBuffer src = list->buffers[terminal.bufferIndex].View(numFrames, numChannels);
       for (int ch = 0; ch < numChannels; ch++)
          for (int i = 0; i < numFrames; i++)
             deviceBuffer.channels[ch][i] += src.channels[ch][i];
+
+      if (terminal.capture != nullptr && terminal.capture->enabled.load(std::memory_order_relaxed))
+      {
+         // Always interleaved stereo for the WAV writer, regardless of the
+         // topology's actual channel count - mono sources duplicate to both
+         // channels, anything wider than stereo is summed down to it.
+         sInterleaveScratch.resize((size_t)numFrames * 2);
+         for (int i = 0; i < numFrames; i++)
+         {
+            const float l = src.channels[0][i];
+            const float r = numChannels > 1 ? src.channels[1][i] : l;
+            sInterleaveScratch[(size_t)i * 2 + 0] = l;
+            sInterleaveScratch[(size_t)i * 2 + 1] = r;
+         }
+         terminal.capture->Write(sInterleaveScratch.data(), numFrames * 2);
+      }
    }
 }
 

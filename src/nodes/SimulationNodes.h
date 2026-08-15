@@ -68,8 +68,8 @@ public:
    float turbulence = 0.0f;
    float turbulenceScale = 1.0f;
 
-   float startSize = 1.0f;
-   float endSize = 0.2f;
+   float startSize = 0.06f;
+   float endSize = 0.02f;
    float startColor[3] = { 1.0f, 0.75f, 0.3f };
    float endColor[3] = { 0.6f, 0.1f, 0.05f };
 

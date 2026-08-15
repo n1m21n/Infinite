@@ -484,7 +484,8 @@ private:
    // draw can be skipped - mirrors GeometryOpNode::Signature on the mesh
    // side, just gathered from more places (own params, an optional camera
    // node, up to kLightSlots optional light nodes, each geometry slot's
-   // mesh revision + material, and the optional env map).
+   // mesh revision + material + world transform + instancing state, and
+   // the optional env map).
    //
    // Deliberately conservative in one place rather than tracking it exactly:
    // a camera/light with orbitPerBeat != 0 moves continuously from Transport
@@ -498,6 +499,17 @@ private:
    // geomRev below instead of forcing a redraw. The remaining per-channel
    // material maps (roughness/metallic/normal/ao) still have no revision
    // stamp of their own, so any of those being bound still forces a redraw.
+   //
+   // modelMatrix/instanceGroupMatrix cover a Geometry node's own
+   // spin/orbit-driven transform (evaluated live off the transport clock,
+   // with no revision bump of its own - see GeometryNode::GetModelMatrix)
+   // and a wrapping Transform node sitting between an instancer and this
+   // node (which likewise doesn't bump the instancer's InstanceRevision()).
+   // instanceRev/instanceCount cover a Particle System -> Instance on Points
+   // chain: the instanced mesh's own MeshRevision()/PointCloudRevision()/
+   // CurveStamp() never change (the instance shape is constant, and the
+   // instancer doesn't override the point-cloud/curve stamps), so without
+   // these the moving instance transforms would never invalidate the cache.
    struct SceneSignature
    {
       std::vector<float> own;
@@ -509,6 +521,10 @@ private:
       unsigned long long geomRev[kSlots] = { 0, 0, 0, 0 };
       unsigned long long surfaceTexRev[kSlots] = { 0, 0, 0, 0 };
       Material material[kSlots];
+      Mat4 modelMatrix[kSlots];
+      unsigned long long instanceRev[kSlots] = { 0, 0, 0, 0 };
+      size_t instanceCount[kSlots] = { 0, 0, 0, 0 };
+      Mat4 instanceGroupMatrix[kSlots];
       bool envConnected = false;
       unsigned long long envRev = 0;
       float envRotation = 0.0f;
@@ -528,9 +544,14 @@ private:
          for (int i = 0; i < kSlots; i++)
          {
             if (hasGeom[i] != o.hasGeom[i] || geomRev[i] != o.geomRev[i] ||
-                surfaceTexRev[i] != o.surfaceTexRev[i])
+                surfaceTexRev[i] != o.surfaceTexRev[i] || instanceRev[i] != o.instanceRev[i] ||
+                instanceCount[i] != o.instanceCount[i])
                return false;
             if (hasGeom[i] && memcmp(&material[i], &o.material[i], sizeof(Material)) != 0)
+               return false;
+            if (hasGeom[i] && !(modelMatrix[i] == o.modelMatrix[i]))
+               return false;
+            if (hasGeom[i] && !(instanceGroupMatrix[i] == o.instanceGroupMatrix[i]))
                return false;
          }
          return envConnected == o.envConnected && envRev == o.envRev && envRotation == o.envRotation &&

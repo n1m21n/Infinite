@@ -178,4 +178,11 @@ public:
    // that first and only falls back to this for the note-only types that
    // need it.
    virtual AudioNode* AudioNodeForNotePorts() { return nullptr; }
+
+   // A node that must be processed every block even when nothing downstream
+   // pulls it - e.g. a Sampler that is currently capturing its audio input.
+   // Without this, a node with no path to an Audio Out and no note input
+   // never gets an AudioTopologyEntry, so ProcessBlock never runs and it
+   // can't do work that only happens inside ProcessBlock (like recording).
+   virtual bool RequiresAudioProcessing() const { return false; }
 };

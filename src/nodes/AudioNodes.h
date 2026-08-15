@@ -1,7 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <string>
 
+#include "audio/AudioCaptureRing.h"
+#include "audio/WavWriter.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 
@@ -19,6 +23,7 @@ class AudioGainNode;
 class AudioMixerNode;
 class AudioSplitterNode;
 class AudioCaptureNode;
+class AudioBlendNode;
 
 class GainNode : public INode, public IAudioSource
 {
@@ -106,6 +111,46 @@ private:
    float mChannelLevel[kSlots] = {};
 };
 
+// A two-input crossfader: blend=0 is input A only, 1 is input B only, 0.5 is
+// an equal-power centre - the routing-utility counterpart to Mixer's N-way
+// sum (docs/plans/audio/audio-graph-semantics.md §1/§2 still apply: this is
+// not a second place to sum two signals, it picks a point between them).
+class BlendAudioNode : public INode, public IAudioSource
+{
+public:
+   static INode* Create() { return new BlendAudioNode(); }
+   BlendAudioNode();
+   ~BlendAudioNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   AudioNode* GetAudioNode() override;
+   AudioCable* AudioInputSlot(int slot) override
+   {
+      return slot == 0 ? &inputA : (slot == 1 ? &inputB : nullptr);
+   }
+   const char* InputLabel(int slot) const override
+   {
+      return slot == 0 ? "a" : (slot == 1 ? "b" : nullptr);
+   }
+
+   // Current output level (0..1, post-blend), for the inline meter.
+   float Level() const { return mLevel; }
+
+   float blend = 0.5f;
+   AudioCable inputA;
+   AudioCable inputB;
+
+private:
+   std::unique_ptr<AudioBlendNode> mAudioNode;
+   int mLastCookFrame = -1;
+   float mLevel = 0.0f;
+};
+
 // Rule 1's explicit fan-out point (docs/plans/audio/audio-graph-semantics.md
 // §1): an ordinary audio output pin feeds exactly one destination, so
 // sending a signal to several places needs this node instead. Its own
@@ -188,14 +233,46 @@ class AudioOutputNode : public INode
 {
 public:
    static INode* Create() { return new AudioOutputNode(); }
+   ~AudioOutputNode() override;
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
-   void CookIfNeeded(int /*frameId*/) override {}
+   // Drains the capture ring into the open WAV file, if one is open - every
+   // frame, whether or not this node's body is on screen, so a scrolled-off
+   // Audio Out doesn't stall its recording (the ring has ~2s of headroom, not
+   // unbounded).
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
 
    AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "audio" : nullptr; }
 
+   AudioCaptureRing& CaptureRing() { return mCaptureRing; }
+
+   // Opens a WAV file at `path` and starts draining the capture ring into it.
+   // Returns false (nothing opened) if the engine isn't running yet or the
+   // file couldn't be created.
+   bool StartRecording(const std::string& path);
+   // Stops draining and finalizes the file's RIFF/data chunk sizes. Safe to
+   // call when not recording.
+   void StopRecording();
+   bool IsRecording() const { return mWriter.IsOpen(); }
+   double ElapsedSeconds() const { return mOpenSampleRate > 0.0 ? (double)mWriter.FramesWritten() / mOpenSampleRate : 0.0; }
+   int64_t FileSizeBytes() const { return mWriter.BytesWritten(); }
+   const std::string& RecordingPath() const { return mWriter.Path(); }
+   uint64_t DroppedSampleCount() const { return mCaptureRing.overflowCount.load(std::memory_order_relaxed); }
+
    AudioCable input;
+
+   // Where "Choose..." last pointed, or empty for the ~/Desktop default -
+   // not persisted as an in-progress recording (nothing about a recording
+   // survives save/load, same as every other recorder in this app - see the
+   // Note Capturer help text), just the destination folder for next time.
+   std::string recordDirectory;
+
+private:
+   AudioCaptureRing mCaptureRing;
+   WavWriter mWriter;
+   double mOpenSampleRate = 0.0;
 };

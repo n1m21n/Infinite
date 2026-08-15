@@ -5,6 +5,7 @@
 #include "dsp/AudioFilterKernel.h"
 #include "dsp/EqKernel.h"
 #include "dsp/DynamicsKernel.h"
+#include "dsp/LimiterKernel.h"
 #include "dsp/DelayKernel.h"
 #include "dsp/ReverbKernel.h"
 #include "dsp/DriveKernel.h"
@@ -180,6 +181,50 @@ namespace
          // mix is AudioEffectNode's universal field, not a second param here.
 
          def.makeKernel = []() { return std::make_unique<DynamicsKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ------------------------------------------------------------------ Limiter
+      // The Tier-1-only mode Dynamics' old `limit` selector used to cover,
+      // now its own right-sized node instead of a mode buried in a
+      // compressor: Threshold, Release, In gain, Out gain, plus a live
+      // gain-reduction meter. Always fully wet (`mix` stays at its 1.0
+      // default and is never drawn) - a limiter is never partially applied.
+      {
+         EffectDef def;
+         def.name = "Limiter";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kLimiterMeter;
+         def.defaultMix = 1.0f;
+
+         // audio-node-sweep's fixed probe tone sits at ~-8 dBFS peak; the
+         // generic small-number candidate sequence (0, 4, -4, 2) never drops
+         // low enough to actually engage a limiter whose default threshold
+         // is -1 dB, so threshold gets explicit below-the-probe
+         // testCandidates (confirmed fix - the sweep passes with these).
+         def.params.push_back(
+            { "threshold", -30.0f, 0.0f, -1.0f, false, {}, { -20.0f, -30.0f, -10.0f, -15.0f } });
+         // `release` is a confirmed (by hand) sweep blind spot, the same
+         // documented class as Dynamics' `sidechainExternal` above: the
+         // sweep's probe is two channels in phase quadrature (L=sin, R=cos),
+         // so the stereo-linked per-sample level max(|L|,|R|) ripples with a
+         // ~40-sample period - but this kernel's peak detector takes the max
+         // over a full lookahead window (~72 samples at the sweep's 48kHz),
+         // wider than that ripple period, so the windowed level lands on
+         // exactly 1.0 (thus a fixed target gain) for every sample once
+         // warmed up, with nothing left for the release coefficient to
+         // chase. Confirmed by direct simulation of the kernel's own math
+         // against the sweep's exact probe and block timing: no threshold
+         // value produces an observable release difference against this
+         // specific two-channel test signal. A real (non-quadrature, non-
+         // perfectly-periodic) signal has genuine amplitude variation across
+         // a 72-sample span, where release is very much audible.
+         def.params.push_back({ "release", 5.0f, 1000.0f, 100.0f });
+         def.params.push_back({ "inGain", -12.0f, 24.0f, 0.0f });
+         def.params.push_back({ "outGain", -24.0f, 12.0f, 0.0f });
+
+         def.makeKernel = []() { return std::make_unique<LimiterKernel>(); };
          defs.push_back(std::move(def));
       }
 

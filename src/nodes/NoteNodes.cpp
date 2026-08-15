@@ -30,6 +30,86 @@ namespace
       uint64_t cur = words[w].load(std::memory_order_relaxed);
       words[w].store(on ? (cur | bit) : (cur & ~bit), std::memory_order_relaxed);
    }
+
+   // Small fixed-capacity NoteEvent::voiceId -> Value map, real-time-safe (no
+   // allocation, linear scan bounded by Capacity - fine at the handful of
+   // concurrent voices any of these nodes actually carry). Consumers that
+   // used to key per-note bookkeeping with `T x[128]` can't do that for
+   // voiceId: unlike a MIDI note, it isn't bounded 0-127, it only grows.
+   template <typename Value, int Capacity>
+   class VoiceIdMap
+   {
+   public:
+      Value* Find(int voiceId)
+      {
+         for (auto& e : mEntries)
+            if (e.used && e.voiceId == voiceId)
+               return &e.value;
+         return nullptr;
+      }
+
+      // Returns the existing entry for voiceId, or a freshly value-initialized
+      // one. If the table is somehow full of *other* voiceIds (shouldn't
+      // happen given bounded per-block event counts), overwrites slot 0
+      // rather than silently dropping the voice.
+      Value& GetOrInsert(int voiceId)
+      {
+         if (Value* v = Find(voiceId))
+            return *v;
+         for (auto& e : mEntries)
+         {
+            if (!e.used)
+            {
+               e.used = true;
+               e.voiceId = voiceId;
+               e.value = Value {};
+               return e.value;
+            }
+         }
+         mEntries[0] = Entry { true, voiceId, Value {} };
+         return mEntries[0].value;
+      }
+
+      void Erase(int voiceId)
+      {
+         for (auto& e : mEntries)
+         {
+            if (e.used && e.voiceId == voiceId)
+            {
+               e.used = false;
+               return;
+            }
+         }
+      }
+
+      void Clear()
+      {
+         for (auto& e : mEntries)
+            e.used = false;
+      }
+
+      // fn(int voiceId, Value& value) -> bool; returning true erases the
+      // entry once fn returns (safe to do from inside fn - this only flips
+      // a flag on the current slot, no other entries move).
+      template <typename Fn>
+      void ForEach(Fn&& fn)
+      {
+         for (auto& e : mEntries)
+         {
+            if (e.used && fn(e.voiceId, e.value))
+               e.used = false;
+         }
+      }
+
+   private:
+      struct Entry
+      {
+         bool used = false;
+         int voiceId = 0;
+         Value value {};
+      };
+      Entry mEntries[Capacity];
+   };
 }
 
 // ------------------------------------------------------------------ MIDI Notes
@@ -72,6 +152,15 @@ public:
          // sample timestamp, so everything lands at the block boundary.
          e.frameOffset = 0;
          e.source = this;
+         if (e.isNoteOn)
+         {
+            e.voiceId = NextVoiceId();
+            mActiveVoiceId[note] = e.voiceId;
+         }
+         else
+         {
+            e.voiceId = mActiveVoiceId[note];
+         }
          mOutbox.Push(e);
 
          SetKeyBit(mHeld, note, e.isNoteOn);
@@ -96,6 +185,7 @@ public:
 private:
    NoteEventQueue mOutbox;
    unsigned long long mCursor = 0;
+   int mActiveVoiceId[128] = {};
 
    std::atomic<uint64_t> mHeld[2] { { 0 }, { 0 } };
    std::atomic<int> mLastNote { -1 };
@@ -421,11 +511,7 @@ class AudioNoteFilterNode : public AudioNode
 public:
    void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
    {
-      // -1 = "this input note is not currently passing" - safe as a sentinel
-      // since real MIDI notes are 0..127. Reset on every rebuild so a stale
-      // mapping from a previous topology generation can't outlive it.
-      for (int i = 0; i < 128; i++)
-         mPassingAs[i] = -1;
+      mPassingAs.Clear();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
@@ -452,28 +538,50 @@ public:
             const bool luckyRoll = chance >= 100.0f || mRng.Next() * 50.0f + 50.0f <= chance;
             const bool pass = inRange && luckyRoll && snapped >= 0 && snapped <= 127;
 
-            mPassingAs[in.note] = pass ? snapped : -1;
             mLastNoteIn.store(in.note, std::memory_order_relaxed);
             mLastPassed.store(pass, std::memory_order_relaxed);
 
             if (pass)
             {
+               mPassingAs.GetOrInsert(in.voiceId) = snapped;
                NoteEvent out = in;
                out.note = snapped;
+               out.voiceId = in.voiceId;
+               out.source = this;
+               mOutbox.Push(out);
+            }
+            else
+            {
+               mPassingAs.Erase(in.voiceId);
+            }
+         }
+         else if (in.bendUpdate)
+         {
+            // A note this node let through is being slid by an upstream
+            // Pitch Bend - forward it re-mapped to the same output pitch,
+            // without touching mPassingAs (that's reserved for the real
+            // note-off). A note this node dropped has no mapped output and
+            // no downstream voice to target, so its bendUpdate is dropped
+            // right along with it.
+            if (int* mapped = mPassingAs.Find(in.voiceId))
+            {
+               NoteEvent out = in;
+               out.note = *mapped;
+               out.voiceId = in.voiceId;
                out.source = this;
                mOutbox.Push(out);
             }
          }
          else
          {
-            const int mapped = mPassingAs[in.note];
-            if (mapped >= 0)
+            if (int* mapped = mPassingAs.Find(in.voiceId))
             {
                NoteEvent out = in;
-               out.note = mapped;
+               out.note = *mapped;
+               out.voiceId = in.voiceId;
                out.source = this;
                mOutbox.Push(out);
-               mPassingAs[in.note] = -1;
+               mPassingAs.Erase(in.voiceId);
             }
          }
       }
@@ -498,7 +606,7 @@ public:
 private:
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
-   int mPassingAs[128] = {};
+   VoiceIdMap<int, 128> mPassingAs;
    DspMath::WhiteNoise mRng;
 
    std::atomic<int> mScale { 13 };
@@ -565,12 +673,7 @@ public:
       mSampleRate = sampleRate;
       mSamplePos = 0;
       mLastOutNote = -1;
-      for (int i = 0; i < 128; i++)
-      {
-         mOutNote[i] = -1;
-         mSuppressOff[i] = false;
-         mScheduledActive[i] = false;
-      }
+      mVoiceState.Clear();
       for (int i = 0; i < kMaxPending; i++)
          mPending[i].active = false;
    }
@@ -640,6 +743,7 @@ public:
                   const int stepNote = std::clamp(mLastOutNote + dir * (k + 1), 0, 127);
                   const uint64_t onSample = stepBase + (uint64_t)((double)k * stepSamples);
                   const uint64_t offSample = stepBase + (uint64_t)((double)(k + 1) * stepSamples);
+                  const int stepVoiceId = NextVoiceId();
                   if (Pending* on = FreeSlot())
                   {
                      on->active = true;
@@ -647,7 +751,9 @@ public:
                      on->velocity = v;
                      on->isNoteOn = true;
                      on->isFinal = false;
+                     on->voiceId = stepVoiceId;
                      on->targetSample = onSample;
+                     on->bendSemitones = in.bendSemitones;
                   }
                   if (Pending* off = FreeSlot())
                   {
@@ -656,6 +762,7 @@ public:
                      off->velocity = 0.0f;
                      off->isNoteOn = false;
                      off->isFinal = false;
+                     off->voiceId = stepVoiceId;
                      off->targetSample = offSample;
                   }
                }
@@ -667,7 +774,8 @@ public:
 
             if (onsetAbs < mSamplePos + (uint64_t)numFrames)
             {
-               EmitFinal(in.note, outNote, v, (int)(onsetAbs - mSamplePos), gateHoldMs, holdSamples, onsetAbs);
+               EmitFinal(in.voiceId, outNote, v, (int)(onsetAbs - mSamplePos), gateHoldMs, holdSamples, onsetAbs,
+                         in.bendSemitones);
             }
             else if (Pending* on = FreeSlot())
             {
@@ -676,52 +784,74 @@ public:
                on->velocity = v;
                on->isNoteOn = true;
                on->isFinal = true;
-               on->inputNote = in.note;
+               on->inputVoiceId = in.voiceId;
                on->holdSamples = gateHoldMs > 0.0f ? std::max(0.0, holdSamples) : -1.0;
                on->targetSample = onsetAbs;
+               on->bendSemitones = in.bendSemitones;
             }
+         }
+         else if (in.bendUpdate)
+         {
+            // A note this node has already remapped is being slid by an
+            // upstream Pitch Bend - forward to the same remapped output
+            // note, without touching mVoiceState (that's reserved for a
+            // real note-off, including the internally-scheduled one below).
+            VoiceState* state = mVoiceState.Find(in.voiceId);
+            if (state == nullptr || state->outNote < 0)
+               continue;
+
+            NoteEvent out;
+            out.note = state->outNote;
+            out.velocity = in.velocity;
+            out.isNoteOn = false;
+            out.frameOffset = in.frameOffset;
+            out.bendUpdate = true;
+            out.bendSemitones = in.bendSemitones;
+            out.source = this;
+            out.voiceId = in.voiceId;
+            mOutbox.Push(out);
          }
          else
          {
-            const int outNote = mOutNote[in.note];
-            if (outNote < 0)
+            VoiceState* state = mVoiceState.Find(in.voiceId);
+            if (state == nullptr || state->outNote < 0)
                continue;
 
-            if (mSuppressOff[in.note])
+            if (state->suppressOff)
                continue; // the scheduled internal note-off will close this voice
 
             NoteEvent out;
-            out.note = outNote;
+            out.note = state->outNote;
             out.velocity = in.velocity;
             out.isNoteOn = false;
             out.frameOffset = in.frameOffset;
             out.source = this;
+            out.voiceId = in.voiceId;
             mOutbox.Push(out);
-            mOutNote[in.note] = -1;
+            mVoiceState.Erase(in.voiceId);
          }
       }
 
       // Fire any internally-scheduled note-offs (gateHoldMs override) that
       // fall inside this block.
-      for (int note = 0; note < 128; note++)
+      mVoiceState.ForEach([&](int voiceId, VoiceState& state) -> bool
       {
-         if (!mScheduledActive[note])
-            continue;
-         const uint64_t target = mScheduledTarget[note];
-         if (target >= mSamplePos && target < mSamplePos + (uint64_t)numFrames)
+         if (!state.scheduledActive)
+            return false;
+         if (state.scheduledTarget >= mSamplePos && state.scheduledTarget < mSamplePos + (uint64_t)numFrames)
          {
             NoteEvent out;
-            out.note = mOutNote[note];
+            out.note = state.outNote;
             out.velocity = 0.0f;
             out.isNoteOn = false;
-            out.frameOffset = (int)(target - mSamplePos);
+            out.frameOffset = (int)(state.scheduledTarget - mSamplePos);
             out.source = this;
+            out.voiceId = voiceId;
             mOutbox.Push(out);
-            mScheduledActive[note] = false;
-            mSuppressOff[note] = false;
-            mOutNote[note] = -1;
+            return true; // erase - voice fully closed
          }
-      }
+         return false;
+      });
 
       // Fire due glide steps and deferred final notes.
       for (int i = 0; i < kMaxPending; i++)
@@ -733,8 +863,8 @@ public:
          {
             const int frameOffset = (int)(p.targetSample - mSamplePos);
             if (p.isFinal)
-               EmitFinal(p.inputNote, p.note, p.velocity, frameOffset, p.holdSamples >= 0.0 ? 1.0f : 0.0f,
-                         p.holdSamples, p.targetSample);
+               EmitFinal(p.inputVoiceId, p.note, p.velocity, frameOffset, p.holdSamples >= 0.0 ? 1.0f : 0.0f,
+                         p.holdSamples, p.targetSample, p.bendSemitones);
             else
             {
                NoteEvent out;
@@ -742,7 +872,9 @@ public:
                out.velocity = p.velocity;
                out.isNoteOn = p.isNoteOn;
                out.frameOffset = frameOffset;
+               out.bendSemitones = p.bendSemitones;
                out.source = this;
+               out.voiceId = p.voiceId;
                mOutbox.Push(out);
             }
             p.active = false;
@@ -779,9 +911,11 @@ private:
       float velocity = 0.0f;
       bool isNoteOn = false;
       uint64_t targetSample = 0;
-      bool isFinal = false;     // the real (possibly glide/quantize-delayed) target note-on
-      int inputNote = 0;        // isFinal only: which input note this closes the loop for
+      bool isFinal = false;      // the real (possibly glide/quantize-delayed) target note-on
+      int voiceId = 0;           // !isFinal only: this glide step's own on/off pairing id
+      int inputVoiceId = 0;      // isFinal only: which input voice this closes the loop for
       double holdSamples = -1.0; // isFinal only: >=0 means gateHoldMs override is active
+      float bendSemitones = 0.0f; // the input note-on's bend, carried through the delay
    };
 
    Pending* FreeSlot()
@@ -792,31 +926,42 @@ private:
       return nullptr;
    }
 
-   // Shared by the immediate path and the deferred-Pending path: registers
-   // this input note's bookkeeping and pushes the actual NoteEvent.
-   void EmitFinal(int inputNote, int outNote, float velocity, int frameOffset, float gateHoldMsFlag,
-                  double holdSamples, uint64_t onsetAbs)
+   struct VoiceState
    {
-      mOutNote[inputNote] = outNote;
+      int outNote = -1;
+      bool suppressOff = false;
+      bool scheduledActive = false;
+      uint64_t scheduledTarget = 0;
+   };
+
+   // Shared by the immediate path and the deferred-Pending path: registers
+   // this input voice's bookkeeping and pushes the actual NoteEvent.
+   void EmitFinal(int inputVoiceId, int outNote, float velocity, int frameOffset, float gateHoldMsFlag,
+                  double holdSamples, uint64_t onsetAbs, float bendSemitones)
+   {
+      VoiceState& state = mVoiceState.GetOrInsert(inputVoiceId);
+      state.outNote = outNote;
 
       NoteEvent out;
       out.note = outNote;
       out.velocity = velocity;
       out.isNoteOn = true;
       out.frameOffset = frameOffset;
+      out.bendSemitones = bendSemitones;
       out.source = this;
+      out.voiceId = inputVoiceId;
       mOutbox.Push(out);
 
       if (gateHoldMsFlag > 0.0f && holdSamples >= 0.0)
       {
-         mSuppressOff[inputNote] = true;
-         mScheduledActive[inputNote] = true;
-         mScheduledTarget[inputNote] = onsetAbs + (uint64_t)holdSamples;
+         state.suppressOff = true;
+         state.scheduledActive = true;
+         state.scheduledTarget = onsetAbs + (uint64_t)holdSamples;
       }
       else
       {
-         mSuppressOff[inputNote] = false;
-         mScheduledActive[inputNote] = false;
+         state.suppressOff = false;
+         state.scheduledActive = false;
       }
    }
 
@@ -826,10 +971,7 @@ private:
    uint64_t mSamplePos = 0;
    DspMath::WhiteNoise mRng;
 
-   int mOutNote[128] = {};
-   bool mSuppressOff[128] = {};
-   bool mScheduledActive[128] = {};
-   uint64_t mScheduledTarget[128] = {};
+   VoiceIdMap<VoiceState, 128> mVoiceState;
    int mLastOutNote = -1;
    Pending mPending[kMaxPending];
 
@@ -904,6 +1046,8 @@ namespace
       float velocity = 0.0f;
       bool isNoteOn = false;
       uint64_t targetSample = 0;
+      int voiceId = 0;
+      float bendSemitones = 0.0f; // the input note-on's bend, carried through the delay
    };
 
    template <int N>
@@ -934,7 +1078,9 @@ namespace
                out.velocity = s.velocity;
                out.isNoteOn = s.isNoteOn;
                out.frameOffset = (int)(s.targetSample - samplePos);
+               out.bendSemitones = s.bendSemitones;
                out.source = source;
+               out.voiceId = s.voiceId;
                outbox.Push(out);
                s.active = false;
             }
@@ -949,8 +1095,7 @@ class AudioSemitoneShiftNode : public AudioNode
 public:
    void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
    {
-      for (int i = 0; i < 128; i++)
-         mOutNote[i] = -1;
+      mOutNote.Clear();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
@@ -968,27 +1113,41 @@ public:
          NoteEvent out;
          out.frameOffset = in.frameOffset;
          out.source = this;
+         out.voiceId = in.voiceId;
 
          if (in.isNoteOn)
          {
             const int outNote = std::clamp(in.note + semi, 0, 127);
-            mOutNote[in.note] = outNote;
+            mOutNote.GetOrInsert(in.voiceId) = outNote;
             out.note = outNote;
             out.velocity = in.velocity;
             out.isNoteOn = true;
+            out.bendSemitones = in.bendSemitones;
             mOutbox.Push(out);
             mLastNoteOut.store(outNote, std::memory_order_relaxed);
          }
+         else if (in.bendUpdate)
+         {
+            int* outNote = mOutNote.Find(in.voiceId);
+            if (outNote == nullptr)
+               continue;
+            out.note = *outNote;
+            out.velocity = in.velocity;
+            out.isNoteOn = false;
+            out.bendUpdate = true;
+            out.bendSemitones = in.bendSemitones;
+            mOutbox.Push(out);
+         }
          else
          {
-            const int outNote = mOutNote[in.note];
-            if (outNote < 0)
+            int* outNote = mOutNote.Find(in.voiceId);
+            if (outNote == nullptr)
                continue;
-            out.note = outNote;
+            out.note = *outNote;
             out.velocity = in.velocity;
             out.isNoteOn = false;
             mOutbox.Push(out);
-            mOutNote[in.note] = -1;
+            mOutNote.Erase(in.voiceId);
          }
       }
    }
@@ -1002,7 +1161,7 @@ public:
 private:
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
-   int mOutNote[128] = {};
+   VoiceIdMap<int, 128> mOutNote;
    std::atomic<int> mSemitones { 0 };
    std::atomic<int> mLastNoteOut { -1 };
 };
@@ -1034,10 +1193,144 @@ int NoteTransposeNode::LastNoteOut() const
    return mAudioNode ? mAudioNode->LastNoteOut() : -1;
 }
 
-// PitchBendNode is now a plain IModulator - see its class comment in
-// NoteNodes.h - so it needs none of the two-object machinery below; its
-// CookIfNeeded/VisitParams/Value01 are trivial enough to live inline in the
-// header, the same as ConstantNode/MacroKnobNode.
+// ---- Pitch Bend ----
+// A note-chain effect, not just a passthrough-with-offset like
+// AudioSemitoneShiftNode above: it has to keep tracking every note it has
+// forwarded for as long as that note is held (keyed by voiceId, same as
+// every other stuck-note guard in this file), so a knob move mid-hold can
+// re-emit a bendUpdate for it. `mHeld` also remembers the *upstream* bend
+// each held note arrived with (its bendSemitones at note-on, or whatever an
+// upstream Pitch Bend last re-based it to via its own bendUpdate) so this
+// node's own contribution stays correctly additive no matter how many Pitch
+// Bend nodes are stacked in the chain.
+class AudioPitchBendNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
+   {
+      mHeld.Clear();
+      // Seed "last emitted" from the current knob value so the first block
+      // after a (re)start doesn't immediately fire a spurious bendUpdate for
+      // a note that only just attacked in that same block.
+      mLastEmittedBend = mBend.load(std::memory_order_relaxed);
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      const float bend = mBend.load(std::memory_order_relaxed);
+
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+
+      for (int i = 0; i < n; i++)
+      {
+         const NoteEvent& in = evts[i];
+         if (in.note < 0 || in.note > 127)
+            continue;
+
+         if (in.isNoteOn)
+         {
+            HeldNote& held = mHeld.GetOrInsert(in.voiceId);
+            held.note = in.note;
+            held.upstreamBend = in.bendSemitones;
+
+            NoteEvent out = in;
+            out.bendSemitones = in.bendSemitones + bend;
+            out.source = this;
+            mOutbox.Push(out);
+         }
+         else if (in.bendUpdate)
+         {
+            // An upstream Pitch Bend re-bent a note this node is also
+            // holding - re-base against its new value and re-forward, but
+            // only if we're actually still tracking this voice as held.
+            HeldNote* held = mHeld.Find(in.voiceId);
+            if (held == nullptr)
+               continue;
+            held->upstreamBend = in.bendSemitones;
+
+            NoteEvent out = in;
+            out.note = held->note;
+            out.bendSemitones = in.bendSemitones + bend;
+            out.bendUpdate = true;
+            out.isNoteOn = false;
+            out.source = this;
+            mOutbox.Push(out);
+         }
+         else
+         {
+            NoteEvent out = in;
+            out.source = this;
+            mOutbox.Push(out);
+            mHeld.Erase(in.voiceId);
+         }
+      }
+
+      // The knob itself moved this block - slide every note currently held,
+      // whether it attacked before or after the last time we did this. This
+      // is what lets Pitch Bend slide a note that's already sounding, the
+      // one thing a note-on-time-only transpose can never do.
+      if (bend != mLastEmittedBend)
+      {
+         mHeld.ForEach([&](int voiceId, HeldNote& held) -> bool
+         {
+            NoteEvent out;
+            out.note = held.note;
+            out.velocity = 0.0f;
+            out.isNoteOn = false;
+            out.frameOffset = 0;
+            out.bendUpdate = true;
+            out.bendSemitones = held.upstreamBend + bend;
+            out.source = this;
+            out.voiceId = voiceId;
+            mOutbox.Push(out);
+            return false; // still held - don't erase
+         });
+         mLastEmittedBend = bend;
+      }
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+
+   void SetBend(float b) { mBend.store(b, std::memory_order_relaxed); }
+
+private:
+   struct HeldNote
+   {
+      int note = -1;
+      float upstreamBend = 0.0f;
+   };
+
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox = nullptr;
+   VoiceIdMap<HeldNote, 128> mHeld;
+   float mLastEmittedBend = 0.0f; // audio-thread-only, not shared with the knob atomic
+
+   std::atomic<float> mBend { 0.0f };
+};
+
+PitchBendNode::PitchBendNode() = default;
+PitchBendNode::~PitchBendNode() = default;
+
+void PitchBendNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioPitchBendNode>();
+   mAudioNode->SetBend(bendSemitones);
+}
+
+void PitchBendNode::VisitParams(ParamVisitor& v) { v.Float("bendSemitones", bendSemitones); }
+
+AudioNode* PitchBendNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioPitchBendNode>();
+   return mAudioNode.get();
+}
 
 // ---- Velocity Curve ----
 class AudioVelocityCurveNode : public AudioNode
@@ -1122,11 +1415,7 @@ public:
    {
       mSampleRate = sampleRate;
       mSamplePos = 0;
-      for (int i = 0; i < 128; i++)
-      {
-         mSuppressOff[i] = false;
-         mScheduledActive[i] = false;
-      }
+      mGateState.Clear();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -1150,46 +1439,60 @@ public:
             out.source = this;
             mOutbox.Push(out);
 
+            GateState& state = mGateState.GetOrInsert(in.voiceId);
+            state.note = in.note;
             if (holdMs > 0.0f)
             {
-               mSuppressOff[in.note] = true;
-               mScheduledActive[in.note] = true;
-               mScheduledTarget[in.note] = mSamplePos + (uint64_t)in.frameOffset + (uint64_t)holdSamples;
+               state.suppressOff = true;
+               state.scheduledActive = true;
+               state.scheduledTarget = mSamplePos + (uint64_t)in.frameOffset + (uint64_t)holdSamples;
             }
             else
             {
-               mSuppressOff[in.note] = false;
-               mScheduledActive[in.note] = false;
+               state.suppressOff = false;
+               state.scheduledActive = false;
             }
          }
-         else
+         else if (in.bendUpdate)
          {
-            if (mSuppressOff[in.note])
-               continue; // the scheduled internal note-off will close this voice
+            // The note is still conceptually sounding even while its real
+            // note-off is being suppressed for a scheduled internal hold -
+            // forward unconditionally, ahead of (not through) the
+            // suppressOff check below, and don't touch mGateState at all.
             NoteEvent out = in;
             out.source = this;
             mOutbox.Push(out);
          }
-      }
-
-      for (int note = 0; note < 128; note++)
-      {
-         if (!mScheduledActive[note])
-            continue;
-         const uint64_t target = mScheduledTarget[note];
-         if (target >= mSamplePos && target < mSamplePos + (uint64_t)numFrames)
+         else
          {
-            NoteEvent out;
-            out.note = note;
-            out.velocity = 0.0f;
-            out.isNoteOn = false;
-            out.frameOffset = (int)(target - mSamplePos);
+            GateState* state = mGateState.Find(in.voiceId);
+            if (state != nullptr && state->suppressOff)
+               continue; // the scheduled internal note-off will close this voice
+            NoteEvent out = in;
             out.source = this;
             mOutbox.Push(out);
-            mScheduledActive[note] = false;
-            mSuppressOff[note] = false;
+            mGateState.Erase(in.voiceId);
          }
       }
+
+      mGateState.ForEach([&](int voiceId, GateState& state) -> bool
+      {
+         if (!state.scheduledActive)
+            return false;
+         if (state.scheduledTarget >= mSamplePos && state.scheduledTarget < mSamplePos + (uint64_t)numFrames)
+         {
+            NoteEvent out;
+            out.note = state.note;
+            out.velocity = 0.0f;
+            out.isNoteOn = false;
+            out.frameOffset = (int)(state.scheduledTarget - mSamplePos);
+            out.source = this;
+            out.voiceId = voiceId;
+            mOutbox.Push(out);
+            return true; // erase - voice fully closed
+         }
+         return false;
+      });
 
       mSamplePos += (uint64_t)numFrames;
    }
@@ -1200,13 +1503,19 @@ public:
    void SetHoldMs(float ms) { mHoldMs.store(ms, std::memory_order_relaxed); }
 
 private:
+   struct GateState
+   {
+      int note = -1;
+      bool suppressOff = false;
+      bool scheduledActive = false;
+      uint64_t scheduledTarget = 0;
+   };
+
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
-   bool mSuppressOff[128] = {};
-   bool mScheduledActive[128] = {};
-   uint64_t mScheduledTarget[128] = {};
+   VoiceIdMap<GateState, 128> mGateState;
    std::atomic<float> mHoldMs { 0.0f };
 };
 
@@ -1242,8 +1551,7 @@ public:
    {
       mSampleRate = sampleRate;
       mSamplePos = 0;
-      for (int i = 0; i < 128; i++)
-         mOutNote[i] = -1;
+      mOutNote.Clear();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -1274,7 +1582,7 @@ public:
                offset = std::clamp(offset + jitterSamples, 0, std::max(0, numFrames - 1));
             }
             const uint64_t onsetAbs = mSamplePos + (uint64_t)offset;
-            mOutNote[in.note] = in.note; // no pitch change - just bookkeeping for the matching note-off
+            mOutNote.GetOrInsert(in.voiceId) = in.note; // no pitch change - just bookkeeping for the matching note-off
 
             if (onsetAbs < mSamplePos + (uint64_t)numFrames)
             {
@@ -1283,7 +1591,9 @@ public:
                out.velocity = v;
                out.isNoteOn = true;
                out.frameOffset = (int)(onsetAbs - mSamplePos);
+               out.bendSemitones = in.bendSemitones;
                out.source = this;
+               out.voiceId = in.voiceId;
                mOutbox.Push(out);
             }
             else if (DeferredNote* slot = mPending.FreeSlot())
@@ -1293,16 +1603,29 @@ public:
                slot->velocity = v;
                slot->isNoteOn = true;
                slot->targetSample = onsetAbs;
+               slot->voiceId = in.voiceId;
+               slot->bendSemitones = in.bendSemitones;
             }
          }
-         else
+         else if (in.bendUpdate)
          {
-            if (mOutNote[in.note] < 0)
+            // No remapping here (Humanizer doesn't touch pitch) - just check
+            // this voice is still one we're tracking, then forward as-is.
+            if (mOutNote.Find(in.voiceId) == nullptr)
                continue;
             NoteEvent out = in;
             out.source = this;
             mOutbox.Push(out);
-            mOutNote[in.note] = -1;
+         }
+         else
+         {
+            if (mOutNote.Find(in.voiceId) == nullptr)
+               continue;
+            NoteEvent out = in;
+            out.source = this;
+            out.voiceId = in.voiceId;
+            mOutbox.Push(out);
+            mOutNote.Erase(in.voiceId);
          }
       }
 
@@ -1325,7 +1648,7 @@ private:
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
    DspMath::WhiteNoise mRng;
-   int mOutNote[128] = {};
+   VoiceIdMap<int, 128> mOutNote;
    DeferredNoteQueue<kMaxPending> mPending;
    std::atomic<float> mTimingMs { 0.0f };
    std::atomic<float> mVelocityPct { 0.0f };
@@ -1367,8 +1690,7 @@ public:
    {
       mSampleRate = sampleRate;
       mSamplePos = 0;
-      for (int i = 0; i < 128; i++)
-         mOutNote[i] = -1;
+      mOutNote.Clear();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -1395,7 +1717,7 @@ public:
                const double gridSamples = std::max(1.0, kQuantizeBeats[div] * samplesPerBeat);
                onsetAbs = (uint64_t)(std::ceil((double)onsetAbs / gridSamples) * gridSamples);
             }
-            mOutNote[in.note] = in.note;
+            mOutNote.GetOrInsert(in.voiceId) = in.note;
 
             if (onsetAbs < mSamplePos + (uint64_t)numFrames)
             {
@@ -1404,7 +1726,9 @@ public:
                out.velocity = in.velocity;
                out.isNoteOn = true;
                out.frameOffset = (int)(onsetAbs - mSamplePos);
+               out.bendSemitones = in.bendSemitones;
                out.source = this;
+               out.voiceId = in.voiceId;
                mOutbox.Push(out);
             }
             else if (DeferredNote* slot = mPending.FreeSlot())
@@ -1414,16 +1738,29 @@ public:
                slot->velocity = in.velocity;
                slot->isNoteOn = true;
                slot->targetSample = onsetAbs;
+               slot->voiceId = in.voiceId;
+               slot->bendSemitones = in.bendSemitones;
             }
          }
-         else
+         else if (in.bendUpdate)
          {
-            if (mOutNote[in.note] < 0)
+            // No remapping here (Quantizer doesn't touch pitch) - just check
+            // this voice is still one we're tracking, then forward as-is.
+            if (mOutNote.Find(in.voiceId) == nullptr)
                continue;
             NoteEvent out = in;
             out.source = this;
             mOutbox.Push(out);
-            mOutNote[in.note] = -1;
+         }
+         else
+         {
+            if (mOutNote.Find(in.voiceId) == nullptr)
+               continue;
+            NoteEvent out = in;
+            out.source = this;
+            out.voiceId = in.voiceId;
+            mOutbox.Push(out);
+            mOutNote.Erase(in.voiceId);
          }
       }
 
@@ -1441,7 +1778,7 @@ private:
    NoteEventQueue* mInbox = nullptr;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
-   int mOutNote[128] = {};
+   VoiceIdMap<int, 128> mOutNote;
    DeferredNoteQueue<kMaxPending> mPending;
    std::atomic<int> mDiv { 0 };
 };
@@ -1479,8 +1816,7 @@ public:
       mSampleRate = sampleRate;
       mSamplePos = 0;
       mLastOutNote = -1;
-      for (int i = 0; i < 128; i++)
-         mOutNote[i] = -1;
+      mOutNote.Clear();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -1512,6 +1848,7 @@ public:
                   const int stepNote = std::clamp(mLastOutNote + dir * (k + 1), 0, 127);
                   const uint64_t onSample = stepBase + (uint64_t)((double)k * stepSamples);
                   const uint64_t offSample = stepBase + (uint64_t)((double)(k + 1) * stepSamples);
+                  const int stepVoiceId = NextVoiceId();
                   if (DeferredNote* on = mPending.FreeSlot())
                   {
                      on->active = true;
@@ -1519,6 +1856,7 @@ public:
                      on->velocity = in.velocity;
                      on->isNoteOn = true;
                      on->targetSample = onSample;
+                     on->voiceId = stepVoiceId;
                   }
                   if (DeferredNote* off = mPending.FreeSlot())
                   {
@@ -1527,13 +1865,14 @@ public:
                      off->velocity = 0.0f;
                      off->isNoteOn = false;
                      off->targetSample = offSample;
+                     off->voiceId = stepVoiceId;
                   }
                }
                onsetAbs = stepBase + (uint64_t)((double)(steps - 1) * stepSamples);
             }
 
             mLastOutNote = in.note;
-            mOutNote[in.note] = in.note;
+            mOutNote.GetOrInsert(in.voiceId) = in.note;
 
             if (onsetAbs < mSamplePos + (uint64_t)numFrames)
             {
@@ -1542,7 +1881,9 @@ public:
                out.velocity = in.velocity;
                out.isNoteOn = true;
                out.frameOffset = (int)(onsetAbs - mSamplePos);
+               out.bendSemitones = in.bendSemitones;
                out.source = this;
+               out.voiceId = in.voiceId;
                mOutbox.Push(out);
             }
             else if (DeferredNote* on = mPending.FreeSlot())
@@ -1552,16 +1893,30 @@ public:
                on->velocity = in.velocity;
                on->isNoteOn = true;
                on->targetSample = onsetAbs;
+               on->voiceId = in.voiceId;
+               on->bendSemitones = in.bendSemitones;
             }
          }
-         else
+         else if (in.bendUpdate)
          {
-            if (mOutNote[in.note] < 0)
+            // No remapping here (Glide's glissando steps are a separate
+            // synthetic voice - this is still about the real input note) -
+            // just check we're still tracking this voice, then forward.
+            if (mOutNote.Find(in.voiceId) == nullptr)
                continue;
             NoteEvent out = in;
             out.source = this;
             mOutbox.Push(out);
-            mOutNote[in.note] = -1;
+         }
+         else
+         {
+            if (mOutNote.Find(in.voiceId) == nullptr)
+               continue;
+            NoteEvent out = in;
+            out.source = this;
+            out.voiceId = in.voiceId;
+            mOutbox.Push(out);
+            mOutNote.Erase(in.voiceId);
          }
       }
 
@@ -1579,7 +1934,7 @@ private:
    NoteEventQueue* mInbox = nullptr;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
-   int mOutNote[128] = {};
+   VoiceIdMap<int, 128> mOutNote;
    int mLastOutNote = -1;
    DeferredNoteQueue<kMaxPending> mPending;
    std::atomic<float> mGlideMs { 0.0f };
@@ -1673,6 +2028,7 @@ public:
             slot->velocity = in.isNoteOn ? std::clamp(in.velocity * std::pow(decay, (float)k), 0.0f, 1.0f)
                                           : in.velocity;
             slot->isNoteOn = in.isNoteOn;
+            slot->voiceId = in.voiceId; // independent delayed copies - just forward the source voice's id
             slot->targetSample = mSamplePos + (uint64_t)in.frameOffset + (uint64_t)(delaySamples * k);
          }
       }
@@ -1691,6 +2047,7 @@ public:
             out.isNoteOn = p.isNoteOn;
             out.frameOffset = (int)(p.targetSample - mSamplePos);
             out.source = this;
+            out.voiceId = p.voiceId;
             mOutbox.Push(out);
             p.active = false;
          }
@@ -1725,6 +2082,7 @@ private:
       int note = 0;
       float velocity = 0.0f;
       bool isNoteOn = false;
+      int voiceId = 0;
       uint64_t targetSample = 0;
    };
 
@@ -1790,8 +2148,7 @@ public:
    {
       mNextIndex = 0;
       mLastRoutedNote = -1;
-      for (int i = 0; i < 128; i++)
-         mRoutedMask[i] = 0;
+      mRoutedMask.Clear();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
@@ -1835,7 +2192,7 @@ public:
                break;
             }
 
-            mRoutedMask[in.note] = (uint8_t)mask;
+            mRoutedMask.GetOrInsert(in.voiceId) = (uint8_t)mask;
             mLastRoutedNote = in.note;
             mLastMask.store(mask, std::memory_order_relaxed);
 
@@ -1848,11 +2205,16 @@ public:
                mOutbox[o].Push(out);
             }
          }
-         else
+         else if (in.bendUpdate)
          {
-            const int mask = mRoutedMask[in.note];
-            if (mask == 0)
+            // Re-send to the same output channel(s) the note-on was routed
+            // to - Router doesn't remap pitch, so the note number is
+            // unchanged - and don't clear mRoutedMask; a note that was never
+            // routed (dropped in kProbability mode) has nothing to re-send.
+            const uint8_t* maskPtr = mRoutedMask.Find(in.voiceId);
+            if (maskPtr == nullptr || *maskPtr == 0)
                continue;
+            const int mask = *maskPtr;
             for (int o = 0; o < 4; o++)
             {
                if ((mask & (1 << o)) == 0)
@@ -1861,7 +2223,22 @@ public:
                out.source = this;
                mOutbox[o].Push(out);
             }
-            mRoutedMask[in.note] = 0;
+         }
+         else
+         {
+            const uint8_t* maskPtr = mRoutedMask.Find(in.voiceId);
+            if (maskPtr == nullptr || *maskPtr == 0)
+               continue;
+            const int mask = *maskPtr;
+            for (int o = 0; o < 4; o++)
+            {
+               if ((mask & (1 << o)) == 0)
+                  continue;
+               NoteEvent out = in;
+               out.source = this;
+               mOutbox[o].Push(out);
+            }
+            mRoutedMask.Erase(in.voiceId);
          }
       }
    }
@@ -1889,7 +2266,7 @@ private:
 
    int mNextIndex = 0;
    int mLastRoutedNote = -1;
-   uint8_t mRoutedMask[128] = {};
+   VoiceIdMap<uint8_t, 128> mRoutedMask;
 
    std::atomic<int> mMode { NoteRouterNode::kRoundRobin };
    std::atomic<float> mProbability { 50.0f };
@@ -1938,7 +2315,7 @@ class AudioArpeggiatorNode : public AudioNode
 {
 public:
    static constexpr int kMaxHeld = 16;
-   static constexpr int kMaxExpanded = kMaxHeld * 4; // kMaxHeld held notes x up to 4 octaves
+   static constexpr int kMaxExpanded = kMaxHeld * 4 * 4; // held notes x up to 4 octaves x up to 4x (repeat x4 / stairs)
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
@@ -1947,8 +2324,11 @@ public:
       mHeldCount = 0;
       mLastStep = -1;
       mStepCounter = 0;
+      mGridStep = 0;
       mCurrentOutNote = -1;
+      mCurrentOutVoiceId = 0;
       mPendingOffActive = false;
+      mGridStepReadout.store(-1, std::memory_order_relaxed);
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -1981,15 +2361,20 @@ public:
          {
             bool found = false;
             for (int h = 0; h < mHeldCount; h++)
-               if (mHeld[h].note == e.note) { mHeld[h].velocity = e.velocity; found = true; break; }
+               if (mHeld[h].note == e.note) { mHeld[h].velocity = e.velocity; mHeld[h].voiceId = e.voiceId; found = true; break; }
             if (!found && mHeldCount < kMaxHeld)
-               mHeld[mHeldCount++] = { e.note, e.velocity };
+               mHeld[mHeldCount++] = { e.note, e.velocity, e.voiceId };
          }
          else
          {
+            // Match by voiceId, not note: a legato replay or doubled chord
+            // note at the same pitch reuses this pitch's held slot (see the
+            // note-on branch above), so a stale note-off from the note-on it
+            // actually displaced must not be allowed to release the slot
+            // that now belongs to a newer voice.
             for (int h = 0; h < mHeldCount; h++)
             {
-               if (mHeld[h].note == e.note)
+               if (mHeld[h].voiceId == e.voiceId)
                {
                   for (int k = h; k < mHeldCount - 1; k++)
                      mHeld[k] = mHeld[k + 1];
@@ -2011,6 +2396,7 @@ public:
          off.isNoteOn = false;
          off.frameOffset = (int)(mPendingOffSample - mSamplePos);
          off.source = this;
+         off.voiceId = mCurrentOutVoiceId;
          mOutbox.Push(off);
          mPendingOffActive = false;
          mCurrentOutNote = -1;
@@ -2022,8 +2408,19 @@ public:
       {
          mLastStep = step;
 
+         // The grid-gate clock advances on every step tick, unconditionally -
+         // including when nothing is held and when the step is gated off.
+         // mStepCounter (below) stays a distinct counter that only advances
+         // while notes are actually being selected, i.e. the note-*selection*
+         // index; this one is purely the gate grid's own position.
+         const int gridStep = (int)(mGridStep % (uint64_t)ArpeggiatorNode::kGateSteps);
+         mGridStep++;
+         const bool gated = ((mStepGates.load(std::memory_order_relaxed) >> gridStep) & 1) != 0;
+
          if (mHeldCount > 0)
          {
+            mGridStepReadout.store(gridStep, std::memory_order_relaxed);
+
             int seqNote[kMaxExpanded];
             float seqVel[kMaxExpanded];
             const int seqLen = BuildSequence(mode, octaves, seqNote, seqVel);
@@ -2045,9 +2442,13 @@ public:
                {
                   idx = (int)(mStepCounter % (uint64_t)seqLen);
                }
+               // Advances on a gated-off step too, so muting a step punches a
+               // hole in the pattern rather than time-shifting the notes
+               // after it (matches Ableton's/Elektron's step-mute behaviour).
                mStepCounter++;
 
-               // Close any still-sounding note first (gate >= 100% case).
+               // Close any still-sounding note first (gate >= 100% case, or
+               // the previous step's note when this one is gated off).
                if (mCurrentOutNote >= 0)
                {
                   NoteEvent off;
@@ -2056,40 +2457,56 @@ public:
                   off.isNoteOn = false;
                   off.frameOffset = 0;
                   off.source = this;
+                  off.voiceId = mCurrentOutVoiceId;
                   mOutbox.Push(off);
                   mPendingOffActive = false;
                }
 
-               NoteEvent on;
-               on.note = seqNote[idx];
-               on.velocity = seqVel[idx];
-               on.isNoteOn = true;
-               on.frameOffset = 0;
-               on.source = this;
-               mOutbox.Push(on);
-               mCurrentOutNote = on.note;
-               mCurrentOutNoteReadout.store(on.note, std::memory_order_relaxed);
+               if (gated)
+               {
+                  NoteEvent on;
+                  on.note = seqNote[idx];
+                  on.velocity = seqVel[idx];
+                  on.isNoteOn = true;
+                  on.frameOffset = 0;
+                  on.source = this;
+                  on.voiceId = NextVoiceId();
+                  mOutbox.Push(on);
+                  mCurrentOutNote = on.note;
+                  mCurrentOutVoiceId = on.voiceId;
+                  mCurrentOutNoteReadout.store(on.note, std::memory_order_relaxed);
 
-               const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
-               const double stepSamples = rateBeats * samplesPerBeat;
-               const double gateSamples = stepSamples * (double)gatePercent / 100.0;
-               mPendingOffSample = mSamplePos + (uint64_t)gateSamples;
-               mPendingOffActive = true;
+                  const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
+                  const double stepSamples = rateBeats * samplesPerBeat;
+                  const double gateSamples = stepSamples * (double)gatePercent / 100.0;
+                  mPendingOffSample = mSamplePos + (uint64_t)gateSamples;
+                  mPendingOffActive = true;
+               }
+               else
+               {
+                  mCurrentOutNote = -1;
+                  mCurrentOutNoteReadout.store(-1, std::memory_order_relaxed);
+               }
             }
          }
-         else if (mCurrentOutNote >= 0)
+         else
          {
-            // Nothing held any more - close whatever was still sounding.
-            NoteEvent off;
-            off.note = mCurrentOutNote;
-            off.velocity = 0.0f;
-            off.isNoteOn = false;
-            off.frameOffset = 0;
-            off.source = this;
-            mOutbox.Push(off);
-            mCurrentOutNote = -1;
-            mCurrentOutNoteReadout.store(-1, std::memory_order_relaxed);
-            mPendingOffActive = false;
+            mGridStepReadout.store(-1, std::memory_order_relaxed);
+            if (mCurrentOutNote >= 0)
+            {
+               // Nothing held any more - close whatever was still sounding.
+               NoteEvent off;
+               off.note = mCurrentOutNote;
+               off.velocity = 0.0f;
+               off.isNoteOn = false;
+               off.frameOffset = 0;
+               off.source = this;
+               off.voiceId = mCurrentOutVoiceId;
+               mOutbox.Push(off);
+               mCurrentOutNote = -1;
+               mCurrentOutNoteReadout.store(-1, std::memory_order_relaxed);
+               mPendingOffActive = false;
+            }
          }
       }
 
@@ -2108,16 +2525,19 @@ public:
       mRateBeats.store(n.rateBeats, std::memory_order_relaxed);
       mRateSeconds.store(n.rateSeconds, std::memory_order_relaxed);
       mGatePercent.store(n.gatePercent, std::memory_order_relaxed);
+      mStepGates.store(n.stepGates, std::memory_order_relaxed);
    }
 
    int HeldCount() const { return mHeldCountReadout.load(std::memory_order_relaxed); }
    int CurrentNote() const { return mCurrentOutNoteReadout.load(std::memory_order_relaxed); }
+   int CurrentGridStep() const { return mGridStepReadout.load(std::memory_order_relaxed); }
 
 private:
    struct HeldNote
    {
       int note = 0;
       float velocity = 0.0f;
+      int voiceId = 0;
    };
 
    int BuildSequence(int mode, int octaves, int outNote[kMaxExpanded], float outVel[kMaxExpanded])
@@ -2140,7 +2560,7 @@ private:
       if (mode != ArpeggiatorNode::kAsPlayed && mode != ArpeggiatorNode::kRandom)
       {
          std::sort(tmp, tmp + n, [](const Pair& a, const Pair& b) { return a.note < b.note; });
-         if (mode == ArpeggiatorNode::kDown || mode == ArpeggiatorNode::kDownUp)
+         if (mode == ArpeggiatorNode::kDown || mode == ArpeggiatorNode::kDownUp || mode == ArpeggiatorNode::kStairsDown)
             std::reverse(tmp, tmp + n);
          else if (mode == ArpeggiatorNode::kConverge)
          {
@@ -2183,6 +2603,72 @@ private:
          }
       }
 
+      // At this point tmp[0..n) is the base sequence Up/Down/Converge/
+      // Diverge/Random/As Played already use - ascending (or descending, or
+      // outside-in/inside-out reordered) pitch, octave-outer. That base *is*
+      // "spread" (C3 D3 E3, C4 D4 E4), so Spread needs no branch of its own.
+      // The remaining new modes reshape this base sequence further.
+      if (mode == ArpeggiatorNode::kJoin || mode == ArpeggiatorNode::kJoinSpread)
+      {
+         // Octave-interleaved (C3 C4, D3 D4, E3 E4): sort the held notes
+         // (pre-octave-expansion) ascending, then walk octaves inner per note.
+         // Join/Spread alternates between this ordering and the base
+         // (spread) ordering above once per full cycle through the pattern.
+         const bool useJoinOrdering = (mode == ArpeggiatorNode::kJoin) || n <= 0 ||
+                                       (((mStepCounter / (uint64_t)n) % 2) == 0);
+         if (useJoinOrdering)
+         {
+            Pair heldSorted[kMaxHeld];
+            const int hn = std::min(mHeldCount, kMaxHeld);
+            for (int i = 0; i < hn; i++)
+               heldSorted[i] = { mHeld[i].note, mHeld[i].velocity };
+            std::sort(heldSorted, heldSorted + hn, [](const Pair& a, const Pair& b) { return a.note < b.note; });
+
+            int w = 0;
+            for (int i = 0; i < hn; i++)
+            {
+               for (int o = 0; o < octaves; o++)
+               {
+                  if (w >= kMaxExpanded)
+                     break;
+                  tmp[w].note = std::clamp(heldSorted[i].note + 12 * o, 0, 127);
+                  tmp[w].vel = heldSorted[i].vel;
+                  w++;
+               }
+            }
+            n = w;
+         }
+      }
+      else if (mode == ArpeggiatorNode::kRepeat2 || mode == ArpeggiatorNode::kRepeat4)
+      {
+         // Pitch-sorted ascending, each entry emitted 2 / 4 times consecutively.
+         const int reps = (mode == ArpeggiatorNode::kRepeat4) ? 4 : 2;
+         Pair rearr[kMaxExpanded];
+         int w = 0;
+         for (int i = 0; i < n && w < kMaxExpanded; i++)
+            for (int r = 0; r < reps && w < kMaxExpanded; r++)
+               rearr[w++] = tmp[i];
+         std::copy(rearr, rearr + w, tmp);
+         n = w;
+      }
+      else if (mode == ArpeggiatorNode::kStairsUp || mode == ArpeggiatorNode::kStairsDown)
+      {
+         // Two-forward walking pairs, wrapping: for C-E-G -> C E, E G, G C.
+         // (base sequence is already descending for StairsDown, above.)
+         Pair rearr[kMaxExpanded];
+         int w = 0;
+         if (n > 0)
+         {
+            for (int i = 0; i < n && w + 1 < kMaxExpanded; i++)
+            {
+               rearr[w++] = tmp[i];
+               rearr[w++] = tmp[(i + 1) % n];
+            }
+         }
+         std::copy(rearr, rearr + w, tmp);
+         n = w;
+      }
+
       for (int i = 0; i < n; i++)
       {
          outNote[i] = tmp[i].note;
@@ -2202,7 +2688,9 @@ private:
 
    long long mLastStep = -1;
    uint64_t mStepCounter = 0;
+   uint64_t mGridStep = 0;
    int mCurrentOutNote = -1;
+   int mCurrentOutVoiceId = 0;
    bool mPendingOffActive = false;
    uint64_t mPendingOffSample = 0;
 
@@ -2212,8 +2700,10 @@ private:
    std::atomic<float> mRateBeats { 0.25f };
    std::atomic<float> mRateSeconds { 0.2f };
    std::atomic<float> mGatePercent { 80.0f };
+   std::atomic<int> mStepGates { 0xFF };
    std::atomic<int> mHeldCountReadout { 0 };
    std::atomic<int> mCurrentOutNoteReadout { -1 };
+   std::atomic<int> mGridStepReadout { -1 };
 };
 
 ArpeggiatorNode::ArpeggiatorNode() = default;
@@ -2237,6 +2727,7 @@ void ArpeggiatorNode::VisitParams(ParamVisitor& v)
    v.Float("rateBeats", rateBeats);
    v.Float("rateSeconds", rateSeconds);
    v.Float("gatePercent", gatePercent);
+   v.Int("stepGates", stepGates);
 }
 
 AudioNode* ArpeggiatorNode::GetAudioNode()
@@ -2256,6 +2747,69 @@ int ArpeggiatorNode::CurrentNote() const
    return mAudioNode ? mAudioNode->CurrentNote() : -1;
 }
 
+int ArpeggiatorNode::CurrentGridStep() const
+{
+   return mAudioNode ? mAudioNode->CurrentGridStep() : -1;
+}
+
+const std::vector<std::string>& ArpeggiatorNode::PresetNames()
+{
+   static const std::vector<std::string> kNames = { "Classic Up", "Trance Gate", "Pedal Stairs",
+                                                     "Chord Spread", "Broken Random", "Wide Converge",
+                                                     "Octave Join" };
+   return kNames;
+}
+
+void ArpeggiatorNode::ApplyPreset(int index)
+{
+   // Each preset sets a complete state (mode, octaves, rate, gate, step
+   // gates) rather than layering on whatever was already dialed in.
+   mode = kUp;
+   octaves = 1;
+   rateMode = 0;
+   rateBeats = 0.25f; // 1/16
+   gatePercent = 80.0f;
+   stepGates = 0xFF;
+
+   switch (index)
+   {
+      case 0: // Classic Up
+         break;
+      case 1: // Trance Gate
+         octaves = 2;
+         gatePercent = 40.0f;
+         stepGates = 0b10111011;
+         break;
+      case 2: // Pedal Stairs
+         mode = kStairsUp;
+         rateBeats = 0.5f; // 1/8
+         break;
+      case 3: // Chord Spread
+         mode = kSpread;
+         octaves = 3;
+         rateBeats = 0.5f; // 1/8
+         gatePercent = 95.0f;
+         break;
+      case 4: // Broken Random
+         mode = kRandom;
+         octaves = 2;
+         stepGates = 0b11011010;
+         break;
+      case 5: // Wide Converge
+         mode = kConverge;
+         octaves = 2;
+         rateBeats = 0.5f; // 1/8
+         break;
+      case 6: // Octave Join
+         mode = kJoin;
+         octaves = 2;
+         gatePercent = 70.0f;
+         break;
+      default:
+         break;
+   }
+}
+
 // ------------------------------------------------------------- Note Sequencer
 class AudioNoteSequencerNode : public AudioNode
 {
@@ -2266,6 +2820,7 @@ public:
       mSamplePos = 0;
       mLastStep = -1;
       mCurrentOutNote = -1;
+      mCurrentOutVoiceId = 0;
       mPendingOffActive = false;
    }
 
@@ -2288,6 +2843,7 @@ public:
          off.isNoteOn = false;
          off.frameOffset = (int)(mPendingOffSample - mSamplePos);
          off.source = this;
+         off.voiceId = mCurrentOutVoiceId;
          mOutbox.Push(off);
          mPendingOffActive = false;
          mCurrentOutNote = -1;
@@ -2311,6 +2867,7 @@ public:
                off.isNoteOn = false;
                off.frameOffset = 0;
                off.source = this;
+               off.voiceId = mCurrentOutVoiceId;
                mOutbox.Push(off);
                mPendingOffActive = false;
             }
@@ -2321,8 +2878,10 @@ public:
             on.isNoteOn = true;
             on.frameOffset = 0;
             on.source = this;
+            on.voiceId = NextVoiceId();
             mOutbox.Push(on);
             mCurrentOutNote = on.note;
+            mCurrentOutVoiceId = on.voiceId;
 
             const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
             const double stepSamples = rateBeats * samplesPerBeat;
@@ -2362,6 +2921,7 @@ private:
 
    long long mLastStep = -1;
    int mCurrentOutNote = -1;
+   int mCurrentOutVoiceId = 0;
    bool mPendingOffActive = false;
    uint64_t mPendingOffSample = 0;
 
@@ -2438,6 +2998,7 @@ public:
       mSamplePos = 0;
       mLastStep = -1;
       mCurrentOutNote = -1;
+      mCurrentOutVoiceId = 0;
       mPendingOffActive = false;
       mPrevNote = -1;
    }
@@ -2464,6 +3025,7 @@ public:
          off.isNoteOn = false;
          off.frameOffset = (int)(mPendingOffSample - mSamplePos);
          off.source = this;
+         off.voiceId = mCurrentOutVoiceId;
          mOutbox.Push(off);
          mPendingOffActive = false;
          mCurrentOutNote = -1;
@@ -2491,6 +3053,7 @@ public:
             off.isNoteOn = false;
             off.frameOffset = 0;
             off.source = this;
+            off.voiceId = mCurrentOutVoiceId;
             mOutbox.Push(off);
             mPendingOffActive = false;
          }
@@ -2501,8 +3064,10 @@ public:
          on.isNoteOn = true;
          on.frameOffset = 0;
          on.source = this;
+         on.voiceId = NextVoiceId();
          mOutbox.Push(on);
          mCurrentOutNote = note;
+         mCurrentOutVoiceId = on.voiceId;
 
          const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
          const double stepSamples = rateBeats * samplesPerBeat;
@@ -2538,6 +3103,7 @@ private:
 
    long long mLastStep = -1;
    int mCurrentOutNote = -1;
+   int mCurrentOutVoiceId = 0;
    int mPrevNote = -1;
    bool mPendingOffActive = false;
    uint64_t mPendingOffSample = 0;
@@ -2652,12 +3218,14 @@ public:
             if (humanizeVel > 0.0f)
                vel = std::clamp(vel + mRng.Next() * (humanizeVel / 100.0f) * 0.5f, 0.05f, 1.0f);
 
+            const int noteVoiceId = NextVoiceId();
             if (Pending* on = FreeSlot())
             {
                on->active = true;
                on->note = notes[i];
                on->velocity = vel;
                on->isNoteOn = true;
+               on->voiceId = noteVoiceId;
                on->targetSample = onset;
             }
             if (Pending* off = FreeSlot())
@@ -2666,6 +3234,7 @@ public:
                off->note = notes[i];
                off->velocity = 0.0f;
                off->isNoteOn = false;
+               off->voiceId = noteVoiceId;
                off->targetSample = onset + (uint64_t)gateSamples;
             }
          }
@@ -2684,6 +3253,7 @@ public:
             out.isNoteOn = p.isNoteOn;
             out.frameOffset = (int)(p.targetSample - mSamplePos);
             out.source = this;
+            out.voiceId = p.voiceId;
             mOutbox.Push(out);
             p.active = false;
          }
@@ -2716,6 +3286,7 @@ private:
       int note = 0;
       float velocity = 0.0f;
       bool isNoteOn = false;
+      int voiceId = 0;
       uint64_t targetSample = 0;
    };
 
@@ -2875,8 +3446,7 @@ public:
       // transient transport/voice-safety state resets here.
       mRecording = false;
       mPlaying = false;
-      for (int i = 0; i < 128; i++)
-         mSounding[i] = false;
+      mSounding.Clear();
       mHeldBits[0].store(0, std::memory_order_relaxed);
       mHeldBits[1].store(0, std::memory_order_relaxed);
    }
@@ -2942,7 +3512,7 @@ public:
             SetKeyBit(mHeldBits, e.note, e.isNoteOn);
 
          if (mRecording && e.note >= 0 && e.note <= 127 && mRecordedCount < NoteCapturerNode::kMaxEvents)
-            mRecorded[mRecordedCount++] = { e.note, e.velocity, e.isNoteOn, beats - mRecordStartBeat };
+            mRecorded[mRecordedCount++] = { e.note, e.velocity, e.isNoteOn, beats - mRecordStartBeat, e.voiceId };
       }
 
       if (mPlaying)
@@ -2976,10 +3546,14 @@ public:
                out.isNoteOn = r.isNoteOn;
                out.frameOffset = 0;
                out.source = this;
+               out.voiceId = r.voiceId;
                mOutbox.Push(out);
                if (r.note >= 0 && r.note <= 127)
                {
-                  mSounding[r.note] = r.isNoteOn;
+                  if (r.isNoteOn)
+                     mSounding.GetOrInsert(r.voiceId) = r.note;
+                  else
+                     mSounding.Erase(r.voiceId);
                   SetKeyBit(mHeldBits, r.note, r.isNoteOn);
                }
                mPlayIndex++;
@@ -3036,24 +3610,24 @@ private:
       float velocity = 0.0f;
       bool isNoteOn = false;
       double beat = 0.0;
+      int voiceId = 0;
    };
 
    void ForceOffAllSounding()
    {
-      for (int note = 0; note < 128; note++)
+      mSounding.ForEach([&](int voiceId, int& note) -> bool
       {
-         if (!mSounding[note])
-            continue;
          NoteEvent off;
          off.note = note;
          off.velocity = 0.0f;
          off.isNoteOn = false;
          off.frameOffset = 0;
          off.source = this;
+         off.voiceId = voiceId;
          mOutbox.Push(off);
-         mSounding[note] = false;
          SetKeyBit(mHeldBits, note, false);
-      }
+         return true; // erase - fully released
+      });
    }
 
    NoteEventQueue mOutbox;
@@ -3067,7 +3641,7 @@ private:
    double mRecordedLengthBeats = 1.0;
    double mPlayStartBeat = 0.0;
    int mPlayIndex = 0;
-   bool mSounding[128] = {};
+   VoiceIdMap<int, 128> mSounding; // voiceId -> note, for ones currently sounding during playback
    std::atomic<uint64_t> mHeldBits[2] { { 0 }, { 0 } };
 
    std::atomic<int> mCommand { kNone };
@@ -3287,12 +3861,14 @@ public:
          {
             const int span = std::max(0, rangeHigh - rangeLow);
             const int note = rangeLow + (int)((mRng.Next() * 0.5f + 0.5f) * (float)(span + 1));
+            const int noteVoiceId = NextVoiceId();
             if (Pending* on = FreeSlot())
             {
                on->active = true;
                on->note = std::clamp(note, 0, 127);
                on->velocity = 0.6f + (mRng.Next() * 0.5f + 0.5f) * 0.3f;
                on->isNoteOn = true;
+               on->voiceId = noteVoiceId;
                on->targetSample = mSamplePos;
             }
             if (Pending* off = FreeSlot())
@@ -3301,6 +3877,7 @@ public:
                off->note = std::clamp(note, 0, 127);
                off->velocity = 0.0f;
                off->isNoteOn = false;
+               off->voiceId = noteVoiceId;
                off->targetSample = mSamplePos + (uint64_t)(0.15 * mSampleRate);
             }
          }
@@ -3330,6 +3907,7 @@ public:
             out.isNoteOn = p.isNoteOn;
             out.frameOffset = (int)(p.targetSample - mSamplePos);
             out.source = this;
+            out.voiceId = p.voiceId;
             mOutbox.Push(out);
             p.active = false;
          }
@@ -3371,6 +3949,7 @@ private:
       int note = 0;
       float velocity = 0.0f;
       bool isNoteOn = false;
+      int voiceId = 0;
       uint64_t targetSample = 0;
    };
 

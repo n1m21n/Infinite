@@ -487,11 +487,13 @@ void NodeViewport::Orbit(SharedViewportCamera& cam, float dAzimuth, float dEleva
    // parallel to the view direction and the image rolls. 85.9437 deg is the
    // old 1.5 rad clamp converted to this struct's degree convention.
    cam.elevation = std::max(-85.9437f, std::min(cam.elevation + dElevation, 85.9437f));
+   mUserAdjusted = true;
 }
 
 void NodeViewport::Zoom(float wheelDelta)
 {
    mDistance = std::max(0.05f, std::min(mDistance * (1.0f - wheelDelta * 0.15f), 500.0f));
+   mUserAdjusted = true;
 }
 
 unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h,
@@ -594,7 +596,20 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    else
       UploadMesh(mesh, revision);
 
-   if (!mFramed && mHasBounds)
+   // A point cloud that has grown well past the bounds it was last framed
+   // against gets re-framed - unless the user has already grabbed the camera
+   // themselves (mUserAdjusted), in which case their framing always wins.
+   // Static meshes never re-frame here: mFramed alone gates them, exactly as
+   // before.
+   float curBoundsRadius = 0.0f;
+   if (mHasBounds)
+   {
+      const float dx = mHi[0] - mLo[0], dy = mHi[1] - mLo[1], dz = mHi[2] - mLo[2];
+      curBoundsRadius = std::max(0.05f, 0.5f * std::sqrt(dx * dx + dy * dy + dz * dz));
+   }
+   const bool shouldReframe = mHasBounds &&
+      (!mFramed || (usePointCloud && !mUserAdjusted && curBoundsRadius > mFramedRadius * 1.5f));
+   if (shouldReframe)
    {
       float lo[3] = { mLo[0], mLo[1], mLo[2] };
       float hi[3] = { mHi[0], mHi[1], mHi[2] };
@@ -640,6 +655,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
       // no taper at all. See kFovDegrees below.
       mDistance = radius / std::tan(kFovDegrees * 0.5f * 3.14159265f / 180.0f) * 1.1f;
       mFramed = true;
+      mFramedRadius = radius;
    }
 
    float normalMatrix[9];

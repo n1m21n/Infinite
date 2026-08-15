@@ -6,14 +6,17 @@
 
 #include "core/AudioCable.h"
 #include "core/INode.h"
+#include "core/NoteCable.h"
 #include "platform/Platform.h"
 
 class AudioPluginAudioNode;
 
 // Hosts a third-party audio plugin (Audio Units today) as an ordinary audio
-// effect node: audio in at slot 0, audio out, the plugin's own editor in a
-// separate native window, and an Ableton-style "configure" list of mapped
-// plugin parameters drawn as modulatable horizontal sliders on the node body.
+// node: audio in at slot 0, audio out, an optional note-input pin at slot 1
+// (only for a plugin that is an instrument or music effect - see
+// AcceptsNotes), the plugin's own editor in a separate native window, and an
+// Ableton-style "configure" list of mapped plugin parameters drawn as
+// modulatable horizontal sliders on the node body.
 //
 // The two-object rule applies as usual: this half runs on the main thread and
 // owns AudioPluginAudioNode, which runs on the audio thread. What is unusual
@@ -73,7 +76,24 @@ public:
 
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "in" : nullptr; }
+   // Slot 1, not a second audio slot - notes and audio share one pin-index
+   // space (see main.cpp's pin-count loop), so the note pin lands one past
+   // the audio input regardless of which the loaded plugin actually accepts.
+   // Only shown/wireable once a plugin that accepts notes is loaded (an
+   // instrument or music-effect AU) - see DrawPluginBody / the pin-count loop.
+   NoteCable* NoteInputSlot(int slot) override { return slot == 1 && AcceptsNotes() ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override
+   {
+      if (slot == 0)
+         return "in";
+      if (slot == 1 && AcceptsNotes())
+         return "notes";
+      return nullptr;
+   }
+
+   // True once the loaded plugin is an instrument or music effect - what the
+   // note pin's visibility is keyed off. False with no plugin loaded.
+   bool AcceptsNotes() const { return mAcceptsNotes; }
 
    // Starts loading `desc`. Asynchronous - the node reports "loading..." until
    // CookIfNeeded sees the instantiation finish. Clears any existing mapping
@@ -121,6 +141,7 @@ public:
    Mapping mappings[kMaxMappedParams];
 
    AudioCable input;
+   NoteCable noteInput;
 
    // Saved identity. `pluginFormat` is always "au" today and exists so a
    // second backend needs no patch-format change.
@@ -137,6 +158,12 @@ private:
 
    std::unique_ptr<AudioPluginAudioNode> mAudioNode;
    int mLastCookFrame = -1;
+
+   // Set once from the PluginDesc handed to LoadPlugin - true for an
+   // instrument or music-effect AU. Drives the note pin's visibility
+   // (AcceptsNotes) and never changes without a different plugin being
+   // loaded, so it's cheap to cache rather than re-derive every frame.
+   bool mAcceptsNotes = false;
 
    Platform::PluginHandle* mHandle = nullptr;  // the one being loaded / live
    Platform::PluginHandle* mLive = nullptr;    // currently published
