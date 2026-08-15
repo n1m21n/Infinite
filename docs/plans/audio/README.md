@@ -96,7 +96,7 @@ not use it as a reading list.
 |---|---|---|
 | MolderSampler | **Sampler**, displayed as "sample player" (shipped) | Shipped minimal first (load/tune/start/loop/volume + waveform+playhead), then grew on direct user request: pitch+finetune (coarse/fine tuning), a -2..2 varispeed `speed` control, a record input pin (captures whatever's cabled in, becomes the loaded buffer), an interactive waveform (click anywhere to audition from that point; drag its two edge handles to set the loop range), and independent reverse/ping-pong toggles for what happens at the range edges. Registered type name stays "Sampler" for patch compatibility - only DisplayName() changed, same pattern "Dynamics" -> "compressor" already uses. Still not the 5-engine/onset-detection spectral spec below - that's left here as a still-open idea, not a to-do this covered. |
 | Wavetable | **Wavetable** | dual A/B oscillators, per-oscillator filter + envelope, unison, waveform preview drawing |
-| Tracker | **Drum Sequencer** | step sequencer with per-step sample, volume, decay, pitch and repeat; transport sync; randomise |
+| Tracker | **Drum Sequencer** (shipped) | 8-lane, up-to-16-step sequencer, transport-synced, with randomise. Shipped **per-lane** sample/volume/pan/pitch/decay/transient/mute/solo/choke, not per-step - the step grid carries only trigger + velocity. See §3's Drum Sequencer row for why per-step was cut. |
 | PaulStretch | **Pitch Time** | extreme spectral time-stretch |
 | MetallicSynth, MutableResonator | **Resonator** | modal / resonator-bank synthesis |
 | Maze | **Note Sequencer** | generative chord engine: scaled degrees, chord count, groove, strum, upper harmonics, humanise timing + velocity |
@@ -164,6 +164,17 @@ own class-comment for its DSP reference. The consolidation reasoning below
 (Bitcrush → part of Drive's `curve`, Stutter → a Delay `mode`) is what this
 session overrode, not what shipped.
 
+**2026-08-14, later: a 16th effect, Wavetable Shaper**, another standalone
+`AudioEffectNode` entry — a `Wavetable` bank frame used as a waveshaping
+transfer curve, in the spirit of KHS Audio's wavetable shaper module. This is
+*not* the **Shaper** modulator two rows up in the table just above (curve
+editor → modulator output, still unshipped) — different node, different
+category (`AudioEffects` vs the modulator family), no overlap, and the
+"Dropped entirely: audio shaper (ShaperBox-style)" note elsewhere in this
+document was never reversed by this addition either — that dropped idea was
+a multiband volume/pan/filter sequencer, which this also is not. See
+`STATUS.md`'s P3c section for its shipped entry.
+
 | One node | Replaces | Why it's one node |
 |---|---|---|
 | **Audio Filter** | filter, EQ | `bands` = 1–4, each with type/freq/Q/gain. An EQ *is* filters in series. |
@@ -189,8 +200,23 @@ as a documented idiom and a starter patch instead of a node.
 | **Oscillator** | oscillator, FM synth, noise synth | Waveform (sine/saw/square/tri/pulse/white/pink/brown) + a 2-operator FM section (ratio + index) + unison/detune. A 2-op FM *is* an oscillator modulated by an oscillator. **Caveat: this does not give you 4–6-op DX-style FM.** If you want that, it is a separate node later — say so now rather than discovering it in Phase 3. |
 | **Wavetable** | wavetable | Kept separate from Oscillator: A/B morphing, per-osc filter+env and table previews are a different UI, and you have 933 lines of it already. |
 | **Sampler** | molder, granulator, paulstretch(playback), looper | **Your MolderSampler already is this consolidation** — 5 engines + live recording. Looper = live-record + loop mode. **4 → 1, and the code exists.** |
-| **Drum Sequencer** | drum sequencer, tracker | Your Tracker *is* a drum sequencer with richer per-step data (sample/vol/decay/pitch/repeat). One node. |
+| **Drum Sequencer** (shipped) | drum sequencer, tracker | 8 lanes × up to 16 steps, `IAudioSource` + a note pin (`NoteInputSlot(0)`), free-running like Wavetable/Sampler. **Per-lane, not per-step** (a deliberate divergence from the original per-step sample/vol/decay/pitch/repeat spec — see below), plus mute/solo/choke group and randomise. |
 | **Resonator** | metallic synth, mutable resonator | Both are banks of resonant filters. `model` = metallic / modal / string / plate. |
+
+**Drum Sequencer's per-step spec was cut to per-lane.** Per-step sample/
+volume/decay/pitch/repeat means five parallel 8×16 value grids, which needs a
+mode selector to say which grid is being edited - the layout rule ("a node
+must not resize when a mode changes") and the minimalism rule both push hard
+against that, and it means the patch file carries 640 floats for a pattern
+that's mostly zeros. The shipped resolution, the one every hardware drum
+machine converged on: the step grid carries trigger + velocity only: sample,
+volume, pan, pitch, decay, transient shaping, mute/solo and choke group all
+live on the *lane* and are edited through one strip for whichever lane is
+selected. One grid, one strip, no mode selector, same expressive range in
+practice. See `.claude/skills/audio-node-ui/SKILL.md` for the widget-level
+detail (the per-lane strip is horizontal sliders, a deliberate exception to
+the "knob by default" rule, for the same reason the Mixer's channel gains
+are).
 
 ### Utility: 7
 
@@ -354,6 +380,33 @@ exists at the time.
   because the drop target is imgui_node_editor's internally-managed canvas.
   Shipped alongside a minimal **Sampler** node (see the table above) as its
   prerequisite drop target.
+- **P3f — Plugin hosting, phase 1 (shipped).** A **Plugin** node
+  (`AudioEffects`) that hosts any installed **Audio Unit** effect: audio in,
+  audio out, the plugin's own editor in a separate native `NSWindow`, and an
+  Ableton-style "configure" list of mapped plugin parameters drawn as
+  modulatable horizontal sliders (`ModSlider`, two per row, up to 32
+  positional slots that are never compacted - see `AudioPluginNode.h`). The
+  docked panel gained a fourth **Plugins mode** backed by `PluginScanner`,
+  which mirrors `SampleScanner`'s thread/disk-cache shape but has no folder
+  list, because AU discovery is a registry query rather than a directory walk;
+  the index is cached in `PluginIndex.json` and a scan only ever happens from
+  the explicit Rescan button. Drag from the panel onto empty canvas (spawns a
+  loaded node) or onto an existing Plugin node (swaps it), or drop a
+  `.component` bundle from Finder.
+
+  Every Objective-C object lives behind `Platform.h`'s plugin section; the
+  audio thread calls one function, `Platform::PluginRender`, which invokes an
+  `AURenderBlock` cached on the main thread at prepare time. Mapped plugin
+  params deliberately do not use `ParamMailbox` (documented baseline in
+  `run-infinite-hygiene/driver.sh`). Covered by `INFINITE_PLUGINSCANTEST`
+  (headless: enumerate, instantiate, render, parameters, `fullState`, then the
+  same plugin through the real node, plus bypass and a save/load round trip)
+  and `INFINITE_PLUGINDRAGTEST`.
+
+  **VST3 is phase 2 and is blocked on a licensing decision, not on effort** -
+  see `plugin-hosting.md`. **VST2 is permanently out of scope** (Steinberg
+  stopped licensing the SDK in 2018). Instrument plugins (`aumu`), MIDI/note
+  input, multi-out, sidechain and latency compensation are phase 3.
 
 ### P4 — Test design
 

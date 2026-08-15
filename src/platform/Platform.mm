@@ -14,7 +14,11 @@
 #import <CoreMIDI/CoreMIDI.h>
 #import <CoreAudio/CoreAudio.h>
 #import <AudioToolbox/AudioToolbox.h>
+// Plugin hosting only: AUAudioUnit's view-controller category and the
+// AUGenericViewController fallback both live here, not in AudioToolbox.
+#import <CoreAudioKit/CoreAudioKit.h>
 
+#include <cstdlib>
 #include <cstring>
 #include <cmath>
 #include <algorithm>
@@ -1833,6 +1837,13 @@ namespace Platform
    {
       AVAudioEngine* engine = nil;
       AVAudioSourceNode* source = nil;
+      // Bound to this specific `engine` object, so it must be removed before
+      // the engine is released (AudioDeviceClose) - a token left registered
+      // against a freed AVAudioEngine is exactly the dangling-observer crash
+      // this recovery work is supposed to prevent, not introduce. See
+      // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md
+      // rule 3.
+      id configChangeObserver = nil;
    };
 
    namespace
@@ -1845,6 +1856,57 @@ namespace Platform
       // channel count so unpacking it into the C-callback shape needs no
       // heap allocation on the audio thread.
       constexpr int kMaxDeviceChannels = 8;
+
+      // ---- device-change / sleep-wake recovery flags ----
+      // Set from whatever thread the corresponding notification lands on;
+      // consumed (cleared) by main.cpp's per-frame PollAudioRecovery via the
+      // accessors below. See Platform.h's doc comment on
+      // AudioDeviceConfigDidChange for why this is a flag and not a
+      // callback into graph code.
+      std::atomic<bool> gAudioConfigChanged { false };
+      std::atomic<bool> gAudioWillSleep { false };
+      std::atomic<bool> gAudioDidWake { false };
+
+      // NSWorkspace's sleep/wake notifications aren't tied to any particular
+      // AVAudioEngine instance (unlike the per-engine config-change
+      // observer above) - they matter for the whole process, so they're
+      // installed once, lazily, the first time an audio device is opened,
+      // and never removed. That's a deliberate asymmetry with
+      // AudioDeviceHandle::configChangeObserver, not an oversight: there is
+      // no "this object is about to be freed" moment for the process itself
+      // to hang the removal off of, and NSWorkspace's own notification
+      // center outlives everything else in this program regardless.
+      bool gWorkspaceObserversInstalled = false;
+
+      void InstallWorkspaceObserversOnce()
+      {
+         if (gWorkspaceObserversInstalled)
+            return;
+         gWorkspaceObserversInstalled = true;
+
+         NSNotificationCenter* center = [[NSWorkspace sharedWorkspace] notificationCenter];
+         [center addObserverForName:NSWorkspaceWillSleepNotification
+                              object:nil
+                               queue:nil
+                          usingBlock:^(NSNotification*) {
+            gAudioWillSleep.store(true, std::memory_order_relaxed);
+         }];
+         [center addObserverForName:NSWorkspaceDidWakeNotification
+                              object:nil
+                               queue:nil
+                          usingBlock:^(NSNotification*) {
+            gAudioDidWake.store(true, std::memory_order_relaxed);
+         }];
+      }
+   }
+
+   bool AudioDeviceConfigDidChange() { return gAudioConfigChanged.exchange(false, std::memory_order_relaxed); }
+   bool AudioWillSleep() { return gAudioWillSleep.exchange(false, std::memory_order_relaxed); }
+   bool AudioDidWake() { return gAudioDidWake.exchange(false, std::memory_order_relaxed); }
+
+   void AudioDeviceDebugSimulateConfigChange()
+   {
+      gAudioConfigChanged.store(true, std::memory_order_relaxed);
    }
 
    namespace
@@ -2101,6 +2163,20 @@ namespace Platform
          // Device/rate/buffer selection all act on the underlying
          // AudioObjectID, so they must happen before the engine (and its
          // output AudioUnit) starts pulling format info from it.
+         // Policy for a user-selected requestedDeviceId that no longer
+         // exists (unplugged since it was chosen): AudioUnitSetProperty
+         // below simply fails for an invalid AudioObjectID, its result is
+         // not checked, and the output AudioUnit is left on whatever it
+         // already defaults to - the system default output. This is a
+         // silent fallback, not a silent *ignore* of the user's choice: the
+         // request itself (gAudioOutputDeviceId in main.cpp) is untouched,
+         // so the device picker still shows what the user picked, and the
+         // next PollAudioRecovery-driven restart tries that same
+         // requestedDeviceId again rather than having quietly forgotten it.
+         // Deliberately not surfacing a dedicated "your device vanished,
+         // using default" message here - see
+         // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md
+         // rule 4.
          AudioObjectID targetDevice = (AudioObjectID)requestedDeviceId;
          if (targetDevice != 0)
          {
@@ -2180,6 +2256,19 @@ namespace Platform
             return false;
          }
 
+         // Bound to h->engine specifically (not `nil`/global) so a
+         // configuration change on some other, unrelated AVAudioEngine
+         // instance elsewhere in the process (there is at least one more -
+         // AudioSpikeStart's) can't spuriously flag this one's recovery.
+         h->configChangeObserver =
+            [[NSNotificationCenter defaultCenter] addObserverForName:AVAudioEngineConfigurationChangeNotification
+                                                                object:h->engine
+                                                                 queue:nil
+                                                            usingBlock:^(NSNotification*) {
+            gAudioConfigChanged.store(true, std::memory_order_relaxed);
+         }];
+         InstallWorkspaceObserversOnce();
+
          gDeviceHandle = h;
          outSampleRate = sampleRate;
          outError.clear();
@@ -2195,6 +2284,16 @@ namespace Platform
       gDeviceHandle = nullptr;
       @autoreleasepool
       {
+         // Remove before the engine goes away - see AudioDeviceHandle's
+         // comment on this field. Removing a nil observer is a documented
+         // no-op, so this is safe even if AudioDeviceOpen never got as far
+         // as installing one.
+         if (h->configChangeObserver != nil)
+         {
+            [[NSNotificationCenter defaultCenter] removeObserver:h->configChangeObserver];
+            h->configChangeObserver = nil;
+         }
+
          // Same teardown hazard as AudioSpikeStop/AudioFileClose: AVAudioEngine
          // throws an NSException on bad teardown state instead of returning an
          // error, and an uncaught one aborts the process.
@@ -2968,5 +3067,936 @@ namespace Platform
       const size_t intervals = gMidiClockState.pulseTimes.size() - 1;
       const double secondsPerPulse = totalSeconds / (double)intervals;
       return (float)(60.0 / (24.0 * secondsPerPulse));
+   }
+
+   // ---- audio plugin hosting (Audio Units) ---------------------------------
+   // See Platform.h's plugin section for the contract. Every Objective-C
+   // object involved is confined below this line; the only function here that
+   // the audio thread ever calls is PluginRender, and it does nothing but
+   // invoke a block cached on the main thread.
+
+   namespace
+   {
+      std::string FourCCToString(OSType code)
+      {
+         const char chars[5] = { (char)((code >> 24) & 0xFF), (char)((code >> 16) & 0xFF),
+                                 (char)((code >> 8) & 0xFF), (char)(code & 0xFF), '\0' };
+         return std::string(chars);
+      }
+
+      OSType StringToFourCC(const std::string& s)
+      {
+         if (s.size() != 4)
+            return 0;
+         return ((OSType)(unsigned char)s[0] << 24) | ((OSType)(unsigned char)s[1] << 16) |
+                ((OSType)(unsigned char)s[2] << 8) | (OSType)(unsigned char)s[3];
+      }
+
+      std::string MakeAuIdentifier(const AudioComponentDescription& d)
+      {
+         return "au:" + FourCCToString(d.componentType) + ":" + FourCCToString(d.componentSubType) +
+                ":" + FourCCToString(d.componentManufacturer);
+      }
+
+      // "au:aufx:dely:appl" -> the component description it names. Returns
+      // false for anything that isn't exactly four colon-separated fields with
+      // four-character codes, which is what a patch written by a future
+      // (vst3) build would look like to this build.
+      bool ParseAuIdentifier(const std::string& id, AudioComponentDescription& out)
+      {
+         std::vector<std::string> parts;
+         size_t start = 0;
+         while (true)
+         {
+            const size_t sep = id.find(':', start);
+            parts.push_back(id.substr(start, sep == std::string::npos ? std::string::npos : sep - start));
+            if (sep == std::string::npos)
+               break;
+            start = sep + 1;
+         }
+         if (parts.size() != 4 || parts[0] != "au")
+            return false;
+         out = AudioComponentDescription {};
+         out.componentType = StringToFourCC(parts[1]);
+         out.componentSubType = StringToFourCC(parts[2]);
+         out.componentManufacturer = StringToFourCC(parts[3]);
+         if (out.componentType == 0 || out.componentSubType == 0 || out.componentManufacturer == 0)
+            return false;
+         return true;
+      }
+
+      // Only these two. 'aumu' (instrument) is deliberately excluded - see
+      // EnumerateAudioUnits' doc comment in Platform.h.
+      bool IsHostableEffectType(OSType type)
+      {
+         return type == kAudioUnitType_Effect || type == kAudioUnitType_MusicEffect;
+      }
+
+      // AVAudioUnitComponent.name is usually "Manufacturer: Plugin"; the
+      // manufacturer is already its own column in the panel, so strip it
+      // rather than printing it twice on every row.
+      std::string StripManufacturerPrefix(const std::string& name, const std::string& manufacturer)
+      {
+         const std::string prefix = manufacturer + ": ";
+         if (!manufacturer.empty() && name.rfind(prefix, 0) == 0)
+            return name.substr(prefix.size());
+         return name;
+      }
+
+      constexpr int kPluginMaxChannels = 8;
+   }
+}
+
+// The editor window's delegate. Its only job is to tell the handle the user
+// closed the window, so Platform::PluginEditorIsOpen (and therefore the node's
+// open/close button) never claims a window that isn't there.
+@interface InfinitePluginEditorDelegate : NSObject <NSWindowDelegate>
+@property (nonatomic, assign) void* handle;
+@end
+
+namespace Platform
+{
+   struct PluginHandle
+   {
+      PluginDesc desc;
+
+      // --- instantiation, main thread except where noted -------------------
+      AUAudioUnit* unit = nil;
+      AUAudioUnit* arrivedUnit = nil; // written by the completion handler's queue
+      NSError* arrivedError = nil;    // ditto
+      std::mutex arrivalMutex;        // guards the two above; main thread only takes it in PluginPoll
+      std::atomic<bool> arrived { false };
+      PluginLoadState state = PluginLoadState::Pending;
+      std::string loadError;
+
+      // --- render path -----------------------------------------------------
+      // The block is held strongly here (so ARC keeps it alive) and also as a
+      // plain void* the render path bridges back without any retain/release.
+      AURenderBlock renderBlockStrong = nil;
+      void* renderBlockRaw = nullptr;
+
+      double sampleRate = 0.0;
+      int maxBlockFrames = 0;
+      bool resourcesAllocated = false;
+      int pluginInChannels = 0;
+      int pluginOutChannels = 0;
+
+      AudioBufferList* outAbl = nullptr;   // allocated once at prepare, sized kPluginMaxChannels
+      std::vector<float> inScratch;        // kPluginMaxChannels * maxBlockFrames
+      std::vector<float> outScratch;       // ditto, used only when channel counts differ
+      double renderSampleTime = 0.0;
+
+      // Set for the duration of a PluginRender call so PluginDestroy (main
+      // thread) can wait out an in-flight render instead of pulling the unit
+      // out from under it.
+      std::atomic<bool> inRender { false };
+
+      // --- learn -----------------------------------------------------------
+      // The observer token is installed once at prepare and kept for the
+      // handle's whole life, not just while learn is on: every parameter write
+      // this host makes passes it as the originator so the plugin's own
+      // notifications never echo our writes back as a "the user touched this"
+      // event. Installing it only during learn would leave our writes
+      // untagged the rest of the time for no benefit.
+      AUParameterObserverToken learnToken = nullptr;
+      std::atomic<bool> learning { false };
+      std::atomic<unsigned long long> learnedAddress { 0 };
+      std::atomic<bool> learnedValid { false };
+
+      // --- editor window ---------------------------------------------------
+      NSWindow* editorWindow = nil;
+      NSViewController* editorController = nil;
+      InfinitePluginEditorDelegate* editorDelegate = nil;
+      bool editorRequestInFlight = false;
+      std::atomic<bool> editorOpen { false };
+   };
+}
+
+@implementation InfinitePluginEditorDelegate
+- (void)windowWillClose:(NSNotification*)notification
+{
+   (void)notification;
+   Platform::PluginHandle* h = (Platform::PluginHandle*)self.handle;
+   if (h == nullptr)
+      return;
+   h->editorOpen.store(false, std::memory_order_relaxed);
+   h->editorWindow = nil;
+   h->editorController = nil;
+   h->editorDelegate = nil;
+}
+@end
+
+namespace Platform
+{
+   void EnumerateAudioUnits(std::vector<PluginDesc>& out)
+   {
+      out.clear();
+      @autoreleasepool
+      {
+         // A zeroed description is the documented wildcard: every installed
+         // component, v2 and v3 alike, in one registry query. There is no
+         // directory walk here at all, which is why PluginScanner has no
+         // folder list.
+         AudioComponentDescription wildcard = {};
+         AVAudioUnitComponentManager* manager = [AVAudioUnitComponentManager sharedAudioUnitComponentManager];
+         NSArray<AVAudioUnitComponent*>* components = [manager componentsMatchingDescription:wildcard];
+
+         for (AVAudioUnitComponent* component in components)
+         {
+            const AudioComponentDescription d = component.audioComponentDescription;
+            if (!IsHostableEffectType(d.componentType))
+               continue;
+
+            PluginDesc desc;
+            desc.format = "au";
+            desc.manufacturer = component.manufacturerName != nil
+                                   ? std::string([component.manufacturerName UTF8String])
+                                   : std::string();
+            const std::string rawName = component.name != nil ? std::string([component.name UTF8String])
+                                                              : std::string();
+            desc.name = StripManufacturerPrefix(rawName, desc.manufacturer);
+            desc.identifier = MakeAuIdentifier(d);
+            if (desc.name.empty() || desc.identifier.empty())
+               continue;
+            out.push_back(std::move(desc));
+         }
+      }
+   }
+
+   bool DescribeAudioUnitBundle(const std::string& bundlePath, std::vector<PluginDesc>& out)
+   {
+      out.clear();
+      @autoreleasepool
+      {
+         NSString* path = [NSString stringWithUTF8String:bundlePath.c_str()];
+         NSBundle* bundle = [NSBundle bundleWithPath:path];
+         if (bundle == nil)
+            return false;
+         // An audio component bundle declares its components in Info.plist
+         // under AudioComponents, one dictionary each with type/subtype/manu
+         // as four-character strings. This is the only way to identify a
+         // dropped .component that the registry hasn't picked up yet.
+         id components = [bundle objectForInfoDictionaryKey:@"AudioComponents"];
+         if (![components isKindOfClass:[NSArray class]])
+            return false;
+
+         for (id entry in (NSArray*)components)
+         {
+            if (![entry isKindOfClass:[NSDictionary class]])
+               continue;
+            NSDictionary* dict = (NSDictionary*)entry;
+            NSString* type = dict[@"type"];
+            NSString* subtype = dict[@"subtype"];
+            NSString* manu = dict[@"manufacturer"];
+            if (![type isKindOfClass:[NSString class]] || ![subtype isKindOfClass:[NSString class]] ||
+                ![manu isKindOfClass:[NSString class]])
+               continue;
+
+            AudioComponentDescription d = {};
+            d.componentType = StringToFourCC(std::string([type UTF8String]));
+            d.componentSubType = StringToFourCC(std::string([subtype UTF8String]));
+            d.componentManufacturer = StringToFourCC(std::string([manu UTF8String]));
+            if (!IsHostableEffectType(d.componentType))
+               continue;
+
+            PluginDesc desc;
+            desc.format = "au";
+            desc.identifier = MakeAuIdentifier(d);
+            NSString* name = dict[@"name"];
+            const std::string rawName = [name isKindOfClass:[NSString class]]
+                                           ? std::string([name UTF8String])
+                                           : std::string();
+            // Info.plist's "name" is also "Manufacturer: Plugin" by
+            // convention, but with no separate manufacturer key to strip with,
+            // so split on the colon here instead.
+            const size_t colon = rawName.find(": ");
+            if (colon != std::string::npos)
+            {
+               desc.manufacturer = rawName.substr(0, colon);
+               desc.name = rawName.substr(colon + 2);
+            }
+            else
+            {
+               desc.name = rawName;
+            }
+            if (desc.name.empty())
+               desc.name = FourCCToString(d.componentSubType);
+            out.push_back(std::move(desc));
+         }
+      }
+      return !out.empty();
+   }
+
+   PluginHandle* PluginCreate(const PluginDesc& desc, double sampleRate, int maxBlockFrames)
+   {
+      PluginHandle* h = new PluginHandle();
+      h->desc = desc;
+      h->sampleRate = sampleRate;
+      h->maxBlockFrames = maxBlockFrames > 0 ? maxBlockFrames : 512;
+
+      AudioComponentDescription cd = {};
+      if (desc.format != "au" || !ParseAuIdentifier(desc.identifier, cd))
+      {
+         h->state = PluginLoadState::Failed;
+         h->loadError = "unsupported plugin identifier: " + desc.identifier;
+         h->arrived.store(true, std::memory_order_release);
+         return h;
+      }
+
+      // Asynchronous on purpose: an out-of-process AUv3 can take seconds to
+      // come up, and the UI thread must stay live the whole time. The
+      // completion handler runs on a queue internal to AudioToolbox, so it
+      // does nothing but stash what it was given - every bit of AUAudioUnit
+      // setup happens on the main thread in PluginPoll.
+      [AUAudioUnit instantiateWithComponentDescription:cd
+                                               options:0
+                                     completionHandler:^(AUAudioUnit* au, NSError* error) {
+                                        {
+                                           std::lock_guard<std::mutex> lock(h->arrivalMutex);
+                                           h->arrivedUnit = au;
+                                           h->arrivedError = error;
+                                        }
+                                        h->arrived.store(true, std::memory_order_release);
+                                     }];
+      return h;
+   }
+
+   namespace
+   {
+      // Shared tail of PluginPoll/PluginPrepare: negotiate bus formats, cap
+      // the block size, allocate render resources, cache the render block.
+      // Main thread only.
+      bool PluginConfigure(PluginHandle* h, std::string& outError)
+      {
+         if (h->unit == nil)
+         {
+            outError = "no plugin instance";
+            return false;
+         }
+
+         @autoreleasepool
+         {
+            AUAudioUnit* au = h->unit;
+            if (h->resourcesAllocated)
+            {
+               [au deallocateRenderResources];
+               h->resourcesAllocated = false;
+            }
+
+            const double rate = h->sampleRate > 0.0 ? h->sampleRate : 48000.0;
+            const int frames = std::min(std::max(h->maxBlockFrames, 1), 4096);
+
+            // Try stereo, fall back to mono: plenty of effects are mono-only,
+            // and a rejected format is a normal outcome, not an error.
+            int negotiatedIn = 0;
+            int negotiatedOut = 0;
+            for (int channels = 2; channels >= 1 && negotiatedOut == 0; channels--)
+            {
+               AVAudioFormat* format = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:rate
+                                                                                       channels:(AVAudioChannelCount)channels];
+               if (format == nil)
+                  continue;
+
+               NSError* busError = nil;
+               bool ok = true;
+               if (au.inputBusses.count > 0)
+               {
+                  AUAudioUnitBus* inBus = [au.inputBusses objectAtIndexedSubscript:0];
+                  ok = [inBus setFormat:format error:&busError];
+                  if (ok)
+                  {
+                     inBus.enabled = YES;
+                     negotiatedIn = channels;
+                  }
+               }
+               if (ok && au.outputBusses.count > 0)
+               {
+                  AUAudioUnitBus* outBus = [au.outputBusses objectAtIndexedSubscript:0];
+                  ok = [outBus setFormat:format error:&busError];
+                  if (ok)
+                  {
+                     outBus.enabled = YES;
+                     negotiatedOut = channels;
+                  }
+               }
+               if (!ok)
+                  negotiatedIn = 0;
+            }
+
+            if (negotiatedOut == 0)
+            {
+               outError = "plugin rejected both stereo and mono float formats";
+               return false;
+            }
+            h->pluginInChannels = negotiatedIn;
+            h->pluginOutChannels = negotiatedOut;
+
+            au.maximumFramesToRender = (AUAudioFrameCount)frames;
+
+            NSError* allocError = nil;
+            if (![au allocateRenderResourcesAndReturnError:&allocError])
+            {
+               outError = allocError != nil ? std::string([[allocError localizedDescription] UTF8String])
+                                            : std::string("allocateRenderResources failed");
+               return false;
+            }
+            h->resourcesAllocated = true;
+
+            // Cached once, here, on the main thread. ProcessBlock calls the
+            // block; it never messages the AUAudioUnit.
+            h->renderBlockStrong = au.renderBlock;
+            h->renderBlockRaw = (__bridge void*)h->renderBlockStrong;
+
+            // Fixed-capacity render scratch, allocated here so the render path
+            // never does. mBuffers is a trailing array, hence the manual size.
+            if (h->outAbl == nullptr)
+            {
+               const size_t bytes = sizeof(AudioBufferList) + sizeof(::AudioBuffer) * (kPluginMaxChannels - 1);
+               h->outAbl = (AudioBufferList*)std::calloc(1, bytes);
+            }
+            h->inScratch.assign((size_t)kPluginMaxChannels * (size_t)frames, 0.0f);
+            h->outScratch.assign((size_t)kPluginMaxChannels * (size_t)frames, 0.0f);
+            h->renderSampleTime = 0.0;
+
+            if (h->learnToken == nullptr && au.parameterTree != nil)
+            {
+               // Called on an arbitrary thread - stores an address into an
+               // atomic and returns. Nothing else is legal here.
+               PluginHandle* raw = h;
+               h->learnToken = [au.parameterTree
+                  tokenByAddingParameterObserver:^(AUParameterAddress address, AUValue value) {
+                     (void)value;
+                     if (!raw->learning.load(std::memory_order_relaxed))
+                        return;
+                     raw->learnedAddress.store((unsigned long long)address, std::memory_order_relaxed);
+                     raw->learnedValid.store(true, std::memory_order_release);
+                  }];
+            }
+         }
+         return true;
+      }
+   }
+
+   PluginLoadState PluginPoll(PluginHandle* h, std::string& outError)
+   {
+      if (h == nullptr)
+      {
+         outError = "null plugin handle";
+         return PluginLoadState::Failed;
+      }
+      if (h->state != PluginLoadState::Pending)
+      {
+         outError = h->loadError;
+         return h->state;
+      }
+      if (!h->arrived.load(std::memory_order_acquire))
+         return PluginLoadState::Pending;
+
+      AUAudioUnit* au = nil;
+      NSError* error = nil;
+      {
+         std::lock_guard<std::mutex> lock(h->arrivalMutex);
+         au = h->arrivedUnit;
+         error = h->arrivedError;
+         h->arrivedUnit = nil;
+         h->arrivedError = nil;
+      }
+
+      if (au == nil)
+      {
+         h->state = PluginLoadState::Failed;
+         if (h->loadError.empty())
+         {
+            h->loadError = error != nil ? std::string([[error localizedDescription] UTF8String])
+                                        : std::string("plugin failed to instantiate");
+         }
+         outError = h->loadError;
+         return h->state;
+      }
+
+      h->unit = au;
+      std::string configError;
+      if (!PluginConfigure(h, configError))
+      {
+         h->state = PluginLoadState::Failed;
+         h->loadError = configError;
+         outError = configError;
+         return h->state;
+      }
+
+      h->state = PluginLoadState::Ready;
+      outError.clear();
+      return h->state;
+   }
+
+   bool PluginPrepare(PluginHandle* h, double sampleRate, int maxBlockFrames, std::string& outError)
+   {
+      if (h == nullptr || h->state != PluginLoadState::Ready)
+      {
+         outError = "plugin not ready";
+         return false;
+      }
+      const int frames = maxBlockFrames > 0 ? maxBlockFrames : h->maxBlockFrames;
+      if (sampleRate <= 0.0)
+         return true; // no device yet - keep whatever we configured with
+      if (std::abs(sampleRate - h->sampleRate) < 1e-6 && frames == h->maxBlockFrames && h->resourcesAllocated)
+         return true;
+
+      h->sampleRate = sampleRate;
+      h->maxBlockFrames = frames;
+      if (!PluginConfigure(h, outError))
+      {
+         h->state = PluginLoadState::Failed;
+         h->loadError = outError;
+         return false;
+      }
+      return true;
+   }
+
+   PluginDesc PluginDescriptionOf(PluginHandle* h)
+   {
+      return h != nullptr ? h->desc : PluginDesc();
+   }
+
+   void PluginDestroy(PluginHandle* h)
+   {
+      if (h == nullptr)
+         return;
+
+      PluginCloseEditor(h);
+
+      // Main thread, so a bounded spin is legal (and this is the only place
+      // the audio thread's use of the handle is actually fenced off - the
+      // node has already unpublished the pointer by the time this runs, so
+      // the wait is for a render that started before that store).
+      for (int spins = 0; spins < 100000 && h->inRender.load(std::memory_order_acquire); spins++)
+      {
+      }
+
+      @autoreleasepool
+      {
+         if (h->unit != nil)
+         {
+            if (h->learnToken != nullptr && h->unit.parameterTree != nil)
+               [h->unit.parameterTree removeParameterObserver:h->learnToken];
+            if (h->resourcesAllocated)
+               [h->unit deallocateRenderResources];
+         }
+      }
+      h->learnToken = nullptr;
+      h->renderBlockRaw = nullptr;
+      h->renderBlockStrong = nil;
+      h->unit = nil;
+      h->arrivedUnit = nil;
+      h->arrivedError = nil;
+      if (h->outAbl != nullptr)
+      {
+         std::free(h->outAbl);
+         h->outAbl = nullptr;
+      }
+      delete h;
+   }
+
+   void PluginRender(PluginHandle* h, const float* const* in, int inChannels,
+                     float* const* out, int outChannels, int numFrames)
+   {
+      // Everything below is on the real-time thread: no Objective-C message
+      // send, no ARC traffic, no allocation, no lock. The two blocks involved
+      // are a cached one (bridged back as __unsafe_unretained, which ARC does
+      // not retain) and a stack literal (which is not copied, because
+      // AURenderBlock's pullInputBlock parameter is not a __strong parameter).
+      if (h == nullptr || h->renderBlockRaw == nullptr || out == nullptr || numFrames <= 0)
+         return;
+
+      h->inRender.store(true, std::memory_order_release);
+
+      const int pluginOut = h->pluginOutChannels;
+      const int pluginIn = h->pluginInChannels;
+      const int frames = numFrames > h->maxBlockFrames ? h->maxBlockFrames : numFrames;
+      AudioBufferList* abl = h->outAbl;
+      if (abl == nullptr || pluginOut <= 0)
+      {
+         h->inRender.store(false, std::memory_order_release);
+         return;
+      }
+
+      // Point the plugin's output buffers straight at the caller's channels
+      // when the counts agree; otherwise render into scratch and fan out
+      // afterwards (a mono effect feeding a stereo chain).
+      const bool direct = (pluginOut == outChannels);
+      float* outScratchBase = h->outScratch.empty() ? nullptr : h->outScratch.data();
+      if (!direct && outScratchBase == nullptr)
+      {
+         h->inRender.store(false, std::memory_order_release);
+         return;
+      }
+
+      abl->mNumberBuffers = (UInt32)pluginOut;
+      for (int ch = 0; ch < pluginOut; ch++)
+      {
+         abl->mBuffers[ch].mNumberChannels = 1;
+         abl->mBuffers[ch].mDataByteSize = (UInt32)(frames * (int)sizeof(float));
+         abl->mBuffers[ch].mData = direct ? (void*)out[ch]
+                                          : (void*)(outScratchBase + (size_t)ch * (size_t)h->maxBlockFrames);
+      }
+
+      float* inScratchBase = h->inScratch.empty() ? nullptr : h->inScratch.data();
+      const int maxFrames = h->maxBlockFrames;
+
+      // Stack block, and __unsafe_unretained on purpose: assigning a block
+      // literal to a __strong variable makes ARC emit Block_copy, which is a
+      // malloc - on the render thread. An unretained local keeps it on the
+      // stack, which is exactly why AURenderBlock's pullInputBlock parameter
+      // is designed to be handed a stack block.
+      __unsafe_unretained AURenderPullInputBlock pull = ^AUAudioUnitStatus(AudioUnitRenderActionFlags* flags,
+                                                        const AudioTimeStamp* timestamp,
+                                                        AUAudioFrameCount frameCount, NSInteger bus,
+                                                        AudioBufferList* inputData) {
+         (void)flags;
+         (void)timestamp;
+         (void)bus;
+         if (inputData == nullptr)
+            return noErr;
+         const int n = (int)frameCount;
+         for (UInt32 i = 0; i < inputData->mNumberBuffers; i++)
+         {
+            float* dst = (float*)inputData->mBuffers[i].mData;
+            if (dst == nullptr)
+            {
+               // The AU handed us an empty buffer to fill in - point it at our
+               // own pre-allocated scratch, as the pull-block contract allows.
+               if (inScratchBase == nullptr || (int)i >= kPluginMaxChannels)
+                  return kAudioUnitErr_InvalidParameter;
+               dst = inScratchBase + (size_t)i * (size_t)maxFrames;
+               inputData->mBuffers[i].mData = dst;
+               inputData->mBuffers[i].mDataByteSize = (UInt32)(n * (int)sizeof(float));
+            }
+            // Fewer upstream channels than the plugin wants: repeat the last
+            // one (mono source into a stereo effect), rather than leaving a
+            // silent right channel.
+            const float* src = (in != nullptr && inChannels > 0)
+                                  ? in[(int)i < inChannels ? (int)i : inChannels - 1]
+                                  : nullptr;
+            if (src != nullptr)
+               std::memcpy(dst, src, (size_t)n * sizeof(float));
+            else
+               std::memset(dst, 0, (size_t)n * sizeof(float));
+         }
+         return noErr;
+      };
+
+      AudioUnitRenderActionFlags flags = 0;
+      AudioTimeStamp timestamp = {};
+      timestamp.mFlags = kAudioTimeStampSampleTimeValid;
+      timestamp.mSampleTime = h->renderSampleTime;
+      h->renderSampleTime += (double)frames;
+
+      // An effect with no input bus (nothing negotiated) is pulled with no
+      // input block at all, which is what the AU contract asks for.
+      __unsafe_unretained AURenderPullInputBlock pullArg = nil;
+      if (pluginIn > 0)
+         pullArg = pull;
+
+      __unsafe_unretained AURenderBlock render = (__bridge AURenderBlock)h->renderBlockRaw;
+      const AUAudioUnitStatus status =
+         render(&flags, &timestamp, (AUAudioFrameCount)frames, 0, abl, pullArg);
+
+      if (status != noErr)
+      {
+         for (int ch = 0; ch < outChannels; ch++)
+            if (out[ch] != nullptr)
+               std::memset(out[ch], 0, (size_t)frames * sizeof(float));
+         h->inRender.store(false, std::memory_order_release);
+         return;
+      }
+
+      if (!direct)
+      {
+         for (int ch = 0; ch < outChannels; ch++)
+         {
+            if (out[ch] == nullptr)
+               continue;
+            const int srcCh = ch < pluginOut ? ch : pluginOut - 1;
+            std::memcpy(out[ch], outScratchBase + (size_t)srcCh * (size_t)maxFrames,
+                        (size_t)frames * sizeof(float));
+         }
+      }
+      else
+      {
+         // An AU is allowed to ignore the buffers we handed it and swap in its
+         // own pointers; when it does, the result is in mData, not in out[].
+         for (int ch = 0; ch < pluginOut; ch++)
+         {
+            float* produced = (float*)abl->mBuffers[ch].mData;
+            if (produced != nullptr && produced != out[ch] && out[ch] != nullptr)
+               std::memcpy(out[ch], produced, (size_t)frames * sizeof(float));
+         }
+      }
+
+      // Any tail channels the plugin doesn't drive stay silent rather than
+      // holding the previous block's contents.
+      for (int ch = pluginOut; ch < outChannels; ch++)
+         if (out[ch] != nullptr && !direct)
+            std::memset(out[ch], 0, (size_t)frames * sizeof(float));
+
+      h->inRender.store(false, std::memory_order_release);
+   }
+
+   int PluginParameterCount(PluginHandle* h)
+   {
+      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+         return 0;
+      return (int)h->unit.parameterTree.allParameters.count;
+   }
+
+   namespace
+   {
+      void FillParamInfo(AUParameter* p, PluginParamInfo& out)
+      {
+         out.address = (unsigned long long)p.address;
+         out.displayName = p.displayName != nil ? std::string([p.displayName UTF8String]) : std::string();
+         if (out.displayName.empty() && p.identifier != nil)
+            out.displayName = std::string([p.identifier UTF8String]);
+         out.minValue = (float)p.minValue;
+         out.maxValue = (float)p.maxValue;
+         out.defaultValue = (float)p.value;
+         out.unit = p.unitName != nil ? std::string([p.unitName UTF8String]) : std::string();
+         // A parameter whose range is degenerate would make a slider that
+         // can't move and a divide-by-zero in the fill calc; widen it.
+         if (!(out.maxValue > out.minValue))
+            out.maxValue = out.minValue + 1.0f;
+      }
+   }
+
+   bool PluginParameterInfo(PluginHandle* h, int index, PluginParamInfo& out)
+   {
+      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+         return false;
+      NSArray<AUParameter*>* all = h->unit.parameterTree.allParameters;
+      if (index < 0 || index >= (int)all.count)
+         return false;
+      FillParamInfo(all[(NSUInteger)index], out);
+      return true;
+   }
+
+   bool PluginParameterInfoByAddress(PluginHandle* h, unsigned long long address, PluginParamInfo& out)
+   {
+      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+         return false;
+      AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
+      if (p == nil)
+         return false;
+      FillParamInfo(p, out);
+      return true;
+   }
+
+   void PluginSetParameter(PluginHandle* h, unsigned long long address, float value)
+   {
+      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+         return;
+      AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
+      if (p == nil)
+         return;
+      // Tagged with our own observer token so this write never comes back
+      // through the learn observer as "the user touched a control".
+      if (h->learnToken != nullptr)
+         [p setValue:(AUValue)value originator:h->learnToken];
+      else
+         p.value = (AUValue)value;
+   }
+
+   bool PluginGetParameter(PluginHandle* h, unsigned long long address, float& outValue)
+   {
+      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+         return false;
+      AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
+      if (p == nil)
+         return false;
+      outValue = (float)p.value;
+      return true;
+   }
+
+   void PluginBeginLearn(PluginHandle* h)
+   {
+      if (h == nullptr)
+         return;
+      h->learnedValid.store(false, std::memory_order_relaxed);
+      h->learning.store(true, std::memory_order_release);
+   }
+
+   void PluginEndLearn(PluginHandle* h)
+   {
+      if (h == nullptr)
+         return;
+      h->learning.store(false, std::memory_order_release);
+      h->learnedValid.store(false, std::memory_order_relaxed);
+   }
+
+   bool PluginPollLearned(PluginHandle* h, unsigned long long& outAddress)
+   {
+      if (h == nullptr || !h->learnedValid.load(std::memory_order_acquire))
+         return false;
+      outAddress = h->learnedAddress.load(std::memory_order_relaxed);
+      h->learnedValid.store(false, std::memory_order_relaxed);
+      return true;
+   }
+
+   namespace
+   {
+      // Shared tail of the editor-open path: wraps whatever view controller we
+      // ended up with in an NSWindow. Main thread only.
+      void PresentEditorWindow(PluginHandle* h, NSViewController* controller)
+      {
+         if (h == nullptr || controller == nil)
+            return;
+         if (h->editorWindow != nil)
+         {
+            [h->editorWindow makeKeyAndOrderFront:nil];
+            return;
+         }
+
+         NSView* view = controller.view;
+         NSSize size = view.fittingSize;
+         if (size.width < 120.0 || size.height < 80.0)
+            size = NSMakeSize(std::max(size.width, 480.0), std::max(size.height, 320.0));
+         [view setFrameSize:size];
+
+         NSWindow* window = [[NSWindow alloc]
+             initWithContentRect:NSMakeRect(0, 0, size.width, size.height)
+                       styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+                                  NSWindowStyleMaskMiniaturizable)
+                         backing:NSBackingStoreBuffered
+                           defer:NO];
+         window.releasedWhenClosed = NO;
+         window.title = [NSString stringWithUTF8String:h->desc.name.c_str()];
+         window.contentViewController = controller;
+
+         InfinitePluginEditorDelegate* delegate = [[InfinitePluginEditorDelegate alloc] init];
+         delegate.handle = (void*)h;
+         window.delegate = delegate;
+
+         [window center];
+         [window makeKeyAndOrderFront:nil];
+
+         h->editorWindow = window;
+         h->editorController = controller;
+         h->editorDelegate = delegate;
+         h->editorOpen.store(true, std::memory_order_release);
+      }
+   }
+
+   bool PluginOpenEditor(PluginHandle* h, std::string& outError)
+   {
+      if (h == nullptr || h->unit == nil || h->state != PluginLoadState::Ready)
+      {
+         outError = "plugin not loaded";
+         return false;
+      }
+      if (h->editorWindow != nil)
+      {
+         [h->editorWindow makeKeyAndOrderFront:nil];
+         return true;
+      }
+      if (h->editorRequestInFlight)
+         return true;
+
+      h->editorRequestInFlight = true;
+      PluginHandle* raw = h;
+      // Asynchronous, and the completion handler is documented as running on
+      // an internal queue - so it hops to the main queue before touching any
+      // AppKit object. glfwPollEvents drains the main queue, verified by the
+      // NSWindow smoke test that gated this whole feature.
+      [h->unit requestViewControllerWithCompletionHandler:^(AUViewControllerBase* controller) {
+         dispatch_async(dispatch_get_main_queue(), ^{
+            raw->editorRequestInFlight = false;
+            NSViewController* vc = controller;
+            if (vc == nil)
+            {
+               // No editor of the plugin's own. AUGenericViewController builds
+               // one from the parameter tree against this same instance (not a
+               // second one), which is exactly what a generic view should be.
+               if (@available(macOS 13.0, *))
+               {
+                  AUGenericViewController* generic = [[AUGenericViewController alloc] init];
+                  generic.auAudioUnit = raw->unit;
+                  vc = generic;
+               }
+            }
+            if (vc == nil)
+               return;
+            PresentEditorWindow(raw, vc);
+         });
+      }];
+      return true;
+   }
+
+   void PluginCloseEditor(PluginHandle* h)
+   {
+      if (h == nullptr || h->editorWindow == nil)
+         return;
+      NSWindow* window = h->editorWindow;
+      // Clearing the delegate first: -close fires windowWillClose, which would
+      // otherwise re-enter this handle's fields while we are tearing them down.
+      window.delegate = nil;
+      h->editorDelegate = nil;
+      h->editorWindow = nil;
+      h->editorController = nil;
+      h->editorOpen.store(false, std::memory_order_release);
+      [window close];
+   }
+
+   bool PluginEditorIsOpen(PluginHandle* h)
+   {
+      return h != nullptr && h->editorOpen.load(std::memory_order_acquire);
+   }
+
+   bool PluginSaveState(PluginHandle* h, std::string& outBase64)
+   {
+      outBase64.clear();
+      if (h == nullptr || h->unit == nil)
+         return false;
+      @autoreleasepool
+      {
+         NSDictionary* state = h->unit.fullState;
+         if (state == nil)
+            return false;
+         NSError* error = nil;
+         NSData* data = [NSKeyedArchiver archivedDataWithRootObject:state
+                                             requiringSecureCoding:NO
+                                                             error:&error];
+         if (data == nil)
+            return false;
+         NSString* encoded = [data base64EncodedStringWithOptions:0];
+         if (encoded == nil)
+            return false;
+         outBase64 = std::string([encoded UTF8String]);
+      }
+      return true;
+   }
+
+   bool PluginRestoreState(PluginHandle* h, const std::string& base64)
+   {
+      if (h == nullptr || h->unit == nil || base64.empty())
+         return false;
+      @autoreleasepool
+      {
+         NSString* encoded = [NSString stringWithUTF8String:base64.c_str()];
+         if (encoded == nil)
+            return false;
+         NSData* data = [[NSData alloc] initWithBase64EncodedString:encoded options:0];
+         if (data == nil)
+            return false;
+         NSError* error = nil;
+         NSKeyedUnarchiver* unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:data error:&error];
+         if (unarchiver == nil)
+            return false;
+         unarchiver.requiresSecureCoding = NO;
+         id state = [unarchiver decodeObjectForKey:NSKeyedArchiveRootObjectKey];
+         [unarchiver finishDecoding];
+         if (![state isKindOfClass:[NSDictionary class]])
+            return false;
+         h->unit.fullState = (NSDictionary*)state;
+      }
+      return true;
    }
 }

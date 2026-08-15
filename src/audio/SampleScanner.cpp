@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 
 #include "crude_json.h"
+#include "audio/MediaExtensions.h"
 
 namespace
 {
@@ -25,27 +26,36 @@ namespace
          return std::string();
       std::string dir = std::string(home) + "/Library/Application Support/Infinite";
       // Mirrors main.cpp's INFINITE_DRAGTEST throwaway-settings-file pattern:
-      // INFINITE_SAMPLERDRAGTEST drives real AddFolder/RemoveFolder/StartScan
-      // calls against whatever this resolves to, and without this override it
-      // was doing that against the user's actual SampleFolders.json/
-      // SampleIndex.json - wiping their real library folder on every hygiene
-      // run. Route it to a throwaway subdirectory instead.
+      // INFINITE_SAMPLERDRAGTEST/INFINITE_MEDIADRAGTEST drive real
+      // AddFolder/RemoveFolder/StartScan calls against whatever this resolves
+      // to, and without this override they were doing that against the
+      // user's actual SampleFolders.json/SampleIndex.json or
+      // MediaFolders.json/MediaIndex.json - wiping their real library
+      // folders on every hygiene run. Route each to its own throwaway
+      // subdirectory instead (kept separate so the two tests can't see each
+      // other's index).
       if (getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
          dir += "/sampler_drag_test";
+      else if (getenv("INFINITE_MEDIADRAGTEST") != nullptr)
+         dir += "/media_drag_test";
       mkdir(dir.c_str(), 0755);
       return dir;
    }
 
-   std::string FoldersPath()
+   std::string FoldersPath(SampleScanner::Kind kind)
    {
       const std::string dir = SettingsDir();
-      return dir.empty() ? std::string() : dir + "/SampleFolders.json";
+      if (dir.empty())
+         return std::string();
+      return dir + (kind == SampleScanner::Kind::Media ? "/MediaFolders.json" : "/SampleFolders.json");
    }
 
-   std::string IndexPath()
+   std::string IndexPath(SampleScanner::Kind kind)
    {
       const std::string dir = SettingsDir();
-      return dir.empty() ? std::string() : dir + "/SampleIndex.json";
+      if (dir.empty())
+         return std::string();
+      return dir + (kind == SampleScanner::Kind::Media ? "/MediaIndex.json" : "/SampleIndex.json");
    }
 
    std::string ToLower(std::string s)
@@ -68,9 +78,31 @@ namespace
             return true;
       return false;
    }
+
+   // Same "discoverable, not a decode guarantee" caveat as HasAudioExtension
+   // above - a listed file that fails to load surfaces as the node's own
+   // error (ImageSourceNode/VideoSourceNode status), it isn't excluded from
+   // the index. Lists come from MediaExtensions.h so the scanner classifies
+   // a path identically to the OS drop handler and drag-resolution logic.
+   bool HasMediaExtension(const fs::path& p)
+   {
+      const std::string ext = ToLower(p.extension().string());
+      if (ext.empty() || ext[0] != '.')
+         return false;
+      const std::string bare = ext.substr(1);
+      const auto& video = MediaExtensions::Video();
+      const auto& image = MediaExtensions::Image();
+      return std::find(video.begin(), video.end(), bare) != video.end() ||
+             std::find(image.begin(), image.end(), bare) != image.end();
+   }
+
+   bool HasExtensionForKind(SampleScanner::Kind kind, const fs::path& p)
+   {
+      return kind == SampleScanner::Kind::Media ? HasMediaExtension(p) : HasAudioExtension(p);
+   }
 }
 
-SampleScanner::SampleScanner() = default;
+SampleScanner::SampleScanner(Kind kind) : mKind(kind) {}
 
 SampleScanner::~SampleScanner()
 {
@@ -123,7 +155,7 @@ void SampleScanner::ScanThreadMain(std::vector<std::string> folders)
          std::error_code fileEc;
          if (!entry.is_regular_file(fileEc) || fileEc)
             continue;
-         if (!HasAudioExtension(entry.path()))
+         if (!HasExtensionForKind(mKind, entry.path()))
             continue;
 
          Entry e;
@@ -173,7 +205,7 @@ void SampleScanner::PollResults()
 
 void SampleScanner::LoadFromDisk()
 {
-   const std::string foldersPath = FoldersPath();
+   const std::string foldersPath = FoldersPath(mKind);
    if (!foldersPath.empty())
    {
       auto [json, ok] = crude_json::value::load(foldersPath);
@@ -185,7 +217,7 @@ void SampleScanner::LoadFromDisk()
       }
    }
 
-   const std::string indexPath = IndexPath();
+   const std::string indexPath = IndexPath(mKind);
    if (!indexPath.empty())
    {
       auto [json, ok] = crude_json::value::load(indexPath);
@@ -211,7 +243,7 @@ void SampleScanner::LoadFromDisk()
 
 void SampleScanner::SaveFoldersToDisk() const
 {
-   const std::string path = FoldersPath();
+   const std::string path = FoldersPath(mKind);
    if (path.empty())
       return;
 
@@ -223,7 +255,7 @@ void SampleScanner::SaveFoldersToDisk() const
 
 void SampleScanner::SaveIndexToDisk() const
 {
-   const std::string path = IndexPath();
+   const std::string path = IndexPath(mKind);
    if (path.empty())
       return;
 

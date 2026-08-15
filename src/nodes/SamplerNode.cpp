@@ -11,6 +11,7 @@
 #include "audio/AudioVoice.h"
 #include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
+#include "audio/SampleSlot.h"
 #include "platform/Platform.h"
 
 namespace
@@ -38,49 +39,6 @@ namespace
    {
       return powf(2.0f, ((float)(note - kFreeRunningNote) + pitchSemis) / 12.0f);
    }
-
-   // Tiny SPSC ring of raw pointers: the audio thread retires a superseded
-   // Platform::SampleBuffer* here instead of deleting it directly (deleting
-   // on the audio thread would free memory mid-callback, one of the
-   // audio-thread prohibitions). The main thread drains and deletes them.
-   // Same index discipline as MeterRing/NoteEventQueue. A full ring silently
-   // drops the retire (the buffer leaks) rather than overwriting a slot the
-   // consumer hasn't read - loads are rare enough that this never triggers
-   // in practice, and leaking one buffer beats a double free.
-   class BufferRetireRing
-   {
-   public:
-      static constexpr int kCapacity = 8;
-
-      // Audio thread only.
-      void Retire(Platform::SampleBuffer* buf)
-      {
-         const size_t tail = mTail.load(std::memory_order_relaxed);
-         const size_t head = mHead.load(std::memory_order_acquire);
-         const size_t next = (tail + 1) % kCapacity;
-         if (next == head)
-            return; // full - drop rather than overwrite an unread slot
-         mEntries[tail] = buf;
-         mTail.store(next, std::memory_order_release);
-      }
-
-      // Main thread only.
-      Platform::SampleBuffer* Drain()
-      {
-         const size_t head = mHead.load(std::memory_order_relaxed);
-         const size_t tail = mTail.load(std::memory_order_acquire);
-         if (head == tail)
-            return nullptr;
-         Platform::SampleBuffer* out = mEntries[head];
-         mHead.store((head + 1) % kCapacity, std::memory_order_release);
-         return out;
-      }
-
-   private:
-      Platform::SampleBuffer* mEntries[kCapacity] = {};
-      std::atomic<size_t> mHead { 0 };
-      std::atomic<size_t> mTail { 0 };
-   };
 }
 
 // ------------------------------------------------------------- audio thread
@@ -118,20 +76,11 @@ public:
 
    // Main thread only. Hands over ownership of a freshly decoded/recorded
    // buffer; the previously active one (if any) is retired through
-   // mRetireRing rather than freed here.
-   void PushBuffer(Platform::SampleBuffer* buf)
-   {
-      Platform::SampleBuffer* old = mPendingBuffer.exchange(buf, std::memory_order_acq_rel);
-      if (old != nullptr)
-         delete old; // never overtook by the audio thread - see DrainRetired()
-   }
+   // mSampleSlot rather than freed here.
+   void PushBuffer(Platform::SampleBuffer* buf) { mSampleSlot.Push(buf); }
 
    // Main thread only, called once per frame from CookIfNeeded.
-   void DrainRetired()
-   {
-      while (Platform::SampleBuffer* b = mRetireRing.Drain())
-         delete b;
-   }
+   void DrainRetired() { mSampleSlot.DrainRetired(); }
 
    void PushParams(float pitch, float finetune, float speed, float volume, float start, float end, bool loop,
                     bool reverse, bool pingpong)
@@ -189,13 +138,11 @@ public:
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& buffer) override
    {
       // Adopt a newly loaded buffer, if any, at the top of the block - never
-      // mid-block, so a voice already reading mActiveBuffer this callback
-      // finishes against a consistent buffer.
-      if (Platform::SampleBuffer* fresh = mPendingBuffer.exchange(nullptr, std::memory_order_acq_rel))
+      // mid-block, so a voice already reading the active buffer this
+      // callback finishes against a consistent buffer.
+      if (mSampleSlot.SwapIn())
       {
-         if (mActiveBuffer != nullptr)
-            mRetireRing.Retire(mActiveBuffer);
-         mActiveBuffer = fresh;
+         mActiveBuffer = mSampleSlot.Active();
          // A newly loaded/recorded buffer should audition on its own, the
          // way SamplerNode.h's class comment describes - without this a
          // one-shot free-running node that already finished playing would
@@ -422,8 +369,7 @@ private:
    std::atomic<bool> mIsPlaying { false };
 
    Platform::SampleBuffer* mActiveBuffer = nullptr;
-   std::atomic<Platform::SampleBuffer*> mPendingBuffer { nullptr };
-   BufferRetireRing mRetireRing;
+   SampleSlot mSampleSlot;
 
    std::atomic<float> mPitch { 0.0f };
    std::atomic<float> mFinetune { 0.0f };

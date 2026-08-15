@@ -34,12 +34,12 @@ Generic since 2026-08-13: `InputCountFor` counts audio/note pins by probing
 per-node ladder left is `DrawAudioNodeBody` (and, for `AudioEffectNode`, a
 second dispatch on `EffectDef::name` inside that same branch).
 
-## Nodes — 23 of 30-plus-8 shipped (effects list expanded past the original 30, see P3c below)
+## Nodes — 24 of 30-plus-8 shipped (effects list expanded past the original 30, see P3c below)
 
 **Shipped:** Wavetable · Gain · Audio Out · Audio In · Mixer · Splitter · MIDI Notes ·
 Envelope · Audio Filter · Dynamics · Delay · Reverb · Drive · Stereo ·
 Pitch Shifter · Chorus · Flanger · Phaser · Bitcrush · Transient Shaper ·
-Stutter · Ring Mod · Formant Filter
+Stutter · Ring Mod · Formant Filter · Wavetable Shaper · EQ
 
 ### P3a Notes — 1 of 7 (+ Envelope)
 
@@ -54,17 +54,17 @@ Stutter · Ring Mod · Formant Filter
 | Note Router | **left** — round-robin / random / probability / chain, 1→4 |
 | Note Display | **left** — piano roll / keyboard |
 
-### P3b Synths — 1 of 5
+### P3b Synths — 2 of 5
 
 | Node | State |
 |---|---|
 | Wavetable | shipped |
 | Oscillator | **left** — waveform + 2-op FM + unison/detune/glide |
-| Drum Sequencer | **left** — per-step sample/vol/decay/pitch/repeat |
+| Drum Sequencer | shipped — 8 lanes × up to 16 steps, per-lane sample/volume/pan/pitch/decay/transient/mute/solo/choke (per-step cut to per-lane, see README.md §3); free-running + note-in, transport-synced, randomise. Next obvious step (not this session): pattern banks A/B/C/D with bar-quantised chaining — see drum-sequencer-prompt.md §7. |
 | Resonator | **left** — metallic / modal / string / plate |
 | Sampler | **left** — classic/slice/repitch/granular/spectral, one session of its own |
 
-### P3c Effects — 15 of 7 (original consolidation exceeded per 2026-08-14 user request)
+### P3c Effects — 17 of 7 (original consolidation exceeded per 2026-08-14 user request)
 
 The user asked to expand past the README §3 7-effect consolidation and add 8
 more, specifying the exact list and pointing at a screenshot of the KHS Audio
@@ -89,8 +89,10 @@ All 15 are `AudioEffectNode` table entries — no new node class, per §0.4.
 | Stutter | shipped — `StutterKernel`, tempo-synced beat-repeat/glitch loop (sync/rateDiv/timeMs/chunk). No visualizer (removed 2026-08-14 per explicit request — the card is knobs + sync toggle only now). `rateDiv` is a confirmed blind spot, same category as Delay's — see `EffectDefs.cpp`'s comment |
 | Ring Mod | shipped — `RingModKernel`, multiplies by a `DspMath::PolyBlepOsc` (freq/waveform/mix, mix is now a knob alongside freq/wave rather than a separate slider) |
 | Formant Filter | shipped — `FormantFilterKernel`, three parallel bandpass resonators morphed A-E-I-O-U (vowel/Q) |
+| Wavetable Shaper | shipped — `WavetableShaperKernel` (`src/audio/dsp/`), a `Wavetable` bank frame read as a waveshaping transfer curve (table/position/drive/bias/smooth/output), in the spirit of KHS Audio's wavetable shaper module. Drive past 0dB pushes the read phase past the table's ends, where `Wavetable::Sample`'s own wrap folds it back rather than clipping — true wavefolding. `smooth` crossfades mip levels for a principled brightness/anti-alias control (one extra table read, no oversampler). Distinct from the still-unshipped Shaper *modulator* node in P3a's list below (curve editor → modulator output) — no overlap. Has the first per-effect `RunWavetableShaperFixture` DSP fixture (node/pure-function parity, a full table x position x drive x bias x smooth bounded/finite sweep, DC-blocker settling under bias, and a monotonic HF-energy check for `smooth`). `smooth` is a confirmed AUDIOPARAMSWEEPTEST blind spot at the node's spawn defaults (table 0 "Basic Shapes" position 0 is a pure sine — a single harmonic, so every mip level reads back identical) — fixed via an `EffectParamDef::prerequisites` entry that pins `position` to 0.5 while `smooth` is probed, same mechanism as Audio Filter's `gain`/Dynamics' `ratio` |
+| EQ | shipped — `EqKernel` (`src/audio/dsp/`), 5 fixed bands always present (low shelf/peak x3/high shelf by default), each independently switchable among low shelf/peak/high shelf/hp 12/lp 12 and on/off, single RBJ `DspMath::Biquad` per band in series. A deliberate second, separate node from Audio Filter (not a re-expansion of it — see Audio Filter's own row) - `docs/plans/audio/eq-node-prompt.md`. Interactive full-width response curve: drag a band's dot for freq/gain, its diamond for Q, double-click to bypass; the Tier 1 knob row follows whichever band was last touched (`selectedBand`, `uiOnly`). `EqDsp::BiquadMagnitudeDb` is a closed-form transfer-function magnitude (not a settled-sine render like `AudioFilterDsp::MagnitudeDb`) so the curve is affordable to recompute every frame of a drag at 5 bands x 160 points. `RunEqFixture` DSP fixture: closed-form vs measured magnitude per band type, rendered peak-band response, exact bypass with all bands off, series composition of two peaks. `INFINITE_EQDRAGTEST` covers the interactive curve (dot drag, diamond drag, double-click bypass, each isolated from every other param). Every band's `freq`/`q`/`on` needed an `EffectParamDef::prerequisites` entry (pinning `gain` nonzero, and `on` for freq/q) — at the spawn default (0 dB gain) a shelf/peak band is an exact identity filter, so those three are otherwise unobservable blind spots, same trap as Audio Filter's `gain` |
 
-All 15 are green under `AUDIOTEARDOWNSWEEPTEST`. `AUDIOPARAMSWEEPTEST` is
+All 17 are green under `AUDIOTEARDOWNSWEEPTEST`. `AUDIOPARAMSWEEPTEST` is
 green except the pre-existing Dynamics/Delay/Reverb blind spots, Stereo's
 `width`, and Chorus/Flanger/Phaser/Stutter's `rateDiv` above — all
 confirmed-by-hand structural, not dropped mailbox pushes (Chorus/Flanger/
@@ -98,7 +100,8 @@ Phaser's sync-to-tempo mode, added 2026-08-14, hits the exact same blind
 spot Delay/Stutter's own `rateDiv` already does, for the same reason). No
 per-node `RunXxxFixture` DSP fixture yet for Drive/Stereo/Pitch Shifter/
 Chorus/Flanger/Phaser/Bitcrush/Transient Shaper/Stutter/Ring Mod/Formant
-Filter — **left**, same as most of P3b/P3a below.
+Filter — **left**, same as most of P3b/P3a below. Wavetable Shaper and EQ
+are the two effects with one (see their rows above).
 
 `AudioEffectNode` (§0.4) is built and proven by Audio Filter's use, and now by
 Dynamics reusing the same table for a second, unrelated kernel: one
@@ -216,5 +219,83 @@ filter-as-you-type, disk-persisted index, per-location rescan, drag-to-spawn.
   — done for Audio Filter, Dynamics, Delay, Reverb (`RunAudioFilterFixture`/
   `RunDynamicsFixture`/`RunDelayFixture`/`RunReverbFixture`, `src/main.cpp`,
   run under `INFINITE_DSPTEST`); left for the rest.
-- Hardening: xrun counter in the UI, device/sample-rate change, sleep-wake
-  recovery, per-node CPU meter, `ARCHITECTURE.md` audio section — left
+- Hardening: xrun counter in the UI — **done**, this line previously claimed
+  it was missing, which was wrong: `AudioEngine::mXrunCount`
+  (`AudioEngine.h:145`, incremented in `Process()` via the
+  `kXrunGapMultiplier` wall-clock-gap heuristic, `AudioEngine.cpp:21-27,
+  172-178`) is read by `XrunCount()` (`AudioEngine.h:78`) and shown in the
+  status bar at `main.cpp:17521-17548`-ish. Also fixed alongside the audio
+  lifecycle correctness pass (2026-08-14,
+  `docs/plans/optimization/prompts/01-audio-lifecycle-correctness.md`):
+  `RebuildAudioTopology`'s `PrepareToPlay` pass, previously only reachable
+  from a cable edit/patch load, is now also run right after
+  `AudioEngine::Start()` succeeds (`main.cpp`'s `StartAudioEngine`, the one
+  choke point every `Start()` call site now goes through) - closes both "a
+  node's `ParamMailbox` never sees the device's real sample rate until the
+  next unrelated graph edit" and "stale `AudioEngine::mSampleRate` readers"
+  in one fix, since `RebuildAudioTopology` re-reads `SampleRate()` itself.
+  `AudioEngine::Stop()` now also clears `mLastCallbackMs` (the stale
+  timestamp was tripping a false xrun on the very next `Start()`, since
+  reopening a device takes far longer than one block period) and resets
+  `mXrunCount` to 0, so the counter answers "did *this run* have dropouts"
+  rather than accumulating across restarts. Covered by
+  `INFINITE_AUDIOLIFECYCLETEST` (registered in `run-infinite-hygiene`).
+  Device/sample-rate change *while nodes are already running*, and
+  sleep-wake recovery, are now also **done** (2026-08-14,
+  `docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md`):
+  the engine had **zero** notification observers of any kind before this -
+  unplugging the output device, switching the system default, or a
+  sleep/wake cycle just went silent with no recovery. `Platform::
+  AudioDeviceOpen` now installs an `AVAudioEngineConfigurationChangeNotification`
+  observer bound to that specific `AVAudioEngine` instance (removed in
+  `AudioDeviceClose` before the engine is released - `Platform.mm`'s
+  `AudioDeviceHandle::configChangeObserver`), plus a pair of process-lifetime
+  `NSWorkspace` will-sleep/did-wake observers installed once, lazily
+  (`InstallWorkspaceObserversOnce`). All three notification handlers do
+  nothing but latch an atomic flag - `Platform::AudioDeviceConfigDidChange`/
+  `AudioWillSleep`/`AudioDidWake` are the consuming accessors - since the
+  notifications can land on arbitrary threads and nothing may touch the
+  graph off the main thread. `main.cpp`'s `PollAudioRecovery`, called once a
+  frame right after `glfwPollEvents()`, is where the flags actually turn
+  into work: will-sleep stops the engine proactively; did-wake or a
+  config-change (or `AudioEngine::IsAlive()` reading dead while the engine
+  believes it should be running) restarts it through `StartAudioEngine` -
+  the same choke point Apply-audio-settings already used, so there is one
+  restart implementation, not two. Restarts are rate-limited to one attempt
+  per `kAudioRecoveryMinIntervalMs` (500ms) and capped at
+  `kAudioRecoveryMaxAttemptsPerWindow` (5) inside any
+  `kAudioRecoveryWindowMs` (10s) window; past the cap it gives up rather
+  than looping forever, stops the engine, and writes the reason into
+  `gAudioStartError` - the toolbar's "Start Audio"/"Stop Audio" toggle and
+  its hover tooltip already read that state, so there is no separate "give
+  up" UI path to keep in sync. `AudioEngine::IsAlive()` is the new liveness
+  signal this needed: the existing xrun heuristic in `Process()` compares
+  the wall-clock gap *between* two callbacks, so a truly dead engine -
+  which produces zero further callbacks - gives it nothing to compare and
+  it never fires; `IsAlive()` instead compares "now" against the last
+  callback (or `Start()`, before the first one lands) from outside the
+  render thread. The toolbar's audio readout (`main.cpp`, next to `audio
+  %.0f%%`) now also reads `IsAlive()` directly rather than a parallel
+  "recovering" flag, so it can't drift out of sync with what
+  `PollAudioRecovery` actually decided - it shows "audio lost -
+  reconnecting" for the brief window between a dead engine being detected
+  and the next recovery attempt landing.
+  Policy for a user-selected output device that vanishes: CoreAudio's
+  `AudioUnitSetProperty(kAudioOutputUnitProperty_CurrentDevice, ...)` simply
+  fails for an invalid `AudioObjectID` (documented, not checked) and the
+  output `AudioUnit` falls back to the system default - `gAudioOutputDeviceId`
+  in `main.cpp` is left untouched, so the picker still shows the user's
+  choice and the next recovery attempt tries that same device ID again
+  rather than having silently forgotten it. No dedicated "your device
+  vanished" message - see the prompt's rule 4.
+  Covered by `INFINITE_AUDIORECOVERYTEST` (registered in
+  `run-infinite-hygiene`), which drives `PollAudioRecovery` via the
+  test-only `Platform::AudioDeviceDebugSimulateConfigChange()` (sets the
+  same flag a real notification would) to prove the collapse-a-burst-into-
+  one-attempt idempotency, that a recovered restart leaves the node's
+  `ParamMailbox` re-prepared at the (re-)negotiated rate, and the
+  rate-limited give-up. What that fixture *cannot* mechanise - real
+  unplug/switch-device and real sleep/wake - was not manually verified in
+  this session (no physical device to unplug and no way to sleep this
+  machine without interrupting the session driving it); flagged rather than
+  claimed. Per-node CPU meter and `ARCHITECTURE.md`'s audio section — left

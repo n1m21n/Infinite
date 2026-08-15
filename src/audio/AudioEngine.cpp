@@ -30,6 +30,15 @@ namespace
    // is noisy (cache effects, scheduler jitter), and the HUD wants a number
    // that doesn't flicker every 10ms.
    constexpr double kLoadSmoothing = 0.2;
+
+   // How long IsAlive() will tolerate silence from a "should be running"
+   // engine before calling it dead. Must clear comfortably past any real
+   // block period (even the largest, 4096 frames @ 44.1kHz, is ~93ms) with
+   // margin for scheduler jitter and the polling interval itself (main.cpp
+   // polls once a frame, not continuously), while staying short enough that
+   // a genuinely stuck engine is caught in a fraction of a second rather
+   // than sitting silent for a while first.
+   constexpr double kDeadEngineMs = 750.0;
 }
 
 AudioEngine& AudioEngine::Instance()
@@ -45,6 +54,7 @@ bool AudioEngine::Start(std::string& outError)
                                   mRequestedDeviceId, mRequestedSampleRate, mRequestedBufferFrames))
       return false;
    mSampleRate.store(sampleRate, std::memory_order_relaxed);
+   mStartedAtMs.store(NowMs(), std::memory_order_relaxed);
    Transport::Instance().NotifyAudioEngineStarted(sampleRate);
    return true;
 }
@@ -53,6 +63,25 @@ void AudioEngine::Stop()
 {
    Platform::AudioDeviceClose();
    mSampleRate.store(0.0, std::memory_order_relaxed);
+
+   // Reset xrun-detection state here, on Stop(), not on the next Start():
+   // Platform::AudioDeviceClose() has already returned, so Process() cannot
+   // be mid-callback racing this write - "not running" starts exactly here.
+   // mLastCallbackMs back to its -1.0 "no previous callback" sentinel means
+   // the first callback after the next Start() has nothing stale to compare
+   // its gap against, so a restart can no longer trip kXrunGapMultiplier on
+   // its own (bug 3's false-positive xrun on restart). mXrunCount resets to
+   // 0 alongside it, a deliberate choice, not an oversight: the status-bar
+   // readout (main.cpp:17521-17548-ish, "xruns=N") exists to answer "did
+   // *this run* introduce dropouts", which only a per-run counter can answer
+   // - a cumulative-since-process-start count can't distinguish "this
+   // restart is clean" from "an earlier run had one and nobody's looked
+   // since". If that ever needs to become "since the app launched" instead,
+   // this reset is the one place to remove, not something to leave debatable
+   // at every call site.
+   mLastCallbackMs.store(-1.0, std::memory_order_relaxed);
+   mXrunCount.store(0, std::memory_order_relaxed);
+
    Transport::Instance().NotifyAudioEngineStopped();
 }
 
@@ -83,6 +112,19 @@ uint64_t AudioEngine::XrunCount() const
 double AudioEngine::LastBlockLoad() const
 {
    return mLastBlockLoad.load(std::memory_order_relaxed);
+}
+
+bool AudioEngine::IsAlive() const
+{
+   const double sampleRate = mSampleRate.load(std::memory_order_relaxed);
+   if (sampleRate <= 0.0)
+      return true; // not supposed to be running at all - "off", not "dead"
+
+   const double lastMs = mLastCallbackMs.load(std::memory_order_relaxed);
+   const double baselineMs = (lastMs >= 0.0) ? lastMs : mStartedAtMs.load(std::memory_order_relaxed);
+   if (baselineMs < 0.0)
+      return true; // Start() hasn't actually run yet by this reading - nothing to judge
+   return (NowMs() - baselineMs) < kDeadEngineMs;
 }
 
 void AudioEngine::PumpMainThread()

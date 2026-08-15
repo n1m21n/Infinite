@@ -3,6 +3,7 @@
 #include <cstdio>
 
 #include "dsp/AudioFilterKernel.h"
+#include "dsp/EqKernel.h"
 #include "dsp/DynamicsKernel.h"
 #include "dsp/DelayKernel.h"
 #include "dsp/ReverbKernel.h"
@@ -17,6 +18,7 @@
 #include "dsp/StutterKernel.h"
 #include "dsp/RingModKernel.h"
 #include "dsp/FormantFilterKernel.h"
+#include "dsp/WavetableShaperKernel.h"
 #include "MusicTime.h"
 
 namespace
@@ -49,6 +51,92 @@ namespace
          // auto-wah control. 0 = off, the kernel's unmodified fast path.
          def.params.push_back({ "envAmount", -1.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<AudioFilterKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ------------------------------------------------------------------- EQ
+      // Five fixed bands, always present, each individually enable-able -
+      // docs/plans/audio/eq-node-prompt.md. Deliberately its own node, not a
+      // re-expansion of Audio Filter above (which was cut down to one band on
+      // purpose - see its comment) and deliberately not table-driven per band
+      // (5 bands x 5 params, flat names, no nesting - EffectParamDef itself
+      // has no nesting concept).
+      {
+         EffectDef def;
+         def.name = "EQ";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kEqCurve;
+
+         struct BandDefault { int type; float freq; float q; };
+         static const BandDefault kBandDefaults[5] = {
+            { EqDsp::kLowShelf, 80.0f, 0.707f },
+            { EqDsp::kPeak, 250.0f, 1.0f },
+            { EqDsp::kPeak, 1000.0f, 1.0f },
+            { EqDsp::kPeak, 4000.0f, 1.0f },
+            { EqDsp::kHighShelf, 10000.0f, 0.707f },
+         };
+
+         for (int b = 0; b < 5; b++)
+         {
+            auto bandParamName = [b](const char* suffix) {
+               char buf[32];
+               snprintf(buf, sizeof(buf), "band%d%s", b + 1, suffix);
+               return std::string(buf);
+            };
+            const std::string bandType = bandParamName("Type");
+            const std::string bandFreq = bandParamName("Freq");
+            const std::string bandQ = bandParamName("Q");
+            const std::string bandGain = bandParamName("Gain");
+            const std::string bandOn = bandParamName("On");
+
+            // band5's default corner (10 kHz, high shelf) is 5+ octaves from
+            // the sweep rig's fixed 300 Hz probe tone (FillDriveTone) - a
+            // lowpass alternate there leaves 300 Hz untouched (still in the
+            // passband), so the generic candidate sequence never lands on an
+            // observable type within its try budget. An explicit hp 12
+            // candidate cuts everything below its corner, including a probe
+            // far below it, regardless of where that corner starts.
+            std::vector<float> typeCandidates;
+            if (b == 4)
+               typeCandidates = { (float)EqDsp::kHp12 };
+            def.params.push_back({ bandType, 0.0f, (float)(EqDsp::kNumBandTypes - 1),
+                                    (float)kBandDefaults[b].type, false, {}, typeCandidates });
+            // freq/q are silent no-ops at the spawn default (gain 0 dB, a
+            // peak/shelf at unity) - prereqs pin gain audible and the band on
+            // so the sweep observes them in isolation, exactly like Audio
+            // Filter's gain prereq above. An explicit 300 Hz test candidate
+            // (the probe tone's own frequency) replaces the generic sequence,
+            // which for band4 (default 4 kHz) happens to land on near-zero
+            // freq alternates that produce a near-unity filter no probe tone
+            // can distinguish from the default - see band5's type comment
+            // above for the same "candidate landed somewhere unobservable"
+            // shape of bug.
+            def.params.push_back({ bandFreq, 20.0f, 20000.0f, kBandDefaults[b].freq, false,
+                                    { { bandGain, 12.0f }, { bandOn, 1.0f } }, { 300.0f } });
+            def.params.push_back({ bandQ, 0.1f, 18.0f, kBandDefaults[b].q, false,
+                                    { { bandGain, 12.0f }, { bandOn, 1.0f } } });
+            // gain/on's own prereqs additionally pin freq near the probe tone
+            // (1000 Hz) - band5's default corner (10 kHz) is otherwise too
+            // far from the fixed 300 Hz probe for any gain/on change there to
+            // move the rendered signature at all (a high shelf leaves
+            // everything below its corner ~flat regardless of gain).
+            def.params.push_back({ bandGain, -24.0f, 24.0f, 0.0f, false,
+                                    { { bandOn, 1.0f }, { bandFreq, 1000.0f } } });
+            // On/off is itself a silent no-op at 0 dB gain (a shelf/peak at
+            // unity gain is an identity filter either way) - same trap as
+            // freq/q, so it also needs gain pinned nonzero to be observable.
+            def.params.push_back({ bandOn, 0.0f, 1.0f, 1.0f, false,
+                                    { { bandGain, 12.0f }, { bandFreq, 1000.0f } } });
+         }
+
+         def.params.push_back({ "outputGainDb", -24.0f, 12.0f, 0.0f });
+         // UI-only: which band the Tier 1 knob row currently follows. No
+         // audio-thread effect by design - the sweep reports it pass-with-a-
+         // note rather than FAIL (EffectParamDef::uiOnly's whole purpose).
+         def.params.push_back({ "selectedBand", 0.0f, 4.0f, 0.0f, true });
+
+         def.makeKernel = []() { return std::make_unique<EqKernel>(); };
          defs.push_back(std::move(def));
       }
 
@@ -456,6 +544,32 @@ namespace
          def.params.push_back({ "vowel", 0.0f, 4.0f, 0.0f });
          def.params.push_back({ "q", 2.0f, 30.0f, 10.0f });
          def.makeKernel = []() { return std::make_unique<FormantFilterKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      {
+         EffectDef def;
+         def.name = "Wavetable Shaper";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kWavetableShaperCurve;
+         def.params.push_back({ "table", 0.0f, (float)(Wavetable::NumTables() - 1), 0.0f });
+         def.params.push_back({ "position", 0.0f, 1.0f, 0.0f });
+         def.params.push_back({ "drive", 0.0f, 24.0f, 0.0f });
+         def.params.push_back({ "bias", -1.0f, 1.0f, 0.0f });
+         // At the spawn default (table 0 "Basic Shapes", position 0), frame 0
+         // is a pure sine - a single harmonic, so every mip level reads back
+         // bit-identical and `smooth` has nothing to remove. Not a dropped
+         // mailbox push (DSPTEST's RunWavetableShaperFixture confirms smooth
+         // strictly cuts HF energy once a harmonically rich frame is in
+         // play) - a gated-by-another-param blind spot, the same class as
+         // Audio Filter's gain/Dynamics' ratio above. position=0.5 lands on
+         // table 0's triangle/saw blend, which has plenty of harmonic
+         // content for smooth to act on.
+         static const std::vector<EffectParamPrereq> kSmoothPrereq = { { "position", 0.5f } };
+         def.params.push_back({ "smooth", 0.0f, 1.0f, 0.0f, false, kSmoothPrereq });
+         def.params.push_back({ "output", -24.0f, 12.0f, 0.0f });
+         def.makeKernel = []() { return std::make_unique<WavetableShaperKernel>(); };
          defs.push_back(std::move(def));
       }
 

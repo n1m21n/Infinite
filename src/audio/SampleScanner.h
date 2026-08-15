@@ -6,10 +6,11 @@
 #include <thread>
 #include <vector>
 
-// Background sample library for the Samples search panel: a list of folders
-// the user has added, a recursive scan of those folders for audio files, and
-// disk persistence so re-opening the app shows the existing index
-// immediately instead of rescanning (see docs/plans/audio/README.md P3e).
+// Background library scanner backing both the Samples and Media modes of the
+// docked node-browser panel: a list of folders the user has added, a
+// recursive scan of those folders for the kind's extensions, and disk
+// persistence so re-opening the app shows the existing index immediately
+// instead of rescanning (see docs/plans/audio/README.md P3e).
 //
 // The scan itself runs on a plain std::thread - the first of its kind in
 // this codebase, since folder scanning is unrelated main-thread/UI work, not
@@ -21,6 +22,8 @@
 class SampleScanner
 {
 public:
+   enum class Kind { Audio, Media };
+
    struct Entry
    {
       std::string path;       // full path, used to load/drag
@@ -28,7 +31,7 @@ public:
       std::string folderRoot; // which added folder this came from
    };
 
-   SampleScanner();
+   explicit SampleScanner(Kind kind = Kind::Audio);
    ~SampleScanner();
 
    // Main thread only.
@@ -63,6 +66,7 @@ public:
 private:
    void ScanThreadMain(std::vector<std::string> folders);
 
+   Kind mKind;
    std::vector<std::string> mFolders;
    std::vector<Entry> mIndex;
 

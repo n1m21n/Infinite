@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 
+constexpr int ColorRampNode::kMaxStops;
+
 namespace
 {
    const std::vector<std::string> kInterpNames = { "Linear", "Constant" };

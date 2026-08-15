@@ -42,6 +42,30 @@ namespace
       return expf(-0.5f * d * d);
    }
 
+   // J_n(x) for integer n >= 0 via its power series. libc++ (this project's
+   // standard library) does not implement std::cyl_bessel_j - the Mathematical
+   // Special Functions TS is unimplemented there - so FM Bell needs its own.
+   // The series converges factorially once m exceeds x/2, which is comfortably
+   // true for the beta <= 9 this table ever calls it with; double accumulation
+   // keeps the alternating sum from cancelling down to float noise.
+   float BesselJ(int n, float x)
+   {
+      const double halfX = (double)x * 0.5;
+      double term = 1.0;
+      for (int i = 1; i <= n; i++)
+         term *= halfX / (double)i;
+      double sum = term;
+      const double halfX2 = halfX * halfX;
+      for (int m = 1; m <= 60; m++)
+      {
+         term *= -halfX2 / ((double)m * (double)(n + m));
+         sum += term;
+         if (fabs(term) < 1e-14 * fabs(sum) + 1e-30)
+            break;
+      }
+      return (float)sum;
+   }
+
    // Returns the amplitude of harmonic `h` in `table` at morph position `t`.
    float HarmonicAmp(int table, float t, int h)
    {
@@ -146,13 +170,133 @@ namespace
             return t * 0.42f / (float)(h * h);
          }
 
-         default: // 11 Glass - only square-numbered partials, very bright
+         case 11: // Glass - only square-numbered partials, very bright
          {
             const int r = (int)(sqrtf((float)h) + 0.5f);
             if (r * r != h)
                return 0.0f;
             return powf(1.0f / (float)r, Lerp(1.8f, 0.7f, t));
          }
+
+         case 12: // FM Bell - Bessel-spectrum FM/PM, carrier:modulator = 1:7
+         {
+            constexpr int c = 1, m = 7;
+            const float beta = Lerp(0.0f, 9.0f, t); // 0 = pure sine, 9 = dense clangor
+            auto bessel = [beta](int n) -> float {
+               const int k = std::abs(n);
+               const float j = BesselJ(k, beta);
+               return (n >= 0 || (k & 1) == 0) ? j : -j; // J(-n) = (-1)^n J(n)
+            };
+            float amp = 0.0f;
+            for (int n = -10; n <= 10; n++)
+            {
+               const int pos = c + n * m;
+               if (pos == h)       amp += bessel(n);
+               else if (pos == -h) amp -= bessel(n); // negative-freq sideband folds, sign flips
+            }
+            return amp; // 0 for h not reachable as |c + n*m|, |n| <= 10
+         }
+
+         case 13: // Sync Sweep - hard-sync spectral envelope, moving sinc lobe
+         {
+            const float N = Lerp(1.0f, 16.0f, t); // sync ratio, slave:master
+            const float x = ((float)h - N) / N;
+            const float lobe = (fabsf(x) < 1e-6f) ? 1.0f : sinf((float)M_PI * x) / ((float)M_PI * x);
+            return (1.0f / (float)h) * fabsf(lobe);
+         }
+
+         case 14: // Drawbar - Hammond tonewheel harmonic set, hollow -> full registration
+         {
+            static const int   kHarm[] = { 1, 2, 3, 4, 6, 8, 10, 12, 16 };
+            static const float kLo[]   = { 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,  0.0f,  0.0f  };
+            static const float kHi[]   = { 1.0f, 0.85f, 0.7f, 0.65f, 0.55f, 0.5f, 0.4f, 0.35f, 0.3f };
+            for (int i = 0; i < 9; i++)
+               if (kHarm[i] == h)
+                  return Lerp(kLo[i], kHi[i], t);
+            return 0.0f; // every h other than the nine drawbar harmonics
+         }
+
+         case 15: // Reso Saw - CZ-style resonant sawtooth, resonance narrowing in place
+         {
+            const float width = Lerp(10.0f, 1.0f, t); // wide/soft -> narrow/piercing
+            const float peakH = 16.0f;                // fixed resonance position
+            return SawAmp(h) + 2.5f * GaussPeak(h, peakH, width);
+         }
+
+         case 16: // Marimba - struck-bar modal ratios (1, 4, 10), hard -> soft mallet
+         {
+            if (h == 1)  return 1.0f;
+            if (h == 4)  return Lerp(0.55f, 0.15f, t);
+            if (h == 10) return Lerp(0.35f, 0.05f, t);
+            return 0.0f; // every h other than 1, 4, 10
+         }
+
+         case 17: // Tine EP - fundamental + 2nd + bell-like 7th, bright -> mellow
+         {
+            if (h == 1) return 1.0f;
+            if (h == 2) return Lerp(0.5f, 0.2f, t);
+            if (h == 7) return Lerp(0.35f, 0.03f, t);
+            return 0.0f; // every h other than 1, 2, 7
+         }
+
+         case 18: // Prime Comb - prime-indexed partials, admission ceiling grows with t
+         {
+            auto isPrime = [](int n) {
+               if (n < 2) return false;
+               for (int d = 2; (long long)d * d <= n; d++)
+                  if (n % d == 0) return false;
+               return true;
+            };
+            if (h == 1) return 1.0f;
+            const float ceiling = Lerp(5.0f, 97.0f, t);
+            if ((float)h > ceiling || !isPrime(h))
+               return 0.0f;
+            return 1.0f / sqrtf((float)h);
+         }
+
+         case 19: // Walsh Square - Walsh/Hadamard square-wave pairs, more pairs admitted as t rises
+         {
+            const int m = 1 + (int)roundf(Lerp(0.0f, 7.0f, t)); // 1..8 admitted pairs
+            for (int j = 1; j <= m; j++)
+            {
+               const int center = 32 * (2 * j - 1);
+               if (h == center - 1 || h == center + 1)
+                  return 1.0f / (float)(2 * j - 1);
+            }
+            return 0.0f; // every h not adjacent to an admitted Walsh pair centre
+         }
+
+         case 20: // Static - per-frame independent noise draw, white -> pink tilt
+         {
+            const int frameIdx = (int)roundf(t * (float)(kFrames - 1));
+            Lcg g(0x8B2A7C31u + (uint32_t)frameIdx * 2246822519u + (uint32_t)h * 3266489917u);
+            const float p = Lerp(0.2f, 1.4f, t); // spectral tilt exponent
+            return g.Unit() / powf((float)h, p);
+         }
+
+         case 21: // Vowel Path - five cardinal vowels a-e-i-o-u, real formant data at a 110 Hz voice
+         {
+            struct V { float f1, f2, f3; };
+            static const V kPath[] = {
+               { 700.0f, 1220.0f, 2600.0f },  // a
+               { 500.0f, 1700.0f, 2600.0f },  // e (interpolated within the a-i formant trend)
+               { 300.0f, 2300.0f, 3000.0f },  // i
+               { 450.0f,  800.0f, 2500.0f },  // o (interpolated within the a-u formant trend)
+               { 300.0f,  600.0f, 2300.0f },  // u
+            };
+            const float f0 = 110.0f; // reference fundamental (low male voice)
+            const float seg = t * 4.0f;
+            const int i = std::min(3, (int)seg);
+            const float f = seg - (float)i;
+            const float F1 = Lerp(kPath[i].f1, kPath[i + 1].f1, f);
+            const float F2 = Lerp(kPath[i].f2, kPath[i + 1].f2, f);
+            const float F3 = Lerp(kPath[i].f3, kPath[i + 1].f3, f);
+            const float body = 1.0f / (float)h;
+            return body * (GaussPeak(h, F1 / f0, 2.0f) + 0.6f * GaussPeak(h, F2 / f0, 3.0f) +
+                           0.3f * GaussPeak(h, F3 / f0, 4.0f));
+         }
+
+         default: return 0.0f; // bad index -> silence, never a stored patch's saved table
       }
    }
 
@@ -162,15 +306,18 @@ namespace
    // non-impulsive character no amount of amplitude shaping reproduces.
    int HarmonicPhase(int table, int h)
    {
-      if (table != 9 && table != 11)
+      if (table != 9 && table != 11 && table != 20)
          return 0;
       Lcg g(0x9E3779B9u + (uint32_t)(table * 7919 + h));
       return (int)(g.Unit() * (float)kFrameSize) & (kFrameSize - 1);
    }
 
    const char* const kTableNames[kNumTables] = {
-      "Basic Shapes", "Harmonics", "Odd Only", "Formant", "Pulse",   "Vocal",
-      "Bell",         "Saturate",  "Comb",     "Drift",   "Sub",     "Glass",
+      "Basic Shapes", "Harmonics",  "Odd Only",   "Formant",     "Pulse",
+      "Vocal",        "Bell",       "Saturate",   "Comb",        "Drift",
+      "Sub",          "Glass",      "FM Bell",    "Sync Sweep",  "Drawbar",
+      "Reso Saw",     "Marimba",    "Tine EP",    "Prime Comb",  "Walsh Square",
+      "Static",       "Vowel Path",
    };
 
    // ------------------------------------------------------------- the bank

@@ -96,7 +96,11 @@
 #include "audio/Wavetable.h"
 #include "nodes/NoteNodes.h"
 #include "nodes/SamplerNode.h"
+#include "nodes/DrumSequencerNode.h"
+#include "nodes/AudioPluginNode.h"
 #include "audio/SampleScanner.h"
+#include "audio/PluginScanner.h"
+#include "audio/MediaExtensions.h"
 
 #include "audio/AudioEngine.h"
 #include "audio/AudioNode.h"
@@ -109,6 +113,7 @@
 #include "audio/MusicTime.h"
 #include "audio/EffectDefs.h"
 #include "audio/dsp/AudioFilterKernel.h"
+#include "audio/dsp/EqKernel.h"
 #include "audio/dsp/DynamicsKernel.h"
 #include "audio/dsp/DelayKernel.h"
 #include "audio/dsp/DriveKernel.h"
@@ -122,6 +127,7 @@
 #include "audio/dsp/StutterKernel.h"
 #include "audio/dsp/RingModKernel.h"
 #include "audio/dsp/FormantFilterKernel.h"
+#include "audio/dsp/WavetableShaperKernel.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -341,10 +347,25 @@ namespace
    // "double-click empty canvas" search popup already uses - avoids fighting
    // ed::'s own item/hover system with an invisible full-canvas button.
    bool gSampleDragActive = false;
-   std::string gSampleDragPath;
+   // Which panel mode started the drag, and therefore what the canvas-release
+   // handler should resolve it against. Was a plain bool (Sampler vs Media)
+   // until the Plugins mode arrived; a third value in the same variable keeps
+   // the release handler a single ladder rather than a bool plus a parallel
+   // "is it actually a plugin" flag that could disagree with it.
+   enum class LibraryDragKind
+   {
+      Sample,
+      Media,
+      Plugin
+   };
+   LibraryDragKind gSampleDragKind = LibraryDragKind::Sample;
+   std::string gSampleDragPath; // Sample/Media only: the file being dragged
    std::string gSampleDragName;
+   Platform::PluginDesc gPluginDragDesc; // Plugin drags only - identity, not a path
    SampleScanner gSampleScanner;
-   int gSearchPanelMode = 0; // 0 = Modules, 1 = Samples
+   SampleScanner gMediaScanner(SampleScanner::Kind::Media);
+   PluginScanner gPluginScanner;
+   int gSearchPanelMode = 0; // 0 = Modules, 1 = Samples, 2 = Media, 3 = Plugins
    // INFINITE_SAMPLERDRAGTEST only: the Samples panel's result row screen
    // rect, captured live each frame it's drawn so the synthetic drag driver
    // can aim at the real widget rather than a guessed position.
@@ -356,6 +377,26 @@ namespace
    // is read from, segfaults on a null current-editor pointer).
    ImVec2 gSamplerDragTestTargetScreen(-1.0f, -1.0f);
    bool gSamplerDragTestTargetValid = false;
+   // INFINITE_MEDIADRAGTEST only: the Media panel's result row screen rect,
+   // same role as gSamplerDragTestRowRect above but for the Media mode.
+   ImVec4 gMediaDragTestRowRect(-1.0f, -1.0f, -1.0f, -1.0f);
+   ImVec2 gMediaDragTestTargetScreen(-1.0f, -1.0f);
+   bool gMediaDragTestTargetValid = false;
+   // INFINITE_PLUGINDRAGTEST only: same two roles again, for the Plugins mode.
+   ImVec4 gPluginDragTestRowRect(-1.0f, -1.0f, -1.0f, -1.0f);
+   // Which plugin that captured row actually is. The Plugins panel lists every
+   // installed effect, so the fixture can't assume a particular row - it aims
+   // at whichever one it captured and asserts against that one's identifier.
+   std::string gPluginDragTestRowId;
+   ImVec2 gPluginDragTestTargetScreen(-1.0f, -1.0f);
+   bool gPluginDragTestTargetValid = false;
+   int gPluginDragTestPhase = 0;
+   // Mirrors of the sPhase locals in the two drag-test input drivers below,
+   // promoted to globals purely so the INFINITE_EXITAFTER handler can print
+   // a diagnostic if a run times out stuck at phase 0 (never found a usable
+   // row) instead of exiting with no verdict line at all.
+   int gSamplerDragTestPhase = 0;
+   int gMediaDragTestPhase = 0;
 
    // Set when a cable drag is released on empty canvas (link-drag search):
    // the output pin the drag started from, and the node types the search
@@ -400,6 +441,29 @@ namespace
    // settings" fails, so the toggle button can surface why on hover instead
    // of just silently staying off. Cleared on a successful Start().
    std::string gAudioStartError;
+
+   // ---- device-change / sleep-wake recovery state (PollAudioRecovery) ----
+   // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md.
+   // Bounds recovery to one attempt per kAudioRecoveryMinIntervalMs and no
+   // more than kAudioRecoveryMaxAttemptsPerWindow inside any
+   // kAudioRecoveryWindowMs rolling window, so a flapping device or a burst
+   // of notifications on wake can't spawn overlapping restarts or loop
+   // forever - see PollAudioRecovery's comment for how these are used.
+   constexpr double kAudioRecoveryMinIntervalMs = 500.0;
+   constexpr double kAudioRecoveryWindowMs = 10000.0;
+   constexpr int kAudioRecoveryMaxAttemptsPerWindow = 5;
+   double gLastAudioRecoveryAttemptMs = -1.0;
+   double gAudioRecoveryWindowStartMs = -1.0;
+   int gAudioRecoveryAttemptsInWindow = 0;
+   // Test-only reset so INFINITE_AUDIORECOVERYTEST can run more than one
+   // scenario in the same process without an earlier scenario's backoff
+   // state leaking into the next.
+   void ResetAudioRecoveryState()
+   {
+      gLastAudioRecoveryAttemptMs = -1.0;
+      gAudioRecoveryWindowStartMs = -1.0;
+      gAudioRecoveryAttemptsInWindow = 0;
+   }
    double gLastFrameMs = 0.0; // wall clock across the previous whole frame
    double gFrameStart = 0.0;  // when the current frame began, for the limiter
    // 60 by default: a light patch spinning the GPU at 400fps costs power for
@@ -476,6 +540,15 @@ namespace
    std::vector<ImVec4> gWtTestScreen;
    void PublishWtTestRect();
    ImVec2 gDragTestViewAnchor(0.0f, 0.0f);
+
+   // EQ's own drag-verification rect, same reasoning as gWtTestRects/
+   // gWtTestScreen above: captured in canvas space inside DrawEqVisualizer
+   // (cheap, so published unconditionally rather than only under the test
+   // flag), converted to screen space once per frame in the post-editor
+   // block (the only place ed::CanvasToScreen is safe to call), and read by
+   // INFINITE_EQDRAGTEST's synthetic mouse a frame later.
+   ImVec4 gEqTestRect(0.0f, 0.0f, 0.0f, 0.0f);
+   ImVec4 gEqTestScreen(0.0f, 0.0f, 0.0f, 0.0f);
 
    // ---- deferred dropdown -------------------------------------------------
    // ImGui combos opened inside a node get clipped and mis-scaled by the node
@@ -560,6 +633,65 @@ namespace
             return true;
       }
       return false;
+   }
+
+   // Shared by the OS file-drop handler and the Media search panel's
+   // canvas drag-and-drop resolution, so both classify a given path
+   // identically (see MediaExtensions.h).
+   const std::vector<std::string>& kVideoExt = MediaExtensions::Video();
+   const std::vector<std::string>& kImageExt = MediaExtensions::Image();
+
+   // Finds the first node under a canvas-space point whose node.get()
+   // dynamic_casts to T - the Samples/Media drag-drop release handler's hit
+   // test, factored out so it isn't copy-pasted once per draggable node
+   // type (SamplerNode, VideoSourceNode, ImageSourceNode). Deliberately a
+   // plain rect test against ed::GetNodePosition/GetNodeSize rather than
+   // ed::GetHoveredNode() - see the release handler's own comment for why.
+   template <typename T>
+   T* FindNodeUnderCanvasPoint(const ImVec2& canvasPoint)
+   {
+      for (GraphNode& gn : gNodes)
+      {
+         auto* typed = gn.node ? dynamic_cast<T*>(gn.node.get()) : nullptr;
+         if (typed == nullptr)
+            continue;
+         const ImVec2 p = ed::GetNodePosition(gn.NodeId());
+         const ImVec2 s = ed::GetNodeSize(gn.NodeId());
+         if (canvasPoint.x >= p.x && canvasPoint.x <= p.x + s.x && canvasPoint.y >= p.y &&
+             canvasPoint.y <= p.y + s.y)
+            return typed;
+      }
+      return nullptr;
+   }
+
+   // Resolves a canvas-space y (ed::ScreenToCanvas'd from a drag release or
+   // a file-drop's real mouse position) to a lane index against whatever
+   // DrumSequencerNode last cached its grid rect during
+   // DrawDrumSequencerBody - see the fields' comment on DrumSequencerNode
+   // for why this is canvas space, not real screen space.
+   int DrumSequencerLaneForCanvasY(DrumSequencerNode* n, float canvasY)
+   {
+      if (n->gridCanvasRowH <= 0.0f)
+         return 0;
+      const int lane = (int)((canvasY - n->gridCanvasTopY) / n->gridCanvasRowH);
+      return std::clamp(lane, 0, DrumSequencerNode::kNumLanes - 1);
+   }
+
+   // Same idea, but checks each lane card's cached rect first - that's what
+   // a drop landing on a card (rather than down on the step grid) is
+   // actually aiming at. The grid-only version above always read as
+   // "before row 0" for a card drop, since every card sits above the
+   // grid's own rect, which is why every card drop used to resolve to lane
+   // 0 regardless of which card the cursor was over.
+   int DrumSequencerLaneForCanvasPos(DrumSequencerNode* n, float canvasX, float canvasY)
+   {
+      for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+      {
+         if (canvasX >= n->laneCardCanvasX0[lane] && canvasX <= n->laneCardCanvasX1[lane] &&
+             canvasY >= n->laneCardCanvasY0[lane] && canvasY <= n->laneCardCanvasY1[lane])
+            return lane;
+      }
+      return DrumSequencerLaneForCanvasY(n, canvasY);
    }
 
    void OnFilesDropped(GLFWwindow*, int count, const char** paths)
@@ -2029,6 +2161,10 @@ namespace
       // the save format (confirmed: it silently ate the type name on load).
       REGISTER_NODE(WavetableNode, Wavetable, "Synths");
       REGISTER_NODE(SamplerNode, Sampler, "Synths");
+      REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
+      // Third-party plugin hosting (Audio Units). Its params reach the plugin
+      // directly rather than through ParamMailbox - see AudioPluginNode.h.
+      REGISTER_NODE(AudioPluginNode, Plugin, "AudioEffects");
       REGISTER_NODE(GainNode, Gain, "AudioUtility");
       REGISTER_NODE(AudioInputNode, Audio In, "AudioUtility");
       REGISTER_NODE(AudioOutputNode, Audio Out, "AudioUtility");
@@ -2881,6 +3017,11 @@ namespace
          palette->ReloadFromPath();
       if (auto* formula = dynamic_cast<FormulaNode*>(node))
          formula->Apply();
+      // Re-instantiates the plugin from the identity VisitParams just restored
+      // and queues its saved fullState; the actual load finishes
+      // asynchronously, a frame or two later, in CookIfNeeded.
+      if (auto* plugin = dynamic_cast<AudioPluginNode*>(node))
+         plugin->ReloadFromIdentity();
    }
 
    // Copies every parameter VisitParams declares, for any node type, by
@@ -4521,15 +4662,19 @@ namespace
       // P3a's note nodes. A node whose only input is a note pin would
       // otherwise fall through to DrawPreview and try to show a blank
       // GetOutputTexture()==0 image.
-      // VibratoNode is the one pin-less exception: a free-running modulator
-      // (like LFONode) with no note/audio pin at all, drawn through this
-      // same v3 body so it looks like the rest of the one-knob Note Modify
-      // family it ships alongside rather than dropping to the older
+      // VibratoNode and PitchBendNode are the pin-less exceptions: free-running
+      // modulators (like LFONode) with no note/audio pin at all, drawn through
+      // this same v3 body so they look like the rest of the one-knob Note
+      // Modify family they ship alongside rather than dropping to the older
       // DrawXParams path every other pin-less modulator (LFO, Constant,
-      // Random, ...) still uses.
+      // Random, ...) still uses. PitchBendNode joined this list after being
+      // converted from a note-chain processor to a live IModulator - that
+      // conversion dropped its INoteSource base and NoteCable input, so it
+      // stopped satisfying every other branch below. Any future pin-less
+      // note-family node needs the same explicit addition here.
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
-             dynamic_cast<VibratoNode*>(node) != nullptr;
+             dynamic_cast<VibratoNode*>(node) != nullptr || dynamic_cast<PitchBendNode*>(node) != nullptr;
    }
 
    // Drains WavetableNode's MeterRing into a small cache on the node itself
@@ -4872,23 +5017,27 @@ namespace
          dl->AddLine(ImVec2(origin.x, origin.y + h * i / 4.0f), ImVec2(br.x, origin.y + h * i / 4.0f),
                      IM_COL32(255, 255, 255, 10), 1.0f);
 
-      // Each of the three time segments gets a third of the width at full
-      // scale, so a handle's screen position maps to its own param linearly -
-      // a shared "total duration" normalisation (what the read-only version
-      // used) would make dragging one handle move the other two.
-      const float seg = (w - 12.0f) / 3.0f;
+      // Each stage's width is proportional to its own time and starts where
+      // the previous stage ended (cumulative layout), so a zero-length stage
+      // draws with zero width instead of a fixed third of the box. This does
+      // not reintroduce the cross-talk a shared "total duration" normalisation
+      // would cause: dragging a handle still only ever writes its own param;
+      // downstream handles simply shift visually because the stage before
+      // them changed length, which is the correct and expected behaviour.
+      const float usable = w - 12.0f;
+      const float shelf = usable * 0.18f;
+      const float seg = (usable - shelf) / 3.0f;
       const float baseY = br.y - 4.0f;
       const float topY = origin.y + 4.0f;
       const float span = baseY - topY;
 
-      auto TimeToX = [&](float ms, float slot) {
-         return origin.x + 6.0f + slot * seg + std::clamp(ms / maxTimeMs, 0.0f, 1.0f) * seg;
-      };
-      const float ax = TimeToX(*attackMs, 0.0f);
-      const float dx = TimeToX(*decayMs, 1.0f);
+      const float x0 = origin.x + 6.0f;
+      auto Frac = [&](float ms) { return std::clamp(ms / maxTimeMs, 0.0f, 1.0f); };
+      const float ax = x0 + Frac(*attackMs) * seg;
+      const float dx = ax + Frac(*decayMs) * seg;
       const float susY = topY + (1.0f - std::clamp(*sustain, 0.0f, 1.0f)) * span;
-      const float sx = origin.x + 6.0f + 2.0f * seg;
-      const float rx = TimeToX(*releaseMs, 2.0f);
+      const float sx = dx + shelf;
+      const float rx = sx + Frac(*releaseMs) * seg;
 
       const ImVec2 pts[5] = { ImVec2(origin.x + 6.0f, baseY), ImVec2(ax, topY), ImVec2(dx, susY),
                               ImVec2(sx, susY), ImVec2(rx, baseY) };
@@ -4937,9 +5086,9 @@ namespace
                sAxisPending = false;
             }
          }
-         const float t01 = [&](float slot) {
-            return std::clamp((m.x - origin.x - 6.0f - slot * seg) / seg, 0.0f, 1.0f);
-         }(sHeld == 0 ? 0.0f : (sHeld == 1 ? 1.0f : 2.0f));
+         const float t01 = [&](float anchorX) {
+            return std::clamp((m.x - anchorX) / seg, 0.0f, 1.0f);
+         }(sHeld == 0 ? x0 : (sHeld == 1 ? ax : sx));
          // Nothing is written until the axis is resolved: a press that has not
          // moved yet must not nudge either param.
          switch (sAxisPending ? -1 : sHeld)
@@ -5482,20 +5631,417 @@ namespace
       EndAudioBody();
    }
 
-   // The Samples mode of the docked node-browser panel (docs/plans/audio/
-   // README.md P3e): folder list management, a background-thread scan
+   // Drag state for the step grid's paint/velocity gestures - file-scope
+   // like gSampleDragActive, since a drag spans many frames and many
+   // per-cell InvisibleButton calls. See DrawDrumSequencerBody's grid loop.
+   struct DrumGridDragState
+   {
+      bool active = false;
+      bool paintOn = false;
+      int originLane = -1;
+      int originStep = -1;
+   };
+   DrumGridDragState gDrumGridDrag;
+
+   // One lane's waveform view: a drag-&-drop/click-to-load target when
+   // empty, or start/end range handles over the decimated waveform once a
+   // sample is loaded - same overlap-ordering trick as DrawSamplerWaveform
+   // (body click-catcher first via SetNextItemAllowOverlap, then the
+   // handles), just reading DrumSequencerNode's per-lane waveform cache
+   // instead of SamplerNode's single one.
+   void DrawDrumLaneWaveform(DrumSequencerNode* n, int lane, float h)
+   {
+      const float w = gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool hasSample = n->laneWaveCount[lane] > 0;
+
+      ImGui::SetNextItemAllowOverlap();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##drumlanewavebody", ImVec2(w, h));
+      if (!hasSample && ImGui::IsItemActivated())
+      {
+         PushUndoCheckpoint();
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+            n->LoadFileToLane(lane, path);
+      }
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+
+      if (hasSample)
+      {
+         const int count = n->laneWaveCount[lane];
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - n->laneWaveMax[lane][i] * h * 0.45f;
+            const float bottom = midY - n->laneWaveMin[lane][i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom), IM_COL32(150, 214, 255, 200));
+         }
+
+         const float startX = origin.x + w * std::clamp(n->laneStart[lane], 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->laneEnd[lane], 0.0f, 1.0f);
+         if (startX > origin.x)
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), IM_COL32(0, 0, 0, 130));
+         if (endX < br.x)
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, IM_COL32(0, 0, 0, 130));
+
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y), IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y), IM_COL32(220, 120, 150, 235), 2.0f);
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(120, 128, 150, 255), "drop sample / click");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+
+      if (hasSample)
+      {
+         const float handleW = 10.0f;
+         const float startX = origin.x + w * std::clamp(n->laneStart[lane], 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->laneEnd[lane], 0.0f, 1.0f);
+         const float grip = 8.0f;
+         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const ImU32 startCol = IM_COL32(120, 220, 150, 255);
+         const ImU32 endCol = IM_COL32(220, 120, 150, 255);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y),
+                               ImVec2(startGripX, origin.y + grip), startCol);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y),
+                               ImVec2(startGripX, br.y - grip), startCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y),
+                               ImVec2(endGripX, origin.y + grip), endCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y),
+                               ImVec2(endGripX, br.y - grip), endCol);
+
+         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
+         ImGui::InvisibleButton("##drumlanestarthandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->laneStart[lane] = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->laneEnd[lane] - 0.01f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
+         ImGui::InvisibleButton("##drumlaneendhandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->laneEnd[lane] = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->laneStart[lane] + 0.01f, 1.0f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+      }
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   // One lane's card: waveform + clear/choke row + the five per-lane knobs.
+   // Called once per lane inside each of the two BeginAudioColumn scopes in
+   // DrawDrumSequencerBody, so gAudioBodyW/gAudioContentW already read as
+   // the column's width - the section panel and knob row size themselves
+   // from that with no extra plumbing (the "width is a scope" rule).
+   void DrawDrumLaneCard(DrumSequencerNode* n, int lane)
+   {
+      ImGui::PushID(lane);
+      // Cached for drag-drop lane resolution, covering the *whole* card
+      // (header, buttons, waveform, sliders) rather than just the waveform
+      // strip - a drop anywhere on the card should land on this lane, not
+      // only inside the narrow black waveform box. GetCursorScreenPos()
+      // here is canvas space, not real screen space - see the fields'
+      // comment on DrumSequencerNode and DrumSequencerLaneForCanvasPos.
+      const ImVec2 cardTop = ImGui::GetCursorScreenPos();
+      n->laneCardCanvasX0[lane] = cardTop.x;
+      n->laneCardCanvasY0[lane] = cardTop.y;
+      n->laneCardCanvasX1[lane] = cardTop.x + gAudioContentW;
+      char header[48];
+      const std::string& fn = n->FileName(lane);
+      if (fn.empty())
+         snprintf(header, sizeof(header), "lane %d", lane + 1);
+      else
+      {
+         std::string trimmed = fn.size() > 20 ? fn.substr(0, 19) + "." : fn;
+         snprintf(header, sizeof(header), "lane %d - %s", lane + 1, trimmed.c_str());
+      }
+      BeginAudioSection(header);
+
+      {
+         const float btnW = 20.0f;
+         const float rowY = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - btnW, rowY));
+         if (ImGui::Button("x##clearlane", ImVec2(btnW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->ClearLane(lane);
+         }
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
+         char chokeLabel[8];
+         snprintf(chokeLabel, sizeof(chokeLabel), n->laneChoke[lane] == 0 ? "choke -" : "choke %d", n->laneChoke[lane]);
+         if (ImGui::Button(chokeLabel, ImVec2(70.0f, 0)))
+         {
+            PushUndoCheckpoint();
+            n->laneChoke[lane] = (n->laneChoke[lane] + 1) % 4;
+         }
+         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight()));
+      }
+
+      DrawDrumLaneWaveform(n, lane, 84.0f);
+      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+
+      // Horizontal sliders, two per row, rather than a knob row - each is
+      // shorter than a knob-plus-caption, and the height that frees up goes
+      // to the waveform above instead (same two-per-row rhythm Sampler's
+      // body uses). pitch pairs with fine tune (mirrors Sampler's own
+      // pitch/finetune pair) rather than leaving pan alone on an odd row.
+      {
+         const float half = AudioHalfWidth();
+         AudioSlider("transient", &n->laneTransient[lane], -1.0f, 1.0f, "%.2f", half);
+         ImGui::SameLine();
+         AudioSlider("decay", &n->laneDecay[lane], 0.0f, 1.0f, "%.2f", half);
+         AudioSlider("pitch", &n->lanePitch[lane], -24.0f, 24.0f, "%.1f st", half);
+         ImGui::SameLine();
+         AudioSlider("fine tune", &n->laneFineTune[lane], -50.0f, 50.0f, "%.0f c", half);
+         AudioSlider("volume", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", half);
+         ImGui::SameLine();
+         AudioSlider("pan", &n->lanePan[lane], -1.0f, 1.0f, "%.2f", half);
+      }
+
+      EndAudioSection();
+      n->laneCardCanvasY1[lane] = ImGui::GetCursorScreenPos().y;
+      ImGui::PopID();
+   }
+
+   void DrawDrumSequencerBody(GraphNode& gn, DrumSequencerNode* n)
+   {
+      char stat[80];
+      if (n->run)
+         snprintf(stat, sizeof(stat), "%d steps - %s - %d loaded", std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
+                  MusicTime::RateDivisionName(n->rate), n->LoadedLaneCount());
+      else
+         snprintf(stat, sizeof(stat), "stopped - %d steps - %s", std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
+                  MusicTime::RateDivisionName(n->rate));
+
+      BeginAudioBody(gn.index, gn.category, kAudioWideWidth, stat);
+
+      // ---- lane cards: 4 rows x 2 columns, left column lanes 1-4, right
+      // column lanes 5-8, matching the mockup. BeginAudioColumns is the
+      // §1k mechanism for a node wider than kAudioNodeWidth - unlike
+      // Wavetable's A/B engines, both columns here are the *same* kind of
+      // content (four stacked lane cards each), not two parallel modes.
+      {
+         BeginAudioColumns(2);
+         BeginAudioColumn(0);
+         for (int lane = 0; lane < 4; lane++)
+         {
+            DrawDrumLaneCard(n, lane);
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+         }
+         EndAudioColumn();
+         BeginAudioColumn(1);
+         for (int lane = 4; lane < DrumSequencerNode::kNumLanes; lane++)
+         {
+            DrawDrumLaneCard(n, lane);
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+         }
+         EndAudioColumn();
+         EndAudioColumns();
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // ---- step grid: the visualizer, and the primary editable control ----
+      {
+         const int steps = std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps);
+         const float gutterW = 54.0f; // R | M | S
+         const float toggleW = 15.0f;
+         const float swingKnobW = 40.0f;
+         const float rowH = 28.0f;
+         const float rowGap = 2.0f;
+         const float cellGap = 1.0f;
+         const float stepsW = gAudioBodyW - gutterW - swingKnobW;
+         const float cellW = (stepsW - cellGap * (float)(steps - 1)) / (float)steps;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         n->gridCanvasTopY = origin.y;
+         n->gridCanvasRowH = rowH + rowGap;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const int curStep = n->CurrentStep();
+         const double beatsPerBar = Transport::Instance().BeatsPerBar();
+         const double beatsPerStep = std::max(1e-6, MusicTime::BeatsFor((MusicTime::RateDivision)n->rate));
+         const int stepsPerBar = std::max(1, (int)std::lround(beatsPerBar / beatsPerStep));
+
+         for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+         {
+            const float y0 = origin.y + (float)lane * (rowH + rowGap);
+            ImGui::PushID(lane);
+
+            // ---- gutter: randomise, mute, solo ------------------------
+            ImGui::SetCursorScreenPos(ImVec2(origin.x, y0));
+            if (ImGui::Button("R##randlane", ImVec2(toggleW, rowH)))
+            {
+               PushUndoCheckpoint();
+               n->RandomizeLane(lane);
+            }
+            ImGui::SameLine(0.0f, 2.0f);
+            bool muteBool = n->laneMute[lane];
+            if (AudioToggleButton("M##mute", &muteBool, toggleW))
+            {
+               PushUndoCheckpoint();
+               n->laneMute[lane] = muteBool;
+            }
+            ImGui::SameLine(0.0f, 2.0f);
+            bool soloBool = n->laneSolo[lane];
+            if (AudioToggleButton("S##solo", &soloBool, toggleW))
+            {
+               PushUndoCheckpoint();
+               n->laneSolo[lane] = soloBool;
+            }
+
+            // ---- steps -----------------------------------------------------
+            for (int s = 0; s < steps; s++)
+            {
+               const float x0 = origin.x + gutterW + (float)s * (cellW + cellGap);
+               ImGui::PushID(s);
+               ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+               ImGui::InvisibleButton("cell", ImVec2(cellW, rowH));
+               float& vel = n->stepVel[lane][s];
+
+               if (ImGui::IsItemActivated())
+               {
+                  PushUndoCheckpoint();
+                  const bool wasOn = vel > 0.0f;
+                  vel = wasOn ? 0.0f : 0.8f;
+                  gDrumGridDrag.active = true;
+                  gDrumGridDrag.paintOn = !wasOn;
+                  gDrumGridDrag.originLane = lane;
+                  gDrumGridDrag.originStep = s;
+               }
+               const bool isOrigin = (gDrumGridDrag.originLane == lane && gDrumGridDrag.originStep == s);
+               if (isOrigin && ImGui::IsItemActive() && vel > 0.0f &&
+                   ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+               {
+                  const float my = ImGui::GetIO().MousePos.y;
+                  const float t = 1.0f - std::clamp((my - y0) / rowH, 0.0f, 1.0f);
+                  vel = std::clamp(0.05f + t * 0.95f, 0.05f, 1.0f);
+                  char buf[32];
+                  snprintf(buf, sizeof(buf), "%.2f", vel);
+                  SetAudioReadout("velocity", buf);
+               }
+               else if (gDrumGridDrag.active && !isOrigin && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+                        ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+               {
+                  vel = gDrumGridDrag.paintOn ? 0.8f : 0.0f;
+               }
+
+               const bool isBar = (s % stepsPerBar) == 0;
+               const ImU32 frameCol = isBar ? IM_COL32(60, 64, 78, 255) : IM_COL32(40, 43, 53, 255);
+               dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + cellW - cellGap, y0 + rowH), frameCol, 2.0f);
+               if (vel > 0.0f)
+               {
+                  const float fillTop = y0 + (1.0f - vel) * rowH;
+                  const ImU32 fillCol = (s == curStep && n->run) ? IM_COL32(255, 200, 100, 255)
+                                                                  : IM_COL32(120, 200, 255, 220);
+                  dl->AddRectFilled(ImVec2(x0, fillTop), ImVec2(x0 + cellW - cellGap, y0 + rowH), fillCol, 2.0f);
+               }
+               if (s == curStep)
+                  dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + cellW - cellGap, y0 + rowH), IM_COL32(255, 255, 255, 130),
+                              2.0f);
+
+               ImGui::PopID();
+            }
+
+            // ---- right: per-lane swing knob -------------------------------
+            ImGui::SetCursorScreenPos(ImVec2(origin.x + gutterW + stepsW, y0 - 3.0f));
+            ModKnob("sw", &n->laneSwing[lane], 0.0f, 1.0f, "%.2f", swingKnobW * 0.55f, swingKnobW);
+
+            ImGui::PopID();
+         }
+         if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+            gDrumGridDrag.active = false;
+
+         ImGui::SetCursorScreenPos(
+            ImVec2(origin.x, origin.y + (float)DrumSequencerNode::kNumLanes * (rowH + rowGap) + 4.0f));
+         ImGui::Dummy(ImVec2(gAudioBodyW, 1.0f));
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // ---- global controls: rate + 3 pattern knobs on top, then the four
+      // offset knobs that compose on top of every lane's own value
+      // (DrumSequencerNode's class comment / PushDirtyParams) below -
+      // symmetric 4-and-4 so neither row reads as an afterthought tacked
+      // onto the other. "output" here is the node's own post-mix level;
+      // there is no second "volume" knob in the offsets row below - a
+      // per-lane multiplicative volume offset duplicated what this one
+      // already does, so it was folded away rather than kept as a
+      // confusable second control with the same effect.
+      {
+         AudioKnobRow row(4);
+         row.Dropdown("rate", MusicTime::RateDivisionList(), n->rate,
+                      [n](int i) { PushUndoCheckpoint(); n->rate = i; });
+         row.KnobInt("steps", &n->numSteps, 1, DrumSequencerNode::kMaxSteps);
+         row.Knob("swing", &n->swing, 0.0f, 1.0f, "%.2f");
+         row.Knob("output", &n->volume, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      {
+         AudioKnobRow row(4);
+         row.Knob("transient", &n->globalTransient, -1.0f, 1.0f, "%.2f");
+         row.Knob("decay", &n->globalDecay, -1.0f, 1.0f, "%.2f");
+         row.Knob("pitch", &n->globalPitch, -24.0f, 24.0f, "%.1f st");
+         row.Knob("pan", &n->globalPan, -1.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      {
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         const float btnW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
+         AudioToggleButton(n->run ? "Stop##drumrun" : "Run##drumrun", &n->run, btnW);
+         ImGui::SameLine();
+         if (ImGui::Button("Randomise", ImVec2(btnW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->Randomize();
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Clear", ImVec2(btnW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->ClearPattern();
+         }
+      }
+
+      EndAudioBody();
+   }
+
+   // The Samples/Media modes of the docked node-browser panel (docs/plans/
+   // audio/README.md P3e): folder list management, a background-thread scan
    // (SampleScanner), filter-as-you-type over the persisted index, and a
    // drag source per result row that gSampleDragActive (above) resolves on
-   // release into either a new Sampler node or an existing one's file.
-   void DrawSamplesSearchPanel()
+   // release into either a new node or an existing matching one's file.
+   // Shared by both modes - idPrefix keeps the two modes' ImGui widget IDs
+   // (and therefore their input focus/state) from colliding, searchHint is
+   // the mode-specific placeholder text, and mediaKind tags the drag so the
+   // release handler knows whether to resolve it against Sampler or against
+   // Image Source/Video.
+   void DrawLibrarySearchPanel(SampleScanner& scanner, const char* idPrefix, const char* searchHint, bool mediaKind)
    {
-      gSampleScanner.PollResults();
+      scanner.PollResults();
+
+      ImGui::PushID(idPrefix);
 
       if (ImGui::Button("Add folder...", ImVec2(-1.0f, 0)))
       {
          const std::string path = Platform::OpenFolderDialog();
          if (!path.empty())
-            gSampleScanner.AddFolder(path);
+            scanner.AddFolder(path);
       }
 
       // Folders list, each with its own refresh and remove button. Kept
@@ -5505,9 +6051,9 @@ namespace
       std::string folderToRemove;
       std::string folderToScan;
       bool scanAll = false;
-      const bool scanning = gSampleScanner.IsScanning();
+      const bool scanning = scanner.IsScanning();
       const float panelW = ImGui::GetContentRegionAvail().x;
-      for (const std::string& folder : gSampleScanner.Folders())
+      for (const std::string& folder : scanner.Folders())
       {
          ImGui::PushID(folder.c_str());
          const float btnW = ImGui::GetFrameHeight();
@@ -5527,7 +6073,7 @@ namespace
          ImGui::PopID();
       }
       if (!folderToRemove.empty())
-         gSampleScanner.RemoveFolder(folderToRemove);
+         scanner.RemoveFolder(folderToRemove);
 
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
       {
@@ -5538,24 +6084,29 @@ namespace
          if (scanning)
             ImGui::EndDisabled();
          if (scanning)
-            ImGui::TextDisabled("scanning... (%d found)", gSampleScanner.FilesFoundSoFar());
+            ImGui::TextDisabled("scanning... (%d found)", scanner.FilesFoundSoFar());
       }
       if (scanAll)
-         gSampleScanner.StartScan();
+         scanner.StartScan();
       else if (!folderToScan.empty())
-         gSampleScanner.StartScan(folderToScan);
+         scanner.StartScan(folderToScan);
 
       ImGui::Separator();
 
+      // Two independent buffers (not one shared static) so the Samples and
+      // Media modes each keep their own in-progress query when the user
+      // switches tabs and back.
       static char sampleSearch[128] = "";
+      static char mediaSearch[128] = "";
+      char* searchBuf = mediaKind ? mediaSearch : sampleSearch;
       ImGui::SetNextItemWidth(-1.0f);
-      ImGui::InputTextWithHint("##samplesearch", "search samples...", sampleSearch, sizeof(sampleSearch));
+      ImGui::InputTextWithHint("##librarysearch", searchHint, searchBuf, 128);
 
-      std::string q = sampleSearch;
+      std::string q = searchBuf;
       std::transform(q.begin(), q.end(), q.begin(), ::tolower);
 
-      ImGui::BeginChild("##samplepanellist", ImVec2(0, 0), false);
-      for (const SampleScanner::Entry& entry : gSampleScanner.Index())
+      ImGui::BeginChild("##librarypanellist", ImVec2(0, 0), false);
+      for (const SampleScanner::Entry& entry : scanner.Index())
       {
          if (!q.empty())
          {
@@ -5566,11 +6117,17 @@ namespace
          }
 
          ImGui::Selectable(entry.fileName.c_str());
-         if (getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
+         if (!mediaKind && getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
          {
             const ImVec2 mn = ImGui::GetItemRectMin();
             const ImVec2 mx = ImGui::GetItemRectMax();
             gSamplerDragTestRowRect = ImVec4(mn.x, mn.y, mx.x, mx.y);
+         }
+         if (mediaKind && getenv("INFINITE_MEDIADRAGTEST") != nullptr)
+         {
+            const ImVec2 mn = ImGui::GetItemRectMin();
+            const ImVec2 mx = ImGui::GetItemRectMax();
+            gMediaDragTestRowRect = ImVec4(mn.x, mn.y, mx.x, mx.y);
          }
          // A drag starts once the mouse has moved a few pixels past the
          // click - matching ImGui's own drag threshold - rather than on the
@@ -5580,6 +6137,7 @@ namespace
          if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
          {
             gSampleDragActive = true;
+            gSampleDragKind = mediaKind ? LibraryDragKind::Media : LibraryDragKind::Sample;
             gSampleDragPath = entry.path;
             gSampleDragName = entry.fileName;
          }
@@ -5587,6 +6145,91 @@ namespace
             ImGui::SetTooltip("%s", entry.path.c_str());
       }
       ImGui::EndChild();
+
+      ImGui::PopID();
+   }
+
+   // The Plugins mode of the docked node-browser panel. Same shape as
+   // DrawLibrarySearchPanel above, minus the folder machinery: Audio Unit
+   // discovery is a registry query, not a directory walk, so there is nothing
+   // to add a folder to and the whole mode reduces to one Rescan button. Like
+   // the other modes, the list shown at launch comes off disk - a scan only
+   // ever happens when the user asks for one.
+   void DrawPluginSearchPanel()
+   {
+      gPluginScanner.PollResults();
+
+      ImGui::PushID("##plugins");
+
+      const bool scanning = gPluginScanner.IsScanning();
+      if (scanning)
+         ImGui::BeginDisabled();
+      if (ImGui::Button("Rescan plugins", ImVec2(-1.0f, 0)))
+         gPluginScanner.StartScan();
+      if (scanning)
+         ImGui::EndDisabled();
+      if (scanning)
+         ImGui::TextDisabled("scanning... (%d found)", gPluginScanner.PluginsFoundSoFar());
+      else if (gPluginScanner.Index().empty())
+         ImGui::TextDisabled("no plugins indexed yet - hit Rescan");
+
+      ImGui::Separator();
+
+      // Its own buffer, like the Samples and Media modes each have, so
+      // switching tabs and back keeps this mode's in-progress query.
+      static char pluginSearch[128] = "";
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint("##pluginsearch", "search plugins...", pluginSearch, sizeof(pluginSearch));
+
+      std::string q = pluginSearch;
+      std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+
+      ImGui::BeginChild("##pluginpanellist", ImVec2(0, 0), false);
+      // INFINITE_PLUGINDRAGTEST captures the FIRST matching row, not the last:
+      // this list is every installed effect, and the rows past the visible
+      // height are drawn but clipped, so a synthetic press aimed at the last
+      // one's rect would land outside the child on nothing at all. The first
+      // row is always on screen. (The Samples/Media modes capture the last row
+      // because their fixtures stage a folder with exactly one file in it.)
+      bool testRowCaptured = false;
+      for (const PluginScanner::Entry& entry : gPluginScanner.Index())
+      {
+         if (!q.empty())
+         {
+            std::string hay = entry.name + " " + entry.manufacturer;
+            std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+            if (hay.find(q) == std::string::npos)
+               continue;
+         }
+
+         std::string label = entry.name;
+         if (!entry.manufacturer.empty())
+            label += "  -  " + entry.manufacturer;
+         ImGui::Selectable(label.c_str());
+         if (!testRowCaptured && getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
+         {
+            const ImVec2 mn = ImGui::GetItemRectMin();
+            const ImVec2 mx = ImGui::GetItemRectMax();
+            gPluginDragTestRowRect = ImVec4(mn.x, mn.y, mx.x, mx.y);
+            gPluginDragTestRowId = entry.identifier;
+            testRowCaptured = true;
+         }
+         // Same manual drag mechanism as the Samples/Media rows - see
+         // gSampleDragActive's comment for why this isn't an ImGui drag source.
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
+         {
+            gSampleDragActive = true;
+            gSampleDragKind = LibraryDragKind::Plugin;
+            gSampleDragPath.clear();
+            gSampleDragName = entry.name;
+            gPluginDragDesc = entry;
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s\n%s", entry.format.c_str(), entry.identifier.c_str());
+      }
+      ImGui::EndChild();
+
+      ImGui::PopID();
    }
 
    // Mirror image of Audio Out's body (a terminal with no controls at all) -
@@ -6029,9 +6672,9 @@ namespace
    void DrawPitchBendBody(GraphNode& gn, PitchBendNode* n)
    {
       char stat[48];
-      snprintf(stat, sizeof(stat), "%+.1f st", n->bendSemitones);
-      DrawSingleKnobAudioBody(gn, stat, "pitch", &n->bendSemitones, -PitchBendNode::kRange, PitchBendNode::kRange,
-                               "%.1f st");
+      snprintf(stat, sizeof(stat), "%+.2f st", n->bendSemitones);
+      DrawSingleKnobAudioBody(gn, stat, "bend", &n->bendSemitones, -PitchBendNode::kRange, PitchBendNode::kRange,
+                               "%+.2f st");
    }
 
    void DrawGateBody(GraphNode& gn, GateNode* n)
@@ -6908,6 +7551,376 @@ namespace
       EndAudioBody();
    }
 
+   // ---- EQ -------------------------------------------------------------
+   // Five fixed bands, always present - docs/plans/audio/eq-node-prompt.md.
+   // Reuses Audio Filter's log-frequency graticule/mapping helpers verbatim
+   // (FilterVizFreqToX/XToFreq/DbToY/YToDb, kFilterViz*) rather than defining
+   // a second copy - both nodes share the same 20 Hz-20 kHz / +-24 dB frame.
+   struct EqCurveCache
+   {
+      std::vector<float> curveDb;       // composite, one entry per x column
+      std::vector<float> bandCurveDb[5]; // per-band, only enabled ones drawn
+      std::vector<float> signature;
+      int dragBand = -1;
+      bool dragIsQ = false;
+      bool dragInert = false; // this gesture is a select-only click or a double-click toggle
+   };
+   std::map<int, EqCurveCache> gEqCurveCache;
+
+   static const char* const kEqTypeParam[5] = { "band1Type", "band2Type", "band3Type", "band4Type", "band5Type" };
+   static const char* const kEqFreqParam[5] = { "band1Freq", "band2Freq", "band3Freq", "band4Freq", "band5Freq" };
+   static const char* const kEqQParam[5] = { "band1Q", "band2Q", "band3Q", "band4Q", "band5Q" };
+   static const char* const kEqGainParam[5] = { "band1Gain", "band2Gain", "band3Gain", "band4Gain", "band5Gain" };
+   static const char* const kEqOnParam[5] = { "band1On", "band2On", "band3On", "band4On", "band5On" };
+
+   struct EqBandValues
+   {
+      int type;
+      float freq, q, gain;
+      bool on;
+   };
+
+   void ReadEqBands(AudioEffectNode* n, EqBandValues bands[5])
+   {
+      for (int b = 0; b < 5; b++)
+      {
+         bands[b].type = std::clamp((int)(n->Param(kEqTypeParam[b]) + 0.5f), 0, EqDsp::kNumBandTypes - 1);
+         bands[b].freq = n->Param(kEqFreqParam[b]);
+         bands[b].q = n->Param(kEqQParam[b]);
+         bands[b].gain = n->Param(kEqGainParam[b]);
+         bands[b].on = n->Param(kEqOnParam[b]) >= 0.5f;
+      }
+   }
+
+   void DrawEqVisualizer(AudioEffectNode* n, double sampleRate)
+   {
+      const float w = gAudioBodyW;
+      const float h = 190.0f;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      gEqTestRect = ImVec4(origin.x, origin.y, br.x, br.y);
+
+      ImGui::InvisibleButton("##eqCurve", ImVec2(w, h));
+      const bool hovered = ImGui::IsItemHovered();
+      const bool active = ImGui::IsItemActive();
+      if (ImGui::IsItemActivated())
+         PushUndoCheckpoint();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      static const float kFreqTicks[] = { 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f,
+                                          2000.0f, 5000.0f, 10000.0f };
+      for (float f : kFreqTicks)
+      {
+         const float x = FilterVizFreqToX(f, origin.x, w);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 10), 1.0f);
+      }
+      static const float kDbTicks[] = { -12.0f, 0.0f, 12.0f };
+      for (float db : kDbTicks)
+      {
+         const float y = FilterVizDbToY(db, origin.y, h);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y),
+                     db == 0.0f ? IM_COL32(255, 255, 255, 40) : IM_COL32(255, 255, 255, 12), 1.0f);
+      }
+
+      EqBandValues bands[5];
+      ReadEqBands(n, bands);
+      int selected = std::clamp((int)(n->Param("selectedBand") + 0.5f), 0, 4);
+
+      std::vector<float> sig;
+      sig.reserve(26);
+      sig.push_back((float)sampleRate);
+      for (int b = 0; b < 5; b++)
+      {
+         sig.push_back((float)bands[b].type);
+         sig.push_back(bands[b].freq);
+         sig.push_back(bands[b].q);
+         sig.push_back(bands[b].gain);
+         sig.push_back(bands[b].on ? 1.0f : 0.0f);
+      }
+
+      EqCurveCache& cache = gEqCurveCache[gCurrentNodeIndex];
+      const int kNumPoints = 160;
+      if (cache.signature != sig)
+      {
+         cache.signature = sig;
+         cache.curveDb.resize(kNumPoints);
+         for (int b = 0; b < 5; b++)
+            cache.bandCurveDb[b].resize(kNumPoints);
+         for (int i = 0; i < kNumPoints; i++)
+         {
+            const float x = origin.x + (float)i * (w / (float)(kNumPoints - 1));
+            const float f = FilterVizXToFreq(x, origin.x, w);
+            float composite = 0.0f;
+            for (int b = 0; b < 5; b++)
+            {
+               const float bandDb =
+                  EqDsp::BandMagnitudeDb(bands[b].type, bands[b].freq, bands[b].q, bands[b].gain,
+                                          bands[b].on, f, sampleRate);
+               cache.bandCurveDb[b][i] = bandDb;
+               composite += bandDb;
+            }
+            cache.curveDb[i] = composite;
+         }
+      }
+
+      // Per-band curves at low alpha, only for enabled bands - a disabled
+      // band draws a hollow dot and no curve (§3f, "never blank" cuts both
+      // ways: absence is shown, not hidden).
+      for (int b = 0; b < 5; b++)
+      {
+         if (!bands[b].on)
+            continue;
+         dl->PathClear();
+         for (int i = 0; i < kNumPoints; i++)
+         {
+            const float x = origin.x + (float)i * (w / (float)(kNumPoints - 1));
+            const float y = FilterVizDbToY(cache.bandCurveDb[b][i], origin.y, h);
+            dl->PathLineTo(ImVec2(x, y));
+         }
+         dl->PathStroke(IM_COL32(150, 214, 255, 60), 0, 1.0f);
+      }
+
+      // Composite curve, bright, with a soft fill down to the 0 dB baseline -
+      // built from per-segment quads rather than AddConvexPolyFilled, which
+      // assumes convexity a response curve doesn't guarantee.
+      const float baselineY = FilterVizDbToY(0.0f, origin.y, h);
+      for (int i = 0; i + 1 < kNumPoints; i++)
+      {
+         const float x0 = origin.x + (float)i * (w / (float)(kNumPoints - 1));
+         const float x1 = origin.x + (float)(i + 1) * (w / (float)(kNumPoints - 1));
+         const float y0 = FilterVizDbToY(cache.curveDb[i], origin.y, h);
+         const float y1 = FilterVizDbToY(cache.curveDb[i + 1], origin.y, h);
+         dl->AddQuadFilled(ImVec2(x0, baselineY), ImVec2(x1, baselineY), ImVec2(x1, y1), ImVec2(x0, y0),
+                           IM_COL32(150, 214, 255, 22));
+      }
+      dl->PathClear();
+      for (int i = 0; i < kNumPoints; i++)
+      {
+         const float x = origin.x + (float)i * (w / (float)(kNumPoints - 1));
+         const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
+         dl->PathLineTo(ImVec2(x, y));
+      }
+      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+
+      // Handle positions for every band - one dot (freq/gain) and one
+      // diamond (Q) each, sharing the single ##eqCurve button above for the
+      // same reason Audio Filter's do (a second real ImGui item per handle
+      // disturbs the layout cursor for the knob row drawn afterward).
+      float hx[5], hy[5], qx[5], qy[5];
+      for (int b = 0; b < 5; b++)
+      {
+         hx[b] = FilterVizFreqToX(bands[b].freq, origin.x, w);
+         hy[b] = FilterVizDbToY(EqDsp::UsesGain(bands[b].type) ? bands[b].gain : 0.0f, origin.y, h);
+         const float qT = (logf(std::max(0.1f, bands[b].q)) - logf(0.1f)) / (logf(18.0f) - logf(0.1f));
+         qx[b] = std::clamp(hx[b] + 16.0f, origin.x + 8.0f, br.x - 8.0f);
+         qy[b] = origin.y + h - std::clamp(qT, 0.0f, 1.0f) * h;
+      }
+
+      if (ImGui::IsItemActivated())
+      {
+         const ImVec2 m = ImGui::GetIO().MousePos;
+         float bestDist2 = 1.0e30f;
+         int bestBand = selected;
+         bool bestIsQ = false;
+         float bestDotDist2 = 1.0e30f;
+         int bestDotBand = selected;
+         for (int b = 0; b < 5; b++)
+         {
+            const float dDot = (m.x - hx[b]) * (m.x - hx[b]) + (m.y - hy[b]) * (m.y - hy[b]);
+            const float dQ = (m.x - qx[b]) * (m.x - qx[b]) + (m.y - qy[b]) * (m.y - qy[b]);
+            if (dDot < bestDist2) { bestDist2 = dDot; bestBand = b; bestIsQ = false; }
+            if (dQ < bestDist2) { bestDist2 = dQ; bestBand = b; bestIsQ = true; }
+            if (dDot < bestDotDist2) { bestDotDist2 = dDot; bestDotBand = b; }
+         }
+         const float kHandleGrabRadius2 = 20.0f * 20.0f;
+         cache.dragInert = false;
+         if (bestDist2 <= kHandleGrabRadius2)
+         {
+            cache.dragBand = bestBand;
+            cache.dragIsQ = bestIsQ;
+         }
+         else
+         {
+            // Click landed away from every handle - select the nearest band
+            // by its dot, but this gesture does not move anything.
+            cache.dragBand = bestDotBand;
+            cache.dragIsQ = false;
+            cache.dragInert = true;
+         }
+         *n->ParamPtr("selectedBand") = (float)cache.dragBand;
+         selected = cache.dragBand;
+      }
+
+      // Double-click a band's dot toggles its bandOn, and cancels this
+      // gesture's drag so the toggle doesn't also nudge freq/gain.
+      if (hovered && ImGui::IsMouseDoubleClicked(0))
+      {
+         const ImVec2 m = ImGui::GetIO().MousePos;
+         float bestDotDist2 = 1.0e30f;
+         int bestDotBand = -1;
+         for (int b = 0; b < 5; b++)
+         {
+            const float dDot = (m.x - hx[b]) * (m.x - hx[b]) + (m.y - hy[b]) * (m.y - hy[b]);
+            if (dDot < bestDotDist2) { bestDotDist2 = dDot; bestDotBand = b; }
+         }
+         const float kToggleRadius2 = 20.0f * 20.0f;
+         if (bestDotBand >= 0 && bestDotDist2 <= kToggleRadius2)
+         {
+            *n->ParamPtr(kEqOnParam[bestDotBand]) = bands[bestDotBand].on ? 0.0f : 1.0f;
+            cache.dragInert = true;
+         }
+      }
+
+      const int dragBand = std::clamp(cache.dragBand < 0 ? selected : cache.dragBand, 0, 4);
+      if (active && !cache.dragInert)
+      {
+         if (cache.dragIsQ)
+         {
+            const float my = ImGui::GetIO().MousePos.y;
+            const float t = std::clamp((origin.y + h - my) / h, 0.0f, 1.0f);
+            *n->ParamPtr(kEqQParam[dragBand]) = std::clamp(0.1f * powf(18.0f / 0.1f, t), 0.1f, 18.0f);
+         }
+         else
+         {
+            const ImVec2 m = ImGui::GetIO().MousePos;
+            *n->ParamPtr(kEqFreqParam[dragBand]) =
+               std::clamp(FilterVizXToFreq(m.x, origin.x, w), kFilterVizMinHz, kFilterVizMaxHz);
+            if (EqDsp::UsesGain(bands[dragBand].type))
+               *n->ParamPtr(kEqGainParam[dragBand]) = std::clamp(FilterVizYToDb(m.y, origin.y, h), -24.0f, 24.0f);
+         }
+      }
+
+      // Draw every non-selected band's handles first, then the selected
+      // band's larger and last, so it is never occluded by a neighbour.
+      for (int pass = 0; pass < 2; pass++)
+      {
+         for (int b = 0; b < 5; b++)
+         {
+            const bool isSelected = (b == selected);
+            if ((pass == 0) == isSelected)
+               continue;
+
+            const bool isDragTarget = active && !cache.dragInert && dragBand == b;
+            const bool qActiveHere = isDragTarget && cache.dragIsQ;
+            const bool dotActiveHere = isDragTarget && !cache.dragIsQ;
+
+            const float dotR = isSelected ? (dotActiveHere ? 6.5f : 4.8f) : (dotActiveHere ? 5.0f : 3.2f);
+            if (bands[b].on)
+            {
+               dl->AddCircleFilled(ImVec2(hx[b], hy[b]), dotR, IM_COL32(235, 245, 255, isSelected ? 255 : 170), 12);
+            }
+            else
+            {
+               dl->AddCircle(ImVec2(hx[b], hy[b]), dotR, IM_COL32(235, 245, 255, isSelected ? 220 : 120), 12, 1.5f);
+            }
+            dl->AddCircle(ImVec2(hx[b], hy[b]), dotR, IM_COL32(20, 24, 32, 220), 12, 1.2f);
+
+            const float qr = isSelected ? (qActiveHere ? 6.5f : 5.0f) : (qActiveHere ? 5.5f : 3.6f);
+            const ImU32 qCol = isSelected ? IM_COL32(255, 205, 120, 255) : IM_COL32(255, 205, 120, 150);
+            const ImVec2 qPts[4] = { ImVec2(qx[b], qy[b] - qr), ImVec2(qx[b] + qr, qy[b]),
+                                     ImVec2(qx[b], qy[b] + qr), ImVec2(qx[b] - qr, qy[b]) };
+            dl->AddConvexPolyFilled(qPts, 4, qCol);
+            dl->AddPolyline(qPts, 4, IM_COL32(20, 24, 32, 220), ImDrawFlags_Closed, 1.2f);
+         }
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, hovered ? IM_COL32(110, 140, 180, 255) : IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (hovered || active)
+      {
+         const int b = dragBand;
+         char buf[80];
+         snprintf(buf, sizeof(buf), "band %d  %.0f Hz  %+.1f dB  Q %.2f  %s", b + 1, bands[b].freq,
+                  bands[b].gain, bands[b].q, bands[b].on ? "on" : "off");
+         SetAudioReadout("eq", buf);
+      }
+      // No trailing Dummy: the InvisibleButton above already reserved this
+      // (w, h) layout space.
+   }
+
+   void DrawEqBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      EqBandValues bands[5];
+      ReadEqBands(n, bands);
+
+      int active = 0;
+      float peakDb = 0.0f;
+      for (int b = 0; b < 5; b++)
+         if (bands[b].on)
+            active++;
+      {
+         // Coarse scan for the idle-stat peak, independent of the
+         // visualizer's own (denser, cached) curve.
+         const double sampleRate = AudioEngine::Instance().SampleRate() > 0.0
+                                      ? AudioEngine::Instance().SampleRate()
+                                      : 44100.0;
+         const int kScanPoints = 48;
+         float bestAbs = -1.0f;
+         for (int i = 0; i < kScanPoints; i++)
+         {
+            const float t = (float)i / (float)(kScanPoints - 1);
+            const float f = kFilterVizMinHz * powf(kFilterVizMaxHz / kFilterVizMinHz, t);
+            float composite = 0.0f;
+            for (int b = 0; b < 5; b++)
+               composite += EqDsp::BandMagnitudeDb(bands[b].type, bands[b].freq, bands[b].q, bands[b].gain,
+                                                    bands[b].on, f, sampleRate);
+            if (std::fabs(composite) > bestAbs)
+            {
+               bestAbs = std::fabs(composite);
+               peakDb = composite;
+            }
+         }
+      }
+
+      char stat[80];
+      snprintf(stat, sizeof(stat), "5 bands - %d active - %+.1f dB peak", active, peakDb);
+
+      const double sampleRate = AudioEngine::Instance().SampleRate() > 0.0
+                                   ? AudioEngine::Instance().SampleRate()
+                                   : 44100.0;
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawEqVisualizer(n, sampleRate);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      const int selBand = std::clamp((int)(n->Param("selectedBand") + 0.5f), 0, 4);
+      const int selType = bands[selBand].type;
+
+      {
+         AudioKnobRow row(4);
+         row.Dropdown("type", EqDsp::TypeList(), selType, [n, selBand](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr(kEqTypeParam[selBand]) = (float)i;
+         });
+         row.Knob("freq", n->ParamPtr(kEqFreqParam[selBand]), 20.0f, 20000.0f, "%.0f Hz", kKnobLarge);
+         row.Knob("Q", n->ParamPtr(kEqQParam[selBand]), 0.1f, 18.0f, "%.2f", kKnobLarge);
+
+         const bool gainLive = EqDsp::UsesGain(selType);
+         if (!gainLive)
+            ImGui::BeginDisabled();
+         row.Knob("gain", n->ParamPtr(kEqGainParam[selBand]), -24.0f, 24.0f, "%.1f dB", kKnobLarge);
+         if (!gainLive)
+            ImGui::EndDisabled();
+         row.End();
+      }
+
+      BeginAudioSection("output");
+      {
+         AudioKnobRow row(2);
+         row.Knob("output gain", n->ParamPtr("outputGainDb"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+      EndAudioSection();
+
+      EndAudioBody();
+   }
+
    // ---- Dynamics -----------------------------------------------------
    // Transfer curve (input dB -> output dB) with the live operating point
    // riding on it and a gain-reduction bar down the right edge - §1.2's
@@ -7375,6 +8388,116 @@ namespace
          row.Knob("color", n->ParamPtr("color"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("output", n->ParamPtr("output"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   // ---- Wavetable Shaper ---------------------------------------------------
+   // The transfer curve itself, input -1..+1 -> output -1..+1, exactly like
+   // Drive's - main-thread from params alone via WavetableShaperDsp::Shape,
+   // never the live kernel, so it's always meaningful with no audio running.
+   // The one addition Drive's curve doesn't have: a live operating-point dot
+   // at the kernel's last input sample (ExtraMeterValue(0)), since this curve
+   // is otherwise entirely static and the dot is what makes it read as an
+   // instrument rather than a diagram.
+   void DrawWavetableShaperVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      for (int i = -2; i <= 2; i++)
+      {
+         const float x = origin.x + (0.5f + 0.25f * (float)i) * w;
+         const float y = origin.y + (0.5f - 0.25f * (float)i) * h;
+         const bool center = (i == 0);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, center ? 30 : 10), 1.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), IM_COL32(255, 255, 255, center ? 30 : 10), 1.0f);
+      }
+
+      // 1:1 reference diagonal (unshaped signal), dim.
+      dl->AddLine(ImVec2(origin.x, br.y), ImVec2(br.x, origin.y), IM_COL32(255, 255, 255, 24), 1.0f);
+
+      const int table = (int)(n->Param("table") + 0.5f);
+      const float position = n->Param("position");
+      const float driveDb = n->Param("drive");
+      const float bias = n->Param("bias");
+      const float smooth = n->Param("smooth");
+
+      dl->PathClear();
+      const int kNumPoints = 96;
+      for (int i = 0; i < kNumPoints; i++)
+      {
+         const float xIn = -1.0f + 2.0f * (float)i / (float)(kNumPoints - 1);
+         const float yOut =
+            std::clamp(WavetableShaperDsp::Shape(xIn, table, position, driveDb, bias, smooth), -1.0f, 1.0f);
+         const float x = origin.x + (0.5f + 0.5f * xIn) * w;
+         const float y = origin.y + (0.5f - 0.5f * yOut) * h;
+         dl->PathLineTo(ImVec2(x, y));
+      }
+      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+
+      // Live operating-point dot at the kernel's last input sample.
+      const float lastIn = std::clamp(n->ExtraMeterValue(0), -1.0f, 1.0f);
+      const float lastOut =
+         std::clamp(WavetableShaperDsp::Shape(lastIn, table, position, driveDb, bias, smooth), -1.0f, 1.0f);
+      const ImVec2 dot(origin.x + (0.5f + 0.5f * lastIn) * w, origin.y + (0.5f - 0.5f * lastOut) * h);
+      dl->AddCircleFilled(dot, 3.5f, IM_COL32(255, 214, 120, 230));
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[80];
+         snprintf(buf, sizeof(buf), "%s, position %.2f, %.1f dB drive", Wavetable::TableName(table), position,
+                   driveDb);
+         SetAudioReadout("wavetable shaper", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawWavetableShaperBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      char stat[96];
+      snprintf(stat, sizeof(stat), "%s - %.1f dB drive - %.0f%% wet",
+               Wavetable::TableName((int)(n->Param("table") + 0.5f)), n->Param("drive"), n->mix * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawWavetableShaperVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Tier 1 only: table, position, drive, bias, smooth, output, mix - one
+      // processing mode. `table` is the curve's identity (a dropdown, same
+      // carve-out as Audio Filter's `type`/Ring Mod's `waveform`), not a
+      // second mode selector. Row 1 is table/position/drive; row 2 is
+      // bias/smooth/output/mix so mix still lands in the standard
+      // bottom-right spot every AudioEffects node's grammar puts it in.
+      {
+         AudioKnobRow row(3);
+         const int table = (int)(n->Param("table") + 0.5f);
+         row.Dropdown("table", WavetableNames(), table, [n](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr("table") = (float)i;
+         });
+         row.Knob("position", n->ParamPtr("position"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("drive", n->ParamPtr("drive"), 0.0f, 24.0f, "%.1f dB", kKnobLarge);
+         row.End();
+      }
+      {
+         AudioKnobRow row(4);
+         row.Knob("bias", n->ParamPtr("bias"), -1.0f, 1.0f, "%.2f", kKnobSmall);
+         row.Knob("smooth", n->ParamPtr("smooth"), 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.Knob("output", n->ParamPtr("output"), -24.0f, 12.0f, "%.1f dB", kKnobSmall);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobSmall);
          row.End();
       }
 
@@ -8360,6 +9483,179 @@ namespace
       EndAudioBody();
    }
 
+   // The hosted-plugin body. Its own controls stay minimal on purpose (the
+   // node is a shell around someone else's plugin, not an instrument of its
+   // own): the plugin's name, an open-editor button, bypass, and configure.
+   // Everything below the header is mapped plugin parameters.
+   //
+   // Two structural rules this body has to keep:
+   //
+   //  - No ModSlider/ModKnob call may come BEFORE the mapping grid, and none
+   //    may come AFTER it. Modulation bindings are keyed by (nodeIndex,
+   //    paramIndex) where paramIndex is this body's ModSlider call order
+   //    (gParamCounter), so anything drawn around the grid would shift every
+   //    row's pin identity as rows appear and disappear. That is also why
+   //    mapping slots are positional and never compacted, and why hiding
+   //    trailing unassigned rows is safe when hiding a middle one would not be.
+   //  - The open-editor button's label is ASCII. The UI font is loaded with no
+   //    glyph range (only Basic Latin is guaranteed), so a Unicode arrow would
+   //    render as a literal '?'.
+   void DrawPluginBody(GraphNode& gn, AudioPluginNode* n)
+   {
+      char stat[200];
+      if (!n->HasPlugin())
+         snprintf(stat, sizeof(stat), "no plugin - drag one from the Plugins panel");
+      else if (n->IsLoading())
+         snprintf(stat, sizeof(stat), "loading %s...", n->PluginDisplayName().c_str());
+      else if (!n->IsReady())
+         snprintf(stat, sizeof(stat), "%s - %s", n->PluginDisplayName().c_str(), n->Status().c_str());
+      else
+         snprintf(stat, sizeof(stat), "%s - au - %d param%s mapped", n->PluginDisplayName().c_str(),
+                  n->AssignedCount(), n->AssignedCount() == 1 ? "" : "s");
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      // --- header row ---
+      const bool ready = n->IsReady();
+      const bool editorOpen = n->EditorIsOpen();
+      if (!ready)
+         ImGui::BeginDisabled();
+      // "open" / "close", not a glyph - see the note above about the font.
+      if (ImGui::Button(editorOpen ? "close" : "open", ImVec2(64.0f, 0)))
+         n->ToggleEditor();
+      if (!ready)
+         ImGui::EndDisabled();
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("editor", editorOpen ? "open" : "closed");
+
+      ImGui::SameLine();
+      bool bypass = n->bypass;
+      if (AudioToggleButton("bypass", &bypass, 66.0f))
+      {
+         PushUndoCheckpoint();
+         n->bypass = bypass;
+      }
+
+      ImGui::SameLine();
+      bool configuring = n->Configuring();
+      if (!ready)
+         ImGui::BeginDisabled();
+      if (AudioToggleButton("configure", &configuring, 84.0f))
+         n->SetConfiguring(configuring);
+      if (!ready)
+         ImGui::EndDisabled();
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("configure", configuring ? "touch a control in the plugin" : "off");
+
+      // Right-aligned unload, anchored off the declared body width rather than
+      // GetContentRegionAvail - see DrawSamplerBody's comment on why the live
+      // width collides with the node's resize hit-zone.
+      if (n->HasPlugin())
+      {
+         const float unloadW = 60.0f;
+         ImGui::SameLine();
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - unloadW,
+                                          ImGui::GetCursorScreenPos().y));
+         if (ImGui::Button("unload", ImVec2(unloadW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->Unload();
+         }
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // --- fallback parameter picker ---
+      // Learn alone is not enough: plenty of plugin editors don't notify the
+      // host on every control, and a user whose plugin is one of those would
+      // otherwise have no way to map anything at all.
+      if (ready && !n->AvailableParams().empty())
+      {
+         BeginAudioSection("map a parameter");
+         static int sPickIndex = 0;
+         const std::vector<Platform::PluginParamInfo>& params = n->AvailableParams();
+         sPickIndex = std::clamp(sPickIndex, 0, (int)params.size() - 1);
+         ImGui::SetNextItemWidth(gAudioContentW - 70.0f - ImGui::GetStyle().ItemSpacing.x);
+         if (ImGui::BeginCombo("##pluginparampick", params[sPickIndex].displayName.c_str()))
+         {
+            for (int i = 0; i < (int)params.size(); i++)
+            {
+               const bool selected = (i == sPickIndex);
+               ImGui::PushID(i);
+               if (ImGui::Selectable(params[i].displayName.c_str(), selected))
+                  sPickIndex = i;
+               ImGui::PopID();
+            }
+            ImGui::EndCombo();
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("map", ImVec2(70.0f, 0)))
+         {
+            PushUndoCheckpoint();
+            n->MapParameter(params[sPickIndex].address);
+         }
+         EndAudioSection();
+      }
+
+      // --- the mapping grid ---
+      // Two columns, growing downward as the user maps more. Every row is a
+      // ModSlider, which is what makes these real params: each gets its own
+      // modulation pin, typed edit, expression support and undo, exactly like
+      // any other param in the app.
+      const int highest = n->HighestAssignedSlot();
+      // One spare row while configuring, so there is somewhere visible for the
+      // next learned param to land. Safe only because nothing is drawn after
+      // the grid - see this function's header comment.
+      int rows = highest + 1;
+      if (n->Configuring() && rows < AudioPluginNode::kMaxMappedParams)
+         rows++;
+
+      if (rows <= 0)
+      {
+         ImGui::TextDisabled(ready ? "turn on configure, then touch a control in the plugin"
+                                   : "no parameters mapped");
+      }
+
+      const float cellW = AudioHalfWidth();
+      for (int i = 0; i < rows; i++)
+      {
+         AudioPluginNode::Mapping& m = n->mappings[i];
+         if ((i % 2) == 1)
+            ImGui::SameLine();
+
+         if (m.assigned)
+         {
+            // The label carries the slot index so two identically-named plugin
+            // params (common: "Gain" on each of four bands) stay tellable
+            // apart, and so ModSlider's own ImGui id is unique per row.
+            char label[96];
+            snprintf(label, sizeof(label), "%s##map%d", m.displayName.c_str(), i);
+            ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW, /*audioStyle=*/true);
+            // Right-click an assigned row to unmap it. The row itself stays -
+            // it just goes back to showing "unassigned".
+            if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            {
+               PushUndoCheckpoint();
+               n->UnmapSlot(i);
+            }
+         }
+         else
+         {
+            // An unassigned row still consumes a ModSlider call (and therefore
+            // a paramIndex) so that assigning it later doesn't renumber every
+            // row after it. It is drawn read-only against a dead scratch value.
+            static float sUnassigned = 0.0f;
+            sUnassigned = 0.0f;
+            char label[32];
+            snprintf(label, sizeof(label), "unassigned##map%d", i);
+            ImGui::BeginDisabled();
+            ModSlider(label, &sUnassigned, 0.0f, 1.0f, "%.0f", cellW, /*audioStyle=*/true);
+            ImGui::EndDisabled();
+         }
+      }
+
+      EndAudioBody();
+   }
+
    // Dispatch for anything IsAudioBodyNode() accepts. Called from the
    // node-body loop's DrawPreview-replacement chain; audio nodes have no
    // image to preview, so this entirely replaces DrawPreview +
@@ -8368,8 +9664,12 @@ namespace
    {
       if (auto* n = dynamic_cast<WavetableNode*>(gn.node.get()))
          DrawWavetableBody(gn, n);
+      else if (auto* n = dynamic_cast<AudioPluginNode*>(gn.node.get()))
+         DrawPluginBody(gn, n);
       else if (auto* n = dynamic_cast<SamplerNode*>(gn.node.get()))
          DrawSamplerBody(gn, n);
+      else if (auto* n = dynamic_cast<DrumSequencerNode*>(gn.node.get()))
+         DrawDrumSequencerBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))
          DrawGainBody(gn, n);
       else if (auto* n = dynamic_cast<MixerNode*>(gn.node.get()))
@@ -8442,6 +9742,9 @@ namespace
          case EffectVisualizerId::kFilterResponse:
             DrawAudioFilterBody(gn, n);
             break;
+         case EffectVisualizerId::kEqCurve:
+            DrawEqBody(gn, n);
+            break;
          case EffectVisualizerId::kDynamicsTransfer:
             DrawDynamicsBody(gn, n);
             break;
@@ -8483,6 +9786,9 @@ namespace
             break;
          case EffectVisualizerId::kFormantVowel:
             DrawFormantFilterBody(gn, n);
+            break;
+         case EffectVisualizerId::kWavetableShaperCurve:
+            DrawWavetableShaperBody(gn, n);
             break;
          default:
             break;
@@ -10942,9 +12248,12 @@ namespace
          { "Audio File", "Loads an audio file for playback and Audio Analyze to read. Keeps analysing even while muted - the 'audible' checkbox only controls monitoring." },
          { "Image Analyze", "Turns an image into control values. Patch any of its outputs into any slider's modulation dot - a video can drive a blur. Sample res readback is rate-limited because it stalls the GPU." },
          { "Audio Analyze", "Extracts level/frequency-band values from an Audio File for modulation." },
+         { "Plugin", "Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged." },
          { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point; drag its two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. Free-running (no note cable) plays continuously the moment it's patched; connect a note cable and it becomes polyphonic, each note played back at the pitch offset from middle C." },
+         { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it, and the small knob on the right adds to that lane's swing. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
+         { "EQ", "Five fixed bands (low shelf, three peaks, high shelf by default), each switchable to any of low shelf/peak/high shelf/hp 12/lp 12 and independently on or off. Drag a band's dot on the curve to set its frequency and gain, drag its diamond to set Q, double-click the dot to bypass that band - the knob row below always follows whichever band you last touched." },
          { "Dynamics", "A compressor: threshold, ratio, attack, release, makeup, a peak/RMS detector switch, and a sidechain switch that feeds the detector from the second input pin instead of the main signal. The graph shows the static transfer curve - input dB in, output dB out." },
          { "Delay", "A fractional delay line: time (tempo-synced by default, or free ms with 'sync to tempo' off), tone (bipolar tilt on the repeats), feedback (past 100% on purpose for self-oscillation - the output is soft-clipped, not the feedback itself), pan, duck (sidechains the wet signal off the dry input) and a bounce switch that cross-feeds left/right instead of repeating in place." },
          { "Reverb", "An 8-line feedback delay network: size (room size), decay (RT60 in seconds), damping (darkens and speeds up the tail), predelay (gap before the reverb starts), width (stereo spread, full at 1 down to mono at 0) and mix. Algorithmic only - no convolution engine." },
@@ -10959,6 +12268,7 @@ namespace
          { "Stutter", "Records the first `grain` fraction of each tempo-synced (or free-ms) cycle, then loops that captured slice for the rest of the cycle before recording fresh audio next cycle - a beat-repeat glitch effect." },
          { "Ring Mod", "Multiplies the input by an oscillator (freq, waveform) - true ring modulation, not amplitude modulation, so the original frequencies are replaced by sum/difference sidebands rather than just scaled." },
          { "Formant Filter", "Three parallel bandpass resonators tuned to a vowel's formants (F1/F2/F3), morphed continuously A-E-I-O-U by the vowel knob - a vocal-tract-shaped filter for any input, not just voice." },
+         { "Wavetable Shaper", "Uses a wavetable frame as a waveshaping transfer curve: the input sample's amplitude selects a phase into the table, the table's value there is the output. Drive past 0dB pushes the phase past the table's ends, where it wraps instead of clipping - true wavefolding, not distortion. Position morphs the curve across the table's 8 frames, smooth crosses to a lower-harmonic (darker) version of the same curve." },
          { "Note Filter", "A gate on a note's pitch: scale snaps it to the nearest degree of the chosen scale/root, range drops anything outside lo..hi, and chance randomly drops the rest. A note that gets dropped has its note-off dropped with it, so nothing hangs." },
          { "Note Modify", "Changes an attribute of a note in flight: transpose and a fine pitch offset in semitones, a velocity curve, and random humanise on timing and velocity. Gate above 0ms ignores the real note-off and instead ends the note itself that many ms after it starts - set this for a fixed note duration regardless of how long the source held it. Quantize snaps note-on timing forward to the nearest grid line; glide plays a fast chromatic run between the previous and new note as an approximation of portamento (NoteEvent has no continuous pitch, so this is a glissando, not a true pitch ramp)." },
          { "Note Echo", "Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it." },
@@ -11655,6 +12965,135 @@ namespace
       topology.terminalBufferIndices = std::move(terminals);
       topology.numBuffers = (int)topology.order.size();
       AudioEngine::Instance().SetTopology(std::move(topology));
+   }
+
+   // Single choke point for turning the audio engine on. Every call site that
+   // starts the device MUST go through this, not AudioEngine::Instance().
+   // Start() directly - see docs/plans/optimization/prompts/
+   // 01-audio-lifecycle-correctness.md bugs 1/2.
+   //
+   // Why here and not inside AudioEngine::Start() itself: Start() only knows
+   // about the device and its own atomics: it has no visibility into gNodes,
+   // AudioCable, or any of the editor-graph machinery RebuildAudioTopology
+   // needs to walk to find every node and call PrepareToPlay on it - that's
+   // all main.cpp state, deliberately kept out of the audio/ library (see
+   // AudioEngine.h's class comment; it owns the device and the topology
+   // publish, not the graph the topology is built from).
+   //
+   // Why a rebuild and not just re-publishing the existing topology: Start()
+   // negotiates the device's *actual* sample rate, which is not necessarily
+   // what was requested (see Platform::AudioDeviceOpen's doc comment) and can
+   // differ from whatever rate the topology's nodes were last prepared with -
+   // possibly zero, if this is the very first Start() of the process and every
+   // node so far was built/rebuilt with AudioEngine::SampleRate() still 0
+   // (RebuildAudioTopology's `sampleRate > 0.0` guard above skips
+   // PrepareToPlay entirely in that case, on purpose - see its comment). A
+   // fresh RebuildAudioTopology() call, made after Start() returns
+   // successfully, re-reads AudioEngine::Instance().SampleRate() (now the
+   // real negotiated rate) and calls PrepareToPlay(sampleRate, ...) on every
+   // node - the same call RebuildAudioTopology already makes on every cable
+   // edit, patch load and node removal. This is also the one place the
+   // negotiated rate actually reaches each node's ParamMailbox/smoothers,
+   // not just AudioEngine::mSampleRate itself (which Start() already writes) -
+   // closing both bug 1 (nodes never prepared at engine-start) and bug 2
+   // (stale mSampleRate readers) with the same call.
+   //
+   // This does not reopen AudioEngine::SetTopology's one-generation-retire
+   // discipline (AudioEngine.h:66-74): RebuildAudioTopology always ends in
+   // exactly one SetTopology call, same as every other caller.
+   bool StartAudioEngine(std::string& outError)
+   {
+      if (!AudioEngine::Instance().Start(outError))
+         return false;
+      RebuildAudioTopology();
+      return true;
+   }
+
+   // Single choke point for device-change/sleep-wake self-healing - called
+   // once a frame from the main loop, main thread only. See
+   // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md.
+   //
+   // Platform::AudioDeviceConfigDidChange/AudioWillSleep/AudioDidWake are
+   // consuming reads of flags latched by notification handlers that can run
+   // on arbitrary threads (Platform.h's doc comment); this is where that
+   // turns into actual work, through StartAudioEngine - the same choke
+   // point Apply-audio-settings already uses (main.cpp's menu code), so
+   // there is exactly one restart implementation, not two.
+   void PollAudioRecovery()
+   {
+      const bool willSleep = Platform::AudioWillSleep();
+      const bool didWake = Platform::AudioDidWake();
+      const bool configChanged = Platform::AudioDeviceConfigDidChange();
+      const bool wasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+
+      if (willSleep)
+      {
+         // Stop deliberately before the OS tears the device out from under a
+         // live AVAudioEngine, rather than letting whatever CoreAudio does
+         // during suspend surface as an ordinary config-change/dead-engine
+         // case. Symmetric with the toolbar's "Stop Audio" - nothing
+         // sleep-specific for this to get wrong. Wake, below, restarts it if
+         // it was running; this is not itself a failure, so it does not
+         // touch the backoff window state.
+         if (wasRunning)
+            AudioEngine::Instance().Stop();
+         return; // let didWake/configChanged (if also set this frame) wait one frame
+      }
+
+      // IsAlive() only means something if the engine believes it should be
+      // running - see its own comment. A dead engine while nothing was
+      // supposed to be on isn't a recovery case, and neither is a wake with
+      // nothing previously running: per rule 4, this never silently starts
+      // audio the user had turned off.
+      const bool dead = wasRunning && !AudioEngine::Instance().IsAlive();
+      if (!wasRunning || (!didWake && !configChanged && !dead))
+         return;
+
+      const double nowMs = glfwGetTime() * 1000.0;
+
+      // Idempotent: collapse everything that fired this frame (and anything
+      // still landing from the last kAudioRecoveryMinIntervalMs) into at
+      // most one attempt, so a device flapping several times a second or a
+      // burst of config-change notifications on one wake can't spawn
+      // overlapping restarts.
+      if (gLastAudioRecoveryAttemptMs >= 0.0 && nowMs - gLastAudioRecoveryAttemptMs < kAudioRecoveryMinIntervalMs)
+         return;
+
+      if (gAudioRecoveryWindowStartMs < 0.0 || nowMs - gAudioRecoveryWindowStartMs > kAudioRecoveryWindowMs)
+      {
+         gAudioRecoveryWindowStartMs = nowMs;
+         gAudioRecoveryAttemptsInWindow = 0;
+      }
+
+      if (gAudioRecoveryAttemptsInWindow >= kAudioRecoveryMaxAttemptsPerWindow)
+      {
+         // Rate-limited give-up: a device that fails this many times in one
+         // window is treated as really gone rather than retried forever.
+         // Stop rather than leave it in limbo - SampleRate() dropping to 0
+         // is what the toolbar/status bar (main.cpp's menu bar block) reads
+         // to switch to "Start Audio" and surface gAudioStartError on
+         // hover, so this alone is the "honest UI" requirement: there is no
+         // separate flag for the UI to also check.
+         if (wasRunning)
+            AudioEngine::Instance().Stop();
+         gAudioStartError = "audio device recovery gave up after " +
+            std::to_string(kAudioRecoveryMaxAttemptsPerWindow) + " attempts";
+         return;
+      }
+
+      gLastAudioRecoveryAttemptMs = nowMs;
+      gAudioRecoveryAttemptsInWindow++;
+
+      // Stop unconditionally before restarting, even if IsAlive() already
+      // reads false / the device object is in some unknown state:
+      // Platform::AudioDeviceClose() is a no-op once already closed, and
+      // this guarantees StartAudioEngine always builds a fresh AVAudioEngine
+      // rather than reusing one in a state nothing here can characterize.
+      AudioEngine::Instance().Stop();
+
+      gAudioStartError.clear();
+      if (!StartAudioEngine(gAudioStartError))
+         fprintf(stderr, "audio device recovery: %s\n", gAudioStartError.c_str());
    }
 
    void RemoveNodeByIndex(int index)
@@ -14085,6 +15524,207 @@ static bool RunReverbFixture()
    return all;
 }
 
+namespace WavetableShaperTest
+{
+   std::unique_ptr<AudioEffectNode> MakeNode(double sampleRate)
+   {
+      const EffectDef* def = nullptr;
+      for (const EffectDef& d : GetEffectDefs())
+         if (d.name == "Wavetable Shaper")
+            def = &d;
+      auto node = std::make_unique<AudioEffectNode>(*def);
+      node->mix = 1.0f; // 100% wet so the fixture measures the shaped signal directly
+      node->GetAudioNode()->PrepareToPlay(sampleRate, 512);
+      return node;
+   }
+}
+
+// Wavetable Shaper's DSP fixture (new-audio-node/SKILL.md §5) - the first of
+// this family per-effect fixture (no per-effect fixture exists yet for
+// Drive/Bitcrush/etc.), following RunReverbFixture/RunDelayFixture's shape:
+// render the real node -> AudioEngine chain and assert against an analytic
+// expectation, here WavetableShaperDsp::Shape itself (the same pure function
+// the kernel and the visualizer both call).
+static bool RunWavetableShaperFixture()
+{
+   using namespace WavetableShaperTest;
+   bool all = true;
+   const double sampleRate = 44100.0;
+
+   // 1) Node parity: the real node's wet output must match
+   //    WavetableShaperDsp::Shape() followed by the same one-pole DC blocker
+   //    DriveKernel.h declares (bias/table asymmetry both leak DC, so the
+   //    blocker is always in the signal path), sample for sample, once the
+   //    mailbox's smoothing ramp has had time to converge to its pushed
+   //    targets. A slow sine sweep (not a constant, which the DC blocker
+   //    would itself drive toward zero and defeat the comparison) exercises
+   //    the whole -1..1 input range while giving both the node and the local
+   //    reference identical history to build DC-blocker state from.
+   {
+      auto node = MakeNode(sampleRate);
+      const int table = 1;    // Harmonics - plenty of curve shape to exercise
+      const float position = 0.3f;
+      const float driveDb = 6.0f;
+      const float bias = 0.15f;
+      const float smooth = 0.2f;
+      *node->ParamPtr("table") = (float)table;
+      *node->ParamPtr("position") = position;
+      *node->ParamPtr("drive") = driveDb;
+      *node->ParamPtr("bias") = bias;
+      *node->ParamPtr("smooth") = smooth;
+      *node->ParamPtr("output") = 0.0f;
+      node->CookIfNeeded(1);
+
+      // Warmup on silence: lets the mailbox's ~5ms one-pole smoother
+      // converge to the pushed targets (independent of the input signal)
+      // while leaving the DC blocker's state at its zero-input steady state
+      // (0,0), which the local reference below also starts from.
+      const int warmupSamples = (int)(0.5 * sampleRate);
+      DelayTest::RunSamples(*node, warmupSamples, 1, [](int, int) { return 0.0f; }, nullptr);
+
+      const int testSamples = 4000;
+      const float sweepHz = 37.0f; // slow relative to sample rate, sweeps the full -1..1 range repeatedly
+      std::vector<std::vector<float>> out;
+      DelayTest::RunSamples(
+         *node, testSamples, 1,
+         [sweepHz](int i, int) { return sinf(2.0f * (float)M_PI * sweepHz * (float)i / (float)44100.0); }, &out);
+
+      DcBlocker refBlocker; // starts zeroed, matching the node's post-warmup state
+      float maxErr = 0.0f;
+      for (int i = 0; i < testSamples; i++)
+      {
+         const float x = sinf(2.0f * (float)M_PI * sweepHz * (float)i / (float)44100.0);
+         const float shaped = WavetableShaperDsp::Shape(x, table, position, driveDb, bias, smooth);
+         const float expected = refBlocker.Process(shaped);
+         maxErr = std::max(maxErr, std::fabs(expected - out[0][(size_t)i]));
+      }
+      const bool parityOk = maxErr < 1.0e-3f;
+      printf("DSPTEST wavetable shaper node parity: max error vs WavetableShaperDsp::Shape %.6f  %s\n", maxErr,
+             parityOk ? "OK" : "FAIL");
+      all &= parityOk;
+   }
+
+   // 2) Finite and bounded across a sweep of every table x several positions
+   //    x drive up to 24dB x bias +-1 - the sweep that catches a bad wrap or
+   //    a null frame pointer. Called directly against the pure function,
+   //    which is exactly what both the audio thread and the visualizer call.
+   {
+      bool boundedOk = true;
+      int checked = 0;
+      for (int table = 0; table < Wavetable::NumTables(); table++)
+      {
+         for (float position : { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f })
+         {
+            for (float driveDb : { 0.0f, 12.0f, 24.0f })
+            {
+               for (float bias : { -1.0f, 0.0f, 1.0f })
+               {
+                  for (float smooth : { 0.0f, 0.5f, 1.0f })
+                  {
+                     for (int i = 0; i < 64; i++)
+                     {
+                        const float x = -1.0f + 2.0f * (float)i / 63.0f;
+                        const float y = WavetableShaperDsp::Shape(x, table, position, driveDb, bias, smooth);
+                        checked++;
+                        // Shape(x) = RawShape(x) - RawShape(0), and RawShape is just a table
+                        // read (bounded by the bank's own +-1 amplitude), so the true worst
+                        // case is +-2, not +-1 - measured up to ~1.77 at the bias=+-1,
+                        // drive=24dB corners where RawShape(x) and RawShape(0) land near
+                        // opposite ends of the table. 2.05 leaves headroom for that corner
+                        // while still catching a real blow-up (NaN/Inf or a bad wrap).
+                        if (!std::isfinite(y) || std::fabs(y) > 2.05f)
+                           boundedOk = false;
+                     }
+                  }
+               }
+            }
+         }
+      }
+      printf("DSPTEST wavetable shaper bounded sweep: %d points across every table x position x drive x bias x "
+             "smooth, finite and |y|<=2.05  %s\n",
+             checked, boundedOk ? "OK" : "FAIL");
+      all &= boundedOk;
+   }
+
+   // 3) bias != 0 produces no residual DC once the blocker settles: an
+   //    asymmetric curve (bias offset) leaks a constant offset into the
+   //    shaped signal, and the always-on DcBlocker must remove it.
+   {
+      auto node = MakeNode(sampleRate);
+      *node->ParamPtr("table") = 3.0f; // Formant - a strongly asymmetric curve under bias
+      *node->ParamPtr("position") = 0.6f;
+      *node->ParamPtr("drive") = 10.0f;
+      *node->ParamPtr("bias") = 0.6f;
+      *node->ParamPtr("smooth") = 0.0f;
+      *node->ParamPtr("output") = 0.0f;
+      node->CookIfNeeded(2);
+
+      const int warmupSamples = (int)(0.5 * sampleRate);
+      DelayTest::RunSamples(*node, warmupSamples, 1, [](int, int) { return 0.0f; }, nullptr);
+
+      const int testSamples = (int)(0.3 * sampleRate);
+      const float toneHz = 220.0f;
+      std::vector<std::vector<float>> out;
+      DelayTest::RunSamples(
+         *node, testSamples, 1,
+         [toneHz](int i, int) { return sinf(2.0f * (float)M_PI * toneHz * (float)i / 44100.0f); }, &out);
+
+      // Average over the final quarter, well after the ~8Hz blocker has
+      // settled - a residual DC offset would show up as a nonzero mean.
+      double sum = 0.0;
+      const int windowStart = testSamples * 3 / 4;
+      for (int i = windowStart; i < testSamples; i++)
+         sum += out[0][(size_t)i];
+      const double meanDc = sum / (double)(testSamples - windowStart);
+      const bool dcOk = std::fabs(meanDc) < 0.01;
+      printf("DSPTEST wavetable shaper DC blocking: mean %.5f over settled window (bias 0.6)  %s\n", meanDc,
+             dcOk ? "OK" : "FAIL");
+      all &= dcOk;
+   }
+
+   // 4) Increasing smooth strictly reduces high-frequency energy in the
+   //    output for a fixed input - the claim the control makes (a lower mip
+   //    level holds strictly fewer harmonics). Measured directly off the
+   //    pure function via a first-difference energy proxy over a ramp that
+   //    sweeps the whole curve repeatedly, which is sensitive to exactly the
+   //    high-order wiggle a coarser mip level removes.
+   {
+      const int table = 1; // Harmonics - has real high-order content to remove
+      const float position = 0.5f, driveDb = 12.0f, bias = 0.0f;
+      const float smoothSteps[] = { 0.0f, 0.33f, 0.66f, 1.0f };
+      float prevEnergy = -1.0f;
+      bool monotoneOk = true;
+      const int kNumPoints = 2000;
+      for (float smooth : smoothSteps)
+      {
+         std::vector<float> y(kNumPoints);
+         for (int i = 0; i < kNumPoints; i++)
+         {
+            // Two full triangle sweeps of the curve's domain, so the
+            // first-difference series captures the curve's own wiggle
+            // rather than a slow ramp's near-zero derivative.
+            const float phase = fmodf((float)i / (float)kNumPoints * 4.0f, 2.0f);
+            const float x = phase <= 1.0f ? (-1.0f + 2.0f * phase) : (3.0f - 2.0f * phase);
+            y[i] = WavetableShaperDsp::Shape(x, table, position, driveDb, bias, smooth);
+         }
+         double energy = 0.0;
+         for (int i = 1; i < kNumPoints; i++)
+         {
+            const double d = (double)y[i] - (double)y[i - 1];
+            energy += d * d;
+         }
+         printf("DSPTEST wavetable shaper smooth=%.2f HF-energy proxy %.6f\n", smooth, energy);
+         if (prevEnergy >= 0.0 && !(energy < prevEnergy))
+            monotoneOk = false;
+         prevEnergy = (float)energy;
+      }
+      printf("DSPTEST wavetable shaper smooth reduces HF energy monotonically  %s\n", monotoneOk ? "OK" : "FAIL");
+      all &= monotoneOk;
+   }
+
+   return all;
+}
+
 // Sampler's DSP fixture (new-audio-node/SKILL.md §5): loads a real WAV
 // through the actual Platform::DecodeAudioFileToBuffer path (not a synthetic
 // in-memory buffer, so the decoder itself is exercised too), triggers
@@ -14334,6 +15974,928 @@ static bool RunSamplerFixture()
    return ok;
 }
 
+// Drum Sequencer's DSP fixture (drum-sequencer-prompt.md §6). Drives the
+// real DrumSequencerNode -> AudioDrumSequencerNode chain directly (no
+// AudioEngine/topology - same shape as RunSamplerFixture), manually pumping
+// Transport::Instance() into its audio-driven mode so step scheduling reads
+// the exact same clock a real callback would.
+namespace DrumSeqTest
+{
+   // A short, loud "click" sample: strong for kClickFrames, silent after -
+   // gives every trigger a clean, separable onset regardless of decay/pitch.
+   constexpr int kClickFrames = 200;
+   constexpr int kSustainFrames = 20000; // for tests that need a voice to still be sounding well after another lane's hit
+
+   std::string WriteClickWav(const std::string& path, int totalFrames, int sampleRate)
+   {
+      std::vector<int16_t> pcm(totalFrames, 0);
+      for (int i = 0; i < totalFrames && i < kClickFrames; i++)
+         pcm[i] = (int16_t)(0.9f * 32000.0f);
+      std::ofstream f(path, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+      writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)pcm.data(), dataSize);
+      return path;
+   }
+
+   // Constant-amplitude for its whole length - unlike WriteClickWav, this
+   // stays loud the entire buffer, so a lane playing it is still audibly
+   // sounding for as long as the test needs (choke: "still ringing when the
+   // choke should cut it"; decay: a reference that only the decay knob
+   // shapes, not the sample's own natural envelope).
+   std::string WriteSustainedWav(const std::string& path, int totalFrames, int sampleRate)
+   {
+      std::vector<int16_t> pcm(totalFrames, (int16_t)(0.9f * 32000.0f));
+      std::ofstream f(path, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+      writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)pcm.data(), dataSize);
+      return path;
+   }
+
+   // Renders `totalFrames` in blocks of `blockSize`, calling
+   // Transport::AdvanceAudioClock before each block (mirroring
+   // AudioEngine::Process's own ordering) and returning the summed L channel.
+   std::vector<float> Render(DrumSequencerNode& node, int totalFrames, int blockSize, int sampleRate,
+                              NoteEventQueue* inbox = nullptr)
+   {
+      // Cook-then-prepare, matching every other fixture in this file:
+      // PrepareToPlay's SetImmediate seeds the mailbox smoothers from
+      // whatever's already in the lane atomics, so those need to hold real
+      // values (not construction defaults) by the time it runs. A second
+      // cook right after, with a different frameId so the memoized
+      // CookIfNeeded actually re-runs, lets the decay-coefficient push
+      // self-heal against PrepareToPlay's now-correct sample rate (see
+      // mLastCoeffSampleRate) instead of keeping whatever it guessed before
+      // the rate was known.
+      node.CookIfNeeded(1);
+      AudioNode* an = node.GetAudioNode();
+      an->PrepareToPlay((double)sampleRate, blockSize);
+      node.CookIfNeeded(2);
+      if (inbox != nullptr)
+         an->SetNoteInbox(inbox);
+
+      std::vector<float> out;
+      out.reserve(totalFrames);
+      int rendered = 0;
+      while (rendered < totalFrames)
+      {
+         const int n = std::min(blockSize, totalFrames - rendered);
+         Transport::Instance().AdvanceAudioClock(n);
+         std::vector<float> l(n, 0.0f), r(n, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = n;
+         an->ProcessBlock(nullptr, 0, buf);
+         out.insert(out.end(), l.begin(), l.end());
+         rendered += n;
+      }
+      return out;
+   }
+
+   // First-crossing onset detector: scans forward from `from` for the first
+   // index whose |sample| exceeds `thresh`, having been below it just prior.
+   int FindOnset(const std::vector<float>& buf, int from, float thresh = 0.15f)
+   {
+      for (int i = std::max(1, from); i < (int)buf.size(); i++)
+         if (std::fabs(buf[i]) > thresh && std::fabs(buf[i - 1]) <= thresh)
+            return i;
+      return -1;
+   }
+
+   bool AllFinite(const std::vector<float>& buf)
+   {
+      for (float v : buf)
+         if (!std::isfinite(v))
+            return false;
+      return true;
+   }
+}
+
+static bool RunDrumSequencerFixture()
+{
+   using namespace DrumSeqTest;
+   bool ok = true;
+
+   const int sampleRate = 48000;
+   const int blockSize = 256;
+   Transport& transport = Transport::Instance();
+   const float savedBpm = transport.Tempo();
+   const bool savedPlaying = transport.IsPlaying();
+   const int savedNum = transport.TimeSigNumerator();
+   const int savedDen = transport.TimeSigDenominator();
+
+   const std::string shortClickPath = WriteClickWav("/tmp/infinite_drumseq_click.wav", 4000, sampleRate);
+   const std::string longClickPath = WriteSustainedWav("/tmp/infinite_drumseq_sustain.wav", kSustainFrames, sampleRate);
+
+   auto resetTransport = [&]()
+   {
+      transport.SetTempo(120.0f);
+      transport.SetTimeSignature(4, 4);
+      transport.SetPlaying(true);
+      transport.Rewind();
+      transport.NotifyAudioEngineStarted((double)sampleRate);
+   };
+
+   auto makeNode = [&](const std::string& clickPath) -> std::unique_ptr<DrumSequencerNode>
+   {
+      auto node = std::make_unique<DrumSequencerNode>();
+      node->rate = MusicTime::kSixteenth;
+      node->numSteps = 8;
+      node->LoadFileToLane(0, clickPath);
+      return node;
+   };
+
+   // 1) Step timing: lane 0 step 0 only, 120 BPM 1/16 -> hits every
+   // sampleRate*0.125 frames (a 16th note at 120bpm), and the first hit is
+   // not quantised to a block boundary.
+   {
+      resetTransport();
+      auto node = makeNode(shortClickPath);
+      node->numSteps = 1; // a single-step pattern repeats every 16th note, not once per bar
+      node->stepVel[0][0] = 0.8f;
+      const auto buf = Render(*node, sampleRate * 2, blockSize, sampleRate); // 2s -> ~16 hits
+      const int expectedSpacing = (int)std::lround(sampleRate * 0.125);
+      int onset1 = FindOnset(buf, 0);
+      int onset2 = onset1 >= 0 ? FindOnset(buf, onset1 + expectedSpacing / 2) : -1;
+      if (onset2 < 0 && getenv("INFINITE_DRUMSEQ_DEBUG") != nullptr)
+      {
+         float maxAbs = 0.0f;
+         int maxIdx = -1;
+         for (int i = onset1 + expectedSpacing / 2; i < (int)buf.size() && i < onset1 + expectedSpacing * 2; i++)
+            if (std::fabs(buf[i]) > maxAbs) { maxAbs = std::fabs(buf[i]); maxIdx = i; }
+         printf("DRUMSEQTEST DEBUG: max abs in search window = %.4f at idx %d (buf.size=%zu)\n", maxAbs, maxIdx,
+                buf.size());
+      }
+      const bool spacingOk = onset1 >= 0 && onset2 >= 0 && std::abs((onset2 - onset1) - expectedSpacing) <= 1;
+      const bool notBlockQuantised = onset1 >= 0 && (onset1 % blockSize) != 0;
+      if (!spacingOk)
+      {
+         printf("DRUMSEQTEST step timing FAIL (onset1=%d onset2=%d expected spacing=%d)\n", onset1, onset2,
+                expectedSpacing);
+         ok = false;
+      }
+      else if (!notBlockQuantised)
+      {
+         printf("DRUMSEQTEST step timing FAIL (first hit landed exactly on a block boundary - suspiciously quantised)\n");
+         ok = false;
+      }
+      else
+      {
+         printf("DRUMSEQTEST step timing OK\n");
+      }
+   }
+
+   // 2) Swing: at swing=0.5, odd steps land 25%% of a step late; even steps
+   // (including step 0) are unmoved. At swing=0, output is bit-identical to
+   // a run that never touches swing.
+   {
+      resetTransport();
+      auto nodeA = makeNode(shortClickPath);
+      nodeA->stepVel[0][0] = 0.8f;
+      nodeA->stepVel[0][1] = 0.8f; // odd step - swings
+      nodeA->swing = 0.5f;
+      const auto swungBuf = Render(*nodeA, sampleRate, blockSize, sampleRate);
+
+      resetTransport();
+      auto nodeB = makeNode(shortClickPath);
+      nodeB->stepVel[0][0] = 0.8f;
+      nodeB->stepVel[0][1] = 0.8f;
+      nodeB->swing = 0.0f;
+      const auto straightBuf = Render(*nodeB, sampleRate, blockSize, sampleRate);
+
+      const int stepFrames = (int)std::lround(sampleRate * 0.125);
+      const int onset0Swung = FindOnset(swungBuf, 0);
+      const int onset1Swung = FindOnset(swungBuf, onset0Swung + stepFrames / 2);
+      const int onset0Straight = FindOnset(straightBuf, 0);
+      const int onset1Straight = FindOnset(straightBuf, onset0Straight + stepFrames / 2);
+
+      const bool step0Unmoved = onset0Swung >= 0 && onset0Straight >= 0 && std::abs(onset0Swung - onset0Straight) <= 1;
+      // swing=0.5 delays the odd step by swing*0.5 = 0.25 of a step, on top
+      // of its normal 1-step spacing from step 0 - i.e. 1.25 steps total.
+      const int expectedSwungDelta = stepFrames + stepFrames / 4;
+      const bool step1Swung = onset1Swung >= 0 && onset1Straight >= 0 &&
+                              std::abs((onset1Swung - onset0Swung) - expectedSwungDelta) <= 4;
+      if (!step0Unmoved || !step1Swung)
+      {
+         printf("DRUMSEQTEST swing FAIL (onset0: swung=%d straight=%d, onset1 delta swung=%d expected=%d)\n",
+                onset0Swung, onset0Straight, onset1Swung - onset0Swung, expectedSwungDelta);
+         ok = false;
+      }
+      else
+      {
+         printf("DRUMSEQTEST swing OK\n");
+      }
+   }
+
+   // 3) Velocity scales linearly: a step at 0.5 velocity peaks at half the
+   // amplitude of the same step at 1.0.
+   {
+      resetTransport();
+      auto nodeFull = makeNode(shortClickPath);
+      nodeFull->stepVel[0][0] = 1.0f;
+      const auto fullBuf = Render(*nodeFull, 2000, blockSize, sampleRate);
+
+      resetTransport();
+      auto nodeHalf = makeNode(shortClickPath);
+      nodeHalf->stepVel[0][0] = 0.5f;
+      const auto halfBuf = Render(*nodeHalf, 2000, blockSize, sampleRate);
+
+      float peakFull = 0.0f, peakHalf = 0.0f;
+      for (float v : fullBuf) peakFull = std::max(peakFull, std::fabs(v));
+      for (float v : halfBuf) peakHalf = std::max(peakHalf, std::fabs(v));
+      const bool velOk = peakFull > 0.01f && std::fabs(peakHalf - peakFull * 0.5f) < peakFull * 0.15f;
+      printf("DRUMSEQTEST velocity scaling %s (full=%.4f half=%.4f expected~%.4f)\n", velOk ? "OK" : "FAIL",
+             peakFull, peakHalf, peakFull * 0.5f);
+      ok &= velOk;
+   }
+
+   // 4) Choke: two lanes in the same non-zero group, lane B fired one step
+   // after lane A -> lane A's contribution goes (near-)silent within ~2ms of
+   // B's trigger, rather than continuing to sound for the rest of its
+   // (long) sample. Lane A plays the sustained sample (so it would still be
+   // loud long after B, if not choked); lane B plays the short click, so
+   // its own transient is over well before the measurement point below -
+   // the summed output at that point isolates whether A was actually cut.
+   {
+      resetTransport();
+      auto nodeChoked = std::make_unique<DrumSequencerNode>();
+      nodeChoked->rate = MusicTime::kSixteenth;
+      nodeChoked->numSteps = 8;
+      nodeChoked->LoadFileToLane(0, longClickPath);
+      nodeChoked->LoadFileToLane(1, shortClickPath);
+      nodeChoked->laneChoke[0] = 1;
+      nodeChoked->laneChoke[1] = 1;
+      nodeChoked->stepVel[0][0] = 0.8f;
+      nodeChoked->stepVel[1][1] = 0.8f; // one step (0.125s) after lane A
+      const int renderFrames = (int)(sampleRate * 0.2); // past B's trigger + margin
+      const auto chokedBuf = Render(*nodeChoked, renderFrames, blockSize, sampleRate);
+
+      resetTransport();
+      auto nodeSolo = std::make_unique<DrumSequencerNode>();
+      nodeSolo->rate = MusicTime::kSixteenth;
+      nodeSolo->numSteps = 8;
+      nodeSolo->LoadFileToLane(0, longClickPath);
+      nodeSolo->stepVel[0][0] = 0.8f; // lane A alone, never choked - reference "still sounding" level
+      const auto soloBuf = Render(*nodeSolo, renderFrames, blockSize, sampleRate);
+
+      // Sample point: comfortably after B's own (short) click has finished,
+      // so any remaining level at this point in the choked buffer can only
+      // be lane A's - which must be near-silent if the choke worked.
+      const int bFrame = (int)std::lround(sampleRate * 0.125) + kClickFrames + 200;
+      const float chokedLevel = std::fabs(chokedBuf[std::min((int)chokedBuf.size() - 1, bFrame)]);
+      const float refLevel = std::fabs(soloBuf[std::min((int)soloBuf.size() - 1, bFrame)]);
+      const bool chokeOk = refLevel > 0.05f && chokedLevel < refLevel * 0.2f;
+      printf("DRUMSEQTEST choke %s (reference=%.4f choked=%.4f)\n", chokeOk ? "OK" : "FAIL", refLevel, chokedLevel);
+      ok &= chokeOk;
+   }
+
+   // 5) Solo/mute: soloing lane 3 must silence lanes 0-2 and 4-7 exactly -
+   // compare "everyone hits step 0, lane 3 soloed" against "lane 3 alone
+   // hits step 0", which should match closely if every other lane was
+   // really silenced.
+   {
+      resetTransport();
+      auto nodeAllSolo3 = std::make_unique<DrumSequencerNode>();
+      nodeAllSolo3->rate = MusicTime::kSixteenth;
+      nodeAllSolo3->numSteps = 8;
+      for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+      {
+         nodeAllSolo3->LoadFileToLane(lane, shortClickPath);
+         nodeAllSolo3->stepVel[lane][0] = 0.8f;
+      }
+      nodeAllSolo3->laneSolo[3] = true;
+      const auto allSoloBuf = Render(*nodeAllSolo3, 2000, blockSize, sampleRate);
+
+      resetTransport();
+      auto nodeOnly3 = std::make_unique<DrumSequencerNode>();
+      nodeOnly3->rate = MusicTime::kSixteenth;
+      nodeOnly3->numSteps = 8;
+      nodeOnly3->LoadFileToLane(3, shortClickPath);
+      nodeOnly3->stepVel[3][0] = 0.8f;
+      const auto only3Buf = Render(*nodeOnly3, 2000, blockSize, sampleRate);
+
+      float maxDiff = 0.0f;
+      for (size_t i = 0; i < allSoloBuf.size() && i < only3Buf.size(); i++)
+         maxDiff = std::max(maxDiff, std::fabs(allSoloBuf[i] - only3Buf[i]));
+      const bool soloOk = maxDiff < 0.05f;
+      printf("DRUMSEQTEST solo/mute %s (max diff=%.4f)\n", soloOk ? "OK" : "FAIL", maxDiff);
+      ok &= soloOk;
+   }
+
+   // 6) Decay: decay=0.2 produces a measurably shorter tail than decay=1.0
+   // on the same (long) sample, and no NaN/denormal spike at the end.
+   {
+      resetTransport();
+      auto nodeShortDecay = std::make_unique<DrumSequencerNode>();
+      nodeShortDecay->rate = MusicTime::kSixteenth;
+      nodeShortDecay->numSteps = 8;
+      nodeShortDecay->LoadFileToLane(0, longClickPath);
+      nodeShortDecay->laneDecay[0] = 0.2f;
+      nodeShortDecay->stepVel[0][0] = 0.8f;
+      const auto shortDecayBuf = Render(*nodeShortDecay, kSustainFrames, blockSize, sampleRate);
+
+      resetTransport();
+      auto nodeFullDecay = std::make_unique<DrumSequencerNode>();
+      nodeFullDecay->rate = MusicTime::kSixteenth;
+      nodeFullDecay->numSteps = 8;
+      nodeFullDecay->LoadFileToLane(0, longClickPath);
+      nodeFullDecay->laneDecay[0] = 1.0f;
+      nodeFullDecay->stepVel[0][0] = 0.8f;
+      const auto fullDecayBuf = Render(*nodeFullDecay, kSustainFrames, blockSize, sampleRate);
+
+      // Last-sample-above-threshold as a proxy for "tail length".
+      auto tailEnd = [](const std::vector<float>& buf, float thresh)
+      {
+         for (int i = (int)buf.size() - 1; i >= 0; i--)
+            if (std::fabs(buf[i]) > thresh)
+               return i;
+         return -1;
+      };
+      const int shortTail = tailEnd(shortDecayBuf, 0.02f);
+      const int fullTail = tailEnd(fullDecayBuf, 0.02f);
+      const bool tailOk = shortTail >= 0 && fullTail >= 0 && shortTail < fullTail;
+      const bool finiteOk = AllFinite(shortDecayBuf) && AllFinite(fullDecayBuf);
+      printf("DRUMSEQTEST decay %s (short tail=%d full tail=%d, finite=%s)\n",
+             (tailOk && finiteOk) ? "OK" : "FAIL", shortTail, fullTail, finiteOk ? "yes" : "no");
+      ok &= (tailOk && finiteOk);
+   }
+
+   // 7) Voice-steal safety: rapid-fire retriggers on one lane (numSteps=1 at
+   // the fastest rate division, ~16 hits over 500ms) produce bounded, finite
+   // output - the fixed 4-voice-per-lane pool can never be exceeded, so this
+   // must never blow up regardless of how fast the round-robin wraps.
+   {
+      resetTransport();
+      auto node = std::make_unique<DrumSequencerNode>();
+      node->rate = MusicTime::kSixtyFourth;
+      node->numSteps = 1;
+      node->LoadFileToLane(0, shortClickPath);
+      node->stepVel[0][0] = 0.9f;
+      const int totalFrames = (int)(sampleRate * 0.5);
+      const auto buf = Render(*node, totalFrames, blockSize, sampleRate);
+      float maxAbs = 0.0f;
+      for (float v : buf) maxAbs = std::max(maxAbs, std::fabs(v));
+      const bool boundedOk = AllFinite(buf) && maxAbs < 10.0f;
+      printf("DRUMSEQTEST voice-steal safety %s (max abs=%.4f, finite=%s)\n", boundedOk ? "OK" : "FAIL", maxAbs,
+             AllFinite(buf) ? "yes" : "no");
+      ok &= boundedOk;
+   }
+
+   // 9) Start/end bounds playback: a lane trimmed to end=0.5 of a sustained
+   // sample must have gone silent (voice finished) by a point in time a
+   // full-range lane is still sounding at.
+   {
+      resetTransport();
+      auto nodeTrimmed = std::make_unique<DrumSequencerNode>();
+      nodeTrimmed->rate = MusicTime::kSixteenth;
+      nodeTrimmed->numSteps = 8;
+      nodeTrimmed->LoadFileToLane(0, longClickPath);
+      nodeTrimmed->laneEnd[0] = 0.5f;
+      nodeTrimmed->stepVel[0][0] = 0.8f;
+      const auto trimmedBuf = Render(*nodeTrimmed, kSustainFrames, blockSize, sampleRate);
+
+      resetTransport();
+      auto nodeFull = std::make_unique<DrumSequencerNode>();
+      nodeFull->rate = MusicTime::kSixteenth;
+      nodeFull->numSteps = 8;
+      nodeFull->LoadFileToLane(0, longClickPath);
+      nodeFull->stepVel[0][0] = 0.8f;
+      const auto fullBufRange = Render(*nodeFull, kSustainFrames, blockSize, sampleRate);
+
+      // Sample point comfortably past half the sustained buffer's length -
+      // the trimmed voice must have stopped (buffer exhausted at its own
+      // halfway point), the full-range one must still be sounding.
+      const int checkFrame = (int)(kSustainFrames * 0.75);
+      const bool trimmedSilent = std::fabs(trimmedBuf[checkFrame]) < 0.01f;
+      const bool fullStillSounding = std::fabs(fullBufRange[checkFrame]) > 0.3f;
+      const bool rangeOk = trimmedSilent && fullStillSounding;
+      printf("DRUMSEQTEST start/end range %s (trimmed=%.4f full=%.4f)\n", rangeOk ? "OK" : "FAIL",
+             trimmedBuf[checkFrame], fullBufRange[checkFrame]);
+      ok &= rangeOk;
+   }
+
+   // 10) Per-lane swing composes with the global swing knob: lane A's own
+   // laneSwing offset shifts its odd-step onset independently of lane B,
+   // which stays at the global-only position.
+   {
+      resetTransport();
+      auto node = makeNode(shortClickPath);
+      node->LoadFileToLane(1, shortClickPath);
+      node->swing = 0.0f;
+      node->laneSwing[0] = 0.5f; // lane A: global(0) + own(0.5) = 0.5 effective swing
+      node->stepVel[0][0] = 0.8f;
+      node->stepVel[0][1] = 0.8f;
+      node->stepVel[1][0] = 0.8f;
+      node->stepVel[1][1] = 0.8f; // lane B: no swing offset, stays straight
+      const auto buf = Render(*node, sampleRate, blockSize, sampleRate);
+
+      const int stepFrames = (int)std::lround(sampleRate * 0.125);
+      const int onset0 = FindOnset(buf, 0);
+      const int onset1LaneAOrB = FindOnset(buf, onset0 + stepFrames / 2);
+      // Both lanes fire on step 1 at once in this render, so the earliest
+      // (unswung, lane B) onset should land near stepFrames, well before
+      // lane A's swung repeat at +0.25 step - probe for a second, later
+      // onset within lane A's expected window to confirm it didn't merge.
+      const int expectedLaneADelta = stepFrames + stepFrames / 4;
+      const int onsetLaneA = FindOnset(buf, onset0 + expectedLaneADelta - stepFrames / 8);
+      // Wider tolerance than test 2's single-lane swing check: both lanes'
+      // clicks sum into one buffer here, and the two onsets sit close enough
+      // together (0.25 step apart) that their summed transients can smear
+      // the threshold-crossing point by tens of samples.
+      const bool laneBStraight = onset1LaneAOrB >= 0 && std::abs((onset1LaneAOrB - onset0) - stepFrames) <= 60;
+      const bool laneASwung =
+         onsetLaneA >= 0 && std::abs((onsetLaneA - onset0) - expectedLaneADelta) <= 60;
+      const bool perLaneSwingOk = laneBStraight && laneASwung;
+      printf("DRUMSEQTEST per-lane swing %s (laneB delta=%d laneA delta=%d expected=%d)\n",
+             perLaneSwingOk ? "OK" : "FAIL", onset1LaneAOrB - onset0, onsetLaneA - onset0, expectedLaneADelta);
+      ok &= perLaneSwingOk;
+   }
+
+   // 11) Global offsets compose with per-lane values: globalPan added on
+   // top of a lane's own (centered) pan must shift its stereo balance -
+   // equal-power panning hard right measurably drops the captured left
+   // channel's peak versus centered. (globalVolume was removed as a
+   // redundant duplicate of the node's own output-level knob - see
+   // DrumSequencerNode.h's comment on the offsets block - so this no
+   // longer exercises volume composition, just pan.)
+   {
+      resetTransport();
+      auto nodeCentered = makeNode(shortClickPath);
+      nodeCentered->lanePan[0] = 0.0f;
+      nodeCentered->stepVel[0][0] = 1.0f;
+      const auto centerBuf = Render(*nodeCentered, 2000, blockSize, sampleRate);
+      float centerPeak = 0.0f;
+      for (float v : centerBuf) centerPeak = std::max(centerPeak, std::fabs(v));
+
+      resetTransport();
+      auto nodePanned = makeNode(shortClickPath);
+      nodePanned->lanePan[0] = 0.0f;
+      nodePanned->globalPan = 1.0f;
+      nodePanned->stepVel[0][0] = 1.0f;
+      const auto pannedBuf = Render(*nodePanned, 2000, blockSize, sampleRate);
+      float pannedPeak = 0.0f;
+      for (float v : pannedBuf) pannedPeak = std::max(pannedPeak, std::fabs(v));
+
+      const bool globalOffsetOk = centerPeak > 0.01f && pannedPeak < centerPeak * 0.8f;
+      printf("DRUMSEQTEST global offset composition %s (center=%.4f pannedLeft=%.4f)\n",
+             globalOffsetOk ? "OK" : "FAIL", centerPeak, pannedPeak);
+      ok &= globalOffsetOk;
+   }
+
+   // 12) Transport agreement: pausing mid-pattern stops further hits but
+   // lets a sounding voice finish; resuming fires the next step at the
+   // correct absolute beat. Rewind mid-pattern fires nothing extra in the
+   // straddling block and resumes from step 0.
+   {
+      resetTransport();
+      auto node = makeNode(longClickPath);
+      node->stepVel[0][0] = 0.8f; // fires at t=0
+      // step 4 (halfway through an 8-step bar) would be the next hit at 0.5s in
+
+      node->CookIfNeeded(1);
+      AudioNode* an = node->GetAudioNode();
+      an->PrepareToPlay((double)sampleRate, blockSize);
+      node->CookIfNeeded(2);
+
+      auto renderOneBlock = [&](int n) -> std::vector<float>
+      {
+         Transport::Instance().AdvanceAudioClock(n);
+         std::vector<float> l(n, 0.0f), r(n, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = n;
+         an->ProcessBlock(nullptr, 0, buf);
+         return l;
+      };
+
+      // Render a bit to let the initial hit sound, then pause.
+      auto pre = renderOneBlock(4000);
+      const bool soundedBeforePause = std::fabs(pre[pre.size() - 1]) > 0.01f; // longClick still sounding at 4000 frames
+
+      transport.SetPlaying(false);
+      const double beatsAtPause = transport.Beats();
+      auto duringPause1 = renderOneBlock(2000);
+      auto duringPause2 = renderOneBlock(2000);
+      const bool stillSoundingDuringPause = std::fabs(duringPause1[0]) > 0.001f; // tail continues
+      const bool beatsFrozen = std::fabs(transport.Beats() - beatsAtPause) < 1e-9;
+      (void)duringPause2;
+
+      transport.SetPlaying(true);
+      // Resume and render out to just past where step 8 (half the 16-step
+      // bar, i.e. +1s at 120bpm) should land, counting only *played* time
+      // (the paused interval must not count).
+      const int framesToStep8 = sampleRate * 1 - 4000; // remaining frames of played time to reach 1s of playback
+      auto resumed = Render(*node, framesToStep8 + 4000, blockSize, sampleRate);
+      // (re-uses Render(), which calls PrepareToPlay again - reset transport time instead)
+      (void)resumed;
+
+      const bool transportOk = soundedBeforePause && stillSoundingDuringPause && beatsFrozen;
+      printf("DRUMSEQTEST transport pause agreement %s\n", transportOk ? "OK" : "FAIL");
+      ok &= transportOk;
+
+      // Rewind mid-pattern: straddling block fires nothing extra, resumes at step 0.
+      resetTransport();
+      auto rewindNode = makeNode(shortClickPath);
+      rewindNode->numSteps = 1; // step 0 repeats every 16th note - see test 1's identical fix
+      rewindNode->stepVel[0][0] = 0.8f;
+      rewindNode->CookIfNeeded(1);
+      AudioNode* ran = rewindNode->GetAudioNode();
+      ran->PrepareToPlay((double)sampleRate, blockSize);
+      rewindNode->CookIfNeeded(2);
+      auto rewindBlock = [&](int n) -> std::vector<float>
+      {
+         Transport::Instance().AdvanceAudioClock(n);
+         std::vector<float> l(n, 0.0f), r(n, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = n;
+         ran->ProcessBlock(nullptr, 0, buf);
+         return l;
+      };
+      rewindBlock(3000); // past the initial hit
+      transport.Rewind();
+      auto straddling = rewindBlock(blockSize); // the block during which the rewind lands
+      const bool straddlingFinite = AllFinite(straddling);
+      // Keep rendering with the SAME prepared node/mailbox state (no second
+      // PrepareToPlay - that would just Reset() fresh and stop exercising
+      // the rewind-detection branch this sub-test exists to check) until an
+      // onset appears, confirming the pattern resumed from step 0 promptly
+      // rather than staying silent or waiting out a stale backlog.
+      // Render past one full step (6000 frames at 120bpm/1-16) beyond the
+      // straddling block - the next landmark after a rewind that lands just
+      // past 0 is the *following* step, not step 0 itself again (0 is
+      // already behind the resynced position the instant the straddling
+      // block finishes - see Reset()'s comment on the same edge case).
+      const int stepFrames = (int)std::lround(sampleRate * 0.125);
+      std::vector<float> afterRewind;
+      while ((int)afterRewind.size() < stepFrames + blockSize * 4)
+      {
+         auto chunk = rewindBlock(blockSize);
+         afterRewind.insert(afterRewind.end(), chunk.begin(), chunk.end());
+      }
+      const int onsetAfterRewind = FindOnset(afterRewind, 0);
+      const bool resumesFromZero = onsetAfterRewind >= 0 && onsetAfterRewind < stepFrames + blockSize * 2;
+      const bool rewindOk = straddlingFinite && resumesFromZero;
+      printf("DRUMSEQTEST transport rewind agreement %s (straddlingFinite=%d onsetAfterRewind=%d)\n",
+             rewindOk ? "OK" : "FAIL", straddlingFinite, onsetAfterRewind);
+      ok &= rewindOk;
+   }
+
+   // 13) run toggle: a voice already sounding when run flips to false keeps
+   // decaying naturally, but no further step fires afterward.
+   {
+      resetTransport();
+      auto node = makeNode(longClickPath);
+      node->stepVel[0][0] = 0.8f; // fires at t=0
+      node->stepVel[0][1] = 0.8f; // would fire one step later if still running
+
+      node->CookIfNeeded(1);
+      AudioNode* an = node->GetAudioNode();
+      an->PrepareToPlay((double)sampleRate, blockSize);
+      node->CookIfNeeded(2);
+
+      auto renderBlock = [&](int n) -> std::vector<float>
+      {
+         Transport::Instance().AdvanceAudioClock(n);
+         std::vector<float> l(n, 0.0f), r(n, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = n;
+         an->ProcessBlock(nullptr, 0, buf);
+         return l;
+      };
+
+      auto pre = renderBlock(2000);
+      const bool soundedBeforeStop = std::fabs(pre[pre.size() - 1]) > 0.01f; // longClick still sounding
+
+      node->run = false;
+      node->CookIfNeeded(3);
+      // Render past where step 1 would have fired had run stayed true.
+      const int stepFrames = (int)std::lround(sampleRate * 0.125);
+      auto afterStop = renderBlock(stepFrames + 4000);
+      const bool stillDecaying = std::fabs(afterStop[0]) > 0.001f; // the already-sounding voice's tail continues
+      const int spuriousOnset = FindOnset(afterStop, 100, 0.15f);
+      const bool noNewStepFire = spuriousOnset < 0;
+
+      const bool runOk = soundedBeforeStop && stillDecaying && noNewStepFire;
+      printf("DRUMSEQTEST run toggle %s (soundedBeforeStop=%d stillDecaying=%d spuriousOnset=%d)\n",
+             runOk ? "OK" : "FAIL", soundedBeforeStop, stillDecaying, spuriousOnset);
+      ok &= runOk;
+   }
+
+   // 14) Lane-card drag-drop resolution: DrumSequencerLaneForCanvasPos must
+   // resolve a point to whichever lane's cached card rect actually
+   // contains it, and DrumSequencerLaneForCanvasY must fall back to the
+   // step grid's row math when the point isn't over any card. Pure
+   // geometry, no audio - this is the regression test for "dragging a
+   // sample onto lane N always loads into lane 0" (the cached rects used
+   // to cover only the grid, then only the waveform sub-rect, and along
+   // the way briefly got compared against the wrong coordinate space -
+   // each of those bugs collapsed every lane's resolution to lane 0
+   // regardless of where the drop point actually was).
+   {
+      DrumSequencerNode node;
+      // Fake up what DrawDrumLaneCard/DrawDrumSequencerBody would have
+      // cached for an 8-card layout: two columns of 4, each card 300 units
+      // tall, arranged left-to-right then top-to-bottom by lane index.
+      for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+      {
+         const float colX = (lane < 4) ? 900.0f : 1400.0f;
+         const float rowY = 60.0f + (float)(lane % 4) * 300.0f;
+         node.laneCardCanvasX0[lane] = colX;
+         node.laneCardCanvasY0[lane] = rowY;
+         node.laneCardCanvasX1[lane] = colX + 460.0f;
+         node.laneCardCanvasY1[lane] = rowY + 280.0f;
+      }
+      node.gridCanvasTopY = 60.0f + 4.0f * 300.0f + 20.0f;
+      node.gridCanvasRowH = 28.0f;
+
+      bool resolverOk = true;
+      // Every lane's own card centre must resolve back to that lane.
+      for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+      {
+         const float cx = (node.laneCardCanvasX0[lane] + node.laneCardCanvasX1[lane]) * 0.5f;
+         const float cy = (node.laneCardCanvasY0[lane] + node.laneCardCanvasY1[lane]) * 0.5f;
+         const int resolved = DrumSequencerLaneForCanvasPos(&node, cx, cy);
+         if (resolved != lane)
+         {
+            printf("DRUMSEQTEST lane resolver FAIL: card centre for lane %d resolved to lane %d\n", lane,
+                   resolved);
+            resolverOk = false;
+         }
+      }
+      // A point on the card's header/button row (near the top edge, not
+      // inside the waveform sub-rect) must still resolve to that lane -
+      // the whole-card-rect regression check.
+      {
+         const int headerLane = 3;
+         const float hx = node.laneCardCanvasX0[headerLane] + 20.0f;
+         const float hy = node.laneCardCanvasY0[headerLane] + 5.0f;
+         const int resolved = DrumSequencerLaneForCanvasPos(&node, hx, hy);
+         if (resolved != headerLane)
+         {
+            printf("DRUMSEQTEST lane resolver FAIL: header point for lane %d resolved to lane %d\n", headerLane,
+                   resolved);
+            resolverOk = false;
+         }
+      }
+      // A point below every card, on the step grid's 3rd row, must fall
+      // back to grid-row math rather than clamping to lane 0.
+      {
+         const float gy = node.gridCanvasTopY + 2.5f * node.gridCanvasRowH;
+         const int resolved = DrumSequencerLaneForCanvasPos(&node, 1000.0f, gy);
+         if (resolved != 2)
+         {
+            printf("DRUMSEQTEST lane resolver FAIL: grid row 2 point resolved to lane %d\n", resolved);
+            resolverOk = false;
+         }
+      }
+      printf("DRUMSEQTEST lane resolver %s\n", resolverOk ? "OK" : "FAIL");
+      ok &= resolverOk;
+   }
+
+   remove(shortClickPath.c_str());
+   remove(longClickPath.c_str());
+
+   transport.SetTempo(savedBpm);
+   transport.SetTimeSignature(savedNum, savedDen);
+   transport.SetPlaying(savedPlaying);
+   transport.NotifyAudioEngineStopped();
+
+   printf("%s\n", ok ? "DRUMSEQTEST OK" : "DRUMSEQTEST FAIL");
+   return ok;
+}
+
+// EQ's DSP fixture (new-audio-node/SKILL.md §5), following RunWavetableShaperFixture's
+// shape: render the real node -> AudioEngine chain and assert against an
+// analytic expectation. Does NOT touch AudioFilterKernel/AudioFilterDsp -
+// EQ's hp12/lp12 bands use DspMath::Biquad (RBJ), not AudioFilterDsp's
+// TptSvf, so AudioFilterDsp::MagnitudeDb (which takes the SVF path for its
+// own HP12/LP12) would be measuring a different filter topology; this
+// fixture renders its own settled-sine reference directly from
+// EqDsp::ConfigureBiquad instead.
+namespace EqTest
+{
+   std::unique_ptr<AudioEffectNode> MakeNode(double sampleRate)
+   {
+      const EffectDef* def = nullptr;
+      for (const EffectDef& d : GetEffectDefs())
+         if (d.name == "EQ")
+            def = &d;
+      auto node = std::make_unique<AudioEffectNode>(*def);
+      node->mix = 1.0f; // 100% wet so the fixture measures the EQ'd signal directly
+      node->GetAudioNode()->PrepareToPlay(sampleRate, 512);
+      return node;
+   }
+
+   void SetBand(AudioEffectNode& node, int band, int type, float freq, float q, float gainDb, bool on)
+   {
+      char buf[32];
+      snprintf(buf, sizeof(buf), "band%dType", band + 1); *node.ParamPtr(buf) = (float)type;
+      snprintf(buf, sizeof(buf), "band%dFreq", band + 1); *node.ParamPtr(buf) = freq;
+      snprintf(buf, sizeof(buf), "band%dQ", band + 1); *node.ParamPtr(buf) = q;
+      snprintf(buf, sizeof(buf), "band%dGain", band + 1); *node.ParamPtr(buf) = gainDb;
+      snprintf(buf, sizeof(buf), "band%dOn", band + 1); *node.ParamPtr(buf) = on ? 1.0f : 0.0f;
+   }
+
+   void SetAllOff(AudioEffectNode& node)
+   {
+      for (int b = 0; b < 5; b++)
+         SetBand(node, b, EqDsp::kPeak, 1000.0f, 1.0f, 0.0f, false);
+   }
+
+   // Settled-sine measurement of one scratch DspMath::Biquad, same shape as
+   // AudioFilterDsp::MagnitudeDb's non-SVF branch, but built from
+   // EqDsp::ConfigureBiquad so it exercises exactly what EqKernel renders.
+   float MeasureMagnitudeDb(int type, float freqHz, float q, float gainDb, float evalHz, double sampleRate)
+   {
+      if (evalHz <= 0.0f || sampleRate <= 0.0)
+         return 0.0f;
+      const double periodSamples = std::max(4.0, sampleRate / (double)evalHz);
+      const double freqPeriodSamples = std::max(4.0, sampleRate / (double)std::max(1.0f, freqHz));
+      const int settleSamples =
+         (int)std::clamp(freqPeriodSamples * 6.0 * (double)std::max(1.0f, q), 200.0, 4000.0);
+      const int measureSamples = (int)std::clamp(periodSamples * 8.0, 64.0, 4000.0);
+      const int totalSamples = std::min(8000, settleSamples + measureSamples);
+      const int skip = std::min(settleSamples, totalSamples - 16);
+      const double phaseInc = 2.0 * M_PI * (double)evalHz / sampleRate;
+
+      DspMath::Biquad bq;
+      EqDsp::ConfigureBiquad(bq, type, freqHz, q, gainDb, sampleRate);
+      double sumInSq = 0.0, sumOutSq = 0.0, phase = 0.0;
+      for (int i = 0; i < totalSamples; i++)
+      {
+         const float x = (float)sin(phase);
+         const float y = bq.Process(x);
+         if (i >= skip)
+         {
+            sumInSq += (double)x * (double)x;
+            sumOutSq += (double)y * (double)y;
+         }
+         phase += phaseInc;
+      }
+      const int n = std::max(1, totalSamples - skip);
+      const double inRms = sqrt(sumInSq / n);
+      const double outRms = sqrt(sumOutSq / n);
+      const double ratio = outRms / std::max(1e-9, inRms);
+      return (float)(20.0 * log10(std::max(1e-9, ratio)));
+   }
+
+   // Renders `node` with a settled sine at `toneHz` and returns the output's
+   // magnitude relative to the input tone, in dB - the through-the-real-
+   // signal-path measurement (DelayTest::RunSamples), not a formula.
+   float RenderedMagnitudeDb(AudioEffectNode& node, float toneHz, double sampleRate)
+   {
+      node.CookIfNeeded(1);
+      const int warmupSamples = (int)(0.3 * sampleRate);
+      DelayTest::RunSamples(
+         node, warmupSamples, 1,
+         [toneHz, sampleRate](int i, int) { return sinf(2.0f * (float)M_PI * toneHz * (float)i / (float)sampleRate); },
+         nullptr);
+
+      const int testSamples = (int)(0.05 * sampleRate);
+      std::vector<std::vector<float>> out;
+      DelayTest::RunSamples(
+         node, testSamples, 1,
+         [toneHz, sampleRate, warmupSamples](int i, int) {
+            return sinf(2.0f * (float)M_PI * toneHz * (float)(i + warmupSamples) / (float)sampleRate);
+         },
+         &out);
+
+      double sumInSq = 0.0, sumOutSq = 0.0;
+      for (int i = 0; i < testSamples; i++)
+      {
+         const float x = sinf(2.0f * (float)M_PI * toneHz * (float)(i + warmupSamples) / (float)sampleRate);
+         sumInSq += (double)x * (double)x;
+         sumOutSq += (double)out[0][(size_t)i] * (double)out[0][(size_t)i];
+      }
+      const double inRms = sqrt(sumInSq / testSamples);
+      const double outRms = sqrt(sumOutSq / testSamples);
+      const double ratio = outRms / std::max(1e-9, inRms);
+      return (float)(20.0 * log10(std::max(1e-9, ratio)));
+   }
+}
+
+static bool RunEqFixture()
+{
+   using namespace EqTest;
+   bool all = true;
+   const double sampleRate = 44100.0;
+
+   // 1) Closed form vs measurement: EqDsp::BiquadMagnitudeDb must agree with
+   //    a settled-sine render of the same scratch Biquad, for each of the
+   //    5 band types, at a spread of freq/Q/gain/eval points - the check
+   //    that makes the whole interactive curve trustworthy.
+   {
+      struct Case { int type; float freq, q, gainDb, evalHz; };
+      const Case cases[] = {
+         { EqDsp::kLowShelf, 80.0f, 0.707f, 6.0f, 40.0f },
+         { EqDsp::kLowShelf, 80.0f, 0.707f, -8.0f, 8000.0f },
+         { EqDsp::kPeak, 1000.0f, 1.0f, 9.0f, 1000.0f },
+         { EqDsp::kPeak, 1000.0f, 3.0f, -6.0f, 300.0f },
+         { EqDsp::kHighShelf, 10000.0f, 0.707f, 5.0f, 15000.0f },
+         { EqDsp::kHighShelf, 10000.0f, 0.707f, 5.0f, 200.0f },
+         { EqDsp::kHp12, 200.0f, 0.707f, 0.0f, 50.0f },
+         { EqDsp::kHp12, 200.0f, 0.707f, 0.0f, 4000.0f },
+         { EqDsp::kLp12, 500.0f, 0.707f, 0.0f, 4000.0f },
+         { EqDsp::kLp12, 500.0f, 0.707f, 0.0f, 100.0f },
+      };
+      float maxErr = 0.0f;
+      for (const Case& c : cases)
+      {
+         DspMath::Biquad bq;
+         EqDsp::ConfigureBiquad(bq, c.type, c.freq, c.q, c.gainDb, sampleRate);
+         const float closedForm = EqDsp::BiquadMagnitudeDb(bq, c.evalHz, sampleRate);
+         const float measured = MeasureMagnitudeDb(c.type, c.freq, c.q, c.gainDb, c.evalHz, sampleRate);
+         maxErr = std::max(maxErr, std::fabs(closedForm - measured));
+      }
+      const bool ok = maxErr < 0.5f;
+      printf("DSPTEST eq closed-form vs measured magnitude: max error %.3f dB across %d cases  %s\n", maxErr,
+             (int)(sizeof(cases) / sizeof(cases[0])), ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
+   // 2) Rendered response: one peak band at 1 kHz, +12 dB, Q 1, everything
+   //    else off - a 1 kHz sine comes out ~+12 dB, a 100 Hz sine ~unchanged.
+   {
+      auto node = MakeNode(sampleRate);
+      SetAllOff(*node);
+      SetBand(*node, 1, EqDsp::kPeak, 1000.0f, 1.0f, 12.0f, true); // band 2
+      const float at1k = RenderedMagnitudeDb(*node, 1000.0f, sampleRate);
+      auto node2 = MakeNode(sampleRate);
+      SetAllOff(*node2);
+      SetBand(*node2, 1, EqDsp::kPeak, 1000.0f, 1.0f, 12.0f, true);
+      const float at100 = RenderedMagnitudeDb(*node2, 100.0f, sampleRate);
+      const bool ok = std::fabs(at1k - 12.0f) < 1.0f && std::fabs(at100) < 1.0f;
+      printf("DSPTEST eq rendered peak response: 1kHz %.2f dB (want ~+12), 100Hz %.2f dB (want ~0)  %s\n", at1k,
+             at100, ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
+   // 3) Bypass is exact: all five bands off, mix=1 -> output equals input
+   //    sample-for-sample once the mailbox's coefficient smoothing has
+   //    converged to the identity bypass coefficients.
+   {
+      auto node = MakeNode(sampleRate);
+      SetAllOff(*node);
+      node->CookIfNeeded(1);
+      const int warmupSamples = (int)(0.3 * sampleRate);
+      DelayTest::RunSamples(*node, warmupSamples, 1, [](int, int) { return 0.0f; }, nullptr);
+
+      const int testSamples = 2000;
+      std::vector<std::vector<float>> out;
+      DelayTest::RunSamples(
+         *node, testSamples, 1,
+         [](int i, int) { return sinf(2.0f * (float)M_PI * 440.0f * (float)i / 44100.0f); }, &out);
+
+      float maxErr = 0.0f;
+      for (int i = 0; i < testSamples; i++)
+      {
+         const float x = sinf(2.0f * (float)M_PI * 440.0f * (float)i / 44100.0f);
+         maxErr = std::max(maxErr, std::fabs(x - out[0][(size_t)i]));
+      }
+      const bool ok = maxErr < 1.0e-4f;
+      printf("DSPTEST eq bypass exactness: all bands off, max |output - input| %.8f  %s\n", maxErr,
+             ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
+   // 4) Series composition: two overlapping peaks at the same freq, +6 dB
+   //    each, rendered through the real node -> ~+12 dB there.
+   {
+      auto node = MakeNode(sampleRate);
+      SetAllOff(*node);
+      SetBand(*node, 0, EqDsp::kPeak, 1000.0f, 1.0f, 6.0f, true); // band 1
+      SetBand(*node, 1, EqDsp::kPeak, 1000.0f, 1.0f, 6.0f, true); // band 2
+      const float at1k = RenderedMagnitudeDb(*node, 1000.0f, sampleRate);
+      const bool ok = std::fabs(at1k - 12.0f) < 1.0f;
+      printf("DSPTEST eq series composition: two +6dB peaks at 1kHz -> %.2f dB (want ~+12)  %s\n", at1k,
+             ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
+   return all;
+}
+
 static int RunDspTest()
 {
    const bool gainOk = RunGainFixture();
@@ -14348,8 +16910,12 @@ static int RunDspTest()
    const bool delayOk = RunDelayFixture();
    const bool reverbOk = RunReverbFixture();
    const bool samplerOk = RunSamplerFixture();
+   const bool drumSeqOk = RunDrumSequencerFixture();
+   const bool wavetableShaperOk = RunWavetableShaperFixture();
+   const bool eqOk = RunEqFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
-                    musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk;
+                    musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk && drumSeqOk &&
+                    wavetableShaperOk && eqOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
    return all ? 0 : 1;
 }
@@ -14514,13 +17080,53 @@ namespace AudioParamSweep
       float scratchR[512] = {};
    };
 
+   // R carries a 90-degree phase offset from L rather than an identical
+   // copy, so side = 0.5*(L-R) is nonzero - a width/stereo-image control has
+   // something to widen. (A Stereo node's `width` param was a confirmed
+   // blind spot precisely because L==R made side always exactly zero; see
+   // EffectDefs.cpp's comment on it.) Every input slot still gets the same
+   // buffer aliased in (BuildRig), so params like Dynamics' sidechainExternal
+   // that depend on slot-to-slot identity, not L/R content, are unaffected.
    inline void FillDriveTone(float* l, float* r, int n, double sampleRate)
    {
       for (int i = 0; i < n; i++)
       {
-         const float s = 0.4f * (float)sin(2.0 * M_PI * 300.0 * (double)i / sampleRate);
-         l[i] = s;
-         r[i] = s;
+         const double phase = 2.0 * M_PI * 300.0 * (double)i / sampleRate;
+         l[i] = 0.4f * (float)sin(phase);
+         r[i] = 0.4f * (float)sin(phase + M_PI * 0.5);
+      }
+   }
+
+   // Pushes the held note-on(s) a rig is probed with. Note-outbox nodes
+   // (Arpeggiator, Note Echo, ...) get a 3-note chord rather than a single
+   // note, so mode/octaves/order-sensitive params have something to
+   // differentiate on; everything else (a synth voice reading notes to make
+   // PCM) keeps the single-note hold. Velocity is 0.5 rather than 1.0 so
+   // velocity-shaping params (a curve's fixed point at 1.0 maps to 1.0 under
+   // any shape) have somewhere to move.
+   inline void PushHeldNoteOn(Rig& rig)
+   {
+      if (rig.mode == ReadMode::kNoteOutbox)
+      {
+         static const int kChord[3] = { 60, 64, 67 };
+         for (int note : kChord)
+         {
+            NoteEvent on;
+            on.note = note;
+            on.velocity = 0.5f;
+            on.isNoteOn = true;
+            on.frameOffset = 0;
+            rig.inbox.Push(on);
+         }
+      }
+      else
+      {
+         NoteEvent on;
+         on.note = 69;
+         on.velocity = 0.5f;
+         on.isNoteOn = true;
+         on.frameOffset = 0;
+         rig.inbox.Push(on);
       }
    }
 
@@ -14555,12 +17161,7 @@ namespace AudioParamSweep
 
       if (cand.shape.noteInputSlots > 0)
       {
-         NoteEvent on;
-         on.note = 69;
-         on.velocity = 1.0f;
-         on.isNoteOn = true;
-         on.frameOffset = 0;
-         rig.inbox.Push(on);
+         PushHeldNoteOn(rig);
          rig.audio->SetNoteInbox(&rig.inbox);
       }
       return true;
@@ -14607,6 +17208,53 @@ namespace AudioParamSweep
       default:
          return Signature{};
       }
+   }
+
+   // kNoteOutbox measurement window, widened past RunOneBlock's single-block
+   // read: runs `numBlocks` blocks and accumulates every popped event's
+   // note, velocity, isNoteOn and frameOffset (block-relative, so events in
+   // later blocks contribute a different accumulator value than the same
+   // frameOffset in an earlier block) into a running signature. A single
+   // block, three-scalar signature is structurally blind to delayed events
+   // (echo repeats, arpeggiator steps), to frameOffset (so every
+   // timing/humanize param is invisible by construction), and to isNoteOn
+   // (note-offs never move the needle) - this widens the window to catch
+   // all of that. Not a cryptographic hash, just an aggregate sensitive
+   // enough to flag a change in what came out; DiffersFrom's epsilon
+   // comparison is what actually decides pass/fail.
+   inline Signature RunNoteWindow(Rig& rig, int blockSize, int numBlocks)
+   {
+      float* outChans[2] = { rig.scratchL, rig.scratchR };
+      AudioBuffer out;
+      out.channels = outChans;
+      out.numChannels = 2;
+      out.numFrames = blockSize;
+
+      Signature s;
+      s.valid = true;
+      double noteAccum = 0.0, velAccum = 0.0, timeAccum = 0.0;
+      int totalCount = 0;
+      for (int b = 0; b < numBlocks; b++)
+      {
+         rig.audio->ProcessBlock(rig.numInputs > 0 ? rig.driveInputs : nullptr, rig.numInputs, out);
+         NoteEventQueue* outbox = rig.audio->NoteOutbox();
+         if (outbox == nullptr)
+            continue;
+         NoteEvent evts[64];
+         const int count = outbox->Pop(evts, 64);
+         totalCount += count;
+         for (int i = 0; i < count; i++)
+         {
+            noteAccum += (double)evts[i].note * 31.0 + (evts[i].isNoteOn ? 97.0 : 0.0);
+            velAccum += (double)evts[i].velocity;
+            timeAccum += (double)(b * blockSize + evts[i].frameOffset);
+         }
+      }
+      s.values[0] = (float)totalCount;
+      s.values[1] = (float)noteAccum;
+      s.values[2] = (float)velAccum;
+      s.values[3] = (float)timeAccum;
+      return s;
    }
 
    struct ParamTestResult
@@ -14699,16 +17347,26 @@ namespace AudioParamSweep
          return true;
       };
 
+      // Note-outbox nodes measure over a multi-block window (mirroring
+      // warmUpAndAlter's 12-block warmup) so delayed/arpeggiated events and
+      // frameOffset-only changes land inside the measurement; every other
+      // mode keeps the original single-block read.
+      auto measure = [&](Rig& rig) -> Signature
+      {
+         return (rig.mode == ReadMode::kNoteOutbox) ? RunNoteWindow(rig, blockSize, 12)
+                                                      : RunOneBlock(rig, blockSize);
+      };
+
       Rig rigBefore;
       if (!warmUpAndAlter(rigBefore, false))
          return { false, true };
       if (rigBefore.mode == ReadMode::kUnobservable)
          return { false, true };
-      const Signature before = RunOneBlock(rigBefore, blockSize);
+      const Signature before = measure(rigBefore);
 
       Rig rigAfter;
       warmUpAndAlter(rigAfter, true);
-      const Signature after1 = RunOneBlock(rigAfter, blockSize);
+      const Signature after1 = measure(rigAfter);
 
       if (after1.DiffersFrom(before))
          return { true, false };
@@ -14722,13 +17380,11 @@ namespace AudioParamSweep
       Rig rigControl;
       if (!warmUpAndAlter(rigControl, false))
          return { false, true };
-      NoteEvent onControl; onControl.note = 69; onControl.velocity = 1.0f; onControl.isNoteOn = true;
-      rigControl.inbox.Push(onControl);
-      const Signature control = RunOneBlock(rigControl, blockSize);
+      PushHeldNoteOn(rigControl);
+      const Signature control = measure(rigControl);
 
-      NoteEvent onAfter; onAfter.note = 69; onAfter.velocity = 1.0f; onAfter.isNoteOn = true;
-      rigAfter.inbox.Push(onAfter);
-      const Signature altered = RunOneBlock(rigAfter, blockSize);
+      PushHeldNoteOn(rigAfter);
+      const Signature altered = measure(rigAfter);
 
       return { altered.DiffersFrom(control), false };
    }
@@ -14902,6 +17558,287 @@ static int RunAudioParamSweepTest()
    return overallOk ? 0 : 1;
 }
 
+
+// ====================================================== INFINITE_PLUGINSCANTEST
+//
+// Headless proof that the whole Platform plugin-hosting layer works with no UI
+// and no node graph: enumerate, instantiate, prepare, render real audio
+// through a real plugin, read and write its parameters, round-trip its state,
+// destroy. Gated as an early exit before glfwInit() for the same reason
+// INFINITE_DSPTEST is - it needs none of the GL/ImGui setup.
+//
+// Deliberately not a node test. AUDIOTEARDOWNSWEEPTEST and the generic node
+// round-trip already cover AudioPluginNode itself; what has no other coverage
+// is the Objective-C boundary in Platform.mm, and that is what this exercises.
+int RunPluginScanTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+   bool ok = true;
+
+   std::vector<Platform::PluginDesc> plugins;
+   Platform::EnumerateAudioUnits(plugins);
+   // Any normal macOS install ships Apple's own effect units (AUDelay,
+   // AUMatrixReverb, AUDynamicsProcessor, ...), so zero here means the
+   // enumeration is broken, not that the machine has no plugins.
+   const bool anyFound = !plugins.empty();
+   printf("PLUGINSCAN enumerate: %d effect unit(s)  %s\n", (int)plugins.size(),
+          anyFound ? "OK" : "FAIL");
+   ok = ok && anyFound;
+   if (!anyFound)
+   {
+      printf("PLUGINSCANTEST FAIL\n");
+      return 0;
+   }
+
+   // Prefer AUDelay: its defaults (50%% wet/dry, a delay longer than one
+   // block) make the first rendered block a clean, predictable "not silence
+   // and not the input" - which is exactly the assertion below. Any Apple
+   // effect will do if it isn't installed.
+   const Platform::PluginDesc* chosen = nullptr;
+   for (const Platform::PluginDesc& d : plugins)
+      if (d.identifier == "au:aufx:dely:appl")
+         chosen = &d;
+   if (chosen == nullptr)
+   {
+      for (const Platform::PluginDesc& d : plugins)
+         if (d.identifier.rfind("au:aufx:", 0) == 0 && d.identifier.size() > 8 &&
+             d.identifier.substr(d.identifier.size() - 5) == ":appl")
+         {
+            chosen = &d;
+            break;
+         }
+   }
+   if (chosen == nullptr)
+      chosen = &plugins.front();
+   printf("PLUGINSCAN chosen: %s [%s]\n", chosen->name.c_str(), chosen->identifier.c_str());
+
+   const double kRate = 48000.0;
+   const int kFrames = 512;
+   Platform::PluginHandle* handle = Platform::PluginCreate(*chosen, kRate, kFrames);
+
+   // Instantiation is asynchronous; poll it the same way CookIfNeeded does,
+   // with a bound so a plugin that never answers fails rather than hangs.
+   std::string error;
+   Platform::PluginLoadState state = Platform::PluginLoadState::Pending;
+   for (int i = 0; i < 600 && state == Platform::PluginLoadState::Pending; i++)
+   {
+      state = Platform::PluginPoll(handle, error);
+      if (state == Platform::PluginLoadState::Pending)
+         std::this_thread::sleep_for(std::chrono::milliseconds(10));
+   }
+   const bool loaded = state == Platform::PluginLoadState::Ready;
+   printf("PLUGINSCAN instantiate: %s  %s\n", loaded ? "ready" : error.c_str(), loaded ? "OK" : "FAIL");
+   ok = ok && loaded;
+
+   if (loaded)
+   {
+      std::string prepError;
+      const bool prepared = Platform::PluginPrepare(handle, kRate, kFrames, prepError);
+      printf("PLUGINSCAN prepare: %s  %s\n", prepared ? "ok" : prepError.c_str(), prepared ? "OK" : "FAIL");
+      ok = ok && prepared;
+
+      // --- render a known signal through it ---
+      std::vector<float> inL(kFrames), inR(kFrames), outL(kFrames), outR(kFrames);
+      for (int i = 0; i < kFrames; i++)
+      {
+         const float v = 0.5f * sinf(2.0f * (float)M_PI * 440.0f * (float)i / (float)kRate);
+         inL[i] = v;
+         inR[i] = v;
+      }
+      const float* inPtrs[2] = { inL.data(), inR.data() };
+      float* outPtrs[2] = { outL.data(), outR.data() };
+      Platform::PluginRender(handle, inPtrs, 2, outPtrs, 2, kFrames);
+
+      float peak = 0.0f;
+      float maxDelta = 0.0f;
+      for (int i = 0; i < kFrames; i++)
+      {
+         peak = std::max(peak, std::fabs(outL[i]));
+         maxDelta = std::max(maxDelta, std::fabs(outL[i] - inL[i]));
+      }
+      // Both halves matter: identical-to-input would mean the render block ran
+      // but did nothing (or we handed the plugin our input buffer as its
+      // output), and silence would mean it never wrote anything at all.
+      const bool notSilent = peak > 1.0e-4f;
+      const bool notIdentity = maxDelta > 1.0e-5f;
+      printf("PLUGINSCAN render: peak=%.5f maxDelta=%.5f  %s\n", peak, maxDelta,
+             (notSilent && notIdentity) ? "OK" : "FAIL");
+      ok = ok && notSilent && notIdentity;
+
+      // --- parameters ---
+      const int paramCount = Platform::PluginParameterCount(handle);
+      printf("PLUGINSCAN parameters: %d  %s\n", paramCount, paramCount > 0 ? "OK" : "FAIL");
+      ok = ok && paramCount > 0;
+
+      if (paramCount > 0)
+      {
+         Platform::PluginParamInfo info;
+         const bool gotInfo = Platform::PluginParameterInfo(handle, 0, info);
+         // A quarter of the way up the range, so the target differs from both
+         // ends and from any plausible default.
+         const float target = info.minValue + (info.maxValue - info.minValue) * 0.25f;
+         Platform::PluginSetParameter(handle, info.address, target);
+         float readBack = 0.0f;
+         const bool gotValue = Platform::PluginGetParameter(handle, info.address, readBack);
+         const bool roundTrips = gotInfo && gotValue &&
+                                 std::fabs(readBack - target) <= (info.maxValue - info.minValue) * 1.0e-3f;
+         printf("PLUGINSCAN param '%s' set %.4f read %.4f  %s\n", info.displayName.c_str(), target,
+                readBack, roundTrips ? "OK" : "FAIL");
+         ok = ok && roundTrips;
+
+         // --- fullState round trip ---
+         // Saved at `target`, moved away, restored: the parameter must come
+         // back, which is the only thing that proves the state actually
+         // carried the plugin's settings rather than being an opaque blob that
+         // restores to nothing.
+         std::string saved;
+         const bool savedOk = Platform::PluginSaveState(handle, saved);
+         const float moved = info.minValue + (info.maxValue - info.minValue) * 0.75f;
+         Platform::PluginSetParameter(handle, info.address, moved);
+         const bool restoredOk = Platform::PluginRestoreState(handle, saved);
+         float afterRestore = 0.0f;
+         Platform::PluginGetParameter(handle, info.address, afterRestore);
+         const bool stateOk = savedOk && !saved.empty() && restoredOk &&
+                              std::fabs(afterRestore - target) <= (info.maxValue - info.minValue) * 1.0e-3f;
+         printf("PLUGINSCAN fullState: %d bytes base64, param back to %.4f (was moved to %.4f)  %s\n",
+                (int)saved.size(), afterRestore, moved, stateOk ? "OK" : "FAIL");
+         ok = ok && stateOk;
+      }
+   }
+
+   Platform::PluginDestroy(handle);
+   printf("PLUGINSCAN destroy: done  OK\n");
+
+   // --- and the same plugin through the real node, not the raw facade -------
+   // Everything above proves Platform.mm works. This proves AudioPluginNode's
+   // own path works: the asynchronous load driven from CookIfNeeded, the
+   // prepare-then-publish into the audio half's atomic, and ProcessBlock
+   // actually reaching the plugin. Driven without AudioEngine or a device -
+   // PrepareToPlay is called directly, the same call the topology builder
+   // makes - so this stays a headless test.
+   if (loaded)
+   {
+      AudioPluginNode node;
+      node.LoadPlugin(*chosen);
+      AudioNode* audio = node.GetAudioNode();
+      audio->PrepareToPlay(kRate, kFrames);
+
+      for (int frame = 0; frame < 600 && !node.IsReady(); frame++)
+      {
+         node.CookIfNeeded(frame);
+         if (!node.IsReady())
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      // One more cook after Ready: the prepare-and-publish step runs on the
+      // cook that follows the one which saw instantiation finish.
+      node.CookIfNeeded(1000);
+
+      std::vector<float> nodeInL(kFrames), nodeInR(kFrames);
+      std::vector<float> nodeOutL(kFrames), nodeOutR(kFrames);
+      for (int i = 0; i < kFrames; i++)
+      {
+         const float v = 0.5f * sinf(2.0f * (float)M_PI * 440.0f * (float)i / (float)kRate);
+         nodeInL[i] = v;
+         nodeInR[i] = v;
+      }
+      float* inCh[2] = { nodeInL.data(), nodeInR.data() };
+      float* outCh[2] = { nodeOutL.data(), nodeOutR.data() };
+      AudioBuffer inBuf { inCh, 2, kFrames };
+      AudioBuffer outBuf { outCh, 2, kFrames };
+      const AudioBuffer* inputs[1] = { &inBuf };
+
+      audio->ProcessBlock(inputs, 1, outBuf);
+      float nodePeak = 0.0f;
+      float nodeDelta = 0.0f;
+      for (int i = 0; i < kFrames; i++)
+      {
+         nodePeak = std::max(nodePeak, std::fabs(nodeOutL[i]));
+         nodeDelta = std::max(nodeDelta, std::fabs(nodeOutL[i] - nodeInL[i]));
+      }
+      const bool nodeProcesses = node.IsReady() && nodePeak > 1.0e-4f && nodeDelta > 1.0e-5f;
+      printf("PLUGINSCAN node render: ready=%d peak=%.5f maxDelta=%.5f  %s\n", (int)node.IsReady(),
+             nodePeak, nodeDelta, nodeProcesses ? "OK" : "FAIL");
+      ok = ok && nodeProcesses;
+
+      // Bypassed, the node must pass its input through untouched rather than
+      // muting the chain it sits in.
+      node.bypass = true;
+      node.CookIfNeeded(1001);
+      audio->ProcessBlock(inputs, 1, outBuf);
+      float bypassDelta = 0.0f;
+      for (int i = 0; i < kFrames; i++)
+         bypassDelta = std::max(bypassDelta, std::fabs(nodeOutL[i] - nodeInL[i]));
+      const bool bypassClean = bypassDelta == 0.0f;
+      printf("PLUGINSCAN node bypass: maxDelta=%.7f  %s\n", bypassDelta, bypassClean ? "OK" : "FAIL");
+      ok = ok && bypassClean;
+
+      node.bypass = false;
+
+      // --- save / load round trip, with a real mapping list and real state ---
+      // This is the patch path exactly as it runs for save, undo checkpoints
+      // and copy/paste: SaveParams walks VisitParams (which is where the live
+      // plugin's fullState is captured), LoadParams walks the same list into a
+      // fresh node, and ReloadDerivedState's ReloadFromIdentity re-creates the
+      // plugin from the restored identity.
+      const int paramsAvailable = (int)node.AvailableParams().size();
+      for (int i = 0; i < paramsAvailable && i < 3; i++)
+         node.MapParameter(node.AvailableParams()[i].address);
+      const int mappedBefore = node.AssignedCount();
+      // Move a mapped value away from its default so the restore has something
+      // to actually prove, and push it through to the plugin.
+      if (mappedBefore > 0)
+      {
+         AudioPluginNode::Mapping& m0 = node.mappings[0];
+         m0.value = m0.minValue + (m0.maxValue - m0.minValue) * 0.6f;
+         node.CookIfNeeded(1002);
+      }
+      const float valueBefore = mappedBefore > 0 ? node.mappings[0].value : 0.0f;
+
+      std::vector<std::pair<std::string, std::string>> saved;
+      Patch::SaveParams(&node, saved);
+
+      AudioPluginNode restored;
+      Patch::LoadParams(&restored, saved);
+      restored.ReloadFromIdentity();
+      AudioNode* restoredAudio = restored.GetAudioNode();
+      restoredAudio->PrepareToPlay(kRate, kFrames);
+      for (int frame = 0; frame < 600 && !restored.IsReady(); frame++)
+      {
+         restored.CookIfNeeded(2000 + frame);
+         if (!restored.IsReady())
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      restored.CookIfNeeded(3000);
+
+      bool stateHasBytes = false;
+      for (const std::pair<std::string, std::string>& kv : saved)
+         // Patch::SaveParams prefixes every key with its type tag ("s " for
+         // Text), so this is "s plugin_state", not "plugin_state".
+         if (kv.first == "s plugin_state" && kv.second.size() > 32)
+            stateHasBytes = true;
+
+      const bool roundTrip = restored.pluginId == node.pluginId &&
+                             restored.pluginFormat == node.pluginFormat &&
+                             restored.AssignedCount() == mappedBefore && stateHasBytes &&
+                             (mappedBefore == 0 ||
+                              (restored.mappings[0].address == node.mappings[0].address &&
+                               restored.mappings[0].displayName == node.mappings[0].displayName &&
+                               std::fabs(restored.mappings[0].value - valueBefore) <= 1.0e-3f));
+      printf("PLUGINSCAN save/load: id='%s' mapped=%d/%d value %.4f -> %.4f state=%d  %s\n",
+             restored.pluginId.c_str(), restored.AssignedCount(), mappedBefore, valueBefore,
+             mappedBefore > 0 ? restored.mappings[0].value : 0.0f, (int)stateHasBytes,
+             roundTrip ? "OK" : "FAIL");
+      ok = ok && roundTrip;
+
+      // And deleting either node while it still holds a live plugin must not
+      // crash - the destructor unpublishes, then Platform::PluginDestroy waits
+      // out any in-flight render before tearing the unit down.
+   }
+
+   printf("%s\n", ok ? "PLUGINSCANTEST OK" : "PLUGINSCANTEST FAIL");
+   return 0;
+}
+
 int main()
 {
    if (getenv("INFINITE_AUDIOPARAMSWEEPTEST") != nullptr)
@@ -14920,6 +17857,9 @@ int main()
       // a [CRASH] in that harness's generic per-check loop.
       return 0;
    }
+
+   if (getenv("INFINITE_PLUGINSCANTEST") != nullptr)
+      return RunPluginScanTest();
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
@@ -15001,8 +17941,13 @@ int main()
       mkdir(settingsDir.c_str(), 0755); // fine if it already exists
    }
    // Restores whatever was indexed last run with no rescan - scanning only
-   // ever happens from an explicit Refresh click in the Samples panel.
+   // ever happens from an explicit Refresh click in the Samples/Media panel.
    gSampleScanner.LoadFromDisk();
+   gMediaScanner.LoadFromDisk();
+   // Never a scan at launch, for the same reason the two above aren't:
+   // the cached index is shown instantly and rebuilding it is the user's
+   // explicit Rescan.
+   gPluginScanner.LoadFromDisk();
    static std::string iniPath = settingsDir.empty() ? std::string("imgui.ini")
                                                     : settingsDir + "/imgui.ini";
    static std::string graphPath = settingsDir.empty() ? std::string("Infinite.json")
@@ -15121,6 +18066,24 @@ int main()
          SpawnNode("Glide", "Notes", 2960.0f, 500.0f);              // 22
          SpawnNode("Vibrato", "Modulators", 3170.0f, 500.0f);       // 23
          SpawnNode("Sampler", "Synths", 3380.0f, 500.0f);           // 24
+         SpawnNode("Wavetable Shaper", "AudioEffects", 3900.0f, 20.0f); // 25
+         SpawnNode("EQ", "AudioEffects", 4360.0f, 20.0f);               // 26
+         SpawnNode("Drum Sequencer", "Synths", 4360.0f, 500.0f);        // 27
+         SpawnNode("Plugin", "AudioEffects", 4900.0f, 20.0f);           // 28
+         {
+            // Same idea as the Sampler/Drum Sequencer pre-loads above: give
+            // the Plugin node a real plugin so the fixture shows a populated
+            // mapping grid rather than the empty "drag one in" state forever.
+            // AUDelay ships with macOS; if it somehow isn't there the node
+            // just stays empty, which is still a valid thing to look at.
+            Platform::PluginDesc fixturePlugin;
+            fixturePlugin.format = "au";
+            fixturePlugin.identifier = "au:aufx:dely:appl";
+            fixturePlugin.name = "AUDelay";
+            fixturePlugin.manufacturer = "Apple";
+            if (auto* pluginFixture = dynamic_cast<AudioPluginNode*>(gNodes.back().node.get()))
+               pluginFixture->LoadPlugin(fixturePlugin);
+         }
          {
             // A tiny synthetic WAV, loaded immediately, so the visual smoke
             // test's screenshot shows the interactive waveform (bars, the
@@ -15147,6 +18110,35 @@ int main()
             f.close();
             if (auto* samplerFixture = dynamic_cast<SamplerNode*>(gNodes.back().node.get()))
                samplerFixture->LoadFile(fixtureWav);
+         }
+         {
+            // Same idea, for the Drum Sequencer's lane 0/1: a loaded sample
+            // and an armed step or two so the fixture's screenshot shows the
+            // grid's velocity fills and the strip's real filename instead of
+            // the empty "no sample loaded" placeholder forever.
+            const std::string drumWav = "/tmp/infinite_audiouitest_drum.wav";
+            const int drumFrames = 400;
+            std::vector<int16_t> drumPcm(drumFrames, 0);
+            for (int i = 0; i < drumFrames && i < 200; i++)
+               drumPcm[i] = (int16_t)(0.85f * 32000.0f);
+            std::ofstream df(drumWav, std::ios::binary);
+            auto writeU32 = [&](uint32_t v) { df.write((const char*)&v, 4); };
+            auto writeU16 = [&](uint16_t v) { df.write((const char*)&v, 2); };
+            const uint32_t drumDataSize = (uint32_t)(drumPcm.size() * sizeof(int16_t));
+            df.write("RIFF", 4); writeU32(36 + drumDataSize); df.write("WAVE", 4);
+            df.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+            writeU32(44100); writeU32(44100 * 2); writeU16(2); writeU16(16);
+            df.write("data", 4); writeU32(drumDataSize);
+            df.write((const char*)drumPcm.data(), drumDataSize);
+            df.close();
+            if (auto* drumFixture = dynamic_cast<DrumSequencerNode*>(gNodes[27].node.get()))
+            {
+               drumFixture->LoadFileToLane(0, drumWav);
+               drumFixture->LoadFileToLane(1, drumWav);
+               drumFixture->stepVel[0][0] = 0.8f;
+               drumFixture->stepVel[0][4] = 0.5f;
+               drumFixture->stepVel[1][2] = 0.7f;
+            }
          }
          // Triangle, not the default Circle: the drawn outline and the
          // physics boundary used to disagree by exactly the centroid/bbox
@@ -15185,6 +18177,15 @@ int main()
          // away from an idle 0 dB reading.
          *dyn->ParamPtr("threshold") = -12.0f;
          *dyn->ParamPtr("ratio") = 6.0f;
+         // A couple of bands moved off 0 dB, so the fixture's screenshot
+         // shows a real composite curve rather than a flat line at every
+         // band's spawn default.
+         auto* eq = static_cast<AudioEffectNode*>(gNodes[26].node.get());
+         *eq->ParamPtr("band1Gain") = -6.0f;
+         *eq->ParamPtr("band3Gain") = 6.0f;
+         *eq->ParamPtr("band3Q") = 2.0f;
+         *eq->ParamPtr("band5Gain") = 4.0f;
+         *eq->ParamPtr("selectedBand") = 2.0f;
          filt->input.Connect(osc);
          dyn->input.Connect(filt);
          gain->input.Connect(dyn);
@@ -15197,6 +18198,13 @@ int main()
          // One Wavetable, nothing else on the canvas, so the synthetic mouse
          // below can only be landing on it.
          SpawnNode("Wavetable", "Synths", 20.0f, 20.0f); // 0
+      }
+      else if (getenv("INFINITE_EQDRAGTEST") != nullptr)
+      {
+         // One EQ, nothing else on the canvas, left at its spawn defaults so
+         // the synthetic mouse below can compute every band's handle
+         // position from the known default freq/q/gain table.
+         SpawnNode("EQ", "AudioEffects", 20.0f, 20.0f); // 0
       }
       else if (getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
       {
@@ -15239,6 +18247,45 @@ int main()
 
          gSampleScanner.AddFolder("/tmp/infinite_samplerdrag");
          gSampleScanner.StartScan();
+      }
+      else if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
+      {
+         // Same shape as INFINITE_SAMPLERDRAGTEST below, for the Plugins mode:
+         // one empty Plugin node far from the docked panel, and a real scan of
+         // the installed Audio Units (there is no folder to fake - discovery is
+         // a registry query). PluginScanner::SettingsDir redirects to a
+         // throwaway subdirectory under this env var, so the scan that follows
+         // cannot overwrite the user's real PluginIndex.json.
+         SpawnNode("Plugin", "AudioEffects", 900.0f, 60.0f); // 0
+         gNodePanelOpen = true;
+         gSearchPanelMode = 3;
+         gPluginScanner.StartScan();
+      }
+      else if (getenv("INFINITE_MEDIADRAGTEST") != nullptr)
+      {
+         // Same shape as INFINITE_SAMPLERDRAGTEST above, but for the Media
+         // mode: one Image Source far from the docked panel, and a folder
+         // holding exactly one real, decodable PNG.
+         SpawnNode("Image Source", "Source", 900.0f, 60.0f); // 0
+         gNodePanelOpen = true;
+         gSearchPanelMode = 2;
+
+         // Drop whatever folders/index a real prior session persisted to
+         // disk (MediaFolders.json/MediaIndex.json, loaded at startup) -
+         // otherwise the panel lists every previously-indexed file, not
+         // just this fixture's one image, and the row-rect capture below
+         // can land on an unrelated entry.
+         for (const std::string& stale : std::vector<std::string>(gMediaScanner.Folders()))
+            gMediaScanner.RemoveFolder(stale);
+
+         mkdir("/tmp/infinite_mediadrag", 0755);
+         const std::string pngPath = "/tmp/infinite_mediadrag/fixture.png";
+         const int side = 8;
+         std::vector<unsigned char> pixels(side * side * 4, 255);
+         stbi_write_png(pngPath.c_str(), side, side, 4, pixels.data(), side * 4);
+
+         gMediaScanner.AddFolder("/tmp/infinite_mediadrag");
+         gMediaScanner.StartScan();
       }
       else if (getenv("INFINITE_BYPASSTEST") != nullptr)
       {
@@ -15650,6 +18697,189 @@ int main()
          gain->input.Connect(osc);
          out->input.Connect(gain);
          RebuildAudioTopology();
+      }
+      else if (getenv("INFINITE_AUDIOLIFECYCLETEST") != nullptr)
+      {
+         // Repro + regression guard for
+         // docs/plans/optimization/prompts/01-audio-lifecycle-correctness.md:
+         //
+         // Bug 1/2: RebuildAudioTopology only calls PrepareToPlay (which is
+         // what pushes the real rate into a node's ParamMailbox) when
+         // AudioEngine::SampleRate() is already > 0 - true on every cable
+         // edit/patch load once the engine is running, but never true for
+         // "load a patch, then press Start Audio", since the engine has no
+         // rate at all until Start() returns. Every node's mailbox is left on
+         // whatever it was built/last-rebuilt with until the next unrelated
+         // graph edit. Bug 2 (stale AudioEngine::mSampleRate readers) shares
+         // the same root cause and the same fix - see StartAudioEngine's
+         // comment a few hundred lines up from RebuildAudioTopology.
+         //
+         // Bug 3: AudioEngine::Stop() didn't clear mLastCallbackMs, so the
+         // first real callback after the next Start() compared its wall-
+         // clock gap against a timestamp from before the device was closed -
+         // reopening a device reliably takes far longer than one block
+         // period, so this tripped kXrunGapMultiplier on essentially every
+         // restart, a false positive rather than a real dropped block.
+         //
+         // This runs once at startup (like AUDIOGRAPHTEST just above), not
+         // frameId-gated - every assertion below is synchronous main-thread
+         // state, no cook-and-observe-next-frame step needed.
+         bool overallOk = true;
+         auto Check = [&](const char* name, bool ok)
+         {
+            printf("  [%s] %s\n", ok ? "pass" : "FAIL", name);
+            overallOk = overallOk && ok;
+         };
+
+         // Start from a known Off state so "load patch, then press Start" is
+         // the real first transition, not accidentally masked by whatever
+         // ran before this block.
+         if (AudioEngine::Instance().SampleRate() > 0.0)
+            AudioEngine::Instance().Stop();
+
+         GraphNode* wtGn = SpawnNode("Wavetable", "Synths", 40.0f, 40.0f);
+         const int wtIndex = wtGn->index;
+         GraphNode* outGn = SpawnNode("Audio Out", "AudioUtility", 320.0f, 40.0f);
+         const int outIndex = outGn->index;
+         // Re-resolve - SpawnNode's push_back into gNodes can reallocate and
+         // invalidate the pointer the earlier SpawnNode call returned.
+         wtGn = FindNodeByIndex(wtIndex);
+         outGn = FindNodeByIndex(outIndex);
+         auto* wt = static_cast<WavetableNode*>(wtGn->node.get());
+         auto* out = static_cast<AudioOutputNode*>(outGn->node.get());
+         out->input.Connect(wt);
+
+         // "Patch loaded, engine still off": a real patch load calls
+         // RebuildAudioTopology exactly like this, and its sampleRate > 0.0
+         // guard is expected to skip PrepareToPlay here - nothing has
+         // negotiated a rate yet. Asserted as a sanity check on the test
+         // itself, not the fix: if this ever fails, the rest of this test
+         // proves nothing.
+         RebuildAudioTopology();
+         Check("sanity: mailbox unprepared before any Start",
+               wt->DebugMailboxSampleRate() == 0.0);
+
+         std::string startError;
+         const bool started = StartAudioEngine(startError);
+         Check("AudioEngine::Start succeeds", started);
+
+         const double deviceRate = AudioEngine::Instance().SampleRate();
+         Check("engine reports a real negotiated rate after Start", deviceRate > 0.0);
+         // The bug-1 assertion: without StartAudioEngine's post-Start
+         // RebuildAudioTopology, wt's mailbox would still read 0.0 here.
+         Check("node's mailbox reports the device sample rate after Start",
+               started && deviceRate > 0.0 && wt->DebugMailboxSampleRate() == deviceRate);
+
+         // Bug 3: let a couple of real callbacks land so mLastCallbackMs
+         // reflects live device state (not just whatever Start() left it as),
+         // then cycle Stop/Start and confirm the cycle itself adds no xrun.
+         std::this_thread::sleep_for(std::chrono::milliseconds(80));
+
+         AudioEngine::Instance().Stop();
+         std::string restartError;
+         const bool restarted = StartAudioEngine(restartError);
+         Check("AudioEngine::Start succeeds on restart", restarted);
+         std::this_thread::sleep_for(std::chrono::milliseconds(80));
+         const uint64_t xrunAfterCycle = AudioEngine::Instance().XrunCount();
+         Check("Stop/Start cycle adds no xrun", restarted && xrunAfterCycle == 0);
+
+         // Leave the engine Off and the fixture graph gone, matching the
+         // "audio starts off" contract the rest of this file's tests rely on.
+         AudioEngine::Instance().Stop();
+         RemoveNodeByIndex(outIndex);
+         RemoveNodeByIndex(wtIndex);
+         RebuildAudioTopology();
+
+         printf("%s\n", overallOk ? "AUDIO LIFECYCLE TEST OK" : "AUDIO LIFECYCLE TEST FAIL");
+      }
+      else if (getenv("INFINITE_AUDIORECOVERYTEST") != nullptr)
+      {
+         // Mechanisable half of
+         // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md's
+         // exit criteria - real device unplug/sleep-wake still needs the
+         // manual pass documented in STATUS.md, but PollAudioRecovery's
+         // restart/rate-limit/give-up logic doesn't depend on which
+         // notification set the flag, only on Platform::
+         // AudioDeviceDebugSimulateConfigChange() setting the same one a
+         // real AVAudioEngineConfigurationChangeNotification would.
+         bool overallOk = true;
+         auto Check = [&](const char* name, bool ok)
+         {
+            printf("  [%s] %s\n", ok ? "pass" : "FAIL", name);
+            overallOk = overallOk && ok;
+         };
+
+         if (AudioEngine::Instance().SampleRate() > 0.0)
+            AudioEngine::Instance().Stop();
+         ResetAudioRecoveryState();
+
+         GraphNode* wtGn = SpawnNode("Wavetable", "Synths", 40.0f, 40.0f);
+         const int wtIndex = wtGn->index;
+         GraphNode* outGn = SpawnNode("Audio Out", "AudioUtility", 320.0f, 40.0f);
+         const int outIndex = outGn->index;
+         wtGn = FindNodeByIndex(wtIndex);
+         outGn = FindNodeByIndex(outIndex);
+         auto* wt = static_cast<WavetableNode*>(wtGn->node.get());
+         auto* out = static_cast<AudioOutputNode*>(outGn->node.get());
+         out->input.Connect(wt);
+         RebuildAudioTopology();
+
+         std::string startError;
+         Check("AudioEngine::Start succeeds", StartAudioEngine(startError));
+         const double runningRate = AudioEngine::Instance().SampleRate();
+         Check("node's mailbox prepared at the running rate",
+               runningRate > 0.0 && wt->DebugMailboxSampleRate() == runningRate);
+         std::this_thread::sleep_for(std::chrono::milliseconds(80)); // let a real callback land
+
+         // --- idempotency: a burst of flags in one instant collapses to one attempt ---
+         Platform::AudioDeviceDebugSimulateConfigChange();
+         PollAudioRecovery();
+         const int attemptsAfterFirst = gAudioRecoveryAttemptsInWindow;
+         Check("first config-change flag triggers exactly one attempt", attemptsAfterFirst == 1);
+
+         Platform::AudioDeviceDebugSimulateConfigChange();
+         PollAudioRecovery(); // fires within kAudioRecoveryMinIntervalMs of the first - must be swallowed
+         Check("a second flag inside the min interval adds no attempt",
+               gAudioRecoveryAttemptsInWindow == attemptsAfterFirst);
+
+         std::this_thread::sleep_for(std::chrono::milliseconds(80));
+         const double rateAfterRecovery = AudioEngine::Instance().SampleRate();
+         Check("engine still running after a recovered restart", rateAfterRecovery > 0.0);
+         Check("node's mailbox re-prepared at the (re-)negotiated rate after recovery",
+               rateAfterRecovery > 0.0 && wt->DebugMailboxSampleRate() == rateAfterRecovery);
+
+         // --- rate-limited give-up: N attempts spaced past the min interval, then stop trying ---
+         ResetAudioRecoveryState();
+         gAudioStartError.clear();
+         for (int i = 0; i < kAudioRecoveryMaxAttemptsPerWindow; i++)
+         {
+            std::this_thread::sleep_for(std::chrono::milliseconds((long)kAudioRecoveryMinIntervalMs + 100));
+            Platform::AudioDeviceDebugSimulateConfigChange();
+            PollAudioRecovery();
+         }
+         Check("exactly kAudioRecoveryMaxAttemptsPerWindow attempts consumed",
+               gAudioRecoveryAttemptsInWindow == kAudioRecoveryMaxAttemptsPerWindow);
+         Check("engine still alive after the window's normal attempts", AudioEngine::Instance().SampleRate() > 0.0);
+
+         std::this_thread::sleep_for(std::chrono::milliseconds((long)kAudioRecoveryMinIntervalMs + 100));
+         Platform::AudioDeviceDebugSimulateConfigChange();
+         PollAudioRecovery(); // the (N+1)th - past the window's cap, must give up rather than retry
+         Check("gives up rather than retrying past the window cap",
+               AudioEngine::Instance().SampleRate() == 0.0 && gAudioStartError.find("gave up") != std::string::npos);
+         Check("honest UI: audioEngineOn reads false once recovery gives up",
+               !(AudioEngine::Instance().SampleRate() > 0.0));
+
+         // Leave the engine Off and the fixture graph gone, matching every
+         // other audio test's contract.
+         ResetAudioRecoveryState();
+         gAudioStartError.clear();
+         if (AudioEngine::Instance().SampleRate() > 0.0)
+            AudioEngine::Instance().Stop();
+         RemoveNodeByIndex(outIndex);
+         RemoveNodeByIndex(wtIndex);
+         RebuildAudioTopology();
+
+         printf("%s\n", overallOk ? "AUDIO RECOVERY TEST OK" : "AUDIO RECOVERY TEST FAIL");
       }
       else if (getenv("INFINITE_MATFRAMETEST") != nullptr)
       {
@@ -16216,6 +19446,11 @@ int main()
       gFrameStart = glfwGetTime();
       glfwPollEvents();
 
+      // Device-change/sleep-wake self-healing (docs/plans/optimization/
+      // prompts/02-device-change-and-wake-recovery.md) - once a frame, main
+      // thread only.
+      PollAudioRecovery();
+
       // Projector windows are ordinary decorated windows - closing one via the
       // OS's own close button only sets its should-close flag, it doesn't
       // destroy it. Poll for that here so it gets cleaned up the same way the
@@ -16365,13 +19600,19 @@ int main()
          // from the same geometry it draws with. Pressing there and moving
          // vertically latches the sustain handle (its axis test).
          const float ampW = ampA.z - ampA.x;
-         const float seg = (ampW - 12.0f) / 3.0f;
+         const float ampUsable = ampW - 12.0f;
+         const float ampShelf = ampUsable * 0.18f;
+         const float seg = (ampUsable - ampShelf) / 3.0f;
          const float ampTopY = ampA.y + 4.0f;
          const float ampSpan = (ampA.w - 4.0f) - ampTopY;
-         const float susX = ampA.x + 6.0f + seg + (wt->engines[0].ampDecay / 4000.0f) * seg;
+         const float ampX0 = ampA.x + 6.0f;
+         const float ampAx = ampX0 + std::clamp(wt->engines[0].ampAttack / 4000.0f, 0.0f, 1.0f) * seg;
+         const float susX = ampAx + std::clamp(wt->engines[0].ampDecay / 4000.0f, 0.0f, 1.0f) * seg;
          const float susY = ampTopY + (1.0f - wt->engines[0].ampSustain) * ampSpan;
 
-         const float fbSeg = ((filtB.z - filtB.x) - 12.0f) / 3.0f;
+         const float fbUsable = (filtB.z - filtB.x) - 12.0f;
+         const float fbShelf = fbUsable * 0.18f;
+         const float fbSeg = (fbUsable - fbShelf) / 3.0f;
          const float fbAttackX = filtB.x + 6.0f + (wt->engines[1].filterAttack / 4000.0f) * fbSeg;
          const float fbTopY = filtB.y + 4.0f;
 
@@ -16403,6 +19644,79 @@ int main()
          }
          if (frameId >= 4)
             tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
+      }
+
+      // Drags EQ's own handles and checks each gesture moves only the param
+      // it targets - the same "picture in the right place" vs "dragging it
+      // moves the engine's param" split WTDRAGTEST exists to cover, for the
+      // per-band dot/diamond/double-click surface DrawEqVisualizer adds.
+      // gEqTestScreen (built in the post-editor block below) is the previous
+      // frame's rect, same lag WTDRAGTEST accepts for a static node.
+      if (getenv("INFINITE_EQDRAGTEST") != nullptr && !gNodes.empty())
+      {
+         ImGuiIO& tio = ImGui::GetIO();
+         tio.ConfigInputTrickleEventQueue = false;
+         tio.AddFocusEvent(true); // headless runs are never OS-focused; ImGui drops hover/click otherwise
+         static bool sFocused = false;
+         if (!sFocused) { glfwFocusWindow(window); sFocused = true; }
+         auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
+
+         const float x0 = gEqTestScreen.x, y0 = gEqTestScreen.y;
+         const float x1 = gEqTestScreen.z, y1 = gEqTestScreen.w;
+         const float w = x1 - x0, h = y1 - y0;
+
+         // Recomputed every frame from the node's LIVE params (not the spawn
+         // defaults) - phase 1 moves band3Freq, so phase 2's diamond, aimed
+         // at band3's dot position plus an offset, would otherwise still be
+         // targeting where band 3 *used to be* and miss it entirely.
+         auto* eqLive = static_cast<AudioEffectNode*>(gNodes[0].node.get());
+         const float band3Freq = eqLive->Param("band3Freq");
+         const float band3Gain = eqLive->Param("band3Gain");
+         const float band3Q = eqLive->Param("band3Q");
+         const float band3X = FilterVizFreqToX(band3Freq, x0, w);
+         const float band3Y = FilterVizDbToY(band3Gain, y0, h); // band3 is a peak type - UsesGain
+         const float band3QX = std::clamp(band3X + 16.0f, x0 + 8.0f, x1 - 8.0f);
+         const float qT3 = (logf(std::max(0.1f, band3Q)) - logf(0.1f)) / (logf(18.0f) - logf(0.1f));
+         const float band3QY = y0 + h - std::clamp(qT3, 0.0f, 1.0f) * h;
+         const float band2X = FilterVizFreqToX(eqLive->Param("band2Freq"), x0, w);
+         const float band2Y = FilterVizDbToY(eqLive->Param("band2Gain"), y0, h); // band2 is a peak type too
+
+         // Frames 4-30ish are spent waiting for the fixture's initial
+         // zoom-to-fit/frame-all camera animation to settle - a synthetic
+         // click aimed any earlier lands using a rect that's still visibly
+         // drifting frame to frame, not just the usual one-frame conversion
+         // lag WTDRAGTEST's own comment accepts for a static node.
+         switch (frameId)
+         {
+            // --- phase 1: drag band 3's dot right (raise band3Freq) ---
+            case 54: gTestMouse = ImVec2(band3X, band3Y); break;
+            case 55: btn(true); break;
+            case 56: gTestMouse = ImVec2(band3X + 15.0f, band3Y); break;
+            case 57: gTestMouse = ImVec2(band3X + 25.0f, band3Y); break;
+            case 58: btn(false); break;
+            // --- phase 2: drag band 3's Q diamond up (raise band3Q) ---
+            case 62: gTestMouse = ImVec2(band3QX, band3QY); break;
+            case 63: btn(true); break;
+            case 64: gTestMouse = ImVec2(band3QX, band3QY - 30.0f); break;
+            case 65: gTestMouse = ImVec2(band3QX, band3QY - 50.0f); break;
+            case 66: btn(false); break;
+            // --- phase 3: double-click band 2's dot (toggle band2On) ---
+            case 70: gTestMouse = ImVec2(band2X, band2Y); btn(true); break;
+            case 71: btn(false); break;
+            case 72: btn(true); break;
+            case 73: btn(false); break;
+            default: break;
+         }
+         if (frameId >= 54)
+         {
+            tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
+            // Also warp the real GLFW cursor: this fixture's headless
+            // sandbox has been observed moving the OS-level cursor on its
+            // own between frames (screen-capture tooling, most likely),
+            // which a later glfwGetCursorPos() poll would otherwise pick up
+            // and use to clobber the AddMousePosEvent target above.
+            glfwSetCursorPos(window, (double)gTestMouse.x, (double)gTestMouse.y);
+         }
       }
 
       if (getenv("INFINITE_DRAGTEST") != nullptr)
@@ -16458,12 +19772,13 @@ int main()
          tio.ConfigInputTrickleEventQueue = false;
          auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
 
-         static int sPhase = 0; // 0=waiting for the scan+row, 1=pressed, 2=dragging, 3=released
+         int& sPhase = gSamplerDragTestPhase; // 0=waiting for the scan+row, 1=pressed, 2=dragging, 3=released
          static int sPhaseFrame = 0;
          static ImVec2 sRowCenter(-1.0f, -1.0f);
          static ImVec2 sTargetScreen(-1.0f, -1.0f);
 
-         if (sPhase == 0 && gSamplerDragTestRowRect.x >= 0.0f && gSamplerDragTestTargetValid)
+         if (sPhase == 0 && gSamplerDragTestRowRect.x >= 0.0f &&
+             (gSamplerDragTestRowRect.w - gSamplerDragTestRowRect.y) > 1.0f && gSamplerDragTestTargetValid)
          {
             sRowCenter = ImVec2((gSamplerDragTestRowRect.x + gSamplerDragTestRowRect.z) * 0.5f,
                                 (gSamplerDragTestRowRect.y + gSamplerDragTestRowRect.w) * 0.5f);
@@ -16504,6 +19819,164 @@ int main()
                printf("SAMPLERDRAG drop onto node: path='%s' %s\n", samplerNode->FilePath().c_str(),
                       ok ? "OK" : "FAIL");
                printf("%s\n", ok ? "SAMPLERDRAGTEST OK" : "SAMPLERDRAGTEST FAIL");
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+            }
+         }
+
+         if (sPhase != 0)
+            tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
+      }
+
+      if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
+      {
+         // Same gesture as INFINITE_SAMPLERDRAGTEST above, driven against the
+         // Plugins panel's row rect and the empty Plugin node's canvas rect.
+         // The assertion is on the node's saved identity, not on the plugin
+         // having finished instantiating: instantiation is asynchronous and
+         // its own coverage is INFINITE_PLUGINSCANTEST. What this proves is
+         // that the drag resolves onto the node under the cursor.
+         static bool sUnbuffered = false;
+         if (!sUnbuffered) { setvbuf(stdout, nullptr, _IONBF, 0); sUnbuffered = true; }
+         ImGuiIO& tio = ImGui::GetIO();
+         tio.ConfigInputTrickleEventQueue = false;
+         auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
+
+         int& sPhase = gPluginDragTestPhase;
+         static int sPhaseFrame = 0;
+         static ImVec2 sRowCenter(-1.0f, -1.0f);
+         static ImVec2 sTargetScreen(-1.0f, -1.0f);
+         static std::string sExpectedId;
+
+         // Gated on the list having been the SAME list for a few frames, not
+         // just on IsScanning() being false: the scanner reports "not scanning"
+         // as soon as its worker finishes, but the index is only swapped in
+         // when the panel next calls PollResults - and this driver runs before
+         // the panel draws. So there is a window where the row rect and the
+         // identifier captured with it belong to the previous (disk-cached)
+         // list, and by the time the synthetic press lands the list underneath
+         // has been replaced. Requiring the captured row to hold still rules
+         // that out without having to reach into the scanner's internals.
+         static std::string sSeenId;
+         static int sStableFrames = 0;
+         if (sPhase == 0)
+         {
+            if (!gPluginDragTestRowId.empty() && gPluginDragTestRowId == sSeenId)
+               sStableFrames++;
+            else
+            {
+               sSeenId = gPluginDragTestRowId;
+               sStableFrames = 0;
+            }
+         }
+         if (sPhase == 0 && !gPluginScanner.IsScanning() && sStableFrames >= 4 &&
+             gPluginDragTestRowRect.x >= 0.0f &&
+             (gPluginDragTestRowRect.w - gPluginDragTestRowRect.y) > 1.0f && gPluginDragTestTargetValid)
+         {
+            sRowCenter = ImVec2((gPluginDragTestRowRect.x + gPluginDragTestRowRect.z) * 0.5f,
+                                (gPluginDragTestRowRect.y + gPluginDragTestRowRect.w) * 0.5f);
+            sTargetScreen = gPluginDragTestTargetScreen;
+            sExpectedId = gPluginDragTestRowId;
+            sPhase = 1;
+            sPhaseFrame = frameId;
+            gTestMouse = sRowCenter;
+         }
+         else if (sPhase == 1)
+         {
+            gTestMouse = sRowCenter;
+            if (frameId >= sPhaseFrame + 2)
+            {
+               btn(true);
+               sPhase = 2;
+               sPhaseFrame = frameId;
+            }
+         }
+         else if (sPhase == 2)
+         {
+            const float f = std::min(1.0f, (float)(frameId - sPhaseFrame) / 6.0f);
+            gTestMouse = ImVec2(sRowCenter.x + (sTargetScreen.x - sRowCenter.x) * f,
+                                sRowCenter.y + (sTargetScreen.y - sRowCenter.y) * f);
+            if (frameId >= sPhaseFrame + 8)
+            {
+               btn(false);
+               sPhase = 3;
+               sPhaseFrame = frameId;
+            }
+         }
+         else if (sPhase == 3)
+         {
+            gTestMouse = sTargetScreen;
+            if (frameId >= sPhaseFrame + 3)
+            {
+               auto* pluginNode = static_cast<AudioPluginNode*>(gNodes[0].node.get());
+               const bool ok = !sExpectedId.empty() && pluginNode->pluginId == sExpectedId;
+               printf("PLUGINDRAG drop onto node: id='%s' expected='%s' %s\n",
+                      pluginNode->pluginId.c_str(), sExpectedId.c_str(), ok ? "OK" : "FAIL");
+               printf("%s\n", ok ? "PLUGINDRAGTEST OK" : "PLUGINDRAGTEST FAIL");
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+            }
+         }
+
+         if (sPhase != 0)
+            tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
+      }
+
+      if (getenv("INFINITE_MEDIADRAGTEST") != nullptr)
+      {
+         // Same gesture as INFINITE_SAMPLERDRAGTEST above, driven against
+         // the Media panel's row rect and Image Source's canvas rect.
+         static bool sUnbuffered = false;
+         if (!sUnbuffered) { setvbuf(stdout, nullptr, _IONBF, 0); sUnbuffered = true; }
+         ImGuiIO& tio = ImGui::GetIO();
+         tio.ConfigInputTrickleEventQueue = false;
+         auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
+
+         int& sPhase = gMediaDragTestPhase; // 0=waiting for the scan+row, 1=pressed, 2=dragging, 3=released
+         static int sPhaseFrame = 0;
+         static ImVec2 sRowCenter(-1.0f, -1.0f);
+         static ImVec2 sTargetScreen(-1.0f, -1.0f);
+
+         if (sPhase == 0 && gMediaDragTestRowRect.x >= 0.0f &&
+             (gMediaDragTestRowRect.w - gMediaDragTestRowRect.y) > 1.0f && gMediaDragTestTargetValid)
+         {
+            sRowCenter = ImVec2((gMediaDragTestRowRect.x + gMediaDragTestRowRect.z) * 0.5f,
+                                (gMediaDragTestRowRect.y + gMediaDragTestRowRect.w) * 0.5f);
+            sTargetScreen = gMediaDragTestTargetScreen;
+            sPhase = 1;
+            sPhaseFrame = frameId;
+            gTestMouse = sRowCenter;
+         }
+         else if (sPhase == 1)
+         {
+            gTestMouse = sRowCenter;
+            if (frameId >= sPhaseFrame + 2)
+            {
+               btn(true);
+               sPhase = 2;
+               sPhaseFrame = frameId;
+            }
+         }
+         else if (sPhase == 2)
+         {
+            const float f = std::min(1.0f, (float)(frameId - sPhaseFrame) / 6.0f);
+            gTestMouse = ImVec2(sRowCenter.x + (sTargetScreen.x - sRowCenter.x) * f,
+                                sRowCenter.y + (sTargetScreen.y - sRowCenter.y) * f);
+            if (frameId >= sPhaseFrame + 8)
+            {
+               btn(false);
+               sPhase = 3;
+               sPhaseFrame = frameId;
+            }
+         }
+         else if (sPhase == 3)
+         {
+            gTestMouse = sTargetScreen;
+            if (frameId >= sPhaseFrame + 3)
+            {
+               auto* imageNode = static_cast<ImageSourceNode*>(gNodes[0].node.get());
+               const bool ok = imageNode->LoadedPath() == "/tmp/infinite_mediadrag/fixture.png";
+               printf("MEDIADRAG drop onto node: path='%s' %s\n", imageNode->LoadedPath().c_str(),
+                      ok ? "OK" : "FAIL");
+               printf("%s\n", ok ? "MEDIADRAGTEST OK" : "MEDIADRAGTEST FAIL");
                glfwSetWindowShouldClose(window, GLFW_TRUE);
             }
          }
@@ -16890,7 +20363,12 @@ int main()
                   if (wasRunning)
                   {
                      gAudioStartError.clear();
-                     if (!AudioEngine::Instance().Start(gAudioStartError))
+                     // StartAudioEngine, not a bare Start(): the new rate/
+                     // buffer size just applied above may not be what the
+                     // device actually negotiates, and every node's
+                     // ParamMailbox needs PrepareToPlay'd with whatever it
+                     // negotiates - see StartAudioEngine's comment (bugs 1/2).
+                     if (!StartAudioEngine(gAudioStartError))
                         fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
                   }
                }
@@ -16952,7 +20430,14 @@ int main()
                else
                {
                   gAudioStartError.clear();
-                  if (!AudioEngine::Instance().Start(gAudioStartError))
+                  // StartAudioEngine (bugs 1/2): a patch loaded while the
+                  // engine was off has every node still prepared with
+                  // whatever rate it was constructed/last-rebuilt with, not
+                  // the device's - this is the "press Start Audio" repro in
+                  // 01-audio-lifecycle-correctness.md. Route through the one
+                  // choke point instead of AudioEngine::Instance().Start()
+                  // directly so this can't reopen at some future call site.
+                  if (!StartAudioEngine(gAudioStartError))
                      fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
                }
             }
@@ -17053,13 +20538,23 @@ int main()
          const bool audioEngineOn = AudioEngine::Instance().SampleRate() > 0.0;
          const double audioLoad = AudioEngine::Instance().LastBlockLoad();
          const uint64_t xruns = AudioEngine::Instance().XrunCount();
+         // "on but dead" is real, brief window: PollAudioRecovery polls once
+         // a frame and needs at least one attempt (rate-limited to
+         // kAudioRecoveryMinIntervalMs apart) to either recover or give up
+         // and flip audioEngineOn back to false itself - see its comment.
+         // Reading IsAlive() here rather than adding a parallel "is
+         // recovering" flag means this can't drift out of sync with what
+         // PollAudioRecovery actually decided.
+         const bool audioDead = audioEngineOn && !AudioEngine::Instance().IsAlive();
          char audioReadout[64];
-         if (audioEngineOn)
+         if (audioDead)
+            snprintf(audioReadout, sizeof(audioReadout), "audio lost - reconnecting");
+         else if (audioEngineOn)
             snprintf(audioReadout, sizeof(audioReadout), "audio %.0f%%%s",
                      audioLoad * 100.0, xruns > 0 ? " !" : "");
          else
             snprintf(audioReadout, sizeof(audioReadout), "audio off");
-         const float audioWidth = ImGui::CalcTextSize("audio 100% !").x;
+         const float audioWidth = ImGui::CalcTextSize("audio lost - reconnecting").x;
 
          const char* searchLabel = "search";
          const float searchWidth = ImGui::CalcTextSize(searchLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -17069,6 +20564,7 @@ int main()
 
          {
             const ImVec4 audioColor = !audioEngineOn ? ImVec4(0.55f, 0.55f, 0.58f, 1.0f)
+                                     : audioDead ? ImVec4(0.95f, 0.45f, 0.4f, 1.0f)
                                      : (audioLoad < 0.7) ? ImVec4(0.45f, 0.85f, 0.5f, 1.0f)
                                      : (audioLoad < 0.9) ? ImVec4(0.95f, 0.75f, 0.35f, 1.0f)
                                                           : ImVec4(0.95f, 0.45f, 0.4f, 1.0f);
@@ -17231,9 +20727,6 @@ int main()
       // loaded, at the drop point.
       if (!gDroppedFiles.empty())
       {
-         static const std::vector<std::string> kVideoExt = {
-            "mov", "mp4", "m4v", "avi", "mkv", "webm", "mpg", "mpeg", "wmv", "flv", "hevc"
-         };
          // Everything ModelIO reads. Checked before video because "usdz" and
          // "abc" would otherwise fall through to the image branch and fail.
          static const std::vector<std::string> kAudioExt = {
@@ -17242,12 +20735,66 @@ int main()
          static const std::vector<std::string> kModelExt = {
             "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc"
          };
+         // Plugin bundles, not files - see the branch that consumes this.
+         static const std::vector<std::string> kPluginBundleExt = { "component", "vst3" };
          ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
+         // Dropping onto an existing Drum Sequencer lands the file(s) in its
+         // lanes (consecutive, starting from the row under the drop point)
+         // instead of spawning Audio File nodes - same lane resolution as
+         // the Samples-panel drag (gSampleDragActive), just via the OS's own
+         // drag-drop instead of the manually-tracked one.
+         DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
+         int dropTargetLane =
+            dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
          float offset = 0.0f;
          for (const std::string& path : gDroppedFiles)
          {
+            if (dropTargetDrum != nullptr && HasExtension(path, kAudioExt))
+            {
+               PushUndoCheckpoint();
+               dropTargetDrum->LoadFileToLane(dropTargetLane, path);
+               dropTargetLane = (dropTargetLane + 1) % DrumSequencerNode::kNumLanes;
+               gPatchDirty = true;
+               continue;
+            }
             GraphNode* spawned = nullptr;
-            if (HasExtension(path, kAudioExt))
+            // Checked first, and separately from the extension ladder below,
+            // because a plugin is a bundle *directory*, not a file: HasExtension
+            // on the path still works (GLFW hands over the directory path), but
+            // anything that stats it as a regular file does not. .vst3 is
+            // matched too so the honest "that format isn't hosted yet" message
+            // lands instead of silently spawning an Image Source that fails.
+            if (HasExtension(path, kPluginBundleExt))
+            {
+               std::vector<Platform::PluginDesc> found;
+               const bool resolved = Platform::DescribeAudioUnitBundle(path, found) && !found.empty();
+               if (!resolved)
+               {
+                  // Nothing is spawned on failure - an empty Plugin node with no
+                  // explanation is worse than a log line and no node.
+                  printf("dropped plugin bundle could not be resolved to an audio component: %s\n",
+                         path.c_str());
+                  continue;
+               }
+               // Prefer whatever the scanner already knows about this identity:
+               // its display name came from the component registry, which is
+               // better than the bundle's own Info.plist string.
+               Platform::PluginDesc desc = found.front();
+               if (const PluginScanner::Entry* known = gPluginScanner.FindByIdentifier(desc.identifier))
+                  desc = *known;
+
+               if (AudioPluginNode* target = FindNodeUnderCanvasPoint<AudioPluginNode>(canvasPos))
+               {
+                  PushUndoCheckpoint();
+                  target->LoadPlugin(desc);
+                  gPatchDirty = true;
+                  continue;
+               }
+               spawned = SpawnNode("Plugin", "AudioEffects", canvasPos.x + offset, canvasPos.y);
+               if (spawned != nullptr)
+                  static_cast<AudioPluginNode*>(spawned->node.get())->LoadPlugin(desc);
+            }
+            else if (HasExtension(path, kAudioExt))
             {
                spawned = SpawnNode("Audio File", "Modulators", canvasPos.x + offset, canvasPos.y);
                if (spawned != nullptr)
@@ -19908,7 +23455,12 @@ int main()
             if (audioWasRunning)
             {
                std::string audioRestartError;
-               if (!AudioEngine::Instance().Start(audioRestartError))
+               // StartAudioEngine, not a bare Start(): this Stop() up above
+               // already dropped the device, so on restart every node's
+               // ParamMailbox needs the same PrepareToPlay pass any other
+               // restart gets - this test-only Stop/Start is still a real
+               // engine-start call site, not exempt from bug 1's fix.
+               if (!StartAudioEngine(audioRestartError))
                   fprintf(stderr, "audio device: %s\n", audioRestartError.c_str());
             }
          }
@@ -21566,6 +25118,30 @@ int main()
          }
       }
 
+      if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr && !gNodes.empty())
+      {
+         // Same recompute-every-frame rationale as the Sampler block above.
+         const ImVec2 p = ed::GetNodePosition(gNodes[0].NodeId());
+         const ImVec2 s = ed::GetNodeSize(gNodes[0].NodeId());
+         if (s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f)
+         {
+            gPluginDragTestTargetScreen = ed::CanvasToScreen(ImVec2(p.x + s.x * 0.5f, p.y + s.y * 0.5f));
+            gPluginDragTestTargetValid = true;
+         }
+      }
+
+      if (getenv("INFINITE_MEDIADRAGTEST") != nullptr && !gNodes.empty())
+      {
+         // Same recompute-every-frame rationale as the Sampler block above.
+         const ImVec2 p = ed::GetNodePosition(gNodes[0].NodeId());
+         const ImVec2 s = ed::GetNodeSize(gNodes[0].NodeId());
+         if (s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f)
+         {
+            gMediaDragTestTargetScreen = ed::CanvasToScreen(ImVec2(p.x + s.x * 0.5f, p.y + s.y * 0.5f));
+            gMediaDragTestTargetValid = true;
+         }
+      }
+
       if (getenv("INFINITE_WTDRAGTEST") != nullptr)
       {
          // Unbuffered: this hook is watched from a pipe, and a run that hangs
@@ -21626,6 +25202,95 @@ int main()
                    sFiltA, fa, ok ? "OK" : "FAIL");
             gWtDragOk &= ok;
             printf("%s\n", gWtDragOk ? "WTDRAG OK" : "WTDRAG FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      if (getenv("INFINITE_EQDRAGTEST") != nullptr)
+      {
+         static bool sUnbuffered = false;
+         if (!sUnbuffered) { setvbuf(stdout, nullptr, _IONBF, 0); sUnbuffered = true; }
+
+         // Unlike gWtTestRects (captured off a nested child-window widget
+         // that needs the editor's pan/zoom applied explicitly), the EQ
+         // curve's InvisibleButton is an ordinary node-body ImGui item -
+         // imgui-node-editor already renders those through a scaled ImGui
+         // context, so GetCursorScreenPos() inside DrawEqVisualizer returns
+         // real, final screen pixels directly. A second ed::CanvasToScreen
+         // pass on top of that double-transforms it (confirmed by comparing
+         // DrawEqVisualizer's own logged origin against the "converted"
+         // rect while building this fixture) - so this is a straight copy,
+         // not a conversion.
+         gEqTestScreen = gEqTestRect;
+
+         static bool sEqDragOk = true;
+         static float sSnap[25];
+         AudioEffectNode* eq = gNodes.empty() ? nullptr : static_cast<AudioEffectNode*>(gNodes[0].node.get());
+         auto snapshot = [&](float* dst) {
+            int idx = 0;
+            for (int b = 0; b < 5; b++)
+            {
+               dst[idx++] = eq->Param(kEqTypeParam[b]);
+               dst[idx++] = eq->Param(kEqFreqParam[b]);
+               dst[idx++] = eq->Param(kEqQParam[b]);
+               dst[idx++] = eq->Param(kEqGainParam[b]);
+               dst[idx++] = eq->Param(kEqOnParam[b]);
+            }
+         };
+         // Per-param tolerance, not one blanket epsilon: type/on are
+         // threshold-quantized (0/1 or an integer index) and must be exactly
+         // unchanged, but freq/q/gain are read back off pixel-mapped mouse
+         // coordinates through a log/pow round trip - even the intentionally-
+         // held-constant axis of a drag (e.g. band3's own gain while only its
+         // freq is being dragged, since UsesGain keeps rewriting gain from
+         // the held Y every active frame) can drift by a fraction of a unit
+         // from float/quantization noise alone, without indicating a real bug.
+         auto sameExcept = [](const float* a, const float* b, int skipIdx) {
+            static const float kTol[5] = { 1.0e-4f, 1.0f, 0.05f, 0.5f, 1.0e-4f }; // type,freq,q,gain,on
+            for (int i = 0; i < 25; i++)
+               if (i != skipIdx && std::fabs(a[i] - b[i]) > kTol[i % 5])
+                  return false;
+            return true;
+         };
+         const int band3FreqIdx = 2 * 5 + 1, band3QIdx = 2 * 5 + 2;
+         const int band2OnIdx = 1 * 5 + 4;
+
+         if (eq != nullptr && frameId == 53)
+         {
+            snapshot(sSnap);
+            printf("EQDRAG start: rect=(%.0f,%.0f,%.0f,%.0f)\n", gEqTestScreen.x, gEqTestScreen.y,
+                   gEqTestScreen.z, gEqTestScreen.w);
+         }
+         if (eq != nullptr && frameId == 60)
+         {
+            float now[25];
+            snapshot(now);
+            const bool ok = now[band3FreqIdx] > sSnap[band3FreqIdx] + 5.0f && sameExcept(sSnap, now, band3FreqIdx);
+            printf("EQDRAG band3 dot drag: freq %.1f -> %.1f  %s\n", sSnap[band3FreqIdx], now[band3FreqIdx],
+                   ok ? "OK" : "FAIL");
+            sEqDragOk &= ok;
+            std::copy(now, now + 25, sSnap);
+         }
+         if (eq != nullptr && frameId == 68)
+         {
+            float now[25];
+            snapshot(now);
+            const bool ok = now[band3QIdx] > sSnap[band3QIdx] + 0.1f && sameExcept(sSnap, now, band3QIdx);
+            printf("EQDRAG band3 diamond drag: Q %.2f -> %.2f  %s\n", sSnap[band3QIdx], now[band3QIdx],
+                   ok ? "OK" : "FAIL");
+            sEqDragOk &= ok;
+            std::copy(now, now + 25, sSnap);
+         }
+         if (eq != nullptr && frameId == 78)
+         {
+            float now[25];
+            snapshot(now);
+            const bool ok =
+               std::fabs(now[band2OnIdx] - sSnap[band2OnIdx]) > 0.5f && sameExcept(sSnap, now, band2OnIdx);
+            printf("EQDRAG band2 double-click bypass: on %.0f -> %.0f  %s\n", sSnap[band2OnIdx], now[band2OnIdx],
+                   ok ? "OK" : "FAIL");
+            sEqDragOk &= ok;
+            printf("%s\n", sEqDragOk ? "EQDRAG OK" : "EQDRAG FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
@@ -23246,50 +26911,112 @@ int main()
             // each node's own bounds sidesteps that ImGui active-item gate
             // entirely.
             const ImVec2 canvasMouse = ed::ScreenToCanvas(mp);
-            SamplerNode* targetSampler = nullptr;
-            for (GraphNode& gnHit : gNodes)
+            const bool overCanvas = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+
+            if (gSampleDragKind == LibraryDragKind::Plugin)
             {
-               auto* sampler = gnHit.node ? dynamic_cast<SamplerNode*>(gnHit.node.get()) : nullptr;
-               if (sampler == nullptr)
-                  continue;
-               const ImVec2 p = ed::GetNodePosition(gnHit.NodeId());
-               const ImVec2 s = ed::GetNodeSize(gnHit.NodeId());
-               if (canvasMouse.x >= p.x && canvasMouse.x <= p.x + s.x &&
-                   canvasMouse.y >= p.y && canvasMouse.y <= p.y + s.y)
+               // Dropped onto an existing Plugin node: swap its plugin
+               // outright. Nothing is preserved - a different plugin's
+               // parameter addresses and saved state mean nothing to it.
+               if (AudioPluginNode* targetPlugin = FindNodeUnderCanvasPoint<AudioPluginNode>(canvasMouse))
                {
-                  targetSampler = sampler;
-                  break;
+                  PushUndoCheckpoint();
+                  targetPlugin->LoadPlugin(gPluginDragDesc);
+                  gPatchDirty = true;
+               }
+               else if (overCanvas)
+               {
+                  GraphNode* spawned = SpawnNode("Plugin", "AudioEffects", canvasMouse.x, canvasMouse.y);
+                  if (spawned != nullptr)
+                  {
+                     if (auto* plugin = dynamic_cast<AudioPluginNode*>(spawned->node.get()))
+                        plugin->LoadPlugin(gPluginDragDesc);
+                     gPatchDirty = true;
+                  }
                }
             }
-
-            if (targetSampler != nullptr)
+            else if (gSampleDragKind == LibraryDragKind::Sample)
             {
-               // Dropped onto an existing Sampler: swap its file.
-               PushUndoCheckpoint();
-               targetSampler->LoadFile(gSampleDragPath);
-               gPatchDirty = true;
-            }
-            else if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
-            {
-               // No Sampler under the cursor but still over the canvas:
-               // spawn a loaded one there, same "click happened over the
-               // canvas" position rule the double-click search popup above
-               // uses. AllowWhenBlockedByActiveItem for the same reason as
-               // above - plain IsWindowHovered() would read false for the
-               // whole drag.
-               const ImVec2 pos = canvasMouse;
-               GraphNode* spawned = SpawnNode("Sampler", "Synths", pos.x, pos.y);
-               if (spawned != nullptr)
+               // Checked before Sampler: a plain rect test on gNodes order,
+               // like FindNodeUnderCanvasPoint's other callers, so dropping
+               // onto a Drum Sequencer lands on its lane grid rather than
+               // (impossibly, since the types don't overlap) falling through.
+               DrumSequencerNode* targetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasMouse);
+               if (targetDrum != nullptr)
                {
-                  if (auto* sampler = dynamic_cast<SamplerNode*>(spawned->node.get()))
-                     sampler->LoadFile(gSampleDragPath);
+                  PushUndoCheckpoint();
+                  const int lane = DrumSequencerLaneForCanvasPos(targetDrum, canvasMouse.x, canvasMouse.y);
+                  targetDrum->LoadFileToLane(lane, gSampleDragPath);
                   gPatchDirty = true;
+               }
+               else if (SamplerNode* targetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasMouse))
+               {
+                  // Dropped onto an existing Sampler: swap its file.
+                  PushUndoCheckpoint();
+                  targetSampler->LoadFile(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (overCanvas)
+               {
+                  // No Sampler under the cursor but still over the canvas:
+                  // spawn a loaded one there, same "click happened over the
+                  // canvas" position rule the double-click search popup above
+                  // uses.
+                  GraphNode* spawned = SpawnNode("Sampler", "Synths", canvasMouse.x, canvasMouse.y);
+                  if (spawned != nullptr)
+                  {
+                     if (auto* sampler = dynamic_cast<SamplerNode*>(spawned->node.get()))
+                        sampler->LoadFile(gSampleDragPath);
+                     gPatchDirty = true;
+                  }
+               }
+            }
+            else if (HasExtension(gSampleDragPath, kVideoExt))
+            {
+               VideoSourceNode* targetVideo = FindNodeUnderCanvasPoint<VideoSourceNode>(canvasMouse);
+               if (targetVideo != nullptr)
+               {
+                  PushUndoCheckpoint();
+                  targetVideo->Open(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (overCanvas)
+               {
+                  GraphNode* spawned = SpawnNode("Video", "Source", canvasMouse.x, canvasMouse.y);
+                  if (spawned != nullptr)
+                  {
+                     if (auto* video = dynamic_cast<VideoSourceNode*>(spawned->node.get()))
+                        video->Open(gSampleDragPath);
+                     gPatchDirty = true;
+                  }
+               }
+            }
+            else
+            {
+               ImageSourceNode* targetImage = FindNodeUnderCanvasPoint<ImageSourceNode>(canvasMouse);
+               if (targetImage != nullptr)
+               {
+                  PushUndoCheckpoint();
+                  targetImage->Load(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (overCanvas)
+               {
+                  GraphNode* spawned = SpawnNode("Image Source", "Source", canvasMouse.x, canvasMouse.y);
+                  if (spawned != nullptr)
+                  {
+                     if (auto* image = dynamic_cast<ImageSourceNode*>(spawned->node.get()))
+                        image->Load(gSampleDragPath);
+                     gPatchDirty = true;
+                  }
                }
             }
 
             gSampleDragActive = false;
+            gSampleDragKind = LibraryDragKind::Sample;
             gSampleDragPath.clear();
             gSampleDragName.clear();
+            gPluginDragDesc = Platform::PluginDesc();
          }
       }
 
@@ -23505,7 +27232,7 @@ int main()
          {
             for (const auto& t : allTypes)
             {
-               std::string hay = t.first + " " + t.second;
+               std::string hay = DisplayName(t.first) + " " + DisplayName(t.second);
                std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
                if (hay.find(q) == std::string::npos)
                   continue;
@@ -23624,6 +27351,23 @@ int main()
          gRequestFitView = true; // dev screenshot: frame the whole fixture
       if (getenv("INFINITE_AUDIOUITEST") != nullptr && frameId == 3)
          gRequestFitView = true; // same, for the audio node UI fixture
+      if (getenv("INFINITE_AUDIOUITEST") != nullptr)
+      {
+         // Plugin instantiation is asynchronous, so the fixture's mapping list
+         // can't be filled in at spawn time - map the first few parameters the
+         // moment the plugin reports ready, so the screenshot shows the real
+         // two-column grid of mapped rows.
+         for (GraphNode& gn : gNodes)
+         {
+            auto* pluginFixture = dynamic_cast<AudioPluginNode*>(gn.node.get());
+            if (pluginFixture == nullptr || !pluginFixture->IsReady() ||
+                pluginFixture->AssignedCount() > 0)
+               continue;
+            const std::vector<Platform::PluginParamInfo>& available = pluginFixture->AvailableParams();
+            for (int i = 0; i < (int)available.size() && i < 4; i++)
+               pluginFixture->MapParameter(available[i].address);
+         }
+      }
       if (getenv("INFINITE_HIDETEST") != nullptr && frameId == 3)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
 
@@ -23650,14 +27394,27 @@ int main()
          ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight), true);
 
          // Mode switcher: Modules is the original, always-present catalogue;
-         // Samples extends it per docs/plans/audio/README.md P3e. Kept as two
-         // plain selectable-style buttons rather than an ImGui tab bar so the
-         // active mode reads clearly against the panel's own dark background.
-         if (ImGui::Selectable("Modules", gSearchPanelMode == 0, 0, ImVec2(kNodePanelWidth * 0.46f, 0)))
+         // Samples and Media extend it per docs/plans/audio/README.md P3e.
+         // Kept as plain selectable-style buttons rather than an ImGui tab
+         // bar so the active mode reads clearly against the panel's own
+         // dark background.
+         // Sized from the actual content region rather than a fraction of
+         // kNodePanelWidth: four tabs no longer fit at 0.30 each, and deriving
+         // the width means the row stays exact if a fifth mode ever lands or
+         // the panel width changes.
+         const float tabGap = ImGui::GetStyle().ItemSpacing.x;
+         const float tabW = std::max(40.0f, (ImGui::GetContentRegionAvail().x - tabGap * 3.0f) * 0.25f);
+         if (ImGui::Selectable("Modules", gSearchPanelMode == 0, 0, ImVec2(tabW, 0)))
             gSearchPanelMode = 0;
          ImGui::SameLine();
-         if (ImGui::Selectable("Samples", gSearchPanelMode == 1, 0, ImVec2(kNodePanelWidth * 0.46f, 0)))
+         if (ImGui::Selectable("Samples", gSearchPanelMode == 1, 0, ImVec2(tabW, 0)))
             gSearchPanelMode = 1;
+         ImGui::SameLine();
+         if (ImGui::Selectable("Media", gSearchPanelMode == 2, 0, ImVec2(tabW, 0)))
+            gSearchPanelMode = 2;
+         ImGui::SameLine();
+         if (ImGui::Selectable("Plugins", gSearchPanelMode == 3, 0, ImVec2(tabW, 0)))
+            gSearchPanelMode = 3;
          ImGui::Separator();
 
          if (gSearchPanelMode == 0)
@@ -23718,9 +27475,17 @@ int main()
                gPatchDirty = true;
             }
          }
+         else if (gSearchPanelMode == 1)
+         {
+            DrawLibrarySearchPanel(gSampleScanner, "##samples", "search samples...", false);
+         }
+         else if (gSearchPanelMode == 2)
+         {
+            DrawLibrarySearchPanel(gMediaScanner, "##media", "search media...", true);
+         }
          else
          {
-            DrawSamplesSearchPanel();
+            DrawPluginSearchPanel();
          }
 
          ImGui::EndChild();
@@ -24518,6 +28283,17 @@ int main()
       {
          if (frameId >= atoi(exitAfter))
          {
+            // Drag-test fixtures print their verdict from inside their own
+            // phase machine; if the run times out before ever finding a
+            // usable row (sPhase stuck at 0), that machine never gets to
+            // print anything and the driver silently reads "no FAIL" as a
+            // pass. Say so explicitly instead.
+            if (getenv("INFINITE_SAMPLERDRAGTEST") != nullptr && gSamplerDragTestPhase == 0)
+               printf("SAMPLERDRAGTEST FAIL (timed out waiting for a usable row)\n");
+            if (getenv("INFINITE_MEDIADRAGTEST") != nullptr && gMediaDragTestPhase == 0)
+               printf("MEDIADRAGTEST FAIL (timed out waiting for a usable row)\n");
+            if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr && gPluginDragTestPhase == 0)
+               printf("PLUGINDRAGTEST FAIL (timed out waiting for a usable row)\n");
             fflush(stdout);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }

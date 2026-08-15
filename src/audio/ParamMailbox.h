@@ -24,6 +24,14 @@ public:
 
    void PrepareToPlay(double sampleRate);
 
+   // Main-thread-only observability hook (not used by SmoothedValue/Push -
+   // those never touch mSampleRate, only the per-slot smoothers PrepareToPlay
+   // already configured). Lets a test confirm which rate this mailbox was
+   // actually prepared with, e.g. INFINITE_AUDIOLIFECYCLETEST checking that a
+   // node's mailbox saw the device's negotiated rate rather than whatever it
+   // was constructed/last-rebuilt with.
+   double SampleRate() const { return mSampleRate; }
+
    // Main thread only. Last write before the audio thread next reads wins.
    void Push(int paramId, float value);
 

@@ -7,6 +7,8 @@
 
 #include "Transport.h"
 
+constexpr int PatternNode::kSteps;
+
 namespace
 {
    const std::vector<std::string> kLfoShapes = {

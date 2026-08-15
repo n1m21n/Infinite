@@ -77,6 +77,18 @@ public:
    double SampleRate() const;
    uint64_t XrunCount() const;
 
+   // True unless the engine believes it should be producing audio
+   // (SampleRate() > 0) but no render callback has actually landed recently
+   // enough to justify that belief. Deliberately not the same signal as the
+   // xrun heuristic in Process(): that one compares the wall-clock gap
+   // BETWEEN two successive callbacks, so a dead engine - which produces
+   // ZERO further callbacks - gives it nothing to compare and it stays
+   // silent forever. This instead compares "now" against the last callback
+   // (or Start(), before the first one has arrived) from the outside, on
+   // whatever thread polls it - see
+   // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md.
+   bool IsAlive() const;
+
    // Fraction of the block's real-time deadline spent inside RunTopology on
    // the last callback (1.0 == used the entire budget before the next block
    // is due). Smoothed with a one-pole filter on the audio thread so the
@@ -145,6 +157,11 @@ private:
    std::atomic<uint64_t> mXrunCount { 0 };
    std::atomic<double> mLastCallbackMs { -1.0 };
    std::atomic<double> mLastBlockLoad { 0.0 };
+   // Set in Start(), read by IsAlive() as the "no callback yet" baseline -
+   // without this, an engine that fails to ever produce a first callback
+   // (mLastCallbackMs staying at its -1.0 sentinel forever) would read as
+   // permanently alive instead of dead.
+   std::atomic<double> mStartedAtMs { -1.0 };
 
    uint32_t mRequestedDeviceId = 0;
    double mRequestedSampleRate = 0.0;

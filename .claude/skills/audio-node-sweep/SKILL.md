@@ -170,6 +170,34 @@ etc.) before treating a new one as a regression. This is the same category of
 caveat `geometry-transform-sweep`'s own `[SKIP]` carries: a gap in what this
 harness can prove, not a claim that the node is broken.
 
+**Note-outbox nodes (Arpeggiator, Note Echo, Note Modify, ...) had the same
+class of structural blind spot, now mostly fixed.** The `kNoteOutbox` read
+mode's signature used to come from a single block, one note-on, three scalars
+(event count, first event's note, first event's velocity) - blind by
+construction to `frameOffset` (so every timing/humanize param was invisible),
+to anything after the first block (so echo repeats, arpeggiator steps, and
+glide ramps all fired outside the measurement window), and to a curve's fixed
+point (velocity 1.0 maps to 1.0 under any shape). `RunNoteWindow`
+(`src/main.cpp`) widens this: it runs a 12-block window (matching the warmup
+count) and accumulates every popped event's note, velocity, `isNoteOn` *and*
+`frameOffset` into a running signature, and `BuildRig`/`TestOneParamWithValue`
+hold a 3-note chord at velocity 0.5 for note-outbox candidates instead of a
+single note at 1.0, so mode/octaves/order-sensitive params have something to
+differentiate. Two structural gaps remain, neither fixable by widening the
+measurement window further:
+
+- **Which outbox port an event went to.** A multi-port node (Note Router's
+  `probability`, which redistributes events across its output ports) is only
+  ever read from port 0 via the base `NoteOutbox()` call - a param whose only
+  effect is *which* port an event lands on reads FAIL regardless of window
+  size.
+- **State gated behind an explicit transport command.** Note Capturer's
+  `loop`/`quantizeDiv` only take effect via a `kStartRecord`/`kStopRecord`/
+  `kStartPlay` command (see `AudioNoteCapturerNode::ProcessBlock`'s
+  `mCommand` switch) that the generic rig never issues - the node stays in
+  its idle state through the whole probe, so nothing downstream of that
+  switch can ever be reached generically.
+
 ## Manually trying combinations these sweeps do not cover
 
 - **Voice-start-gated params on an already-sounding voice.** A wavetable's

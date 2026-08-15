@@ -29,7 +29,8 @@
 //                       pitch and never aliases.
 //
 // Total storage is kNumTables * kFrames * kMipLevels * kFrameSize floats
-// (~3.9 MB), built once per process on the main thread by EnsureBuilt() and
+// (~6.9 MB at the current kNumTables), built once per process on the main
+// thread by EnsureBuilt() and
 // immutable afterwards - which is what lets ProcessBlock read it with no
 // synchronisation at all.
 namespace Wavetable
@@ -38,7 +39,7 @@ namespace Wavetable
    constexpr int kFrames = 8;
    constexpr int kMipLevels = 10;
    constexpr int kMaxHarmonic = kFrameSize / 2; // 512 - Nyquist for one frame
-   constexpr int kNumTables = 12;
+   constexpr int kNumTables = 22;
 
    // Main thread, idempotent, ~100 ms the first time. Every accessor below
    // assumes it has already run; the Wavetable node calls it from its

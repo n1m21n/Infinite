@@ -67,6 +67,60 @@ What each node type does: math, state, per-node parameter UI.
 | TextNode | Typography via CoreText/CoreGraphics |
 | OutputNode | Terminal node — identity-pass FBO, drives recording |
 
+### Audio / note node system
+
+A second cable type and DAG (see `docs/plans/audio/README.md`/`STATUS.md` for
+the full plan/state). Most audio *effects* share one C++ class rather than
+getting a file each:
+
+- **`src/nodes/AudioEffectNode.h`/`.cpp`** — the one class every entry in the
+  `EffectDef` table (`src/audio/EffectDefs.h`/`.cpp`) is instantiated as; adding
+  effect N+1 is a table row plus an `IEffectKernel` (`src/audio/dsp/*Kernel.h`/
+  `.cpp`, one per effect: Audio Filter, Dynamics, Delay, Reverb, Drive, Stereo,
+  Pitch Shifter, Chorus, Flanger, Phaser, Bitcrush, Transient Shaper, Stutter,
+  Ring Mod, Formant Filter, Wavetable Shaper, EQ), not a new node class. EQ is
+  a deliberate second, separate node from Audio Filter rather than a
+  re-expansion of it — Audio Filter stays one band/one type on purpose.
+- **`src/audio/Wavetable.h`/`.cpp`** — the 12-table/8-frame/10-mip-level bank
+  shared by the **Wavetable** synth and the **Wavetable Shaper** effect
+  (the latter reads a frame as a transfer curve rather than an oscillator).
+- **`src/audio/SampleSlot.h`** — the main-thread-hands-a-buffer-to-the-audio-
+  thread lifetime pattern (pending/active/retire-ring), shared by **Sampler**
+  (one instance) and **Drum Sequencer** (eight, one per lane). Lifted out of
+  `SamplerNode.cpp` so a new sample-playing node never has to reimplement its
+  own use-after-free trap.
+- **`src/nodes/AudioPluginNode.h`/`.cpp`** — hosts a third-party plugin (Audio
+  Units today) as an ordinary audio effect node. Unusually for this codebase it
+  is a *three*-object node: the `INode` main-thread half, its `AudioNode` audio
+  half, and the plugin instance itself, an opaque `Platform::PluginHandle` the
+  main half owns and the audio half only ever reads through a
+  `std::atomic<PluginHandle*>`. Two consequences are load-bearing and written
+  up on the class: mapped plugin parameters deliberately bypass `ParamMailbox`
+  (they go straight to `AUParameter`, which does its own smoothing, and 32
+  mapped params would not fit the mailbox's 64 slots anyway — this is why the
+  node carries a documented `AUDIOPARAMSWEEPTEST` baseline), and swapping or
+  unloading a plugin retires the old handle for one generation before
+  destroying it, mirroring `AudioEngine::SetTopology`.
+- **`src/audio/PluginScanner.h`/`.cpp`** — `SampleScanner`'s thread +
+  `PollResults()` + disk-cache shape, over a component-registry query instead
+  of a directory walk, so it has no user-managed folder list. Backs the docked
+  panel's fourth mode.
+- **Every Objective-C object involved in plugin hosting lives behind
+  `Platform.h`'s plugin section** — `src/nodes/` and `src/audio/` stay pure
+  C++, and the audio thread never sends a message or touches ARC: the render
+  path calls an `AURenderBlock` cached on the main thread at prepare time, with
+  an `__unsafe_unretained` stack pull-input block. The plugin's editor is a
+  plain `NSWindow` (the only one in the app), which works because
+  `glfwPollEvents` drains and dispatches `NSApp`'s queue — verified with a
+  throwaway empty-window test before any of this was built. VST3 is designed
+  for but not implemented; see `docs/plans/audio/plugin-hosting.md` for the
+  licensing reason.
+- Per-effect body/visualizer UI lives in `src/main.cpp` as `DrawXxxBody`/
+  `DrawXxxVisualizer` pairs next to the `EffectVisualizerId` switch inside
+  `DrawAudioNodeBody` — see `.claude/skills/new-audio-node/SKILL.md` for the
+  exact wiring sites and `.claude/skills/audio-node-ui/SKILL.md` for the
+  layout grammar.
+
 ### Invariants for `IGeometrySource`-consuming nodes
 
 Two rules every node with a single `IGeometrySource*` input (or `sourceInput`/

@@ -106,6 +106,13 @@ public:
 
    AudioNode* GetAudioNode() override;
 
+   // Test-only observability: the sample rate AudioWavetableNode's own
+   // ParamMailbox was last PrepareToPlay'd with. Used by
+   // INFINITE_AUDIOLIFECYCLETEST to confirm a topology rebuild after
+   // AudioEngine::Start() actually reaches this node's mailbox with the
+   // device's negotiated rate, not whatever the node was constructed with.
+   double DebugMailboxSampleRate() const;
+
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
 

@@ -206,6 +206,38 @@ namespace Platform
    // negotiated after a requestedBufferFrames the device may have clamped.
    uint32_t AudioDeviceBufferFrames(uint32_t deviceId = 0);
 
+   // ---- audio device recovery (config-change / sleep-wake) ----
+   // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md.
+   //
+   // AVAudioEngineConfigurationChangeNotification can be posted on an
+   // arbitrary thread, and NSWorkspace's sleep/wake notifications are not
+   // guaranteed main-thread either by anything this file controls - nothing
+   // downstream of them may touch the audio graph directly
+   // (src/audio/AudioNode.h's RT-safety list covers the render thread, but
+   // main-thread-only graph state like gNodes/AudioCable is just as
+   // unsafe from a random notification thread). So these three functions
+   // are the entire cross-thread surface: the notification handlers
+   // installed by AudioDeviceOpen do nothing but latch an atomic flag, and
+   // each accessor here consumes (clears) its flag on read. main.cpp's
+   // per-frame loop polls all three once a frame and does the actual
+   // Stop/Start work itself, through the same choke point Apply-audio-
+   // settings already uses - see main.cpp's PollAudioRecovery.
+   //
+   // Consuming means a burst of N notifications between two polls collapses
+   // to a single true - the poller does its own additional rate-limiting on
+   // top of that (see PollAudioRecovery's comment), this alone does not
+   // bound retry frequency.
+   bool AudioDeviceConfigDidChange();
+   bool AudioWillSleep();
+   bool AudioDidWake();
+
+   // Test-only: pokes the same flag AudioDeviceConfigDidChange() consumes,
+   // without a real CoreAudio notification - INFINITE_AUDIORECOVERYTEST's
+   // way of exercising PollAudioRecovery's restart/rate-limit logic
+   // deterministically, since real device unplug/sleep-wake can't be
+   // scripted headlessly.
+   void AudioDeviceDebugSimulateConfigChange();
+
    // ---- audio device enumeration (CoreAudio HAL) ----
    struct AudioDeviceInfo
    {
@@ -267,6 +299,164 @@ namespace Platform
    // isn't running yet, e.g. still waiting on the device to open or on mic
    // permission). Audio-thread safe: lock-free, no allocation.
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels);
+
+   // ---- audio plugin hosting -----------------------------------------------
+   // Every Objective-C object involved in hosting a third-party plugin lives
+   // behind this facade, for the same reason the rest of this header exists:
+   // src/nodes/ and src/audio/ are pure C++ and the audio thread must never
+   // send an Objective-C message or touch ARC. AudioPluginNode holds an opaque
+   // PluginHandle* and calls PluginRender from ProcessBlock; that one function
+   // is the only real-time-safe entry point here, and it does nothing but call
+   // a render block cached on the main thread at prepare time.
+   //
+   // Only Audio Units are implemented (Phase 1). VST3 is a second backend
+   // behind exactly this surface - see docs/plans/audio/plugin-hosting.md for
+   // why it is not here yet (the VST3 SDK is GPLv3-or-proprietary and this
+   // codebase is MIT). Every struct that crosses this boundary carries a
+   // `format` string from day one so the second backend needs no signature
+   // change; today it is always "au".
+
+   struct PluginDesc
+   {
+      std::string format = "au"; // "au" today; "vst3" is the planned second backend
+      std::string name;
+      std::string manufacturer;
+      // Stable identity, and what a patch file stores - NOT a filesystem path,
+      // which moves when a plugin is reinstalled elsewhere. For AU this is
+      // "au:<type>:<subtype>:<manufacturer>" built from the component's four-
+      // char codes, e.g. "au:aufx:dely:appl".
+      //
+      // Deliberately excludes the component version, even though the version
+      // is part of an AudioComponentDescription: including it would make every
+      // plugin update invalidate the identity stored in already-saved patches.
+      // Two AUs never share type+subtype+manufacturer, so the version buys no
+      // disambiguation and costs patch stability.
+      std::string identifier;
+   };
+
+   // Every installed effect Audio Unit, via AVAudioUnitComponentManager (a
+   // registry query - there is no folder to walk, which is why PluginScanner
+   // has no user-managed folder list). Filtered to 'aufx' (effect) and 'aumf'
+   // (music effect); 'aumu' instruments are excluded because AudioPluginNode
+   // is audio-in/audio-out only until note input lands, and listing a synth
+   // that can only ever render silence is worse than not listing it.
+   // Main thread only - the first call can take a second or two if the system
+   // component registry is cold, which is exactly why PluginScanner runs it
+   // on a background thread and caches the result to disk.
+   void EnumerateAudioUnits(std::vector<PluginDesc>& out);
+
+   // Resolves a dropped .component *bundle directory* back to the plugin(s) it
+   // contains, by reading its Info.plist AudioComponents array. Returns false
+   // if the path isn't a readable audio component bundle. One bundle can
+   // declare several components, hence the vector.
+   bool DescribeAudioUnitBundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
+
+   struct PluginHandle;
+
+   enum class PluginLoadState
+   {
+      Pending, // instantiation still in flight - keep polling, keep the UI live
+      Ready,   // render block cached, safe to publish to the audio thread
+      Failed   // see the outError from PluginPoll
+   };
+
+   // Starts instantiation and returns immediately. AUAudioUnit instantiation
+   // is asynchronous (out-of-process AUv3s in particular can take seconds), so
+   // this never blocks: the handle exists straight away in the Pending state
+   // and the node polls it from CookIfNeeded. `sampleRate` may be 0 if the
+   // device isn't open yet; PluginPrepare below re-does the format/render-
+   // resource setup once a real rate is known.
+   PluginHandle* PluginCreate(const PluginDesc& desc, double sampleRate, int maxBlockFrames);
+
+   // Main thread only, call once per frame while Pending. The transition to
+   // Ready happens inside this call: the completion handler runs on an
+   // arbitrary queue and does nothing but stash the instantiated unit, and all
+   // of the actual setup (bus formats, maximumFramesToRender,
+   // allocateRenderResources, caching the render block) is done here, on the
+   // main thread, where AUAudioUnit expects it.
+   PluginLoadState PluginPoll(PluginHandle* handle, std::string& outError);
+
+   // Re-negotiates bus formats and re-allocates render resources at a new
+   // sample rate / block size. Main thread only, and NOT safe while the handle
+   // is reachable from a published topology - AudioPluginNode calls it before
+   // publishing. A no-op if nothing changed. Returns false and fills outError
+   // if the plugin rejects the format.
+   bool PluginPrepare(PluginHandle* handle, double sampleRate, int maxBlockFrames, std::string& outError);
+
+   // Main thread only, and never while the handle is still reachable from a
+   // published audio topology - see AudioPluginNode's retire discipline. Closes
+   // the editor window first, removes the learn observer, and briefly spins
+   // (main thread, bounded) if a render is in flight before tearing the unit
+   // down.
+   void PluginDestroy(PluginHandle* handle);
+
+   PluginDesc PluginDescriptionOf(PluginHandle* handle);
+
+   // THE real-time-safe entry point. Calls the cached AUAudioUnitRenderBlock
+   // with a stack-allocated pull-input block that copies from `in`. No
+   // Objective-C message send, no ARC retain/release, no allocation, no lock.
+   // `in` may be null (treated as silence). Output is planar, one pointer per
+   // channel, numFrames long.
+   void PluginRender(PluginHandle* handle, const float* const* in, int inChannels,
+                     float* const* out, int outChannels, int numFrames);
+
+   struct PluginParamInfo
+   {
+      unsigned long long address = 0;
+      std::string displayName;
+      float minValue = 0.0f;
+      float maxValue = 1.0f;
+      float defaultValue = 0.0f;
+      std::string unit;
+   };
+
+   // The plugin's AUParameterTree, flattened (allParameters). Main thread only.
+   int PluginParameterCount(PluginHandle* handle);
+   bool PluginParameterInfo(PluginHandle* handle, int index, PluginParamInfo& out);
+   bool PluginParameterInfoByAddress(PluginHandle* handle, unsigned long long address, PluginParamInfo& out);
+
+   // Main thread only - AUParameter's setter is non-blocking and is the
+   // supported way to drive a parameter from a host's own UI, so mapped params
+   // go straight down this path from CookIfNeeded rather than through the
+   // node's ParamMailbox (the plugin does its own smoothing). This is the one
+   // deliberate exception to "every param reaches the audio thread through the
+   // mailbox", and is why AudioPluginNode carries a documented
+   // AUDIOPARAMSWEEPTEST baseline.
+   void PluginSetParameter(PluginHandle* handle, unsigned long long address, float value);
+   bool PluginGetParameter(PluginHandle* handle, unsigned long long address, float& outValue);
+
+   // "Configure" / learn mode, the Ableton-style mapping gesture: while learn
+   // is on, touching a control in the plugin's OWN editor window reports that
+   // parameter's address here, and the node fills its next free mapping slot.
+   //
+   // Implemented with AUParameterTree's parameter observer, whose block is
+   // called on an arbitrary thread - so it does nothing but store the address
+   // into an atomic that PluginPollLearned drains from the main thread.
+   // Parameter writes this host makes itself are tagged with the observer's own
+   // token and therefore never echo back as a learned touch.
+   void PluginBeginLearn(PluginHandle* handle);
+   void PluginEndLearn(PluginHandle* handle);
+   bool PluginPollLearned(PluginHandle* handle, unsigned long long& outAddress);
+
+   // The plugin's own editor, in a separate native window (the app itself is
+   // GLFW/ImGui/OpenGL and has no other NSWindow). Verified: a plain NSWindow
+   // is created, displayed and dispatched to correctly with glfwPollEvents as
+   // the only run-loop pump. The view comes from
+   // -requestViewControllerWithCompletionHandler:, which is asynchronous, so
+   // PluginOpenEditor returns true meaning "the request went out" and the
+   // window appears a beat later.
+   //
+   // Closing the window (red button or PluginDestroy) routes back through
+   // PluginCloseEditor so PluginEditorIsOpen never lies to the node.
+   bool PluginOpenEditor(PluginHandle* handle, std::string& outError);
+   void PluginCloseEditor(PluginHandle* handle);
+   bool PluginEditorIsOpen(PluginHandle* handle);
+
+   // AUAudioUnit.fullState, keyed-archived and base64'd so it round-trips
+   // through Patch.cpp's Text param (one backslash-escaped line, no length
+   // cap). Returns false if the plugin publishes no state.
+   bool PluginSaveState(PluginHandle* handle, std::string& outBase64);
+   bool PluginRestoreState(PluginHandle* handle, const std::string& base64);
 
    // ---- MIDI input ----
    // Listens to every connected class-compliant MIDI source (Akai/Nektar/Pioneer

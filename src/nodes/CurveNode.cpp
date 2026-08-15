@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+constexpr int CurveNode::kMaxPoints;
+
 namespace
 {
    const std::vector<std::string> kKindNames = {

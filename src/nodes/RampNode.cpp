@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 
+constexpr int RampNode::kStops;
+
 namespace
 {
    const std::vector<std::string> kTypeNames = {

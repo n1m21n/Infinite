@@ -248,6 +248,9 @@ public:
 
    void SetNoteInbox(NoteEventQueue* inbox) override { mNoteInbox = inbox; }
 
+   // See WavetableNode::DebugMailboxSampleRate's comment - test-only.
+   double DebugMailboxSampleRate() const { return mMailbox.SampleRate(); }
+
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
    {
       // Per-block snapshot of everything that isn't smoothed. Reading these
@@ -873,6 +876,11 @@ AudioNode* WavetableNode::GetAudioNode()
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioWavetableNode>();
    return mAudioNode.get();
+}
+
+double WavetableNode::DebugMailboxSampleRate() const
+{
+   return mAudioNode ? mAudioNode->DebugMailboxSampleRate() : 0.0;
 }
 
 int WavetableNode::ReadScope(float* out, int capacity)

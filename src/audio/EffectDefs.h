@@ -81,6 +81,8 @@ enum class EffectVisualizerId
    kStutterGrid,
    kRingModWave,
    kFormantVowel,
+   kWavetableShaperCurve,
+   kEqCurve,
 };
 
 struct EffectDef

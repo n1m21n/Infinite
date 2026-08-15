@@ -58,6 +58,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/audio/Wavetable.cpp
     src/audio/EffectDefs.cpp
     src/audio/dsp/AudioFilterKernel.cpp
+    src/audio/dsp/EqKernel.cpp
     src/audio/dsp/DynamicsKernel.cpp
     src/audio/dsp/DelayKernel.cpp
     src/audio/dsp/ReverbKernel.cpp
@@ -72,6 +73,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/audio/dsp/StutterKernel.cpp
     src/audio/dsp/RingModKernel.cpp
     src/audio/dsp/FormantFilterKernel.cpp
+    src/audio/dsp/WavetableShaperKernel.cpp
     src/nodes/ImageSourceNode.cpp
     src/nodes/ShapeNode.cpp
     src/nodes/FormulaNode.cpp
@@ -116,7 +118,10 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/WavetableNode.cpp
     src/nodes/AudioEffectNode.cpp
     src/nodes/SamplerNode.cpp
+    src/nodes/DrumSequencerNode.cpp
+    src/nodes/AudioPluginNode.cpp
     src/audio/SampleScanner.cpp
+    src/audio/PluginScanner.cpp
 
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
@@ -174,6 +179,11 @@ if(APPLE)
         "-framework CoreMIDI"
         "-framework CoreAudio"
         "-framework AudioToolbox"
+        # Plugin hosting: AUAudioUnit's -requestViewControllerWithCompletionHandler:
+        # lives in CoreAudioKit (AUViewController.h), as does the
+        # AUGenericViewController fallback for plugins with no editor of their
+        # own. See Platform.h's audio plugin hosting section.
+        "-framework CoreAudioKit"
     )
     target_compile_definitions(Infinite PRIVATE GL_SILENCE_DEPRECATION)
 
