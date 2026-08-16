@@ -13104,24 +13104,64 @@ namespace
    void DrawMaterialParams(MaterialNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
-      // Only shown when a normal map is actually patched in - a strength slider
-      // for a map that is not there is just another dead control.
       if (n->MapInput(kMapNormal).IsConnected())
          ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f);
-      NodeSeparator("material");
+      NodeSeparator("surface");
       DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
       ColorSwatch("colour", n->color, n);
       ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
       ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("specular", &n->specular, 0.0f, 1.0f);
+      ModSlider("ior", &n->ior, 1.0f, 3.0f);
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      if (n->opacity < 1.0f || n->alphaCutoff > 0.0f)
+         ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f);
+
+      NodeSeparator("emission");
       ColorSwatch("emission", n->emissionColor, n);
       ModSlider("emission", &n->emission, 0.0f, 8.0f);
+
+      NodeSeparator("coat & sheen");
+      ModSlider("clearcoat", &n->clearcoat, 0.0f, 1.0f);
+      if (n->clearcoat > 0.0f || n->MapInput(kMapClearcoat).IsConnected())
+         ModSlider("coat roughness", &n->clearcoatRoughness, 0.02f, 1.0f);
+      ModSlider("sheen", &n->sheen, 0.0f, 1.0f);
+      if (n->sheen > 0.0f || n->MapInput(kMapSheen).IsConnected())
+      {
+         ColorSwatch("sheen tint", n->sheenColor, n);
+         ModSlider("sheen roughness", &n->sheenRoughness, 0.01f, 1.0f);
+      }
+
+      NodeSeparator("optics");
+      ModSlider("anisotropy", &n->anisotropy, -1.0f, 1.0f);
+      if (n->anisotropy != 0.0f)
+         ModSlider("aniso rotation", &n->anisotropyRotation, 0.0f, 1.0f);
+      ModSlider("iridescence", &n->iridescence, 0.0f, 1.0f);
+      if (n->iridescence > 0.0f)
+      {
+         ModSlider("irid IOR", &n->iridescenceIor, 1.0f, 3.0f);
+         ModSlider("irid thickness", &n->iridescenceThickness, 100.0f, 1000.0f, "%.0f nm");
+      }
+      ModSlider("transmission", &n->transmission, 0.0f, 1.0f);
+      if (n->transmission > 0.0f)
+      {
+         ModSlider("trans rough", &n->transmissionRoughness, 0.0f, 1.0f);
+         ModSlider("dispersion", &n->dispersion, 0.0f, 1.0f);
+      }
+      ModSlider("subsurface", &n->subsurface, 0.0f, 1.0f);
+      if (n->subsurface > 0.0f)
+      {
+         ColorSwatch("sss colour", n->subsurfaceColor, n);
+         ModSlider("sss radius", &n->subsurfaceRadius, 0.0f, 1.0f);
+      }
    }
 
    void DrawMappingParams(MappingNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
       DropdownButton("space", MappingNode::SpaceNames(), n->space, [n](int i) { n->space = i; });
+      if (n->space != kMapSpaceUv)
+         ModSlider("blend softness", &n->triplanarBlend, 0.0f, 1.0f);
 
       NodeSeparator("translate");
       ModSlider("x", &n->translateX, -4.0f, 4.0f);
@@ -13709,8 +13749,13 @@ namespace
       DropdownButton("type", LightNode::TypeNames(), n->type, [n](int i) { n->type = i; });
       ModSlider("orbit", &n->azimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
       ModSlider("elevation", &n->elevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0");
-      if (n->type == 1)
+      if (n->type == 1 || n->type == 4)
          ModSlider("distance", &n->distance, 0.2f, 20.0f);
+      if (n->type == 4)
+      {
+         ModSlider("cone angle", &n->spotAngle, 5.0f, 85.0f, "%.1f\xC2\xB0");
+         ModSlider("penumbra", &n->spotPenumbra, 0.0f, 1.0f);
+      }
       ColorSwatch("colour", n->color, n);
       ModSlider("intensity", &n->intensity, 0.0f, 5.0f);
       ModSlider("orbit / beat", &n->orbitPerBeat, -1.0f, 1.0f);
@@ -27113,6 +27158,7 @@ int main()
          probe.mapping.translate[0] = 1.5f; probe.mapping.translate[1] = -2.5f; probe.mapping.translate[2] = 0.75f;
          probe.mapping.rotate[0] = 0.3f; probe.mapping.rotate[1] = 0.6f; probe.mapping.rotate[2] = 0.9f;
          probe.mapping.scale[0] = 2.0f; probe.mapping.scale[1] = 3.0f; probe.mapping.scale[2] = 4.0f;
+         probe.mapping.triplanarBlend = 0.45f;
 
          int frame = 21000;
          auto cook = [&](IGeometrySource* g) {
@@ -27121,6 +27167,8 @@ int main()
          };
          auto matches = [&](const MappingTransform& a, const MappingTransform& b) {
             if (a.space != b.space)
+               return false;
+            if (std::fabs(a.triplanarBlend - b.triplanarBlend) > 1e-4f)
                return false;
             for (int i = 0; i < 3; i++)
             {

@@ -48,6 +48,26 @@ struct Material
    float subsurface = 0.0f;
    float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
    float subsurfaceRadius = 0.5f;
+
+   // Sheen / cloth / velvet microfacet backscattering lobe (Charlie distribution)
+   float sheen = 0.0f;
+   float sheenColor[3] = { 1.0f, 1.0f, 1.0f };
+   float sheenRoughness = 0.5f;
+
+   // Optical thin-film interference / iridescence (soap bubble / oil slick / pearl)
+   float iridescence = 0.0f;
+   float iridescenceIor = 1.33f;
+   float iridescenceThickness = 400.0f; // nanometres
+
+   // Anisotropic specular reflection (brushed metals, grooves, vinyl)
+   float anisotropy = 0.0f; // -1.0 to 1.0
+   float anisotropyRotation = 0.0f; // 0.0 to 1.0
+
+   // Prismatic chromatic dispersion for transmission
+   float dispersion = 0.0f;
+
+   // Alpha test / cutout threshold (0 = smooth alpha blend, >0 = mask cutoff)
+   float alphaCutoff = 0.0f;
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own
@@ -64,6 +84,9 @@ enum MaterialMap
    kMapMetallic,
    kMapNormal,
    kMapAmbientOcclusion,
+   kMapEmission,
+   kMapClearcoat,
+   kMapSheen,
    kMapCount
 };
 
@@ -89,6 +112,7 @@ struct MappingTransform
    float translate[3] = { 0.0f, 0.0f, 0.0f };
    float rotate[3] = { 0.0f, 0.0f, 0.0f }; // radians
    float scale[3] = { 1.0f, 1.0f, 1.0f };
+   float triplanarBlend = 0.0f; // 0 = sharp pick, >0 = smooth blended triplanar
 };
 
 class IGeometrySource
@@ -243,6 +267,16 @@ public:
    float subsurface = 0.0f;
    float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
    float subsurfaceRadius = 0.5f;
+   float sheen = 0.0f;
+   float sheenColor[3] = { 1.0f, 1.0f, 1.0f };
+   float sheenRoughness = 0.5f;
+   float iridescence = 0.0f;
+   float iridescenceIor = 1.33f;
+   float iridescenceThickness = 400.0f;
+   float anisotropy = 0.0f;
+   float anisotropyRotation = 0.0f;
+   float dispersion = 0.0f;
+   float alphaCutoff = 0.0f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -266,6 +300,12 @@ public:
       v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
       v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
       v.Float("subsurfaceRadius", subsurfaceRadius);
+      v.Float("sheen", sheen); v.Color("sheenColor", sheenColor);
+      v.Float("sheenRoughness", sheenRoughness);
+      v.Float("iridescence", iridescence); v.Float("iridescenceIor", iridescenceIor);
+      v.Float("iridescenceThickness", iridescenceThickness);
+      v.Float("anisotropy", anisotropy); v.Float("anisotropyRotation", anisotropyRotation);
+      v.Float("dispersion", dispersion); v.Float("alphaCutoff", alphaCutoff);
    }
 
 private:

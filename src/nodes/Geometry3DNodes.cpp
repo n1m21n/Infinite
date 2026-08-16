@@ -340,6 +340,16 @@ namespace
       "uniform float uSubsurface;\n"
       "uniform vec3 uSubsurfaceColor;\n"
       "uniform float uSubsurfaceRadius;\n"
+      "uniform float uSheen;\n"
+      "uniform vec3 uSheenColor;\n"
+      "uniform float uSheenRoughness;\n"
+      "uniform float uIridescence;\n"
+      "uniform float uIridescenceIor;\n"
+      "uniform float uIridescenceThickness;\n"
+      "uniform float uAnisotropy;\n"
+      "uniform float uAnisotropyRotation;\n"
+      "uniform float uDispersion;\n"
+      "uniform float uAlphaCutoff;\n"
       "uniform float uTransmission;\n"
       "uniform float uTransmissionRoughness;\n"
       "uniform sampler2D uSceneColor;\n"
@@ -349,6 +359,8 @@ namespace
       "uniform vec3 uLightColor[3];\n"
       "uniform float uLightIntensity[3];\n"
       "uniform int uLightType[3];\n"
+      "uniform float uLightSpotAngle[3];\n"
+      "uniform float uLightSpotPenumbra[3];\n"
       "uniform int uLightCount;\n"
       "uniform vec3 uAmbient;\n"
       "uniform float uRim;\n"
@@ -359,10 +371,16 @@ namespace
       "uniform sampler2D uMetallicMap;\n"
       "uniform sampler2D uNormalMap;\n"
       "uniform sampler2D uAoMap;\n"
+      "uniform sampler2D uEmissionMap;\n"
+      "uniform sampler2D uClearcoatMap;\n"
+      "uniform sampler2D uSheenMap;\n"
       "uniform int uHasRoughnessMap;\n"
       "uniform int uHasMetallicMap;\n"
       "uniform int uHasNormalMap;\n"
       "uniform int uHasAoMap;\n"
+      "uniform int uHasEmissionMap;\n"
+      "uniform int uHasClearcoatMap;\n"
+      "uniform int uHasSheenMap;\n"
       "uniform float uNormalStrength;\n"
       // Mapping: which coordinate space the material maps sample (UV /
       // Generated / Object) and the offset/rotation/scale applied to it before
@@ -372,6 +390,7 @@ namespace
       "uniform vec3 uMapTranslate;\n"
       "uniform vec3 uMapRotate;\n"
       "uniform vec3 uMapScale;\n"
+      "uniform float uTriplanarBlend;\n"
       "uniform vec3 uObjLo;\n"
       "uniform vec3 uObjHi;\n"
       "uniform float uExposure;\n"
@@ -395,23 +414,12 @@ namespace
       "uniform int uIsSprite;\n"
       "uniform int uSpriteShape;\n" // 0 circle, 1 square
       "\n"
-      // 3x3 percentage-closer filter. A single depth comparison gives a hard,
-      // stair-stepped edge at any shadow map resolution; averaging several
-      // comparisons around the sample turns that into a gradient.
-      //
-      // sampler2DShadow does the compare in hardware, so each tap is one
-      // instruction rather than a fetch plus a branch.
       "float shadowFactor(vec3 normal, vec3 lightDir) {\n"
       "   if (uShadowsOn == 0) return 1.0;\n"
       "   vec3 proj = vLightSpacePos.xyz / max(vLightSpacePos.w, 1e-6);\n"
       "   proj = proj * 0.5 + 0.5;\n"
-      // Outside the shadow volume there is no information, so treat it as lit
-      // rather than shadowing everything beyond the fitted box.
       "   if (proj.z > 1.0 || proj.x < 0.0 || proj.x > 1.0 || proj.y < 0.0 || proj.y > 1.0)\n"
       "      return 1.0;\n"
-      // Slope-scaled bias: a surface at a grazing angle to the light spans more
-      // depth per texel, and a constant bias either acnes those or peters the
-      // face-on ones off their own contact shadow.
       "   float slope = 1.0 - max(dot(normal, lightDir), 0.0);\n"
       "   float bias = uShadowBias * (1.0 + slope * 4.0);\n"
       "   float lit = 0.0;\n"
@@ -425,51 +433,25 @@ namespace
       "   return mix(1.0, lit, uShadowStrength);\n"
       "}\n"
       "\n"
-      // Colours arrive from the UI in sRGB. Lighting has to happen in linear
-      // space or every sum and product is being done on gamma-encoded numbers,
-      // which is what makes falloff read as too dark in the mids and blow out
-      // abruptly at the top.
       "vec3 toLinear(vec3 c) { return pow(max(c, vec3(0.0)), vec3(2.2)); }\n"
       "vec3 toSrgb(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }\n"
       "\n"
-      // Narkowicz's ACES fit: cheap, and it rolls highlights off instead of
-      // clipping them flat the way a bare clamp does.
       "vec3 acesFilm(vec3 x) {\n"
       "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
       "}\n"
       "\n"
-      // Ordered dither, one 8-bit step wide, applied just before the frame is
-      // quantised. Smooth shading across a large surface otherwise lands in
-      // visible bands, and this scatters the rounding instead.
       "float ditherOffset() {\n"
       "   vec2 p = floor(gl_FragCoord.xy);\n"
       "   float v = fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);\n"
       "   return (v - 0.5) / 255.0;\n"
       "}\n"
       "\n"
-      // Equirectangular lookup: longitude wraps around Y (rotatable so a scene
-      // can be turned to face a sun in the image), latitude runs top-to-bottom.
       "vec2 dirToEquirect(vec3 d) {\n"
       "   float phi = atan(d.z, d.x) + uEnvRotation;\n"
       "   float theta = acos(clamp(d.y, -1.0, 1.0));\n"
-      // Same vertical-flip correction as the background quad's copy of this
-      // function - see its comment. Reflections and diffuse IBL both read
-      // this one.
       "   return vec2(phi / 6.28318530718 + 0.5, 1.0 - theta / 3.14159265359);\n"
       "}\n"
       "\n"
-      // When an HDRI is patched in, its mip chain stands in for both blurred
-      // reflections and diffuse irradiance: rough*uEnvMaxLod walks from a sharp
-      // mirror sample at mip 0 to a heavily averaged, near-uniform sample at the
-      // top of the chain. That is an averaged-mip approximation rather than a
-      // real GGX prefilter (each mip is a box-ish downsample, not
-      // importance-sampled against the specular lobe), so very glossy metal
-      // reads softer than a proper split-sum IBL renderer would give it - a
-      // deliberate cut, not an oversight, to keep this a single texture upload.
-      //
-      // With no HDRI this falls back to the original three-stop vertical
-      // gradient: sky/horizon/ground, blending toward the horizon colour as
-      // roughness rises to fake the same blur without any texture at all.
       "vec3 sampleEnv(vec3 dir, float rough) {\n"
       "   if (uHasEnvMap == 1) {\n"
       "      float lod = clamp(rough, 0.0, 1.0) * uEnvMaxLod;\n"
@@ -481,16 +463,37 @@ namespace
       "   return mix(env, toLinear(uEnvHorizon), rough * rough) * uEnvIntensity;\n"
       "}\n"
       "\n"
-      // Cook-Torrance: GGX/Trowbridge-Reitz distribution, Smith height-
-      // correlated geometry via Schlick-GGX, Schlick Fresnel.
       "float distributionGGX(float nDotH, float rough) {\n"
       "   float a = rough * rough;\n"
       "   float a2 = a * a;\n"
       "   float d = nDotH * nDotH * (a2 - 1.0) + 1.0;\n"
       "   return a2 / max(3.14159265 * d * d, 1e-7);\n"
       "}\n"
+      "float distributionAnisotropic(vec3 h, vec3 n, vec3 t, vec3 b, float rough, float aniso) {\n"
+      "   float a = rough * rough;\n"
+      "   float ax = max(a * (1.0 + aniso), 0.001);\n"
+      "   float ay = max(a * (1.0 - aniso), 0.001);\n"
+      "   float xDotH = dot(t, h);\n"
+      "   float yDotH = dot(b, h);\n"
+      "   float nDotH = dot(n, h);\n"
+      "   float d = (xDotH * xDotH) / (ax * ax) + (yDotH * yDotH) / (ay * ay) + nDotH * nDotH;\n"
+      "   return 1.0 / max(3.14159265 * ax * ay * d * d, 1e-7);\n"
+      "}\n"
+      "float distributionCharlie(float nDotH, float rough) {\n"
+      "   float invR = 1.0 / max(rough, 0.01);\n"
+      "   float cos2h = nDotH * nDotH;\n"
+      "   float sin2h = max(1.0 - cos2h, 0.0078125);\n"
+      "   return (2.0 + invR) * pow(sin2h, invR * 0.5) / 6.2831853;\n"
+      "}\n"
+      "vec3 evalIridescence(float nDotV, float iridIor, float thickness) {\n"
+      "   float sinTheta2 = max(1.0 - nDotV * nDotV, 0.0);\n"
+      "   float cosThetaPrime = sqrt(max(iridIor * iridIor - sinTheta2, 0.0));\n"
+      "   float delta = 2.0 * 3.14159265 * thickness * cosThetaPrime;\n"
+      "   vec3 lambda = vec3(650.0, 530.0, 470.0);\n"
+      "   vec3 phi = delta / lambda;\n"
+      "   return 0.5 + 0.5 * cos(phi);\n"
+      "}\n"
       "float geometrySchlickGGX(float nDotV, float rough) {\n"
-      // Direct-lighting remap of k; image-based lighting uses a different one.
       "   float r = rough + 1.0;\n"
       "   float k = (r * r) / 8.0;\n"
       "   return nDotV / (nDotV * (1.0 - k) + k);\n"
@@ -498,10 +501,6 @@ namespace
       "vec3 fresnelSchlick(float cosTheta, vec3 f0) {\n"
       "   return f0 + (1.0 - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);\n"
       "}\n"
-      // Tangent frame derived from screen-space derivatives rather than from
-      // vertex tangents. The Vertex struct carries only position, normal and UV,
-      // and adding tangents would mean regenerating them in every primitive and
-      // every mesh operator; this needs nothing but the UVs already present.
       "vec3 applyNormalMap(vec3 normal, vec3 viewDir, vec2 uv) {\n"
       "   vec3 dp1 = dFdx(vWorldPos);\n"
       "   vec3 dp2 = dFdy(vWorldPos);\n"
@@ -511,8 +510,6 @@ namespace
       "   vec3 dp1perp = cross(normal, dp1);\n"
       "   vec3 tangent = dp2perp * duv1.x + dp1perp * duv2.x;\n"
       "   vec3 bitangent = dp2perp * duv1.y + dp1perp * duv2.y;\n"
-      // A face with degenerate UVs gives a zero-length frame; falling back to
-      // the geometric normal is better than normalising a zero vector.
       "   float maxLen = max(dot(tangent, tangent), dot(bitangent, bitangent));\n"
       "   if (maxLen < 1e-12) return normal;\n"
       "   float invMax = inversesqrt(maxLen);\n"
@@ -523,8 +520,6 @@ namespace
       "}\n"
       "\n"
       "vec3 fresnelSchlickRoughness(float cosTheta, vec3 f0, float rough) {\n"
-      // Rough surfaces should not develop a razor-thin mirror rim at grazing
-      // angles the way the plain Schlick term would give them.
       "   vec3 ceiling = max(vec3(1.0 - rough), f0);\n"
       "   return f0 + (ceiling - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);\n"
       "}\n"
@@ -539,14 +534,6 @@ namespace
       "   return p;\n"
       "}\n"
       "\n"
-      // Where a material map actually samples. UV space stays the mesh's own
-      // baked 2D UV, offset/rotated/scaled in place - the direct equivalent of
-      // Blender's Mapping node feeding an Image Texture set to UV. Generated
-      // and Object are 3D coordinates, so a single sampler2D lookup needs a 2D
-      // projection: this picks whichever of the three axis planes best faces
-      // the surface normal (a box/triplanar pick, one tap, no blending), which
-      // is what gives a primitive like a cube correct, unstretched orientation
-      // per face instead of one plane smeared across every side.
       "vec2 computeMapUv(vec3 n) {\n"
       "   vec3 base;\n"
       "   if (uMapSpace == 1) {\n"
@@ -565,68 +552,94 @@ namespace
       "   return base.xy;\n"
       "}\n"
       "\n"
+      "vec4 sampleMap(sampler2D tex, vec3 n, vec2 uv) {\n"
+      "   if (uMapSpace == 0 || uTriplanarBlend <= 0.001) return texture(tex, uv);\n"
+      "   vec3 base;\n"
+      "   if (uMapSpace == 1) {\n"
+      "      vec3 sz = max(uObjHi - uObjLo, vec3(1e-5));\n"
+      "      base = (vLocalPos - uObjLo) / sz;\n"
+      "   } else {\n"
+      "      base = vLocalPos;\n"
+      "   }\n"
+      "   base = mapRotate(base * uMapScale, uMapRotate) + uMapTranslate;\n"
+      "   vec3 an = abs(n);\n"
+      "   float sharpness = 1.0 + (1.0 - uTriplanarBlend) * 7.0;\n"
+      "   vec3 w = pow(max(an, vec3(1e-4)), vec3(sharpness));\n"
+      "   w /= (w.x + w.y + w.z);\n"
+      "   return texture(tex, base.yz) * w.x + texture(tex, base.xz) * w.y + texture(tex, base.xy) * w.z;\n"
+      "}\n"
+      "\n"
       "void main() {\n"
-      // A point should read as a point, not a flat plane seen edge-on - the
-      // single highest-impact visual difference from the old CPU-baked quads.
       "   if (uIsSprite == 1 && uSpriteShape == 0) {\n"
       "      vec2 d = vUv * 2.0 - 1.0;\n"
       "      if (dot(d, d) > 1.0) discard;\n"
       "   }\n"
+      "   if (uAlphaCutoff > 0.0 && uOpacity < uAlphaCutoff) discard;\n"
       "   vec3 n = normalize(vNormal);\n"
-      // Normals and UVs are data being visualised, not light - they must not be
-      // tonemapped or gamma-encoded on the way out.
       "   if (uShading == 1) { fragColor = vec4(n * 0.5 + 0.5, uOpacity); return; }\n"
       "   if (uShading == 2) { fragColor = vec4(vUv, 0.0, uOpacity); return; }\n"
       "\n"
       "   vec2 mapUv = computeMapUv(n);\n"
       "   vec3 base = toLinear(uBaseColor) * vInstanceColor * vVertexColor;\n"
-      "   if (uHasTexture == 1) base *= toLinear(texture(uTexture, mapUv).rgb);\n"
+      "   if (uHasTexture == 1) base *= toLinear(sampleMap(uTexture, n, mapUv).rgb);\n"
       "   if (uShading == 3) { fragColor = vec4(toSrgb(base), uOpacity); return; }\n"
       "\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
-      // Maps multiply the slider rather than replacing it, so the slider stays
-      // the overall level and the map is the variation across the surface.
       "   float rough = uRoughness;\n"
-      "   if (uHasRoughnessMap == 1) rough *= texture(uRoughnessMap, mapUv).r;\n"
+      "   if (uHasRoughnessMap == 1) rough *= sampleMap(uRoughnessMap, n, mapUv).r;\n"
       "   rough = clamp(rough, 0.045, 1.0);\n"
       "   float metal = uMetallic;\n"
-      "   if (uHasMetallicMap == 1) metal *= texture(uMetallicMap, mapUv).r;\n"
+      "   if (uHasMetallicMap == 1) metal *= sampleMap(uMetallicMap, n, mapUv).r;\n"
       "   metal = clamp(metal, 0.0, 1.0);\n"
       "   if (uHasNormalMap == 1) n = applyNormalMap(n, viewDir, mapUv);\n"
-      "   float ao = (uHasAoMap == 1) ? texture(uAoMap, mapUv).r : 1.0;\n"
+      "   float ao = (uHasAoMap == 1) ? sampleMap(uAoMap, n, mapUv).r : 1.0;\n"
+      "   float cc = uClearcoat;\n"
+      "   if (uHasClearcoatMap == 1) cc *= sampleMap(uClearcoatMap, n, mapUv).r;\n"
+      "   float sh = uSheen;\n"
+      "   if (uHasSheenMap == 1) sh *= sampleMap(uSheenMap, n, mapUv).r;\n"
+      "   vec3 emiss = toLinear(uEmissionColor) * uEmission;\n"
+      "   if (uHasEmissionMap == 1) emiss *= toLinear(sampleMap(uEmissionMap, n, mapUv).rgb);\n"
+      "\n"
       "   float nDotV = max(dot(n, viewDir), 1e-4);\n"
-      // Dielectrics reflect ~4% head-on at IOR 1.5 (glass/Blender default);
-      // uSpecular is Blender's "Specular Level" - a 0..1 multiplier on that
-      // Fresnel-derived reflectance, independent of the metallic split below.
-      // Metals reflect their own albedo and have no diffuse lobe at all.
       "   float iorF0 = pow((uIor - 1.0) / (uIor + 1.0), 2.0);\n"
       "   vec3 dielectricF0 = vec3(clamp(iorF0 * 2.0 * uSpecular, 0.0, 1.0));\n"
       "   vec3 f0 = mix(dielectricF0, base, metal);\n"
       "   vec3 col = vec3(0.0);\n"
       "\n"
+      "   vec3 tangent = normalize(dFdx(vWorldPos));\n"
+      "   vec3 bitangent = normalize(cross(n, tangent));\n"
+      "   if (abs(uAnisotropy) > 0.001) {\n"
+      "      float rotRad = uAnisotropyRotation * 6.2831853;\n"
+      "      vec3 tRot = tangent * cos(rotRad) + bitangent * sin(rotRad);\n"
+      "      bitangent = cross(n, tRot);\n"
+      "      tangent = tRot;\n"
+      "   }\n"
+      "\n"
       "   for (int i = 0; i < 3; i++) {\n"
       "      if (i >= uLightCount) break;\n"
-      // Type 3 is an ambient fill: it has no direction at all, so it skips the
-      // whole BRDF and simply lifts the surface. Handled before anything that
-      // needs a light vector.
       "      if (uLightType[i] == 3) {\n"
       "         col += base * (1.0 - metal) * toLinear(uLightColor[i]) * uLightIntensity[i];\n"
       "         continue;\n"
       "      }\n"
       "      vec3 lightDir;\n"
       "      float attenuation = 1.0;\n"
-      "      if (uLightType[i] == 1) {\n"
+      "      if (uLightType[i] == 1 || uLightType[i] == 4) {\n"
       "         vec3 toLight = uLightDir[i] - vWorldPos;\n"
       "         float dist = length(toLight);\n"
       "         lightDir = toLight / max(dist, 1e-4);\n"
       "         attenuation = 1.0 / (1.0 + dist * dist * 0.25);\n"
+      "         if (uLightType[i] == 4) {\n"
+      "            vec3 spotDir = normalize(-uLightDir[i]);\n"
+      "            float cosCur = dot(-lightDir, spotDir);\n"
+      "            float cosOuter = cos(radians(uLightSpotAngle[i]));\n"
+      "            float cosInner = cos(radians(uLightSpotAngle[i] * (1.0 - uLightSpotPenumbra[i])));\n"
+      "            float spotAtten = clamp((cosCur - cosOuter) / max(cosInner - cosOuter, 1e-4), 0.0, 1.0);\n"
+      "            attenuation *= spotAtten * spotAtten;\n"
+      "         }\n"
       "      } else {\n"
       "         lightDir = normalize(uLightDir[i]);\n"
       "      }\n"
       "      vec3 halfway = normalize(lightDir + viewDir);\n"
-      // A sun is a large angular source, not a point at infinity, so its
-      // terminator is soft. Wrapping the diffuse term is the cheap stand-in for
-      // that; without it a "sun" is indistinguishable from a directional light.
       "      float nDotL;\n"
       "      if (uLightType[i] == 2) {\n"
       "         const float wrap = 0.35;\n"
@@ -634,12 +647,6 @@ namespace
       "      } else {\n"
       "         nDotL = max(dot(n, lightDir), 0.0);\n"
       "      }\n"
-      // Fake subsurface scattering: wrap lighting extended much further past
-      // the terminator than the sun's own soft wrap above, tinted by
-      // subsurfaceColor. Computed before the nDotL<=0 cull below so a thin
-      // shape lit from directly behind still picks up bleed-through - real
-      // multi-scatter would trace through the volume; this just lies about
-      // which side of the surface the light landed on.
       "      float sssWrap = uSubsurfaceRadius * 2.0;\n"
       "      float sssNdotL = clamp((dot(n, lightDir) + sssWrap) / (1.0 + sssWrap), 0.0, 1.0);\n"
       "      vec3 sssRadiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
@@ -647,55 +654,57 @@ namespace
       "      if (nDotL <= 0.0) continue;\n"
       "      float nDotH = max(dot(n, halfway), 0.0);\n"
       "\n"
-      "      float d = distributionGGX(nDotH, rough);\n"
+      "      float d;\n"
+      "      if (abs(uAnisotropy) > 0.001) {\n"
+      "         d = distributionAnisotropic(halfway, n, tangent, bitangent, rough, uAnisotropy);\n"
+      "      } else {\n"
+      "         d = distributionGGX(nDotH, rough);\n"
+      "      }\n"
       "      float g = geometrySchlickGGX(nDotV, rough) * geometrySchlickGGX(nDotL, rough);\n"
       "      vec3 f = fresnelSchlick(max(dot(halfway, viewDir), 0.0), f0);\n"
+      "      if (uIridescence > 0.0) {\n"
+      "         vec3 irid = evalIridescence(nDotV, uIridescenceIor, uIridescenceThickness);\n"
+      "         f = mix(f, f * irid * 2.0, uIridescence);\n"
+      "      }\n"
       "      vec3 specular = (d * g * f) / max(4.0 * nDotV * nDotL, 1e-7);\n"
-      // Second, untinted Fresnel-weighted lobe on top - clearcoat/lacquer.
-      // Fixed IOR 1.5 dielectric response (0.04 F0): a clearcoat is its own
-      // material layer, not tinted by uIor/uSpecular below it.
+      "\n"
       "      float ccRough = clamp(uClearcoatRoughness, 0.02, 1.0);\n"
       "      float ccD = distributionGGX(nDotH, ccRough);\n"
       "      float ccG = geometrySchlickGGX(nDotV, ccRough) * geometrySchlickGGX(nDotL, ccRough);\n"
       "      float ccF = 0.04 + 0.96 * pow(clamp(1.0 - max(dot(halfway, viewDir), 0.0), 0.0, 1.0), 5.0);\n"
-      "      float clearcoatSpec = (ccD * ccG * ccF) / max(4.0 * nDotV * nDotL, 1e-7) * uClearcoat;\n"
-      // Whatever is not reflected is refracted and available to scatter, so the
-      // two lobes together never return more energy than arrived.
-      "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal);\n"
+      "      float clearcoatSpec = (ccD * ccG * ccF) / max(4.0 * nDotV * nDotL, 1e-7) * cc;\n"
+      "\n"
+      "      vec3 sheenSpec = vec3(0.0);\n"
+      "      if (sh > 0.0) {\n"
+      "         float shD = distributionCharlie(nDotH, uSheenRoughness);\n"
+      "         sheenSpec = uSheenColor * shD * sh;\n"
+      "      }\n"
+      "\n"
+      "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal) * (1.0 - cc * 0.5);\n"
       "      vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
-      // Only light 0 casts: one depth map is rendered, from that light.
       "      float shadow = (i == 0) ? shadowFactor(n, lightDir) : 1.0;\n"
-      "      col += (kD * base / 3.14159265 + specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow;\n"
+      "      col += (kD * base / 3.14159265 + specular + vec3(clearcoatSpec) + sheenSpec) * radiance * nDotL * shadow;\n"
       "   }\n"
       "\n"
-      // Ambient, from the environment rather than a flat constant: the diffuse
-      // half samples straight up the normal, the specular half up the mirror
-      // direction. uAmbient stays as a tint so old patches still respond to it.
       "   vec3 reflectDir = reflect(-viewDir, n);\n"
       "   vec3 irradiance = sampleEnv(n, 1.0) * toLinear(uAmbient) * 3.0;\n"
       "   vec3 reflection = sampleEnv(reflectDir, rough);\n"
       "   vec3 fAmbient = fresnelSchlickRoughness(nDotV, f0, rough);\n"
-      // Ambient occlusion darkens only the ambient and environment terms - it
-      // describes light that cannot reach a crevice from the surroundings, not
-      // light blocked from a specific lamp, which is what shadows are for.
+      "   if (uIridescence > 0.0) {\n"
+      "      vec3 irid = evalIridescence(nDotV, uIridescenceIor, uIridescenceThickness);\n"
+      "      fAmbient = mix(fAmbient, fAmbient * irid * 2.0, uIridescence);\n"
+      "   }\n"
       "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance * ao;\n"
       "   col += reflection * fAmbient * ao;\n"
       "\n"
       "   col += base * pow(1.0 - nDotV, 3.0) * uRim;\n"
-      "   col += toLinear(uEmissionColor) * uEmission;\n"
+      "   col += emiss;\n"
       "\n"
       "   col *= uExposure;\n"
       "   if (uTonemap == 1) col = acesFilm(col);\n"
       "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
       "   col = toSrgb(col) + ditherOffset();\n"
       "\n"
-      // Screen-space transmission: bend the background sample by how far this
-      // fragment's clip-space position would move if pushed along its own
-      // normal, an image-space proxy for real refraction. Mixed in display
-      // space, after tonemapping, against a snapshot of the opaque pass taken
-      // before this draw - so it is exactly as approximate as that snapshot:
-      // no thickness, no light re-entering the medium, and nothing behind
-      // another transmissive surface is captured correctly.
       "   if (uTransmission > 0.0) {\n"
       "      vec4 clipA = uViewProj * vec4(vWorldPos, 1.0);\n"
       "      vec4 clipB = uViewProj * vec4(vWorldPos + n * 0.1, 1.0);\n"
@@ -705,7 +714,16 @@ namespace
       "      float bendStrength = (uIor - 1.0) * 4.0 * uTransmission;\n"
       "      vec2 refractUv = clamp(gl_FragCoord.xy / uScreenSize + bendDir * bendStrength, 0.0, 1.0);\n"
       "      float lod = clamp(uTransmissionRoughness, 0.0, 1.0) * uSceneMaxLod;\n"
-      "      vec3 refracted = textureLod(uSceneColor, refractUv, lod).rgb * mix(vec3(1.0), toSrgb(base), 0.4);\n"
+      "      vec3 refracted;\n"
+      "      if (uDispersion > 0.001) {\n"
+      "         vec2 dispOffset = bendDir * (uDispersion * 0.04);\n"
+      "         float r = textureLod(uSceneColor, clamp(refractUv - dispOffset, 0.0, 1.0), lod).r;\n"
+      "         float g = textureLod(uSceneColor, refractUv, lod).g;\n"
+      "         float b = textureLod(uSceneColor, clamp(refractUv + dispOffset, 0.0, 1.0), lod).b;\n"
+      "         refracted = vec3(r, g, b) * mix(vec3(1.0), toSrgb(base), 0.4);\n"
+      "      } else {\n"
+      "         refracted = textureLod(uSceneColor, refractUv, lod).rgb * mix(vec3(1.0), toSrgb(base), 0.4);\n"
+      "      }\n"
       "      col = mix(col, refracted, uTransmission);\n"
       "   }\n"
       "   fragColor = vec4(col, uOpacity);\n"
@@ -827,6 +845,18 @@ Material GeometryNode::GetMaterial() const
    m.subsurfaceColor[1] = subsurfaceColor[1];
    m.subsurfaceColor[2] = subsurfaceColor[2];
    m.subsurfaceRadius = subsurfaceRadius;
+   m.sheen = sheen;
+   m.sheenColor[0] = sheenColor[0];
+   m.sheenColor[1] = sheenColor[1];
+   m.sheenColor[2] = sheenColor[2];
+   m.sheenRoughness = sheenRoughness;
+   m.iridescence = iridescence;
+   m.iridescenceIor = iridescenceIor;
+   m.iridescenceThickness = iridescenceThickness;
+   m.anisotropy = anisotropy;
+   m.anisotropyRotation = anisotropyRotation;
+   m.dispersion = dispersion;
+   m.alphaCutoff = alphaCutoff;
    return m;
 }
 
@@ -1430,6 +1460,8 @@ void Render3DNode::CookIfNeeded(int frameId)
    float lightCols[kLightSlots * 3] = { 0 };
    float lightPower[kLightSlots] = { 0 };
    int lightTypes[kLightSlots] = { 0 };
+   float lightSpotAngle[kLightSlots] = { 45.0f, 45.0f, 45.0f };
+   float lightSpotPenumbra[kLightSlots] = { 0.2f, 0.2f, 0.2f };
    int lightCount = 0;
    for (int i = 0; i < kLightSlots; i++)
    {
@@ -1445,6 +1477,8 @@ void Render3DNode::CookIfNeeded(int frameId)
       lightCols[lightCount * 3 + 2] = lights[i]->color[2];
       lightPower[lightCount] = lights[i]->intensity;
       lightTypes[lightCount] = lights[i]->type;
+      lightSpotAngle[lightCount] = lights[i]->spotAngle;
+      lightSpotPenumbra[lightCount] = lights[i]->spotPenumbra;
       lightCount++;
    }
    if (lightCount == 0)
@@ -1659,6 +1693,8 @@ void Render3DNode::CookIfNeeded(int frameId)
    glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kLightSlots, lightCols);
    glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kLightSlots, lightPower);
    glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kLightSlots, lightTypes);
+   glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotAngle"), kLightSlots, lightSpotAngle);
+   glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kLightSlots, lightSpotPenumbra);
    glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
    glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, ambientColor);
    glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
@@ -1827,7 +1863,8 @@ void Render3DNode::CookIfNeeded(int frameId)
       // to a swatch-less billboard; explicitly off rather than left however
       // the previous slot's draw call last set them.
       static const char* kHasUniform[] = { "", "uHasRoughnessMap", "uHasMetallicMap",
-                                           "uHasNormalMap", "uHasAoMap" };
+                                           "uHasNormalMap", "uHasAoMap", "uHasEmissionMap",
+                                           "uHasClearcoatMap", "uHasSheenMap" };
       for (int map = kMapRoughness; map < kMapCount; map++)
          glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), 0);
 
@@ -1849,6 +1886,16 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uSubsurface"), material.subsurface);
       glUniform3fv(glGetUniformLocation(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
       glUniform1f(glGetUniformLocation(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
+      glUniform1f(glGetUniformLocation(mProgram, "uSheen"), material.sheen);
+      glUniform3fv(glGetUniformLocation(mProgram, "uSheenColor"), 1, material.sheenColor);
+      glUniform1f(glGetUniformLocation(mProgram, "uSheenRoughness"), material.sheenRoughness);
+      glUniform1f(glGetUniformLocation(mProgram, "uIridescence"), material.iridescence);
+      glUniform1f(glGetUniformLocation(mProgram, "uIridescenceIor"), material.iridescenceIor);
+      glUniform1f(glGetUniformLocation(mProgram, "uIridescenceThickness"), material.iridescenceThickness);
+      glUniform1f(glGetUniformLocation(mProgram, "uAnisotropy"), material.anisotropy);
+      glUniform1f(glGetUniformLocation(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
+      glUniform1f(glGetUniformLocation(mProgram, "uDispersion"), 0.0f);
+      glUniform1f(glGetUniformLocation(mProgram, "uAlphaCutoff"), material.alphaCutoff);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), 0.0f);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), 0.0f);
 
@@ -1986,16 +2033,19 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
 
       // The remaining material channels. Units 0 and 1 are taken by albedo and
-      // the shadow map, so these start at 2.
+      // the shadow map, so these start at 2, and units 6 & 7 by env and sceneColor.
       {
-         static const char* kMapUniform[] = { "", "uRoughnessMap", "uMetallicMap",
-                                              "uNormalMap", "uAoMap" };
-         static const char* kHasUniform[] = { "", "uHasRoughnessMap", "uHasMetallicMap",
-                                              "uHasNormalMap", "uHasAoMap" };
+         static const int kMapUnit[] = { 0, 2, 3, 4, 5, 8, 9, 10 };
+         static const char* kMapUniform[] = { "uTexture", "uRoughnessMap", "uMetallicMap",
+                                              "uNormalMap", "uAoMap", "uEmissionMap",
+                                              "uClearcoatMap", "uSheenMap" };
+         static const char* kHasUniform[] = { "uHasTexture", "uHasRoughnessMap", "uHasMetallicMap",
+                                              "uHasNormalMap", "uHasAoMap", "uHasEmissionMap",
+                                              "uHasClearcoatMap", "uHasSheenMap" };
          for (int map = kMapRoughness; map < kMapCount; map++)
          {
             const unsigned int tex = source->GetMaterialTexture(map);
-            const int unit = 2 + (map - kMapRoughness);
+            const int unit = kMapUnit[map];
             glActiveTexture(GL_TEXTURE0 + unit);
             glBindTexture(GL_TEXTURE_2D, tex != 0 ? tex : WhiteTexture());
             glUniform1i(glGetUniformLocation(mProgram, kMapUniform[map]), unit);
@@ -2015,6 +2065,7 @@ void Render3DNode::CookIfNeeded(int frameId)
          glUniform3fv(glGetUniformLocation(mProgram, "uMapTranslate"), 1, mapping.translate);
          glUniform3fv(glGetUniformLocation(mProgram, "uMapRotate"), 1, mapping.rotate);
          glUniform3fv(glGetUniformLocation(mProgram, "uMapScale"), 1, mapping.scale);
+         glUniform1f(glGetUniformLocation(mProgram, "uTriplanarBlend"), mapping.triplanarBlend);
          // Object-space bounds computed at upload time, so Generated coordinates
          // normalise into this mesh's own box rather than a hardcoded -1..1.
          static const float kFallbackLo[3] = { -1.0f, -1.0f, -1.0f };
@@ -2128,6 +2179,16 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uSubsurface"), material.subsurface);
       glUniform3fv(glGetUniformLocation(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
       glUniform1f(glGetUniformLocation(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
+      glUniform1f(glGetUniformLocation(mProgram, "uSheen"), material.sheen);
+      glUniform3fv(glGetUniformLocation(mProgram, "uSheenColor"), 1, material.sheenColor);
+      glUniform1f(glGetUniformLocation(mProgram, "uSheenRoughness"), material.sheenRoughness);
+      glUniform1f(glGetUniformLocation(mProgram, "uIridescence"), material.iridescence);
+      glUniform1f(glGetUniformLocation(mProgram, "uIridescenceIor"), material.iridescenceIor);
+      glUniform1f(glGetUniformLocation(mProgram, "uIridescenceThickness"), material.iridescenceThickness);
+      glUniform1f(glGetUniformLocation(mProgram, "uAnisotropy"), material.anisotropy);
+      glUniform1f(glGetUniformLocation(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
+      glUniform1f(glGetUniformLocation(mProgram, "uDispersion"), material.dispersion);
+      glUniform1f(glGetUniformLocation(mProgram, "uAlphaCutoff"), material.alphaCutoff);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), material.transmission);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), material.transmissionRoughness);
 

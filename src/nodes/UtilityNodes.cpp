@@ -72,6 +72,18 @@ Material MaterialNode::GetMaterial() const
    m.subsurfaceColor[1] = subsurfaceColor[1];
    m.subsurfaceColor[2] = subsurfaceColor[2];
    m.subsurfaceRadius = subsurfaceRadius;
+   m.sheen = sheen;
+   m.sheenColor[0] = sheenColor[0];
+   m.sheenColor[1] = sheenColor[1];
+   m.sheenColor[2] = sheenColor[2];
+   m.sheenRoughness = sheenRoughness;
+   m.iridescence = iridescence;
+   m.iridescenceIor = iridescenceIor;
+   m.iridescenceThickness = iridescenceThickness;
+   m.anisotropy = anisotropy;
+   m.anisotropyRotation = anisotropyRotation;
+   m.dispersion = dispersion;
+   m.alphaCutoff = alphaCutoff;
    return m;
 }
 
@@ -139,6 +151,7 @@ MappingTransform MappingNode::GetMappingTransform() const
    const float d2r = 3.14159265f / 180.0f;
    t.rotate[0] = rotateX * d2r; t.rotate[1] = rotateY * d2r; t.rotate[2] = rotateZ * d2r;
    t.scale[0] = scaleX; t.scale[1] = scaleY; t.scale[2] = scaleZ;
+   t.triplanarBlend = triplanarBlend;
    return t;
 }
 

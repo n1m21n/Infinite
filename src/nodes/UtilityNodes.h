@@ -220,8 +220,8 @@ public:
    const char* InputLabel(int slot) const override
    {
       static const char* kNames[] = { "geo", "albedo", "roughness", "metallic",
-                                      "normal", "ao" };
-      return (slot >= 0 && slot < 6) ? kNames[slot] : nullptr;
+                                      "normal", "ao", "emission", "clearcoat", "sheen" };
+      return (slot >= 0 && slot < (1 + kMapCount)) ? kNames[slot] : nullptr;
    }
    size_t TriangleCount() const;
 
@@ -256,7 +256,16 @@ public:
    float subsurface = 0.0f;
    float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
    float subsurfaceRadius = 0.5f;
-
+   float sheen = 0.0f;
+   float sheenColor[3] = { 1.0f, 1.0f, 1.0f };
+   float sheenRoughness = 0.5f;
+   float iridescence = 0.0f;
+   float iridescenceIor = 1.33f;
+   float iridescenceThickness = 400.0f;
+   float anisotropy = 0.0f;
+   float anisotropyRotation = 0.0f;
+   float dispersion = 0.0f;
+   float alphaCutoff = 0.0f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -270,6 +279,12 @@ public:
       v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
       v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
       v.Float("subsurfaceRadius", subsurfaceRadius);
+      v.Float("sheen", sheen); v.Color("sheenColor", sheenColor);
+      v.Float("sheenRoughness", sheenRoughness);
+      v.Float("iridescence", iridescence); v.Float("iridescenceIor", iridescenceIor);
+      v.Float("iridescenceThickness", iridescenceThickness);
+      v.Float("anisotropy", anisotropy); v.Float("anisotropyRotation", anisotropyRotation);
+      v.Float("dispersion", dispersion); v.Float("alphaCutoff", alphaCutoff);
       v.Float("normalStrength", normalStrength);
    }
 private:
@@ -336,16 +351,17 @@ public:
    float translateX = 0.0f, translateY = 0.0f, translateZ = 0.0f;
    float rotateX = 0.0f, rotateY = 0.0f, rotateZ = 0.0f;
    float scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
+   float triplanarBlend = 0.0f;
 
    static const std::vector<std::string>& SpaceNames();
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("space", space);
-      v.Float("translateX", translateX); v.Float("translateY", translateY);
-      v.Float("translateZ", translateZ);
+      v.Float("translateX", translateX); v.Float("translateY", translateY); v.Float("translateZ", translateZ);
       v.Float("rotateX", rotateX); v.Float("rotateY", rotateY); v.Float("rotateZ", rotateZ);
       v.Float("scaleX", scaleX); v.Float("scaleY", scaleY); v.Float("scaleZ", scaleZ);
+      v.Float("triplanarBlend", triplanarBlend);
    }
 
 private:
