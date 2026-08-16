@@ -1,5 +1,4 @@
 #include "Platform.h"
-#include "PluginVST3.h"
 #include <atomic>
 
 #import <Cocoa/Cocoa.h>
@@ -21,6 +20,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <mach-o/dyld.h> // _NSGetExecutablePath, for ExecutablePath()
 #include <cmath>
 #include <algorithm>
 #include <chrono>
@@ -3391,48 +3391,19 @@ namespace Platform
       return !out.empty();
    }
 
-#if !INFINITE_ENABLE_VST3
-   void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out)
+   std::string ExecutablePath()
    {
-      (void)folders;
-      (void)out;
+      uint32_t size = 0;
+      _NSGetExecutablePath(nullptr, &size); // sets size to what's needed
+      std::string buf(size, '\0');
+      if (_NSGetExecutablePath(&buf[0], &size) != 0)
+         return std::string();
+      buf.resize(strlen(buf.c_str()));
+      return buf;
    }
-
-   bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out)
-   {
-      (void)bundlePath;
-      (void)out;
-      return false;
-   }
-
-   void CacheVST3BundlePath(const std::string& identifier, const std::string& bundlePath)
-   {
-      (void)identifier;
-      (void)bundlePath;
-   }
-
-   void SetVST3SearchFolders(const std::vector<std::string>& folders)
-   {
-      (void)folders;
-   }
-#endif
 
    PluginHandle* PluginCreate(const PluginDesc& desc, double sampleRate, int maxBlockFrames)
    {
-      if (desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3Create(desc, sampleRate, maxBlockFrames);
-#else
-         PluginHandle* h = new PluginHandle();
-         h->desc = desc;
-         h->state = PluginLoadState::Failed;
-         h->loadError = "VST3 plugins are disabled in this build";
-         h->arrived.store(true, std::memory_order_release);
-         return h;
-#endif
-      }
-
       PluginHandle* h = new PluginHandle();
       h->desc = desc;
       h->sampleRate = sampleRate;
@@ -3442,37 +3413,40 @@ namespace Platform
       if (desc.format != "au" || !ParseAuIdentifier(desc.identifier, cd))
       {
          h->state = PluginLoadState::Failed;
-         h->loadError = "unsupported plugin identifier: " + desc.identifier;
+         h->loadError = "unsupported plugin format: " + desc.format;
          h->arrived.store(true, std::memory_order_release);
          return h;
       }
 
-      // Asynchronous on purpose: an out-of-process AUv3 can take seconds to
-      // come up, and the UI thread must stay live the whole time. The
-      // completion handler runs on a queue internal to AudioToolbox, so it
-      // does nothing but stash what it was given - every bit of AUAudioUnit
-      // setup happens on the main thread in PluginPoll.
+      AudioComponent comp = AudioComponentFindNext(nullptr, &cd);
+      if (comp == nullptr)
+      {
+         h->state = PluginLoadState::Failed;
+         h->loadError = "Audio Unit not found on system: " + desc.identifier;
+         h->arrived.store(true, std::memory_order_release);
+         return h;
+      }
+
+      // Asynchronous instantiation via AUv3 API. The completion handler can
+      // be called on an internal queue, so arrival fields are guarded by
+      // arrivalMutex.
       [AUAudioUnit instantiateWithComponentDescription:cd
                                                options:0
                                      completionHandler:^(AUAudioUnit* au, NSError* error) {
-                                        {
-                                           std::lock_guard<std::mutex> lock(h->arrivalMutex);
-                                           h->arrivedUnit = au;
-                                           h->arrivedError = error;
-                                        }
-                                        h->arrived.store(true, std::memory_order_release);
-                                     }];
+         std::lock_guard<std::mutex> lock(h->arrivalMutex);
+         h->arrivedUnit = au;
+         h->arrivedError = error;
+         h->arrived.store(true, std::memory_order_release);
+      }];
+
       return h;
    }
 
    namespace
    {
-      // Shared tail of PluginPoll/PluginPrepare: negotiate bus formats, cap
-      // the block size, allocate render resources, cache the render block.
-      // Main thread only.
       bool PluginConfigure(PluginHandle* h, std::string& outError)
       {
-         if (h->unit == nil)
+         if (h == nullptr || h->unit == nil)
          {
             outError = "no plugin instance";
             return false;
@@ -3569,8 +3543,6 @@ namespace Platform
 
             if (h->learnToken == nullptr && au.parameterTree != nil)
             {
-               // Called on an arbitrary thread - stores an address into an
-               // atomic and returns. Nothing else is legal here.
                PluginHandle* raw = h;
                h->learnToken = [au.parameterTree
                   tokenByAddingParameterObserver:^(AUParameterAddress address, AUValue value) {
@@ -3582,6 +3554,7 @@ namespace Platform
                   }];
             }
          }
+
          return true;
       }
    }
@@ -3592,16 +3565,6 @@ namespace Platform
       {
          outError = "null plugin handle";
          return PluginLoadState::Failed;
-      }
-
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3Poll(h, outError);
-#else
-         outError = "VST3 plugins disabled";
-         return PluginLoadState::Failed;
-#endif
       }
 
       if (h->state != PluginLoadState::Pending)
@@ -3657,16 +3620,6 @@ namespace Platform
          return false;
       }
 
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3Prepare(h, sampleRate, maxBlockFrames, outError);
-#else
-         outError = "VST3 plugins disabled";
-         return false;
-#endif
-      }
-
       if (h->state != PluginLoadState::Ready)
       {
          outError = "plugin not ready";
@@ -3698,16 +3651,6 @@ namespace Platform
    {
       if (h == nullptr)
          return;
-
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         PluginVST3Destroy(h);
-#else
-         delete h;
-#endif
-         return;
-      }
 
       // Real teardown of the editor window/controller/observer. PluginCloseEditor
       // only hides the window (it is cached across open/close - see its
@@ -3752,8 +3695,8 @@ namespace Platform
       h->learnToken = nullptr;
       h->renderBlockRaw = nullptr;
       h->renderBlockStrong = nil;
-      h->scheduleMIDIEventBlockRaw = nullptr;
       h->scheduleMIDIEventBlockStrong = nil;
+      h->scheduleMIDIEventBlockRaw = nullptr;
       h->unit = nil;
       h->arrivedUnit = nil;
       h->arrivedError = nil;
@@ -3770,14 +3713,6 @@ namespace Platform
    {
       if (h == nullptr)
          return;
-
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         PluginVST3Render(h, in, inChannels, out, outChannels, numFrames);
-#endif
-         return;
-      }
 
       // Everything below is on the real-time thread: no Objective-C message
       // send, no ARC traffic, no allocation, no lock. The two blocks involved
@@ -3926,14 +3861,6 @@ namespace Platform
       if (h == nullptr)
          return;
 
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         PluginVST3ScheduleMIDIEvent(h, frameOffset, bytes, byteCount);
-#endif
-         return;
-      }
-
       if (h->scheduleMIDIEventBlockRaw == nullptr || bytes == nullptr || byteCount <= 0)
          return;
       __unsafe_unretained AUScheduleMIDIEventBlock schedule =
@@ -3945,15 +3872,6 @@ namespace Platform
    {
       if (h == nullptr)
          return 0;
-
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3ParameterCount(h);
-#else
-         return 0;
-#endif
-      }
 
       if (h->unit == nil || h->unit.parameterTree == nil)
          return 0;
@@ -3984,15 +3902,6 @@ namespace Platform
       if (h == nullptr)
          return false;
 
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3ParameterInfo(h, index, out);
-#else
-         return false;
-#endif
-      }
-
       if (h->unit == nil || h->unit.parameterTree == nil)
          return false;
       NSArray<AUParameter*>* all = h->unit.parameterTree.allParameters;
@@ -4007,15 +3916,6 @@ namespace Platform
       if (h == nullptr)
          return false;
 
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3ParameterInfoByAddress(h, address, out);
-#else
-         return false;
-#endif
-      }
-
       if (h->unit == nil || h->unit.parameterTree == nil)
          return false;
       AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
@@ -4029,14 +3929,6 @@ namespace Platform
    {
       if (h == nullptr)
          return;
-
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         PluginVST3SetParameter(h, address, value);
-#endif
-         return;
-      }
 
       if (h->unit == nil || h->unit.parameterTree == nil)
          return;
@@ -4056,15 +3948,6 @@ namespace Platform
       if (h == nullptr)
          return false;
 
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3GetParameter(h, address, outValue);
-#else
-         return false;
-#endif
-      }
-
       if (h->unit == nil || h->unit.parameterTree == nil)
          return false;
       AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
@@ -4079,14 +3962,6 @@ namespace Platform
       if (h == nullptr)
          return;
 
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         PluginVST3BeginLearn(h);
-#endif
-         return;
-      }
-
       h->learnedValid.store(false, std::memory_order_relaxed);
       h->learning.store(true, std::memory_order_release);
    }
@@ -4096,14 +3971,6 @@ namespace Platform
       if (h == nullptr)
          return;
 
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         PluginVST3EndLearn(h);
-#endif
-         return;
-      }
-
       h->learning.store(false, std::memory_order_release);
       h->learnedValid.store(false, std::memory_order_relaxed);
    }
@@ -4112,15 +3979,6 @@ namespace Platform
    {
       if (h == nullptr)
          return false;
-
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3PollLearned(h, outAddress);
-#else
-         return false;
-#endif
-      }
 
       if (!h->learnedValid.load(std::memory_order_acquire))
          return false;
@@ -4225,16 +4083,6 @@ namespace Platform
          return false;
       }
 
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3OpenEditor(h, outError);
-#else
-         outError = "VST3 plugins disabled";
-         return false;
-#endif
-      }
-
       if (h->unit == nil || h->state != PluginLoadState::Ready)
       {
          outError = "plugin not loaded";
@@ -4291,14 +4139,6 @@ namespace Platform
       if (h == nullptr)
          return;
 
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         PluginVST3CloseEditor(h);
-#endif
-         return;
-      }
-
       if (h->editorWindow == nil)
          return;
       // Soft close: hide the window but keep it (and its view controller)
@@ -4313,15 +4153,6 @@ namespace Platform
    {
       if (h == nullptr)
          return false;
-
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3EditorIsOpen(h);
-#else
-         return false;
-#endif
-      }
 
       return h->editorOpen.load(std::memory_order_acquire);
    }
@@ -4344,15 +4175,6 @@ namespace Platform
       outBase64.clear();
       if (h == nullptr)
          return false;
-
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3SaveState(h, outBase64);
-#else
-         return false;
-#endif
-      }
 
       if (h->unit == nil)
          return false;
@@ -4379,15 +4201,6 @@ namespace Platform
    {
       if (h == nullptr || base64.empty())
          return false;
-
-      if (h->desc.format == "vst3")
-      {
-#if INFINITE_ENABLE_VST3
-         return PluginVST3RestoreState(h, base64);
-#else
-         return false;
-#endif
-      }
 
       if (h->unit == nil)
          return false;

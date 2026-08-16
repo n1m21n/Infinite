@@ -1,10 +1,11 @@
 #include "PluginScanner.h"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdlib>
 #include <filesystem>
-
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "crude_json.h"
 
@@ -12,11 +13,6 @@ namespace
 {
    namespace fs = std::filesystem;
 
-   // Same directory and the same "getenv(HOME) or give up" fallback as
-   // SampleScanner::SettingsDir, including its throwaway-subdirectory
-   // override: INFINITE_PLUGINDRAGTEST drives a real StartScan/SaveIndexToDisk
-   // against whatever this resolves to, and without the override a hygiene run
-   // would overwrite the user's actual plugin index.
    std::string SettingsDir()
    {
       const char* home = getenv("HOME");
@@ -58,18 +54,17 @@ void PluginScanner::AddFolder(const std::string& path)
       return;
    mFolders.push_back(path);
    SaveFoldersToDisk();
-   Platform::SetVST3SearchFolders(mFolders);
 }
 
 void PluginScanner::RemoveFolder(const std::string& path)
 {
    mFolders.erase(std::remove(mFolders.begin(), mFolders.end(), path), mFolders.end());
    SaveFoldersToDisk();
-   Platform::SetVST3SearchFolders(mFolders);
 }
 
 void PluginScanner::StartScan(const std::string& folder)
 {
+   (void)folder;
    if (mScanning.exchange(true, std::memory_order_relaxed))
       return; // already in flight
 
@@ -77,42 +72,23 @@ void PluginScanner::StartScan(const std::string& folder)
       mScanThread.join(); // previous scan already finished; reap it first
 
    mFound.store(0, std::memory_order_relaxed);
-
-   std::vector<std::string> vst3Folders;
-   if (!folder.empty())
-   {
-      vst3Folders.push_back(folder);
-   }
-   else
-   {
-      // Standard macOS VST3 paths
-      vst3Folders.push_back("/Library/Audio/Plug-Ins/VST3");
-      const char* home = getenv("HOME");
-      if (home != nullptr)
-         vst3Folders.push_back(std::string(home) + "/Library/Audio/Plug-Ins/VST3");
-      for (const std::string& userFolder : mFolders)
-         if (std::find(vst3Folders.begin(), vst3Folders.end(), userFolder) == vst3Folders.end())
-            vst3Folders.push_back(userFolder);
-   }
-
-   mScanThread = std::thread(&PluginScanner::ScanThreadMain, this, std::move(vst3Folders));
+   mScanThread = std::thread(&PluginScanner::ScanThreadMain, this);
 }
 
-void PluginScanner::ScanThreadMain(std::vector<std::string> vst3Folders)
+void PluginScanner::ScanThreadMain()
 {
    std::vector<Entry> found;
+   std::vector<std::string> failed;
 
-   // 1. Audio Units registry enumeration
+   // Audio Units registry enumeration. Safe in-process: this is a registry
+   // query against cached metadata, it does not load any plugin binary.
    Platform::EnumerateAudioUnits(found);
-   mFound.store((int)found.size(), std::memory_order_relaxed);
-
-   // 2. VST3 directory walk
-   Platform::EnumerateVST3Plugins(vst3Folders, found);
    mFound.store((int)found.size(), std::memory_order_relaxed);
 
    {
       std::lock_guard<std::mutex> lock(mResultMutex);
       mPendingResult = std::move(found);
+      mPendingFailed = std::move(failed);
    }
    mResultReady.store(true, std::memory_order_release);
    mScanning.store(false, std::memory_order_relaxed);
@@ -129,6 +105,8 @@ void PluginScanner::PollResults()
 
    mIndex = std::move(mPendingResult);
    mPendingResult.clear();
+   mFailed = std::move(mPendingFailed);
+   mPendingFailed.clear();
    mResultReady.store(false, std::memory_order_relaxed);
    lock.unlock();
 
@@ -157,7 +135,6 @@ void PluginScanner::LoadFromDisk()
             if (v.is_string())
                mFolders.push_back(v.get<crude_json::string>());
       }
-      Platform::SetVST3SearchFolders(mFolders);
    }
 
    const std::string path = IndexPath();
@@ -168,8 +145,6 @@ void PluginScanner::LoadFromDisk()
    if (!ok || !json.is_object())
       return;
 
-   // A cache from a different schema is dropped, not migrated - the user's
-   // next Rescan rebuilds it in a second or two.
    if (!json["schema"].is_number())
       return;
    if ((int)json["schema"].get<crude_json::number>() != kIndexSchemaVersion)
@@ -182,12 +157,6 @@ void PluginScanner::LoadFromDisk()
       if (!v.is_object())
          continue;
       Entry e;
-      // Every read goes through contains() first: crude_json's *const*
-      // operator[] asserts (and aborts the process) on a missing key rather
-      // than returning null, and SaveIndexToDisk deliberately omits "path" for
-      // AU entries - so a bare v["path"] killed the app at launch as soon as
-      // the index held a single Audio Unit, taking the VST3 bundle-path cache
-      // seeded below down with it.
       auto str = [&v](const char* key, std::string& dst)
       {
          if (v.contains(key) && v[key].is_string())
@@ -200,10 +169,8 @@ void PluginScanner::LoadFromDisk()
       str("path", e.path);
       if (v.contains("acceptsNotes") && v["acceptsNotes"].is_boolean())
          e.acceptsNotes = v["acceptsNotes"].get<crude_json::boolean>();
-      if (!e.identifier.empty())
+      if (!e.identifier.empty() && e.format == "au")
       {
-         if (e.format == "vst3" && !e.path.empty())
-            Platform::CacheVST3BundlePath(e.identifier, e.path);
          mIndex.push_back(std::move(e));
       }
    }

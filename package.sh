@@ -29,7 +29,8 @@ if [ -f "$BUILD/CMakeCache.txt" ] &&
     rm -rf "$BUILD"
 fi
 
-cmake -S "$ROOT" -B "$BUILD" ${GENERATOR[@]+"${GENERATOR[@]}"} -DCMAKE_BUILD_TYPE=Release >/dev/null
+cmake -S "$ROOT" -B "$BUILD" ${GENERATOR[@]+"${GENERATOR[@]}"} \
+    -DCMAKE_BUILD_TYPE=Release >/dev/null
 
 echo "==> building"
 cmake --build "$BUILD" -j"$(sysctl -n hw.ncpu)"
@@ -52,7 +53,12 @@ lipo -info "$APP/Contents/MacOS/Infinite"
 # first launch still needs right-click -> Open. Signing at least keeps the
 # bundle from being reported as damaged.
 echo "==> ad-hoc signing"
-codesign --force --deep --sign - "$APP"
+# The entitlements must be repeated here: this re-sign replaces the signature
+# CMake's POST_BUILD step applied, and dropping them would leave a shipped app
+# that the kernel SIGKILLs (no error, no stderr) the first time a third-party
+# plugin maps its code pages. See cmake/Infinite.entitlements.
+codesign --force --deep --sign - \
+    --entitlements "$ROOT/cmake/Infinite.entitlements" "$APP"
 codesign --verify --deep --strict "$APP" && echo "signature ok"
 
 echo "==> staging"

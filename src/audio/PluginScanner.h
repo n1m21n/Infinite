@@ -17,8 +17,7 @@ class PluginScanner
 {
 public:
    // Bumped whenever Entry's shape or meaning changes; a cache written by a
-   // different version is discarded rather than migrated.
-   static constexpr int kIndexSchemaVersion = 3; // bumped: VST3 folder walk + multi-format index
+   static constexpr int kIndexSchemaVersion = 4; // Audio Units index
 
    using Entry = Platform::PluginDesc;
 
@@ -42,6 +41,12 @@ public:
 
    const std::vector<Entry>& Index() const { return mIndex; }
 
+   // Bundles the last scan could not describe, by path: each one crashed or
+   // hung its child process rather than returning a description. Surfaced in
+   // the Plugins panel because the alternative - silently showing a shorter
+   // list - is what made a damaged plugin look like a bug in this app.
+   const std::vector<std::string>& FailedBundles() const { return mFailed; }
+
    // Looks an identifier up in the cached index. Used by patch load and by the
    // Finder-drop path to recover a display name for an identifier without
    // instantiating anything.
@@ -53,14 +58,16 @@ public:
    void SaveIndexToDisk() const;
 
 private:
-   void ScanThreadMain(std::vector<std::string> vst3Folders);
+   void ScanThreadMain();
 
    std::vector<std::string> mFolders;
    std::vector<Entry> mIndex;
+   std::vector<std::string> mFailed;
 
    std::thread mScanThread;
    std::mutex mResultMutex;
-   std::vector<Entry> mPendingResult; // guarded by mResultMutex
+   std::vector<Entry> mPendingResult;         // guarded by mResultMutex
+   std::vector<std::string> mPendingFailed;   // guarded by mResultMutex
    std::atomic<bool> mResultReady { false };
    std::atomic<bool> mScanning { false };
    std::atomic<int> mFound { 0 };

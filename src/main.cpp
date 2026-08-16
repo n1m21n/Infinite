@@ -100,6 +100,7 @@
 #include "nodes/NoteNodes.h"
 #include "nodes/SamplerNode.h"
 #include "nodes/PaulStretchNode.h"
+#include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
 #include "nodes/AudioPluginNode.h"
 #include "audio/SampleScanner.h"
@@ -265,6 +266,8 @@ namespace
          return "sample player";
       if (name == "PaulStretch")
          return "paul stretch";
+      if (name == "Granular")
+         return "granular";
       std::string out = name;
       std::transform(out.begin(), out.end(), out.begin(),
                      [](unsigned char c) { return (char)std::tolower(c); });
@@ -656,10 +659,13 @@ namespace
 
    bool HasExtension(const std::string& path, const std::vector<std::string>& exts)
    {
-      size_t dot = path.find_last_of('.');
+      std::string cleanPath = path;
+      while (cleanPath.size() > 1 && (cleanPath.back() == '/' || cleanPath.back() == '\\'))
+         cleanPath.pop_back();
+      size_t dot = cleanPath.find_last_of('.');
       if (dot == std::string::npos)
          return false;
-      std::string ext = path.substr(dot + 1);
+      std::string ext = cleanPath.substr(dot + 1);
       std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
       for (const std::string& e : exts)
       {
@@ -2342,6 +2348,7 @@ namespace
       REGISTER_NODE(WavetableNode, Wavetable, "Synths");
       REGISTER_NODE(SamplerNode, Sampler, "Synths");
       REGISTER_NODE(PaulStretchNode, PaulStretch, "Synths");
+      REGISTER_NODE(GranularNode, Granular, "Synths");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
@@ -3171,6 +3178,8 @@ namespace
          sampler->ReloadFromPath();
       if (auto* paul = dynamic_cast<PaulStretchNode*>(node))
          paul->ReloadFromPath();
+      if (auto* gran = dynamic_cast<GranularNode*>(node))
+         gran->ReloadFromPath();
       if (auto* drum = dynamic_cast<DrumSequencerNode*>(node))
          drum->ReloadFromPaths();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
@@ -5379,6 +5388,135 @@ namespace
       ImGui::Dummy(ImVec2(w, h));
    }
 
+   // Waveform and real-time grain particle renderer for Granular synthesis node
+   void DrawGranularWaveform(GranularNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool hasSample = n->waveformCacheCount > 0;
+
+      ImGui::SetNextItemAllowOverlap();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##granularwavebody", ImVec2(w, h));
+      if (hasSample && (ImGui::IsItemActivated() || (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))))
+      {
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         n->Seek(frac);
+      }
+
+      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+
+      if (hasSample)
+      {
+         const int count = n->waveformCacheCount;
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - n->waveformMax[i] * h * 0.44f;
+            const float bottom = midY - n->waveformMin[i] * h * 0.44f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom), IM_COL32(140, 160, 220, 175));
+         }
+
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         if (startX > origin.x)
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), IM_COL32(0, 0, 0, 140));
+         if (endX < br.x)
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, IM_COL32(0, 0, 0, 140));
+
+         // Render active real-time grain particles/dots
+         const auto& snap = n->VisualSnapshot();
+         for (int g = 0; g < snap.count; ++g)
+         {
+            const auto& gr = snap.grains[g];
+            if (gr.amp < 0.01f)
+               continue;
+
+            const float gx = origin.x + w * std::clamp(gr.position, 0.0f, 1.0f);
+            const float gy = midY + (gr.pan * 0.38f * h);
+            const float radius = 2.0f + gr.amp * 3.5f;
+
+            // Outer glow
+            const int glowAlpha = (int)(gr.amp * 80.0f);
+            dl->AddCircleFilled(ImVec2(gx, gy), radius + 2.5f, IM_COL32(100, 220, 255, glowAlpha));
+
+            // Core grain dot
+            const int coreAlpha = std::min(255, (int)(gr.amp * 255.0f));
+            dl->AddCircleFilled(ImVec2(gx, gy), radius, IM_COL32(230, 248, 255, coreAlpha));
+
+            // Small direction indicator / velocity streak
+            const float dirLen = (gr.pitchRatio > 1.05f ? 4.0f : (gr.pitchRatio < 0.95f ? -4.0f : 0.0f));
+            if (std::abs(dirLen) > 0.1f)
+            {
+               dl->AddLine(ImVec2(gx - dirLen, gy), ImVec2(gx + dirLen, gy),
+                           IM_COL32(255, 235, 160, (int)(gr.amp * 160.0f)), 1.5f);
+            }
+         }
+
+         // Current playing playhead (pos)
+         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
+         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), IM_COL32(255, 205, 80, 235), 2.0f);
+         const float pGrip = 8.0f;
+         dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, origin.y), ImVec2(px + pGrip * 0.5f, origin.y), ImVec2(px, origin.y + pGrip), IM_COL32(255, 205, 80, 255));
+         dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, br.y), ImVec2(px + pGrip * 0.5f, br.y), ImVec2(px, br.y - pGrip), IM_COL32(255, 205, 80, 255));
+
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y), IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y), IM_COL32(220, 120, 150, 235), 2.0f);
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(120, 128, 150, 255), "no sample loaded");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+
+      if (hasSample)
+      {
+         const float handleW = 10.0f;
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+
+         const float grip = 8.0f;
+         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const ImU32 startCol = IM_COL32(120, 220, 150, 255);
+         const ImU32 endCol = IM_COL32(220, 120, 150, 255);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
+
+         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
+         ImGui::InvisibleButton("##granularstarthandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
+         ImGui::InvisibleButton("##granularendhandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+      }
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
    // Narrow vertical meter drawn beside a channel fader. Same traffic-light
    // reading as a horizontal meter, rotated - a mixer strip without one is
    // just a row of numbers you can't check against the sound.
@@ -6561,6 +6699,121 @@ namespace
       EndAudioBody();
    }
 
+   // Custom node body for Granular Synthesizer
+   void DrawGranularBody(GraphNode& gn, GranularNode* n)
+   {
+      char stat[160];
+      if (!n->FileName().empty())
+         snprintf(stat, sizeof(stat), "%s  -  %s", n->FileName().c_str(), n->Status().c_str());
+      else
+         snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      if (ImGui::Button("Load...", ImVec2(80, 0)))
+      {
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            n->LoadFile(path);
+         }
+      }
+      ImGui::SameLine();
+      const bool recording = n->IsRecording();
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(recording ? "Stop##granRec" : "Record##granRec", ImVec2(70, 0)))
+      {
+         PushUndoCheckpoint();
+         if (recording)
+            n->StopRecording();
+         else
+            n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+
+      ImGui::SameLine();
+      bool freezeBool = n->freeze;
+      if (AudioToggleButton("freeze##granFreeze", &freezeBool))
+      {
+         PushUndoCheckpoint();
+         n->freeze = freezeBool;
+      }
+
+      ImGui::SameLine();
+      bool loopBool = n->loop;
+      if (AudioToggleButton("loop##granLoop", &loopBool))
+      {
+         PushUndoCheckpoint();
+         n->loop = loopBool;
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      DrawGranularWaveform(n, 130.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Row 1: Position & Scan
+      if (AudioSlider("pos", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
+         PushUndoCheckpoint();
+         n->Seek(n->position);
+      }
+      ImGui::SameLine();
+      AudioSlider("scan", &n->scan, -4.0f, 4.0f, "%.2fx", AudioHalfWidth());
+
+      // Row 2: Grain Size & Density
+      AudioSlider("size", &n->grainLength, 5.0f, 1000.0f, "%.0f ms", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("density", &n->density, 1.0f, 100.0f, "%.0f Hz", AudioHalfWidth());
+
+      // Row 3: Random Position (Spray) & Random Length
+      AudioSlider("spray", &n->randomPos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("rnd size", &n->randomLength, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+
+      // Row 4: Random Pitch & Pitch Shift
+      AudioSlider("pitch", &n->pitchShift, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("rnd pitch", &n->randomPitch, 0.0f, 24.0f, "%.1f st", AudioHalfWidth());
+
+      // Row 5: Fine Tune & Reverse Probability
+      AudioSlider("finetune", &n->fineTune, -100.0f, 100.0f, "%.0f c", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("reverse", &n->reverseProb, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+
+      // Row 6: Window Envelope Shape & Pan Spread
+      static const std::vector<std::string> sWinShapes = {
+         "Hann", "Gaussian", "Triangle", "Exp Decay", "Trapezoid"
+      };
+      AudioBareDropdown("granShape", sWinShapes, n->windowShape,
+                        [n](int idx) {
+                           PushUndoCheckpoint();
+                           n->windowShape = idx;
+                        }, AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("pan spread", &n->randomPan, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+
+      // Row 7: Master Pan & Width
+      AudioSlider("pan", &n->pan, -1.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("width", &n->width, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+
+      // Row 8: Dry/Wet Mix & Volume
+      AudioSlider("mix", &n->mix, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("volume", &n->volume, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+
+      // Row 9: Trim Start & End
+      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+         n->start = std::min(n->start, n->end - 0.01f);
+      ImGui::SameLine();
+      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+         n->end = std::max(n->end, n->start + 0.01f);
+
+      EndAudioBody();
+   }
+
    // Drag state for the step grid's paint/velocity gestures - file-scope
    // like gSampleDragActive, since a drag spans many frames and many
    // per-cell InvisibleButton calls. See DrawDrumSequencerBody's grid loop.
@@ -7233,59 +7486,6 @@ namespace
 
       ImGui::PushID("##plugins");
 
-#if INFINITE_ENABLE_VST3
-      if (ImGui::Button("Add folder...", ImVec2(-1.0f, 0)))
-      {
-         const std::string path = Platform::OpenFolderDialog();
-         if (!path.empty())
-            gPluginScanner.AddFolder(path);
-      }
-
-      std::string folderToRemove;
-      std::string folderToScan;
-      bool scanAll = false;
-      const bool scanning = gPluginScanner.IsScanning();
-      const float panelW = ImGui::GetContentRegionAvail().x;
-      for (const std::string& folder : gPluginScanner.Folders())
-      {
-         ImGui::PushID(folder.c_str());
-         const float btnW = ImGui::GetFrameHeight();
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + panelW - 2.0f * btnW - 14.0f);
-         ImGui::TextDisabled("%s", folder.c_str());
-         ImGui::PopTextWrapPos();
-         ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
-         if (scanning)
-            ImGui::BeginDisabled();
-         if (ImGui::Button("\xe2\x86\xbb", ImVec2(btnW, 0))) // U+21BB clockwise open circle arrow
-            folderToScan = folder;
-         if (scanning)
-            ImGui::EndDisabled();
-         ImGui::SameLine(panelW - btnW);
-         if (ImGui::Button("x", ImVec2(btnW, 0)))
-            folderToRemove = folder;
-         ImGui::PopID();
-      }
-      if (!folderToRemove.empty())
-         gPluginScanner.RemoveFolder(folderToRemove);
-
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
-      {
-         if (scanning)
-            ImGui::BeginDisabled();
-         if (ImGui::Button("Refresh all", ImVec2(-1.0f, 0)))
-            scanAll = true;
-         if (scanning)
-            ImGui::EndDisabled();
-         if (scanning)
-            ImGui::TextDisabled("scanning... (%d found)", gPluginScanner.PluginsFoundSoFar());
-         else if (gPluginScanner.Index().empty())
-            ImGui::TextDisabled("no plugins indexed yet - hit Refresh all");
-      }
-      if (scanAll)
-         gPluginScanner.StartScan();
-      else if (!folderToScan.empty())
-         gPluginScanner.StartScan(folderToScan);
-#else
       const bool scanning = gPluginScanner.IsScanning();
       if (scanning)
          ImGui::BeginDisabled();
@@ -7293,11 +7493,11 @@ namespace
          gPluginScanner.StartScan();
       if (scanning)
          ImGui::EndDisabled();
+
       if (scanning)
          ImGui::TextDisabled("scanning... (%d found)", gPluginScanner.PluginsFoundSoFar());
       else if (gPluginScanner.Index().empty())
-         ImGui::TextDisabled("no plugins indexed yet - hit Rescan");
-#endif
+         ImGui::TextDisabled("no plugins indexed yet - hit Rescan plugins");
 
       ImGui::Separator();
 
@@ -11471,6 +11671,8 @@ namespace
          DrawSamplerBody(gn, n);
       else if (auto* n = dynamic_cast<PaulStretchNode*>(gn.node.get()))
          DrawPaulStretchBody(gn, n);
+      else if (auto* n = dynamic_cast<GranularNode*>(gn.node.get()))
+         DrawGranularBody(gn, n);
       else if (auto* n = dynamic_cast<DrumSequencerNode*>(gn.node.get()))
          DrawDrumSequencerBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))
@@ -17981,6 +18183,98 @@ static bool RunPaulStretchFixture()
    return ok;
 }
 
+// Granular Synthesizer's DSP fixture: loads a real WAV, triggers granular playback,
+// and asserts that position, scan, grain length, density, spray, pitch shift,
+// window shapes, and volume produce finite, valid audio outputs.
+static bool RunGranularFixture()
+{
+   const int numFrames = 44100; // 1.0s @ 44100 Hz
+   const int sampleRate = 44100;
+   std::vector<int16_t> pcm(numFrames);
+   for (int i = 0; i < numFrames; i++)
+   {
+      const float t = (float)i / (float)(numFrames - 1);
+      pcm[i] = (int16_t)(std::sin(t * 440.0f * 6.283185f) * 30000.0f);
+   }
+
+   const std::string path = "/tmp/infinite_granular_fixture.wav";
+   {
+      std::ofstream f(path, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+      writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)pcm.data(), dataSize);
+   }
+
+   bool ok = true;
+
+   auto trigger = [&](float pos, float scan, float len, float dens, float spray, float pitch, int winShape, int frames) -> std::vector<float>
+   {
+      GranularNode node;
+      if (!node.LoadFile(path))
+      {
+         ok = false;
+         return {};
+      }
+      node.position = pos;
+      node.scan = scan;
+      node.grainLength = len;
+      node.density = dens;
+      node.randomPos = spray;
+      node.pitchShift = pitch;
+      node.windowShape = winShape;
+      node.volume = 0.8f;
+      node.CookIfNeeded(1);
+
+      AudioNode* an = node.GetAudioNode();
+      an->PrepareToPlay((double)sampleRate, 2048);
+      node.CookIfNeeded(2);
+
+      std::vector<float> l(frames, 0.0f), r(frames, 0.0f);
+      float* chans[2] = { l.data(), r.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = frames;
+      for (int block = 0; block < 4; ++block)
+         an->ProcessBlock(nullptr, 0, buf);
+      return l;
+   };
+
+   const auto baseline = trigger(0.2f, 1.0f, 50.0f, 30.0f, 0.05f, 0.0f, 0, 1024);
+   const auto pitched = trigger(0.2f, 1.0f, 50.0f, 30.0f, 0.05f, 7.0f, 0, 1024);
+   const auto gaussianWin = trigger(0.2f, 0.0f, 100.0f, 50.0f, 0.2f, 0.0f, 1, 1024);
+
+   if (baseline.empty() || pitched.empty() || gaussianWin.empty())
+   {
+      printf("GRANULARTEST BUG (fixture failed to load test file)\n");
+      ok = false;
+   }
+   else
+   {
+      for (float s : baseline)
+      {
+         if (!std::isfinite(s)) { printf("GRANULARTEST baseline produced non-finite sample FAIL\n"); ok = false; break; }
+      }
+      for (float s : pitched)
+      {
+         if (!std::isfinite(s)) { printf("GRANULARTEST pitched produced non-finite sample FAIL\n"); ok = false; break; }
+      }
+      for (float s : gaussianWin)
+      {
+         if (!std::isfinite(s)) { printf("GRANULARTEST gaussianWin produced non-finite sample FAIL\n"); ok = false; break; }
+      }
+   }
+
+   remove(path.c_str());
+   printf("%s\n", ok ? "GRANULARTEST OK" : "GRANULARTEST FAIL");
+   return ok;
+}
+
 // Drum Sequencer's DSP fixture (drum-sequencer-prompt.md §6). Drives the
 // real DrumSequencerNode -> AudioDrumSequencerNode chain directly (no
 // AudioEngine/topology - same shape as RunSamplerFixture), manually pumping
@@ -19190,6 +19484,7 @@ static int RunDspTest()
    const bool reverbOk = RunReverbFixture();
    const bool samplerOk = RunSamplerFixture();
    const bool paulStretchOk = RunPaulStretchFixture();
+   const bool granularOk = RunGranularFixture();
    const bool drumSeqOk = RunDrumSequencerFixture();
    const bool wavetableShaperOk = RunWavetableShaperFixture();
    const bool eqOk = RunEqFixture();
@@ -19197,7 +19492,7 @@ static int RunDspTest()
    const bool freqShifterOk = RunFrequencyShifterFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk &&
-                    paulStretchOk && drumSeqOk && wavetableShaperOk && eqOk && noteStackOk && freqShifterOk;
+                    paulStretchOk && granularOk && drumSeqOk && wavetableShaperOk && eqOk && noteStackOk && freqShifterOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
    return all ? 0 : 1;
 }
@@ -20146,64 +20441,14 @@ int main()
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
 
-   // dev-only: resolve+instantiate one plugin by name straight off the cached
-   // index, with desc.path deliberately cleared - the exact shape of the desc
-   // ReloadFromIdentity hands PluginCreate on patch load. Reproduces a "bundle
-   // not found on disk" without needing the GUI to be driven.
-   if (const char* probeName = getenv("INFINITE_VST3PROBE"))
-   {
-      gPluginScanner.LoadFromDisk();
-      setvbuf(stdout, nullptr, _IONBF, 0); // a crash mid-sweep must not eat the log
-      const bool sweepAll = std::string(probeName) == "ALL";
-      std::vector<PluginScanner::Entry> targets;
-      for (const PluginScanner::Entry& e : gPluginScanner.Index())
-         if (e.format == "vst3" && (sweepAll || e.name == probeName))
-            targets.push_back(e);
+   // Out-of-process half of the plugin scan: describe ONE bundle and exit. The
+   // parent (PluginScanner::ScanThreadMain) re-execs us once per bundle so that
+   // a plugin which cannot be loaded - damaged code pages earn an uncatchable
+   // SIGKILL from the kernel, and plenty of plugins simply crash in their own
+   // static initialisers - costs us a dead child process instead of the whole
+   // app. Output is one tab-separated record per class on stdout; anything else
+   // the plugin decides to print goes to stderr and is ignored.
 
-      // Chunking: loading every heavy plugin into one process gets the whole
-      // run OOM-killed, so the sweep is driven in batches of fresh processes.
-      if (sweepAll)
-      {
-         const int from = getenv("INFINITE_VST3FROM") != nullptr ? atoi(getenv("INFINITE_VST3FROM")) : 0;
-         const int count = getenv("INFINITE_VST3COUNT") != nullptr ? atoi(getenv("INFINITE_VST3COUNT")) : 0;
-         if (from > 0)
-            targets.erase(targets.begin(), targets.begin() + std::min<size_t>(from, targets.size()));
-         if (count > 0 && (size_t)count < targets.size())
-            targets.resize(count);
-      }
-
-      if (targets.empty())
-         printf("VST3PROBE FAIL: '%s' not in the cached index\n", probeName);
-
-      int ready = 0, failed = 0;
-      for (const PluginScanner::Entry& hit : targets)
-      {
-         Platform::PluginDesc desc;
-         desc.format = hit.format;
-         desc.identifier = hit.identifier;
-         desc.name = hit.name;
-         desc.acceptsNotes = hit.acceptsNotes;
-         // path left empty on purpose - that is what ReloadFromIdentity does
-         Platform::PluginHandle* h = Platform::PluginCreate(desc, 48000.0, 512);
-         std::string err;
-         Platform::PluginLoadState st = Platform::PluginLoadState::Pending;
-         // Pump the main run loop rather than sleeping: a plugin's bundleEntry
-         // may dispatch_sync onto the main queue, which deadlocks forever
-         // against a main thread parked in sleep_for. The real app is always
-         // servicing its event loop here.
-         for (int i = 0; i < 1200 && (st = Platform::PluginPoll(h, err)) == Platform::PluginLoadState::Pending; i++)
-            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.005, true);
-         const bool okNow = st == Platform::PluginLoadState::Ready;
-         okNow ? ready++ : failed++;
-         printf("VST3PROBE %-6s %-34s params=%-5d %s\n", okNow ? "READY" : "FAILED", hit.name.c_str(),
-                okNow ? Platform::PluginParameterCount(h) : 0, err.c_str());
-         Platform::PluginDestroy(h);
-      }
-      if (sweepAll)
-         printf("VST3PROBE SUMMARY: %d ready, %d failed, %d total\n", ready, failed, (int)targets.size());
-      fflush(stdout);
-      return 0;
-   }
 
    if (!glfwInit())
    {
@@ -23127,21 +23372,12 @@ int main()
             "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc"
          };
          // Plugin bundles, not files - see the branch that consumes this.
-         static const std::vector<std::string> kPluginBundleExt = { "component", "vst3" };
+         static const std::vector<std::string> kPluginBundleExt = { "component" };
          ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
-         // Dropping onto an existing Drum Sequencer lands the file(s) in its
-         // lanes (consecutive, starting from the row under the drop point)
-         // instead of spawning Audio File nodes - same lane resolution as
-         // the Samples-panel drag (gSampleDragActive), just via the OS's own
-         // drag-drop instead of the manually-tracked one.
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
          float offset = 0.0f;
-         // One drop gesture is one undoable action, even when it drops several
-         // files onto an existing node (drum lanes, a plugin) - so the
-         // checkpoint fires once, lazily, on the first file that actually
-         // mutates something, not per file.
          bool droppedCheckpointPushed = false;
          auto ensureDroppedCheckpoint = [&]()
          {
@@ -23151,8 +23387,11 @@ int main()
                droppedCheckpointPushed = true;
             }
          };
-         for (const std::string& path : gDroppedFiles)
+         for (std::string path : gDroppedFiles)
          {
+            while (path.size() > 1 && (path.back() == '/' || path.back() == '\\'))
+               path.pop_back();
+
             if (dropTargetDrum != nullptr && HasExtension(path, kAudioExt))
             {
                ensureDroppedCheckpoint();
@@ -23161,24 +23400,20 @@ int main()
                gPatchDirty = true;
                continue;
             }
+
+            if (HasExtension(path, std::vector<std::string> { "vst3" }))
+            {
+               printf("VST3 plugins are not supported; please use Audio Unit (.component) plugins: %s\n", path.c_str());
+               continue;
+            }
+
             GraphNode* spawned = nullptr;
-            // Checked first, and separately from the extension ladder below,
-            // because a plugin is a bundle *directory*, not a file: HasExtension
-            // on the path still works (GLFW hands over the directory path), but
-            // anything that stats it as a regular file does not. .vst3 is
-            // matched too so the honest "that format isn't hosted yet" message
-            // lands instead of silently spawning an Image Source that fails.
             if (HasExtension(path, kPluginBundleExt))
             {
                std::vector<Platform::PluginDesc> found;
-               const bool isVST3 = HasExtension(path, std::vector<std::string> { "vst3" });
-               const bool resolved = isVST3
-                                        ? (Platform::DescribeVST3Bundle(path, found) && !found.empty())
-                                        : (Platform::DescribeAudioUnitBundle(path, found) && !found.empty());
+               const bool resolved = Platform::DescribeAudioUnitBundle(path, found) && !found.empty();
                if (!resolved)
                {
-                  // Nothing is spawned on failure - an empty Plugin node with no
-                  // explanation is worse than a log line and no node.
                   printf("dropped plugin bundle could not be resolved to an audio component: %s\n",
                          path.c_str());
                   continue;
@@ -23188,7 +23423,12 @@ int main()
                // better than the bundle's own Info.plist string.
                Platform::PluginDesc desc = found.front();
                if (const PluginScanner::Entry* known = gPluginScanner.FindByIdentifier(desc.identifier))
+               {
+                  const std::string origPath = desc.path;
                   desc = *known;
+                  if (desc.path.empty() && !origPath.empty())
+                     desc.path = origPath;
+               }
 
                if (AudioPluginNode* target = FindNodeUnderCanvasPoint<AudioPluginNode>(canvasPos))
                {
@@ -29632,6 +29872,13 @@ int main()
                   // Dropped onto an existing PaulStretch: swap its file.
                   PushUndoCheckpoint();
                   targetPaul->LoadFile(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (GranularNode* targetGran = FindNodeUnderCanvasPoint<GranularNode>(canvasMouse))
+               {
+                  // Dropped onto an existing Granular: swap its file.
+                  PushUndoCheckpoint();
+                  targetGran->LoadFile(gSampleDragPath);
                   gPatchDirty = true;
                }
                else if (overCanvas)

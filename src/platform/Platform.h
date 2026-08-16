@@ -310,31 +310,18 @@ namespace Platform
    // PluginHandle* and calls PluginRender from ProcessBlock; that one function
    // is the only real-time-safe entry point here, and it does nothing but call
    // a render block cached on the main thread at prepare time.
-   //
-   // Only Audio Units are implemented (Phase 1). VST3 is a second backend
-   // behind exactly this surface - see docs/plans/audio/plugin-hosting.md for
-   // why it is not here yet (the VST3 SDK is GPLv3-or-proprietary and this
-   // codebase is MIT). Every struct that crosses this boundary carries a
-   // `format` string from day one so the second backend needs no signature
-   // change; today it is always "au".
-
+   // Audio Units plugin hosting backend.
    struct PluginDesc
    {
-      std::string format = "au"; // "au" today; "vst3" is the planned second backend
+      std::string format = "au";
       std::string name;
       std::string manufacturer;
       // Stable identity, and what a patch file stores - NOT a filesystem path,
       // which moves when a plugin is reinstalled elsewhere. For AU this is
       // "au:<type>:<subtype>:<manufacturer>" built from the component's four-
       // char codes, e.g. "au:aufx:dely:appl".
-      //
-      // Deliberately excludes the component version, even though the version
-      // is part of an AudioComponentDescription: including it would make every
-      // plugin update invalidate the identity stored in already-saved patches.
-      // Two AUs never share type+subtype+manufacturer, so the version buys no
-      // disambiguation and costs patch stability.
       std::string identifier;
-      std::string path; // Bundle directory path (e.g. for VST3 bundles)
+      std::string path; // Bundle directory path if loaded from bundle directly
 
       // True for 'aumu' (instrument) and 'aumf' (music effect) components -
       // the two component types that can meaningfully consume MIDI. This is
@@ -353,21 +340,6 @@ namespace Platform
    // if the path isn't a readable audio component bundle. One bundle can
    // declare several components, hence the vector.
    bool DescribeAudioUnitBundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
-
-   // Enumerates VST3 plugins (.vst3 bundles) found within the specified folders.
-   // Gated by INFINITE_ENABLE_VST3 at build time (no-op when disabled).
-   void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out);
-
-   // Resolves a dropped .vst3 bundle back to the plugin description(s) it contains.
-   bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
-
-   // Caches bundle path for a plugin identifier.
-   void CacheVST3BundlePath(const std::string& identifier, const std::string& bundlePath);
-
-   // User-added VST3 folders (PluginScanner::Folders()), kept in sync so that
-   // PluginVST3Create's on-demand bundle resolution can search them too, not
-   // just the two OS-standard VST3 directories. No-op when VST3 is disabled.
-   void SetVST3SearchFolders(const std::vector<std::string>& folders);
 
    struct PluginHandle;
 

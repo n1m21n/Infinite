@@ -91,10 +91,10 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
   rather than a generic parameter list. Every audio param is patchable by
   the same modulators that drive the image graph, so a **Macro Knob** or an
   **LFO** can sweep a filter cutoff exactly like it sweeps a blur radius.
-- **Plugin hosting** — the **Plugin** node hosts installed Audio Unit and
-  VST3 plugins. The docked panel's **Plugins** tab indexes what's installed
+- **Plugin hosting** — the **Plugin** node hosts installed Audio Unit
+  plugins. The docked panel's **Plugins** tab indexes what's installed
   (once — the index is cached, so launching never rescans) and a plugin drags
-  from there onto the canvas, or a `.component` / `.vst3` bundle drops straight
+  from there onto the canvas, or a `.component` bundle drops straight
   in from Finder. The plugin's own editor opens in its own window; turn
   **configure** on, touch a control in that window, and it appears on the node
   as a slider with its own modulation pin — so the same LFO that sweeps a blur
@@ -139,14 +139,6 @@ cd Infinite
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j8
 open build/Infinite.app
-```
-
-To build with optional VST3 plugin hosting support (links the GPLv3 Steinberg VST3 SDK):
-
-```bash
-git submodule update --init --recursive external/vst3sdk
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DINFINITE_ENABLE_VST3=ON
-cmake --build build -j8
 ```
 
 To build the DMG:
@@ -197,10 +189,6 @@ src/platform/   macOS shims: file dialogs, image decode, video decode, recording
 ## Licence
 
 Infinite's source code is MIT — see [LICENSE](LICENSE).
-
-Building with `-DINFINITE_ENABLE_VST3=ON` links the Steinberg VST3 SDK (GPLv3),
-and the resulting combined binary must then be distributed under the terms of
-the GPLv3.
 
 Vendored dependencies: [Dear ImGui](https://github.com/ocornut/imgui) (MIT),
 [imgui-node-editor](https://github.com/thedmd/imgui-node-editor) (MIT),
