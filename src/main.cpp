@@ -23335,6 +23335,11 @@ int main()
          gNodes[2].showParams = false;
          gNodes[4].showParams = false;
       }
+      else if (const char* loadPatchPath = getenv("INFINITE_LOADPATCH"))
+      {
+         LoadPatchFrom(loadPatchPath);
+         gRequestFitView = true;
+      }
       else if (wantsFixture)
       {
          SpawnNode("Shape", "Source", 60.0f, 60.0f);
@@ -31653,6 +31658,8 @@ int main()
          gRequestFitView = true; // dev screenshot: frame the whole fixture
       if (getenv("INFINITE_AUDIOUITEST") != nullptr && frameId == 3)
          gRequestFitView = true; // same, for the audio node UI fixture
+      if (getenv("INFINITE_LOADPATCH") != nullptr && (frameId == 2 || frameId == 4))
+         gRequestFitView = true;
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
       {
          // Plugin instantiation is asynchronous, so the fixture's mapping list
@@ -32510,7 +32517,8 @@ int main()
 
       if (const char* shotPath = getenv("IMAGERESYNTH_SCREENSHOT"))
       {
-         if (frameId == 12)
+         const int targetFrame = getenv("INFINITE_SCREENSHOT_FRAME") ? atoi(getenv("INFINITE_SCREENSHOT_FRAME")) : 12;
+         if (frameId == targetFrame)
          {
             std::vector<unsigned char> px(fbW * fbH * 4);
             glReadPixels(0, 0, fbW, fbH, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
