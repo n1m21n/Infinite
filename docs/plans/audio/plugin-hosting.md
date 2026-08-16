@@ -1,7 +1,6 @@
 # Plugin hosting
 
-Status: **Phase 1 (Audio Units) shipped.** Phase 2 (VST3) is blocked on a
-licensing decision, not on engineering effort. VST2 is permanently out of scope.
+Status: **Phase 1 (Audio Units) and Phase 2 (VST3) shipped.** Phase 2 is built via the optional `INFINITE_ENABLE_VST3=ON` CMake flag (GPLv3). VST2 is permanently out of scope.
 
 Related: `src/platform/Platform.h`'s plugin section (the whole API surface),
 `src/nodes/AudioPluginNode.h` (the node and its two load-bearing invariants),
@@ -9,42 +8,29 @@ Related: `src/platform/Platform.h`'s plugin section (the whole API surface),
 
 ---
 
-## 0. Why only AU today
+## 0. Supported Formats
 
-The original ask was "VST / VST3 / AU". Only AU is buildable without a decision
-that isn't an engineer's to make.
-
-| Format | Status | Why |
+| Format | Status | Why / Notes |
 |---|---|---|
-| **AU** (v2 and v3) | shipped | Hostable with zero new third-party code. `AudioToolbox`/`AVFoundation`/`CoreAudio` were already linked; only `CoreAudioKit` was added, for the editor view controller. `AVAudioUnitComponentManager` enumerates, `AUAudioUnit` instantiates and renders, `AUParameterTree` supplies the parameter list and the "which control did the user just touch" observer that drives configure mode. Covers most macOS plugins. |
-| **VST3** | phase 2, **blocked** | Needs the Steinberg VST3 SDK, which is dual-licensed **GPLv3 or a proprietary Steinberg agreement**. Infinite is MIT, and this codebase has an explicit clean-room rule about not mixing in GPL code (`.claude/skills/new-audio-node/SKILL.md` §0.1). The SDK must not be vendored — and neither must JUCE, for the same reason — until the licensing route is chosen. |
+| **AU** (v2 and v3) | shipped | Hostable with zero third-party dependencies. `AudioToolbox`/`AVFoundation`/`CoreAudio`/`CoreAudioKit` are system frameworks. `AVAudioUnitComponentManager` enumerates, `AUAudioUnit` instantiates and renders, `AUParameterTree` supplies the parameter list and the learn observer. Pure MIT build. |
+| **VST3** | shipped (optional) | Built when `-DINFINITE_ENABLE_VST3=ON`. The Steinberg VST3 SDK is dual-licensed **GPLv3 or proprietary Steinberg agreement**. Infinite's source remains MIT; distributing a binary compiled with VST3 enabled links the GPLv3 VST3 SDK and must be distributed under GPLv3. The SDK is fetched via submodule / external directory. |
 | **VST2** | **permanently out of scope** | Steinberg stopped issuing VST2 SDK licences in October 2018 and the SDK is no longer distributable. Do not build it. |
 
 Everything below the node — the scanner entry, the node's saved identity, the
-patch format — carries a `format` string from day one so a second backend needs
-no format change. Today it is always `"au"`.
+patch format — carries a `format` string ("au" or "vst3").
 
-## 1. What phase 2 (VST3) would touch
+## 1. Phase 2 (VST3) architecture
 
-If and when the licensing question is answered, VST3 should reuse all of
-phase 1. In rough order:
+VST3 reuses all of phase 1's node and UI architecture:
 
-- `PluginScanner` gains a folder list (the standard
+- `PluginScanner` has a folder list (the standard
   `/Library/Audio/Plug-Ins/VST3` and `~/Library/Audio/Plug-Ins/VST3` roots plus
-  user-added ones) alongside the registry query. This is the one place the
-  "AU needs no folders" simplification has to be undone; the machinery to copy
-  is `SampleScanner`'s.
-- `PluginDesc.format` becomes `"vst3"`, and its `identifier` becomes whatever
-  is stable for a VST3 (the class UID, not a path — same reasoning as AU's
-  four-char-code triple).
-- The `Platform::Plugin*` functions gain a second backend behind the same
-  signatures.
-- `PluginScanner::kIndexSchemaVersion` bumps, which discards the old cache
-  rather than migrating it.
+  user-added ones) alongside the AU registry query, with persistence in `PluginFolders.json`.
+- `PluginDesc.format` carries `"vst3"`, and its `identifier` is the stable class UID (`vst3:<hex>`).
+- The `Platform::Plugin*` functions dispatch to `src/platform/PluginVST3.mm` behind the exact same signatures.
+- `PluginScanner::kIndexSchemaVersion` is bumped to 3, cleanly refreshing stale caches.
 
-**No node, panel, mapping or patch-format change should be needed.** If phase 2
-finds itself needing one, the phase 1 abstraction was drawn in the wrong place
-and that is the thing to fix, not to work around.
+**No node, panel, mapping or patch-format change was needed.** The phase 1 abstraction cleanly accommodates both backends.
 
 ## 2. Phase 3 — what phase 1 deliberately does not do
 

@@ -44,11 +44,39 @@ public:
 
    struct Source
    {
+      // A binding's polarity is a property of the *connection*, not the
+      // modulator - see docs/plans/modulators/README.md. kAbsolute is the
+      // default and must stay the default: it is today's override behaviour,
+      // and every existing patch and every freshly-dragged cable has to load
+      // and behave exactly as it always has.
+      enum Polarity { kAbsolute = 0, kBipolar };
+
       int nodeIndex = -1;
       int outputIndex = 0;
+      int polarity = kAbsolute;
+      // Only meaningful when polarity == kBipolar. -1..1, matching
+      // ModDepthNode's convention (negative inverts).
+      float depth = 1.0f;
+      // The destination parameter's own value at the instant the binding was
+      // created (or, for a patch load, whatever was saved) - the centre a
+      // kBipolar binding swings around. Captured once and never touched
+      // again by the apply loop, since *value is being overwritten by the
+      // modulator every frame from then on and can't be read back safely.
+      float centre = 0.0f;
    };
 
+   // Creates a fresh binding, always kAbsolute, capturing the destination
+   // parameter's current value as `centre` (read through this frame's
+   // FrameParams - see the .cpp for why that's safe at every real call site).
    void Bind(int nodeIndex, int paramIndex, int modulatorNodeIndex, int outputIndex = 0);
+   // Patch load only: installs a Source exactly as read from disk, including
+   // its persisted centre - unlike Bind(), it must NOT recompute centre from
+   // the current frame, since the node whose value should become centre may
+   // not have drawn a single frame yet.
+   void RestoreLink(int nodeIndex, int paramIndex, const Source& source);
+   // Changes an existing binding's polarity/depth in place, leaving
+   // nodeIndex/outputIndex/centre untouched. No-op if nothing is bound there.
+   void SetPolarity(int nodeIndex, int paramIndex, int polarity, float depth);
    void Unbind(int nodeIndex, int paramIndex);
    void UnbindAllFor(int nodeIndex); // node deleted: drop it as target and as source
 

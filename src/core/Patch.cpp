@@ -210,7 +210,8 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "note " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const ModRecord& m : data.modulation)
       file << "mod " << m.dstIndex << " " << m.dstParam << " "
-           << m.srcIndex << " " << m.srcOutput << "\n";
+           << m.srcIndex << " " << m.srcOutput << " "
+           << m.polarity << " " << FloatToString(m.depth) << " " << FloatToString(m.centre) << "\n";
    for (const PaletteRecord& p : data.palette)
       file << "pal " << p.dstIndex << " " << p.dstColor << " "
            << p.srcIndex << " " << p.srcSwatch << "\n";
@@ -343,8 +344,14 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       }
       else if (tag == "mod")
       {
+         // polarity/depth/centre are a later addition; missing on older
+         // patches, where >>'s failed-extraction behaviour leaves these
+         // initialised values in place - see the "flags" precedent above.
          ModRecord m;
-         in >> m.dstIndex >> m.dstParam >> m.srcIndex >> m.srcOutput;
+         m.polarity = 0;
+         m.depth = 1.0f;
+         m.centre = 0.0f;
+         in >> m.dstIndex >> m.dstParam >> m.srcIndex >> m.srcOutput >> m.polarity >> m.depth >> m.centre;
          outData.modulation.push_back(m);
       }
       else if (tag == "pal")

@@ -13,32 +13,26 @@
 // and the same contract that matters most to the user: loading from disk
 // shows the existing index instantly, and a scan only ever happens from an
 // explicit StartScan() - opening the app never rescans.
-//
-// Two deliberate differences from SampleScanner:
-//
-//  - No user-managed folder list. AU discovery is a registry query
-//    (AVAudioUnitComponentManager), not a directory walk, so there is nothing
-//    to add a folder to - the panel gets a single Rescan button instead of
-//    Add-folder/per-folder-refresh. VST3, when it lands, is the format that
-//    needs folders; that is when the folder machinery should appear.
-//  - The cache carries a schema version. The entry shape is expected to grow
-//    when a second plugin format arrives, and discarding a stale cache is
-//    strictly better than hand-migrating one.
 class PluginScanner
 {
 public:
    // Bumped whenever Entry's shape or meaning changes; a cache written by a
    // different version is discarded rather than migrated.
-   static constexpr int kIndexSchemaVersion = 2; // bumped: Entry (PluginDesc) gained acceptsNotes
+   static constexpr int kIndexSchemaVersion = 3; // bumped: VST3 folder walk + multi-format index
 
    using Entry = Platform::PluginDesc;
 
    PluginScanner() = default;
    ~PluginScanner();
 
+   // Main thread only.
+   void AddFolder(const std::string& path);
+   void RemoveFolder(const std::string& path);
+   const std::vector<std::string>& Folders() const { return mFolders; }
+
    // Main thread only. A scan already in flight is left to finish; gate the
    // Rescan button on IsScanning() rather than queueing another.
-   void StartScan();
+   void StartScan(const std::string& folder = std::string());
    bool IsScanning() const { return mScanning.load(std::memory_order_relaxed); }
    int PluginsFoundSoFar() const { return mFound.load(std::memory_order_relaxed); }
 
@@ -55,11 +49,13 @@ public:
 
    // Disk persistence, mirroring SampleScanner's. LoadFromDisk never scans.
    void LoadFromDisk();
+   void SaveFoldersToDisk() const;
    void SaveIndexToDisk() const;
 
 private:
-   void ScanThreadMain();
+   void ScanThreadMain(std::vector<std::string> vst3Folders);
 
+   std::vector<std::string> mFolders;
    std::vector<Entry> mIndex;
 
    std::thread mScanThread;

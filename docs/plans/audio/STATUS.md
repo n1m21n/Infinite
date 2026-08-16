@@ -49,7 +49,7 @@ Stutter · Ring Mod · Formant Filter · Wavetable Shaper · EQ
 | Note Sequencer | **left** — grid / euclidean / polyrhythm + record-arm |
 | Arpeggiator | **left** |
 | Note Filter | **left** — scale snap, range gate, chance |
-| Note Modify | **left** — pitch/octave/velocity/gate/pan/humanise |
+| Note Modify | **removed** — superseded by Note Transpose, Pitch Bend, Velocity Curve, Gate, Humanizer, Quantizer, Glide, Vibrato |
 | Note Echo | **left** |
 | Note Router | **left** — round-robin / random / probability / chain, 1→4 |
 | Note Display | **left** — piano roll / keyboard |

@@ -493,8 +493,12 @@ void AudioPluginNode::CookIfNeeded(int frameId)
    // 6. Read back, so turning a knob in the plugin's own window moves this
    //    node's slider. Rate-limited to two slots per frame rather than all 32:
    //    CookIfNeeded's budget is microseconds, and a mapped control catching up
-   //    within a few frames is imperceptible.
-   if ((mCookCounter & 1) == 0)
+   //    within a few frames is imperceptible. Gated on the editor actually
+   //    being open: with it closed nothing can change the plugin's values
+   //    behind the node's back (the read-back exists solely to catch the user
+   //    turning a knob in the plugin's own window), so the poll - an XPC round
+   //    trip per call for an out-of-process AUv3 - is pure cost otherwise.
+   if ((mCookCounter & 1) == 0 && Platform::PluginEditorIsOpen(mHandle))
    {
       for (int probe = 0; probe < 2; probe++)
       {

@@ -243,6 +243,15 @@ if [ $FAIL -gt 0 ]; then
   echo "ripple), which lands on a fixed value once warmed up - nothing left for"
   echo "release to chase. threshold has explicit testCandidates and passes; see"
   echo "EffectDefs.cpp's comment on Limiter's release param."
+  echo "known baseline: AUDIOPARAMSWEEPTEST also reports [FAIL] on all eight of Note"
+  echo "Stack's semiN params (semi0..semi7 - enabledN itself passes for all eight)."
+  echo "Same root cause as Note Router/Sampler above: each semitone only affects the"
+  echo "voice it belongs to, and the sweep's generic rig builds a bare throwaway"
+  echo "instance with every enabledN false by default, so no voice is sounding for"
+  echo "any semiN to be observed on. Confirmed correct by RunNoteStackFixture"
+  echo "(DSPTEST notestack ...) in main.cpp, which enables real voices and checks"
+  echo "the exact transposed pitches, the dedupe rule, and the out-of-range drop -"
+  echo "all against the live semitone values."
   exit 1
 fi
 echo "all checks green."

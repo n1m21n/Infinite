@@ -39,15 +39,29 @@ namespace Wavetable
    constexpr int kFrames = 8;
    constexpr int kMipLevels = 10;
    constexpr int kMaxHarmonic = kFrameSize / 2; // 512 - Nyquist for one frame
-   constexpr int kNumTables = 22;
+   constexpr int kNumTables = 64;
 
-   // Main thread, idempotent, ~100 ms the first time. Every accessor below
+   enum class Category
+   {
+      Analog = 0,
+      Harmonic,
+      Digital,
+      Vocal,
+      Acoustic,
+      Spectral,
+      Count
+   };
+
+   // Main thread, idempotent, ~150 ms the first time. Every accessor below
    // assumes it has already run; the Wavetable node calls it from its
    // constructor so the audio thread never races the build.
    void EnsureBuilt();
 
    int NumTables();
    const char* TableName(int table);
+   Category TableCategory(int table);
+   const char* CategoryName(Category cat);
+   const char* TableCategoryName(int table);
 
    // kFrameSize contiguous floats. `table`, `frame` and `mip` are clamped, so
    // a stale saved index can never index out of the bank.

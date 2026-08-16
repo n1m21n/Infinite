@@ -4,6 +4,8 @@
 
 #include "AnalyzeNodes.h"
 
+#include "audio/AudioEngine.h"
+
 namespace
 {
    const char* kFragSrc =
@@ -51,28 +53,43 @@ bool OutputNode::StartRecording(const std::string& path)
    mRecordW = mOut.w & ~1;
    mRecordH = mOut.h & ~1;
 
-   // The audio file is read straight off disk by the recorder, independent of
-   // whatever the node's own playback/loop state is doing, so a paused or
-   // muted Audio File source still gets recorded correctly.
    std::string audioPath;
    bool audioLoop = true;
-   if (includeAudio && audioSource != nullptr && audioSource->IsLoaded())
+   double liveAudioSampleRate = 0.0;
+
+   if (includeAudio && mAudioInput.IsConnected())
    {
-      audioPath = audioSource->FilePath();
-      audioLoop = audioSource->loop;
+      if (auto* file = dynamic_cast<AudioFileNode*>(mAudioInput.GetSource()))
+      {
+         if (file->IsLoaded())
+         {
+            audioPath = file->FilePath();
+            audioLoop = file->loop;
+         }
+      }
+      else
+      {
+         liveAudioSampleRate = AudioEngine::Instance().SampleRate();
+         if (liveAudioSampleRate <= 0.0)
+            liveAudioSampleRate = 44100.0;
+         mCaptureRing.overflowCount.store(0, std::memory_order_relaxed);
+         mCaptureRing.enabled.store(true, std::memory_order_relaxed);
+      }
    }
 
    std::string error;
    mRecorder = Platform::RecorderStart(path, mRecordW, mRecordH, recordFps, error,
-                                       audioPath, audioLoop);
+                                       audioPath, audioLoop, liveAudioSampleRate, 2);
    if (mRecorder == nullptr)
    {
+      mCaptureRing.enabled.store(false, std::memory_order_relaxed);
       mRecordStatus = error.empty() ? "could not start recording" : error;
       return false;
    }
 
-   mRecordStatus = (includeAudio && !audioPath.empty()) ? "recording with audio..."
-                                                        : "recording...";
+   mRecordStatus = (includeAudio && (!audioPath.empty() || liveAudioSampleRate > 0.0))
+                      ? "recording with audio..."
+                      : "recording...";
    return true;
 }
 
@@ -80,6 +97,9 @@ void OutputNode::StopRecording()
 {
    if (mRecorder == nullptr)
       return;
+
+   mCaptureRing.enabled.store(false, std::memory_order_relaxed);
+   DrainAudioCapture();
 
    const int frames = Platform::RecorderFrameCount(mRecorder);
    std::string error;
@@ -92,6 +112,19 @@ void OutputNode::StopRecording()
       mRecordStatus = error;
 }
 
+void OutputNode::DrainAudioCapture()
+{
+   if (mRecorder == nullptr)
+      return;
+
+   float scratch[4096];
+   int n;
+   while ((n = mCaptureRing.Read(scratch, 4096)) > 0)
+   {
+      Platform::RecorderAppendAudio(mRecorder, scratch, n / 2);
+   }
+}
+
 int OutputNode::RecordedFrames() const
 {
    return Platform::RecorderFrameCount(mRecorder);
@@ -101,6 +134,8 @@ void OutputNode::CaptureFrame()
 {
    if (mRecorder == nullptr)
       return;
+
+   DrainAudioCapture();
 
    // Read back the locked-size region; if the graph resolution changed mid-take
    // we still feed the encoder frames of the size it was opened with.

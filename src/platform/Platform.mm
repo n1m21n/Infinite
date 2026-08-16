@@ -1,4 +1,5 @@
 #include "Platform.h"
+#include "PluginVST3.h"
 #include <atomic>
 
 #import <Cocoa/Cocoa.h>
@@ -1085,7 +1086,8 @@ namespace Platform
 
    RecorderHandle* RecorderStart(const std::string& path, int width, int height,
                                  int fps, std::string& outError,
-                                 const std::string& audioPath, bool loopAudio)
+                                 const std::string& audioPath, bool loopAudio,
+                                 double liveAudioSampleRate, int liveAudioChannels)
    {
       @autoreleasepool
       {
@@ -1143,6 +1145,7 @@ namespace Platform
          // this function did) silently produced a video-only file every time.
          AVAssetWriterInput* audioInput = nil;
          AVAudioFile* audioFile = nil;
+         AVAudioFormat* audioFormat = nil;
          double audioSampleRate = 44100.0;
 
          if (!audioPath.empty())
@@ -1174,6 +1177,7 @@ namespace Platform
                {
                   [writer addInput:audioInput];
                   audioSampleRate = audioFile.processingFormat.sampleRate;
+                  audioFormat = audioFile.processingFormat;
                }
                else
                {
@@ -1181,6 +1185,32 @@ namespace Platform
                   audioInput = nil;
                   audioFile = nil;
                }
+            }
+         }
+         else if (liveAudioSampleRate > 0.0)
+         {
+            const int ch = std::max(1, std::min(2, liveAudioChannels));
+            NSDictionary* audioSettings = @{
+               AVFormatIDKey         : @(kAudioFormatMPEG4AAC),
+               AVSampleRateKey       : @(liveAudioSampleRate),
+               AVNumberOfChannelsKey : @(ch),
+               AVEncoderBitRateKey   : @(160000)
+            };
+            audioInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeAudio
+                                                            outputSettings:audioSettings];
+            audioInput.expectsMediaDataInRealTime = NO;
+
+            if ([writer canAddInput:audioInput])
+            {
+               [writer addInput:audioInput];
+               audioSampleRate = liveAudioSampleRate;
+               audioFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:liveAudioSampleRate
+                                                                            channels:(AVAudioChannelCount)ch];
+            }
+            else
+            {
+               fprintf(stderr, "recorder: could not add live audio track, continuing video-only\n");
+               audioInput = nil;
             }
          }
 
@@ -1201,13 +1231,53 @@ namespace Platform
          h->audioLoop = loopAudio;
          h->audioInput = audioInput;
          h->audioFile = audioFile;
-         if (audioFile != nil)
-         {
-            h->audioFormat = audioFile.processingFormat;
-            h->audioSampleRate = audioSampleRate;
-         }
+         h->audioFormat = audioFormat;
+         h->audioSampleRate = audioSampleRate;
 
          return h;
+      }
+   }
+
+   bool RecorderAppendAudio(RecorderHandle* h, const float* interleavedSamples, int numFrames)
+   {
+      if (h == nullptr || h->audioInput == nil || interleavedSamples == nullptr || numFrames <= 0)
+         return false;
+
+      @autoreleasepool
+      {
+         if (h->audioScratch == nil || h->audioScratch.frameCapacity < (AVAudioFrameCount)numFrames)
+         {
+            h->audioScratch = [[AVAudioPCMBuffer alloc] initWithPCMFormat:h->audioFormat
+                                                           frameCapacity:(AVAudioFrameCount)std::max(4096, numFrames)];
+         }
+
+         h->audioScratch.frameLength = (AVAudioFrameCount)numFrames;
+         float* left = h->audioScratch.floatChannelData[0];
+         float* right = h->audioFormat.channelCount > 1 ? h->audioScratch.floatChannelData[1] : nullptr;
+
+         if (right != nullptr)
+         {
+            for (int i = 0; i < numFrames; i++)
+            {
+               left[i] = interleavedSamples[i * 2 + 0];
+               right[i] = interleavedSamples[i * 2 + 1];
+            }
+         }
+         else
+         {
+            for (int i = 0; i < numFrames; i++)
+               left[i] = interleavedSamples[i * 2 + 0];
+         }
+
+         CMTime pts = CMTimeMake(h->audioFramesWritten, (int32_t)h->audioSampleRate);
+         CMSampleBufferRef sb = PCMBufferToSampleBuffer(h->audioScratch, pts);
+         if (sb != NULL)
+         {
+            [h->audioInput appendSampleBuffer:sb];
+            CFRelease(sb);
+         }
+         h->audioFramesWritten += numFrames;
+         return true;
       }
    }
 
@@ -3158,89 +3228,36 @@ namespace Platform
 
       constexpr int kPluginMaxChannels = 8;
    }
+
+   struct PluginHandle;
+
+   // Process-wide count of open plugin editor windows, kept in lockstep with
+   // every PluginHandle's editorOpen flag (see SetPluginEditorOpen below) so
+   // AnyPluginEditorOpen() is a cheap atomic read rather than a walk over
+   // every handle.
+   std::atomic<int> gOpenPluginEditorCount { 0 };
+
+   // The single place editorOpen is ever written. Keeps gOpenPluginEditorCount
+   // accurate no matter which of the several call sites (open, soft-close,
+   // user closing the window) flips the flag.
+   void SetPluginEditorOpen(PluginHandle* h, bool open);
 }
 
-// The editor window's delegate. Its only job is to tell the handle the user
-// closed the window, so Platform::PluginEditorIsOpen (and therefore the node's
-// open/close button) never claims a window that isn't there.
-@interface InfinitePluginEditorDelegate : NSObject <NSWindowDelegate>
-@property (nonatomic, assign) void* handle;
-@end
+#include "PluginHandleInternal.h"
 
 namespace Platform
 {
-   struct PluginHandle
+
+   void SetPluginEditorOpen(PluginHandle* h, bool open)
    {
-      PluginDesc desc;
-
-      // --- instantiation, main thread except where noted -------------------
-      AUAudioUnit* unit = nil;
-      AUAudioUnit* arrivedUnit = nil; // written by the completion handler's queue
-      NSError* arrivedError = nil;    // ditto
-      std::mutex arrivalMutex;        // guards the two above; main thread only takes it in PluginPoll
-      std::atomic<bool> arrived { false };
-      PluginLoadState state = PluginLoadState::Pending;
-      std::string loadError;
-
-      // --- render path -----------------------------------------------------
-      // The block is held strongly here (so ARC keeps it alive) and also as a
-      // plain void* the render path bridges back without any retain/release.
-      AURenderBlock renderBlockStrong = nil;
-      void* renderBlockRaw = nullptr;
-
-      // Same discipline, for note input: nil for a plugin that never
-      // publishes one (an effect with no MIDI input), in which case
-      // PluginScheduleMIDIEvent is a no-op and the node just renders with
-      // whatever the plugin does with no note input, rather than crashing.
-      AUScheduleMIDIEventBlock scheduleMIDIEventBlockStrong = nil;
-      void* scheduleMIDIEventBlockRaw = nullptr;
-
-      double sampleRate = 0.0;
-      int maxBlockFrames = 0;
-      bool resourcesAllocated = false;
-      int pluginInChannels = 0;
-      int pluginOutChannels = 0;
-
-      AudioBufferList* outAbl = nullptr;   // allocated once at prepare, sized kPluginMaxChannels
-      std::vector<float> inScratch;        // kPluginMaxChannels * maxBlockFrames
-      std::vector<float> outScratch;       // ditto, used only when channel counts differ
-      double renderSampleTime = 0.0;
-
-      // Set for the duration of a PluginRender call so PluginDestroy (main
-      // thread) can wait out an in-flight render instead of pulling the unit
-      // out from under it.
-      std::atomic<bool> inRender { false };
-
-      // --- learn -----------------------------------------------------------
-      // The observer token is installed once at prepare and kept for the
-      // handle's whole life, not just while learn is on: every parameter write
-      // this host makes passes it as the originator so the plugin's own
-      // notifications never echo our writes back as a "the user touched this"
-      // event. Installing it only during learn would leave our writes
-      // untagged the rest of the time for no benefit.
-      AUParameterObserverToken learnToken = nullptr;
-      std::atomic<bool> learning { false };
-      std::atomic<unsigned long long> learnedAddress { 0 };
-      std::atomic<bool> learnedValid { false };
-
-      // --- editor window ---------------------------------------------------
-      NSWindow* editorWindow = nil;
-      NSViewController* editorController = nil;
-      InfinitePluginEditorDelegate* editorDelegate = nil;
-      bool editorRequestInFlight = false;
-      std::atomic<bool> editorOpen { false };
-      // Watches the (possibly remote-view) editor for its real content size
-      // arriving after the view controller does - see PresentEditorWindow.
-      // Removed only on real teardown (PluginDestroy), not on a soft close,
-      // since the window/controller are cached across those.
-      id editorSizeObserver = nil;
-      // Sticky once the user drags the editor window themselves; suppresses
-      // the auto-resize-to-real-size logic from fighting a resize they did.
-      // Set from InfinitePluginEditorDelegate's windowDidResize:, which uses
-      // programmaticResize to tell its own resizes apart from the user's.
-      bool editorUserResized = false;
-      bool programmaticResize = false;
-   };
+      bool was = h->editorOpen.exchange(open, std::memory_order_acq_rel);
+      if (was == open)
+         return;
+      if (open)
+         gOpenPluginEditorCount.fetch_add(1, std::memory_order_relaxed);
+      else
+         gOpenPluginEditorCount.fetch_sub(1, std::memory_order_relaxed);
+   }
 }
 
 @implementation InfinitePluginEditorDelegate
@@ -3255,7 +3272,7 @@ namespace Platform
    Platform::PluginHandle* h = (Platform::PluginHandle*)self.handle;
    if (h == nullptr)
       return;
-   h->editorOpen.store(false, std::memory_order_relaxed);
+   Platform::SetPluginEditorOpen(h, false);
 }
 
 // Distinguishes the user dragging the window's own resize handle from the
@@ -3374,8 +3391,48 @@ namespace Platform
       return !out.empty();
    }
 
+#if !INFINITE_ENABLE_VST3
+   void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out)
+   {
+      (void)folders;
+      (void)out;
+   }
+
+   bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out)
+   {
+      (void)bundlePath;
+      (void)out;
+      return false;
+   }
+
+   void CacheVST3BundlePath(const std::string& identifier, const std::string& bundlePath)
+   {
+      (void)identifier;
+      (void)bundlePath;
+   }
+
+   void SetVST3SearchFolders(const std::vector<std::string>& folders)
+   {
+      (void)folders;
+   }
+#endif
+
    PluginHandle* PluginCreate(const PluginDesc& desc, double sampleRate, int maxBlockFrames)
    {
+      if (desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3Create(desc, sampleRate, maxBlockFrames);
+#else
+         PluginHandle* h = new PluginHandle();
+         h->desc = desc;
+         h->state = PluginLoadState::Failed;
+         h->loadError = "VST3 plugins are disabled in this build";
+         h->arrived.store(true, std::memory_order_release);
+         return h;
+#endif
+      }
+
       PluginHandle* h = new PluginHandle();
       h->desc = desc;
       h->sampleRate = sampleRate;
@@ -3536,6 +3593,17 @@ namespace Platform
          outError = "null plugin handle";
          return PluginLoadState::Failed;
       }
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3Poll(h, outError);
+#else
+         outError = "VST3 plugins disabled";
+         return PluginLoadState::Failed;
+#endif
+      }
+
       if (h->state != PluginLoadState::Pending)
       {
          outError = h->loadError;
@@ -3583,7 +3651,23 @@ namespace Platform
 
    bool PluginPrepare(PluginHandle* h, double sampleRate, int maxBlockFrames, std::string& outError)
    {
-      if (h == nullptr || h->state != PluginLoadState::Ready)
+      if (h == nullptr)
+      {
+         outError = "null plugin handle";
+         return false;
+      }
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3Prepare(h, sampleRate, maxBlockFrames, outError);
+#else
+         outError = "VST3 plugins disabled";
+         return false;
+#endif
+      }
+
+      if (h->state != PluginLoadState::Ready)
       {
          outError = "plugin not ready";
          return false;
@@ -3615,6 +3699,16 @@ namespace Platform
       if (h == nullptr)
          return;
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3Destroy(h);
+#else
+         delete h;
+#endif
+         return;
+      }
+
       // Real teardown of the editor window/controller/observer. PluginCloseEditor
       // only hides the window (it is cached across open/close - see its
       // comment), so this handle's last use has to release it for real.
@@ -3633,7 +3727,7 @@ namespace Platform
          h->editorDelegate = nil;
          h->editorWindow = nil;
          h->editorController = nil;
-         h->editorOpen.store(false, std::memory_order_release);
+         SetPluginEditorOpen(h, false);
          [window close];
       }
 
@@ -3674,12 +3768,23 @@ namespace Platform
    void PluginRender(PluginHandle* h, const float* const* in, int inChannels,
                      float* const* out, int outChannels, int numFrames)
    {
+      if (h == nullptr)
+         return;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3Render(h, in, inChannels, out, outChannels, numFrames);
+#endif
+         return;
+      }
+
       // Everything below is on the real-time thread: no Objective-C message
       // send, no ARC traffic, no allocation, no lock. The two blocks involved
       // are a cached one (bridged back as __unsafe_unretained, which ARC does
       // not retain) and a stack literal (which is not copied, because
       // AURenderBlock's pullInputBlock parameter is not a __strong parameter).
-      if (h == nullptr || h->renderBlockRaw == nullptr || out == nullptr || numFrames <= 0)
+      if (h->renderBlockRaw == nullptr || out == nullptr || numFrames <= 0)
          return;
 
       h->inRender.store(true, std::memory_order_release);
@@ -3818,7 +3923,18 @@ namespace Platform
 
    void PluginScheduleMIDIEvent(PluginHandle* h, int frameOffset, const unsigned char* bytes, int byteCount)
    {
-      if (h == nullptr || h->scheduleMIDIEventBlockRaw == nullptr || bytes == nullptr || byteCount <= 0)
+      if (h == nullptr)
+         return;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3ScheduleMIDIEvent(h, frameOffset, bytes, byteCount);
+#endif
+         return;
+      }
+
+      if (h->scheduleMIDIEventBlockRaw == nullptr || bytes == nullptr || byteCount <= 0)
          return;
       __unsafe_unretained AUScheduleMIDIEventBlock schedule =
          (__bridge AUScheduleMIDIEventBlock)h->scheduleMIDIEventBlockRaw;
@@ -3827,7 +3943,19 @@ namespace Platform
 
    int PluginParameterCount(PluginHandle* h)
    {
-      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+      if (h == nullptr)
+         return 0;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3ParameterCount(h);
+#else
+         return 0;
+#endif
+      }
+
+      if (h->unit == nil || h->unit.parameterTree == nil)
          return 0;
       return (int)h->unit.parameterTree.allParameters.count;
    }
@@ -3853,7 +3981,19 @@ namespace Platform
 
    bool PluginParameterInfo(PluginHandle* h, int index, PluginParamInfo& out)
    {
-      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+      if (h == nullptr)
+         return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3ParameterInfo(h, index, out);
+#else
+         return false;
+#endif
+      }
+
+      if (h->unit == nil || h->unit.parameterTree == nil)
          return false;
       NSArray<AUParameter*>* all = h->unit.parameterTree.allParameters;
       if (index < 0 || index >= (int)all.count)
@@ -3864,7 +4004,19 @@ namespace Platform
 
    bool PluginParameterInfoByAddress(PluginHandle* h, unsigned long long address, PluginParamInfo& out)
    {
-      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+      if (h == nullptr)
+         return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3ParameterInfoByAddress(h, address, out);
+#else
+         return false;
+#endif
+      }
+
+      if (h->unit == nil || h->unit.parameterTree == nil)
          return false;
       AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
       if (p == nil)
@@ -3875,7 +4027,18 @@ namespace Platform
 
    void PluginSetParameter(PluginHandle* h, unsigned long long address, float value)
    {
-      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+      if (h == nullptr)
+         return;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3SetParameter(h, address, value);
+#endif
+         return;
+      }
+
+      if (h->unit == nil || h->unit.parameterTree == nil)
          return;
       AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
       if (p == nil)
@@ -3890,7 +4053,19 @@ namespace Platform
 
    bool PluginGetParameter(PluginHandle* h, unsigned long long address, float& outValue)
    {
-      if (h == nullptr || h->unit == nil || h->unit.parameterTree == nil)
+      if (h == nullptr)
+         return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3GetParameter(h, address, outValue);
+#else
+         return false;
+#endif
+      }
+
+      if (h->unit == nil || h->unit.parameterTree == nil)
          return false;
       AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
       if (p == nil)
@@ -3903,6 +4078,15 @@ namespace Platform
    {
       if (h == nullptr)
          return;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3BeginLearn(h);
+#endif
+         return;
+      }
+
       h->learnedValid.store(false, std::memory_order_relaxed);
       h->learning.store(true, std::memory_order_release);
    }
@@ -3911,13 +4095,34 @@ namespace Platform
    {
       if (h == nullptr)
          return;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3EndLearn(h);
+#endif
+         return;
+      }
+
       h->learning.store(false, std::memory_order_release);
       h->learnedValid.store(false, std::memory_order_relaxed);
    }
 
    bool PluginPollLearned(PluginHandle* h, unsigned long long& outAddress)
    {
-      if (h == nullptr || !h->learnedValid.load(std::memory_order_acquire))
+      if (h == nullptr)
+         return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3PollLearned(h, outAddress);
+#else
+         return false;
+#endif
+      }
+
+      if (!h->learnedValid.load(std::memory_order_acquire))
          return false;
       outAddress = h->learnedAddress.load(std::memory_order_relaxed);
       h->learnedValid.store(false, std::memory_order_relaxed);
@@ -3942,7 +4147,7 @@ namespace Platform
          if (h->editorWindow != nil)
          {
             [h->editorWindow makeKeyAndOrderFront:nil];
-            h->editorOpen.store(true, std::memory_order_release);
+            SetPluginEditorOpen(h, true);
             return;
          }
 
@@ -3983,7 +4188,7 @@ namespace Platform
          h->editorWindow = window;
          h->editorController = controller;
          h->editorDelegate = delegate;
-         h->editorOpen.store(true, std::memory_order_release);
+         SetPluginEditorOpen(h, true);
 
          // The remote view's real size for an out-of-process AUv3 typically
          // arrives after the view controller does. Watch for it and resize +
@@ -4014,7 +4219,23 @@ namespace Platform
 
    bool PluginOpenEditor(PluginHandle* h, std::string& outError)
    {
-      if (h == nullptr || h->unit == nil || h->state != PluginLoadState::Ready)
+      if (h == nullptr)
+      {
+         outError = "null plugin handle";
+         return false;
+      }
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3OpenEditor(h, outError);
+#else
+         outError = "VST3 plugins disabled";
+         return false;
+#endif
+      }
+
+      if (h->unit == nil || h->state != PluginLoadState::Ready)
       {
          outError = "plugin not loaded";
          return false;
@@ -4029,7 +4250,7 @@ namespace Platform
       if (h->editorWindow != nil)
       {
          [h->editorWindow makeKeyAndOrderFront:nil];
-         h->editorOpen.store(true, std::memory_order_release);
+         SetPluginEditorOpen(h, true);
          return true;
       }
       if (h->editorRequestInFlight)
@@ -4067,25 +4288,73 @@ namespace Platform
 
    void PluginCloseEditor(PluginHandle* h)
    {
-      if (h == nullptr || h->editorWindow == nil)
+      if (h == nullptr)
+         return;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3CloseEditor(h);
+#endif
+         return;
+      }
+
+      if (h->editorWindow == nil)
          return;
       // Soft close: hide the window but keep it (and its view controller)
       // alive so the next PluginOpenEditor shows the plugin's real GUI again
       // instead of re-requesting a view controller. Real teardown - closing
       // the window for good - only happens in PluginDestroy.
       [h->editorWindow orderOut:nil];
-      h->editorOpen.store(false, std::memory_order_release);
+      SetPluginEditorOpen(h, false);
    }
 
    bool PluginEditorIsOpen(PluginHandle* h)
    {
-      return h != nullptr && h->editorOpen.load(std::memory_order_acquire);
+      if (h == nullptr)
+         return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3EditorIsOpen(h);
+#else
+         return false;
+#endif
+      }
+
+      return h->editorOpen.load(std::memory_order_acquire);
+   }
+
+   bool AnyPluginEditorOpen()
+   {
+      return gOpenPluginEditorCount.load(std::memory_order_relaxed) > 0;
+   }
+
+   bool PumpPluginEditorEvents()
+   {
+      @autoreleasepool
+      {
+         return CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.0, true) == kCFRunLoopRunHandledSource;
+      }
    }
 
    bool PluginSaveState(PluginHandle* h, std::string& outBase64)
    {
       outBase64.clear();
-      if (h == nullptr || h->unit == nil)
+      if (h == nullptr)
+         return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3SaveState(h, outBase64);
+#else
+         return false;
+#endif
+      }
+
+      if (h->unit == nil)
          return false;
       @autoreleasepool
       {
@@ -4108,7 +4377,19 @@ namespace Platform
 
    bool PluginRestoreState(PluginHandle* h, const std::string& base64)
    {
-      if (h == nullptr || h->unit == nil || base64.empty())
+      if (h == nullptr || base64.empty())
+         return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3RestoreState(h, base64);
+#else
+         return false;
+#endif
+      }
+
+      if (h->unit == nil)
          return false;
       @autoreleasepool
       {

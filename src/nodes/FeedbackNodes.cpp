@@ -47,9 +47,9 @@ void FeedbackNode::CookIfNeeded(int frameId)
 
    const int w = std::max(1, mInput.Width());
    const int h = std::max(1, mInput.Height());
-   if (!GLUtil::EnsureFbo(mBuffers[mWrite], w, h))
+   if (!GLUtil::EnsureFbo(mBuffers[mWrite], w, h, GL_RGBA16F))
       return;
-   GLUtil::EnsureFbo(mBuffers[1 - mWrite], w, h);
+   GLUtil::EnsureFbo(mBuffers[1 - mWrite], w, h, GL_RGBA16F);
 
    // Capture this frame into the write buffer; readers keep seeing the other
    // one until the swap below, which is what produces the one-frame delay.
@@ -148,9 +148,9 @@ void TrailsNode::CookIfNeeded(int frameId)
    const int back = 1 - mFront;
    if (mBuffers[mFront].w != w || mBuffers[mFront].h != h)
       mNeedsClear = true;
-   if (!GLUtil::EnsureFbo(mBuffers[back], w, h))
+   if (!GLUtil::EnsureFbo(mBuffers[back], w, h, GL_RGBA16F))
       return;
-   GLUtil::EnsureFbo(mBuffers[mFront], w, h);
+   GLUtil::EnsureFbo(mBuffers[mFront], w, h, GL_RGBA16F);
 
    const unsigned int prevTex = GLUtil::FboTexture(mBuffers[mFront]);
    const bool clearNow = mNeedsClear;
@@ -300,8 +300,8 @@ bool ReactionDiffusionNode::EnsureShaders()
 
 void ReactionDiffusionNode::Seed(int w, int h)
 {
-   GLUtil::EnsureFbo(mState[0], w, h);
-   GLUtil::EnsureFbo(mState[1], w, h);
+   GLUtil::EnsureFbo(mState[0], w, h, GL_RGBA16F);
+   GLUtil::EnsureFbo(mState[1], w, h, GL_RGBA16F);
    static float sSeedCounter = 0.0f;
    sSeedCounter += 7.13f;
    const float seedValue = sSeedCounter;
@@ -337,9 +337,9 @@ void ReactionDiffusionNode::CookIfNeeded(int frameId)
 
    if (mState[mFront].w != w || mState[mFront].h != h)
       mNeedsSeed = true;
-   if (!GLUtil::EnsureFbo(mState[0], w, h))
+   if (!GLUtil::EnsureFbo(mState[0], w, h, GL_RGBA16F))
       return;
-   GLUtil::EnsureFbo(mState[1], w, h);
+   GLUtil::EnsureFbo(mState[1], w, h, GL_RGBA16F);
    GLUtil::EnsureFbo(mDisplay, w, h);
 
    if (mNeedsSeed)

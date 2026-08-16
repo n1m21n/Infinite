@@ -1,5 +1,11 @@
 # 09 — Note Modify
 
+> **Later removed.** Note Modify was split back into eight single-purpose
+> nodes (Note Transpose, Pitch Bend, Velocity Curve, Gate, Humanizer,
+> Quantizer, Glide, Vibrato), and the fused node itself was then deleted
+> entirely. This prompt is left as-is as a historical record of what was
+> originally built.
+
 Paste everything below into a fresh Claude Code session.
 
 ---

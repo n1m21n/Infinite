@@ -31,13 +31,26 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glfw)
 
+option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" OFF)
+
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)
 set(STB_DIR external/stb)
 
+if(INFINITE_ENABLE_VST3)
+    set(VST3_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/vst3sdk")
+    if(NOT EXISTS "${VST3_SDK_DIR}/pluginterfaces/vst/ivstaudioprocessor.h")
+        message(FATAL_ERROR "INFINITE_ENABLE_VST3 is ON, but Steinberg VST3 SDK was not found in external/vst3sdk.\n"
+                            "Please initialize submodules with:\n"
+                            "  git submodule update --init --recursive external/vst3sdk\n"
+                            "or clone the VST3 SDK into external/vst3sdk.")
+    endif()
+endif()
+
 add_executable(Infinite MACOSX_BUNDLE
     src/main.cpp
     src/core/GLUtil.cpp
+    src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
     src/core/CategoryColors.cpp
     src/core/FilterDefs.cpp
@@ -74,6 +87,8 @@ add_executable(Infinite MACOSX_BUNDLE
     src/audio/dsp/TransientShaperKernel.cpp
     src/audio/dsp/StutterKernel.cpp
     src/audio/dsp/RingModKernel.cpp
+    src/audio/dsp/FrequencyShifterKernel.cpp
+    src/audio/dsp/TremoloKernel.cpp
     src/audio/dsp/FormantFilterKernel.cpp
     src/audio/dsp/WavetableShaperKernel.cpp
     src/audio/dsp/LimiterKernel.cpp
@@ -119,8 +134,10 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/AudioNodes.cpp
     src/nodes/NoteNodes.cpp
     src/nodes/WavetableNode.cpp
+    src/nodes/OscillatorNode.cpp
     src/nodes/AudioEffectNode.cpp
     src/nodes/SamplerNode.cpp
+    src/nodes/PaulStretchNode.cpp
     src/nodes/DrumSequencerNode.cpp
     src/nodes/AudioPluginNode.cpp
     src/audio/SampleScanner.cpp
@@ -149,11 +166,24 @@ target_include_directories(Infinite PRIVATE
 
 target_link_libraries(Infinite PRIVATE glfw)
 
-# The platform shim holds AVFoundation objects across function calls; without ARC
-# the autoreleased writer input/adaptor die at the end of their @autoreleasepool
-# and the stored pointers dangle.
 set_source_files_properties(src/platform/Platform.mm
     PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+
+if(INFINITE_ENABLE_VST3)
+    target_compile_definitions(Infinite PRIVATE INFINITE_ENABLE_VST3=1)
+    target_include_directories(Infinite PRIVATE
+        ${VST3_SDK_DIR}
+        ${VST3_SDK_DIR}/pluginterfaces
+        ${VST3_SDK_DIR}/public.sdk
+    )
+    target_sources(Infinite PRIVATE
+        src/platform/PluginVST3.mm
+        ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
+        ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
+    )
+    set_source_files_properties(src/platform/PluginVST3.mm
+        PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+endif()
 
 # imgui-node-editor 0.9.1 ships its own GetKeyIndex() shim, which collides with
 # ImGui's obsolete-keyio copy. Dropping the obsolete API leaves only the shim.
@@ -203,8 +233,12 @@ if(APPLE)
     # Rebuilding the executable inside a signed bundle invalidates the
     # signature, and an unsigned bundle hangs in glfwInit() on macOS rather
     # than failing loudly. Re-sign on every build so iterating never trips it.
+    # The entitlements are not optional once plugins are hosted: see
+    # cmake/Infinite.entitlements for which ones and why.
     add_custom_command(TARGET Infinite POST_BUILD
-        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:Infinite>"
+        COMMAND codesign --force --sign -
+                --entitlements "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Infinite.entitlements"
+                "$<TARGET_BUNDLE_DIR:Infinite>"
         COMMENT "Ad-hoc signing the bundle")
 
     target_sources(Infinite PRIVATE

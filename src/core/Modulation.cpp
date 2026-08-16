@@ -11,12 +11,57 @@ void Modulation::Bind(int nodeIndex, int paramIndex, int modulatorNodeIndex, int
    Source source;
    source.nodeIndex = modulatorNodeIndex;
    source.outputIndex = outputIndex;
+   // Capture the pre-modulation value now, while it's still whatever the
+   // knob was showing: every real call site (drag-connect in main.cpp, the
+   // self-test fixtures) invokes Bind() from within the same frame that
+   // registered this param via RegisterParam, so FrameParams already has it.
+   for (const ParamRef& ref : mFrameParams)
+   {
+      if (ref.nodeIndex == nodeIndex && ref.paramIndex == paramIndex && ref.value != nullptr)
+      {
+         source.centre = *ref.value;
+         break;
+      }
+   }
    mLinks[Key(nodeIndex, paramIndex)] = source;
+}
+
+void Modulation::RestoreLink(int nodeIndex, int paramIndex, const Source& source)
+{
+   mLinks[Key(nodeIndex, paramIndex)] = source;
+}
+
+void Modulation::SetPolarity(int nodeIndex, int paramIndex, int polarity, float depth)
+{
+   auto it = mLinks.find(Key(nodeIndex, paramIndex));
+   if (it == mLinks.end())
+      return;
+   it->second.polarity = polarity;
+   it->second.depth = depth;
 }
 
 void Modulation::Unbind(int nodeIndex, int paramIndex)
 {
-   mLinks.erase(Key(nodeIndex, paramIndex));
+   const Key key(nodeIndex, paramIndex);
+   auto it = mLinks.find(key);
+   // Bipolar mode leaves the knob live and meaningful, so unbinding restores
+   // it to where the user left it rather than freezing at whatever the
+   // modulator happened to be at. Absolute mode keeps its long-standing
+   // behaviour (the value just stays wherever the modulator last wrote it) -
+   // there is no "knob position" to return to when the binding overrode the
+   // parameter outright.
+   if (it != mLinks.end() && it->second.polarity == Source::kBipolar)
+   {
+      for (const ParamRef& ref : mFrameParams)
+      {
+         if (ref.nodeIndex == nodeIndex && ref.paramIndex == paramIndex && ref.value != nullptr)
+         {
+            *ref.value = it->second.centre;
+            break;
+         }
+      }
+   }
+   mLinks.erase(key);
 }
 
 void Modulation::UnbindAllFor(int nodeIndex)

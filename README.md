@@ -26,7 +26,7 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
 | 3D | Geometry (8 primitives), Model 3D (obj/ply/stl/usd), Text 3D (extruded glyphs), Ocean (Gerstner waves), Transform, Array, Subdivide (Loop), Smooth (Taubin), Mirror, Screw, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Join Geometry, Material, Null 3D, Mesh to Points/Edges/Faces, Instance on Points, Wrap (cylindrical/spherical arc-length-preserving bend whose radius follows the target's size, tuned by a radius scale multiplier - or nearest-surface conform), **Particle System**, **Cloth**, Camera, Light (directional/point/sun/ambient), **HDRI** (equirectangular .hdr/.exr environment - background, reflections and ambient light for Render 3D), Render 3D |
 | Resynth | Resynthesize — iterative generative resampler with an XY FX pad |
 | Modulators | LFO, Random, Pattern (8-step), Path (6 shapes), Math, Macro Knob, Macro XY, **Image Analyze**, **Audio File**, **Audio Analyze** |
-| Audio / Note | **Wavetable** synth, **Sampler**, **Drum Sequencer**, **MIDI Notes** (live MIDI input), **Envelope**, **Gain**, **Audio Out**, **Mixer**, **Splitter**, **Plugin** (hosts an Audio Unit effect, with its own editor window and an Ableton-style list of mapped plugin params), and 16 effect nodes — Audio Filter, Dynamics, Delay, Reverb, Drive, Stereo, Pitch Shifter, Chorus, Flanger, Phaser, Bitcrush, Transient Shaper, Stutter, Ring Mod, Formant Filter, Wavetable Shaper |
+| Audio / Note | **Wavetable** synth, **Sampler**, **Drum Sequencer**, **MIDI Notes** (live MIDI input), **Envelope**, **Gain**, **Audio Out**, **Mixer**, **Splitter**, **Plugin** (hosts an Audio Unit effect, with its own editor window and an Ableton-style list of mapped plugin params), and effect nodes — Audio Filter, Dynamics, Delay, Reverb, Drive, Stereo, Pitch Shifter, Frequency Shifter, Chorus, Flanger, Phaser, Bitcrush, Transient Shaper, Stutter, Ring Mod, Tremolo, Formant Filter, Wavetable Shaper, EQ |
 | Output | Output (PNG export + H.264 recording, with an optional audio track) |
 
 - **Live 1:1 preview on every node**, including effects and compositing.
@@ -91,14 +91,14 @@ cook-once-per-frame DAG — repointed from audio buffers to GPU textures.
   rather than a generic parameter list. Every audio param is patchable by
   the same modulators that drive the image graph, so a **Macro Knob** or an
   **LFO** can sweep a filter cutoff exactly like it sweeps a blur radius.
-- **Plugin hosting** — the **Plugin** node hosts any installed Audio Unit
-  effect. The docked panel's **Plugins** tab indexes what's installed (once —
-  the index is cached, so launching never rescans) and a plugin drags from
-  there onto the canvas, or a `.component` bundle drops straight in from
-  Finder. The plugin's own editor opens in its own window; turn **configure**
-  on, touch a control in that window, and it appears on the node as a slider
-  with its own modulation pin — so the same LFO that sweeps a blur radius can
-  sweep a third-party reverb's decay.
+- **Plugin hosting** — the **Plugin** node hosts installed Audio Unit and
+  VST3 plugins. The docked panel's **Plugins** tab indexes what's installed
+  (once — the index is cached, so launching never rescans) and a plugin drags
+  from there onto the canvas, or a `.component` / `.vst3` bundle drops straight
+  in from Finder. The plugin's own editor opens in its own window; turn
+  **configure** on, touch a control in that window, and it appears on the node
+  as a slider with its own modulation pin — so the same LFO that sweeps a blur
+  radius can sweep a third-party reverb's decay.
 
 ## Install
 
@@ -139,6 +139,14 @@ cd Infinite
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j8
 open build/Infinite.app
+```
+
+To build with optional VST3 plugin hosting support (links the GPLv3 Steinberg VST3 SDK):
+
+```bash
+git submodule update --init --recursive external/vst3sdk
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DINFINITE_ENABLE_VST3=ON
+cmake --build build -j8
 ```
 
 To build the DMG:
@@ -188,7 +196,11 @@ src/platform/   macOS shims: file dialogs, image decode, video decode, recording
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+Infinite's source code is MIT — see [LICENSE](LICENSE).
+
+Building with `-DINFINITE_ENABLE_VST3=ON` links the Steinberg VST3 SDK (GPLv3),
+and the resulting combined binary must then be distributed under the terms of
+the GPLv3.
 
 Vendored dependencies: [Dear ImGui](https://github.com/ocornut/imgui) (MIT),
 [imgui-node-editor](https://github.com/thedmd/imgui-node-editor) (MIT),

@@ -57,7 +57,7 @@ cable — that is not fan-in.
 | Oscillator, Wavetable, Sampler, Resonator | — | 1 (merge) | 1 | Note-driven synths |
 | Drum Sequencer | — | — | 1 | Self-driving |
 | Note Sequencer | — | — | 1 | Generator |
-| Arpeggiator, Note Filter, Note Modify, Note Echo | — | 1 (merge) | 1 | Serial note processors |
+| Arpeggiator, Note Filter, Note Echo | — | 1 (merge) | 1 | Serial note processors |
 | Note Display | — | 1 (merge) | — | Terminal |
 | Envelope, Shaper, Mod Recorder, Macro | — | 1 (Envelope only) | modulator | Modulator outputs are unrestricted — see §6 |
 

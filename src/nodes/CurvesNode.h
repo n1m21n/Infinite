@@ -6,6 +6,7 @@
 #include "INode.h"
 #include "ImageCable.h"
 #include "GLUtil.h"
+#include "core/CurveShape.h"
 
 // Photoshop-style curves: draggable control points per channel, evaluated into
 // a 256-entry lookup texture the shader samples. The curve itself is the UI -
@@ -35,14 +36,9 @@ public:
    ImageCable& Input() { return mInput; }
    INode* BypassSource() override { return mInput.GetSource(); }
 
-   struct Point
-   {
-      float x = 0.0f;
-      float y = 0.0f;
-   };
+   using Point = CurveShape::Point;
 
-   std::vector<Point>& Points(int channel) { return mPoints[channel]; }
-   const std::vector<Point>& Points(int channel) const { return mPoints[channel]; }
+   CurveShape& Shape(int channel) { return mShapes[channel]; }
 
    // Curve editing. Points are kept sorted by x; the two endpoints cannot be
    // removed, and interior points cannot cross their neighbours.
@@ -72,22 +68,18 @@ public:
       };
       for (int c = 0; c < kChannelCount; c++)
       {
-         std::string encoded = EncodePoints(mPoints[c]);
+         std::string encoded = mShapes[c].Encode();
          v.Text(kKeys[c], encoded);
-         std::vector<Point> decoded = DecodePoints(encoded);
-         if (decoded.size() >= 2)
-            mPoints[c] = decoded;
+         mShapes[c].Decode(encoded);
          mLutDirty = true;
       }
    }
 
 private:
-   static std::string EncodePoints(const std::vector<Point>& pts);
-   static std::vector<Point> DecodePoints(const std::string& s);
    bool EnsureShader();
    void RebuildLut();
 
-   std::vector<Point> mPoints[kChannelCount];
+   CurveShape mShapes[kChannelCount];
    bool mLutDirty = true;
    unsigned int mLutTex = 0;
 

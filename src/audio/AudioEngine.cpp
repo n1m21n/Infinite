@@ -55,6 +55,7 @@ bool AudioEngine::Start(std::string& outError)
       return false;
    mSampleRate.store(sampleRate, std::memory_order_relaxed);
    mStartedAtMs.store(NowMs(), std::memory_order_relaxed);
+   mPreviewPlayer.PrepareToPlay(sampleRate);
    Transport::Instance().NotifyAudioEngineStarted(sampleRate);
    return true;
 }
@@ -132,6 +133,11 @@ void AudioEngine::PumpMainThread()
    // No DSP here by design - see the two-object rule. Real drain/push of
    // per-node MeterRing/ParamMailbox instances happens once P3 wires actual
    // audio-backed INodes through this call.
+
+   // Bookkeeping, not DSP: frees whatever preview buffer the audio thread
+   // retired (superseded by a newer Play(), or Stop()'s buffer once a new
+   // one lands) rather than leaving it to leak.
+   mPreviewPlayer.DrainRetired();
 }
 
 void AudioEngine::ProcessOffline(AudioBuffer& buffer)
@@ -251,6 +257,11 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    const double topologyStartMs = NowMs();
    ProcessList* list = mCurrent.load(std::memory_order_acquire);
    RunTopology(list, buffer);
+   // Deliberately after RunTopology, not part of it: the preview is not in
+   // the node topology at all, so it stays audible (and unaffected by
+   // bypass/the transport) across a topology swap, and even with nothing
+   // patched to an Audio Out.
+   mPreviewPlayer.ProcessBlock(buffer);
    const double topologyMs = NowMs() - topologyStartMs;
 
    if (sampleRate > 0.0)

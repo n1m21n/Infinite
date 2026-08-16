@@ -334,6 +334,7 @@ namespace Platform
       // Two AUs never share type+subtype+manufacturer, so the version buys no
       // disambiguation and costs patch stability.
       std::string identifier;
+      std::string path; // Bundle directory path (e.g. for VST3 bundles)
 
       // True for 'aumu' (instrument) and 'aumf' (music effect) components -
       // the two component types that can meaningfully consume MIDI. This is
@@ -344,14 +345,7 @@ namespace Platform
    };
 
    // Every installed effect/music-effect/instrument Audio Unit, via
-   // AVAudioUnitComponentManager (a registry query - there is no folder to
-   // walk, which is why PluginScanner has no user-managed folder list).
-   // Filtered to 'aufx' (effect), 'aumf' (music effect) and 'aumu'
-   // (instrument) - AudioPluginNode accepts note input (see its note pin), so
-   // an instrument is no longer guaranteed to render silence.
-   // Main thread only - the first call can take a second or two if the system
-   // component registry is cold, which is exactly why PluginScanner runs it
-   // on a background thread and caches the result to disk.
+   // AVAudioUnitComponentManager (a registry query).
    void EnumerateAudioUnits(std::vector<PluginDesc>& out);
 
    // Resolves a dropped .component *bundle directory* back to the plugin(s) it
@@ -359,6 +353,21 @@ namespace Platform
    // if the path isn't a readable audio component bundle. One bundle can
    // declare several components, hence the vector.
    bool DescribeAudioUnitBundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
+
+   // Enumerates VST3 plugins (.vst3 bundles) found within the specified folders.
+   // Gated by INFINITE_ENABLE_VST3 at build time (no-op when disabled).
+   void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out);
+
+   // Resolves a dropped .vst3 bundle back to the plugin description(s) it contains.
+   bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
+
+   // Caches bundle path for a plugin identifier.
+   void CacheVST3BundlePath(const std::string& identifier, const std::string& bundlePath);
+
+   // User-added VST3 folders (PluginScanner::Folders()), kept in sync so that
+   // PluginVST3Create's on-demand bundle resolution can search them too, not
+   // just the two OS-standard VST3 directories. No-op when VST3 is disabled.
+   void SetVST3SearchFolders(const std::vector<std::string>& folders);
 
    struct PluginHandle;
 
@@ -470,6 +479,15 @@ namespace Platform
    bool PluginOpenEditor(PluginHandle* handle, std::string& outError);
    void PluginCloseEditor(PluginHandle* handle);
    bool PluginEditorIsOpen(PluginHandle* handle);
+
+   // True if any hosted plugin currently has an editor window on screen.
+   bool AnyPluginEditorOpen();
+
+   // Drains and dispatches pending main-run-loop work (AppKit events, plugin
+   // editor redraws, XPC replies from an out-of-process AUv3) without blocking.
+   // Main thread only. No-op if no editor window is open. Returns true if it
+   // actually dispatched something.
+   bool PumpPluginEditorEvents();
 
    // AUAudioUnit.fullState, keyed-archived and base64'd so it round-trips
    // through Patch.cpp's Text param (one backslash-escaped line, no length
@@ -588,12 +606,18 @@ namespace Platform
    // audioPath is optional. When given, its samples are read independently of
    // any playback the Audio File node is doing and muxed in alongside the
    // video - recording does not depend on the file actually being audible.
+   // When liveAudioSampleRate > 0, an audio track is configured to receive
+   // streaming audio via RecorderAppendAudio.
    RecorderHandle* RecorderStart(const std::string& path, int width, int height,
                                  int fps, std::string& outError,
                                  const std::string& audioPath = std::string(),
-                                 bool loopAudio = true);
+                                 bool loopAudio = true,
+                                 double liveAudioSampleRate = 0.0,
+                                 int liveAudioChannels = 2);
    // `pixels` is RGBA8 bottom-up, exactly as glReadPixels returns it.
    bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels);
+   // Appends interleaved float audio frames to the movie's audio track.
+   bool RecorderAppendAudio(RecorderHandle* handle, const float* interleavedSamples, int numFrames);
    bool RecorderStop(RecorderHandle* handle, std::string& outError);
    int RecorderFrameCount(RecorderHandle* handle);
 

@@ -37,9 +37,10 @@ machinery.
 | B2 | **Strum** — appears only inside Note Sequencer's generative description. It is what turns a chord from an organ stab into a guitar, so it belongs wherever chords are made. | A control on **Chorder** and on **Maze**, not a sub-mode of one node. Shared helper alongside the swing/humanise helpers in `MusicTime.h` (§2.0's argument: three implementations of one feel control is a phasing mess). |
 | B3 | **Maze — un-merge it.** README §3 folds it into Note Sequencer's generative mode. Its actual interaction is an 8×8 grid of chord events in a 2D field, not a linear step sequencer with a different step-selection rule (which is what grid / euclidean / polyrhythm are). Its params — scaled degree, count, randomise, groove, humanise vel, upper harmonics, strum, humanise timing — are nearly disjoint from a step grid's per-step data (on/off, degree, velocity, probability, ratchet, tie). | **Keep `Maze` as its own node.** This applies §3's own merge rule rather than overriding it: *"Keep separate when the interaction model differs, because a dropdown that swaps the entire UI is a worse node than two nodes."* Session 14 (Note Sequencer) then drops its generative mode and gets simpler. |
 
-Randomised velocity and humanise timing are **already covered** — Note Modify
-Tier 2, and §2.0 lists them as two of the four musicality levers, deliberately
-split into two controls rather than one "humanize" knob.
+Randomised velocity and humanise timing are **already covered** — Humanizer
+(one of the eight single-purpose nodes that replaced Note Modify), and §2.0
+lists them as two of the four musicality levers, deliberately split into two
+controls rather than one "humanize" knob.
 
 ## C — PaulStretch is a source, and the plan has it as an effect
 

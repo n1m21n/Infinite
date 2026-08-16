@@ -127,10 +127,11 @@ dropdown that swaps the entire UI is a worse node than two nodes.
 | **Note Sequencer** | note sequencer, euclidean sequencer, polyrhythmic, note recorder | `pattern` = Grid / Euclidean / Polyrhythm — all three are "choose steps on a grid", only the step-selection rule differs. Note recorder becomes a **record-arm button** on the grid, which is how every DAW does it and is better UX than a separate node. |
 | **Arpeggiator** | arp | 15 modes (up/down/updown/downup/random/as-played/repeat x2/repeat x4/join/spread/join-spread/stairs up/stairs down/diverge/converge), octaves, rate, 8-step gate grid, presets |
 | **Note Filter** | scaling, quantiser, note range filter, note chance | All four are *gates on a note's pitch*: snap-to-scale, pass-if-in-range, pass-if-lucky. Scale and quantiser are the same operation. |
-| **Note Modify** | transposing, note duration, note panning, velocity expressions, note expressions | All are *"change an attribute in flight"*: pitch offset, octave, velocity curve, gate length, pan, humanise. You almost never want just one. **Biggest single win.** |
+| **Note Modify** *(later split back into eight single-purpose nodes and removed)* | transposing, note duration, note panning, velocity expressions, note expressions | All are *"change an attribute in flight"*: pitch offset, octave, velocity curve, gate length, pan, humanise. You almost never want just one. **Biggest single win.** |
 | **Note Echo** | note echo | generates new notes over time — genuinely distinct from Modify |
 | **Note Router** | note distributor, note chain | `mode` = round-robin / random / probability / chain. 1-in, 4-out. |
 | **Note Display** | note displayer, keyboard displayer | `view` = piano roll / keyboard. Same data, two skins. |
+| **Note Stack** *(added later, not part of the original consolidation)* | note harmoniser/layering chord builder | Input-driven, key-agnostic — 8 independent semitone voices, each with its own on/off switch, layered on top of every incoming note. The dry note always passes through; distinct from **Chorder** (a self-clocked generator that invents its own chord roots from a scale). |
 
 **Dropped as a node, folded into params:** *portamento* is per-voice synth
 behaviour (`glide` is an Oscillator/Wavetable param).
@@ -259,7 +260,7 @@ I extracted all 119 currently-registered node names and checked. **Six collide:*
 | `Curves` | `Curves` (Color) | **Shaper** |
 | `Shape` | `Shape` (Source, `ShapeNode`) | **Shaper** |
 | `Pattern` | `Pattern` (Modulators) | *reuse it* — extend the existing node |
-| `Transform` | `Transform` (3D) | **Note Modify** |
+| `Transform` | `Transform` (3D) | **Note Transpose** |
 
 `Filter` does not collide (the `FilterDefs` entries are `Blur`, `Sharpen`, …)
 but is ambiguous in the search panel — use **Audio Filter**.
@@ -465,7 +466,10 @@ down.
 
 **Consolidation before implementation, not after.** Merging Note Transpose +
 Duration + Pan + Velocity into Note Modify costs nothing today and is a
-migration with patch-format fallout once patches exist.
+migration with patch-format fallout once patches exist. (Note Modify was
+later split back into eight single-purpose nodes and removed entirely, but
+the ordering argument here still held at the time this consolidation
+shipped.)
 
 ## 6. How to execute this — one phase, one session
 

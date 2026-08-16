@@ -47,6 +47,7 @@ struct GraphNode
    // reasoning as showParams.
    bool showAdvancedParams = false;
    bool hasModulatedParams = false; // recomputed each frame, drives the collapsed "mod" tag
+   bool hasBipolarParams = false;   // ditto: true if any binding on this node is bipolar - "mod±"
    bool hasPaletteColors = false;   // ditto, for the collapsed "pal" tag
 
    // Where to place the node the first frame it appears (canvas coords).

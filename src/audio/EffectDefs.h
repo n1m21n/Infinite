@@ -80,6 +80,8 @@ enum class EffectVisualizerId
    kTransientEnvelope,
    kStutterGrid,
    kRingModWave,
+   kFrequencyShiftSpectrum,
+   kTremoloWave,
    kFormantVowel,
    kWavetableShaperCurve,
    kEqCurve,

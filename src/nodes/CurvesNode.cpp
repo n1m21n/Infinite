@@ -51,50 +51,11 @@ CurvesNode::~CurvesNode()
       glDeleteProgram(mProgram);
 }
 
-std::string CurvesNode::EncodePoints(const std::vector<Point>& pts)
-{
-   std::string out;
-   for (size_t i = 0; i < pts.size(); i++)
-   {
-      if (i > 0)
-         out += ";";
-      char buf[48];
-      snprintf(buf, sizeof(buf), "%.6g,%.6g", (double)pts[i].x, (double)pts[i].y);
-      out += buf;
-   }
-   return out;
-}
-
-std::vector<CurvesNode::Point> CurvesNode::DecodePoints(const std::string& s)
-{
-   std::vector<Point> pts;
-   size_t start = 0;
-   while (start < s.size())
-   {
-      size_t sep = s.find(';', start);
-      std::string term = s.substr(start, sep == std::string::npos ? std::string::npos : sep - start);
-      const size_t comma = term.find(',');
-      if (comma != std::string::npos)
-      {
-         Point p;
-         p.x = (float)atof(term.substr(0, comma).c_str());
-         p.y = (float)atof(term.substr(comma + 1).c_str());
-         pts.push_back(p);
-      }
-      if (sep == std::string::npos)
-         break;
-      start = sep + 1;
-   }
-   return pts;
-}
-
 void CurvesNode::ResetChannel(int channel)
 {
    if (channel < 0 || channel >= kChannelCount)
       return;
-   mPoints[channel].clear();
-   mPoints[channel].push_back({ 0.0f, 0.0f });
-   mPoints[channel].push_back({ 1.0f, 1.0f });
+   mShapes[channel].Reset();
    mLutDirty = true;
 }
 
@@ -102,48 +63,16 @@ int CurvesNode::AddPoint(int channel, float x, float y)
 {
    if (channel < 0 || channel >= kChannelCount)
       return -1;
-   x = std::min(1.0f, std::max(0.0f, x));
-   y = std::min(1.0f, std::max(0.0f, y));
-
-   std::vector<Point>& pts = mPoints[channel];
-   size_t insertAt = pts.size();
-   for (size_t i = 0; i < pts.size(); i++)
-   {
-      if (pts[i].x > x)
-      {
-         insertAt = i;
-         break;
-      }
-   }
-   pts.insert(pts.begin() + insertAt, { x, y });
+   int index = mShapes[channel].AddPoint(x, y);
    mLutDirty = true;
-   return (int)insertAt;
+   return index;
 }
 
 void CurvesNode::MovePoint(int channel, int index, float x, float y)
 {
    if (channel < 0 || channel >= kChannelCount)
       return;
-   std::vector<Point>& pts = mPoints[channel];
-   if (index < 0 || index >= (int)pts.size())
-      return;
-
-   y = std::min(1.0f, std::max(0.0f, y));
-
-   if (index == 0)
-      x = 0.0f; // endpoints stay pinned to the edges
-   else if (index == (int)pts.size() - 1)
-      x = 1.0f;
-   else
-   {
-      // keep the ordering intact so evaluation stays monotonic in x
-      const float lo = pts[index - 1].x + 0.002f;
-      const float hi = pts[index + 1].x - 0.002f;
-      x = std::min(hi, std::max(lo, x));
-   }
-
-   pts[index].x = x;
-   pts[index].y = y;
+   mShapes[channel].MovePoint(index, x, y);
    mLutDirty = true;
 }
 
@@ -151,10 +80,7 @@ void CurvesNode::RemovePoint(int channel, int index)
 {
    if (channel < 0 || channel >= kChannelCount)
       return;
-   std::vector<Point>& pts = mPoints[channel];
-   if (index <= 0 || index >= (int)pts.size() - 1)
-      return; // endpoints are permanent
-   pts.erase(pts.begin() + index);
+   mShapes[channel].RemovePoint(index);
    mLutDirty = true;
 }
 
@@ -162,37 +88,7 @@ float CurvesNode::Evaluate(int channel, float x) const
 {
    if (channel < 0 || channel >= kChannelCount)
       return x;
-   const std::vector<Point>& pts = mPoints[channel];
-   if (pts.size() < 2)
-      return x;
-
-   x = std::min(1.0f, std::max(0.0f, x));
-   if (x <= pts.front().x)
-      return pts.front().y;
-   if (x >= pts.back().x)
-      return pts.back().y;
-
-   size_t i = 0;
-   while (i + 1 < pts.size() && pts[i + 1].x < x)
-      i++;
-
-   const Point& p1 = pts[i];
-   const Point& p2 = pts[i + 1];
-   const float span = std::max(1e-5f, p2.x - p1.x);
-   const float t = (x - p1.x) / span;
-
-   // Catmull-Rom through the neighbours, so the curve is smooth rather than
-   // faceted, with the ends duplicated to avoid overshoot at the edges.
-   const Point& p0 = (i > 0) ? pts[i - 1] : p1;
-   const Point& p3 = (i + 2 < pts.size()) ? pts[i + 2] : p2;
-
-   const float t2 = t * t;
-   const float t3 = t2 * t;
-   float y = 0.5f * ((2.0f * p1.y) +
-                     (-p0.y + p2.y) * t +
-                     (2.0f * p0.y - 5.0f * p1.y + 4.0f * p2.y - p3.y) * t2 +
-                     (-p0.y + 3.0f * p1.y - 3.0f * p2.y + p3.y) * t3);
-   return std::min(1.0f, std::max(0.0f, y));
+   return mShapes[channel].Evaluate(x);
 }
 
 void CurvesNode::RebuildLut()

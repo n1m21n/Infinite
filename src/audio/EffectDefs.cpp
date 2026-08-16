@@ -18,6 +18,8 @@
 #include "dsp/TransientShaperKernel.h"
 #include "dsp/StutterKernel.h"
 #include "dsp/RingModKernel.h"
+#include "dsp/FrequencyShifterKernel.h"
+#include "dsp/TremoloKernel.h"
 #include "dsp/FormantFilterKernel.h"
 #include "dsp/WavetableShaperKernel.h"
 #include "MusicTime.h"
@@ -573,6 +575,53 @@ namespace
          def.params.push_back({ "freq", 1.0f, 5000.0f, 220.0f });
          def.params.push_back({ "waveform", 0.0f, (float)DspMath::kWaveSquare, (float)DspMath::kWaveSine });
          def.makeKernel = []() { return std::make_unique<RingModKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ----------------------------------------------------- Frequency Shifter
+      // Single-sideband frequency shifter: moves every partial by the same
+      // number of Hz (signed shift), creating inharmonicity, with soft-clipped
+      // feedback for barber-pole spirals and spread for stereo width.
+      {
+         EffectDef def;
+         def.name = "Frequency Shifter";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kFrequencyShiftSpectrum;
+         def.defaultMix = 0.5f;
+         def.params.push_back({ "shift", -10000.0f, 10000.0f, 0.0f });
+         def.params.push_back({ "feedback", 0.0f, 0.95f, 0.0f });
+         def.params.push_back({ "spread", 0.0f, 100.0f, 0.0f });
+         def.params.push_back({ "range", 0.0f, 1.0f, 0.0f, true /* uiOnly */ });
+         def.makeKernel = []() { return std::make_unique<FrequencyShifterKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // -------------------------------------------------------------- Tremolo
+      // A unipolar gain envelope traced by a band-limited LFO - NOT ring
+      // modulation (Ring Mod above is a bipolar audio-rate carrier that
+      // replaces the input's frequencies; Tremolo's sub-audio LFO only scales
+      // the input's existing level). See TremoloKernel.h's class comment.
+      // `sync`/`rateDiv`/`rate` mirror Chorus/Flanger/Phaser's own
+      // sync-to-tempo pair exactly (same MusicTime table): `rate` is gated
+      // behind `sync == 0` so the sweep can observe it in isolation; `sync`/
+      // `rateDiv` themselves stay confirmed (by hand) blind spots, the same
+      // way those effects' do - they can't be gated around their own effect.
+      {
+         EffectDef def;
+         def.name = "Tremolo";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kTremoloWave;
+         def.defaultMix = 1.0f;
+         def.params.push_back({ "depth", 0.0f, 1.0f, 0.6f });
+         def.params.push_back({ "shape", 0.0f, 3.0f, 0.0f });
+         def.params.push_back({ "stereoPhase", 0.0f, 180.0f, 0.0f });
+         def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f });
+         def.params.push_back(
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kEighth });
+         def.params.push_back({ "rate", 0.05f, 20.0f, 5.0f, false, { { "sync", 0.0f } } });
+         def.makeKernel = []() { return std::make_unique<TremoloKernel>(); };
          defs.push_back(std::move(def));
       }
 

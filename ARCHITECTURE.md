@@ -77,16 +77,17 @@ getting a file each:
   `EffectDef` table (`src/audio/EffectDefs.h`/`.cpp`) is instantiated as; adding
   effect N+1 is a table row plus an `IEffectKernel` (`src/audio/dsp/*Kernel.h`/
   `.cpp`, one per effect: Audio Filter, Dynamics, Delay, Reverb, Drive, Stereo,
-  Pitch Shifter, Chorus, Flanger, Phaser, Bitcrush, Transient Shaper, Stutter,
-  Ring Mod, Formant Filter, Wavetable Shaper, EQ), not a new node class. EQ is
-  a deliberate second, separate node from Audio Filter rather than a
-  re-expansion of it — Audio Filter stays one band/one type on purpose.
+  Pitch Shifter, Frequency Shifter, Chorus, Flanger, Phaser, Bitcrush,
+  Transient Shaper, Stutter, Ring Mod, Tremolo, Formant Filter, Wavetable Shaper,
+  EQ), not a new node class. EQ is a deliberate second, separate node from Audio
+  Filter rather than a re-expansion of it — Audio Filter stays one band/one type
+  on purpose.
 - **`src/audio/Wavetable.h`/`.cpp`** — the 12-table/8-frame/10-mip-level bank
   shared by the **Wavetable** synth and the **Wavetable Shaper** effect
   (the latter reads a frame as a transfer curve rather than an oscillator).
 - **`src/audio/SampleSlot.h`** — the main-thread-hands-a-buffer-to-the-audio-
   thread lifetime pattern (pending/active/retire-ring), shared by **Sampler**
-  (one instance) and **Drum Sequencer** (eight, one per lane). Lifted out of
+  (one instance), **PaulStretch** (one instance), and **Drum Sequencer** (eight, one per lane). Lifted out of
   `SamplerNode.cpp` so a new sample-playing node never has to reimplement its
   own use-after-free trap.
 - **`src/nodes/AudioPluginNode.h`/`.cpp`** — hosts a third-party plugin (Audio

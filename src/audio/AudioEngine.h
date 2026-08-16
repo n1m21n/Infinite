@@ -8,6 +8,7 @@
 #include "AudioBuffer.h"
 #include "AudioCaptureRing.h"
 #include "AudioNode.h"
+#include "SamplePreviewPlayer.h"
 
 // Ceilings shared by the topology builder (main.cpp's RebuildAudioTopology)
 // and the engine's buffer pool. kAudioMaxNodeInputs is Mixer's 8-in ceiling
@@ -116,6 +117,13 @@ public:
    // over a caller-owned scratch buffer without touching the real device.
    void ProcessOffline(AudioBuffer& buffer);
 
+   // The Samples search panel's audition player (see
+   // local-prompts/05-sample-preview-in-search-panel.md). Lives here, not in
+   // the node topology, so it is unaffected by the graph, bypass, or the
+   // transport, and survives a topology rebuild mid-preview - see Process()
+   // mixing it in after RunTopology.
+   SamplePreviewPlayer& Preview() { return mPreviewPlayer; }
+
 private:
    AudioEngine() = default;
 
@@ -177,4 +185,6 @@ private:
    uint32_t mRequestedDeviceId = 0;
    double mRequestedSampleRate = 0.0;
    int mRequestedBufferFrames = 0;
+
+   SamplePreviewPlayer mPreviewPlayer;
 };

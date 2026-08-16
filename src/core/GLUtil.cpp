@@ -52,21 +52,24 @@ namespace GLUtil
       glBindVertexArray(0);
    }
 
-   bool EnsureFbo(Fbo& fbo, int w, int h)
+   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat)
    {
       if (w <= 0 || h <= 0)
          return false;
 
-      if (fbo.fbo != 0 && fbo.w == w && fbo.h == h)
+      if (fbo.fbo != 0 && fbo.w == w && fbo.h == h && fbo.internalFormat == internalFormat)
          return true;
 
       DestroyFbo(fbo);
+
+      GLenum format = GL_RGBA;
+      GLenum type = (internalFormat == GL_RGBA16F) ? GL_FLOAT : GL_UNSIGNED_BYTE;
 
       glGenFramebuffers(1, &fbo.fbo);
       glGenTextures(1, &fbo.tex);
 
       glBindTexture(GL_TEXTURE_2D, fbo.tex);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+      glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, nullptr);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -88,6 +91,7 @@ namespace GLUtil
 
       fbo.w = w;
       fbo.h = h;
+      fbo.internalFormat = internalFormat;
       return true;
    }
 

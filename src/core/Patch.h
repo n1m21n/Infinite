@@ -27,7 +27,12 @@ class INode;
 //   geo <dstIndex> <dstSlot> <srcIndex>
 //   aud <dstIndex> <dstSlot> <srcIndex>
 //   note <dstIndex> <dstSlot> <srcIndex>
-//   mod <dstIndex> <dstParam> <srcIndex> <srcOutput>
+//   mod <dstIndex> <dstParam> <srcIndex> <srcOutput> <polarity> <depth> <centre>
+//     polarity/depth/centre are trailing additions (per-binding modulation
+//     polarity - see Modulation::Source): missing on older patches, where
+//     >>'s failed-extraction behaviour leaves them at their defaults
+//     (polarity 0 = absolute, depth 1.0, centre 0.0), i.e. today's override
+//     behaviour, unchanged.
 //   pal <dstIndex> <dstColor> <srcIndex> <srcSwatch>
 //   expr <dstIndex> <dstParam> <expression text to end of line>
 //   glob <name> <expression text to end of line>
@@ -66,6 +71,11 @@ namespace Patch
       int dstParam = 0;
       int srcIndex = 0;
       int srcOutput = 0;
+      // See Modulation::Source::Polarity. 0 = absolute (default, today's
+      // override behaviour), 1 = bipolar.
+      int polarity = 0;
+      float depth = 1.0f;
+      float centre = 0.0f;
    };
 
    // A palette node driving one colour swatch on another node.

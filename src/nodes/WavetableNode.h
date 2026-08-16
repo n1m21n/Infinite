@@ -87,6 +87,20 @@ struct WavetableEngine
    bool on = true;
 };
 
+// The parameter surface AudioWavetableNode renders from, decoupled from
+// which INode supplied it - Wavetable fills both engines, Oscillator fills
+// one and leaves engines[1].on false. Lets both nodes share one voice
+// allocator and one DSP path instead of forking it.
+struct WavetableSynthParams
+{
+   WavetableEngine engines[2];
+   float mix = 0.0f;
+   float volume = 0.8f;
+   float frequency = 220.0f;
+   float glide = 0.0f;
+   float pitchBend = 0.0f;
+};
+
 class WavetableNode : public INode, public IAudioSource
 {
 public:

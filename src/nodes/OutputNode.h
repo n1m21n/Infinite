@@ -5,8 +5,10 @@
 
 #include "INode.h"
 #include "ImageCable.h"
+#include "AudioCable.h"
 #include "GLUtil.h"
 #include "Platform.h"
+#include "audio/AudioCaptureRing.h"
 
 // Terminal node. Passes its input through into its own FBO (identity pass) so it
 // has a real cook/output-texture lifecycle like any other node, and can also
@@ -24,8 +26,12 @@ public:
    void CookIfNeeded(int frameId) override;
 
    ImageCable& Input() { return mInput; }
+   AudioCable& AudioInput() { return mAudioInput; }
    INode* BypassSource() override { return mInput.GetSource(); }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "in" : "audio"; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "in" : (slot == 1 ? "audio" : nullptr); }
+   AudioCable* AudioInputSlot(int slot) override { return slot == 1 ? &mAudioInput : nullptr; }
+
+   AudioCaptureRing& CaptureRing() { return mCaptureRing; }
 
    // --- recording ---
    bool StartRecording(const std::string& path);
@@ -36,10 +42,6 @@ public:
 
    int recordFps = 30;
    bool includeAudio = false;
-   // Not an ImageCable: recording reads the file directly off disk at its own
-   // pace rather than pulling through the cook graph, so this is a plain
-   // pointer set the same way geometry/camera pins are.
-   class AudioFileNode* audioSource = nullptr;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -50,8 +52,11 @@ public:
 private:
    bool EnsureShader();
    void CaptureFrame();
+   void DrainAudioCapture();
 
    ImageCable mInput;
+   AudioCable mAudioInput;
+   AudioCaptureRing mCaptureRing;
    GLUtil::Fbo mOut;
    unsigned int mProgram = 0;
    bool mShaderTried = false;

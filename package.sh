@@ -29,7 +29,7 @@ if [ -f "$BUILD/CMakeCache.txt" ] &&
     rm -rf "$BUILD"
 fi
 
-cmake -S "$ROOT" -B "$BUILD" "${GENERATOR[@]}" -DCMAKE_BUILD_TYPE=Release >/dev/null
+cmake -S "$ROOT" -B "$BUILD" ${GENERATOR[@]+"${GENERATOR[@]}"} -DCMAKE_BUILD_TYPE=Release >/dev/null
 
 echo "==> building"
 cmake --build "$BUILD" -j"$(sysctl -n hw.ncpu)"

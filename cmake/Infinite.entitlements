@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements a plugin host needs on macOS. Without these the kernel kills
+  Infinite outright - SIGKILL, "Code Signature Invalid", no catchable error and
+  nothing on stderr - the moment a third-party plugin maps its code pages:
+
+  - disable-library-validation: plugins are signed by their own vendors, not by
+    this app's signing identity. Library Validation refuses to map any such
+    binary into the process.
+  - allow-jit / allow-unsigned-executable-memory: several commercial plugins
+    (Cableguys ShaperBox, XLN RC-20) generate code at runtime.
+
+  Every DAW ships this set for the same reason.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+</dict>
+</plist>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <OpenGL/gl3.h>
 #include <functional>
 #include <string>
 #include <vector>
@@ -15,10 +16,13 @@ namespace GLUtil
       unsigned int tex = 0;
       int w = 0;
       int h = 0;
+      unsigned int internalFormat = GL_RGBA8;
    };
 
-   // Lazily (re)allocates the FBO's color texture to the requested size.
-   bool EnsureFbo(Fbo& fbo, int w, int h);
+   // Lazily (re)allocates the FBO's color texture to the requested size and
+   // internal format (default GL_RGBA8, matching prior behavior). Pass
+   // GL_RGBA16F for nodes that need HDR range or unclamped simulation state.
+   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat = GL_RGBA8);
    void DestroyFbo(Fbo& fbo);
 
    inline unsigned int FboTexture(const Fbo& fbo) { return fbo.tex; }

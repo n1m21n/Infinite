@@ -140,9 +140,12 @@ public:
       {
          if (channelFilter >= 0 && msgs[i].channel != channelFilter)
             continue;
-         const int note = msgs[i].note + transpose;
+         int note = msgs[i].note + transpose;
          if (note < 0 || note > 127)
             continue;
+
+         if (mUseGlobalScale.load(std::memory_order_relaxed))
+            note = std::clamp(MusicTime::SnapToScale(note, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest), 0, 127);
 
          NoteEvent e;
          e.note = note;
@@ -155,11 +158,13 @@ public:
          if (e.isNoteOn)
          {
             e.voiceId = NextVoiceId();
-            mActiveVoiceId[note] = e.voiceId;
+            mActiveVoiceId[msgs[i].note] = e.voiceId;
+            mMappedNote[msgs[i].note] = note;
          }
          else
          {
-            e.voiceId = mActiveVoiceId[note];
+            e.voiceId = mActiveVoiceId[msgs[i].note];
+            e.note = mMappedNote[msgs[i].note];
          }
          mOutbox.Push(e);
 
@@ -177,6 +182,7 @@ public:
       mChannel.store(n.channel, std::memory_order_relaxed);
       mTranspose.store(n.transpose, std::memory_order_relaxed);
       mVelocityScale.store(n.velocityScale, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
    }
 
    uint64_t HeldWord(int w) const { return mHeld[w].load(std::memory_order_relaxed); }
@@ -186,12 +192,14 @@ private:
    NoteEventQueue mOutbox;
    unsigned long long mCursor = 0;
    int mActiveVoiceId[128] = {};
+   int mMappedNote[128] = {};
 
    std::atomic<uint64_t> mHeld[2] { { 0 }, { 0 } };
    std::atomic<int> mLastNote { -1 };
    std::atomic<int> mChannel { -1 };
    std::atomic<int> mTranspose { 0 };
    std::atomic<float> mVelocityScale { 1.0f };
+   std::atomic<bool> mUseGlobalScale { false };
 };
 
 MidiNotesNode::MidiNotesNode() = default;
@@ -218,6 +226,7 @@ void MidiNotesNode::VisitParams(ParamVisitor& v)
    v.Int("channel", channel);
    v.Int("transpose", transpose);
    v.Float("velocityScale", velocityScale);
+   v.Bool("useGlobalScale", useGlobalScale);
 }
 
 AudioNode* MidiNotesNode::GetAudioNode()
@@ -258,151 +267,6 @@ int MidiNotesNode::HeldCount() const
 int MidiNotesNode::LastNote() const
 {
    return mAudioNode ? mAudioNode->LastNote() : -1;
-}
-
-// -------------------------------------------------------------------- Envelope
-class AudioEnvelopeNode : public AudioNode
-{
-public:
-   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
-   {
-      mSampleRate = sampleRate;
-      mEnv.SetSampleRate(sampleRate);
-      mEnv.SetADSR(mAttackMs.load(std::memory_order_relaxed), mDecayMs.load(std::memory_order_relaxed),
-                   mSustainLevel.load(std::memory_order_relaxed), mReleaseMs.load(std::memory_order_relaxed));
-      mLastPulseStep = -1;
-      mGateOpen = false;
-   }
-
-   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
-   {
-      mEnv.SetADSR(mAttackMs.load(std::memory_order_relaxed), mDecayMs.load(std::memory_order_relaxed),
-                   mSustainLevel.load(std::memory_order_relaxed), mReleaseMs.load(std::memory_order_relaxed));
-
-      const int numFrames = output.numFrames;
-      const int trigger = mTrigger.load(std::memory_order_relaxed);
-      float level = mEnv.Process(); // in case numFrames==0, still publish something sane
-
-      if (trigger == EnvelopeNode::kTriggerPulse)
-      {
-         // Free-runs off the transport, exactly like Chorder's "groove" step
-         // clock (NoteNodes.cpp's AudioChorderNode) - no note input needed.
-         // One NoteOn/NoteOff pair per rateDiv-beats period, held open for
-         // gatePct of that period. Step/gate checked once per block (the
-         // same ~block-length granularity Chorder/Stutter already use for
-         // their own tempo-synced triggers), not per sample.
-         const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
-         const double beatsPerDiv = std::max(0.015625, MusicTime::BeatsFor((MusicTime::RateDivision)rateDiv));
-         const double gatePct = std::clamp((double)mGatePct.load(std::memory_order_relaxed), 0.01, 1.0);
-         const double stepPos = Transport::Instance().Beats() / beatsPerDiv;
-         const long long step = (long long)std::floor(stepPos);
-         const double phase = stepPos - (double)step; // 0..1 through the current pulse
-
-         if (step != mLastPulseStep)
-         {
-            mLastPulseStep = step;
-            mEnv.NoteOn();
-            mGateOpen = true;
-         }
-         if (mGateOpen && phase >= gatePct)
-         {
-            mEnv.NoteOff();
-            mGateOpen = false;
-         }
-
-         for (int i = 0; i < numFrames; i++)
-            level = mEnv.Process();
-      }
-      else
-      {
-         NoteEvent evts[64];
-         const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
-         int evtIdx = 0;
-
-         for (int i = 0; i < numFrames; i++)
-         {
-            while (evtIdx < n && evts[evtIdx].frameOffset == i)
-            {
-               if (evts[evtIdx].isNoteOn)
-                  mEnv.NoteOn();
-               else
-                  mEnv.NoteOff();
-               evtIdx++;
-            }
-            level = mEnv.Process();
-         }
-      }
-      mLevel.store(level, std::memory_order_relaxed);
-   }
-
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
-
-   // Main thread only.
-   void PushParams(const EnvelopeNode& n)
-   {
-      mAttackMs.store(n.attackMs, std::memory_order_relaxed);
-      mDecayMs.store(n.decayMs, std::memory_order_relaxed);
-      mSustainLevel.store(n.sustainLevel, std::memory_order_relaxed);
-      mReleaseMs.store(n.releaseMs, std::memory_order_relaxed);
-      mTrigger.store(n.trigger, std::memory_order_relaxed);
-      mRateDiv.store(n.rateDiv, std::memory_order_relaxed);
-      mGatePct.store(n.gatePct, std::memory_order_relaxed);
-   }
-
-   float Level() const { return mLevel.load(std::memory_order_relaxed); }
-
-private:
-   Envelope mEnv;
-   NoteEventQueue* mInbox = nullptr;
-   std::atomic<float> mLevel { 0.0f };
-   std::atomic<float> mAttackMs { 10.0f };
-   std::atomic<float> mDecayMs { 200.0f };
-   std::atomic<float> mSustainLevel { 0.6f };
-   std::atomic<float> mReleaseMs { 400.0f };
-   std::atomic<int> mTrigger { EnvelopeNode::kTriggerNote };
-   std::atomic<int> mRateDiv { 6 };
-   std::atomic<float> mGatePct { 0.5f };
-   double mSampleRate = 44100.0;
-   bool mGateOpen = false;
-   long long mLastPulseStep = -1;
-};
-
-EnvelopeNode::EnvelopeNode() = default;
-EnvelopeNode::~EnvelopeNode() = default;
-
-void EnvelopeNode::CookIfNeeded(int frameId)
-{
-   if (frameId == mLastCookFrame)
-      return;
-   mLastCookFrame = frameId;
-   if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioEnvelopeNode>();
-   mAudioNode->PushParams(*this);
-}
-
-void EnvelopeNode::VisitParams(ParamVisitor& v)
-{
-   v.Float("attackMs", attackMs);
-   v.Float("decayMs", decayMs);
-   v.Float("sustainLevel", sustainLevel);
-   v.Float("releaseMs", releaseMs);
-   v.Int("trigger", trigger);
-   v.Int("rateDiv", rateDiv);
-   v.Float("gatePct", gatePct);
-}
-
-AudioNode* EnvelopeNode::AudioNodeForNotePorts()
-{
-   if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioEnvelopeNode>();
-   return mAudioNode.get();
-}
-
-float EnvelopeNode::Value01()
-{
-   if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioEnvelopeNode>();
-   return mAudioNode->Level();
 }
 
 // ---------------------------------------------------------------- Note to CV
@@ -516,8 +380,9 @@ public:
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
    {
-      const int scale = mScale.load(std::memory_order_relaxed);
-      const int root = mRoot.load(std::memory_order_relaxed);
+      const bool useGlobal = mUseGlobalScale.load(std::memory_order_relaxed);
+      const int scale = useGlobal ? Transport::Instance().Scale() : mScale.load(std::memory_order_relaxed);
+      const int root = useGlobal ? Transport::Instance().Key() : mRoot.load(std::memory_order_relaxed);
       const int rangeLow = mRangeLow.load(std::memory_order_relaxed);
       const int rangeHigh = mRangeHigh.load(std::memory_order_relaxed);
       const float chance = mChance.load(std::memory_order_relaxed);
@@ -557,12 +422,6 @@ public:
          }
          else if (in.bendUpdate)
          {
-            // A note this node let through is being slid by an upstream
-            // Pitch Bend - forward it re-mapped to the same output pitch,
-            // without touching mPassingAs (that's reserved for the real
-            // note-off). A note this node dropped has no mapped output and
-            // no downstream voice to target, so its bendUpdate is dropped
-            // right along with it.
             if (int* mapped = mPassingAs.Find(in.voiceId))
             {
                NoteEvent out = in;
@@ -598,6 +457,7 @@ public:
       mRangeLow.store(n.rangeLow, std::memory_order_relaxed);
       mRangeHigh.store(n.rangeHigh, std::memory_order_relaxed);
       mChance.store(n.chance, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
    }
 
    int LastNoteIn() const { return mLastNoteIn.load(std::memory_order_relaxed); }
@@ -614,6 +474,7 @@ private:
    std::atomic<int> mRangeLow { 0 };
    std::atomic<int> mRangeHigh { 127 };
    std::atomic<float> mChance { 100.0f };
+   std::atomic<bool> mUseGlobalScale { false };
    std::atomic<int> mLastNoteIn { -1 };
    std::atomic<bool> mLastPassed { false };
 };
@@ -638,6 +499,7 @@ void NoteFilterNode::VisitParams(ParamVisitor& v)
    v.Int("rangeLow", rangeLow);
    v.Int("rangeHigh", rangeHigh);
    v.Float("chance", chance);
+   v.Bool("useGlobalScale", useGlobalScale);
 }
 
 AudioNode* NoteFilterNode::GetAudioNode()
@@ -657,386 +519,19 @@ bool NoteFilterNode::LastPassed() const
    return mAudioNode ? mAudioNode->LastPassed() : false;
 }
 
-// ---------------------------------------------------------------- Note Modify
 // Grid divisions quantizeDiv indexes into, in beats (a beat is a quarter
-// note) - index 0 is "off" and never reaches this table.
+// note) - index 0 is "off" and never reaches this table. Shared by Quantizer
+// and Note Capturer.
 static const double kQuantizeBeats[] = { 1.0, 1.0, 0.5, 0.25, 0.125 };
 static constexpr int kNumQuantizeDiv = 5;
 
-class AudioNoteModifyNode : public AudioNode
-{
-public:
-   static constexpr int kMaxPending = 96;
-
-   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
-   {
-      mSampleRate = sampleRate;
-      mSamplePos = 0;
-      mLastOutNote = -1;
-      mVoiceState.Clear();
-      for (int i = 0; i < kMaxPending; i++)
-         mPending[i].active = false;
-   }
-
-   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
-   {
-      const int numFrames = output.numFrames;
-      const int transpose = mTranspose.load(std::memory_order_relaxed);
-      const int pitch = mPitch.load(std::memory_order_relaxed);
-      const float curve = mVelocityCurve.load(std::memory_order_relaxed);
-      const float humanizeMs = mHumanizeTimingMs.load(std::memory_order_relaxed);
-      const float humanizeVel = mHumanizeVelocity.load(std::memory_order_relaxed);
-      const float gateHoldMs = mGateHoldMs.load(std::memory_order_relaxed);
-      const int quantizeDiv = std::clamp(mQuantizeDiv.load(std::memory_order_relaxed), 0, kNumQuantizeDiv - 1);
-      const float glideMs = std::max(0.0f, mGlideMs.load(std::memory_order_relaxed));
-      const double holdSamples = gateHoldMs * 0.001 * mSampleRate;
-      const double bpm = (double)Transport::Instance().Tempo();
-      const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
-
-      NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
-
-      for (int i = 0; i < n; i++)
-      {
-         const NoteEvent& in = evts[i];
-         if (in.note < 0 || in.note > 127)
-            continue;
-
-         if (in.isNoteOn)
-         {
-            const int outNote = std::clamp(in.note + transpose + pitch, 0, 127);
-            float v = std::clamp(in.velocity, 0.0f, 1.0f);
-            v = std::pow(v, curve);
-            v += mRng.Next() * (humanizeVel / 100.0f) * 0.5f;
-            v = std::clamp(v, 0.0f, 1.0f);
-
-            int offset = in.frameOffset;
-            if (humanizeMs > 0.0f)
-            {
-               const int jitterSamples = (int)(mRng.Next() * humanizeMs * 0.001 * mSampleRate);
-               offset = std::clamp(offset + jitterSamples, 0, std::max(0, numFrames - 1));
-            }
-
-            uint64_t onsetAbs = mSamplePos + (uint64_t)offset;
-
-            // Quantize: snap forward to the next grid line at the chosen
-            // division, rather than nearest - guarantees the onset never
-            // moves earlier than it actually arrived.
-            if (quantizeDiv > 0)
-            {
-               const double gridSamples = std::max(1.0, kQuantizeBeats[quantizeDiv] * samplesPerBeat);
-               onsetAbs = (uint64_t)(std::ceil((double)onsetAbs / gridSamples) * gridSamples);
-            }
-
-            // Glide: a fast chromatic run from the previous output note into
-            // this one, filling the gap it pushes the real onset back by.
-            // NoteEvent carries no continuous pitch, so this approximates
-            // portamento as a glissando rather than a true pitch ramp.
-            if (glideMs > 0.0f && mLastOutNote >= 0 && mLastOutNote != outNote)
-            {
-               const int steps = std::clamp(std::abs(outNote - mLastOutNote), 1, 16);
-               const int dir = outNote > mLastOutNote ? 1 : -1;
-               const double stepSamples = std::max(1.0, (glideMs * 0.001 * mSampleRate) / (double)steps);
-               const uint64_t stepBase = onsetAbs;
-               for (int k = 0; k < steps - 1; k++)
-               {
-                  const int stepNote = std::clamp(mLastOutNote + dir * (k + 1), 0, 127);
-                  const uint64_t onSample = stepBase + (uint64_t)((double)k * stepSamples);
-                  const uint64_t offSample = stepBase + (uint64_t)((double)(k + 1) * stepSamples);
-                  const int stepVoiceId = NextVoiceId();
-                  if (Pending* on = FreeSlot())
-                  {
-                     on->active = true;
-                     on->note = stepNote;
-                     on->velocity = v;
-                     on->isNoteOn = true;
-                     on->isFinal = false;
-                     on->voiceId = stepVoiceId;
-                     on->targetSample = onSample;
-                     on->bendSemitones = in.bendSemitones;
-                  }
-                  if (Pending* off = FreeSlot())
-                  {
-                     off->active = true;
-                     off->note = stepNote;
-                     off->velocity = 0.0f;
-                     off->isNoteOn = false;
-                     off->isFinal = false;
-                     off->voiceId = stepVoiceId;
-                     off->targetSample = offSample;
-                  }
-               }
-               onsetAbs = stepBase + (uint64_t)((double)(steps - 1) * stepSamples);
-            }
-            mLastOutNote = outNote;
-            mLastNoteOut.store(outNote, std::memory_order_relaxed);
-            mLastVelocityOut.store(v, std::memory_order_relaxed);
-
-            if (onsetAbs < mSamplePos + (uint64_t)numFrames)
-            {
-               EmitFinal(in.voiceId, outNote, v, (int)(onsetAbs - mSamplePos), gateHoldMs, holdSamples, onsetAbs,
-                         in.bendSemitones);
-            }
-            else if (Pending* on = FreeSlot())
-            {
-               on->active = true;
-               on->note = outNote;
-               on->velocity = v;
-               on->isNoteOn = true;
-               on->isFinal = true;
-               on->inputVoiceId = in.voiceId;
-               on->holdSamples = gateHoldMs > 0.0f ? std::max(0.0, holdSamples) : -1.0;
-               on->targetSample = onsetAbs;
-               on->bendSemitones = in.bendSemitones;
-            }
-         }
-         else if (in.bendUpdate)
-         {
-            // A note this node has already remapped is being slid by an
-            // upstream Pitch Bend - forward to the same remapped output
-            // note, without touching mVoiceState (that's reserved for a
-            // real note-off, including the internally-scheduled one below).
-            VoiceState* state = mVoiceState.Find(in.voiceId);
-            if (state == nullptr || state->outNote < 0)
-               continue;
-
-            NoteEvent out;
-            out.note = state->outNote;
-            out.velocity = in.velocity;
-            out.isNoteOn = false;
-            out.frameOffset = in.frameOffset;
-            out.bendUpdate = true;
-            out.bendSemitones = in.bendSemitones;
-            out.source = this;
-            out.voiceId = in.voiceId;
-            mOutbox.Push(out);
-         }
-         else
-         {
-            VoiceState* state = mVoiceState.Find(in.voiceId);
-            if (state == nullptr || state->outNote < 0)
-               continue;
-
-            if (state->suppressOff)
-               continue; // the scheduled internal note-off will close this voice
-
-            NoteEvent out;
-            out.note = state->outNote;
-            out.velocity = in.velocity;
-            out.isNoteOn = false;
-            out.frameOffset = in.frameOffset;
-            out.source = this;
-            out.voiceId = in.voiceId;
-            mOutbox.Push(out);
-            mVoiceState.Erase(in.voiceId);
-         }
-      }
-
-      // Fire any internally-scheduled note-offs (gateHoldMs override) that
-      // fall inside this block.
-      mVoiceState.ForEach([&](int voiceId, VoiceState& state) -> bool
-      {
-         if (!state.scheduledActive)
-            return false;
-         if (state.scheduledTarget >= mSamplePos && state.scheduledTarget < mSamplePos + (uint64_t)numFrames)
-         {
-            NoteEvent out;
-            out.note = state.outNote;
-            out.velocity = 0.0f;
-            out.isNoteOn = false;
-            out.frameOffset = (int)(state.scheduledTarget - mSamplePos);
-            out.source = this;
-            out.voiceId = voiceId;
-            mOutbox.Push(out);
-            return true; // erase - voice fully closed
-         }
-         return false;
-      });
-
-      // Fire due glide steps and deferred final notes.
-      for (int i = 0; i < kMaxPending; i++)
-      {
-         Pending& p = mPending[i];
-         if (!p.active)
-            continue;
-         if (p.targetSample >= mSamplePos && p.targetSample < mSamplePos + (uint64_t)numFrames)
-         {
-            const int frameOffset = (int)(p.targetSample - mSamplePos);
-            if (p.isFinal)
-               EmitFinal(p.inputVoiceId, p.note, p.velocity, frameOffset, p.holdSamples >= 0.0 ? 1.0f : 0.0f,
-                         p.holdSamples, p.targetSample, p.bendSemitones);
-            else
-            {
-               NoteEvent out;
-               out.note = p.note;
-               out.velocity = p.velocity;
-               out.isNoteOn = p.isNoteOn;
-               out.frameOffset = frameOffset;
-               out.bendSemitones = p.bendSemitones;
-               out.source = this;
-               out.voiceId = p.voiceId;
-               mOutbox.Push(out);
-            }
-            p.active = false;
-         }
-      }
-
-      mSamplePos += (uint64_t)numFrames;
-   }
-
-   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
-
-   // Main thread only.
-   void PushParams(const NoteModifyNode& n)
-   {
-      mTranspose.store(n.transposeSemi, std::memory_order_relaxed);
-      mPitch.store(n.pitchSemi, std::memory_order_relaxed);
-      mVelocityCurve.store(n.velocityCurve, std::memory_order_relaxed);
-      mHumanizeTimingMs.store(n.humanizeTimingMs, std::memory_order_relaxed);
-      mHumanizeVelocity.store(n.humanizeVelocity, std::memory_order_relaxed);
-      mGateHoldMs.store(n.gateHoldMs, std::memory_order_relaxed);
-      mQuantizeDiv.store(n.quantizeDiv, std::memory_order_relaxed);
-      mGlideMs.store(n.glideMs, std::memory_order_relaxed);
-   }
-
-   int LastNoteOut() const { return mLastNoteOut.load(std::memory_order_relaxed); }
-   float LastVelocityOut() const { return mLastVelocityOut.load(std::memory_order_relaxed); }
-
-private:
-   struct Pending
-   {
-      bool active = false;
-      int note = 0;
-      float velocity = 0.0f;
-      bool isNoteOn = false;
-      uint64_t targetSample = 0;
-      bool isFinal = false;      // the real (possibly glide/quantize-delayed) target note-on
-      int voiceId = 0;           // !isFinal only: this glide step's own on/off pairing id
-      int inputVoiceId = 0;      // isFinal only: which input voice this closes the loop for
-      double holdSamples = -1.0; // isFinal only: >=0 means gateHoldMs override is active
-      float bendSemitones = 0.0f; // the input note-on's bend, carried through the delay
-   };
-
-   Pending* FreeSlot()
-   {
-      for (int i = 0; i < kMaxPending; i++)
-         if (!mPending[i].active)
-            return &mPending[i];
-      return nullptr;
-   }
-
-   struct VoiceState
-   {
-      int outNote = -1;
-      bool suppressOff = false;
-      bool scheduledActive = false;
-      uint64_t scheduledTarget = 0;
-   };
-
-   // Shared by the immediate path and the deferred-Pending path: registers
-   // this input voice's bookkeeping and pushes the actual NoteEvent.
-   void EmitFinal(int inputVoiceId, int outNote, float velocity, int frameOffset, float gateHoldMsFlag,
-                  double holdSamples, uint64_t onsetAbs, float bendSemitones)
-   {
-      VoiceState& state = mVoiceState.GetOrInsert(inputVoiceId);
-      state.outNote = outNote;
-
-      NoteEvent out;
-      out.note = outNote;
-      out.velocity = velocity;
-      out.isNoteOn = true;
-      out.frameOffset = frameOffset;
-      out.bendSemitones = bendSemitones;
-      out.source = this;
-      out.voiceId = inputVoiceId;
-      mOutbox.Push(out);
-
-      if (gateHoldMsFlag > 0.0f && holdSamples >= 0.0)
-      {
-         state.suppressOff = true;
-         state.scheduledActive = true;
-         state.scheduledTarget = onsetAbs + (uint64_t)holdSamples;
-      }
-      else
-      {
-         state.suppressOff = false;
-         state.scheduledActive = false;
-      }
-   }
-
-   NoteEventQueue mOutbox;
-   NoteEventQueue* mInbox = nullptr;
-   double mSampleRate = 48000.0;
-   uint64_t mSamplePos = 0;
-   DspMath::WhiteNoise mRng;
-
-   VoiceIdMap<VoiceState, 128> mVoiceState;
-   int mLastOutNote = -1;
-   Pending mPending[kMaxPending];
-
-   std::atomic<int> mTranspose { 0 };
-   std::atomic<int> mPitch { 0 };
-   std::atomic<float> mVelocityCurve { 1.0f };
-   std::atomic<float> mHumanizeTimingMs { 0.0f };
-   std::atomic<float> mHumanizeVelocity { 0.0f };
-   std::atomic<float> mGateHoldMs { 0.0f };
-   std::atomic<int> mQuantizeDiv { 0 };
-   std::atomic<float> mGlideMs { 0.0f };
-   std::atomic<int> mLastNoteOut { -1 };
-   std::atomic<float> mLastVelocityOut { 0.0f };
-};
-
-NoteModifyNode::NoteModifyNode() = default;
-NoteModifyNode::~NoteModifyNode() = default;
-
-void NoteModifyNode::CookIfNeeded(int frameId)
-{
-   if (frameId == mLastCookFrame)
-      return;
-   mLastCookFrame = frameId;
-   if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioNoteModifyNode>();
-   mAudioNode->PushParams(*this);
-}
-
-void NoteModifyNode::VisitParams(ParamVisitor& v)
-{
-   v.Int("transposeSemi", transposeSemi);
-   v.Int("pitchSemi", pitchSemi);
-   v.Float("velocityCurve", velocityCurve);
-   v.Float("humanizeTimingMs", humanizeTimingMs);
-   v.Float("humanizeVelocity", humanizeVelocity);
-   v.Float("gateHoldMs", gateHoldMs);
-   v.Int("quantizeDiv", quantizeDiv);
-   v.Float("glideMs", glideMs);
-}
-
-AudioNode* NoteModifyNode::GetAudioNode()
-{
-   if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioNoteModifyNode>();
-   return mAudioNode.get();
-}
-
-int NoteModifyNode::LastNoteOut() const
-{
-   return mAudioNode ? mAudioNode->LastNoteOut() : -1;
-}
-
-float NoteModifyNode::LastVelocityOut() const
-{
-   return mAudioNode ? mAudioNode->LastVelocityOut() : 0.0f;
-}
-
-// ------------------------------------------------------- Note Modify, split up
-// The eight nodes below are Note Modify's controls, one concern per node -
-// see the class comments on their declarations in NoteNodes.h. A small
-// shared helper for the four that need to delay a note-on into a future
-// block (Gate's internal note-off, Humanizer/Quantizer's delayed onset,
-// Glide's glissando steps) - the same Pending-slot mechanism
-// AudioNoteModifyNode uses above, pulled out since four separate nodes need
-// it rather than one.
+// ------------------------------------------------------------- Note editors
+// The eight nodes below are the note-modification surface, one concern per
+// node - see the class comments on their declarations in NoteNodes.h. A
+// small shared helper for the four that need to delay a note-on into a
+// future block (Gate's internal note-off, Humanizer/Quantizer's delayed
+// onset, Glide's glissando steps) - a single Pending-slot mechanism pulled
+// out since four separate nodes need it rather than one.
 namespace
 {
    struct DeferredNote
@@ -1117,7 +612,10 @@ public:
 
          if (in.isNoteOn)
          {
-            const int outNote = std::clamp(in.note + semi, 0, 127);
+            int outNote = in.note + semi;
+            if (mUseGlobalScale.load(std::memory_order_relaxed))
+               outNote = MusicTime::SnapToScale(outNote, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
+            outNote = std::clamp(outNote, 0, 127);
             mOutNote.GetOrInsert(in.voiceId) = outNote;
             out.note = outNote;
             out.velocity = in.velocity;
@@ -1155,7 +653,11 @@ public:
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
    void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
 
-   void SetSemitones(int semi) { mSemitones.store(semi, std::memory_order_relaxed); }
+   void PushParams(const NoteTransposeNode& n)
+   {
+      mSemitones.store(n.semitones, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
+   }
    int LastNoteOut() const { return mLastNoteOut.load(std::memory_order_relaxed); }
 
 private:
@@ -1163,6 +665,7 @@ private:
    NoteEventQueue* mInbox = nullptr;
    VoiceIdMap<int, 128> mOutNote;
    std::atomic<int> mSemitones { 0 };
+   std::atomic<bool> mUseGlobalScale { false };
    std::atomic<int> mLastNoteOut { -1 };
 };
 
@@ -1176,10 +679,14 @@ void NoteTransposeNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioSemitoneShiftNode>();
-   mAudioNode->SetSemitones(semitones);
+   mAudioNode->PushParams(*this);
 }
 
-void NoteTransposeNode::VisitParams(ParamVisitor& v) { v.Int("semitones", semitones); }
+void NoteTransposeNode::VisitParams(ParamVisitor& v)
+{
+   v.Int("semitones", semitones);
+   v.Bool("useGlobalScale", useGlobalScale);
+}
 
 AudioNode* NoteTransposeNode::GetAudioNode()
 {
@@ -2526,6 +2033,7 @@ public:
       mRateSeconds.store(n.rateSeconds, std::memory_order_relaxed);
       mGatePercent.store(n.gatePercent, std::memory_order_relaxed);
       mStepGates.store(n.stepGates, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
    }
 
    int HeldCount() const { return mHeldCountReadout.load(std::memory_order_relaxed); }
@@ -2701,6 +2209,7 @@ private:
    std::atomic<float> mRateSeconds { 0.2f };
    std::atomic<float> mGatePercent { 80.0f };
    std::atomic<int> mStepGates { 0xFF };
+   std::atomic<bool> mUseGlobalScale { false };
    std::atomic<int> mHeldCountReadout { 0 };
    std::atomic<int> mCurrentOutNoteReadout { -1 };
    std::atomic<int> mGridStepReadout { -1 };
@@ -2728,6 +2237,7 @@ void ArpeggiatorNode::VisitParams(ParamVisitor& v)
    v.Float("rateSeconds", rateSeconds);
    v.Float("gatePercent", gatePercent);
    v.Int("stepGates", stepGates);
+   v.Bool("useGlobalScale", useGlobalScale);
 }
 
 AudioNode* ArpeggiatorNode::GetAudioNode()
@@ -2873,7 +2383,10 @@ public:
             }
 
             NoteEvent on;
-            on.note = std::clamp(mNote[idx].load(std::memory_order_relaxed), 0, 127);
+            int outNote = mNote[idx].load(std::memory_order_relaxed);
+            if (mUseGlobalScale.load(std::memory_order_relaxed))
+               outNote = MusicTime::SnapToScale(outNote, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
+            on.note = std::clamp(outNote, 0, 127);
             on.velocity = std::clamp(mVelocity[idx].load(std::memory_order_relaxed), 0.0f, 1.0f);
             on.isNoteOn = true;
             on.frameOffset = 0;
@@ -2904,6 +2417,7 @@ public:
       mRateBeats.store(n.rateBeats, std::memory_order_relaxed);
       mRateSeconds.store(n.rateSeconds, std::memory_order_relaxed);
       mGatePercent.store(n.gatePercent, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
       for (int i = 0; i < NoteSequencerNode::kMaxSteps; i++)
       {
          mNote[i].store(n.stepNote[i], std::memory_order_relaxed);
@@ -2930,6 +2444,7 @@ private:
    std::atomic<float> mRateBeats { 0.25f };
    std::atomic<float> mRateSeconds { 0.2f };
    std::atomic<float> mGatePercent { 70.0f };
+   std::atomic<bool> mUseGlobalScale { false };
    std::atomic<int> mNote[NoteSequencerNode::kMaxSteps] = {};
    std::atomic<float> mVelocity[NoteSequencerNode::kMaxSteps] = {};
    std::atomic<bool> mEnabled[NoteSequencerNode::kMaxSteps] = {};
@@ -2964,6 +2479,7 @@ void NoteSequencerNode::VisitParams(ParamVisitor& v)
    v.Float("rateBeats", rateBeats);
    v.Float("rateSeconds", rateSeconds);
    v.Float("gatePercent", gatePercent);
+   v.Bool("useGlobalScale", useGlobalScale);
    for (int i = 0; i < kMaxSteps; i++)
    {
       char key[16];
@@ -3008,8 +2524,9 @@ public:
       const int numFrames = output.numFrames;
       const int rangeLow = mRangeLow.load(std::memory_order_relaxed);
       const int rangeHigh = std::max(rangeLow, mRangeHigh.load(std::memory_order_relaxed));
-      const int scale = mScale.load(std::memory_order_relaxed);
-      const int root = mRoot.load(std::memory_order_relaxed);
+      const bool useGlobal = mUseGlobalScale.load(std::memory_order_relaxed);
+      const int scale = useGlobal ? Transport::Instance().Scale() : mScale.load(std::memory_order_relaxed);
+      const int root = useGlobal ? Transport::Instance().Key() : mRoot.load(std::memory_order_relaxed);
       const int rateMode = mRateMode.load(std::memory_order_relaxed);
       const float rateBeatsP = std::max(0.015625f, mRateBeats.load(std::memory_order_relaxed));
       const float rateSecondsP = std::max(0.01f, mRateSeconds.load(std::memory_order_relaxed));
@@ -3091,6 +2608,7 @@ public:
       mRateBeats.store(n.rateBeats, std::memory_order_relaxed);
       mRateSeconds.store(n.rateSeconds, std::memory_order_relaxed);
       mMaxStep.store(n.maxStep, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
    }
 
    int LastNote() const { return mLastNoteReadout.load(std::memory_order_relaxed); }
@@ -3116,6 +2634,7 @@ private:
    std::atomic<float> mRateBeats { 0.25f };
    std::atomic<float> mRateSeconds { 0.2f };
    std::atomic<int> mMaxStep { 4 };
+   std::atomic<bool> mUseGlobalScale { true };
    std::atomic<int> mLastNoteReadout { -1 };
 };
 
@@ -3142,6 +2661,7 @@ void RandomNoteGeneratorNode::VisitParams(ParamVisitor& v)
    v.Float("rateBeats", rateBeats);
    v.Float("rateSeconds", rateSeconds);
    v.Int("maxStep", maxStep);
+   v.Bool("useGlobalScale", useGlobalScale);
 }
 
 AudioNode* RandomNoteGeneratorNode::GetAudioNode()
@@ -3175,8 +2695,9 @@ public:
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
       const int numFrames = output.numFrames;
-      const int scale = mScale.load(std::memory_order_relaxed);
-      const int root = mRoot.load(std::memory_order_relaxed);
+      const bool useGlobal = mUseGlobalScale.load(std::memory_order_relaxed);
+      const int scale = useGlobal ? Transport::Instance().Scale() : mScale.load(std::memory_order_relaxed);
+      const int root = useGlobal ? Transport::Instance().Key() : mRoot.load(std::memory_order_relaxed);
       const int chordSize = std::clamp(mChordSize.load(std::memory_order_relaxed), 2, 6);
       const float rateBeats = std::max(0.015625f, mRateBeats.load(std::memory_order_relaxed));
       const float strumMs = std::max(0.0f, mStrumMs.load(std::memory_order_relaxed));
@@ -3275,6 +2796,7 @@ public:
       mHumanizeTimingMs.store(n.humanizeTimingMs, std::memory_order_relaxed);
       mHumanizeVelocity.store(n.humanizeVelocity, std::memory_order_relaxed);
       mUpperHarmonics.store(n.upperHarmonics, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
    }
 
    int LastChordSize() const { return mLastChordSizeReadout.load(std::memory_order_relaxed); }
@@ -3313,6 +2835,7 @@ private:
    std::atomic<float> mHumanizeTimingMs { 10.0f };
    std::atomic<float> mHumanizeVelocity { 15.0f };
    std::atomic<float> mUpperHarmonics { 20.0f };
+   std::atomic<bool> mUseGlobalScale { true };
    std::atomic<int> mLastChordSizeReadout { 0 };
 };
 
@@ -3339,6 +2862,7 @@ void ChorderNode::VisitParams(ParamVisitor& v)
    v.Float("humanizeTimingMs", humanizeTimingMs);
    v.Float("humanizeVelocity", humanizeVelocity);
    v.Float("upperHarmonics", upperHarmonics);
+   v.Bool("useGlobalScale", useGlobalScale);
 }
 
 AudioNode* ChorderNode::GetAudioNode()
@@ -3353,30 +2877,148 @@ int ChorderNode::LastChordSize() const
    return mAudioNode ? mAudioNode->LastChordSize() : 0;
 }
 
-// ------------------------------------------------------------- Scale Notes
-class AudioScaleNotesNode : public AudioNode
+// -------------------------------------------------------------- Note Stack
+class AudioNoteStackNode : public AudioNode
 {
 public:
+   static constexpr int kVoices = NoteStackNode::kVoices;
+
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
+   {
+      mVoiceState.Clear();
+   }
+
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
    {
-      const int scale = mScale.load(std::memory_order_relaxed);
-      const int root = mRoot.load(std::memory_order_relaxed);
+      int semis[kVoices];
+      bool ens[kVoices];
+      for (int i = 0; i < kVoices; i++)
+      {
+         semis[i] = mSemitones[i].load(std::memory_order_relaxed);
+         ens[i] = mEnabled[i].load(std::memory_order_relaxed);
+      }
 
       NoteEvent evts[64];
       const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+
       for (int i = 0; i < n; i++)
       {
          const NoteEvent& in = evts[i];
-         NoteEvent out = in;
-         if (in.note >= 0 && in.note <= 127)
+
+         if (in.bendUpdate)
          {
-            const int snapped = MusicTime::SnapToScale(in.note, root, scale, MusicTime::kSnapNearest);
-            out.note = std::clamp(snapped, 0, 127);
-            if (in.isNoteOn)
-               mLastNoteOut.store(out.note, std::memory_order_relaxed);
+            // Not a note-on/off - a live pitch-bend update for an already-
+            // sounding voice. Forward it to the dry copy and to every voice
+            // this input note is currently driving, matched by the voiceId
+            // captured at note-on; never touch mVoiceState here.
+            NoteEvent dry = in;
+            dry.source = this;
+            mOutbox.Push(dry);
+
+            StackVoice* sv = mVoiceState.Find(in.voiceId);
+            if (sv != nullptr)
+            {
+               for (int k = 0; k < sv->extraCount; k++)
+               {
+                  NoteEvent out;
+                  out.note = sv->extraNote[k];
+                  out.velocity = in.velocity;
+                  out.isNoteOn = false;
+                  out.bendUpdate = true;
+                  out.bendSemitones = in.bendSemitones;
+                  out.frameOffset = in.frameOffset;
+                  out.source = this;
+                  out.voiceId = sv->extraVoiceId[k];
+                  mOutbox.Push(out);
+               }
+            }
+            continue;
          }
-         out.source = this;
-         mOutbox.Push(out);
+
+         if (in.note < 0 || in.note > 127)
+            continue;
+
+         if (in.isNoteOn)
+         {
+            // Dry note: always passes through unchanged, on its own voiceId.
+            NoteEvent dry = in;
+            dry.source = this;
+            mOutbox.Push(dry);
+
+            // Capture the enabled set now; the note-off replays exactly
+            // these pitches/voiceIds regardless of what the knobs do later.
+            StackVoice& sv = mVoiceState.GetOrInsert(in.voiceId);
+            sv.extraCount = 0;
+
+            int seen[kVoices + 1];
+            int seenCount = 0;
+            seen[seenCount++] = in.note; // dedupe against the dry pitch too
+
+            for (int v = 0; v < kVoices; v++)
+            {
+               if (!ens[v])
+                  continue;
+               int target = in.note + semis[v];
+               if (mUseGlobalScale.load(std::memory_order_relaxed))
+                  target = MusicTime::SnapToScale(target, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
+               if (target < 0 || target > 127)
+                  continue; // out of range - dropped, not folded
+
+               bool dup = false;
+               for (int s = 0; s < seenCount; s++)
+               {
+                  if (seen[s] == target)
+                  {
+                     dup = true;
+                     break;
+                  }
+               }
+               if (dup)
+                  continue;
+               seen[seenCount++] = target;
+
+               const int newVoiceId = NextVoiceId();
+               NoteEvent out;
+               out.note = target;
+               out.velocity = in.velocity;
+               out.isNoteOn = true;
+               out.frameOffset = in.frameOffset;
+               out.bendSemitones = in.bendSemitones;
+               out.source = this;
+               out.voiceId = newVoiceId;
+               mOutbox.Push(out);
+
+               sv.extraNote[sv.extraCount] = (int8_t)target;
+               sv.extraVoiceId[sv.extraCount] = newVoiceId;
+               sv.extraCount++;
+            }
+
+            mLastStackSize.store(1 + sv.extraCount, std::memory_order_relaxed);
+         }
+         else
+         {
+            // Dry note-off: same passthrough shape as the note-on.
+            NoteEvent dry = in;
+            dry.source = this;
+            mOutbox.Push(dry);
+
+            StackVoice* sv = mVoiceState.Find(in.voiceId);
+            if (sv != nullptr)
+            {
+               for (int k = 0; k < sv->extraCount; k++)
+               {
+                  NoteEvent out;
+                  out.note = sv->extraNote[k];
+                  out.velocity = in.velocity;
+                  out.isNoteOn = false;
+                  out.frameOffset = in.frameOffset;
+                  out.source = this;
+                  out.voiceId = sv->extraVoiceId[k];
+                  mOutbox.Push(out);
+               }
+               mVoiceState.Erase(in.voiceId);
+            }
+         }
       }
    }
 
@@ -3384,52 +3026,253 @@ public:
    void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
 
    // Main thread only.
-   void PushParams(const ScaleNotesNode& n)
+   void PushParams(const NoteStackNode& n)
    {
-      mScale.store(n.scale, std::memory_order_relaxed);
-      mRoot.store(n.root, std::memory_order_relaxed);
+      for (int i = 0; i < kVoices; i++)
+      {
+         mSemitones[i].store(n.semitones[i], std::memory_order_relaxed);
+         mEnabled[i].store(n.enabled[i], std::memory_order_relaxed);
+      }
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
    }
 
-   int LastNoteOut() const { return mLastNoteOut.load(std::memory_order_relaxed); }
+   int LastStackSize() const { return mLastStackSize.load(std::memory_order_relaxed); }
 
 private:
+   struct StackVoice
+   {
+      int8_t extraCount = 0;
+      int8_t extraNote[kVoices] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+      int extraVoiceId[kVoices] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+   };
+
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   VoiceIdMap<StackVoice, 128> mVoiceState;
 
-   std::atomic<int> mScale { 0 };
-   std::atomic<int> mRoot { 0 };
-   std::atomic<int> mLastNoteOut { -1 };
+   std::atomic<int> mSemitones[kVoices] = {};
+   std::atomic<bool> mEnabled[kVoices] = {};
+   std::atomic<bool> mUseGlobalScale { false };
+   std::atomic<int> mLastStackSize { 0 };
 };
 
-ScaleNotesNode::ScaleNotesNode() = default;
-ScaleNotesNode::~ScaleNotesNode() = default;
+NoteStackNode::NoteStackNode() = default;
+NoteStackNode::~NoteStackNode() = default;
 
-void ScaleNotesNode::CookIfNeeded(int frameId)
+void NoteStackNode::CookIfNeeded(int frameId)
 {
    if (frameId == mLastCookFrame)
       return;
    mLastCookFrame = frameId;
    if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioScaleNotesNode>();
+      mAudioNode = std::make_unique<AudioNoteStackNode>();
    mAudioNode->PushParams(*this);
 }
 
-void ScaleNotesNode::VisitParams(ParamVisitor& v)
+void NoteStackNode::VisitParams(ParamVisitor& v)
 {
-   v.Int("scale", scale);
-   v.Int("root", root);
+   char key[24];
+   for (int i = 0; i < kVoices; i++)
+   {
+      snprintf(key, sizeof(key), "semi%d", i);
+      v.Int(key, semitones[i]);
+      snprintf(key, sizeof(key), "enabled%d", i);
+      v.Bool(key, enabled[i]);
+   }
+   v.Bool("useGlobalScale", useGlobalScale);
 }
 
-AudioNode* ScaleNotesNode::GetAudioNode()
+AudioNode* NoteStackNode::GetAudioNode()
 {
    if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioScaleNotesNode>();
+      mAudioNode = std::make_unique<AudioNoteStackNode>();
    return mAudioNode.get();
 }
 
-int ScaleNotesNode::LastNoteOut() const
+int NoteStackNode::LastStackSize() const
 {
-   return mAudioNode ? mAudioNode->LastNoteOut() : -1;
+   return mAudioNode ? mAudioNode->LastStackSize() : 0;
+}
+
+// ---------------------------------------------------------------- Note Strum
+class AudioStrumNode : public AudioNode
+{
+public:
+   struct DelayedEvent
+   {
+      NoteEvent evt;
+      int64_t targetSample = 0;
+   };
+
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
+      mCurrentSample = 0;
+      mDelayedCount = 0;
+      mAppliedDelayPerVoice.Clear();
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
+   {
+      const int numFrames = output.numFrames;
+      const double sampleRate = mSampleRate > 0.0 ? mSampleRate : 44100.0;
+      const float strumMs = std::max(0.0f, mStrumMs.load(std::memory_order_relaxed));
+      const double strumFrames = (double)strumMs * 0.001 * sampleRate;
+
+      const int64_t blockStartSample = mCurrentSample;
+      const int64_t blockEndSample = blockStartSample + numFrames;
+
+      NoteEvent inEvents[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(inEvents, 64) : 0;
+
+      NoteEvent noteOns[64];
+      int numNoteOns = 0;
+      NoteEvent others[64];
+      int numOthers = 0;
+
+      for (int i = 0; i < n; i++)
+      {
+         if (inEvents[i].isNoteOn)
+         {
+            if (numNoteOns < 64)
+               noteOns[numNoteOns++] = inEvents[i];
+         }
+         else
+         {
+            if (numOthers < 64)
+               others[numOthers++] = inEvents[i];
+         }
+      }
+
+      if (numNoteOns > 0)
+         mLastStrumCount.store(numNoteOns, std::memory_order_relaxed);
+
+      std::sort(noteOns, noteOns + numNoteOns, [](const NoteEvent& a, const NoteEvent& b) {
+         return a.note < b.note;
+      });
+
+      for (int i = 0; i < numNoteOns; i++)
+      {
+         const int64_t delayOffset = (int64_t)std::round((double)i * strumFrames);
+         mAppliedDelayPerVoice.GetOrInsert(noteOns[i].voiceId) = delayOffset;
+
+         const int64_t targetSample = blockStartSample + noteOns[i].frameOffset + delayOffset;
+         if (targetSample < blockEndSample)
+         {
+            NoteEvent out = noteOns[i];
+            out.frameOffset = (int)std::clamp(targetSample - blockStartSample, (int64_t)0, (int64_t)(numFrames - 1));
+            out.source = this;
+            mOutbox.Push(out);
+         }
+         else
+         {
+            if (mDelayedCount < kMaxDelayed)
+            {
+               mDelayed[mDelayedCount++] = { noteOns[i], targetSample };
+            }
+         }
+      }
+
+      for (int i = 0; i < numOthers; i++)
+      {
+         int64_t delayOffset = 0;
+         if (int64_t* d = mAppliedDelayPerVoice.Find(others[i].voiceId))
+         {
+            delayOffset = *d;
+            if (!others[i].bendUpdate)
+               mAppliedDelayPerVoice.Erase(others[i].voiceId);
+         }
+
+         const int64_t targetSample = blockStartSample + others[i].frameOffset + delayOffset;
+         if (targetSample < blockEndSample)
+         {
+            NoteEvent out = others[i];
+            out.frameOffset = (int)std::clamp(targetSample - blockStartSample, (int64_t)0, (int64_t)(numFrames - 1));
+            out.source = this;
+            mOutbox.Push(out);
+         }
+         else
+         {
+            if (mDelayedCount < kMaxDelayed)
+            {
+               mDelayed[mDelayedCount++] = { others[i], targetSample };
+            }
+         }
+      }
+
+      int writeIdx = 0;
+      for (int i = 0; i < mDelayedCount; i++)
+      {
+         if (mDelayed[i].targetSample < blockEndSample)
+         {
+            NoteEvent out = mDelayed[i].evt;
+            out.frameOffset = (int)std::clamp(mDelayed[i].targetSample - blockStartSample, (int64_t)0, (int64_t)(numFrames - 1));
+            out.source = this;
+            mOutbox.Push(out);
+         }
+         else
+         {
+            mDelayed[writeIdx++] = mDelayed[i];
+         }
+      }
+      mDelayedCount = writeIdx;
+
+      mCurrentSample += numFrames;
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+
+   void PushParams(const NoteStrumNode& n)
+   {
+      mStrumMs.store(n.strumMs, std::memory_order_relaxed);
+   }
+
+   int LastStrumCount() const { return mLastStrumCount.load(std::memory_order_relaxed); }
+
+private:
+   static constexpr int kMaxDelayed = 128;
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox = nullptr;
+   double mSampleRate = 44100.0;
+   int64_t mCurrentSample = 0;
+
+   DelayedEvent mDelayed[kMaxDelayed];
+   int mDelayedCount = 0;
+   VoiceIdMap<int64_t, 128> mAppliedDelayPerVoice;
+
+   std::atomic<float> mStrumMs { 25.0f };
+   std::atomic<int> mLastStrumCount { 0 };
+};
+
+NoteStrumNode::NoteStrumNode() = default;
+NoteStrumNode::~NoteStrumNode() = default;
+
+void NoteStrumNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioStrumNode>();
+   mAudioNode->PushParams(*this);
+}
+
+void NoteStrumNode::VisitParams(ParamVisitor& v)
+{
+   v.Float("strumMs", strumMs);
+}
+
+AudioNode* NoteStrumNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioStrumNode>();
+   return mAudioNode.get();
+}
+
+int NoteStrumNode::LastStrumCount() const
+{
+   return mAudioNode ? mAudioNode->LastStrumCount() : 0;
 }
 
 // -------------------------------------------------------------- Note Capturer
@@ -3860,7 +3703,13 @@ public:
          if (collided)
          {
             const int span = std::max(0, rangeHigh - rangeLow);
-            const int note = rangeLow + (int)((mRng.Next() * 0.5f + 0.5f) * (float)(span + 1));
+            int rawNote = rangeLow + (int)((mRng.Next() * 0.5f + 0.5f) * (float)(span + 1));
+            const bool useGlobal = mUseGlobalScale.load(std::memory_order_relaxed);
+            const int scale = useGlobal ? Transport::Instance().Scale() : mScale.load(std::memory_order_relaxed);
+            const int root = useGlobal ? Transport::Instance().Key() : mRoot.load(std::memory_order_relaxed);
+            int note = MusicTime::SnapToScale(rawNote, root, scale, MusicTime::kSnapNearest);
+            note = std::clamp(note, rangeLow, rangeHigh);
+
             const int noteVoiceId = NextVoiceId();
             if (Pending* on = FreeSlot())
             {
@@ -3927,6 +3776,9 @@ public:
       mBallSpeed.store(n.ballSpeed, std::memory_order_relaxed);
       mRangeLow.store(n.rangeLow, std::memory_order_relaxed);
       mRangeHigh.store(n.rangeHigh, std::memory_order_relaxed);
+      mScale.store(n.scale, std::memory_order_relaxed);
+      mRoot.store(n.root, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
    }
 
    int BallPositions(float outX[BouncingBallsNode::kMaxBalls], float outY[BouncingBallsNode::kMaxBalls],
@@ -3983,6 +3835,9 @@ private:
    std::atomic<float> mBallSpeed { 0.6f };
    std::atomic<int> mRangeLow { 48 };
    std::atomic<int> mRangeHigh { 84 };
+   std::atomic<int> mScale { 0 };
+   std::atomic<int> mRoot { 0 };
+   std::atomic<bool> mUseGlobalScale { true };
 };
 
 BouncingBallsNode::BouncingBallsNode() = default;
@@ -4006,6 +3861,9 @@ void BouncingBallsNode::VisitParams(ParamVisitor& v)
    v.Float("ballSpeed", ballSpeed);
    v.Int("rangeLow", rangeLow);
    v.Int("rangeHigh", rangeHigh);
+   v.Int("scale", scale);
+   v.Int("root", root);
+   v.Bool("useGlobalScale", useGlobalScale);
 }
 
 AudioNode* BouncingBallsNode::GetAudioNode()

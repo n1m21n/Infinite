@@ -12,10 +12,8 @@
 // AudioNode-derived class that runs on the real-time thread, talked to only
 // through param pushes - CookIfNeeded does no DSP.
 class AudioMidiNotesNode;
-class AudioEnvelopeNode;
 class AudioNoteToCVNode;
 class AudioNoteFilterNode;
-class AudioNoteModifyNode;
 class AudioSemitoneShiftNode;
 class AudioPitchBendNode;
 class AudioVelocityCurveNode;
@@ -31,7 +29,8 @@ class AudioRandomNoteGeneratorNode;
 class AudioChorderNode;
 class AudioNoteCapturerNode;
 class AudioBouncingBallsNode;
-class AudioScaleNotesNode;
+class AudioStrumNode;
+class AudioNoteStackNode;
 
 // The system's note source: live MIDI in, turned into NoteEvents on the note
 // cable. Replaces the P3a Note Sequencer, whose fixed one-pitch step grid was
@@ -74,6 +73,7 @@ public:
    int channel = -1;             // -1 = omni, else 0-15
    int transpose = 0;            // semitones applied to every incoming note
    float velocityScale = 1.0f;   // 0..2, applied before the note leaves this node
+   bool useGlobalScale = false;  // snap incoming notes to Transport's key/scale
 
    // Main-thread view of what is currently held, for the inline keyboard.
    // Published by the audio thread as two atomics rather than 128 flags.
@@ -86,59 +86,12 @@ private:
    int mLastCookFrame = -1;
 };
 
-// A note consumer whose output is a modulator value, not an audio buffer -
-// see docs/plans/audio/audio-graph-semantics.md §6. Built on the existing
-// Envelope class (src/audio/AudioVoice.h), unchanged - this node just wires
-// note events into NoteOn()/NoteOff() and publishes Process()'s per-block
-// result for Value01() to read.
-class EnvelopeNode : public INode, public IModulator
-{
-public:
-   static INode* Create() { return new EnvelopeNode(); }
-   EnvelopeNode();
-   ~EnvelopeNode() override;
-
-   unsigned int GetOutputTexture() override { return 0; }
-   int GetOutputWidth() const override { return 0; }
-   int GetOutputHeight() const override { return 0; }
-   void CookIfNeeded(int frameId) override;
-   void VisitParams(ParamVisitor& v) override;
-
-   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
-   AudioNode* AudioNodeForNotePorts() override;
-
-   // IModulator - reads the audio-thread-published current envelope level.
-   float Value01() override;
-
-   enum Trigger { kTriggerNote = 0, kTriggerPulse };
-
-   float attackMs = 10.0f;
-   float decayMs = 200.0f;
-   float sustainLevel = 0.6f;
-   float releaseMs = 400.0f;
-   // kTriggerNote (default): unchanged, driven by incoming note events.
-   // kTriggerPulse: free-runs off the transport - no note input needed - by
-   // re-firing NoteOn/NoteOff itself every `rateDiv` beats, gated to `gatePct`
-   // of that period, so the node can drive a synth param on its own clock
-   // rather than needing something wired into its note input first.
-   int trigger = kTriggerNote;
-   int rateDiv = 6; // index into MusicTime::RateDivisionList - MusicTime::kQuarter
-   float gatePct = 0.5f; // 0..1, fraction of the pulse period held high
-   NoteCable noteInput;
-
-private:
-   std::unique_ptr<AudioEnvelopeNode> mAudioNode;
-   int mLastCookFrame = -1;
-};
-
 // Note pitch -> normalized modulation value, so a note stream can drive a
-// synth param (cutoff, warp, pan, ...) the same way an LFO or Envelope does,
-// the same "note consumer whose output is a modulator value" shape as
-// EnvelopeNode above. Unlike Envelope, this doesn't gate on note-on/off -
-// it's a pitch tracker, not an amplitude stage - so the CV holds the last
-// played note's pitch rather than falling back toward 0 on release; that's
-// the useful behaviour for "modulate a filter by which note is playing".
+// synth param (cutoff, warp, pan, ...) the same way an LFO does. Unlike
+// Envelope (ModulatorNodes.h), this doesn't gate on note-on/off - it's a
+// pitch tracker, not an amplitude stage - so the CV holds the last played
+// note's pitch rather than falling back toward 0 on release; that's the
+// useful behaviour for "modulate a filter by which note is playing".
 class NoteToCVNode : public INode, public IModulator
 {
 public:
@@ -202,6 +155,7 @@ public:
    int rangeLow = 0;
    int rangeHigh = 127;
    float chance = 100.0f; // percent
+   bool useGlobalScale = false;
    NoteCable noteInput;
 
    // Main-thread readout for the visualizer - last note this node was asked
@@ -214,61 +168,11 @@ private:
    int mLastCookFrame = -1;
 };
 
-// Changes an attribute of a note in flight: transpose, velocity curve,
-// timing/velocity humanise, and an optional fixed gate-length override -
-// README.md §3's "biggest single win" consolidation (transposing, note
-// duration, velocity expressions, note expressions all fold into one node).
-// Pan is not included: NoteEvent (audio/NoteEvent.h) carries no per-note pan
-// field, and adding one to route through every note consumer is a much
-// bigger change than this node needs.
-//
-// gateHoldMs == 0 passes note-off through unchanged (default). > 0 ignores
-// the real note-off and instead schedules an internal one that many ms after
-// the note-on - this is also "note duration": a plucked/staccato patch is
-// gateHoldMs with a short value, a pad that ignores host note length is a
-// long one.
-class NoteModifyNode : public INode, public INoteSource
-{
-public:
-   static INode* Create() { return new NoteModifyNode(); }
-   NoteModifyNode();
-   ~NoteModifyNode() override;
-
-   unsigned int GetOutputTexture() override { return 0; }
-   int GetOutputWidth() const override { return 0; }
-   int GetOutputHeight() const override { return 0; }
-   void CookIfNeeded(int frameId) override;
-   void VisitParams(ParamVisitor& v) override;
-
-   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
-   AudioNode* GetAudioNode() override;
-
-   int transposeSemi = 0;          // -48..48, folds in "octave" (dial by 12s)
-   int pitchSemi = 0;               // -24..24, a second additive transpose (fine pitch offset)
-   float velocityCurve = 1.0f;     // 0.25..4, exponent; 1 = linear/unchanged
-   float humanizeTimingMs = 0.0f;  // 0..100, random jitter on note-on timing
-   float humanizeVelocity = 0.0f;  // 0..100 percent, random jitter on velocity
-   float gateHoldMs = 0.0f;        // 0..3000, 0 = passthrough note-off
-   int quantizeDiv = 0;             // 0 = off, else index into kQuantizeDivisions (see .cpp)
-   float glideMs = 0.0f;            // 0..2000, portamento time applied to LastNoteOut() readout consumers
-   NoteCable noteInput;
-
-   // Main-thread readout for the visualizer.
-   int LastNoteOut() const;
-   float LastVelocityOut() const;
-
-private:
-   std::unique_ptr<AudioNoteModifyNode> mAudioNode;
-   int mLastCookFrame = -1;
-};
-
 // ---------------------------------------------------------------------------
-// The eight single-purpose nodes below replace Note Modify's fused control
-// surface with one node per concern - each small enough to be one or two
-// knobs, standing in a chain wherever only one of these was ever needed.
-// Note Modify itself is untouched (existing patches keep working); these are
-// the new, composable alternative for new patches.
+// The eight nodes below are the note-modification surface: transpose,
+// velocity curve, timing/velocity humanise, gate, quantize, glide, and pitch
+// bend, one concern per node - each small enough to be one or two knobs,
+// standing in a chain wherever only one of these is needed.
 
 // A single semitone offset applied to every note that passes through,
 // applied at note-on and remembered per input voice so the matching note-off
@@ -297,6 +201,7 @@ public:
    AudioNode* GetAudioNode() override;
 
    int semitones = 0; // -48..48
+   bool useGlobalScale = false; // snap transposed output to global scale
    NoteCable noteInput;
 
    int LastNoteOut() const;
@@ -517,8 +422,9 @@ public:
 };
 
 // Generates new notes over time from an incoming one - genuinely distinct
-// from Note Modify (README.md §3), which only ever edits an event that's
-// already there. Every incoming event (on and off alike) is echoed `repeats`
+// from the single-purpose editors above (Note Transpose, Velocity Curve, and
+// the rest), which only ever edit an event that's already there. Every
+// incoming event (on and off alike) is echoed `repeats`
 // times, each `delayMs` further apart, with velocity decaying and pitch
 // optionally shifting per repeat. The original event always passes through
 // unchanged first (repeat 0); this is a dry+wet echo, not a bypassable one -
@@ -561,7 +467,7 @@ private:
 // A note-on's routed destination(s) are remembered per input note number so
 // its matching note-off always replays to the same output(s), regardless of
 // mode changes or RNG state in between - the same stuck-note guard Note
-// Filter and Note Modify already use.
+// Filter and Note Transpose already use.
 class NoteRouterNode : public INode, public INoteSource
 {
 public:
@@ -633,6 +539,7 @@ public:
    float rateSeconds = 0.2f; // seconds per step, free mode
    float gatePercent = 80.0f; // 0..100, percent of the step the note stays on
    int stepGates = 0xFF;      // bit i = step i enabled; all on by default
+   bool useGlobalScale = false;
 
    // UI-only: which preset the dropdown last showed as selected. Not visited
    // by VisitParams - the preset is an action that writes the real params
@@ -680,6 +587,7 @@ public:
    float rateBeats = 0.25f;   // beats per step, synced mode
    float rateSeconds = 0.2f;  // seconds per step, free mode
    float gatePercent = 70.0f; // 0..100, percent of the step the note stays on
+   bool useGlobalScale = false;
 
    int stepNote[kMaxSteps];
    float stepVelocity[kMaxSteps];
@@ -724,6 +632,7 @@ public:
    float rateBeats = 0.25f;
    float rateSeconds = 0.2f;
    int maxStep = 4; // semitones, max wander per step
+   bool useGlobalScale = true; // follow Transport key/scale by default
 
    int LastNote() const; // main-thread readout for the visualizer
 
@@ -761,6 +670,7 @@ public:
    float humanizeTimingMs = 10.0f;
    float humanizeVelocity = 15.0f;
    float upperHarmonics = 20.0f; // 0..100 percent chance of an extra note an octave above
+   bool useGlobalScale = true; // follow Transport key/scale by default
 
    int LastChordSize() const; // main-thread readout for the visualizer
 
@@ -769,16 +679,21 @@ private:
    int mLastCookFrame = -1;
 };
 
-// Quantizes every incoming note's pitch to the nearest degree of a chosen
-// scale/root - a plain gate, no timing or velocity change at all. Distinct
-// from Note Filter (which also range-gates and chance-gates): this node
-// does one thing only, so it can sit inline in a chain without side effects.
-class ScaleNotesNode : public INode, public INoteSource
+// Layers up to eight transposed copies on top of every incoming note - input-
+// driven and key-agnostic, unlike Chorder above (a self-clocked generator).
+// The dry note always passes through unchanged; each of the eight voices is
+// an independent semitone offset with its own enable switch, added on top of
+// it, not instead of it. The set of voices actually sounding for a given
+// input note is captured at note-on and replayed verbatim at note-off, so
+// toggling a voice mid-note never stray-releases or strands a pitch.
+class NoteStackNode : public INode, public INoteSource
 {
 public:
-   static INode* Create() { return new ScaleNotesNode(); }
-   ScaleNotesNode();
-   ~ScaleNotesNode() override;
+   static constexpr int kVoices = 8;
+
+   static INode* Create() { return new NoteStackNode(); }
+   NoteStackNode();
+   ~NoteStackNode() override;
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
@@ -790,14 +705,45 @@ public:
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
    AudioNode* GetAudioNode() override;
 
-   int scale = 0; // MusicTime::kMajor
-   int root = 0;
+   int  semitones[kVoices] = { 12, 7, 5, 3, -3, -5, -7, -12 };
+   bool enabled[kVoices]   = { false, false, false, false, false, false, false, false };
+   bool useGlobalScale = false;
    NoteCable noteInput;
 
-   int LastNoteOut() const; // main-thread readout for the visualizer
+   int LastStackSize() const; // main-thread readout: notes emitted for the last note-on
 
 private:
-   std::unique_ptr<AudioScaleNotesNode> mAudioNode;
+   std::unique_ptr<AudioNoteStackNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// Single-knob note strumming processor: spreads simultaneous notes in a chord
+// across time by strumMs per voice (ascending pitch order), while preserving
+// original note gate lengths.
+class NoteStrumNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new NoteStrumNode(); }
+   NoteStrumNode();
+   ~NoteStrumNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* GetAudioNode() override;
+
+   float strumMs = 25.0f; // 0..200 ms
+   NoteCable noteInput;
+
+   int LastStrumCount() const;
+
+private:
+   std::unique_ptr<AudioStrumNode> mAudioNode;
    int mLastCookFrame = -1;
 };
 
@@ -889,6 +835,9 @@ public:
    float ballSpeed = 0.6f;  // 0.05..2.0, units/sec in that same normalized space
    int rangeLow = 48;
    int rangeHigh = 84;
+   int scale = 0;
+   int root = 0;
+   bool useGlobalScale = true;
 
    // Main-thread readouts for the visualizer: positions of the first
    // `numBalls` balls, normalized to the shape's -1..1 space, plus a
