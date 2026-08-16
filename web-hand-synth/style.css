@@ -1,0 +1,283 @@
+/* ===================================================================
+   INFINITE THERMAL HAND-SYNTH — MINIMAL RIGHT-PANEL STYLESHEET
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+    --bg-base: #000000;
+    --panel-bg: rgba(12, 15, 22, 0.96);
+    --panel-border: rgba(255, 255, 255, 0.08);
+    --btn-bg: rgba(255, 255, 255, 0.04);
+    --btn-bg-hover: rgba(255, 255, 255, 0.08);
+    --btn-border: rgba(255, 255, 255, 0.07);
+    --accent: #00ffcc;
+    --accent-glow: rgba(0, 255, 204, 0.25);
+    --text-main: #f1f5f9;
+    --text-dim: #94a3b8;
+    --text-muted: #64748b;
+    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background-color: var(--bg-base);
+    color: var(--text-main);
+    font-family: var(--font-ui);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Main Two-Column Layout */
+.app-container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Left: Full Canvas Stage */
+.canvas-stage {
+    flex: 1;
+    height: 100vh;
+    position: relative;
+    background: #000;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#main-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    cursor: crosshair;
+}
+
+/* Right: Minimal Sleek Control Panel */
+.right-panel {
+    width: 250px;
+    height: 100vh;
+    background: var(--panel-bg);
+    border-left: 1px solid var(--panel-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 14px;
+    gap: 14px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    z-index: 20;
+}
+
+/* Minimal Brand / Title Header */
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.panel-title {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.panel-title::before {
+    content: '∞';
+    color: var(--accent);
+    font-size: 14px;
+}
+
+.status-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #64748b;
+}
+
+.status-dot.active {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+}
+
+/* Section Containers */
+.panel-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* Heatmap Palette Vertical List */
+.palette-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.palette-item {
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    color: var(--text-dim);
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.palette-item:hover {
+    background: var(--btn-bg-hover);
+    color: var(--text-main);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.palette-item.active {
+    background: rgba(0, 255, 204, 0.12);
+    border-color: var(--accent);
+    color: #ffffff;
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.palette-left {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.color-strip {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.strip-ironbow { background: linear-gradient(135deg, #100030, #ff2040, #ffea00, #ffffff); }
+.strip-magma { background: linear-gradient(135deg, #000004, #b63679, #fb8861, #fefbb0); }
+.strip-cyberpunk { background: linear-gradient(135deg, #0a0020, #ff007f, #00f0ff, #ffffff); }
+.strip-turbo { background: linear-gradient(135deg, #30123b, #1be58b, #fbb938, #7a0403); }
+.strip-inferno { background: linear-gradient(135deg, #000004, #bb372f, #f3a02c, #fcffa4); }
+.strip-viridis { background: linear-gradient(135deg, #440154, #31688e, #35b779, #fde725); }
+.strip-acid { background: linear-gradient(135deg, #001005, #008040, #00ff73, #e0ffe0); }
+.strip-ice_fire { background: linear-gradient(135deg, #002070, #00d0ff, #ffffff, #ff2000); }
+
+.key-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+/* Engine Action Buttons */
+.action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.btn-action {
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    color: var(--text-main);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+}
+
+.btn-action:hover {
+    background: var(--btn-bg-hover);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-action.active {
+    background: rgba(0, 255, 204, 0.18);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.btn-full {
+    grid-column: span 2;
+}
+
+/* Minimal Footer Shortcuts */
+.panel-footer {
+    margin-top: auto;
+    padding-top: 10px;
+    border-top: 1px solid var(--panel-border);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.footer-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.footer-row span:last-child {
+    color: var(--text-dim);
+}
+
+/* Scrollbar customization */
+.right-panel::-webkit-scrollbar {
+    width: 4px;
+}
+
+.right-panel::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+}

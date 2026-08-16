@@ -1895,13 +1895,14 @@ public:
 
       // Fire a previously-scheduled gate-off before considering a new step,
       // so two output notes are never sounding at once.
-      if (mPendingOffActive && mPendingOffSample >= mSamplePos && mPendingOffSample < mSamplePos + (uint64_t)numFrames)
+      if (mPendingOffActive && mPendingOffSample < mSamplePos + (uint64_t)numFrames)
       {
          NoteEvent off;
          off.note = mCurrentOutNote;
          off.velocity = 0.0f;
          off.isNoteOn = false;
-         off.frameOffset = (int)(mPendingOffSample - mSamplePos);
+         const int offset = (mPendingOffSample > mSamplePos) ? (int)(mPendingOffSample - mSamplePos) : 0;
+         off.frameOffset = std::clamp(offset, 0, numFrames - 1);
          off.source = this;
          off.voiceId = mCurrentOutVoiceId;
          mOutbox.Push(off);
@@ -2345,13 +2346,14 @@ public:
       const double bpm = (double)Transport::Instance().Tempo();
       const double rateBeats = std::max(0.001, rateMode == 1 ? (double)rateSecondsP * bpm / 60.0 : (double)rateBeatsP);
 
-      if (mPendingOffActive && mPendingOffSample >= mSamplePos && mPendingOffSample < mSamplePos + (uint64_t)numFrames)
+      if (mPendingOffActive && mPendingOffSample < mSamplePos + (uint64_t)numFrames)
       {
          NoteEvent off;
          off.note = mCurrentOutNote;
          off.velocity = 0.0f;
          off.isNoteOn = false;
-         off.frameOffset = (int)(mPendingOffSample - mSamplePos);
+         const int offset = (mPendingOffSample > mSamplePos) ? (int)(mPendingOffSample - mSamplePos) : 0;
+         off.frameOffset = std::clamp(offset, 0, numFrames - 1);
          off.source = this;
          off.voiceId = mCurrentOutVoiceId;
          mOutbox.Push(off);
@@ -2534,13 +2536,14 @@ public:
       const double bpm = (double)Transport::Instance().Tempo();
       const double rateBeats = std::max(0.001, rateMode == 1 ? (double)rateSecondsP * bpm / 60.0 : (double)rateBeatsP);
 
-      if (mPendingOffActive && mPendingOffSample >= mSamplePos && mPendingOffSample < mSamplePos + (uint64_t)numFrames)
+      if (mPendingOffActive && mPendingOffSample < mSamplePos + (uint64_t)numFrames)
       {
          NoteEvent off;
          off.note = mCurrentOutNote;
          off.velocity = 0.0f;
          off.isNoteOn = false;
-         off.frameOffset = (int)(mPendingOffSample - mSamplePos);
+         const int offset = (mPendingOffSample > mSamplePos) ? (int)(mPendingOffSample - mSamplePos) : 0;
+         off.frameOffset = std::clamp(offset, 0, numFrames - 1);
          off.source = this;
          off.voiceId = mCurrentOutVoiceId;
          mOutbox.Push(off);

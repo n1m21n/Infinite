@@ -26,9 +26,10 @@ public:
 
    struct Entry
    {
-      std::string path;       // full path, used to load/drag
-      std::string fileName;   // display name
-      std::string folderRoot; // which added folder this came from
+      std::string path;          // full path, used to load/drag
+      std::string fileName;      // display name
+      std::string fileNameLower; // lowercased display name for fast filter matching
+      std::string folderRoot;    // which added folder this came from
    };
 
    explicit SampleScanner(Kind kind = Kind::Audio);
@@ -53,6 +54,7 @@ public:
    void PollResults();
 
    const std::vector<Entry>& Index() const { return mIndex; }
+   uint64_t IndexVersion() const { return mIndexVersion; }
 
    // Disk persistence, mirroring Patch.cpp's RecentsPath/settings-dir
    // pattern but serialized with crude_json (already vendored for
@@ -69,6 +71,7 @@ private:
    Kind mKind;
    std::vector<std::string> mFolders;
    std::vector<Entry> mIndex;
+   uint64_t mIndexVersion { 1 };
 
    // Which folders the in-flight (or just-finished) scan covers - main
    // thread only, set in StartScan and read back in PollResults to know

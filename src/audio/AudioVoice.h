@@ -17,9 +17,9 @@ public:
 
    void SetADSR(float attackMs, float decayMs, float sustainLevel, float releaseMs)
    {
-      mAttackInc = SegmentInc(attackMs);
-      mDecayInc = SegmentInc(decayMs);
       mSustainLevel = sustainLevel < 0.0f ? 0.0f : (sustainLevel > 1.0f ? 1.0f : sustainLevel);
+      mAttackInc = SegmentInc(attackMs);
+      mDecayInc = SegmentInc(decayMs, 1.0f - mSustainLevel);
       mReleaseMs = releaseMs;
    }
 

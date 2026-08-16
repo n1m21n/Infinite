@@ -77,6 +77,7 @@ public:
    void StartRecording();
    void StopRecording();
    bool IsRecording() const { return mRecording; }
+   bool RequiresAudioProcessing() const override { return IsRecording(); }
 
    void Seek(float frac);
    bool IsPlaying() const { return mIsPlaying; }

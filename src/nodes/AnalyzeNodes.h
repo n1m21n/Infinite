@@ -9,30 +9,68 @@
 #include "Platform.h"
 
 // --- Image Analyze ------------------------------------------------------
-// Reduces an image to control values, which closes the loop in the graph:
-// until now data only flowed modulators -> images, so a video could not drive
-// a blur. This makes an image a legitimate modulation source.
-//
-// Reading pixels back off the GPU stalls the pipeline, so the readback is done
-// at a reduced resolution and rate-limited rather than every frame.
+// Reduces an image or video to control values and modulation channels.
+// Provides 4 sampling modes (Global average, Point probe, ROI box, Center weighted),
+// 22 mathematical/color operations and custom algebraic formulas via Expression::Evaluate,
+// and outputs multiple modulation signals for driving parameters across Infinite.
 class ImageAnalyzeNode : public INode
 {
 public:
    enum Output
    {
-      kBrightness = 0,
+      kResult = 0,
+      kBrightness,
       kContrast,
       kRed,
       kGreen,
       kBlue,
       kSaturation,
+      kHue,
       kMotion,
       kCentroidX,
       kCentroidY,
       kOutputCount
    };
 
+   enum SampleMode
+   {
+      kGlobalAverage = 0,
+      kPointProbe,
+      kBoxRegion,
+      kCenterWeighted,
+      kSampleModeCount
+   };
+
+   enum MathOp
+   {
+      kCustomExpression = 0,
+      kRedOp,
+      kGreenOp,
+      kBlueOp,
+      kAlphaOp,
+      kLuminanceOp,
+      kAverageOp,
+      kSumOp,
+      kProductOp,
+      kMaxOp,
+      kMinOp,
+      kRangeOp,
+      kRMinusG,
+      kRMinusB,
+      kGMinusB,
+      kAbsRMinusG,
+      kAbsRMinusB,
+      kAbsGMinusB,
+      kSaturationOp,
+      kHueOp,
+      kEuclideanNorm,
+      kDeltaMotion,
+      kMathOpCount
+   };
+
    static INode* Create() { return new ImageAnalyzeNode(); }
+   static const std::vector<std::string>& SampleModeNames();
+   static const std::vector<std::string>& MathOpNames();
 
    ImageAnalyzeNode();
    ~ImageAnalyzeNode() override;
@@ -49,15 +87,50 @@ public:
    ImageCable& Input() { return mInput; }
    float Value(int index) const;
 
-   float smoothing = 0.35f;
+   float RawR() const { return mRawR; }
+   float RawG() const { return mRawG; }
+   float RawB() const { return mRawB; }
+   float RawA() const { return mRawA; }
+   float RawLum() const { return mRawLum; }
+   float RawDelta() const { return mRawDelta; }
+
+   const std::string& ExpressionError() const { return mExprError; }
+
+   // Configuration & parameters
+   int sampleMode = kGlobalAverage;
+   float probeU = 0.5f;
+   float probeV = 0.5f;
+   float probeRadius = 0.1f;
+
+   int mathOp = kLuminanceOp;
+   std::string customFormula = "r * 0.5 + g * 0.5";
+
    float gain = 1.0f;
+   float offset = 0.0f;
+   float power = 1.0f;
+   bool invert = false;
+   bool clamp01 = true;
+
+   float smoothing = 0.35f;
    float sampleRate = 30.0f; // readbacks per second
    int sampleSize = 64;      // readback resolution
 
    void VisitParams(ParamVisitor& v) override
    {
-      v.Float("smoothing", smoothing); v.Float("gain", gain);
-      v.Float("sampleRate", sampleRate); v.Int("sampleSize", sampleSize);
+      v.Int("sampleMode", sampleMode);
+      v.Float("probeU", probeU);
+      v.Float("probeV", probeV);
+      v.Float("probeRadius", probeRadius);
+      v.Int("mathOp", mathOp);
+      v.Text("customFormula", customFormula);
+      v.Float("gain", gain);
+      v.Float("offset", offset);
+      v.Float("power", power);
+      v.Bool("invert", invert);
+      v.Bool("clamp01", clamp01);
+      v.Float("smoothing", smoothing);
+      v.Float("sampleRate", sampleRate);
+      v.Int("sampleSize", sampleSize);
    }
 
 private:
@@ -69,10 +142,21 @@ private:
    };
 
    void Analyze();
+   float ComputeMathResult(float r, float g, float b, float a, float lum, float delta);
 
    ImageCable mInput;
    Tap mTaps[kOutputCount];
    float mValues[kOutputCount] = { 0 };
+
+   float mRawR = 0.0f;
+   float mRawG = 0.0f;
+   float mRawB = 0.0f;
+   float mRawA = 1.0f;
+   float mRawLum = 0.0f;
+   float mRawDelta = 0.0f;
+
+   std::string mExprError;
+
    std::vector<unsigned char> mPixels;
    std::vector<unsigned char> mPrevPixels;
    unsigned int mSmallFbo = 0;

@@ -8,6 +8,24 @@
 #include "audio/AudioEngine.h"
 #include "audio/AudioNode.h"
 
+namespace
+{
+   // 0xB0 7B/78 - All Notes Off / All Sound Off, channel 0 (every event this
+   // bridge sends is channel 0 - see the pitch-bend comment below on why MPE
+   // was not adopted). Fire-and-forget: safe to call from either thread, since
+   // AUScheduleMIDIEventBlock is documented real-time-safe from any thread,
+   // not just the render thread.
+   void FlushPluginNotes(Platform::PluginHandle* handle)
+   {
+      if (handle == nullptr)
+         return;
+      const unsigned char allNotesOff[3] = { 0xB0, 0x7B, 0x00 };
+      const unsigned char allSoundOff[3] = { 0xB0, 0x78, 0x00 };
+      Platform::PluginScheduleMIDIEvent(handle, 0, allNotesOff, 3);
+      Platform::PluginScheduleMIDIEvent(handle, 0, allSoundOff, 3);
+   }
+}
+
 // ---------------------------------------------------------------- audio half
 //
 // Deliberately tiny. Read the atomic handle once, then either pass audio
@@ -32,30 +50,59 @@ public:
    {
       const AudioBuffer* in = (numInputs > 0) ? inputs[0] : nullptr;
       Platform::PluginHandle* handle = mHandle.load(std::memory_order_acquire);
+      const bool bypassed = mBypass.load(std::memory_order_relaxed);
 
-      if (handle == nullptr || mBypass.load(std::memory_order_relaxed))
+      // A fresh handle (new plugin published, or handle gone to nullptr) means
+      // whatever voice/bend-range state was tracked against the previous one
+      // is meaningless - and, for a live handle, the plugin's own pitch-bend
+      // range is unknown until we widen it. See SendPitchBend's comment on why
+      // this widening is unverified against a real instrument AU.
+      if (handle != mLastSeenHandle)
       {
-         PassThrough(in, output);
-         return;
+         mActiveVoiceCount = 0;
+         mLastStartedVoiceId = 0;
+         mWasBypassed = false;
+         if (handle != nullptr)
+            SendPitchBendRangeRpn(handle);
+         mLastSeenHandle = handle;
       }
+
+      // Bypass never touches the handle, so a voice held at the moment of the
+      // toggle would otherwise sustain in the plugin for as long as bypass
+      // stays on - flush on the rising edge only, once, not every block.
+      if (bypassed && !mWasBypassed && handle != nullptr)
+      {
+         FlushPluginNotes(handle);
+         mActiveVoiceCount = 0;
+         mLastStartedVoiceId = 0;
+      }
+      mWasBypassed = bypassed;
 
       // Notes go through the note queue, not ParamMailbox - see the class
       // comment's mapped-params exception, which is unrelated to this. Drained
-      // before the render call so every event lands in the same block its
-      // frameOffset was scheduled against.
+      // unconditionally, even with no handle or while bypassed: the producer
+      // keeps pushing regardless, and NoteEventQueue's overflow policy
+      // force-overwrites real events once the ring fills (see
+      // NoteEventQueue.h) - so leaving this undrained for as long as a plugin
+      // takes to load, or stays bypassed, corrupts the queue and dumps a
+      // stuck-note backlog into the very next live block.
       if (mNoteInbox != nullptr)
       {
+         const bool deliver = (handle != nullptr && !bypassed);
          NoteEvent evts[64];
-         const int numEvts = mNoteInbox->Pop(evts, 64);
-         for (int i = 0; i < numEvts; i++)
+         int numEvts = 0;
+         while ((numEvts = mNoteInbox->Pop(evts, 64)) > 0)
          {
-            const unsigned char status = (unsigned char)((evts[i].isNoteOn ? 0x90 : 0x80));
-            const unsigned char note = (unsigned char)std::clamp(evts[i].note, 0, 127);
-            const unsigned char velocity =
-               (unsigned char)std::clamp((int)std::lround(evts[i].velocity * 127.0f), 0, 127);
-            const unsigned char bytes[3] = { status, note, velocity };
-            Platform::PluginScheduleMIDIEvent(handle, evts[i].frameOffset, bytes, 3);
+            if (deliver)
+               for (int i = 0; i < numEvts; i++)
+                  DeliverNoteEvent(handle, evts[i], output.numFrames);
          }
+      }
+
+      if (handle == nullptr || bypassed)
+      {
+         PassThrough(in, output);
+         return;
       }
 
       const float* inChannels[kAudioMaxChannels] = {};
@@ -73,13 +120,36 @@ public:
 
    // Deliberately no Reset() override: AudioNode::Reset means "clear DSP
    // state", and dropping the published plugin handle there would silently
-   // unload the plugin. The plugin's own state is the plugin's business.
+   // unload the plugin. The plugin's own state is the plugin's business. (If
+   // a Reset() override is ever added, it must flush notes exactly like the
+   // sites above and must NOT touch mHandle - say so here again if you do.)
 
    // A note-consuming node's inbox, wired by RebuildAudioTopology's note pass
    // (main.cpp) - see AudioNode::SetNoteInbox's comment. nullptr (the
    // default) when the note pin is unconnected or this plugin doesn't accept
    // notes at all; ProcessBlock just skips the drain in that case.
-   void SetNoteInbox(NoteEventQueue* inbox) override { mNoteInbox = inbox; }
+   //
+   // A transition from a real inbox to nullptr means the note cable was just
+   // disconnected (or the graph is tearing this node's note input down) -
+   // whatever the old inbox's producer left held in the plugin would
+   // otherwise sustain forever, since nothing will ever deliver its note-off
+   // once the inbox pointer is gone. Flush here, the same way the bypass
+   // rising edge and the main-thread half's Unload/LoadPlugin/re-prepare sites
+   // do. Called from the main thread (RebuildAudioTopology), same as the
+   // plain pointer write to mNoteInbox already was before this change - no
+   // new synchronization requirement over what already existed here.
+   void SetNoteInbox(NoteEventQueue* inbox) override
+   {
+      if (inbox == nullptr && mNoteInbox != nullptr)
+      {
+         Platform::PluginHandle* handle = mHandle.load(std::memory_order_acquire);
+         if (handle != nullptr)
+            FlushPluginNotes(handle);
+         mActiveVoiceCount = 0;
+         mLastStartedVoiceId = 0;
+      }
+      mNoteInbox = inbox;
+   }
 
    // Main thread only.
    void SetHandle(Platform::PluginHandle* handle) { mHandle.store(handle, std::memory_order_release); }
@@ -88,6 +158,107 @@ public:
    int MaxBlockSize() const { return mMaxBlockSize.load(std::memory_order_relaxed); }
 
 private:
+   // NoteEvent's bend (NoteEvent.h) is per-voice; MIDI pitch bend (0xE0) is
+   // per-channel. Full correctness would need MPE (one channel per voice),
+   // but that requires the plugin to be switched into MPE mode, which is off
+   // by default in both Serum and Vital - silently wrong for anyone who
+   // hasn't enabled it. Rounding bend into the note number at note-on and
+   // dropping continuous updates was the other alternative, but that throws
+   // away the one feature bendSemitones exists for.
+   //
+   // So: channel-0 pitch bend reflecting whichever voice most recently
+   // started, only while exactly one voice is held; with two or more voices
+   // held, the wheel is pinned to centre rather than smearing one voice's
+   // bend across a chord. Correct for the mono lead/bass case bend is
+   // actually used for, honestly wrong-but-inaudible (centred, not smeared)
+   // everywhere else.
+   void DeliverNoteEvent(Platform::PluginHandle* handle, const NoteEvent& evt, int numFrames)
+   {
+      const int frameOffset = std::clamp(evt.frameOffset, 0, std::max(0, numFrames - 1));
+
+      if (evt.bendUpdate)
+      {
+         if (mActiveVoiceCount == 1 && evt.voiceId == mLastStartedVoiceId)
+            SendPitchBend(handle, evt.bendSemitones, frameOffset);
+         else
+            SendPitchBend(handle, 0.0f, frameOffset);
+         return;
+      }
+
+      const unsigned char note = (unsigned char)std::clamp(evt.note, 0, 127);
+      if (evt.isNoteOn)
+      {
+         // A velocity that rounds to 0 is not a quiet note-on: 0x90 note 0 is
+         // the standard running-status spelling of a note-OFF (see
+         // Platform.mm's incoming-MIDI parser, which already relies on this
+         // exact convention), so every synth including Serum/Vital reads it as
+         // one and kills the voice instead of starting it quietly.
+         const unsigned char velocity =
+            (unsigned char)std::clamp((int)std::lround(evt.velocity * 127.0f), 1, 127);
+         const unsigned char bytes[3] = { 0x90, note, velocity };
+         Platform::PluginScheduleMIDIEvent(handle, frameOffset, bytes, 3);
+         AddActiveVoice(evt.voiceId);
+      }
+      else
+      {
+         const unsigned char bytes[3] = { 0x80, note, 0 };
+         Platform::PluginScheduleMIDIEvent(handle, frameOffset, bytes, 3);
+         RemoveActiveVoice(evt.voiceId);
+      }
+   }
+
+   // Widens the plugin's pitch-bend range via RPN 0 (channel 0) once per live
+   // handle, so bendSemitones isn't crushed into MIDI's default +/-2
+   // semitones. NOT verified against a real instrument AU that this bridge
+   // widens correctly - Serum/Vital were not available to test against in
+   // this environment. If a given plugin ignores RPN 0, its range stays at
+   // the MIDI default while SendPitchBend below still encodes against
+   // kPitchBendRangeSemitones: the audible bend will be proportionally wrong
+   // (too wide) but still bounded to a single wheel excursion, never
+   // uncontrolled - the same tradeoff the fix prompt's item 2 called out.
+   static void SendPitchBendRangeRpn(Platform::PluginHandle* handle)
+   {
+      const unsigned char rpnMsb[3] = { 0xB0, 0x65, 0x00 };
+      const unsigned char rpnLsb[3] = { 0xB0, 0x64, 0x00 };
+      const unsigned char dataMsb[3] = { 0xB0, 0x06, (unsigned char)(int)kPitchBendRangeSemitones };
+      const unsigned char dataLsb[3] = { 0xB0, 0x26, 0x00 };
+      Platform::PluginScheduleMIDIEvent(handle, 0, rpnMsb, 3);
+      Platform::PluginScheduleMIDIEvent(handle, 0, rpnLsb, 3);
+      Platform::PluginScheduleMIDIEvent(handle, 0, dataMsb, 3);
+      Platform::PluginScheduleMIDIEvent(handle, 0, dataLsb, 3);
+   }
+
+   static void SendPitchBend(Platform::PluginHandle* handle, float semitones, int frameOffset)
+   {
+      const float clamped = std::clamp(semitones, -kPitchBendRangeSemitones, kPitchBendRangeSemitones);
+      int pb14 = (int)std::lround(8192.0f + (clamped / kPitchBendRangeSemitones) * 8191.0f);
+      pb14 = std::clamp(pb14, 0, 16383);
+      const unsigned char lsb = (unsigned char)(pb14 & 0x7F);
+      const unsigned char msb = (unsigned char)((pb14 >> 7) & 0x7F);
+      const unsigned char bytes[3] = { 0xE0, lsb, msb };
+      Platform::PluginScheduleMIDIEvent(handle, frameOffset, bytes, 3);
+   }
+
+   void AddActiveVoice(int voiceId)
+   {
+      if (mActiveVoiceCount < kMaxTrackedVoices)
+         mActiveVoiceIds[mActiveVoiceCount++] = voiceId;
+      mLastStartedVoiceId = voiceId;
+   }
+
+   void RemoveActiveVoice(int voiceId)
+   {
+      for (int i = 0; i < mActiveVoiceCount; i++)
+      {
+         if (mActiveVoiceIds[i] == voiceId)
+         {
+            mActiveVoiceIds[i] = mActiveVoiceIds[mActiveVoiceCount - 1];
+            mActiveVoiceCount--;
+            return;
+         }
+      }
+   }
+
    static void PassThrough(const AudioBuffer* in, AudioBuffer& output)
    {
       for (int ch = 0; ch < output.numChannels; ch++)
@@ -119,6 +290,18 @@ private:
    NoteEventQueue* mNoteInbox = nullptr; // set by SetNoteInbox; see its comment
    std::atomic<double> mSampleRate { 0.0 };
    std::atomic<int> mMaxBlockSize { 0 };
+
+   // Audio-thread-only note-bridge state (see DeliverNoteEvent / SetNoteInbox
+   // / ProcessBlock's bypass-edge handling). Nothing here is touched from the
+   // main thread except via SetNoteInbox, which already shared this
+   // synchronization discipline with mNoteInbox before this change.
+   static constexpr float kPitchBendRangeSemitones = 24.0f;
+   static constexpr int kMaxTrackedVoices = 32;
+   int mActiveVoiceIds[kMaxTrackedVoices] = {};
+   int mActiveVoiceCount = 0;
+   int mLastStartedVoiceId = 0;
+   Platform::PluginHandle* mLastSeenHandle = nullptr;
+   bool mWasBypassed = false;
 };
 
 // ----------------------------------------------------------------- main half
@@ -203,6 +386,11 @@ void AudioPluginNode::LoadPlugin(const Platform::PluginDesc& desc)
    if (!mAcceptsNotes)
       noteInput.Disconnect();
 
+   // A note the outgoing plugin is holding would otherwise sustain forever -
+   // nothing will ever deliver its note-off once mLive is unpublished below.
+   if (mLive != nullptr)
+      FlushPluginNotes(mLive);
+
    // Unpublish before creating: the previous plugin must stop being reachable
    // from the audio thread the moment the user asks for a different one, not
    // whenever the new one finishes loading.
@@ -260,6 +448,10 @@ void AudioPluginNode::ReloadFromIdentity()
 
 void AudioPluginNode::Unload()
 {
+   // Same reasoning as LoadPlugin's flush: a note held in the plugin at
+   // unload time would otherwise never get its note-off.
+   if (mLive != nullptr)
+      FlushPluginNotes(mLive);
    if (mAudioNode)
       mAudioNode->SetHandle(nullptr);
    SetConfiguring(false);
@@ -439,6 +631,10 @@ void AudioPluginNode::CookIfNeeded(int frameId)
       rate = mAudioNode->SampleRate();
    if (rate > 0.0 && (rate != mPreparedRate || mPreparedBlock != kAudioMaxBlockFrames))
    {
+      // A note held across this unpublish window would otherwise sustain
+      // forever - the re-prepare below tears down and rebuilds the plugin's
+      // render resources, but its held-note state goes with it either way.
+      FlushPluginNotes(mHandle);
       mAudioNode->SetHandle(nullptr);
       std::string error;
       if (!Platform::PluginPrepare(mHandle, rate, kAudioMaxBlockFrames, error))

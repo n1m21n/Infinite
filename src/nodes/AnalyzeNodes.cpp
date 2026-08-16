@@ -6,6 +6,7 @@
 
 #include "GLUtil.h"
 #include "Transport.h"
+#include "core/Expression.h"
 
 // =========================================================== Image Analyze
 
@@ -19,8 +20,47 @@ namespace
       "void main() { fragColor = texture(uSrc, vUv); }\n";
 
    const char* kImageOutputNames[] = {
-      "bright", "contrast", "red", "green", "blue", "sat", "motion", "cx", "cy"
+      "result", "bright", "contrast", "red", "green", "blue", "sat", "hue", "motion", "cx", "cy"
    };
+
+   const std::vector<std::string> kSampleModeNames = {
+      "Global Average", "Point Probe", "Region of Interest", "Center Weighted"
+   };
+
+   const std::vector<std::string> kMathOpNames = {
+      "Custom Expression",
+      "Red (R)",
+      "Green (G)",
+      "Blue (B)",
+      "Alpha (A)",
+      "Luminance (0.299R+0.587G+0.114B)",
+      "Average ((R+G+B)/3)",
+      "Sum (R+G+B)",
+      "Product (R*G*B)",
+      "Max (max(R,G,B))",
+      "Min (min(R,G,B))",
+      "Range (Max - Min)",
+      "R - G",
+      "R - B",
+      "G - B",
+      "|R - G| (Red/Green Diff)",
+      "|R - B| (Red/Blue Diff)",
+      "|G - B| (Green/Blue Diff)",
+      "Saturation",
+      "Hue",
+      "Euclidean Norm",
+      "Delta / Motion"
+   };
+}
+
+const std::vector<std::string>& ImageAnalyzeNode::SampleModeNames()
+{
+   return kSampleModeNames;
+}
+
+const std::vector<std::string>& ImageAnalyzeNode::MathOpNames()
+{
+   return kMathOpNames;
 }
 
 ImageAnalyzeNode::ImageAnalyzeNode()
@@ -60,12 +100,125 @@ float ImageAnalyzeNode::Value(int index) const
 {
    if (index < 0 || index >= kOutputCount)
       return 0.0f;
-   return std::min(1.0f, std::max(0.0f, mValues[index] * gain));
+   return mValues[index];
+}
+
+float ImageAnalyzeNode::ComputeMathResult(float r, float g, float b, float a, float lum, float delta)
+{
+   float result = 0.0f;
+   const float maxRGB = std::max(r, std::max(g, b));
+   const float minRGB = std::min(r, std::min(g, b));
+   const float sat = (maxRGB > 1e-5f) ? (maxRGB - minRGB) / maxRGB : 0.0f;
+
+   float hue = 0.0f;
+   if (maxRGB - minRGB > 1e-5f)
+   {
+      if (maxRGB == r)
+      {
+         hue = (g - b) / (maxRGB - minRGB);
+         if (hue < 0.0f) hue += 6.0f;
+      }
+      else if (maxRGB == g)
+      {
+         hue = ((b - r) / (maxRGB - minRGB)) + 2.0f;
+      }
+      else
+      {
+         hue = ((r - g) / (maxRGB - minRGB)) + 4.0f;
+      }
+      hue /= 6.0f;
+   }
+
+   switch (mathOp)
+   {
+      case kCustomExpression:
+      {
+         std::string formula = customFormula;
+         while (!formula.empty() && formula.front() == '=')
+            formula.erase(formula.begin());
+
+         std::map<std::string, float> vars;
+         vars["r"] = r;
+         vars["red"] = r;
+         vars["g"] = g;
+         vars["green"] = g;
+         vars["b"] = b;
+         vars["blue"] = b;
+         vars["a"] = a;
+         vars["alpha"] = a;
+         vars["lum"] = lum;
+         vars["l"] = lum;
+         vars["bright"] = lum;
+         vars["sat"] = sat;
+         vars["s"] = sat;
+         vars["hue"] = hue;
+         vars["h"] = hue;
+         vars["max"] = maxRGB;
+         vars["min"] = minRGB;
+         vars["delta"] = delta;
+         vars["motion"] = delta;
+         vars["u"] = probeU;
+         vars["v"] = probeV;
+
+         float evalVal = 0.0f;
+         std::string evalErr;
+         const double t = Transport::Instance().Seconds();
+         if (Expression::Evaluate(formula, t, &vars, nullptr, evalVal, evalErr))
+         {
+            result = evalVal;
+            mExprError.clear();
+         }
+         else
+         {
+            mExprError = evalErr;
+            result = lum;
+         }
+         break;
+      }
+      case kRedOp: result = r; break;
+      case kGreenOp: result = g; break;
+      case kBlueOp: result = b; break;
+      case kAlphaOp: result = a; break;
+      case kLuminanceOp: result = lum; break;
+      case kAverageOp: result = (r + g + b) / 3.0f; break;
+      case kSumOp: result = (r + g + b) / 3.0f; break;
+      case kProductOp: result = r * g * b; break;
+      case kMaxOp: result = maxRGB; break;
+      case kMinOp: result = minRGB; break;
+      case kRangeOp: result = maxRGB - minRGB; break;
+      case kRMinusG: result = (r - g + 1.0f) * 0.5f; break;
+      case kRMinusB: result = (r - b + 1.0f) * 0.5f; break;
+      case kGMinusB: result = (g - b + 1.0f) * 0.5f; break;
+      case kAbsRMinusG: result = std::fabs(r - g); break;
+      case kAbsRMinusB: result = std::fabs(r - b); break;
+      case kAbsGMinusB: result = std::fabs(g - b); break;
+      case kSaturationOp: result = sat; break;
+      case kHueOp: result = hue; break;
+      case kEuclideanNorm: result = std::sqrt(r * r + g * g + b * b) / 1.7320508f; break;
+      case kDeltaMotion: result = delta; break;
+      default: result = lum; break;
+   }
+
+   result = result * gain + offset;
+
+   if (power > 0.001f && std::fabs(power - 1.0f) > 0.001f)
+   {
+      const float sign = result < 0.0f ? -1.0f : 1.0f;
+      result = sign * std::pow(std::fabs(result), power);
+   }
+
+   if (invert)
+      result = 1.0f - result;
+
+   if (clamp01)
+      result = std::clamp(result, 0.0f, 1.0f);
+
+   return result;
 }
 
 void ImageAnalyzeNode::Analyze()
 {
-   const int size = std::max(8, std::min(sampleSize, 256));
+   const int size = std::clamp(sampleSize, 8, 256);
 
    if (mSmallSize != size)
    {
@@ -114,56 +267,221 @@ void ImageAnalyzeNode::Analyze()
    glReadPixels(0, 0, size, size, GL_RGBA, GL_UNSIGNED_BYTE, mPixels.data());
    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
 
-   double sumR = 0, sumG = 0, sumB = 0, sumLum = 0, sumLum2 = 0, sumSat = 0;
-   double weightedX = 0, weightedY = 0, weightTotal = 0, motion = 0;
    const bool haveHistory = mPrevPixels.size() == mPixels.size();
+
+   double sumR = 0, sumG = 0, sumB = 0, sumA = 0, sumLum = 0, sumLum2 = 0, sumSat = 0;
+   double weightedX = 0, weightedY = 0, weightTotal = 0, motion = 0;
+   double sampleWeightTotal = 0.0;
    const int count = size * size;
 
-   for (int y = 0; y < size; y++)
+   const float pu = std::clamp(probeU, 0.0f, 1.0f);
+   const float pv = std::clamp(probeV, 0.0f, 1.0f);
+   const float pr = std::clamp(probeRadius, 0.01f, 1.0f);
+
+   if (sampleMode == kPointProbe)
    {
-      for (int x = 0; x < size; x++)
+      const int cx = std::clamp((int)(pu * (size - 1)), 0, size - 1);
+      const int cy = std::clamp((int)(pv * (size - 1)), 0, size - 1);
+
+      for (int dy = -1; dy <= 1; dy++)
       {
-         const size_t i = ((size_t)y * size + x) * 4;
-         const double r = mPixels[i] / 255.0;
-         const double g = mPixels[i + 1] / 255.0;
-         const double b = mPixels[i + 2] / 255.0;
-         const double lum = 0.299 * r + 0.587 * g + 0.114 * b;
+         for (int dx = -1; dx <= 1; dx++)
+         {
+            const int px = std::clamp(cx + dx, 0, size - 1);
+            const int py = std::clamp(cy + dy, 0, size - 1);
+            const size_t i = ((size_t)py * size + px) * 4;
 
-         sumR += r; sumG += g; sumB += b;
-         sumLum += lum;
-         sumLum2 += lum * lum;
+            const double w = (dx == 0 && dy == 0) ? 2.0 : 1.0;
+            const double r = mPixels[i] / 255.0;
+            const double g = mPixels[i + 1] / 255.0;
+            const double b = mPixels[i + 2] / 255.0;
+            const double a = mPixels[i + 3] / 255.0;
+            const double lum = 0.299 * r + 0.587 * g + 0.114 * b;
 
-         const double mx = std::max(r, std::max(g, b));
-         const double mn = std::min(r, std::min(g, b));
-         sumSat += (mx > 1e-5) ? (mx - mn) / mx : 0.0;
+            sumR += r * w; sumG += g * w; sumB += b * w; sumA += a * w;
+            sumLum += lum * w;
+            sumLum2 += lum * lum * w;
 
-         weightedX += x * lum;
-         weightedY += y * lum;
-         weightTotal += lum;
+            const double mx = std::max(r, std::max(g, b));
+            const double mn = std::min(r, std::min(g, b));
+            sumSat += ((mx > 1e-5) ? (mx - mn) / mx : 0.0) * w;
 
-         if (haveHistory)
-            motion += std::fabs(lum - (0.299 * mPrevPixels[i] + 0.587 * mPrevPixels[i + 1] + 0.114 * mPrevPixels[i + 2]) / 255.0);
+            sampleWeightTotal += w;
+
+            if (haveHistory)
+            {
+               const double prevR = mPrevPixels[i] / 255.0;
+               const double prevG = mPrevPixels[i + 1] / 255.0;
+               const double prevB = mPrevPixels[i + 2] / 255.0;
+               motion += (std::fabs(r - prevR) + std::fabs(g - prevG) + std::fabs(b - prevB)) * (w / 3.0);
+            }
+         }
+      }
+   }
+   else if (sampleMode == kBoxRegion)
+   {
+      const int minX = std::clamp((int)((pu - pr) * size), 0, size - 1);
+      const int maxX = std::clamp((int)((pu + pr) * size), 0, size - 1);
+      const int minY = std::clamp((int)((pv - pr) * size), 0, size - 1);
+      const int maxY = std::clamp((int)((pv + pr) * size), 0, size - 1);
+
+      for (int y = minY; y <= maxY; y++)
+      {
+         for (int x = minX; x <= maxX; x++)
+         {
+            const size_t i = ((size_t)y * size + x) * 4;
+            const double r = mPixels[i] / 255.0;
+            const double g = mPixels[i + 1] / 255.0;
+            const double b = mPixels[i + 2] / 255.0;
+            const double a = mPixels[i + 3] / 255.0;
+            const double lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+            sumR += r; sumG += g; sumB += b; sumA += a;
+            sumLum += lum;
+            sumLum2 += lum * lum;
+
+            const double mx = std::max(r, std::max(g, b));
+            const double mn = std::min(r, std::min(g, b));
+            sumSat += (mx > 1e-5) ? (mx - mn) / mx : 0.0;
+
+            sampleWeightTotal += 1.0;
+
+            if (haveHistory)
+            {
+               const double prevR = mPrevPixels[i] / 255.0;
+               const double prevG = mPrevPixels[i + 1] / 255.0;
+               const double prevB = mPrevPixels[i + 2] / 255.0;
+               motion += (std::fabs(r - prevR) + std::fabs(g - prevG) + std::fabs(b - prevB)) / 3.0;
+            }
+         }
+      }
+   }
+   else if (sampleMode == kCenterWeighted)
+   {
+      const double centerU = (double)pu;
+      const double centerV = (double)pv;
+
+      for (int y = 0; y < size; y++)
+      {
+         const double v = (double)y / (size - 1);
+         const double dv = v - centerV;
+         for (int x = 0; x < size; x++)
+         {
+            const double u = (double)x / (size - 1);
+            const double du = u - centerU;
+            const double distSq = du * du + dv * dv;
+            const double w = std::exp(-distSq * 8.0);
+
+            const size_t i = ((size_t)y * size + x) * 4;
+            const double r = mPixels[i] / 255.0;
+            const double g = mPixels[i + 1] / 255.0;
+            const double b = mPixels[i + 2] / 255.0;
+            const double a = mPixels[i + 3] / 255.0;
+            const double lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+            sumR += r * w; sumG += g * w; sumB += b * w; sumA += a * w;
+            sumLum += lum * w;
+            sumLum2 += lum * lum * w;
+
+            const double mx = std::max(r, std::max(g, b));
+            const double mn = std::min(r, std::min(g, b));
+            sumSat += ((mx > 1e-5) ? (mx - mn) / mx : 0.0) * w;
+
+            sampleWeightTotal += w;
+
+            if (haveHistory)
+            {
+               const double prevR = mPrevPixels[i] / 255.0;
+               const double prevG = mPrevPixels[i + 1] / 255.0;
+               const double prevB = mPrevPixels[i + 2] / 255.0;
+               motion += (std::fabs(r - prevR) + std::fabs(g - prevG) + std::fabs(b - prevB)) * (w / 3.0);
+            }
+         }
+      }
+   }
+   else // kGlobalAverage
+   {
+      for (int y = 0; y < size; y++)
+      {
+         for (int x = 0; x < size; x++)
+         {
+            const size_t i = ((size_t)y * size + x) * 4;
+            const double r = mPixels[i] / 255.0;
+            const double g = mPixels[i + 1] / 255.0;
+            const double b = mPixels[i + 2] / 255.0;
+            const double a = mPixels[i + 3] / 255.0;
+            const double lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+            sumR += r; sumG += g; sumB += b; sumA += a;
+            sumLum += lum;
+            sumLum2 += lum * lum;
+
+            const double mx = std::max(r, std::max(g, b));
+            const double mn = std::min(r, std::min(g, b));
+            sumSat += (mx > 1e-5) ? (mx - mn) / mx : 0.0;
+
+            weightedX += x * lum;
+            weightedY += y * lum;
+            weightTotal += lum;
+
+            sampleWeightTotal += 1.0;
+
+            if (haveHistory)
+               motion += std::fabs(lum - (0.299 * mPrevPixels[i] + 0.587 * mPrevPixels[i + 1] + 0.114 * mPrevPixels[i + 2]) / 255.0);
+         }
       }
    }
 
    mPrevPixels = mPixels;
 
-   const double invCount = 1.0 / (double)count;
-   const double meanLum = sumLum * invCount;
-   const double variance = std::max(0.0, sumLum2 * invCount - meanLum * meanLum);
+   const double invWeight = (sampleWeightTotal > 1e-6) ? (1.0 / sampleWeightTotal) : 1.0;
+   mRawR = (float)(sumR * invWeight);
+   mRawG = (float)(sumG * invWeight);
+   mRawB = (float)(sumB * invWeight);
+   mRawA = (float)(sumA * invWeight);
+   mRawLum = (float)(sumLum * invWeight);
+   mRawDelta = haveHistory ? (float)std::clamp(motion * invWeight * (sampleMode == kGlobalAverage ? 8.0 : 6.0), 0.0, 1.0) : 0.0f;
+
+   const double meanLum = mRawLum;
+   const double variance = std::max(0.0, sumLum2 * invWeight - meanLum * meanLum);
+
+   const float maxRGB = std::max(mRawR, std::max(mRawG, mRawB));
+   const float minRGB = std::min(mRawR, std::min(mRawG, mRawB));
+   float rawHue = 0.0f;
+   if (maxRGB - minRGB > 1e-5f)
+   {
+      if (maxRGB == mRawR)
+      {
+         rawHue = (mRawG - mRawB) / (maxRGB - minRGB);
+         if (rawHue < 0.0f) rawHue += 6.0f;
+      }
+      else if (maxRGB == mRawG)
+      {
+         rawHue = ((mRawB - mRawR) / (maxRGB - minRGB)) + 2.0f;
+      }
+      else
+      {
+         rawHue = ((mRawR - mRawG) / (maxRGB - minRGB)) + 4.0f;
+      }
+      rawHue /= 6.0f;
+   }
+
+   const float mathRes = ComputeMathResult(mRawR, mRawG, mRawB, mRawA, mRawLum, mRawDelta);
 
    float target[kOutputCount];
+   target[kResult] = mathRes;
    target[kBrightness] = (float)meanLum;
    target[kContrast] = (float)std::min(1.0, std::sqrt(variance) * 3.0);
-   target[kRed] = (float)(sumR * invCount);
-   target[kGreen] = (float)(sumG * invCount);
-   target[kBlue] = (float)(sumB * invCount);
-   target[kSaturation] = (float)(sumSat * invCount);
-   target[kMotion] = haveHistory ? (float)std::min(1.0, motion * invCount * 8.0) : 0.0f;
+   target[kRed] = mRawR;
+   target[kGreen] = mRawG;
+   target[kBlue] = mRawB;
+   target[kSaturation] = (float)(sumSat * invWeight);
+   target[kHue] = rawHue;
+   target[kMotion] = mRawDelta;
    target[kCentroidX] = weightTotal > 1e-5 ? (float)(weightedX / weightTotal / (size - 1)) : 0.5f;
    target[kCentroidY] = weightTotal > 1e-5 ? (float)(weightedY / weightTotal / (size - 1)) : 0.5f;
 
-   const float k = std::min(1.0f, std::max(0.01f, 1.0f - smoothing));
+   const float k = std::clamp(1.0f - smoothing, 0.01f, 1.0f);
    for (int i = 0; i < kOutputCount; i++)
       mValues[i] += (target[i] - mValues[i]) * k;
 }

@@ -3865,7 +3865,9 @@ namespace Platform
          return;
       __unsafe_unretained AUScheduleMIDIEventBlock schedule =
          (__bridge AUScheduleMIDIEventBlock)h->scheduleMIDIEventBlockRaw;
-      schedule((AUEventSampleTime)frameOffset, 0, byteCount, bytes);
+      const AUEventSampleTime sampleTime =
+         AUEventSampleTimeImmediate + (AUEventSampleTime)std::max(0, frameOffset);
+      schedule(sampleTime, 0, byteCount, bytes);
    }
 
    int PluginParameterCount(PluginHandle* h)

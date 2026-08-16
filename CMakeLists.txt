@@ -122,7 +122,12 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/AudioNodes.cpp
     src/nodes/NoteNodes.cpp
     src/nodes/WavetableNode.cpp
+    src/nodes/WaveTerrainNode.cpp
+    src/nodes/ImageSpectralSynthNode.cpp
+    src/nodes/AudioDisplacementNode.cpp
+    src/audio/dsp/SpectralAdditiveSynth.cpp
     src/nodes/OscillatorNode.cpp
+    src/nodes/MetallicNode.cpp
     src/nodes/AudioEffectNode.cpp
     src/nodes/SamplerNode.cpp
     src/nodes/PaulStretchNode.cpp

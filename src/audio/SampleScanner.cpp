@@ -122,6 +122,7 @@ void SampleScanner::RemoveFolder(const std::string& path)
 {
    mFolders.erase(std::remove(mFolders.begin(), mFolders.end(), path), mFolders.end());
    SaveFoldersToDisk();
+   ++mIndexVersion;
    // Entries from the removed folder stay in the index until the next
    // Refresh - matching "manual refresh only" (no implicit rescan on every
    // folder-list edit), same as the plan's Refresh-button-only contract.
@@ -172,15 +173,24 @@ void SampleScanner::ScanThreadMain(std::vector<std::string> folders)
          {
             const fs::directory_entry entry = *it;
             std::error_code entryEc;
-            if (entry.is_directory(entryEc) && !entryEc)
+            const std::string name = entry.path().filename().string();
+            const bool isHidden = (!name.empty() && name[0] == '.');
+            const bool isSymlink = entry.is_symlink(entryEc) && !entryEc;
+
+            if (!isHidden && !isSymlink && entry.is_directory(entryEc) && !entryEc)
             {
-               dirStack.push_back(entry.path());
+               const std::string ext = ToLower(entry.path().extension().string());
+               if (ext != ".app" && ext != ".framework" && ext != ".plugin" && ext != ".bundle")
+               {
+                  dirStack.push_back(entry.path());
+               }
             }
-            else if (entry.is_regular_file(entryEc) && !entryEc && HasExtensionForKind(mKind, entry.path()))
+            else if (!isHidden && entry.is_regular_file(entryEc) && !entryEc && HasExtensionForKind(mKind, entry.path()))
             {
                Entry e;
                e.path = entry.path().string();
-               e.fileName = entry.path().filename().string();
+               e.fileName = name;
+               e.fileNameLower = ToLower(name);
                e.folderRoot = root;
                found.push_back(std::move(e));
                mFilesFound.fetch_add(1, std::memory_order_relaxed);
@@ -224,6 +234,7 @@ void SampleScanner::PollResults()
    mIndex = std::move(merged);
    mPendingResult.clear();
    mResultReady.store(false, std::memory_order_relaxed);
+   ++mIndexVersion;
    lock.unlock();
 
    SaveIndexToDisk();
@@ -257,7 +268,10 @@ void SampleScanner::LoadFromDisk()
             if (v["path"].is_string())
                e.path = v["path"].get<crude_json::string>();
             if (v["fileName"].is_string())
+            {
                e.fileName = v["fileName"].get<crude_json::string>();
+               e.fileNameLower = ToLower(e.fileName);
+            }
             if (v["folderRoot"].is_string())
                e.folderRoot = v["folderRoot"].get<crude_json::string>();
             if (!e.path.empty())
@@ -265,6 +279,7 @@ void SampleScanner::LoadFromDisk()
          }
       }
    }
+   ++mIndexVersion;
 }
 
 void SampleScanner::SaveFoldersToDisk() const

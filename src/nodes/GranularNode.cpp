@@ -121,6 +121,7 @@ public:
       mGrains.resize(kMaxGrains);
       for (auto& g : mGrains)
          g.active = false;
+      mRecordBuffer.resize((size_t)kMaxRecordSeconds * kMaxRecordSampleRate);
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
