@@ -69,8 +69,7 @@ What each node type does: math, state, per-node parameter UI.
 
 ### Audio / note node system
 
-A second cable type and DAG (see `docs/plans/audio/README.md`/`STATUS.md` for
-the full plan/state). Most audio *effects* share one C++ class rather than
+A second cable type and DAG. Most audio *effects* share one C++ class rather than
 getting a file each:
 
 - **`src/nodes/AudioEffectNode.h`/`.cpp`** — the one class every entry in the
@@ -112,10 +111,8 @@ getting a file each:
   path calls an `AURenderBlock` cached on the main thread at prepare time, with
   an `__unsafe_unretained` stack pull-input block. The plugin's editor is a
   plain `NSWindow` (the only one in the app), which works because
-  `glfwPollEvents` drains and dispatches `NSApp`'s queue — verified with a
-  throwaway empty-window test before any of this was built. VST3 is designed
-  for but not implemented; see `docs/plans/audio/plugin-hosting.md` for the
-  licensing reason.
+  `glfwPollEvents` drains and dispatches `NSApp`'s queue. Both AU and VST3
+  plugins are supported.
 - Per-effect body/visualizer UI lives in `src/main.cpp` as `DrawXxxBody`/
   `DrawXxxVisualizer` pairs next to the `EffectVisualizerId` switch inside
   `DrawAudioNodeBody` — see `.claude/skills/new-audio-node/SKILL.md` for the
