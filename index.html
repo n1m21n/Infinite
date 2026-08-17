@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infinite — Unified Audiovisual Modular Workstation for macOS</title>
+  <meta name="description" content="Infinite is an open-source, unified node-based audiovisual modular workstation for macOS. Real-time GPU video compositing, procedural 3D geometry, and modular synth engine with AU & VST3 hosting.">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Infinite — Audiovisual Modular Workstation">
+  <meta property="og:description" content="Real-time GPU video compositing, procedural 3D geometry, and modular synth engine with AU & VST3 hosting.">
+  <meta property="og:image" content="assets/screenshot.png">
+  <meta property="og:type" content="website">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="assets/icon.png">
+
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Ambient Audio-Visual Canvas & Glows -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-glow bg-glow-3"></div>
+  <canvas id="patch-canvas" aria-hidden="true"></canvas>
+
+  <!-- Sticky Navbar -->
+  <header class="site-header">
+    <div class="container nav-container">
+      <a href="#" class="brand">
+        <img src="assets/icon.png" alt="Infinite Icon" class="brand-icon">
+        <span class="brand-name">Infinite</span>
+        <span class="brand-badge">macOS 11+</span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="#showcase">Showcase</a>
+        <a href="#features">Engine</a>
+        <a href="#interactive-synth">Live DSP Demo</a>
+        <a href="#nodes">160+ Nodes</a>
+        <a href="#gatekeeper">First-Time Setup</a>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+          <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          <span>Star on GitHub</span>
+        </a>
+        <a href="#download" class="btn btn-primary btn-sm">Download DMG</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="container hero-container">
+        <div class="hero-badge">
+          <span class="pulse-dot"></span>
+          <span>Open-Source Universal macOS Workstation</span>
+        </div>
+
+        <h1 class="hero-title">
+          Sound, Light & Geometry.<br>
+          <span class="gradient-text">Unified in Real-Time.</span>
+        </h1>
+
+        <p class="hero-subtitle">
+          Real-time GPU shader compositing, procedural 3D geometry & simulation, and a modular synthesizer rack with AU & VST3 plugin hosting — interconnected by a universal cross-domain modulation graph.
+        </p>
+
+        <div class="hero-cta-group">
+          <a href="#download" class="btn btn-primary btn-lg">
+            <div class="btn-content-row">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Download for macOS</span>
+            </div>
+            <span class="btn-subtext">Universal Binary • Apple Silicon & Intel • Free & Open Source</span>
+          </a>
+
+          <div class="quick-command">
+            <code>git clone https://github.com/n1m21n/Infinite.git</code>
+            <button class="copy-btn" id="copy-clone-btn" title="Copy command" aria-label="Copy git clone command">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Hero Showcase Switcher -->
+        <div id="showcase" class="preview-wrapper">
+          <div class="showcase-tabs">
+            <button class="showcase-tab active" data-target="media-daw">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              Modular Workstation UI
+            </button>
+            <button class="showcase-tab" data-target="media-visual">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+              Live Generative Visuals
+            </button>
+            <button class="showcase-tab" data-target="media-motion">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              3D Physics & Motion
+            </button>
+            <button class="showcase-tab" data-target="media-graph">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+              High-Res Node DAG
+            </button>
+          </div>
+
+          <div class="preview-glass-frame">
+            <div class="preview-header">
+              <div class="window-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+              </div>
+              <span class="window-title" id="showcase-title">Infinite — Live Modular Graph & Audio-Visual Engine</span>
+              <div class="window-tags">
+                <span class="tag">60 FPS GPU</span>
+                <span class="tag">48 kHz DSP</span>
+                <span class="tag">Zero-Latency</span>
+              </div>
+            </div>
+
+            <!-- Showcase Panels -->
+            <div class="showcase-viewport">
+              <div class="showcase-media active" id="media-daw">
+                <video src="assets/daw_preview.mp4" autoplay loop muted playsinline class="showcase-video"></video>
+              </div>
+              <div class="showcase-media" id="media-visual">
+                <video src="assets/visual_preview.mp4" autoplay loop muted playsinline class="showcase-video"></video>
+              </div>
+              <div class="showcase-media" id="media-motion">
+                <video src="assets/motion_preview.mp4" autoplay loop muted playsinline class="showcase-video"></video>
+              </div>
+              <div class="showcase-media" id="media-graph">
+                <img src="assets/screenshot.png" alt="Infinite node graph with 3D viewport and audio racks" class="showcase-img" loading="lazy">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats & Capabilities Ribbon -->
+    <section class="ribbon-section">
+      <div class="container">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number">160+</div>
+            <div class="stat-label">Built-In Modular Nodes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">60 FPS</div>
+            <div class="stat-label">Pull-Based GPU Texture DAG</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">AU & VST3</div>
+            <div class="stat-label">Plugin Hosting with Native GUI</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">Zero-Copy</div>
+            <div class="stat-label">Syphon Real-Time Video I/O</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Core Engine Pillars -->
+    <section id="features" class="section">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Architecture</div>
+          <h2 class="section-title">One Canvas. Four Synchronized Disciplines.</h2>
+          <p class="section-subtitle">No separate apps, no complex sync bridges. Video shaders, 3D geometry, audio synthesis, and hosted plugins live in a single unified graph.</p>
+        </div>
+
+        <div class="features-grid">
+          <!-- Card 1 -->
+          <div class="feature-card">
+            <div class="feature-icon icon-cyan">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+            </div>
+            <h3 class="feature-title">Real-Time GPU Texture Pipeline</h3>
+            <p class="feature-desc">Pull-based 60 FPS GLSL 150 processing with 31 blend modes, on-device Apple Vision AI background removal, SDF generators, live brush painting, and Syphon video streaming.</p>
+            <div class="feature-tags">
+              <span>GLSL Shaders</span>
+              <span>Syphon I/O</span>
+              <span>Apple Vision AI</span>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="feature-card">
+            <div class="feature-icon icon-amber">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2 10s3-3 5-3 5 6 7 6 5-6 8-3"></path>
+                <path d="M2 14s3-3 5-3 5 6 7 6 5-6 8-3"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Modular Audio & DSP Engine</h3>
+            <p class="feature-desc">Multi-frame Wavetable synthesis, Granular texture engines, Modal Physical Modeling resonators, PaulStretch spectral stretchers, and 8-track drum sequencing.</p>
+            <div class="feature-tags">
+              <span>Wavetable</span>
+              <span>Granular</span>
+              <span>Physical Modeling</span>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="feature-card">
+            <div class="feature-icon icon-purple">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="14.31" y1="8" x2="20.05" y2="17.94"></line>
+                <line x1="9.69" y1="8" x2="21.17" y2="8"></line>
+                <line x1="7.38" y1="12" x2="13.12" y2="2.06"></line>
+                <line x1="9.69" y1="16" x2="3.95" y2="6.06"></line>
+                <line x1="14.31" y1="16" x2="2.83" y2="16"></line>
+                <line x1="16.62" y1="12" x2="10.88" y2="21.94"></line>
+              </svg>
+            </div>
+            <h3 class="feature-title">Procedural 3D & PBR Physics</h3>
+            <p class="feature-desc">Single-draw-call GPU point instancing, Poisson surface scattering, Gerstner ocean waves, PBD cloth dynamics, and Cook-Torrance GGX rendering with 32-bit HDRI.</p>
+            <div class="feature-tags">
+              <span>PBR GGX</span>
+              <span>Cloth Simulation</span>
+              <span>GPU Instancing</span>
+            </div>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="feature-card">
+            <div class="feature-icon icon-emerald">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              </svg>
+            </div>
+            <h3 class="feature-title">AU & VST3 Plugin Hosting</h3>
+            <p class="feature-desc">Drop your favorite third-party synthesizers and effects directly into the graph. Open native graphical interfaces and map any parameter to the modulation matrix.</p>
+            <div class="feature-tags">
+              <span>Native GUI</span>
+              <span>Parameter Automate</span>
+              <span>Sidechain</span>
+            </div>
+          </div>
+
+          <!-- Card 5 -->
+          <div class="feature-card">
+            <div class="feature-icon icon-rose">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+                <line x1="6" y1="1" x2="6" y2="4"></line>
+                <line x1="10" y1="1" x2="10" y2="4"></line>
+                <line x1="14" y1="1" x2="14" y2="4"></line>
+              </svg>
+            </div>
+            <h3 class="feature-title">Universal Modulation Graph</h3>
+            <p class="feature-desc">Extract 8-band FFT spectrum or onset pulses from audio to drive 3D vertex displacements and shaders. Convert video motion centroids into synth pitch and CV.</p>
+            <div class="feature-tags">
+              <span>Audio FFT to Video</span>
+              <span>Video to CV</span>
+              <span>Macro XY Pads</span>
+            </div>
+          </div>
+
+          <!-- Card 6 -->
+          <div class="feature-card">
+            <div class="feature-icon icon-blue">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Fast, Fluid Ergonomics</h3>
+            <p class="feature-desc">Link-Drag-to-Search auto wiring, live 1:1 animated node thumbnails, dockable 3D viewport, deterministic transport pause, and plain-text version-controllable patch files.</p>
+            <div class="feature-tags">
+              <span>Link-Drag Search</span>
+              <span>1:1 Previews</span>
+              <span>Plain Text Patches</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive In-Browser Synthesizer Sandbox -->
+    <section id="interactive-synth" class="section section-dark">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Interactive Demo</div>
+          <h2 class="section-title">Hear the Modular Sound Engine</h2>
+          <p class="section-subtitle">Experience the DSP concept directly in your browser. Play the interactive synthesizer below, sweep the resonance filter, and watch the real-time oscilloscope.</p>
+        </div>
+
+        <div class="synth-demo-box">
+          <div class="synth-canvas-wrapper">
+            <canvas id="synth-scope-canvas"></canvas>
+            <div class="synth-overlay-status" id="synth-status-text">Click "Play Live Audio Demo" to activate Web DSP</div>
+          </div>
+
+          <div class="synth-controls">
+            <div class="synth-control-group">
+              <button id="synth-toggle-btn" class="btn btn-primary btn-sm">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                <span>Play Live Audio Demo</span>
+              </button>
+            </div>
+
+            <div class="synth-control-group slider-group">
+              <label for="synth-filter-slider">Filter Cutoff (Hz): <span id="cutoff-val">1200</span></label>
+              <input type="range" id="synth-filter-slider" min="100" max="8000" value="1200" step="10">
+            </div>
+
+            <div class="synth-control-group slider-group">
+              <label for="synth-lfo-slider">LFO Modulation Speed: <span id="lfo-val">2.5 Hz</span></label>
+              <input type="range" id="synth-lfo-slider" min="0.1" max="15" value="2.5" step="0.1">
+            </div>
+
+            <div class="synth-control-group wave-select-group">
+              <label>Oscillator</label>
+              <div class="wave-btns">
+                <button class="wave-btn active" data-wave="sawtooth">Saw</button>
+                <button class="wave-btn" data-wave="square">Square</button>
+                <button class="wave-btn" data-wave="sine">Sine</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Node Explorer Directory (160+ Nodes) -->
+    <section id="nodes" class="section">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Library</div>
+          <h2 class="section-title">Explore 160+ Built-In Nodes</h2>
+          <p class="section-subtitle">A comprehensive creative toolkit spanning video synthesis, 3D generative art, audio DSP, and MIDI algorithmic composition.</p>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="node-filter-bar">
+          <button class="node-filter-btn active" data-filter="all">All Nodes (160+)</button>
+          <button class="node-filter-btn" data-filter="source">Sources & Shaders</button>
+          <button class="node-filter-btn" data-filter="effects2d">2D Effects & Color</button>
+          <button class="node-filter-btn" data-filter="geometry3d">3D & Physics</button>
+          <button class="node-filter-btn" data-filter="synths">Synths & Audio</button>
+          <button class="node-filter-btn" data-filter="midi">Notes & MIDI</button>
+          <button class="node-filter-btn" data-filter="modulation">Modulation & CV</button>
+        </div>
+
+        <div class="node-search-box">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="node-search-input" placeholder="Search node names, shaders, DSP effects (e.g. Wavetable, PaulStretch, Blur, Ocean)...">
+        </div>
+
+        <div class="nodes-grid" id="nodes-grid"></div>
+      </div>
+    </section>
+
+    <!-- macOS Gatekeeper Guide -->
+    <section id="gatekeeper" class="section section-dark">
+      <div class="container">
+        <div class="gatekeeper-card">
+          <div class="gatekeeper-badge">macOS Security & Gatekeeper</div>
+          <h2 class="gatekeeper-title">First-Time Opening on macOS</h2>
+          <p class="gatekeeper-desc">
+            Because Infinite is an open-source indie project built as an ad-hoc signed binary, macOS Gatekeeper may display a security prompt on first launch. Here is how to open it in 5 seconds:
+          </p>
+
+          <div class="steps-grid">
+            <div class="step-card">
+              <div class="step-num">1</div>
+              <h4>Double-Click App</h4>
+              <p>Download the DMG, drag <code>Infinite.app</code> into Applications, and double-click to launch. macOS will notify you it's from an unverified developer.</p>
+            </div>
+
+            <div class="step-card">
+              <div class="step-num">2</div>
+              <h4>System Settings</h4>
+              <p>Open <strong>System Settings → Privacy & Security</strong>, scroll down to the Security section, and click <strong>"Open Anyway"</strong>.</p>
+            </div>
+
+            <div class="step-card">
+              <div class="step-num">3</div>
+              <h4>Terminal One-Liner (Optional)</h4>
+              <p>Or remove the browser quarantine attribute with a single command:</p>
+              <div class="code-pill">
+                <code>xattr -dr com.apple.quarantine /Applications/Infinite.app</code>
+                <button class="copy-inline-btn" data-code="xattr -dr com.apple.quarantine /Applications/Infinite.app">Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download Box -->
+    <section id="download" class="section">
+      <div class="container">
+        <div class="download-box">
+          <div class="download-content">
+            <div class="download-badge">macOS 11.0 Big Sur or Later • Universal Binary</div>
+            <h2 class="download-title">Get Infinite for Mac</h2>
+            <p class="download-desc">
+              Self-contained universal binary (.dmg). Zero dependencies, no Homebrew required. Runs natively on Apple Silicon (M1/M2/M3/M4) and Intel Macs.
+            </p>
+
+            <div class="specs-list">
+              <div class="spec-item">
+                <span class="spec-label">Version</span>
+                <span class="spec-val">v0.1-preview</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-label">Architectures</span>
+                <span class="spec-val">arm64 (Apple Silicon) + x86_64 (Intel)</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-label">License</span>
+                <span class="spec-val">MIT Open Source</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-label">Size</span>
+                <span class="spec-val">~25 MB</span>
+              </div>
+            </div>
+
+            <div class="download-actions">
+              <a href="https://github.com/n1m21n/Infinite/releases/latest" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+                <div class="btn-content-row">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  <span>Download DMG from GitHub Releases</span>
+                </div>
+              </a>
+
+              <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
+                View Source on GitHub
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Build from Source Section -->
+    <section id="build" class="section section-dark">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Developers</div>
+          <h2 class="section-title">Build from Source in 3 Commands</h2>
+          <p class="section-subtitle">Requires Xcode Command Line Tools and CMake 3.16+.</p>
+        </div>
+
+        <div class="terminal-wrapper">
+          <div class="terminal-header">
+            <div class="window-dots">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <span class="terminal-title">zsh — Terminal</span>
+            <button class="terminal-copy-btn" id="copy-build-btn">Copy All</button>
+          </div>
+          <pre class="terminal-body"><code id="build-code-snippet"><span class="cmd-comment"># 1. Clone repository</span>
+<span class="cmd">git clone https://github.com/n1m21n/Infinite.git</span>
+<span class="cmd">cd Infinite</span>
+
+<span class="cmd-comment"># 2. Configure and compile universal binary</span>
+<span class="cmd">cmake -B build -DCMAKE_BUILD_TYPE=Release</span>
+<span class="cmd">cmake --build build -j8</span>
+
+<span class="cmd-comment"># 3. Launch application</span>
+<span class="cmd">open build/Infinite.app</span></code></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-left">
+        <div class="brand">
+          <img src="assets/icon.png" alt="Infinite Icon" class="brand-icon">
+          <span class="brand-name">Infinite</span>
+        </div>
+        <p class="footer-desc">Unified node-based audiovisual modular workstation for macOS.</p>
+      </div>
+
+      <div class="footer-links">
+        <div class="footer-group">
+          <h5>Workstation</h5>
+          <a href="#showcase">Showcase</a>
+          <a href="#features">Engine Architecture</a>
+          <a href="#nodes">160+ Node Directory</a>
+          <a href="#download">Download macOS DMG</a>
+        </div>
+        <div class="footer-group">
+          <h5>Open Source</h5>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub Repository</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases & Changelogs</a>
+          <a href="https://github.com/n1m21n/Infinite/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture Guide</a>
+          <a href="https://github.com/n1m21n/Infinite/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <p>© 2026 Infinite. Created by Naman Soni. Released under the open-source MIT License.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
