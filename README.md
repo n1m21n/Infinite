@@ -4,10 +4,6 @@ A unified node-based audiovisual modular workstation for macOS. Real-time GPU im
 
 Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeSynth/BespokeSynth)'s module system — a registry of node types, typed cables, and a pull-based cook-once-per-frame DAG — extended across GPU textures, procedural geometry, and real-time audio buffers.
 
-https://github.com/n1m21n/Infinite/raw/main/assets/videos/new%20DAW.mov
-
-https://github.com/n1m21n/Infinite/raw/main/assets/videos/die.mov
-
 ![node graph](docs/screenshot.png)
 
 ---
