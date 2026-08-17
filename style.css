@@ -6,9 +6,9 @@
 
 :root {
   /* Strict 3-Size Global Scale */
-  --font-size-large: clamp(2.1rem, 4vw, 3.1rem);     /* Hero & Main Section Titles */
-  --font-size-medium: clamp(1.05rem, 1.35vw, 1.18rem); /* Body text, Subheadings & Card Titles */
-  --font-size-small: clamp(0.84rem, 1vw, 0.92rem);    /* Pills, Labels, Badges, Button Subtext */
+  --font-size-large: clamp(2rem, 3.8vw, 2.9rem);     /* Hero & Main Section Titles */
+  --font-size-medium: clamp(1rem, 1.25vw, 1.12rem);  /* Body text, Subheadings & Step Titles */
+  --font-size-small: clamp(0.82rem, 0.95vw, 0.9rem);  /* Pills, Labels, Badges, Button Subtext, Cap Titles */
 
   /* Fonts */
   --font-sans: 'Inter', -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -16,15 +16,14 @@
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Monaco, monospace;
 
   /* Line Heights */
-  --lh-tight: 1.16;
-  --lh-normal: 1.6;
-  --lh-relaxed: 1.75;
+  --lh-tight: 1.15;
+  --lh-normal: 1.55;
+  --lh-relaxed: 1.65;
 
-  /* Palette: Warm Ivory Paper + Charcoal Ink + Pastel Terracotta/Sage/Lavender */
+  /* Palette: Warm Ivory Paper + Charcoal Ink + Pastel Terracotta */
   --bg-page: #fbfaf6;
   --bg-card: #ffffff;
   --bg-inner: #f3f0e7;
-  --bg-glass: rgba(255, 255, 255, 0.85);
 
   --border-card: rgba(45, 35, 25, 0.1);
   --border-subtle: rgba(45, 35, 25, 0.06);
@@ -54,7 +53,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   Reset & Base Setup
+   Reset & Base Setup (No Glows anywhere)
    -------------------------------------------------------------------------- */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -78,7 +77,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Background Cosmic Nebula Dust Canvas (Subtle charcoal/pastel ink particles) */
+/* Background Cosmic Dust Canvas */
 #cosmic-canvas {
   position: fixed;
   top: 0;
@@ -92,7 +91,7 @@ body {
 
 .container {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 0 24px;
   position: relative;
@@ -128,9 +127,9 @@ body {
 }
 
 .brand-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
 }
 
 .brand-name {
@@ -185,7 +184,6 @@ body {
 .btn-primary:hover {
   transform: translateY(-2px);
   filter: brightness(1.06);
-  box-shadow: 0 6px 18px rgba(194, 89, 63, 0.25);
 }
 
 .btn-secondary {
@@ -219,7 +217,7 @@ body {
    Hero Section
    -------------------------------------------------------------------------- */
 .hero-section {
-  padding: 60px 0 40px;
+  padding: 55px 0 35px;
   text-align: center;
 }
 
@@ -234,7 +232,7 @@ body {
   font-weight: 700;
   line-height: var(--lh-tight);
   letter-spacing: -0.03em;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   max-width: 860px;
 }
 
@@ -245,21 +243,22 @@ body {
   color: var(--pastel-terracotta);
 }
 
+/* Concise 3-line refined hero description (smaller font size) */
 .hero-subtitle {
-  font-size: var(--font-size-medium);
+  font-size: var(--font-size-small);
   color: var(--text-secondary);
-  max-width: 760px;
-  margin-bottom: 34px;
+  max-width: 680px;
+  margin-bottom: 30px;
   line-height: var(--lh-relaxed);
 }
 
 .hero-cta-group {
   display: flex;
   align-items: flex-start;
-  gap: 18px;
+  gap: 16px;
   flex-wrap: wrap;
   justify-content: center;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
 }
 
 .cta-wrapper {
@@ -282,15 +281,15 @@ body {
   margin-top: 8px;
 }
 .sketch-arrow-svg {
-  width: 32px;
-  height: 20px;
+  width: 30px;
+  height: 18px;
   color: var(--pastel-terracotta);
 }
 
 /* Single Live Canvas Frame */
 .showcase-wrapper {
   width: 100%;
-  max-width: 1040px;
+  max-width: 1020px;
   margin-top: 10px;
 }
 
@@ -299,7 +298,6 @@ body {
   border: 1px solid var(--border-card);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
 }
 
 .notebook-header {
@@ -347,22 +345,22 @@ body {
 
 .showcase-video {
   width: 100%;
-  max-height: 600px;
+  max-height: 580px;
   display: block;
   object-fit: contain;
 }
 
 /* --------------------------------------------------------------------------
-   Sections & Headings (Strict 3-Size Scale)
+   Sections & Headings
    -------------------------------------------------------------------------- */
 .section {
-  padding: 60px 0;
+  padding: 55px 0;
 }
 
 .section-header {
   text-align: center;
-  max-width: 720px;
-  margin: 0 auto 36px;
+  max-width: 700px;
+  margin: 0 auto 30px;
 }
 
 .section-label {
@@ -379,7 +377,7 @@ body {
   font-weight: 700;
   line-height: var(--lh-tight);
   letter-spacing: -0.02em;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .section-subheading {
@@ -388,38 +386,53 @@ body {
   line-height: var(--lh-normal);
 }
 
+/* Sketchy Scratchy Underline on "Work" */
+.sketch-underline {
+  position: relative;
+  display: inline-block;
+}
+.sketch-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: -2px;
+  right: -2px;
+  height: 5px;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M 0 4 Q 25 1 50 6 T 100 3' fill='none' stroke='%23c2593f' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x;
+  background-size: 60px 5px;
+}
+
 /* --------------------------------------------------------------------------
-   Metaballs Interactive Canvas Section
+   Organic Blobs Canvas (Transparent, No White Container Box)
    -------------------------------------------------------------------------- */
+.metaballs-section {
+  padding-top: 30px;
+}
+
 .metaball-canvas-wrapper {
   width: 100%;
-  max-width: 980px;
-  height: 380px;
+  max-width: 1000px;
+  height: 320px;
   margin: 0 auto;
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.04);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
 }
 
 #metaballs-canvas {
   width: 100%;
   height: 100%;
   display: block;
-  cursor: grab;
-}
-#metaballs-canvas:active {
-  cursor: grabbing;
 }
 
 /* --------------------------------------------------------------------------
-   Capabilities (4 Animated Mini-Canvases with Titles Only)
+   Capabilities (4 Animated Mini-Canvases with Smaller Clean Titles)
    -------------------------------------------------------------------------- */
 .capabilities-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px;
 }
 
 .cap-card {
@@ -430,16 +443,15 @@ body {
   display: flex;
   flex-direction: column;
   transition: transform var(--transition-fast), border-color var(--transition-fast);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
 }
 .cap-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--pastel-peach);
+  transform: translateY(-2px);
+  border-color: var(--pastel-terracotta);
 }
 
 .cap-canvas-box {
   width: 100%;
-  height: 170px;
+  height: 160px;
   background: #12151b;
   position: relative;
 }
@@ -450,8 +462,8 @@ body {
 }
 
 .cap-title {
-  padding: 16px;
-  font-size: var(--font-size-medium);
+  padding: 12px 14px;
+  font-size: var(--font-size-small);
   font-weight: 600;
   text-align: center;
   color: var(--text-primary);
@@ -463,24 +475,23 @@ body {
    Listen (Minimal Single Soundscape Player)
    -------------------------------------------------------------------------- */
 .minimal-player-card {
-  max-width: 680px;
+  max-width: 650px;
   margin: 0 auto;
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-lg);
-  padding: 24px 28px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  padding: 22px 26px;
 }
 
 .minimal-player-row {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
 }
 
 .minimal-play-circle {
-  width: 50px;
-  height: 50px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: var(--btn-primary-bg);
   color: #fff;
@@ -493,7 +504,7 @@ body {
   transition: transform var(--transition-fast);
 }
 .minimal-play-circle:hover {
-  transform: scale(1.06);
+  transform: scale(1.05);
 }
 
 .minimal-track-info {
@@ -523,7 +534,7 @@ body {
 
 .m-progress-bar {
   width: 100%;
-  height: 8px;
+  height: 7px;
   background: var(--bg-inner);
   border-radius: var(--radius-pill);
   cursor: pointer;
@@ -545,17 +556,17 @@ body {
 .howto-stack {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
 }
 
 .howto-item {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-md);
-  padding: 28px;
+  padding: 26px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 30px;
+  gap: 28px;
   align-items: center;
 }
 
@@ -583,7 +594,7 @@ body {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .flow-pill {
@@ -612,21 +623,21 @@ body {
 .ticker-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   overflow: hidden;
-  padding: 10px 0;
+  padding: 8px 0;
   user-select: none;
 }
 
 .ticker-track {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   width: max-content;
 }
 
 .ticker-pill {
   font-size: var(--font-size-small);
-  padding: 8px 18px;
+  padding: 7px 16px;
   border-radius: var(--radius-pill);
   background: var(--bg-card);
   border: 1px solid var(--border-card);
@@ -634,7 +645,6 @@ body {
   cursor: pointer;
   white-space: nowrap;
   transition: all var(--transition-fast);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 .ticker-pill:hover {
   border-color: var(--pastel-terracotta);
@@ -673,8 +683,8 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(30, 25, 20, 0.5);
-  backdrop-filter: blur(8px);
+  background: rgba(30, 25, 20, 0.4);
+  backdrop-filter: blur(6px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -689,11 +699,10 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-lg);
-  padding: 32px;
-  max-width: 480px;
+  padding: 30px;
+  max-width: 460px;
   width: 100%;
   position: relative;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
   animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -704,8 +713,8 @@ body {
 
 .modal-close {
   position: absolute;
-  top: 18px;
-  right: 18px;
+  top: 16px;
+  right: 16px;
   background: transparent;
   border: none;
   font-size: 1.2rem;
@@ -734,7 +743,7 @@ body {
   font-size: var(--font-size-medium);
   color: var(--text-secondary);
   line-height: var(--lh-normal);
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .modal-pins {
@@ -757,32 +766,32 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-md);
-  padding: 36px;
+  padding: 32px;
 }
 
 .setup-intro {
   font-size: var(--font-size-medium);
   color: var(--text-secondary);
   line-height: var(--lh-normal);
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
 .steps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 18px;
 }
 
 .step-card {
   background: var(--bg-inner);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-md);
-  padding: 22px;
+  padding: 20px;
 }
 
 .step-num {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--pastel-terracotta);
   color: #fff;
@@ -791,7 +800,7 @@ body {
   justify-content: center;
   font-weight: 700;
   font-size: var(--font-size-small);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .step-title {
@@ -841,21 +850,21 @@ body {
   border: 1px solid var(--border-card);
   border-radius: var(--radius-md);
   text-align: center;
-  padding: 44px 30px;
+  padding: 40px 24px;
 }
 
 .download-intro {
   font-size: var(--font-size-medium);
   color: var(--text-secondary);
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
 .specs-grid {
   display: flex;
   justify-content: center;
-  gap: 36px;
+  gap: 32px;
   flex-wrap: wrap;
-  margin-bottom: 30px;
+  margin-bottom: 28px;
 }
 
 .spec-col {
@@ -879,7 +888,7 @@ body {
 .download-actions {
   display: flex;
   justify-content: center;
-  gap: 16px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
@@ -888,7 +897,7 @@ body {
    -------------------------------------------------------------------------- */
 .site-footer {
   border-top: 1px solid var(--border-card);
-  padding: 46px 0 28px;
+  padding: 42px 0 24px;
   background: var(--bg-inner);
 }
 
@@ -897,30 +906,30 @@ body {
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
-  gap: 36px;
-  margin-bottom: 30px;
+  gap: 32px;
+  margin-bottom: 26px;
 }
 
 .footer-left {
-  max-width: 320px;
+  max-width: 300px;
 }
 
 .footer-desc {
   font-size: var(--font-size-small);
   color: var(--text-muted);
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .footer-links {
   display: flex;
-  gap: 60px;
+  gap: 50px;
 }
 
 .footer-col h5 {
   font-size: var(--font-size-small);
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .footer-col a {
@@ -928,7 +937,7 @@ body {
   color: var(--text-secondary);
   text-decoration: none;
   font-size: var(--font-size-small);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   transition: color var(--transition-fast);
 }
 .footer-col a:hover {
@@ -938,7 +947,7 @@ body {
 .footer-bottom {
   text-align: center;
   border-top: 1px solid var(--border-subtle);
-  padding-top: 20px;
+  padding-top: 18px;
   font-size: var(--font-size-small);
   color: var(--text-muted);
 }
@@ -948,11 +957,11 @@ body {
    -------------------------------------------------------------------------- */
 @media (max-width: 768px) {
   .nav-links { display: none; }
-  .hero-section { padding: 40px 0 24px; }
-  .metaball-canvas-wrapper { height: 300px; }
-  .howto-item { grid-template-columns: 1fr; gap: 18px; padding: 20px; }
-  .setup-box { padding: 24px 18px; }
-  .download-card { padding: 30px 18px; }
-  .footer-links { gap: 30px; }
-  .specs-grid { gap: 16px; }
+  .hero-section { padding: 36px 0 20px; }
+  .metaball-canvas-wrapper { height: 260px; }
+  .howto-item { grid-template-columns: 1fr; gap: 16px; padding: 18px; }
+  .setup-box { padding: 20px 16px; }
+  .download-card { padding: 26px 16px; }
+  .footer-links { gap: 24px; }
+  .specs-grid { gap: 14px; }
 }
