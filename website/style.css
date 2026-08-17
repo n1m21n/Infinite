@@ -625,14 +625,17 @@ body {
   flex-direction: column;
   gap: 10px;
   overflow: hidden;
-  padding: 6px 0;
+  padding: 8px 0;
   user-select: none;
+  width: 100%;
+  position: relative;
 }
 
 .ticker-track {
   display: flex;
   gap: 10px;
   width: max-content;
+  will-change: transform;
 }
 
 .ticker-pill {
@@ -644,7 +647,8 @@ body {
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast), background var(--transition-fast);
 }
 .ticker-pill:hover {
   border-color: var(--pastel-terracotta);
@@ -654,24 +658,56 @@ body {
 }
 
 .ticker-forward {
-  animation: scrollForward 40s linear infinite;
+  animation: scrollForward 35s linear infinite;
+  -webkit-animation: scrollForward 35s linear infinite;
 }
 .ticker-reverse {
-  animation: scrollReverse 40s linear infinite;
+  animation: scrollReverse 35s linear infinite;
+  -webkit-animation: scrollReverse 35s linear infinite;
 }
 
-.ticker-track:hover {
-  animation-play-state: paused;
+/* Pause on hover only on desktop pointer devices, never sticky on mobile touch */
+@media (hover: hover) and (pointer: fine) {
+  .ticker-track:hover {
+    animation-play-state: paused;
+    -webkit-animation-play-state: paused;
+  }
 }
 
 @keyframes scrollForward {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@-webkit-keyframes scrollForward {
+  0% {
+    -webkit-transform: translate3d(0, 0, 0);
+  }
+  100% {
+    -webkit-transform: translate3d(-50%, 0, 0);
+  }
 }
 
 @keyframes scrollReverse {
-  0% { transform: translateX(-50%); }
-  100% { transform: translateX(0); }
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@-webkit-keyframes scrollReverse {
+  0% {
+    -webkit-transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    -webkit-transform: translate3d(0, 0, 0);
+  }
 }
 
 /* --------------------------------------------------------------------------
