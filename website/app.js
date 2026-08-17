@@ -758,7 +758,7 @@ function initKnobsAnimation() {
 
 
 // ==========================================================================
-// 4. Minimal Soundscape Audio Player
+// 4. Minimal Soundscape Audio Player with Multi-Track Switching
 // ==========================================================================
 function initMinimalAudioPlayer() {
   const audio = document.getElementById('m-audio-element');
@@ -768,6 +768,8 @@ function initMinimalAudioPlayer() {
   const progressContainer = document.getElementById('m-progress-container');
   const progressFill = document.getElementById('m-progress-fill');
   const timeText = document.getElementById('m-track-time');
+  const trackTitle = document.getElementById('m-track-title');
+  const trackPills = document.querySelectorAll('.track-select-pill');
 
   if (!audio || !playBtn) return;
 
@@ -785,6 +787,27 @@ function initMinimalAudioPlayer() {
   }
 
   playBtn.addEventListener('click', togglePlay);
+
+  trackPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      trackPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+
+      const src = pill.dataset.src;
+      const title = pill.dataset.title;
+      const dur = pill.dataset.duration || '0:15';
+
+      if (trackTitle) trackTitle.textContent = title;
+      if (timeText) timeText.textContent = `0:00 / ${dur}`;
+
+      audio.src = src;
+      audio.currentTime = 0;
+      audio.play().then(() => {
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+      }).catch(() => {});
+    });
+  });
 
   audio.addEventListener('timeupdate', () => {
     if (audio.duration) {
@@ -814,6 +837,26 @@ function initMinimalAudioPlayer() {
       }
     });
   }
+}
+
+// Recipes Show More / Show Less Toggle
+function initRecipesToggle() {
+  const btn = document.getElementById('toggle-recipes-btn');
+  const extraRecipes = document.getElementById('extra-recipes');
+  if (!btn || !extraRecipes) return;
+
+  btn.addEventListener('click', () => {
+    const isHidden = extraRecipes.classList.contains('hidden');
+    if (isHidden) {
+      extraRecipes.classList.remove('hidden');
+      const span = btn.querySelector('span');
+      if (span) span.textContent = 'Show Fewer Recipes';
+    } else {
+      extraRecipes.classList.add('hidden');
+      const span = btn.querySelector('span');
+      if (span) span.textContent = 'Show More Recipes (3)';
+    }
+  });
 }
 
 
@@ -975,6 +1018,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initKnobsAnimation();
 
   initMinimalAudioPlayer();
+  initRecipesToggle();
   initTickerTapes();
   initModal();
   initCopyButtons();

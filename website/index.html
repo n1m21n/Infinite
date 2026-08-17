@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
   <!-- Ambient Cosmic Dust Canvas -->
@@ -187,7 +187,7 @@
 
             <div class="minimal-track-info">
               <div class="track-header-row">
-                <span class="m-track-title">Infinite Modular Patch 01</span>
+                <span id="m-track-title" class="m-track-title">Infinite Modular Patch 01</span>
                 <span id="m-track-time" class="m-time-text">0:00 / 0:11</span>
               </div>
               <div class="m-progress-bar" id="m-progress-container">
@@ -195,6 +195,17 @@
               </div>
             </div>
           </div>
+
+          <!-- Quick Track Selector -->
+          <div class="track-selector-row">
+            <button class="track-select-pill active" data-src="assets/infinite_patch.mp3" data-title="Infinite Modular Patch 01" data-duration="0:11">
+              ▶ Patch 01 (Modular Rack)
+            </button>
+            <button class="track-select-pill" data-src="assets/ambient_patch.mp3" data-title="Ambient Modular Soundscape" data-duration="0:16">
+              ▶ Ambient Soundscape
+            </button>
+          </div>
+
           <audio id="m-audio-element" src="assets/infinite_patch.mp3" preload="metadata"></audio>
         </div>
       </div>
@@ -257,6 +268,83 @@
               <img src="assets/howto_daw.jpg" alt="Audio workstation and synth nodes layout" loading="lazy">
             </div>
           </div>
+
+          <!-- Extra Recipes (Revealed with Show More Button) -->
+          <div id="extra-recipes" class="extra-recipes hidden">
+            <!-- Recipe 3 -->
+            <div class="howto-item">
+              <div class="howto-content">
+                <span class="recipe-num">Recipe 03</span>
+                <h3 class="recipe-title">Live Shader Grading & Kaleidoscope FX</h3>
+                <p class="recipe-desc">
+                  Wire image textures into <strong>Color Adjustment</strong>, modulate tones using an <strong>XY Motion Pad</strong>, and blend through <strong>Kaleidoscope</strong> and optical <strong>Bloom</strong>.
+                </p>
+                <div class="node-flow-diagram">
+                  <span class="flow-pill">Texture / Image</span>
+                  <span class="flow-arrow">→</span>
+                  <span class="flow-pill">Color Adjust</span>
+                  <span class="flow-arrow">→</span>
+                  <span class="flow-pill">XY Motion Pad</span>
+                  <span class="flow-arrow">→</span>
+                  <span class="flow-pill">Kaleidoscope & Bloom</span>
+                </div>
+              </div>
+              <div class="howto-media">
+                <img src="assets/recipe_kaleido.jpg" alt="Live visual shader graph screenshot" loading="lazy">
+              </div>
+            </div>
+
+            <!-- Recipe 4 -->
+            <div class="howto-item">
+              <div class="howto-content">
+                <span class="recipe-num">Recipe 04</span>
+                <h3 class="recipe-title">Dual-Engine Wavetable Sound Design</h3>
+                <p class="recipe-desc">
+                  Stack dual morphing oscillators in <strong>Wavetable Synth</strong> with 3 envelope generators, route through a resonant <strong>Stereo Filter</strong>, and immerse in <strong>Chorus, Delay & Reverb</strong>.
+                </p>
+                <div class="node-flow-diagram">
+                  <span class="flow-pill">Wavetable Synth</span>
+                  <span class="flow-arrow">→</span>
+                  <span class="flow-pill">3x ADSR Envelopes</span>
+                  <span class="flow-arrow">→</span>
+                  <span class="flow-pill">Stereo Filter</span>
+                  <span class="flow-arrow">→</span>
+                  <span class="flow-pill">Chorus & Reverb</span>
+                </div>
+              </div>
+              <div class="howto-media">
+                <img src="assets/recipe_synth.jpg" alt="Modular wavetable synthesizer rack screenshot" loading="lazy">
+              </div>
+            </div>
+
+            <!-- Recipe 5 -->
+            <div class="howto-item">
+              <div class="howto-content">
+                <span class="recipe-num">Recipe 05</span>
+                <h3 class="recipe-title">Spectrogram Synthesis & 3D Texture Mapping</h3>
+                <p class="recipe-desc">
+                  Synthesize image pixels directly into 128 audio harmonics with <strong>Spectrogram Synth</strong> while simultaneously projecting the texture onto a rotating 3D geometry cube in <strong>Render 3D</strong>.
+                </p>
+                <div class="node-flow-diagram">
+                  <span class="flow-pill">Artwork Source</span>
+                  <span class="flow-arrow">→</span>
+                  <span class="flow-pill">Spectrogram Synth (128p)</span>
+                  <span class="flow-arrow">→</span>
+                  <span class="flow-pill">Render 3D Viewport</span>
+                </div>
+              </div>
+              <div class="howto-media">
+                <img src="assets/recipe_spectrogram.jpg" alt="Image spectrogram synthesis and 3D texture mapping" loading="lazy">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Show More / Less Recipes Toggle Button -->
+        <div class="recipes-toggle-wrap">
+          <button id="toggle-recipes-btn" class="btn btn-secondary btn-sm">
+            <span>Show More Recipes (3)</span>
+          </button>
         </div>
 
       </div>
@@ -403,6 +491,6 @@
     </div>
   </footer>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>

@@ -543,24 +543,70 @@ body {
   transition: width 0.1s linear;
 }
 
+.track-selector-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.track-select-pill {
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-inner);
+  border: 1px solid var(--border-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.track-select-pill:hover {
+  color: var(--pastel-terracotta);
+  border-color: var(--pastel-terracotta);
+}
+.track-select-pill.active {
+  background: rgba(194, 89, 63, 0.12);
+  border-color: var(--pastel-terracotta);
+  color: var(--pastel-terracotta);
+  font-weight: 600;
+}
+
 /* --------------------------------------------------------------------------
    How-To / Illustrated Node Recipes
    -------------------------------------------------------------------------- */
 .howto-stack {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
 }
 
 .howto-item {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-md);
-  padding: 24px;
+  padding: 20px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 20px;
   align-items: center;
+}
+
+.extra-recipes {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: opacity 0.3s ease, max-height 0.4s ease;
+}
+.extra-recipes.hidden {
+  display: none;
+}
+
+.recipes-toggle-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
 }
 
 .recipe-num {
