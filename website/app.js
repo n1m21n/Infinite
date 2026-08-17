@@ -1,11 +1,11 @@
 /**
  * Infinite — Web Application Logic
- * Cosmic Nebula Canvas, Interactive Metaballs, 4 Capability Canvas Animations,
+ * Cosmic Dust, Organic Natural Morphing Blobs, 4 Mini-Canvas Animations,
  * Minimal Audio Player, and 3 Interactive Node Ticker Tapes.
  */
 
 // ==========================================================================
-// 1. Cosmic Dust & Nebula Canvas (Visible on Warm Paper Background)
+// 1. Cosmic Dust & Nebula Canvas (Subtle Charcoal/Pastel Ink on Paper)
 // ==========================================================================
 const cosmicCanvas = document.getElementById('cosmic-canvas');
 const cosmicCtx = cosmicCanvas ? cosmicCanvas.getContext('2d') : null;
@@ -30,24 +30,23 @@ function initCosmos() {
       x: Math.random() * cWidth,
       y: Math.random() * cHeight,
       size: Math.random() * 2 + 1,
-      alpha: Math.random() * 0.25 + 0.08,
+      alpha: Math.random() * 0.22 + 0.08,
       pulseSpeed: 0.008 + Math.random() * 0.015,
       pulseOffset: Math.random() * Math.PI * 2,
-      vx: (Math.random() - 0.5) * 0.2,
-      vy: (Math.random() - 0.5) * 0.2,
+      vx: (Math.random() - 0.5) * 0.18,
+      vy: (Math.random() - 0.5) * 0.18,
       color: ['#2b2621', '#c2593f', '#d97736', '#4d7c67', '#6b6b99'][Math.floor(Math.random() * 5)]
     });
   }
 
-  // Soft drifting pastel nebula patches
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 4; i++) {
     cosmicNebulae.push({
       x: Math.random() * cWidth,
       y: Math.random() * cHeight,
       radius: Math.random() * 220 + 200,
-      vx: (Math.random() - 0.5) * 0.12,
-      vy: (Math.random() - 0.5) * 0.12,
-      color: ['rgba(194, 89, 63, 0.04)', 'rgba(217, 119, 54, 0.04)', 'rgba(77, 124, 103, 0.04)', 'rgba(107, 107, 153, 0.04)'][i % 4]
+      vx: (Math.random() - 0.5) * 0.1,
+      vy: (Math.random() - 0.5) * 0.1,
+      color: ['rgba(194, 89, 63, 0.035)', 'rgba(217, 119, 54, 0.035)', 'rgba(77, 124, 103, 0.035)', 'rgba(107, 107, 153, 0.035)'][i % 4]
     });
   }
 }
@@ -58,7 +57,6 @@ function animateCosmos() {
   cosmicTime++;
   cosmicCtx.clearRect(0, 0, cWidth, cHeight);
 
-  // Draw soft drifting nebula clusters
   cosmicNebulae.forEach(n => {
     n.x += n.vx;
     n.y += n.vy;
@@ -77,7 +75,6 @@ function animateCosmos() {
     cosmicCtx.fill();
   });
 
-  // Draw twinkling star & ink dust
   cosmicStars.forEach(s => {
     s.x += s.vx;
     s.y += s.vy;
@@ -100,143 +97,152 @@ function animateCosmos() {
 
 
 // ==========================================================================
-// 2. Interactive Metaballs Canvas Simulation
+// 2. Organic Natural Floating Blobs (Zero Glow, Simple Blue/Black Border, Smooth Motion)
 // Keywords: Sound, Music, Art, Geometry, Generative, Node-Based, Real-Time
 // ==========================================================================
 const metaCanvas = document.getElementById('metaballs-canvas');
 const metaCtx = metaCanvas ? metaCanvas.getContext('2d') : null;
 
-const METABALL_WORDS = [
-  { text: 'Sound', color: '#c2593f', r: 46 },
-  { text: 'Music', color: '#d97736', r: 44 },
-  { text: 'Art', color: '#b8860b', r: 42 },
-  { text: 'Geometry', color: '#4d7c67', r: 48 },
-  { text: 'Generative', color: '#6b6b99', r: 52 },
-  { text: 'Node-Based', color: '#c2593f', r: 50 },
-  { text: 'Real-Time', color: '#d97736', r: 48 }
+const BLOB_ITEMS = [
+  { text: 'Sound', border: '#0f172a', r: 42, speed: 0.25 },
+  { text: 'Music', border: '#1e293b', r: 40, speed: 0.28 },
+  { text: 'Art', border: '#2563eb', r: 38, speed: 0.22 },
+  { text: 'Geometry', border: '#0f172a', r: 44, speed: 0.26 },
+  { text: 'Generative', border: '#1e3a8a', r: 46, speed: 0.24 },
+  { text: 'Node-Based', border: '#0f172a', r: 45, speed: 0.25 },
+  { text: 'Real-Time', border: '#1d4ed8', r: 44, speed: 0.27 }
 ];
 
-let metaballs = [];
-let mouseX = -1000, mouseY = -1000;
-let isMouseDown = false;
+let blobs = [];
+let blobMouseX = -1000, blobMouseY = -1000;
+let isBlobDragging = false;
 
-function initMetaballs() {
+function initBlobs() {
   if (!metaCanvas) return;
   const rect = metaCanvas.getBoundingClientRect();
-  metaCanvas.width = rect.width * window.devicePixelRatio || 900;
-  metaCanvas.height = rect.height * window.devicePixelRatio || 380;
+  metaCanvas.width = rect.width * (window.devicePixelRatio || 1) || 900;
+  metaCanvas.height = rect.height * (window.devicePixelRatio || 1) || 320;
   const w = metaCanvas.width;
   const h = metaCanvas.height;
 
-  metaballs = METABALL_WORDS.map((item, idx) => ({
+  blobs = BLOB_ITEMS.map((item, idx) => ({
     text: item.text,
-    color: item.color,
-    radius: item.r * (window.devicePixelRatio || 1) * 0.85,
-    x: (w / (METABALL_WORDS.length + 1)) * (idx + 1) + (Math.random() - 0.5) * 40,
+    border: item.border,
+    baseR: item.r * (window.devicePixelRatio || 1) * 0.9,
+    x: (w / (BLOB_ITEMS.length + 1)) * (idx + 1) + (Math.random() - 0.5) * 50,
     y: h / 2 + (Math.random() - 0.5) * 80,
-    vx: (Math.random() - 0.5) * 0.6,
-    vy: (Math.random() - 0.5) * 0.6,
-    baseRadius: item.r * (window.devicePixelRatio || 1) * 0.85
+    vx: (Math.random() - 0.5) * item.speed,
+    vy: (Math.random() - 0.5) * item.speed,
+    phase: Math.random() * Math.PI * 2,
+    morphSpeed: 0.015 + Math.random() * 0.01
   }));
 }
 
-function animateMetaballs() {
+let blobFrame = 0;
+function animateBlobs() {
   if (!metaCtx || !metaCanvas) return;
+  blobFrame++;
   const w = metaCanvas.width;
   const h = metaCanvas.height;
   metaCtx.clearRect(0, 0, w, h);
 
-  // Soft organic connections between nearby metaballs
-  for (let i = 0; i < metaballs.length; i++) {
-    for (let j = i + 1; j < metaballs.length; j++) {
-      const b1 = metaballs[i];
-      const b2 = metaballs[j];
-      const dx = b2.x - b1.x;
-      const dy = b2.y - b1.y;
-      const dist = Math.hypot(dx, dy);
-      const maxDist = (b1.radius + b2.radius) * 1.5;
+  // Draw organic connections between nearby blobs
+  for (let i = 0; i < blobs.length; i++) {
+    for (let j = i + 1; j < blobs.length; j++) {
+      const b1 = blobs[i];
+      const b2 = blobs[j];
+      const dist = Math.hypot(b2.x - b1.x, b2.y - b1.y);
+      const maxDist = (b1.baseR + b2.baseR) * 1.6;
 
       if (dist < maxDist) {
         const factor = 1 - dist / maxDist;
         metaCtx.beginPath();
         metaCtx.moveTo(b1.x, b1.y);
         metaCtx.lineTo(b2.x, b2.y);
-        metaCtx.strokeStyle = b1.color;
-        metaCtx.globalAlpha = factor * 0.25;
-        metaCtx.lineWidth = factor * 30;
-        metaCtx.lineCap = 'round';
+        metaCtx.strokeStyle = 'rgba(30, 41, 59, 0.12)';
+        metaCtx.lineWidth = factor * 1.5;
         metaCtx.stroke();
-        metaCtx.globalAlpha = 1.0;
       }
     }
   }
 
-  // Update & draw each metaball circle
-  metaballs.forEach(b => {
-    // Mouse interaction
-    const mdx = mouseX - b.x;
-    const mdy = mouseY - b.y;
-    const mdist = Math.hypot(mdx, mdy);
-    if (mdist < 140 && mdist > 0) {
-      const force = (1 - mdist / 140) * (isMouseDown ? 2.5 : -1.2);
-      b.vx += (mdx / mdist) * force * 0.1;
-      b.vy += (mdy / mdist) * force * 0.1;
+  // Update and draw each organic blob
+  blobs.forEach(b => {
+    // Mouse avoidance / soft attraction
+    const dx = blobMouseX - b.x;
+    const dy = blobMouseY - b.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 130 && dist > 0) {
+      const force = (1 - dist / 130) * (isBlobDragging ? 1.5 : -1.0);
+      b.vx += (dx / dist) * force * 0.08;
+      b.vy += (dy / dist) * force * 0.08;
     }
 
-    // Motion & damping
+    // Smooth physics
     b.x += b.vx;
     b.y += b.vy;
-    b.vx *= 0.985;
-    b.vy *= 0.985;
+    b.vx *= 0.99;
+    b.vy *= 0.99;
 
-    // Gentle float impulses
-    b.vx += (Math.random() - 0.5) * 0.08;
-    b.vy += (Math.random() - 0.5) * 0.08;
+    // Gentle floating impulses
+    b.vx += (Math.random() - 0.5) * 0.04;
+    b.vy += (Math.random() - 0.5) * 0.04;
 
-    // Bounce off walls
-    const padding = b.radius + 10;
-    if (b.x < padding) { b.x = padding; b.vx *= -1; }
-    if (b.x > w - padding) { b.x = w - padding; b.vx *= -1; }
-    if (b.y < padding) { b.y = padding; b.vy *= -1; }
-    if (b.y > h - padding) { b.y = h - padding; b.vy *= -1; }
+    // Smooth boundary bounce
+    const pad = b.baseR + 15;
+    if (b.x < pad) { b.x = pad; b.vx *= -1; }
+    if (b.x > w - pad) { b.x = w - pad; b.vx *= -1; }
+    if (b.y < pad) { b.y = pad; b.vy *= -1; }
+    if (b.y > h - pad) { b.y = h - pad; b.vy *= -1; }
 
-    // Draw soft pastel metaball body
+    // Draw natural organic blob shape using sine harmonic offsets (No Glow)
+    b.phase += b.morphSpeed;
     metaCtx.beginPath();
-    metaCtx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-    metaCtx.fillStyle = '#ffffff';
-    metaCtx.shadowColor = b.color;
-    metaCtx.shadowBlur = 16;
-    metaCtx.fill();
-    metaCtx.shadowBlur = 0;
+    const points = 24;
+    for (let p = 0; p <= points; p++) {
+      const angle = (p / points) * Math.PI * 2;
+      const wobble = Math.sin(angle * 3 + b.phase) * 3.5 + Math.cos(angle * 2 - b.phase * 1.2) * 2.5;
+      const r = b.baseR + wobble;
+      const px = b.x + Math.cos(angle) * r;
+      const py = b.y + Math.sin(angle) * r;
 
-    metaCtx.lineWidth = 2.5;
-    metaCtx.strokeStyle = b.color;
+      if (p === 0) metaCtx.moveTo(px, py);
+      else metaCtx.lineTo(px, py);
+    }
+    metaCtx.closePath();
+
+    // Clean fill + crisp blue/black border stroke (Zero Glow)
+    metaCtx.fillStyle = '#ffffff';
+    metaCtx.fill();
+
+    metaCtx.lineWidth = 1.5;
+    metaCtx.strokeStyle = b.border;
     metaCtx.stroke();
 
-    // Draw keyword label
-    metaCtx.font = `600 ${14 * (window.devicePixelRatio || 1)}px Inter, sans-serif`;
+    // Clean text label inside blob
+    metaCtx.font = `500 ${13.5 * (window.devicePixelRatio || 1)}px Inter, sans-serif`;
     metaCtx.fillStyle = '#1f1d1a';
     metaCtx.textAlign = 'center';
     metaCtx.textBaseline = 'middle';
     metaCtx.fillText(b.text, b.x, b.y);
   });
 
-  requestAnimationFrame(animateMetaballs);
+  requestAnimationFrame(animateBlobs);
 }
 
 if (metaCanvas) {
   metaCanvas.addEventListener('mousemove', (e) => {
     const rect = metaCanvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    mouseX = (e.clientX - rect.left) * dpr;
-    mouseY = (e.clientY - rect.top) * dpr;
+    blobMouseX = (e.clientX - rect.left) * dpr;
+    blobMouseY = (e.clientY - rect.top) * dpr;
   });
   metaCanvas.addEventListener('mouseleave', () => {
-    mouseX = -1000;
-    mouseY = -1000;
+    blobMouseX = -1000;
+    blobMouseY = -1000;
   });
-  metaCanvas.addEventListener('mousedown', () => { isMouseDown = true; });
-  window.addEventListener('mouseup', () => { isMouseDown = false; });
+  metaCanvas.addEventListener('mousedown', () => { isBlobDragging = true; });
+  window.addEventListener('mouseup', () => { isBlobDragging = false; });
 }
 
 
@@ -385,7 +391,7 @@ function initParticlesAnimation() {
   draw();
 }
 
-// Animation 4: 4 Modulation Knobs with Pulsing Cables
+// Animation 4: 4 Modulation Knobs with Cables
 function initKnobsAnimation() {
   const canvas = document.getElementById('anim-knobs');
   if (!canvas) return;
@@ -412,7 +418,7 @@ function initKnobsAnimation() {
       { x: w * 0.68, y: h * 0.72, speed: -0.9, color: '#b8b8d1' }
     ];
 
-    // Draw patch cables between knobs
+    // Draw patch cables
     ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(244, 162, 97, 0.4)';
@@ -426,12 +432,11 @@ function initKnobsAnimation() {
     ctx.bezierCurveTo(w * 0.4, h * 0.95, w * 0.6, h * 0.95, knobPositions[3].x, knobPositions[3].y);
     ctx.stroke();
 
-    // Draw the 4 rotary knobs
+    // Draw rotary knobs
     knobPositions.forEach((k, idx) => {
       const angle = t * k.speed + idx * 1.5;
       const r = 22;
 
-      // Outer ring
       ctx.beginPath();
       ctx.arc(k.x, k.y, r, 0, Math.PI * 2);
       ctx.fillStyle = '#1c212a';
@@ -440,7 +445,6 @@ function initKnobsAnimation() {
       ctx.strokeStyle = k.color;
       ctx.stroke();
 
-      // Indicator pointer line
       const px = k.x + Math.cos(angle) * (r * 0.75);
       const py = k.y + Math.sin(angle) * (r * 0.75);
       ctx.beginPath();
@@ -550,13 +554,11 @@ function initTickerTapes() {
 
   if (!t1 || !t2 || !t3) return;
 
-  // Split nodes into 3 groups
   const g1 = ALL_NODES.slice(0, 7);
   const g2 = ALL_NODES.slice(7, 14);
   const g3 = ALL_NODES.slice(14);
 
   function createPillsHtml(group) {
-    // Duplicate 3x for infinite seamless looping
     const tri = [...group, ...group, ...group];
     return tri.map(n => `
       <div class="ticker-pill" data-name="${escapeHtml(n.name)}" data-cat="${escapeHtml(n.cat)}" data-desc="${escapeHtml(n.desc)}">
@@ -569,7 +571,6 @@ function initTickerTapes() {
   t2.innerHTML = createPillsHtml(g2);
   t3.innerHTML = createPillsHtml(g3);
 
-  // Click on pill to open modal
   document.querySelectorAll('.ticker-pill').forEach(pill => {
     pill.addEventListener('click', () => {
       openNodeModal(pill.dataset.name, pill.dataset.cat, pill.dataset.desc);
@@ -645,8 +646,8 @@ document.addEventListener('DOMContentLoaded', () => {
   resizeCosmicCanvas();
   requestAnimationFrame(animateCosmos);
 
-  initMetaballs();
-  requestAnimationFrame(animateMetaballs);
+  initBlobs();
+  requestAnimationFrame(animateBlobs);
 
   initWavesAnimation();
   initWavetableAnimation();
