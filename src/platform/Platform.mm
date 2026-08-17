@@ -17,6 +17,12 @@
 // Plugin hosting only: AUAudioUnit's view-controller category and the
 // AUGenericViewController fallback both live here, not in AudioToolbox.
 #import <CoreAudioKit/CoreAudioKit.h>
+#import <OpenGL/OpenGL.h>
+#import <OpenGL/gl3.h>
+#import <Syphon/SyphonOpenGLServer.h>
+#import <Syphon/SyphonOpenGLClient.h>
+#import <Syphon/SyphonServerDirectory.h>
+#import <Syphon/SyphonOpenGLImage.h>
 
 #include <cstdlib>
 #include <cstring>
@@ -4227,4 +4233,223 @@ namespace Platform
       }
       return true;
    }
+
+   // ---- Syphon inter-app video sharing ------------------------------------
+   struct SyphonServerHandle
+   {
+      SyphonOpenGLServer* server = nil;
+      std::string currentName;
+   };
+
+   struct SyphonClientHandle
+   {
+      SyphonOpenGLClient* client = nil;
+      SyphonOpenGLImage* currentImage = nil;
+      std::string currentAppName;
+      std::string currentServerName;
+      std::string currentUuid;
+   };
+
+   SyphonServerHandle* SyphonServerCreate(const std::string& serverName)
+   {
+      @autoreleasepool
+      {
+         CGLContextObj cglContext = CGLGetCurrentContext();
+         if (!cglContext) return nullptr;
+
+         NSString* nsName = serverName.empty() ? @"Infinite Output" : [NSString stringWithUTF8String:serverName.c_str()];
+         SyphonOpenGLServer* s = [[SyphonOpenGLServer alloc] initWithName:nsName context:cglContext options:nil];
+         if (s == nil) return nullptr;
+
+         auto* h = new SyphonServerHandle();
+         h->server = s;
+         h->currentName = serverName;
+         return h;
+      }
+   }
+
+   void SyphonServerUpdateName(SyphonServerHandle* handle, const std::string& serverName)
+   {
+      if (!handle || !handle->server) return;
+      if (handle->currentName == serverName) return;
+      @autoreleasepool
+      {
+         NSString* nsName = serverName.empty() ? @"Infinite Output" : [NSString stringWithUTF8String:serverName.c_str()];
+         handle->server.name = nsName;
+         handle->currentName = serverName;
+      }
+   }
+
+   void SyphonServerPublish(SyphonServerHandle* handle, unsigned int textureId, int width, int height, bool flipped)
+   {
+      if (!handle || !handle->server || textureId == 0 || width <= 0 || height <= 0) return;
+      @autoreleasepool
+      {
+         [handle->server publishFrameTexture:textureId
+                               textureTarget:GL_TEXTURE_2D
+                                 imageRegion:NSMakeRect(0, 0, width, height)
+                           textureDimensions:NSMakeSize(width, height)
+                                     flipped:flipped ? YES : NO];
+      }
+   }
+
+   bool SyphonServerHasClients(SyphonServerHandle* handle)
+   {
+      if (!handle || !handle->server) return false;
+      return handle->server.hasClients;
+   }
+
+   void SyphonServerDestroy(SyphonServerHandle* handle)
+   {
+      if (!handle) return;
+      @autoreleasepool
+      {
+         if (handle->server)
+         {
+            [handle->server stop];
+            handle->server = nil;
+         }
+      }
+      delete handle;
+   }
+
+   std::vector<SyphonServerInfo> SyphonGetAvailableServers()
+   {
+      std::vector<SyphonServerInfo> results;
+      @autoreleasepool
+      {
+         NSArray* servers = [[SyphonServerDirectory sharedDirectory] servers];
+         for (NSDictionary* desc in servers)
+         {
+            if (![desc isKindOfClass:[NSDictionary class]]) continue;
+            NSString* app = [desc objectForKey:SyphonServerDescriptionAppNameKey];
+            NSString* name = [desc objectForKey:SyphonServerDescriptionNameKey];
+            NSString* uuid = [desc objectForKey:SyphonServerDescriptionUUIDKey];
+            SyphonServerInfo info;
+            info.appName = app ? [app UTF8String] : "";
+            info.serverName = name ? [name UTF8String] : "";
+            info.uuid = uuid ? [uuid UTF8String] : "";
+            results.push_back(info);
+         }
+      }
+      return results;
+   }
+
+   SyphonClientHandle* SyphonClientCreate()
+   {
+      auto* h = new SyphonClientHandle();
+      return h;
+   }
+
+   bool SyphonClientConnect(SyphonClientHandle* handle, const std::string& appName, const std::string& serverName, const std::string& uuid)
+   {
+      if (!handle) return false;
+      @autoreleasepool
+      {
+         if (handle->currentImage)
+         {
+            handle->currentImage = nil;
+         }
+         if (handle->client)
+         {
+            [handle->client stop];
+            handle->client = nil;
+         }
+
+         CGLContextObj cglContext = CGLGetCurrentContext();
+         if (!cglContext) return false;
+
+         NSArray* servers = [[SyphonServerDirectory sharedDirectory] servers];
+         NSDictionary* matchedDesc = nil;
+         for (NSDictionary* desc in servers)
+         {
+            NSString* u = [desc objectForKey:SyphonServerDescriptionUUIDKey];
+            if (!uuid.empty() && u && [u isEqualToString:[NSString stringWithUTF8String:uuid.c_str()]])
+            {
+               matchedDesc = desc;
+               break;
+            }
+            NSString* a = [desc objectForKey:SyphonServerDescriptionAppNameKey];
+            NSString* n = [desc objectForKey:SyphonServerDescriptionNameKey];
+            if ((!appName.empty() && a && [a isEqualToString:[NSString stringWithUTF8String:appName.c_str()]]) &&
+                (!serverName.empty() && n && [n isEqualToString:[NSString stringWithUTF8String:serverName.c_str()]]))
+            {
+               matchedDesc = desc;
+               break;
+            }
+         }
+
+         if (!matchedDesc && servers.count > 0 && appName.empty() && serverName.empty() && uuid.empty())
+         {
+            matchedDesc = [servers firstObject];
+         }
+         if (!matchedDesc) return false;
+
+         handle->client = [[SyphonOpenGLClient alloc] initWithServerDescription:matchedDesc context:cglContext options:nil newFrameHandler:nil];
+         if (!handle->client || !handle->client.isValid)
+         {
+            if (handle->client) [handle->client stop];
+            handle->client = nil;
+            return false;
+         }
+
+         handle->currentAppName = appName;
+         handle->currentServerName = serverName;
+         handle->currentUuid = uuid;
+         return true;
+      }
+   }
+
+   bool SyphonClientIsConnected(SyphonClientHandle* handle)
+   {
+      if (!handle || !handle->client) return false;
+      return handle->client.isValid;
+   }
+
+   bool SyphonClientHasNewFrame(SyphonClientHandle* handle)
+   {
+      if (!handle || !handle->client) return false;
+      return handle->client.hasNewFrame;
+   }
+
+   unsigned int SyphonClientGetFrameTexture(SyphonClientHandle* handle, int& outWidth, int& outHeight)
+   {
+      outWidth = 0;
+      outHeight = 0;
+      if (!handle || !handle->client || !handle->client.isValid) return 0;
+
+      @autoreleasepool
+      {
+         SyphonOpenGLImage* img = [handle->client newFrameImage];
+         if (img != nil)
+         {
+            handle->currentImage = img;
+         }
+
+         if (handle->currentImage != nil)
+         {
+            NSSize sz = handle->currentImage.textureSize;
+            outWidth = (int)sz.width;
+            outHeight = (int)sz.height;
+            return handle->currentImage.textureName;
+         }
+         return 0;
+      }
+   }
+
+   void SyphonClientDestroy(SyphonClientHandle* handle)
+   {
+      if (!handle) return;
+      @autoreleasepool
+      {
+         handle->currentImage = nil;
+         if (handle->client)
+         {
+            [handle->client stop];
+            handle->client = nil;
+         }
+      }
+      delete handle;
+   }
 }
+

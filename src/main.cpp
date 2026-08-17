@@ -92,12 +92,17 @@
 #include "nodes/ModulatorNodes.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
+#include "nodes/SyphonInNode.h"
+#include "nodes/SyphonOutNode.h"
+#include "nodes/ProjectionNode.h"
 #include "nodes/AudioNodes.h"
 #include "nodes/AudioEffectNode.h"
 #include "nodes/WavetableNode.h"
 #include "nodes/WaveTerrainNode.h"
 #include "nodes/ImageSpectralSynthNode.h"
 #include "nodes/AudioDisplacementNode.h"
+#include "nodes/AudioTextureNode.h"
+#include "nodes/AudioRibbonNode.h"
 #include "nodes/OscillatorNode.h"
 #include "nodes/MetallicNode.h"
 #include "audio/Wavetable.h"
@@ -182,6 +187,8 @@ namespace
    // node is visually smaller" is true instead of aspirational.
    const float kAudioNodeWidth = 440.0f;
    const float kAudioNarrowWidth = 200.0f;
+   // Two-column layout width for large 3D nodes (Render 3D, Material)
+   const float kWideNodeWidth = 476.0f;
    // A third width, for a node that is genuinely two parallel instruments
    // side by side (Wavetable's engine pair). Stacking them vertically at 440
    // put the node near 1600px tall - unreadable, and it forced an A/B tab whose
@@ -1366,7 +1373,9 @@ namespace
       // a -60..+12 dB range; see the taper's own comment.
       VFaderDb,
       // Same widget as Knob, routed through ConsoleFaderTaper.
-      KnobDb
+      KnobDb,
+      // Logarithmic taper matching human ear frequency/pitch perception and visualizer response curves.
+      KnobFreq
    };
 
    // Visual width the fader occupies inside its cell (track plus the cap's
@@ -1374,13 +1383,33 @@ namespace
    // does: the cell's side margins belong to ModKnob's modulation pin.
    const float kFaderWidth = 22.0f;
 
-   // Optional non-linear position<->value mapping for VFaderFloat. nullptr
+   // Optional non-linear position<->value mapping for VFaderFloat / KnobFloat. nullptr
    // (the default at every call site but the console strip/channel faders)
    // means plain linear, i.e. the original behaviour. A future non-dB taper
    // could plug in here the same way - this is a general fader capability,
    // not dB-specific plumbing hardcoded into the widget.
    using FaderPosToValueFn = float (*)(float pos01, float minV, float maxV);
    using FaderValueToPosFn = float (*)(float value, float minV, float maxV);
+
+   // Logarithmic frequency taper: maps 0..1 throw to an octave-linear scale between minV and maxV.
+   // Perceptually centres ~630 Hz on 20..20,000 Hz, matching human pitch perception and filter graphs.
+   namespace FrequencyTaper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV)
+      {
+         const float lo = std::max(1.0f, minV);
+         const float hi = std::max(lo + 1.0f, maxV);
+         return lo * powf(hi / lo, std::clamp(pos01, 0.0f, 1.0f));
+      }
+
+      inline float ValueToPos(float value, float minV, float maxV)
+      {
+         const float lo = std::max(1.0f, minV);
+         const float hi = std::max(lo + 1.0f, maxV);
+         const float clampedVal = std::clamp(value, lo, hi);
+         return std::clamp((logf(clampedVal) - logf(lo)) / (logf(hi) - logf(lo)), 0.0f, 1.0f);
+      }
+   }
 
    // Piecewise-linear -60..+12 dB console taper: unity sits at 75% of throw
    // and the range below -30 dB (near-inaudible) is compressed, instead of
@@ -1695,6 +1724,9 @@ namespace
          if (style == AudioWidgetStyle::KnobDb)
             return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
                               ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos);
+         if (style == AudioWidgetStyle::KnobFreq)
+            return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
+                              FrequencyTaper::PosToValue, FrequencyTaper::ValueToPos);
          return style == AudioWidgetStyle::VFader
             ? VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f)
             : KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
@@ -2235,6 +2267,7 @@ namespace
       REGISTER_NODE(FormulaNode, Formula, "Source");
       REGISTER_NODE(TextNode, Text, "Text");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
+      REGISTER_NODE(SyphonInNode, Syphon In, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(TextureNode, Texture, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
@@ -2253,6 +2286,7 @@ namespace
       REGISTER_NODE(MaterialNode, Material, "3D");
       REGISTER_NODE(DisplacementNode, Displacement, "3D");
       REGISTER_NODE(AudioDisplacementNode, Audio Displacement, "3D");
+      REGISTER_NODE(AudioRibbonNode, Audio Ribbon, "3D");
       REGISTER_NODE(MappingNode, Mapping, "3D");
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
       REGISTER_NODE(ClothNode, Cloth, "3D");
@@ -2321,6 +2355,8 @@ namespace
       REGISTER_NODE(LayerStackNode, Layer Stack, "Compositing");
       REGISTER_NODE(SwitcherNode, Switcher, "Compositing");
       REGISTER_NODE(OutputNode, Output, "Output");
+      REGISTER_NODE(SyphonOutNode, Syphon Out, "Output");
+      REGISTER_NODE(ProjectionNode, Projection, "Output");
       REGISTER_NODE(LFONode, LFO, "Modulators");
       REGISTER_NODE(RandomNode, Random, "Modulators");
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
@@ -2372,6 +2408,7 @@ namespace
       // "Blend Audio" not "Blend" - that name is taken by the image
       // compositing node (REGISTER_NODE(BlendNode, Blend, "Compositing") above).
       REGISTER_NODE(BlendAudioNode, Blend Audio, "AudioUtility");
+      REGISTER_NODE(AudioTextureNode, Audio Texture, "Audio");
 
       // P3a Part 1 - note-transport proving nodes. See
       // docs/plans/audio/P3a-notes-prompt.md; Part 2 adds Note Filter/
@@ -2544,6 +2581,10 @@ namespace
       if (auto* filter = dynamic_cast<FilterNode*>(gn.node.get()))
          return filter->Def().inputs;
       if (dynamic_cast<FitNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<ProjectionNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<ResynthNode*>(gn.node.get()) != nullptr)
          return 1;
@@ -2726,6 +2767,10 @@ namespace
          return slot == 0 ? &spec->TextureInput() : nullptr;
       if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
          return slot == 0 ? &out->Input() : nullptr;
+      if (auto* syphonOut = dynamic_cast<SyphonOutNode*>(gn.node.get()))
+         return slot == 0 ? &syphonOut->Input() : nullptr;
+      if (auto* proj = dynamic_cast<ProjectionNode*>(gn.node.get()))
+         return slot == 0 ? &proj->Input() : nullptr;
       return nullptr;
    }
 
@@ -3258,6 +3303,80 @@ namespace
       }
    }
 
+   void DrawSyphonOutParams(SyphonOutNode* n)
+   {
+      ImGui::SetNextItemWidth(kPreviewSize);
+      if (ImGui::InputText("##syphon_name", &n->serverNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
+      {
+         n->SetServerName(n->serverNameInput);
+      }
+      if (ImGui::IsItemDeactivatedAfterEdit())
+      {
+         n->SetServerName(n->serverNameInput);
+      }
+
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      if (n->PublishedWidth() > 0 && n->PublishedHeight() > 0)
+      {
+         ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
+         if (n->HasClients())
+            ImGui::TextColored(ImVec4(0.3f, 0.9f, 1.0f, 1.0f), "Clients: Active");
+         else
+            ImGui::TextDisabled("Clients: Waiting for app...");
+      }
+      else
+      {
+         ImGui::TextDisabled("Connect an image input to publish");
+      }
+      ImGui::PopTextWrapPos();
+   }
+
+   void DrawSyphonInParams(SyphonInNode* n)
+   {
+      if (ImGui::Button("Refresh Servers", ImVec2(kPreviewSize, 0)))
+      {
+         n->RefreshServers();
+      }
+
+      const auto& servers = n->AvailableServers();
+      if (servers.empty())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("No active Syphon servers found.");
+         ImGui::PopTextWrapPos();
+      }
+      else
+      {
+         std::vector<std::string> serverNames;
+         serverNames.reserve(servers.size());
+         for (const auto& s : servers)
+         {
+            std::string label = s.appName.empty() ? "App" : s.appName;
+            if (!s.serverName.empty())
+               label += " (" + s.serverName + ")";
+            serverNames.push_back(label);
+         }
+
+         int currentIdx = n->SelectedServerIndex();
+         if (currentIdx < 0) currentIdx = 0;
+         DropdownButton("##syphon_server", serverNames, currentIdx, [n](int idx) {
+            n->SelectServer(idx);
+         }, kPreviewSize);
+
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         if (n->IsConnected())
+         {
+            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
+         }
+         else
+         {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Connecting...");
+         }
+         ImGui::PopTextWrapPos();
+      }
+   }
+
+
    void DrawEnvironmentParams(EnvironmentNode* n)
    {
       if (ImGui::Button("Choose HDRI...", ImVec2(kPreviewSize, 0)))
@@ -3427,6 +3546,204 @@ namespace
       }
       ColorSwatch("bg", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
+   }
+
+   void DrawProjectionHandleOverlay(ProjectionNode* node, ImVec2 origin, ImVec2 imageSize, const char* btnIdSuffix)
+   {
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton(btnIdSuffix, imageSize);
+
+      static int sDragRow = -1;
+      static int sDragCol = -1;
+      static ProjectionNode* sDragNode = nullptr;
+
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      auto toScreen = [&](float nx, float ny) -> ImVec2 {
+         return ImVec2(origin.x + nx * imageSize.x, origin.y + ny * imageSize.y);
+      };
+
+      const bool isCornerPin = (node->mode == (int)ProjectionNode::WarpMode::CornerPin);
+      const int gw = isCornerPin ? 2 : std::max(2, std::min(8, node->gridW));
+      const int gh = isCornerPin ? 2 : std::max(2, std::min(8, node->gridH));
+
+      // Handle point selection & dragging
+      if (ImGui::IsItemActive())
+      {
+         if (sDragNode != node || sDragRow < 0 || sDragCol < 0)
+         {
+            float nearestDist = 32.0f;
+            int bestR = -1, bestC = -1;
+            for (int r = 0; r < gh; ++r)
+            {
+               for (int c = 0; c < gw; ++c)
+               {
+                  ImVec2 pt = toScreen(node->points[r][c].x, node->points[r][c].y);
+                  float d = std::hypot(mouse.x - pt.x, mouse.y - pt.y);
+                  if (d < nearestDist)
+                  {
+                     nearestDist = d;
+                     bestR = r;
+                     bestC = c;
+                  }
+               }
+            }
+            if (bestR >= 0 && bestC >= 0)
+            {
+               sDragNode = node;
+               sDragRow = bestR;
+               sDragCol = bestC;
+            }
+         }
+
+         if (sDragNode == node && sDragRow >= 0 && sDragCol >= 0)
+         {
+            float nx = (mouse.x - origin.x) / std::max(1.0f, imageSize.x);
+            float ny = (mouse.y - origin.y) / std::max(1.0f, imageSize.y);
+            node->points[sDragRow][sDragCol].x = std::max(0.0f, std::min(1.0f, nx));
+            node->points[sDragRow][sDragCol].y = std::max(0.0f, std::min(1.0f, ny));
+         }
+      }
+      else if (ImGui::IsItemDeactivated())
+      {
+         PushUndoCheckpoint();
+         sDragNode = nullptr;
+         sDragRow = -1;
+         sDragCol = -1;
+      }
+
+      // Draw connecting wireframe
+      for (int r = 0; r < gh; ++r)
+      {
+         for (int c = 0; c < gw - 1; ++c)
+         {
+            ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
+            ImVec2 pB = toScreen(node->points[r][c + 1].x, node->points[r][c + 1].y);
+            dl->AddLine(pA, pB, IM_COL32(255, 180, 50, 200), 1.5f);
+         }
+      }
+      for (int c = 0; c < gw; ++c)
+      {
+         for (int r = 0; r < gh - 1; ++r)
+         {
+            ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
+            ImVec2 pB = toScreen(node->points[r + 1][c].x, node->points[r + 1][c].y);
+            dl->AddLine(pA, pB, IM_COL32(255, 180, 50, 200), 1.5f);
+         }
+      }
+
+      // Draw corner diagonals in corner pin mode for visual alignment
+      if (isCornerPin)
+      {
+         ImVec2 pTL = toScreen(node->points[0][0].x, node->points[0][0].y);
+         ImVec2 pTR = toScreen(node->points[0][1].x, node->points[0][1].y);
+         ImVec2 pBR = toScreen(node->points[1][1].x, node->points[1][1].y);
+         ImVec2 pBL = toScreen(node->points[1][0].x, node->points[1][0].y);
+         dl->AddLine(pTL, pBR, IM_COL32(255, 180, 50, 70), 1.0f);
+         dl->AddLine(pTR, pBL, IM_COL32(255, 180, 50, 70), 1.0f);
+      }
+
+      // Draw circular pin handles
+      for (int r = 0; r < gh; ++r)
+      {
+         for (int c = 0; c < gw; ++c)
+         {
+            ImVec2 pt = toScreen(node->points[r][c].x, node->points[r][c].y);
+            const bool isDragged = (sDragNode == node && sDragRow == r && sDragCol == c);
+            float distToMouse = std::hypot(mouse.x - pt.x, mouse.y - pt.y);
+            const bool isHovered = (distToMouse < 18.0f);
+
+            dl->AddCircleFilled(pt, 6.0f, IM_COL32(255, 180, 50, 255));
+            dl->AddCircle(pt, 7.0f, IM_COL32(20, 20, 25, 255), 0, 1.5f);
+            if (isDragged || isHovered)
+               dl->AddCircle(pt, 11.0f, IM_COL32(255, 255, 255, 240), 0, 2.0f);
+         }
+      }
+   }
+
+   void DrawProjectionPreview(ProjectionNode* node)
+   {
+      const float size = kViewportSize;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      // Checkerboard backdrop
+      DrawCheckerboardBackdrop(dl, origin, size);
+
+      if (node->GetOutputTexture() != 0)
+      {
+         dl->AddImage((ImTextureID)(intptr_t)node->GetOutputTexture(), origin,
+                      ImVec2(origin.x + size, origin.y + size), ImVec2(0, 1), ImVec2(1, 0));
+      }
+
+      char btnId[32];
+      snprintf(btnId, sizeof(btnId), "##projinlinenode%p", (void*)node);
+      DrawProjectionHandleOverlay(node, origin, ImVec2(size, size), btnId);
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), IM_COL32(90, 130, 190, 255), 4.0f, 0, 2.0f);
+
+      // Reserve space so the eye toggle and params below aren't drawn over the preview!
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(size, size));
+   }
+
+   void DrawProjectionParams(ProjectionNode* n)
+   {
+      const float colW = kViewportSize;
+      static const std::vector<std::string> kModes = { "Corner Pin (Perspective)", "Mesh Grid" };
+      DropdownButton("mode", kModes, n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; }, colW);
+      DropdownButton("pattern", ProjectionNode::PatternNames(), n->patternMode,
+                     [n](int i) { PushUndoCheckpoint(); n->patternMode = i; }, colW);
+
+      if (ImGui::Checkbox("match input res", &n->matchInput))
+         PushUndoCheckpoint();
+
+      if (!n->matchInput)
+      {
+         ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f", colW);
+         ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f", colW);
+      }
+
+      if (n->mode == 1) // Mesh Grid
+      {
+         ImGui::SetNextItemWidth(100.0f);
+         int gw = n->gridW;
+         if (ImGui::SliderInt("grid X", &gw, 2, 8))
+            n->SetGridSize(gw, n->gridH);
+         if (ImGui::IsItemDeactivatedAfterEdit()) PushUndoCheckpoint();
+
+         ImGui::SameLine(0.0f, 16.0f);
+         ImGui::SetNextItemWidth(100.0f);
+         int gh = n->gridH;
+         if (ImGui::SliderInt("grid Y", &gh, 2, 8))
+            n->SetGridSize(n->gridW, gh);
+         if (ImGui::IsItemDeactivatedAfterEdit()) PushUndoCheckpoint();
+      }
+
+      const float btnW = (colW - 12.0f) * 0.25f;
+      if (ImGui::Button("Reset Corners", ImVec2(btnW, 0)))
+      {
+         PushUndoCheckpoint();
+         n->ResetCorners();
+      }
+      ImGui::SameLine(0.0f, 4.0f);
+      if (ImGui::Button("Reset All", ImVec2(btnW, 0)))
+      {
+         PushUndoCheckpoint();
+         n->ResetAllPoints();
+      }
+      ImGui::SameLine(0.0f, 4.0f);
+      if (ImGui::Button("Flip H", ImVec2(btnW, 0)))
+      {
+         PushUndoCheckpoint();
+         n->FlipH();
+      }
+      ImGui::SameLine(0.0f, 4.0f);
+      if (ImGui::Button("Flip V", ImVec2(btnW, 0)))
+      {
+         PushUndoCheckpoint();
+         n->FlipV();
+      }
    }
 
    void DrawLFOParams(LFONode* n)
@@ -4962,10 +5279,15 @@ namespace
       }
 
       void Knob(const char* label, float* v, float lo, float hi, const char* fmt,
-                float dia = kKnobSmall, bool dbTaper = false)
+                float dia = kKnobSmall, bool dbTaper = false, bool freqTaper = false)
       {
          Place(dia);
-         ModKnob(label, v, lo, hi, fmt, dia, cellW, dbTaper ? AudioWidgetStyle::KnobDb : AudioWidgetStyle::Knob);
+         AudioWidgetStyle style = AudioWidgetStyle::Knob;
+         if (dbTaper)
+            style = AudioWidgetStyle::KnobDb;
+         else if (freqTaper || (lo >= 1.0f && hi >= 1000.0f && (strstr(fmt, "Hz") != nullptr || strcmp(label, "freq") == 0 || strcmp(label, "cutoff") == 0)))
+            style = AudioWidgetStyle::KnobFreq;
+         ModKnob(label, v, lo, hi, fmt, dia, cellW, style);
          index++;
       }
 
@@ -5037,7 +5359,7 @@ namespace
       void DropdownKnob(const char* dropId, const std::vector<std::string>& options, int current,
                         std::function<void(int)> onSelect, const char* knobLabel, float* v,
                         float lo, float hi, const char* fmt, bool knobDisabled = false,
-                        float dia = kKnobSmall)
+                        float dia = kKnobSmall, bool freqTaper = false)
       {
          if (!options.empty())
          {
@@ -5057,7 +5379,10 @@ namespace
          Place(dia);
          if (knobDisabled)
             ImGui::BeginDisabled();
-         ModKnob(knobLabel, v, lo, hi, fmt, dia, cellW);
+         AudioWidgetStyle style = AudioWidgetStyle::Knob;
+         if (freqTaper || (lo >= 1.0f && hi >= 1000.0f && (strstr(fmt, "Hz") != nullptr || strcmp(knobLabel, "freq") == 0 || strcmp(knobLabel, "cutoff") == 0 || strcmp(knobLabel, "filter") == 0)))
+            style = AudioWidgetStyle::KnobFreq;
+         ModKnob(knobLabel, v, lo, hi, fmt, dia, cellW, style);
          if (knobDisabled)
             ImGui::EndDisabled();
          index++;
@@ -5144,6 +5469,8 @@ namespace
       // at slot 0 either, but it keeps its interactive-ADSR body rather than
       // falling back to the generic modulator meter. Any future pin-less
       // node that wants a bespoke body needs the same explicit addition.
+      if (dynamic_cast<AudioTextureNode*>(node) != nullptr)
+         return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
              dynamic_cast<VibratoNode*>(node) != nullptr || dynamic_cast<EnvelopeNode*>(node) != nullptr;
@@ -6432,7 +6759,7 @@ namespace
       DrawWavetableScope(n, 48.0f, gAudioContentW);
       ImGui::Dummy(ImVec2(0.0f, 5.0f));
       {
-         AudioKnobRow row(5);
+         AudioKnobRow row(6, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
          row.Knob("mix  a-b", &n->mix, 0.0f, 1.0f, "%.2f");
          row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f");
          // Free-running pitch is meaningless once notes drive pitch - greyed
@@ -6449,6 +6776,12 @@ namespace
          // NoteEvent.h) and adds additively with whatever this knob is set
          // to. Drag this one directly for a bend with nothing patched.
          row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
+         // fmMode picks phase modulation (cheap, always-stable sideband FM)
+         // vs exponential FM (pitch-tracking, can self-modulate harder) - the
+         // depth knob's meaning depends on it, so they read as one control.
+         row.DropdownKnob("wtFmMode", { "pm", "fm" }, n->fmMode,
+                          [n](int i) { PushUndoCheckpoint(); n->fmMode = i; },
+                          "fm depth", &n->fmDepth, 0.0f, 2.0f, "%.2f");
          row.End();
       }
       EndAudioSection();
@@ -6658,7 +6991,7 @@ namespace
       DrawOscillatorScope(n, 48.0f, gAudioContentW);
       ImGui::Dummy(ImVec2(0.0f, 5.0f));
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
          if (noteDriven)
             ImGui::BeginDisabled();
          row.Knob("freq", &n->frequency, 20.0f, 8000.0f, "%.0f Hz");
@@ -6666,6 +6999,11 @@ namespace
             ImGui::EndDisabled();
          row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s");
          row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
+         // fmMode picks phase modulation vs exponential FM - see the
+         // Wavetable master row's identical control for why they're paired.
+         row.DropdownKnob("oscFmMode", { "pm", "fm" }, n->fmMode,
+                          [n](int i) { PushUndoCheckpoint(); n->fmMode = i; },
+                          "fm depth", &n->fmDepth, 0.0f, 2.0f, "%.2f");
          row.End();
       }
       EndAudioSection();
@@ -6909,9 +7247,15 @@ namespace
             dl->AddImage((ImTextureID)(intptr_t)n->GetOutputTexture(), imgTl, imgBr, ImVec2(0, 1), ImVec2(1, 0));
             dl->AddRect(imgTl, imgBr, IM_COL32(50, 200, 255, 120), 2.0f, 0, 1.0f);
 
-            // Dynamic Glowing Orbit Trajectory Overlay (drawn cleanly on top of image every frame)
+            // Dynamic Glowing Orbit Trajectory Overlay (drawn cleanly on top of image every frame).
+            // Frame 0 (cyan) and frame 7 (magenta) are both drawn now that the
+            // morph knob spans a real fraction of the image between them
+            // (see EvaluateOrbit's morphCy in WaveTerrainDsp.h) - previously
+            // only frame 0 was ever drawn here, so the span the `position`
+            // ("morph") knob sweeps across was invisible while dragging it.
             constexpr int kOrbitPoints = 128;
             ImVec2 orbitPts[kOrbitPoints];
+            ImVec2 orbitPtsEnd[kOrbitPoints];
             const float totalRot = n->rotation + n->CurrentRotation();
             const float totalRotRad = totalRot * (3.14159265f / 180.0f);
 
@@ -6924,11 +7268,21 @@ namespace
                                             n->phaseOffset, totalRotRad, u, v);
                orbitPts[i] = ImVec2(imgTl.x + std::clamp(u, 0.0f, 1.0f) * imgSize,
                                     imgBr.y - std::clamp(v, 0.0f, 1.0f) * imgSize);
+
+               float u7 = 0.0f, v7 = 0.0f;
+               WaveTerrainDsp::EvaluateOrbit(n->orbitType, t, WaveTerrainDsp::kFrames - 1, n->centerX, n->centerY,
+                                            n->radiusX, n->radiusY, n->ratioA, n->ratioB,
+                                            n->phaseOffset, totalRotRad, u7, v7);
+               orbitPtsEnd[i] = ImVec2(imgTl.x + std::clamp(u7, 0.0f, 1.0f) * imgSize,
+                                       imgBr.y - std::clamp(v7, 0.0f, 1.0f) * imgSize);
             }
 
-            // Outer cyan glow
+            // Frame 7 (magenta), drawn first so frame 0's cyan sits on top.
+            dl->AddPolyline(orbitPtsEnd, kOrbitPoints, IM_COL32(240, 0, 200, 55), ImDrawFlags_Closed, 3.5f);
+            dl->AddPolyline(orbitPtsEnd, kOrbitPoints, IM_COL32(255, 170, 240, 200), ImDrawFlags_Closed, 1.5f);
+
+            // Frame 0 (cyan).
             dl->AddPolyline(orbitPts, kOrbitPoints, IM_COL32(0, 240, 220, 60), ImDrawFlags_Closed, 3.5f);
-            // Sharp core cyan curve
             dl->AddPolyline(orbitPts, kOrbitPoints, IM_COL32(200, 255, 255, 240), ImDrawFlags_Closed, 1.5f);
          }
          ImGui::Dummy(ImVec2(containerW, previewH));
@@ -10015,10 +10369,11 @@ namespace
 
       BeginAudioSection("output");
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(4);
          row.Knob("output gain", n->ParamPtr("outputGainDb"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("env", n->ParamPtr("envAmount"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("mod", n->ParamPtr("modAmount"), -1.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
       EndAudioSection();
@@ -13106,54 +13461,69 @@ namespace
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
       if (n->MapInput(kMapNormal).IsConnected())
          ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f);
-      NodeSeparator("surface");
-      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+
+      const float colW = kParamWidth;
+      const float gutter = 16.0f;
+
+      // --- Left Column ---
+      ImGui::BeginGroup();
+
+      NodeSeparator("surface", colW);
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; }, colW);
       ColorSwatch("colour", n->color, n);
-      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
-      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
-      ModSlider("specular", &n->specular, 0.0f, 1.0f);
-      ModSlider("ior", &n->ior, 1.0f, 3.0f);
-      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f, "%.3f", colW);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f, "%.3f", colW);
+      ModSlider("specular", &n->specular, 0.0f, 1.0f, "%.3f", colW);
+      ModSlider("ior", &n->ior, 1.0f, 3.0f, "%.3f", colW);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f, "%.3f", colW);
       if (n->opacity < 1.0f || n->alphaCutoff > 0.0f)
-         ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f);
+         ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f, "%.3f", colW);
 
-      NodeSeparator("emission");
+      NodeSeparator("emission", colW);
       ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f, "%.3f", colW);
 
-      NodeSeparator("coat & sheen");
-      ModSlider("clearcoat", &n->clearcoat, 0.0f, 1.0f);
+      ImGui::EndGroup();
+
+      // --- Right Column ---
+      ImGui::SameLine(0.0f, gutter);
+      ImGui::BeginGroup();
+
+      NodeSeparator("coat & sheen", colW);
+      ModSlider("clearcoat", &n->clearcoat, 0.0f, 1.0f, "%.3f", colW);
       if (n->clearcoat > 0.0f || n->MapInput(kMapClearcoat).IsConnected())
-         ModSlider("coat roughness", &n->clearcoatRoughness, 0.02f, 1.0f);
-      ModSlider("sheen", &n->sheen, 0.0f, 1.0f);
+         ModSlider("coat roughness", &n->clearcoatRoughness, 0.02f, 1.0f, "%.3f", colW);
+      ModSlider("sheen", &n->sheen, 0.0f, 1.0f, "%.3f", colW);
       if (n->sheen > 0.0f || n->MapInput(kMapSheen).IsConnected())
       {
          ColorSwatch("sheen tint", n->sheenColor, n);
-         ModSlider("sheen roughness", &n->sheenRoughness, 0.01f, 1.0f);
+         ModSlider("sheen roughness", &n->sheenRoughness, 0.01f, 1.0f, "%.3f", colW);
       }
 
-      NodeSeparator("optics");
-      ModSlider("anisotropy", &n->anisotropy, -1.0f, 1.0f);
+      NodeSeparator("optics", colW);
+      ModSlider("anisotropy", &n->anisotropy, -1.0f, 1.0f, "%.3f", colW);
       if (n->anisotropy != 0.0f)
-         ModSlider("aniso rotation", &n->anisotropyRotation, 0.0f, 1.0f);
-      ModSlider("iridescence", &n->iridescence, 0.0f, 1.0f);
+         ModSlider("aniso rotation", &n->anisotropyRotation, 0.0f, 1.0f, "%.3f", colW);
+      ModSlider("iridescence", &n->iridescence, 0.0f, 1.0f, "%.3f", colW);
       if (n->iridescence > 0.0f)
       {
-         ModSlider("irid IOR", &n->iridescenceIor, 1.0f, 3.0f);
-         ModSlider("irid thickness", &n->iridescenceThickness, 100.0f, 1000.0f, "%.0f nm");
+         ModSlider("irid IOR", &n->iridescenceIor, 1.0f, 3.0f, "%.3f", colW);
+         ModSlider("irid thickness", &n->iridescenceThickness, 100.0f, 1000.0f, "%.0f nm", colW);
       }
-      ModSlider("transmission", &n->transmission, 0.0f, 1.0f);
+      ModSlider("transmission", &n->transmission, 0.0f, 1.0f, "%.3f", colW);
       if (n->transmission > 0.0f)
       {
-         ModSlider("trans rough", &n->transmissionRoughness, 0.0f, 1.0f);
-         ModSlider("dispersion", &n->dispersion, 0.0f, 1.0f);
+         ModSlider("trans rough", &n->transmissionRoughness, 0.0f, 1.0f, "%.3f", colW);
+         ModSlider("dispersion", &n->dispersion, 0.0f, 1.0f, "%.3f", colW);
       }
-      ModSlider("subsurface", &n->subsurface, 0.0f, 1.0f);
+      ModSlider("subsurface", &n->subsurface, 0.0f, 1.0f, "%.3f", colW);
       if (n->subsurface > 0.0f)
       {
          ColorSwatch("sss colour", n->subsurfaceColor, n);
-         ModSlider("sss radius", &n->subsurfaceRadius, 0.0f, 1.0f);
+         ModSlider("sss radius", &n->subsurfaceRadius, 0.0f, 1.0f, "%.3f", colW);
       }
+
+      ImGui::EndGroup();
    }
 
    void DrawMappingParams(MappingNode* n)
@@ -13674,6 +14044,56 @@ namespace
       }
    }
 
+   void DrawAudioTextureParams(AudioTextureNode* n)
+   {
+      DropdownButton("mode", AudioTextureNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
+      if (n->mode == AudioTextureNode::kModeWaveform)
+      {
+         DropdownButton("window", AudioTextureNode::WindowSizeNames(), n->windowSizeIndex, [n](int i) { n->windowSizeIndex = i; });
+      }
+      else
+      {
+         ImGui::BeginDisabled();
+         int dummy = 1; // 1024
+         DropdownButton("window (1024)", AudioTextureNode::WindowSizeNames(), dummy, [](int) {});
+         ImGui::EndDisabled();
+      }
+      ModSlider("gain", &n->gain, 0.1f, 10.0f);
+      ModSlider("smoothing", &n->smoothing, 0.0f, 0.99f);
+   }
+
+   void DrawAudioRibbonParams(AudioRibbonNode* n)
+   {
+      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      ModSlider("width", &n->width, 0.05f, 5.0f);
+      ModSlider("height scale", &n->heightScale, 0.0f, 5.0f);
+      ModSliderInt("segments", &n->segments, 16, 1024);
+      ModSlider("gain", &n->gain, 0.1f, 10.0f);
+      ModSlider("smoothing", &n->smoothing, 0.0f, 0.99f);
+
+      NodeSeparator("transform");
+      ModSlider("pos X", &n->posX, -10.0f, 10.0f);
+      ModSlider("pos Y", &n->posY, -10.0f, 10.0f);
+      ModSlider("pos Z", &n->posZ, -10.0f, 10.0f);
+      ModSlider("rot X", &n->rotX, -3.14159f, 3.14159f);
+      ModSlider("rot Y", &n->rotY, -3.14159f, 3.14159f);
+      ModSlider("rot Z", &n->rotZ, -3.14159f, 3.14159f);
+      ModSlider("scale X", &n->scaleX, 0.01f, 10.0f);
+      ModSlider("scale Y", &n->scaleY, 0.01f, 10.0f);
+      ModSlider("scale Z", &n->scaleZ, 0.01f, 10.0f);
+      ModSlider("uniform scale", &n->uniformScale, 0.01f, 10.0f);
+
+      NodeSeparator("material");
+      DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; });
+      ColorSwatch("colour", n->color, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.02f, 1.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f);
+      ModSlider("ior", &n->ior, 1.0f, 3.0f);
+   }
+
    void DrawSetColorParams(SetColorNode* n)
    {
       if (n->input != nullptr)
@@ -13854,18 +14274,26 @@ namespace
          if (n->geometry[i] != nullptr)
             connected++;
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
+      ImGui::SameLine(0.0f, 16.0f);
       ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
-      if (ImGui::Button("Frame scene", ImVec2(kParamWidth, 0)))
+
+      const float colW = kParamWidth;
+      const float gutter = 16.0f;
+
+      if (ImGui::Button("Frame scene", ImVec2(colW, 0)))
          FrameSceneInView(n);
 
-      NodeSeparator("output");
+      // --- Left Column ---
+      ImGui::BeginGroup();
+
+      NodeSeparator("output", colW);
       // This is the export resolution: Output sizes its own buffer from whatever
       // its input hands it, so a 4000px PNG needs 4000 set here or it is an
       // upscale of a smaller render.
-      ModSlider("width", &n->width, 64.0f, 8192.0f, "%.0f");
-      ModSlider("height", &n->height, 64.0f, 8192.0f, "%.0f");
+      ModSlider("width", &n->width, 64.0f, 8192.0f, "%.0f", colW);
+      ModSlider("height", &n->height, 64.0f, 8192.0f, "%.0f", colW);
       DropdownButton("antialias", Render3DNode::SampleNames(), n->samples,
-                     [n](int i) { n->samples = i; });
+                     [n](int i) { n->samples = i; }, colW);
       {
          // The requested sample count is clamped by both the driver and a memory
          // budget, so show what actually happened when they disagree.
@@ -13876,52 +14304,45 @@ namespace
                                n->ActiveSamples());
       }
       DropdownButton("tonemap", Render3DNode::TonemapNames(), n->tonemap,
-                     [n](int i) { n->tonemap = i; });
-      ModSlider("exposure", &n->exposure, 0.1f, 4.0f);
+                     [n](int i) { n->tonemap = i; }, colW);
+      ModSlider("exposure", &n->exposure, 0.1f, 4.0f, "%.3f", colW);
       ColorSwatch("background", n->bgColor, n);
-      ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
+      ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f, "%.3f", colW);
 
-      NodeSeparator("points");
-      DropdownButton("sprite shape", Render3DNode::SpriteShapeNames(), n->spriteShape,
-                     [n](int i) { n->spriteShape = i; });
-      DropdownButton("sprite size", Render3DNode::SpriteSizeModeNames(), n->spriteSizeMode,
-                     [n](int i) { n->spriteSizeMode = i; });
-
-      NodeSeparator("camera");
+      NodeSeparator("camera", colW);
       if (n->camera != nullptr)
          ImGui::TextDisabled("driven by a Camera node");
       else
       {
-      DropdownButton("projection", Render3DNode::ProjectionNames(), n->projection,
-                     [n](int i) { n->projection = i; });
-      if (n->projection == 0)
-         ModSlider("fov", &n->fov, 10.0f, 120.0f);
-      else
-         ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f);
-      ModSlider("distance", &n->camDistance, 0.3f, 20.0f);
-      // This render's own camera, entirely separate from any node's
-      // mini-viewport/panel camera (SharedViewportCamera.h/gNodeCameras):
-      // the final output framing is a deliberate setup, not something
-      // casual node-viewport orbiting should ever move.
-      ModSlider("orbit", &n->camAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
-      ModSlider("elevation", &n->camElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0");
-      ModSlider("target x", &n->targetX, -3.0f, 3.0f);
-      ModSlider("target y", &n->targetY, -3.0f, 3.0f);
-      ModSlider("target z", &n->targetZ, -3.0f, 3.0f);
+         DropdownButton("projection", Render3DNode::ProjectionNames(), n->projection,
+                        [n](int i) { n->projection = i; }, colW);
+         if (n->projection == 0)
+            ModSlider("fov", &n->fov, 10.0f, 120.0f, "%.3f", colW);
+         else
+            ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f, "%.3f", colW);
+         ModSlider("distance", &n->camDistance, 0.3f, 20.0f, "%.3f", colW);
+         // This render's own camera, entirely separate from any node's
+         // mini-viewport/panel camera (SharedViewportCamera.h/gNodeCameras):
+         // the final output framing is a deliberate setup, not something
+         // casual node-viewport orbiting should ever move.
+         ModSlider("orbit", &n->camAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0", colW);
+         ModSlider("elevation", &n->camElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0", colW);
+         ModSlider("target x", &n->targetX, -3.0f, 3.0f, "%.3f", colW);
+         ModSlider("target y", &n->targetY, -3.0f, 3.0f, "%.3f", colW);
+         ModSlider("target z", &n->targetZ, -3.0f, 3.0f, "%.3f", colW);
       }
 
-      NodeSeparator("shadows");
-      ImGui::Checkbox("cast shadows", &n->shadowsEnabled);
-      if (n->shadowsEnabled)
-      {
-         DropdownButton("resolution", Render3DNode::ShadowQualityNames(), n->shadowQuality,
-                        [n](int i) { n->shadowQuality = i; });
-         ModSlider("strength", &n->shadowStrength, 0.0f, 1.0f);
-         ModSlider("softness", &n->shadowSoftness, 0.0f, 4.0f);
-         ModSlider("bias", &n->shadowBias, 0.0002f, 0.02f, "%.4f");
-      }
+      NodeSeparator("raster", colW);
+      ImGui::Checkbox("depth test", &n->depthTest);
+      ImGui::Checkbox("cull backfaces", &n->backfaceCull);
 
-      NodeSeparator("light");
+      ImGui::EndGroup();
+
+      // --- Right Column ---
+      ImGui::SameLine(0.0f, gutter);
+      ImGui::BeginGroup();
+
+      NodeSeparator("light", colW);
       int patchedLights = 0;
       for (int i = 0; i < Render3DNode::kLightSlots; i++)
          if (n->lights[i] != nullptr)
@@ -13930,15 +14351,26 @@ namespace
          ImGui::TextDisabled("%d Light node%s patched", patchedLights, patchedLights == 1 ? "" : "s");
       else
       {
-      ModSlider("light orbit", &n->lightAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
-      ModSlider("light height", &n->lightElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0");
-      ColorSwatch("light", n->lightColor, n);
-      ModSlider("intensity", &n->lightIntensity, 0.0f, 4.0f);
+         ModSlider("light orbit", &n->lightAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0", colW);
+         ModSlider("light height", &n->lightElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0", colW);
+         ColorSwatch("light", n->lightColor, n);
+         ModSlider("intensity", &n->lightIntensity, 0.0f, 4.0f, "%.3f", colW);
       }
       ColorSwatch("ambient", n->ambientColor, n);
-      ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f);
+      ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f, "%.3f", colW);
 
-      NodeSeparator("environment");
+      NodeSeparator("shadows", colW);
+      ImGui::Checkbox("cast shadows", &n->shadowsEnabled);
+      if (n->shadowsEnabled)
+      {
+         DropdownButton("resolution", Render3DNode::ShadowQualityNames(), n->shadowQuality,
+                        [n](int i) { n->shadowQuality = i; }, colW);
+         ModSlider("strength", &n->shadowStrength, 0.0f, 1.0f, "%.3f", colW);
+         ModSlider("softness", &n->shadowSoftness, 0.0f, 4.0f, "%.3f", colW);
+         ModSlider("bias", &n->shadowBias, 0.0002f, 0.02f, "%.4f", colW);
+      }
+
+      NodeSeparator("environment", colW);
       const bool envConnected = n->envInput.IsConnected();
       if (envConnected)
       {
@@ -13951,11 +14383,15 @@ namespace
          ColorSwatch("horizon", n->envHorizon, n);
          ColorSwatch("ground", n->envGround, n);
       }
-      ModSlider("env intensity", &n->envIntensity, 0.0f, 3.0f);
+      ModSlider("env intensity", &n->envIntensity, 0.0f, 3.0f, "%.3f", colW);
 
-      NodeSeparator("raster");
-      ImGui::Checkbox("depth test", &n->depthTest);
-      ImGui::Checkbox("cull backfaces", &n->backfaceCull);
+      NodeSeparator("points", colW);
+      DropdownButton("sprite shape", Render3DNode::SpriteShapeNames(), n->spriteShape,
+                     [n](int i) { n->spriteShape = i; }, colW);
+      DropdownButton("sprite size", Render3DNode::SpriteSizeModeNames(), n->spriteSizeMode,
+                     [n](int i) { n->spriteSizeMode = i; }, colW);
+
+      ImGui::EndGroup();
    }
 
    void DrawBlendParams(BlendNode* n)
@@ -14558,16 +14994,20 @@ namespace
    void DrawPreview(INode* node)
    {
       unsigned int tex = node->GetOutputTexture();
-      ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-
-      // Render 3D gets a working viewport rather than a thumbnail: it is the
-      // one preview you orbit and frame a scene in. Viewport nodes are asking
-      // for the same thing explicitly.
       auto* render = dynamic_cast<Render3DNode*>(node);
       const bool wantsBigCanvas =
          render != nullptr || dynamic_cast<ViewportNode*>(node) != nullptr;
       const float size = wantsBigCanvas ? kViewportSize : kPreviewSize;
+
+      if (render != nullptr)
+      {
+         const float offset = std::max(0.0f, (kWideNodeWidth - size) * 0.5f);
+         if (offset > 0.0f)
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+      }
+
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
 
       DrawCheckerboardBackdrop(dl, origin, size);
 
@@ -14681,7 +15121,16 @@ namespace
       NodeViewport& viewport = gNodeViewports[gn.index];
       SharedViewportCamera& cam = gNodeCameras[gn.index];
 
-      const float size = kPreviewSize;
+      const bool isMaterial = (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr);
+      const float size = isMaterial ? kViewportSize : kPreviewSize;
+
+      if (isMaterial)
+      {
+         const float offset = std::max(0.0f, (kWideNodeWidth - size) * 0.5f);
+         if (offset > 0.0f)
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+      }
+
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       DrawCheckerboardBackdrop(dl, origin, size);
@@ -14936,6 +15385,17 @@ namespace
                draw->EndStroke();
             }
 
+            ImGui::SetCursorScreenPos(origin);
+         }
+
+         // A Projection node's panel card supports draggable warping pins,
+         // matching its inline preview
+         if (auto* proj = dynamic_cast<ProjectionNode*>(gn.node.get()))
+         {
+            ImGui::SetCursorScreenPos(origin);
+            char btnId[32];
+            snprintf(btnId, sizeof(btnId), "##projviewportcanvas%d", gn.index);
+            DrawProjectionHandleOverlay(proj, origin, imageSize, btnId);
             ImGui::SetCursorScreenPos(origin);
          }
 
@@ -15408,6 +15868,8 @@ namespace
 
          // ---------------- Output ----------------
          { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
+         { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
+         { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
 
          // ---------------- 3D / geometry pipeline ----------------
          { "Geometry", "The base 3D primitive node - pick any of its 24 shapes from the dropdown. Each shape also has its own directly-spawnable named node (Cube, Sphere, Torus, ...) that just starts on that shape." },
@@ -15790,6 +16252,8 @@ namespace
             } },
             { "Output", {
                { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
+               { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
+               { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
             } },
          };
 
@@ -15910,6 +16374,10 @@ namespace
          return noteSrc->GetAudioNode();
       if (auto* adisp = dynamic_cast<AudioDisplacementNode*>(node))
          return adisp->GetAudioNode();
+      if (auto* at = dynamic_cast<AudioTextureNode*>(node))
+         return at->GetAudioNode();
+      if (auto* ar = dynamic_cast<AudioRibbonNode*>(node))
+         return ar->GetAudioNode();
       return node->AudioNodeForNotePorts();
    }
 
@@ -16064,6 +16532,31 @@ namespace
       // AudioPluginNode's lives at slot 1 (audio stays at slot 0 there so
       // existing patches keep loading unchanged) - a node exposes at most one
       // note pin, so whichever slot answers non-null is it.
+      // A producer's outbox can fan out to more than one consumer (two
+      // synths off one Note Sequencer, an FM patch, etc) - each consumer
+      // needs its own read cursor so draining events in one doesn't starve
+      // another (see NoteEventQueue's multi-consumer contract). Reset every
+      // outbox that's in play this generation before handing out fresh
+      // cursor ids, so ids never leak across rebuilds.
+      {
+         std::set<NoteEventQueue*> resetOutboxes;
+         for (GraphNode& gn : gNodes)
+         {
+            NoteCable* cable = nullptr;
+            for (int slot = 0; slot < kMaxNoteSlots && cable == nullptr; slot++)
+               cable = gn.node->NoteInputSlot(slot);
+            if (cable == nullptr || !cable->IsConnected())
+               continue;
+            if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+            {
+               if (NoteEventQueue* outbox = producer->NoteOutbox(cable->GetOutputSlot()))
+               {
+                  if (resetOutboxes.insert(outbox).second)
+                     outbox->ResetConsumers();
+               }
+            }
+         }
+      }
       for (GraphNode& gn : gNodes)
       {
          NoteCable* cable = nullptr;
@@ -16075,12 +16568,17 @@ namespace
          if (consumer == nullptr)
             continue;
          NoteEventQueue* inbox = nullptr;
+         int cursor = -1;
          if (cable->IsConnected())
          {
             if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+            {
                inbox = producer->NoteOutbox(cable->GetOutputSlot());
+               if (inbox != nullptr)
+                  cursor = inbox->RegisterConsumer();
+            }
          }
-         consumer->SetNoteInbox(inbox);
+         consumer->SetNoteInbox(inbox, cursor);
       }
 
       const double sampleRate = AudioEngine::Instance().SampleRate();
@@ -16967,8 +17465,13 @@ struct AudioNodeShape
    bool isNoteSource = false;
    bool isModulator = false;
    bool hasNotePorts = false; // AudioNodeForNotePorts() != nullptr (NoteToCVNode)
-   int audioInputSlots = 0;   // contiguous AudioInputSlot(i) != nullptr count
-   int noteInputSlots = 0;    // contiguous NoteInputSlot(i) != nullptr count
+   int audioInputSlots = 0;   // highest AudioInputSlot(i) != nullptr index + 1
+   int noteInputSlots = 0;    // highest NoteInputSlot(i) != nullptr index + 1
+   int firstNoteInputSlot = -1; // actual slot index of the first live NoteInputSlot(); -1 if none.
+                                 // Nodes with note-only input (no AudioInputSlot at all) can have
+                                 // their note pin start at a nonzero slot - e.g. WaveTerrainNode and
+                                 // ImageSpectralSynthNode both only answer NoteInputSlot(1). Callers
+                                 // that need to actually connect a cable must use this, not slot 0.
 
    // Does this node own (or reach) an AudioNode at all? AUDIOPARAMSWEEPTEST's
    // "reaches the audio thread" check needs one to drive; a node with none
@@ -16992,16 +17495,20 @@ inline AudioNodeShape ProbeAudioNodeShape(INode* node)
    shape.isNoteSource = dynamic_cast<INoteSource*>(node) != nullptr;
    shape.isModulator = dynamic_cast<IModulator*>(node) != nullptr;
    shape.hasNotePorts = node->AudioNodeForNotePorts() != nullptr;
+   // Scan the full slot range rather than breaking on the first empty slot -
+   // a node's audio and note pins don't have to start contiguously at index 0
+   // (see firstNoteInputSlot comment above). This probe runs once per node
+   // type on a throwaway instance, so the extra iterations are free.
    for (int i = 0; i < kAudioMaxNodeInputs; i++)
    {
-      const bool hasAudio = node->AudioInputSlot(i) != nullptr;
-      const bool hasNote = node->NoteInputSlot(i) != nullptr;
-      if (!hasAudio && !hasNote)
-         break;
-      if (hasAudio)
+      if (node->AudioInputSlot(i) != nullptr)
          shape.audioInputSlots = i + 1;
-      if (hasNote)
+      if (node->NoteInputSlot(i) != nullptr)
+      {
          shape.noteInputSlots = i + 1;
+         if (shape.firstNoteInputSlot < 0)
+            shape.firstNoteInputSlot = i;
+      }
    }
    return shape;
 }
@@ -17524,7 +18031,7 @@ static bool RunWavetableFixture()
       wt.CookIfNeeded(1);
 
       NoteEventQueue inbox;
-      audio->SetNoteInbox(&inbox);
+      audio->SetNoteInbox(&inbox, inbox.RegisterConsumer());
 
       std::vector<float> chan0(numFrames), chan1(numFrames);
       float* chans[2] = { chan0.data(), chan1.data() };
@@ -18961,7 +19468,7 @@ static bool RunSamplerFixture()
       on.isNoteOn = true;
       on.frameOffset = 0;
       queue.Push(on);
-      an->SetNoteInbox(&queue);
+      an->SetNoteInbox(&queue, queue.RegisterConsumer());
 
       std::vector<float> l(frames, 0.0f), r(frames, 0.0f);
       float* chans[2] = { l.data(), r.data() };
@@ -19046,7 +19553,7 @@ static bool RunSamplerFixture()
          on.isNoteOn = true;
          on.frameOffset = 0;
          queue.Push(on);
-         an->SetNoteInbox(&queue);
+         an->SetNoteInbox(&queue, queue.RegisterConsumer());
          std::vector<float> l(frames, 0.0f), r(frames, 0.0f);
          float* chans[2] = { l.data(), r.data() };
          AudioBuffer buf;
@@ -19438,7 +19945,7 @@ namespace DrumSeqTest
       an->PrepareToPlay((double)sampleRate, blockSize);
       node.CookIfNeeded(2);
       if (inbox != nullptr)
-         an->SetNoteInbox(inbox);
+         an->SetNoteInbox(inbox, inbox->RegisterConsumer());
 
       std::vector<float> out;
       out.reserve(totalFrames);
@@ -20269,11 +20776,11 @@ static bool RunNoteStackFixture()
       AudioNode* audio = n.GetAudioNode();
       audio->PrepareToPlay(sampleRate, numFrames);
       n.CookIfNeeded(1);
-      audio->SetNoteInbox(&inbox);
+      audio->SetNoteInbox(&inbox, inbox.RegisterConsumer());
       return audio;
    };
 
-   auto RunBlockCollect = [&](AudioNode* audio, NoteEvent* out, int cap) -> int
+   auto RunBlockCollect = [&](AudioNode* audio, int outboxCursor, NoteEvent* out, int cap) -> int
    {
       std::vector<float> chan0(numFrames), chan1(numFrames);
       float* chans[2] = { chan0.data(), chan1.data() };
@@ -20282,7 +20789,7 @@ static bool RunNoteStackFixture()
       buf.numChannels = 2;
       buf.numFrames = numFrames;
       audio->ProcessBlock(nullptr, 0, buf);
-      return audio->NoteOutbox()->Pop(out, cap);
+      return audio->NoteOutbox()->Pop(outboxCursor, out, cap);
    };
 
    // 1) +12/-7/+6 enabled: one note-on must yield exactly 4 note-ons (dry +
@@ -20298,6 +20805,7 @@ static bool RunNoteStackFixture()
 
       NoteEventQueue inbox;
       AudioNode* audio = MakeRig(n, inbox);
+      const int outboxCursor = audio->NoteOutbox()->RegisterConsumer();
 
       NoteEvent on;
       on.note = 60;
@@ -20307,7 +20815,7 @@ static bool RunNoteStackFixture()
       inbox.Push(on);
 
       NoteEvent evts[16];
-      const int count = RunBlockCollect(audio, evts, 16);
+      const int count = RunBlockCollect(audio, outboxCursor, evts, 16);
 
       bool sawDry = false, saw72 = false, saw53 = false, saw66 = false;
       bool velOk = true;
@@ -20342,7 +20850,7 @@ static bool RunNoteStackFixture()
       inbox.Push(off);
 
       NoteEvent offEvts[16];
-      const int offCount = RunBlockCollect(audio, offEvts, 16);
+      const int offCount = RunBlockCollect(audio, outboxCursor, offEvts, 16);
       bool offDry = false, off72 = false, off53 = false, off66 = false;
       for (int i = 0; i < offCount; i++)
       {
@@ -20374,6 +20882,7 @@ static bool RunNoteStackFixture()
 
       NoteEventQueue inbox;
       AudioNode* audio = MakeRig(n, inbox);
+      const int outboxCursor = audio->NoteOutbox()->RegisterConsumer();
 
       NoteEvent on;
       on.note = 60;
@@ -20383,7 +20892,7 @@ static bool RunNoteStackFixture()
       inbox.Push(on);
 
       NoteEvent evts[16];
-      const int count = RunBlockCollect(audio, evts, 16);
+      const int count = RunBlockCollect(audio, outboxCursor, evts, 16);
       const bool ok = count == 2; // dry (60) + one 65, not two
       printf("DSPTEST notestack dedupes identical semitone voices: got %d note-ons (want 2)  %s\n", count,
              ok ? "OK" : "FAIL");
@@ -20399,6 +20908,7 @@ static bool RunNoteStackFixture()
 
       NoteEventQueue inbox;
       AudioNode* audio = MakeRig(n, inbox);
+      const int outboxCursor = audio->NoteOutbox()->RegisterConsumer();
 
       NoteEvent on;
       on.note = 120; // 120 + 24 = 144, out of range
@@ -20408,7 +20918,7 @@ static bool RunNoteStackFixture()
       inbox.Push(on);
 
       NoteEvent evts[16];
-      const int count = RunBlockCollect(audio, evts, 16);
+      const int count = RunBlockCollect(audio, outboxCursor, evts, 16);
       const bool ok = count == 1 && evts[0].note == 120;
       printf("DSPTEST notestack drops out-of-range voice, dry still sounds: got %d note-ons  %s\n", count,
              ok ? "OK" : "FAIL");
@@ -20638,6 +21148,462 @@ static bool RunImageSpectralSynthFixture()
    printf("DSPTEST spectral additive synth audio render: peakL=%.3f peakR=%.3f %s\n", peakL, peakR, audioOk ? "OK" : "FAIL");
    all &= audioOk;
 
+   // 5. Test Unison & Detune Synthesis
+   specNode.unison = 4;
+   specNode.detune = 25.0f;
+   specNode.stereoWidth = 1.0f;
+   specNode.PushParams();
+
+   float unisonPeakL = 0.0f, unisonPeakR = 0.0f;
+   bool unisonNoNaNs = true;
+   for (int b = 0; b < 50; b++)
+   {
+      audioNode->ProcessBlock(nullptr, 0, outBuf);
+      for (int i = 0; i < blockSize; i++)
+      {
+         const float sL = bufL[i];
+         const float sR = bufR[i];
+         if (std::isnan(sL) || std::isnan(sR) || std::isinf(sL) || std::isinf(sR))
+            unisonNoNaNs = false;
+         unisonPeakL = std::max(unisonPeakL, std::fabs(sL));
+         unisonPeakR = std::max(unisonPeakR, std::fabs(sR));
+      }
+   }
+   const bool unisonOk = unisonNoNaNs && (unisonPeakL > 0.02f) && (unisonPeakR > 0.02f);
+   printf("DSPTEST spectral unison (4-voice detuned): peakL=%.3f peakR=%.3f %s\n", unisonPeakL, unisonPeakR, unisonOk ? "OK" : "FAIL");
+   all &= unisonOk;
+
+   // 6. Test LP24 vs LP12 Filter Steeper Roll-off
+   specNode.unison = 1;
+   specNode.filterType = SpectralAdditiveDsp::kFilterLP12;
+   specNode.cutoff = 400.0f;
+   specNode.resonance = 0.0f;
+   specNode.PushParams();
+
+   float rmsLP12 = 0.0f;
+   for (int b = 0; b < 40; b++)
+   {
+      audioNode->ProcessBlock(nullptr, 0, outBuf);
+      for (int i = 0; i < blockSize; i++)
+         rmsLP12 += bufL[i] * bufL[i];
+   }
+
+   specNode.filterType = SpectralAdditiveDsp::kFilterLP24;
+   specNode.PushParams();
+
+   float rmsLP24 = 0.0f;
+   for (int b = 0; b < 40; b++)
+   {
+      audioNode->ProcessBlock(nullptr, 0, outBuf);
+      for (int i = 0; i < blockSize; i++)
+         rmsLP24 += bufL[i] * bufL[i];
+   }
+
+   // 24dB cascaded low-pass must attenuate high harmonics more strongly than 12dB
+   const bool lp24Ok = (rmsLP24 < rmsLP12 * 0.85f);
+   printf("DSPTEST spectral filter LP24 cascade roll-off: rmsLP12=%.5f rmsLP24=%.5f %s\n", rmsLP12, rmsLP24, lp24Ok ? "OK" : "FAIL");
+   all &= lp24Ok;
+
+   // 7. ADSR attack: an attack of N ms should reach ~full envelope level
+   //    within ~N ms of real time - catches item 3a (Envelope::Process()
+   //    used to be called once per block instead of numFrames times, so a
+   //    10ms attack took ~441 blocks (~5s at 512/44.1k) to actually
+   //    complete).
+   {
+      ImageSpectralSynthNode attackNode;
+      attackNode.scanMode = SpectralAdditiveDsp::kScanFreeRunHz;
+      attackNode.scanSpeed = 0.0f;
+      attackNode.volume = 1.0f;
+      attackNode.ampAttack = 20.0f;
+      attackNode.ampDecay = 300.0f;
+      attackNode.ampSustain = 1.0f;
+      attackNode.ampRelease = 200.0f;
+      attackNode.PushParams(); // the constructor pushed the pre-assignment defaults; push again now that the fields above are set
+
+      AudioNode* attackAudio = attackNode.GetAudioNode();
+      const double sr = 44100.0;
+      const int bs = 512;
+      attackAudio->PrepareToPlay(sr, bs);
+
+      NoteEventQueue attackInbox;
+      attackAudio->SetNoteInbox(&attackInbox, attackInbox.RegisterConsumer());
+
+      std::vector<float> aL(bs), aR(bs);
+      float* aChans[2] = { aL.data(), aR.data() };
+      AudioBuffer aBuf;
+      aBuf.channels = aChans;
+      aBuf.numChannels = 2;
+      aBuf.numFrames = bs;
+
+      NoteEvent noteOn;
+      noteOn.note = 69;
+      noteOn.velocity = 1.0f;
+      noteOn.isNoteOn = true;
+      noteOn.frameOffset = 0;
+      attackInbox.Push(noteOn);
+
+      // 20ms of real time at 512/44.1kHz is ~1.72 blocks; round up so the
+      // attack segment (882 samples) has fully elapsed by the time we measure.
+      const int blocksForAttack = (int)std::ceil((attackNode.ampAttack * 0.001 * sr) / (double)bs);
+      float peakAtAttackEnd = 0.0f;
+      for (int b = 0; b < blocksForAttack; b++)
+      {
+         attackAudio->ProcessBlock(nullptr, 0, aBuf);
+         for (int i = 0; i < bs; i++)
+            peakAtAttackEnd = std::max(peakAtAttackEnd, std::fabs(aL[i]));
+      }
+
+      // Run well past decay into sustain for a settled reference peak.
+      float peakSettled = 0.0f;
+      for (int b = 0; b < 60; b++)
+      {
+         attackAudio->ProcessBlock(nullptr, 0, aBuf);
+         for (int i = 0; i < bs; i++)
+            peakSettled = std::max(peakSettled, std::fabs(aL[i]));
+      }
+
+      // Correct behaviour: by the time the attack segment has elapsed, the
+      // envelope is already at/near full level, so the block-end peak
+      // should already be within shouting distance of the fully-settled
+      // peak. The old bug (Process() once per block) left the envelope
+      // near zero for hundreds of blocks, so this ratio would be near 0
+      // instead.
+      const bool attackTimingOk = peakSettled > 1e-4f && (peakAtAttackEnd > peakSettled * 0.5f);
+      printf("DSPTEST spectral ADSR attack timing: peakAtAttackEnd=%.4f peakSettled=%.4f %s\n",
+             peakAtAttackEnd, peakSettled, attackTimingOk ? "OK" : "FAIL");
+      all &= attackTimingOk;
+   }
+
+   // 8. A param pushed at block K must be observable in the very next block
+   //    - catches item 3b (ParamMailbox::SmoothedValue used to advance once
+   //    per block, so every smoothed param slewed numFrames times slower
+   //    than intended). Uses `pan` rather than `cutoff`: pan's effect
+   //    (relative L/R balance) is independent of the drone's scan position
+   //    and of the underlying image content, so a frozen manual scan
+   //    position isolates the one thing under test instead of also letting
+   //    the natural block-to-block image variation confound the comparison.
+   {
+      ImageSpectralSynthNode paramNode;
+      paramNode.scanMode = SpectralAdditiveDsp::kScanManual;
+      paramNode.position = 0.5f; // frozen scan position - only `pan` changes below
+      paramNode.volume = 0.6f;
+      paramNode.filterType = SpectralAdditiveDsp::kFilterOff;
+      paramNode.stereoWidth = 0.0f; // no inherent L/R phase decorrelation - isolate pan alone
+      paramNode.pan = 0.0f; // centered
+      paramNode.PushParams(); // the constructor pushed the pre-assignment defaults; push again now that the fields above are set
+
+      AudioNode* paramAudio = paramNode.GetAudioNode();
+      const double sr = 44100.0;
+      const int bs = 512;
+      paramAudio->PrepareToPlay(sr, bs);
+
+      std::vector<float> pL(bs), pR(bs);
+      float* pChans[2] = { pL.data(), pR.data() };
+      AudioBuffer pBuf;
+      pBuf.channels = pChans;
+      pBuf.numChannels = 2;
+      pBuf.numFrames = bs;
+
+      for (int b = 0; b < 20; b++)
+         paramAudio->ProcessBlock(nullptr, 0, pBuf); // let the drone and the pan smoother settle at center
+
+      float rmsLBefore = 0.0f, rmsRBefore = 0.0f;
+      for (int i = 0; i < bs; i++)
+      {
+         rmsLBefore += pL[i] * pL[i];
+         rmsRBefore += pR[i] * pR[i];
+      }
+
+      paramNode.pan = -0.9f; // hard left
+      paramNode.PushParams();
+
+      paramAudio->ProcessBlock(nullptr, 0, pBuf); // exactly one block after the push
+      float rmsLAfter = 0.0f, rmsRAfter = 0.0f;
+      for (int i = 0; i < bs; i++)
+      {
+         rmsLAfter += pL[i] * pL[i];
+         rmsRAfter += pR[i] * pR[i];
+      }
+
+      // Centered, L and R should be roughly equal; after panning hard left,
+      // R should already be well below L within this one block if the
+      // smoother actually advanced numFrames times (5ms time constant over
+      // an ~11.6ms/512-sample block covers ~90% of the distance to target).
+      // Before the fix (SmoothedValue advanced once per block, i.e. one
+      // sample of a 5ms-time-constant smoother) the R/L ratio would barely
+      // have moved from its centered ~1.0 within a single block.
+      const bool balancedBefore = rmsLBefore > 1e-8f && rmsRBefore > 1e-8f &&
+                                  std::fabs(rmsRBefore - rmsLBefore) < rmsLBefore * 0.3f;
+      const bool shiftedAfter = rmsLAfter > 1e-8f && (rmsRAfter < rmsLAfter * 0.3f);
+      const bool paramReachOk = balancedBefore && shiftedAfter;
+      printf("DSPTEST spectral param reaches audio within one block: L/R before=%.6f/%.6f after=%.6f/%.6f %s\n",
+             rmsLBefore, rmsRBefore, rmsLAfter, rmsRAfter, paramReachOk ? "OK" : "FAIL");
+      all &= paramReachOk;
+   }
+
+   // 9. One full playhead sweep at scanSpeed=1 must take exactly 1 second in
+   //    every scan mode - catches item 5 (Ping-Pong and One-Shot's
+   //    playheadInc was a per-sample increment applied only once per block,
+   //    so a "1 Hz" sweep actually took ~numFrames times longer than 1
+   //    second).
+   {
+      struct ScanCase
+      {
+         int mode;
+         float expected;
+         const char* label;
+      };
+      const ScanCase cases[] = {
+         { SpectralAdditiveDsp::kScanForwardLoop, 0.0f, "Loop" },
+         { SpectralAdditiveDsp::kScanPingPong, 1.0f, "PingPong" },
+         { SpectralAdditiveDsp::kScanOneShot, 1.0f, "OneShot" },
+         { SpectralAdditiveDsp::kScanFreeRunHz, 0.0f, "FreeRunHz" },
+      };
+
+      bool scanTimingOk = true;
+      for (const auto& c : cases)
+      {
+         ImageSpectralSynthNode scanNode;
+         scanNode.scanMode = c.mode;
+         scanNode.scanSpeed = 1.0f;
+         scanNode.direction = 0;
+         scanNode.volume = 0.1f;
+         scanNode.PushParams(); // the constructor pushed the pre-assignment defaults (scanMode=BpmSync); push again now that scanMode is actually set
+
+         AudioNode* scanAudio = scanNode.GetAudioNode();
+         const double sr = 48000.0;
+         const int bs = 480; // sr / bs is exact, so the 1-second window below lands exactly
+         scanAudio->PrepareToPlay(sr, bs);
+
+         std::vector<float> sL(bs), sR(bs);
+         float* sChans[2] = { sL.data(), sR.data() };
+         AudioBuffer sBuf;
+         sBuf.channels = sChans;
+         sBuf.numChannels = 2;
+         sBuf.numFrames = bs;
+
+         const int totalSamples = (int)sr; // exactly 1 second
+         int processed = 0;
+         while (processed < totalSamples)
+         {
+            scanAudio->ProcessBlock(nullptr, 0, sBuf);
+            processed += bs;
+         }
+
+         const float playhead = scanNode.Playhead();
+         const bool ok = std::fabs(playhead - c.expected) < 0.02f;
+         printf("DSPTEST spectral scan timing (%s): playhead=%.4f expected=%.4f %s\n", c.label, playhead,
+                c.expected, ok ? "OK" : "FAIL");
+         scanTimingOk &= ok;
+      }
+      all &= scanTimingOk;
+   }
+
+   return all;
+}
+
+// New DSP fixture (there was none before this pass): Wave Terrain's LP24
+// cascade roll-off (item 6) and per-block voice count (item 8).
+static bool RunWaveTerrainFixture()
+{
+   bool all = true;
+   const double sr = 48000.0;
+   const int bs = 480;
+
+   // 1. LP24 must roll off more steeply than LP12 at 2x cutoff - catches
+   //    item 6 (LP24 fell through to the same single TptSvf stage as LP12,
+   //    so the two filter types were audibly identical).
+   {
+      WaveTerrainNode wt;
+      wt.frequency = 220.0f;
+      wt.unison = 1;
+      wt.filterType = 1; // LP12
+      wt.cutoff = 400.0f;
+      wt.resonance = 0.0f;
+      wt.drive = 0.0f;
+
+      AudioNode* audio = wt.GetAudioNode();
+      audio->PrepareToPlay(sr, bs);
+      wt.CookIfNeeded(1); // headless: no GL context, still fills the bank via the CPU-only fallback path
+
+      std::vector<float> bl(bs), br(bs);
+      float* chans[2] = { bl.data(), br.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = bs;
+
+      float rmsLP12 = 0.0f;
+      for (int b = 0; b < 60; b++)
+      {
+         audio->ProcessBlock(nullptr, 0, buf);
+         for (int i = 0; i < bs; i++)
+            rmsLP12 += bl[i] * bl[i];
+      }
+
+      wt.filterType = 2; // LP24
+      wt.CookIfNeeded(2);
+
+      float rmsLP24 = 0.0f;
+      for (int b = 0; b < 60; b++)
+      {
+         audio->ProcessBlock(nullptr, 0, buf);
+         for (int i = 0; i < bs; i++)
+            rmsLP24 += bl[i] * bl[i];
+      }
+
+      const bool lp24Ok = rmsLP12 > 1e-8f && (rmsLP24 < rmsLP12 * 0.85f);
+      printf("DSPTEST wave terrain LP24 cascade roll-off: rmsLP12=%.6f rmsLP24=%.6f %s\n", rmsLP12, rmsLP24,
+             lp24Ok ? "OK" : "FAIL");
+      all &= lp24Ok;
+   }
+
+   // 2. Voice count must reflect distinct held notes, not numFrames x
+   //    voices - catches item 8 (activeCount was incremented inside the
+   //    per-sample loop instead of once per block).
+   {
+      WaveTerrainNode wt2;
+      AudioNode* audio2 = wt2.GetAudioNode();
+      audio2->PrepareToPlay(sr, bs);
+      wt2.CookIfNeeded(10);
+
+      NoteEventQueue inbox;
+      audio2->SetNoteInbox(&inbox, inbox.RegisterConsumer());
+
+      std::vector<float> bl(bs), br(bs);
+      float* chans[2] = { bl.data(), br.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = bs;
+
+      const int kHeldNotes = 3;
+      for (int n = 0; n < kHeldNotes; n++)
+      {
+         NoteEvent on;
+         on.note = 60 + n;
+         on.voiceId = n + 1;
+         on.velocity = 0.8f;
+         on.isNoteOn = true;
+         on.frameOffset = 0;
+         inbox.Push(on);
+      }
+
+      audio2->ProcessBlock(nullptr, 0, buf);
+      const int voices = wt2.ActiveVoices();
+      const bool voiceCountOk = (voices == kHeldNotes);
+      printf("DSPTEST wave terrain voice count for %d held notes: reported=%d %s\n", kHeldNotes, voices,
+             voiceCountOk ? "OK" : "FAIL");
+      all &= voiceCountOk;
+   }
+
+   return all;
+}
+
+// New DSP fixture (there was none before this pass): Audio Displacement
+// actually deforms the mesh under a live signal and relaxes back to rest
+// once the signal stops, rather than freezing in its last deformed pose
+// (items 12/13).
+static bool RunAudioDisplacementFixture()
+{
+   bool all = true;
+
+   GeometryNode probeMesh;
+   probeMesh.shape = 1; // cube
+   probeMesh.detail = 3;
+   probeMesh.CookIfNeeded(1);
+
+   AudioDisplacementNode adisp;
+   adisp.input = &probeMesh;
+   adisp.mode = AudioDisplacementNode::kModeNormalWaveform;
+   adisp.strength = 1.0f;
+   adisp.subdivide = 0;
+   adisp.attack = 5.0f;
+   adisp.decay = 100.0f;
+
+   AudioNode* audioNode = adisp.GetAudioNode();
+   const double sr = 48000.0;
+   const int bs = 480;
+   audioNode->PrepareToPlay(sr, bs);
+
+   std::vector<float> inL(bs), inR(bs);
+   for (int i = 0; i < bs; i++)
+   {
+      const float s = 0.8f * sinf(2.0f * 3.14159265f * 220.0f * (float)i / (float)sr);
+      inL[i] = s;
+      inR[i] = s;
+   }
+   float* inChans[2] = { inL.data(), inR.data() };
+   AudioBuffer inBuf;
+   inBuf.channels = inChans;
+   inBuf.numChannels = 2;
+   inBuf.numFrames = bs;
+   const AudioBuffer* inputs[1] = { &inBuf };
+
+   std::vector<float> outL(bs), outR(bs);
+   float* outChans[2] = { outL.data(), outR.data() };
+   AudioBuffer outBuf;
+   outBuf.channels = outChans;
+   outBuf.numChannels = 2;
+   outBuf.numFrames = bs;
+
+   int frame = 2;
+   for (int b = 0; b < 20; b++)
+   {
+      audioNode->ProcessBlock(inputs, 1, outBuf);
+      adisp.CookIfNeeded(frame++);
+   }
+
+   const Mesh& rest = probeMesh.GetMesh();
+   const Mesh displaced = adisp.GetMesh(); // copy: the reference is about to be invalidated by more CookIfNeeded calls below
+
+   bool moved = false;
+   float maxDispBefore = 0.0f;
+   if (!rest.vertices.empty() && rest.vertices.size() == displaced.vertices.size())
+   {
+      for (size_t i = 0; i < rest.vertices.size(); i++)
+      {
+         const float dx = displaced.vertices[i].px - rest.vertices[i].px;
+         const float dy = displaced.vertices[i].py - rest.vertices[i].py;
+         const float dz = displaced.vertices[i].pz - rest.vertices[i].pz;
+         const float d2 = dx * dx + dy * dy + dz * dz;
+         maxDispBefore = std::max(maxDispBefore, d2);
+         if (d2 > 1e-8f)
+            moved = true;
+      }
+   }
+   printf("DSPTEST audio displacement moves mesh under a live signal: %s\n", moved ? "OK" : "FAIL");
+   all &= moved;
+
+   // Now silence the input and confirm the mesh relaxes back toward rest -
+   // it must NOT stay frozen in its displaced pose (item 13's bug: the cache
+   // signature used to key off an audio-frame counter that froze the moment
+   // the ring stopped returning samples, leaving mCurrentEnergy's decay
+   // invisible to the cache even as it played out underneath).
+   std::fill(inL.begin(), inL.end(), 0.0f);
+   std::fill(inR.begin(), inR.end(), 0.0f);
+
+   for (int b = 0; b < 400; b++)
+   {
+      audioNode->ProcessBlock(inputs, 1, outBuf); // inputs now silent
+      adisp.CookIfNeeded(frame++);
+   }
+
+   const Mesh& relaxed = adisp.GetMesh();
+   float maxDispAfter = 0.0f;
+   for (size_t i = 0; i < rest.vertices.size() && i < relaxed.vertices.size(); i++)
+   {
+      const float dx = relaxed.vertices[i].px - rest.vertices[i].px;
+      const float dy = relaxed.vertices[i].py - rest.vertices[i].py;
+      const float dz = relaxed.vertices[i].pz - rest.vertices[i].pz;
+      maxDispAfter = std::max(maxDispAfter, dx * dx + dy * dy + dz * dz);
+   }
+
+   const bool relaxedOk = maxDispBefore > 1e-8f && maxDispAfter < maxDispBefore * 0.05f;
+   printf("DSPTEST audio displacement relaxes to rest when audio stops: before=%.6f after=%.6f %s\n",
+          maxDispBefore, maxDispAfter, relaxedOk ? "OK" : "FAIL");
+   all &= relaxedOk;
+
    return all;
 }
 
@@ -20663,10 +21629,12 @@ static int RunDspTest()
    const bool noteStackOk = RunNoteStackFixture();
    const bool freqShifterOk = RunFrequencyShifterFixture();
    const bool spectralSynthOk = RunImageSpectralSynthFixture();
+   const bool waveTerrainOk = RunWaveTerrainFixture();
+   const bool audioDisplacementOk = RunAudioDisplacementFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk &&
                     paulStretchOk && granularOk && drumSeqOk && wavetableShaperOk && eqOk && noteStackOk &&
-                    freqShifterOk && spectralSynthOk;
+                    freqShifterOk && spectralSynthOk && waveTerrainOk && audioDisplacementOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
    return all ? 0 : 1;
 }
@@ -20821,6 +21789,7 @@ namespace AudioParamSweep
       std::unique_ptr<INode> node;
       AudioNode* audio = nullptr;
       NoteEventQueue inbox;
+      int outboxCursor = -1; // this rig's own cursor on audio->NoteOutbox(), if it has one
       const AudioBuffer* driveInputs[kAudioMaxNodeInputs] = {};
       AudioBuffer drive[kAudioMaxNodeInputs];
       int numInputs = 0;
@@ -20913,8 +21882,10 @@ namespace AudioParamSweep
       if (cand.shape.noteInputSlots > 0)
       {
          PushHeldNoteOn(rig);
-         rig.audio->SetNoteInbox(&rig.inbox);
+         rig.audio->SetNoteInbox(&rig.inbox, rig.inbox.RegisterConsumer());
       }
+      if (NoteEventQueue* outbox = rig.audio->NoteOutbox())
+         rig.outboxCursor = outbox->RegisterConsumer();
       return true;
    }
 
@@ -20946,7 +21917,7 @@ namespace AudioParamSweep
          if (NoteEventQueue* outbox = rig.audio->NoteOutbox())
          {
             NoteEvent evts[64];
-            const int count = outbox->Pop(evts, 64);
+            const int count = outbox->Pop(rig.outboxCursor, evts, 64);
             s.values[0] = (float)count;
             if (count > 0)
             {
@@ -20992,7 +21963,7 @@ namespace AudioParamSweep
          if (outbox == nullptr)
             continue;
          NoteEvent evts[64];
-         const int count = outbox->Pop(evts, 64);
+         const int count = outbox->Pop(rig.outboxCursor, evts, 64);
          totalCount += count;
          for (int i = 0; i < count; i++)
          {
@@ -21017,23 +21988,37 @@ namespace AudioParamSweep
       bool uiOnly = false;
    };
 
-   // Sets every EffectParamDef::prerequisites entry for `paramName` (looked
-   // up via FindEffectParamDef against `nodeName` - a no-op for any node not
-   // in the EffectDefs table, or a param with no prerequisites) on `node`
-   // before it's probed - the fix for the "gated param reports FAIL from its
-   // own spawn defaults" blind spot documented in audio-node-sweep's SKILL.md
-   // (Audio Filter's gain, Dynamics' ratio/hold/range/sidechain params).
-   // Applied identically to every rig TestOneParamWithValue builds,
-   // so the prerequisite is in force for both the "before" and "after"
-   // comparison, not just one side of it.
+   // Sets every prerequisite entry for `paramName` on `node` before it's
+   // probed - the fix for the "gated param reports FAIL from its own spawn
+   // defaults" blind spot documented in audio-node-sweep's SKILL.md (Audio
+   // Filter's gain, Dynamics' ratio/hold/range/sidechain params). Prefers
+   // EffectParamDef::prerequisites (looked up via FindEffectParamDef against
+   // `nodeName` - populated only for table-driven AudioEffectNode instances);
+   // a hand-rolled node (a real C++ class with no EffectDefs.cpp row, so
+   // FindEffectParamDef always misses for it - e.g. WaveTerrainNode's/
+   // ImageSpectralSynthNode's "detune"/"stereoWidth", both no-ops unless
+   // "unison" > 1) instead declares its own via INode::SweepPrerequisitesFor.
+   // Applied identically to every rig TestOneParamWithValue builds, so the
+   // prerequisite is in force for both the "before" and "after" comparison,
+   // not just one side of it.
    inline void ApplyPrerequisites(INode* node, const std::string& nodeName, const std::string& paramName)
    {
       const EffectParamDef* def = FindEffectParamDef(nodeName, paramName);
-      if (def == nullptr || def->prerequisites.empty())
+      std::vector<INode::SweepParamPrereq> prereqs;
+      if (def != nullptr)
+      {
+         for (const EffectParamPrereq& p : def->prerequisites)
+            prereqs.push_back({ p.paramName, p.value });
+      }
+      else
+      {
+         prereqs = node->SweepPrerequisitesFor(paramName);
+      }
+      if (prereqs.empty())
          return;
       Collector c;
       node->VisitParams(c);
-      for (const EffectParamPrereq& prereq : def->prerequisites)
+      for (const INode::SweepParamPrereq& prereq : prereqs)
       {
          for (auto& slot : c.slots)
          {
@@ -21307,6 +22292,48 @@ static int RunAudioParamSweepTest()
 
    printf("%s\n", overallOk ? "AUDIO PARAM SWEEP OK" : "AUDIO PARAM SWEEP FAIL");
    return overallOk ? 0 : 1;
+}
+
+// fmMode is a plain atomic pushed straight from CookIfNeeded, not a value
+// routed through the smoothed ParamMailbox like every other VisitParams
+// field (see WavetableSynthCore.h's mFmMode comment) - so it falls outside
+// what the generic sweep above can observe (it only reads params back
+// through rendered PCM/modulator/note-outbox signatures, never a raw
+// accessor). fmDepth itself IS a normal mailbox float and IS already
+// covered generically above, since the sweep drives every AudioInputSlot
+// (including "fm in") with its shared excitation tone, giving fmDepth's
+// extFm * fmDepth term something nonzero to move. This is a small, targeted
+// check for the one field the generic sweep can't see: set fmMode, cook
+// once, and confirm DebugFmMode() reflects it - covers both nodes built on
+// AudioWavetableNode.
+static bool RunFmModeDebugCheck()
+{
+   bool ok = true;
+   int frame = 1;
+
+   {
+      WavetableNode n;
+      n.fmMode = 1;
+      n.CookIfNeeded(frame++);
+      const int seen = n.DebugFmMode();
+      printf("  [%s] %-24s fmMode=1 reaches DebugFmMode() after CookIfNeeded (saw %d)\n",
+             seen == 1 ? "pass" : "FAIL", "Wavetable", seen);
+      if (seen != 1)
+         ok = false;
+   }
+   {
+      OscillatorNode n;
+      n.fmMode = 1;
+      n.CookIfNeeded(frame++);
+      const int seen = n.DebugFmMode();
+      printf("  [%s] %-24s fmMode=1 reaches DebugFmMode() after CookIfNeeded (saw %d)\n",
+             seen == 1 ? "pass" : "FAIL", "Oscillator", seen);
+      if (seen != 1)
+         ok = false;
+   }
+
+   printf("%s\n", ok ? "FM MODE DEBUG CHECK OK" : "FM MODE DEBUG CHECK FAIL");
+   return ok;
 }
 
 
@@ -21638,7 +22665,8 @@ int RunPluginScanTest()
          if (instrumentReady)
          {
             NoteEventQueue queue;
-            audio->SetNoteInbox(&queue);
+            const int queueCursor = queue.RegisterConsumer();
+            audio->SetNoteInbox(&queue, queueCursor);
 
             // No audio input driven here - an instrument like DLSMusicDevice
             // has no input bus, and this test is about the note bridge, not
@@ -21714,7 +22742,7 @@ int RunPluginScanTest()
             AudioNode* audio2 = node2.GetAudioNode();
             audio2->PrepareToPlay(kRate, kFrames);
             NoteEventQueue queue2;
-            audio2->SetNoteInbox(&queue2);
+            audio2->SetNoteInbox(&queue2, queue2.RegisterConsumer());
             NoteEvent earlyOn;
             earlyOn.note = 60;
             earlyOn.velocity = 1.0f;
@@ -21760,7 +22788,7 @@ int RunPluginScanTest()
                   std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             node.CookIfNeeded(1000);
-            audio->SetNoteInbox(&queue); // reloaded node's audio object is the same object; inbox unchanged
+            audio->SetNoteInbox(&queue, queueCursor); // reloaded node's audio object is the same object; inbox/cursor unchanged
             audio->ProcessBlock(inputs, 0, outBuf);
             const float afterSwapPeak = peakOf();
             const bool noStuckNoteAcrossSwap = heldSounding && node.IsReady() && afterSwapPeak <= 1.0e-4f;
@@ -21785,6 +22813,7 @@ int main()
       // it is safe to call this early, before glfwInit().
       RegisterNodes();
       RunAudioParamSweepTest();
+      RunFmModeDebugCheck();
       // Always 0, never the sweep's own pass/fail - the printf verdict line
       // is the only signal every other INFINITE_* fixture uses (see
       // run-infinite-hygiene/SKILL.md's "verdict lines aren't exit codes"
@@ -26974,6 +28003,9 @@ int main()
          DisplacementNode dispNode; dispNode.input = &probe;
          checkGeneric("DisplacementNode", &dispNode);
 
+         AudioDisplacementNode adispNode; adispNode.input = &probe;
+         checkGeneric("AudioDisplacementNode", &adispNode);
+
          SetColorNode setColorNode; setColorNode.input = &probe;
          checkGeneric("SetColorNode", &setColorNode);
 
@@ -27198,6 +28230,9 @@ int main()
          DisplacementNode dispNode; dispNode.input = &probe;
          checkForwarding("DisplacementNode", &dispNode);
 
+         AudioDisplacementNode adispNode; adispNode.input = &probe;
+         checkForwarding("AudioDisplacementNode", &adispNode);
+
          SetColorNode setColorNode; setColorNode.input = &probe;
          checkForwarding("SetColorNode", &setColorNode);
 
@@ -27309,6 +28344,22 @@ int main()
          dispNode.CookIfNeeded(frame++);
          const unsigned long long dispThird = dispNode.MeshRevision();
          results.push_back({ "DisplacementNode(static texture)", dispFirst == dispSecond && dispSecond == dispThird });
+
+         // AudioDisplacementNode's own analogous case: with no audio cable
+         // connected, mCurrentEnergy sits at 0 forever, so its signature
+         // (now keyed on quantised energy rather than an ever-incrementing
+         // audio-frame counter - see item 13's fix) should stay flat across
+         // repeated cooks instead of rebuilding every frame regardless of
+         // whether anything actually changed.
+         AudioDisplacementNode adispNode;
+         adispNode.input = &probeMesh;
+         adispNode.CookIfNeeded(frame++);
+         const unsigned long long adispFirst = adispNode.MeshRevision();
+         adispNode.CookIfNeeded(frame++);
+         const unsigned long long adispSecond = adispNode.MeshRevision();
+         adispNode.CookIfNeeded(frame++);
+         const unsigned long long adispThird = adispNode.MeshRevision();
+         results.push_back({ "AudioDisplacementNode(no audio)", adispFirst == adispSecond && adispSecond == adispThird });
 
          MeshResynthNode resynthNode;
          resynthNode.input = &probeMesh;
@@ -27998,7 +29049,7 @@ int main()
             if (upstreamNoteIndex >= 0)
             {
                if (GraphNode* upstreamNote = FindNodeByIndex(upstreamNoteIndex))
-                  if (NoteCable* nc = cn->node->NoteInputSlot(0))
+                  if (NoteCable* nc = cn->node->NoteInputSlot(cand.shape.firstNoteInputSlot))
                      nc->Connect(upstreamNote->node.get());
             }
             if (downstreamGainIndex >= 0 && downstreamOutIndex >= 0)
@@ -28076,6 +29127,405 @@ int main()
 
          printf("xruns=%llu\n", (unsigned long long)AudioEngine::Instance().XrunCount());
          printf("%s\n", overallOk ? "AUDIO TEARDOWN SWEEP OK" : "AUDIO TEARDOWN SWEEP FAIL");
+      }
+
+      // NoteEventQueue multi-consumer fanout regression (docs/plans/
+      // fm-and-note-fanout-fixes.md item 11): before the fix, a single-cursor
+      // queue meant the FIRST consumer to Pop() in topology order drained
+      // every event, starving every other consumer wired to the same
+      // producer. The bug report's exact patch - one note source feeding two
+      // synths, one of which also feeds the other's FM input, so the FM
+      // modulator (a dependency) necessarily runs before the synth it
+      // modulates - made the second synth silent ("output peak=0.00000").
+      // Goes through the real graph and the real RebuildAudioTopology (not a
+      // hand-rolled inbox), because the thing under test is the topology
+      // builder's ResetConsumers()/RegisterConsumer() wiring itself, not the
+      // queue's own Push/Pop (already covered by NoteEventQueue's unit-level
+      // use in the other fixtures above).
+      if (getenv("INFINITE_NOTEFANOUTTEST") != nullptr && frameId == 4)
+      {
+         auto SpawnIndex = [&](const std::string& name, const std::string& category, float x, float y) -> int
+         {
+            GraphNode* gn = SpawnNode(name, category, x, y);
+            return gn ? gn->index : -1;
+         };
+
+         // Renders `osc1` into `osc1Buf`, then `osc2` reading `osc1Buf` on
+         // its fm-in slot (1) - the exact per-block order RebuildAudioTopology's
+         // own CollectAudioChain walk would run them in, since osc2's audio
+         // cable makes osc1 its dependency. Returns osc2's rendered L peak.
+         auto RunFmPair = [&](AudioNode* osc1, AudioNode* osc2, float* osc2LOut, int numFrames) -> float
+         {
+            std::vector<float> o1L(numFrames), o1R(numFrames);
+            float* o1Chans[2] = { o1L.data(), o1R.data() };
+            AudioBuffer o1Buf;
+            o1Buf.channels = o1Chans;
+            o1Buf.numChannels = 2;
+            o1Buf.numFrames = numFrames;
+
+            std::vector<float> o2L(numFrames), o2R(numFrames);
+            float* o2Chans[2] = { o2L.data(), o2R.data() };
+            AudioBuffer o2Buf;
+            o2Buf.channels = o2Chans;
+            o2Buf.numChannels = 2;
+            o2Buf.numFrames = numFrames;
+
+            float peak = 0.0f;
+            for (int b = 0; b < 10; b++)
+            {
+               osc1->ProcessBlock(nullptr, 0, o1Buf);
+               const AudioBuffer* osc2Inputs[2] = { nullptr, &o1Buf };
+               osc2->ProcessBlock(osc2Inputs, 2, o2Buf);
+            }
+            for (int i = 0; i < numFrames; i++)
+               peak = std::max(peak, std::fabs(o2L[i]));
+            if (osc2LOut != nullptr)
+               std::copy(o2L.begin(), o2L.end(), osc2LOut);
+            return peak;
+         };
+
+         bool overallOk = true;
+         const int numFrames = 256;
+
+         // Case 1: the bug report's exact patch - producer fans out to osc1
+         // (FM modulator) and osc2 (fed by osc1's FM in), both wired from
+         // the SAME producer outbox.
+         {
+            const int producerIdx = SpawnIndex("Note Stack", "Notes", 40.0f, 40.0f);
+            const int osc1Idx = SpawnIndex("Oscillator", "Synths", 320.0f, 40.0f);
+            const int osc2Idx = SpawnIndex("Oscillator", "Synths", 600.0f, 40.0f);
+            GraphNode* producer = FindNodeByIndex(producerIdx);
+            GraphNode* osc1 = FindNodeByIndex(osc1Idx);
+            GraphNode* osc2 = FindNodeByIndex(osc2Idx);
+            bool wired = producer && osc1 && osc2;
+            if (wired)
+            {
+               osc1->node->NoteInputSlot(0)->Connect(producer->node.get());
+               osc2->node->NoteInputSlot(0)->Connect(producer->node.get());
+               osc2->node->AudioInputSlot(1)->Connect(osc1->node.get()); // osc1 -> osc2's fm in
+               producer->node->CookIfNeeded(1);
+               osc1->node->CookIfNeeded(1);
+               osc2->node->CookIfNeeded(1);
+            }
+
+            RebuildAudioTopology();
+
+            // Nothing upstream feeds the producer itself in this graph -
+            // hand it a note-on directly the same way RunNoteStackFixture
+            // drives NoteStackNode standalone. This has to happen AFTER
+            // RebuildAudioTopology: the rebuild's wiring loop calls
+            // SetNoteInbox(nullptr, -1) on every node with an unconnected
+            // note-input slot, which would otherwise stomp this right back
+            // out.
+            NoteEventQueue producerInbox;
+            AudioNode* producerAudio = wired ? AudioNodeOfAny(producer->node.get()) : nullptr;
+            if (producerAudio)
+               producerAudio->SetNoteInbox(&producerInbox, producerInbox.RegisterConsumer());
+
+            AudioNode* osc1Audio = wired ? AudioNodeOfAny(osc1->node.get()) : nullptr;
+            AudioNode* osc2Audio = wired ? AudioNodeOfAny(osc2->node.get()) : nullptr;
+
+            bool caseOk = wired && producerAudio && osc1Audio && osc2Audio;
+            int voices1 = 0, voices2 = 0;
+            float peak2 = 0.0f;
+            if (caseOk)
+            {
+               NoteEvent on;
+               on.note = 69;
+               on.velocity = 0.8f;
+               on.isNoteOn = true;
+               on.voiceId = NextVoiceId();
+               producerInbox.Push(on);
+
+               std::vector<float> dL(numFrames), dR(numFrames);
+               float* dChans[2] = { dL.data(), dR.data() };
+               AudioBuffer dBuf;
+               dBuf.channels = dChans;
+               dBuf.numChannels = 2;
+               dBuf.numFrames = numFrames;
+               producerAudio->ProcessBlock(nullptr, 0, dBuf);
+
+               peak2 = RunFmPair(osc1Audio, osc2Audio, nullptr, numFrames);
+               voices1 = static_cast<OscillatorNode*>(osc1->node.get())->ActiveVoices();
+               voices2 = static_cast<OscillatorNode*>(osc2->node.get())->ActiveVoices();
+            }
+
+            caseOk = caseOk && voices1 > 0 && voices2 > 0 && peak2 > 1e-6f;
+            printf("  [%s] fanout+FM (bug report patch): osc1 voices=%d osc2 voices=%d osc2 output peak=%.6f\n",
+                   caseOk ? "pass" : "FAIL", voices1, voices2, peak2);
+            overallOk = overallOk && caseOk;
+
+            for (int idx : { producerIdx, osc1Idx, osc2Idx })
+               if (idx >= 0)
+                  RemoveNodeByIndex(idx);
+         }
+
+         // Case 2: three consumers on one producer - every one of them must
+         // still see the note-on, not just the first two.
+         {
+            const int producerIdx = SpawnIndex("Note Stack", "Notes", 40.0f, 260.0f);
+            const int oscIdx[3] = {
+               SpawnIndex("Oscillator", "Synths", 320.0f, 200.0f),
+               SpawnIndex("Oscillator", "Synths", 320.0f, 260.0f),
+               SpawnIndex("Oscillator", "Synths", 320.0f, 320.0f),
+            };
+            GraphNode* producer = FindNodeByIndex(producerIdx);
+            GraphNode* osc[3] = { FindNodeByIndex(oscIdx[0]), FindNodeByIndex(oscIdx[1]), FindNodeByIndex(oscIdx[2]) };
+            bool wired = producer && osc[0] && osc[1] && osc[2];
+            if (wired)
+            {
+               for (GraphNode* o : osc)
+               {
+                  o->node->NoteInputSlot(0)->Connect(producer->node.get());
+                  o->node->CookIfNeeded(1);
+               }
+               producer->node->CookIfNeeded(1);
+            }
+
+            RebuildAudioTopology();
+
+            NoteEventQueue producerInbox;
+            AudioNode* producerAudio = wired ? AudioNodeOfAny(producer->node.get()) : nullptr;
+            if (producerAudio)
+               producerAudio->SetNoteInbox(&producerInbox, producerInbox.RegisterConsumer());
+
+            bool caseOk = wired && producerAudio;
+            int voices[3] = {};
+            if (caseOk)
+            {
+               NoteEvent on;
+               on.note = 64;
+               on.velocity = 0.8f;
+               on.isNoteOn = true;
+               on.voiceId = NextVoiceId();
+               producerInbox.Push(on);
+
+               std::vector<float> dL(numFrames), dR(numFrames);
+               float* dChans[2] = { dL.data(), dR.data() };
+               AudioBuffer dBuf;
+               dBuf.channels = dChans;
+               dBuf.numChannels = 2;
+               dBuf.numFrames = numFrames;
+               producerAudio->ProcessBlock(nullptr, 0, dBuf);
+
+               for (int i = 0; i < 3; i++)
+               {
+                  AudioNode* a = AudioNodeOfAny(osc[i]->node.get());
+                  std::vector<float> oL(numFrames), oR(numFrames);
+                  float* oChans[2] = { oL.data(), oR.data() };
+                  AudioBuffer oBuf;
+                  oBuf.channels = oChans;
+                  oBuf.numChannels = 2;
+                  oBuf.numFrames = numFrames;
+                  a->ProcessBlock(nullptr, 0, oBuf);
+                  voices[i] = static_cast<OscillatorNode*>(osc[i]->node.get())->ActiveVoices();
+               }
+            }
+
+            caseOk = caseOk && voices[0] > 0 && voices[1] > 0 && voices[2] > 0;
+            printf("  [%s] three-consumer fanout: voices=%d,%d,%d (all must see the note-on)\n",
+                   caseOk ? "pass" : "FAIL", voices[0], voices[1], voices[2]);
+            overallOk = overallOk && caseOk;
+
+            for (int idx : { producerIdx, oscIdx[0], oscIdx[1], oscIdx[2] })
+               if (idx >= 0)
+                  RemoveNodeByIndex(idx);
+         }
+
+         // Case 3: one of two consumers is deleted mid-playback (the real
+         // RemoveNodeByIndex, which triggers its own RebuildAudioTopology -
+         // exercising ResetConsumers/RegisterConsumer's re-issue of cursor
+         // ids on the surviving edge). The survivor must keep receiving
+         // events with no crash and no dangling read.
+         {
+            const int producerIdx = SpawnIndex("Note Stack", "Notes", 40.0f, 480.0f);
+            const int survivorIdx = SpawnIndex("Oscillator", "Synths", 320.0f, 460.0f);
+            const int doomedIdx = SpawnIndex("Oscillator", "Synths", 320.0f, 520.0f);
+            GraphNode* producer = FindNodeByIndex(producerIdx);
+            GraphNode* survivor = FindNodeByIndex(survivorIdx);
+            GraphNode* doomed = FindNodeByIndex(doomedIdx);
+            bool wired = producer && survivor && doomed;
+            if (wired)
+            {
+               survivor->node->NoteInputSlot(0)->Connect(producer->node.get());
+               doomed->node->NoteInputSlot(0)->Connect(producer->node.get());
+               producer->node->CookIfNeeded(1);
+               survivor->node->CookIfNeeded(1);
+               doomed->node->CookIfNeeded(1);
+            }
+
+            RebuildAudioTopology();
+
+            NoteEventQueue producerInbox;
+            AudioNode* producerAudio = wired ? AudioNodeOfAny(producer->node.get()) : nullptr;
+            if (producerAudio)
+               producerAudio->SetNoteInbox(&producerInbox, producerInbox.RegisterConsumer());
+
+            bool caseOk = wired && producerAudio;
+            if (caseOk)
+            {
+               std::vector<float> dL(numFrames), dR(numFrames);
+               float* dChans[2] = { dL.data(), dR.data() };
+               AudioBuffer dBuf;
+               dBuf.channels = dChans;
+               dBuf.numChannels = 2;
+               dBuf.numFrames = numFrames;
+
+               NoteEvent on1;
+               on1.note = 60;
+               on1.velocity = 0.8f;
+               on1.isNoteOn = true;
+               on1.voiceId = NextVoiceId();
+               producerInbox.Push(on1);
+               producerAudio->ProcessBlock(nullptr, 0, dBuf);
+
+               AudioNode* survivorAudio = AudioNodeOfAny(survivor->node.get());
+               std::vector<float> sL(numFrames), sR(numFrames);
+               float* sChans[2] = { sL.data(), sR.data() };
+               AudioBuffer sBuf;
+               sBuf.channels = sChans;
+               sBuf.numChannels = 2;
+               sBuf.numFrames = numFrames;
+               survivorAudio->ProcessBlock(nullptr, 0, sBuf);
+
+               RemoveNodeByIndex(doomedIdx); // triggers a real RebuildAudioTopology
+
+               // A fresh note-on after the delete - the survivor's cursor was
+               // just re-issued by the rebuild above, so this proves it still
+               // reads real events, not a stale/dangling cursor id.
+               NoteEvent on2;
+               on2.note = 67;
+               on2.velocity = 0.8f;
+               on2.isNoteOn = true;
+               on2.voiceId = NextVoiceId();
+               producerInbox.Push(on2);
+               producerAudio->ProcessBlock(nullptr, 0, dBuf);
+               survivorAudio->ProcessBlock(nullptr, 0, sBuf); // must not crash on a freed doomed
+
+               // Re-resolve rather than reuse the pre-delete GraphNode* -
+               // gNodes.erase() shifts every element after the erased one
+               // down a slot, invalidating pointers taken before the call
+               // (see the cutoff-mod teardown case's comment on the same
+               // hazard).
+               survivor = FindNodeByIndex(survivorIdx);
+               const int survivorVoices =
+                  survivor ? static_cast<OscillatorNode*>(survivor->node.get())->ActiveVoices() : -1;
+               caseOk = survivorVoices > 0;
+               printf("  [%s] consumer deleted mid-playback: survivor voices=%d after delete+re-note (no crash)\n",
+                      caseOk ? "pass" : "FAIL", survivorVoices);
+            }
+            else
+            {
+               printf("  [FAIL] consumer deleted mid-playback: rig failed to build\n");
+            }
+            overallOk = overallOk && caseOk;
+
+            for (int idx : { producerIdx, survivorIdx })
+               if (idx >= 0)
+                  RemoveNodeByIndex(idx);
+         }
+
+         printf("%s\n", overallOk ? "NOTE FANOUT TEST OK" : "NOTE FANOUT TEST FAIL");
+      }
+
+      // Audio Filter's "cutoff mod" sidechain input (slot 1), deleted
+      // mid-playback: the generic AUDIOTEARDOWNSWEEPTEST above only ever
+      // wires an upstream node into slot 0 (see its
+      // "upstreamGainIndex"/AudioInputSlot(0) comment) - a modulator wired
+      // specifically into a second/sidechain slot and then deleted is not
+      // exercised there, so this covers that gap directly (docs/plans/
+      // fm-and-note-fanout-fixes.md item 11 part C).
+      if (getenv("INFINITE_NOTEFANOUTTEST") != nullptr && frameId == 4)
+      {
+         auto SpawnIndex = [&](const std::string& name, const std::string& category, float x, float y) -> int
+         {
+            GraphNode* gn = SpawnNode(name, category, x, y);
+            return gn ? gn->index : -1;
+         };
+
+         const int modIdx = SpawnIndex("Oscillator", "Synths", 40.0f, 700.0f);
+         const int filterIdx = SpawnIndex("Audio Filter", "AudioEffects", 320.0f, 700.0f);
+         const int upstreamGainIdx = SpawnIndex("Gain", "AudioUtility", 40.0f, 760.0f);
+         GraphNode* mod = FindNodeByIndex(modIdx);
+         GraphNode* filter = FindNodeByIndex(filterIdx);
+         GraphNode* upstreamGain = FindNodeByIndex(upstreamGainIdx);
+         bool wired = mod && filter && upstreamGain;
+         if (wired)
+         {
+            filter->node->AudioInputSlot(0)->Connect(upstreamGain->node.get()); // real signal to filter
+            filter->node->AudioInputSlot(1)->Connect(mod->node.get());          // oscillator -> cutoff mod
+            mod->node->CookIfNeeded(1);
+            filter->node->CookIfNeeded(1);
+            upstreamGain->node->CookIfNeeded(1);
+         }
+
+         RebuildAudioTopology();
+
+         const int numFrames = 256;
+         std::vector<float> fL(numFrames), fR(numFrames);
+         float* fChans[2] = { fL.data(), fR.data() };
+         AudioBuffer fBuf;
+         fBuf.channels = fChans;
+         fBuf.numChannels = 2;
+         fBuf.numFrames = numFrames;
+
+         bool ok = wired;
+         if (ok)
+         {
+            AudioNode* filterAudio = AudioNodeOfAny(filter->node.get());
+            AudioNode* modAudio = AudioNodeOfAny(mod->node.get());
+            AudioNode* gainAudio = AudioNodeOfAny(upstreamGain->node.get());
+
+            std::vector<float> mL(numFrames), mR(numFrames);
+            float* mChans[2] = { mL.data(), mR.data() };
+            AudioBuffer mBuf;
+            mBuf.channels = mChans;
+            mBuf.numChannels = 2;
+            mBuf.numFrames = numFrames;
+
+            std::vector<float> gL(numFrames), gR(numFrames);
+            float* gChans[2] = { gL.data(), gR.data() };
+            AudioBuffer gBuf;
+            gBuf.channels = gChans;
+            gBuf.numChannels = 2;
+            gBuf.numFrames = numFrames;
+            const AudioBuffer* gainInputs[1] = { &gBuf }; // Gain's own input is silence; fine, still exercises the filter
+
+            for (int b = 0; b < 4; b++)
+            {
+               modAudio->ProcessBlock(nullptr, 0, mBuf);
+               gainAudio->ProcessBlock(gainInputs, 1, gBuf);
+               const AudioBuffer* filterInputs[2] = { &gBuf, &mBuf };
+               filterAudio->ProcessBlock(filterInputs, 2, fBuf);
+            }
+
+            RemoveNodeByIndex(modIdx); // deletes the cutoff-mod source mid-playback
+
+            // gNodes.erase() shifts every element after the erased one down
+            // a slot, invalidating any GraphNode* taken before the call
+            // (same hazard AUDIOTEARDOWNSWEEPTEST's own comment on SpawnNode
+            // documents for push_back) - `filter` was resolved before the
+            // removal above, so it must be re-resolved by index rather than
+            // dereferenced directly, or this is exactly the same
+            // dangling-pointer bug DELETECRASHTEST exists to catch.
+            filter = FindNodeByIndex(filterIdx);
+
+            // Filter must keep processing post-delete - DisconnectAllTo
+            // clears its sidechain cable, so slot 1 reads back as
+            // nullptr/inactive rather than a dangling AudioNode*.
+            for (int b = 0; b < 4; b++)
+            {
+               gainAudio->ProcessBlock(gainInputs, 1, gBuf);
+               const AudioBuffer* filterInputs[2] = { &gBuf, nullptr };
+               filterAudio->ProcessBlock(filterInputs, 2, fBuf);
+            }
+            ok = filter != nullptr && filter->node->AudioInputSlot(1)->GetSource() == nullptr;
+         }
+         printf("%s\n", ok ? "FILTER CUTOFF MOD TEARDOWN OK" : "FILTER CUTOFF MOD TEARDOWN FAIL");
+
+         for (int idx : { filterIdx, upstreamGainIdx })
+            if (idx >= 0)
+               RemoveNodeByIndex(idx);
       }
 
       if (getenv("INFINITE_AUDIOGRAPHTEST") != nullptr && frameId == 4)
@@ -29504,6 +30954,7 @@ int main()
 
          // --- inputs spread along the top edge ---
          int inputs = InputCountFor(gn);
+         const float pinSpacing = (inputs > 4) ? 8.0f : 12.0f;
          for (int slot = 0; slot < inputs; slot++)
          {
             char label[24];
@@ -29515,7 +30966,7 @@ int main()
                snprintf(label, sizeof(label), "%c", 'A' + slot);
             DrawPin(gn.InputPinId(slot), ed::PinKind::Input, label);
             if (slot + 1 < inputs)
-               ImGui::SameLine(0.0f, 12.0f);
+               ImGui::SameLine(0.0f, pinSpacing);
          }
 
          // Group the body so its measured width can right-align the out pin.
@@ -29574,6 +31025,7 @@ int main()
                   dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<AudioDisplacementNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<AudioRibbonNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<SetColorNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
@@ -29587,11 +31039,13 @@ int main()
                   dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
          {
+            const bool isWide = (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr);
+            const float boxW = isWide ? kWideNodeWidth : kPreviewSize;
             ImVec2 origin = ImGui::GetCursorScreenPos();
             const float h = 52.0f;
-            ImGui::Dummy(ImVec2(kPreviewSize, h));
+            ImGui::Dummy(ImVec2(boxW, h));
             ImDrawList* dl = ImGui::GetWindowDrawList();
-            ImVec2 br(origin.x + kPreviewSize, origin.y + h);
+            ImVec2 br(origin.x + boxW, origin.y + h);
             dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
             dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
             char line[64] = "";
@@ -29617,6 +31071,8 @@ int main()
                snprintf(line, sizeof(line), "%zu triangles", disp->TriangleCount());
             else if (auto* adisp = dynamic_cast<AudioDisplacementNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu triangles", adisp->TriangleCount());
+            else if (auto* arib = dynamic_cast<AudioRibbonNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu triangles", arib->TriangleCount());
             else if (auto* setColor = dynamic_cast<SetColorNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu triangles", setColor->TriangleCount());
             else if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
@@ -29668,6 +31124,8 @@ int main()
             DrawCommentPreview(comment);
          else if (auto* palette = dynamic_cast<PaletteNode*>(gn.node.get()))
             DrawPalettePreview(palette);
+         else if (auto* proj = dynamic_cast<ProjectionNode*>(gn.node.get()))
+            DrawProjectionPreview(proj);
          else if (isAudioBodyNode)
             DrawAudioNodeBody(gn);
          else
@@ -29690,6 +31148,14 @@ int main()
          // toggle - see the comment above isAudioBody.
          if (!isAudioBody)
          {
+            const bool isWide = (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr ||
+                                 dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr);
+            if (isWide)
+            {
+               const float offset = std::max(0.0f, (kWideNodeWidth - kViewportSize) * 0.5f);
+               if (offset > 0.0f)
+                  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+            }
             if (EyeToggle(gn.showParams))
                gn.showParams = !gn.showParams;
             // Mini viewport toggle, only for nodes that actually have a mesh to
@@ -29739,12 +31205,16 @@ int main()
          {
             if (auto* n = dynamic_cast<ImageSourceNode*>(gn.node.get()))
                DrawImageSourceParams(n);
+            else if (auto* n = dynamic_cast<SyphonInNode*>(gn.node.get()))
+               DrawSyphonInParams(n);
             else if (auto* n = dynamic_cast<EnvironmentNode*>(gn.node.get()))
                DrawEnvironmentParams(n);
             else if (auto* n = dynamic_cast<VideoSourceNode*>(gn.node.get()))
                DrawVideoParams(n);
             else if (auto* n = dynamic_cast<FitNode*>(gn.node.get()))
                DrawFitParams(n);
+            else if (auto* n = dynamic_cast<ProjectionNode*>(gn.node.get()))
+               DrawProjectionParams(n);
             else if (auto* n = dynamic_cast<LFONode*>(gn.node.get()))
                DrawLFOParams(n);
             else if (auto* n = dynamic_cast<RandomNode*>(gn.node.get()))
@@ -29828,6 +31298,10 @@ int main()
                DrawDisplacementParams(n);
             else if (auto* n = dynamic_cast<AudioDisplacementNode*>(gn.node.get()))
                DrawAudioDisplacementParams(n);
+            else if (auto* n = dynamic_cast<AudioRibbonNode*>(gn.node.get()))
+               DrawAudioRibbonParams(n);
+            else if (auto* n = dynamic_cast<AudioTextureNode*>(gn.node.get()))
+               DrawAudioTextureParams(n);
             else if (auto* n = dynamic_cast<SetColorNode*>(gn.node.get()))
                DrawSetColorParams(n);
             else if (auto* n = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
@@ -29942,6 +31416,8 @@ int main()
                   ImGui::PopTextWrapPos();
                }
             }
+            else if (auto* n = dynamic_cast<SyphonOutNode*>(gn.node.get()))
+               DrawSyphonOutParams(n);
          }
 
          ImGui::EndGroup();
@@ -31158,10 +32634,16 @@ int main()
       }
 
       // double-click empty canvas -> searchable spawner
-      if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+      const ImVec2 dblClickMouse = ImGui::GetMousePos();
+      const bool overGraph = dblClickMouse.x >= gGraphScreenTL.x &&
+                             dblClickMouse.y >= gGraphScreenTL.y &&
+                             dblClickMouse.x <= gGraphScreenTL.x + gGraphScreenSize.x &&
+                             dblClickMouse.y <= gGraphScreenTL.y + gGraphScreenSize.y;
+      if (overGraph &&
+          ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
           !ed::GetHoveredNode() && !ed::GetHoveredPin() && !ed::GetHoveredLink())
       {
-         gSpawnPos = ed::ScreenToCanvas(ImGui::GetMousePos());
+         gSpawnPos = ed::ScreenToCanvas(dblClickMouse);
          searchBuf[0] = '\0';
          searchJustOpened = true;
          ImGui::OpenPopup("search");
@@ -31891,6 +33373,7 @@ int main()
                ImGui::TextDisabled("functions   sin cos tan abs sign sqrt exp log pow");
                ImGui::TextDisabled("            floor ceil round mod min max clamp lerp");
                ImGui::TextDisabled("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)");
+               ImGui::TextDisabled("            rand(speed) rand(min,max,speed) sh(min,max,speed)");
                ImGui::TextDisabled("bound       t = transport seconds, pi");
                ImGui::TextDisabled("in a param  lo / hi = that param's own range, plus its siblings");
                ImGui::TextDisabled("            a sibling of the same name shadows a global");
@@ -31951,13 +33434,62 @@ int main()
             }
 
             ImGui::Separator();
-            if (ImGui::Button("Add global", ImVec2(120, 0)))
+            if (ImGui::Button("Add global", ImVec2(110, 0)))
             {
                PushUndoCheckpoint();
                char name[32];
                snprintf(name, sizeof(name), "g%d", (int)globals.size() + 1);
                globals.push_back({ name, "0", 0.0f, std::string() });
                gPatchDirty = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Presets...", ImVec2(110, 0)))
+            {
+               ImGui::OpenPopup("ExprPresetsMenu");
+            }
+
+            if (ImGui::BeginPopup("ExprPresetsMenu"))
+            {
+               ImGui::TextDisabled("Click to insert preset global:");
+               ImGui::Separator();
+               std::string currentCategory;
+               for (const ExprGlobals::Preset& p : ExprGlobals::Presets())
+               {
+                  if (p.category != currentCategory)
+                  {
+                     if (!currentCategory.empty())
+                        ImGui::Separator();
+                     currentCategory = p.category;
+                     ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "%s", currentCategory.c_str());
+                  }
+
+                  char itemLabel[256];
+                  snprintf(itemLabel, sizeof(itemLabel), "%s = %s", p.name.c_str(), p.expr.c_str());
+                  if (ImGui::MenuItem(itemLabel, nullptr))
+                  {
+                     PushUndoCheckpoint();
+                     bool found = false;
+                     for (ExprGlobals::Global& g : globals)
+                     {
+                        if (g.name == p.name)
+                        {
+                           g.expr = p.expr;
+                           found = true;
+                           break;
+                        }
+                     }
+                     if (!found)
+                     {
+                        globals.push_back({ p.name, p.expr, 0.0f, std::string() });
+                     }
+                     gPatchDirty = true;
+                  }
+                  if (ImGui::IsItemHovered())
+                  {
+                     ImGui::SetTooltip("%s\nFormula: %s", p.description.c_str(), p.expr.c_str());
+                  }
+               }
+               ImGui::EndPopup();
             }
          }
          ImGui::End();
@@ -32196,7 +33728,8 @@ int main()
 
       for (GraphNode& gn : gNodes)
       {
-         if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr)
+         if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr ||
+             dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr)
             gn.node->CookIfNeeded(frameId);
       }
       if (getenv("INFINITE_SHOWCASE") != nullptr && frameId == 1)
@@ -32576,7 +34109,12 @@ int main()
          }
 
          if (tex != 0)
-            GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+         {
+            if (dynamic_cast<ProjectionNode*>(src->node.get()) != nullptr)
+               GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
+            else
+               GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+         }
          else
          {
             glViewport(0, 0, pw, ph);

@@ -36,6 +36,7 @@ namespace WavetableSynthCore
       kMix,
       kGlide,
       kPitchBend,
+      kFmDepth,
       kNumGlobalParams
    };
 
@@ -248,12 +249,21 @@ public:
          v.Reset(sampleRate);
    }
 
-   void SetNoteInbox(NoteEventQueue* inbox) override { mNoteInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
+   {
+      mNoteInbox = inbox;
+      mNoteCursor = cursor;
+   }
 
    // See WavetableNode::DebugMailboxSampleRate's comment - test-only.
    double DebugMailboxSampleRate() const { return mMailbox.SampleRate(); }
 
-   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
+   // See WavetableNode::DebugFmMode's comment - test-only. mFmMode is a
+   // plain atomic (mode switches skip the smoothed ParamMailbox), so this
+   // reads it back directly rather than through the mailbox.
+   int DebugFmMode() const { return mFmMode.load(std::memory_order_relaxed); }
+
+   void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& buffer) override
    {
       using namespace WavetableSynthCore;
       // Per-block snapshot of everything that isn't smoothed. Reading these
@@ -291,12 +301,18 @@ public:
       }
 
       const bool noteDriven = mNoteInbox != nullptr;
+      // Summed to mono rather than reading channels[0] alone - a hard-panned
+      // or stereo-wide modulator should still modulate at full strength.
+      const AudioBuffer* fmBuf = (inputs && numInputs > 1 && inputs[1] && inputs[1]->numChannels > 0)
+                                    ? inputs[1]
+                                    : nullptr;
+      const int fmMode = mFmMode.load(std::memory_order_relaxed);
 
       NoteEvent evts[64];
       int numEvts = 0;
       int evtIdx = 0;
       if (noteDriven)
-         numEvts = mNoteInbox->Pop(evts, 64);
+         numEvts = mNoteInbox->Pop(mNoteCursor, evts, 64);
 
       int activeCount = 0;
 
@@ -319,6 +335,7 @@ public:
          sm.mix = std::clamp(mMailbox.SmoothedValue(kMix), 0.0f, 1.0f);
          sm.glide = mMailbox.SmoothedValue(kGlide);
          sm.pitchBend = mMailbox.SmoothedValue(kPitchBend);
+         sm.fmDepth = mMailbox.SmoothedValue(kFmDepth);
          for (int e = 0; e < kEngines; e++)
          {
             sm.eng[e].position = std::clamp(mMailbox.SmoothedValue(EngineParamId(e, kEngPosition)), 0.0f, 1.0f);
@@ -338,6 +355,17 @@ public:
          // which reads as the mix knob having a hole in it.
          const float mixA = cosf(sm.mix * (float)M_PI * 0.5f);
          const float mixB = sinf(sm.mix * (float)M_PI * 0.5f);
+
+         float extFm = 0.0f;
+         if (fmBuf != nullptr)
+         {
+            const int fmChans = std::min(fmBuf->numChannels, 2);
+            for (int c = 0; c < fmChans; c++)
+               extFm += fmBuf->channels[c][i];
+            extFm /= (float)fmChans;
+         }
+         const float fmPhaseOffset = (fmMode == 0) ? (extFm * sm.fmDepth) : 0.0f;
+         const float fmExpSemitones = (fmMode == 1) ? (extFm * sm.fmDepth * 12.0f) : 0.0f;
 
          float outL = 0.0f, outR = 0.0f;
 
@@ -359,11 +387,14 @@ public:
                   continue;
                }
                const float semitones = (float)(eng[e].octave * 12 + eng[e].semi) * 100.0f + sm.eng[e].fine +
-                                       sm.pitchBend * 100.0f;
-               const float freq = base * powf(2.0f, semitones / 1200.0f);
+                                       (sm.pitchBend + fmExpSemitones) * 100.0f;
+               // Exponential FM has no ceiling of its own - a full-scale
+               // modulator can otherwise push the carrier past Nyquist.
+               const float freq = std::clamp(base * powf(2.0f, semitones / 1200.0f), 20.0f,
+                                             (float)mSampleRate * 0.45f);
                float l = 0.0f, r = 0.0f;
                RenderEngine(eng[e], sm.eng[e], freq, mFreeEngine[e], eng[1 - e].on ? prevOut[1 - e] : 0.0f,
-                            eng[1 - e].on, 0.0f, l, r);
+                            eng[1 - e].on, 0.0f, fmPhaseOffset, l, r);
                const float g = (e == 0 ? mixA : mixB) * sm.eng[e].volume;
                outL += l * g;
                outR += r * g;
@@ -413,11 +444,14 @@ public:
 
                   const float semitones = (float)(eng[e].octave * 12 + eng[e].semi) * 100.0f +
                                           sm.eng[e].fine + eng[e].pitchAmount * pitchEnv * 100.0f +
-                                          sm.pitchBend * 100.0f + v.bend * 100.0f;
-                  const float freq = base * powf(2.0f, semitones / 1200.0f);
+                                          (sm.pitchBend + fmExpSemitones) * 100.0f + v.bend * 100.0f;
+                  // Exponential FM has no ceiling of its own - a full-scale
+                  // modulator can otherwise push the carrier past Nyquist.
+                  const float freq = std::clamp(base * powf(2.0f, semitones / 1200.0f), 20.0f,
+                                                (float)mSampleRate * 0.45f);
                   float l = 0.0f, r = 0.0f;
                   RenderEngine(eng[e], sm.eng[e], freq, v.eng[e], eng[1 - e].on ? prevOut[1 - e] : 0.0f,
-                               eng[1 - e].on, filtEnv, l, r);
+                               eng[1 - e].on, filtEnv, fmPhaseOffset, l, r);
                   const float g = (e == 0 ? mixA : mixB) * sm.eng[e].volume * ampEnv * velGain;
                   outL += l * g;
                   outR += r * g;
@@ -452,8 +486,12 @@ public:
          {
             buffer.channels[0][i] = outL;
             buffer.channels[1][i] = outR;
+            // Zeroed rather than duplicating L into every extra channel: a
+            // >2-channel device path should get silence on channels this
+            // node has no opinion about, not a phantom copy of the stereo
+            // mix nobody asked it to route there.
             for (int ch = 2; ch < buffer.numChannels; ch++)
-               buffer.channels[ch][i] = outL;
+               buffer.channels[ch][i] = 0.0f;
          }
          else if (buffer.numChannels == 1)
          {
@@ -480,6 +518,9 @@ public:
       values[kMix] = n.mix;
       values[kGlide] = n.glide;
       values[kPitchBend] = n.pitchBend;
+      values[kFmDepth] = n.fmDepth;
+
+      mFmMode.store(n.fmMode, std::memory_order_relaxed);
 
       for (int e = 0; e < kEngines; e++)
       {
@@ -531,6 +572,8 @@ public:
    int ActiveVoices() const { return mActiveVoices.load(std::memory_order_relaxed); }
 
 private:
+   std::atomic<int> mFmMode{0};
+
    struct EngineBlock
    {
       bool on;
@@ -552,7 +595,7 @@ private:
 
    struct SmoothedBlock
    {
-      float frequency, volume, mix, glide, pitchBend;
+      float frequency, volume, mix, glide, pitchBend, fmDepth;
       SmoothedEngine eng[WavetableSynthCore::kEngines];
    };
 
@@ -621,7 +664,7 @@ private:
    // its `lastOut` for the other engine to read next sample.
    void RenderEngine(const EngineBlock& eb, const SmoothedEngine& se, float freq,
                      EngineState& st, float otherOut, bool otherOn, float filtEnv,
-                     float& outL, float& outR)
+                     float fmPhaseOffset, float& outL, float& outR)
    {
       using namespace WavetableSynthCore;
       outL = 0.0f;
@@ -671,7 +714,7 @@ private:
          const float* hi = Wavetable::Frame(eb.table, frameHi, mip);
 
          const double randOffset = (double)se.phaseRand * (double)kVoicePhaseSeed[u];
-         const double basePhase = st.phase[u] + (double)se.phase + randOffset;
+         const double basePhase = st.phase[u] + (double)se.phase + randOffset + (double)fmPhaseOffset;
          const double readPhase = WarpReadPhase(eb.warpMode, se.warpAmount, se.warpRatio, basePhase, mod);
 
          float s = Wavetable::Sample(lo, hi, frameFrac, readPhase);
@@ -847,6 +890,7 @@ private:
    ParamMailbox mMailbox;
    MeterRing mScopeRing;
    NoteEventQueue* mNoteInbox = nullptr;
+   int mNoteCursor = -1;
 
    Voice mVoices[WavetableSynthCore::kMaxVoices];
    uint64_t mNextAge = 1;

@@ -55,9 +55,22 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 1 ? &mNoteInput : nullptr; }
 
+   // "detune" only spreads unison voices apart (RenderVoice's pitch spread) -
+   // a no-op while "unison" (default 1) isn't > 1. "stereoWidth" has a
+   // partial effect independent of unison (phaseSpread), but forcing unison
+   // to 2 also exercises its unison-pan spread, so it's included too. See
+   // INode's SweepPrerequisitesFor comment.
+   std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
+   {
+      if (paramName == "detune" || paramName == "stereoWidth")
+         return { { "unison", 2.0f } };
+      return {};
+   }
+
    int ReadScope(float* out, int capacity);
    int ActiveVoices() const;
    float Playhead() const;
+   void PushParams();
    void TriggerScan();
 
    // ------------------------------------------------ Parameters
@@ -67,6 +80,10 @@ public:
    float scanSpeed = 1.0f;     // Speed multiplier (0.01 .. 20.0 Hz or rate scale)
    float position = 0.0f;      // 0..1 manual scrub position
    int direction = 0;          // 0 = Forward, 1 = Reverse
+   // Retrigger per note (each voice sweeps the image from its own start
+   // point) vs one shared playhead every voice reads in lockstep (the
+   // previous, only, behaviour). A two-state toggle, not a fifth scan mode.
+   bool perVoiceScan = false;
 
    // Frequency & Partial Spectrum
    int partialsChoice = 1;     // 0: 64 partials, 1: 128 partials, 2: 256 partials

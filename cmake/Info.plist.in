@@ -38,7 +38,7 @@
 				<string>inf</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>InfinitePatch</string>
+			<string>Infinite</string>
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>com.namansoni.infinite.patch</string>
@@ -55,7 +55,7 @@
 			<key>UTTypeDescription</key>
 			<string>Infinite Patch</string>
 			<key>UTTypeIconFile</key>
-			<string>InfinitePatch</string>
+			<string>Infinite</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>

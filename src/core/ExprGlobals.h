@@ -52,6 +52,17 @@ namespace ExprGlobals
    // identifier lookup. Rebuilt by EvaluateAll.
    const std::map<std::string, float>& Values();
 
+   // Preset definition for quick-adding popular global modulation expressions
+   struct Preset
+   {
+      std::string category;
+      std::string name;
+      std::string expr;
+      std::string description;
+   };
+
+   const std::vector<Preset>& Presets();
+
    // Dropping the whole graph drops the globals with it - they are part of the
    // patch, not of the application.
    void Clear();

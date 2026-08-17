@@ -34,6 +34,41 @@ FetchContent_MakeAvailable(glfw)
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)
 set(STB_DIR external/stb)
+set(SYPHON_DIR external/syphon)
+
+set(SYPHON_SOURCES
+    ${SYPHON_DIR}/src/SyphonCGL.c
+    ${SYPHON_DIR}/src/SyphonDispatch.c
+    ${SYPHON_DIR}/src/SyphonOpenGLFunctions.c
+    ${SYPHON_DIR}/src/SyphonCFMessageReceiver.m
+    ${SYPHON_DIR}/src/SyphonCFMessageSender.m
+    ${SYPHON_DIR}/src/SyphonClient.m
+    ${SYPHON_DIR}/src/SyphonClientBase.m
+    ${SYPHON_DIR}/src/SyphonClientConnectionManager.m
+    ${SYPHON_DIR}/src/SyphonGLShader.m
+    ${SYPHON_DIR}/src/SyphonGLVertices.m
+    ${SYPHON_DIR}/src/SyphonIOSurfaceImageCore.m
+    ${SYPHON_DIR}/src/SyphonIOSurfaceImageLegacy.m
+    ${SYPHON_DIR}/src/SyphonImage.m
+    ${SYPHON_DIR}/src/SyphonImageBase.m
+    ${SYPHON_DIR}/src/SyphonMessageQueue.m
+    ${SYPHON_DIR}/src/SyphonMessageReceiver.m
+    ${SYPHON_DIR}/src/SyphonMessageSender.m
+    ${SYPHON_DIR}/src/SyphonMessaging.m
+    ${SYPHON_DIR}/src/SyphonOpenGLClient.m
+    ${SYPHON_DIR}/src/SyphonOpenGLImage.m
+    ${SYPHON_DIR}/src/SyphonOpenGLServer.m
+    ${SYPHON_DIR}/src/SyphonPrivate.m
+    ${SYPHON_DIR}/src/SyphonServer.m
+    ${SYPHON_DIR}/src/SyphonServerBase.m
+    ${SYPHON_DIR}/src/SyphonServerConnectionManager.m
+    ${SYPHON_DIR}/src/SyphonServerDirectory.m
+    ${SYPHON_DIR}/src/SyphonServerGLShader.m
+    ${SYPHON_DIR}/src/SyphonServerGLVertices.m
+    ${SYPHON_DIR}/src/SyphonServerRendererCoreGL.m
+    ${SYPHON_DIR}/src/SyphonServerRendererGL.m
+    ${SYPHON_DIR}/src/SyphonServerRendererLegacyGL.m
+)
 
 add_executable(Infinite MACOSX_BUNDLE
     src/main.cpp
@@ -108,7 +143,6 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/UtilityNodes.cpp
     src/nodes/PathNode.cpp
     src/nodes/OceanNode.cpp
-    src/nodes/CurveNode.cpp
     src/nodes/SimulationNodes.cpp
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
@@ -117,14 +151,20 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/FeedbackNodes.cpp
     src/nodes/SwitcherNode.cpp
     src/nodes/Switcher3DNode.cpp
+    src/nodes/CurveNode.cpp
     src/nodes/TextNode.cpp
     src/nodes/OutputNode.cpp
+    src/nodes/SyphonInNode.cpp
+    src/nodes/SyphonOutNode.cpp
+    src/nodes/ProjectionNode.cpp
     src/nodes/AudioNodes.cpp
     src/nodes/NoteNodes.cpp
     src/nodes/WavetableNode.cpp
     src/nodes/WaveTerrainNode.cpp
     src/nodes/ImageSpectralSynthNode.cpp
     src/nodes/AudioDisplacementNode.cpp
+    src/nodes/AudioTextureNode.cpp
+    src/nodes/AudioRibbonNode.cpp
     src/audio/dsp/SpectralAdditiveSynth.cpp
     src/nodes/OscillatorNode.cpp
     src/nodes/MetallicNode.cpp
@@ -136,6 +176,8 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/AudioPluginNode.cpp
     src/audio/SampleScanner.cpp
     src/audio/PluginScanner.cpp
+
+    ${SYPHON_SOURCES}
 
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
@@ -156,14 +198,16 @@ target_include_directories(Infinite PRIVATE
     ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
     ${STB_DIR}
+    ${SYPHON_DIR}/include
+    ${SYPHON_DIR}/src
 )
 
 target_link_libraries(Infinite PRIVATE glfw)
 
 set_source_files_properties(src/platform/Platform.mm
     PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
-
-
+set_source_files_properties(${SYPHON_SOURCES}
+    PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")
 
 # imgui-node-editor 0.9.1 ships its own GetKeyIndex() shim, which collides with
 # ImGui's obsolete-keyio copy. Dropping the obsolete API leaves only the shim.
@@ -188,10 +232,10 @@ if(APPLE)
         "-framework ModelIO"
         "-framework Accelerate"
         "-framework CoreMedia"
-        "-framework CoreVideo"
         "-framework CoreMIDI"
         "-framework CoreAudio"
         "-framework AudioToolbox"
+        "-framework IOSurface"
         # Plugin hosting: AUAudioUnit's -requestViewControllerWithCompletionHandler:
         # lives in CoreAudioKit (AUViewController.h), as does the
         # AUGenericViewController fallback for plugins with no editor of their

@@ -34,8 +34,17 @@ const std::vector<std::string>& AudioDisplacementNode::ModeNames()
 class AudioDisplaceAudioSink : public AudioNode
 {
 public:
-   AudioDisplaceAudioSink() = default;
+   AudioDisplaceAudioSink()
+   {
+      mMono.resize(4096, 0.0f);
+   }
    ~AudioDisplaceAudioSink() override = default;
+
+   void PrepareToPlay(double /*sampleRate*/, int maxBlockSize) override
+   {
+      const int allocSize = std::max(maxBlockSize, 4096);
+      mMono.resize(allocSize, 0.0f);
+   }
 
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
    {
@@ -67,14 +76,16 @@ public:
          const float* inL = inBuf->channels[0];
          const float* inR = (inBuf->numChannels > 1 && inBuf->channels[1] != nullptr) ? inBuf->channels[1] : inL;
 
-         std::vector<float> mono(numFrames);
+         if (mMono.size() < (size_t)numFrames)
+            mMono.resize(numFrames, 0.0f);
+
          for (int i = 0; i < numFrames; i++)
          {
-            mono[i] = (inL[i] + inR[i]) * 0.5f;
+            mMono[i] = (inL[i] + inR[i]) * 0.5f;
             if (output.channels[0]) output.channels[0][i] = inL[i];
             if (output.numChannels > 1 && output.channels[1]) output.channels[1][i] = inR[i];
          }
-         mMeterRing.Write(mono.data(), numFrames);
+         mMeterRing.Write(mMono.data(), numFrames);
       }
    }
 
@@ -85,6 +96,7 @@ public:
 
 private:
    MeterRing mMeterRing;
+   std::vector<float> mMono;
 };
 
 // ---------------------------------------------------------------------------
@@ -108,7 +120,18 @@ AudioNode* AudioDisplacementNode::GetAudioNode()
 
 int AudioDisplacementNode::ReadAudioScope(float* out, int capacity)
 {
-   return mAudioSink ? mAudioSink->ReadSamples(out, capacity) : 0;
+   // Single drain point for the ring is CookIfNeeded below - this reads the
+   // persistent, fixed-length mAudioWaveform it maintains rather than
+   // draining MeterRing a second time. Two independent readers draining the
+   // same ring race for whichever samples arrived that frame (whichever ran
+   // first got them, the other got nothing) - that was why mAudioWaveform's
+   // length used to flap between 0 and 1024 depending on read order, which
+   // in turn made the kModeNormalWaveform angle mapping below rescale
+   // unpredictably every frame.
+   const int count = std::min(capacity, (int)mAudioWaveform.size());
+   if (count > 0 && out != nullptr)
+      std::copy(mAudioWaveform.end() - count, mAudioWaveform.end(), out);
+   return count;
 }
 
 void AudioDisplacementNode::CookIfNeeded(int frameId)
@@ -120,13 +143,29 @@ void AudioDisplacementNode::CookIfNeeded(int frameId)
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
 
-   // Read live audio samples from ring buffer
+   // Read live audio samples from ring buffer - the only drain point for it
+   // (see ReadAudioScope's comment above). mAudioWaveform is kept at a fixed
+   // length of 1024 as a rolling history rather than being re-`assign`ed to
+   // whatever count happened to arrive this frame, which used to make its
+   // length (and therefore every mode's angle/index mapping over it) flap
+   // between 0 and 1024 samples frame to frame.
    float tempBuf[1024];
    const int readCount = mAudioSink ? mAudioSink->ReadSamples(tempBuf, 1024) : 0;
 
    if (readCount > 0)
    {
-      mAudioWaveform.assign(tempBuf, tempBuf + readCount);
+      if (mAudioWaveform.size() != 1024)
+         mAudioWaveform.assign(1024, 0.0f);
+
+      if (readCount >= 1024)
+      {
+         std::copy(tempBuf + (readCount - 1024), tempBuf + readCount, mAudioWaveform.begin());
+      }
+      else
+      {
+         std::move(mAudioWaveform.begin() + readCount, mAudioWaveform.end(), mAudioWaveform.begin());
+         std::copy(tempBuf, tempBuf + readCount, mAudioWaveform.end() - readCount);
+      }
       mAudioFrameCounter++;
    }
 
@@ -137,8 +176,18 @@ void AudioDisplacementNode::CookIfNeeded(int frameId)
    const float rawRms = sqrtf(sumSq / (float)std::max((size_t)1, mAudioWaveform.size()));
    const float targetEnergy = std::min(1.5f, rawRms * 2.5f);
 
-   // Ballistics filter (Attack / Decay)
-   const float dtSec = 1.0f / 60.0f;
+   // Ballistics filter (Attack / Decay). dtSec used to be hard-coded to
+   // 1/60s, which made the attack/decay ms params frame-rate dependent -
+   // use the real elapsed time between CookIfNeeded calls instead.
+   const auto now = std::chrono::steady_clock::now();
+   float dtSec = 1.0f / 60.0f;
+   if (mLastCookTime.time_since_epoch().count() != 0)
+   {
+      dtSec = (float)std::chrono::duration<double>(now - mLastCookTime).count();
+      dtSec = std::clamp(dtSec, 1.0f / 1000.0f, 0.25f); // guard against a huge first-call/stall delta
+   }
+   mLastCookTime = now;
+
    const float tau = (targetEnergy > mCurrentEnergy) ? (attack * 0.001f) : (decay * 0.001f);
    const float alpha = (tau > 0.0001f) ? (1.0f - expf(-dtSec / tau)) : 1.0f;
    mCurrentEnergy += alpha * (targetEnergy - mCurrentEnergy);
@@ -204,7 +253,7 @@ AudioDisplacementNode::Signature AudioDisplacementNode::CurrentSignature() const
    s.selectionOnly = selectionOnly;
    s.upstream = input;
    s.upstreamRevision = input ? input->MeshRevision() : 0;
-   s.audioFrameId = mAudioFrameCounter;
+   s.energyQuant = (int)(mCurrentEnergy * 4096.0f);
    return s;
 }
 
@@ -223,15 +272,53 @@ const Mesh& AudioDisplacementNode::GetMesh()
    if (rawSrc.vertices.empty())
       return kEmptyMesh;
 
-   const Mesh src = (subdivide > 0)
-      ? MeshOps::Subdivide(rawSrc, std::clamp(subdivide, 0, 4), 0.0f)
-      : rawSrc;
+   // Base mesh (subdivide + weld map + selection mask) only needs to rebuild
+   // when the upstream mesh or the subdivide level actually changes - not
+   // once per audio frame. This is the expensive part (Subdivide is up to
+   // 256x the triangle count at level 4, plus a full weld-map pass).
+   const bool baseCacheValid = mBaseHasCache && mBaseCachedUpstream == input &&
+                              mBaseCachedUpstreamRevision == sig.upstreamRevision &&
+                              mBaseCachedSubdivide == subdivide;
+   if (!baseCacheValid)
+   {
+      mBaseMeshCache = (subdivide > 0)
+         ? MeshOps::Subdivide(rawSrc, std::clamp(subdivide, 0, 4), 0.0f)
+         : rawSrc;
+      mWeldMapCache = MeshOps::BuildWeldMap(mBaseMeshCache);
+      // Selection lives on rawSrc's faceMask; Subdivide doesn't propagate
+      // faceMask to the subdivided mesh (there's no well-defined face
+      // correspondence once triangles have been split), so the mask is
+      // computed against rawSrc and mapped onto the subdivided mesh's
+      // vertices by index - Subdivide keeps every original vertex at its
+      // original index (repositioned in place) and only appends new
+      // edge-point vertices after them, so indices < rawSrc.vertices.size()
+      // carry over exactly. New edge-point vertices (introduced only when
+      // subdivide > 0) have no single original vertex to inherit selection
+      // from, since Subdivide doesn't expose which edge each descends from;
+      // this treats them as selected (displaced normally) rather than
+      // guessing - the boundary of a selection will bleed outward slightly
+      // under subdivision as a result, which is a known limitation of
+      // layering selectionOnly on top of a subdivide step, not a bug in the
+      // mask logic itself.
+      const std::vector<unsigned char> rawMask = MeshOps::VertexSelectionFromFaces(rawSrc);
+      mVertexSelectionCache.assign(mBaseMeshCache.vertices.size(), 1);
+      for (size_t i = 0; i < rawMask.size() && i < mVertexSelectionCache.size(); i++)
+         mVertexSelectionCache[i] = rawMask[i];
+
+      mBaseCachedUpstream = input;
+      mBaseCachedUpstreamRevision = sig.upstreamRevision;
+      mBaseCachedSubdivide = subdivide;
+      mBaseHasCache = true;
+   }
+
+   const Mesh& src = mBaseMeshCache;
+   const std::vector<unsigned int>& weldMap = mWeldMapCache;
+   const bool applySelection = selectionOnly && !rawSrc.faceMask.empty();
 
    mCache = src;
    const size_t vCount = src.vertices.size();
    const float pi = 3.14159265358979323846f;
 
-   const auto weldMap = MeshOps::BuildWeldMap(src);
    std::vector<float> weldDisp(vCount, 0.0f);
    std::vector<float> weldDx(vCount, 0.0f);
    std::vector<float> weldDy(vCount, 0.0f);
@@ -349,9 +436,18 @@ const Mesh& AudioDisplacementNode::GetMesh()
 
    for (size_t i = 0; i < vCount; i++)
    {
-      const size_t repr = (i < weldMap.size()) ? weldMap[i] : i;
       const Vertex& sv = src.vertices[i];
       Vertex& dv = mCache.vertices[i];
+
+      if (applySelection && i < mVertexSelectionCache.size() && mVertexSelectionCache[i] == 0)
+      {
+         dv.px = sv.px;
+         dv.py = sv.py;
+         dv.pz = sv.pz;
+         continue;
+      }
+
+      const size_t repr = (i < weldMap.size()) ? weldMap[i] : i;
 
       if (mode == kModeDirectionalAxis)
       {

@@ -49,6 +49,8 @@ void OscillatorNode::CookIfNeeded(int frameId)
    params.frequency = frequency;
    params.glide = glide;
    params.pitchBend = pitchBend;
+   params.fmDepth = fmDepth;
+   params.fmMode = fmMode;
 
    mAudioNode->PushParams(params);
 }
@@ -63,6 +65,11 @@ AudioNode* OscillatorNode::GetAudioNode()
 double OscillatorNode::DebugMailboxSampleRate() const
 {
    return mAudioNode ? mAudioNode->DebugMailboxSampleRate() : 0.0;
+}
+
+int OscillatorNode::DebugFmMode() const
+{
+   return mAudioNode ? mAudioNode->DebugFmMode() : 0;
 }
 
 int OscillatorNode::ReadScope(float* out, int capacity)
@@ -80,6 +87,8 @@ void OscillatorNode::VisitParams(ParamVisitor& v)
    v.Float("frequency", frequency);
    v.Float("glide", glide);
    v.Float("pitchBend", pitchBend);
+   v.Float("fmDepth", fmDepth);
+   v.Int("fmMode", fmMode);
    v.Int("waveform", waveform);
    v.Float("fine", engine.fine);
    v.Int("octave", engine.octave);

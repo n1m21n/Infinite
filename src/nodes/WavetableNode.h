@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "audio/SynthModes.h"
+#include "core/AudioCable.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
 
@@ -99,6 +100,8 @@ struct WavetableSynthParams
    float frequency = 220.0f;
    float glide = 0.0f;
    float pitchBend = 0.0f;
+   float fmDepth = 0.0f;
+   int fmMode = 0; // 0: Phase Modulation / Linear FM, 1: Exponential FM
 };
 
 class WavetableNode : public INode, public IAudioSource
@@ -127,8 +130,20 @@ public:
    // device's negotiated rate, not whatever the node was constructed with.
    double DebugMailboxSampleRate() const;
 
+   // Test-only observability: fmMode is a plain atomic on the audio node
+   // (mode switches don't need the smoothed ParamMailbox), so it can't be
+   // read back through DebugMailboxSampleRate's mailbox path - this mirrors
+   // that accessor for the atomic instead.
+   int DebugFmMode() const;
+
+   AudioCable* AudioInputSlot(int slot) override { return slot == 1 ? &fmInput : nullptr; }
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   const char* InputLabel(int slot) const override
+   {
+      if (slot == 0) return "notes";
+      if (slot == 1) return "fm in";
+      return nullptr;
+   }
 
    // Decimated output trace for the inline scope; drains the audio node's
    // MeterRing on the main thread. Returns the count written.
@@ -158,8 +173,11 @@ public:
    // hardware-style bend with nothing patched into the note chain. Default
    // range +/-2 st matches the standard MIDI wheel range.
    float pitchBend = 0.0f;   // -2..2 semitones
+   float fmDepth = 0.0f;     // audio-rate FM / PM modulation depth
+   int fmMode = 0;           // 0 = Phase Modulation, 1 = Exponential FM
 
    NoteCable noteInput;
+   AudioCable fmInput;
 
    // UI-only scope cache - not a saved param, not touched by VisitParams.
    static constexpr int kScopeCacheCapacity = 128;

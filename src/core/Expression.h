@@ -30,7 +30,7 @@ namespace Expression
    // Supports + - * / % ^ (with unary minus and right-associative ^), the
    // comparisons < <= > >= == !=, the logical operators && || !, the
    // functions sin cos tan abs min max clamp floor ceil round mod lerp sqrt
-   // exp log pow sign step smoothstep if, and the constant pi. Returns false
+   // exp log pow sign step smoothstep rand noise sh if, and the constant pi. Returns false
    // and fills outError on a parse or evaluation error (unknown identifier,
    // wrong argument count, division by zero from a malformed expression,
    // etc.); outValue is left untouched in that case.

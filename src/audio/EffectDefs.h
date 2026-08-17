@@ -106,6 +106,11 @@ struct EffectDef
    // AudioInputSlot(1) when this is set, so every other effect keeps its
    // single contiguous input slot.
    bool hasSidechain = false;
+   // UI label for the sidechain input pin (only shown when hasSidechain is
+   // set) - "sidechain" reads right for Dynamics but wrong for a filter's
+   // audio-rate cutoff input, so this is table-driven rather than a name
+   // special-case in AudioEffectNode::InputLabel.
+   const char* sidechainLabel = "sidechain";
 };
 
 const std::vector<EffectDef>& GetEffectDefs();

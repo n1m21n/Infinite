@@ -1,5 +1,6 @@
 #include "SpectralAdditiveSynth.h"
 #include <cmath>
+#include "audio/DspMath.h"
 
 namespace SpectralAdditiveDsp
 {
@@ -241,9 +242,9 @@ namespace SpectralAdditiveDsp
       }
 
       // Equal-power stereo panning
-      const float clampedPan = std::clamp(pan, -1.0f, 1.0f);
-      const float angle = (clampedPan + 1.0f) * (3.14159265358979323846f / 4.0f);
-      outAmpL = luma * cosf(angle) * ampMultiplierL;
-      outAmpR = luma * sinf(angle) * ampMultiplierR;
+      float panL = 1.0f, panR = 1.0f;
+      DspMath::EqualPowerPan(pan, panL, panR);
+      outAmpL = luma * panL * ampMultiplierL;
+      outAmpR = luma * panR * ampMultiplierR;
    }
 }

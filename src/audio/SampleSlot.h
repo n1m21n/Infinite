@@ -12,28 +12,39 @@
 // same use-after-free trap eight times.
 //
 // Contract, unchanged from the original: the main thread calls Push() with
-// a freshly decoded Platform::SampleBuffer* it owns; the audio thread calls
-// SwapIn() at the top of its own ProcessBlock (never mid-block) to adopt it
-// and retires whatever was active before into an SPSC ring rather than
-// deleting it there (deleting on the audio thread is one of the standing
-// audio-thread prohibitions); the main thread calls DrainRetired() once per
-// CookIfNeeded to actually free those.
+// a freshly allocated T* it owns; the audio thread calls SwapIn() at the top
+// of its own ProcessBlock (never mid-block) to adopt it and retires whatever
+// was active before into an SPSC ring rather than deleting it there
+// (deleting on the audio thread is one of the standing audio-thread
+// prohibitions); the main thread calls DrainRetired() once per CookIfNeeded
+// to actually free those.
+//
+// Templatised on the payload type T (originally hard-typed to
+// Platform::SampleBuffer*) so WaveTerrainNode's BankData and
+// ImageSpectralSynthNode's SpectrogramMatrix double-buffers - which had the
+// exact same "main thread writes, audio thread holds a reference for a
+// whole block, a second write mid-block would race" lifetime problem as a
+// sampler's decoded buffer - can reuse this instead of hand-rolling a third
+// variant of it. The only requirement on T is that `delete` works on a
+// T* (a plain value type, no virtual destructor needed since the exact
+// type is always known here).
 namespace SampleSlotDetail
 {
    // Tiny SPSC ring of raw pointers: the audio thread retires a superseded
-   // Platform::SampleBuffer* here instead of deleting it directly. The main
-   // thread drains and deletes them. Same index discipline as MeterRing/
-   // NoteEventQueue. A full ring silently drops the retire (the buffer
-   // leaks) rather than overwriting a slot the consumer hasn't read - loads
-   // are rare enough that this never triggers in practice, and leaking one
-   // buffer beats a double free.
+   // T* here instead of deleting it directly. The main thread drains and
+   // deletes them. Same index discipline as MeterRing/NoteEventQueue. A
+   // full ring silently drops the retire (the buffer leaks) rather than
+   // overwriting a slot the consumer hasn't read - loads are rare enough
+   // that this never triggers in practice, and leaking one buffer beats a
+   // double free.
+   template <typename T>
    class BufferRetireRing
    {
    public:
       static constexpr int kCapacity = 8;
 
       // Audio thread only.
-      void Retire(Platform::SampleBuffer* buf)
+      void Retire(T* buf)
       {
          const size_t tail = mTail.load(std::memory_order_relaxed);
          const size_t head = mHead.load(std::memory_order_acquire);
@@ -45,34 +56,35 @@ namespace SampleSlotDetail
       }
 
       // Main thread only.
-      Platform::SampleBuffer* Drain()
+      T* Drain()
       {
          const size_t head = mHead.load(std::memory_order_relaxed);
          const size_t tail = mTail.load(std::memory_order_acquire);
          if (head == tail)
             return nullptr;
-         Platform::SampleBuffer* out = mEntries[head];
+         T* out = mEntries[head];
          mHead.store((head + 1) % kCapacity, std::memory_order_release);
          return out;
       }
 
    private:
-      Platform::SampleBuffer* mEntries[kCapacity] = {};
+      T* mEntries[kCapacity] = {};
       std::atomic<size_t> mHead { 0 };
       std::atomic<size_t> mTail { 0 };
    };
 }
 
-class SampleSlot
+template <typename T>
+class SampleSlotT
 {
 public:
-   // Main thread only. Hands over ownership of a freshly decoded buffer; the
+   // Main thread only. Hands over ownership of a freshly built T*; the
    // previously *pending* one (if any - two loads in a row before the audio
    // thread got to the first) is deleted here since the audio thread never
    // saw it and can't be racing a read against it.
-   void Push(Platform::SampleBuffer* buf)
+   void Push(T* buf)
    {
-      Platform::SampleBuffer* old = mPendingBuffer.exchange(buf, std::memory_order_acq_rel);
+      T* old = mPendingBuffer.exchange(buf, std::memory_order_acq_rel);
       if (old != nullptr)
          delete old;
    }
@@ -83,7 +95,7 @@ public:
    // reset any playback state that shouldn't carry across a buffer change.
    bool SwapIn()
    {
-      Platform::SampleBuffer* fresh = mPendingBuffer.exchange(nullptr, std::memory_order_acq_rel);
+      T* fresh = mPendingBuffer.exchange(nullptr, std::memory_order_acq_rel);
       if (fresh == nullptr)
          return false;
       if (mActiveBuffer != nullptr)
@@ -93,17 +105,22 @@ public:
    }
 
    // Audio thread only.
-   Platform::SampleBuffer* Active() const { return mActiveBuffer; }
+   T* Active() const { return mActiveBuffer; }
 
    // Main thread only, called once per frame from CookIfNeeded.
    void DrainRetired()
    {
-      while (Platform::SampleBuffer* b = mRetireRing.Drain())
+      while (T* b = mRetireRing.Drain())
          delete b;
    }
 
 private:
-   Platform::SampleBuffer* mActiveBuffer = nullptr;
-   std::atomic<Platform::SampleBuffer*> mPendingBuffer { nullptr };
-   SampleSlotDetail::BufferRetireRing mRetireRing;
+   T* mActiveBuffer = nullptr;
+   std::atomic<T*> mPendingBuffer { nullptr };
+   SampleSlotDetail::BufferRetireRing<T> mRetireRing;
 };
+
+// The original, still-used-as-is name: every existing SamplerNode/
+// GranularNode/PaulStretchNode/DrumSequencerNode call site keeps compiling
+// unchanged against this alias.
+using SampleSlot = SampleSlotT<Platform::SampleBuffer>;

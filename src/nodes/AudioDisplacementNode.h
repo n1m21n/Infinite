@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <vector>
 #include <string>
@@ -143,7 +144,21 @@ private:
       bool selectionOnly = false;
       const IGeometrySource* upstream = nullptr;
       unsigned long long upstreamRevision = 0;
-      uint64_t audioFrameId = 0;
+      // Quantised (not raw float) so float jitter doesn't defeat the cache -
+      // replaces a previous `audioFrameId` counter that advanced on every
+      // audio frame that produced samples, *including silence* (silence
+      // still produces samples), which meant the cache invalidated and the
+      // full subdivide+weld+displace+recalc-normals pipeline reran on every
+      // single frame audio was connected, deformed or not. It also meant
+      // that disconnecting the audio cable (RequiresAudioProcessing() then
+      // false, the ring goes empty, the counter freezes) left the mesh
+      // permanently locked in its last deformed pose even as mCurrentEnergy
+      // decayed to zero underneath it. Keying on the energy itself instead
+      // means the signature naturally tracks the decay (rebuilding while it
+      // audibly settles) and naturally stabilises at rest once it's done -
+      // and, combined with mBaseMeshCache below, the *expensive* part
+      // (subdivide/weld) still only reruns when topology actually changes.
+      int energyQuant = 0;
 
       bool operator==(const Signature& o) const
       {
@@ -152,7 +167,7 @@ private:
                 axis == o.axis && subdivide == o.subdivide && chladniM == o.chladniM && chladniN == o.chladniN &&
                 flat == o.flat && flip == o.flip && selectionOnly == o.selectionOnly &&
                 upstream == o.upstream && upstreamRevision == o.upstreamRevision &&
-                audioFrameId == o.audioFrameId;
+                energyQuant == o.energyQuant;
       }
    };
 
@@ -163,9 +178,25 @@ private:
    bool mHasBuilt = false;
    unsigned long long mMeshRevision = 1;
    int mLastCookFrame = -1;
+   std::chrono::steady_clock::time_point mLastCookTime{};
    float mPhaseAccum = 0.0f;
    float mCurrentEnergy = 0.0f;
    std::vector<float> mSmoothedSpectrum;
    std::vector<float> mAudioWaveform;
    uint64_t mAudioFrameCounter = 0;
+
+   // Separate cache for the subdivided base mesh + weld map + selection
+   // mask, keyed only on (upstream, upstream revision, subdivide level) -
+   // independent of the full Signature above, which also varies with the
+   // (fast-changing, while audio plays) energy. Subdivide (up to 256x the
+   // triangle count at level 4) + BuildWeldMap only need to rerun when the
+   // topology actually changes; only the displacement pass and
+   // RecalculateNormals need to run per audio frame.
+   Mesh mBaseMeshCache;
+   std::vector<unsigned int> mWeldMapCache;
+   std::vector<unsigned char> mVertexSelectionCache;
+   const IGeometrySource* mBaseCachedUpstream = nullptr;
+   unsigned long long mBaseCachedUpstreamRevision = 0;
+   int mBaseCachedSubdivide = -1;
+   bool mBaseHasCache = false;
 };

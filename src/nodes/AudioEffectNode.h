@@ -63,7 +63,7 @@ public:
       if (slot == 0)
          return "audio";
       if (slot == 1 && mDef.hasSidechain)
-         return "sidechain";
+         return mDef.sidechainLabel;
       return nullptr;
    }
 

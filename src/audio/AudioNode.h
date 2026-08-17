@@ -50,12 +50,18 @@ public:
    // other producer is unaffected.
    virtual NoteEventQueue* NoteOutbox(int /*outputSlot*/) { return NoteOutbox(); }
 
-   // A node that CONSUMES note events (Oscillator's note input, Envelope)
-   // overrides SetNoteInbox(), called once by the topology builder with a
-   // pointer to its upstream producer's outbox, or nullptr if this node's
-   // note pin isn't connected this generation. The pointer is valid for the
-   // lifetime of the topology generation it was set under - AudioEngine's
-   // existing one-generation-retire discipline (see AudioEngine.h) already
-   // guarantees the producer outlives any in-flight callback using it.
-   virtual void SetNoteInbox(NoteEventQueue* inbox) { (void)inbox; }
+   // A node that CONSUMES note events (Oscillator's note input, Wavetable's,
+   // ...) overrides SetNoteInbox(), called once by the topology builder with
+   // a pointer to its upstream producer's outbox plus the cursor id that
+   // outbox's NoteEventQueue::RegisterConsumer() assigned this consumer, or
+   // nullptr/-1 if this node's note pin isn't connected this generation. The
+   // outbox can be shared by several consumers (one note source fanned out
+   // to multiple synths) - each gets its own cursor so one consumer draining
+   // events can never starve another; consumers must pop with
+   // `inbox->Pop(cursor, ...)`, never the cursor-less form. The pointer is
+   // valid for the lifetime of the topology generation it was set under -
+   // AudioEngine's existing one-generation-retire discipline (see
+   // AudioEngine.h) already guarantees the producer outlives any in-flight
+   // callback using it.
+   virtual void SetNoteInbox(NoteEventQueue* inbox, int cursor) { (void)inbox; (void)cursor; }
 };

@@ -79,9 +79,10 @@ public:
       mFreeRunTriggerTimer = 0;
    }
 
-   void SetNoteInbox(NoteEventQueue* inbox) override
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
    {
       mNoteInbox = inbox;
+      mNoteCursor = cursor;
    }
 
    MeterRing& ScopeRing() { return mScopeRing; }
@@ -164,7 +165,7 @@ public:
          if (mNoteInbox != nullptr)
          {
             NoteEvent evts[64];
-            const int numEvts = mNoteInbox->Pop(evts, 64);
+            const int numEvts = mNoteInbox->Pop(mNoteCursor, evts, 64);
             for (int i = 0; i < numEvts; i++)
             {
                const auto& event = evts[i];
@@ -365,6 +366,7 @@ private:
 
    ParamMailbox mMailbox;
    NoteEventQueue* mNoteInbox = nullptr;
+   int mNoteCursor = -1;
    MeterRing mScopeRing;
 
    DspMath::TptSvf mFilterL1;

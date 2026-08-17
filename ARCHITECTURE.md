@@ -65,6 +65,9 @@ What each node type does: math, state, per-node parameter UI.
 | FeedbackNodes | Feedback/trails/reaction-diffusion |
 | SwitcherNode | Cycles between inputs on a timer |
 | TextNode | Typography via CoreText/CoreGraphics |
+| SyphonInNode | Syphon video client (zero-copy GPU texture receiver) |
+| SyphonOutNode | Syphon video server (zero-copy GPU texture publisher) |
+| ProjectionNode | Projection mapping, 4-corner homography warp, mesh warping, and test patterns |
 | OutputNode | Terminal node — identity-pass FBO, drives recording |
 
 ### Audio / note node system

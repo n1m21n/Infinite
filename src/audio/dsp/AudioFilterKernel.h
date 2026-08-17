@@ -190,6 +190,7 @@ public:
    static constexpr int kQSlot = kFreqSlot + 1;
    static constexpr int kGainSlot = kQSlot + 1;
    static constexpr int kEnvAmountSlot = kGainSlot + 1;
+   static constexpr int kModAmountSlot = kEnvAmountSlot + 1;
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
@@ -209,14 +210,18 @@ public:
       for (auto& bq : mBiquad)
          bq.Reset();
       mEnvFollower = 0.0f;
+      mBiquadFreqSlew = 1000.0f;
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
 
-   void ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out) override
+   void ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out) override
    {
       const int numChannels = std::min({ in.numChannels, out.numChannels, kMaxChannels });
       const int type = mType.load(std::memory_order_relaxed);
+      // Summed to mono rather than reading channels[0] alone - a hard-panned
+      // or stereo-wide modulator should still modulate at full strength.
+      const AudioBuffer* modBuf = (sidechain != nullptr && sidechain->numChannels > 0) ? sidechain : nullptr;
 
       // Envelope-follower time constants for the "env" knob's auto-wah style
       // cutoff sweep - fast attack, slower release, the standard envelope
@@ -229,6 +234,13 @@ public:
       {
          const float envAmount = mMailbox.SmoothedValue(kEnvAmountSlot);
          const bool envActive = std::fabs(envAmount) > 1.0e-4f;
+         // modAmount is smoothed like every other slot, so it's read once
+         // per sample here rather than once per block - and gates the fast
+         // path exactly like envAmount does: a connected-but-silent, or
+         // fully-turned-down, modulator shouldn't force the slow per-sample
+         // coefficient recompute below.
+         const float modAmount = mMailbox.SmoothedValue(kModAmountSlot);
+         const bool modActive = (modBuf != nullptr) && std::fabs(modAmount) > 1.0e-4f;
 
          // Envelope follower runs on the input's peak magnitude across
          // channels, once per sample, regardless of envActive - so the
@@ -241,24 +253,48 @@ public:
          mEnvFollower = peak + coef * (mEnvFollower - peak);
 
          float coeffs[kStages][kCoeffsPerStage];
-         if (!envActive)
+         if (!envActive && !modActive)
          {
             // Fast path: precomputed, smoothed coefficients from PushParams -
-            // unchanged behaviour for every patch that leaves env at 0.
+            // unchanged behaviour for every patch that leaves env at 0 and mod unconnected.
             for (int s = 0; s < kStages; s++)
                for (int c = 0; c < kCoeffsPerStage; c++)
                   coeffs[s][c] = mMailbox.SmoothedValue(s * kCoeffsPerStage + c);
+            // Keep the biquad slew-limiter's state tracking the current
+            // cutoff even while it's unused, so re-engaging modulation later
+            // glides from "here", not from a stale value left over from a
+            // previous session of modulation.
+            mBiquadFreqSlew = mMailbox.SmoothedValue(kFreqSlot);
          }
          else
          {
             // Recompute this sample's coefficients from the modulated
             // cutoff - envAmount is in octaves of shift, scaled by the
-            // follower's 0-1 envelope.
+            // follower's 0-1 envelope, plus the audio-rate modulator scaled
+            // by modAmount (bipolar, so a negative setting inverts it -
+            // matching envAmount's shape).
             const float freq = mMailbox.SmoothedValue(kFreqSlot);
             const float q = mMailbox.SmoothedValue(kQSlot);
             const float gainDb = mMailbox.SmoothedValue(kGainSlot);
+            float extModOctaves = 0.0f;
+            if (modActive)
+            {
+               const int modChans = std::min(modBuf->numChannels, 2);
+               float modValue = 0.0f;
+               for (int c = 0; c < modChans; c++)
+                  modValue += modBuf->channels[c][i];
+               modValue /= (float)modChans;
+               extModOctaves = modValue * 4.0f * modAmount;
+            }
+            const float totalOctaves = (envAmount * mEnvFollower * 4.0f) + extModOctaves;
+            // Clamped to a hard ceiling below Nyquist rather than a fixed
+            // 20kHz - correct for sample rates above 44.1kHz, where the old
+            // fixed bound left an env/mod sweep stopping well short of what
+            // the device can actually represent. ConfigureBiquad's shelf/peak
+            // math stays well-behaved this close to Nyquist since it's still
+            // bounded away from exactly Nyquist by the 0.45 factor.
             const float freqMod =
-               std::clamp(freq * powf(2.0f, envAmount * mEnvFollower * 4.0f), 20.0f, 20000.0f);
+               std::clamp(freq * powf(2.0f, totalOctaves), 20.0f, (float)mSampleRate * 0.45f);
 
             if (AudioFilterDsp::IsSvf(type))
             {
@@ -273,8 +309,18 @@ public:
             }
             else
             {
+               // The biquad types keep coefficient-dependent state (unlike
+               // the SVF's topology-preserving transform), so recomputing
+               // coefficients every sample straight from an audio-rate
+               // modulator is the classic route to level jumps or blow-up at
+               // high Q. A few-ms one-pole slew on the cutoff feeding this
+               // branch only keeps the feature on every filter type while
+               // costing one multiply-add.
+               const float slewCoef = expf(-1.0f / (float)(mSampleRate * 0.005));
+               mBiquadFreqSlew = freqMod + slewCoef * (mBiquadFreqSlew - freqMod);
+
                DspMath::Biquad bq;
-               AudioFilterDsp::ConfigureBiquad(bq, type, freqMod, q, gainDb, mSampleRate);
+               AudioFilterDsp::ConfigureBiquad(bq, type, mBiquadFreqSlew, q, gainDb, mSampleRate);
                coeffs[0][0] = bq.b0;
                coeffs[0][1] = bq.b1;
                coeffs[0][2] = bq.b2;
@@ -334,4 +380,7 @@ private:
    DspMath::TptSvf mSvf[kStages][kMaxChannels];
    DspMath::Biquad mBiquad[kMaxChannels];
    float mEnvFollower = 0.0f;
+   // Slew-limits the cutoff feeding the biquad branch under modulation - see
+   // ProcessBlock's comment at the biquad recompute for why.
+   float mBiquadFreqSlew = 1000.0f;
 };

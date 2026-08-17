@@ -282,7 +282,7 @@ public:
    {
       const int numFrames = output.numFrames;
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
       // Only note-on moves the target - note-off is ignored entirely so the
       // CV holds the last played pitch instead of falling back toward 0 on
       // release (see the class comment on NoteToCVNode).
@@ -307,7 +307,7 @@ public:
       mLevel.store(level, std::memory_order_relaxed);
    }
 
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // Main thread only.
    void PushParams(const NoteToCVNode& n)
@@ -322,6 +322,7 @@ public:
 
 private:
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    double mSampleRate = 44100.0;
    std::atomic<float> mLevel { 0.0f };
    std::atomic<int> mLastNote { -1 };
@@ -388,7 +389,7 @@ public:
       const float chance = mChance.load(std::memory_order_relaxed);
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -447,7 +448,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // Main thread only.
    void PushParams(const NoteFilterNode& n)
@@ -466,6 +467,7 @@ public:
 private:
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    VoiceIdMap<int, 128> mPassingAs;
    DspMath::WhiteNoise mRng;
 
@@ -597,7 +599,7 @@ public:
    {
       const int semi = mSemitones.load(std::memory_order_relaxed);
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -651,7 +653,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    void PushParams(const NoteTransposeNode& n)
    {
@@ -663,6 +665,7 @@ public:
 private:
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    VoiceIdMap<int, 128> mOutNote;
    std::atomic<int> mSemitones { 0 };
    std::atomic<bool> mUseGlobalScale { false };
@@ -727,7 +730,7 @@ public:
       const float bend = mBend.load(std::memory_order_relaxed);
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -798,7 +801,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    void SetBend(float b) { mBend.store(b, std::memory_order_relaxed); }
 
@@ -811,6 +814,7 @@ private:
 
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    VoiceIdMap<HeldNote, 128> mHeld;
    float mLastEmittedBend = 0.0f; // audio-thread-only, not shared with the knob atomic
 
@@ -849,7 +853,7 @@ public:
    {
       const float curve = mCurve.load(std::memory_order_relaxed);
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -868,7 +872,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    void SetCurve(float c) { mCurve.store(c, std::memory_order_relaxed); }
    float LastVelocityIn() const { return mLastVelocityIn.load(std::memory_order_relaxed); }
@@ -877,6 +881,7 @@ public:
 private:
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    std::atomic<float> mCurve { 1.0f };
    std::atomic<float> mLastVelocityIn { 0.0f };
    std::atomic<float> mLastVelocityOut { 0.0f };
@@ -932,7 +937,7 @@ public:
       const double holdSamples = holdMs * 0.001 * mSampleRate;
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -1005,7 +1010,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    void SetHoldMs(float ms) { mHoldMs.store(ms, std::memory_order_relaxed); }
 
@@ -1020,6 +1025,7 @@ private:
 
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
    VoiceIdMap<GateState, 128> mGateState;
@@ -1068,7 +1074,7 @@ public:
       const float velocityPct = mVelocityPct.load(std::memory_order_relaxed);
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -1141,7 +1147,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    void SetParams(float timingMs, float velocityPct)
    {
@@ -1152,6 +1158,7 @@ public:
 private:
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
    DspMath::WhiteNoise mRng;
@@ -1208,7 +1215,7 @@ public:
       const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -1276,13 +1283,14 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    void SetDiv(int d) { mDiv.store(d, std::memory_order_relaxed); }
 
 private:
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
    VoiceIdMap<int, 128> mOutNote;
@@ -1332,7 +1340,7 @@ public:
       const float glideMs = std::max(0.0f, mGlideMs.load(std::memory_order_relaxed));
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -1432,13 +1440,14 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    void SetGlideMs(float ms) { mGlideMs.store(ms, std::memory_order_relaxed); }
 
 private:
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
    VoiceIdMap<int, 128> mOutNote;
@@ -1514,7 +1523,7 @@ public:
       const double delaySamples = delayMs * 0.001 * mSampleRate;
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -1569,7 +1578,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // Main thread only.
    void PushParams(const NoteEchoNode& n)
@@ -1603,6 +1612,7 @@ private:
 
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
    Pending mPending[kMaxPending];
@@ -1664,7 +1674,7 @@ public:
       const float probability = mProbability.load(std::memory_order_relaxed);
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -1755,7 +1765,7 @@ public:
    {
       return &mOutbox[std::clamp(outputSlot, 0, 3)];
    }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // Main thread only.
    void PushParams(const NoteRouterNode& n)
@@ -1769,6 +1779,7 @@ public:
 private:
    NoteEventQueue mOutbox[4];
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    DspMath::WhiteNoise mRng;
 
    int mNextIndex = 0;
@@ -1858,7 +1869,7 @@ public:
       // thing incoming events affect. The arp's own output is timed
       // separately, below.
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
       for (int i = 0; i < n; i++)
       {
          const NoteEvent& e = evts[i];
@@ -2022,7 +2033,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // Main thread only.
    void PushParams(const ArpeggiatorNode& n)
@@ -2188,6 +2199,7 @@ private:
 
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
    DspMath::WhiteNoise mRng;
@@ -2902,7 +2914,7 @@ public:
       }
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
 
       for (int i = 0; i < n; i++)
       {
@@ -3026,7 +3038,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // Main thread only.
    void PushParams(const NoteStackNode& n)
@@ -3051,6 +3063,7 @@ private:
 
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    VoiceIdMap<StackVoice, 128> mVoiceState;
 
    std::atomic<int> mSemitones[kVoices] = {};
@@ -3126,7 +3139,7 @@ public:
       const int64_t blockEndSample = blockStartSample + numFrames;
 
       NoteEvent inEvents[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(inEvents, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, inEvents, 64) : 0;
 
       NoteEvent noteOns[64];
       int numNoteOns = 0;
@@ -3224,7 +3237,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    void PushParams(const NoteStrumNode& n)
    {
@@ -3237,6 +3250,7 @@ private:
    static constexpr int kMaxDelayed = 128;
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
    double mSampleRate = 44100.0;
    int64_t mCurrentSample = 0;
 
@@ -3346,7 +3360,7 @@ public:
       }
 
       NoteEvent evts[64];
-      const int n = (mInbox != nullptr) ? mInbox->Pop(evts, 64) : 0;
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
       for (int i = 0; i < n; i++)
       {
          const NoteEvent& e = evts[i];
@@ -3416,7 +3430,7 @@ public:
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
-   void SetNoteInbox(NoteEventQueue* inbox) override { mInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // Main thread only.
    void PushParams(const NoteCapturerNode& n)
@@ -3478,6 +3492,7 @@ private:
 
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
 
    RecEvt mRecorded[NoteCapturerNode::kMaxEvents];
    int mRecordedCount = 0;

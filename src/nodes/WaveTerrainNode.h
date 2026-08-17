@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
@@ -51,6 +52,16 @@ public:
    NoteCable& NoteInput() { return mNoteInput; }
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 1 ? &mNoteInput : nullptr; }
+
+   // "detune"/"stereoWidth" only spread unison voices apart in RenderVoice -
+   // both are a no-op while "unison" (default 1) isn't > 1. See INode's
+   // SweepPrerequisitesFor comment.
+   std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
+   {
+      if (paramName == "detune" || paramName == "stereoWidth")
+         return { { "unison", 2.0f } };
+      return {};
+   }
 
    int ReadScope(float* out, int capacity);
    int ActiveVoices() const;
@@ -131,6 +142,8 @@ private:
    float mLastRatioB = -1.0f;
    float mLastPhaseOffset = -1.0f;
    float mLastTotalRot = -999.0f;
+   float mLastRotationParam = -999.0f;
+   std::chrono::steady_clock::time_point mLastContinuousRebuild{};
    int mLastOrbitType = -1;
    int mLastChannel = -1;
 

@@ -118,7 +118,11 @@ public:
          mRecordBuffer.resize((size_t)kMaxRecordSeconds * kMaxRecordSampleRate);
    }
 
-   void SetNoteInbox(NoteEventQueue* inbox) override { mNoteInbox = inbox; }
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
+   {
+      mNoteInbox = inbox;
+      mNoteCursor = cursor;
+   }
 
    // Main thread only. Hands over ownership of a freshly decoded/recorded
    // buffer; the previously active one (if any) is retired through
@@ -263,7 +267,7 @@ public:
       int numEvts = 0;
       int evtIdx = 0;
       if (noteDriven)
-         numEvts = mNoteInbox->Pop(evts, 64);
+         numEvts = mNoteInbox->Pop(mNoteCursor, evts, 64);
 
       // A pending manual preview (click-the-waveform, or the node's own
       // audition button) always wins the same block it arrives in,
@@ -478,6 +482,7 @@ private:
    ParamMailbox mMailbox;
    MeterRing mPlayheadRing;
    NoteEventQueue* mNoteInbox = nullptr;
+   int mNoteCursor = -1;
 
    VoiceAllocator mVoices;
    std::vector<double> mVoicePos;

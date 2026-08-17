@@ -36,6 +36,8 @@ void WavetableNode::CookIfNeeded(int frameId)
    params.frequency = frequency;
    params.glide = glide;
    params.pitchBend = pitchBend;
+   params.fmDepth = fmDepth;
+   params.fmMode = fmMode;
 
    mAudioNode->PushParams(params);
 }
@@ -50,6 +52,11 @@ AudioNode* WavetableNode::GetAudioNode()
 double WavetableNode::DebugMailboxSampleRate() const
 {
    return mAudioNode ? mAudioNode->DebugMailboxSampleRate() : 0.0;
+}
+
+int WavetableNode::DebugFmMode() const
+{
+   return mAudioNode ? mAudioNode->DebugFmMode() : 0;
 }
 
 int WavetableNode::ReadScope(float* out, int capacity)
@@ -69,6 +76,8 @@ void WavetableNode::VisitParams(ParamVisitor& v)
    v.Float("frequency", frequency);
    v.Float("glide", glide);
    v.Float("pitchBend", pitchBend);
+   v.Float("fmDepth", fmDepth);
+   v.Int("fmMode", fmMode);
 
    // Per-engine names are prefixed rather than indexed generically so a saved
    // patch stays readable and a future third engine can't silently renumber

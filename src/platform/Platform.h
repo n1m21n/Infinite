@@ -603,4 +603,33 @@ namespace Platform
       double duration = 0.0;
    };
    MovieInfo InspectMovie(const std::string& path);
+
+   // ---- Syphon inter-app video sharing ------------------------------------
+   struct SyphonServerHandle;
+   struct SyphonClientHandle;
+
+   struct SyphonServerInfo
+   {
+      std::string appName;
+      std::string serverName;
+      std::string uuid;
+   };
+
+   // Syphon Server (Broadcast)
+   SyphonServerHandle* SyphonServerCreate(const std::string& serverName);
+   void SyphonServerUpdateName(SyphonServerHandle* handle, const std::string& serverName);
+   void SyphonServerPublish(SyphonServerHandle* handle, unsigned int textureId, int width, int height, bool flipped = false);
+   bool SyphonServerHasClients(SyphonServerHandle* handle);
+   void SyphonServerDestroy(SyphonServerHandle* handle);
+
+   // Syphon Directory & Client (Receiver)
+   std::vector<SyphonServerInfo> SyphonGetAvailableServers();
+   SyphonClientHandle* SyphonClientCreate();
+   bool SyphonClientConnect(SyphonClientHandle* handle, const std::string& appName, const std::string& serverName, const std::string& uuid = "");
+   bool SyphonClientIsConnected(SyphonClientHandle* handle);
+   bool SyphonClientHasNewFrame(SyphonClientHandle* handle);
+   // Returns the GL_TEXTURE_RECTANGLE texture name and dimensions from the latest Syphon frame, or 0 if none.
+   unsigned int SyphonClientGetFrameTexture(SyphonClientHandle* handle, int& outWidth, int& outHeight);
+   void SyphonClientDestroy(SyphonClientHandle* handle);
 }
+

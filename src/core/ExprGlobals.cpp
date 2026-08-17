@@ -84,6 +84,34 @@ void EvaluateAll(double t)
 
 const std::map<std::string, float>& Values() { return sValues; }
 
+const std::vector<Preset>& Presets()
+{
+   static const std::vector<Preset> sPresets = {
+      // --- Random & Noise ---
+      { "Random & Noise", "rand", "rand(0, 1, 2)", "Smooth continuous organic random wander (0..1, speed 2)" },
+      { "Random & Noise", "rand_wide", "(sin(t * 1.5) + sin(t * 2.427) + sin(t * 4.077)) / 6.0 + 0.5", "Multi-frequency sine random wander (0..1)" },
+      { "Random & Noise", "rand_glide", "lerp(sh(1, 0, 2), sh(1, 0, 2), smoothstep(0, 1, mod(t * 2, 1)))", "Smooth gliding random walk between targets" },
+      { "Random & Noise", "sh", "sh(0, 1, 4)", "Sample & Hold stepped random jumps (rate 4 Hz)" },
+      { "Random & Noise", "chaos", "abs(mod(sin(t * 1.7) * 43.12 + cos(t * 2.3) * 17.54, 1.0))", "Chaotic non-linear oscillator (0..1)" },
+
+      // --- Rhythm & Beats (120 BPM base: t * 2 = 1 beat) ---
+      { "Rhythm & Beats", "beat", "mod(t * 2, 1) < 0.5", "Square tempo pulse (120 BPM, 50% duty)" },
+      { "Rhythm & Beats", "beat_saw", "mod(t * 2, 1)", "Sawtooth ramp per beat (0..1)" },
+      { "Rhythm & Beats", "beat_pulse", "smoothstep(0.0, 0.04, mod(t * 2, 1)) * (1.0 - smoothstep(0.04, 0.35, mod(t * 2, 1)))", "Snappy decay envelope per beat" },
+      { "Rhythm & Beats", "measure", "mod(t * 0.5, 1)", "4-beat / 1-bar saw ramp (0..1)" },
+      { "Rhythm & Beats", "euclid_3_8", "mod(floor(t * 4) * 3, 8) < 3", "Euclidean 3-in-8 rhythmic trigger" },
+      { "Rhythm & Beats", "triplet", "mod(t * 3, 1) < 0.5", "8th note triplet gate" },
+
+      // --- Motion & LFOs ---
+      { "Motion & LFOs", "slow_drift", "sin(t * 0.2) * 0.5 + 0.5", "Slow ambient sine wave (0..1, period ~30s)" },
+      { "Motion & LFOs", "fast_lfo", "sin(t * 8) * 0.5 + 0.5", "Fast sine LFO (0..1, rate ~1.3 Hz)" },
+      { "Motion & LFOs", "wobble", "sin(t * 4 + sin(t * 1.5) * 2) * 0.5 + 0.5", "Frequency-modulated wobble LFO (0..1)" },
+      { "Motion & LFOs", "bounce", "abs(sin(t * 3))", "Bouncing gravity curve (0..1)" },
+      { "Motion & LFOs", "strobe", "mod(t * 16, 1) < 0.2", "Rapid strobe / glitch trigger" }
+   };
+   return sPresets;
+}
+
 void Clear()
 {
    sGlobals.clear();

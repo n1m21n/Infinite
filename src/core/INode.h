@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 // Mix-in interface for image-graph nodes, ported from BespokeSynth's IVisualNode.
 // A node renders its output into a GL texture; downstream nodes pull that texture
@@ -185,4 +186,21 @@ public:
    // never gets an AudioTopologyEntry, so ProcessBlock never runs and it
    // can't do work that only happens inside ProcessBlock (like recording).
    virtual bool RequiresAudioProcessing() const { return false; }
+
+   // A param whose audible effect only shows up when another param sits at a
+   // specific value (unison-spread params like "detune"/"stereoWidth" are a
+   // no-op while "unison" == 1) needs that other param set first, or a sweep
+   // that probes it from a fresh node's own defaults will false-FAIL it.
+   // EffectDefs.h's EffectParamDef::prerequisites gives table-driven
+   // AudioEffectNode instances this escape hatch already; a hand-rolled node
+   // (a real C++ class, not an EffectDefs.cpp row) has no table entry for
+   // FindEffectParamDef to find, so it overrides this instead. Return one
+   // entry per prerequisite that must hold for `paramName` to be observable
+   // in isolation.
+   struct SweepParamPrereq
+   {
+      std::string paramName;
+      float value = 0.0f;
+   };
+   virtual std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& /*paramName*/) const { return {}; }
 };

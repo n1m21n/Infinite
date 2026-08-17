@@ -91,7 +91,7 @@ public:
          const bool deliver = (handle != nullptr && !bypassed);
          NoteEvent evts[64];
          int numEvts = 0;
-         while ((numEvts = mNoteInbox->Pop(evts, 64)) > 0)
+         while ((numEvts = mNoteInbox->Pop(mNoteCursor, evts, 64)) > 0)
          {
             if (deliver)
                for (int i = 0; i < numEvts; i++)
@@ -138,7 +138,7 @@ public:
    // do. Called from the main thread (RebuildAudioTopology), same as the
    // plain pointer write to mNoteInbox already was before this change - no
    // new synchronization requirement over what already existed here.
-   void SetNoteInbox(NoteEventQueue* inbox) override
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
    {
       if (inbox == nullptr && mNoteInbox != nullptr)
       {
@@ -149,6 +149,7 @@ public:
          mLastStartedVoiceId = 0;
       }
       mNoteInbox = inbox;
+      mNoteCursor = cursor;
    }
 
    // Main thread only.
@@ -288,6 +289,7 @@ private:
    std::atomic<Platform::PluginHandle*> mHandle { nullptr };
    std::atomic<bool> mBypass { false };
    NoteEventQueue* mNoteInbox = nullptr; // set by SetNoteInbox; see its comment
+   int mNoteCursor = -1; // set by SetNoteInbox alongside mNoteInbox
    std::atomic<double> mSampleRate { 0.0 };
    std::atomic<int> mMaxBlockSize { 0 };
 

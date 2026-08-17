@@ -255,8 +255,25 @@ namespace WaveTerrainDsp
       const float rxRot = localX * cosR - localY * sinR;
       const float ryRot = localX * sinR + localY * cosR;
 
+      // Widen the morph span (item 18): each orbit case above already nudges
+      // its own shape per-frame (rSpread/phase/radius terms, up to +-30-40%),
+      // but that alone is a small dilation of the same loop, not the large
+      // timbral change a terrain's whole point is. Traverse the orbit's
+      // center through a real fraction of the image across the 8 frames too,
+      // so frame 0 and frame 7 sample genuinely different regions rather
+      // than a slightly-bigger version of the same region. Scanline already
+      // drives its Y axis directly from `frame` across the full radius (see
+      // its case above) - adding this on top would double up that traversal
+      // with a second, uncoordinated one, so it's excluded here.
+      float morphCy = cy;
+      if (orbitType != kOrbitScanline)
+      {
+         const float morphSpan = 0.6f; // fraction of the image traversed frame 0 -> frame 7
+         morphCy = std::clamp(cy + (morph - 0.5f) * morphSpan, 0.0f, 1.0f);
+      }
+
       outU = cx + rxRot;
-      outV = cy + ryRot;
+      outV = morphCy + ryRot;
    }
 
    // Builds an exact 10-level anti-aliased wavetable bank from raw pixel heightfield via O(N log N) Fast Fourier Transform

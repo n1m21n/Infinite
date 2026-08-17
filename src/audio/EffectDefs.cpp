@@ -53,6 +53,12 @@ namespace
          // follower on the input signal - the classic envelope-filter/
          // auto-wah control. 0 = off, the kernel's unmodified fast path.
          def.params.push_back({ "envAmount", -1.0f, 1.0f, 0.0f });
+         // Depth for the audio-rate "cutoff mod" sidechain input - bipolar
+         // like envAmount, so a negative setting inverts the modulator. 0 =
+         // off, matching envAmount's fast-path gating.
+         def.params.push_back({ "modAmount", -1.0f, 1.0f, 0.0f });
+         def.hasSidechain = true;
+         def.sidechainLabel = "cutoff mod";
          def.makeKernel = []() { return std::make_unique<AudioFilterKernel>(); };
          defs.push_back(std::move(def));
       }

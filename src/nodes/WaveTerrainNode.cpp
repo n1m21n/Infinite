@@ -1,5 +1,6 @@
 #include "WaveTerrainNode.h"
 
+#include <GLFW/glfw3.h>
 #include <OpenGL/gl3.h>
 #include <algorithm>
 #include <atomic>
@@ -15,6 +16,7 @@
 #include "audio/NoteEvent.h"
 #include "audio/NoteEventQueue.h"
 #include "audio/ParamMailbox.h"
+#include "audio/SampleSlot.h"
 #include "audio/SynthModes.h"
 #include "core/GLUtil.h"
 
@@ -58,6 +60,37 @@ namespace
       return 440.0f * powf(2.0f, (float)(midiNote - 69 + fineCents * 0.01f) / 12.0f);
    }
 
+   // CPU-only procedural fallback for when there's no source texture to read
+   // (no cable connected, or no GL context at all - the headless test/sweep
+   // harness). Mirrors ImageSpectralSynthNode's SpectrogramMatrix::
+   // GenerateDefaultPattern(): a flat single-value image would make the
+   // terrain surface uniformly flat, so every orbit shape/param would sample
+   // the same silence regardless of its own value - not just cosmetically
+   // wrong, but exactly why headless orbit-param changes went unobserved on
+   // a flat placeholder. A few overlapping rings give the surface actual
+   // height variation so orbit shape/position genuinely matters.
+   inline void FillProceduralDefault(std::vector<uint8_t>& pixels, int size)
+   {
+      pixels.resize((size_t)size * size * 4);
+      for (int y = 0; y < size; y++)
+      {
+         for (int x = 0; x < size; x++)
+         {
+            const float u = ((float)x + 0.5f) / (float)size - 0.5f;
+            const float v = ((float)y + 0.5f) / (float)size - 0.5f;
+            const float r = sqrtf(u * u + v * v);
+            const float ang = atan2f(v, u);
+            const float val = 0.5f + 0.35f * sinf(r * 26.0f) + 0.15f * sinf(ang * 5.0f);
+            const uint8_t lum = (uint8_t)std::clamp((int)(val * 255.0f), 0, 255);
+            uint8_t* px = pixels.data() + ((size_t)y * size + x) * 4;
+            px[0] = lum;
+            px[1] = lum;
+            px[2] = lum;
+            px[3] = 255;
+         }
+      }
+   }
+
    const char* kLineVertSrc =
       "#version 150\n"
       "in vec2 aPos;\n"
@@ -89,23 +122,23 @@ public:
 
    AudioWaveTerrainNode()
    {
-      mBanks[0] = std::make_shared<WaveTerrainDsp::BankData>();
-      mBanks[1] = std::make_shared<WaveTerrainDsp::BankData>();
+      // Seed an initial bank (plain sine, same as before) and adopt it
+      // immediately - the audio thread isn't running yet at construction
+      // time, so it's safe to call SwapIn() directly here rather than
+      // waiting for the first ProcessBlock, which keeps Active() non-null
+      // from the very first call.
+      auto* initialBank = new WaveTerrainDsp::BankData();
       for (int f = 0; f < WaveTerrainDsp::kFrames; f++)
       {
          for (int L = 0; L < WaveTerrainDsp::kMipLevels; L++)
          {
-            float* dst0 = mBanks[0]->data.data() + mBanks[0]->Offset(f, L);
-            float* dst1 = mBanks[1]->data.data() + mBanks[1]->Offset(f, L);
+            float* dst = initialBank->data.data() + initialBank->Offset(f, L);
             for (int i = 0; i < WaveTerrainDsp::kFrameSize; i++)
-            {
-               const float s = sinf(6.283185307f * (float)i / (float)WaveTerrainDsp::kFrameSize);
-               dst0[i] = s;
-               dst1[i] = s;
-            }
+               dst[i] = sinf(6.283185307f * (float)i / (float)WaveTerrainDsp::kFrameSize);
          }
       }
-      mActiveBankIndex.store(0, std::memory_order_relaxed);
+      mBankSlot.Push(initialBank);
+      mBankSlot.SwapIn();
 
       for (int v = 0; v < kMaxVoices; v++)
          mVoices[v].Reset(44100.0);
@@ -113,25 +146,40 @@ public:
 
    ~AudioWaveTerrainNode() override = default;
 
-   void SetNoteInbox(NoteEventQueue* inbox) override
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
    {
       mNoteInbox = inbox;
+      mNoteCursor = cursor;
    }
 
-   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   void PrepareToPlay(double sampleRate, int maxBlockSize) override
    {
       mSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
       mMailbox.PrepareToPlay(mSampleRate);
       for (int v = 0; v < kMaxVoices; v++)
          mVoices[v].Reset(mSampleRate);
+
+      const int allocSize = std::max(maxBlockSize, 4096);
+      mMonoScope.resize(allocSize, 0.0f);
    }
 
+   // Main thread only. Hands a freshly built bank over to the audio thread;
+   // see SampleSlot.h. This replaces a hand-rolled two-slot double buffer
+   // that had a real race: the audio thread binds `bank` once at the top of
+   // ProcessBlock and holds that reference for the whole block, but with
+   // only two slots a *second* main-thread swap inside that same block
+   // would overwrite the very buffer being read. SampleSlotT's pending/
+   // active/retire discipline (adopt only at the top of ProcessBlock, retire
+   // instead of overwrite, free only after the audio thread has moved on)
+   // is exactly the fix, reused rather than hand-rolled a third time.
    void SwapBank(const WaveTerrainDsp::BankData& newBank)
    {
-      const int nextIdx = 1 - mActiveBankIndex.load(std::memory_order_relaxed);
-      *mBanks[nextIdx] = newBank;
-      mActiveBankIndex.store(nextIdx, std::memory_order_release);
+      mBankSlot.Push(new WaveTerrainDsp::BankData(newBank));
    }
+
+   // Main thread only, once per CookIfNeeded - frees whatever the audio
+   // thread has since retired.
+   void DrainRetiredBanks() { mBankSlot.DrainRetired(); }
 
    void PushParams(const WaveTerrainNode& n)
    {
@@ -200,8 +248,10 @@ public:
       std::fill_n(outL, numFrames, 0.0f);
       std::fill_n(outR, numFrames, 0.0f);
 
-      const int bankIdx = mActiveBankIndex.load(std::memory_order_acquire);
-      const WaveTerrainDsp::BankData& bank = *mBanks[bankIdx];
+      // Adopt a freshly pushed bank only here, at the top of the block
+      // (never mid-block) - see SampleSlot.h's contract.
+      mBankSlot.SwapIn();
+      const WaveTerrainDsp::BankData& bank = *mBankSlot.Active();
 
       const int unison = mUnison.load(std::memory_order_relaxed);
       const int octave = mOctave.load(std::memory_order_relaxed);
@@ -222,7 +272,7 @@ public:
       if (mNoteInbox != nullptr)
       {
          NoteEvent evts[64];
-         const int numEvts = mNoteInbox->Pop(evts, 64);
+         const int numEvts = mNoteInbox->Pop(mNoteCursor, evts, 64);
          for (int i = 0; i < numEvts; i++)
          {
             const auto& event = evts[i];
@@ -263,7 +313,8 @@ public:
 
       int activeCount = 0;
       const bool isNoteDriven = (mNoteInbox != nullptr);
-      std::vector<float> monoScope(numFrames);
+      if (mMonoScope.size() < (size_t)numFrames)
+         mMonoScope.resize(numFrames, 0.0f);
 
       for (int i = 0; i < numFrames; i++)
       {
@@ -291,10 +342,9 @@ public:
             v.currentFreq = targetHz;
 
             float vOutL = 0.0f, vOutR = 0.0f;
-            RenderVoice(v, bank, unison, position, detune, stereoWidth, filterType, cutoff, resonance, 0.0f, filterAmount, vOutL, vOutR);
+            RenderVoice(v, bank, v.currentFreq, unison, position, detune, stereoWidth, filterType, cutoff, resonance, 0.0f, filterAmount, vOutL, vOutR);
             frameSumL += vOutL;
             frameSumR += vOutR;
-            activeCount = 1;
          }
          else
          {
@@ -304,7 +354,6 @@ public:
                if (!v.active)
                   continue;
 
-               activeCount++;
                const float ampEnv = v.amp.Process();
                const float filtEnv = v.filt.Process();
 
@@ -324,9 +373,17 @@ public:
                   v.currentFreq = v.targetFreq;
                }
 
+               // `fine` (cents offset) is applied at render time only, kept
+               // out of v.currentFreq itself, so the glide state above tracks
+               // pure pitch and doesn't have to be re-derived if `fine`
+               // changes mid-glide. The free-run branch above already applied
+               // fine correctly; this is what made note-driven mode match it
+               // (previously voiceHz was computed and never passed anywhere -
+               // RenderVoice read v.currentFreq directly, so fine was a no-op
+               // in note-driven mode).
                const float voiceHz = v.currentFreq * powf(2.0f, fine * 0.01f / 12.0f);
                float vOutL = 0.0f, vOutR = 0.0f;
-               RenderVoice(v, bank, unison, position, detune, stereoWidth, filterType, cutoff, resonance, filtEnv, filterAmount, vOutL, vOutR);
+               RenderVoice(v, bank, voiceHz, unison, position, detune, stereoWidth, filterType, cutoff, resonance, filtEnv, filterAmount, vOutL, vOutR);
 
                const float gain = ampEnv * v.velocity;
                frameSumL += vOutL * gain;
@@ -345,10 +402,26 @@ public:
          DspMath::EqualPowerPan(pan, panL, panR);
          outL[i] = frameSumL * volume * panL;
          outR[i] = frameSumR * volume * panR;
-         monoScope[i] = (outL[i] + outR[i]) * 0.5f;
+         mMonoScope[i] = (outL[i] + outR[i]) * 0.5f;
       }
 
-      mScopeRing.Write(monoScope.data(), numFrames);
+      mScopeRing.Write(mMonoScope.data(), numFrames);
+
+      // Count active voices once per block, not once per sample: activeCount
+      // used to be incremented inside the per-sample loop above, so the
+      // "N voices" status line read ~numFrames times the true count.
+      if (isNoteDriven)
+      {
+         for (int vIdx = 0; vIdx < kMaxVoices; vIdx++)
+         {
+            if (mVoices[vIdx].active)
+               activeCount++;
+         }
+      }
+      else
+      {
+         activeCount = 1;
+      }
       mActiveVoices.store(activeCount, std::memory_order_relaxed);
    }
 
@@ -369,7 +442,10 @@ private:
       double phase[kMaxUnison] = {};
       Envelope amp;
       Envelope filt;
+      // filter[2] is L/R stage 1; filter2[2] is L/R stage 2, only run for
+      // LP24 (a real 24dB/oct cascade, not the same TptSvf reused twice).
       DspMath::TptSvf filter[2];
+      DspMath::TptSvf filter2[2];
 
       void Reset(double sampleRate)
       {
@@ -389,17 +465,19 @@ private:
          {
             filter[c].SetSampleRate(sampleRate);
             filter[c].Reset();
+            filter2[c].SetSampleRate(sampleRate);
+            filter2[c].Reset();
          }
       }
    };
 
-   void RenderVoice(Voice& v, const WaveTerrainDsp::BankData& bank, int unison, float position,
+   void RenderVoice(Voice& v, const WaveTerrainDsp::BankData& bank, float baseFreq, int unison, float position,
                     float detuneCents, float stereoWidth, int filterType, float cutoffHz,
                     float resonance, float filtEnv, float filterAmount, float& outL, float& outR)
    {
       outL = 0.0f;
       outR = 0.0f;
-      if (v.currentFreq <= 0.0f)
+      if (baseFreq <= 0.0f)
          return;
 
       float sumL = 0.0f;
@@ -410,7 +488,7 @@ private:
          const float spread = (unison > 1)
             ? detuneCents * 0.5f * (2.0f * (float)u / (float)(unison - 1) - 1.0f)
             : 0.0f;
-         const float voiceFreq = v.currentFreq * powf(2.0f, spread / 1200.0f);
+         const float voiceFreq = baseFreq * powf(2.0f, spread / 1200.0f);
          const double inc = (double)voiceFreq / mSampleRate;
 
          const double randOffset = (double)kVoicePhaseSeed[u] * 0.5;
@@ -443,6 +521,8 @@ private:
          for (int c = 0; c < 2; c++)
          {
             v.filter[c].SetCutoff(clampedHz, q);
+            if (filterType == 2) // LP24
+               v.filter2[c].SetCutoff(clampedHz, q);
          }
 
          auto resL = v.filter[0].Process(sumL);
@@ -451,10 +531,18 @@ private:
          switch (filterType)
          {
             case 1: // LP12
-            case 2: // LP24
                outL = resL.low;
                outR = resR.low;
                break;
+            case 2: // LP24 - genuine two-stage cascade, not the same single
+                    // TptSvf output reused (that was identical to LP12).
+            {
+               auto resL2 = v.filter2[0].Process(resL.low);
+               auto resR2 = v.filter2[1].Process(resR.low);
+               outL = resL2.low;
+               outR = resR2.low;
+               break;
+            }
             case 3: // HP12
                outL = resL.high;
                outR = resR.high;
@@ -480,11 +568,11 @@ private:
    ParamMailbox mMailbox;
    MeterRing mScopeRing;
    NoteEventQueue* mNoteInbox = nullptr;
+   int mNoteCursor = -1;
    std::atomic<int> mActiveVoices{0};
    uint64_t mAgeCounter = 0;
 
-   std::shared_ptr<WaveTerrainDsp::BankData> mBanks[2];
-   std::atomic<int> mActiveBankIndex{0};
+   SampleSlotT<WaveTerrainDsp::BankData> mBankSlot;
 
    std::atomic<int> mUnison{1};
    std::atomic<int> mOctave{0};
@@ -496,6 +584,7 @@ private:
    std::atomic<float> mFilterAdsr[4]{5.0f, 300.0f, 0.4f, 250.0f};
 
    Voice mVoices[kMaxVoices];
+   std::vector<float> mMonoScope;
 };
 
 // ---------------------------------------------------------------------------
@@ -565,6 +654,8 @@ void WaveTerrainNode::CookIfNeeded(int frameId)
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioWaveTerrainNode>();
 
+   mAudioNode->DrainRetiredBanks();
+
    if (fabsf(scanSpeed) > 0.001f)
    {
       mCurrentRotation += scanSpeed * 0.05f;
@@ -578,27 +669,74 @@ void WaveTerrainNode::CookIfNeeded(int frameId)
 
 void WaveTerrainNode::RenderPreview(int /*frameId*/)
 {
+   // No GL context in headless test/sweep runs (no window created) - all GL
+   // calls below (glGenTextures/glGenFramebuffers inside
+   // EnsurePreviewResources, the texture blit/glReadPixels, and the
+   // viewport/framebuffer binds) are unsafe without one. But the orbit/
+   // texture-baking pipeline (BuildBankFromPixels -> SwapBank) is pure CPU
+   // work over `mPixels` - it doesn't need GL at all, and it's the only path
+   // that ever pushes orbit-shape param changes (centerX/radiusX/orbitType/
+   // rotation/...) to the audio thread. Bailing out of the whole function
+   // (as an earlier version of this fix did) made those params permanently
+   // unreachable in headless mode - not just untested, genuinely dead - so
+   // only the strictly-GL parts are skipped below; the CPU bank rebuild
+   // always runs off of whatever's currently in mPixels.
    const int size = 128;
-   EnsurePreviewResources(size);
+   const bool hasGL = glfwGetCurrentContext() != nullptr;
 
-   const unsigned int srcTex = mTextureInput.GetSource() ? mTextureInput.GetSource()->GetOutputTexture() : 0;
+   if (hasGL)
+      EnsurePreviewResources(size);
+   else if (mPixels.size() != (size_t)size * size * 4)
+      FillProceduralDefault(mPixels, size); // see comment on FillProceduralDefault: a flat placeholder would make every orbit param sample the same silence
+
+   const unsigned int srcTex = (hasGL && mTextureInput.GetSource()) ? mTextureInput.GetSource()->GetOutputTexture() : 0;
    const unsigned long long currentTexRev = mTextureInput.GetSource() ? mTextureInput.GetSource()->TextureRevision() : 0;
    const float totalRot = rotation + mCurrentRotation;
 
-   const bool texChanged = (currentTexRev != mLastTexRev) || (mPixels.empty());
-   const bool paramsChanged = (centerX != mLastCenterX) || (centerY != mLastCenterY) ||
-                              (radiusX != mLastRadiusX) || (radiusY != mLastRadiusY) ||
-                              (ratioA != mLastRatioA) || (ratioB != mLastRatioB) ||
-                              (phaseOffset != mLastPhaseOffset) || (std::fabs(totalRot - mLastTotalRot) > 0.001f) ||
-                              (orbitType != mLastOrbitType) || (channel != mLastChannel);
+   const bool texChanged = hasGL && ((currentTexRev != mLastTexRev) || (mPixels.empty()));
+   // Discrete edits (a shape param actually dragged) rebuild immediately.
+   // Rotation drift and a live video source's texture revision are
+   // *continuous* modulation - scanSpeed alone bumps mCurrentRotation every
+   // single CookIfNeeded, and a connected video source bumps its revision at
+   // frame rate - neither needs a full FFT/mip-pyramid rebuild (8 forward +
+   // 80 inverse 1024-point FFTs) plus a synchronous glReadPixels on every
+   // single frame; those are rate-limited below instead.
+   // `rotation` itself is an explicit user drag and stays immediate;
+   // `mCurrentRotation` (scanSpeed's continuous drift, added into totalRot)
+   // is what gets rate-limited below.
+   const bool rotationParamChanged = (rotation != mLastRotationParam);
+   const bool discreteChanged = (centerX != mLastCenterX) || (centerY != mLastCenterY) ||
+                                (radiusX != mLastRadiusX) || (radiusY != mLastRadiusY) ||
+                                (ratioA != mLastRatioA) || (ratioB != mLastRatioB) ||
+                                (phaseOffset != mLastPhaseOffset) ||
+                                (orbitType != mLastOrbitType) || (channel != mLastChannel) ||
+                                rotationParamChanged;
+   const bool rotDriftChanged = !rotationParamChanged && (std::fabs(totalRot - mLastTotalRot) > 0.001f);
 
-   if (texChanged || paramsChanged)
+   bool shouldRebuild = discreteChanged;
+   if (!shouldRebuild && (rotDriftChanged || texChanged))
+   {
+      constexpr double kMinContinuousRebuildInterval = 1.0 / 15.0; // ~15Hz cap
+      const auto now = std::chrono::steady_clock::now();
+      const double elapsed = std::chrono::duration<double>(now - mLastContinuousRebuild).count();
+      if (elapsed >= kMinContinuousRebuildInterval)
+      {
+         shouldRebuild = true;
+         mLastContinuousRebuild = now;
+      }
+   }
+
+   if (shouldRebuild)
    {
       GLint prevFbo = 0;
-      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
-
-      glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
-      glViewport(0, 0, size, size);
+      GLint prevViewport[4] = { 0, 0, 0, 0 };
+      if (hasGL)
+      {
+         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+         glGetIntegerv(GL_VIEWPORT, prevViewport);
+         glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
+         glViewport(0, 0, size, size);
+      }
 
       if (texChanged)
       {
@@ -651,7 +789,11 @@ void WaveTerrainNode::RenderPreview(int /*frameId*/)
 
       mAudioNode->SwapBank(bank);
 
-      glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+      if (hasGL)
+      {
+         glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+         glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+      }
 
       mLastCenterX = centerX;
       mLastCenterY = centerY;
@@ -661,6 +803,7 @@ void WaveTerrainNode::RenderPreview(int /*frameId*/)
       mLastRatioB = ratioB;
       mLastPhaseOffset = phaseOffset;
       mLastTotalRot = totalRot;
+      mLastRotationParam = rotation;
       mLastOrbitType = orbitType;
       mLastChannel = channel;
    }

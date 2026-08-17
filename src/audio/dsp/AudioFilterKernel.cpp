@@ -51,4 +51,5 @@ void AudioFilterKernel::PushParams(const AudioEffectNode& node, double sampleRat
    mMailbox.Push(kQSlot, q);
    mMailbox.Push(kGainSlot, gainDb);
    mMailbox.Push(kEnvAmountSlot, node.Param("envAmount"));
+   mMailbox.Push(kModAmountSlot, node.Param("modAmount"));
 }

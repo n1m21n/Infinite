@@ -31,8 +31,18 @@ public:
    // Test-only observability: sample rate last received by the mailbox.
    double DebugMailboxSampleRate() const;
 
+   // Test-only observability: fmMode is a plain atomic, pushed outside the
+   // smoothed ParamMailbox - see WavetableNode::DebugFmMode's comment.
+   int DebugFmMode() const;
+
+   AudioCable* AudioInputSlot(int slot) override { return slot == 1 ? &fmInput : nullptr; }
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   const char* InputLabel(int slot) const override
+   {
+      if (slot == 0) return "notes";
+      if (slot == 1) return "fm in";
+      return nullptr;
+   }
 
    // Decimated output trace for inline scope visualizer.
    int ReadScope(float* out, int capacity);
@@ -55,8 +65,11 @@ public:
    float frequency = 220.0f; // free-running pitch (ignored when note-driven)
    float glide = 0.0f;       // portamento, seconds
    float pitchBend = 0.0f;   // -2..2 semitones global pitch bend
+   float fmDepth = 0.0f;     // audio-rate FM / PM depth
+   int fmMode = 0;           // 0 = Phase Modulation, 1 = Exponential FM
 
    NoteCable noteInput;
+   AudioCable fmInput;
 
    // UI-only scope cache.
    static constexpr int kScopeCacheCapacity = 128;

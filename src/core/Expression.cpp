@@ -163,6 +163,64 @@ namespace
          const double x = std::min(std::max((a[2] - a[0]) / (a[1] - a[0]), 0.0), 1.0);
          return x * x * (3.0 - 2.0 * x);
       }
+      if (name == "rand" || name == "noise")
+      {
+         double minVal = 0.0;
+         double maxVal = 1.0;
+         double speed = 1.0;
+         if (a.size() == 1)
+         {
+            speed = a[0];
+         }
+         else if (a.size() == 2)
+         {
+            minVal = a[0];
+            maxVal = a[1];
+         }
+         else if (a.size() == 3)
+         {
+            minVal = a[0];
+            maxVal = a[1];
+            speed = a[2];
+         }
+         else if (!a.empty())
+         {
+            s.Fail(name + "() expects 0 to 3 arguments (e.g. rand(speed) or rand(min, max, speed))");
+            return 0.0;
+         }
+         const double tau_t = s.t * speed;
+         const double n = (sin(tau_t) + sin(tau_t * 1.618033988749895) + sin(tau_t * 2.718281828459045)) / 6.0 + 0.5;
+         return minVal + (maxVal - minVal) * n;
+      }
+      if (name == "sh")
+      {
+         double minVal = 0.0;
+         double maxVal = 1.0;
+         double speed = 1.0;
+         if (a.size() == 1)
+         {
+            speed = a[0];
+         }
+         else if (a.size() == 2)
+         {
+            minVal = a[0];
+            maxVal = a[1];
+         }
+         else if (a.size() == 3)
+         {
+            minVal = a[0];
+            maxVal = a[1];
+            speed = a[2];
+         }
+         else if (!a.empty())
+         {
+            s.Fail("sh() expects 0 to 3 arguments (min, max, speed)");
+            return 0.0;
+         }
+         const double seed = floor(s.t * speed) * 123.456;
+         const double frac = fabs(fmod(sin(seed) * 43758.5453123, 1.0));
+         return minVal + (maxVal - minVal) * frac;
+      }
       // Both branches are already evaluated by the time we get here - see the
       // note in Expression.h on why there is no short circuit.
       if (name == "if") return need(3) ? (a[0] != 0.0 ? a[1] : a[2]) : 0.0;
