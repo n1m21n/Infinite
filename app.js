@@ -1,11 +1,11 @@
 /**
  * Infinite — Web Application Logic
- * Cosmic Dust, Organic Natural Morphing Blobs, 4 Mini-Canvas Animations,
+ * Cosmic Dust, Growing Nature Tree Branches with Tip Labels, 4 Mini-Canvas Animations,
  * Minimal Audio Player, and 3 Interactive Node Ticker Tapes.
  */
 
 // ==========================================================================
-// 1. Cosmic Dust & Nebula Canvas (Subtle Charcoal/Pastel Ink on Paper)
+// 1. Cosmic Dust Canvas (Subtle Ink Particles on Paper)
 // ==========================================================================
 const cosmicCanvas = document.getElementById('cosmic-canvas');
 const cosmicCtx = cosmicCanvas ? cosmicCanvas.getContext('2d') : null;
@@ -24,17 +24,17 @@ function initCosmos() {
   cosmicStars = [];
   cosmicNebulae = [];
 
-  const starCount = Math.floor(Math.min(cWidth, 1400) / 14);
+  const starCount = Math.floor(Math.min(cWidth, 1400) / 16);
   for (let i = 0; i < starCount; i++) {
     cosmicStars.push({
       x: Math.random() * cWidth,
       y: Math.random() * cHeight,
-      size: Math.random() * 2 + 1,
+      size: Math.random() * 2 + 0.8,
       alpha: Math.random() * 0.22 + 0.08,
       pulseSpeed: 0.008 + Math.random() * 0.015,
       pulseOffset: Math.random() * Math.PI * 2,
-      vx: (Math.random() - 0.5) * 0.18,
-      vy: (Math.random() - 0.5) * 0.18,
+      vx: (Math.random() - 0.5) * 0.15,
+      vy: (Math.random() - 0.5) * 0.15,
       color: ['#2b2621', '#c2593f', '#d97736', '#4d7c67', '#6b6b99'][Math.floor(Math.random() * 5)]
     });
   }
@@ -43,9 +43,9 @@ function initCosmos() {
     cosmicNebulae.push({
       x: Math.random() * cWidth,
       y: Math.random() * cHeight,
-      radius: Math.random() * 220 + 200,
-      vx: (Math.random() - 0.5) * 0.1,
-      vy: (Math.random() - 0.5) * 0.1,
+      radius: Math.random() * 200 + 180,
+      vx: (Math.random() - 0.5) * 0.08,
+      vy: (Math.random() - 0.5) * 0.08,
       color: ['rgba(194, 89, 63, 0.035)', 'rgba(217, 119, 54, 0.035)', 'rgba(77, 124, 103, 0.035)', 'rgba(107, 107, 153, 0.035)'][i % 4]
     });
   }
@@ -97,157 +97,166 @@ function animateCosmos() {
 
 
 // ==========================================================================
-// 2. Organic Natural Floating Blobs (Zero Glow, Simple Blue/Black Border, Smooth Motion)
-// Keywords: Sound, Music, Art, Geometry, Generative, Node-Based, Real-Time
+// 2. Organic Growing Tree Branches Dividing Inward from Both Sides
+// Text Labels pop up at the tips of the branches
 // ==========================================================================
-const metaCanvas = document.getElementById('metaballs-canvas');
-const metaCtx = metaCanvas ? metaCanvas.getContext('2d') : null;
+const branchCanvas = document.getElementById('nature-branch-canvas');
+const branchCtx = branchCanvas ? branchCanvas.getContext('2d') : null;
 
-const BLOB_ITEMS = [
-  { text: 'Sound', border: '#0f172a', r: 42, speed: 0.25 },
-  { text: 'Music', border: '#1e293b', r: 40, speed: 0.28 },
-  { text: 'Art', border: '#2563eb', r: 38, speed: 0.22 },
-  { text: 'Geometry', border: '#0f172a', r: 44, speed: 0.26 },
-  { text: 'Generative', border: '#1e3a8a', r: 46, speed: 0.24 },
-  { text: 'Node-Based', border: '#0f172a', r: 45, speed: 0.25 },
-  { text: 'Real-Time', border: '#1d4ed8', r: 44, speed: 0.27 }
-];
+let branchWidth, branchHeight;
+let branchProgress = 0;
+let branchTreeData = null;
 
-let blobs = [];
-let blobMouseX = -1000, blobMouseY = -1000;
-let isBlobDragging = false;
+function resizeBranchCanvas() {
+  if (!branchCanvas) return;
+  const rect = branchCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  branchCanvas.width = rect.width * dpr;
+  branchCanvas.height = rect.height * dpr;
+  branchWidth = branchCanvas.width;
+  branchHeight = branchCanvas.height;
+  buildTreeStructure();
+}
 
-function initBlobs() {
-  if (!metaCanvas) return;
-  const rect = metaCanvas.getBoundingClientRect();
-  metaCanvas.width = rect.width * (window.devicePixelRatio || 1) || 900;
-  metaCanvas.height = rect.height * (window.devicePixelRatio || 1) || 320;
-  const w = metaCanvas.width;
-  const h = metaCanvas.height;
+function buildTreeStructure() {
+  const w = branchWidth;
+  const h = branchHeight;
+  const isMobile = w < 600 * (window.devicePixelRatio || 1);
 
-  blobs = BLOB_ITEMS.map((item, idx) => ({
-    text: item.text,
-    border: item.border,
-    baseR: item.r * (window.devicePixelRatio || 1) * 0.9,
-    x: (w / (BLOB_ITEMS.length + 1)) * (idx + 1) + (Math.random() - 0.5) * 50,
-    y: h / 2 + (Math.random() - 0.5) * 80,
-    vx: (Math.random() - 0.5) * item.speed,
-    vy: (Math.random() - 0.5) * item.speed,
-    phase: Math.random() * Math.PI * 2,
-    morphSpeed: 0.015 + Math.random() * 0.01
+  // Left Branches (growing from x=0 toward center-left)
+  const leftTips = isMobile ? [
+    { label: 'Sound', targetX: w * 0.38, targetY: h * 0.22, color: '#c2593f' },
+    { label: 'Music', targetX: w * 0.44, targetY: h * 0.48, color: '#d97736' },
+    { label: 'Art', targetX: w * 0.36, targetY: h * 0.78, color: '#b8860b' }
+  ] : [
+    { label: 'Sound', targetX: w * 0.32, targetY: h * 0.24, color: '#c2593f' },
+    { label: 'Music', targetX: w * 0.40, targetY: h * 0.50, color: '#d97736' },
+    { label: 'Art', targetX: w * 0.30, targetY: h * 0.78, color: '#b8860b' }
+  ];
+
+  // Right Branches (growing from x=w toward center-right)
+  const rightTips = isMobile ? [
+    { label: 'Geometry', targetX: w * 0.62, targetY: h * 0.20, color: '#4d7c67' },
+    { label: 'Generative', targetX: w * 0.68, targetY: h * 0.42, color: '#6b6b99' },
+    { label: 'Node-Based', targetX: w * 0.58, targetY: h * 0.68, color: '#c2593f' },
+    { label: 'Real-Time', targetX: w * 0.66, targetY: h * 0.86, color: '#2563eb' }
+  ] : [
+    { label: 'Geometry', targetX: w * 0.66, targetY: h * 0.22, color: '#4d7c67' },
+    { label: 'Generative', targetX: w * 0.74, targetY: h * 0.44, color: '#6b6b99' },
+    { label: 'Node-Based', targetX: w * 0.62, targetY: h * 0.68, color: '#c2593f' },
+    { label: 'Real-Time', targetX: w * 0.72, targetY: h * 0.84, color: '#2563eb' }
+  ];
+
+  // Left Tree Curves
+  const leftCurves = leftTips.map(tip => ({
+    p0: { x: 0, y: h * 0.5 },
+    p1: { x: w * 0.12, y: h * (tip.targetY > h * 0.5 ? 0.65 : 0.35) },
+    p2: { x: w * 0.22, y: tip.targetY + (h * 0.5 - tip.targetY) * 0.3 },
+    p3: { x: tip.targetX, y: tip.targetY },
+    label: tip.label,
+    color: tip.color
   }));
+
+  // Right Tree Curves
+  const rightCurves = rightTips.map(tip => ({
+    p0: { x: w, y: h * 0.5 },
+    p1: { x: w * 0.88, y: h * (tip.targetY > h * 0.5 ? 0.68 : 0.32) },
+    p2: { x: w * 0.78, y: tip.targetY + (h * 0.5 - tip.targetY) * 0.3 },
+    p3: { x: tip.targetX, y: tip.targetY },
+    label: tip.label,
+    color: tip.color
+  }));
+
+  branchTreeData = { leftCurves, rightCurves, isMobile };
 }
 
-let blobFrame = 0;
-function animateBlobs() {
-  if (!metaCtx || !metaCanvas) return;
-  blobFrame++;
-  const w = metaCanvas.width;
-  const h = metaCanvas.height;
-  metaCtx.clearRect(0, 0, w, h);
+function getCubicBezierPoint(p0, p1, p2, p3, t) {
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const mt3 = mt2 * mt;
+  const t2 = t * t;
+  const t3 = t2 * t;
 
-  // Draw organic connections between nearby blobs
-  for (let i = 0; i < blobs.length; i++) {
-    for (let j = i + 1; j < blobs.length; j++) {
-      const b1 = blobs[i];
-      const b2 = blobs[j];
-      const dist = Math.hypot(b2.x - b1.x, b2.y - b1.y);
-      const maxDist = (b1.baseR + b2.baseR) * 1.6;
+  return {
+    x: mt3 * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t3 * p3.x,
+    y: mt3 * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t3 * p3.y
+  };
+}
 
-      if (dist < maxDist) {
-        const factor = 1 - dist / maxDist;
-        metaCtx.beginPath();
-        metaCtx.moveTo(b1.x, b1.y);
-        metaCtx.lineTo(b2.x, b2.y);
-        metaCtx.strokeStyle = 'rgba(30, 41, 59, 0.12)';
-        metaCtx.lineWidth = factor * 1.5;
-        metaCtx.stroke();
-      }
-    }
+let branchTime = 0;
+function animateNatureBranches() {
+  if (!branchCtx || !branchCanvas || !branchTreeData) return;
+  branchTime += 0.02;
+  const w = branchWidth;
+  const h = branchHeight;
+  const dpr = window.devicePixelRatio || 1;
+
+  branchCtx.clearRect(0, 0, w, h);
+
+  // Smooth ease-in progress for branch growth
+  if (branchProgress < 1) {
+    branchProgress += 0.012;
   }
+  const t = Math.min(1, branchProgress);
 
-  // Update and draw each organic blob
-  blobs.forEach(b => {
-    // Mouse avoidance / soft attraction
-    const dx = blobMouseX - b.x;
-    const dy = blobMouseY - b.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 130 && dist > 0) {
-      const force = (1 - dist / 130) * (isBlobDragging ? 1.5 : -1.0);
-      b.vx += (dx / dist) * force * 0.08;
-      b.vy += (dy / dist) * force * 0.08;
+  const allCurves = [...branchTreeData.leftCurves, ...branchTreeData.rightCurves];
+
+  // Draw main organic tree trunk / branches
+  allCurves.forEach((curve, idx) => {
+    branchCtx.beginPath();
+    const steps = 60;
+    const currentSteps = Math.floor(steps * t);
+
+    for (let i = 0; i <= currentSteps; i++) {
+      const u = i / steps;
+      // Gentle natural breathing sway
+      const sway = Math.sin(branchTime + idx + u * Math.PI) * (1.5 * dpr) * u;
+      const pt = getCubicBezierPoint(curve.p0, curve.p1, curve.p2, curve.p3, u);
+      const px = pt.x;
+      const py = pt.y + sway;
+
+      if (i === 0) branchCtx.moveTo(px, py);
+      else branchCtx.lineTo(px, py);
     }
 
-    // Smooth physics
-    b.x += b.vx;
-    b.y += b.vy;
-    b.vx *= 0.99;
-    b.vy *= 0.99;
+    branchCtx.lineWidth = Math.max(1.2 * dpr, 2.5 * dpr * (1 - t * 0.4));
+    branchCtx.strokeStyle = 'rgba(30, 41, 59, 0.45)';
+    branchCtx.lineCap = 'round';
+    branchCtx.stroke();
 
-    // Gentle floating impulses
-    b.vx += (Math.random() - 0.5) * 0.04;
-    b.vy += (Math.random() - 0.5) * 0.04;
+    // When the branch tip has finished growing, show the organic tip dot & floating text
+    if (t >= 0.92) {
+      const tipAlpha = Math.min(1, (t - 0.92) / 0.08);
+      const endSway = Math.sin(branchTime + idx + Math.PI) * (1.5 * dpr);
+      const tipX = curve.p3.x;
+      const tipY = curve.p3.y + endSway;
 
-    // Smooth boundary bounce
-    const pad = b.baseR + 15;
-    if (b.x < pad) { b.x = pad; b.vx *= -1; }
-    if (b.x > w - pad) { b.x = w - pad; b.vx *= -1; }
-    if (b.y < pad) { b.y = pad; b.vy *= -1; }
-    if (b.y > h - pad) { b.y = h - pad; b.vy *= -1; }
+      // Small natural branch tip node dot
+      branchCtx.beginPath();
+      branchCtx.arc(tipX, tipY, 3.5 * dpr, 0, Math.PI * 2);
+      branchCtx.fillStyle = curve.color;
+      branchCtx.globalAlpha = tipAlpha;
+      branchCtx.fill();
 
-    // Draw natural organic blob shape using sine harmonic offsets (No Glow)
-    b.phase += b.morphSpeed;
-    metaCtx.beginPath();
-    const points = 24;
-    for (let p = 0; p <= points; p++) {
-      const angle = (p / points) * Math.PI * 2;
-      const wobble = Math.sin(angle * 3 + b.phase) * 3.5 + Math.cos(angle * 2 - b.phase * 1.2) * 2.5;
-      const r = b.baseR + wobble;
-      const px = b.x + Math.cos(angle) * r;
-      const py = b.y + Math.sin(angle) * r;
+      // Clean typography label floating right at the tip
+      const isLeft = curve.p0.x === 0;
+      branchCtx.font = `600 ${13 * dpr}px Inter, -apple-system, sans-serif`;
+      branchCtx.fillStyle = '#1f1d1a';
+      branchCtx.textAlign = isLeft ? 'right' : 'left';
+      branchCtx.textBaseline = 'middle';
 
-      if (p === 0) metaCtx.moveTo(px, py);
-      else metaCtx.lineTo(px, py);
+      const textOffsetX = isLeft ? -9 * dpr : 9 * dpr;
+      branchCtx.fillText(curve.label, tipX + textOffsetX, tipY);
+      branchCtx.globalAlpha = 1.0;
     }
-    metaCtx.closePath();
-
-    // Clean fill + crisp blue/black border stroke (Zero Glow)
-    metaCtx.fillStyle = '#ffffff';
-    metaCtx.fill();
-
-    metaCtx.lineWidth = 1.5;
-    metaCtx.strokeStyle = b.border;
-    metaCtx.stroke();
-
-    // Clean text label inside blob
-    metaCtx.font = `500 ${13.5 * (window.devicePixelRatio || 1)}px Inter, sans-serif`;
-    metaCtx.fillStyle = '#1f1d1a';
-    metaCtx.textAlign = 'center';
-    metaCtx.textBaseline = 'middle';
-    metaCtx.fillText(b.text, b.x, b.y);
   });
 
-  requestAnimationFrame(animateBlobs);
-}
-
-if (metaCanvas) {
-  metaCanvas.addEventListener('mousemove', (e) => {
-    const rect = metaCanvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    blobMouseX = (e.clientX - rect.left) * dpr;
-    blobMouseY = (e.clientY - rect.top) * dpr;
-  });
-  metaCanvas.addEventListener('mouseleave', () => {
-    blobMouseX = -1000;
-    blobMouseY = -1000;
-  });
-  metaCanvas.addEventListener('mousedown', () => { isBlobDragging = true; });
-  window.addEventListener('mouseup', () => { isBlobDragging = false; });
+  requestAnimationFrame(animateNatureBranches);
 }
 
 
 // ==========================================================================
-// 3. Four Capability Mini-Canvas Animations
+// 3. Four Capability Mini-Canvas Animations (Proper Responsive DPR handling)
 // ==========================================================================
 
 // Animation 1: Formula Interference Waves
@@ -258,8 +267,10 @@ function initWavesAnimation() {
   let t = 0;
 
   function resize() {
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
   }
   resize();
 
@@ -267,20 +278,21 @@ function initWavesAnimation() {
     t += 0.03;
     const w = canvas.width;
     const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
     ctx.fillStyle = '#0f1218';
     ctx.fillRect(0, 0, w, h);
 
-    const step = 8;
-    ctx.lineWidth = 1.2;
+    const step = 8 * dpr;
+    ctx.lineWidth = 1.2 * dpr;
 
     for (let y = 0; y < h; y += step) {
       ctx.beginPath();
       ctx.strokeStyle = `rgba(217, 119, 54, ${0.35 + Math.sin(y * 0.05 + t) * 0.25})`;
-      for (let x = 0; x < w; x += 4) {
+      for (let x = 0; x < w; x += 4 * dpr) {
         const d1 = Math.hypot(x - w * 0.35, y - h * 0.5);
         const d2 = Math.hypot(x - w * 0.65, y - h * 0.5);
-        const wave = Math.sin(d1 * 0.08 - t * 2) + Math.sin(d2 * 0.08 - t * 2);
-        const py = y + wave * 6;
+        const wave = Math.sin(d1 * (0.08 / dpr) - t * 2) + Math.sin(d2 * (0.08 / dpr) - t * 2);
+        const py = y + wave * (6 * dpr);
         if (x === 0) ctx.moveTo(x, py);
         else ctx.lineTo(x, py);
       }
@@ -289,6 +301,7 @@ function initWavesAnimation() {
     requestAnimationFrame(draw);
   }
   draw();
+  window.addEventListener('resize', resize);
 }
 
 // Animation 2: 3D Wavetable Movement
@@ -299,8 +312,10 @@ function initWavetableAnimation() {
   let t = 0;
 
   function resize() {
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
   }
   resize();
 
@@ -308,6 +323,7 @@ function initWavetableAnimation() {
     t += 0.025;
     const w = canvas.width;
     const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
     ctx.fillStyle = '#0f1218';
     ctx.fillRect(0, 0, w, h);
 
@@ -316,20 +332,20 @@ function initWavetableAnimation() {
 
     for (let f = 0; f < frames; f++) {
       const depth = f / frames;
-      const ox = w * 0.15 + (f - frames / 2) * 4;
-      const oy = h * 0.28 + f * 10;
+      const ox = w * 0.15 + (f - frames / 2) * (4 * dpr);
+      const oy = h * 0.28 + f * (10 * dpr);
       const alpha = 0.2 + depth * 0.7;
 
       ctx.beginPath();
       ctx.strokeStyle = f === Math.floor((Math.sin(t) * 0.5 + 0.5) * (frames - 1)) 
         ? '#c2593f' 
         : `rgba(233, 196, 106, ${alpha})`;
-      ctx.lineWidth = f === Math.floor((Math.sin(t) * 0.5 + 0.5) * (frames - 1)) ? 2.5 : 1.2;
+      ctx.lineWidth = f === Math.floor((Math.sin(t) * 0.5 + 0.5) * (frames - 1)) ? 2.5 * dpr : 1.2 * dpr;
 
-      for (let x = 0; x <= sliceWidth; x += 3) {
+      for (let x = 0; x <= sliceWidth; x += 3 * dpr) {
         const u = x / sliceWidth;
         const morph = Math.sin(u * Math.PI * (2 + f * 0.5) + t * 2) * Math.cos(u * Math.PI + f * 0.3);
-        const y = oy - morph * 22;
+        const y = oy - morph * (22 * dpr);
         if (x === 0) ctx.moveTo(ox + x, y);
         else ctx.lineTo(ox + x, y);
       }
@@ -338,6 +354,7 @@ function initWavetableAnimation() {
     requestAnimationFrame(draw);
   }
   draw();
+  window.addEventListener('resize', resize);
 }
 
 // Animation 3: Particle Cloud Simulation
@@ -347,8 +364,10 @@ function initParticlesAnimation() {
   const ctx = canvas.getContext('2d');
 
   function resize() {
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
   }
   resize();
 
@@ -356,9 +375,9 @@ function initParticlesAnimation() {
   for (let i = 0; i < 90; i++) {
     particles.push({
       angle: Math.random() * Math.PI * 2,
-      radius: Math.random() * 55 + 10,
+      radiusRatio: Math.random() * 0.7 + 0.1,
       speed: 0.015 + Math.random() * 0.02,
-      yOffset: (Math.random() - 0.5) * 40,
+      yRatio: (Math.random() - 0.5) * 0.4,
       size: Math.random() * 2 + 1,
       color: ['#81b29a', '#b8b8d1', '#e9c46a'][Math.floor(Math.random() * 3)]
     });
@@ -369,19 +388,22 @@ function initParticlesAnimation() {
     t += 0.02;
     const w = canvas.width;
     const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
     ctx.fillStyle = '#0f1218';
     ctx.fillRect(0, 0, w, h);
 
     const cx = w / 2;
     const cy = h / 2;
+    const maxRadius = Math.min(w, h) * 0.4;
 
     particles.forEach(p => {
       p.angle += p.speed;
-      const x = cx + Math.cos(p.angle) * p.radius;
-      const y = cy + Math.sin(p.angle) * (p.radius * 0.45) + Math.sin(t + p.radius) * 8;
+      const r = p.radiusRatio * maxRadius;
+      const x = cx + Math.cos(p.angle) * r;
+      const y = cy + Math.sin(p.angle) * (r * 0.45) + Math.sin(t + r) * (8 * dpr);
 
       ctx.beginPath();
-      ctx.arc(x, y, p.size, 0, Math.PI * 2);
+      ctx.arc(x, y, p.size * dpr, 0, Math.PI * 2);
       ctx.fillStyle = p.color;
       ctx.fill();
     });
@@ -389,6 +411,7 @@ function initParticlesAnimation() {
     requestAnimationFrame(draw);
   }
   draw();
+  window.addEventListener('resize', resize);
 }
 
 // Animation 4: 4 Modulation Knobs with Cables
@@ -399,8 +422,10 @@ function initKnobsAnimation() {
   let t = 0;
 
   function resize() {
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
   }
   resize();
 
@@ -408,6 +433,7 @@ function initKnobsAnimation() {
     t += 0.03;
     const w = canvas.width;
     const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
     ctx.fillStyle = '#0f1218';
     ctx.fillRect(0, 0, w, h);
 
@@ -418,8 +444,7 @@ function initKnobsAnimation() {
       { x: w * 0.68, y: h * 0.72, speed: -0.9, color: '#b8b8d1' }
     ];
 
-    // Draw patch cables
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = 1.8 * dpr;
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(244, 162, 97, 0.4)';
     ctx.moveTo(knobPositions[0].x, knobPositions[0].y);
@@ -432,16 +457,15 @@ function initKnobsAnimation() {
     ctx.bezierCurveTo(w * 0.4, h * 0.95, w * 0.6, h * 0.95, knobPositions[3].x, knobPositions[3].y);
     ctx.stroke();
 
-    // Draw rotary knobs
     knobPositions.forEach((k, idx) => {
       const angle = t * k.speed + idx * 1.5;
-      const r = 22;
+      const r = 20 * dpr;
 
       ctx.beginPath();
       ctx.arc(k.x, k.y, r, 0, Math.PI * 2);
       ctx.fillStyle = '#1c212a';
       ctx.fill();
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 * dpr;
       ctx.strokeStyle = k.color;
       ctx.stroke();
 
@@ -450,7 +474,7 @@ function initKnobsAnimation() {
       ctx.beginPath();
       ctx.moveTo(k.x, k.y);
       ctx.lineTo(px, py);
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2.5 * dpr;
       ctx.strokeStyle = '#ffffff';
       ctx.stroke();
     });
@@ -458,6 +482,7 @@ function initKnobsAnimation() {
     requestAnimationFrame(draw);
   }
   draw();
+  window.addEventListener('resize', resize);
 }
 
 
@@ -642,12 +667,16 @@ function initCopyButtons() {
 
 // DOM Ready initialization
 document.addEventListener('DOMContentLoaded', () => {
-  window.addEventListener('resize', resizeCosmicCanvas);
+  window.addEventListener('resize', () => {
+    resizeCosmicCanvas();
+    resizeBranchCanvas();
+  });
+
   resizeCosmicCanvas();
   requestAnimationFrame(animateCosmos);
 
-  initBlobs();
-  requestAnimationFrame(animateBlobs);
+  resizeBranchCanvas();
+  requestAnimationFrame(animateNatureBranches);
 
   initWavesAnimation();
   initWavetableAnimation();
