@@ -1,29 +1,29 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Infinite — A Visual & Sound Notebook for macOS</title>
-  <meta name="description" content="Infinite is an open-source visual and sound workstation for macOS. Create real-time generative visuals, procedural 3D art, and modular music on an infinite canvas.">
+  <title>Infinite — A Visual Notebook Where Sound, Art and Geometry Connect</title>
+  <meta name="description" content="Infinite is an all-in-one creative space for macOS. Wire real-time video shaders, 3D geometry, and modular music on an infinite canvas.">
   
   <!-- Open Graph -->
-  <meta property="og:title" content="Infinite — A Visual & Sound Notebook for macOS">
-  <meta property="og:description" content="Create real-time generative visuals, procedural 3D art, and modular music on an infinite canvas.">
+  <meta property="og:title" content="Infinite — A Visual Notebook Where Sound, Art and Geometry Connect">
+  <meta property="og:description" content="Real-time video shaders, 3D geometry, and modular synthesizers connected on an infinite canvas.">
   <meta property="og:image" content="assets/screenshot.png">
   <meta property="og:type" content="website">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="assets/icon.png">
 
-  <!-- Typography: EB Garamond (All body & headings) + Caveat (Sketch annotations) -->
+  <!-- Fonts: Clean Helvetica/Inter + Caveat for organic sketch cursive -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Subtle Cosmic Nebula & Star Dust Canvas (0.1 Opacity) -->
+  <!-- Ambient Cosmic Dust & Soft Floating Galaxy Particles Canvas -->
   <canvas id="cosmic-canvas" aria-hidden="true"></canvas>
 
   <!-- Sticky Navbar -->
@@ -32,12 +32,11 @@
       <a href="#" class="brand">
         <img src="assets/icon.png" alt="Infinite Icon" class="brand-icon">
         <span class="brand-name">Infinite</span>
-        <span class="brand-tag">Mac Workstation</span>
       </a>
 
       <nav class="nav-links">
-        <a href="#about">What is it?</a>
-        <a href="#purpose">Purpose</a>
+        <a href="#about">Overview</a>
+        <a href="#capabilities">Capabilities</a>
         <a href="#listen">Listen</a>
         <a href="#howto">How It Works</a>
         <a href="#nodes">160+ Nodes</a>
@@ -45,20 +44,9 @@
       </nav>
 
       <div class="nav-actions">
-        <!-- Theme Toggle (Dark / Light) -->
-        <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Light / Dark mode" aria-label="Toggle Light / Dark theme">
-          <svg class="sun-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-          <svg class="moon-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-        </button>
-
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+          GitHub
+        </a>
         <a href="#download" class="btn btn-primary btn-sm">Get Infinite</a>
       </div>
     </div>
@@ -69,17 +57,16 @@
     <section class="hero-section">
       <div class="container hero-container">
         
-        <div class="hero-badge">
-          <span>Open-Source Audiovisual Canvas for macOS</span>
-        </div>
-
         <h1 class="hero-title">
-          A visual notebook where sound,<br>
-          <em>light, and geometry</em> connect.
+          A visual notebook where <br>
+          <span class="cursive-text">sound, art and geometry</span> connect.
         </h1>
 
+        <!-- 3-line concise consumer summary -->
         <p class="hero-subtitle">
-          Infinite is an all-in-one creative space for Mac. Instead of switching between three different apps, you wire real-time video filters, 3D shapes, and musical instruments together on a single boundless page.
+          Infinite is an all-in-one creative playground for Mac.<br>
+          Instead of juggling separate apps for music, video effects, and 3D modeling,<br>
+          you wire ideas together on a single boundless page where every element reacts in real time.
         </p>
 
         <div class="hero-cta-group">
@@ -90,9 +77,9 @@
             </a>
             <!-- Hand-drawn sketch annotation -->
             <div class="sketch-annotation sketch-arrow-left">
-              <svg class="sketch-arrow-svg" viewBox="0 0 60 40">
-                <path d="M 50,30 Q 30,5 10,25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <path d="M 10,25 L 18,18 M 10,25 L 20,28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <svg class="sketch-arrow-svg" viewBox="0 0 50 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M 45,22 Q 25,2 8,18"/>
+                <path d="M 8,18 L 16,12 M 8,18 L 18,22"/>
               </svg>
               <span>No signup, 100% open source</span>
             </div>
@@ -104,15 +91,8 @@
           </a>
         </div>
 
-        <!-- Hero Showcase Frame -->
+        <!-- Single Clean Live Canvas Video Showcase -->
         <div class="showcase-wrapper">
-          <div class="showcase-tabs">
-            <button class="showcase-tab active" data-target="media-daw">The Live Canvas</button>
-            <button class="showcase-tab" data-target="media-visual">Generative Visuals</button>
-            <button class="showcase-tab" data-target="media-motion">3D & Cloth Physics</button>
-            <button class="showcase-tab" data-target="media-graph">Node Graph Map</button>
-          </div>
-
           <div class="notebook-frame">
             <div class="notebook-header">
               <div class="window-dots">
@@ -120,23 +100,12 @@
                 <span class="dot dot-2"></span>
                 <span class="dot dot-3"></span>
               </div>
-              <span class="notebook-title" id="showcase-title">Infinite — Interactive Modular Canvas</span>
-              <span class="notebook-chip">Live Preview</span>
+              <span class="notebook-title">Infinite — Live Modular Canvas</span>
+              <span class="notebook-chip">60 FPS Real-Time</span>
             </div>
 
             <div class="showcase-media-container">
-              <div class="showcase-item active" id="media-daw">
-                <video src="assets/daw_preview.mp4" autoplay loop muted playsinline class="showcase-video"></video>
-              </div>
-              <div class="showcase-item" id="media-visual">
-                <video src="assets/visual_preview.mp4" autoplay loop muted playsinline class="showcase-video"></video>
-              </div>
-              <div class="showcase-item" id="media-motion">
-                <video src="assets/motion_preview.mp4" autoplay loop muted playsinline class="showcase-video"></video>
-              </div>
-              <div class="showcase-item" id="media-graph">
-                <img src="assets/screenshot.png" alt="Infinite node graph workspace" class="showcase-img" loading="lazy">
-              </div>
+              <video src="assets/daw_preview.mp4" autoplay loop muted playsinline class="showcase-video"></video>
             </div>
           </div>
         </div>
@@ -144,205 +113,145 @@
       </div>
     </section>
 
-    <!-- What is Infinite? (Consumer Friendly) -->
-    <section id="about" class="section">
-      <div class="container">
-        <div class="notebook-card highlight-card">
-          <div class="card-inner">
-            <div class="section-label">Overview</div>
-            <h2 class="section-heading">What is Infinite?</h2>
-            <p class="section-text">
-              Think of traditional creative tools: you use one app for video effects, a second app for 3D modeling, and a third app for making music. Getting them to talk to each other is frustrating and clunky.
-            </p>
-            <p class="section-text">
-              <strong>Infinite combines all three into a single visual playground.</strong> You place building blocks (called <em>nodes</em>) on a canvas and connect them with cables. A drum beat can make a 3D sphere ripple; a webcam feed can modulate an audio synthesizer; a hand-drawn brush stroke can distort live video. Everything reacts in real time at 60 frames per second.
-            </p>
-
-            <div class="pill-row">
-              <span class="pastel-tag tag-peach">No Coding Needed</span>
-              <span class="pastel-tag tag-sage">Runs Entirely on Your Mac</span>
-              <span class="pastel-tag tag-lavender">Instant Live Feedback</span>
-              <span class="pastel-tag tag-amber">Zero Subscription Fees</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Purpose of Infinite (Categories of Nodes) -->
-    <section id="purpose" class="section">
+    <!-- Floating Interactive Metaballs Section (Replaces Boxy Section) -->
+    <section id="about" class="section metaballs-section">
       <div class="container">
         <div class="section-header">
-          <div class="section-label">Capabilities</div>
-          <h2 class="section-heading">Four Creative Disciplines in Harmony</h2>
-          <p class="section-subheading">Here is what you can create and explore inside the workspace:</p>
+          <div class="section-label">Core Dimensions</div>
+          <h2 class="section-heading">Connected by Nature</h2>
+          <p class="section-subheading">Hover or drag to see the modular disciplines merge and interact.</p>
         </div>
 
-        <div class="purpose-grid">
-          <!-- 1. Video & Visuals -->
-          <div class="notebook-card purpose-card">
-            <div class="purpose-icon-box bg-peach">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="2" width="20" height="20" rx="4"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
+        <div class="metaball-canvas-wrapper">
+          <canvas id="metaballs-canvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Capabilities Section (4 Animated Mini-Canvases with Clean Titles) -->
+    <section id="capabilities" class="section">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-label">Engine Capabilities</div>
+          <h2 class="section-heading">Four Creative Streams</h2>
+        </div>
+
+        <div class="capabilities-grid">
+          <!-- 1. Wave Interference Formula Animation -->
+          <div class="cap-card">
+            <div class="cap-canvas-box">
+              <canvas id="anim-waves"></canvas>
             </div>
-            <h3 class="card-heading">1. Real-Time Video & Shaders</h3>
-            <p class="section-text">
-              Import videos, photos, and webcams. Add blurs, cinematic color curves, procedural noise, glitch effects, and one-click AI background removal that runs completely on-device without internet access.
-            </p>
+            <h3 class="cap-title">Real-Time Video & Shaders</h3>
           </div>
 
-          <!-- 2. Sound & Synths -->
-          <div class="notebook-card purpose-card">
-            <div class="purpose-icon-box bg-amber">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 18V5l12-2v13"></path>
-                <circle cx="6" cy="18" r="3"></circle>
-                <circle cx="18" cy="16" r="3"></circle>
-              </svg>
+          <!-- 2. Wavetable Position Movement Animation -->
+          <div class="cap-card">
+            <div class="cap-canvas-box">
+              <canvas id="anim-wavetable"></canvas>
             </div>
-            <h3 class="card-heading">2. Synthesizers & Sound Design</h3>
-            <p class="section-text">
-              Build music with rich wavetable synths, metallic resonators for physical acoustic chimes, granular texture players, and 8-track drum sequencers. You can even host your favorite third-party Audio Unit (AU) plugins.
-            </p>
+            <h3 class="cap-title">Synthesizers & Sound Design</h3>
           </div>
 
-          <!-- 3. 3D & Physics -->
-          <div class="notebook-card purpose-card">
-            <div class="purpose-icon-box bg-lavender">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                <polyline points="2 17 12 22 22 17"></polyline>
-                <polyline points="2 12 12 17 22 12"></polyline>
-              </svg>
+          <!-- 3. Particle System Cloud Animation -->
+          <div class="cap-card">
+            <div class="cap-canvas-box">
+              <canvas id="anim-particles"></canvas>
             </div>
-            <h3 class="card-heading">3. 3D Worlds & Cloth Physics</h3>
-            <p class="section-text">
-              Load 3D models or generate procedural shapes. Scatter thousands of instances across surfaces, simulate waving ocean water, blow cloth with digital wind, and light everything with 32-bit realistic HDRI reflections.
-            </p>
+            <h3 class="cap-title">3D Worlds & Cloth Physics</h3>
           </div>
 
-          <!-- 4. The Connective Tissue -->
-          <div class="notebook-card purpose-card">
-            <div class="purpose-icon-box bg-sage">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="18" cy="5" r="3"></circle>
-                <circle cx="6" cy="12" r="3"></circle>
-                <circle cx="18" cy="19" r="3"></circle>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-              </svg>
+          <!-- 4. 4 Modulation Knobs Moving with Cables -->
+          <div class="cap-card">
+            <div class="cap-canvas-box">
+              <canvas id="anim-knobs"></canvas>
             </div>
-            <h3 class="card-heading">4. Universal Modulation</h3>
-            <p class="section-text">
-              The secret sauce: any output can control any knob. Plug an audio frequency analyzer into a 3D displacement slider, or map a video color channel to synth pitch. Creative cross-talk is effortless.
-            </p>
+            <h3 class="cap-title">Universal Modulation</h3>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Listen / Audio Showcase -->
+    <!-- Listen Section (Clean Single Modular Soundscape Player) -->
     <section id="listen" class="section">
       <div class="container">
         <div class="section-header">
           <div class="section-label">Soundtrack</div>
-          <h2 class="section-heading">Listen to Music Made with Infinite</h2>
-          <p class="section-subheading">Every sound in these recordings was synthesized and generated inside the Infinite patch graph.</p>
+          <h2 class="section-heading">Listen to Music Made in Infinite</h2>
         </div>
 
-        <div class="audio-player-card notebook-card">
-          <div class="player-header">
-            <div class="track-info">
-              <div class="track-badge">Recorded Live from Graph</div>
-              <h3 class="track-title" id="current-track-title">Audiovisual Modulation Loop</h3>
-              <p class="track-artist">Infinite Synthesizer & Generative Engine</p>
-            </div>
-            <button id="main-play-btn" class="play-circle-btn" aria-label="Play or pause audio track">
-              <svg id="play-icon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        <div class="minimal-player-card">
+          <div class="minimal-player-row">
+            <button id="minimal-play-btn" class="minimal-play-circle" aria-label="Play modular soundscape">
+              <svg id="m-play-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <polygon points="6 4 20 12 6 20 6 4"></polygon>
               </svg>
-              <svg id="pause-icon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" style="display:none;">
+              <svg id="m-pause-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" style="display:none;">
                 <rect x="6" y="4" width="4" height="16"></rect>
                 <rect x="14" y="4" width="4" height="16"></rect>
               </svg>
             </button>
-          </div>
 
-          <!-- Progress Scrubber -->
-          <div class="scrubber-row">
-            <span id="time-current" class="time-label">0:00</span>
-            <div class="progress-bar" id="progress-container">
-              <div class="progress-fill" id="progress-fill"></div>
+            <div class="minimal-track-info">
+              <div class="track-header-row">
+                <span class="m-track-title">Ambient Modular Soundscape</span>
+                <span id="m-track-time" class="m-time-text">0:00 / 0:16</span>
+              </div>
+              <div class="m-progress-bar" id="m-progress-container">
+                <div class="m-progress-fill" id="m-progress-fill"></div>
+              </div>
             </div>
-            <span id="time-duration" class="time-label">0:12</span>
           </div>
-
-          <!-- Track Playlist Picker -->
-          <div class="playlist-row">
-            <button class="track-btn active" data-src="assets/demo_track.mp3" data-title="Audiovisual Modulation Loop" data-duration="0:12">
-              <span>Track 01: Modulation Loop (Wavetable + Resonator)</span>
-            </button>
-            <button class="track-btn" data-src="assets/ambient_patch.mp3" data-title="Ambient Modular Soundscape" data-duration="0:16">
-              <span>Track 02: Ambient Soundscape (PaulStretch + Granular)</span>
-            </button>
-          </div>
-
-          <audio id="audio-element" src="assets/demo_track.mp3" preload="metadata"></audio>
+          <audio id="m-audio-element" src="assets/ambient_patch.mp3" preload="metadata"></audio>
         </div>
       </div>
     </section>
 
-    <!-- How-To Guide / Illustrated Node Layouts -->
+    <!-- How-To Guide / Illustrated Node Recipes -->
     <section id="howto" class="section">
       <div class="container">
         <div class="section-header">
           <div class="section-label">Field Guide</div>
           <h2 class="section-heading">How Does It Work?</h2>
-          <p class="section-subheading">Here are three real examples of simple, powerful node recipes you can build in seconds:</p>
+          <p class="section-subheading">Connect blocks with cables. Here is what simple recipes look like:</p>
         </div>
 
         <div class="howto-stack">
           <!-- Recipe 1 -->
-          <div class="howto-item notebook-card">
+          <div class="howto-item">
             <div class="howto-content">
               <span class="recipe-num">Recipe 01</span>
-              <h3 class="card-heading">Making Live Audio-Reactive Visuals</h3>
-              <p class="section-text">
-                Connect your microphone or an audio file into an <strong>Audio Analyze</strong> node. It splits sound into 8 frequency bands. Wire the high-frequency band into a <strong>Ripple Filter</strong> connected to an image or webcam. When the snare hits, the image ripples instantly.
+              <h3 class="recipe-title">Making Live Audio-Reactive Visuals</h3>
+              <p class="recipe-desc">
+                An <strong>Audio Analyze</strong> node splits sound into 8 frequency bands. Connecting a high-frequency band to a <strong>Ripple Filter</strong> causes live video to distort in exact sync with percussion.
               </p>
               <div class="node-flow-diagram">
                 <span class="flow-pill">Audio In</span>
                 <span class="flow-arrow">→</span>
                 <span class="flow-pill">Audio Analyze</span>
                 <span class="flow-arrow">→</span>
-                <span class="flow-pill">Ripple / Displace</span>
+                <span class="flow-pill">Ripple Filter</span>
                 <span class="flow-arrow">→</span>
                 <span class="flow-pill">Visual Output</span>
               </div>
             </div>
             <div class="howto-media">
               <img src="assets/howto_visual.jpg" alt="Audio reactive visual screenshot" loading="lazy">
-              <div class="sketch-annotation sketch-caption">
-                <span>Live video modulating from real-time FFT bands</span>
-              </div>
             </div>
           </div>
 
           <!-- Recipe 2 -->
-          <div class="howto-item notebook-card">
+          <div class="howto-item">
             <div class="howto-content">
               <span class="recipe-num">Recipe 02</span>
-              <h3 class="card-heading">Turning Any Sample into Lush Ambient Pads</h3>
-              <p class="section-text">
-                Drop any sound file into a <strong>PaulStretch</strong> node. It performs spectral time-stretching up to 50x without changing the pitch. Route the lush wash into an <strong>Algorithmic Reverb</strong> and adjust the diffusion. Instant cinematic soundtrack.
+              <h3 class="recipe-title">Turning Any Sound into Ambient Clouds</h3>
+              <p class="recipe-desc">
+                Drop any sound file into <strong>PaulStretch</strong> to stretch time up to 50x without changing pitch. Feeding the wash through an <strong>Algorithmic Reverb</strong> creates endless atmospheric textures.
               </p>
               <div class="node-flow-diagram">
                 <span class="flow-pill">Audio File</span>
                 <span class="flow-arrow">→</span>
-                <span class="flow-pill">PaulStretch Engine</span>
+                <span class="flow-pill">PaulStretch</span>
                 <span class="flow-arrow">→</span>
                 <span class="flow-pill">Reverb & Delay</span>
                 <span class="flow-arrow">→</span>
@@ -351,19 +260,16 @@
             </div>
             <div class="howto-media">
               <img src="assets/howto_daw.jpg" alt="Audio workstation and synth nodes layout" loading="lazy">
-              <div class="sketch-annotation sketch-caption">
-                <span>Modular synthesizer graph with parameter automation</span>
-              </div>
             </div>
           </div>
 
           <!-- Recipe 3 -->
-          <div class="howto-item notebook-card">
+          <div class="howto-item">
             <div class="howto-content">
               <span class="recipe-num">Recipe 03</span>
-              <h3 class="card-heading">Simulating Soft Cloth & 3D Lighting</h3>
-              <p class="section-text">
-                Create a 3D geometry mesh, plug it into a <strong>Cloth (PBD)</strong> physics solver, and attach a virtual wind force. Route the result into a <strong>Render 3D</strong> node with a 32-bit HDRI environment for photorealistic metallic reflections.
+              <h3 class="recipe-title">Simulating Soft Cloth & 3D Lighting</h3>
+              <p class="recipe-desc">
+                Create a 3D geometry mesh, plug it into a <strong>Cloth (PBD)</strong> solver with wind turbulence, and render it through <strong>Render 3D</strong> with 32-bit HDRI reflection maps.
               </p>
               <div class="node-flow-diagram">
                 <span class="flow-pill">3D Mesh</span>
@@ -377,9 +283,6 @@
             </div>
             <div class="howto-media">
               <img src="assets/howto_3d.jpg" alt="3D physics simulation screenshot" loading="lazy">
-              <div class="sketch-annotation sketch-caption">
-                <span>Real-time physical soft-body simulation & Cook-Torrance GGX</span>
-              </div>
             </div>
           </div>
         </div>
@@ -387,47 +290,31 @@
       </div>
     </section>
 
-    <!-- 160+ Node Explorer -->
+    <!-- 160+ Node Interactive Ticker Tapes Section -->
     <section id="nodes" class="section">
       <div class="container">
         <div class="section-header">
           <div class="section-label">Library</div>
           <h2 class="section-heading">Browse the 160+ Node Collection</h2>
-          <p class="section-subheading">Every node is documented with a clear, plain-language explanation of what it does.</p>
+          <p class="section-subheading">Click any node in the continuous tapes to inspect its description.</p>
         </div>
+      </div>
 
-        <!-- Filter Pills -->
-        <div class="node-filter-bar">
-          <button class="node-filter-btn active" data-filter="all">All (160+)</button>
-          <button class="node-filter-btn" data-filter="source">Sources & Shaders</button>
-          <button class="node-filter-btn" data-filter="effects2d">2D & Color Effects</button>
-          <button class="node-filter-btn" data-filter="geometry3d">3D & Physics</button>
-          <button class="node-filter-btn" data-filter="synths">Synths & Audio</button>
-          <button class="node-filter-btn" data-filter="midi">Notes & MIDI</button>
-          <button class="node-filter-btn" data-filter="modulation">Modulation & CV</button>
-        </div>
-
-        <!-- Search Bar -->
-        <div class="node-search-box">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" id="node-search-input" placeholder="Search nodes in plain English (e.g., Blur, Ocean, Drum, Wavetable, Glitch)...">
-        </div>
-
-        <!-- Grid -->
-        <div class="nodes-grid" id="nodes-grid"></div>
+      <!-- 3 Continuous Scrolling Ticker Tapes -->
+      <div class="ticker-wrapper">
+        <div class="ticker-track ticker-forward" id="ticker-1"></div>
+        <div class="ticker-track ticker-reverse" id="ticker-2"></div>
+        <div class="ticker-track ticker-forward" id="ticker-3"></div>
       </div>
     </section>
 
     <!-- First Time Setup on Mac (macOS Gatekeeper) -->
     <section id="setup" class="section">
       <div class="container">
-        <div class="notebook-card gatekeeper-card">
+        <div class="setup-box">
           <div class="section-label">First-Time Setup</div>
           <h2 class="section-heading">Opening Infinite on macOS in 3 Steps</h2>
-          <p class="section-text">
+          <p class="setup-intro">
             Because Infinite is a free community open-source project and built as an ad-hoc signed app, macOS Gatekeeper may show a one-time security confirmation on your first launch. Here is how to open it:
           </p>
 
@@ -435,7 +322,7 @@
             <div class="step-card">
               <div class="step-num">1</div>
               <h4 class="step-title">Double-Click App</h4>
-              <p class="step-desc">Drag <code>Infinite.app</code> to your Applications folder and double-click to open. macOS will state it is from an unverified developer.</p>
+              <p class="step-desc">Drag <code>Infinite.app</code> to your Applications folder and double-click. macOS will state it is from an unverified developer.</p>
             </div>
 
             <div class="step-card">
@@ -458,13 +345,13 @@
       </div>
     </section>
 
-    <!-- Download Card -->
+    <!-- Download Section -->
     <section id="download" class="section">
       <div class="container">
-        <div class="notebook-card download-card">
+        <div class="download-card">
           <div class="section-label">Ready to Create?</div>
           <h2 class="section-heading">Download Infinite for macOS</h2>
-          <p class="section-text">
+          <p class="download-intro">
             A single self-contained application file. No Homebrew or terminal dependencies required to run.
           </p>
 
@@ -502,6 +389,20 @@
     </section>
   </main>
 
+  <!-- Node Inspector Modal Popup -->
+  <div id="node-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card">
+      <button id="modal-close-btn" class="modal-close" aria-label="Close modal">✕</button>
+      <div class="modal-badge" id="modal-cat">Node Category</div>
+      <h3 class="modal-title" id="modal-name">Node Name</h3>
+      <p class="modal-desc" id="modal-desc">Description of what this node does inside Infinite.</p>
+      <div class="modal-pins" id="modal-pins">
+        <span class="pin-tag">Universal Modulation Pin</span>
+        <span class="pin-tag">Live 1:1 Preview</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="site-footer">
     <div class="container footer-container">
@@ -510,14 +411,14 @@
           <img src="assets/icon.png" alt="Infinite Icon" class="brand-icon">
           <span class="brand-name">Infinite</span>
         </div>
-        <p class="footer-desc">A unified audiovisual & sound workstation for macOS.</p>
+        <p class="footer-desc">A visual notebook where sound, art and geometry connect.</p>
       </div>
 
       <div class="footer-links">
         <div class="footer-col">
           <h5>Navigate</h5>
-          <a href="#about">What is Infinite?</a>
-          <a href="#purpose">Capabilities</a>
+          <a href="#about">Overview</a>
+          <a href="#capabilities">Capabilities</a>
           <a href="#listen">Listen to Music</a>
           <a href="#howto">How It Works</a>
           <a href="#nodes">160+ Node Directory</a>
