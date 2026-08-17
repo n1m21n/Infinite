@@ -1,20 +1,135 @@
 /**
- * Infinite — Web Application Logic, Interactive Audio & Visual Engines
+ * Infinite — Web Application Logic
+ * Cosmic Nebula Canvas, Light/Dark Mode, Playable Audio Tracks, and Node Explorer
  */
 
 // ==========================================================================
-// 1. Interactive Showcase Tab Switcher
+// 1. Theme Manager (Dark Mode & Light Mode)
+// ==========================================================================
+function initTheme() {
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  const savedTheme = localStorage.getItem('infinite-theme');
+  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  const initialTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', initialTheme);
+
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('infinite-theme', next);
+    });
+  }
+}
+
+// ==========================================================================
+// 2. Cosmic Nebula & Soft Star Dust Canvas (0.1 Opacity)
+// ==========================================================================
+const cosmicCanvas = document.getElementById('cosmic-canvas');
+const cosmicCtx = cosmicCanvas ? cosmicCanvas.getContext('2d') : null;
+let cWidth, cHeight;
+let stars = [];
+let nebulae = [];
+
+function resizeCosmicCanvas() {
+  if (!cosmicCanvas) return;
+  cWidth = cosmicCanvas.width = window.innerWidth;
+  cHeight = cosmicCanvas.height = window.innerHeight;
+  initCosmos();
+}
+
+function initCosmos() {
+  stars = [];
+  nebulae = [];
+
+  const starCount = Math.floor(Math.min(cWidth, 1400) / 18);
+  for (let i = 0; i < starCount; i++) {
+    stars.push({
+      x: Math.random() * cWidth,
+      y: Math.random() * cHeight,
+      size: Math.random() * 1.5 + 0.5,
+      alpha: Math.random() * 0.7 + 0.3,
+      pulseSpeed: 0.005 + Math.random() * 0.015,
+      pulseOffset: Math.random() * Math.PI * 2,
+      vx: (Math.random() - 0.5) * 0.15,
+      vy: (Math.random() - 0.5) * 0.15
+    });
+  }
+
+  // Soft cosmic gas clusters
+  for (let i = 0; i < 4; i++) {
+    nebulae.push({
+      x: Math.random() * cWidth,
+      y: Math.random() * cHeight,
+      radius: Math.random() * 200 + 250,
+      vx: (Math.random() - 0.5) * 0.1,
+      vy: (Math.random() - 0.5) * 0.1,
+      color: ['#e07a5f', '#f4a261', '#81b29a', '#b8b8d1'][i % 4]
+    });
+  }
+}
+
+let frameCount = 0;
+function animateCosmos() {
+  if (!cosmicCtx) return;
+  frameCount++;
+  cosmicCtx.clearRect(0, 0, cWidth, cHeight);
+
+  // Draw soft drifting nebula clusters
+  nebulae.forEach(n => {
+    n.x += n.vx;
+    n.y += n.vy;
+    if (n.x < -n.radius) n.x = cWidth + n.radius;
+    if (n.x > cWidth + n.radius) n.x = -n.radius;
+    if (n.y < -n.radius) n.y = cHeight + n.radius;
+    if (n.y > cHeight + n.radius) n.y = -n.radius;
+
+    const grad = cosmicCtx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius);
+    grad.addColorStop(0, n.color);
+    grad.addColorStop(1, 'transparent');
+
+    cosmicCtx.fillStyle = grad;
+    cosmicCtx.beginPath();
+    cosmicCtx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+    cosmicCtx.fill();
+  });
+
+  // Draw twinkling star dust
+  cosmicCtx.fillStyle = '#ffffff';
+  stars.forEach(s => {
+    s.x += s.vx;
+    s.y += s.vy;
+    if (s.x < 0) s.x = cWidth;
+    if (s.x > cWidth) s.x = 0;
+    if (s.y < 0) s.y = cHeight;
+    if (s.y > cHeight) s.y = 0;
+
+    const twinkle = Math.sin(frameCount * s.pulseSpeed + s.pulseOffset) * 0.3 + 0.7;
+    cosmicCtx.globalAlpha = s.alpha * twinkle;
+    cosmicCtx.beginPath();
+    cosmicCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    cosmicCtx.fill();
+  });
+  cosmicCtx.globalAlpha = 1.0;
+
+  requestAnimationFrame(animateCosmos);
+}
+
+// ==========================================================================
+// 3. Showcase Tab Switcher
 // ==========================================================================
 function initShowcaseSwitcher() {
   const tabs = document.querySelectorAll('.showcase-tab');
-  const mediaPanels = document.querySelectorAll('.showcase-media');
+  const items = document.querySelectorAll('.showcase-item');
   const titleEl = document.getElementById('showcase-title');
 
   const titles = {
-    'media-daw': 'Infinite — Live Modular Graph & Audio-Visual Engine',
-    'media-visual': 'Infinite — Live Real-Time Generative Shader Visuals',
-    'media-motion': 'Infinite — Procedural 3D Physics, Soft-Body & Instancing',
-    'media-graph': 'Infinite — High-Resolution Pull-Based Node DAG'
+    'media-daw': 'Infinite — Interactive Modular Canvas',
+    'media-visual': 'Infinite — Live Generative Video & Shaders',
+    'media-motion': 'Infinite — Procedural 3D & Soft Cloth Dynamics',
+    'media-graph': 'Infinite — Node Graph Map (Pull-Based DAG)'
   };
 
   tabs.forEach(tab => {
@@ -22,7 +137,7 @@ function initShowcaseSwitcher() {
       const targetId = tab.dataset.target;
 
       tabs.forEach(t => t.classList.remove('active'));
-      mediaPanels.forEach(p => p.classList.remove('active'));
+      items.forEach(item => item.classList.remove('active'));
 
       tab.classList.add('active');
       const targetPanel = document.getElementById(targetId);
@@ -40,424 +155,205 @@ function initShowcaseSwitcher() {
 }
 
 // ==========================================================================
-// 2. Interactive In-Browser Web Audio Synthesizer & Oscilloscope
+// 4. Playable Audio Track Showcase Player
 // ==========================================================================
-let audioCtx = null;
-let osc = null;
-let filter = null;
-let lfo = null;
-let lfoGain = null;
-let analyser = null;
-let isAudioPlaying = false;
-let currentWave = 'sawtooth';
+function initAudioPlayer() {
+  const audio = document.getElementById('audio-element');
+  const playBtn = document.getElementById('main-play-btn');
+  const playIcon = document.getElementById('play-icon');
+  const pauseIcon = document.getElementById('pause-icon');
+  const progressContainer = document.getElementById('progress-container');
+  const progressFill = document.getElementById('progress-fill');
+  const timeCurrent = document.getElementById('time-current');
+  const timeDuration = document.getElementById('time-duration');
+  const trackBtns = document.querySelectorAll('.track-btn');
+  const currentTitleEl = document.getElementById('current-track-title');
 
-const synthCanvas = document.getElementById('synth-scope-canvas');
-const synthCtx = synthCanvas ? synthCanvas.getContext('2d') : null;
-const synthToggleBtn = document.getElementById('synth-toggle-btn');
-const synthStatusText = document.getElementById('synth-status-text');
-const cutoffSlider = document.getElementById('synth-filter-slider');
-const cutoffVal = document.getElementById('cutoff-val');
-const lfoSlider = document.getElementById('synth-lfo-slider');
-const lfoVal = document.getElementById('lfo-val');
-const waveBtns = document.querySelectorAll('.wave-btn');
+  if (!audio || !playBtn) return;
 
-function initSynthAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-
-  // Create Synth Graph: Osc -> Filter -> Analyser -> Master Gain -> Out
-  osc = audioCtx.createOscillator();
-  osc.type = currentWave;
-  osc.frequency.setValueAtTime(110, audioCtx.currentTime); // A2 fundamental
-
-  // Second detuned osc for warmth
-  const subOsc = audioCtx.createOscillator();
-  subOsc.type = 'sine';
-  subOsc.frequency.setValueAtTime(55, audioCtx.currentTime); // A1 sub
-
-  filter = audioCtx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(parseFloat(cutoffSlider.value), audioCtx.currentTime);
-  filter.Q.setValueAtTime(6.0, audioCtx.currentTime);
-
-  // LFO Modulating filter cutoff
-  lfo = audioCtx.createOscillator();
-  lfo.frequency.setValueAtTime(parseFloat(lfoSlider.value), audioCtx.currentTime);
-  lfoGain = audioCtx.createGain();
-  lfoGain.gain.setValueAtTime(400, audioCtx.currentTime);
-
-  lfo.connect(lfoGain);
-  lfoGain.connect(filter.frequency);
-
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 1024;
-
-  const masterGain = audioCtx.createGain();
-  masterGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
-
-  osc.connect(filter);
-  subOsc.connect(filter);
-  filter.connect(analyser);
-  analyser.connect(masterGain);
-  masterGain.connect(audioCtx.destination);
-
-  osc.start();
-  subOsc.start();
-  lfo.start();
-
-  isAudioPlaying = true;
-  if (synthStatusText) synthStatusText.style.display = 'none';
-  if (synthToggleBtn) {
-    synthToggleBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-      <span>Mute Audio Demo</span>
-    `;
-    synthToggleBtn.classList.remove('btn-primary');
-    synthToggleBtn.classList.add('btn-secondary');
-  }
-
-  renderOscilloscope();
-}
-
-function stopSynthAudio() {
-  if (audioCtx) {
-    audioCtx.close();
-    audioCtx = null;
-  }
-  isAudioPlaying = false;
-  if (synthStatusText) {
-    synthStatusText.textContent = 'Audio muted. Click to activate Web DSP.';
-    synthStatusText.style.display = 'block';
-  }
-  if (synthToggleBtn) {
-    synthToggleBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-      <span>Play Live Audio Demo</span>
-    `;
-    synthToggleBtn.classList.remove('btn-secondary');
-    synthToggleBtn.classList.add('btn-primary');
-  }
-}
-
-if (synthToggleBtn) {
-  synthToggleBtn.addEventListener('click', () => {
-    if (isAudioPlaying) {
-      stopSynthAudio();
+  function togglePlay() {
+    if (audio.paused) {
+      audio.play().then(() => {
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+      }).catch(() => {});
     } else {
-      initSynthAudio();
+      audio.pause();
+      playIcon.style.display = 'block';
+      pauseIcon.style.display = 'none';
     }
-  });
-}
-
-if (cutoffSlider) {
-  cutoffSlider.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    if (cutoffVal) cutoffVal.textContent = val;
-    if (filter && audioCtx) {
-      filter.frequency.setTargetAtTime(val, audioCtx.currentTime, 0.05);
-    }
-  });
-}
-
-if (lfoSlider) {
-  lfoSlider.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    if (lfoVal) lfoVal.textContent = `${val} Hz`;
-    if (lfo && audioCtx) {
-      lfo.frequency.setTargetAtTime(val, audioCtx.currentTime, 0.05);
-    }
-  });
-}
-
-waveBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    waveBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentWave = btn.dataset.wave;
-    if (osc) osc.type = currentWave;
-  });
-});
-
-function renderOscilloscope() {
-  if (!synthCanvas || !synthCtx) return;
-
-  synthCanvas.width = synthCanvas.clientWidth;
-  synthCanvas.height = synthCanvas.clientHeight;
-
-  const w = synthCanvas.width;
-  const h = synthCanvas.height;
-
-  function draw() {
-    if (!isAudioPlaying || !analyser) {
-      // Idle grid
-      synthCtx.fillStyle = '#020408';
-      synthCtx.fillRect(0, 0, w, h);
-      synthCtx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-      synthCtx.lineWidth = 1;
-      synthCtx.beginPath();
-      synthCtx.moveTo(0, h / 2);
-      synthCtx.lineTo(w, h / 2);
-      synthCtx.stroke();
-      return;
-    }
-
-    requestAnimationFrame(draw);
-
-    const bufferLength = analyser.frequencyBinCount;
-    const timeData = new Uint8Array(bufferLength);
-    analyser.getByteTimeDomainData(timeData);
-
-    synthCtx.fillStyle = '#020408';
-    synthCtx.fillRect(0, 0, w, h);
-
-    // Subtle background grid
-    synthCtx.strokeStyle = 'rgba(0, 242, 254, 0.08)';
-    synthCtx.lineWidth = 1;
-    for (let y = 0; y < h; y += 30) {
-      synthCtx.beginPath();
-      synthCtx.moveTo(0, y);
-      synthCtx.lineTo(w, y);
-      synthCtx.stroke();
-    }
-
-    // Oscilloscope wave
-    synthCtx.lineWidth = 2;
-    synthCtx.strokeStyle = '#00f2fe';
-    synthCtx.shadowBlur = 10;
-    synthCtx.shadowColor = '#00f2fe';
-    synthCtx.beginPath();
-
-    const sliceWidth = w / bufferLength;
-    let x = 0;
-
-    for (let i = 0; i < bufferLength; i++) {
-      const v = timeData[i] / 128.0;
-      const y = (v * h) / 2;
-
-      if (i === 0) {
-        synthCtx.moveTo(x, y);
-      } else {
-        synthCtx.lineTo(x, y);
-      }
-      x += sliceWidth;
-    }
-
-    synthCtx.stroke();
-    synthCtx.shadowBlur = 0;
   }
 
-  draw();
-}
+  playBtn.addEventListener('click', togglePlay);
 
+  audio.addEventListener('timeupdate', () => {
+    if (audio.duration) {
+      const progressPercent = (audio.currentTime / audio.duration) * 100;
+      progressFill.style.width = `${progressPercent}%`;
 
-// ==========================================================================
-// 3. Interactive Patch Cable Background Canvas
-// ==========================================================================
-const bgCanvas = document.getElementById('patch-canvas');
-const bgCtx = bgCanvas ? bgCanvas.getContext('2d') : null;
-let bgWidth, bgHeight;
-let patchNodes = [];
-let patchCables = [];
+      const curMins = Math.floor(audio.currentTime / 60);
+      const curSecs = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
+      timeCurrent.textContent = `${curMins}:${curSecs}`;
 
-function resizeBgCanvas() {
-  if (!bgCanvas) return;
-  bgWidth = bgCanvas.width = window.innerWidth;
-  bgHeight = bgCanvas.height = window.innerHeight;
-  initBgNetwork();
-}
+      const durMins = Math.floor(audio.duration / 60);
+      const durSecs = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+      timeDuration.textContent = `${durMins}:${durSecs}`;
+    }
+  });
 
-function initBgNetwork() {
-  patchNodes = [];
-  patchCables = [];
-  const count = Math.floor(Math.min(bgWidth, 1400) / 110);
+  audio.addEventListener('ended', () => {
+    playIcon.style.display = 'block';
+    pauseIcon.style.display = 'none';
+    progressFill.style.width = '0%';
+  });
 
-  for (let i = 0; i < count; i++) {
-    patchNodes.push({
-      x: Math.random() * bgWidth,
-      y: Math.random() * bgHeight,
-      vx: (Math.random() - 0.5) * 0.35,
-      vy: (Math.random() - 0.5) * 0.35,
-      radius: Math.random() * 2 + 2.5,
-      color: ['#00f2fe', '#4facfe', '#f59e0b', '#a855f7', '#10b981', '#f43f5e'][Math.floor(Math.random() * 6)]
+  if (progressContainer) {
+    progressContainer.addEventListener('click', (e) => {
+      const width = progressContainer.clientWidth;
+      const clickX = e.offsetX;
+      if (audio.duration) {
+        audio.currentTime = (clickX / width) * audio.duration;
+      }
     });
   }
 
-  for (let i = 0; i < patchNodes.length; i++) {
-    for (let j = i + 1; j < patchNodes.length; j++) {
-      const dist = Math.hypot(patchNodes[i].x - patchNodes[j].x, patchNodes[i].y - patchNodes[j].y);
-      if (dist < 180 && Math.random() > 0.45) {
-        patchCables.push({
-          from: patchNodes[i],
-          to: patchNodes[j],
-          pulse: Math.random(),
-          speed: 0.004 + Math.random() * 0.008,
-          color: patchNodes[i].color
-        });
-      }
-    }
-  }
+  // Playlist switching
+  trackBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      trackBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const src = btn.dataset.src;
+      const title = btn.dataset.title;
+      const duration = btn.dataset.duration;
+
+      audio.src = src;
+      if (currentTitleEl) currentTitleEl.textContent = title;
+      if (timeDuration) timeDuration.textContent = duration;
+
+      audio.play().then(() => {
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+      }).catch(() => {});
+    });
+  });
 }
 
-function animateBgCanvas() {
-  if (!bgCtx) return;
-  bgCtx.clearRect(0, 0, bgWidth, bgHeight);
-
-  patchCables.forEach(c => {
-    const dist = Math.hypot(c.from.x - c.to.x, c.from.y - c.to.y);
-    const alpha = Math.max(0, 1 - dist / 220) * 0.25;
-
-    if (alpha > 0) {
-      bgCtx.beginPath();
-      bgCtx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.35})`;
-      bgCtx.lineWidth = 1;
-      bgCtx.moveTo(c.from.x, c.from.y);
-      bgCtx.lineTo(c.to.x, c.to.y);
-      bgCtx.stroke();
-
-      c.pulse = (c.pulse + c.speed) % 1;
-      const px = c.from.x + (c.to.x - c.from.x) * c.pulse;
-      const py = c.from.y + (c.to.y - c.from.y) * c.pulse;
-
-      bgCtx.beginPath();
-      bgCtx.fillStyle = c.color;
-      bgCtx.arc(px, py, 2, 0, Math.PI * 2);
-      bgCtx.fill();
-    }
-  });
-
-  patchNodes.forEach(node => {
-    node.x += node.vx;
-    node.y += node.vy;
-
-    if (node.x < 0 || node.x > bgWidth) node.vx *= -1;
-    if (node.y < 0 || node.y > bgHeight) node.vy *= -1;
-
-    bgCtx.beginPath();
-    bgCtx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-    bgCtx.fillStyle = node.color;
-    bgCtx.fill();
-  });
-
-  requestAnimationFrame(animateBgCanvas);
-}
-
-
 // ==========================================================================
-// 4. Comprehensive Infinite Node Database (160+ Nodes)
+// 5. Plain-Language 160+ Node Explorer Database
 // ==========================================================================
-const NODES_DATABASE = [
-  // Source
-  { name: 'Image', category: 'source', catLabel: 'Source', desc: 'Static image loader supporting PNG, JPG, EXR, HDR, and TIFF with live aspect ratio fitting.' },
-  { name: 'Video', category: 'source', catLabel: 'Source', desc: 'Hardware-accelerated AVFoundation video decoder with loop, scrubbing, speed, and timecode sync.' },
-  { name: 'Syphon In', category: 'source', catLabel: 'Source', desc: 'Zero-copy GPU video receiver streaming live frames from OBS, Resolume, or TouchDesigner.' },
-  { name: 'Formula', category: 'source', catLabel: 'Source', desc: 'Live GLSL fragment shader editor with 16 presets, syntax errors, and custom uniform inputs.' },
-  { name: 'Draw', category: 'source', catLabel: 'Source', desc: 'Paintable canvas with 6 procedural brushes, eraser, pressure support, and transport stroke recording.' },
-  { name: 'Noise', category: 'source', catLabel: 'Source', desc: 'Real-time procedural noise: Value, Perlin, Voronoi, Ridged Multi-fractal, Simplex, and White noise.' },
-  { name: 'Shape', category: 'source', catLabel: 'Source', desc: 'Signed Distance Field (SDF) 2D primitives: Circle, Box, Polygon, Star, Heart, Ring, Rounded Box.' },
-  { name: 'Texture', category: 'source', catLabel: 'Source', desc: 'Procedural patterns including Brick, Magic Texture, Wave, Musgrave, and Voronoi cells.' },
-  { name: 'Ramp', category: 'source', catLabel: 'Source', desc: 'Gradient generator with 5 spatial modes: Linear, Radial, Angle, Diamond, and Box.' },
-  { name: 'Text', category: 'source', catLabel: 'Source', desc: 'System typography renderer with CoreText/CoreGraphics, kerning, line spacing, and alignment.' },
+const NODES_DATA = [
+  // Sources
+  { name: 'Video Player', category: 'source', catLabel: 'Source', desc: 'Play any video file with smooth looping, slow motion, and speed controls.' },
+  { name: 'Image Loader', category: 'source', catLabel: 'Source', desc: 'Load photos, textures, illustrations, and HDR skies onto the canvas.' },
+  { name: 'Syphon Receiver', category: 'source', catLabel: 'Source', desc: 'Stream live video straight from OBS, Resolume, or TouchDesigner with zero lag.' },
+  { name: 'Formula Shader', category: 'source', catLabel: 'Source', desc: 'Write custom GLSL code or pick from 16 animated visual presets.' },
+  { name: 'Paint Brush', category: 'source', catLabel: 'Source', desc: 'Hand-paint procedural brushes directly onto the screen with stroke recording.' },
+  { name: 'Noise Generator', category: 'source', catLabel: 'Source', desc: 'Creates organic textures: clouds, marble, water ripples, and static.' },
+  { name: '2D Shapes', category: 'source', catLabel: 'Source', desc: 'Generates clean vector-like circles, stars, polygons, hearts, and rings.' },
+  { name: 'Text & Titles', category: 'source', catLabel: 'Source', desc: 'Render sharp typography using any font installed on your Mac.' },
 
-  // 2D Effects & Color
-  { name: 'Remove BG', category: 'effects2d', catLabel: '2D & Color', desc: 'On-device Apple Vision ML neural segmentation — zero latency, private, and instant.' },
-  { name: 'Blur', category: 'effects2d', catLabel: '2D & Color', desc: 'Separable Gaussian, Box, Motion, and Radial blur with HDR support and edge clamp.' },
-  { name: 'Bloom & Glow', category: 'effects2d', catLabel: '2D & Color', desc: 'Multi-pass thresholded bloom with threshold, knee, anamorphic spread, and diffuse glow.' },
-  { name: 'Curves', category: 'effects2d', catLabel: '2D & Color', desc: 'Interactive Photoshop-style cubic spline color curves for Master, RGB, and Luma channels.' },
-  { name: 'Color Ramp', category: 'effects2d', catLabel: '2D & Color', desc: 'Up to 32 editable gradient stops with linear, ease, and constant interpolation modes.' },
-  { name: 'Blend', category: 'effects2d', catLabel: '2D & Color', desc: '31 compositing blend modes including Multiply, Screen, Overlay, Color Dodge, Soft Light, etc.' },
-  { name: 'Layer Stack', category: 'effects2d', catLabel: '2D & Color', desc: '4 reorderable Photoshop-like layers with individual blend modes, opacities, and soloing.' },
-  { name: 'Displace & Liquify', category: 'effects2d', catLabel: '2D & Color', desc: 'Texture-driven coordinate warping and interactive mouse push/pull brush liquify.' },
-  { name: 'Glitch', category: 'effects2d', catLabel: '2D & Color', desc: '6 glitch modes: RGB Split, Block Mosh, Scanline Jitter, Bit Error, Analog VHS, Wave Tear.' },
-  { name: 'Kaleidoscope', category: 'effects2d', catLabel: '2D & Color', desc: 'Radial mirror symmetry with segment count, rotation, pinch, and reflection offsets.' },
-  { name: 'LUT 3D', category: 'effects2d', catLabel: '2D & Color', desc: 'Industry-standard .cube 3D lookup table color grading and film emulation.' },
-  { name: 'Palette Extraction', category: 'effects2d', catLabel: '2D & Color', desc: 'Oklab color space k-means clustering to extract dominant color palettes from live video.' },
+  // 2D & Color
+  { name: 'Remove Background', category: 'effects2d', catLabel: '2D & Color', desc: 'AI subject segmentation runs on your Apple Neural Engine with zero internet.' },
+  { name: 'Blur & Soften', category: 'effects2d', catLabel: '2D & Color', desc: 'Add buttery smooth Gaussian, motion, and radial camera blurs.' },
+  { name: 'Bloom & Glow', category: 'effects2d', catLabel: '2D & Color', desc: 'Adds dreamy cinematic light glows to the bright parts of your image.' },
+  { name: 'Color Curves', category: 'effects2d', catLabel: '2D & Color', desc: 'Photoshop-style tone curves to balance contrast, shadow, and highlights.' },
+  { name: 'Color Ramp', category: 'effects2d', catLabel: '2D & Color', desc: 'Map multi-color gradients across lighting and image brightness.' },
+  { name: 'Blend Modes', category: 'effects2d', catLabel: '2D & Color', desc: '31 Photoshop blending modes (Multiply, Screen, Overlay, Soft Light).' },
+  { name: 'Glitch & VHS', category: 'effects2d', catLabel: '2D & Color', desc: '6 retro effects: RGB split, analog VHS noise, and digital scanline jitter.' },
+  { name: 'Kaleidoscope', category: 'effects2d', catLabel: '2D & Color', desc: 'Turn any video or image into hypnotic repeating mirror mandalas.' },
+  { name: '3D LUT Colorist', category: 'effects2d', catLabel: '2D & Color', desc: 'Apply cinematic film grading LUT (.cube) files directly to your visuals.' },
 
-  // 3D Geometry & Physics
-  { name: 'Geometry Source', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Procedural 3D primitives: Cube, Sphere, Icosphere, Cylinder, Cone, Torus, Plane, Disc.' },
-  { name: 'Model 3D', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Import 3D models via Apple ModelIO: OBJ, PLY, STL, and USD/USDZ formats with materials.' },
-  { name: 'Instance on Points', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Scatter tens of thousands of meshes using single-draw-call GPU instanced rendering.' },
-  { name: 'Distribute Points', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Poisson disk surface scattering, grid arrays, and mesh vertex deconstruction.' },
-  { name: 'Cloth & Soft Body', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Position-Based Dynamics (PBD) soft-body and cloth solver with pin constraints.' },
-  { name: 'Ocean Simulation', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Gerstner wave procedural ocean mesh with foam, choppiness, and wind direction.' },
-  { name: 'Particle System', category: 'geometry3d', catLabel: '3D & Physics', desc: 'GPU accelerated particle emitter with turbulence fields, gravity, drag, and bounce floor.' },
-  { name: 'Render 3D', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Cook-Torrance GGX PBR renderer, 32-bit HDRI environment reflections, ACES tonemapping, 8x MSAA.' },
-  { name: 'Camera & Lights', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Orbit & fly cameras with Perspective/Orthographic modes, Directional, Point, and Spot lights.' },
-  { name: 'Taubin Smooth & Subdivide', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Volume-preserving mesh smoothing, Loop subdivision, and normals recalculation.' },
+  // 3D & Physics
+  { name: '3D Shapes', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Create spheres, cubes, donuts (torus), cylinders, and terrain planes.' },
+  { name: '3D Model Import', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Drag and drop 3D files (OBJ, PLY, STL, USDZ) directly onto the canvas.' },
+  { name: 'Cloth Simulation', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Simulate soft blowing fabrics and flags with realistic digital wind.' },
+  { name: 'Ocean Waves', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Generate a rolling 3D ocean surface with adjustable choppiness and foam.' },
+  { name: 'Particle Clouds', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Emit thousands of swirling dust particles that react to gravity and force fields.' },
+  { name: 'Instance on Points', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Scatter tens of thousands of objects across surfaces in a single draw call.' },
+  { name: 'Realistic Lighting', category: 'geometry3d', catLabel: '3D & Physics', desc: 'Photorealistic Cook-Torrance GGX shaders with 32-bit HDRI reflection maps.' },
 
-  // Synths & Audio DSP
-  { name: 'Wavetable Synth', category: 'synths', catLabel: 'Synth & DSP', desc: '12 factory tables, 8 morphable frames, bandlimited mipmaps, unison detune, and sub-oscillator.' },
-  { name: 'Granular Synth', category: 'synths', catLabel: 'Synth & DSP', desc: 'Real-time granular texture engine with live playhead scrubbing, grain jitter, spray, and density.' },
-  { name: 'Metallic Resonator', category: 'synths', catLabel: 'Synth & DSP', desc: 'Modal physical modeling synthesis simulating bells, metallic plates, tubes, mallets, and bars.' },
-  { name: 'PaulStretch', category: 'synths', catLabel: 'Synth & DSP', desc: 'Extreme real-time spectral FFT phase-randomized time-stretcher for ambient soundscapes.' },
-  { name: 'Drum Sequencer', category: 'synths', catLabel: 'Synth & DSP', desc: '8-track step sequencer with per-lane sample triggers, swing, velocity accent, and pattern chaining.' },
-  { name: 'Sampler', category: 'synths', catLabel: 'Synth & DSP', desc: 'Multi-folder disk sample scanner with pitch tracking, root note detection, and loop points.' },
-  { name: 'Plugin Host (AU/VST3)', category: 'synths', catLabel: 'Synth & DSP', desc: 'Host native macOS Audio Unit & VST3 plugins with native UI windows and parameter CV mapping.' },
-  { name: 'Parametric EQ', category: 'synths', catLabel: 'Synth & DSP', desc: 'Multi-band parametric equalizer with interactive frequency response visualizer.' },
-  { name: 'Reverb & Delay', category: 'synths', catLabel: 'Synth & DSP', desc: 'Algorithmic diffusion reverb and tempo-synced stereo ping-pong delay with filter feedback.' },
-  { name: 'Formant Filter', category: 'synths', catLabel: 'Synth & DSP', desc: 'Vocal vowel morphing filter (A-E-I-O-U) with formant frequency modulation.' },
+  // Synths & Audio
+  { name: 'Wavetable Synth', category: 'synths', catLabel: 'Synths & Audio', desc: '12 multi-frame wavetables with rich unison detuning and stereo filters.' },
+  { name: 'Modal Resonator', category: 'synths', catLabel: 'Synths & Audio', desc: 'Acoustic physical modeling for bells, chimes, glass cups, and metal plates.' },
+  { name: 'PaulStretch Engine', category: 'synths', catLabel: 'Synths & Audio', desc: 'Time-stretches any audio clip up to 50x into endless ambient soundscapes.' },
+  { name: 'Granular Player', category: 'synths', catLabel: 'Synths & Audio', desc: 'Chops audio into tiny clouds of grains for lush, textured musical clouds.' },
+  { name: 'Drum Sequencer', category: 'synths', catLabel: 'Synths & Audio', desc: '8-track step sequencer with lane mutes, swing, and sample triggers.' },
+  { name: 'AU / VST3 Host', category: 'synths', catLabel: 'Synths & Audio', desc: 'Host your favorite commercial instrument and effect plugins inside the graph.' },
+  { name: 'Parametric EQ', category: 'synths', catLabel: 'Synths & Audio', desc: 'Multi-band audio equalizer with interactive frequency curve display.' },
+  { name: 'Reverb & Delay', category: 'synths', catLabel: 'Synths & Audio', desc: 'Rich diffusion space reverb and tempo-synced ping-pong stereo echo.' },
 
   // Notes & MIDI
-  { name: 'MIDI Input', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Live USB/Bluetooth CoreMIDI keyboard input with velocity, pitch bend, and clock sync.' },
-  { name: 'Arpeggiator', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Tempo-synced pattern arpeggiator with Up, Down, Random, Ping-Pong, and octave ranges.' },
-  { name: 'Bouncing Balls', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Physics-based gravity bouncing polyphonic note generator with musical scale quantization.' },
-  { name: 'Chord Generator', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Harmonic chord builder supporting major, minor, 7th, 9th, sus4, and custom modal voicings.' },
-  { name: 'Note Sequencer', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Visual piano roll and step note sequence generator with gate and tie controls.' },
-  { name: 'Humanizer & Quantize', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Timing and velocity micro-randomization with scale snapping across 24 musical modes.' },
+  { name: 'MIDI Keyboard', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Plug in any USB or Bluetooth MIDI controller keyboard to play notes live.' },
+  { name: 'Arpeggiator', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Turns single chords into rhythmic ascending, descending, or random melodies.' },
+  { name: 'Bouncing Balls', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Physics simulation where balls bounce under gravity to trigger musical notes.' },
+  { name: 'Chord Generator', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Press one key to generate rich musical chords (Maj7, Min9, Sus4).' },
+  { name: 'Scale Quantizer', category: 'midi', catLabel: 'Notes & MIDI', desc: 'Snaps any random note to your chosen musical scale so you never play out of key.' },
 
   // Modulation & CV
-  { name: 'Audio Analyze', category: 'modulation', catLabel: 'Modulation & CV', desc: 'Extracts 8-band FFT spectrum, energy peaks, and transient onsets to modulate shaders & 3D.' },
-  { name: 'Image Analyze', category: 'modulation', catLabel: 'Modulation & CV', desc: 'Extracts brightness, RGB color channels, motion vectors, and centroids to drive audio synths.' },
-  { name: 'LFO', category: 'modulation', catLabel: 'Modulation & CV', desc: 'Tempo-synced low frequency oscillator with Sine, Triangle, Saw, Square, and Perlin waveforms.' },
-  { name: 'Macro XY Pad', category: 'modulation', catLabel: 'Modulation & CV', desc: '2D modulation surface with live mouse motion recording, spring physics, and looping playback.' },
-  { name: 'Math & Logic', category: 'modulation', catLabel: 'Modulation & CV', desc: 'Control voltage math operators (+, -, *, /, min, max, clamp, smooth lag, invert, range-map).' },
-  { name: 'Audio to CV / Note to CV', category: 'modulation', catLabel: 'Modulation & CV', desc: 'Converts audio amplitude envelopes, pitch tracking, and MIDI velocities to normalized CV.' }
+  { name: 'Audio Analyzer', category: 'modulation', catLabel: 'Modulation', desc: 'Splits live sound into 8 frequency bands to modulate your visuals.' },
+  { name: 'Video Analyzer', category: 'modulation', catLabel: 'Modulation', desc: 'Extracts brightness, colors, and motion from video to control sound synths.' },
+  { name: 'LFO Oscillator', category: 'modulation', catLabel: 'Modulation', desc: 'Slow cyclic waves (sine, saw, random) that automatically turn knobs for you.' },
+  { name: 'XY Motion Pad', category: 'modulation', catLabel: 'Modulation', desc: 'Record your mouse gestures on a 2D pad to loop expressive modulation paths.' }
 ];
 
-// ==========================================================================
-// 5. Node Directory Filtering & Search
-// ==========================================================================
-const nodesGrid = document.getElementById('nodes-grid');
-const searchInput = document.getElementById('node-search-input');
-const filterButtons = document.querySelectorAll('.node-filter-btn');
+function initNodeDirectory() {
+  const nodesGrid = document.getElementById('nodes-grid');
+  const searchInput = document.getElementById('node-search-input');
+  const filterBtns = document.querySelectorAll('.node-filter-btn');
 
-let currentFilter = 'all';
-let searchQuery = '';
+  let currentFilter = 'all';
+  let searchQuery = '';
 
-function renderNodes() {
-  if (!nodesGrid) return;
+  function render() {
+    if (!nodesGrid) return;
 
-  const filtered = NODES_DATABASE.filter(node => {
-    const matchesCategory = (currentFilter === 'all') || (node.category === currentFilter);
-    const matchesSearch = !searchQuery || 
-      node.name.toLowerCase().includes(searchQuery) ||
-      node.desc.toLowerCase().includes(searchQuery) ||
-      node.catLabel.toLowerCase().includes(searchQuery);
-    return matchesCategory && matchesSearch;
-  });
+    const filtered = NODES_DATA.filter(node => {
+      const matchCat = (currentFilter === 'all') || (node.category === currentFilter);
+      const matchSearch = !searchQuery ||
+        node.name.toLowerCase().includes(searchQuery) ||
+        node.desc.toLowerCase().includes(searchQuery) ||
+        node.catLabel.toLowerCase().includes(searchQuery);
+      return matchCat && matchSearch;
+    });
 
-  if (filtered.length === 0) {
-    nodesGrid.innerHTML = `
-      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
-        <p>No nodes matching "<strong>${escapeHtml(searchQuery)}</strong>"</p>
+    if (filtered.length === 0) {
+      nodesGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+          <p>No nodes found for "<strong>${escapeHtml(searchQuery)}</strong>"</p>
+        </div>
+      `;
+      return;
+    }
+
+    nodesGrid.innerHTML = filtered.map(n => `
+      <div class="node-pill-card">
+        <div class="node-pill-header">
+          <span class="node-pill-name">${escapeHtml(n.name)}</span>
+          <span class="node-pill-cat">${escapeHtml(n.catLabel)}</span>
+        </div>
+        <p class="node-pill-desc">${escapeHtml(n.desc)}</p>
       </div>
-    `;
-    return;
+    `).join('');
   }
 
-  nodesGrid.innerHTML = filtered.map(node => `
-    <div class="node-pill-card">
-      <div class="node-pill-header">
-        <span class="node-pill-name">${escapeHtml(node.name)}</span>
-        <span class="node-pill-cat">${escapeHtml(node.catLabel)}</span>
-      </div>
-      <p class="node-pill-desc">${escapeHtml(node.desc)}</p>
-    </div>
-  `).join('');
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      render();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim().toLowerCase();
+      render();
+    });
+  }
+
+  render();
 }
 
 function escapeHtml(str) {
@@ -466,78 +362,36 @@ function escapeHtml(str) {
   })[m]);
 }
 
-if (filterButtons) {
-  filterButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      filterButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFilter = btn.dataset.filter;
-      renderNodes();
-    });
-  });
-}
-
-if (searchInput) {
-  searchInput.addEventListener('input', (e) => {
-    searchQuery = e.target.value.trim().toLowerCase();
-    renderNodes();
-  });
-}
-
 // ==========================================================================
-// 6. Copy-to-Clipboard Functionality
+// 6. Copy-to-Clipboard Helpers
 // ==========================================================================
-function setupCopyButtons() {
-  const cloneBtn = document.getElementById('copy-clone-btn');
-  if (cloneBtn) {
-    cloneBtn.addEventListener('click', () => {
-      copyTextToClipboard('git clone https://github.com/n1m21n/Infinite.git', cloneBtn);
-    });
-  }
-
-  const buildBtn = document.getElementById('copy-build-btn');
-  if (buildBtn) {
-    buildBtn.addEventListener('click', () => {
-      const code = `git clone https://github.com/n1m21n/Infinite.git\ncd Infinite\ncmake -B build -DCMAKE_BUILD_TYPE=Release\ncmake --build build -j8\nopen build/Infinite.app`;
-      copyTextToClipboard(code, buildBtn);
-    });
-  }
-
+function initCopyButtons() {
   document.querySelectorAll('.copy-inline-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const text = btn.dataset.code;
-      copyTextToClipboard(text, btn);
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.innerText;
+        btn.innerText = 'Copied!';
+        btn.style.color = 'var(--pastel-peach)';
+        setTimeout(() => {
+          btn.innerText = original;
+          btn.style.color = '';
+        }, 2000);
+      });
     });
   });
 }
 
-function copyTextToClipboard(text, btnElement) {
-  navigator.clipboard.writeText(text).then(() => {
-    const originalText = btnElement.innerText;
-    const originalHtml = btnElement.innerHTML;
-
-    if (btnElement.tagName === 'BUTTON' && originalText) {
-      btnElement.innerText = 'Copied!';
-    } else {
-      btnElement.style.color = 'var(--accent-emerald)';
-    }
-
-    setTimeout(() => {
-      if (btnElement.tagName === 'BUTTON' && originalText) {
-        btnElement.innerHTML = originalHtml;
-      } else {
-        btnElement.style.color = '';
-      }
-    }, 2000);
-  });
-}
-
-// Initialize on DOM load
+// DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   initShowcaseSwitcher();
-  setupCopyButtons();
-  renderNodes();
-  window.addEventListener('resize', resizeBgCanvas);
-  resizeBgCanvas();
-  requestAnimationFrame(animateBgCanvas);
+  initAudioPlayer();
+  initNodeDirectory();
+  initCopyButtons();
+
+  window.addEventListener('resize', resizeCosmicCanvas);
+  resizeCosmicCanvas();
+  requestAnimationFrame(animateCosmos);
 });
