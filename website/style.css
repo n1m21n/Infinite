@@ -972,4 +972,33 @@ body {
   .specs-grid { gap: 12px; }
   .m-track-title { font-size: 0.82rem; }
   .minimal-player-card { padding: 14px 16px; }
+
+  /* Smaller, tighter CTA buttons on mobile — the desktop btn-lg padding/subtext
+     reads oversized once the viewport narrows */
+  .btn-lg {
+    padding: 9px 16px;
+    font-size: 0.85rem;
+    gap: 1px;
+  }
+  .btn-lg .btn-subtext {
+    font-size: 0.7rem;
+  }
+  .hero-cta-group {
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .cta-wrapper, .hero-cta-group > a {
+    width: 100%;
+    max-width: 320px;
+  }
+  .cta-wrapper .btn-lg, .hero-cta-group > a.btn-lg {
+    width: 100%;
+  }
+  .sketch-annotation {
+    font-size: 0.9rem;
+  }
+  .download-actions .btn-lg {
+    width: 100%;
+    max-width: 320px;
+  }
 }

@@ -106,16 +106,61 @@ const branchCtx = branchCanvas ? branchCanvas.getContext('2d') : null;
 let branchWidth, branchHeight;
 let branchProgress = 0;
 let branchTreeData = null;
+let lastBranchRectW = 0, lastBranchRectH = 0;
 
 function resizeBranchCanvas() {
   if (!branchCanvas) return;
   const rect = branchCanvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
+  // Guard against a 0×0 measurement (fires on some mobile browsers before
+  // fonts/layout settle, with no later 'resize' event to recover from it).
+  if (rect.width < 10 || rect.height < 10) return;
+
+  // Mobile browsers fire 'resize'/ResizeObserver repeatedly during a scroll
+  // gesture (address bar collapsing, etc). Rebuilding on every call reset
+  // branchProgress back to 0 each time, so the tree kept restarting and
+  // never finished growing. Only rebuild when the size actually changed.
+  if (Math.abs(rect.width - lastBranchRectW) < 2 && Math.abs(rect.height - lastBranchRectH) < 2) return;
+  lastBranchRectW = rect.width;
+  lastBranchRectH = rect.height;
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   branchCanvas.width = rect.width * dpr;
   branchCanvas.height = rect.height * dpr;
   branchWidth = branchCanvas.width;
   branchHeight = branchCanvas.height;
+  branchProgress = 0;
   buildTreeStructure();
+}
+
+function getQuadPoint(p0, p1, p2, t) {
+  const mt = 1 - t;
+  return {
+    x: mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x,
+    y: mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y
+  };
+}
+
+// One directed branch reaching a fixed tip position, plus a couple of short
+// "twig" offshoots partway along its length for a real branching silhouette
+// — without the fully-recursive fork exploding into an illegible tangle.
+function buildOneBranch(p0, targetX, targetY, color, label) {
+  const midX = p0.x + (targetX - p0.x) * 0.5;
+  const midY = p0.y + (targetY - p0.y) * 0.35;
+  const main = { p0, p1: { x: midX, y: midY }, p2: { x: targetX, y: targetY } };
+
+  const twigs = [0.42, 0.68].map((at, i) => {
+    const base = getQuadPoint(main.p0, main.p1, main.p2, at);
+    const dir = i === 0 ? -1 : 1;
+    const spread = 22 + Math.random() * 14;
+    return {
+      startAt: at,
+      p0: base,
+      p1: { x: base.x + (targetX > p0.x ? spread : -spread), y: base.y + dir * spread * 0.4 },
+      p2: { x: base.x + (targetX > p0.x ? spread * 1.8 : -spread * 1.8), y: base.y + dir * spread * 1.3 }
+    };
+  });
+
+  return { main, twigs, color, label, tipX: targetX, tipY: targetY, fromLeft: p0.x === 0 };
 }
 
 function buildTreeStructure() {
@@ -123,133 +168,102 @@ function buildTreeStructure() {
   const h = branchHeight;
   const isMobile = w < 600 * (window.devicePixelRatio || 1);
 
-  // Left Branches (growing from x=0 toward center-left)
   const leftTips = isMobile ? [
-    { label: 'Sound', targetX: w * 0.38, targetY: h * 0.22, color: '#c2593f' },
-    { label: 'Music', targetX: w * 0.44, targetY: h * 0.48, color: '#d97736' },
-    { label: 'Art', targetX: w * 0.36, targetY: h * 0.78, color: '#b8860b' }
+    { label: 'Sound', x: w * 0.36, y: h * 0.24, color: '#c2593f' },
+    { label: 'Music', x: w * 0.42, y: h * 0.50, color: '#d97736' },
+    { label: 'Art', x: w * 0.34, y: h * 0.78, color: '#b8860b' }
   ] : [
-    { label: 'Sound', targetX: w * 0.32, targetY: h * 0.24, color: '#c2593f' },
-    { label: 'Music', targetX: w * 0.40, targetY: h * 0.50, color: '#d97736' },
-    { label: 'Art', targetX: w * 0.30, targetY: h * 0.78, color: '#b8860b' }
+    { label: 'Sound', x: w * 0.30, y: h * 0.24, color: '#c2593f' },
+    { label: 'Music', x: w * 0.38, y: h * 0.50, color: '#d97736' },
+    { label: 'Art', x: w * 0.28, y: h * 0.78, color: '#b8860b' }
   ];
 
-  // Right Branches (growing from x=w toward center-right)
   const rightTips = isMobile ? [
-    { label: 'Geometry', targetX: w * 0.62, targetY: h * 0.20, color: '#4d7c67' },
-    { label: 'Generative', targetX: w * 0.68, targetY: h * 0.42, color: '#6b6b99' },
-    { label: 'Node-Based', targetX: w * 0.58, targetY: h * 0.68, color: '#c2593f' },
-    { label: 'Real-Time', targetX: w * 0.66, targetY: h * 0.86, color: '#2563eb' }
+    { label: 'Geometry', x: w * 0.64, y: h * 0.20, color: '#4d7c67' },
+    { label: 'Generative', x: w * 0.70, y: h * 0.42, color: '#6b6b99' },
+    { label: 'Node-Based', x: w * 0.60, y: h * 0.68, color: '#c2593f' },
+    { label: 'Real-Time', x: w * 0.68, y: h * 0.86, color: '#2563eb' }
   ] : [
-    { label: 'Geometry', targetX: w * 0.66, targetY: h * 0.22, color: '#4d7c67' },
-    { label: 'Generative', targetX: w * 0.74, targetY: h * 0.44, color: '#6b6b99' },
-    { label: 'Node-Based', targetX: w * 0.62, targetY: h * 0.68, color: '#c2593f' },
-    { label: 'Real-Time', targetX: w * 0.72, targetY: h * 0.84, color: '#2563eb' }
+    { label: 'Geometry', x: w * 0.70, y: h * 0.20, color: '#4d7c67' },
+    { label: 'Generative', x: w * 0.78, y: h * 0.42, color: '#6b6b99' },
+    { label: 'Node-Based', x: w * 0.66, y: h * 0.68, color: '#c2593f' },
+    { label: 'Real-Time', x: w * 0.76, y: h * 0.86, color: '#2563eb' }
   ];
 
-  // Left Tree Curves
-  const leftCurves = leftTips.map(tip => ({
-    p0: { x: 0, y: h * 0.5 },
-    p1: { x: w * 0.12, y: h * (tip.targetY > h * 0.5 ? 0.65 : 0.35) },
-    p2: { x: w * 0.22, y: tip.targetY + (h * 0.5 - tip.targetY) * 0.3 },
-    p3: { x: tip.targetX, y: tip.targetY },
-    label: tip.label,
-    color: tip.color
-  }));
+  const leftBranches = leftTips.map(tip => buildOneBranch({ x: 0, y: h * 0.5 }, tip.x, tip.y, tip.color, tip.label));
+  const rightBranches = rightTips.map(tip => buildOneBranch({ x: w, y: h * 0.5 }, tip.x, tip.y, tip.color, tip.label));
 
-  // Right Tree Curves
-  const rightCurves = rightTips.map(tip => ({
-    p0: { x: w, y: h * 0.5 },
-    p1: { x: w * 0.88, y: h * (tip.targetY > h * 0.5 ? 0.68 : 0.32) },
-    p2: { x: w * 0.78, y: tip.targetY + (h * 0.5 - tip.targetY) * 0.3 },
-    p3: { x: tip.targetX, y: tip.targetY },
-    label: tip.label,
-    color: tip.color
-  }));
-
-  branchTreeData = { leftCurves, rightCurves, isMobile };
+  branchTreeData = { leftBranches, rightBranches, isMobile };
 }
 
-function getCubicBezierPoint(p0, p1, p2, p3, t) {
-  const mt = 1 - t;
-  const mt2 = mt * mt;
-  const mt3 = mt2 * mt;
-  const t2 = t * t;
-  const t3 = t2 * t;
-
-  return {
-    x: mt3 * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t3 * p3.x,
-    y: mt3 * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t3 * p3.y
-  };
+function strokeGrowingQuad(ctx, p0, p1, p2, t, width, color, sway) {
+  if (t <= 0) return;
+  const steps = 24;
+  const currentSteps = Math.max(1, Math.floor(steps * t));
+  ctx.beginPath();
+  for (let i = 0; i <= currentSteps; i++) {
+    const u = (i / steps) * t;
+    const pt = getQuadPoint(p0, p1, p2, u);
+    const y = pt.y + sway * u;
+    if (i === 0) ctx.moveTo(pt.x, y);
+    else ctx.lineTo(pt.x, y);
+  }
+  ctx.lineWidth = width;
+  ctx.strokeStyle = color;
+  ctx.lineCap = 'round';
+  ctx.stroke();
 }
 
 let branchTime = 0;
 function animateNatureBranches() {
   if (!branchCtx || !branchCanvas || !branchTreeData) return;
-  branchTime += 0.02;
+  branchTime += 0.015;
   const w = branchWidth;
   const h = branchHeight;
   const dpr = window.devicePixelRatio || 1;
 
   branchCtx.clearRect(0, 0, w, h);
 
-  // Smooth ease-in progress for branch growth
-  if (branchProgress < 1) {
-    branchProgress += 0.012;
-  }
+  if (branchProgress < 1) branchProgress += 0.008;
   const t = Math.min(1, branchProgress);
 
-  const allCurves = [...branchTreeData.leftCurves, ...branchTreeData.rightCurves];
+  const allBranches = [...branchTreeData.leftBranches, ...branchTreeData.rightBranches];
 
-  // Draw main organic tree trunk / branches
-  allCurves.forEach((curve, idx) => {
-    branchCtx.beginPath();
-    const steps = 60;
-    const currentSteps = Math.floor(steps * t);
+  // Pass 1: draw every branch's main line + twigs first.
+  allBranches.forEach((branch, idx) => {
+    const sway = Math.sin(branchTime + idx) * (2 * dpr);
+    strokeGrowingQuad(branchCtx, branch.main.p0, branch.main.p1, branch.main.p2, t, 2.4 * dpr, 'rgba(30, 41, 59, 0.5)', sway);
 
-    for (let i = 0; i <= currentSteps; i++) {
-      const u = i / steps;
-      // Gentle natural breathing sway
-      const sway = Math.sin(branchTime + idx + u * Math.PI) * (1.5 * dpr) * u;
-      const pt = getCubicBezierPoint(curve.p0, curve.p1, curve.p2, curve.p3, u);
-      const px = pt.x;
-      const py = pt.y + sway;
+    branch.twigs.forEach((twig, twigIdx) => {
+      const twigT = Math.max(0, Math.min(1, (t - twig.startAt) / (1 - twig.startAt)));
+      strokeGrowingQuad(branchCtx, twig.p0, twig.p1, twig.p2, twigT, 1.3 * dpr, 'rgba(30, 41, 59, 0.32)', sway * 0.6);
+    });
+  });
 
-      if (i === 0) branchCtx.moveTo(px, py);
-      else branchCtx.lineTo(px, py);
-    }
+  // Pass 2: tip dots + labels drawn last so nothing paints over them.
+  if (t >= 0.94) {
+    const tipAlpha = Math.min(1, (t - 0.94) / 0.06);
+    allBranches.forEach((branch, idx) => {
+      const sway = Math.sin(branchTime + idx) * (2 * dpr);
+      const tipX = branch.tipX;
+      const tipY = branch.tipY + sway;
 
-    branchCtx.lineWidth = Math.max(1.2 * dpr, 2.5 * dpr * (1 - t * 0.4));
-    branchCtx.strokeStyle = 'rgba(30, 41, 59, 0.45)';
-    branchCtx.lineCap = 'round';
-    branchCtx.stroke();
-
-    // When the branch tip has finished growing, show the organic tip dot & floating text
-    if (t >= 0.92) {
-      const tipAlpha = Math.min(1, (t - 0.92) / 0.08);
-      const endSway = Math.sin(branchTime + idx + Math.PI) * (1.5 * dpr);
-      const tipX = curve.p3.x;
-      const tipY = curve.p3.y + endSway;
-
-      // Small natural branch tip node dot
       branchCtx.beginPath();
       branchCtx.arc(tipX, tipY, 3.5 * dpr, 0, Math.PI * 2);
-      branchCtx.fillStyle = curve.color;
+      branchCtx.fillStyle = branch.color;
       branchCtx.globalAlpha = tipAlpha;
       branchCtx.fill();
 
-      // Clean typography label floating right at the tip
-      const isLeft = curve.p0.x === 0;
       branchCtx.font = `600 ${13 * dpr}px Inter, -apple-system, sans-serif`;
       branchCtx.fillStyle = '#1f1d1a';
-      branchCtx.textAlign = isLeft ? 'right' : 'left';
+      branchCtx.textAlign = branch.fromLeft ? 'right' : 'left';
       branchCtx.textBaseline = 'middle';
 
-      const textOffsetX = isLeft ? -9 * dpr : 9 * dpr;
-      branchCtx.fillText(curve.label, tipX + textOffsetX, tipY);
+      const textOffsetX = branch.fromLeft ? -9 * dpr : 9 * dpr;
+      branchCtx.fillText(branch.label, tipX + textOffsetX, tipY);
       branchCtx.globalAlpha = 1.0;
-    }
-  });
+    });
+  }
 
   requestAnimationFrame(animateNatureBranches);
 }
@@ -357,7 +371,7 @@ function initWavetableAnimation() {
   window.addEventListener('resize', resize);
 }
 
-// Animation 3: Particle Cloud Simulation
+// Animation 3: Draped Cloth (PBD-style) Grid in 3D-ish Perspective
 function initParticlesAnimation() {
   const canvas = document.getElementById('anim-particles');
   if (!canvas) return;
@@ -371,17 +385,8 @@ function initParticlesAnimation() {
   }
   resize();
 
-  const particles = [];
-  for (let i = 0; i < 90; i++) {
-    particles.push({
-      angle: Math.random() * Math.PI * 2,
-      radiusRatio: Math.random() * 0.7 + 0.1,
-      speed: 0.015 + Math.random() * 0.02,
-      yRatio: (Math.random() - 0.5) * 0.4,
-      size: Math.random() * 2 + 1,
-      color: ['#81b29a', '#b8b8d1', '#e9c46a'][Math.floor(Math.random() * 3)]
-    });
-  }
+  const cols = 14;
+  const rows = 10;
 
   let t = 0;
   function draw() {
@@ -392,21 +397,69 @@ function initParticlesAnimation() {
     ctx.fillStyle = '#0f1218';
     ctx.fillRect(0, 0, w, h);
 
-    const cx = w / 2;
-    const cy = h / 2;
-    const maxRadius = Math.min(w, h) * 0.4;
+    const marginX = w * 0.12;
+    const marginY = h * 0.14;
+    const gridW = w - marginX * 2;
+    const gridH = h - marginY * 2;
 
-    particles.forEach(p => {
-      p.angle += p.speed;
-      const r = p.radiusRatio * maxRadius;
-      const x = cx + Math.cos(p.angle) * r;
-      const y = cy + Math.sin(p.angle) * (r * 0.45) + Math.sin(t + r) * (8 * dpr);
+    // Compute a draped-cloth height field: pinned along the top edge,
+    // sagging and billowing under simulated wind turbulence below.
+    const points = [];
+    for (let r = 0; r < rows; r++) {
+      const row = [];
+      for (let c = 0; c < cols; c++) {
+        const u = c / (cols - 1);
+        const v = r / (rows - 1);
+        const pin = v; // 0 = pinned top edge, 1 = free-hanging bottom
+        const sag = Math.pow(pin, 1.6) * (14 * dpr);
+        const wind = Math.sin(u * 5 + t * 1.4 + v * 3) * pin * (7 * dpr)
+                   + Math.cos(u * 2.3 - t * 1.1 + v * 1.6) * pin * (4 * dpr);
+        const px = marginX + u * gridW;
+        const py = marginY + v * gridH + sag + wind;
+        // Faux depth shading: crest catches light, trough falls into shadow
+        const shade = 0.35 + 0.5 * (Math.sin(u * 5 + t * 1.4 + v * 3) * 0.5 + 0.5) * pin;
+        row.push({ x: px, y: py, shade });
+      }
+      points.push(row);
+    }
 
+    // Draw the cloth as a shaded quad mesh (subtle fill) with wireframe on top
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        const a = points[r][c], b = points[r][c + 1], cc = points[r + 1][c + 1], d = points[r + 1][c];
+        const avgShade = (a.shade + b.shade + cc.shade + d.shade) / 4;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(cc.x, cc.y);
+        ctx.lineTo(d.x, d.y);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(129, 178, 154, ${0.05 + avgShade * 0.16})`;
+        ctx.fill();
+      }
+    }
+
+    ctx.lineWidth = 1 * dpr;
+    ctx.strokeStyle = 'rgba(233, 196, 106, 0.5)';
+    for (let r = 0; r < rows; r++) {
       ctx.beginPath();
-      ctx.arc(x, y, p.size * dpr, 0, Math.PI * 2);
-      ctx.fillStyle = p.color;
-      ctx.fill();
-    });
+      for (let c = 0; c < cols; c++) {
+        const p = points[r][c];
+        if (c === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(129, 178, 154, 0.45)';
+    for (let c = 0; c < cols; c++) {
+      ctx.beginPath();
+      for (let r = 0; r < rows; r++) {
+        const p = points[r][c];
+        if (r === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
 
     requestAnimationFrame(draw);
   }
@@ -677,6 +730,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   resizeBranchCanvas();
   requestAnimationFrame(animateNatureBranches);
+
+  // Mobile browsers can report a 0×0 wrapper on first measurement (before
+  // fonts/layout settle) and never fire a 'resize' event afterward — watch
+  // the wrapper directly so the tree still builds once it actually has size.
+  const natureWrapper = document.querySelector('.nature-canvas-wrapper');
+  if (natureWrapper && 'ResizeObserver' in window) {
+    let lastW = 0, lastH = 0;
+    const ro = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect;
+      if (Math.abs(width - lastW) > 4 || Math.abs(height - lastH) > 4) {
+        lastW = width; lastH = height;
+        resizeBranchCanvas();
+      }
+    });
+    ro.observe(natureWrapper);
+  }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(resizeBranchCanvas);
+  }
+  window.addEventListener('load', resizeBranchCanvas);
 
   initWavesAnimation();
   initWavetableAnimation();
