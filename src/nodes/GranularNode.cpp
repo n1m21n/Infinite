@@ -15,6 +15,7 @@
 #include "platform/Platform.h"
 #include "Transport.h"
 #include "core/AudioTopologyRequest.h"
+#include "audio/WavWriter.h"
 
 const char* const GranularNode::kWindowShapeNames[GranularNode::kNumWindowShapes] = {
    "Hann",
@@ -671,17 +672,22 @@ void GranularNode::StopRecording()
    }
 
    const double sr = mAudioNode->RecordSampleRate();
+   const float* data = mAudioNode->RecordBufferData();
+
+   const std::string wavPath = AudioRecordings::GenerateFilePath("granular");
+   AudioRecordings::WriteWav(wavPath, data, frames, sr, 1);
+
    auto* decoded = new Platform::SampleBuffer();
    decoded->channels = 1;
    decoded->numFrames = frames;
    decoded->sampleRate = sr;
-   decoded->channelData.assign(mAudioNode->RecordBufferData(), mAudioNode->RecordBufferData() + frames);
+   decoded->channelData.assign(data, data + frames);
 
    char stat[128];
    const double durationSec = (double)frames / sr;
    snprintf(stat, sizeof(stat), "1 ch · %.1fkHz · %.2fs (rec)", sr / 1000.0, durationSec);
 
-   FinishBuffer(decoded, "recording", "", stat);
+   FinishBuffer(decoded, "recording", wavPath, stat);
 }
 
 bool GranularNode::LoadFile(const std::string& path)
@@ -713,7 +719,13 @@ bool GranularNode::LoadFile(const std::string& path)
 void GranularNode::ReloadFromPath()
 {
    if (!mFilePath.empty())
+   {
+      float savedStart = start;
+      float savedEnd = end;
       LoadFile(mFilePath);
+      start = savedStart;
+      end = savedEnd;
+   }
 }
 
 void GranularNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::string& fileName,

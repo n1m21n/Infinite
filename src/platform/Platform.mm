@@ -1,6 +1,7 @@
 #include "Platform.h"
 #include <atomic>
 
+#import <objc/runtime.h>
 #import <Cocoa/Cocoa.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
@@ -4450,6 +4451,197 @@ namespace Platform
          }
       }
       delete handle;
+   }
+
+   // =============================================== macOS document opening
+   static std::mutex sOpenFileMutex;
+   static std::vector<std::string> sPendingOpenFiles;
+
+   // Both the Apple Event handler and the NSApplicationDelegate methods can be
+   // live at once (by design - see InitDocumentHandlingPostGlfw). If both fire
+   // for the same launch, dedupe here rather than loading the same patch twice.
+   // Caller must hold sOpenFileMutex.
+   static void PushPendingOpenFileLocked(const std::string& path)
+   {
+      for (const std::string& existing : sPendingOpenFiles)
+      {
+         if (existing == path)
+            return;
+      }
+      sPendingOpenFiles.push_back(path);
+   }
+
+   static BOOL OpenFileImp(id self, SEL _cmd, NSApplication* sender, NSString* filename)
+   {
+      if (filename != nil)
+      {
+         std::lock_guard<std::mutex> lock(sOpenFileMutex);
+         PushPendingOpenFileLocked([filename UTF8String]);
+      }
+      return YES;
+   }
+
+   static void OpenFilesImp(id self, SEL _cmd, NSApplication* sender, NSArray<NSString*>* filenames)
+   {
+      if (filenames != nil)
+      {
+         std::lock_guard<std::mutex> lock(sOpenFileMutex);
+         for (NSString* filename in filenames)
+         {
+            if (filename != nil)
+               PushPendingOpenFileLocked([filename UTF8String]);
+         }
+      }
+      [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+   }
+
+   static void OpenURLsImp(id self, SEL _cmd, NSApplication* application, NSArray<NSURL*>* urls)
+   {
+      if (urls != nil)
+      {
+         std::lock_guard<std::mutex> lock(sOpenFileMutex);
+         for (NSURL* url in urls)
+         {
+            if (url != nil && [url isFileURL])
+            {
+               NSString* path = [url path];
+               if (path != nil)
+                  PushPendingOpenFileLocked([path UTF8String]);
+            }
+         }
+      }
+      [application replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+   }
+}
+
+@interface InfiniteOpenDocHandler : NSObject
+- (void)handleOpenDocEvent:(NSAppleEventDescriptor *)event withReplyEvent:(NSAppleEventDescriptor *)replyEvent;
+@end
+
+// The handler object is allocated once; re-calling this re-registers it with
+// NSAppleEventManager, which is necessary because AppKit's
+// -[NSApplication finishLaunching] (invoked from inside glfwInit()) installs
+// its own kAEOpenDocuments handler and silently replaces ours.
+static void InstallOpenDocAppleEventHandler()
+{
+   static InfiniteOpenDocHandler* sHandler = nil;
+   if (sHandler == nil)
+      sHandler = [[InfiniteOpenDocHandler alloc] init];
+   [[NSAppleEventManager sharedAppleEventManager]
+      setEventHandler:sHandler
+          andSelector:@selector(handleOpenDocEvent:withReplyEvent:)
+        forEventClass:kCoreEventClass
+           andEventID:kAEOpenDocuments];
+}
+
+@implementation InfiniteOpenDocHandler
++ (void)load
+{
+   InstallOpenDocAppleEventHandler();
+}
+
+- (void)handleOpenDocEvent:(NSAppleEventDescriptor *)event withReplyEvent:(NSAppleEventDescriptor *)replyEvent
+{
+   @autoreleasepool
+   {
+      NSAppleEventDescriptor* docList = [event paramDescriptorForKeyword:keyDirectObject];
+      if (docList != nil)
+      {
+         NSInteger count = [docList numberOfItems];
+         if (count > 0)
+         {
+            for (NSInteger i = 1; i <= count; ++i)
+            {
+               NSAppleEventDescriptor* item = [docList descriptorAtIndex:i];
+               NSString* path = nil;
+               NSAppleEventDescriptor* furl = [item coerceToDescriptorType:typeFileURL];
+               if (furl != nil && [furl data] != nil)
+               {
+                  NSString* urlStr = [[NSString alloc] initWithData:[furl data] encoding:NSUTF8StringEncoding];
+                  if (urlStr != nil)
+                  {
+                     NSURL* u = [NSURL URLWithString:urlStr];
+                     if (u != nil && [u isFileURL])
+                        path = [u path];
+                  }
+               }
+               if (path == nil)
+                  path = [item stringValue];
+
+               if (path != nil && [path length] > 0)
+               {
+                  std::lock_guard<std::mutex> lock(Platform::sOpenFileMutex);
+                  Platform::PushPendingOpenFileLocked([path UTF8String]);
+               }
+            }
+         }
+         else
+         {
+            NSString* path = nil;
+            NSAppleEventDescriptor* furl = [docList coerceToDescriptorType:typeFileURL];
+            if (furl != nil && [furl data] != nil)
+            {
+               NSString* urlStr = [[NSString alloc] initWithData:[furl data] encoding:NSUTF8StringEncoding];
+               if (urlStr != nil)
+               {
+                  NSURL* u = [NSURL URLWithString:urlStr];
+                  if (u != nil && [u isFileURL])
+                     path = [u path];
+               }
+            }
+            if (path == nil)
+               path = [docList stringValue];
+
+            if (path != nil && [path length] > 0)
+            {
+               std::lock_guard<std::mutex> lock(Platform::sOpenFileMutex);
+               Platform::PushPendingOpenFileLocked([path UTF8String]);
+            }
+         }
+      }
+   }
+}
+@end
+
+namespace Platform
+{
+   void InitDocumentHandlingPreGlfw()
+   {
+      @autoreleasepool
+      {
+         // GLFWApplicationDelegate is compiled into the binary, so this resolves
+         // at dyld load time - NSApp does not need to exist yet. Adding the
+         // methods before glfwInit() calls [NSApp setDelegate:...] means
+         // AppKit's cached _delegateFlags are built correctly the first time.
+         Class glfwDelegateClass = objc_getClass("GLFWApplicationDelegate");
+         if (glfwDelegateClass != nil)
+         {
+            class_addMethod(glfwDelegateClass, @selector(application:openFile:), (IMP)OpenFileImp, "B@:@@");
+            class_addMethod(glfwDelegateClass, @selector(application:openFiles:), (IMP)OpenFilesImp, "v@:@@");
+            class_addMethod(glfwDelegateClass, @selector(application:openURLs:), (IMP)OpenURLsImp, "v@:@@");
+         }
+      }
+   }
+
+   void InitDocumentHandlingPostGlfw()
+   {
+      @autoreleasepool
+      {
+         // -[NSApplication finishLaunching], run inside glfwInit(), replaces
+         // whatever kAEOpenDocuments handler was installed by +load. Reinstall
+         // it now so a Finder open while the app is already running still works.
+         InstallOpenDocAppleEventHandler();
+      }
+   }
+
+   bool PollPendingOpenFile(std::string& outPath)
+   {
+      std::lock_guard<std::mutex> lock(sOpenFileMutex);
+      if (sPendingOpenFiles.empty())
+         return false;
+      outPath = sPendingOpenFiles.front();
+      sPendingOpenFiles.erase(sPendingOpenFiles.begin());
+      return true;
    }
 }
 

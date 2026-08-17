@@ -36,9 +36,10 @@
 			<key>CFBundleTypeExtensions</key>
 			<array>
 				<string>inf</string>
+				<string>infinite</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>Infinite</string>
+			<string>InfinitePatch</string>
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>com.namansoni.infinite.patch</string>
@@ -55,7 +56,7 @@
 			<key>UTTypeDescription</key>
 			<string>Infinite Patch</string>
 			<key>UTTypeIconFile</key>
-			<string>Infinite</string>
+			<string>InfinitePatch</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
@@ -66,6 +67,7 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>inf</string>
+					<string>infinite</string>
 				</array>
 			</dict>
 		</dict>

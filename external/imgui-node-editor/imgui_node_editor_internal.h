@@ -1461,7 +1461,10 @@ struct EditorContext
     float AlignPointToGrid(float p) const
     {
         if (!ImGui::GetIO().KeyAlt)
-            return p - ImFmod(p, 16.0f);
+        {
+            float spacing = (m_Style.GridSpacing > 0.0f) ? m_Style.GridSpacing : 20.0f;
+            return std::round(p / spacing) * spacing;
+        }
         else
             return p;
     }

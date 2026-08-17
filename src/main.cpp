@@ -231,12 +231,44 @@ namespace
    const float kPinRadius = 7.0f;
    const float kPinHit = 20.0f; // generous click target - small dots were unhittable
 
+   inline bool IsThemeLight()
+   {
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      return (0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
+   }
+
+   inline ImU32 ScopeBgCol()
+   {
+      return IsThemeLight() ? IM_COL32(236, 240, 248, 255) : IM_COL32(11, 12, 16, 255);
+   }
+
+   inline ImU32 ScopeBorderCol()
+   {
+      return IsThemeLight() ? IM_COL32(185, 192, 208, 255) : IM_COL32(64, 68, 84, 255);
+   }
+
+   inline ImU32 ScopeGridCol()
+   {
+      return IsThemeLight() ? IM_COL32(208, 215, 228, 255) : IM_COL32(255, 255, 255, 12);
+   }
+
+   inline ImU32 ScopeMidLineCol()
+   {
+      return IsThemeLight() ? IM_COL32(178, 186, 204, 255) : IM_COL32(255, 255, 255, 26);
+   }
+
+   inline ImU32 ScopeTextCol()
+   {
+      return IsThemeLight() ? IM_COL32(70, 78, 96, 255) : IM_COL32(120, 128, 150, 255);
+   }
+
    // Backdrop for any node preview about to blit a texture: a flat dark rect
    // reads as solid black wherever that texture is actually transparent, so
    // this paints a checkerboard instead, matching image editors' convention.
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f)
    {
-      dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), rounding);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, isLight ? IM_COL32(238, 240, 246, 255) : IM_COL32(18, 18, 24, 255), rounding);
       const float cell = 12.0f;
       const int cols = (int)std::ceil((br.x - origin.x) / cell);
       const int rows = (int)std::ceil((br.y - origin.y) / cell);
@@ -248,7 +280,7 @@ namespace
                continue;
             const ImVec2 tl(origin.x + x * cell, origin.y + y * cell);
             const ImVec2 cbr(std::min(br.x, tl.x + cell), std::min(br.y, tl.y + cell));
-            dl->AddRectFilled(tl, cbr, IM_COL32(30, 30, 38, 255));
+            dl->AddRectFilled(tl, cbr, isLight ? IM_COL32(220, 224, 232, 255) : IM_COL32(30, 30, 38, 255));
          }
       }
    }
@@ -939,9 +971,19 @@ namespace
    bool AudioSliderFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                          float width, ImU32 fillColor, bool readOnly)
    {
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.055f, 0.060f, 0.080f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.085f, 0.092f, 0.118f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.100f, 0.108f, 0.138f, 1.0f));
+      const bool isLight = IsThemeLight();
+      if (isLight)
+      {
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.88f, 0.89f, 0.92f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.83f, 0.85f, 0.89f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.78f, 0.81f, 0.86f, 1.0f));
+      }
+      else
+      {
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.055f, 0.060f, 0.080f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.085f, 0.092f, 0.118f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.100f, 0.108f, 0.138f, 1.0f));
+      }
       ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
@@ -962,14 +1004,11 @@ namespace
       {
          // Deliberately low alpha: the fill is a tint the label and value
          // stay readable over, not a solid block that hides them.
-         // No bright line at the fill edge: the label sits over the track, so
-         // a vertical rule crossing it reads as a text caret in an input
-         // field. The fill block's own edge against the darker track is
-         // enough, so it carries slightly more alpha to compensate.
-         const ImU32 soft = (fillColor & 0x00FFFFFF) | ((ImU32)86 << 24);
+         const ImU32 alpha = isLight ? 110 : 86;
+         const ImU32 soft = (fillColor & 0x00FFFFFF) | (alpha << 24);
          dl->AddRectFilled(r0, ImVec2(fillX, r1.y), soft, 3.0f);
       }
-      dl->AddRect(r0, r1, IM_COL32(72, 76, 92, 255), 3.0f);
+      dl->AddRect(r0, r1, isLight ? IM_COL32(180, 185, 200, 255) : IM_COL32(72, 76, 92, 255), 3.0f);
 
       std::string name(label);
       const size_t hash = name.find("##");
@@ -981,17 +1020,16 @@ namespace
       const ImVec2 valSize = ImGui::CalcTextSize(valBuf);
       const float valX = r1.x - 7.0f - valSize.x;
       dl->PushClipRect(r0, r1, true);
-      dl->AddText(ImVec2(valX, textY),
-                  readOnly ? IM_COL32(190, 192, 206, 255) : IM_COL32(232, 236, 246, 255), valBuf);
-      // The label is clipped to whatever is left of the value rather than
-      // drawn over it. A track is only so wide, and "release" next to
-      // "2249 ms" is wider than one - so the two printed on top of each other
-      // and the field read as corrupted. Truncating the label is the right
-      // sacrifice: the value is what changes and what is being read, and the
-      // label is repeated identically down every envelope panel.
+      const ImU32 valCol = isLight
+         ? (readOnly ? IM_COL32(110, 115, 130, 255) : IM_COL32(25, 30, 45, 255))
+         : (readOnly ? IM_COL32(190, 192, 206, 255) : IM_COL32(232, 236, 246, 255));
+      dl->AddText(ImVec2(valX, textY), valCol, valBuf);
+
       dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - 6.0f), r1.y), true);
-      dl->AddText(ImVec2(r0.x + 7.0f, textY),
-                  readOnly ? IM_COL32(150, 152, 166, 255) : IM_COL32(186, 192, 208, 255), name.c_str());
+      const ImU32 nameCol = isLight
+         ? (readOnly ? IM_COL32(125, 130, 145, 255) : IM_COL32(186, 192, 208, 255))
+         : (readOnly ? IM_COL32(150, 152, 166, 255) : IM_COL32(186, 192, 208, 255));
+      dl->AddText(ImVec2(r0.x + 7.0f, textY), nameCol, name.c_str());
       dl->PopClipRect();
       dl->PopClipRect();
 
@@ -1067,10 +1105,14 @@ namespace
       ImGui::Dummy(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
-      const ImU32 pinColor = modulated              ? IM_COL32(255, 190, 90, 255)
-                            : hasExpr && !exprErrored ? IM_COL32(170, 130, 255, 255)
-                                                      : IM_COL32(95, 100, 120, 255);
+      const bool isLight = IsThemeLight();
+      const ImU32 pinColor = modulated
+         ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
+         : hasExpr && !exprErrored
+            ? (isLight ? IM_COL32(130, 80, 230, 255) : IM_COL32(170, 130, 255, 255))
+            : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
       dl->AddCircleFilled(c, 4.0f, pinColor);
+      dl->AddCircle(c, 4.0f, isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255), 0, 1.0f);
       ed::EndPin();
       ImGui::SameLine(0.0f, 4.0f);
 
@@ -1520,53 +1562,91 @@ namespace
       const float bottom = p.y + height - 6.0f;
       const float capY = bottom - t * (bottom - top);
 
+      const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      // Slot, sunk into the panel.
-      dl->AddRectFilled(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                        IM_COL32(14, 15, 20, 255), 3.0f);
-      dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                  IM_COL32(58, 62, 76, 255), 3.0f);
-      // Travelled portion, below the cap.
-      if (t > 0.0f)
-         dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
-      // Detents at quarter-throw positions by default; a tapered fader's
-      // detents mean something once they land on the taper's own dB marks
-      // instead (see the ConsoleFaderTaper::kDetentsDb call site).
-      if (valueToPos == nullptr)
+      if (isLight)
       {
-      for (int i = 0; i <= 4; i++)
-      {
-         const float y = bottom - (float)i * 0.25f * (bottom - top);
-         dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
-         dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
-      }
+         dl->AddRectFilled(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
+                           IM_COL32(215, 220, 230, 255), 3.0f);
+         dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
+                     IM_COL32(180, 185, 200, 255), 3.0f);
+         if (t > 0.0f)
+            dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
+
+         if (valueToPos == nullptr)
+         {
+            for (int i = 0; i <= 4; i++)
+            {
+               const float y = bottom - (float)i * 0.25f * (bottom - top);
+               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(0, 0, 0, 45), 1.0f);
+               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(0, 0, 0, 45), 1.0f);
+            }
+         }
+         else
+         {
+            for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
+            {
+               const float dpos = std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f);
+               const float y = bottom - dpos * (bottom - top);
+               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(0, 0, 0, 45), 1.0f);
+               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(0, 0, 0, 45), 1.0f);
+            }
+         }
+         const ImU32 capCol = readOnly ? IM_COL32(180, 185, 198, 255) : IM_COL32(235, 238, 245, 255);
+         dl->AddRectFilled(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f), capCol, 3.0f);
+         dl->AddRect(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f),
+                     IM_COL32(150, 155, 170, 255), 3.0f);
+         dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
+                     readOnly ? IM_COL32(120, 125, 140, 255) : IM_COL32(40, 45, 60, 255), 1.6f);
+         if (hovered && !readOnly)
+            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
+                        IM_COL32(0, 0, 0, 30), 4.0f, 0, 2.0f);
       }
       else
       {
-         for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
+         dl->AddRectFilled(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
+                           IM_COL32(14, 15, 20, 255), 3.0f);
+         dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
+                     IM_COL32(58, 62, 76, 255), 3.0f);
+         if (t > 0.0f)
+            dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
+
+         if (valueToPos == nullptr)
          {
-            const float dpos = std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f);
-            const float y = bottom - dpos * (bottom - top);
-            dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
-            dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
+            for (int i = 0; i <= 4; i++)
+            {
+               const float y = bottom - (float)i * 0.25f * (bottom - top);
+               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
+               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
+            }
          }
+         else
+         {
+            for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
+            {
+               const float dpos = std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f);
+               const float y = bottom - dpos * (bottom - top);
+               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
+               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
+            }
+         }
+         const ImU32 capCol = readOnly ? IM_COL32(96, 99, 114, 255) : IM_COL32(72, 77, 94, 255);
+         dl->AddRectFilled(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f), capCol, 3.0f);
+         dl->AddRect(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f),
+                     IM_COL32(18, 19, 25, 200), 3.0f);
+         dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
+                     readOnly ? IM_COL32(200, 202, 212, 255) : IM_COL32(238, 240, 248, 255), 1.6f);
+         if (hovered && !readOnly)
+            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
+                        IM_COL32(255, 255, 255, 60), 4.0f, 0, 2.0f);
       }
-      // The cap: wider than the slot, with a centre line, so its position is
-      // readable at a glance from across the node.
-      const ImU32 capCol = readOnly ? IM_COL32(96, 99, 114, 255) : IM_COL32(72, 77, 94, 255);
-      dl->AddRectFilled(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f), capCol, 3.0f);
-      dl->AddRect(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f),
-                  IM_COL32(18, 19, 25, 200), 3.0f);
-      dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
-                  readOnly ? IM_COL32(200, 202, 212, 255) : IM_COL32(238, 240, 248, 255), 1.6f);
-      if (hovered && !readOnly)
-         dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
-                     IM_COL32(255, 255, 255, 60), 4.0f, 0, 2.0f);
 
       // Caption below, same baseline rule as the knob's.
       const char* caption = label[0] == '#' ? "" : label;
       const ImVec2 textSize = ImGui::CalcTextSize(caption);
-      const ImU32 capTextCol = readOnly ? IM_COL32(140, 140, 150, 255) : IM_COL32(176, 182, 198, 255);
+      const ImU32 capTextCol = isLight
+         ? (readOnly ? IM_COL32(125, 130, 145, 255) : IM_COL32(50, 55, 70, 255))
+         : (readOnly ? IM_COL32(140, 140, 150, 255) : IM_COL32(176, 182, 198, 255));
       const float capTextY = p.y + height + 4.0f;
       dl->PushClipRect(ImVec2(p.x, capTextY), ImVec2(p.x + cell, capTextY + textH), true);
       dl->AddText(ImVec2(cx - textSize.x * 0.5f, capTextY), capTextCol, caption);
@@ -1640,27 +1720,44 @@ namespace
       const float t = ValueToPos01(*value);
       const float angle = aMin + t * (aMax - aMin);
 
+      const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      // Body: a slightly domed cap (two stacked circles) rather than one flat
-      // disc, so the knob reads as a physical control at a glance.
-      dl->AddCircleFilled(center, radius, IM_COL32(36, 38, 48, 255), 32);
-      dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(22, 23, 30, 255), 32);
-      // Unfilled remainder of the sweep, then the filled arc on top of it.
-      dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-      dl->PathStroke(IM_COL32(58, 62, 76, 255), 0, 3.0f);
-      if (t > 0.0f)
+      if (isLight)
       {
-         dl->PathArcTo(center, radius + 2.5f, aMin, angle, 32);
-         dl->PathStroke(fillColor, 0, 3.0f);
+         dl->AddCircleFilled(center, radius, IM_COL32(220, 224, 234, 255), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(242, 245, 250, 255), 32);
+         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
+         dl->PathStroke(IM_COL32(195, 200, 212, 255), 0, 3.0f);
+         if (t > 0.0f)
+         {
+            dl->PathArcTo(center, radius + 2.5f, aMin, angle, 32);
+            dl->PathStroke(fillColor, 0, 3.0f);
+         }
+         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
+         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
+         dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(140, 145, 160, 255) : IM_COL32(40, 45, 60, 255), 2.0f);
+         dl->AddCircle(center, radius, IM_COL32(175, 180, 195, 255), 32, 1.0f);
+         if (hovered && !readOnly)
+            dl->AddCircle(center, radius + 2.5f, IM_COL32(0, 0, 0, 30), 32, 3.0f);
       }
-      // Pointer runs from partway out to the rim, like a moulded indicator
-      // line, rather than all the way from the centre.
-      const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
-      const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-      dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(200, 202, 212, 255) : IM_COL32(238, 240, 248, 255), 2.0f);
-      dl->AddCircle(center, radius, IM_COL32(74, 78, 94, 255), 32, 1.0f);
-      if (hovered && !readOnly)
-         dl->AddCircle(center, radius + 2.5f, IM_COL32(255, 255, 255, 40), 32, 3.0f);
+      else
+      {
+         dl->AddCircleFilled(center, radius, IM_COL32(36, 38, 48, 255), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(22, 23, 30, 255), 32);
+         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
+         dl->PathStroke(IM_COL32(58, 62, 76, 255), 0, 3.0f);
+         if (t > 0.0f)
+         {
+            dl->PathArcTo(center, radius + 2.5f, aMin, angle, 32);
+            dl->PathStroke(fillColor, 0, 3.0f);
+         }
+         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
+         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
+         dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(200, 202, 212, 255) : IM_COL32(238, 240, 248, 255), 2.0f);
+         dl->AddCircle(center, radius, IM_COL32(74, 78, 94, 255), 32, 1.0f);
+         if (hovered && !readOnly)
+            dl->AddCircle(center, radius + 2.5f, IM_COL32(255, 255, 255, 40), 32, 3.0f);
+      }
 
       // The knob's permanent caption is the param *name*, not its value - a
       // hardware knob doesn't print a live number on its cap either. The
@@ -1672,7 +1769,9 @@ namespace
          // Clip rather than let a long caption widen the cell and break the
          // row's fit-to-body-width guarantee.
          ImVec2 textSize = ImGui::CalcTextSize(caption);
-         const ImU32 capCol = readOnly ? IM_COL32(140, 140, 150, 255) : IM_COL32(176, 182, 198, 255);
+         const ImU32 capCol = isLight
+            ? (readOnly ? IM_COL32(125, 130, 145, 255) : IM_COL32(50, 55, 70, 255))
+            : (readOnly ? IM_COL32(140, 140, 150, 255) : IM_COL32(176, 182, 198, 255));
          const float capY = p.y + diameter + 4.0f;
          if (textSize.x <= cell)
          {
@@ -2243,8 +2342,9 @@ namespace
       ImGui::Dummy(ImVec2(kPinHit, kPinHit));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(p.x + kPinHit * 0.5f, p.y + kPinHit * 0.5f);
-      dl->AddCircleFilled(c, kPinRadius, IM_COL32(150, 190, 255, 255));
-      dl->AddCircle(c, kPinRadius, IM_COL32(20, 22, 30, 255), 0, 1.5f);
+      const bool isLight = IsThemeLight();
+      dl->AddCircleFilled(c, kPinRadius, isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255));
+      dl->AddCircle(c, kPinRadius, isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255), 0, 1.5f);
 
       if (!labelFirst && label != nullptr && label[0] != '\0')
       {
@@ -2476,9 +2576,16 @@ namespace
       auto vec = [](const CategoryColors::Color& c, float a = 1.0f) {
          return ImVec4(c.r, c.g, c.b, a);
       };
-      auto lighten = [](const CategoryColors::Color& c, float amt) {
-         return ImVec4(c.r + (1.0f - c.r) * amt, c.g + (1.0f - c.g) * amt,
-                       c.b + (1.0f - c.b) * amt, 1.0f);
+      const float lum = 0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b;
+      const bool isLight = (lum > 0.5f);
+
+      auto shade = [isLight](const CategoryColors::Color& c, float amt) {
+         if (isLight)
+            return ImVec4(c.r * (1.0f - amt * 0.45f), c.g * (1.0f - amt * 0.45f),
+                          c.b * (1.0f - amt * 0.45f), 1.0f);
+         else
+            return ImVec4(c.r + (1.0f - c.r) * amt, c.g + (1.0f - c.g) * amt,
+                          c.b + (1.0f - c.b) * amt, 1.0f);
       };
 
       ImGuiStyle& style = ImGui::GetStyle();
@@ -2489,25 +2596,25 @@ namespace
       style.Colors[ImGuiCol_PopupBg] = vec(t.panelBg, 0.98f);
       style.Colors[ImGuiCol_Border] = vec(t.border);
       style.Colors[ImGuiCol_FrameBg] = vec(t.panelBg);
-      style.Colors[ImGuiCol_FrameBgHovered] = lighten(t.panelBg, 0.12f);
-      style.Colors[ImGuiCol_FrameBgActive] = lighten(t.panelBg, 0.20f);
+      style.Colors[ImGuiCol_FrameBgHovered] = shade(t.panelBg, 0.14f);
+      style.Colors[ImGuiCol_FrameBgActive] = shade(t.panelBg, 0.24f);
       style.Colors[ImGuiCol_TitleBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_TitleBgActive] = vec(t.windowBg);
       style.Colors[ImGuiCol_TitleBgCollapsed] = vec(t.windowBg, 0.75f);
       style.Colors[ImGuiCol_MenuBarBg] = vec(t.panelBg);
       style.Colors[ImGuiCol_ScrollbarBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_ScrollbarGrab] = vec(t.border);
-      style.Colors[ImGuiCol_ScrollbarGrabHovered] = lighten(t.border, 0.25f);
+      style.Colors[ImGuiCol_ScrollbarGrabHovered] = shade(t.border, 0.25f);
       style.Colors[ImGuiCol_ScrollbarGrabActive] = vec(t.accent);
       style.Colors[ImGuiCol_CheckMark] = vec(t.accent);
       style.Colors[ImGuiCol_SliderGrab] = vec(t.accent, 0.85f);
       style.Colors[ImGuiCol_SliderGrabActive] = vec(t.accent);
       style.Colors[ImGuiCol_Button] = vec(t.panelBg);
-      style.Colors[ImGuiCol_ButtonHovered] = lighten(t.panelBg, 0.18f);
-      style.Colors[ImGuiCol_ButtonActive] = vec(t.accent, 0.65f);
-      style.Colors[ImGuiCol_Header] = vec(t.accent, 0.30f);
-      style.Colors[ImGuiCol_HeaderHovered] = vec(t.accent, 0.45f);
-      style.Colors[ImGuiCol_HeaderActive] = vec(t.accent, 0.60f);
+      style.Colors[ImGuiCol_ButtonHovered] = shade(t.panelBg, 0.18f);
+      style.Colors[ImGuiCol_ButtonActive] = isLight ? shade(t.panelBg, 0.32f) : vec(t.accent, 0.65f);
+      style.Colors[ImGuiCol_Header] = vec(t.accent, isLight ? 0.20f : 0.30f);
+      style.Colors[ImGuiCol_HeaderHovered] = vec(t.accent, isLight ? 0.35f : 0.45f);
+      style.Colors[ImGuiCol_HeaderActive] = vec(t.accent, isLight ? 0.50f : 0.60f);
       style.Colors[ImGuiCol_Separator] = vec(t.border);
       style.Colors[ImGuiCol_SeparatorHovered] = vec(t.accent, 0.6f);
       style.Colors[ImGuiCol_SeparatorActive] = vec(t.accent);
@@ -2516,7 +2623,7 @@ namespace
       style.Colors[ImGuiCol_ResizeGripActive] = vec(t.accent);
       style.Colors[ImGuiCol_Tab] = vec(t.panelBg);
       style.Colors[ImGuiCol_TabHovered] = vec(t.accent, 0.5f);
-      style.Colors[ImGuiCol_TabActive] = lighten(t.panelBg, 0.15f);
+      style.Colors[ImGuiCol_TabActive] = shade(t.panelBg, 0.15f);
       style.Colors[ImGuiCol_TabUnfocused] = vec(t.windowBg);
       style.Colors[ImGuiCol_TabUnfocusedActive] = vec(t.panelBg);
       style.Colors[ImGuiCol_TextSelectedBg] = vec(t.accent, 0.35f);
@@ -2534,8 +2641,11 @@ namespace
       ed::EditorContext* prevEditor = ed::GetCurrentEditor();
       ed::SetCurrentEditor(gEditor);
       ed::Style& edStyle = ed::GetStyle();
-      edStyle.Colors[ed::StyleColor_Bg] = vec(t.windowBg, 0.784f);
-      edStyle.Colors[ed::StyleColor_Grid] = vec(t.border, 0.35f);
+      edStyle.Colors[ed::StyleColor_Bg] = vec(t.windowBg, isLight ? 1.0f : 0.784f);
+      edStyle.Colors[ed::StyleColor_Grid] = vec(t.border, isLight ? 0.50f : 0.35f);
+      edStyle.Colors[ed::StyleColor_NodeBg] = vec(t.panelBg, isLight ? 0.95f : 0.80f);
+      edStyle.Colors[ed::StyleColor_NodeBorder] = vec(t.border, isLight ? 0.70f : 0.40f);
+      edStyle.GridSpacing = gGridSnap;
       ed::SetCurrentEditor(prevEditor);
    }
 
@@ -3847,18 +3957,21 @@ namespace
       if (hoverStep < 0 && hovered)
          hoverStep = stepAt(mouse.x);
 
-      dl->AddRectFilled(origin, br, IM_COL32(16, 16, 22, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, isLight ? IM_COL32(236, 240, 248, 255) : IM_COL32(16, 16, 22, 255), 4.0f);
 
       const float centerY = origin.y + height * 0.5f;
       if (n->bipolar)
-         dl->AddLine(ImVec2(origin.x, centerY), ImVec2(br.x, centerY), IM_COL32(80, 84, 100, 255));
+         dl->AddLine(ImVec2(origin.x, centerY), ImVec2(br.x, centerY), isLight ? IM_COL32(180, 186, 202, 255) : IM_COL32(80, 84, 100, 255));
 
       for (int i = 0; i < count; i++)
       {
          const float x0 = origin.x + (float)i * (cellW + gap);
          const float x1 = x0 + cellW;
          const bool isGroupStart = (i % groupSize) == 0;
-         const ImU32 gridCol = isGroupStart ? IM_COL32(64, 68, 84, 255) : IM_COL32(38, 40, 50, 255);
+         const ImU32 gridCol = isLight
+            ? (isGroupStart ? IM_COL32(210, 216, 228, 255) : IM_COL32(224, 228, 238, 255))
+            : (isGroupStart ? IM_COL32(64, 68, 84, 255) : IM_COL32(38, 40, 50, 255));
          dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y), gridCol, 2.0f);
 
          const float v = n->steps[i];
@@ -3882,10 +3995,12 @@ namespace
             fillBottom = br.y;
          }
          const bool isPlayhead = (i == curStep) && curStep < count;
-         const ImU32 fillCol = isPlayhead ? IM_COL32(255, 190, 90, 255) : IM_COL32(120, 190, 255, 220);
+         const ImU32 fillCol = isPlayhead
+            ? (isLight ? IM_COL32(225, 130, 20, 255) : IM_COL32(255, 190, 90, 255))
+            : (isLight ? IM_COL32(35, 115, 235, 230) : IM_COL32(120, 190, 255, 220));
          dl->AddRectFilled(ImVec2(x0, fillTop), ImVec2(x1, fillBottom), fillCol, 2.0f);
          if (isPlayhead)
-            dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, br.y), IM_COL32(255, 255, 255, 130), 2.0f);
+            dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, br.y), isLight ? IM_COL32(0, 0, 0, 80) : IM_COL32(255, 255, 255, 130), 2.0f);
 
          char label[8];
          snprintf(label, sizeof(label), "%d", i + 1);
@@ -3895,10 +4010,13 @@ namespace
          // overlap into unreadable clutter.
          const float labelFontSize = count <= 8 ? ImGui::GetFontSize() : std::max(8.0f, cellW * 0.95f);
          const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
+         const ImU32 stepNumCol = isLight
+            ? (isGroupStart ? IM_COL32(40, 48, 65, 255) : IM_COL32(110, 116, 132, 255))
+            : (isGroupStart ? IM_COL32(190, 194, 210, 255) : IM_COL32(110, 114, 130, 255));
          dl->AddText(ImGui::GetFont(), labelFontSize, ImVec2(x0 + (cellW - textSize.x) * 0.5f, br.y + 3.0f),
-                     isGroupStart ? IM_COL32(190, 194, 210, 255) : IM_COL32(110, 114, 130, 255), label);
+                     stepNumCol, label);
       }
-      dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+      dl->AddRect(origin, br, isLight ? IM_COL32(185, 192, 208, 255) : IM_COL32(70, 74, 90, 255), 4.0f);
 
       const float labelRowH = ImGui::GetFontSize() + 6.0f;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, br.y + labelRowH));
@@ -4162,15 +4280,16 @@ namespace
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 br(origin.x + size, origin.y + size);
-      dl->AddRectFilled(origin, br, IM_COL32(16, 16, 22, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
 
       for (int i = 1; i < 4; i++)
       {
          float f = (float)i / 4.0f;
          dl->AddLine(ImVec2(origin.x + size * f, origin.y), ImVec2(origin.x + size * f, br.y),
-                     IM_COL32(48, 50, 62, 255));
+                     ScopeGridCol());
          dl->AddLine(ImVec2(origin.x, origin.y + size * f), ImVec2(br.x, origin.y + size * f),
-                     IM_COL32(48, 50, 62, 255));
+                     ScopeGridCol());
       }
 
       const std::vector<ResynthNode::PadPoint>& path = n->Path();
@@ -4178,12 +4297,12 @@ namespace
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, IM_COL32(120, 200, 255, 170), 1.4f);
+         dl->AddLine(a, b, isLight ? IM_COL32(30, 120, 230, 220) : IM_COL32(120, 200, 255, 170), 1.6f);
       }
 
       // Corner labels: the pad blends between these four named effects, so it is
       // obvious what is being swept rather than four anonymous weights.
-      const ImU32 labelCol = IM_COL32(150, 156, 180, 255);
+      const ImU32 labelCol = isLight ? IM_COL32(50, 58, 75, 255) : IM_COL32(150, 156, 180, 255);
       const char* bl = n->CornerLabel(0);
       const char* brName = n->CornerLabel(1);
       const char* tl = n->CornerLabel(2);
@@ -4198,11 +4317,11 @@ namespace
 
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
       ImU32 orbColor = n->IsRecordingPath() ? IM_COL32(255, 90, 90, 255)
-                     : n->IsPlayingPath()   ? IM_COL32(120, 235, 150, 255)
-                                            : IM_COL32(255, 190, 90, 255);
+                     : n->IsPlayingPath()   ? (isLight ? IM_COL32(30, 180, 80, 255) : IM_COL32(120, 235, 150, 255))
+                                            : (isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 190, 90, 255));
       dl->AddCircleFilled(orb, 9.0f, orbColor);
-      dl->AddCircle(orb, 9.0f, IM_COL32(20, 20, 28, 255), 0, 2.0f);
-      dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+      dl->AddCircle(orb, 9.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 2.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
    }
 
    void DrawResynthParams(ResynthNode* n)
@@ -4367,27 +4486,28 @@ namespace
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 br(origin.x + size, origin.y + size);
-      dl->AddRectFilled(origin, br, IM_COL32(16, 16, 22, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       for (int i = 1; i < 4; i++)
       {
          float f = (float)i / 4.0f;
-         dl->AddLine(ImVec2(origin.x + size * f, origin.y), ImVec2(origin.x + size * f, br.y), IM_COL32(48, 50, 62, 255));
-         dl->AddLine(ImVec2(origin.x, origin.y + size * f), ImVec2(br.x, origin.y + size * f), IM_COL32(48, 50, 62, 255));
+         dl->AddLine(ImVec2(origin.x + size * f, origin.y), ImVec2(origin.x + size * f, br.y), ScopeGridCol());
+         dl->AddLine(ImVec2(origin.x, origin.y + size * f), ImVec2(br.x, origin.y + size * f), ScopeGridCol());
       }
       const std::vector<MacroXYNode::PadPoint>& path = n->Path();
       for (size_t i = 1; i < path.size(); i++)
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, IM_COL32(120, 200, 255, 170), 1.4f);
+         dl->AddLine(a, b, isLight ? IM_COL32(30, 120, 230, 220) : IM_COL32(120, 200, 255, 170), 1.6f);
       }
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
       ImU32 orbColor = n->IsRecordingPath() ? IM_COL32(255, 90, 90, 255)
-                     : n->IsPlayingPath()   ? IM_COL32(120, 235, 150, 255)
-                                            : IM_COL32(255, 190, 90, 255);
+                     : n->IsPlayingPath()   ? (isLight ? IM_COL32(30, 180, 80, 255) : IM_COL32(120, 235, 150, 255))
+                                            : (isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 190, 90, 255));
       dl->AddCircleFilled(orb, 9.0f, orbColor);
-      dl->AddCircle(orb, 9.0f, IM_COL32(20, 20, 28, 255), 0, 2.0f);
-      dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+      dl->AddCircle(orb, 9.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 2.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
       ImGui::TextDisabled("x %.3f   y %.3f", n->padX, n->padY);
 
@@ -4501,19 +4621,20 @@ namespace
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 br(origin.x + size, origin.y + size);
-      dl->AddRectFilled(origin, br, IM_COL32(16, 16, 22, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       for (int i = 1; i < 4; i++)
       {
          float f = (float)i / 4.0f;
-         dl->AddLine(ImVec2(origin.x + size * f, origin.y), ImVec2(origin.x + size * f, br.y), IM_COL32(44, 46, 58, 255));
-         dl->AddLine(ImVec2(origin.x, origin.y + size * f), ImVec2(br.x, origin.y + size * f), IM_COL32(44, 46, 58, 255));
+         dl->AddLine(ImVec2(origin.x + size * f, origin.y), ImVec2(origin.x + size * f, br.y), ScopeGridCol());
+         dl->AddLine(ImVec2(origin.x, origin.y + size * f), ImVec2(br.x, origin.y + size * f), ScopeGridCol());
       }
-      dl->AddLine(origin, ImVec2(br.x, br.y), IM_COL32(58, 60, 74, 255)); // identity reference
+      dl->AddLine(origin, ImVec2(br.x, br.y), ScopeMidLineCol()); // identity reference
       if (crosshair)
       {
          ImVec2 mid = toScreen(0.5f, 0.5f);
-         dl->AddLine(ImVec2(mid.x, origin.y), ImVec2(mid.x, br.y), IM_COL32(120, 124, 140, 200));
-         dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), IM_COL32(120, 124, 140, 200));
+         dl->AddLine(ImVec2(mid.x, origin.y), ImVec2(mid.x, br.y), isLight ? IM_COL32(100, 110, 130, 200) : IM_COL32(120, 124, 140, 200));
+         dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), isLight ? IM_COL32(100, 110, 130, 200) : IM_COL32(120, 124, 140, 200));
       }
 
       const int kSegments = 64;
@@ -4528,26 +4649,27 @@ namespace
       {
          ImVec2 sp = toScreen(pts[i].x, pts[i].y);
          dl->AddCircleFilled(sp, i == nearest ? 6.0f : 4.5f, lineCol);
-         dl->AddCircle(sp, i == nearest ? 6.0f : 4.5f, IM_COL32(18, 18, 26, 255), 0, 1.5f);
+         dl->AddCircle(sp, i == nearest ? 6.0f : 4.5f, isLight ? IM_COL32(240, 242, 248, 255) : IM_COL32(18, 18, 26, 255), 0, 1.5f);
       }
       if (liveX >= 0.0f)
       {
          float clampedX = std::min(1.0f, std::max(0.0f, liveX));
          ImVec2 dot = toScreen(clampedX, shape.Evaluate(clampedX));
-         dl->AddCircleFilled(dot, 5.0f, IM_COL32(255, 200, 60, 255));
-         dl->AddCircle(dot, 5.0f, IM_COL32(18, 18, 26, 255), 0, 1.5f);
+         dl->AddCircleFilled(dot, 5.0f, isLight ? IM_COL32(220, 130, 20, 255) : IM_COL32(255, 200, 60, 255));
+         dl->AddCircle(dot, 5.0f, isLight ? IM_COL32(240, 242, 248, 255) : IM_COL32(18, 18, 26, 255), 0, 1.5f);
       }
-      dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
    }
 
    void DrawCurvesParams(CurvesNode* n)
    {
       DropdownButton("channel", CurvesNode::ChannelNames(), n->activeChannel,
                      [n](int i) { n->activeChannel = i; });
-      ImU32 lineCol = IM_COL32(230, 235, 250, 255);
-      if (n->activeChannel == CurvesNode::kRed)   lineCol = IM_COL32(255, 110, 110, 255);
-      if (n->activeChannel == CurvesNode::kGreen) lineCol = IM_COL32(120, 230, 130, 255);
-      if (n->activeChannel == CurvesNode::kBlue)  lineCol = IM_COL32(120, 170, 255, 255);
+      const bool isLight = IsThemeLight();
+      ImU32 lineCol = isLight ? IM_COL32(30, 40, 60, 255) : IM_COL32(230, 235, 250, 255);
+      if (n->activeChannel == CurvesNode::kRed)   lineCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(255, 110, 110, 255);
+      if (n->activeChannel == CurvesNode::kGreen) lineCol = isLight ? IM_COL32(25, 160, 60, 255) : IM_COL32(120, 230, 130, 255);
+      if (n->activeChannel == CurvesNode::kBlue)  lineCol = isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(120, 170, 255, 255);
       DrawCurveEditor(n->Shape(n->activeChannel), lineCol);
       if (ImGui::Button("Reset channel", ImVec2(kPreviewSize, 0)))
          n->ResetChannel(n->activeChannel);
@@ -4556,8 +4678,9 @@ namespace
 
    void DrawModCurveParams(ModCurveNode* n)
    {
+      const bool isLight = IsThemeLight();
       const float in = n->input ? n->input->Value01() : n->constantIn;
-      DrawCurveEditor(n->curve, IM_COL32(230, 235, 250, 255), /*resetOnEmptyRightClick=*/true,
+      DrawCurveEditor(n->curve, isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(230, 235, 250, 255), /*resetOnEmptyRightClick=*/true,
                      /*crosshair=*/true, /*liveX=*/in);
       if (n->input == nullptr)
          ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
@@ -5093,18 +5216,23 @@ namespace
          it->second.clear(); // cleared every frame; controls re-write it while hovered
       }
 
+      const bool isLight = IsThemeLight();
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetTextLineHeight() + 6.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(p, ImVec2(p.x + width, p.y + h), IM_COL32(255, 255, 255, 10), 3.0f);
+      dl->AddRectFilled(p, ImVec2(p.x + width, p.y + h),
+                        isLight ? IM_COL32(0, 0, 0, 12) : IM_COL32(255, 255, 255, 10), 3.0f);
       const float textY = p.y + 3.0f;
       if (idleStat != nullptr && idleStat[0] != '\0')
-         dl->AddText(ImVec2(p.x + 7.0f, textY), IM_COL32(132, 138, 158, 255), idleStat);
+         dl->AddText(ImVec2(p.x + 7.0f, textY),
+                     isLight ? IM_COL32(80, 88, 108, 255) : IM_COL32(132, 138, 158, 255),
+                     idleStat);
       if (!readout.empty())
       {
          const ImVec2 sz = ImGui::CalcTextSize(readout.c_str());
          dl->PushClipRect(p, ImVec2(p.x + width, p.y + h), true);
-         dl->AddText(ImVec2(p.x + width - 8.0f - sz.x, textY), IM_COL32(226, 232, 244, 255),
+         dl->AddText(ImVec2(p.x + width - 8.0f - sz.x, textY),
+                     isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(226, 232, 244, 255),
                      readout.c_str());
          dl->PopClipRect();
       }
@@ -5205,23 +5333,26 @@ namespace
       gAudioSectionTop = p.y;
       const float cached = gAudioSectionHeight[std::pair<int, int>(gCurrentNodeIndex, gAudioSectionIndex)];
       ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
       if (cached > 0.0f)
       {
          dl->AddRectFilled(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                           IM_COL32(255, 255, 255, 9), 5.0f);
+                           isLight ? IM_COL32(0, 0, 0, 10) : IM_COL32(255, 255, 255, 9), 5.0f);
          dl->AddRect(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                     IM_COL32(255, 255, 255, 16), 5.0f);
+                     isLight ? IM_COL32(0, 0, 0, 20) : IM_COL32(255, 255, 255, 16), 5.0f);
       }
 
       const float headerH = ImGui::GetTextLineHeight() + 4.0f;
       dl->AddText(ImVec2(gAudioBodyX + kAudioSectionPad, p.y + 3.0f),
-                  IM_COL32((int)(gAudioTint.r * 255.0f), (int)(gAudioTint.g * 255.0f),
-                           (int)(gAudioTint.b * 255.0f), 210),
+                  isLight ? IM_COL32((int)(gAudioTint.r * 180.0f), (int)(gAudioTint.g * 180.0f),
+                                     (int)(gAudioTint.b * 180.0f), 255)
+                          : IM_COL32((int)(gAudioTint.r * 255.0f), (int)(gAudioTint.g * 255.0f),
+                                     (int)(gAudioTint.b * 255.0f), 210),
                   label);
       const float ruleY = p.y + headerH + 2.0f;
       dl->AddLine(ImVec2(gAudioBodyX + kAudioSectionPad, ruleY),
                   ImVec2(gAudioBodyX + gAudioBodyW - kAudioSectionPad, ruleY),
-                  IM_COL32(255, 255, 255, 18), 1.0f);
+                  isLight ? IM_COL32(0, 0, 0, 22) : IM_COL32(255, 255, 255, 18), 1.0f);
       ImGui::Dummy(ImVec2(gAudioBodyW, headerH + 4.0f));
 
       ImGui::Indent(kAudioSectionPad);
@@ -5342,9 +5473,10 @@ namespace
             gDropdown.current = safe;
             gDropdown.justOpened = true;
          }
+         const bool isLight = IsThemeLight();
          const ImVec2 sz = ImGui::CalcTextSize(label);
          ImGui::GetWindowDrawList()->AddText(ImVec2(cx - sz.x * 0.5f, y0 + headerH + maxDia + 4.0f),
-                                             IM_COL32(176, 182, 198, 255), label);
+                                             isLight ? IM_COL32(50, 55, 70, 255) : IM_COL32(176, 182, 198, 255), label);
          index++;
       }
 
@@ -5425,16 +5557,21 @@ namespace
    // AddRect borders instead of trusting a themed background.
    bool AudioToggleButton(const char* label, bool* value, float width = 44.0f)
    {
+      const bool isLight = IsThemeLight();
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-      ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(130, 138, 160, 200));
-      ImGui::PushStyleColor(ImGuiCol_Button, *value ? IM_COL32(90, 115, 205, 255) : IM_COL32(58, 64, 82, 255));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(130, 138, 160, 200));
+      ImGui::PushStyleColor(ImGuiCol_Button, *value ? (isLight ? IM_COL32(55, 115, 235, 255) : IM_COL32(90, 115, 205, 255))
+                                                    : (isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(58, 64, 82, 255)));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                            *value ? IM_COL32(108, 132, 220, 255) : IM_COL32(76, 83, 104, 255));
+                            *value ? (isLight ? IM_COL32(75, 135, 245, 255) : IM_COL32(108, 132, 220, 255))
+                                   : (isLight ? IM_COL32(208, 214, 225, 255) : IM_COL32(76, 83, 104, 255)));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                            *value ? IM_COL32(120, 144, 230, 255) : IM_COL32(88, 96, 118, 255));
+                            *value ? (isLight ? IM_COL32(40, 95, 215, 255) : IM_COL32(120, 144, 230, 255))
+                                   : (isLight ? IM_COL32(195, 202, 215, 255) : IM_COL32(88, 96, 118, 255)));
+      ImGui::PushStyleColor(ImGuiCol_Text, *value ? IM_COL32(255, 255, 255, 255)
+                                                  : (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255)));
       const bool clicked = ImGui::Button(label, ImVec2(width, 0));
-      ImGui::PopStyleColor(3);
-      ImGui::PopStyleColor();
+      ImGui::PopStyleColor(4);
       ImGui::PopStyleVar();
       if (clicked)
          *value = !*value;
@@ -5498,17 +5635,18 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
-                     IM_COL32(255, 255, 255, 10), 1.0f);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+                     ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       if (n->scopeCacheCount > 1)
       {
+         const bool isLight = IsThemeLight();
          const int count = n->scopeCacheCount;
          for (int pass = 0; pass < 2; pass++)
          {
@@ -5519,17 +5657,19 @@ namespace
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
             }
-            dl->PathStroke(pass == 0 ? IM_COL32(120, 200, 255, 46) : IM_COL32(150, 214, 255, 245), 0,
-                           pass == 0 ? 4.5f : 1.6f);
+            const ImU32 strokeCol = isLight
+               ? (pass == 0 ? IM_COL32(30, 110, 230, 50) : IM_COL32(20, 100, 230, 255))
+               : (pass == 0 ? IM_COL32(120, 200, 255, 46) : IM_COL32(150, 214, 255, 245));
+            dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
          }
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(120, 128, 150, 255), "idle");
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -5552,17 +5692,18 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
-                     IM_COL32(255, 255, 255, 10), 1.0f);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+                     ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       if (n->scopeCacheCount > 1)
       {
+         const bool isLight = IsThemeLight();
          const int count = n->scopeCacheCount;
          for (int pass = 0; pass < 2; pass++)
          {
@@ -5573,17 +5714,19 @@ namespace
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
             }
-            dl->PathStroke(pass == 0 ? IM_COL32(120, 200, 255, 46) : IM_COL32(150, 214, 255, 245), 0,
-                           pass == 0 ? 4.5f : 1.6f);
+            const ImU32 strokeCol = isLight
+               ? (pass == 0 ? IM_COL32(30, 110, 230, 50) : IM_COL32(20, 100, 230, 255))
+               : (pass == 0 ? IM_COL32(120, 200, 255, 46) : IM_COL32(150, 214, 255, 245));
+            dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
          }
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(120, 128, 150, 255), "idle");
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -5606,17 +5749,18 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, IM_COL32(11, 13, 16, 255), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
-                     IM_COL32(255, 255, 255, 10), 1.0f);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 24), 1.0f);
+                     ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       if (n->scopeCacheCount > 1)
       {
+         const bool isLight = IsThemeLight();
          const int count = n->scopeCacheCount;
          for (int pass = 0; pass < 2; pass++)
          {
@@ -5627,17 +5771,19 @@ namespace
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.44f));
             }
-            dl->PathStroke(pass == 0 ? IM_COL32(255, 190, 80, 48) : IM_COL32(255, 215, 120, 240), 0,
-                           pass == 0 ? 4.5f : 1.6f);
+            const ImU32 strokeCol = isLight
+               ? (pass == 0 ? IM_COL32(230, 140, 20, 50) : IM_COL32(210, 120, 10, 255))
+               : (pass == 0 ? IM_COL32(255, 190, 80, 48) : IM_COL32(255, 215, 120, 240));
+            dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
          }
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(140, 150, 165, 255), "strike / idle");
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "strike / idle");
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(68, 72, 88, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -5682,11 +5828,12 @@ namespace
          n->TriggerPreview(target);
       }
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       if (hasSample)
       {
@@ -5697,7 +5844,8 @@ namespace
             const float barW = std::max(1.0f, w / (float)count);
             const float top = midY - n->waveformMax[i] * h * 0.45f;
             const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom), IM_COL32(150, 214, 255, 200));
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
          }
 
          // Dim whatever the start/end range excludes, so the active loop
@@ -5705,24 +5853,28 @@ namespace
          // read numerically against each other.
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
          if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), IM_COL32(0, 0, 0, 130));
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
          if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, IM_COL32(0, 0, 0, 130));
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
 
          const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
-         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), IM_COL32(255, 200, 90, 230), 2.0f);
+         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
+                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 230), 2.0f);
 
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y), IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y), IM_COL32(220, 120, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
+                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
+                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(120, 128, 150, 255), "no sample loaded");
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
       if (hasSample)
       {
@@ -5739,8 +5891,8 @@ namespace
          const float grip = 8.0f;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = IM_COL32(220, 120, 150, 255);
+         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
+         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
@@ -5788,11 +5940,12 @@ namespace
          n->TriggerPreview(target);
       }
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       if (hasSample)
       {
@@ -5803,29 +5956,34 @@ namespace
             const float barW = std::max(1.0f, w / (float)count);
             const float top = midY - n->waveformMax[i] * h * 0.45f;
             const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom), IM_COL32(165, 180, 255, 210));
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(40, 100, 230, 210) : IM_COL32(165, 180, 255, 210));
          }
 
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
          if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), IM_COL32(0, 0, 0, 130));
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
          if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, IM_COL32(0, 0, 0, 130));
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
 
          const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
-         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), IM_COL32(255, 200, 90, 230), 2.0f);
+         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
+                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 230), 2.0f);
 
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y), IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y), IM_COL32(220, 120, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
+                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
+                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(120, 128, 150, 255), "no sample loaded");
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
       if (hasSample)
       {
@@ -5836,8 +5994,8 @@ namespace
          const float grip = 8.0f;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = IM_COL32(220, 120, 150, 255);
+         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
+         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
@@ -5884,11 +6042,12 @@ namespace
          n->Seek(frac);
       }
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       if (hasSample)
       {
@@ -5899,15 +6058,17 @@ namespace
             const float barW = std::max(1.0f, w / (float)count);
             const float top = midY - n->waveformMax[i] * h * 0.44f;
             const float bottom = midY - n->waveformMin[i] * h * 0.44f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom), IM_COL32(140, 160, 220, 175));
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(40, 90, 200, 200) : IM_COL32(140, 160, 220, 175));
          }
 
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 140);
          if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), IM_COL32(0, 0, 0, 140));
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
          if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, IM_COL32(0, 0, 0, 140));
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
 
          // Render active real-time grain particles/dots
          const auto& snap = n->VisualSnapshot();
@@ -5923,38 +6084,44 @@ namespace
 
             // Outer glow
             const int glowAlpha = (int)(gr.amp * 80.0f);
-            dl->AddCircleFilled(ImVec2(gx, gy), radius + 2.5f, IM_COL32(100, 220, 255, glowAlpha));
+            dl->AddCircleFilled(ImVec2(gx, gy), radius + 2.5f,
+                                isLight ? IM_COL32(20, 120, 230, glowAlpha) : IM_COL32(100, 220, 255, glowAlpha));
 
             // Core grain dot
             const int coreAlpha = std::min(255, (int)(gr.amp * 255.0f));
-            dl->AddCircleFilled(ImVec2(gx, gy), radius, IM_COL32(230, 248, 255, coreAlpha));
+            dl->AddCircleFilled(ImVec2(gx, gy), radius,
+                                isLight ? IM_COL32(20, 80, 200, coreAlpha) : IM_COL32(230, 248, 255, coreAlpha));
 
             // Small direction indicator / velocity streak
             const float dirLen = (gr.pitchRatio > 1.05f ? 4.0f : (gr.pitchRatio < 0.95f ? -4.0f : 0.0f));
             if (std::abs(dirLen) > 0.1f)
             {
                dl->AddLine(ImVec2(gx - dirLen, gy), ImVec2(gx + dirLen, gy),
-                           IM_COL32(255, 235, 160, (int)(gr.amp * 160.0f)), 1.5f);
+                           isLight ? IM_COL32(210, 130, 20, (int)(gr.amp * 180.0f)) : IM_COL32(255, 235, 160, (int)(gr.amp * 160.0f)), 1.5f);
             }
          }
 
          // Current playing playhead (pos)
          const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
-         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), IM_COL32(255, 205, 80, 235), 2.0f);
+         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
+                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 205, 80, 235), 2.0f);
          const float pGrip = 8.0f;
-         dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, origin.y), ImVec2(px + pGrip * 0.5f, origin.y), ImVec2(px, origin.y + pGrip), IM_COL32(255, 205, 80, 255));
-         dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, br.y), ImVec2(px + pGrip * 0.5f, br.y), ImVec2(px, br.y - pGrip), IM_COL32(255, 205, 80, 255));
+         const ImU32 pCol = isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 205, 80, 255);
+         dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, origin.y), ImVec2(px + pGrip * 0.5f, origin.y), ImVec2(px, origin.y + pGrip), pCol);
+         dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, br.y), ImVec2(px + pGrip * 0.5f, br.y), ImVec2(px, br.y - pGrip), pCol);
 
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y), IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y), IM_COL32(220, 120, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
+                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
+                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(120, 128, 150, 255), "no sample loaded");
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
       if (hasSample)
       {
@@ -5965,8 +6132,8 @@ namespace
          const float grip = 8.0f;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = IM_COL32(220, 120, 150, 255);
+         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
+         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
@@ -6002,7 +6169,7 @@ namespace
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 tl(x, y), br(x + w, y + h);
-      dl->AddRectFilled(tl, br, IM_COL32(11, 12, 16, 255), 2.0f);
+      dl->AddRectFilled(tl, br, ScopeBgCol(), 2.0f);
 
       // Calibrated to a fixed -60..0 dBFS window rather than linear
       // amplitude - a linear meter crushes the bottom 40 dB of useful range
@@ -6017,7 +6184,7 @@ namespace
       for (float db : kTicksDb)
       {
          const float t = dBToFrac(db);
-         dl->AddLine(ImVec2(x, br.y - h * t), ImVec2(br.x, br.y - h * t), IM_COL32(255, 255, 255, 26), 1.0f);
+         dl->AddLine(ImVec2(x, br.y - h * t), ImVec2(br.x, br.y - h * t), ScopeMidLineCol(), 1.0f);
       }
       const float db = levelToDb(std::max(0.0f, level));
       const float lvl = dBToFrac(db);
@@ -6031,7 +6198,7 @@ namespace
          dl->AddRectFilled(ImVec2(x + 1.0f, br.y - 1.0f - (h - 2.0f) * lvl),
                            ImVec2(br.x - 1.0f, br.y - 1.0f), col, 1.0f);
       }
-      dl->AddRect(tl, br, IM_COL32(58, 62, 76, 255), 2.0f);
+      dl->AddRect(tl, br, ScopeBorderCol(), 2.0f);
    }
 
    // The wavetable itself, drawn as a receding stack of single-cycle traces
@@ -6082,7 +6249,8 @@ namespace
          eng.position = x;
       }
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       // Perspective: each successive frame steps right and up by a fixed
@@ -6112,26 +6280,31 @@ namespace
             dl->PathLineTo(ImVec2(baseX + t * traceW, baseY - frame[idx] * amp));
          }
          const int alpha = isCurrent ? 255 : (int)(40.0f + focus * 120.0f);
-         dl->PathStroke(Fade(isCurrent ? IM_COL32(150, 214, 255, 255) : IM_COL32(96, 150, 205, alpha)), 0,
-                        isCurrent ? 2.2f : 1.0f);
+         const ImU32 frameStroke = isLight
+            ? (isCurrent ? IM_COL32(20, 100, 230, 255) : IM_COL32(70, 115, 175, alpha))
+            : (isCurrent ? IM_COL32(150, 214, 255, 255) : IM_COL32(96, 150, 205, alpha));
+         dl->PathStroke(Fade(frameStroke), 0, isCurrent ? 2.2f : 1.0f);
       }
 
       // Scrub handle along the bottom: without it the display looks like a
       // picture, and nothing says it can be dragged.
       const float handleX = origin.x + 10.0f + std::clamp(eng.position, 0.0f, 1.0f) * (w - 20.0f);
       dl->AddLine(ImVec2(handleX, origin.y + 3.0f), ImVec2(handleX, br.y - 3.0f),
-                  IM_COL32(255, 255, 255, hovered ? 90 : 42), 1.0f);
+                  isLight ? IM_COL32(0, 0, 0, hovered ? 120 : 60) : IM_COL32(255, 255, 255, hovered ? 90 : 42), 1.0f);
+      const ImU32 triCol = isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(190, 224, 255, 255);
       dl->AddTriangleFilled(ImVec2(handleX - 5.0f, br.y - 2.0f), ImVec2(handleX + 5.0f, br.y - 2.0f),
-                            ImVec2(handleX, br.y - 9.0f), Fade(IM_COL32(190, 224, 255, 255)));
+                            ImVec2(handleX, br.y - 9.0f), Fade(triCol));
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? IM_COL32(110, 140, 180, 255) : IM_COL32(64, 68, 84, 255), 4.0f);
-      dl->AddText(ImVec2(origin.x + 9.0f, origin.y + 5.0f), Fade(IM_COL32(160, 172, 196, 255)),
+      dl->AddRect(origin, br, hovered ? IM_COL32(110, 140, 180, 255) : ScopeBorderCol(), 4.0f);
+      dl->AddText(ImVec2(origin.x + 9.0f, origin.y + 5.0f),
+                  Fade(isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(160, 172, 196, 255)),
                   Wavetable::TableName(eng.table));
       char posText[24];
       snprintf(posText, sizeof(posText), "%.3f", eng.position);
       const ImVec2 sz = ImGui::CalcTextSize(posText);
-      dl->AddText(ImVec2(br.x - 9.0f - sz.x, origin.y + 5.0f), IM_COL32(140, 150, 172, 255), posText);
+      dl->AddText(ImVec2(br.x - 9.0f - sz.x, origin.y + 5.0f),
+                  isLight ? IM_COL32(60, 68, 85, 255) : IM_COL32(140, 150, 172, 255), posText);
       if (hovered)
          SetAudioReadout("position", posText);
    }
@@ -6218,8 +6391,9 @@ namespace
       if (ImGui::IsItemActivated())
          PushUndoCheckpoint();
 
+      const bool isLight = IsThemeLight();
       // Sleek rounded background
-      dl->AddRectFilled(origin, br, IM_COL32(11, 13, 18, 255), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       // Subtle horizontal level guidelines at 25%, 50%, 75%
@@ -6227,14 +6401,14 @@ namespace
       {
          const float gy = origin.y + h * (i / 4.0f);
          dl->AddLine(ImVec2(origin.x + 2.0f, gy), ImVec2(br.x - 2.0f, gy),
-                     IM_COL32(255, 255, 255, 12), 1.0f);
+                     ScopeGridCol(), 1.0f);
       }
 
       ADSRLayout layout = ComputeADSRLayout(origin, w, h, *attackMs, *decayMs, *sustain, *releaseMs, maxTimeMs);
 
       // Subtle sustain gate vertical zone highlight
       dl->AddRectFilled(ImVec2(layout.pD.x, layout.topY), ImVec2(layout.pS.x, layout.baseY),
-                        IM_COL32(255, 255, 255, 6));
+                        isLight ? IM_COL32(0, 0, 0, 8) : IM_COL32(255, 255, 255, 6));
 
       // Latch nearest handle on press and support smooth dragging
       static int sHeld = -1;
@@ -6355,7 +6529,8 @@ namespace
       for (const ImVec2& pt : curvePts)
          dl->PathLineTo(pt);
       dl->PathLineTo(ImVec2(layout.pR.x, layout.baseY));
-      const ImU32 fillCol = (color & 0x00FFFFFFu) | 0x2E000000u;
+      const ImU32 fillAlpha = isLight ? 0x4A000000u : 0x2E000000u;
+      const ImU32 fillCol = (color & 0x00FFFFFFu) | fillAlpha;
       dl->PathFillConvex(fillCol);
 
       // Draw antialiased curve stroke
@@ -6378,12 +6553,12 @@ namespace
          if (isHot)
             dl->AddCircleFilled(handlePts[i], radius + 3.0f, (color & 0x00FFFFFFu) | 0x40000000u, 14);
 
-         dl->AddCircleFilled(handlePts[i], radius, IM_COL32(240, 248, 255, 255), 14);
-         dl->AddCircle(handlePts[i], radius, IM_COL32(20, 24, 34, 230), 14, 1.4f);
+         dl->AddCircleFilled(handlePts[i], radius, isLight ? IM_COL32(255, 255, 255, 255) : IM_COL32(240, 248, 255, 255), 14);
+         dl->AddCircle(handlePts[i], radius, isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 24, 34, 230), 14, 1.4f);
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, (hovered || active) ? IM_COL32(110, 140, 180, 255) : IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, (hovered || active) ? IM_COL32(110, 140, 180, 255) : ScopeBorderCol(), 4.0f);
 
       // Rich Readout & Status info
       if (hovered || active)
@@ -6802,20 +6977,21 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
       const float amp = (h * 0.5f) - 12.0f;
 
       // Horizontal center line
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       // Vertical grid ticks
       for (int i = 1; i < 4; i++)
       {
          const float x = origin.x + w * ((float)i / 4.0f);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 12), 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
       }
 
       std::vector<ImVec2> pts;
@@ -6889,16 +7065,16 @@ namespace
       dl->PathClear();
       for (const auto& p : pts)
          dl->PathLineTo(p);
-      dl->PathStroke(IM_COL32(100, 190, 255, 50), 0, 4.5f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 45) : IM_COL32(100, 190, 255, 50), 0, 4.5f);
 
       // Core trace
       dl->PathClear();
       for (const auto& p : pts)
          dl->PathLineTo(p);
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(20, 100, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -7143,14 +7319,15 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, IM_COL32(11, 13, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
-                     IM_COL32(255, 255, 255, 10), 1.0f);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 24), 1.0f);
+                     ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       if (n->scopeCacheCount > 1)
       {
@@ -7165,13 +7342,13 @@ namespace
                dl->PathLineTo(ImVec2(origin.x + t * w, y));
             }
             if (pass == 0)
-               dl->PathStroke(IM_COL32(0, 220, 255, 45), 0, 4.0f);
+               dl->PathStroke(isLight ? IM_COL32(0, 160, 200, 45) : IM_COL32(0, 220, 255, 45), 0, 4.0f);
             else
-               dl->PathStroke(IM_COL32(50, 240, 255, 240), 0, 1.6f);
+               dl->PathStroke(isLight ? IM_COL32(0, 140, 210, 240) : IM_COL32(50, 240, 255, 240), 0, 1.6f);
          }
       }
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -7380,14 +7557,15 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, IM_COL32(11, 13, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
-                     IM_COL32(255, 255, 255, 10), 1.0f);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 24), 1.0f);
+                     ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       if (n->scopeCacheCount > 1)
       {
@@ -7402,13 +7580,13 @@ namespace
                dl->PathLineTo(ImVec2(origin.x + t * w, y));
             }
             if (pass == 0)
-               dl->PathStroke(IM_COL32(0, 240, 220, 45), 0, 4.0f);
+               dl->PathStroke(isLight ? IM_COL32(0, 170, 150, 45) : IM_COL32(0, 240, 220, 45), 0, 4.0f);
             else
-               dl->PathStroke(IM_COL32(50, 255, 230, 240), 0, 1.6f);
+               dl->PathStroke(isLight ? IM_COL32(0, 160, 140, 240) : IM_COL32(50, 255, 230, 240), 0, 1.6f);
          }
       }
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -8146,11 +8324,12 @@ namespace
             n->LoadFileToLane(lane, path);
       }
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 26), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       if (hasSample)
       {
@@ -8161,26 +8340,30 @@ namespace
             const float barW = std::max(1.0f, w / (float)count);
             const float top = midY - n->laneWaveMax[lane][i] * h * 0.45f;
             const float bottom = midY - n->laneWaveMin[lane][i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom), IM_COL32(150, 214, 255, 200));
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
          }
 
          const float startX = origin.x + w * std::clamp(n->laneStart[lane], 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->laneEnd[lane], 0.0f, 1.0f);
+         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
          if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), IM_COL32(0, 0, 0, 130));
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
          if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, IM_COL32(0, 0, 0, 130));
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
 
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y), IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y), IM_COL32(220, 120, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
+                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
+                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), IM_COL32(120, 128, 150, 255), "drop sample / click");
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "drop sample / click");
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
       if (hasSample)
       {
@@ -8999,7 +9182,8 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       static const int kWhiteOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
@@ -9016,8 +9200,10 @@ namespace
             const int note = lowNote + o * 12 + kWhiteOffsets[k];
             const bool on = note >= 0 && note < 128 && held[note];
             const float x = origin.x + 2.0f + (float)(o * 7 + k) * keyW;
+            const ImU32 whiteCol = on ? (isLight ? IM_COL32(50, 130, 245, 255) : IM_COL32(120, 200, 255, 245))
+                                      : (isLight ? IM_COL32(250, 250, 255, 255) : IM_COL32(206, 210, 222, 255));
             dl->AddRectFilled(ImVec2(x + 0.5f, origin.y + 3.0f), ImVec2(x + keyW - 0.5f, br.y - 3.0f),
-                              on ? IM_COL32(120, 200, 255, 245) : IM_COL32(206, 210, 222, 255), 2.0f);
+                              whiteCol, 2.0f);
          }
       }
       for (int o = 0; o < octaves; o++)
@@ -9027,13 +9213,15 @@ namespace
             const int note = lowNote + o * 12 + kBlackOffsets[k];
             const bool on = note >= 0 && note < 128 && held[note];
             const float x = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[k] + 1.0f) * keyW - keyW * 0.3f;
+            const ImU32 blackCol = on ? (isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255))
+                                      : (isLight ? IM_COL32(60, 65, 80, 255) : IM_COL32(26, 28, 36, 255));
             dl->AddRectFilled(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
-                              on ? IM_COL32(90, 170, 235, 255) : IM_COL32(26, 28, 36, 255), 2.0f);
+                              blackCol, 2.0f);
          }
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -9136,7 +9324,8 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       static const int kWhiteOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
@@ -9149,14 +9338,16 @@ namespace
       const int lastIn = n->LastNoteIn();
       const bool lastPassed = n->LastPassed();
 
-      auto KeyColor = [n](int note, bool isWhite) -> ImU32 {
+      auto KeyColor = [n, isLight](int note, bool isWhite) -> ImU32 {
          const bool inRange = note >= n->rangeLow && note <= n->rangeHigh;
          const int pc = ((note - n->root) % 12 + 12) % 12;
          const bool inScale = MusicTime::ScaleContainsPitchClass(n->scale, pc);
          const bool active = inRange && inScale;
          if (isWhite)
-            return active ? IM_COL32(206, 210, 222, 255) : IM_COL32(72, 76, 90, 255);
-         return active ? IM_COL32(90, 170, 235, 255) : IM_COL32(26, 28, 36, 255);
+            return active ? (isLight ? IM_COL32(250, 250, 255, 255) : IM_COL32(206, 210, 222, 255))
+                          : (isLight ? IM_COL32(200, 205, 218, 255) : IM_COL32(72, 76, 90, 255));
+         return active ? (isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255))
+                       : (isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(26, 28, 36, 255));
       };
 
       for (int o = 0; o < octaves; o++)
@@ -9187,7 +9378,7 @@ namespace
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -9376,19 +9567,20 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       for (int i = 1; i < 4; i++)
       {
          dl->AddLine(ImVec2(origin.x, origin.y + h * i / 4.0f), ImVec2(br.x, origin.y + h * i / 4.0f),
-                     IM_COL32(255, 255, 255, 10), 1.0f);
+                     ScopeGridCol(), 1.0f);
          dl->AddLine(ImVec2(origin.x + w * i / 4.0f, origin.y), ImVec2(origin.x + w * i / 4.0f, br.y),
-                     IM_COL32(255, 255, 255, 10), 1.0f);
+                     ScopeGridCol(), 1.0f);
       }
       // The linear reference (curve == 1) as a dim diagonal, so the knob's
       // effect reads relative to "unchanged" rather than in isolation.
-      dl->AddLine(ImVec2(origin.x, br.y), ImVec2(br.x, origin.y), IM_COL32(255, 255, 255, 30), 1.0f);
+      dl->AddLine(ImVec2(origin.x, br.y), ImVec2(br.x, origin.y), ScopeMidLineCol(), 1.0f);
 
       dl->PathClear();
       const int kSteps = 32;
@@ -9398,10 +9590,10 @@ namespace
          const float y = std::pow(x, curve);
          dl->PathLineTo(ImVec2(origin.x + x * w, br.y - y * h));
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -9565,11 +9757,14 @@ namespace
          const bool on = ((n->stepGates >> s) & 1) != 0;
          const bool isPlayhead = (playStep == s);
 
-         dl->AddRectFilled(cellMin, cellMax, IM_COL32(11, 12, 16, 255), 4.0f);
+         const bool isLight = IsThemeLight();
+         dl->AddRectFilled(cellMin, cellMax, isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(11, 12, 16, 255), 4.0f);
          if (on)
             dl->AddRectFilled(cellMin, cellMax,
-                               isPlayhead ? IM_COL32(225, 242, 255, 255) : IM_COL32(150, 214, 255, 200), 4.0f);
-         dl->AddRect(cellMin, cellMax, isPlayhead ? IM_COL32(255, 255, 255, 255) : IM_COL32(64, 68, 84, 255), 4.0f,
+                               isPlayhead ? (isLight ? IM_COL32(255, 255, 255, 255) : IM_COL32(225, 242, 255, 255))
+                                          : (isLight ? IM_COL32(40, 120, 235, 240) : IM_COL32(150, 214, 255, 200)), 4.0f);
+         dl->AddRect(cellMin, cellMax, isPlayhead ? (isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(255, 255, 255, 255))
+                                                  : (isLight ? IM_COL32(180, 188, 204, 255) : IM_COL32(64, 68, 84, 255)), 4.0f,
                      0, isPlayhead ? 2.0f : 1.0f);
 
          ImGui::PopID();
@@ -9963,23 +10158,17 @@ namespace
       const ImVec2 origin(rowOrigin.x + (fullW - w) * 0.5f, rowOrigin.y);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const ImVec2 center((origin.x + br.x) * 0.5f, (origin.y + br.y) * 0.5f);
       const float scale = (w * 0.5f - 6.0f) / BouncingBallsNode::kBound;
       auto ToScreen = [&](float x, float y) { return ImVec2(center.x + x * scale, center.y - y * scale); };
 
-      const ImU32 outlineCol = IM_COL32(150, 165, 190, 255);
+      const ImU32 outlineCol = isLight ? IM_COL32(140, 150, 175, 255) : IM_COL32(150, 165, 190, 255);
       const float outlineThickness = 5.0f;
       const float b = BouncingBallsNode::kBound;
-      // Triangle-only: the physics sim's vertices (kVx/kVy in
-      // AudioBouncingBallsNode) are centroid-centred, so a ball's raw
-      // (x, y) is in that same centroid-centred frame. The drawn outline
-      // below is shifted down by bboxCenterY to look bbox-centred instead -
-      // applying that same shift to ball positions keeps the drawn boundary
-      // and the physics boundary the same triangle, so balls stop bouncing
-      // off empty space above the outline / clipping past it below.
       const float triBboxCenterY = (b + -0.5f * b) * 0.5f;
       if (n->shape == BouncingBallsNode::kSquare)
       {
@@ -9987,10 +10176,6 @@ namespace
       }
       else if (n->shape == BouncingBallsNode::kTriangle)
       {
-         // Vertices centroid is above the bounding-box centre (an
-         // equilateral triangle's mass sits high in its own bbox), which
-         // reads as off-centre even though it's centred on centroid - shift
-         // down by the bbox/centroid gap so it visually centers instead.
          const ImVec2 p0 = ToScreen(0.0f, b - triBboxCenterY);
          const ImVec2 p1 = ToScreen(-0.8660254f * b, -0.5f * b - triBboxCenterY);
          const ImVec2 p2 = ToScreen(0.8660254f * b, -0.5f * b - triBboxCenterY);
@@ -10007,18 +10192,16 @@ namespace
       for (int i = 0; i < count; i++)
       {
          const ImVec2 p = ToScreen(bx[i], by[i] - ballShiftY);
-         // Flash bright orange for a moment right after a wall hit, settling
-         // back to the resting blue as the flash decays.
          const float flash = std::clamp(bf[i], 0.0f, 1.0f);
-         const ImU32 restCol = IM_COL32(120, 200, 255, 235);
-         const ImU32 hitCol = IM_COL32(255, 190, 90, 255);
+         const ImU32 restCol = isLight ? IM_COL32(30, 110, 230, 245) : IM_COL32(120, 200, 255, 235);
+         const ImU32 hitCol = isLight ? IM_COL32(230, 120, 20, 255) : IM_COL32(255, 190, 90, 255);
          const ImU32 col = ImGui::ColorConvertFloat4ToU32(
             ImLerp(ImGui::ColorConvertU32ToFloat4(restCol), ImGui::ColorConvertU32ToFloat4(hitCol), flash));
          dl->AddCircleFilled(p, n->ballSize * scale, col);
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 4.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::SetCursorScreenPos(rowOrigin);
       ImGui::Dummy(ImVec2(fullW, h));
    }
@@ -10211,7 +10394,8 @@ namespace
       if (ImGui::IsItemActivated())
          PushUndoCheckpoint();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       // Octave-ish frequency ticks and dB ticks - the graticule that keeps
@@ -10221,14 +10405,14 @@ namespace
       for (float f : kFreqTicks)
       {
          const float x = FilterVizFreqToX(f, origin.x, w);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 10), 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
       }
       static const float kDbTicks[] = { -12.0f, 0.0f, 12.0f };
       for (float db : kDbTicks)
       {
          const float y = FilterVizDbToY(db, origin.y, h);
          dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y),
-                     db == 0.0f ? IM_COL32(255, 255, 255, 40) : IM_COL32(255, 255, 255, 12), 1.0f);
+                     db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
       }
 
       const float type = n->Param("type");
@@ -10260,7 +10444,7 @@ namespace
          const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       // Two handles sharing the single ##filterCurve button above - the
       // round one sets freq/gain, the diamond sets Q. Q used to ride the
@@ -10317,7 +10501,8 @@ namespace
       dl->AddPolyline(qPts, 4, IM_COL32(20, 24, 32, 220), ImDrawFlags_Closed, 1.5f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? IM_COL32(110, 140, 180, 255) : IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, hovered ? (isLight ? IM_COL32(50, 120, 220, 255) : IM_COL32(110, 140, 180, 255))
+                                      : ScopeBorderCol(), 3.0f);
 
       if (isNear)
       {
@@ -10438,7 +10623,8 @@ namespace
       if (ImGui::IsItemActivated())
          PushUndoCheckpoint();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       static const float kFreqTicks[] = { 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f,
@@ -10446,14 +10632,14 @@ namespace
       for (float f : kFreqTicks)
       {
          const float x = FilterVizFreqToX(f, origin.x, w);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 10), 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
       }
       static const float kDbTicks[] = { -12.0f, 0.0f, 12.0f };
       for (float db : kDbTicks)
       {
          const float y = FilterVizDbToY(db, origin.y, h);
          dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y),
-                     db == 0.0f ? IM_COL32(255, 255, 255, 40) : IM_COL32(255, 255, 255, 12), 1.0f);
+                     db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
       }
 
       EqBandValues bands[5];
@@ -10525,7 +10711,7 @@ namespace
          const float y0 = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          const float y1 = FilterVizDbToY(cache.curveDb[i + 1], origin.y, h);
          dl->AddQuadFilled(ImVec2(x0, baselineY), ImVec2(x1, baselineY), ImVec2(x1, y1), ImVec2(x0, y0),
-                           IM_COL32(150, 214, 255, 22));
+                           isLight ? IM_COL32(30, 110, 230, 30) : IM_COL32(150, 214, 255, 22));
       }
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
@@ -10534,7 +10720,7 @@ namespace
          const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       // Handle positions for every band - one dot (freq/gain) and one
       // diamond (Q) each, sharing the single ##eqCurve button above for the
@@ -10659,7 +10845,8 @@ namespace
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? IM_COL32(110, 140, 180, 255) : IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, hovered ? (isLight ? IM_COL32(50, 120, 220, 255) : IM_COL32(110, 140, 180, 255))
+                                      : ScopeBorderCol(), 3.0f);
 
       if (hovered || active)
       {
@@ -10789,7 +10976,8 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       static const float kDbTicks[] = { -48.0f, -36.0f, -24.0f, -12.0f, 0.0f };
@@ -10797,12 +10985,12 @@ namespace
       {
          const float x = DynVizDbToX(db, origin.x, curveW);
          const float y = DynVizDbToY(db, origin.y, h);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, db == 0.0f ? 30 : 10), 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
          dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + curveW, y),
-                     IM_COL32(255, 255, 255, db == 0.0f ? 30 : 10), 1.0f);
+                     db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
          char tickBuf[8];
          snprintf(tickBuf, sizeof(tickBuf), "%.0f", db);
-         dl->AddText(ImVec2(origin.x + 3.0f, y - (db == 0.0f ? 14.0f : 1.0f)), IM_COL32(150, 158, 176, 130), tickBuf);
+         dl->AddText(ImVec2(origin.x + 3.0f, y - (db == 0.0f ? 14.0f : 1.0f)), ScopeTextCol(), tickBuf);
       }
 
       // 1:1 reference diagonal (unprocessed signal), dim.
@@ -10821,10 +11009,10 @@ namespace
          const float yDb = DynamicsDsp::GainComputerDb(xDb, threshold, ratio) + makeupDb;
          dl->PathLineTo(ImVec2(x, DynVizDbToY(yDb, origin.y, h)));
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -10892,7 +11080,8 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 origin(x, y);
       const ImVec2 br(x + w, y + h);
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 3.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
       dl->PushClipRect(origin, br, true);
 
       const float grDb = std::clamp(n->ExtraMeterValue(0), 0.0f, 20.0f);
@@ -10902,18 +11091,19 @@ namespace
       {
          const float t = std::clamp(-db / 20.0f, 0.0f, 1.0f);
          const float ty = y + t * h;
-         dl->AddLine(ImVec2(x, ty), ImVec2(br.x, ty), IM_COL32(255, 255, 255, db == 0.0f ? 40 : 16), 1.0f);
+         dl->AddLine(ImVec2(x, ty), ImVec2(br.x, ty), db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
          char buf[8];
          snprintf(buf, sizeof(buf), "%.0f", db);
-         dl->AddText(ImVec2(x + 3.0f, ty - (db == 0.0f ? 12.0f : 1.0f)), IM_COL32(150, 158, 176, 150), buf);
+         dl->AddText(ImVec2(x + 3.0f, ty - (db == 0.0f ? 12.0f : 1.0f)), ScopeTextCol(), buf);
       }
 
       const float barBottom = y + std::clamp(grDb / 20.0f, 0.0f, 1.0f) * h;
       if (barBottom > y + 1.0f)
-         dl->AddRectFilled(ImVec2(x + 4.0f, y), ImVec2(br.x - 4.0f, barBottom), IM_COL32(255, 160, 60, 220), 2.0f);
+         dl->AddRectFilled(ImVec2(x + 4.0f, y), ImVec2(br.x - 4.0f, barBottom),
+                           isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 160, 60, 220), 2.0f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -10976,14 +11166,15 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       // Amplitude gridlines, same 25%-step reading aid Dynamics/Reverb use.
       for (int i = 1; i < 4; i++)
       {
          const float y = origin.y + barsH - (float)i * 0.25f * barsH;
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), IM_COL32(255, 255, 255, 10), 1.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), ScopeGridCol(), 1.0f);
       }
 
       const bool sync = n->Param("sync") != 0.0f;
@@ -11007,16 +11198,16 @@ namespace
          const float x = origin.x + std::clamp(t / windowSeconds, 0.0f, 1.0f) * w;
          const float barTopY = origin.y + barsH - amp * barsH;
          dl->AddRectFilled(ImVec2(x - barHalfW, barTopY), ImVec2(x + barHalfW, origin.y + barsH),
-                           IM_COL32(150, 214, 255, 220));
+                           isLight ? IM_COL32(30, 110, 230, 230) : IM_COL32(150, 214, 255, 220));
          amp *= feedback;
          t += baseSeconds;
       }
 
-      dl->AddLine(ImVec2(origin.x, origin.y + barsH), ImVec2(br.x, origin.y + barsH), IM_COL32(255, 255, 255, 30),
+      dl->AddLine(ImVec2(origin.x, origin.y + barsH), ImVec2(br.x, origin.y + barsH), ScopeMidLineCol(),
                   1.0f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -11110,42 +11301,29 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float predelaySeconds = n->Param("predelay") * 0.001f;
       const float decaySeconds = std::max(0.05f, n->Param("decay"));
       const float dampFrac = std::clamp(n->Param("damping"), 0.0f, 1.0f);
-      // Fixed axis, not proportional to decay: decay's range is 0.1-20s, and
-      // a window sized to predelay+decay renormalizes every value to the
-      // same on-screen shape (the curve is plotted as a function of
-      // t/windowSeconds, so scaling the window by decay cancels decay's
-      // visible effect entirely - the knob moved the param but the curve
-      // never looked different). A fixed window lets short decays visibly
-      // drop to the floor early and long decays visibly still be
-      // descending at the right edge.
       const float windowSeconds = 5.0f;
 
-      // Time gridlines every second and amplitude gridlines every -20dB,
-      // same reading aid Dynamics' dB grid gives its transfer curve.
       for (int sec = 1; sec < (int)windowSeconds; sec++)
       {
          const float x = origin.x + ((float)sec / windowSeconds) * w;
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 10), 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
       }
       for (int i = 1; i < 4; i++)
       {
          const float y = br.y - (float)i * 0.25f * (h - 6.0f);
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), IM_COL32(255, 255, 255, 10), 1.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), ScopeGridCol(), 1.0f);
       }
 
       const float predelayX = origin.x + std::clamp(predelaySeconds / windowSeconds, 0.0f, 1.0f) * w;
-      dl->AddLine(ImVec2(predelayX, origin.y), ImVec2(predelayX, br.y), IM_COL32(255, 255, 255, 24), 1.0f);
+      dl->AddLine(ImVec2(predelayX, origin.y), ImVec2(predelayX, br.y), ScopeMidLineCol(), 1.0f);
 
-      // Exponential -60dB decay from the predelay point, damping bends the
-      // curve to fall faster than a straight exponential (illustrative -
-      // damping's real effect is frequency-dependent, this shows the overall
-      // energy trend a user can read at a glance).
       dl->PathClear();
       const int kNumPoints = 64;
       for (int i = 0; i < kNumPoints; i++)
@@ -11159,16 +11337,16 @@ namespace
             const float tailT = t - predelaySeconds;
             const float rt60Frac = std::clamp(tailT / decaySeconds, 0.0f, 4.0f);
             const float shapedFrac = rt60Frac * (1.0f + dampFrac * 0.5f);
-            amp = std::pow(10.0f, -3.0f * shapedFrac); // -60dB at shapedFrac == 1
+            amp = std::pow(10.0f, -3.0f * shapedFrac);
          }
          const float x = origin.x + (t / windowSeconds) * w;
          const float y = br.y - amp * (h - 6.0f);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -11227,7 +11405,8 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       // Center gridlines (x=0, y=0) plus quarter-amplitude ticks, the same
@@ -11237,12 +11416,12 @@ namespace
          const float x = origin.x + (0.5f + 0.25f * (float)i) * w;
          const float y = origin.y + (0.5f - 0.25f * (float)i) * h;
          const bool center = (i == 0);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, center ? 30 : 10), 1.0f);
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), IM_COL32(255, 255, 255, center ? 30 : 10), 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), center ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), center ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
       }
 
       // 1:1 reference diagonal (unshaped signal), dim.
-      dl->AddLine(ImVec2(origin.x, br.y), ImVec2(br.x, origin.y), IM_COL32(255, 255, 255, 24), 1.0f);
+      dl->AddLine(ImVec2(origin.x, br.y), ImVec2(br.x, origin.y), ScopeMidLineCol(), 1.0f);
 
       const float driveDb = n->Param("drive");
       const float bias = n->Param("bias");
@@ -11258,10 +11437,10 @@ namespace
          const float y = origin.y + (0.5f - 0.5f * yOut) * h;
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -11320,7 +11499,8 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       for (int i = -2; i <= 2; i++)
@@ -11328,12 +11508,12 @@ namespace
          const float x = origin.x + (0.5f + 0.25f * (float)i) * w;
          const float y = origin.y + (0.5f - 0.25f * (float)i) * h;
          const bool center = (i == 0);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, center ? 30 : 10), 1.0f);
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), IM_COL32(255, 255, 255, center ? 30 : 10), 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), center ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y), center ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
       }
 
       // 1:1 reference diagonal (unshaped signal), dim.
-      dl->AddLine(ImVec2(origin.x, br.y), ImVec2(br.x, origin.y), IM_COL32(255, 255, 255, 24), 1.0f);
+      dl->AddLine(ImVec2(origin.x, br.y), ImVec2(br.x, origin.y), ScopeMidLineCol(), 1.0f);
 
       const int table = (int)(n->Param("table") + 0.5f);
       const float position = n->Param("position");
@@ -11352,17 +11532,17 @@ namespace
          const float y = origin.y + (0.5f - 0.5f * yOut) * h;
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       // Live operating-point dot at the kernel's last input sample.
       const float lastIn = std::clamp(n->ExtraMeterValue(0), -1.0f, 1.0f);
       const float lastOut =
          std::clamp(WavetableShaperDsp::Shape(lastIn, table, position, driveDb, bias, smooth), -1.0f, 1.0f);
       const ImVec2 dot(origin.x + (0.5f + 0.5f * lastIn) * w, origin.y + (0.5f - 0.5f * lastOut) * h);
-      dl->AddCircleFilled(dot, 3.5f, IM_COL32(255, 214, 120, 230));
+      dl->AddCircleFilled(dot, 3.5f, isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 214, 120, 230));
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -11433,7 +11613,8 @@ namespace
       const ImVec2 apex(origin.x + w * 0.5f, br.y - 20.0f);
       const float radius = std::min(w * 0.48f, h - 26.0f);
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       // Concentric dB rings, apex-centered, sweeping only the upper half.
@@ -11443,21 +11624,19 @@ namespace
          const float r = radius * (float)i / (float)kNumRings;
          dl->PathClear();
          dl->PathArcTo(apex, r, (float)M_PI, 2.0f * (float)M_PI, 32);
-         dl->PathStroke(IM_COL32(255, 255, 255, 22), 0, 1.0f);
+         dl->PathStroke(ScopeGridCol(), 0, 1.0f);
       }
-      dl->AddLine(ImVec2(apex.x, apex.y), ImVec2(apex.x, apex.y - radius), IM_COL32(255, 255, 255, 30), 1.0f);
-      dl->AddLine(ImVec2(apex.x - radius, apex.y), ImVec2(apex.x + radius, apex.y), IM_COL32(255, 255, 255, 22), 1.0f);
+      dl->AddLine(ImVec2(apex.x, apex.y), ImVec2(apex.x, apex.y - radius), ScopeMidLineCol(), 1.0f);
+      dl->AddLine(ImVec2(apex.x - radius, apex.y), ImVec2(apex.x + radius, apex.y), ScopeMidLineCol(), 1.0f);
 
-      // dB scale along the baseline: loud (0 dB) at the outer edges, quiet
-      // (-24 dB) at the center apex, mirrored left/right.
       static const char* kDbLabels[] = { "0", "-6", "-12", "-18", "-24" };
       for (int i = 0; i < kNumRings; i++)
       {
          const float t = (float)i / (float)kNumRings;
          const float x = apex.x - radius + t * radius;
-         dl->AddText(ImVec2(x - 6.0f, apex.y + 4.0f), IM_COL32(150, 158, 176, 160), kDbLabels[kNumRings - 1 - i]);
+         dl->AddText(ImVec2(x - 6.0f, apex.y + 4.0f), ScopeTextCol(), kDbLabels[kNumRings - 1 - i]);
          const float xr = apex.x + radius - t * radius;
-         dl->AddText(ImVec2(xr - 6.0f, apex.y + 4.0f), IM_COL32(150, 158, 176, 160), kDbLabels[kNumRings - 1 - i]);
+         dl->AddText(ImVec2(xr - 6.0f, apex.y + 4.0f), ScopeTextCol(), kDbLabels[kNumRings - 1 - i]);
       }
 
       const float width = std::clamp(n->Param("width"), 0.0f, 2.0f);
@@ -11481,23 +11660,24 @@ namespace
       dl->PathLineTo(apex);
       dl->PathLineTo(leftPt);
       dl->PathLineTo(rightPt);
-      dl->PathFillConvex(IM_COL32(150, 130, 230, 90));
+      dl->PathFillConvex(isLight ? IM_COL32(110, 90, 210, 80) : IM_COL32(150, 130, 230, 90));
 
       dl->PathClear();
       dl->PathLineTo(leftPt);
       dl->PathLineTo(apex);
       dl->PathLineTo(rightPt);
-      dl->PathStroke(IM_COL32(190, 170, 255, 235), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(120, 80, 230, 235) : IM_COL32(190, 170, 255, 235), 0, 1.8f);
 
       if (bassMonoHz > 0.0f)
       {
          char blo[24];
          snprintf(blo, sizeof(blo), "mono <%.0f Hz", bassMonoHz);
-         dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), IM_COL32(255, 196, 120, 210), blo);
+         dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f),
+                     isLight ? IM_COL32(210, 100, 20, 230) : IM_COL32(255, 196, 120, 210), blo);
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -11540,25 +11720,26 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 20), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeGridCol(), 1.0f);
       const float centerX = origin.x + 0.5f * w;
-      dl->AddLine(ImVec2(centerX, origin.y), ImVec2(centerX, br.y), IM_COL32(255, 255, 255, 30), 1.0f);
+      dl->AddLine(ImVec2(centerX, origin.y), ImVec2(centerX, br.y), ScopeMidLineCol(), 1.0f);
 
       const float pitch = std::clamp(n->Param("pitch"), -24.0f, 24.0f);
       const float t = 0.5f + 0.5f * (pitch / 24.0f);
       const float markX = origin.x + t * w;
-      dl->AddCircleFilled(ImVec2(markX, midY), 6.0f, IM_COL32(150, 214, 255, 245));
+      dl->AddCircleFilled(ImVec2(markX, midY), 6.0f, isLight ? IM_COL32(30, 110, 230, 245) : IM_COL32(150, 214, 255, 245));
 
       char buf[32];
       snprintf(buf, sizeof(buf), "%+.1f st", pitch);
-      dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), IM_COL32(220, 226, 236, 220), buf);
+      dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), ScopeTextCol(), buf);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
          SetAudioReadout("pitch shifter", buf);
@@ -11632,11 +11813,12 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 16), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       const int taps = n->Param("taps") >= 2.5f ? 3 : 2;
       const float spread = std::clamp(n->Param("spread"), 0.0f, 1.0f);
@@ -11659,15 +11841,15 @@ namespace
             const float y = midY - amp * sinf(2.0f * (float)M_PI * (t * 2.0f + phaseOffset));
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(IM_COL32(150, 214, 255, alpha), 0, 1.5f + feedback * 1.5f);
+         dl->PathStroke(isLight ? IM_COL32(30, 110, 230, alpha) : IM_COL32(150, 214, 255, alpha), 0, 1.5f + feedback * 1.5f);
       }
 
       char buf[24];
       snprintf(buf, sizeof(buf), "%.1f ms", delayMs);
-      dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), IM_COL32(220, 226, 236, 200), buf);
+      dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), ScopeTextCol(), buf);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -11738,7 +11920,8 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -11758,7 +11941,7 @@ namespace
          const float y = midY - (h * 0.1f) * sinf(2.0f * (float)M_PI * t * rippleFreq);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(IM_COL32(255, 255, 255, 36), 0, 1.0f);
+      dl->PathStroke(ScopeMidLineCol(), 0, 1.0f);
 
       auto drawWet = [&](float phaseOffset, int alpha) {
          dl->PathClear();
@@ -11771,17 +11954,17 @@ namespace
             const float y = midY - envelope - ripple;
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(IM_COL32(150, 214, 255, alpha), 0, 1.4f + std::fabs(feedback) * 2.2f);
+         dl->PathStroke(isLight ? IM_COL32(30, 110, 230, alpha) : IM_COL32(150, 214, 255, alpha), 0, 1.4f + std::fabs(feedback) * 2.2f);
       };
       drawWet(0.0f, 235);
       drawWet(0.25f, 120);
 
       char buf[24];
       snprintf(buf, sizeof(buf), "%.2f ms", delayMs);
-      dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), IM_COL32(220, 226, 236, 200), buf);
+      dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), ScopeTextCol(), buf);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -11844,7 +12027,8 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float logMin = log10f(50.0f), logMax = log10f(8000.0f);
@@ -11855,7 +12039,7 @@ namespace
       for (float hz : { 100.0f, 300.0f, 1000.0f, 3000.0f })
       {
          const float x = freqToX(hz);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 12), 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
       }
 
       const float cutoff = n->Param("cutoff");
@@ -11886,14 +12070,14 @@ namespace
             const float y = br.y - 6.0f - mag * (h - 16.0f);
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(IM_COL32(150, 214, 255, alpha), 0, 1.6f);
+         dl->PathStroke(isLight ? IM_COL32(30, 110, 230, alpha) : IM_COL32(150, 214, 255, alpha), 0, 1.6f);
       };
       drawTrace(1.0f, 235);
       if (spread > 0.01f)
          drawTrace(powf(2.0f, spread * 0.5f), 110);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -11954,7 +12138,8 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float rateHz = std::max(100.0f, n->Param("rate"));
@@ -11985,24 +12170,17 @@ namespace
          pts[i] = ImVec2(x, y);
       }
 
-      // Per-segment trapezoid fill, not one PathFillConvex over the whole
-      // curve - a staircase/step function is not convex, and ImGui's convex
-      // fill triangulates as a fan from vertex 0, which draws stray diagonal
-      // slashes across any concave step. Each segment's quad (two adjacent
-      // curve points plus their baseline projections) is always convex on
-      // its own, so filling them one at a time is artifact-free regardless
-      // of the curve's overall shape.
       for (int i = 0; i < kNumSteps - 1; i++)
          dl->AddQuadFilled(pts[i], pts[i + 1], ImVec2(pts[i + 1].x, baseY), ImVec2(pts[i].x, baseY),
-                            IM_COL32(150, 110, 230, 110));
+                            isLight ? IM_COL32(110, 80, 210, 80) : IM_COL32(150, 110, 230, 110));
 
       dl->PathClear();
       for (int i = 0; i < kNumSteps; i++)
          dl->PathLineTo(pts[i]);
-      dl->PathStroke(IM_COL32(190, 160, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(120, 80, 230, 245) : IM_COL32(190, 160, 255, 245), 0, 1.8f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       char buf[48];
       snprintf(buf, sizeof(buf), "%.0f Hz - %.0f bit", rateHz, bits);
@@ -12063,30 +12241,20 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float attackDb = n->Param("attack");
       const float sustainDb = n->Param("sustain");
 
-      // Fixed ~400 ms window so the kernel's 30 ms/300 ms follower
-      // constants are both legible on the curve.
       const float kWindowSec = 0.4f;
       const int kNumPoints = 96;
 
-      // env(t): the unshaped "hit" being fed into the shaper - fast rise,
-      // exponential decay - same shape as before, now just the input
-      // signal rather than the whole picture.
       auto envAt = [](float t) {
          return t < 0.08f ? (t / 0.08f) : expf(-(t - 0.08f) * 6.0f);
       };
 
-      // tau(t): transient weight, 1 at the hit decaying with the fast
-      // follower's 30 ms release as the slow follower catches up. This is
-      // an analytic approximation of the kernel's actual dual-peak-follower
-      // detector (TransientShaperKernel::ProcessBlock), not a step of the
-      // real recursion - stepping the real fastAtk/fastRel/slowAtk/slowRel
-      // filters here would mean ~17k iterations per frame per visible node.
       auto tauAt = [](float tSec) {
          return expf(-tSec / 0.030f);
       };
@@ -12094,7 +12262,6 @@ namespace
       float peakDb = -1000.0f;
       float peakX = origin.x, peakY = origin.y;
 
-      // Dim reference line: the unshaped envelope with both params at 0 dB.
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
       {
@@ -12105,9 +12272,8 @@ namespace
          const float y = TsVizDbToY(ampDb, origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 60), 0, 1.5f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 60) : IM_COL32(150, 214, 255, 60), 0, 1.5f);
 
-      // Live curve: env(t) shaped by the attack/sustain crossfade.
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
       {
@@ -12127,13 +12293,14 @@ namespace
             peakY = y;
          }
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       const float transientAmount = std::clamp(n->ExtraMeterValue(0), 0.0f, 1.0f);
-      dl->AddCircleFilled(ImVec2(peakX, peakY), 3.0f + transientAmount * 4.0f, IM_COL32(255, 196, 120, 230));
+      dl->AddCircleFilled(ImVec2(peakX, peakY), 3.0f + transientAmount * 4.0f,
+                          isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 196, 120, 230));
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -12194,10 +12361,11 @@ namespace
          }
          const bool on = (mask & (1 << i)) != 0;
          const bool hovered = ImGui::IsItemHovered();
-         const ImU32 col = on ? IM_COL32(120, 200, 255, hovered ? 255 : 215)
-                               : IM_COL32(56, 60, 74, hovered ? 210 : 160);
+         const bool isLight = IsThemeLight();
+         const ImU32 col = on ? (isLight ? IM_COL32(30, 110, 230, hovered ? 255 : 220) : IM_COL32(120, 200, 255, hovered ? 255 : 215))
+                               : (isLight ? IM_COL32(220, 225, 235, hovered ? 245 : 215) : IM_COL32(56, 60, 74, hovered ? 210 : 160));
          dl->AddRectFilled(p0, p1, col, 3.0f);
-         dl->AddRect(p0, p1, IM_COL32(64, 68, 84, 255), 3.0f, 0, 1.0f);
+         dl->AddRect(p0, p1, ScopeBorderCol(), 3.0f, 0, 1.0f);
          ImGui::PopID();
       }
 
@@ -12262,11 +12430,12 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), IM_COL32(255, 255, 255, 16), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
       const int waveform = std::clamp((int)(n->Param("waveform") + 0.5f), 0, (int)DspMath::kWaveSquare);
       const float amp = h * 0.5f - 6.0f;
@@ -12283,10 +12452,10 @@ namespace
          const float y = midY - v * amp;
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -12336,7 +12505,8 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float shift = n->Param("shift");
@@ -12346,9 +12516,9 @@ namespace
       const float botY = origin.y + h * 0.72f;
 
       // Center frequency axis & rows
-      dl->AddLine(ImVec2(origin.x + 12.0f, topY), ImVec2(br.x - 12.0f, topY), IM_COL32(255, 255, 255, 18), 1.0f);
-      dl->AddLine(ImVec2(origin.x + 12.0f, botY), ImVec2(br.x - 12.0f, botY), IM_COL32(255, 255, 255, 18), 1.0f);
-      dl->AddLine(ImVec2(midX, origin.y + 6.0f), ImVec2(midX, br.y - 6.0f), IM_COL32(255, 255, 255, 25), 1.0f);
+      dl->AddLine(ImVec2(origin.x + 12.0f, topY), ImVec2(br.x - 12.0f, topY), ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x + 12.0f, botY), ImVec2(br.x - 12.0f, botY), ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(midX, origin.y + 6.0f), ImVec2(midX, br.y - 6.0f), ScopeMidLineCol(), 1.0f);
 
       // Partials comb: 7 evenly spaced input partials
       const int kNumPartials = 7;
@@ -12361,8 +12531,9 @@ namespace
 
       // Arrow & shifted partial color: amber for up-shift, coral/magenta for down-shift, blue-grey for zero
       const ImU32 arrowCol = (shift > 0.5f)
-         ? IM_COL32(255, 185, 70, 230)
-         : ((shift < -0.5f) ? IM_COL32(255, 110, 130, 230) : IM_COL32(140, 160, 195, 180));
+         ? (isLight ? IM_COL32(210, 120, 20, 240) : IM_COL32(255, 185, 70, 230))
+         : ((shift < -0.5f) ? (isLight ? IM_COL32(220, 40, 70, 240) : IM_COL32(255, 110, 130, 230))
+                            : (isLight ? IM_COL32(90, 105, 130, 200) : IM_COL32(140, 160, 195, 180)));
 
       for (int i = 0; i < kNumPartials; i++)
       {
@@ -12370,7 +12541,8 @@ namespace
          const float xOutL = xIn + dxL;
 
          // Input partial tick (upper row)
-         dl->AddLine(ImVec2(xIn, topY - 7.0f), ImVec2(xIn, topY + 3.0f), IM_COL32(150, 170, 205, 210), 1.5f);
+         dl->AddLine(ImVec2(xIn, topY - 7.0f), ImVec2(xIn, topY + 3.0f),
+                     isLight ? IM_COL32(70, 90, 130, 220) : IM_COL32(150, 170, 205, 210), 1.5f);
 
          // Shifted partial tick (lower row)
          dl->AddLine(ImVec2(xOutL, botY - 3.0f), ImVec2(xOutL, botY + 7.0f), arrowCol, 1.8f);
@@ -12379,7 +12551,6 @@ namespace
          dl->AddLine(ImVec2(xIn, topY + 3.0f), ImVec2(xOutL, botY - 3.0f), arrowCol, 1.2f);
          if (std::fabs(dxL) > 1.5f || std::fabs(topY - botY) > 5.0f)
          {
-            // Small arrowhead at destination
             const float arrowSz = 3.0f;
             dl->AddTriangleFilled(ImVec2(xOutL, botY - 2.0f),
                                   ImVec2(xOutL - arrowSz, botY - 2.0f - arrowSz * 1.5f),
@@ -12387,20 +12558,19 @@ namespace
                                   arrowCol);
          }
 
-         // If spread is active, draw secondary right-channel shifted ticks in dimmer tone
          if (spread > 0.5f)
          {
             const float shiftRFrac = std::clamp((shift + spread) / maxShiftSpan, -1.0f, 1.0f);
             const float dxR = shiftRFrac * kMaxShiftPix;
             const float xOutR = xIn + dxR;
             const ImU32 spreadCol = (shift + spread > 0.5f)
-               ? IM_COL32(255, 205, 110, 120)
-               : ((shift + spread < -0.5f) ? IM_COL32(255, 140, 160, 120) : IM_COL32(140, 160, 195, 100));
+               ? (isLight ? IM_COL32(210, 140, 40, 140) : IM_COL32(255, 205, 110, 120))
+               : ((shift + spread < -0.5f) ? (isLight ? IM_COL32(210, 80, 100, 140) : IM_COL32(255, 140, 160, 120))
+                                           : (isLight ? IM_COL32(90, 105, 130, 120) : IM_COL32(140, 160, 195, 100)));
             dl->AddLine(ImVec2(xOutR, botY - 2.0f), ImVec2(xOutR, botY + 6.0f), spreadCol, 1.2f);
          }
       }
 
-      // Large numeric Hz / kHz readout rendered inside the panel
       char valBuf[64];
       auto FmtFreq = [](float f, char* b, size_t sz, bool withSign) {
          if (std::fabs(f) >= 1000.0f)
@@ -12422,10 +12592,11 @@ namespace
       }
 
       const ImVec2 textSz = ImGui::CalcTextSize(valBuf);
-      dl->AddText(ImVec2(br.x - textSz.x - 10.0f, origin.y + 8.0f), IM_COL32(230, 238, 255, 240), valBuf);
+      dl->AddText(ImVec2(br.x - textSz.x - 10.0f, origin.y + 8.0f),
+                  isLight ? IM_COL32(40, 55, 80, 240) : IM_COL32(230, 238, 255, 240), valBuf);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -12488,7 +12659,8 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const int shape = std::clamp((int)(n->Param("shape") + 0.5f), 0, 3);
@@ -12509,16 +12681,6 @@ namespace
       };
 
       const int kNumPoints = 128;
-
-      // Filled area under the left-channel envelope - per-segment trapezoid
-      // fill, not one PathFillConvex over the whole curve. A two-cycle
-      // envelope (let alone ramp-down's sawtooth) is not convex, and ImGui's
-      // convex fill triangulates as a fan from vertex 0, which draws stray
-      // diagonal slashes across every concave dip. Each segment's quad (two
-      // adjacent curve points plus their baseline projections) is always
-      // convex on its own, so filling them one at a time is artifact-free
-      // regardless of the curve's overall shape (see DrawBitcrushVisualizer,
-      // same fix for the same reason).
       ImVec2 envPts[kNumPoints];
       for (int i = 0; i < kNumPoints; i++)
       {
@@ -12528,12 +12690,12 @@ namespace
       }
       for (int i = 0; i < kNumPoints - 1; i++)
          dl->AddQuadFilled(envPts[i], envPts[i + 1], ImVec2(envPts[i + 1].x, br.y), ImVec2(envPts[i].x, br.y),
-                            IM_COL32(150, 214, 255, 60));
+                            isLight ? IM_COL32(30, 110, 230, 45) : IM_COL32(150, 214, 255, 60));
 
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
          dl->PathLineTo(envPts[i]);
-      dl->PathStroke(IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       if (stereoPhaseCycles > 0.0f)
       {
@@ -12544,11 +12706,11 @@ namespace
             const float x = origin.x + (float)i / (float)(kNumPoints - 1) * w;
             dl->PathLineTo(ImVec2(x, envelopeY(phase)));
          }
-         dl->PathStroke(IM_COL32(150, 214, 255, 110), 0, 1.4f);
+         dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 110) : IM_COL32(150, 214, 255, 110), 0, 1.4f);
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -12626,7 +12788,8 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, br, IM_COL32(11, 12, 16, 255), 4.0f);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float logMin = log10f(100.0f), logMax = log10f(5000.0f);
@@ -12638,7 +12801,7 @@ namespace
       for (float hz : { 100.0f, 300.0f, 1000.0f, 3000.0f })
       {
          const float x = freqToX(hz);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), IM_COL32(255, 255, 255, 12), 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
       }
 
       const FormantDsp::Formants f = FormantDsp::VowelFormants(n->Param("vowel"));
@@ -12649,12 +12812,13 @@ namespace
       {
          const float x = freqToX(formants[i]);
          const float peakY = br.y - 6.0f - weights[i] * (h - 20.0f);
-         dl->AddLine(ImVec2(x, br.y - 6.0f), ImVec2(x, peakY), IM_COL32(150, 214, 255, 220), 3.0f);
-         dl->AddText(ImVec2(x - 7.0f, peakY - 14.0f), IM_COL32(220, 226, 236, 200), kFormantLabels[i]);
+         dl->AddLine(ImVec2(x, br.y - 6.0f), ImVec2(x, peakY),
+                     isLight ? IM_COL32(30, 110, 230, 230) : IM_COL32(150, 214, 255, 220), 3.0f);
+         dl->AddText(ImVec2(x - 7.0f, peakY - 14.0f), ScopeTextCol(), kFormantLabels[i]);
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, IM_COL32(64, 68, 84, 255), 3.0f);
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -14898,9 +15062,16 @@ namespace
          gColor.justOpened = true;
       }
       ImGui::SameLine();
-      ImGui::PushStyleColor(ImGuiCol_Text,
-                            ImVec4(n->color[0] * 0.4f + 0.6f, n->color[1] * 0.4f + 0.6f,
-                                   n->color[2] * 0.4f + 0.6f, 1.0f));
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      const bool isLight = (0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
+      if (isLight)
+         ImGui::PushStyleColor(ImGuiCol_Text,
+                               ImVec4(n->color[0] * 0.70f, n->color[1] * 0.70f,
+                                      n->color[2] * 0.70f, 1.0f));
+      else
+         ImGui::PushStyleColor(ImGuiCol_Text,
+                               ImVec4(n->color[0] * 0.4f + 0.6f, n->color[1] * 0.4f + 0.6f,
+                                      n->color[2] * 0.4f + 0.6f, 1.0f));
       if (n->renaming)
       {
          if (n->renameJustStarted)
@@ -17275,10 +17446,14 @@ namespace
                        origin.y + margin + (world.y - minY) * scale);
       };
 
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      const bool isLight = (0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
+
       ImDrawList* dl = ImGui::GetForegroundDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h),
-                        IM_COL32(14, 15, 20, (int)(gMinimapOpacity * 255)), 6.0f);
-      dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), IM_COL32(70, 74, 90, 200), 6.0f, 0, 1.5f);
+                        IM_COL32((int)(t.panelBg.r * 255), (int)(t.panelBg.g * 255), (int)(t.panelBg.b * 255), (int)(gMinimapOpacity * 255)), 6.0f);
+      dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h),
+                  IM_COL32((int)(t.border.r * 255), (int)(t.border.g * 255), (int)(t.border.b * 255), 200), 6.0f, 0, 1.5f);
 
       for (const GraphNode& gn : gNodes)
       {
@@ -17297,7 +17472,7 @@ namespace
          dl->PushClipRect(origin, ImVec2(origin.x + w, origin.y + h), true);
          const ImVec2 a = toMinimap(viewWorldTL);
          const ImVec2 b = toMinimap(viewWorldBR);
-         dl->AddRect(a, b, IM_COL32(255, 255, 255, 220), 2.0f, 0, 1.5f);
+         dl->AddRect(a, b, isLight ? IM_COL32(40, 44, 55, 220) : IM_COL32(255, 255, 255, 220), 2.0f, 0, 1.5f);
          dl->PopClipRect();
       }
 
@@ -19460,15 +19635,17 @@ static bool RunSamplerFixture()
 
       AudioNode* an = node.GetAudioNode();
       an->PrepareToPlay((double)sampleRate, frames);
+      node.CookIfNeeded(2);
 
       NoteEventQueue queue;
+      const int cursor = queue.RegisterConsumer();
+      an->SetNoteInbox(&queue, cursor);
       NoteEvent on;
       on.note = 60;
       on.velocity = 1.0f;
       on.isNoteOn = true;
       on.frameOffset = 0;
       queue.Push(on);
-      an->SetNoteInbox(&queue, queue.RegisterConsumer());
 
       std::vector<float> l(frames, 0.0f), r(frames, 0.0f);
       float* chans[2] = { l.data(), r.data() };
@@ -19546,14 +19723,16 @@ static bool RunSamplerFixture()
          AudioNode* an = node.GetAudioNode();
          const int frames = numFrames + 200;
          an->PrepareToPlay((double)sampleRate, frames);
+         node.CookIfNeeded(2);
          NoteEventQueue queue;
+         const int cursor = queue.RegisterConsumer();
+         an->SetNoteInbox(&queue, cursor);
          NoteEvent on;
          on.note = 60;
          on.velocity = 1.0f;
          on.isNoteOn = true;
          on.frameOffset = 0;
          queue.Push(on);
-         an->SetNoteInbox(&queue, queue.RegisterConsumer());
          std::vector<float> l(frames, 0.0f), r(frames, 0.0f);
          float* chans[2] = { l.data(), r.data() };
          AudioBuffer buf;
@@ -19631,10 +19810,23 @@ static bool RunSamplerFixture()
          an->ProcessBlock(inputs, 2, outBuf);
 
          node.StopRecording();
-         if (node.FileName() != "recorded audio" || node.waveformCacheCount <= 0)
+         if (node.FileName() != "recorded audio" || node.waveformCacheCount <= 0 || node.FilePath().empty())
          {
             printf("SAMPLERTEST record param had no effect (nothing captured) FAIL\n");
             ok = false;
+         }
+         else
+         {
+            SamplerNode reloaded;
+            std::vector<std::pair<std::string, std::string>> params;
+            Patch::SaveParams(&node, params);
+            Patch::LoadParams(&reloaded, params);
+            reloaded.ReloadFromPath();
+            if (reloaded.waveformCacheCount <= 0 || reloaded.FilePath().empty())
+            {
+               printf("SAMPLERTEST record patch reload failed FAIL\n");
+               ok = false;
+            }
          }
       }
    }
@@ -19730,6 +19922,60 @@ static bool RunPaulStretchFixture()
       for (float s : pitched)
       {
          if (!std::isfinite(s)) { printf("PAULSTRETCHTEST pitched produced non-finite sample FAIL\n"); ok = false; break; }
+      }
+
+      // Record test: verify StartRecording arms and captures audio, writes WAV to disk, and reloads via Patch / ReloadFromPath()
+      {
+         PaulStretchNode recNode;
+         recNode.StartRecording();
+         if (!recNode.IsRecording())
+         {
+            printf("PAULSTRETCHTEST record arm failed FAIL\n");
+            ok = false;
+         }
+         else
+         {
+            AudioNode* an = recNode.GetAudioNode();
+            an->PrepareToPlay((double)sampleRate, 128);
+            std::vector<float> tone(128);
+            for (int i = 0; i < 128; i++)
+               tone[i] = sinf((float)i * 0.3f);
+            float* srcChans[1] = { tone.data() };
+            AudioBuffer srcBuf;
+            srcBuf.channels = srcChans;
+            srcBuf.numChannels = 1;
+            srcBuf.numFrames = 128;
+
+            std::vector<float> outL(128, 0.0f), outR(128, 0.0f);
+            float* outChans[2] = { outL.data(), outR.data() };
+            AudioBuffer outBuf;
+            outBuf.channels = outChans;
+            outBuf.numChannels = 2;
+            outBuf.numFrames = 128;
+
+            const AudioBuffer* inputs[1] = { &srcBuf };
+            an->ProcessBlock(inputs, 1, outBuf);
+
+            recNode.StopRecording();
+            if (recNode.waveformCacheCount <= 0 || recNode.FileName() != "recording" || recNode.FilePath().empty())
+            {
+               printf("PAULSTRETCHTEST recording buffer capture or file path failed FAIL\n");
+               ok = false;
+            }
+            else
+            {
+               PaulStretchNode reloaded;
+               std::vector<std::pair<std::string, std::string>> params;
+               Patch::SaveParams(&recNode, params);
+               Patch::LoadParams(&reloaded, params);
+               reloaded.ReloadFromPath();
+               if (reloaded.waveformCacheCount <= 0 || reloaded.FilePath().empty())
+               {
+                  printf("PAULSTRETCHTEST record patch reload failed FAIL\n");
+                  ok = false;
+               }
+            }
+         }
       }
    }
 
@@ -19862,10 +20108,23 @@ static bool RunGranularFixture()
                printf("GRANULARTEST RequiresAudioProcessing should be false after stop FAIL\n");
                ok = false;
             }
-            if (recNode.waveformCacheCount <= 0 || recNode.FileName() != "recording")
+            if (recNode.waveformCacheCount <= 0 || recNode.FileName() != "recording" || recNode.FilePath().empty())
             {
                printf("GRANULARTEST recording buffer capture failed FAIL\n");
                ok = false;
+            }
+            else
+            {
+               GranularNode reloaded;
+               std::vector<std::pair<std::string, std::string>> params;
+               Patch::SaveParams(&recNode, params);
+               Patch::LoadParams(&reloaded, params);
+               reloaded.ReloadFromPath();
+               if (reloaded.waveformCacheCount <= 0 || reloaded.FilePath().empty())
+               {
+                  printf("GRANULARTEST record patch reload failed FAIL\n");
+                  ok = false;
+               }
             }
          }
       }
@@ -22803,7 +23062,7 @@ int RunPluginScanTest()
    return 0;
 }
 
-int main()
+int main(int argc, char** argv)
 {
    if (getenv("INFINITE_AUDIOPARAMSWEEPTEST") != nullptr)
    {
@@ -22838,11 +23097,13 @@ int main()
    // the plugin decides to print goes to stderr and is ignored.
 
 
+   Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
    {
       fprintf(stderr, "glfwInit failed\n");
       return 1;
    }
+   Platform::InitDocumentHandlingPostGlfw();
 
    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
@@ -24414,6 +24675,18 @@ int main()
    else
       snprintf(recordPath, sizeof(recordPath), "infinite_output.mov");
 
+   if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
+   {
+      const std::string argPath = argv[1];
+      if (HasExtension(argPath, std::vector<std::string> { "inf", "infinite" }))
+      {
+         LoadPatchFrom(argPath);
+         gRequestFitView = true;
+      }
+   }
+   // Any launch-time Finder open is drained by the in-frame loop below, right
+   // after the first glfwPollEvents() call.
+
    char searchBuf[128] = "";
    bool searchJustOpened = false;
    std::vector<std::string> clipboard;      // typeNames copied
@@ -24426,6 +24699,13 @@ int main()
    {
       gFrameStart = glfwGetTime();
       glfwPollEvents();
+
+      std::string pendingOpenPatch;
+      while (Platform::PollPendingOpenFile(pendingOpenPatch))
+      {
+         LoadPatchFrom(pendingOpenPatch);
+         gRequestFitView = true;
+      }
 
       // Device-change/sleep-wake self-healing (docs/plans/optimization/
       // prompts/02-device-change-and-wake-recovery.md) - once a frame, main
@@ -25727,6 +26007,7 @@ int main()
       gGraphScreenSize = ImVec2(graphWidth > 0.0f ? graphWidth : ImGui::GetContentRegionAvail().x,
                                 graphHeight);
 
+      ed::GetStyle().GridSpacing = gGridSnap;
       ed::Begin("graph", ImVec2(graphWidth, graphHeight));
 
       if (!gPendingSelect.empty())
@@ -25778,6 +26059,13 @@ int main()
          {
             while (path.size() > 1 && (path.back() == '/' || path.back() == '\\'))
                path.pop_back();
+
+            if (HasExtension(path, std::vector<std::string> { "inf", "infinite" }))
+            {
+               LoadPatchFrom(path);
+               gRequestFitView = true;
+               continue;
+            }
 
             if (dropTargetDrum != nullptr && HasExtension(path, kAudioExt))
             {
@@ -30936,15 +31224,17 @@ int main()
          // vocabulary, not something a user repicks per node. Blended into the
          // library's own default NodeBg rather than replacing it outright, so
          // a node still reads as "the same kind of card", just tinted.
+         const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
          const CategoryColors::Color& catColor = CategoryColors::ColorFor(gn.category);
-         const float kTintWeight = 0.16f;
+         const bool isLight = (0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
+         const float kTintWeight = isLight ? 0.12f : 0.16f;
          ed::PushStyleColor(ed::StyleColor_NodeBg,
-                            ImColor(0.125f * (1.0f - kTintWeight) + catColor.r * kTintWeight,
-                                    0.125f * (1.0f - kTintWeight) + catColor.g * kTintWeight,
-                                    0.125f * (1.0f - kTintWeight) + catColor.b * kTintWeight,
-                                    0.784f));
+                            ImColor(t.panelBg.r * (1.0f - kTintWeight) + catColor.r * kTintWeight,
+                                    t.panelBg.g * (1.0f - kTintWeight) + catColor.g * kTintWeight,
+                                    t.panelBg.b * (1.0f - kTintWeight) + catColor.b * kTintWeight,
+                                    isLight ? 0.95f : 0.784f));
          ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                            ImColor(catColor.r, catColor.g, catColor.b, 0.55f));
+                            ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
 
          ed::BeginNode(gn.NodeId());
          ImGui::PushID(gn.index);
@@ -30976,11 +31266,14 @@ int main()
          ImGui::BeginGroup();
 
          ImGui::TextUnformatted(NodeTitle(gn).c_str());
-         // Lightened toward white so the label stays legible at small sizes,
-         // the same blend DrawGroupNode uses for its own colour-tinted label.
-         ImGui::PushStyleColor(ImGuiCol_Text,
-                               ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f,
-                                      catColor.b * 0.6f + 0.4f, 1.0f));
+         if (isLight)
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                                  ImVec4(catColor.r * 0.75f, catColor.g * 0.75f,
+                                         catColor.b * 0.75f, 1.0f));
+         else
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                                  ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f,
+                                         catColor.b * 0.6f + 0.4f, 1.0f));
          ImGui::TextUnformatted(gn.category.c_str());
          ImGui::PopStyleColor();
 
@@ -31631,12 +31924,14 @@ int main()
       // it. The link is approximated as a straight line between the two nodes'
       // facing edges rather than the bezier actually drawn: close enough to feel
       // right, and it avoids reaching into the editor's internal curve geometry.
+      const bool isLight = IsThemeLight();
       for (const LinkInfo& link : gLinks)
       {
          const bool isMod = GraphNode::IsParamPin(link.dstPin);
          if (isMod)
          {
-            ed::Link(link.id, link.srcPin, link.dstPin, ImColor(255, 190, 90), 1.8f);
+            ed::Link(link.id, link.srcPin, link.dstPin,
+                     isLight ? ImColor(215, 120, 10) : ImColor(255, 190, 90), 2.0f);
             continue;
          }
          // Audio = blue, Note = green (docs/plans/audio/README.md's colour
@@ -31651,22 +31946,25 @@ int main()
                const int slot = GraphNode::InputSlotFromPin(link.dstPin);
                if (dst->node->AudioInputSlot(slot) != nullptr)
                {
-                  ed::Link(link.id, link.srcPin, link.dstPin, ImColor(90, 150, 255), 1.8f);
+                  ed::Link(link.id, link.srcPin, link.dstPin,
+                           isLight ? ImColor(30, 100, 230) : ImColor(90, 150, 255), 2.0f);
                   tinted = true;
                }
                else if (dst->node->NoteInputSlot(slot) != nullptr)
                {
-                  ed::Link(link.id, link.srcPin, link.dstPin, ImColor(90, 220, 130), 1.8f);
+                  ed::Link(link.id, link.srcPin, link.dstPin,
+                           isLight ? ImColor(20, 150, 60) : ImColor(90, 220, 130), 2.0f);
                   tinted = true;
                }
             }
          }
          if (!tinted)
-            ed::Link(link.id, link.srcPin, link.dstPin);
+            ed::Link(link.id, link.srcPin, link.dstPin,
+                     isLight ? ImColor(55, 62, 78) : ImColor(230, 235, 245), 2.0f);
       }
 
       // ---- handle new connections ----
-      if (ed::BeginCreate())
+      if (ed::BeginCreate(isLight ? ImColor(55, 62, 78) : ImColor(255, 255, 255), 2.0f))
       {
          ed::PinId startPin, endPin;
          if (ed::QueryNewLink(&startPin, &endPin))

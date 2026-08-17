@@ -222,6 +222,7 @@ struct Style
     float   GroupBorderWidth;
     float   HighlightConnectedLinks;
     float   SnapLinkToPinDir; // when true link will start on the line defined by pin direction
+    float   GridSpacing;
     ImVec4  Colors[StyleColor_Count];
 
     Style()
@@ -257,6 +258,7 @@ struct Style
         GroupBorderWidth         = 1.0f;
         HighlightConnectedLinks  = 0.0f;
         SnapLinkToPinDir         = 0.0f;
+        GridSpacing              = 20.0f;
 
         Colors[StyleColor_Bg]                 = ImColor( 60,  60,  70, 200);
         Colors[StyleColor_Grid]               = ImColor(120, 120, 120,  40);

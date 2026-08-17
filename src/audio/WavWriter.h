@@ -39,3 +39,19 @@ private:
    int mNumChannels = 2;
    int64_t mFramesWritten = 0;
 };
+
+namespace AudioRecordings
+{
+   // Returns ~/Library/Application Support/Infinite/Recordings (or /tmp/Infinite/Recordings fallback).
+   // Creates the directory if it does not exist.
+   std::string GetRecordingsDirectory();
+
+   // Generates a timestamped unique WAV filename inside GetRecordingsDirectory(),
+   // e.g. ".../Recordings/recording_paulstretch_20260817_221530_001_1.wav".
+   std::string GenerateFilePath(const std::string& prefix);
+
+   // Writes mono or interleaved multi-channel float PCM audio frames directly to a 16-bit WAV file on disk.
+   // Returns true on success.
+   bool WriteWav(const std::string& path, const float* data, int frames, double sampleRate, int numChannels = 1);
+}
+

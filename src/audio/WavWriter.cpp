@@ -86,3 +86,63 @@ void WavWriter::Close()
    fclose(mFile);
    mFile = nullptr;
 }
+
+#include <chrono>
+#include <ctime>
+#include <atomic>
+#include <sys/stat.h>
+
+namespace AudioRecordings
+{
+   std::string GetRecordingsDirectory()
+   {
+      const char* home = getenv("HOME");
+      std::string base;
+      if (home != nullptr)
+         base = std::string(home) + "/Library/Application Support/Infinite";
+      else
+         base = "/tmp/Infinite";
+
+      mkdir(base.c_str(), 0755);
+      std::string dir = base + "/Recordings";
+      mkdir(dir.c_str(), 0755);
+      return dir;
+   }
+
+   std::string GenerateFilePath(const std::string& prefix)
+   {
+      const std::string dir = GetRecordingsDirectory();
+      auto now = std::chrono::system_clock::now();
+      auto timeT = std::chrono::system_clock::to_time_t(now);
+      std::tm tmVal {};
+      localtime_r(&timeT, &tmVal);
+
+      auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+      static std::atomic<uint32_t> sCounter{ 0 };
+      uint32_t count = ++sCounter;
+
+      char filename[256];
+      snprintf(filename, sizeof(filename), "recording_%s_%04d%02d%02d_%02d%02d%02d_%03d_%u.wav",
+               prefix.c_str(),
+               tmVal.tm_year + 1900, tmVal.tm_mon + 1, tmVal.tm_mday,
+               tmVal.tm_hour, tmVal.tm_min, tmVal.tm_sec,
+               (int)ms.count(), count);
+
+      return dir + "/" + filename;
+   }
+
+   bool WriteWav(const std::string& path, const float* data, int frames, double sampleRate, int numChannels)
+   {
+      if (data == nullptr || frames <= 0 || sampleRate <= 0.0)
+         return false;
+
+      WavWriter writer;
+      if (!writer.Open(path, sampleRate, numChannels))
+         return false;
+
+      writer.Append(data, frames);
+      writer.Close();
+      return true;
+   }
+}
+

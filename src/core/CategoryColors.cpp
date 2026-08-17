@@ -147,6 +147,102 @@ const std::vector<Preset>& Presets()
         { 0.231f, 0.259f, 0.380f },  // border  Border     #3B4261
         { 0.478f, 0.635f, 0.969f } } // accent  Blue       #7AA2F7
       },
+      { "Catppuccin Latte", {
+         { "Source",      { 0.251f, 0.627f, 0.169f } }, // Green   #40A02B
+         { "Text",        { 0.090f, 0.573f, 0.600f } }, // Teal    #179299
+         { "3D",          { 0.016f, 0.647f, 0.898f } }, // Sky     #04A5E5
+         { "Compositing", { 0.118f, 0.400f, 0.961f } }, // Blue    #1E66F5
+         { "Color",       { 0.533f, 0.224f, 0.937f } }, // Mauve   #8839EF
+         { "Mask",        { 0.918f, 0.463f, 0.796f } }, // Pink    #EA76CB
+         { "Feedback",    { 0.824f, 0.059f, 0.224f } }, // Red     #D20F39
+         { "Resynth",     { 0.996f, 0.392f, 0.043f } }, // Peach   #FE640B
+         { "Effects",     { 0.875f, 0.557f, 0.114f } }, // Yellow  #DF8E1D
+         { "Modulators",  { 0.125f, 0.624f, 0.710f } }, // Sapphire #209FB5
+         { "Output",      { 0.298f, 0.310f, 0.412f } }, // Text    #4C4F69
+         { "Notes",       { 0.251f, 0.627f, 0.169f } }, // Green
+         { "Synths",      { 0.118f, 0.400f, 0.961f } }, // Blue
+         { "AudioEffects", { 0.016f, 0.647f, 0.898f } }, // Sky
+         { "AudioUtility",  { 0.125f, 0.624f, 0.710f } }, // Sapphire
+      },
+      { { 0.937f, 0.945f, 0.961f },  // window  Base     #EFF1F5
+        { 0.886f, 0.902f, 0.925f },  // panel   Mantle   #E6E9EF
+        { 0.298f, 0.310f, 0.412f },  // text    Text     #4C4F69
+        { 0.549f, 0.561f, 0.631f },  // textDim Overlay0 #8C8FA1
+        { 0.760f, 0.780f, 0.835f },  // border  Surface1 #BCC0CC
+        { 0.533f, 0.224f, 0.937f } } // accent  Mauve    #8839EF
+      },
+      { "GitHub Light", {
+         { "Source",      { 0.102f, 0.498f, 0.216f } }, // Green  #1A7F37
+         { "Text",        { 0.020f, 0.314f, 0.682f } }, // Teal   #0550AE
+         { "3D",          { 0.035f, 0.412f, 0.855f } }, // Blue   #0969DA
+         { "Compositing", { 0.510f, 0.314f, 0.875f } }, // Purple #8250DF
+         { "Color",       { 0.749f, 0.224f, 0.537f } }, // Pink   #BF3989
+         { "Mask",        { 0.812f, 0.133f, 0.180f } }, // Coral  #CF222E
+         { "Feedback",    { 0.737f, 0.298f, 0.000f } }, // Orange #BC4C00
+         { "Resynth",     { 0.984f, 0.561f, 0.267f } }, // Peach  #FB8F44
+         { "Effects",     { 0.604f, 0.404f, 0.000f } }, // Gold   #9A6700
+         { "Modulators",  { 0.067f, 0.388f, 0.161f } }, // Forest #116329
+         { "Output",      { 0.122f, 0.137f, 0.157f } }, // Text   #1F2328
+         { "Notes",       { 0.102f, 0.498f, 0.216f } },
+         { "Synths",      { 0.035f, 0.412f, 0.855f } },
+         { "AudioEffects", { 0.020f, 0.314f, 0.682f } },
+         { "AudioUtility",  { 0.396f, 0.427f, 0.463f } },
+      },
+      { { 0.980f, 0.984f, 0.988f },  // window  #FAFBFC
+        { 0.930f, 0.941f, 0.953f },  // panel   #EDF0F3
+        { 0.122f, 0.137f, 0.157f },  // text    #1F2328
+        { 0.396f, 0.427f, 0.463f },  // textDim #656D76
+        { 0.780f, 0.812f, 0.847f },  // border  #C7CFD8
+        { 0.035f, 0.412f, 0.855f } } // accent  #0969DA
+      },
+      { "Solarized Light", {
+         { "Source",      { 0.522f, 0.600f, 0.000f } }, // Green   #859900
+         { "Text",        { 0.165f, 0.631f, 0.596f } }, // Cyan    #2AA198
+         { "3D",          { 0.149f, 0.545f, 0.824f } }, // Blue    #268BD2
+         { "Compositing", { 0.424f, 0.443f, 0.769f } }, // Violet  #6C71C4
+         { "Color",       { 0.827f, 0.212f, 0.510f } }, // Magenta #D33682
+         { "Mask",        { 0.863f, 0.196f, 0.184f } }, // Red     #DC322F
+         { "Feedback",    { 0.796f, 0.294f, 0.086f } }, // Orange  #CB4B16
+         { "Resynth",     { 0.863f, 0.196f, 0.184f } }, // Red
+         { "Effects",     { 0.710f, 0.537f, 0.000f } }, // Yellow  #B58900
+         { "Modulators",  { 0.165f, 0.631f, 0.596f } }, // Cyan
+         { "Output",      { 0.345f, 0.431f, 0.459f } }, // Base00  #586E75
+         { "Notes",       { 0.522f, 0.600f, 0.000f } },
+         { "Synths",      { 0.149f, 0.545f, 0.824f } },
+         { "AudioEffects", { 0.165f, 0.631f, 0.596f } },
+         { "AudioUtility",  { 0.576f, 0.631f, 0.631f } },
+      },
+      { { 0.992f, 0.965f, 0.890f },  // window  Base3   #FDF6E3
+        { 0.925f, 0.898f, 0.812f },  // panel   Base2   #EBE5CF
+        { 0.345f, 0.431f, 0.459f },  // text    Base00  #586E75
+        { 0.576f, 0.631f, 0.631f },  // textDim Base1   #93A1A1
+        { 0.810f, 0.776f, 0.655f },  // border  #CFC6A7
+        { 0.149f, 0.545f, 0.824f } } // accent  Blue    #268BD2
+      },
+      { "Nord Light", {
+         { "Source",      { 0.310f, 0.494f, 0.224f } }, // nord14 #4F7E39
+         { "Text",        { 0.169f, 0.420f, 0.412f } }, // nord7  #2B6B69
+         { "3D",          { 0.184f, 0.416f, 0.494f } }, // nord8  #2F6A7E
+         { "Compositing", { 0.231f, 0.357f, 0.518f } }, // nord9  #3B5B84
+         { "Color",       { 0.439f, 0.267f, 0.420f } }, // nord15 #70446B
+         { "Mask",        { 0.541f, 0.180f, 0.220f } }, // nord11 #8A2E38
+         { "Feedback",    { 0.580f, 0.286f, 0.165f } }, // nord12 #94492A
+         { "Resynth",     { 0.541f, 0.180f, 0.220f } },
+         { "Effects",     { 0.494f, 0.388f, 0.145f } }, // nord13 #7E6325
+         { "Modulators",  { 0.212f, 0.325f, 0.467f } },
+         { "Output",      { 0.180f, 0.204f, 0.251f } }, // nord0  #2E3440
+         { "Notes",       { 0.310f, 0.494f, 0.224f } },
+         { "Synths",      { 0.231f, 0.357f, 0.518f } },
+         { "AudioEffects", { 0.184f, 0.416f, 0.494f } },
+         { "AudioUtility",  { 0.298f, 0.337f, 0.416f } },
+      },
+      { { 0.925f, 0.937f, 0.957f },  // window  nord6   #ECEFF4
+        { 0.882f, 0.902f, 0.929f },  // panel   nord5   #E1E6ED
+        { 0.180f, 0.204f, 0.251f },  // text    nord0   #2E3440
+        { 0.298f, 0.337f, 0.416f },  // textDim nord3   #4C566A
+        { 0.790f, 0.820f, 0.870f },  // border  #C9D1DE
+        { 0.369f, 0.506f, 0.675f } } // accent  nord10  #5E81AC
+      },
    };
    return presets;
 }

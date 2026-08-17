@@ -631,5 +631,14 @@ namespace Platform
    // Returns the GL_TEXTURE_RECTANGLE texture name and dimensions from the latest Syphon frame, or 0 if none.
    unsigned int SyphonClientGetFrameTexture(SyphonClientHandle* handle, int& outWidth, int& outHeight);
    void SyphonClientDestroy(SyphonClientHandle* handle);
+
+   // macOS Native Document Opening (Finder / AppleEvents)
+   // Must be called before glfwInit() so the delegate methods exist on
+   // GLFWApplicationDelegate by the time GLFW installs it as NSApp's delegate.
+   void InitDocumentHandlingPreGlfw();
+   // Must be called after glfwInit() to reinstall the Apple Event handler that
+   // AppKit's -[NSApplication finishLaunching] (run inside glfwInit) clobbers.
+   void InitDocumentHandlingPostGlfw();
+   bool PollPendingOpenFile(std::string& outPath);
 }
 

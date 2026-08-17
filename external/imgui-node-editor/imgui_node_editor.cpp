@@ -1496,27 +1496,30 @@ void ed::EditorContext::End()
     // ImGui::PopClipRect();
 
     // Draw grid
-# if 1 // #FIXME
     {
-        //auto& style = ImGui::GetStyle();
-
         m_DrawList->ChannelsSetCurrent(c_UserChannel_Grid);
 
-        ImVec2 offset    = m_Canvas.ViewOrigin() * (1.0f / m_Canvas.ViewScale());
-        ImU32 GRID_COLOR = GetColor(StyleColor_Grid, ImClamp(m_Canvas.ViewScale() * m_Canvas.ViewScale(), 0.0f, 1.0f));
-        float GRID_SX    = 32.0f;// * m_Canvas.ViewScale();
-        float GRID_SY    = 32.0f;// * m_Canvas.ViewScale();
-        ImVec2 VIEW_POS  = m_Canvas.ViewRect().Min;
-        ImVec2 VIEW_SIZE = m_Canvas.ViewRect().GetSize();
+        const ImRect viewRect = m_Canvas.ViewRect();
+        const float viewScale = m_Canvas.ViewScale();
+        const float baseGrid = (m_Style.GridSpacing > 0.0f) ? m_Style.GridSpacing : 20.0f;
 
-        m_DrawList->AddRectFilled(VIEW_POS, VIEW_POS + VIEW_SIZE, GetColor(StyleColor_Bg));
+        // Prevent overdraw only at extreme zoom-out
+        float gridStep = baseGrid;
+        while (gridStep * viewScale < 4.0f)
+            gridStep *= 2.0f;
 
-        for (float x = fmodf(offset.x, GRID_SX); x < VIEW_SIZE.x; x += GRID_SX)
-            m_DrawList->AddLine(ImVec2(x, 0.0f) + VIEW_POS, ImVec2(x, VIEW_SIZE.y) + VIEW_POS, GRID_COLOR);
-        for (float y = fmodf(offset.y, GRID_SY); y < VIEW_SIZE.y; y += GRID_SY)
-            m_DrawList->AddLine(ImVec2(0.0f, y) + VIEW_POS, ImVec2(VIEW_SIZE.x, y) + VIEW_POS, GRID_COLOR);
+        ImU32 gridColor = GetColor(StyleColor_Grid, ImClamp(viewScale * 1.5f, 0.20f, 1.0f));
+
+        m_DrawList->AddRectFilled(viewRect.Min, viewRect.Max, GetColor(StyleColor_Bg));
+
+        const float startX = std::floor(viewRect.Min.x / gridStep) * gridStep;
+        for (float x = startX; x <= viewRect.Max.x; x += gridStep)
+            m_DrawList->AddLine(ImVec2(x, viewRect.Min.y), ImVec2(x, viewRect.Max.y), gridColor);
+
+        const float startY = std::floor(viewRect.Min.y / gridStep) * gridStep;
+        for (float y = startY; y <= viewRect.Max.y; y += gridStep)
+            m_DrawList->AddLine(ImVec2(viewRect.Min.x, y), ImVec2(viewRect.Max.x, y), gridColor);
     }
-# endif
 
 # if 0
     {

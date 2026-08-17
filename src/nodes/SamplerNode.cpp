@@ -15,6 +15,7 @@
 #include "platform/Platform.h"
 #include "Transport.h"
 #include "core/AudioTopologyRequest.h"
+#include "audio/WavWriter.h"
 
 namespace
 {
@@ -609,13 +610,19 @@ void SamplerNode::StopRecording()
       return;
    }
 
+   const double sr = mAudioNode->RecordSampleRate();
+   const float* data = mAudioNode->RecordBufferData();
+
+   const std::string wavPath = AudioRecordings::GenerateFilePath("sampler");
+   AudioRecordings::WriteWav(wavPath, data, frames, sr, 1);
+
    auto* decoded = new Platform::SampleBuffer();
    decoded->channels = 1;
    decoded->numFrames = frames;
-   decoded->sampleRate = mAudioNode->RecordSampleRate();
-   decoded->channelData.assign(mAudioNode->RecordBufferData(), mAudioNode->RecordBufferData() + frames);
+   decoded->sampleRate = sr;
+   decoded->channelData.assign(data, data + frames);
 
-   FinishBuffer(decoded, "recorded audio", "", "recorded");
+   FinishBuffer(decoded, "recorded audio", wavPath, "recorded");
 }
 
 bool SamplerNode::LoadFile(const std::string& path)
@@ -675,5 +682,11 @@ void SamplerNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::strin
 void SamplerNode::ReloadFromPath()
 {
    if (!mFilePath.empty())
+   {
+      float savedStart = start;
+      float savedEnd = end;
       LoadFile(mFilePath);
+      start = savedStart;
+      end = savedEnd;
+   }
 }
