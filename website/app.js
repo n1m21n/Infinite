@@ -108,29 +108,33 @@ let lastNetRectW = 0, lastNetRectH = 0;
 let networkNodes = [];
 let networkEdges = [];
 let networkPulses = [];
-let hoveredNode = null;
 
 const NETWORK_ITEMS = [
-  { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.18, dtY: 0.26, mbX: 0.22, mbY: 0.18 },
-  { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.18, dtY: 0.72, mbX: 0.20, mbY: 0.44 },
-  { id: 'nodebased', label: 'Node-Based', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.38, dtY: 0.48, mbX: 0.50, mbY: 0.60 },
-  { id: 'generative', label: 'Generative', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.58, dtY: 0.24, mbX: 0.78, mbY: 0.42 },
-  { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.50, dtY: 0.80, mbX: 0.22, mbY: 0.84 },
-  { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.80, dtY: 0.30, mbX: 0.76, mbY: 0.18 },
-  { id: 'realtime', label: 'Real-Time', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.82, dtY: 0.74, mbX: 0.76, mbY: 0.84 }
+  { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.14, dtY: 0.24, mbX: 0.22, mbY: 0.14 },
+  { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.14, dtY: 0.76, mbX: 0.20, mbY: 0.36 },
+  { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.32, dtY: 0.32, mbX: 0.78, mbY: 0.36 },
+  { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.38, dtY: 0.74, mbX: 0.50, mbY: 0.54 },
+  { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.54, dtY: 0.22, mbX: 0.22, mbY: 0.72 },
+  { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.58, dtY: 0.78, mbX: 0.24, mbY: 0.88 },
+  { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.72, dtY: 0.34, mbX: 0.78, mbY: 0.72 },
+  { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.88, dtY: 0.24, mbX: 0.76, mbY: 0.14 },
+  { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.86, dtY: 0.76, mbX: 0.76, mbY: 0.88 }
 ];
 
 const NETWORK_CONNECTIONS = [
   ['sound', 'music'],
-  ['sound', 'nodebased'],
-  ['music', 'nodebased'],
-  ['nodebased', 'generative'],
-  ['nodebased', 'art'],
-  ['generative', 'geometry'],
-  ['generative', 'realtime'],
-  ['art', 'realtime'],
-  ['art', 'generative'],
-  ['geometry', 'realtime']
+  ['sound', 'physics'],
+  ['music', 'math'],
+  ['physics', 'math'],
+  ['physics', 'art'],
+  ['math', 'motion'],
+  ['art', 'motion'],
+  ['art', 'light'],
+  ['art', 'geometry'],
+  ['geometry', 'light'],
+  ['geometry', 'color'],
+  ['motion', 'color'],
+  ['light', 'color']
 ];
 
 function resizeBranchCanvas() {
@@ -165,8 +169,8 @@ function buildNetworkStructure() {
       baseY,
       x: baseX,
       y: baseY,
-      phase: idx * 0.9,
-      floatSpeed: 0.8 + (idx % 3) * 0.2
+      phase: idx * 0.75,
+      floatSpeed: 0.7 + (idx % 4) * 0.18
     };
   });
 
@@ -185,9 +189,9 @@ function buildNetworkStructure() {
     networkPulses.push({
       edge,
       progress: Math.random(),
-      speed: 0.003 + Math.random() * 0.005,
+      speed: 0.003 + Math.random() * 0.004,
       forward: Math.random() > 0.5,
-      size: 2.5 + Math.random() * 1.5
+      size: 2.4 + Math.random() * 1.4
     });
   }
 }
@@ -204,8 +208,8 @@ function animateNatureBranches() {
 
   // Update floating positions with gentle organic breathing
   networkNodes.forEach(node => {
-    const floatX = Math.sin(netTime * node.floatSpeed + node.phase) * (4 * dpr);
-    const floatY = Math.cos(netTime * node.floatSpeed * 0.8 + node.phase) * (4 * dpr);
+    const floatX = Math.sin(netTime * node.floatSpeed + node.phase) * (3.5 * dpr);
+    const floatY = Math.cos(netTime * node.floatSpeed * 0.8 + node.phase) * (3.5 * dpr);
     node.x = node.baseX + floatX;
     node.y = node.baseY + floatY;
   });
@@ -215,8 +219,8 @@ function animateNatureBranches() {
     natureCtx.beginPath();
     natureCtx.moveTo(edge.src.x, edge.src.y);
     natureCtx.lineTo(edge.dst.x, edge.dst.y);
-    natureCtx.strokeStyle = 'rgba(60, 50, 40, 0.14)';
-    natureCtx.lineWidth = 1.6 * dpr;
+    natureCtx.strokeStyle = 'rgba(60, 50, 40, 0.13)';
+    natureCtx.lineWidth = 1.5 * dpr;
     natureCtx.stroke();
   });
 
@@ -239,23 +243,22 @@ function animateNatureBranches() {
 
   // 3. Draw Nodes with Clean Protected Badge Clearance (Zero Overlap Guarantee)
   const isMobile = w < 620 * dpr;
-  const fontSize = (isMobile ? 12 : 13.5) * dpr;
+  const fontSize = (isMobile ? 11.5 : 13) * dpr;
   natureCtx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`;
   natureCtx.textBaseline = 'middle';
 
   networkNodes.forEach(node => {
     const textWidth = natureCtx.measureText(node.label).width;
-    const padX = 10 * dpr;
-    const padY = 6 * dpr;
+    const padX = 9 * dpr;
+    const padY = 5 * dpr;
     const badgeH = fontSize + padY * 2;
-    const dotRadius = 4.5 * dpr;
-    const badgeW = textWidth + padX * 2 + dotRadius * 2 + 6 * dpr;
+    const dotRadius = 4 * dpr;
+    const badgeW = textWidth + padX * 2 + dotRadius * 2 + 5 * dpr;
 
     const badgeX = node.x - badgeW / 2;
     const badgeY = node.y - badgeH / 2;
     const radius = badgeH / 2;
 
-    // Outer subtle shadow / glow
     natureCtx.fillStyle = '#ffffff';
     natureCtx.strokeStyle = 'rgba(45, 35, 25, 0.12)';
     natureCtx.lineWidth = 1.2 * dpr;
@@ -272,7 +275,7 @@ function animateNatureBranches() {
 
     // Halo around dot
     natureCtx.beginPath();
-    natureCtx.arc(dotX, dotY, dotRadius + 2.5 * dpr, 0, Math.PI * 2);
+    natureCtx.arc(dotX, dotY, dotRadius + 2.2 * dpr, 0, Math.PI * 2);
     natureCtx.fillStyle = node.bg;
     natureCtx.fill();
 
@@ -285,7 +288,7 @@ function animateNatureBranches() {
     // Label Text
     natureCtx.textAlign = 'left';
     natureCtx.fillStyle = '#1f1d1a';
-    natureCtx.fillText(node.label, dotX + dotRadius + 6 * dpr, node.y);
+    natureCtx.fillText(node.label, dotX + dotRadius + 5 * dpr, node.y);
   });
 
   requestAnimationFrame(animateNatureBranches);
@@ -590,8 +593,8 @@ function initParticlesAnimation() {
     let x3 = x1 * Math.cos(rotZ) - y2 * Math.sin(rotZ);
     let y3 = x1 * Math.sin(rotZ) + y2 * Math.cos(rotZ);
 
-    const fov = 3.6;
-    const scale = (Math.min(w, h) * 0.26) / (fov + z2);
+    const fov = 3.2;
+    const scale = (Math.min(w, h) * 0.44) / (fov + z2);
 
     return {
       x: w * 0.5 + x3 * scale,

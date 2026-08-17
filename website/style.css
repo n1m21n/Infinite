@@ -202,15 +202,8 @@ body {
 }
 
 .btn-lg {
-  padding: 12px 22px;
+  padding: 12px 28px;
   font-size: var(--font-size-medium);
-  flex-direction: column;
-  gap: 2px;
-}
-.btn-lg .btn-subtext {
-  font-size: var(--font-size-small);
-  font-weight: 400;
-  opacity: 0.9;
 }
 
 /* --------------------------------------------------------------------------
@@ -898,25 +891,28 @@ body {
 .specs-grid {
   display: flex;
   justify-content: center;
-  gap: 28px;
+  gap: 36px;
   flex-wrap: wrap;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .spec-col {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 
 .spec-label {
-  font-size: var(--font-size-small);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .spec-val {
-  font-size: var(--font-size-small);
+  font-size: 1.02rem;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -989,7 +985,7 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   Mobile Optimization (Proper Padding, No Breaking Layouts)
+   Mobile Optimization (Proper Padding, 2x2 Capabilities Grid)
    -------------------------------------------------------------------------- */
 @media (max-width: 768px) {
   :root {
@@ -1000,24 +996,42 @@ body {
 
   .nav-links { display: none; }
   .hero-section { padding: 30px 0 18px; }
-  .nature-canvas-wrapper { height: 320px; }
+  .nature-canvas-wrapper { height: 340px; }
+
+  /* Creative streams: 2x2 grid layout on mobile */
+  .capabilities-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .cap-canvas-box {
+    height: 125px;
+  }
+  .cap-title {
+    padding: 8px 6px;
+    font-size: 0.76rem;
+    line-height: 1.25;
+  }
+
   .howto-item { grid-template-columns: 1fr; gap: 14px; padding: 16px; }
   .setup-box { padding: 18px 14px; }
   .download-card { padding: 24px 14px; }
   .footer-links { gap: 20px; }
-  .specs-grid { gap: 12px; }
+
+  .specs-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px 12px;
+    text-align: center;
+  }
+  .spec-label { font-size: 0.74rem; }
+  .spec-val { font-size: 0.92rem; }
+
   .m-track-title { font-size: 0.82rem; }
   .minimal-player-card { padding: 14px 16px; }
 
-  /* Smaller, tighter CTA buttons on mobile — the desktop btn-lg padding/subtext
-     reads oversized once the viewport narrows */
   .btn-lg {
-    padding: 9px 16px;
-    font-size: 0.85rem;
-    gap: 1px;
-  }
-  .btn-lg .btn-subtext {
-    font-size: 0.7rem;
+    padding: 11px 20px;
+    font-size: 0.9rem;
   }
   .hero-cta-group {
     gap: 10px;
