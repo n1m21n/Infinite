@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
   <!-- Ambient Cosmic Dust Canvas -->
@@ -62,11 +62,9 @@
           <span class="cursive-text">sound, art and geometry</span> connect.
         </h1>
 
-        <!-- 3-line concise consumer summary -->
+        <!-- Concise consumer summary -->
         <p class="hero-subtitle">
-          Infinite is an all-in-one creative playground for Mac.<br>
-          Instead of juggling separate apps for music, video effects, and 3D modeling,<br>
-          you wire ideas together on a single boundless page where every element reacts in real time.
+          Infinite is an all-in-one creative playground for Mac. You wire ideas together on a single boundless page where every element reacts in real time.
         </p>
 
         <div class="hero-cta-group">
@@ -165,7 +163,7 @@
       </div>
     </section>
 
-    <!-- Listen Section (Clean Minimal Soundscape Player) -->
+    <!-- Listen Section (Clean Seamless Audio Player) -->
     <section id="listen" class="section">
       <div class="container">
         <div class="section-header">
@@ -173,37 +171,19 @@
           <h2 class="section-heading">Listen to Music Made in Infinite</h2>
         </div>
 
-        <div class="minimal-player-card">
-          <div class="minimal-player-row">
-            <button id="minimal-play-btn" class="minimal-play-circle" aria-label="Play modular soundscape">
-              <svg id="m-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <polygon points="6 4 20 12 6 20 6 4"></polygon>
-              </svg>
-              <svg id="m-pause-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none;">
-                <rect x="6" y="4" width="4" height="16"></rect>
-                <rect x="14" y="4" width="4" height="16"></rect>
-              </svg>
-            </button>
+        <div class="seamless-player-wrap">
+          <button id="minimal-play-btn" class="minimal-play-circle" aria-label="Play modular soundscape">
+            <svg id="m-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <polygon points="6 4 20 12 6 20 6 4"></polygon>
+            </svg>
+            <svg id="m-pause-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none;">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+          </button>
 
-            <div class="minimal-track-info">
-              <div class="track-header-row">
-                <span id="m-track-title" class="m-track-title">Infinite Modular Patch 01</span>
-                <span id="m-track-time" class="m-time-text">0:00 / 0:42</span>
-              </div>
-              <div class="m-progress-bar" id="m-progress-container">
-                <div class="m-progress-fill" id="m-progress-fill"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Quick Track Selector -->
-          <div class="track-selector-row">
-            <button class="track-select-pill active" data-src="assets/infinite_patch.mp3" data-title="Infinite Modular Patch 01" data-duration="0:42">
-              ▶ Patch 01 (Modular Rack)
-            </button>
-            <button class="track-select-pill" data-src="assets/ambient_patch.mp3" data-title="Ambient Modular Soundscape" data-duration="0:16">
-              ▶ Ambient Soundscape
-            </button>
+          <div class="waveform-box" id="waveform-box" title="Click to seek">
+            <canvas id="waveform-canvas"></canvas>
           </div>
 
           <audio id="m-audio-element" src="assets/infinite_patch.mp3" preload="metadata"></audio>
@@ -216,9 +196,7 @@
       <div class="container">
         <div class="section-header">
           <div class="section-label">Field Guide</div>
-          <h2 class="section-heading">
-            How Does It <span class="sketch-underline">Work?</span>
-          </h2>
+          <h2 class="section-heading">How Does It Work?</h2>
           <p class="section-subheading">Connect blocks with cables. Here is what simple recipes look like:</p>
         </div>
 
@@ -356,7 +334,6 @@
         <div class="section-header">
           <div class="section-label">Library</div>
           <h2 class="section-heading">Browse the 160+ Node Collection</h2>
-          <p class="section-subheading">Every module connects seamlessly across sound, video, and 3D geometry.</p>
           <div class="node-manual-download-wrap">
             <a href="assets/Infinite_Node_Reference_Manual.pdf" download="Infinite_Node_Reference_Manual.pdf" class="btn btn-secondary btn-md node-docs-btn" target="_blank" rel="noopener">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -513,6 +490,6 @@
     </div>
   </footer>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

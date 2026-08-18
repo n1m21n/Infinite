@@ -97,8 +97,9 @@ function animateCosmos() {
 
 
 // ==========================================================================
-// 2. Connected by Nature: Dynamic Connected Network Graph
-// Guaranteed zero text overlap with clean pill badges and signal pulses
+// ==========================================================================
+// 2. Connected by Nature: Complete Interconnected Network Graph
+// "Everything is connected to everything" — Full Mesh Constellation
 // ==========================================================================
 const natureCanvas = document.getElementById('nature-branch-canvas');
 const natureCtx = natureCanvas ? natureCanvas.getContext('2d') : null;
@@ -108,47 +109,30 @@ let lastNetRectW = 0, lastNetRectH = 0;
 let networkNodes = [];
 let networkEdges = [];
 let networkPulses = [];
+let hoveredNode = null;
+let netMouse = { x: -1000, y: -1000, active: false };
 
 const NETWORK_ITEMS = [
-  { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.14, dtY: 0.24, mbX: 0.22, mbY: 0.14 },
-  { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.14, dtY: 0.76, mbX: 0.20, mbY: 0.36 },
-  { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.32, dtY: 0.32, mbX: 0.78, mbY: 0.36 },
-  { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.38, dtY: 0.74, mbX: 0.50, mbY: 0.54 },
-  { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.54, dtY: 0.22, mbX: 0.22, mbY: 0.72 },
-  { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.58, dtY: 0.78, mbX: 0.24, mbY: 0.88 },
-  { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.72, dtY: 0.34, mbX: 0.78, mbY: 0.72 },
-  { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.88, dtY: 0.24, mbX: 0.76, mbY: 0.14 },
-  { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.86, dtY: 0.76, mbX: 0.76, mbY: 0.88 }
-];
-
-const NETWORK_CONNECTIONS = [
-  ['sound', 'music'],
-  ['sound', 'physics'],
-  ['music', 'math'],
-  ['physics', 'math'],
-  ['physics', 'art'],
-  ['math', 'motion'],
-  ['art', 'motion'],
-  ['art', 'light'],
-  ['art', 'geometry'],
-  ['geometry', 'light'],
-  ['geometry', 'color'],
-  ['motion', 'color'],
-  ['light', 'color']
+  { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.12, dtY: 0.24, mbX: 0.22, mbY: 0.14 },
+  { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.12, dtY: 0.76, mbX: 0.20, mbY: 0.36 },
+  { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.30, dtY: 0.30, mbX: 0.78, mbY: 0.36 },
+  { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.36, dtY: 0.74, mbX: 0.50, mbY: 0.54 },
+  { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.52, dtY: 0.20, mbX: 0.22, mbY: 0.72 },
+  { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.56, dtY: 0.80, mbX: 0.24, mbY: 0.88 },
+  { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.72, dtY: 0.32, mbX: 0.78, mbY: 0.72 },
+  { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.88, dtY: 0.22, mbX: 0.76, mbY: 0.14 },
+  { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.88, dtY: 0.76, mbX: 0.76, mbY: 0.88 }
 ];
 
 function resizeBranchCanvas() {
   if (!natureCanvas) return;
   const rect = natureCanvas.getBoundingClientRect();
-  if (rect.width < 10 || rect.height < 10) return;
-
-  if (Math.abs(rect.width - lastNetRectW) < 2 && Math.abs(rect.height - lastNetRectH) < 2) return;
-  lastNetRectW = rect.width;
-  lastNetRectH = rect.height;
+  const rawW = rect.width > 10 ? rect.width : (natureCanvas.parentElement ? natureCanvas.parentElement.clientWidth : 800);
+  const rawH = rect.height > 10 ? rect.height : 320;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  natureCanvas.width = rect.width * dpr;
-  natureCanvas.height = rect.height * dpr;
+  natureCanvas.width = (rawW || 800) * dpr;
+  natureCanvas.height = (rawH || 320) * dpr;
   netWidth = natureCanvas.width;
   netHeight = natureCanvas.height;
 
@@ -169,36 +153,113 @@ function buildNetworkStructure() {
       baseY,
       x: baseX,
       y: baseY,
+      targetX: baseX,
+      targetY: baseY,
       phase: idx * 0.75,
-      floatSpeed: 0.7 + (idx % 4) * 0.18
+      floatSpeed: 0.65 + (idx % 4) * 0.15,
+      badgeW: 80,
+      badgeH: 26
     };
   });
 
   const nodeMap = {};
   networkNodes.forEach(n => { nodeMap[n.id] = n; });
 
-  networkEdges = NETWORK_CONNECTIONS.map(([srcId, dstId]) => ({
-    src: nodeMap[srcId],
-    dst: nodeMap[dstId]
-  })).filter(e => e.src && e.dst);
+  // CONNECT EVERYTHING TO EVERYTHING (Full Mesh Graph: all 36 pairwise connections)
+  networkEdges = [];
+  const PRIMARY_SET = new Set([
+    'sound-music', 'sound-physics', 'sound-art', 'music-math', 'physics-math', 'physics-art',
+    'math-motion', 'art-motion', 'art-light', 'art-geometry', 'geometry-light',
+    'geometry-color', 'motion-color', 'light-color', 'music-sound', 'art-physics'
+  ]);
 
-  // Initialize roaming signal pulses
+  for (let i = 0; i < networkNodes.length; i++) {
+    for (let j = i + 1; j < networkNodes.length; j++) {
+      const src = networkNodes[i];
+      const dst = networkNodes[j];
+      const key1 = `${src.id}-${dst.id}`;
+      const key2 = `${dst.id}-${src.id}`;
+      const isPrimary = PRIMARY_SET.has(key1) || PRIMARY_SET.has(key2);
+
+      networkEdges.push({
+        src,
+        dst,
+        isPrimary,
+        baseAlpha: isPrimary ? 0.15 : 0.055,
+        currentAlpha: isPrimary ? 0.15 : 0.055
+      });
+    }
+  }
+
+  // Initialize roaming signal pulses across all network filaments
   networkPulses = [];
-  for (let i = 0; i < networkEdges.length * 2; i++) {
-    const edge = networkEdges[i % networkEdges.length];
+  const pulseCount = 36;
+  for (let i = 0; i < pulseCount; i++) {
+    const edge = networkEdges[Math.floor(Math.random() * networkEdges.length)];
     networkPulses.push({
       edge,
       progress: Math.random(),
-      speed: 0.003 + Math.random() * 0.004,
+      speed: 0.003 + Math.random() * 0.005,
       forward: Math.random() > 0.5,
-      size: 2.4 + Math.random() * 1.4
+      size: 2.2 + Math.random() * 1.5,
+      color: edge.src.color
     });
   }
 }
 
+// Interactive hover tracking on nature network canvas
+if (natureCanvas) {
+  natureCanvas.addEventListener('mousemove', (e) => {
+    const rect = natureCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    netMouse.x = (e.clientX - rect.left) * dpr;
+    netMouse.y = (e.clientY - rect.top) * dpr;
+    netMouse.active = true;
+
+    // Detect hovered node
+    let closest = null;
+    let minDist = 45 * dpr;
+    networkNodes.forEach(node => {
+      const dist = Math.hypot(node.x - netMouse.x, node.y - netMouse.y);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = node;
+      }
+    });
+    hoveredNode = closest;
+  });
+
+  natureCanvas.addEventListener('mouseleave', () => {
+    netMouse.active = false;
+    hoveredNode = null;
+  });
+}
+
+// Safe Canvas roundRect Polyfill
+if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, radii) {
+    if (!radii) radii = 0;
+    const r = typeof radii === 'number' ? radii : (Array.isArray(radii) ? radii[0] : 0);
+    const radius = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+    this.beginPath();
+    this.moveTo(x + radius, y);
+    this.arcTo(x + w, y, x + w, y + h, radius);
+    this.arcTo(x + w, y + h, x, y + h, radius);
+    this.arcTo(x, y + h, x, y, radius);
+    this.arcTo(x, y, x + w, y, radius);
+    this.closePath();
+    return this;
+  };
+}
+
 let netTime = 0;
 function animateNatureBranches() {
-  if (!natureCtx || !natureCanvas || networkNodes.length === 0) return;
+  if (!natureCtx || !natureCanvas) return;
+  if (networkNodes.length === 0) {
+    resizeBranchCanvas();
+    requestAnimationFrame(animateNatureBranches);
+    return;
+  }
   netTime += 0.016;
   const w = netWidth;
   const h = netHeight;
@@ -206,27 +267,68 @@ function animateNatureBranches() {
 
   natureCtx.clearRect(0, 0, w, h);
 
-  // Update floating positions with gentle organic breathing
+  // Update floating positions with gentle organic breathing + cursor attraction
   networkNodes.forEach(node => {
-    const floatX = Math.sin(netTime * node.floatSpeed + node.phase) * (3.5 * dpr);
-    const floatY = Math.cos(netTime * node.floatSpeed * 0.8 + node.phase) * (3.5 * dpr);
-    node.x = node.baseX + floatX;
-    node.y = node.baseY + floatY;
+    const floatX = Math.sin(netTime * node.floatSpeed + node.phase) * (3.0 * dpr);
+    const floatY = Math.cos(netTime * node.floatSpeed * 0.8 + node.phase) * (3.0 * dpr);
+
+    let attractX = 0, attractY = 0;
+    if (netMouse.active) {
+      const dx = netMouse.x - node.baseX;
+      const dy = netMouse.y - node.baseY;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 140 * dpr && dist > 1) {
+        const force = (1 - dist / (140 * dpr)) * (8 * dpr);
+        attractX = (dx / dist) * force;
+        attractY = (dy / dist) * force;
+      }
+    }
+
+    node.x = node.baseX + floatX + attractX;
+    node.y = node.baseY + floatY + attractY;
   });
 
-  // 1. Draw Network Connection Edges
+  // 1. Draw Network Connection Edges (All Interconnected Filaments)
   networkEdges.forEach(edge => {
+    const isConnectedToHover = hoveredNode && (edge.src === hoveredNode || edge.dst === hoveredNode);
+    let targetAlpha = edge.baseAlpha;
+    let strokeColor = 'rgba(60, 50, 40, 0.12)';
+    let lineWidth = (edge.isPrimary ? 1.4 : 0.85) * dpr;
+
+    if (hoveredNode) {
+      if (isConnectedToHover) {
+        targetAlpha = 0.55;
+        strokeColor = hoveredNode.color;
+        lineWidth = 2.0 * dpr;
+      } else {
+        targetAlpha = 0.025; // Subtle dim for non-related edges
+      }
+    }
+
+    // Smooth alpha interpolation
+    edge.currentAlpha += (targetAlpha - edge.currentAlpha) * 0.15;
+
     natureCtx.beginPath();
     natureCtx.moveTo(edge.src.x, edge.src.y);
     natureCtx.lineTo(edge.dst.x, edge.dst.y);
-    natureCtx.strokeStyle = 'rgba(60, 50, 40, 0.13)';
-    natureCtx.lineWidth = 1.5 * dpr;
+
+    if (isConnectedToHover) {
+      natureCtx.strokeStyle = hoveredNode.color;
+      natureCtx.globalAlpha = edge.currentAlpha;
+    } else {
+      natureCtx.strokeStyle = `rgba(60, 50, 40, ${edge.currentAlpha})`;
+      natureCtx.globalAlpha = 1.0;
+    }
+    natureCtx.lineWidth = lineWidth;
     natureCtx.stroke();
+    natureCtx.globalAlpha = 1.0;
   });
 
-  // 2. Draw Traveling Signal Pulses
+  // 2. Draw Traveling Signal Pulses Across the Web
   networkPulses.forEach(p => {
-    p.progress += p.speed;
+    const isEdgeHovered = hoveredNode && (p.edge.src === hoveredNode || p.edge.dst === hoveredNode);
+    const speed = isEdgeHovered ? p.speed * 2.2 : p.speed;
+    p.progress += speed;
     if (p.progress > 1) p.progress = 0;
     const t = p.forward ? p.progress : 1 - p.progress;
 
@@ -234,9 +336,9 @@ function animateNatureBranches() {
     const py = p.edge.src.y + (p.edge.dst.y - p.edge.src.y) * t;
 
     natureCtx.beginPath();
-    natureCtx.arc(px, py, p.size * dpr, 0, Math.PI * 2);
-    natureCtx.fillStyle = p.edge.src.color;
-    natureCtx.globalAlpha = 0.75;
+    natureCtx.arc(px, py, (isEdgeHovered ? p.size * 1.4 : p.size) * dpr, 0, Math.PI * 2);
+    natureCtx.fillStyle = isEdgeHovered ? hoveredNode.color : p.edge.src.color;
+    natureCtx.globalAlpha = isEdgeHovered ? 0.95 : (hoveredNode ? 0.35 : 0.7);
     natureCtx.fill();
     natureCtx.globalAlpha = 1.0;
   });
@@ -248,22 +350,23 @@ function animateNatureBranches() {
   natureCtx.textBaseline = 'middle';
 
   networkNodes.forEach(node => {
+    const isHovered = (node === hoveredNode);
     const textWidth = natureCtx.measureText(node.label).width;
     const padX = 9 * dpr;
     const padY = 5 * dpr;
     const badgeH = fontSize + padY * 2;
-    const dotRadius = 4 * dpr;
+    const dotRadius = (isHovered ? 4.8 : 4.0) * dpr;
     const badgeW = textWidth + padX * 2 + dotRadius * 2 + 5 * dpr;
 
     const badgeX = node.x - badgeW / 2;
     const badgeY = node.y - badgeH / 2;
     const radius = badgeH / 2;
 
+    // Draw pill background with sleek shadow on hover
     natureCtx.fillStyle = '#ffffff';
-    natureCtx.strokeStyle = 'rgba(45, 35, 25, 0.12)';
-    natureCtx.lineWidth = 1.2 * dpr;
+    natureCtx.strokeStyle = isHovered ? node.color : 'rgba(45, 35, 25, 0.12)';
+    natureCtx.lineWidth = (isHovered ? 1.8 : 1.2) * dpr;
 
-    // Draw pill background so text NEVER collides or gets crossed by lines
     natureCtx.beginPath();
     natureCtx.roundRect(badgeX, badgeY, badgeW, badgeH, radius);
     natureCtx.fill();
@@ -275,7 +378,7 @@ function animateNatureBranches() {
 
     // Halo around dot
     natureCtx.beginPath();
-    natureCtx.arc(dotX, dotY, dotRadius + 2.2 * dpr, 0, Math.PI * 2);
+    natureCtx.arc(dotX, dotY, dotRadius + (isHovered ? 3.5 : 2.2) * dpr, 0, Math.PI * 2);
     natureCtx.fillStyle = node.bg;
     natureCtx.fill();
 
@@ -287,7 +390,7 @@ function animateNatureBranches() {
 
     // Label Text
     natureCtx.textAlign = 'left';
-    natureCtx.fillStyle = '#1f1d1a';
+    natureCtx.fillStyle = isHovered ? node.color : '#1f1d1a';
     natureCtx.fillText(node.label, dotX + dotRadius + 5 * dpr, node.y);
   });
 
@@ -757,23 +860,75 @@ function initKnobsAnimation() {
 }
 
 
+
+
+
 // ==========================================================================
-// 4. Minimal Soundscape Audio Player with Multi-Track Switching
+// 4. Seamless Audio Player (Single Track + Reactive Amplitude Waveform)
 // ==========================================================================
 function initMinimalAudioPlayer() {
   const audio = document.getElementById('m-audio-element');
   const playBtn = document.getElementById('minimal-play-btn');
   const playIcon = document.getElementById('m-play-icon');
   const pauseIcon = document.getElementById('m-pause-icon');
-  const progressContainer = document.getElementById('m-progress-container');
-  const progressFill = document.getElementById('m-progress-fill');
-  const timeText = document.getElementById('m-track-time');
-  const trackTitle = document.getElementById('m-track-title');
-  const trackPills = document.querySelectorAll('.track-select-pill');
+  const waveCanvas = document.getElementById('waveform-canvas');
+  const waveBox = document.getElementById('waveform-box');
 
-  if (!audio || !playBtn) return;
+  if (!audio || !playBtn || !waveCanvas) return;
+
+  const ctx = waveCanvas.getContext('2d');
+  let audioCtx = null;
+  let analyser = null;
+  let dataArray = null;
+  let isWebAudioInitialized = false;
+
+  const barCount = 52;
+  const baseProfile = [];
+  for (let i = 0; i < barCount; i++) {
+    const u = i / barCount;
+    const env = Math.sin(u * Math.PI) * 0.75 + 0.25;
+    const detail = (Math.sin(u * 14.0) * 0.2 + Math.cos(u * 28.0) * 0.15 + Math.sin(u * 44.0) * 0.1);
+    baseProfile.push(Math.max(0.15, Math.min(0.95, env + detail)));
+  }
+
+  let hoverPct = -1;
+
+  function initWebAudio() {
+    if (isWebAudioInitialized) return;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      audioCtx = new AudioContextClass();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.8;
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const source = audioCtx.createMediaElementSource(audio);
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      isWebAudioInitialized = true;
+    } catch (e) {
+      isWebAudioInitialized = false;
+    }
+  }
+
+  function resizeCanvas() {
+    if (!waveBox) return;
+    const rect = waveBox.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    waveCanvas.width = (rect.width || 500) * dpr;
+    waveCanvas.height = (rect.height || 48) * dpr;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
 
   function togglePlay() {
+    initWebAudio();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+
     if (audio.paused) {
       audio.play().then(() => {
         playIcon.style.display = 'none';
@@ -788,55 +943,122 @@ function initMinimalAudioPlayer() {
 
   playBtn.addEventListener('click', togglePlay);
 
-  trackPills.forEach(pill => {
-    pill.addEventListener('click', () => {
-      trackPills.forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-
-      const src = pill.dataset.src;
-      const title = pill.dataset.title;
-      const dur = pill.dataset.duration || '0:15';
-
-      if (trackTitle) trackTitle.textContent = title;
-      if (timeText) timeText.textContent = `0:00 / ${dur}`;
-
-      audio.src = src;
-      audio.currentTime = 0;
-      audio.play().then(() => {
-        playIcon.style.display = 'none';
-        pauseIcon.style.display = 'block';
-      }).catch(() => {});
-    });
-  });
-
-  audio.addEventListener('timeupdate', () => {
-    if (audio.duration) {
-      const pct = (audio.currentTime / audio.duration) * 100;
-      if (progressFill) progressFill.style.width = `${pct}%`;
-
-      const curM = Math.floor(audio.currentTime / 60);
-      const curS = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
-      const durM = Math.floor(audio.duration / 60);
-      const durS = Math.floor(audio.duration % 60).toString().padStart(2, '0');
-      if (timeText) timeText.textContent = `${curM}:${curS} / ${durM}:${durS}`;
-    }
-  });
-
   audio.addEventListener('ended', () => {
     playIcon.style.display = 'block';
     pauseIcon.style.display = 'none';
-    if (progressFill) progressFill.style.width = '0%';
   });
 
-  if (progressContainer) {
-    progressContainer.addEventListener('click', (e) => {
-      const rect = progressContainer.getBoundingClientRect();
+  // Click & Hover on Waveform to Seek
+  if (waveBox) {
+    waveBox.addEventListener('click', (e) => {
+      const rect = waveBox.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, clickX / rect.width));
       if (audio.duration) {
-        audio.currentTime = (clickX / rect.width) * audio.duration;
+        audio.currentTime = pct * audio.duration;
       }
     });
+
+    waveBox.addEventListener('mousemove', (e) => {
+      const rect = waveBox.getBoundingClientRect();
+      hoverPct = (e.clientX - rect.left) / rect.width;
+    });
+
+    waveBox.addEventListener('mouseleave', () => {
+      hoverPct = -1;
+    });
   }
+
+  let waveTime = 0;
+  function renderWaveform() {
+    waveTime += 0.035;
+    const w = waveCanvas.width;
+    const h = waveCanvas.height;
+    const dpr = window.devicePixelRatio || 1;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const isPlaying = !audio.paused;
+    let progressPct = 0;
+    if (audio.duration) {
+      progressPct = audio.currentTime / audio.duration;
+    }
+
+    const barW = (w / barCount) * 0.58;
+    const gap = (w / barCount) * 0.42;
+    const centerY = h * 0.5;
+
+    for (let i = 0; i < barCount; i++) {
+      const barU = i / (barCount - 1);
+      const x = i * (barW + gap) + gap * 0.5;
+
+      let rawAmp = baseProfile[i];
+
+      if (isPlaying) {
+        if (analyser && dataArray) {
+          const binIdx = Math.floor(barU * (dataArray.length * 0.75));
+          const binVal = (dataArray[binIdx] || 0) / 255;
+          rawAmp = rawAmp * 0.45 + binVal * 0.65;
+        } else {
+          const pulse1 = Math.sin(waveTime * 3.5 + i * 0.4) * 0.28;
+          const pulse2 = Math.cos(waveTime * 5.2 - i * 0.6) * 0.18;
+          rawAmp = Math.max(0.18, Math.min(1.0, rawAmp + pulse1 + pulse2));
+        }
+      } else {
+        const idle = Math.sin(waveTime * 0.8 + i * 0.2) * 0.06;
+        rawAmp = Math.max(0.12, rawAmp * 0.75 + idle);
+      }
+
+      const barH = Math.max(4 * dpr, rawAmp * (h * 0.88));
+      const y = centerY - barH * 0.5;
+      const radius = Math.min(barW * 0.5, 3 * dpr);
+
+      const isPlayed = barU <= progressPct;
+      const isHoverScrub = hoverPct >= 0 && barU <= hoverPct;
+
+      if (isPlayed) {
+        const grad = ctx.createLinearGradient(0, y, 0, y + barH);
+        grad.addColorStop(0, '#c2593f');
+        grad.addColorStop(1, '#d97736');
+        ctx.fillStyle = grad;
+      } else if (isHoverScrub) {
+        ctx.fillStyle = 'rgba(194, 89, 63, 0.45)';
+      } else {
+        ctx.fillStyle = 'rgba(45, 35, 25, 0.16)';
+      }
+
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(x, y, barW, barH, radius);
+      } else {
+        ctx.rect(x, y, barW, barH);
+      }
+      ctx.fill();
+    }
+
+    if (progressPct > 0 && progressPct <= 1) {
+      const playheadX = progressPct * w;
+      ctx.beginPath();
+      ctx.arc(playheadX, centerY, 3.5 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = '#c2593f';
+      ctx.fill();
+    }
+
+    if (hoverPct >= 0 && hoverPct <= 1) {
+      const scrubX = hoverPct * w;
+      ctx.beginPath();
+      ctx.moveTo(scrubX, 2 * dpr);
+      ctx.lineTo(scrubX, h - 2 * dpr);
+      ctx.strokeStyle = 'rgba(194, 89, 63, 0.5)';
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.setLineDash([3 * dpr, 3 * dpr]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    requestAnimationFrame(renderWaveform);
+  }
+  requestAnimationFrame(renderWaveform);
 }
 
 // Recipes Show More / Show Less Toggle
@@ -858,7 +1080,6 @@ function initRecipesToggle() {
     }
   });
 }
-
 
 // ==========================================================================
 // 5. 3 Continuous Ticker Tapes & Interactive Node Modal
@@ -992,9 +1213,6 @@ document.addEventListener('DOMContentLoaded', () => {
   resizeBranchCanvas();
   requestAnimationFrame(animateNatureBranches);
 
-  // Mobile browsers can report a 0×0 wrapper on first measurement (before
-  // fonts/layout settle) and never fire a 'resize' event afterward — watch
-  // the wrapper directly so the tree still builds once it actually has size.
   const natureWrapper = document.querySelector('.nature-canvas-wrapper');
   if (natureWrapper && 'ResizeObserver' in window) {
     let lastW = 0, lastH = 0;
@@ -1012,6 +1230,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   window.addEventListener('load', resizeBranchCanvas);
 
+  // Initialize the 4 primary capabilities animations
   initWavesAnimation();
   initWavetableAnimation();
   initParticlesAnimation();

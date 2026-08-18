@@ -68,6 +68,13 @@ html {
 
 body {
   background-color: var(--bg-page);
+  /* Sleek low-opacity notebook canvas grid & intersection dots */
+  background-image: 
+    radial-gradient(rgba(45, 35, 25, 0.055) 1px, transparent 1px),
+    linear-gradient(to right, rgba(45, 35, 25, 0.022) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(45, 35, 25, 0.022) 1px, transparent 1px);
+  background-size: 26px 26px, 26px 26px, 26px 26px;
+  background-position: 0 0, 0 0, 0 0;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: var(--font-size-medium);
@@ -77,7 +84,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Background Cosmic Dust Canvas */
+/* Background Cosmic Dust Canvas (Subtle ambient graphite specks on notebook) */
 #cosmic-canvas {
   position: fixed;
   top: 0;
@@ -86,7 +93,7 @@ body {
   height: 100vh;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.85;
+  opacity: 0.7;
 }
 
 .container {
@@ -266,6 +273,13 @@ body {
   font-size: 1.18em;
   font-weight: 700;
   color: var(--pastel-terracotta);
+  display: inline-block;
+  cursor: default;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.cursive-text:hover {
+  transform: translateY(-1px);
 }
 
 /* Concise 3-line refined hero description */
@@ -411,21 +425,6 @@ body {
   line-height: var(--lh-normal);
 }
 
-/* Sketchy Scratchy Underline on "Work?" */
-.sketch-underline {
-  position: relative;
-  display: inline-block;
-}
-.sketch-underline::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: -2px;
-  right: -2px;
-  height: 5px;
-  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M 0 4 Q 25 1 50 6 T 100 3' fill='none' stroke='%23c2593f' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x;
-  background-size: 60px 5px;
-}
 
 /* --------------------------------------------------------------------------
    Nature Connected Graph Canvas Section
@@ -450,7 +449,7 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   Capabilities (Animated Mini-Canvases with Smaller Titles)
+   Capabilities (Animated Mini-Canvases with Smaller Clean Titles)
    -------------------------------------------------------------------------- */
 .capabilities-grid {
   display: grid;
@@ -495,26 +494,22 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   Listen (Minimal Single Soundscape Player with Smaller Title)
+   Listen (Seamless Audio Player: Pure Play Button + Amplitude Waveform)
    -------------------------------------------------------------------------- */
-.minimal-player-card {
-  max-width: 620px;
-  margin: 0 auto;
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
-  border-radius: var(--radius-lg);
-  padding: 18px 22px;
-}
-
-.minimal-player-row {
+.seamless-player-wrap {
+  max-width: 600px;
+  margin: 18px auto 0;
   display: flex;
   align-items: center;
   gap: 16px;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .minimal-play-circle {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: var(--btn-primary-bg);
   color: #fff;
@@ -524,86 +519,41 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform var(--transition-fast);
+  transition: all var(--transition-smooth);
+  box-shadow: 0 3px 12px rgba(194, 89, 63, 0.28);
 }
 .minimal-play-circle:hover {
-  transform: scale(1.05);
+  transform: scale(1.08);
+  filter: brightness(1.08);
+  box-shadow: 0 5px 16px rgba(194, 89, 63, 0.38);
+}
+.minimal-play-circle:active {
+  transform: scale(0.95);
 }
 
-.minimal-track-info {
+.waveform-box {
   flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.track-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-/* Smaller, cleaner soundscape title */
-.m-track-title {
-  font-size: var(--font-size-small);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.m-time-text {
-  font-size: var(--font-size-small);
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-}
-
-.m-progress-bar {
-  width: 100%;
-  height: 6px;
-  background: var(--bg-inner);
-  border-radius: var(--radius-pill);
-  cursor: pointer;
+  height: 48px;
+  background: rgba(45, 35, 25, 0.035);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   position: relative;
-  overflow: hidden;
-}
-
-.m-progress-fill {
-  width: 0%;
-  height: 100%;
-  background: var(--pastel-terracotta);
-  border-radius: var(--radius-pill);
-  transition: width 0.1s linear;
-}
-
-.track-selector-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-
-.track-select-pill {
-  font-family: var(--font-sans);
-  font-size: 0.76rem;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-inner);
-  border: 1px solid var(--border-card);
-  color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  overflow: hidden;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
-.track-select-pill:hover {
-  color: var(--pastel-terracotta);
-  border-color: var(--pastel-terracotta);
+.waveform-box:hover {
+  background: rgba(45, 35, 25, 0.055);
+  border-color: rgba(194, 89, 63, 0.3);
 }
-.track-select-pill.active {
-  background: rgba(194, 89, 63, 0.12);
-  border-color: var(--pastel-terracotta);
-  color: var(--pastel-terracotta);
-  font-weight: 600;
+
+#waveform-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
+
+
 
 /* --------------------------------------------------------------------------
    How-To / Illustrated Node Recipes
@@ -874,70 +824,83 @@ body {
 .modal-card {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
-  border-radius: var(--radius-lg);
-  padding: 26px;
-  max-width: 440px;
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  max-width: 380px;
   width: 100%;
   position: relative;
-  animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 12px 36px rgba(45, 35, 25, 0.14);
+  animation: modalPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes modalPop {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
 }
 
 .modal-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  background: transparent;
-  border: none;
-  font-size: 1.1rem;
+  top: 10px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  font-size: 0.8rem;
   color: var(--text-muted);
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 .modal-close:hover {
   color: var(--text-primary);
+  border-color: var(--pastel-terracotta);
 }
 
 .modal-badge {
-  font-size: var(--font-size-small);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--pastel-terracotta);
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-weight: 700;
+  margin-bottom: 2px;
 }
 
 .modal-title {
-  font-size: var(--font-size-large);
+  font-size: 1.15rem;
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  line-height: 1.2;
 }
 
 .modal-desc {
-  font-size: var(--font-size-medium);
+  font-size: 0.84rem;
   color: var(--text-secondary);
-  line-height: var(--lh-normal);
-  margin-bottom: 14px;
+  line-height: 1.45;
+  margin-bottom: 10px;
 }
 
 .modal-pins {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 .pin-tag {
-  font-size: var(--font-size-small);
-  padding: 3px 8px;
+  font-size: 0.72rem;
+  padding: 2px 7px;
   border-radius: var(--radius-pill);
   background: var(--bg-inner);
+  border: 1px solid var(--border-card);
   color: var(--text-muted);
 }
 
 .modal-footer-action {
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
   display: flex;
   justify-content: flex-end;
@@ -946,8 +909,8 @@ body {
 .modal-doc-link {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.78rem;
+  gap: 4px;
+  font-size: 0.74rem;
   font-weight: 600;
   color: var(--pastel-terracotta);
   text-decoration: none;
