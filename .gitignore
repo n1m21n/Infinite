@@ -11,6 +11,7 @@ imgui.ini
 
 .DS_Store
 *.swp
+.claude/*.json
 
 # scratch space for future execution/implementation prompts - never meant
 # to be tracked, just kept out from underfoot in the repo root

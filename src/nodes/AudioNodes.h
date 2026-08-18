@@ -265,6 +265,9 @@ public:
 
    AudioCable input;
 
+   // 0 = WAV, 1 = FLAC, 2 = MP3
+   int formatIndex = 0;
+
    // Where "Choose..." last pointed, or empty for the ~/Desktop default -
    // not persisted as an in-progress recording (nothing about a recording
    // survives save/load, same as every other recorder in this app - see the
@@ -273,6 +276,6 @@ public:
 
 private:
    AudioCaptureRing mCaptureRing;
-   WavWriter mWriter;
+   AudioFileWriter mWriter;
    double mOpenSampleRate = 0.0;
 };

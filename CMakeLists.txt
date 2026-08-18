@@ -91,7 +91,8 @@ add_executable(Infinite MACOSX_BUNDLE
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp
     src/audio/AudioCaptureRing.cpp
-    src/audio/WavWriter.cpp
+    src/audio/AudioFileWriter.mm
+    external/shine/shine_mp3.c
     src/audio/AudioVoice.cpp
     src/audio/Wavetable.cpp
     src/audio/EffectDefs.cpp
@@ -198,13 +199,14 @@ target_include_directories(Infinite PRIVATE
     ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
     ${STB_DIR}
+    external/shine
     ${SYPHON_DIR}/include
     ${SYPHON_DIR}/src
 )
 
 target_link_libraries(Infinite PRIVATE glfw)
 
-set_source_files_properties(src/platform/Platform.mm
+set_source_files_properties(src/platform/Platform.mm src/audio/AudioFileWriter.mm
     PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 set_source_files_properties(${SYPHON_SOURCES}
     PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")

@@ -1111,9 +1111,17 @@ namespace Platform
          NSURL* url = [NSURL fileURLWithPath:nsPath];
          [[NSFileManager defaultManager] removeItemAtURL:url error:nil];
 
+         AVFileType fileType = AVFileTypeQuickTimeMovie;
+         std::string lowerPath = path;
+         for (char& c : lowerPath) c = (char)tolower((unsigned char)c);
+         if (lowerPath.length() >= 4 && (lowerPath.rfind(".mp4") == lowerPath.length() - 4 || lowerPath.rfind(".m4v") == lowerPath.length() - 4))
+         {
+            fileType = AVFileTypeMPEG4;
+         }
+
          NSError* err = nil;
          AVAssetWriter* writer = [[AVAssetWriter alloc] initWithURL:url
-                                                           fileType:AVFileTypeQuickTimeMovie
+                                                           fileType:fileType
                                                               error:&err];
          if (writer == nil)
          {

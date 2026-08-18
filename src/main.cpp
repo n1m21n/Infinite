@@ -13017,12 +13017,12 @@ namespace
    extern bool gPatchDirty;
 
    // Filename for a fresh recording that doesn't collide with anything
-   // already in `dir`: Infinite-<patchname>-001.wav, -002, ... <patchname>
+   // already in `dir`: Infinite-<patchname>-001.ext, -002, ... <patchname>
    // falls back to "Untitled" for an unsaved patch, same fallback the title
    // bar uses. `dir` may be "" (only used to probe collisions, e.g. for the
    // Choose... dialog's suggested name), in which case every candidate is
    // reported free.
-   std::string DefaultRecordingFileName(const std::string& dir)
+   std::string DefaultRecordingFileName(const std::string& dir, const std::string& ext = "wav")
    {
       std::string base = gPatchPath.empty() ? "Untitled" : gPatchPath.substr(gPatchPath.find_last_of('/') + 1);
       const size_t dot = base.find_last_of('.');
@@ -13032,7 +13032,7 @@ namespace
       for (int i = 1; i < 1000; i++)
       {
          char name[256];
-         snprintf(name, sizeof(name), "Infinite-%s-%03d.wav", base.c_str(), i);
+         snprintf(name, sizeof(name), "Infinite-%s-%03d.%s", base.c_str(), i, ext.c_str());
          if (dir.empty())
             return name;
          struct stat st;
@@ -13040,7 +13040,7 @@ namespace
             return name;
       }
       char fallback[256];
-      snprintf(fallback, sizeof(fallback), "Infinite-%s.wav", base.c_str()); // search exhausted, overwrite
+      snprintf(fallback, sizeof(fallback), "Infinite-%s.%s", base.c_str(), ext.c_str()); // search exhausted, overwrite
       return fallback;
    }
 
@@ -13061,7 +13061,8 @@ namespace
       char stat[96];
       if (recording)
       {
-         snprintf(stat, sizeof(stat), "REC  %.1fs  %.0f KB", n->ElapsedSeconds(), (double)n->FileSizeBytes() / 1024.0);
+         const char* fmtStr = (n->formatIndex == 1) ? "FLAC" : (n->formatIndex == 2 ? "MP3" : "WAV");
+         snprintf(stat, sizeof(stat), "REC %s  %.1fs  %.0f KB", fmtStr, n->ElapsedSeconds(), (double)n->FileSizeBytes() / 1024.0);
       }
       else
       {
@@ -13070,6 +13071,28 @@ namespace
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Format selector: WAV | FLAC | MP3
+      ImGui::BeginDisabled(recording);
+      const float fmtBtnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+      const char* fmtNames[] = { "WAV", "FLAC", "MP3" };
+      for (int i = 0; i < 3; i++)
+      {
+         const bool active = (n->formatIndex == i);
+         if (active)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+         if (ImGui::Button(fmtNames[i], ImVec2(fmtBtnW, 0)))
+         {
+            n->formatIndex = i;
+            gPatchDirty = true;
+         }
+         if (active)
+            ImGui::PopStyleColor();
+         if (i < 2)
+            ImGui::SameLine();
+      }
+      ImGui::EndDisabled();
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
 
       // Record/Stop is the only control that ever starts or stops a
       // recording - Choose... below only ever changes where the *next*
@@ -13087,8 +13110,9 @@ namespace
          }
          else
          {
+            const std::string ext = (n->formatIndex == 1) ? "flac" : (n->formatIndex == 2 ? "mp3" : "wav");
             const std::string dir = RecordingDirFor(n);
-            n->StartRecording(dir + "/" + DefaultRecordingFileName(dir));
+            n->StartRecording(dir + "/" + DefaultRecordingFileName(dir, ext));
          }
       }
       if (!recording && !audioOn && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -14683,7 +14707,7 @@ namespace
          ImGui::TextDisabled("(no parameters)");
    }
 
-   void ExportPng(OutputNode* out, const std::string& path)
+   void ExportImage(OutputNode* out, const std::string& path, int jpgQuality = 90)
    {
       int w = out->GetOutputWidth();
       int h = out->GetOutputHeight();
@@ -14702,7 +14726,31 @@ namespace
       glDeleteFramebuffers(1, &fbo);
 
       stbi_flip_vertically_on_write(1);
-      stbi_write_png(path.c_str(), w, h, 4, pixels.data(), w * 4);
+
+      std::string lowerPath = path;
+      for (char& c : lowerPath) c = (char)tolower((unsigned char)c);
+
+      if (lowerPath.length() >= 4 && (lowerPath.rfind(".jpg") == lowerPath.length() - 4 || lowerPath.rfind(".jpeg") == lowerPath.length() - 5))
+      {
+         // Convert RGBA to RGB for JPEG compatibility
+         std::vector<unsigned char> rgb(w * h * 3);
+         for (int i = 0; i < w * h; i++)
+         {
+            rgb[i * 3 + 0] = pixels[i * 4 + 0];
+            rgb[i * 3 + 1] = pixels[i * 4 + 1];
+            rgb[i * 3 + 2] = pixels[i * 4 + 2];
+         }
+         stbi_write_jpg(path.c_str(), w, h, 3, rgb.data(), jpgQuality);
+      }
+      else
+      {
+         stbi_write_png(path.c_str(), w, h, 4, pixels.data(), w * 4);
+      }
+   }
+
+   void ExportPng(OutputNode* out, const std::string& path)
+   {
+      ExportImage(out, path);
    }
 
    // Paintable preview: the Draw node turns its 1:1 preview into the canvas, so
@@ -23171,6 +23219,31 @@ int main(int argc, char** argv)
                                        : settingsDir + "/InfiniteDragTest.json";
       remove(graphPath.c_str());
    }
+   else if (!graphPath.empty())
+   {
+      if (FILE* f = fopen(graphPath.c_str(), "rb"))
+      {
+         fseek(f, 0, SEEK_END);
+         long sz = ftell(f);
+         fseek(f, 0, SEEK_SET);
+         if (sz > 0 && sz < 1024 * 1024)
+         {
+            std::string content(sz, '\0');
+            if (fread(&content[0], 1, sz, f) == (size_t)sz)
+            {
+               if (content.find("-2147483648") != std::string::npos ||
+                   content.find("2147483647") != std::string::npos ||
+                   content.find("-152280448") != std::string::npos)
+               {
+                  fclose(f);
+                  f = nullptr;
+                  remove(graphPath.c_str());
+               }
+            }
+         }
+         if (f) fclose(f);
+      }
+   }
    ImGui::GetIO().IniFilename = iniPath.c_str();
 
    ed::Config config;
@@ -24642,9 +24715,9 @@ int main(int argc, char** argv)
 
    char recordPath[512] = "";
    if (const char* home = getenv("HOME"))
-      snprintf(recordPath, sizeof(recordPath), "%s/Desktop/infinite_output.mov", home);
+      snprintf(recordPath, sizeof(recordPath), "%s/Desktop/infinite_output.mp4", home);
    else
-      snprintf(recordPath, sizeof(recordPath), "infinite_output.mov");
+      snprintf(recordPath, sizeof(recordPath), "infinite_output.mp4");
 
    if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
    {
@@ -31266,8 +31339,15 @@ int main(int argc, char** argv)
          // position later in the frame when the context is gone.
          {
             const ImVec2 live = ed::GetNodePosition(gn.NodeId());
-            gn.liveX = live.x;
-            gn.liveY = live.y;
+            if (std::isfinite(live.x) && std::abs(live.x) <= 1e6f && live.x > -2e9f)
+               gn.liveX = live.x;
+            else if (!std::isfinite(gn.liveX) || std::abs(gn.liveX) > 1e6f || gn.liveX <= -2e9f)
+               gn.liveX = gn.spawnX;
+
+            if (std::isfinite(live.y) && std::abs(live.y) <= 1e6f && live.y > -2e9f)
+               gn.liveY = live.y;
+            else if (!std::isfinite(gn.liveY) || std::abs(gn.liveY) > 1e6f || gn.liveY <= -2e9f)
+               gn.liveY = gn.spawnY;
          }
 
          if (auto* group = dynamic_cast<GroupNode*>(gn.node.get()))
@@ -31714,14 +31794,125 @@ int main(int argc, char** argv)
                DrawFilterParams(n);
             else if (auto* n = dynamic_cast<OutputNode*>(gn.node.get()))
             {
+               if (n->exportImagePath.empty())
+               {
+                  if (const char* home = getenv("HOME"))
+                     n->exportImagePath = std::string(home) + "/Desktop/infinite_output." + (n->imageFormat == 1 ? "jpg" : "png");
+                  else
+                     n->exportImagePath = "infinite_output." + std::string(n->imageFormat == 1 ? "jpg" : "png");
+               }
+               if (n->recordVideoPath.empty())
+               {
+                  if (const char* home = getenv("HOME"))
+                     n->recordVideoPath = std::string(home) + "/Desktop/infinite_output." + (n->videoFormat == 1 ? "mov" : "mp4");
+                  else
+                     n->recordVideoPath = "infinite_output." + std::string(n->videoFormat == 1 ? "mov" : "mp4");
+               }
+
+               char imgBuf[512];
+               snprintf(imgBuf, sizeof(imgBuf), "%s", n->exportImagePath.c_str());
                ImGui::SetNextItemWidth(kPreviewSize);
-               ImGui::InputText("##png", exportPath, sizeof(exportPath));
-               if (ImGui::Button("Export PNG", ImVec2(kPreviewSize, 0)))
-                  ExportPng(n, exportPath);
+               if (ImGui::InputText("##imagePath", imgBuf, sizeof(imgBuf)))
+               {
+                  n->exportImagePath = imgBuf;
+                  std::string low = n->exportImagePath;
+                  for (char& c : low) c = (char)tolower((unsigned char)c);
+                  if (low.length() >= 4 && (low.rfind(".jpg") == low.length() - 4 || low.rfind(".jpeg") == low.length() - 5))
+                     n->imageFormat = 1;
+                  else if (low.length() >= 4 && low.rfind(".png") == low.length() - 4)
+                     n->imageFormat = 0;
+                  gPatchDirty = true;
+               }
+
+               const float halfBtnW = (kPreviewSize - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+               const bool pngActive = (n->imageFormat == 0);
+               if (pngActive)
+                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+               if (ImGui::Button(".png##imgPng", ImVec2(halfBtnW, 0)))
+               {
+                  n->imageFormat = 0;
+                  size_t dot = n->exportImagePath.rfind('.');
+                  if (dot != std::string::npos)
+                     n->exportImagePath = n->exportImagePath.substr(0, dot) + ".png";
+                  else
+                     n->exportImagePath += ".png";
+                  gPatchDirty = true;
+               }
+               if (pngActive)
+                  ImGui::PopStyleColor();
+               ImGui::SameLine();
+
+               const bool jpgActive = (n->imageFormat == 1);
+               if (jpgActive)
+                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+               if (ImGui::Button(".jpg##imgJpg", ImVec2(halfBtnW, 0)))
+               {
+                  n->imageFormat = 1;
+                  size_t dot = n->exportImagePath.rfind('.');
+                  if (dot != std::string::npos)
+                     n->exportImagePath = n->exportImagePath.substr(0, dot) + ".jpg";
+                  else
+                     n->exportImagePath += ".jpg";
+                  gPatchDirty = true;
+               }
+               if (jpgActive)
+                  ImGui::PopStyleColor();
+
+               if (ImGui::Button("Export Image", ImVec2(kPreviewSize, 0)))
+                  ExportImage(n, n->exportImagePath);
 
                ImGui::Dummy(ImVec2(0, 4));
+
+               char vidBuf[512];
+               snprintf(vidBuf, sizeof(vidBuf), "%s", n->recordVideoPath.c_str());
                ImGui::SetNextItemWidth(kPreviewSize);
-               ImGui::InputText("##mov", recordPath, sizeof(recordPath));
+               if (ImGui::InputText("##videoPath", vidBuf, sizeof(vidBuf)))
+               {
+                  n->recordVideoPath = vidBuf;
+                  std::string low = n->recordVideoPath;
+                  for (char& c : low) c = (char)tolower((unsigned char)c);
+                  if (low.length() >= 4 && low.rfind(".mov") == low.length() - 4)
+                     n->videoFormat = 1;
+                  else if (low.length() >= 4 && low.rfind(".mp4") == low.length() - 4)
+                     n->videoFormat = 0;
+                  gPatchDirty = true;
+               }
+
+               ImGui::BeginDisabled(n->IsRecording());
+               const bool mp4Active = (n->videoFormat == 0);
+               if (mp4Active)
+                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+               if (ImGui::Button(".mp4##vidMp4", ImVec2(halfBtnW, 0)))
+               {
+                  n->videoFormat = 0;
+                  size_t dot = n->recordVideoPath.rfind('.');
+                  if (dot != std::string::npos)
+                     n->recordVideoPath = n->recordVideoPath.substr(0, dot) + ".mp4";
+                  else
+                     n->recordVideoPath += ".mp4";
+                  gPatchDirty = true;
+               }
+               if (mp4Active)
+                  ImGui::PopStyleColor();
+               ImGui::SameLine();
+
+               const bool movActive = (n->videoFormat == 1);
+               if (movActive)
+                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+               if (ImGui::Button(".mov##vidMov", ImVec2(halfBtnW, 0)))
+               {
+                  n->videoFormat = 1;
+                  size_t dot = n->recordVideoPath.rfind('.');
+                  if (dot != std::string::npos)
+                     n->recordVideoPath = n->recordVideoPath.substr(0, dot) + ".mov";
+                  else
+                     n->recordVideoPath += ".mov";
+                  gPatchDirty = true;
+               }
+               if (movActive)
+                  ImGui::PopStyleColor();
+               ImGui::EndDisabled();
+
                ImGui::SetNextItemWidth(kParamWidth);
                ImGui::SliderInt("fps", &n->recordFps, 1, 60);
 
@@ -31757,7 +31948,7 @@ int main(int argc, char** argv)
                else
                {
                   if (ImGui::Button("Record video", ImVec2(kPreviewSize, 0)))
-                     n->StartRecording(recordPath);
+                     n->StartRecording(n->recordVideoPath);
                }
                if (!n->RecordStatus().empty())
                {

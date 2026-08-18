@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infinite — Vertical Presentation Deck</title>
+  
+  <!-- Fonts: Inter, Caveat, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Direct Website Stylesheet -->
+  <link rel="stylesheet" href="style.css?v=12">
+
+  <style>
+    /* ==========================================================================
+       Vertical Slide Deck Setup (1080px x 1920px)
+       Directly adopting the exact website component styles, cards, and diagrams
+       ========================================================================== */
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    @page {
+      size: 1080px 1920px;
+      margin: 0;
+    }
+
+    html, body {
+      background-color: #2b2723;
+      font-family: var(--font-sans);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .deck-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+      padding: 40px 0;
+    }
+
+    /* Individual Vertical Slide */
+    .slide {
+      width: 1080px;
+      height: 1920px;
+      background-color: var(--bg-page);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 72px 64px 60px 64px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+      page-break-after: always;
+      page-break-inside: avoid;
+    }
+
+    @media print {
+      body {
+        background-color: var(--bg-page);
+      }
+      .deck-container {
+        padding: 0;
+        gap: 0;
+      }
+      .slide {
+        box-shadow: none;
+        width: 1080px;
+        height: 1920px;
+        page-break-after: always;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    /* Ambient Background Dot Pattern */
+    .slide-bg-grid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: radial-gradient(rgba(45, 35, 25, 0.08) 1.5px, transparent 1.5px);
+      background-size: 36px 36px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .slide-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    /* Slide Header */
+    .deck-slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 20px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 11px;
+    }
+
+    .brand-title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .deck-slide-pill {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      color: var(--text-muted);
+      background: var(--bg-inner);
+      padding: 8px 18px;
+      border-radius: var(--radius-pill);
+      letter-spacing: 0.03em;
+    }
+
+    /* Slide Main Center Content */
+    .deck-slide-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin: auto 0;
+      gap: 28px;
+      width: 100%;
+    }
+
+    .deck-headline {
+      font-size: 50px;
+      font-weight: 800;
+      line-height: 1.18;
+      letter-spacing: -0.035em;
+      color: var(--text-primary);
+      max-width: 920px;
+    }
+
+    .deck-headline .cursive-text {
+      font-family: var(--font-cursive);
+      color: var(--pastel-terracotta);
+      font-size: 1.15em;
+      font-weight: 700;
+      display: inline-block;
+    }
+
+    /* Centerpiece Visual Frame */
+    .deck-visual-frame {
+      width: 100%;
+      max-width: 952px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(45, 35, 25, 0.08);
+      position: relative;
+    }
+
+    .deck-window-top {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      background: #faf8f3;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .deck-window-title {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-left: 14px;
+    }
+
+    /* Annotation & Arrow */
+    .deck-annotation-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .deck-arrow-svg {
+      width: 44px;
+      height: 44px;
+      color: var(--pastel-terracotta);
+    }
+
+    .deck-two-line {
+      font-family: var(--font-cursive);
+      font-size: 34px;
+      line-height: 1.25;
+      color: var(--pastel-terracotta);
+      font-weight: 700;
+      text-align: center;
+      max-width: 860px;
+    }
+
+    /* Slide Footer */
+    .deck-slide-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 20px;
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    .deck-footer-link {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      color: var(--pastel-terracotta);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .deck-footer-right {
+      font-weight: 500;
+    }
+
+    /* Section-specific adapted heights */
+    .hero-media-wrap {
+      width: 100%;
+      height: 720px;
+    }
+    .hero-media-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .nature-slide-wrap {
+      width: 100%;
+      height: 720px;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .nature-slide-wrap canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Slide 3: Capabilities 2x2 grid */
+    .deck-cap-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 20px;
+      background: #faf8f3;
+      height: 720px;
+    }
+    .deck-cap-grid .cap-card {
+      background: #ffffff;
+      border: 1px solid var(--border-card);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: none;
+    }
+    .deck-cap-grid .cap-canvas-box {
+      width: 100%;
+      height: 220px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #111;
+    }
+    .deck-cap-grid .cap-canvas-box canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .deck-cap-grid .cap-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-top: 10px;
+      text-align: left;
+    }
+
+    /* Slide 4: Two Recipes */
+    .deck-recipes-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 22px;
+      background: #faf8f3;
+      height: 720px;
+      justify-content: center;
+    }
+    .deck-recipe-card {
+      background: #ffffff;
+      border: 1px solid var(--border-card);
+      border-radius: 16px;
+      padding: 18px 20px;
+      display: grid;
+      grid-template-columns: 1.3fr 0.9fr;
+      gap: 18px;
+      align-items: center;
+      text-align: left;
+    }
+    .deck-recipe-card .recipe-num {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--pastel-terracotta);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .deck-recipe-card .recipe-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      line-height: 1.25;
+    }
+    .deck-recipe-card .recipe-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+      margin-bottom: 10px;
+    }
+    .deck-recipe-card .node-flow-diagram {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .deck-recipe-card .flow-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--bg-inner);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+    .deck-recipe-card .flow-arrow {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .deck-recipe-card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid var(--border-card);
+    }
+
+    /* Slide 5: Download macOS Card */
+    .deck-download-wrap {
+      height: 720px;
+      background: #ffffff;
+      padding: 36px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-align: left;
+    }
+    .deck-dl-header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .deck-dl-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(45,35,25,0.12);
+    }
+    .deck-dl-title {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+    .deck-dl-sub {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .deck-dl-specs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .deck-dl-spec-box {
+      background: var(--bg-inner);
+      padding: 16px 20px;
+      border-radius: 12px;
+    }
+    .deck-dl-spec-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .deck-dl-spec-val {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .deck-dl-cta-box {
+      background: #fdfaf7;
+      border: 2px solid rgba(194, 89, 63, 0.3);
+      padding: 20px 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .deck-dl-cta-btn {
+      background: var(--pastel-terracotta);
+      color: #ffffff;
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 16px;
+      padding: 12px 24px;
+      border-radius: var(--radius-pill);
+      text-decoration: none;
+      box-shadow: 0 4px 14px rgba(194, 89, 63, 0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="deck-container">
+
+    <!-- =======================================================================
+         SLIDE 1: A visual notebook where sound, art and geometry connect
+         ======================================================================= -->
+    <section class="slide" id="slide-1">
+      <div class="slide-bg-grid"></div>
+      <div class="slide-content">
+        
+        <header class="deck-slide-header">
+          <div class="brand-group">
+            <img src="assets/icon.png" alt="Infinite Icon" class="brand-icon">
+            <span class="brand-title">Infinite</span>
+          </div>
+          <span class="deck-slide-pill">01 / 05</span>
+        </header>
+
+        <div class="deck-slide-body">
+          <h1 class="deck-headline">
+            A visual notebook where <br>
+            <span class="cursive-text">sound, art and geometry</span> connect.
+          </h1>
+
+          <div class="deck-visual-frame">
+            <div class="deck-window-top">
+              <div class="window-dots">
+                <span class="dot dot-1"></span>
+                <span class="dot dot-2"></span>
+                <span class="dot dot-3"></span>
+              </div>
+              <span class="deck-window-title">infinite_canvas_preview</span>
+            </div>
+            <div class="hero-media-wrap">
+              <img src="assets/screenshot.png" alt="Infinite Visual Notebook Canvas">
+            </div>
+          </div>
+
+          <div class="deck-annotation-box">
+            <svg class="deck-arrow-svg" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 20,36 Q 28,18 20,6" />
+              <path d="M 12,14 L 20,6 L 28,14" />
+            </svg>
+            <p class="deck-two-line">
+              wire music, video shaders, and 3d on one boundless page.<br>
+              every element reacts together in real time.
+            </p>
+          </div>
+        </div>
+
+        <footer class="deck-slide-footer">
+          <a href="https://n1m21n.github.io/Infinite/" class="deck-footer-link">https://n1m21n.github.io/Infinite/</a>
+          <span class="deck-footer-right">all-in-one creative space for mac</span>
+        </footer>
+
+      </div>
+    </section>
+
+
+    <!-- =======================================================================
+         SLIDE 2: Connected by Nature
+         ======================================================================= -->
+    <section class="slide" id="slide-2">
+      <div class="slide-bg-grid"></div>
+      <div class="slide-content">
+        
+        <header class="deck-slide-header">
+          <div class="brand-group">
+            <img src="assets/icon.png" alt="Infinite Icon" class="brand-icon">
+            <span class="brand-title">Infinite</span>
+          </div>
+          <span class="deck-slide-pill">02 / 05</span>
+        </header>
+
+        <div class="deck-slide-body">
+          <h2 class="deck-headline">
+            Connected by <span class="cursive-text">Nature</span>
+          </h2>
+
+          <div class="deck-visual-frame">
+            <div class="deck-window-top">
+              <div class="window-dots">
+                <span class="dot dot-1"></span>
+                <span class="dot dot-2"></span>
+                <span class="dot dot-3"></span>
+              </div>
+              <span class="deck-window-title">nature_signal_mesh</span>
+            </div>
+            <div class="nature-slide-wrap">
+              <canvas id="nature-branch-canvas"></canvas>
+            </div>
+          </div>
+
+          <div class="deck-annotation-box">
+            <svg class="deck-arrow-svg" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 20,36 Q 28,18 20,6" />
+              <path d="M 12,14 L 20,6 L 28,14" />
+            </svg>
+            <p class="deck-two-line">
+              an organic web of signals connecting math, physics, light and sound.<br>
+              any node parameter can modulate any other in real time.
+            </p>
+          </div>
+        </div>
+
+        <footer class="deck-slide-footer">
+          <a href="https://n1m21n.github.io/Infinite/" class="deck-footer-link">https://n1m21n.github.io/Infinite/</a>
+          <span class="deck-footer-right">universal signal graph</span>
+        </footer>
+
+      </div>
+    </section>
+
+
+    <!-- =======================================================================
+         SLIDE 3: Creative Streams
+         ======================================================================= -->
+    <section class="slide" id="slide-3">
+      <div class="slide-bg-grid"></div>
+      <div class="slide-content">
+        
+        <header class="deck-slide-header">
+          <div class="brand-group">
+            <img src="assets/icon.png" alt="Infinite Icon" class="brand-icon">
+            <span class="brand-title">Infinite</span>
+          </div>
+          <span class="deck-slide-pill">03 / 05</span>
+        </header>
+
+        <div class="deck-slide-body">
+          <h2 class="deck-headline">
+            <span class="cursive-text">Creative</span> Streams
+          </h2>
+
+          <div class="deck-visual-frame">
+            <div class="deck-window-top">
+              <div class="window-dots">
+                <span class="dot dot-1"></span>
+                <span class="dot dot-2"></span>
+                <span class="dot dot-3"></span>
+              </div>
+              <span class="deck-window-title">capabilities_live_stream</span>
+            </div>
+            <div class="deck-cap-grid">
+              <!-- 1. Real GLSL Formula from Infinite Engine -->
+              <div class="cap-card">
+                <div class="cap-canvas-box">
+                  <canvas id="anim-waves"></canvas>
+                </div>
+                <h3 class="cap-title">Real-Time Video & Shaders</h3>
+              </div>
+
+              <!-- 2. Wavetable Position Movement Animation -->
+              <div class="cap-card">
+                <div class="cap-canvas-box">
+                  <canvas id="anim-wavetable"></canvas>
+                </div>
+                <h3 class="cap-title">Synthesizers & Sound Design</h3>
+              </div>
+
+              <!-- 3. 3D Geometry rotating cube + orbital particle system -->
+              <div class="cap-card">
+                <div class="cap-canvas-box">
+                  <canvas id="anim-particles"></canvas>
+                </div>
+                <h3 class="cap-title">3D Geometry</h3>
+              </div>
+
+              <!-- 4. 4 Modulation Knobs Moving with Cables -->
+              <div class="cap-card">
+                <div class="cap-canvas-box">
+                  <canvas id="anim-knobs"></canvas>
+                </div>
+                <h3 class="cap-title">Universal Modulation</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="deck-annotation-box">
+            <svg class="deck-arrow-svg" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 20,36 Q 28,18 20,6" />
+              <path d="M 12,14 L 20,6 L 28,14" />
+            </svg>
+            <p class="deck-two-line">
+              four powerful creative engines unified inside one modular canvas.<br>
+              glsl shaders, modular synths, 3d geometry & universal modulation.
+            </p>
+          </div>
+        </div>
+
+        <footer class="deck-slide-footer">
+          <a href="https://n1m21n.github.io/Infinite/" class="deck-footer-link">https://n1m21n.github.io/Infinite/</a>
+          <span class="deck-footer-right">160+ modular blocks</span>
+        </footer>
+
+      </div>
+    </section>
+
+
+    <!-- =======================================================================
+         SLIDE 4: two recipes
+         ======================================================================= -->
+    <section class="slide" id="slide-4">
+      <div class="slide-bg-grid"></div>
+      <div class="slide-content">
+        
+        <header class="deck-slide-header">
+          <div class="brand-group">
+            <img src="assets/icon.png" alt="Infinite Icon" class="brand-icon">
+            <span class="brand-title">Infinite</span>
+          </div>
+          <span class="deck-slide-pill">04 / 05</span>
+        </header>
+
+        <div class="deck-slide-body">
+          <h2 class="deck-headline">
+            Two <span class="cursive-text">Recipes</span>
+          </h2>
+
+          <div class="deck-visual-frame">
+            <div class="deck-window-top">
+              <div class="window-dots">
+                <span class="dot dot-1"></span>
+                <span class="dot dot-2"></span>
+                <span class="dot dot-3"></span>
+              </div>
+              <span class="deck-window-title">node_recipes_guide</span>
+            </div>
+            
+            <div class="deck-recipes-wrap">
+              <!-- Recipe 1 -->
+              <div class="deck-recipe-card">
+                <div>
+                  <span class="recipe-num">Recipe 01</span>
+                  <h3 class="recipe-title">Making Live Audio-Reactive Visuals</h3>
+                  <p class="recipe-desc">
+                    An <strong>Audio Analyze</strong> node splits sound into 8 frequency bands. Connecting a high-frequency band to a <strong>Ripple Filter</strong> causes live video to distort in exact sync with percussion.
+                  </p>
+                  <div class="node-flow-diagram">
+                    <span class="flow-pill">Audio In</span>
+                    <span class="flow-arrow">→</span>
+                    <span class="flow-pill">Audio Analyze</span>
+                    <span class="flow-arrow">→</span>
+                    <span class="flow-pill">Ripple Filter</span>
+                    <span class="flow-arrow">→</span>
+                    <span class="flow-pill">Visual Out</span>
+                  </div>
+                </div>
+                <img src="assets/howto_visual.jpg" alt="Audio reactive visual screenshot">
+              </div>
+
+              <!-- Recipe 2 -->
+              <div class="deck-recipe-card">
+                <div>
+                  <span class="recipe-num">Recipe 02</span>
+                  <h3 class="recipe-title">Turning Any Sound into Ambient Clouds</h3>
+                  <p class="recipe-desc">
+                    Drop any sound file into <strong>PaulStretch</strong> to stretch time up to 50x without changing pitch. Feeding the wash through an <strong>Algorithmic Reverb</strong> creates endless atmospheric textures.
+                  </p>
+                  <div class="node-flow-diagram">
+                    <span class="flow-pill">Audio File</span>
+                    <span class="flow-arrow">→</span>
+                    <span class="flow-pill">PaulStretch</span>
+                    <span class="flow-arrow">→</span>
+                    <span class="flow-pill">Reverb & Delay</span>
+                    <span class="flow-arrow">→</span>
+                    <span class="flow-pill">Audio Out</span>
+                  </div>
+                </div>
+                <img src="assets/howto_daw.jpg" alt="Audio workstation and synth nodes layout">
+              </div>
+            </div>
+          </div>
+
+          <div class="deck-annotation-box">
+            <svg class="deck-arrow-svg" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 20,36 Q 28,18 20,6" />
+              <path d="M 12,14 L 20,6 L 28,14" />
+            </svg>
+            <p class="deck-two-line">
+              connect blocks with cables to build reactive visuals in seconds.<br>
+              stretch any sound 50x or distort live video to rhythm.
+            </p>
+          </div>
+        </div>
+
+        <footer class="deck-slide-footer">
+          <a href="https://n1m21n.github.io/Infinite/" class="deck-footer-link">https://n1m21n.github.io/Infinite/</a>
+          <span class="deck-footer-right">illustrated node recipes</span>
+        </footer>
+
+      </div>
+    </section>
+
+
+    <!-- =======================================================================
+         SLIDE 5: Download Infinite for macOS
+         ======================================================================= -->
+    <section class="slide" id="slide-5">
+      <div class="slide-bg-grid"></div>
+      <div class="slide-content">
+        
+        <header class="deck-slide-header">
+          <div class="brand-group">
+            <img src="assets/icon.png" alt="Infinite Icon" class="brand-icon">
+            <span class="brand-title">Infinite</span>
+          </div>
+          <span class="deck-slide-pill">05 / 05</span>
+        </header>
+
+        <div class="deck-slide-body">
+          <h2 class="deck-headline">
+            Download Infinite for <span class="cursive-text">macOS</span>
+          </h2>
+
+          <div class="deck-visual-frame">
+            <div class="deck-window-top">
+              <div class="window-dots">
+                <span class="dot dot-1"></span>
+                <span class="dot dot-2"></span>
+                <span class="dot dot-3"></span>
+              </div>
+              <span class="deck-window-title">macos_universal_release</span>
+            </div>
+
+            <div class="deck-download-wrap">
+              <div class="deck-dl-header">
+                <img src="assets/icon.png" alt="Infinite Icon" class="deck-dl-icon">
+                <div>
+                  <h3 class="deck-dl-title">Infinite for macOS</h3>
+                  <p class="deck-dl-sub">A visual notebook where sound, art and geometry connect.</p>
+                </div>
+              </div>
+
+              <div class="deck-dl-specs">
+                <div class="deck-dl-spec-box">
+                  <div class="deck-dl-spec-label">Version</div>
+                  <div class="deck-dl-spec-val">v0.1-preview</div>
+                </div>
+                <div class="deck-dl-spec-box">
+                  <div class="deck-dl-spec-label">Compatibility</div>
+                  <div class="deck-dl-spec-val">macOS 11.0 Big Sur or later</div>
+                </div>
+                <div class="deck-dl-spec-box">
+                  <div class="deck-dl-spec-label">Architecture</div>
+                  <div class="deck-dl-spec-val">Universal (Apple Silicon + Intel)</div>
+                </div>
+                <div class="deck-dl-spec-box">
+                  <div class="deck-dl-spec-label">License</div>
+                  <div class="deck-dl-spec-val">MIT Open Source</div>
+                </div>
+              </div>
+
+              <div class="deck-dl-cta-box">
+                <div>
+                  <strong style="font-size: 18px; color: var(--text-primary); display: block; margin-bottom: 2px;">Ready to create?</strong>
+                  <span style="font-size: 14px; color: var(--text-muted); font-family: var(--font-mono);">No signup • 100% offline ready • Free forever</span>
+                </div>
+                <a href="https://n1m21n.github.io/Infinite/assets/Infinite.dmg" class="deck-dl-cta-btn">Download Infinite.dmg</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="deck-annotation-box">
+            <svg class="deck-arrow-svg" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 20,36 Q 28,18 20,6" />
+              <path d="M 12,14 L 20,6 L 28,14" />
+            </svg>
+            <p class="deck-two-line">
+              free and 100% open source under the mit license.<br>
+              runs natively on apple silicon and intel macs with zero setup.
+            </p>
+          </div>
+        </div>
+
+        <footer class="deck-slide-footer">
+          <a href="https://n1m21n.github.io/Infinite/" class="deck-footer-link">https://n1m21n.github.io/Infinite/</a>
+          <span class="deck-footer-right">get started today</span>
+        </footer>
+
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Live Dynamic Canvas Scripts directly borrowed from website/app.js -->
+  <script>
+    // 1. Connected by Nature: Dynamic Connected Network Graph
+    const natureCanvas = document.getElementById('nature-branch-canvas');
+    const natureCtx = natureCanvas ? natureCanvas.getContext('2d') : null;
+    let netWidth = 0, netHeight = 0;
+    let networkNodes = [], networkEdges = [], networkPulses = [];
+
+    const NETWORK_ITEMS = [
+      { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.15, dtY: 0.22 },
+      { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.15, dtY: 0.78 },
+      { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.34, dtY: 0.30 },
+      { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.38, dtY: 0.75 },
+      { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.54, dtY: 0.20 },
+      { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.58, dtY: 0.80 },
+      { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.72, dtY: 0.32 },
+      { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.86, dtY: 0.22 },
+      { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.85, dtY: 0.78 }
+    ];
+
+    const NETWORK_CONNECTIONS = [
+      ['sound', 'music'], ['sound', 'physics'], ['music', 'math'], ['physics', 'math'],
+      ['physics', 'art'], ['math', 'motion'], ['art', 'motion'], ['art', 'light'],
+      ['art', 'geometry'], ['geometry', 'light'], ['geometry', 'color'], ['motion', 'color'], ['light', 'color']
+    ];
+
+    function initNature() {
+      if (!natureCanvas) return;
+      const rect = natureCanvas.getBoundingClientRect();
+      const dpr = 2;
+      natureCanvas.width = (rect.width || 950) * dpr;
+      natureCanvas.height = (rect.height || 720) * dpr;
+      netWidth = natureCanvas.width;
+      netHeight = natureCanvas.height;
+
+      const w = netWidth, h = netHeight;
+      networkNodes = NETWORK_ITEMS.map((item, idx) => {
+        const baseX = item.dtX * w;
+        const baseY = item.dtY * h;
+        return { ...item, baseX, baseY, x: baseX, y: baseY, phase: idx * 0.75, floatSpeed: 0.7 };
+      });
+
+      const nodeMap = {};
+      networkNodes.forEach(n => { nodeMap[n.id] = n; });
+      networkEdges = NETWORK_CONNECTIONS.map(([srcId, dstId]) => ({ src: nodeMap[srcId], dst: nodeMap[dstId] })).filter(e => e.src && e.dst);
+
+      networkPulses = [];
+      for (let i = 0; i < networkEdges.length * 2; i++) {
+        const edge = networkEdges[i % networkEdges.length];
+        networkPulses.push({ edge, progress: (i * 0.1) % 1, speed: 0.005, forward: true, size: 3.5 });
+      }
+
+      drawNature();
+    }
+
+    function drawNature() {
+      if (!natureCtx || !natureCanvas) return;
+      const w = netWidth, h = netHeight, dpr = 2;
+      natureCtx.clearRect(0, 0, w, h);
+
+      // Edges
+      networkEdges.forEach(edge => {
+        natureCtx.beginPath();
+        natureCtx.moveTo(edge.src.x, edge.src.y);
+        natureCtx.lineTo(edge.dst.x, edge.dst.y);
+        natureCtx.strokeStyle = 'rgba(60, 50, 40, 0.16)';
+        natureCtx.lineWidth = 2 * dpr;
+        natureCtx.stroke();
+      });
+
+      // Signal Pulses
+      networkPulses.forEach(p => {
+        const px = p.edge.src.x + (p.edge.dst.x - p.edge.src.x) * p.progress;
+        const py = p.edge.src.y + (p.edge.dst.y - p.edge.src.y) * p.progress;
+        natureCtx.beginPath();
+        natureCtx.arc(px, py, p.size * dpr, 0, Math.PI * 2);
+        natureCtx.fillStyle = p.edge.src.color;
+        natureCtx.fill();
+      });
+
+      // Nodes
+      const fontSize = 14 * dpr;
+      natureCtx.font = `700 ${fontSize}px Inter, sans-serif`;
+      natureCtx.textBaseline = 'middle';
+
+      networkNodes.forEach(node => {
+        const textWidth = natureCtx.measureText(node.label).width;
+        const padX = 14 * dpr, padY = 8 * dpr;
+        const badgeH = fontSize + padY * 2;
+        const dotRadius = 5 * dpr;
+        const badgeW = textWidth + padX * 2 + dotRadius * 2 + 8 * dpr;
+        const badgeX = node.x - badgeW / 2;
+        const badgeY = node.y - badgeH / 2;
+        const radius = badgeH / 2;
+
+        natureCtx.fillStyle = '#ffffff';
+        natureCtx.strokeStyle = 'rgba(45, 35, 25, 0.16)';
+        natureCtx.lineWidth = 1.5 * dpr;
+        natureCtx.beginPath();
+        natureCtx.roundRect(badgeX, badgeY, badgeW, badgeH, radius);
+        natureCtx.fill();
+        natureCtx.stroke();
+
+        const dotX = badgeX + padX + dotRadius;
+        natureCtx.beginPath();
+        natureCtx.arc(dotX, node.y, dotRadius + 3 * dpr, 0, Math.PI * 2);
+        natureCtx.fillStyle = node.bg;
+        natureCtx.fill();
+
+        natureCtx.beginPath();
+        natureCtx.arc(dotX, node.y, dotRadius, 0, Math.PI * 2);
+        natureCtx.fillStyle = node.color;
+        natureCtx.fill();
+
+        natureCtx.textAlign = 'left';
+        natureCtx.fillStyle = '#1f1d1a';
+        natureCtx.fillText(node.label, dotX + dotRadius + 8 * dpr, node.y);
+      });
+    }
+
+    // 2. Creative Streams Mini Canvases
+    function initStreams() {
+      // Waves
+      const c1 = document.getElementById('anim-waves');
+      if (c1) {
+        c1.width = 440; c1.height = 220;
+        const ctx = c1.getContext('2d');
+        ctx.fillStyle = '#0f1218'; ctx.fillRect(0, 0, 440, 220);
+        for (let y = 20; y < 220; y += 12) {
+          ctx.beginPath();
+          for (let x = 0; x < 440; x += 4) {
+            const vy = y + Math.sin(x * 0.03 + y * 0.08) * 12 + Math.cos(x * 0.02) * 8;
+            if (x === 0) ctx.moveTo(x, vy); else ctx.lineTo(x, vy);
+          }
+          ctx.strokeStyle = `hsl(${(y * 1.5 + 180) % 360}, 75%, 65%)`;
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+        }
+      }
+
+      // Wavetable
+      const c2 = document.getElementById('anim-wavetable');
+      if (c2) {
+        c2.width = 440; c2.height = 220;
+        const ctx = c2.getContext('2d');
+        ctx.fillStyle = '#121016'; ctx.fillRect(0, 0, 440, 220);
+        for (let layer = 0; layer < 12; layer++) {
+          const lY = 40 + layer * 13;
+          const lX = 50 + layer * 8;
+          ctx.beginPath();
+          for (let x = 0; x < 280; x += 4) {
+            const wave = Math.sin(x * 0.04 + layer * 0.4) * (20 - layer * 0.8);
+            const px = lX + x;
+            const py = lY + wave;
+            if (x === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.strokeStyle = layer === 6 ? '#d97736' : 'rgba(217, 119, 54, 0.35)';
+          ctx.lineWidth = layer === 6 ? 2.5 : 1.2;
+          ctx.stroke();
+        }
+      }
+
+      // Particles 3D
+      const c3 = document.getElementById('anim-particles');
+      if (c3) {
+        c3.width = 440; c3.height = 220;
+        const ctx = c3.getContext('2d');
+        ctx.fillStyle = '#0e141a'; ctx.fillRect(0, 0, 440, 220);
+        const cx = 220, cy = 110;
+        for (let i = 0; i < 90; i++) {
+          const angle = i * 0.15;
+          const r = 25 + (i % 5) * 16;
+          const px = cx + Math.cos(angle) * r * 1.6;
+          const py = cy + Math.sin(angle) * r * 0.7;
+          ctx.beginPath();
+          ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+          ctx.fillStyle = i % 2 === 0 ? '#6b6b99' : '#8888cc';
+          ctx.fill();
+        }
+        // Center 3D Wireframe Cube
+        ctx.strokeStyle = '#a5a5e0';
+        ctx.lineWidth = 1.8;
+        ctx.strokeRect(cx - 30, cy - 30, 60, 60);
+        ctx.strokeRect(cx - 18, cy - 42, 60, 60);
+        ctx.beginPath();
+        ctx.moveTo(cx - 30, cy - 30); ctx.lineTo(cx - 18, cy - 42);
+        ctx.moveTo(cx + 30, cy - 30); ctx.lineTo(cx + 42, cy - 42);
+        ctx.moveTo(cx - 30, cy + 30); ctx.lineTo(cx - 18, cy + 18);
+        ctx.moveTo(cx + 30, cy + 30); ctx.lineTo(cx + 42, cy + 18);
+        ctx.stroke();
+      }
+
+      // Knobs
+      const c4 = document.getElementById('anim-knobs');
+      if (c4) {
+        c4.width = 440; c4.height = 220;
+        const ctx = c4.getContext('2d');
+        ctx.fillStyle = '#0f1713'; ctx.fillRect(0, 0, 440, 220);
+        const knobXs = [70, 170, 270, 370];
+        knobXs.forEach((kx, i) => {
+          ctx.beginPath();
+          ctx.arc(kx, 110, 28, 0, Math.PI * 2);
+          ctx.fillStyle = '#1e2d25'; ctx.fill();
+          ctx.strokeStyle = '#4d7c67'; ctx.lineWidth = 2.5; ctx.stroke();
+
+          // Indicator
+          const a = -Math.PI * 0.8 + i * 0.9;
+          ctx.beginPath();
+          ctx.moveTo(kx, 110);
+          ctx.lineTo(kx + Math.cos(a) * 24, 110 + Math.sin(a) * 24);
+          ctx.strokeStyle = '#6ee7b7'; ctx.lineWidth = 3; ctx.stroke();
+        });
+        // Cable connecting them
+        ctx.beginPath();
+        ctx.moveTo(70, 110);
+        ctx.bezierCurveTo(120, 180, 220, 40, 270, 110);
+        ctx.strokeStyle = '#4d7c67'; ctx.lineWidth = 2.5; ctx.stroke();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initNature();
+      initStreams();
+    });
+    setTimeout(() => {
+      initNature();
+      initStreams();
+    }, 200);
+  </script>
+
+</body>
+</html>

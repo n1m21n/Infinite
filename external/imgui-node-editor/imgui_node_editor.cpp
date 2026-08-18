@@ -1508,17 +1508,27 @@ void ed::EditorContext::End()
         while (gridStep * viewScale < 4.0f)
             gridStep *= 2.0f;
 
-        ImU32 gridColor = GetColor(StyleColor_Grid, ImClamp(viewScale * 1.5f, 0.20f, 1.0f));
+        const float width = viewRect.GetWidth();
+        const float height = viewRect.GetHeight();
+        if (width > 0.0f && height > 0.0f && std::isfinite(width) && std::isfinite(height))
+        {
+            while (width / gridStep > 300.0f || height / gridStep > 300.0f)
+                gridStep *= 2.0f;
 
-        m_DrawList->AddRectFilled(viewRect.Min, viewRect.Max, GetColor(StyleColor_Bg));
+            ImU32 gridColor = GetColor(StyleColor_Grid, ImClamp(viewScale * 1.5f, 0.20f, 1.0f));
 
-        const float startX = std::floor(viewRect.Min.x / gridStep) * gridStep;
-        for (float x = startX; x <= viewRect.Max.x; x += gridStep)
-            m_DrawList->AddLine(ImVec2(x, viewRect.Min.y), ImVec2(x, viewRect.Max.y), gridColor);
+            m_DrawList->AddRectFilled(viewRect.Min, viewRect.Max, GetColor(StyleColor_Bg));
 
-        const float startY = std::floor(viewRect.Min.y / gridStep) * gridStep;
-        for (float y = startY; y <= viewRect.Max.y; y += gridStep)
-            m_DrawList->AddLine(ImVec2(viewRect.Min.x, y), ImVec2(viewRect.Max.x, y), gridColor);
+            const float startX = std::floor(viewRect.Min.x / gridStep) * gridStep;
+            int countX = 0;
+            for (float x = startX; x <= viewRect.Max.x && countX < 500; x += gridStep, ++countX)
+                m_DrawList->AddLine(ImVec2(x, viewRect.Min.y), ImVec2(x, viewRect.Max.y), gridColor);
+
+            const float startY = std::floor(viewRect.Min.y / gridStep) * gridStep;
+            int countY = 0;
+            for (float y = startY; y <= viewRect.Max.y && countY < 500; y += gridStep, ++countY)
+                m_DrawList->AddLine(ImVec2(viewRect.Min.x, y), ImVec2(viewRect.Max.x, y), gridColor);
+        }
     }
 
 # if 0
@@ -2733,8 +2743,12 @@ bool ed::NodeSettings::Parse(const json::value& data, NodeSettings& result)
 
             if (xValue.is_number() && yValue.is_number())
             {
-                result.x = static_cast<float>(xValue.get<double>());
-                result.y = static_cast<float>(yValue.get<double>());
+                double xd = xValue.get<double>();
+                double yd = yValue.get<double>();
+                if (!std::isfinite(xd) || !std::isfinite(yd) || std::abs(xd) > 1e6 || std::abs(yd) > 1e6)
+                    return false;
+                result.x = static_cast<float>(xd);
+                result.y = static_cast<float>(yd);
 
                 return true;
             }
@@ -2876,8 +2890,12 @@ bool ed::Settings::Parse(const std::string& string, Settings& settings)
 
             if (xValue.is_number() && yValue.is_number())
             {
-                result.x = static_cast<float>(xValue.get<double>());
-                result.y = static_cast<float>(yValue.get<double>());
+                double xd = xValue.get<double>();
+                double yd = yValue.get<double>();
+                if (!std::isfinite(xd) || !std::isfinite(yd) || std::abs(xd) > 1e6 || std::abs(yd) > 1e6)
+                    return false;
+                result.x = static_cast<float>(xd);
+                result.y = static_cast<float>(yd);
 
                 return true;
             }

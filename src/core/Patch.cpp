@@ -192,8 +192,10 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
    file << kMagic << " " << kVersion << "\n";
    for (const NodeRecord& node : data.nodes)
    {
+      const float px = (std::isfinite(node.x) && std::abs(node.x) <= 1e6f && node.x > -2e9f) ? node.x : 0.0f;
+      const float py = (std::isfinite(node.y) && std::abs(node.y) <= 1e6f && node.y > -2e9f) ? node.y : 0.0f;
       file << "node " << node.index << " " << node.category << " " << node.typeName << "\n";
-      file << "  pos " << FloatToString(node.x) << " " << FloatToString(node.y) << "\n";
+      file << "  pos " << FloatToString(px) << " " << FloatToString(py) << "\n";
       file << "  flags " << (node.showParams ? 1 : 0) << " " << (node.bypassed ? 1 : 0) << " "
            << (node.showMiniViewport ? 1 : 0) << " " << (node.showAdvancedParams ? 1 : 0) << "\n";
       for (const auto& p : node.params)
@@ -293,6 +295,8 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       else if (tag == "pos" && inNode)
       {
          in >> current.x >> current.y;
+         if (!std::isfinite(current.x) || std::abs(current.x) > 1e6f || current.x <= -2e9f) current.x = 0.0f;
+         if (!std::isfinite(current.y) || std::abs(current.y) > 1e6f || current.y <= -2e9f) current.y = 0.0f;
       }
       else if (tag == "flags" && inNode)
       {

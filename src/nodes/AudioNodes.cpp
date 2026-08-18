@@ -442,6 +442,7 @@ void AudioOutputNode::CookIfNeeded(int /*frameId*/)
 
 void AudioOutputNode::VisitParams(ParamVisitor& v)
 {
+   v.Int("formatIndex", formatIndex);
    v.Text("recordDirectory", recordDirectory);
 }
 
