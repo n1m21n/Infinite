@@ -98,18 +98,20 @@ function animateCosmos() {
 
 // ==========================================================================
 // ==========================================================================
-// 2. Connected by Nature: Complete Interconnected Network Graph
-// "Everything is connected to everything" — Full Mesh Constellation
+// 2. Connected by Nature: Dynamic Interactive Network Graph
+// Every node is draggable (touch on mobile, mouse on desktop).
+// Moving any node causes all connected nodes to organically rearrange.
 // ==========================================================================
 const natureCanvas = document.getElementById('nature-branch-canvas');
 const natureCtx = natureCanvas ? natureCanvas.getContext('2d') : null;
 
 let netWidth = 0, netHeight = 0;
-let lastNetRectW = 0, lastNetRectH = 0;
 let networkNodes = [];
 let networkEdges = [];
 let networkPulses = [];
 let hoveredNode = null;
+let draggedNode = null;
+let dragPos = { x: 0, y: 0 };
 let netMouse = { x: -1000, y: -1000, active: false };
 
 const NETWORK_ITEMS = [
@@ -142,30 +144,40 @@ function resizeBranchCanvas() {
 function buildNetworkStructure() {
   const w = netWidth;
   const h = netHeight;
-  const isMobile = w < 620 * (window.devicePixelRatio || 1);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const isMobile = w < 620 * dpr;
+  const fontSize = (isMobile ? 11.5 : 13) * dpr;
+
+  if (natureCtx) {
+    natureCtx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`;
+  }
 
   networkNodes = NETWORK_ITEMS.map((item, idx) => {
     const baseX = isMobile ? item.mbX * w : item.dtX * w;
     const baseY = isMobile ? item.mbY * h : item.dtY * h;
+    const textW = natureCtx ? natureCtx.measureText(item.label).width : 45 * dpr;
+    const padX = 9 * dpr;
+    const padY = 5 * dpr;
+    const dotRadius = 4.0 * dpr;
+    const badgeW = textW + padX * 2 + dotRadius * 2 + 5 * dpr;
+    const badgeH = fontSize + padY * 2;
+
     return {
       ...item,
       baseX,
       baseY,
       x: baseX,
       y: baseY,
-      targetX: baseX,
-      targetY: baseY,
+      vx: 0,
+      vy: 0,
       phase: idx * 0.75,
-      floatSpeed: 0.65 + (idx % 4) * 0.15,
-      badgeW: 80,
-      badgeH: 26
+      floatSpeed: 0.55 + (idx % 4) * 0.12,
+      badgeW,
+      badgeH
     };
   });
 
-  const nodeMap = {};
-  networkNodes.forEach(n => { nodeMap[n.id] = n; });
-
-  // CONNECT EVERYTHING TO EVERYTHING (Full Mesh Graph: all 36 pairwise connections)
+  // CONNECT EVERYTHING TO EVERYTHING (Full Mesh: all 36 pairwise connections)
   networkEdges = [];
   const PRIMARY_SET = new Set([
     'sound-music', 'sound-physics', 'sound-art', 'music-math', 'physics-math', 'physics-art',
@@ -191,46 +203,127 @@ function buildNetworkStructure() {
     }
   }
 
-  // Initialize roaming signal pulses across all network filaments
+  // 25% Decreased Density (27 pulses instead of 36) + Slower, gentle speed
   networkPulses = [];
-  const pulseCount = 36;
+  const pulseCount = 27;
   for (let i = 0; i < pulseCount; i++) {
     const edge = networkEdges[Math.floor(Math.random() * networkEdges.length)];
     networkPulses.push({
       edge,
       progress: Math.random(),
-      speed: 0.003 + Math.random() * 0.005,
+      speed: 0.0012 + Math.random() * 0.0022,
       forward: Math.random() > 0.5,
-      size: 2.2 + Math.random() * 1.5,
+      size: 2.0 + Math.random() * 1.4,
       color: edge.src.color
     });
   }
 }
 
-// Interactive hover tracking on nature network canvas
-if (natureCanvas) {
-  natureCanvas.addEventListener('mousemove', (e) => {
-    const rect = natureCanvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    netMouse.x = (e.clientX - rect.left) * dpr;
-    netMouse.y = (e.clientY - rect.top) * dpr;
-    netMouse.active = true;
+function getNodeAtPoint(px, py, dpr) {
+  for (let i = networkNodes.length - 1; i >= 0; i--) {
+    const node = networkNodes[i];
+    const halfW = (node.badgeW || 80) * 0.5 + 8 * dpr;
+    const halfH = (node.badgeH || 26) * 0.5 + 8 * dpr;
+    if (px >= node.x - halfW && px <= node.x + halfW &&
+        py >= node.y - halfH && py <= node.y + halfH) {
+      return node;
+    }
+  }
+  return null;
+}
 
-    // Detect hovered node
-    let closest = null;
-    let minDist = 45 * dpr;
-    networkNodes.forEach(node => {
-      const dist = Math.hypot(node.x - netMouse.x, node.y - netMouse.y);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = node;
-      }
-    });
-    hoveredNode = closest;
+function getCanvasPoint(clientX, clientY) {
+  if (!natureCanvas) return { x: 0, y: 0 };
+  const rect = natureCanvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  return {
+    x: (clientX - rect.left) * dpr,
+    y: (clientY - rect.top) * dpr
+  };
+}
+
+// Interactive Desktop Mouse & Drag Events
+if (natureCanvas) {
+  natureCanvas.addEventListener('mousedown', (e) => {
+    const pt = getCanvasPoint(e.clientX, e.clientY);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const node = getNodeAtPoint(pt.x, pt.y, dpr);
+    if (node) {
+      draggedNode = node;
+      hoveredNode = node;
+      dragPos.x = pt.x;
+      dragPos.y = pt.y;
+      natureCanvas.style.cursor = 'grabbing';
+    }
   });
 
-  natureCanvas.addEventListener('mouseleave', () => {
-    netMouse.active = false;
+  window.addEventListener('mousemove', (e) => {
+    if (!natureCanvas) return;
+    const pt = getCanvasPoint(e.clientX, e.clientY);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+
+    if (draggedNode) {
+      dragPos.x = pt.x;
+      dragPos.y = pt.y;
+      natureCanvas.style.cursor = 'grabbing';
+    } else {
+      const rect = natureCanvas.getBoundingClientRect();
+      const isInside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+      if (isInside) {
+        hoveredNode = getNodeAtPoint(pt.x, pt.y, dpr);
+        natureCanvas.style.cursor = hoveredNode ? 'grab' : 'default';
+        netMouse.x = pt.x;
+        netMouse.y = pt.y;
+        netMouse.active = true;
+      } else {
+        hoveredNode = null;
+        netMouse.active = false;
+      }
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (draggedNode) {
+      draggedNode = null;
+      if (natureCanvas) {
+        natureCanvas.style.cursor = hoveredNode ? 'grab' : 'default';
+      }
+    }
+  });
+
+  // Interactive Mobile Touch & Drag Events
+  natureCanvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const pt = getCanvasPoint(touch.clientX, touch.clientY);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+      const node = getNodeAtPoint(pt.x, pt.y, dpr);
+      if (node) {
+        draggedNode = node;
+        hoveredNode = node;
+        dragPos.x = pt.x;
+        dragPos.y = pt.y;
+        e.preventDefault(); // Prevent scroll while dragging a node
+      }
+    }
+  }, { passive: false });
+
+  natureCanvas.addEventListener('touchmove', (e) => {
+    if (draggedNode && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const pt = getCanvasPoint(touch.clientX, touch.clientY);
+      dragPos.x = pt.x;
+      dragPos.y = pt.y;
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  natureCanvas.addEventListener('touchend', () => {
+    draggedNode = null;
+    hoveredNode = null;
+  });
+  natureCanvas.addEventListener('touchcancel', () => {
+    draggedNode = null;
     hoveredNode = null;
   });
 }
@@ -263,49 +356,100 @@ function animateNatureBranches() {
   netTime += 0.016;
   const w = netWidth;
   const h = netHeight;
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
 
   natureCtx.clearRect(0, 0, w, h);
 
-  // Update floating positions with gentle organic breathing + cursor attraction
-  networkNodes.forEach(node => {
-    const floatX = Math.sin(netTime * node.floatSpeed + node.phase) * (3.0 * dpr);
-    const floatY = Math.cos(netTime * node.floatSpeed * 0.8 + node.phase) * (3.0 * dpr);
+  // 1. Force-Directed Physics Simulation (Organic Dynamic Rearrangement)
+  // Repulsion between all node pairs
+  const repulsionRadius = 140 * dpr;
+  for (let i = 0; i < networkNodes.length; i++) {
+    for (let j = i + 1; j < networkNodes.length; j++) {
+      const n1 = networkNodes[i];
+      const n2 = networkNodes[j];
+      const dx = n2.x - n1.x;
+      const dy = n2.y - n1.y;
+      const dist = Math.hypot(dx, dy) || 1;
 
-    let attractX = 0, attractY = 0;
-    if (netMouse.active) {
-      const dx = netMouse.x - node.baseX;
-      const dy = netMouse.y - node.baseY;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 140 * dpr && dist > 1) {
-        const force = (1 - dist / (140 * dpr)) * (8 * dpr);
-        attractX = (dx / dist) * force;
-        attractY = (dy / dist) * force;
+      if (dist < repulsionRadius) {
+        const factor = Math.pow((repulsionRadius - dist) / repulsionRadius, 1.8) * (5.5 * dpr);
+        const fx = (dx / dist) * factor;
+        const fy = (dy / dist) * factor;
+        if (n1 !== draggedNode) { n1.vx -= fx; n1.vy -= fy; }
+        if (n2 !== draggedNode) { n2.vx += fx; n2.vy += fy; }
       }
     }
+  }
 
-    node.x = node.baseX + floatX + attractX;
-    node.y = node.baseY + floatY + attractY;
+  // Elastic spring tension along edges
+  networkEdges.forEach(edge => {
+    const dx = edge.dst.x - edge.src.x;
+    const dy = edge.dst.y - edge.src.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const restLength = (edge.isPrimary ? 130 : 210) * dpr;
+    const diff = dist - restLength;
+    const springK = 0.006;
+    const fx = (dx / dist) * diff * springK;
+    const fy = (dy / dist) * diff * springK;
+
+    if (edge.src !== draggedNode) { edge.src.vx += fx; edge.src.vy += fy; }
+    if (edge.dst !== draggedNode) { edge.dst.vx -= fx; edge.dst.vy -= fy; }
   });
 
-  // 1. Draw Network Connection Edges (All Interconnected Filaments)
+  // Soft Home Anchor, Damping & Boundary Bounds Integration
+  networkNodes.forEach(node => {
+    if (node === draggedNode) {
+      node.x = dragPos.x;
+      node.y = dragPos.y;
+      node.vx = 0;
+      node.vy = 0;
+    } else {
+      // Gentle spring returning towards base anchor
+      const anchorK = 0.022;
+      node.vx += (node.baseX - node.x) * anchorK;
+      node.vy += (node.baseY - node.y) * anchorK;
+
+      // Organic gentle idle breathing
+      const floatX = Math.sin(netTime * node.floatSpeed + node.phase) * (0.35 * dpr);
+      const floatY = Math.cos(netTime * node.floatSpeed * 0.8 + node.phase) * (0.35 * dpr);
+      node.vx += floatX;
+      node.vy += floatY;
+
+      // Smooth damping (friction)
+      node.vx *= 0.82;
+      node.vy *= 0.82;
+
+      node.x += node.vx;
+      node.y += node.vy;
+    }
+
+    // Boundary constraints (Strictly stay within section canvas)
+    const minX = (node.badgeW * 0.5 || 40) + 12 * dpr;
+    const maxX = w - minX;
+    const minY = (node.badgeH * 0.5 || 15) + 10 * dpr;
+    const maxY = h - minY;
+
+    if (node.x < minX) { node.x = minX; node.vx = 0; }
+    if (node.x > maxX) { node.x = maxX; node.vx = 0; }
+    if (node.y < minY) { node.y = minY; node.vy = 0; }
+    if (node.y > maxY) { node.y = maxY; node.vy = 0; }
+  });
+
+  // 2. Draw Network Connection Edges (All Interconnected Filaments)
   networkEdges.forEach(edge => {
     const isConnectedToHover = hoveredNode && (edge.src === hoveredNode || edge.dst === hoveredNode);
     let targetAlpha = edge.baseAlpha;
-    let strokeColor = 'rgba(60, 50, 40, 0.12)';
     let lineWidth = (edge.isPrimary ? 1.4 : 0.85) * dpr;
 
     if (hoveredNode) {
       if (isConnectedToHover) {
         targetAlpha = 0.55;
-        strokeColor = hoveredNode.color;
         lineWidth = 2.0 * dpr;
       } else {
         targetAlpha = 0.025; // Subtle dim for non-related edges
       }
     }
 
-    // Smooth alpha interpolation
     edge.currentAlpha += (targetAlpha - edge.currentAlpha) * 0.15;
 
     natureCtx.beginPath();
@@ -324,10 +468,10 @@ function animateNatureBranches() {
     natureCtx.globalAlpha = 1.0;
   });
 
-  // 2. Draw Traveling Signal Pulses Across the Web
+  // 3. Draw Traveling Signal Pulses Across the Web (Slow, Organic Flow)
   networkPulses.forEach(p => {
     const isEdgeHovered = hoveredNode && (p.edge.src === hoveredNode || p.edge.dst === hoveredNode);
-    const speed = isEdgeHovered ? p.speed * 2.2 : p.speed;
+    const speed = isEdgeHovered ? p.speed * 2.0 : p.speed;
     p.progress += speed;
     if (p.progress > 1) p.progress = 0;
     const t = p.forward ? p.progress : 1 - p.progress;
@@ -336,21 +480,21 @@ function animateNatureBranches() {
     const py = p.edge.src.y + (p.edge.dst.y - p.edge.src.y) * t;
 
     natureCtx.beginPath();
-    natureCtx.arc(px, py, (isEdgeHovered ? p.size * 1.4 : p.size) * dpr, 0, Math.PI * 2);
+    natureCtx.arc(px, py, (isEdgeHovered ? p.size * 1.35 : p.size) * dpr, 0, Math.PI * 2);
     natureCtx.fillStyle = isEdgeHovered ? hoveredNode.color : p.edge.src.color;
     natureCtx.globalAlpha = isEdgeHovered ? 0.95 : (hoveredNode ? 0.35 : 0.7);
     natureCtx.fill();
     natureCtx.globalAlpha = 1.0;
   });
 
-  // 3. Draw Nodes with Clean Protected Badge Clearance (Zero Overlap Guarantee)
+  // 4. Draw Nodes with Clean Protected Badge Clearance
   const isMobile = w < 620 * dpr;
   const fontSize = (isMobile ? 11.5 : 13) * dpr;
   natureCtx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`;
   natureCtx.textBaseline = 'middle';
 
   networkNodes.forEach(node => {
-    const isHovered = (node === hoveredNode);
+    const isHovered = (node === hoveredNode || node === draggedNode);
     const textWidth = natureCtx.measureText(node.label).width;
     const padX = 9 * dpr;
     const padY = 5 * dpr;
@@ -358,13 +502,16 @@ function animateNatureBranches() {
     const dotRadius = (isHovered ? 4.8 : 4.0) * dpr;
     const badgeW = textWidth + padX * 2 + dotRadius * 2 + 5 * dpr;
 
+    node.badgeW = badgeW;
+    node.badgeH = badgeH;
+
     const badgeX = node.x - badgeW / 2;
     const badgeY = node.y - badgeH / 2;
     const radius = badgeH / 2;
 
-    // Draw pill background with sleek shadow on hover
+    // Draw pill background
     natureCtx.fillStyle = '#ffffff';
-    natureCtx.strokeStyle = isHovered ? node.color : 'rgba(45, 35, 25, 0.12)';
+    natureCtx.strokeStyle = isHovered ? node.color : 'rgba(45, 35, 25, 0.14)';
     natureCtx.lineWidth = (isHovered ? 1.8 : 1.2) * dpr;
 
     natureCtx.beginPath();
