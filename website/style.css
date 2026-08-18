@@ -430,13 +430,13 @@ body {
    Nature Connected Graph Canvas Section
    -------------------------------------------------------------------------- */
 .nature-section {
-  padding: 24px 0 28px;
+  padding: 32px 0 40px;
 }
 
 .nature-canvas-wrapper {
   width: 100%;
-  max-width: 1040px;
-  height: 320px;
+  max-width: 1140px;
+  height: 460px;
   margin: 0 auto;
   background: transparent;
   position: relative;

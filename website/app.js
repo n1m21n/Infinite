@@ -115,26 +115,26 @@ let dragPos = { x: 0, y: 0 };
 let netMouse = { x: -1000, y: -1000, active: false };
 
 const NETWORK_ITEMS = [
-  { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.12, dtY: 0.24, mbX: 0.22, mbY: 0.14 },
-  { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.12, dtY: 0.76, mbX: 0.20, mbY: 0.36 },
-  { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.30, dtY: 0.30, mbX: 0.78, mbY: 0.36 },
-  { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.36, dtY: 0.74, mbX: 0.50, mbY: 0.54 },
-  { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.52, dtY: 0.20, mbX: 0.22, mbY: 0.72 },
-  { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.56, dtY: 0.80, mbX: 0.24, mbY: 0.88 },
-  { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.72, dtY: 0.32, mbX: 0.78, mbY: 0.72 },
-  { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.88, dtY: 0.22, mbX: 0.76, mbY: 0.14 },
-  { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.88, dtY: 0.76, mbX: 0.76, mbY: 0.88 }
+  { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.08, dtY: 0.22, mbX: 0.22, mbY: 0.14 },
+  { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.08, dtY: 0.78, mbX: 0.20, mbY: 0.36 },
+  { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.28, dtY: 0.30, mbX: 0.78, mbY: 0.36 },
+  { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.32, dtY: 0.82, mbX: 0.50, mbY: 0.54 },
+  { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.50, dtY: 0.16, mbX: 0.22, mbY: 0.72 },
+  { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.52, dtY: 0.86, mbX: 0.24, mbY: 0.88 },
+  { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.72, dtY: 0.30, mbX: 0.78, mbY: 0.72 },
+  { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.92, dtY: 0.22, mbX: 0.76, mbY: 0.14 },
+  { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.92, dtY: 0.78, mbX: 0.76, mbY: 0.88 }
 ];
 
 function resizeBranchCanvas() {
   if (!natureCanvas) return;
   const rect = natureCanvas.getBoundingClientRect();
-  const rawW = rect.width > 10 ? rect.width : (natureCanvas.parentElement ? natureCanvas.parentElement.clientWidth : 800);
-  const rawH = rect.height > 10 ? rect.height : 320;
+  const rawW = rect.width > 10 ? rect.width : (natureCanvas.parentElement ? natureCanvas.parentElement.clientWidth : 960);
+  const rawH = rect.height > 10 ? rect.height : 460;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  natureCanvas.width = (rawW || 800) * dpr;
-  natureCanvas.height = (rawH || 320) * dpr;
+  natureCanvas.width = (rawW || 960) * dpr;
+  natureCanvas.height = (rawH || 460) * dpr;
   netWidth = natureCanvas.width;
   netHeight = natureCanvas.height;
 
@@ -146,7 +146,7 @@ function buildNetworkStructure() {
   const h = netHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   const isMobile = w < 620 * dpr;
-  const fontSize = (isMobile ? 11.5 : 13) * dpr;
+  const fontSize = (isMobile ? 12 : 14.5) * dpr;
 
   if (natureCtx) {
     natureCtx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`;
@@ -155,11 +155,11 @@ function buildNetworkStructure() {
   networkNodes = NETWORK_ITEMS.map((item, idx) => {
     const baseX = isMobile ? item.mbX * w : item.dtX * w;
     const baseY = isMobile ? item.mbY * h : item.dtY * h;
-    const textW = natureCtx ? natureCtx.measureText(item.label).width : 45 * dpr;
-    const padX = 9 * dpr;
-    const padY = 5 * dpr;
-    const dotRadius = 4.0 * dpr;
-    const badgeW = textW + padX * 2 + dotRadius * 2 + 5 * dpr;
+    const textW = natureCtx ? natureCtx.measureText(item.label).width : 50 * dpr;
+    const padX = (isMobile ? 10 : 13) * dpr;
+    const padY = (isMobile ? 6 : 8) * dpr;
+    const dotRadius = (isMobile ? 4.2 : 5.2) * dpr;
+    const badgeW = textW + padX * 2 + dotRadius * 2 + 6 * dpr;
     const badgeH = fontSize + padY * 2;
 
     return {
@@ -358,11 +358,9 @@ function animateNatureBranches() {
   const h = netHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
 
-  natureCtx.clearRect(0, 0, w, h);
-
-  // 1. Force-Directed Physics Simulation (Organic Dynamic Rearrangement)
+  natureCtx.clearRect(0, 0, w, h);  // 1. Force-Directed Physics Simulation (Organic Dynamic Rearrangement)
   // Repulsion between all node pairs
-  const repulsionRadius = 140 * dpr;
+  const repulsionRadius = (isMobile ? 140 : 185) * dpr;
   for (let i = 0; i < networkNodes.length; i++) {
     for (let j = i + 1; j < networkNodes.length; j++) {
       const n1 = networkNodes[i];
@@ -386,14 +384,14 @@ function animateNatureBranches() {
     const dx = edge.dst.x - edge.src.x;
     const dy = edge.dst.y - edge.src.y;
     const dist = Math.hypot(dx, dy) || 1;
-    const restLength = (edge.isPrimary ? 130 : 210) * dpr;
+    const restLength = (edge.isPrimary ? (isMobile ? 130 : 170) : (isMobile ? 210 : 270)) * dpr;
     const diff = dist - restLength;
     const springK = 0.006;
     const fx = (dx / dist) * diff * springK;
     const fy = (dy / dist) * diff * springK;
 
     if (edge.src !== draggedNode) { edge.src.vx += fx; edge.src.vy += fy; }
-    if (edge.dst !== draggedNode) { edge.dst.vx -= fx; edge.dst.vy -= fy; }
+    if (edge.dst !== draggedNode) { edge.dst.vx += fx; edge.dst.vy += fy; }
   });
 
   // Soft Home Anchor, Damping & Boundary Bounds Integration
@@ -439,12 +437,12 @@ function animateNatureBranches() {
   networkEdges.forEach(edge => {
     const isConnectedToHover = hoveredNode && (edge.src === hoveredNode || edge.dst === hoveredNode);
     let targetAlpha = edge.baseAlpha;
-    let lineWidth = (edge.isPrimary ? 1.4 : 0.85) * dpr;
+    let lineWidth = (edge.isPrimary ? 1.5 : 0.9) * dpr;
 
     if (hoveredNode) {
       if (isConnectedToHover) {
         targetAlpha = 0.55;
-        lineWidth = 2.0 * dpr;
+        lineWidth = 2.2 * dpr;
       } else {
         targetAlpha = 0.025; // Subtle dim for non-related edges
       }
@@ -480,7 +478,7 @@ function animateNatureBranches() {
     const py = p.edge.src.y + (p.edge.dst.y - p.edge.src.y) * t;
 
     natureCtx.beginPath();
-    natureCtx.arc(px, py, (isEdgeHovered ? p.size * 1.35 : p.size) * dpr, 0, Math.PI * 2);
+    natureCtx.arc(px, py, (isEdgeHovered ? p.size * 1.4 : p.size) * dpr, 0, Math.PI * 2);
     natureCtx.fillStyle = isEdgeHovered ? hoveredNode.color : p.edge.src.color;
     natureCtx.globalAlpha = isEdgeHovered ? 0.95 : (hoveredNode ? 0.35 : 0.7);
     natureCtx.fill();
@@ -488,19 +486,18 @@ function animateNatureBranches() {
   });
 
   // 4. Draw Nodes with Clean Protected Badge Clearance
-  const isMobile = w < 620 * dpr;
-  const fontSize = (isMobile ? 11.5 : 13) * dpr;
+  const fontSize = (isMobile ? 12 : 14.5) * dpr;
   natureCtx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`;
   natureCtx.textBaseline = 'middle';
 
   networkNodes.forEach(node => {
     const isHovered = (node === hoveredNode || node === draggedNode);
     const textWidth = natureCtx.measureText(node.label).width;
-    const padX = 9 * dpr;
-    const padY = 5 * dpr;
+    const padX = (isMobile ? 10 : 13) * dpr;
+    const padY = (isMobile ? 6 : 8) * dpr;
     const badgeH = fontSize + padY * 2;
-    const dotRadius = (isHovered ? 4.8 : 4.0) * dpr;
-    const badgeW = textWidth + padX * 2 + dotRadius * 2 + 5 * dpr;
+    const dotRadius = (isHovered ? (isMobile ? 5.0 : 6.0) : (isMobile ? 4.2 : 5.2)) * dpr;
+    const badgeW = textWidth + padX * 2 + dotRadius * 2 + 6 * dpr;
 
     node.badgeW = badgeW;
     node.badgeH = badgeH;
