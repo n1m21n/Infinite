@@ -357,8 +357,11 @@ function animateNatureBranches() {
   const w = netWidth;
   const h = netHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const isMobile = w < 620 * dpr;
 
-  natureCtx.clearRect(0, 0, w, h);  // 1. Force-Directed Physics Simulation (Organic Dynamic Rearrangement)
+  natureCtx.clearRect(0, 0, w, h);
+
+  // 1. Force-Directed Physics Simulation (Organic Dynamic Rearrangement)
   // Repulsion between all node pairs
   const repulsionRadius = (isMobile ? 140 : 185) * dpr;
   for (let i = 0; i < networkNodes.length; i++) {
