@@ -115,15 +115,15 @@ let dragPos = { x: 0, y: 0 };
 let netMouse = { x: -1000, y: -1000, active: false };
 
 const NETWORK_ITEMS = [
-  { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.08, dtY: 0.22, mbX: 0.22, mbY: 0.14 },
-  { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.08, dtY: 0.78, mbX: 0.20, mbY: 0.36 },
-  { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.28, dtY: 0.30, mbX: 0.78, mbY: 0.36 },
-  { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.32, dtY: 0.82, mbX: 0.50, mbY: 0.54 },
-  { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.50, dtY: 0.16, mbX: 0.22, mbY: 0.72 },
-  { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.52, dtY: 0.86, mbX: 0.24, mbY: 0.88 },
-  { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.72, dtY: 0.30, mbX: 0.78, mbY: 0.72 },
-  { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.92, dtY: 0.22, mbX: 0.76, mbY: 0.14 },
-  { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.92, dtY: 0.78, mbX: 0.76, mbY: 0.88 }
+  { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.12, dtY: 0.26, mbX: 0.20, mbY: 0.15 },
+  { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.12, dtY: 0.74, mbX: 0.20, mbY: 0.38 },
+  { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.31, dtY: 0.32, mbX: 0.80, mbY: 0.38 },
+  { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.31, dtY: 0.70, mbX: 0.50, mbY: 0.52 },
+  { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.50, dtY: 0.46, mbX: 0.20, mbY: 0.70 },
+  { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.69, dtY: 0.70, mbX: 0.22, mbY: 0.88 },
+  { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.69, dtY: 0.32, mbX: 0.80, mbY: 0.70 },
+  { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.88, dtY: 0.26, mbX: 0.80, mbY: 0.15 },
+  { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.88, dtY: 0.74, mbX: 0.78, mbY: 0.88 }
 ];
 
 function resizeBranchCanvas() {
@@ -363,7 +363,7 @@ function animateNatureBranches() {
 
   // 1. Force-Directed Physics Simulation (Organic Dynamic Rearrangement)
   // Repulsion between all node pairs
-  const repulsionRadius = (isMobile ? 140 : 185) * dpr;
+  const repulsionRadius = (isMobile ? 130 : 160) * dpr;
   for (let i = 0; i < networkNodes.length; i++) {
     for (let j = i + 1; j < networkNodes.length; j++) {
       const n1 = networkNodes[i];
@@ -373,7 +373,7 @@ function animateNatureBranches() {
       const dist = Math.hypot(dx, dy) || 1;
 
       if (dist < repulsionRadius) {
-        const factor = Math.pow((repulsionRadius - dist) / repulsionRadius, 1.8) * (5.5 * dpr);
+        const factor = Math.pow((repulsionRadius - dist) / repulsionRadius, 1.8) * (4.8 * dpr);
         const fx = (dx / dist) * factor;
         const fy = (dy / dist) * factor;
         if (n1 !== draggedNode) { n1.vx -= fx; n1.vy -= fy; }
@@ -382,14 +382,14 @@ function animateNatureBranches() {
     }
   }
 
-  // Elastic spring tension along edges
+  // Elastic spring tension along edges (differentiated primary vs secondary)
   networkEdges.forEach(edge => {
     const dx = edge.dst.x - edge.src.x;
     const dy = edge.dst.y - edge.src.y;
     const dist = Math.hypot(dx, dy) || 1;
-    const restLength = (edge.isPrimary ? (isMobile ? 130 : 170) : (isMobile ? 210 : 270)) * dpr;
+    const restLength = (edge.isPrimary ? (isMobile ? 140 : 180) : (isMobile ? 220 : 300)) * dpr;
     const diff = dist - restLength;
-    const springK = 0.006;
+    const springK = edge.isPrimary ? 0.0035 : 0.0006;
     const fx = (dx / dist) * diff * springK;
     const fy = (dy / dist) * diff * springK;
 
@@ -397,7 +397,7 @@ function animateNatureBranches() {
     if (edge.dst !== draggedNode) { edge.dst.vx += fx; edge.dst.vy += fy; }
   });
 
-  // Soft Home Anchor, Damping & Boundary Bounds Integration
+  // Balanced Home Anchor, Damping & Boundary Bounds Integration
   networkNodes.forEach(node => {
     if (node === draggedNode) {
       node.x = dragPos.x;
@@ -405,8 +405,8 @@ function animateNatureBranches() {
       node.vx = 0;
       node.vy = 0;
     } else {
-      // Gentle spring returning towards base anchor
-      const anchorK = 0.022;
+      // Balanced spring returning towards base anchor
+      const anchorK = 0.048;
       node.vx += (node.baseX - node.x) * anchorK;
       node.vy += (node.baseY - node.y) * anchorK;
 
