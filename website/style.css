@@ -206,6 +206,38 @@ body {
   font-size: var(--font-size-medium);
 }
 
+.nav-doc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: rgba(194, 89, 63, 0.35);
+  color: var(--pastel-terracotta);
+  font-weight: 600;
+}
+
+.nav-doc-btn:hover {
+  background: rgba(194, 89, 63, 0.08);
+  border-color: var(--pastel-terracotta);
+  color: var(--pastel-terracotta);
+}
+
+.hero-doc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-color: rgba(194, 89, 63, 0.4);
+  color: var(--pastel-terracotta);
+  font-weight: 600;
+  background: var(--bg-card);
+}
+
+.hero-doc-btn:hover {
+  background: var(--bg-inner);
+  border-color: var(--pastel-terracotta);
+  color: var(--pastel-terracotta);
+  box-shadow: 0 4px 12px rgba(194, 89, 63, 0.12);
+}
+
 /* --------------------------------------------------------------------------
    Hero Section
    -------------------------------------------------------------------------- */
@@ -671,6 +703,61 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   Node Reference Manual Download CTA
+   -------------------------------------------------------------------------- */
+.node-manual-download-wrap {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.node-docs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  color: var(--text-primary);
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(45, 35, 25, 0.04);
+  transition: all var(--transition-smooth);
+}
+
+.node-docs-btn:hover {
+  background: var(--bg-inner);
+  border-color: var(--pastel-terracotta);
+  color: var(--pastel-terracotta);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(194, 89, 63, 0.12);
+}
+
+.node-docs-btn svg {
+  color: var(--pastel-terracotta);
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.node-docs-btn:hover svg {
+  transform: translateY(1px);
+}
+
+.btn-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(194, 89, 63, 0.1);
+  color: var(--pastel-terracotta);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* --------------------------------------------------------------------------
    3 Ticker Tapes (Endless Marquee with Clickable Node Pills)
    -------------------------------------------------------------------------- */
 .ticker-wrapper {
@@ -846,6 +933,30 @@ body {
   border-radius: var(--radius-pill);
   background: var(--bg-inner);
   color: var(--text-muted);
+}
+
+.modal-footer-action {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--pastel-terracotta);
+  text-decoration: none;
+  transition: opacity var(--transition-fast);
+}
+
+.modal-doc-link:hover {
+  text-decoration: underline;
+  opacity: 0.85;
 }
 
 /* --------------------------------------------------------------------------
