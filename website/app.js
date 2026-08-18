@@ -284,6 +284,8 @@ if (natureCanvas) {
 
   window.addEventListener('mouseup', () => {
     if (draggedNode) {
+      draggedNode.baseX = draggedNode.x;
+      draggedNode.baseY = draggedNode.y;
       draggedNode = null;
       if (natureCanvas) {
         natureCanvas.style.cursor = hoveredNode ? 'grab' : 'default';
@@ -319,10 +321,18 @@ if (natureCanvas) {
   }, { passive: false });
 
   natureCanvas.addEventListener('touchend', () => {
+    if (draggedNode) {
+      draggedNode.baseX = draggedNode.x;
+      draggedNode.baseY = draggedNode.y;
+    }
     draggedNode = null;
     hoveredNode = null;
   });
   natureCanvas.addEventListener('touchcancel', () => {
+    if (draggedNode) {
+      draggedNode.baseX = draggedNode.x;
+      draggedNode.baseY = draggedNode.y;
+    }
     draggedNode = null;
     hoveredNode = null;
   });
@@ -402,11 +412,13 @@ function animateNatureBranches() {
     if (node === draggedNode) {
       node.x = dragPos.x;
       node.y = dragPos.y;
+      node.baseX = dragPos.x;
+      node.baseY = dragPos.y;
       node.vx = 0;
       node.vy = 0;
     } else {
       // Balanced spring returning towards base anchor
-      const anchorK = 0.048;
+      const anchorK = 0.035;
       node.vx += (node.baseX - node.x) * anchorK;
       node.vy += (node.baseY - node.y) * anchorK;
 
