@@ -262,27 +262,12 @@ namespace
       return IsThemeLight() ? IM_COL32(70, 78, 96, 255) : IM_COL32(120, 128, 150, 255);
    }
 
-   // Backdrop for any node preview about to blit a texture: a flat dark rect
-   // reads as solid black wherever that texture is actually transparent, so
-   // this paints a checkerboard instead, matching image editors' convention.
+   // Backdrop for node previews and viewports: a solid dark (or light in light
+   // theme) frame, letterboxing non-square aspect ratios cleanly like TouchDesigner.
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f)
    {
       const bool isLight = IsThemeLight();
       dl->AddRectFilled(origin, br, isLight ? IM_COL32(238, 240, 246, 255) : IM_COL32(18, 18, 24, 255), rounding);
-      const float cell = 12.0f;
-      const int cols = (int)std::ceil((br.x - origin.x) / cell);
-      const int rows = (int)std::ceil((br.y - origin.y) / cell);
-      for (int y = 0; y < rows; y++)
-      {
-         for (int x = 0; x < cols; x++)
-         {
-            if ((x + y) % 2)
-               continue;
-            const ImVec2 tl(origin.x + x * cell, origin.y + y * cell);
-            const ImVec2 cbr(std::min(br.x, tl.x + cell), std::min(br.y, tl.y + cell));
-            dl->AddRectFilled(tl, cbr, isLight ? IM_COL32(220, 224, 232, 255) : IM_COL32(30, 30, 38, 255));
-         }
-      }
    }
 
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float rounding = 4.0f)
@@ -3524,8 +3509,8 @@ namespace
                      [n](int i) { n->shapeType = i; });
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
-      ModSlider("size", &n->size, 0.01f, 0.5f);
-      ModSlider("aspect", &n->aspect, 0.2f, 3.0f);
+      ModSlider("size x", &n->sizeX, 0.01f, 1.0f);
+      ModSlider("size y", &n->sizeY, 0.01f, 1.0f);
       ModSlider("corner/thick", &n->cornerRadius, 0.0f, 0.3f);
       ModSliderInt("sides", &n->sides, 3, 20);
       ModSlider("inner ratio", &n->innerRatio, 0.05f, 1.0f);
@@ -14754,21 +14739,7 @@ namespace
       }
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
-                        IM_COL32(18, 18, 24, 255), 4.0f);
-      // checkerboard, so transparent areas of the canvas are obvious
-      for (int y = 0; y < 8; y++)
-      {
-         for (int x = 0; x < 8; x++)
-         {
-            if ((x + y) % 2)
-               continue;
-            const float c = kPreviewSize / 8.0f;
-            dl->AddRectFilled(ImVec2(origin.x + x * c, origin.y + y * c),
-                              ImVec2(origin.x + (x + 1) * c, origin.y + (y + 1) * c),
-                              IM_COL32(30, 30, 38, 255));
-         }
-      }
+      DrawCheckerboardBackdrop(dl, origin, kPreviewSize);
       if (node->GetOutputTexture() != 0)
          dl->AddImage((ImTextureID)(intptr_t)node->GetOutputTexture(), tl,
                       ImVec2(tl.x + dw, tl.y + dh), ImVec2(0, 1), ImVec2(1, 0));
@@ -34411,7 +34382,7 @@ int main(int argc, char** argv)
             if (dynamic_cast<ProjectionNode*>(src->node.get()) != nullptr)
                GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
             else
-               GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+               GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/false);
          }
          else
          {

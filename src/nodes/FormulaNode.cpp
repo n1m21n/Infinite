@@ -17,6 +17,7 @@ namespace
       "uniform float uB;\n"
       "uniform float uC;\n"
       "uniform float uD;\n"
+      "uniform float uAspect;\n"
       "\n"
       "#define PI 3.14159265359\n"
       "#define TAU 6.28318530718\n"
@@ -25,13 +26,17 @@ namespace
       "float sdCircle(vec2 p, float r) { return length(p) - r; }\n"
       "float sdBox(vec2 p, vec2 b) { vec2 d = abs(p) - b; return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); }\n"
       "\n"
-      "// uv is 0..1, p is centered -0.5..0.5, t is seconds, knobs uA..uD are 0..1.\n"
+      "// uv is 0..1, p is centered and aspect-corrected, t is seconds, knobs uA..uD are 0..1.\n"
       "// Return the final RGBA for this pixel.\n"
       "vec4 shape(vec2 uv, vec2 p, float t) {\n";
 
    const char* kEpilogue =
       "\n}\n"
-      "void main() { fragColor = shape(vUv, vUv - vec2(0.5), uTime); }\n";
+      "void main() {\n"
+      "   vec2 p = vUv - vec2(0.5);\n"
+      "   p.x *= uAspect;\n"
+      "   fragColor = shape(vUv, p, uTime);\n"
+      "}\n";
 
    const char* kDefaultFormula =
       "   float d = sdCircle(p, 0.2 + uA * 0.2);\n"
@@ -427,5 +432,6 @@ void FormulaNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uB"), knobB);
       glUniform1f(glGetUniformLocation(mProgram, "uC"), knobC);
       glUniform1f(glGetUniformLocation(mProgram, "uD"), knobD);
+      glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
    });
 }

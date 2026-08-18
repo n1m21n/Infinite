@@ -33,6 +33,8 @@ public:
    int shapeType = 0; // index into ShapeNames()
    float width = 1024.0f;
    float height = 1024.0f;
+   float sizeX = 0.35f;
+   float sizeY = 0.35f;
    float size = 0.35f;
    float aspect = 1.0f;
    float cornerRadius = 0.05f;
@@ -53,6 +55,7 @@ public:
    {
       v.Int("shapeType", shapeType);
       v.Float("width", width); v.Float("height", height);
+      v.Float("sizeX", sizeX); v.Float("sizeY", sizeY);
       v.Float("size", size); v.Float("aspect", aspect);
       v.Float("cornerRadius", cornerRadius); v.Int("sides", sides);
       v.Float("innerRatio", innerRatio); v.Float("rotation", rotation);
