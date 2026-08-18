@@ -65,11 +65,20 @@ echo "==> staging"
 rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
+if [ -f "$ROOT/Infinite_Node_Reference_Manual.pdf" ]; then
+    cp "$ROOT/Infinite_Node_Reference_Manual.pdf" "$STAGE/"
+fi
 ln -s /Applications "$STAGE/Applications"
 
 echo "==> building dmg"
 hdiutil create -volname "Infinite" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"
 
+if [ -d "$ROOT/website/assets" ]; then
+    cp "$DMG" "$ROOT/website/assets/Infinite.dmg"
+    echo "copied $DMG -> website/assets/Infinite.dmg"
+fi
+
 echo
 echo "built $DMG ($(du -h "$DMG" | cut -f1))"
+
