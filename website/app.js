@@ -51,6 +51,45 @@ function initCosmos() {
   }
 }
 
+// Viewport Visibility Observer Helper: Automatically halts RAF rendering when off-screen
+function createViewportLoop(element, renderFn) {
+  if (!element) return;
+  let isVisible = true;
+  let isRunning = false;
+  let rafId = null;
+
+  function loop(ts) {
+    if (!isVisible) {
+      isRunning = false;
+      return;
+    }
+    renderFn(ts);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function start() {
+    if (!isRunning && isVisible) {
+      isRunning = true;
+      rafId = requestAnimationFrame(loop);
+    }
+  }
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      isVisible = entries[0].isIntersecting;
+      if (isVisible) {
+        start();
+      } else if (rafId) {
+        cancelAnimationFrame(rafId);
+        isRunning = false;
+      }
+    }, { rootMargin: '120px 0px' });
+    observer.observe(element);
+  }
+
+  start();
+}
+
 let cosmicTime = 0;
 function animateCosmos() {
   if (!cosmicCtx) return;
@@ -91,8 +130,6 @@ function animateCosmos() {
     cosmicCtx.fill();
   });
   cosmicCtx.globalAlpha = 1.0;
-
-  requestAnimationFrame(animateCosmos);
 }
 
 
@@ -112,7 +149,9 @@ let networkPulses = [];
 let hoveredNode = null;
 let draggedNode = null;
 let dragPos = { x: 0, y: 0 };
+let dragOffset = { x: 0, y: 0 };
 let netMouse = { x: -1000, y: -1000, active: false };
+let cachedCanvasRect = null;
 
 const NETWORK_ITEMS = [
   { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.12, dtY: 0.26, mbX: 0.20, mbY: 0.15 },
@@ -126,19 +165,61 @@ const NETWORK_ITEMS = [
   { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.88, dtY: 0.74, mbX: 0.78, mbY: 0.88 }
 ];
 
+function updateNatureCanvasRect() {
+  if (natureCanvas) {
+    cachedCanvasRect = natureCanvas.getBoundingClientRect();
+  }
+}
+
 function resizeBranchCanvas() {
   if (!natureCanvas) return;
   const rect = natureCanvas.getBoundingClientRect();
+  cachedCanvasRect = rect;
   const rawW = rect.width > 10 ? rect.width : (natureCanvas.parentElement ? natureCanvas.parentElement.clientWidth : 960);
   const rawH = rect.height > 10 ? rect.height : 460;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  natureCanvas.width = (rawW || 960) * dpr;
-  natureCanvas.height = (rawH || 460) * dpr;
-  netWidth = natureCanvas.width;
-  netHeight = natureCanvas.height;
+  const targetW = Math.round((rawW || 960) * dpr);
+  const targetH = Math.round((rawH || 460) * dpr);
 
-  buildNetworkStructure();
+  if (Math.abs(targetW - netWidth) < 2 && Math.abs(targetH - netHeight) < 2) {
+    return;
+  }
+
+  const prevW = netWidth || targetW;
+  const prevH = netHeight || targetH;
+
+  natureCanvas.width = targetW;
+  natureCanvas.height = targetH;
+  netWidth = targetW;
+  netHeight = targetH;
+
+  if (networkNodes.length === 0) {
+    buildNetworkStructure();
+  } else {
+    // Seamless proportional scaling: preserve dragged node layout & dynamic state without resetting!
+    const scaleX = targetW / prevW;
+    const scaleY = targetH / prevH;
+    const isMobile = targetW < 620 * dpr;
+    const fontSize = (isMobile ? 12 : 14.5) * dpr;
+    if (natureCtx) {
+      natureCtx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`;
+    }
+    networkNodes.forEach(node => {
+      node.x *= scaleX;
+      node.y *= scaleY;
+      node.baseX *= scaleX;
+      node.baseY *= scaleY;
+      node.vx = 0;
+      node.vy = 0;
+      const textW = natureCtx ? natureCtx.measureText(node.label).width : 50 * dpr;
+      const padX = (isMobile ? 10 : 13) * dpr;
+      const padY = (isMobile ? 6 : 8) * dpr;
+      const dotRadius = (isMobile ? 4.2 : 5.2) * dpr;
+      node.badgeW = textW + padX * 2 + dotRadius * 2 + 6 * dpr;
+      node.badgeH = fontSize + padY * 2;
+    });
+  }
 }
 
 function buildNetworkStructure() {
@@ -177,7 +258,7 @@ function buildNetworkStructure() {
     };
   });
 
-  // CONNECT EVERYTHING TO EVERYTHING (Full Mesh: all 36 pairwise connections)
+  // Full Mesh: all 36 pairwise connections with harmonic alpha
   networkEdges = [];
   const PRIMARY_SET = new Set([
     'sound-music', 'sound-physics', 'sound-art', 'music-math', 'physics-math', 'physics-art',
@@ -203,7 +284,7 @@ function buildNetworkStructure() {
     }
   }
 
-  // 25% Decreased Density (27 pulses instead of 36) + Slower, gentle speed
+  // Organic Traveling Signal Pulses
   networkPulses = [];
   const pulseCount = 27;
   for (let i = 0; i < pulseCount; i++) {
@@ -222,8 +303,8 @@ function buildNetworkStructure() {
 function getNodeAtPoint(px, py, dpr) {
   for (let i = networkNodes.length - 1; i >= 0; i--) {
     const node = networkNodes[i];
-    const halfW = (node.badgeW || 80) * 0.5 + 8 * dpr;
-    const halfH = (node.badgeH || 26) * 0.5 + 8 * dpr;
+    const halfW = (node.badgeW || 80) * 0.5 + 10 * dpr;
+    const halfH = (node.badgeH || 26) * 0.5 + 10 * dpr;
     if (px >= node.x - halfW && px <= node.x + halfW &&
         py >= node.y - halfH && py <= node.y + halfH) {
       return node;
@@ -234,108 +315,85 @@ function getNodeAtPoint(px, py, dpr) {
 
 function getCanvasPoint(clientX, clientY) {
   if (!natureCanvas) return { x: 0, y: 0 };
-  const rect = natureCanvas.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  if (!cachedCanvasRect) {
+    cachedCanvasRect = natureCanvas.getBoundingClientRect();
+  }
+  const rectW = cachedCanvasRect.width || 1;
+  const rectH = cachedCanvasRect.height || 1;
   return {
-    x: (clientX - rect.left) * dpr,
-    y: (clientY - rect.top) * dpr
+    x: (clientX - cachedCanvasRect.left) * (natureCanvas.width / rectW),
+    y: (clientY - cachedCanvasRect.top) * (natureCanvas.height / rectH)
   };
 }
 
-// Interactive Desktop Mouse & Drag Events
+// Interactive Modern Pointer & Drag Events (Instant Touch & Mouse Tracking)
 if (natureCanvas) {
-  natureCanvas.addEventListener('mousedown', (e) => {
+  natureCanvas.addEventListener('pointerdown', (e) => {
+    updateNatureCanvasRect();
     const pt = getCanvasPoint(e.clientX, e.clientY);
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     const node = getNodeAtPoint(pt.x, pt.y, dpr);
     if (node) {
       draggedNode = node;
       hoveredNode = node;
-      dragPos.x = pt.x;
-      dragPos.y = pt.y;
+      dragOffset.x = node.x - pt.x;
+      dragOffset.y = node.y - pt.y;
+      dragPos.x = pt.x + dragOffset.x;
+      dragPos.y = pt.y + dragOffset.y;
       natureCanvas.style.cursor = 'grabbing';
+      try {
+        natureCanvas.setPointerCapture(e.pointerId);
+      } catch (_) {}
+      e.preventDefault();
     }
   });
 
-  window.addEventListener('mousemove', (e) => {
-    if (!natureCanvas) return;
+  natureCanvas.addEventListener('pointermove', (e) => {
     const pt = getCanvasPoint(e.clientX, e.clientY);
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
 
     if (draggedNode) {
-      dragPos.x = pt.x;
-      dragPos.y = pt.y;
+      dragPos.x = pt.x + dragOffset.x;
+      dragPos.y = pt.y + dragOffset.y;
       natureCanvas.style.cursor = 'grabbing';
-    } else {
-      const rect = natureCanvas.getBoundingClientRect();
-      const isInside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-      if (isInside) {
-        hoveredNode = getNodeAtPoint(pt.x, pt.y, dpr);
-        natureCanvas.style.cursor = hoveredNode ? 'grab' : 'default';
-        netMouse.x = pt.x;
-        netMouse.y = pt.y;
-        netMouse.active = true;
-      } else {
-        hoveredNode = null;
-        netMouse.active = false;
-      }
-    }
-  });
-
-  window.addEventListener('mouseup', () => {
-    if (draggedNode) {
-      draggedNode.baseX = draggedNode.x;
-      draggedNode.baseY = draggedNode.y;
-      draggedNode = null;
-      if (natureCanvas) {
-        natureCanvas.style.cursor = hoveredNode ? 'grab' : 'default';
-      }
-    }
-  });
-
-  // Interactive Mobile Touch & Drag Events
-  natureCanvas.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const pt = getCanvasPoint(touch.clientX, touch.clientY);
-      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-      const node = getNodeAtPoint(pt.x, pt.y, dpr);
-      if (node) {
-        draggedNode = node;
-        hoveredNode = node;
-        dragPos.x = pt.x;
-        dragPos.y = pt.y;
-        e.preventDefault(); // Prevent scroll while dragging a node
-      }
-    }
-  }, { passive: false });
-
-  natureCanvas.addEventListener('touchmove', (e) => {
-    if (draggedNode && e.touches.length === 1) {
-      const touch = e.touches[0];
-      const pt = getCanvasPoint(touch.clientX, touch.clientY);
-      dragPos.x = pt.x;
-      dragPos.y = pt.y;
       e.preventDefault();
+    } else {
+      hoveredNode = getNodeAtPoint(pt.x, pt.y, dpr);
+      natureCanvas.style.cursor = hoveredNode ? 'grab' : 'default';
+      netMouse.x = pt.x;
+      netMouse.y = pt.y;
+      netMouse.active = !!hoveredNode;
     }
-  }, { passive: false });
+  });
 
-  natureCanvas.addEventListener('touchend', () => {
+  const onPointerRelease = (e) => {
     if (draggedNode) {
       draggedNode.baseX = draggedNode.x;
       draggedNode.baseY = draggedNode.y;
+      draggedNode.vx = 0;
+      draggedNode.vy = 0;
+      try {
+        natureCanvas.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      draggedNode = null;
     }
-    draggedNode = null;
-    hoveredNode = null;
-  });
-  natureCanvas.addEventListener('touchcancel', () => {
-    if (draggedNode) {
-      draggedNode.baseX = draggedNode.x;
-      draggedNode.baseY = draggedNode.y;
+    const pt = getCanvasPoint(e.clientX, e.clientY);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    hoveredNode = getNodeAtPoint(pt.x, pt.y, dpr);
+    natureCanvas.style.cursor = hoveredNode ? 'grab' : 'default';
+  };
+
+  natureCanvas.addEventListener('pointerup', onPointerRelease);
+  natureCanvas.addEventListener('pointercancel', onPointerRelease);
+  natureCanvas.addEventListener('pointerleave', () => {
+    if (!draggedNode) {
+      hoveredNode = null;
+      netMouse.active = false;
+      natureCanvas.style.cursor = 'default';
     }
-    draggedNode = null;
-    hoveredNode = null;
   });
+
+  window.addEventListener('scroll', updateNatureCanvasRect, { passive: true });
 }
 
 // Safe Canvas roundRect Polyfill
@@ -356,14 +414,24 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D
 }
 
 let netTime = 0;
-function animateNatureBranches() {
-  if (!natureCtx || !natureCanvas) return;
+let lastNetTimestamp = 0;
+let natureAnimating = true;
+
+function animateNatureBranches(timestamp) {
+  if (!natureCtx || !natureCanvas || !natureAnimating) return;
   if (networkNodes.length === 0) {
     resizeBranchCanvas();
     requestAnimationFrame(animateNatureBranches);
     return;
   }
-  netTime += 0.016;
+
+  if (!lastNetTimestamp) lastNetTimestamp = timestamp || performance.now();
+  const currentTs = timestamp || performance.now();
+  const rawDt = (currentTs - lastNetTimestamp) / 1000;
+  lastNetTimestamp = currentTs;
+  const dt = Math.min(Math.max(rawDt, 0.008), 0.033);
+  netTime += dt;
+
   const w = netWidth;
   const h = netHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
@@ -372,8 +440,8 @@ function animateNatureBranches() {
   natureCtx.clearRect(0, 0, w, h);
 
   // 1. Force-Directed Physics Simulation (Organic Dynamic Rearrangement)
-  // Repulsion between all node pairs
-  const repulsionRadius = (isMobile ? 130 : 160) * dpr;
+  // Soft pairwise repulsion to prevent overlapping without aggressive jitter
+  const repulsionRadius = (isMobile ? 120 : 150) * dpr;
   for (let i = 0; i < networkNodes.length; i++) {
     for (let j = i + 1; j < networkNodes.length; j++) {
       const n1 = networkNodes[i];
@@ -383,9 +451,10 @@ function animateNatureBranches() {
       const dist = Math.hypot(dx, dy) || 1;
 
       if (dist < repulsionRadius) {
-        const factor = Math.pow((repulsionRadius - dist) / repulsionRadius, 1.8) * (4.8 * dpr);
-        const fx = (dx / dist) * factor;
-        const fy = (dy / dist) * factor;
+        const norm = (repulsionRadius - dist) / repulsionRadius;
+        const force = Math.min(norm * norm * (2.2 * dpr), 3.2 * dpr);
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
         if (n1 !== draggedNode) { n1.vx -= fx; n1.vy -= fy; }
         if (n2 !== draggedNode) { n2.vx += fx; n2.vy += fy; }
       }
@@ -397,9 +466,9 @@ function animateNatureBranches() {
     const dx = edge.dst.x - edge.src.x;
     const dy = edge.dst.y - edge.src.y;
     const dist = Math.hypot(dx, dy) || 1;
-    const restLength = (edge.isPrimary ? (isMobile ? 140 : 180) : (isMobile ? 220 : 300)) * dpr;
+    const restLength = (edge.isPrimary ? (isMobile ? 130 : 170) : (isMobile ? 210 : 280)) * dpr;
     const diff = dist - restLength;
-    const springK = edge.isPrimary ? 0.0035 : 0.0006;
+    const springK = edge.isPrimary ? 0.0022 : 0.0004;
     const fx = (dx / dist) * diff * springK;
     const fy = (dy / dist) * diff * springK;
 
@@ -409,43 +478,45 @@ function animateNatureBranches() {
 
   // Balanced Home Anchor, Damping & Boundary Bounds Integration
   networkNodes.forEach(node => {
-    if (node === draggedNode) {
-      node.x = dragPos.x;
-      node.y = dragPos.y;
-      node.baseX = dragPos.x;
-      node.baseY = dragPos.y;
-      node.vx = 0;
-      node.vy = 0;
-    } else {
-      // Balanced spring returning towards base anchor
-      const anchorK = 0.035;
-      node.vx += (node.baseX - node.x) * anchorK;
-      node.vy += (node.baseY - node.y) * anchorK;
-
-      // Organic gentle idle breathing
-      const floatX = Math.sin(netTime * node.floatSpeed + node.phase) * (0.35 * dpr);
-      const floatY = Math.cos(netTime * node.floatSpeed * 0.8 + node.phase) * (0.35 * dpr);
-      node.vx += floatX;
-      node.vy += floatY;
-
-      // Smooth damping (friction)
-      node.vx *= 0.82;
-      node.vy *= 0.82;
-
-      node.x += node.vx;
-      node.y += node.vy;
-    }
-
-    // Boundary constraints (Strictly stay within section canvas)
     const minX = (node.badgeW * 0.5 || 40) + 12 * dpr;
     const maxX = w - minX;
     const minY = (node.badgeH * 0.5 || 15) + 10 * dpr;
     const maxY = h - minY;
 
-    if (node.x < minX) { node.x = minX; node.vx = 0; }
-    if (node.x > maxX) { node.x = maxX; node.vx = 0; }
-    if (node.y < minY) { node.y = minY; node.vy = 0; }
-    if (node.y > maxY) { node.y = maxY; node.vy = 0; }
+    if (node === draggedNode) {
+      // 1:1 Instant Tracking with zero sluggishness
+      const clampedX = Math.max(minX, Math.min(maxX, dragPos.x));
+      const clampedY = Math.max(minY, Math.min(maxY, dragPos.y));
+      node.x = clampedX;
+      node.y = clampedY;
+      node.baseX = clampedX;
+      node.baseY = clampedY;
+      node.vx = 0;
+      node.vy = 0;
+    } else {
+      // Gentle anchor spring
+      const anchorK = 0.018;
+      node.vx += (node.baseX - node.x) * anchorK;
+      node.vy += (node.baseY - node.y) * anchorK;
+
+      // Organic gentle idle breathing
+      const floatX = Math.sin(netTime * node.floatSpeed + node.phase) * (0.28 * dpr);
+      const floatY = Math.cos(netTime * node.floatSpeed * 0.8 + node.phase) * (0.28 * dpr);
+      node.vx += floatX;
+      node.vy += floatY;
+
+      // Smooth damping (friction)
+      node.vx *= 0.87;
+      node.vy *= 0.87;
+
+      node.x += node.vx;
+      node.y += node.vy;
+
+      if (node.x < minX) { node.x = minX; node.vx = 0; }
+      if (node.x > maxX) { node.x = maxX; node.vx = 0; }
+      if (node.y < minY) { node.y = minY; node.vy = 0; }
+      if (node.y > maxY) { node.y = maxY; node.vy = 0; }
+    }
   });
 
   // 2. Draw Network Connection Edges (All Interconnected Filaments)
@@ -459,7 +530,7 @@ function animateNatureBranches() {
         targetAlpha = 0.55;
         lineWidth = 2.2 * dpr;
       } else {
-        targetAlpha = 0.025; // Subtle dim for non-related edges
+        targetAlpha = 0.025;
       }
     }
 
@@ -552,8 +623,6 @@ function animateNatureBranches() {
     natureCtx.fillStyle = isHovered ? node.color : '#1f1d1a';
     natureCtx.fillText(node.label, dotX + dotRadius + 5 * dpr, node.y);
   });
-
-  requestAnimationFrame(animateNatureBranches);
 }
 
 
@@ -686,10 +755,9 @@ function initWavesAnimation() {
     gl.uniform1f(uDUniform, 0.5);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-    requestAnimationFrame(render);
   }
-  render();
-  window.addEventListener('resize', resize);
+  createViewportLoop(canvas, render);
+  window.addEventListener('resize', resize, { passive: true });
 }
 
 function initWaves2DFallback(canvas) {
@@ -720,10 +788,9 @@ function initWaves2DFallback(canvas) {
       }
       ctx.stroke();
     }
-    requestAnimationFrame(draw);
   }
-  draw();
-  window.addEventListener('resize', resize);
+  createViewportLoop(canvas, draw);
+  window.addEventListener('resize', resize, { passive: true });
 }
 
 // Animation 2: 3D Wavetable Movement
@@ -773,10 +840,9 @@ function initWavetableAnimation() {
       }
       ctx.stroke();
     }
-    requestAnimationFrame(draw);
   }
-  draw();
-  window.addEventListener('resize', resize);
+  createViewportLoop(canvas, draw);
+  window.addEventListener('resize', resize, { passive: true });
 }
 
 // Animation 3: 3D Geometry Rotating Cube Render with Dynamic Particle System
@@ -845,7 +911,6 @@ function initParticlesAnimation() {
   let rotZ = 0.2;
 
   function project3D(v, w, h, dpr) {
-    // 3D rotation
     let x1 = v.x * Math.cos(rotY) + v.z * Math.sin(rotY);
     let z1 = -v.x * Math.sin(rotY) + v.z * Math.cos(rotY);
 
@@ -940,11 +1005,9 @@ function initParticlesAnimation() {
       ctx.fill();
     });
     ctx.globalAlpha = 1.0;
-
-    requestAnimationFrame(draw);
   }
-  draw();
-  window.addEventListener('resize', resize);
+  createViewportLoop(canvas, draw);
+  window.addEventListener('resize', resize, { passive: true });
 }
 
 // Animation 4: 4 Modulation Knobs with Cables
@@ -1011,11 +1074,9 @@ function initKnobsAnimation() {
       ctx.strokeStyle = '#ffffff';
       ctx.stroke();
     });
-
-    requestAnimationFrame(draw);
   }
-  draw();
-  window.addEventListener('resize', resize);
+  createViewportLoop(canvas, draw);
+  window.addEventListener('resize', resize, { passive: true });
 }
 
 
@@ -1361,23 +1422,27 @@ function initCopyButtons() {
 
 // DOM Ready initialization
 document.addEventListener('DOMContentLoaded', () => {
+  let resizeTimer = null;
   window.addEventListener('resize', () => {
-    resizeCosmicCanvas();
-    resizeBranchCanvas();
-  });
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      resizeCosmicCanvas();
+      resizeBranchCanvas();
+    }, 100);
+  }, { passive: true });
 
   resizeCosmicCanvas();
-  requestAnimationFrame(animateCosmos);
+  createViewportLoop(cosmicCanvas, animateCosmos);
 
   resizeBranchCanvas();
-  requestAnimationFrame(animateNatureBranches);
+  createViewportLoop(natureCanvas, animateNatureBranches);
 
   const natureWrapper = document.querySelector('.nature-canvas-wrapper');
   if (natureWrapper && 'ResizeObserver' in window) {
     let lastW = 0, lastH = 0;
     const ro = new ResizeObserver(entries => {
       const { width, height } = entries[0].contentRect;
-      if (Math.abs(width - lastW) > 4 || Math.abs(height - lastH) > 4) {
+      if (Math.abs(width - lastW) > 10 || Math.abs(height - lastH) > 10) {
         lastW = width; lastH = height;
         resizeBranchCanvas();
       }
@@ -1387,7 +1452,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(resizeBranchCanvas);
   }
-  window.addEventListener('load', resizeBranchCanvas);
+  window.addEventListener('load', resizeBranchCanvas, { passive: true });
 
   // Initialize the 4 primary capabilities animations
   initWavesAnimation();
