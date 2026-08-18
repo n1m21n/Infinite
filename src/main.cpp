@@ -28879,6 +28879,92 @@ int main(int argc, char** argv)
          }
       }
 
+      // A different bug class from RENDER3DLIVETEST above: not a live-updating
+      // source with no revision bump of its own, but the opposite direction -
+      // a real upstream mesh/cloud/curve change that DOES bump a revision,
+      // but never reaches Render 3D's rendered pixels because
+      // BuildSceneSignature's per-slot geomRev used to XOR-fold
+      // MeshRevision()/PointCloudRevision()/CurveStamp() into one value.
+      // Several IGeometrySource implementations deliberately return the same
+      // counter from two of those three accessors (mesh cache and point/curve
+      // cache rebuilt together, sharing one stamp), which made the XOR
+      // cancel to a constant 0 forever - the cache never invalidated and the
+      // viewport froze on the first frame. See the SceneSignature comment in
+      // Geometry3DNodes.h for the full story.
+      //
+      // The check, per geometry-consuming node type: cook Render 3D once,
+      // capture NodeWorkCounter() (bumped only on a real, non-cached render -
+      // Geometry3DNodes.cpp's CookIfNeeded increments it right after the
+      // cache-hit early-return check), change something upstream that
+      // genuinely alters the geometry, cook Render 3D again, and assert
+      // NodeWorkCounter() advanced - i.e. the cache early-return was NOT
+      // taken.
+      if (getenv("INFINITE_RENDER3DCACHESWEEPTEST") != nullptr && frameId == 6)
+      {
+         struct Result { std::string name; bool ok; };
+         std::vector<Result> results;
+         int frame = 32000;
+
+         auto checkCacheInvalidates = [&](const char* name, IGeometrySource* source, std::function<void()> mutate)
+         {
+            Render3DNode render;
+            render.geometry[0] = source;
+            render.CookIfNeeded(frame++);
+            const unsigned long long workBefore = NodeWorkCounter();
+            mutate();
+            render.CookIfNeeded(frame++);
+            const unsigned long long workAfter = NodeWorkCounter();
+            results.push_back({ name, workAfter != workBefore });
+         };
+
+         // MeshToPointsNode: mesh cache and point cache rebuilt together off
+         // the same probe mesh, sharing mMeshRevision for both accessors.
+         {
+            GeometryNode probe;
+            probe.shape = 1; // cube
+            probe.detail = 2;
+            MeshToPointsNode node;
+            node.input = &probe;
+            node.mode = 0;
+            checkCacheInvalidates("MeshToPointsNode", &node, [&]() { probe.detail = 4; });
+         }
+
+         // DistributePointsOnFacesNode: same aliasing, both mMeshRevision.
+         {
+            GeometryNode probe;
+            probe.shape = 1;
+            probe.detail = 2;
+            DistributePointsOnFacesNode node;
+            node.input = &probe;
+            checkCacheInvalidates("DistributePointsOnFacesNode", &node, [&]() { probe.detail = 4; });
+         }
+
+         // DistributePointsInGridNode: no mesh input at all - its own
+         // countX/countY drive PointRevision()/MeshRevision() together.
+         {
+            DistributePointsInGridNode node;
+            node.countX = 4;
+            node.countY = 4;
+            checkCacheInvalidates("DistributePointsInGridNode", &node, [&]() { node.countX = 8; });
+         }
+
+         // CurveNode: MeshRevision() and CurveStamp() both return mRevision.
+         {
+            CurveNode node;
+            node.pointCount = 5;
+            checkCacheInvalidates("CurveNode", &node, [&]() { node.pointCount = 7; });
+         }
+
+         bool allOk = true;
+         for (const Result& r : results)
+         {
+            printf("  [%s] %-32s\n", r.ok ? "pass" : "FAIL", r.name.c_str());
+            if (!r.ok)
+               allOk = false;
+         }
+         printf("%s\n", allOk ? "RENDER3D CACHE SWEEP OK" : "RENDER3D CACHE SWEEP FAIL");
+      }
+
       if (getenv("INFINITE_FIXTEST") != nullptr && frameId == 6)
       {
          auto* r0 = static_cast<RandomNode*>(gNodes[0].node.get());

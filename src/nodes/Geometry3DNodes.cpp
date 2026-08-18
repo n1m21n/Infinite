@@ -1337,12 +1337,12 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       if (source == nullptr)
          continue;
       sig.hasGeom[i] = true;
-      // A pure cloud (a Particle System) has no triangles of its own worth
-      // revving on MeshRevision() - it reports a constant 0 there - so every
-      // component's revision is folded in together. Whichever one the source
-      // actually implements is the one that changes, and an unimplemented
-      // component's stamp is a constant 0 that contributes nothing.
-      sig.geomRev[i] = source->MeshRevision() ^ source->PointCloudRevision() ^ source->CurveStamp();
+      // Tracked as three separate fields, not XOR-folded - see the comment
+      // on SceneSignature in Geometry3DNodes.h for why folding them silently
+      // broke cache invalidation for several node types.
+      sig.meshRev[i] = source->MeshRevision();
+      sig.cloudRev[i] = source->PointCloudRevision();
+      sig.curveRev[i] = source->CurveStamp();
       sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
       sig.material[i] = source->GetMaterial();
       sig.modelMatrix[i] = source->GetModelMatrix();

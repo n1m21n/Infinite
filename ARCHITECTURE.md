@@ -124,7 +124,7 @@ getting a file each:
 
 ### Invariants for `IGeometrySource`-consuming nodes
 
-Two rules every node with a single `IGeometrySource*` input (or `sourceInput`/
+Three rules every node with a single `IGeometrySource*` input (or `sourceInput`/
 `instanceShape`/etc.) is expected to follow, each backed by an automated
 sweep in `geometry-transform-sweep` (also run as part of
 `run-infinite-hygiene`) rather than left to manual review:
@@ -149,10 +149,18 @@ sweep in `geometry-transform-sweep` (also run as part of
    stateful node downstream (`ClothNode`) that keys a full state reset off
    "did the input's revision move" then resets every frame instead of ever
    settling. `REVISIONSWEEPTEST` checks this generically.
+3. **Render 3D's scene cache must see every component stamp separately.**
+   `Render3DNode::BuildSceneSignature` tracks `MeshRevision()`,
+   `PointCloudRevision()` and `CurveStamp()` as distinct fields, not folded
+   together. They used to be XOR-folded into one value, which silently produced
+   a constant `0` for every node that returns the same counter from two of them
+   (`MeshToPointsNode`, both `DistributePoints*` nodes, `CurveNode`) — the
+   render then cached its first frame forever and no upstream edit ever showed
+   up in the viewport. `RENDER3DCACHESWEEPTEST` checks this generically.
 
-If you add a new node type in this category, wire it into both sweeps rather
-than hand-writing a one-off check — see `geometry-transform-sweep`'s SKILL.md,
-"Adding a new node type to a sweep."
+If you add a new node type in this category, wire it into all three sweeps
+rather than hand-writing a one-off check — see `geometry-transform-sweep`'s
+SKILL.md, "Adding a new node type to a sweep."
 
 **File:** `src/main.cpp` — registration, per-node UI, and node-graph wiring
 (as opposed to the *rendering* of pins/links, which is Editor UI)

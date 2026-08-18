@@ -536,9 +536,25 @@ private:
    // *contents*, only GetSurfaceTexture()'s GL handle, which a persistent-FBO
    // producer like Formula/Filter keeps unchanged across recooks), but
    // SurfaceTextureRevision() now provides that stamp, so it's tracked like
-   // geomRev below instead of forcing a redraw. The remaining per-channel
-   // material maps (roughness/metallic/normal/ao) still have no revision
-   // stamp of their own, so any of those being bound still forces a redraw.
+   // meshRev/cloudRev/curveRev below instead of forcing a redraw. The
+   // remaining per-channel material maps (roughness/metallic/normal/ao)
+   // still have no revision stamp of their own, so any of those being bound
+   // still forces a redraw.
+   //
+   // meshRev/cloudRev/curveRev are kept as three SEPARATE fields rather than
+   // folded into one via XOR (or any other combiner). Several
+   // IGeometrySource implementations deliberately return the same counter
+   // from two of MeshRevision()/PointCloudRevision()/CurveStamp() - e.g.
+   // MeshToPointsNode, DistributePointsOnFacesNode, DistributePointsInGridNode
+   // (mesh cache and point cache rebuilt together, sharing mMeshRevision) and
+   // CurveNode (mesh and curve share mRevision). That sharing is correct on
+   // the producer side. But XOR-folding those three counters into one
+   // geomRev means a ^ a == 0 for any node aliasing two of them, so the fold
+   // was a constant 0 forever no matter how much the geometry changed - the
+   // signature never moved and the viewport froze on the first frame. Keeping
+   // the three stamps separate here makes that cancellation impossible: a
+   // change to any one component always shows up in its own field.
+   // RENDER3DCACHESWEEPTEST checks this generically.
    //
    // modelMatrix/instanceGroupMatrix cover a Geometry node's own
    // spin/orbit-driven transform (evaluated live off the transport clock,
@@ -558,7 +574,9 @@ private:
       bool hasLight[kLightSlots] = { false, false, false };
       std::vector<float> light[kLightSlots];
       bool hasGeom[kSlots] = { false, false, false, false };
-      unsigned long long geomRev[kSlots] = { 0, 0, 0, 0 };
+      unsigned long long meshRev[kSlots] = { 0, 0, 0, 0 };
+      unsigned long long cloudRev[kSlots] = { 0, 0, 0, 0 };
+      unsigned long long curveRev[kSlots] = { 0, 0, 0, 0 };
       unsigned long long surfaceTexRev[kSlots] = { 0, 0, 0, 0 };
       Material material[kSlots];
       Mat4 modelMatrix[kSlots];
@@ -583,7 +601,8 @@ private:
                return false;
          for (int i = 0; i < kSlots; i++)
          {
-            if (hasGeom[i] != o.hasGeom[i] || geomRev[i] != o.geomRev[i] ||
+            if (hasGeom[i] != o.hasGeom[i] || meshRev[i] != o.meshRev[i] ||
+                cloudRev[i] != o.cloudRev[i] || curveRev[i] != o.curveRev[i] ||
                 surfaceTexRev[i] != o.surfaceTexRev[i] || instanceRev[i] != o.instanceRev[i] ||
                 instanceCount[i] != o.instanceCount[i])
                return false;

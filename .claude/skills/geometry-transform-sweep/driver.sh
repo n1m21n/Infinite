@@ -25,12 +25,21 @@
 #     was connected, even with unchanged pixels, which forced ClothNode
 #     downstream to treat every frame as a topology change and reset the
 #     simulation back to rest pose continuously instead of ever draping.
+#   - RENDER3DCACHESWEEPTEST — the opposite direction from REVISIONSWEEPTEST:
+#     a real upstream mesh/cloud/curve change DOES reach Render 3D's rendered
+#     pixels, rather than being swallowed by its scene cache. Caught a real
+#     bug: Render3DNode::BuildSceneSignature XOR-folded MeshRevision()/
+#     PointCloudRevision()/CurveStamp() into one value, which silently
+#     cancelled to a constant 0 for every node that returns the same counter
+#     from two of those three accessors (MeshToPointsNode, both
+#     DistributePoints* nodes, CurveNode) - the render then cached its first
+#     frame forever and no upstream edit ever showed up in the viewport.
 #
 # None of these are a fixed fixture like run-infinite-hygiene's BUGTEST
 # checks - they exist to keep covering every geometry-consuming node type as
 # new ones are added, without anyone hand-writing a new check per node per
 # invariant. See ARCHITECTURE.md's "Node Library" section, "Invariants for
-# IGeometrySource-consuming nodes" for the two rules these enforce.
+# IGeometrySource-consuming nodes" for the three rules these enforce.
 #
 # Usage:
 #   .claude/skills/geometry-transform-sweep/driver.sh               # build + run
@@ -87,6 +96,7 @@ SWEEPS=(
   "Transform propagation:TRANSFORMSWEEPTEST:TRANSFORM SWEEP OK:TRANSFORM SWEEP FAIL:/tmp/infinite_transform_sweep.log"
   "Mapping-transform forwarding:MAPPINGSWEEPTEST:MAPPING SWEEP OK:MAPPING SWEEP FAIL:/tmp/infinite_mapping_sweep.log"
   "Revision stability:REVISIONSWEEPTEST:REVISION SWEEP OK:REVISION SWEEP FAIL:/tmp/infinite_revision_sweep.log"
+  "Render 3D cache invalidation:RENDER3DCACHESWEEPTEST:RENDER3D CACHE SWEEP OK:RENDER3D CACHE SWEEP FAIL:/tmp/infinite_render3d_cache_sweep.log"
 )
 
 overallOk=1
