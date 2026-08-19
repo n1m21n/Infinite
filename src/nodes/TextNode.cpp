@@ -54,23 +54,57 @@ void TextNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
 
+   const bool paramsUnchanged = mHasBuilt &&
+      text == mBuiltText && fontName == mBuiltFontName &&
+      fontSize == mBuiltFontSize &&
+      color[0] == mBuiltColor[0] && color[1] == mBuiltColor[1] && color[2] == mBuiltColor[2] &&
+      tracking == mBuiltTracking &&
+      posX == mBuiltPosX && posY == mBuiltPosY &&
+      align == mBuiltAlign &&
+      scaleX == mBuiltScaleX && scaleY == mBuiltScaleY &&
+      wordWrap == mBuiltWordWrap &&
+      wrapWidth == mBuiltWrapWidth && wrapHeight == mBuiltWrapHeight &&
+      fitToBox == mBuiltFitToBox &&
+      lineSpacing == mBuiltLineSpacing &&
+      outlineWidth == mBuiltOutlineWidth &&
+      outlineColor[0] == mBuiltOutlineColor[0] && outlineColor[1] == mBuiltOutlineColor[1] && outlineColor[2] == mBuiltOutlineColor[2] &&
+      outlineOnly == mBuiltOutlineOnly &&
+      width == mBuiltWidth && height == mBuiltHeight;
+   if (paramsUnchanged)
+      return;
+
+   mBuiltText = text;
+   mBuiltFontName = fontName;
+   mBuiltFontSize = fontSize;
+   mBuiltColor[0] = color[0]; mBuiltColor[1] = color[1]; mBuiltColor[2] = color[2];
+   mBuiltTracking = tracking;
+   mBuiltPosX = posX; mBuiltPosY = posY;
+   mBuiltAlign = align;
+   mBuiltScaleX = scaleX; mBuiltScaleY = scaleY;
+   mBuiltWordWrap = wordWrap;
+   mBuiltWrapWidth = wrapWidth; mBuiltWrapHeight = wrapHeight;
+   mBuiltFitToBox = fitToBox;
+   mBuiltLineSpacing = lineSpacing;
+   mBuiltOutlineWidth = outlineWidth;
+   mBuiltOutlineColor[0] = outlineColor[0]; mBuiltOutlineColor[1] = outlineColor[1]; mBuiltOutlineColor[2] = outlineColor[2];
+   mBuiltOutlineOnly = outlineOnly;
+   mBuiltWidth = width; mBuiltHeight = height;
+   mHasBuilt = true;
+
    mWidth = std::max(16, (int)width);
    mHeight = std::max(16, (int)height);
 
-   std::vector<unsigned char> pixels(mWidth * mHeight * 4, 0);
+   mPixels.assign((size_t)mWidth * mHeight * 4, 0);
 
    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
    CGContextRef ctx = CGBitmapContextCreate(
-      pixels.data(), mWidth, mHeight, 8, mWidth * 4, colorSpace,
+      mPixels.data(), mWidth, mHeight, 8, mWidth * 4, colorSpace,
       kCGImageAlphaPremultipliedLast);
 
    if (ctx != nullptr)
    {
       if (fontName.empty())
          fontName = AvailableFonts().front();
-
-      CFStringRef cfFontName = MakeCFString(fontName);
-      CFRelease(cfFontName);
 
       CGColorRef fillColor = CGColorCreateGenericRGB(color[0], color[1], color[2], 1.0);
       CGColorRef strokeColor = CGColorCreateGenericRGB(outlineColor[0], outlineColor[1], outlineColor[2], 1.0);
@@ -215,18 +249,31 @@ void TextNode::CookIfNeeded(int frameId)
 
    // CGBitmapContext writes its top row first; GL treats row 0 as the bottom.
    // Reverse the rows so text matches the orientation of every FBO-backed node.
+   // (Flipping the CTM instead would avoid this memcpy, but that changes glyph
+   // orientation handling in ways not obviously correct - keep the flip.)
    const int stride = mWidth * 4;
-   std::vector<unsigned char> flipped(pixels.size());
+   mFlipped.resize(mPixels.size());
    for (int y = 0; y < mHeight; y++)
-      memcpy(&flipped[y * stride], &pixels[(mHeight - 1 - y) * stride], stride);
+      memcpy(&mFlipped[y * stride], &mPixels[(mHeight - 1 - y) * stride], stride);
 
    if (mTex == 0)
       glGenTextures(1, &mTex);
    glBindTexture(GL_TEXTURE_2D, mTex);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, mWidth, mHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, flipped.data());
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   if (mUploadedWidth == mWidth && mUploadedHeight == mHeight)
+   {
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mWidth, mHeight, GL_RGBA, GL_UNSIGNED_BYTE, mFlipped.data());
+   }
+   else
+   {
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, mWidth, mHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, mFlipped.data());
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      mUploadedWidth = mWidth;
+      mUploadedHeight = mHeight;
+   }
    glBindTexture(GL_TEXTURE_2D, 0);
+
+   mRevision = NextTextureRevision();
 }
