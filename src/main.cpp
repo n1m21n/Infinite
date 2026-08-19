@@ -53,6 +53,8 @@
 #include "core/NodeViewport.h"
 #include "core/AudioCable.h"
 #include "core/NoteCable.h"
+#include "core/RemoteControl.h"
+#include "core/PatchJson.h"
 #include "nodes/ImageSourceNode.h"
 #include "nodes/ShapeNode.h"
 #include "nodes/FormulaNode.h"
@@ -90,6 +92,7 @@
 #include "nodes/SwitcherNode.h"
 #include "nodes/Switcher3DNode.h"
 #include "nodes/ModulatorNodes.h"
+#include "nodes/OscNodes.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
 #include "nodes/SyphonInNode.h"
@@ -2464,6 +2467,8 @@ namespace
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
+      REGISTER_NODE(OscReceiveNode, OSC Receive, "OSC");
+      REGISTER_NODE(OscSendNode, OSC Send, "OSC");
 
       // P2 audio-graph proof nodes - see docs/plans/audio/README.md P2.
       // Category deliberately "AudioUtility" not "Audio Utility": Patch.cpp's
@@ -3166,6 +3171,68 @@ namespace
       return false;
    }
 
+   // Headless equivalent of the ed::QueryNewLink handler's connect-acceptance
+   // path (below, in the main editor draw loop) - same validity checks and
+   // wiring calls, extracted so RemoteControl's `connect` RPC can wire an
+   // ordinary input slot (image/geometry/audio/note/modulator/palette-color)
+   // without going through the imgui-node-editor UI at all. Deliberately
+   // scoped to plain input-slot connections only, matching the RPC's
+   // (srcIndex, srcOutputIndex, dstIndex, dstSlot) shape - it does not cover
+   // binding a modulator into a param pin or a palette into a swatch pin,
+   // since those need a param/color pin index rather than a plain input
+   // slot; that's left for a future RPC method if it's ever needed.
+   bool ConnectNodes(int srcIndex, int srcOutputIndex, int dstIndex, int dstSlot, std::string& outError)
+   {
+      GraphNode* srcNode = FindNodeByIndex(srcIndex);
+      GraphNode* dstNode = FindNodeByIndex(dstIndex);
+      if (srcNode == nullptr || dstNode == nullptr)
+      {
+         outError = "unknown node index";
+         return false;
+      }
+      if (srcNode == dstNode)
+      {
+         outError = "cannot connect a node to itself";
+         return false;
+      }
+
+      const bool srcIsModulator = dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr ||
+                                   ModulatorForOutput(srcNode->node.get(), srcOutputIndex) != nullptr;
+      auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode->node.get());
+      auto* srcAudioFile = dynamic_cast<AudioFileNode*>(srcNode->node.get());
+      auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode->node.get());
+      auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
+      auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
+      const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
+      const bool srcIsAudioNode = dynamic_cast<IAudioSource*>(srcNode->node.get()) != nullptr;
+      const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
+
+      if (!IsInputSlotCompatible(dstNode, dstSlot, srcIsModulator, srcPalette, srcGeometry, srcCamera,
+                                  srcLight, srcAudioFile, srcIsEnvironment, srcIsAudioNode, srcIsNoteSource))
+      {
+         outError = "incompatible source/destination for this slot";
+         return false;
+      }
+      if (srcIsAudioNode && WouldCreateAudioCycle(srcNode->node.get(), dstNode->node.get()))
+      {
+         outError = "would create an audio feedback loop";
+         return false;
+      }
+      if (srcIsNoteSource && WouldCreateNoteCycle(srcNode->node.get(), dstNode->node.get()))
+      {
+         outError = "would create a note feedback loop";
+         return false;
+      }
+
+      PushUndoCheckpoint();
+      WireInputSlot(*srcNode, *dstNode, dstSlot, srcOutputIndex);
+      if (srcIsAudioNode || srcIsNoteSource ||
+          dstNode->node->AudioInputSlot(dstSlot) != nullptr ||
+          dstNode->node->NoteInputSlot(dstSlot) != nullptr)
+         RebuildAudioTopology();
+      return true;
+   }
+
    // Node types worth suggesting first in the search popup when a cable was
    // dragged out of `srcNode`'s output and dropped on empty canvas: every
    // registered, user-spawnable type that has at least one input slot
@@ -3471,6 +3538,29 @@ namespace
       }
    }
 
+   void DrawOscReceiveParams(OscReceiveNode* n)
+   {
+      ModSliderInt("port", &n->port, 1, 65535);
+      ImGui::SetNextItemWidth(kParamWidth);
+      ImGui::InputText("address", &n->address);
+      ModSlider("low", &n->low, 0.0f, 1.0f);
+      ModSlider("high", &n->high, 0.0f, 1.0f);
+   }
+
+   void DrawOscSendParams(OscSendNode* n)
+   {
+      ImGui::SetNextItemWidth(kParamWidth);
+      ImGui::InputText("host", &n->host);
+      ModSliderInt("port", &n->port, 1, 65535);
+      ImGui::SetNextItemWidth(kParamWidth);
+      ImGui::InputText("address", &n->address);
+      ModSlider("epsilon", &n->epsilon, 0.0f, 0.1f, "%.4f");
+      ModSlider("interval (ms)", &n->intervalMs, 1.0f, 1000.0f, "%.0f");
+      if (n->LastSent() < 0.0f)
+         ImGui::TextDisabled("not sent yet");
+      else
+         ImGui::TextDisabled("last sent: %.3f", n->LastSent());
+   }
 
    void DrawEnvironmentParams(EnvironmentNode* n)
    {
@@ -16061,6 +16151,10 @@ namespace
          { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
          { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
 
+         // ---------------- OSC ----------------
+         { "OSC Receive", "Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin." },
+         { "OSC Send", "Sends its patched modulator input as an Open Sound Control message (address + float) to a host:port over UDP, on change (past an epsilon) or at least every interval - the one node in the patch with no output of its own." },
+
          // ---------------- 3D / geometry pipeline ----------------
          { "Geometry", "The base 3D primitive node - pick any of its 24 shapes from the dropdown. Each shape also has its own directly-spawnable named node (Cube, Sphere, Torus, ...) that just starts on that shape." },
          { "Text 3D", "Extrudes text into a 3D mesh, with depth, bevel and letter tracking, using any font installed on the system." },
@@ -16252,6 +16346,7 @@ namespace
       if (category == "3D") return "Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights.";
       if (category == "Notes") return "Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.";
       if (category == "Output") return "Terminal node: shows, exports or records the final result.";
+      if (category == "OSC") return "Sends or receives Open Sound Control messages over UDP to talk to other apps (TouchDesigner, Max, lighting rigs). Loopback/LAN only.";
       return "No additional notes for this node.";
    }
 
@@ -16444,6 +16539,10 @@ namespace
                { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
                { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
                { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
+            } },
+            { "OSC", {
+               { "OSC Receive", "Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin." },
+               { "OSC Send", "Sends its patched modulator input as an Open Sound Control message (address + float) to a host:port over UDP, on change (past an epsilon) or at least every interval - the one node in the patch with no output of its own." },
             } },
          };
 
@@ -17403,6 +17502,248 @@ namespace
       ApplyPatchData(next);
       gPatchDirty = true;
       gPatchStatus = "Redo";
+   }
+
+   // Dispatches one RemoteControl JSON-RPC request. Runs on the main thread,
+   // once per frame per pending command (see RemoteControl::DrainPending's
+   // call site, right after glfwPollEvents()) - so every case here is free to
+   // touch gNodes/gEditor/etc exactly as the normal UI code does. Returns
+   // false with outError set on any failure; RemoteControl wraps that into a
+   // JSON-RPC error reply.
+   bool HandleRpcCommand(const std::string& method, const nlohmann::json& params,
+                         nlohmann::json& outResult, std::string& outError)
+   {
+      using json = nlohmann::json;
+
+      if (method == "list_node_types")
+      {
+         json categories = json::object();
+         for (const std::string& cat : NodeFactory::Instance().GetCategories())
+         {
+            json names = json::array();
+            for (const std::string& n : NodeFactory::Instance().GetNodesInCategory(cat))
+               names.push_back(n);
+            categories[cat] = names;
+         }
+         outResult = categories;
+         return true;
+      }
+      else if (method == "create_node")
+      {
+         const std::string typeName = params.value("typeName", std::string());
+         const std::string category = params.value("category", std::string());
+         const float x = params.value("x", 0.0f);
+         const float y = params.value("y", 0.0f);
+         GraphNode* gn = SpawnNode(typeName, category, x, y);
+         if (gn == nullptr)
+         {
+            outError = "unknown node type '" + typeName + "'";
+            return false;
+         }
+         outResult = { {"index", gn->index} };
+         return true;
+      }
+      else if (method == "delete_node")
+      {
+         const int index = params.value("index", -1);
+         if (FindNodeByIndex(index) == nullptr)
+         {
+            outError = "unknown node index";
+            return false;
+         }
+         RemoveNodeByIndex(index);
+         outResult = json::object();
+         return true;
+      }
+      else if (method == "connect")
+      {
+         const int srcIndex = params.value("srcIndex", -1);
+         const int srcOutput = params.value("srcOutput", 0);
+         const int dstIndex = params.value("dstIndex", -1);
+         const int dstSlot = params.value("dstSlot", -1);
+         if (!ConnectNodes(srcIndex, srcOutput, dstIndex, dstSlot, outError))
+            return false;
+         outResult = json::object();
+         return true;
+      }
+      else if (method == "disconnect")
+      {
+         const int linkId = params.value("linkId", -1);
+         if (FindLink(linkId) == nullptr)
+         {
+            outError = "unknown link id";
+            return false;
+         }
+         PushUndoCheckpoint();
+         DisconnectLinkById(linkId);
+         outResult = json::object();
+         return true;
+      }
+      else if (method == "get_graph")
+      {
+         json out = PatchJson::ToJson(BuildPatchData());
+         // Patch::Data's cable records carry endpoints but no link id, since
+         // ids are a live editor concept and never hit the patch file. The
+         // disconnect() method needs one, so publish gLinks alongside the
+         // patch, with each pin decoded back to a node index + slot/output.
+         json links = json::array();
+         for (const LinkInfo& link : gLinks)
+         {
+            json entry = { {"id", link.id} };
+            entry["srcIndex"] = GraphNode::NodeIndexFromPin(link.srcPin);
+            entry["srcOutput"] = GraphNode::IsOutputPin(link.srcPin)
+                                    ? GraphNode::OutputIndexFromPin(link.srcPin)
+                                    : 0;
+            entry["dstIndex"] = GraphNode::NodeIndexFromPin(link.dstPin);
+            const int dstOff = GraphNode::OffsetFromPin(link.dstPin);
+            if (GraphNode::IsParamPin(link.dstPin))
+               entry["dstParamPin"] = dstOff - GraphNode::kParamBase;
+            else if (GraphNode::IsColorPin(link.dstPin))
+               entry["dstColorPin"] = GraphNode::ColorIndexFromPin(link.dstPin);
+            else
+               entry["dstSlot"] = dstOff - 1;
+            links.push_back(entry);
+         }
+         out["links"] = links;
+         outResult = out;
+         return true;
+      }
+      else if (method == "get_params")
+      {
+         const int index = params.value("index", -1);
+         GraphNode* gn = FindNodeByIndex(index);
+         if (gn == nullptr)
+         {
+            outError = "unknown node index";
+            return false;
+         }
+         std::vector<std::pair<std::string, std::string>> raw;
+         Patch::SaveParams(gn->node.get(), raw);
+         json out = json::object();
+         for (const auto& kv : raw)
+            out[kv.first] = kv.second;
+         outResult = out;
+         return true;
+      }
+      else if (method == "set_param")
+      {
+         const int index = params.value("index", -1);
+         const std::string name = params.value("name", std::string());
+         GraphNode* gn = FindNodeByIndex(index);
+         if (gn == nullptr)
+         {
+            outError = "unknown node index";
+            return false;
+         }
+         // Params are keyed "<type letter> <name>" (Patch.h's f/i/b/c/s
+         // convention) - find the existing key for `name` so we replay it
+         // with the right type letter rather than guessing one.
+         std::vector<std::pair<std::string, std::string>> raw;
+         Patch::SaveParams(gn->node.get(), raw);
+         std::string matchedKey;
+         for (const auto& kv : raw)
+         {
+            const size_t sp = kv.first.find(' ');
+            if (sp != std::string::npos && kv.first.substr(sp + 1) == name)
+            {
+               matchedKey = kv.first;
+               break;
+            }
+         }
+         if (matchedKey.empty())
+         {
+            outError = "unknown param '" + name + "' on this node";
+            return false;
+         }
+         std::string valueStr;
+         if (params.contains("value"))
+         {
+            const json& v = params["value"];
+            if (v.is_string())
+               valueStr = v.get<std::string>();
+            else
+               valueStr = v.dump();
+         }
+         PushUndoCheckpoint();
+         Patch::LoadParams(gn->node.get(), { { matchedKey, valueStr } });
+         outResult = json::object();
+         return true;
+      }
+      else if (method == "set_node_position" || method == "get_node_position")
+      {
+         const int index = params.value("index", -1);
+         GraphNode* gn = FindNodeByIndex(index);
+         if (gn == nullptr)
+         {
+            outError = "unknown node index";
+            return false;
+         }
+         ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
+         if (method == "set_node_position")
+         {
+            const float x = params.value("x", 0.0f);
+            const float y = params.value("y", 0.0f);
+            ed::SetNodePosition(gn->NodeId(), ImVec2(x, y));
+            outResult = json::object();
+         }
+         else
+         {
+            const ImVec2 p = ed::GetNodePosition(gn->NodeId());
+            outResult = { {"x", p.x}, {"y", p.y} };
+         }
+         ed::SetCurrentEditor(prevEditor);
+         return true;
+      }
+      else if (method == "fit_view")
+      {
+         gRequestFitView = true;
+         outResult = json::object();
+         return true;
+      }
+      else if (method == "save_patch")
+      {
+         const std::string path = params.value("path", std::string());
+         if (!SavePatchTo(path))
+         {
+            outError = gPatchStatus;
+            return false;
+         }
+         outResult = json::object();
+         return true;
+      }
+      else if (method == "load_patch")
+      {
+         const std::string path = params.value("path", std::string());
+         if (!LoadPatchFrom(path))
+         {
+            outError = gPatchStatus;
+            return false;
+         }
+         outResult = json::object();
+         return true;
+      }
+      else if (method == "new_patch")
+      {
+         NewPatch();
+         outResult = json::object();
+         return true;
+      }
+      else if (method == "undo")
+      {
+         Undo();
+         outResult = json::object();
+         return true;
+      }
+      else if (method == "redo")
+      {
+         Redo();
+         outResult = json::object();
+         return true;
+      }
+
+      outError = "unknown method '" + method + "'";
+      return false;
    }
 
    // Drawn inside the ed::Suspend() block alongside the popups, so plain
@@ -23258,6 +23599,16 @@ int main(int argc, char** argv)
    RegisterNodes();
    ApplyTheme();
 
+   // Embedded local control server (see docs/plans - RemoteControl) - lets an
+   // external tool (the Infinite MCP server) drive this running instance.
+   // Loopback-only; port overridable for running more than one instance.
+   {
+      int controlPort = 7777;
+      if (const char* portEnv = getenv("INFINITE_CONTROL_PORT"))
+         controlPort = atoi(portEnv);
+      RemoteControl::Start(controlPort);
+   }
+
    // The audio engine no longer auto-starts at launch: someone opening the
    // app to work on visuals shouldn't have audio hardware opened out from
    // under them. It's started explicitly from the toolbar's Audio toggle
@@ -23308,7 +23659,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_MODTEST") != nullptr ||
          getenv("INFINITE_SIZETEST") != nullptr || getenv("INFINITE_INPUTTEST") != nullptr ||
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
-         getenv("INFINITE_PICKERTEST") != nullptr;
+         getenv("INFINITE_PICKERTEST") != nullptr || getenv("INFINITE_OSCTEST") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
       {
@@ -24702,6 +25053,20 @@ int main(int argc, char** argv)
             SpawnNode("Macro XY", "Modulators", 60.0f, 500.0f);
             gNodes[0].showParams = true;
          }
+         if (getenv("INFINITE_OSCTEST") != nullptr)
+         {
+            // Constant -> OSC Send -> (UDP, loopback) -> OSC Receive, proving a
+            // round trip through the actual wire format rather than just
+            // exercising the C++ classes in isolation.
+            SpawnNode("Constant", "Modulators", 60.0f, 500.0f);   // gNodes[2]
+            SpawnNode("OSC Send", "OSC", 300.0f, 500.0f);         // gNodes[3]
+            SpawnNode("OSC Receive", "OSC", 540.0f, 500.0f);      // gNodes[4]
+            gNodes[2].showParams = true;
+            gNodes[3].showParams = true;
+            gNodes[4].showParams = true;
+            std::string wireErr;
+            ConnectNodes(gNodes[2].index, 0, gNodes[3].index, 0, wireErr);
+         }
       }
    }
 
@@ -24743,6 +25108,10 @@ int main(int argc, char** argv)
    {
       gFrameStart = glfwGetTime();
       glfwPollEvents();
+
+      // Apply any RemoteControl RPC requests queued by the network thread
+      // since last frame, before any ed:: drawing reads the graph this frame.
+      RemoteControl::DrainPending(HandleRpcCommand);
 
       std::string pendingOpenPatch;
       while (Platform::PollPendingOpenFile(pendingOpenPatch))
@@ -31703,6 +32072,10 @@ int main(int argc, char** argv)
             {
                ModSlider("value", &n->value, 0.0f, 1.0f);
             }
+            else if (auto* n = dynamic_cast<OscReceiveNode*>(gn.node.get()))
+               DrawOscReceiveParams(n);
+            else if (auto* n = dynamic_cast<OscSendNode*>(gn.node.get()))
+               DrawOscSendParams(n);
             else if (auto* n = dynamic_cast<MaterialNode*>(gn.node.get()))
                DrawMaterialParams(n);
             else if (auto* n = dynamic_cast<MappingNode*>(gn.node.get()))
@@ -34275,7 +34648,8 @@ int main(int argc, char** argv)
       for (GraphNode& gn : gNodes)
       {
          if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr ||
-             dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr)
+             dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr ||
+             dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
             gn.node->CookIfNeeded(frameId);
       }
       if (getenv("INFINITE_SHOWCASE") != nullptr && frameId == 1)
@@ -34409,6 +34783,40 @@ int main(int argc, char** argv)
          }
          if (frameId == 44)
             glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+
+      if (getenv("INFINITE_OSCTEST") != nullptr)
+      {
+         if (gNodes.size() < 5)
+         {
+            printf("OSCTEST fixture missing (%zu nodes)\n", gNodes.size());
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+            return 1;
+         }
+         auto* constNode = static_cast<ConstantNode*>(gNodes[2].node.get());
+         auto* send = static_cast<OscSendNode*>(gNodes[3].node.get());
+         auto* recv = static_cast<OscReceiveNode*>(gNodes[4].node.get());
+         if (frameId == 1)
+         {
+            // A dedicated port, not the 9000 default both nodes spawn with -
+            // proves the port field itself (and the receive listener restart
+            // it triggers) actually takes effect, not just the wiring.
+            const int testPort = 9737;
+            constNode->value = 0.73f;
+            send->host = "127.0.0.1";
+            send->port = testPort;
+            send->address = "/infinite/osctest";
+            recv->port = testPort;
+            recv->address = "/infinite/osctest";
+         }
+         if (frameId == 60)
+         {
+            const float got = recv->Value01();
+            const bool ok = std::fabs(got - constNode->value) < 0.02f;
+            printf("osc sent=%.3f received=%.3f  %s\n", constNode->value, got,
+                   ok ? "ROUND TRIP OK" : "BUG");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
       }
 
       for (GraphNode& gn : gNodes)

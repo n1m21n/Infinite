@@ -86,6 +86,9 @@ add_executable(Infinite MACOSX_BUNDLE
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp
+    src/core/RemoteControl.cpp
+    src/core/PatchJson.cpp
+    src/core/OscMessage.cpp
     src/platform/Platform.mm
     src/audio/AudioEngine.cpp
     src/audio/ParamMailbox.cpp
@@ -125,6 +128,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/FitNode.cpp
     src/nodes/VideoSourceNode.cpp
     src/nodes/ModulatorNodes.cpp
+    src/nodes/OscNodes.cpp
     src/nodes/NoiseNode.cpp
     src/nodes/TextureNode.cpp
     src/nodes/ResynthNode.cpp
@@ -199,6 +203,7 @@ target_include_directories(Infinite PRIVATE
     ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
     ${STB_DIR}
+    external/json
     external/shine
     ${SYPHON_DIR}/include
     ${SYPHON_DIR}/src
