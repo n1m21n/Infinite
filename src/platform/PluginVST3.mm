@@ -4,16 +4,27 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cerrno>
+#include <csetjmp>
+#include <chrono>
+#include <crt_externs.h> // _NSGetEnviron
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <filesystem>
+#include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <signal.h>
+#include <spawn.h>
 #include <string>
+#include <sys/select.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
@@ -323,6 +334,172 @@ namespace Platform
       std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
       gScanFailures.push_back(bundlePath);
    }
+
+   // Adds a bundle to the persisted blocklist immediately, in the same scan
+   // that caught it crashing/hanging - unlike the sentinel path above (which
+   // only catches a crash on the *next* launch), this fires the moment
+   // ProbeVST3BundleOutOfProcess sees a dead or unresponsive child.
+   void AddToBlocklistLocked(const std::string& bundlePath)
+   {
+      LoadBlocklistLocked();
+      if (std::find(gBlocklist.begin(), gBlocklist.end(), bundlePath) == gBlocklist.end())
+      {
+         gBlocklist.push_back(bundlePath);
+         SaveBlocklistLocked();
+      }
+   }
+
+   // ------------------------------------------------------------------------
+   // Out-of-process bundle probing
+   //
+   // DescribeVST3Bundle runs arbitrary third-party code in-process and is only
+   // safe to call directly from the "--vst3-scan-bundle" child mode in
+   // main.cpp (see its comment), where a crash costs one disposable process.
+   // EnumerateVST3Plugins below re-execs this binary once per bundle instead
+   // of calling DescribeVST3Bundle itself, so a crashing or hanging plugin
+   // never takes the scan - or the app - down with it.
+   // ------------------------------------------------------------------------
+
+   enum class ProbeOutcome
+   {
+      Success,   // child exited cleanly and described at least one class
+      CleanMiss, // child exited cleanly but found nothing usable - not a crash
+      Crashed,   // child was killed by a signal, exited nonzero, or hung
+   };
+
+   std::vector<Platform::PluginDesc> ParseProbeOutput(const std::string& output)
+   {
+      std::vector<Platform::PluginDesc> out;
+      size_t pos = 0;
+      while (pos < output.size())
+      {
+         size_t nl = output.find('\n', pos);
+         const std::string line = output.substr(pos, nl == std::string::npos ? std::string::npos : nl - pos);
+         pos = (nl == std::string::npos) ? output.size() : nl + 1;
+         if (line.empty())
+            continue;
+
+         std::vector<std::string> fields;
+         size_t p = 0;
+         while (true)
+         {
+            size_t tab = line.find('\t', p);
+            fields.push_back(line.substr(p, tab == std::string::npos ? std::string::npos : tab - p));
+            if (tab == std::string::npos)
+               break;
+            p = tab + 1;
+         }
+         if (fields.size() != 6)
+            continue;
+
+         Platform::PluginDesc d;
+         d.format = fields[0];
+         d.name = fields[1];
+         d.manufacturer = fields[2];
+         d.identifier = fields[3];
+         d.path = fields[4];
+         d.acceptsNotes = fields[5] == "1";
+         out.push_back(std::move(d));
+      }
+      return out;
+   }
+
+   ProbeOutcome ProbeVST3BundleOutOfProcess(const std::string& bundlePath, std::vector<Platform::PluginDesc>& out)
+   {
+      const std::string exe = Platform::ExecutablePath();
+      if (exe.empty())
+         return ProbeOutcome::Crashed; // can't self-exec - treat like any other probe failure
+
+      int pipeFds[2];
+      if (pipe(pipeFds) != 0)
+         return ProbeOutcome::Crashed;
+
+      posix_spawn_file_actions_t actions;
+      posix_spawn_file_actions_init(&actions);
+      posix_spawn_file_actions_adddup2(&actions, pipeFds[1], STDOUT_FILENO);
+      posix_spawn_file_actions_addclose(&actions, pipeFds[0]);
+      posix_spawn_file_actions_addclose(&actions, pipeFds[1]);
+      // Third-party plugin code prints whatever it wants on stderr; the scan
+      // has nowhere useful to put that, so it goes to /dev/null.
+      posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
+
+      char argv0[] = "Infinite";
+      char flag[] = "--vst3-scan-bundle";
+      std::vector<char> pathBuf(bundlePath.begin(), bundlePath.end());
+      pathBuf.push_back('\0');
+      char* childArgv[] = { argv0, flag, pathBuf.data(), nullptr };
+
+      pid_t pid = 0;
+      const int rc = posix_spawn(&pid, exe.c_str(), &actions, nullptr, childArgv, *_NSGetEnviron());
+      posix_spawn_file_actions_destroy(&actions);
+      close(pipeFds[1]);
+      if (rc != 0)
+      {
+         close(pipeFds[0]);
+         return ProbeOutcome::Crashed;
+      }
+
+      // A hung plugin (e.g. blocked in a static initialiser) must not stall
+      // the whole scan - give it a generous window, then kill it and treat it
+      // exactly like a crash.
+      std::string output;
+      char buf[4096];
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+      bool timedOut = false;
+      for (;;)
+      {
+         const auto remaining = deadline - std::chrono::steady_clock::now();
+         if (remaining.count() <= 0)
+         {
+            timedOut = true;
+            break;
+         }
+         fd_set fds;
+         FD_ZERO(&fds);
+         FD_SET(pipeFds[0], &fds);
+         timeval tv;
+         tv.tv_sec = (long)std::chrono::duration_cast<std::chrono::seconds>(remaining).count();
+         tv.tv_usec = (long)(std::chrono::duration_cast<std::chrono::microseconds>(remaining).count() % 1000000);
+         const int sel = select(pipeFds[0] + 1, &fds, nullptr, nullptr, &tv);
+         if (sel < 0 && errno == EINTR)
+            continue;
+         if (sel <= 0)
+         {
+            timedOut = (sel == 0);
+            break;
+         }
+         const ssize_t n = read(pipeFds[0], buf, sizeof(buf));
+         if (n <= 0)
+            break; // EOF: child closed stdout, i.e. it exited
+         output.append(buf, (size_t)n);
+      }
+      close(pipeFds[0]);
+
+      if (timedOut)
+      {
+         VST3Trace("bundle timed out during out-of-process probe: %s", bundlePath.c_str());
+         kill(pid, SIGKILL);
+         int status = 0;
+         waitpid(pid, &status, 0);
+         return ProbeOutcome::Crashed;
+      }
+
+      int status = 0;
+      waitpid(pid, &status, 0);
+      if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+      {
+         VST3Trace("bundle crashed during out-of-process probe: %s", bundlePath.c_str());
+         return ProbeOutcome::Crashed;
+      }
+
+      std::vector<Platform::PluginDesc> parsed = ParseProbeOutput(output);
+      if (parsed.empty())
+         return ProbeOutcome::CleanMiss;
+
+      for (Platform::PluginDesc& d : parsed)
+         out.push_back(std::move(d));
+      return ProbeOutcome::Success;
+   }
 }
 
 namespace Platform
@@ -490,17 +667,246 @@ namespace
          return Steinberg::kResultOk;
       }
 
-      Steinberg::tresult PLUGIN_API createInstance(Steinberg::TUID cid, Steinberg::TUID _iid, void** obj) override
-      {
-         (void)cid;
-         (void)_iid;
-         *obj = nullptr;
-         return Steinberg::kNoInterface;
-      }
+      Steinberg::tresult PLUGIN_API createInstance(Steinberg::TUID cid, Steinberg::TUID _iid, void** obj) override;
 
    private:
       std::atomic<uint32_t> mRefCount { 1 };
    };
+
+   // ------------------------------------------------------------------------
+   // Host-created message objects (IMessage / IAttributeList)
+   //
+   // These are the only way a VST3 processor and its edit controller exchange
+   // anything beyond a plain parameter value: ComponentBase::allocateMessage()
+   // calls straight through IHostApplication::createInstance(). Big synths
+   // (wavetable/spectrum displays, voice counts, sample loading) ride on this;
+   // simple parameter-only effects never touch it, which is why only the
+   // former broke while this was stubbed. A processor can allocate and send
+   // one from the audio thread, so both classes below avoid locks and heap
+   // work beyond what the call itself requires.
+   // ------------------------------------------------------------------------
+
+   class HostAttributeList : public Steinberg::Vst::IAttributeList
+   {
+   public:
+      using AttrID = Steinberg::Vst::IAttributeList::AttrID;
+
+      Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid, void** obj) override
+      {
+         if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::Vst::IAttributeList::iid) ||
+             Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid))
+         {
+            addRef();
+            *obj = this;
+            return Steinberg::kResultOk;
+         }
+         *obj = nullptr;
+         return Steinberg::kNoInterface;
+      }
+
+      Steinberg::uint32 PLUGIN_API addRef() override { return ++mRefCount; }
+      Steinberg::uint32 PLUGIN_API release() override
+      {
+         if (--mRefCount == 0)
+         {
+            delete this;
+            return 0;
+         }
+         return mRefCount;
+      }
+
+      Steinberg::tresult PLUGIN_API setInt(AttrID aid, Steinberg::int64 value) override
+      {
+         if (!aid)
+            return Steinberg::kInvalidArgument;
+         Attribute a;
+         a.type = Attribute::Type::kInt;
+         a.intValue = value;
+         mAttrs[aid] = std::move(a);
+         return Steinberg::kResultTrue;
+      }
+
+      Steinberg::tresult PLUGIN_API getInt(AttrID aid, Steinberg::int64& value) override
+      {
+         if (!aid)
+            return Steinberg::kInvalidArgument;
+         auto it = mAttrs.find(aid);
+         if (it == mAttrs.end() || it->second.type != Attribute::Type::kInt)
+            return Steinberg::kResultFalse;
+         value = it->second.intValue;
+         return Steinberg::kResultTrue;
+      }
+
+      Steinberg::tresult PLUGIN_API setFloat(AttrID aid, double value) override
+      {
+         if (!aid)
+            return Steinberg::kInvalidArgument;
+         Attribute a;
+         a.type = Attribute::Type::kFloat;
+         a.floatValue = value;
+         mAttrs[aid] = std::move(a);
+         return Steinberg::kResultTrue;
+      }
+
+      Steinberg::tresult PLUGIN_API getFloat(AttrID aid, double& value) override
+      {
+         if (!aid)
+            return Steinberg::kInvalidArgument;
+         auto it = mAttrs.find(aid);
+         if (it == mAttrs.end() || it->second.type != Attribute::Type::kFloat)
+            return Steinberg::kResultFalse;
+         value = it->second.floatValue;
+         return Steinberg::kResultTrue;
+      }
+
+      Steinberg::tresult PLUGIN_API setString(AttrID aid, const Steinberg::Vst::TChar* string) override
+      {
+         if (!aid)
+            return Steinberg::kInvalidArgument;
+         Attribute a;
+         a.type = Attribute::Type::kString;
+         if (string != nullptr)
+         {
+            size_t len = 0;
+            while (string[len] != 0)
+               len++;
+            a.stringValue.assign(string, string + len);
+         }
+         a.stringValue.push_back(0); // null-terminate, per spec
+         mAttrs[aid] = std::move(a);
+         return Steinberg::kResultTrue;
+      }
+
+      Steinberg::tresult PLUGIN_API getString(AttrID aid, Steinberg::Vst::TChar* string, Steinberg::uint32 sizeInBytes) override
+      {
+         if (!aid)
+            return Steinberg::kInvalidArgument;
+         auto it = mAttrs.find(aid);
+         if (it == mAttrs.end() || it->second.type != Attribute::Type::kString)
+            return Steinberg::kResultFalse;
+         const size_t haveBytes = it->second.stringValue.size() * sizeof(Steinberg::Vst::TChar);
+         const size_t copyBytes = std::min<size_t>(haveBytes, sizeInBytes);
+         std::memcpy(string, it->second.stringValue.data(), copyBytes);
+         return Steinberg::kResultTrue;
+      }
+
+      Steinberg::tresult PLUGIN_API setBinary(AttrID aid, const void* data, Steinberg::uint32 sizeInBytes) override
+      {
+         if (!aid)
+            return Steinberg::kInvalidArgument;
+         Attribute a;
+         a.type = Attribute::Type::kBinary;
+         const uint8_t* p = static_cast<const uint8_t*>(data);
+         a.binaryValue.assign(p, p + sizeInBytes);
+         mAttrs[aid] = std::move(a);
+         return Steinberg::kResultTrue;
+      }
+
+      Steinberg::tresult PLUGIN_API getBinary(AttrID aid, const void*& data, Steinberg::uint32& sizeInBytes) override
+      {
+         if (!aid)
+         {
+            sizeInBytes = 0;
+            return Steinberg::kInvalidArgument;
+         }
+         auto it = mAttrs.find(aid);
+         if (it == mAttrs.end() || it->second.type != Attribute::Type::kBinary)
+         {
+            sizeInBytes = 0;
+            return Steinberg::kResultFalse;
+         }
+         // Pointer stays valid until this attribute is next overwritten or
+         // this list is destroyed - it points into storage we own.
+         data = it->second.binaryValue.data();
+         sizeInBytes = (Steinberg::uint32)it->second.binaryValue.size();
+         return Steinberg::kResultTrue;
+      }
+
+   private:
+      struct Attribute
+      {
+         enum class Type { kInt, kFloat, kString, kBinary } type = Type::kInt;
+         Steinberg::int64 intValue = 0;
+         double floatValue = 0.0;
+         std::vector<Steinberg::Vst::TChar> stringValue;
+         std::vector<uint8_t> binaryValue;
+      };
+
+      std::atomic<uint32_t> mRefCount { 1 };
+      std::map<std::string, Attribute> mAttrs;
+   };
+
+   class HostMessage : public Steinberg::Vst::IMessage
+   {
+   public:
+      Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid, void** obj) override
+      {
+         if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::Vst::IMessage::iid) ||
+             Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid))
+         {
+            addRef();
+            *obj = this;
+            return Steinberg::kResultOk;
+         }
+         *obj = nullptr;
+         return Steinberg::kNoInterface;
+      }
+
+      Steinberg::uint32 PLUGIN_API addRef() override { return ++mRefCount; }
+      Steinberg::uint32 PLUGIN_API release() override
+      {
+         if (--mRefCount == 0)
+         {
+            delete this;
+            return 0;
+         }
+         return mRefCount;
+      }
+
+      Steinberg::FIDString PLUGIN_API getMessageID() override
+      {
+         return mMessageId.empty() ? nullptr : mMessageId.c_str();
+      }
+
+      void PLUGIN_API setMessageID(Steinberg::FIDString mid) override
+      {
+         mMessageId = (mid != nullptr) ? mid : "";
+      }
+
+      Steinberg::Vst::IAttributeList* PLUGIN_API getAttributes() override
+      {
+         // Must never return null - a plugin dereferencing this result
+         // unchecked is itself a likely crash source, so this list is
+         // created eagerly on first access and owned for the message's
+         // whole lifetime.
+         if (!mAttributes)
+            mAttributes = Steinberg::owned(new HostAttributeList());
+         return mAttributes.get();
+      }
+
+   private:
+      std::atomic<uint32_t> mRefCount { 1 };
+      std::string mMessageId;
+      Steinberg::IPtr<Steinberg::Vst::IAttributeList> mAttributes;
+   };
+
+   Steinberg::tresult PLUGIN_API HostApplication::createInstance(Steinberg::TUID cid, Steinberg::TUID _iid, void** obj)
+   {
+      if (Steinberg::FUnknownPrivate::iidEqual(cid, Steinberg::Vst::IMessage::iid) &&
+          Steinberg::FUnknownPrivate::iidEqual(_iid, Steinberg::Vst::IMessage::iid))
+      {
+         *obj = new HostMessage();
+         return Steinberg::kResultTrue;
+      }
+      if (Steinberg::FUnknownPrivate::iidEqual(cid, Steinberg::Vst::IAttributeList::iid) &&
+          Steinberg::FUnknownPrivate::iidEqual(_iid, Steinberg::Vst::IAttributeList::iid))
+      {
+         *obj = new HostAttributeList();
+         return Steinberg::kResultTrue;
+      }
+      *obj = nullptr;
+      return Steinberg::kNoInterface;
+   }
 
    // One host context for the whole process, deliberately never destroyed: it
    // is handed to plugin factories via IPluginFactory3::setHostContext and to
@@ -811,6 +1217,49 @@ namespace
       std::atomic<uint32_t> mRefCount { 1 };
       Platform::PluginHandle* mHandle = nullptr;
    };
+
+   // ------------------------------------------------------------------------
+   // Host-side IPlugFrame - required so a plugin's resizable GUI can ask us
+   // to resize its window. Without this, resizeView() has no host object to
+   // call, and a resizable-GUI plugin either can't resize or crashes trying.
+   // ------------------------------------------------------------------------
+   class HostPlugFrame : public Steinberg::IPlugFrame
+   {
+   public:
+      explicit HostPlugFrame(Platform::PluginHandle* handle) : mHandle(handle) {}
+
+      Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid, void** obj) override
+      {
+         if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::IPlugFrame::iid) ||
+             Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid))
+         {
+            addRef();
+            *obj = this;
+            return Steinberg::kResultOk;
+         }
+         *obj = nullptr;
+         return Steinberg::kNoInterface;
+      }
+
+      Steinberg::uint32 PLUGIN_API addRef() override { return ++mRefCount; }
+      Steinberg::uint32 PLUGIN_API release() override
+      {
+         if (--mRefCount == 0)
+         {
+            delete this;
+            return 0;
+         }
+         return mRefCount;
+      }
+
+      Steinberg::tresult PLUGIN_API resizeView(Steinberg::IPlugView* view, Steinberg::ViewRect* newSize) override;
+
+      void detach() { mHandle = nullptr; }
+
+   private:
+      std::atomic<uint32_t> mRefCount { 1 };
+      Platform::PluginHandle* mHandle = nullptr;
+   };
 }
 
 namespace Platform
@@ -865,8 +1314,35 @@ namespace Platform
       std::atomic<bool> inRender { false };
       NSWindow* editorWindow = nil;
       InfinitePluginEditorDelegate* editorDelegate = nil;
+      Steinberg::IPtr<HostPlugFrame> plugFrame;
       std::atomic<bool> editorOpen { false };
+
+      // Set once a crash guard (see RunPluginCallGuarded) catches this
+      // instance segfaulting inside getState/setState. Further state calls
+      // are skipped outright rather than retried - a plugin whose state
+      // accessor crashed once has a real bug in it and isn't going to
+      // start working on the next undo checkpoint.
+      std::atomic<bool> stateCallsUnstable { false };
+
+      // Same idea for the editor: set once a crash guard catches this
+      // instance segfaulting inside createView/getSize/attached (seen live:
+      // Serum2 crashing deep in its own GUI init when its editor is opened).
+      // Independent from stateCallsUnstable - a plugin can have a broken
+      // editor and a perfectly fine getState(), or vice versa.
+      std::atomic<bool> editorUnstable { false };
    };
+
+   // Defined further down, alongside the rest of the crash-guard machinery;
+   // forward-declared here (inside the same unnamed namespace nested in
+   // Platform, which is shared across the whole translation unit) so it can
+   // be used ahead of that point - by PluginVST3Destroy below, and by
+   // HostPlugFrame::resizeView, which needs to call it but lives in a
+   // different (global-scope) unnamed namespace and so must reach this one
+   // through the qualified name Platform::RunPluginCallGuarded.
+   namespace
+   {
+      bool RunPluginCallGuarded(const char* what, PluginHandle* h, const std::function<void()>& fn);
+   }
 }
 
 namespace
@@ -879,6 +1355,38 @@ namespace
          return;
       mHandle->vst3->learnedAddress.store((unsigned long long)id, std::memory_order_relaxed);
       mHandle->vst3->learnedValid.store(true, std::memory_order_release);
+   }
+
+   Steinberg::tresult PLUGIN_API HostPlugFrame::resizeView(Steinberg::IPlugView* view, Steinberg::ViewRect* newSize)
+   {
+      if (mHandle == nullptr || mHandle->vst3 == nullptr || newSize == nullptr)
+         return Steinberg::kResultFalse;
+      Platform::PluginVST3State* v = mHandle->vst3;
+      // Editor may already be gone (window closed, or this call landed
+      // after teardown) - the plugin's timer can fire against
+      // half-torn-down state.
+      if (v->editorWindow == nil || v->plugView != view)
+         return Steinberg::kResultFalse;
+
+      NSWindow* window = v->editorWindow;
+      NSView* containerView = window.contentView;
+      const CGFloat width = (CGFloat)(newSize->right - newSize->left);
+      const CGFloat height = (CGFloat)(newSize->bottom - newSize->top);
+      if (width <= 0.0 || height <= 0.0)
+         return Steinberg::kResultFalse;
+
+      [containerView setFrameSize:NSMakeSize(width, height)];
+      NSRect frame = [window frameRectForContentRect:NSMakeRect(0, 0, width, height)];
+      [window setContentSize:frame.size];
+
+      // Per IPlugFrame::resizeView's own doc comment: the host must call
+      // IPlugView::onSize() after handling the resize.
+      if (!Platform::RunPluginCallGuarded("onSize", mHandle, [&] { view->onSize(newSize); }))
+      {
+         v->editorUnstable.store(true, std::memory_order_relaxed);
+         return Steinberg::kResultFalse;
+      }
+      return Steinberg::kResultTrue;
    }
 
    using GetPluginFactoryProc = Steinberg::IPluginFactory* (*)();
@@ -1016,9 +1524,19 @@ namespace Platform
                         VST3Trace("skipping blocklisted bundle: %s", bundlePath.c_str());
                         RecordScanFailure(bundlePath);
                      }
-                     else if (!DescribeVST3Bundle(bundlePath, out))
+                     else
                      {
-                        RecordScanFailure(bundlePath);
+                        const ProbeOutcome outcome = ProbeVST3BundleOutOfProcess(bundlePath, out);
+                        if (outcome == ProbeOutcome::Crashed)
+                        {
+                           RecordScanFailure(bundlePath);
+                           std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+                           AddToBlocklistLocked(bundlePath);
+                        }
+                        else if (outcome == ProbeOutcome::CleanMiss)
+                        {
+                           RecordScanFailure(bundlePath);
+                        }
                      }
                   }
                   else
@@ -1148,9 +1666,24 @@ namespace Platform
          return h;
       }
 
-      // Background instantiation, so a slow plugin never stalls a frame - the
-      // handle comes back Pending immediately and the node polls it.
-      dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      // Deferred but on the MAIN queue, not a background one. This used to be
+      // dispatch_get_global_queue() so a slow plugin never stalled a frame,
+      // but the VST3 module entry point/factory/createInstance are only
+      // guaranteed safe on the main thread - several real plugins create
+      // AppKit objects (a license/auth NSPanel, an eagerly-built editor,
+      // Qt's Cocoa integration) synchronously inside those calls, and doing
+      // that off the main thread is not a "maybe": it's a guaranteed abort
+      // for those plugins (seen live: Roland ZENOLOGY throws an NSException
+      // from -[NSPanel initWithContentRect:...] when created off-thread here,
+      // Native Instruments' Qt-based plugins hit a dispatch_assert_queue trap
+      // the same way). The handle still comes back Pending immediately and
+      // the node still polls it - glfwPollEvents drains the main queue every
+      // frame (same pattern already relied on for AU editor instantiation
+      // above), so this is still non-blocking for the caller. The actual
+      // instantiation now briefly blocks the UI thread while it runs, same
+      // as every other compliant VST3 host - that's the real, spec-required
+      // tradeoff, not a bug.
+      dispatch_async(dispatch_get_main_queue(), ^{
          // Use h->desc, not the `desc` reference parameter, from here on: `desc`
          // is only guaranteed valid for the synchronous portion of this call.
          // Its ultimate referent (e.g. the Plugins panel's gPluginDragDesc
@@ -1371,6 +1904,19 @@ namespace Platform
          v->pluginInChannels = inChannels;
          v->pluginOutChannels = outChannels;
 
+         // Every audio bus starts deactivated per the VST3 spec (see
+         // IComponent::activateBus) - a plugin is entitled to treat an
+         // inactive bus's buffers as silence and correctly ignore them.
+         // Lenient plugins (most JUCE-based ones) process anyway regardless
+         // of this call ever happening, which is how this went unnoticed;
+         // strict from-the-SDK plugins (FabFilter, and evidently some of
+         // Arturia's) honor it exactly, so without this they correctly
+         // produce/consume silence even though process() returns kResultOk.
+         if (inBusCount > 0)
+            v->component->activateBus(Steinberg::Vst::kAudio, Steinberg::Vst::kInput, 0, true);
+         if (outBusCount > 0)
+            v->component->activateBus(Steinberg::Vst::kAudio, Steinberg::Vst::kOutput, 0, true);
+
          Steinberg::Vst::ProcessSetup setup = {};
          setup.processMode = Steinberg::Vst::kRealtime;
          setup.symbolicSampleSize = Steinberg::Vst::kSample32;
@@ -1560,7 +2106,16 @@ namespace Platform
 
       PluginVST3State* v = h->vst3;
 
-      // Close editor window
+      // removed() must happen while the container view is still alive and
+      // attached - detach the plugin from its view first, only then tear
+      // down the window it was living in. (Guarded: a plugin whose editor
+      // already faulted once can fault again here.)
+      if (v->plugView)
+      {
+         RunPluginCallGuarded("removed", h, [&] { v->plugView->removed(); });
+         v->plugView = nullptr;
+      }
+
       if (v->editorWindow != nil)
       {
          NSWindow* win = v->editorWindow;
@@ -1571,10 +2126,10 @@ namespace Platform
          [win close];
       }
 
-      if (v->plugView)
+      if (v->plugFrame)
       {
-         v->plugView->removed();
-         v->plugView = nullptr;
+         v->plugFrame->detach();
+         v->plugFrame = nullptr;
       }
 
       if (v->componentHandler)
@@ -1853,6 +2408,75 @@ namespace Platform
    }
 
    // ------------------------------------------------------------------------
+   // Crash guard for narrow, synchronous, main-thread calls into plugin code
+   // ------------------------------------------------------------------------
+   //
+   // Both editor open (createView/getSize/attached) and state save/restore
+   // (getState/setState) are calls we make into plugin code with no
+   // in-flight audio or partially-applied graph mutation riding on them -
+   // "the call failed" is a safe, reportable outcome. Some otherwise-fine
+   // plugins have real bugs in these paths (seen live: Serum2 segfaulting
+   // deep in its own GUI init on editor open, and separately in its own
+   // getState()). There's no way to prevent a plugin's own bug from
+   // faulting; what we CAN do is stop that fault from taking the whole app
+   // down. Deliberately NOT used around realtime audio processing - catching
+   // a signal mid-process() with partially-written audio buffers is not a
+   // safe place to just shrug off.
+   namespace
+   {
+      thread_local sigjmp_buf gPluginCallJmpBuf;
+      thread_local volatile sig_atomic_t gPluginCallGuardActive = 0;
+
+      void PluginCallCrashHandler(int sig)
+      {
+         if (gPluginCallGuardActive)
+         {
+            gPluginCallGuardActive = 0;
+            siglongjmp(gPluginCallJmpBuf, 1);
+         }
+         // Not inside a guarded call right now - a real crash, let it die normally.
+         signal(sig, SIG_DFL);
+         raise(sig);
+      }
+
+      void InstallPluginCallCrashHandlerOnce()
+      {
+         static std::once_flag once;
+         std::call_once(once, []
+         {
+            struct sigaction sa = {};
+            sa.sa_handler = PluginCallCrashHandler;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = 0;
+            sigaction(SIGSEGV, &sa, nullptr);
+            sigaction(SIGBUS, &sa, nullptr);
+            sigaction(SIGILL, &sa, nullptr);
+         });
+      }
+
+      // Runs fn() guarded; returns false (without letting the crash reach
+      // the process) if the plugin faults inside it. Does not touch any
+      // "unstable" flag itself - callers know which failure class (state vs.
+      // editor) applies and set their own flag so future calls of that kind
+      // skip the guard machinery instead of retrying it.
+      bool RunPluginCallGuarded(const char* what, PluginHandle* h, const std::function<void()>& fn)
+      {
+         InstallPluginCallCrashHandlerOnce();
+         gPluginCallGuardActive = 1;
+         const bool crashed = (sigsetjmp(gPluginCallJmpBuf, 1) != 0);
+         if (!crashed)
+            fn();
+         gPluginCallGuardActive = 0;
+         if (crashed)
+         {
+            const char* name = (h != nullptr) ? h->desc.name.c_str() : "?";
+            std::fprintf(stderr, "[VST3] plugin '%s' crashed inside %s - call aborted\n", name, what);
+         }
+         return !crashed;
+      }
+   }
+
+   // ------------------------------------------------------------------------
    // Editor Window
    // ------------------------------------------------------------------------
 
@@ -1865,6 +2489,12 @@ namespace Platform
       }
       PluginVST3State* v = h->vst3;
 
+      if (v->editorUnstable.load(std::memory_order_relaxed))
+      {
+         outError = "plugin's editor crashed previously and is disabled for this session";
+         return false;
+      }
+
       if (v->editorWindow != nil)
       {
          [v->editorWindow makeKeyAndOrderFront:nil];
@@ -1874,7 +2504,13 @@ namespace Platform
 
       if (!v->plugView)
       {
-         Steinberg::IPlugView* view = v->controller->createView(Steinberg::Vst::ViewType::kEditor);
+         Steinberg::IPlugView* view = nullptr;
+         if (!RunPluginCallGuarded("createView", h, [&] { view = v->controller->createView(Steinberg::Vst::ViewType::kEditor); }))
+         {
+            v->editorUnstable.store(true, std::memory_order_relaxed);
+            outError = "plugin crashed creating its editor view";
+            return false;
+         }
          if (view == nullptr)
          {
             outError = "plugin has no custom GUI editor";
@@ -1884,7 +2520,12 @@ namespace Platform
       }
 
       Steinberg::ViewRect rect = {};
-      v->plugView->getSize(&rect);
+      if (!RunPluginCallGuarded("getSize", h, [&] { v->plugView->getSize(&rect); }))
+      {
+         v->editorUnstable.store(true, std::memory_order_relaxed);
+         outError = "plugin crashed sizing its editor view";
+         return false;
+      }
       CGFloat width = (CGFloat)(rect.right - rect.left);
       CGFloat height = (CGFloat)(rect.bottom - rect.top);
       if (width < 120.0 || height < 80.0)
@@ -1905,7 +2546,33 @@ namespace Platform
       NSView* containerView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, width, height)];
       window.contentView = containerView;
 
-      v->plugView->attached((__bridge void*)containerView, Steinberg::kPlatformTypeNSView);
+      // Spec requires setFrame() before attached() - it is how a plugin with
+      // a resizable GUI learns who to ask for a resize. Serum2 relies on
+      // this (calls plugFrame->resizeView() from its own GUI timer).
+      if (!v->plugFrame)
+         v->plugFrame = Steinberg::owned(new HostPlugFrame(h));
+      if (!RunPluginCallGuarded("setFrame", h, [&] { v->plugView->setFrame(v->plugFrame); }))
+      {
+         v->editorUnstable.store(true, std::memory_order_relaxed);
+         outError = "plugin crashed setting its editor frame";
+         [window close];
+         return false;
+      }
+
+      if (!RunPluginCallGuarded("attached", h, [&] { v->plugView->attached((__bridge void*)containerView, Steinberg::kPlatformTypeNSView); }))
+      {
+         v->editorUnstable.store(true, std::memory_order_relaxed);
+         outError = "plugin crashed opening its editor";
+         // The plugin may already have installed GUI timers/observers by
+         // this point (this is exactly the Serum2 crash shape: a fault mid-
+         // attached() leaves them armed against half-constructed state).
+         // removed() first while the container view is still alive, then
+         // tear down the window - not the reverse.
+         RunPluginCallGuarded("removed", h, [&] { v->plugView->removed(); });
+         v->plugView = nullptr;
+         [window close];
+         return false;
+      }
 
       InfinitePluginEditorDelegate* delegate = [[InfinitePluginEditorDelegate alloc] init];
       delegate.handle = (void*)h;
@@ -1924,8 +2591,25 @@ namespace Platform
    {
       if (h == nullptr || h->vst3 == nullptr || h->vst3->editorWindow == nil)
          return;
-      [h->vst3->editorWindow orderOut:nil];
+      PluginVST3State* v = h->vst3;
+
+      // Fully detach, not just hide: a merely-ordered-out window left the
+      // plugin's view attached() and its GUI timer armed indefinitely
+      // (removed() was previously only ever called from PluginVST3Destroy).
+      // removed() first while the container view is still alive, matching
+      // the same ordering used on the attached()-failure and destroy paths.
+      if (v->plugView)
+      {
+         RunPluginCallGuarded("removed", h, [&] { v->plugView->removed(); });
+         v->plugView = nullptr;
+      }
+
+      NSWindow* win = v->editorWindow;
+      win.delegate = nil;
+      v->editorDelegate = nil;
+      v->editorWindow = nil;
       SetPluginEditorOpen(h, false);
+      [win close];
    }
 
    bool PluginVST3EditorIsOpen(PluginHandle* h)
@@ -1942,14 +2626,30 @@ namespace Platform
       outBase64.clear();
       if (h == nullptr || h->vst3 == nullptr || !h->vst3->component)
          return false;
+      if (h->vst3->stateCallsUnstable.load(std::memory_order_relaxed))
+         return false;
 
       MemoryStream compStream;
-      if (h->vst3->component->getState(&compStream) != Steinberg::kResultOk)
+      Steinberg::tresult compResult = Steinberg::kResultFalse;
+      if (!RunPluginCallGuarded("getState (component)", h, [&]
+             { compResult = h->vst3->component->getState(&compStream); }))
+      {
+         h->vst3->stateCallsUnstable.store(true, std::memory_order_relaxed);
+         return false;
+      }
+      if (compResult != Steinberg::kResultOk)
          return false;
 
       MemoryStream ctrlStream;
       if (h->vst3->controller)
-         h->vst3->controller->getState(&ctrlStream);
+      {
+         if (!RunPluginCallGuarded("getState (controller)", h, [&]
+                { h->vst3->controller->getState(&ctrlStream); }))
+         {
+            h->vst3->stateCallsUnstable.store(true, std::memory_order_relaxed);
+            return false;
+         }
+      }
 
       const uint64_t compSize = (uint64_t)compStream.getSize();
       const uint64_t ctrlSize = (uint64_t)ctrlStream.getSize();
@@ -1986,6 +2686,8 @@ namespace Platform
    {
       if (h == nullptr || h->vst3 == nullptr || !h->vst3->component || base64.empty())
          return false;
+      if (h->vst3->stateCallsUnstable.load(std::memory_order_relaxed))
+         return false;
 
       std::vector<uint8_t> payload;
       @autoreleasepool
@@ -2013,12 +2715,20 @@ namespace Platform
          return false;
       if (compSize > 0)
       {
-         MemoryStream compStream(ptr, (size_t)compSize);
-         h->vst3->component->setState(&compStream);
-         if (h->vst3->controller)
+         bool ok = RunPluginCallGuarded("setState (component)", h, [&]
          {
-            compStream.seek(0, Steinberg::IBStream::kIBSeekSet, nullptr);
-            h->vst3->controller->setComponentState(&compStream);
+            MemoryStream compStream(ptr, (size_t)compSize);
+            h->vst3->component->setState(&compStream);
+            if (h->vst3->controller)
+            {
+               compStream.seek(0, Steinberg::IBStream::kIBSeekSet, nullptr);
+               h->vst3->controller->setComponentState(&compStream);
+            }
+         });
+         if (!ok)
+         {
+            h->vst3->stateCallsUnstable.store(true, std::memory_order_relaxed);
+            return false;
          }
          ptr += compSize;
       }
@@ -2030,8 +2740,15 @@ namespace Platform
          ptr += sizeof(uint64_t);
          if (ctrlSize > 0 && ptr + ctrlSize <= end && h->vst3->controller)
          {
-            MemoryStream ctrlStream(ptr, (size_t)ctrlSize);
-            h->vst3->controller->setState(&ctrlStream);
+            if (!RunPluginCallGuarded("setState (controller)", h, [&]
+                   {
+                      MemoryStream ctrlStream(ptr, (size_t)ctrlSize);
+                      h->vst3->controller->setState(&ctrlStream);
+                   }))
+            {
+               h->vst3->stateCallsUnstable.store(true, std::memory_order_relaxed);
+               return false;
+            }
          }
       }
 

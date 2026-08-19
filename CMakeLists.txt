@@ -238,6 +238,7 @@ if(INFINITE_ENABLE_VST3)
         src/platform/PluginVST3.mm
         ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
         ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
+        ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
     )
     set_source_files_properties(src/platform/PluginVST3.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
