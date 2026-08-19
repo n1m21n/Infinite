@@ -114,8 +114,11 @@ getting a file each:
   path calls an `AURenderBlock` cached on the main thread at prepare time, with
   an `__unsafe_unretained` stack pull-input block. The plugin's editor is a
   plain `NSWindow` (the only one in the app), which works because
-  `glfwPollEvents` drains and dispatches `NSApp`'s queue. Both AU and VST3
-  plugins are supported.
+  `glfwPollEvents` drains and dispatches `NSApp`'s queue. AU is always
+  supported; VST3 is a second backend behind the same surface, gated behind
+  the `INFINITE_ENABLE_VST3` build option (off by default — the VST3 SDK is
+  GPLv3-or-commercial and this codebase is MIT, see `LICENSE` and
+  `docs/plans/audio/plugin-hosting.md`).
 - Per-effect body/visualizer UI lives in `src/main.cpp` as `DrawXxxBody`/
   `DrawXxxVisualizer` pairs next to the `EffectVisualizerId` switch inside
   `DrawAudioNodeBody` — see `.claude/skills/new-audio-node/SKILL.md` for the

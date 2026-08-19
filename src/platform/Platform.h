@@ -296,7 +296,13 @@ namespace Platform
    // PluginHandle* and calls PluginRender from ProcessBlock; that one function
    // is the only real-time-safe entry point here, and it does nothing but call
    // a render block cached on the main thread at prepare time.
-   // Audio Units plugin hosting backend.
+   // Audio Unit and (optionally, build-time) VST3 plugin hosting backend.
+   // VST3 support is gated behind INFINITE_ENABLE_VST3, off by default: the
+   // Steinberg VST3 SDK is GPLv3-or-proprietary and this codebase is MIT, so
+   // building with VST3 enabled changes the license of the distributed binary
+   // - see LICENSE and docs/plans/audio/plugin-hosting.md. Every struct that
+   // crosses this boundary carries a `format` string ("au" or "vst3") so both
+   // backends share one surface.
    struct PluginDesc
    {
       std::string format = "au";
@@ -305,9 +311,10 @@ namespace Platform
       // Stable identity, and what a patch file stores - NOT a filesystem path,
       // which moves when a plugin is reinstalled elsewhere. For AU this is
       // "au:<type>:<subtype>:<manufacturer>" built from the component's four-
-      // char codes, e.g. "au:aufx:dely:appl".
+      // char codes, e.g. "au:aufx:dely:appl". For VST3 this is the factory
+      // class's FUID string, e.g. "vst3:<uid-hex>".
       std::string identifier;
-      std::string path; // Bundle directory path if loaded from bundle directly
+      std::string path; // Bundle directory path (e.g. for VST3 bundles)
 
       // True for 'aumu' (instrument) and 'aumf' (music effect) components -
       // the two component types that can meaningfully consume MIDI. This is
@@ -326,6 +333,38 @@ namespace Platform
    // if the path isn't a readable audio component bundle. One bundle can
    // declare several components, hence the vector.
    bool DescribeAudioUnitBundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
+
+   // Enumerates VST3 plugins (.vst3 bundles) found within the specified folders.
+   // Gated by INFINITE_ENABLE_VST3 at build time (no-op when disabled).
+   void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out);
+
+   // Resolves a dropped .vst3 bundle back to the plugin description(s) it contains.
+   bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
+
+   // Caches bundle path for a plugin identifier.
+   void CacheVST3BundlePath(const std::string& identifier, const std::string& bundlePath);
+
+   // User-added VST3 folders (PluginScanner::Folders()), kept in sync so that
+   // PluginVST3Create's on-demand bundle resolution can search them too, not
+   // just the two OS-standard VST3 directories. No-op when VST3 is disabled.
+   void SetVST3SearchFolders(const std::vector<std::string>& folders);
+
+   // Crash-safety for the VST3 scan. A bundle is written to a sentinel file
+   // immediately before it is probed in-process (CFBundleLoadExecutable /
+   // bundleEntry / bundleExit) and cleared right after a clean return. If the
+   // process is found dead mid-probe - the sentinel is non-empty at the next
+   // launch - that bundle's path is appended to a persisted blocklist and
+   // skipped by every future scan. Surface both lists in the Plugins panel,
+   // with a way to clear the blocklist and retry.
+   std::vector<std::string> VST3Blocklist();
+   void ClearVST3Blocklist();
+
+   // Bundles the most recent EnumerateVST3Plugins() call could not describe
+   // (corrupt bundle, wrong CPU architecture, no usable audio-effect class) by
+   // path. Reset at the start of every call; read immediately after it
+   // returns. Distinct from the blocklist: a scan failure here is a clean,
+   // reported miss, not evidence the bundle is dangerous to retry.
+   std::vector<std::string> VST3ScanFailures();
 
    struct PluginHandle;
 

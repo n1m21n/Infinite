@@ -5571,7 +5571,7 @@ namespace
       ImGui::PushStyleColor(ImGuiCol_Text, *value ? IM_COL32(255, 255, 255, 255)
                                                   : (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255)));
       const bool clicked = ImGui::Button(label, ImVec2(width, 0));
-      ImGui::PopStyleColor(4);
+      ImGui::PopStyleColor(5);
       ImGui::PopStyleVar();
       if (clicked)
          *value = !*value;
@@ -9002,11 +9002,78 @@ namespace
       else if (gPluginScanner.Index().empty())
          ImGui::TextDisabled("no plugins indexed yet - hit Rescan plugins");
 
+#if INFINITE_ENABLE_VST3
+      // VST3 folder management: AU is discovered entirely through the OS
+      // component registry and needs none of this, but VST3 has no registry -
+      // only the two OS-standard directories plus whatever the user adds here.
+      if (ImGui::TreeNodeEx("VST3 search folders", ImGuiTreeNodeFlags_None))
+      {
+         for (const std::string& folder : gPluginScanner.Folders())
+         {
+            ImGui::TextUnformatted(folder.c_str());
+            ImGui::SameLine();
+            ImGui::PushID(folder.c_str());
+            if (ImGui::SmallButton("Remove"))
+               gPluginScanner.RemoveFolder(folder);
+            ImGui::PopID();
+         }
+         if (ImGui::Button("Add VST3 folder...", ImVec2(-1.0f, 0)))
+         {
+            const std::string folder = Platform::OpenFolderDialog("Add VST3 folder");
+            if (!folder.empty())
+               gPluginScanner.AddFolder(folder);
+         }
+         ImGui::TreePop();
+      }
+
+      const std::vector<std::string> blocklist = Platform::VST3Blocklist();
+      if (!blocklist.empty())
+      {
+         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.55f, 0.25f, 1.0f));
+         if (ImGui::TreeNodeEx("Blocklisted VST3 bundles (crashed a previous scan)",
+                                ImGuiTreeNodeFlags_None))
+         {
+            ImGui::PopStyleColor();
+            for (const std::string& path : blocklist)
+               ImGui::TextWrapped("%s", path.c_str());
+            if (ImGui::Button("Clear blocklist and retry", ImVec2(-1.0f, 0)))
+               Platform::ClearVST3Blocklist();
+            ImGui::TreePop();
+         }
+         else
+         {
+            ImGui::PopStyleColor();
+         }
+      }
+
+      if (!gPluginScanner.FailedBundles().empty())
+      {
+         if (ImGui::TreeNodeEx("Bundles that failed to describe", ImGuiTreeNodeFlags_None))
+         {
+            for (const std::string& path : gPluginScanner.FailedBundles())
+               ImGui::TextWrapped("%s", path.c_str());
+            ImGui::TreePop();
+         }
+      }
+#else
+      ImGui::TextDisabled("VST3 support is not compiled into this build.");
+#endif
+
       ImGui::Separator();
 
       // Its own buffer, like the Samples and Media modes each have, so
       // switching tabs and back keeps this mode's in-progress query.
       static char pluginSearch[128] = "";
+      static bool sPluginSearchSeeded = false;
+      if (!sPluginSearchSeeded)
+      {
+         sPluginSearchSeeded = true;
+         if (const char* seed = getenv("INFINITE_PLUGINDRAGTEST_SEARCH"))
+         {
+            strncpy(pluginSearch, seed, sizeof(pluginSearch) - 1);
+            pluginSearch[sizeof(pluginSearch) - 1] = '\0';
+         }
+      }
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputTextWithHint("##pluginsearch", "search plugins...", pluginSearch, sizeof(pluginSearch));
 
@@ -9031,7 +9098,8 @@ namespace
                continue;
          }
 
-         std::string label = entry.name;
+         std::string label = "[" + (entry.format == "vst3" ? std::string("VST3") : std::string("AU")) +
+                              "] " + entry.name;
          if (!entry.manufacturer.empty())
             label += "  -  " + entry.manufacturer;
          ImGui::Selectable(label.c_str());
@@ -26105,7 +26173,7 @@ int main(int argc, char** argv)
             "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc"
          };
          // Plugin bundles, not files - see the branch that consumes this.
-         static const std::vector<std::string> kPluginBundleExt = { "component" };
+         static const std::vector<std::string> kPluginBundleExt = { "component", "vst3" };
          ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
@@ -26141,20 +26209,25 @@ int main(int argc, char** argv)
                continue;
             }
 
-            if (HasExtension(path, std::vector<std::string> { "vst3" }))
-            {
-               printf("VST3 plugins are not supported; please use Audio Unit (.component) plugins: %s\n", path.c_str());
-               continue;
-            }
-
             GraphNode* spawned = nullptr;
             if (HasExtension(path, kPluginBundleExt))
             {
+               const bool isVst3 = HasExtension(path, std::vector<std::string> { "vst3" });
+#if !INFINITE_ENABLE_VST3
+               if (isVst3)
+               {
+                  printf("VST3 support is not compiled into this build (build with "
+                         "-DINFINITE_ENABLE_VST3=ON): %s\n", path.c_str());
+                  continue;
+               }
+#endif
                std::vector<Platform::PluginDesc> found;
-               const bool resolved = Platform::DescribeAudioUnitBundle(path, found) && !found.empty();
+               const bool resolved = isVst3
+                  ? (Platform::DescribeVST3Bundle(path, found) && !found.empty())
+                  : (Platform::DescribeAudioUnitBundle(path, found) && !found.empty());
                if (!resolved)
                {
-                  printf("dropped plugin bundle could not be resolved to an audio component: %s\n",
+                  printf("dropped plugin bundle could not be resolved to a plugin: %s\n",
                          path.c_str());
                   continue;
                }
