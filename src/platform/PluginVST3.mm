@@ -1260,6 +1260,119 @@ namespace
       std::atomic<uint32_t> mRefCount { 1 };
       Platform::PluginHandle* mHandle = nullptr;
    };
+
+   // ------------------------------------------------------------------------
+   // Host-side connection proxy
+   //
+   // Wiring compCP/ctrlCP directly together (as this file used to) means a
+   // notify() sent by the processor lands on the edit controller on
+   // whichever thread sent it - the audio thread, for a processor that
+   // pushes state to its own GUI mid-process(). This proxy sits between the
+   // two real connection points and marshals notify() onto the main thread.
+   //
+   // This is a hand-written equivalent of the SDK's
+   // public.sdk/source/vst/hosting/connectionproxy.cpp, not that file
+   // compiled in as-is: ConnectionProxy's own notify() only compares the
+   // calling thread against whichever thread constructed the proxy
+   // (ThreadChecker) and drops the message on mismatch - it does not queue
+   // or hop threads by itself. What's needed here is an actual dispatch to
+   // the main queue, so this class does that instead of wrapping/subclassing
+   // the SDK one.
+   // ------------------------------------------------------------------------
+   class HostConnectionProxy : public Steinberg::Vst::IConnectionPoint
+   {
+   public:
+      // srcPoint is the real connection point being told "your peer is this
+      // proxy" (via connect(), below) - i.e. the component's or the
+      // controller's own IConnectionPoint.
+      explicit HostConnectionProxy(Steinberg::Vst::IConnectionPoint* srcPoint) : mSrc(srcPoint) {}
+
+      Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid, void** obj) override
+      {
+         if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::Vst::IConnectionPoint::iid) ||
+             Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid))
+         {
+            addRef();
+            *obj = this;
+            return Steinberg::kResultOk;
+         }
+         *obj = nullptr;
+         return Steinberg::kNoInterface;
+      }
+
+      Steinberg::uint32 PLUGIN_API addRef() override { return ++mRefCount; }
+      Steinberg::uint32 PLUGIN_API release() override
+      {
+         if (--mRefCount == 0)
+         {
+            delete this;
+            return 0;
+         }
+         return mRefCount;
+      }
+
+      // Registers `other` (the real peer we ultimately forward notify()
+      // calls to) and tells mSrc that its peer is now this proxy.
+      Steinberg::tresult PLUGIN_API connect(Steinberg::Vst::IConnectionPoint* other) override
+      {
+         if (other == nullptr)
+            return Steinberg::kInvalidArgument;
+         if (mDst || !mSrc)
+            return Steinberg::kResultFalse;
+         mDst = other;
+         Steinberg::tresult res = mSrc->connect(this);
+         if (res != Steinberg::kResultTrue)
+            mDst = nullptr;
+         return res;
+      }
+
+      Steinberg::tresult PLUGIN_API disconnect(Steinberg::Vst::IConnectionPoint* other) override
+      {
+         if (other == nullptr)
+            return Steinberg::kInvalidArgument;
+         if (other != mDst.get())
+            return Steinberg::kInvalidArgument;
+         if (mSrc)
+            mSrc->disconnect(this);
+         mDst = nullptr;
+         return Steinberg::kResultTrue;
+      }
+
+      Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage* message) override
+      {
+         if (!mDst || message == nullptr)
+            return Steinberg::kResultFalse;
+         // Keep both alive for the duration of the hop: the sender is only
+         // guaranteed to hold its own reference to `message` for as long as
+         // this call is on the stack, and may release it the instant
+         // notify() returns (which happens before the async block runs).
+         Steinberg::IPtr<Steinberg::Vst::IConnectionPoint> dst = mDst;
+         Steinberg::IPtr<Steinberg::Vst::IMessage> msg = message;
+         if ([NSThread isMainThread])
+         {
+            dst->notify(msg);
+            return Steinberg::kResultTrue;
+         }
+         dispatch_async(dispatch_get_main_queue(), ^{
+            dst->notify(msg);
+         });
+         return Steinberg::kResultTrue;
+      }
+
+      // Undoes connect(): tells mSrc to forget this proxy as its peer.
+      // Called during teardown, mirroring the SDK ConnectionProxy's own
+      // no-arg disconnect() helper.
+      void DisconnectFromSource()
+      {
+         if (mDst)
+            disconnect(mDst.get());
+      }
+
+   private:
+      std::atomic<uint32_t> mRefCount { 1 };
+      Steinberg::IPtr<Steinberg::Vst::IConnectionPoint> mSrc;
+      Steinberg::IPtr<Steinberg::Vst::IConnectionPoint> mDst;
+   };
 }
 
 namespace Platform
@@ -1274,6 +1387,14 @@ namespace Platform
       Steinberg::IPtr<Steinberg::Vst::IAudioProcessor> processor;
       Steinberg::IPtr<Steinberg::IPlugView> plugView;
       Steinberg::IPtr<HostComponentHandler> componentHandler;
+
+      // Marshal component<->controller IMessage traffic onto the main
+      // thread instead of wiring the two IConnectionPoints together
+      // directly. compToCtrlProxy tells the component its peer is this
+      // proxy (so component-originated notify() calls land here first);
+      // ctrlToCompProxy is the mirror for the controller side.
+      Steinberg::IPtr<HostConnectionProxy> compToCtrlProxy;
+      Steinberg::IPtr<HostConnectionProxy> ctrlToCompProxy;
 
       // Pending instantiation arrival
       std::mutex arrivalMutex;
@@ -2038,7 +2159,11 @@ namespace Platform
          v->componentHandler = new HostComponentHandler(h);
          v->controller->setComponentHandler(v->componentHandler);
 
-         // Connect component and controller if separate
+         // Connect component and controller if separate - through a proxy
+         // each way so a notify() sent from the audio thread (a processor
+         // pushing state to its own GUI mid-process()) is marshaled onto
+         // the main thread rather than calling into the controller directly
+         // from there. See HostConnectionProxy above.
          Steinberg::IPtr<Steinberg::Vst::IConnectionPoint> compCP;
          Steinberg::IPtr<Steinberg::Vst::IConnectionPoint> ctrlCP;
          if (v->component->queryInterface(Steinberg::Vst::IConnectionPoint::iid, (void**)&compCP) == Steinberg::kResultOk &&
@@ -2046,8 +2171,10 @@ namespace Platform
          {
             if (compCP && ctrlCP && compCP != ctrlCP)
             {
-               compCP->connect(ctrlCP);
-               ctrlCP->connect(compCP);
+               v->compToCtrlProxy = Steinberg::owned(new HostConnectionProxy(compCP));
+               v->ctrlToCompProxy = Steinberg::owned(new HostConnectionProxy(ctrlCP));
+               v->compToCtrlProxy->connect(ctrlCP);
+               v->ctrlToCompProxy->connect(compCP);
             }
          }
 
@@ -2130,6 +2257,17 @@ namespace Platform
       {
          v->plugFrame->detach();
          v->plugFrame = nullptr;
+      }
+
+      if (v->compToCtrlProxy)
+      {
+         v->compToCtrlProxy->DisconnectFromSource();
+         v->compToCtrlProxy = nullptr;
+      }
+      if (v->ctrlToCompProxy)
+      {
+         v->ctrlToCompProxy->DisconnectFromSource();
+         v->ctrlToCompProxy = nullptr;
       }
 
       if (v->componentHandler)
