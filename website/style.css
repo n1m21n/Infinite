@@ -1055,6 +1055,54 @@ body {
   flex-wrap: wrap;
 }
 
+.download-donate-wrap {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border-subtle);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.donate-text {
+  font-size: var(--font-size-small);
+  color: var(--text-muted);
+}
+
+.donate-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.btn-donate-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 13px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: var(--pastel-terracotta);
+  background: rgba(194, 89, 63, 0.08);
+  border: 1px solid rgba(194, 89, 63, 0.25);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.btn-donate-sm:hover {
+  background: rgba(194, 89, 63, 0.16);
+  border-color: rgba(194, 89, 63, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-donate-sm svg {
+  color: var(--pastel-terracotta);
+}
+
 /* --------------------------------------------------------------------------
    Footer
    -------------------------------------------------------------------------- */
@@ -1081,6 +1129,37 @@ body {
   font-size: var(--font-size-small);
   color: var(--text-muted);
   margin-top: 6px;
+}
+
+.footer-donate {
+  margin-top: 10px;
+}
+
+.footer-donate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  background: rgba(45, 35, 25, 0.04);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.footer-donate-btn:hover {
+  color: var(--pastel-terracotta);
+  border-color: rgba(194, 89, 63, 0.35);
+  background: rgba(194, 89, 63, 0.06);
+  transform: translateY(-1px);
+}
+
+.footer-donate-btn svg {
+  color: var(--pastel-terracotta);
 }
 
 .footer-links {
