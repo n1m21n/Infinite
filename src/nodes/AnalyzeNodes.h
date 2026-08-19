@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -7,6 +8,9 @@
 #include "ImageCable.h"
 #include "Modulation.h"
 #include "Platform.h"
+
+class AudioFilePlayerAudioNode; // defined in AnalyzeNodes.cpp - see SamplerNode.h's
+                                 // forward-declare-in-header/define-in-cpp pattern
 
 // --- Image Analyze ------------------------------------------------------
 // Reduces an image or video to control values and modulation channels.
@@ -169,20 +173,43 @@ private:
 };
 
 // --- Audio File ---------------------------------------------------------
-// Plays an audio file and analyses it independently of the live input, so a
-// backing track can drive the visuals. Patch its output into Audio Analyze, or
-// read it directly - it exposes the same set of taps.
-class AudioFileNode : public INode
+// Plays an audio file into the real-time DSP graph - not just a private
+// analysis-only engine off to the side - so its output can be patched into
+// Audio Analyze, Audio Displacement, a Mixer, an effect, or straight to
+// Audio Out like any other audio source. Decodes once via
+// Platform::DecodeAudioFileToBuffer (main thread) and hands the buffer to
+// its own AudioFilePlayerAudioNode (defined in AnalyzeNodes.cpp), the same
+// two-object split SamplerNode/AudioSamplerNode use.
+//
+// `monitor` and `volume` no longer mean "audible on the hardware output
+// regardless of the patch" - this node's own AVAudioEngine is gone.
+// Audibility now comes entirely from whether this node's output is patched
+// (directly or through other audio nodes) into an Audio Out; `monitor`
+// silences this node's own output buffer (still analysed - see Levels())
+// the same way "silent but still analysed" always meant, just scoped to the
+// graph instead of to the speakers.
+class AudioFileNode : public INode, public IAudioSource
 {
 public:
    static INode* Create() { return new AudioFileNode(); }
 
+   AudioFileNode(); // out-of-line: mAudioNode's pointee is forward-declared here
    ~AudioFileNode() override;
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
+
+   AudioNode* GetAudioNode() override;
+
+   // While a file is loaded this node must keep processing every block even
+   // with no path to an Audio Out - both to advance its own playhead and
+   // because Levels()/AudioAnalyzeNode's fileSource pointer mechanism reads
+   // it directly rather than through an AudioCable RebuildAudioTopology
+   // would otherwise discover it through. Same pattern as SamplerNode's
+   // IsRecording()-gated override.
+   bool RequiresAudioProcessing() const override { return IsLoaded(); }
 
    bool OpenViaDialog();
    bool Open(const std::string& path);
@@ -191,9 +218,9 @@ public:
    void Pause();
    void Restart();
    bool IsPlaying() const;
-   bool IsLoaded() const { return mHandle != nullptr; }
+   bool IsLoaded() const { return mLoaded; }
 
-   double Duration() const;
+   double Duration() const { return mDuration; }
    double Position() const;
    const std::string& FileName() const { return mFileName; }
    const std::string& FilePath() const { return mFilePath; }
@@ -202,7 +229,7 @@ public:
 
    bool loop = true;
    bool followTransport = true; // play/pause with the global transport
-   bool monitor = true;         // audible, or silent but still analysed
+   bool monitor = true;         // audible into the graph, or silent but still analysed
    float volume = 0.8f;
    float gain = 1.0f;
    float attack = 0.5f;
@@ -227,12 +254,14 @@ public:
    }
 
 private:
-   Platform::AudioPlayerHandle* mHandle = nullptr;
+   std::unique_ptr<AudioFilePlayerAudioNode> mAudioNode;
    Platform::AudioLevels mLevels;
    std::string mFileName;
    std::string mFilePath;
    std::string mStatus = "no file loaded";
    bool mWasTransportPlaying = false;
+   bool mLoaded = false;
+   double mDuration = 0.0;
    int mLastCookFrame = -1;
 };
 

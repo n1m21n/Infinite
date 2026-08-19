@@ -2981,10 +2981,27 @@ namespace
                               srcLight == nullptr && !srcIsAudioNode && !srcIsNoteSource;
 
       // Audio/note pins are found generically via AudioInputSlot()/NoteInputSlot().
+      // AudioFileNode is a real IAudioSource (its samples flow through the
+      // DSP graph like any other audio node - see AnalyzeNodes.h), so
+      // srcIsAudioNode alone covers it here; the special-case
+      // "srcAudioFile != nullptr" carve-out this branch used to also accept
+      // was scoped too broadly (every AudioInputSlot(), not just
+      // OutputNode's recording slot) and let a cable land on Audio
+      // Displacement/Mixer/effects/Audio Out that read as permanent silence -
+      // see docs/plans/audio-file-into-dsp-graph.md.
       if (dstNode->node->AudioInputSlot(slot) != nullptr)
-         return srcIsAudioNode || srcAudioFile != nullptr;
+         return srcIsAudioNode;
       else if (dstNode->node->NoteInputSlot(slot) != nullptr)
          return srcIsNoteSource;
+      // dstAudio (Audio Analyze) is checked ahead of the srcIsAudioNode/
+      // srcIsNoteSource gate below because it needs to accept an
+      // AudioFileNode source specifically, and that source is now ALSO an
+      // IAudioSource (srcIsAudioNode true) - the gate would otherwise reject
+      // it before this branch is ever reached. This is the "fileSource"
+      // pointer mechanism (WireInputSlot), not an AudioCable - deliberately
+      // out of scope for this fix, see AudioAnalyzeNode::fileSource's comment.
+      else if (dstAudio != nullptr)
+         return srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
       else if (srcIsAudioNode || srcIsNoteSource)
          return false;
       else if (dstRender != nullptr)
@@ -3012,8 +3029,6 @@ namespace
          return srcIsImage;
       else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
          return false; // 3D cables only go into 3D nodes
-      else if (dstAudio != nullptr)
-         return srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
       else if (dstNode->node->ModulatorInputSlot(slot) != nullptr && !dstWantsImage)
          return srcIsModulator;
       else
@@ -5591,7 +5606,13 @@ namespace
       // at slot 0 either, but it keeps its interactive-ADSR body rather than
       // falling back to the generic modulator meter. Any future pin-less
       // node that wants a bespoke body needs the same explicit addition.
-      if (dynamic_cast<AudioTextureNode*>(node) != nullptr)
+      // AudioFileNode became an IAudioSource so its samples flow through the
+      // DSP graph (see docs/plans/audio-file-into-dsp-graph.md), but it still
+      // wants its own file-picker/transport/level body (DrawAudioFileParams)
+      // rather than the generic v3 audio body, which has no case for it and
+      // would otherwise render an empty shell with just the pin - same
+      // reasoning as the AudioTextureNode carve-out just below.
+      if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -32304,7 +32325,7 @@ int main(int argc, char** argv)
                      auto* dstSetColorNode = dynamic_cast<SetColorNode*>(dstNode->node.get());
                      auto* dstMappingNode = dynamic_cast<MappingNode*>(dstNode->node.get());
 
-                     if (dstWantsAudio && !srcIsAudioNode && srcAudioFile == nullptr)
+                     if (dstWantsAudio && !srcIsAudioNode)
                         rejectReason = srcIsModulator
                            ? "A modulator can't drive an audio signal pin - only another audio source can"
                            : "This pin only accepts an audio source";
@@ -34539,20 +34560,12 @@ int main(int argc, char** argv)
                continue;
             }
 
-            if (dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr)
-            {
-               // an audio source has neither a texture nor a modulator tap
-               printf("%-22s [%-12s] audio source   OK\n",
-                      gn.typeName.c_str(), gn.category.c_str());
-               continue;
-            }
-
             if (dynamic_cast<IAudioSource*>(gn.node.get()) != nullptr ||
                 dynamic_cast<AudioOutputNode*>(gn.node.get()) != nullptr)
             {
-               // P2's audio-graph nodes emit real-time samples, not a
-               // texture or a 0-1 modulator value - same reasoning as
-               // AudioFileNode just above.
+               // P2's audio-graph nodes (AudioFileNode included, now that
+               // it's a real IAudioSource) emit real-time samples, not a
+               // texture or a 0-1 modulator value.
                printf("%-22s [%-12s] audio node     OK\n",
                       gn.typeName.c_str(), gn.category.c_str());
                continue;

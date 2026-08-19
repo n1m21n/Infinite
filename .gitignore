@@ -20,3 +20,8 @@ local-prompts/
 # external/ is vendored on purpose: imgui, imgui-node-editor and stb are all
 # permissively licensed, and committing them means a fresh clone builds offline
 # with no version drift. GLFW is the exception - it is fetched by CMake.
+
+# mcp-server/ is its own standalone git repo (n1m21n/infinite-mcp, private) -
+# never swept into this repo's history by git add -A. See
+# .claude/skills/repo-privacy-split.
+mcp-server/

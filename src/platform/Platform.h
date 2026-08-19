@@ -134,25 +134,11 @@ namespace Platform
    };
 
    // ---- audio file playback ----
-   // Each player owns its own engine and its own analyser, so a file and the
-   // live input can be analysed independently and at the same time.
-   struct AudioPlayerHandle;
-
+   // File playback moved into the DSP graph (AudioFileNode/AudioFilePlayerAudioNode
+   // in src/nodes/AnalyzeNodes.cpp) - it decodes via DecodeAudioFileToBuffer below
+   // and runs its own AudioNode like SamplerNode, rather than owning a private
+   // AVAudioEngine here. OpenAudioDialog is still shared with the file picker.
    std::string OpenAudioDialog();
-   AudioPlayerHandle* AudioFileOpen(const std::string& path, std::string& outError);
-   void AudioFileClose(AudioPlayerHandle* handle);
-   void AudioFilePlay(AudioPlayerHandle* handle);
-   void AudioFilePause(AudioPlayerHandle* handle);
-   void AudioFileRestart(AudioPlayerHandle* handle);
-   bool AudioFileIsPlaying(AudioPlayerHandle* handle);
-   void AudioFileSetLoop(AudioPlayerHandle* handle, bool loop);
-   void AudioFileSetVolume(AudioPlayerHandle* handle, float volume);
-   void AudioFileSetMonitor(AudioPlayerHandle* handle, bool audible);
-   double AudioFileDuration(AudioPlayerHandle* handle);
-   double AudioFilePosition(AudioPlayerHandle* handle);
-   bool AudioFileRead(AudioPlayerHandle* handle, AudioLevels& out);
-   void AudioFileSetSmoothing(AudioPlayerHandle* handle, float attack, float release);
-   void AudioFileSetGain(AudioPlayerHandle* handle, float gain);
 
    bool AudioStart(std::string& outError);
    void AudioStop();
