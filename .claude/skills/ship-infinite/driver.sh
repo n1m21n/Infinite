@@ -80,9 +80,30 @@ step_nodediff() {
 # ----------------------------------------------------------------- release ---
 # Builds the universal Release .app + DMG via package.sh, which also copies
 # the DMG into website/assets/Infinite.dmg. Slow (minutes, two-arch build).
+# Then re-uploads the same DMG onto the latest GitHub Release as an asset -
+# the website and the Releases page are two independent distribution
+# points (a `git push` deploys the site; it does not touch a release's
+# attached files), and a rebuild here means both need the new binary or the
+# Releases page silently goes stale. Requires `gh` to be authenticated;
+# skipped with a warning (not a hard failure - the website deploy is the
+# part `commit`/`push` still cover) if it isn't.
 step_release() {
     echo "==> release: package.sh (build + DMG + copy into website/assets)"
     ./package.sh
+
+    echo "==> release: syncing website/assets/Infinite.dmg onto the latest GitHub Release"
+    if ! command -v gh >/dev/null 2>&1; then
+        echo "    gh CLI not found - skipping Release asset upload; website DMG is still up to date"
+        return 0
+    fi
+    local tag
+    tag=$(gh release view --json tagName -q .tagName 2>/dev/null)
+    if [ -z "$tag" ]; then
+        echo "    no GitHub Release found (or gh not authenticated) - skipping Release asset upload"
+        return 0
+    fi
+    gh release upload "$tag" website/assets/Infinite.dmg --clobber
+    echo "    uploaded website/assets/Infinite.dmg onto release $tag"
 }
 
 # ----------------------------------------------------------------- cleanup ---

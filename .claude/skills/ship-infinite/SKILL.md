@@ -80,6 +80,16 @@ rebuild and takes minutes; don't run it as part of routine iteration, only
 when actually cutting a release. Commit and push afterward — that's what
 publishes the new DMG to the website.
 
+It then also uploads that same `website/assets/Infinite.dmg` onto the
+latest GitHub Release (`gh release upload <tag> ... --clobber`). The
+website and the Releases page are two independent distribution points —
+pushing `main` redeploys the site but never touches a release's attached
+files, so without this step the Releases page silently drifts out of date
+every time the DMG is rebuilt. Needs `gh` authenticated; if it isn't (or
+there's no release yet), this step prints a warning and continues rather
+than failing the pipeline — the website deploy from `commit`/`push` still
+goes through either way.
+
 ## Cleanup
 
 ```bash
