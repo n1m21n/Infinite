@@ -239,20 +239,24 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Center X", "uCenterX", T::Float, 0.0f, 1.0f, 0.5f),
           P("Center Y", "uCenterY", T::Float, 0.0f, 1.0f, 0.5f) } },
 
-      // ---------------- Effects: transform (folded in per the request) ----------------
-      { "transform", "Effects",
+      // ---------------- Compositing: transform ----------------
+      { "transform", "Compositing",
         "uniform float uTranslateX;\n"
         "uniform float uTranslateY;\n"
         "uniform float uScale;\n"
         "uniform float uScaleX;\n"
         "uniform float uScaleY;\n"
         "uniform float uRotation;\n"
+        "uniform int uFlipH;\n"
+        "uniform int uFlipV;\n"
         "void main() {\n"
         "   vec2 uv = vUv - vec2(0.5, 0.5);\n"
         "   float s = sin(-uRotation), c = cos(-uRotation);\n"
         "   uv = vec2(c*uv.x - s*uv.y, s*uv.x + c*uv.y);\n"
         "   uv /= max(uScale, 0.0001);\n"
         "   uv /= vec2(max(uScaleX, 0.0001), max(uScaleY, 0.0001));\n"
+        "   if (uFlipH != 0) uv.x = -uv.x;\n"
+        "   if (uFlipV != 0) uv.y = -uv.y;\n"
         "   uv -= vec2(uTranslateX, uTranslateY);\n"
         "   uv += vec2(0.5, 0.5);\n"
         "   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) fragColor = vec4(0.0);\n"
@@ -263,7 +267,9 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Scale", "uScale", T::Float, 0.1f, 4.0f, 1.0f),
           P("Scale X", "uScaleX", T::Float, 0.1f, 4.0f, 1.0f),
           P("Scale Y", "uScaleY", T::Float, 0.1f, 4.0f, 1.0f),
-          P("Rotation", "uRotation", T::Float, -6.2832f, 6.2832f, 0.0f) } },
+          P("Rotation", "uRotation", T::Float, -6.2832f, 6.2832f, 0.0f),
+          P("Flip Horizontal", "uFlipH", T::Bool, 0.0f, 1.0f, 0.0f),
+          P("Flip Vertical", "uFlipV", T::Bool, 0.0f, 1.0f, 0.0f) } },
 
       // ---------------- Color adjustments ----------------
       { "invert", "Color",

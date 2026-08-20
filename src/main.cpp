@@ -16315,7 +16315,7 @@ namespace
          { "pixelate", "Chunks the image into flat colour blocks. Block Size sets how large each block is." },
          { "addnoise", "Adds random per-pixel grain, re-randomised every frame. Amount sets how strong it is." },
          { "vignette", "Darkens the image toward the edges, framing the centre. Radius and Softness shape the falloff, Center X/Y offsets it." },
-         { "transform", "Translates, scales and rotates the whole image. Scale X/Y let you stretch non-uniformly on top of the overall Scale." },
+         { "transform", "Translates, scales, rotates, and flips (horizontal/vertical) the whole image. Scale X/Y let you stretch non-uniformly on top of the overall Scale." },
          { "brightnesscontrast", "Basic exposure control: Brightness adds or subtracts a flat amount, Contrast steepens or flattens the curve around mid-grey." },
          { "levels", "Remaps the input range: Black Point and White Point set what maps to pure black/white, Gamma curves the midtones." },
          { "hsl", "Shifts Hue, scales Saturation and adds Lightness, independent of the underlying colour." },
@@ -16581,7 +16581,6 @@ namespace
                { "Glitch family", "Five kinds: the original combined glitch, RGB shift, scanlines, blocks, wave and datamosh." },
                { "Symmetry", "Symmetry (mirror about X, Y or both), Kaleidoscope (segment count, rotation, zoom) and Mirror Tile." },
                { "Stylise", "Halftone (mono or CMY-style colour), Sobel edge detection and Edge Outline." },
-               { "Transform", "Translate, scale and rotate - filed under Effects rather than as a separate category." },
                { "Pixelate / Noise / Vignette", "Block pixelation, additive grain and a vignette with its own centre." },
             } },
             { "Color", {
@@ -16595,6 +16594,7 @@ namespace
                { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
             } },
             { "Compositing", {
+               { "Transform", "Translate, scale, rotate, flip horizontal and flip vertical." },
                { "Blend", "Two inputs and 31 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
                { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
                { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
