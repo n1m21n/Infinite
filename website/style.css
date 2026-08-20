@@ -1205,12 +1205,14 @@ body {
     flex-wrap: nowrap;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
     gap: 14px;
     padding: 6px 16px 18px;
     margin-left: -16px;
     margin-right: -16px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    position: relative;
   }
   .capabilities-grid::-webkit-scrollbar {
     display: none;
@@ -1232,12 +1234,14 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    margin-top: 12px;
+    gap: 14px;
+    margin-top: 14px;
+    position: relative;
+    z-index: 10;
   }
   .cap-slider-btn {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: #ffffff;
     border: 1px solid var(--border-card);
@@ -1246,12 +1250,16 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    pointer-events: auto;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   }
   .cap-slider-btn:active {
-    transform: scale(0.92);
+    transform: scale(0.90);
     border-color: var(--pastel-terracotta);
+    background: var(--bg-card);
   }
   .cap-slider-dots {
     display: flex;
@@ -1266,6 +1274,9 @@ body {
     border: none;
     padding: 0;
     cursor: pointer;
+    pointer-events: auto;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
     transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease;
   }
   .cap-dot.active {

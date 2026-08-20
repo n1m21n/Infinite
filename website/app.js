@@ -1459,44 +1459,82 @@ function initMobileCapabilitiesSlider() {
   }
 
   function scrollToCard(idx) {
-    if (idx < 0 || idx >= cards.length) return;
-    const card = cards[idx];
-    const offset = card.offsetLeft - (grid.clientWidth - card.clientWidth) / 2;
-    grid.scrollTo({
-      left: Math.max(0, offset),
-      behavior: 'smooth'
-    });
+    if (cards.length === 0) return;
+    if (idx < 0) idx = cards.length - 1;
+    if (idx >= cards.length) idx = 0;
+
+    const targetCard = cards[idx];
+    if (!targetCard) return;
+
+    try {
+      targetCard.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest'
+      });
+    } catch (err) {
+      const targetLeft = targetCard.offsetLeft - 16;
+      grid.scrollTo({ left: targetLeft, behavior: 'smooth' });
+    }
+
     setActiveDot(idx);
   }
 
+  function bindAction(el, action) {
+    if (!el) return;
+    let lastTime = 0;
+    const handler = (e) => {
+      const now = Date.now();
+      if (now - lastTime < 250) return;
+      lastTime = now;
+      if (e && e.cancelable) {
+        e.preventDefault();
+      }
+      action();
+    };
+    el.addEventListener('click', handler);
+    el.addEventListener('touchend', handler);
+  }
+
   dots.forEach((dot, idx) => {
-    dot.addEventListener('click', () => {
-      scrollToCard(idx);
-    });
+    bindAction(dot, () => scrollToCard(idx));
   });
 
   if (prevBtn) {
-    prevBtn.addEventListener('click', () => {
-      scrollToCard(activeIndex - 1);
-    });
+    bindAction(prevBtn, () => scrollToCard(activeIndex - 1));
   }
   if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
-      scrollToCard(activeIndex + 1);
-    });
+    bindAction(nextBtn, () => scrollToCard(activeIndex + 1));
   }
 
-  let scrollTimeout = null;
-  grid.addEventListener('scroll', () => {
-    if (scrollTimeout) return;
-    scrollTimeout = requestAnimationFrame(() => {
-      scrollTimeout = null;
-      const scrollLeft = grid.scrollLeft;
-      const cardWidth = (cards[0].offsetWidth || 280) + 14;
-      const newIndex = Math.round(scrollLeft / cardWidth);
-      setActiveDot(newIndex);
+  // Active dot tracking with IntersectionObserver for rock-solid sync on all mobile devices
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const idx = parseInt(entry.target.getAttribute('data-index') || '0', 10);
+          setActiveDot(idx);
+        }
+      });
+    }, {
+      root: grid,
+      threshold: 0.55
     });
-  }, { passive: true });
+
+    cards.forEach(card => observer.observe(card));
+  } else {
+    let scrollTimeout = null;
+    grid.addEventListener('scroll', () => {
+      if (scrollTimeout) return;
+      scrollTimeout = requestAnimationFrame(() => {
+        scrollTimeout = null;
+        const scrollLeft = grid.scrollLeft;
+        const cardWidth = (cards[0].offsetWidth || 280) + 14;
+        const newIndex = Math.round(scrollLeft / cardWidth);
+        setActiveDot(newIndex);
+      });
+    }, { passive: true });
+  }
 }
 
 
