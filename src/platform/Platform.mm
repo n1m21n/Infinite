@@ -4691,3 +4691,364 @@ namespace Platform
    }
 }
 
+// ==================================================== live camera input (Video In node)
+
+@class InfiniteCameraCaptureDelegate;
+
+namespace Platform
+{
+   struct CameraFrameBuffer
+   {
+      std::vector<unsigned char> pixels;
+      int width = 0;
+      int height = 0;
+      uint64_t frameSeq = 0;
+   };
+
+   struct CameraHandle
+   {
+      AVCaptureSession* session = nil;
+      AVCaptureDeviceInput* input = nil;
+      AVCaptureVideoDataOutput* output = nil;
+      InfiniteCameraCaptureDelegate* delegate = nil;
+      dispatch_queue_t queue = nil;
+
+      std::string deviceId;
+      CameraResolution resolution = CameraResolution::Auto;
+      std::atomic<bool> mirrorX { true };
+
+      CameraFrameBuffer buffers[3];
+      std::atomic<int> readyIndex { -1 };
+      std::atomic<int> readIndex { 0 };
+      std::atomic<uint64_t> currentSeq { 0 };
+      uint64_t lastReadSeq = 0;
+   };
+}
+
+@interface InfiniteCameraCaptureDelegate : NSObject <AVCaptureVideoDataOutputSampleBufferDelegate>
+{
+   Platform::CameraHandle* _handle;
+}
+- (instancetype)initWithHandle:(Platform::CameraHandle*)handle;
+@end
+
+@implementation InfiniteCameraCaptureDelegate
+- (instancetype)initWithHandle:(Platform::CameraHandle*)handle
+{
+   if ((self = [super init]))
+   {
+      _handle = handle;
+   }
+   return self;
+}
+
+- (void)captureOutput:(AVCaptureOutput*)output
+didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
+       fromConnection:(AVCaptureConnection*)connection
+{
+   if (!_handle)
+      return;
+
+   CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+   if (!pixelBuffer)
+      return;
+
+   CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+   const int w = (int)CVPixelBufferGetWidth(pixelBuffer);
+   const int h = (int)CVPixelBufferGetHeight(pixelBuffer);
+   const size_t srcStride = CVPixelBufferGetBytesPerRow(pixelBuffer);
+   const unsigned char* src = (const unsigned char*)CVPixelBufferGetBaseAddress(pixelBuffer);
+
+   if (w > 0 && h > 0 && src)
+   {
+      int ready = _handle->readyIndex.load(std::memory_order_relaxed);
+      int read = _handle->readIndex.load(std::memory_order_relaxed);
+      int writeIdx = 0;
+      for (int i = 0; i < 3; i++)
+      {
+         if (i != ready && i != read)
+         {
+            writeIdx = i;
+            break;
+         }
+      }
+
+      Platform::CameraFrameBuffer& fb = _handle->buffers[writeIdx];
+      const size_t neededSize = (size_t)w * h * 4;
+      if (fb.pixels.size() != neededSize)
+         fb.pixels.resize(neededSize);
+
+      fb.width = w;
+      fb.height = h;
+
+      const bool mirror = _handle->mirrorX.load(std::memory_order_relaxed);
+
+      // BGRA -> RGBA, flip rows for OpenGL's bottom-up textures, and apply horizontal mirror
+      for (int y = 0; y < h; y++)
+      {
+         const unsigned char* srcRow = src + (size_t)y * srcStride;
+         unsigned char* dstRow = fb.pixels.data() + (size_t)(h - 1 - y) * w * 4;
+         if (mirror)
+         {
+            for (int x = 0; x < w; x++)
+            {
+               const int dstX = w - 1 - x;
+               dstRow[dstX * 4 + 0] = srcRow[x * 4 + 2];
+               dstRow[dstX * 4 + 1] = srcRow[x * 4 + 1];
+               dstRow[dstX * 4 + 2] = srcRow[x * 4 + 0];
+               dstRow[dstX * 4 + 3] = srcRow[x * 4 + 3];
+            }
+         }
+         else
+         {
+            for (int x = 0; x < w; x++)
+            {
+               dstRow[x * 4 + 0] = srcRow[x * 4 + 2];
+               dstRow[x * 4 + 1] = srcRow[x * 4 + 1];
+               dstRow[x * 4 + 2] = srcRow[x * 4 + 0];
+               dstRow[x * 4 + 3] = srcRow[x * 4 + 3];
+            }
+         }
+      }
+
+      fb.frameSeq = ++_handle->currentSeq;
+      _handle->readyIndex.store(writeIdx, std::memory_order_release);
+   }
+
+   CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+}
+@end
+
+namespace Platform
+{
+   static AVCaptureSessionPreset PresetForResolution(AVCaptureDevice* dev, CameraResolution res)
+   {
+      switch (res)
+      {
+         case CameraResolution::Res1080p:
+            if ([dev supportsAVCaptureSessionPreset:AVCaptureSessionPreset1920x1080])
+               return AVCaptureSessionPreset1920x1080;
+            break;
+         case CameraResolution::Res720p:
+            if ([dev supportsAVCaptureSessionPreset:AVCaptureSessionPreset1280x720])
+               return AVCaptureSessionPreset1280x720;
+            break;
+         case CameraResolution::Res480p:
+            if ([dev supportsAVCaptureSessionPreset:AVCaptureSessionPreset640x480])
+               return AVCaptureSessionPreset640x480;
+            break;
+         default:
+            break;
+      }
+      if ([dev supportsAVCaptureSessionPreset:AVCaptureSessionPresetHigh])
+         return AVCaptureSessionPresetHigh;
+      return AVCaptureSessionPresetPhoto;
+   }
+
+   std::vector<CameraDeviceInfo> CameraListDevices()
+   {
+      std::vector<CameraDeviceInfo> result;
+      @autoreleasepool
+      {
+         NSMutableArray<AVCaptureDeviceType>* deviceTypes = [NSMutableArray arrayWithArray:@[
+            AVCaptureDeviceTypeBuiltInWideAngleCamera
+         ]];
+         if (@available(macOS 14.0, *))
+         {
+            [deviceTypes addObject:AVCaptureDeviceTypeContinuityCamera];
+            [deviceTypes addObject:AVCaptureDeviceTypeExternal];
+         }
+         else
+         {
+            [deviceTypes addObject:AVCaptureDeviceTypeExternalUnknown];
+         }
+
+         AVCaptureDeviceDiscoverySession* session = [AVCaptureDeviceDiscoverySession
+            discoverySessionWithDeviceTypes:deviceTypes
+                                  mediaType:AVMediaTypeVideo
+                                   position:AVCaptureDevicePositionUnspecified];
+
+         AVCaptureDevice* defaultDev = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+         std::string defaultId = defaultDev ? [[defaultDev uniqueID] UTF8String] : "";
+
+         for (AVCaptureDevice* dev in session.devices)
+         {
+            CameraDeviceInfo info;
+            info.uniqueId = [[dev uniqueID] UTF8String];
+            info.localizedName = [[dev localizedName] UTF8String];
+            info.isDefault = (!defaultId.empty() && info.uniqueId == defaultId);
+            result.push_back(info);
+         }
+      }
+      return result;
+   }
+
+   CameraHandle* CameraOpen(const std::string& deviceId, CameraResolution res, bool mirrorX, std::string& outError)
+   {
+      @autoreleasepool
+      {
+         AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+         if (status == AVAuthorizationStatusDenied || status == AVAuthorizationStatusRestricted)
+         {
+            outError = "Camera access denied. Enable Camera permission in System Settings -> Privacy & Security.";
+            return nullptr;
+         }
+         else if (status == AVAuthorizationStatusNotDetermined)
+         {
+            [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL granted) {
+            }];
+            outError = "Waiting for Camera permission...";
+            return nullptr;
+         }
+
+         AVCaptureDevice* device = nil;
+         if (!deviceId.empty())
+         {
+            device = [AVCaptureDevice deviceWithUniqueID:[NSString stringWithUTF8String:deviceId.c_str()]];
+         }
+         if (device == nil)
+         {
+            device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+         }
+         if (device == nil)
+         {
+            outError = "No camera device found";
+            return nullptr;
+         }
+
+         NSError* err = nil;
+         AVCaptureDeviceInput* input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&err];
+         if (input == nil || err != nil)
+         {
+            outError = err ? [[err localizedDescription] UTF8String] : "Could not open camera device input";
+            return nullptr;
+         }
+
+         AVCaptureSession* session = [[AVCaptureSession alloc] init];
+         [session beginConfiguration];
+
+         AVCaptureSessionPreset preset = PresetForResolution(device, res);
+         if ([session canSetSessionPreset:preset])
+            [session setSessionPreset:preset];
+
+         if (![session canAddInput:input])
+         {
+            outError = "Cannot add camera input to session";
+            return nullptr;
+         }
+         [session addInput:input];
+
+         AVCaptureVideoDataOutput* output = [[AVCaptureVideoDataOutput alloc] init];
+         output.alwaysDiscardsLateVideoFrames = YES;
+         output.videoSettings = @{
+            (id)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA)
+         };
+
+         if (![session canAddOutput:output])
+         {
+            outError = "Cannot add video data output to session";
+            return nullptr;
+         }
+         [session addOutput:output];
+
+         auto* handle = new CameraHandle();
+         handle->deviceId = [[device uniqueID] UTF8String];
+         handle->resolution = res;
+         handle->mirrorX.store(mirrorX, std::memory_order_relaxed);
+         handle->session = session;
+         handle->input = input;
+         handle->output = output;
+
+         handle->delegate = [[InfiniteCameraCaptureDelegate alloc] initWithHandle:handle];
+         handle->queue = dispatch_queue_create("com.namansoni.infinite.camera", DISPATCH_QUEUE_SERIAL);
+         [output setSampleBufferDelegate:handle->delegate queue:handle->queue];
+
+         [session commitConfiguration];
+         [session startRunning];
+
+         return handle;
+      }
+   }
+
+   void CameraClose(CameraHandle* handle)
+   {
+      if (handle == nullptr)
+         return;
+
+      @autoreleasepool
+      {
+         if (handle->session)
+         {
+            if ([handle->session isRunning])
+               [handle->session stopRunning];
+         }
+         if (handle->output)
+         {
+            [handle->output setSampleBufferDelegate:nil queue:NULL];
+         }
+         if (handle->queue)
+         {
+            dispatch_sync(handle->queue, ^{});
+         }
+         handle->delegate = nil;
+         handle->input = nil;
+         handle->output = nil;
+         handle->session = nil;
+         handle->queue = nil;
+         delete handle;
+      }
+   }
+
+   bool CameraIsRunning(CameraHandle* handle)
+   {
+      return handle != nullptr && handle->session != nil && [handle->session isRunning];
+   }
+
+   void CameraSetMirror(CameraHandle* handle, bool mirrorX)
+   {
+      if (handle)
+         handle->mirrorX.store(mirrorX, std::memory_order_relaxed);
+   }
+
+   void CameraSetResolution(CameraHandle* handle, CameraResolution res)
+   {
+      if (handle && handle->session && handle->input)
+      {
+         @autoreleasepool
+         {
+            [handle->session beginConfiguration];
+            AVCaptureSessionPreset preset = PresetForResolution(handle->input.device, res);
+            if ([handle->session canSetSessionPreset:preset])
+               [handle->session setSessionPreset:preset];
+            [handle->session commitConfiguration];
+            handle->resolution = res;
+         }
+      }
+   }
+
+   bool CameraReadFrame(CameraHandle* handle, std::vector<unsigned char>& outPixels,
+                        int& outWidth, int& outHeight, unsigned long long& outFrameSeq)
+   {
+      if (handle == nullptr)
+         return false;
+
+      int ready = handle->readyIndex.load(std::memory_order_acquire);
+      if (ready < 0 || ready > 2)
+         return false;
+
+      const CameraFrameBuffer& fb = handle->buffers[ready];
+      if (fb.frameSeq == 0 || fb.frameSeq == handle->lastReadSeq)
+         return false;
+
+      handle->readIndex.store(ready, std::memory_order_relaxed);
+
+      outPixels = fb.pixels;
+      outWidth = fb.width;
+      outHeight = fb.height;
+      outFrameSeq = fb.frameSeq;
+      handle->lastReadSeq = fb.frameSeq;
+      return true;
+   }
+}
+
+

@@ -692,5 +692,37 @@ namespace Platform
    // AppKit's -[NSApplication finishLaunching] (run inside glfwInit) clobbers.
    void InitDocumentHandlingPostGlfw();
    bool PollPendingOpenFile(std::string& outPath);
+
+   // ---- live camera input (for Video In node) -----------------------------
+   struct CameraDeviceInfo
+   {
+      std::string uniqueId;
+      std::string localizedName;
+      bool isDefault = false;
+   };
+
+   enum class CameraResolution
+   {
+      Auto = 0,
+      Res1080p,
+      Res720p,
+      Res480p,
+      Count
+   };
+
+   struct CameraHandle;
+
+   std::vector<CameraDeviceInfo> CameraListDevices();
+   CameraHandle* CameraOpen(const std::string& deviceId, CameraResolution res, bool mirrorX, std::string& outError);
+   void CameraClose(CameraHandle* handle);
+   bool CameraIsRunning(CameraHandle* handle);
+   void CameraSetMirror(CameraHandle* handle, bool mirrorX);
+   void CameraSetResolution(CameraHandle* handle, CameraResolution res);
+
+   // Drains the latest frame into outPixels (RGBA8, GL bottom-up).
+   // Returns true only when a new frame was received and written.
+   bool CameraReadFrame(CameraHandle* handle, std::vector<unsigned char>& outPixels,
+                        int& outWidth, int& outHeight, unsigned long long& outFrameSeq);
 }
+
 

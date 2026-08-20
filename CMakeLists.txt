@@ -143,6 +143,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/LayerStackNode.cpp
     src/nodes/FitNode.cpp
     src/nodes/VideoSourceNode.cpp
+    src/nodes/VideoInNode.cpp
     src/nodes/ModulatorNodes.cpp
     src/nodes/OscNodes.cpp
     src/nodes/NoiseNode.cpp
