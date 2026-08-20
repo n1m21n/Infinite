@@ -1309,7 +1309,9 @@ namespace
    // Host Component Handler (routing learn mode beginEdit/performEdit)
    // ------------------------------------------------------------------------
 
-   class HostComponentHandler : public Steinberg::Vst::IComponentHandler
+   class HostComponentHandler : public Steinberg::Vst::IComponentHandler,
+                                public Steinberg::Vst::IComponentHandler2,
+                                public Steinberg::Vst::IComponentHandlerBusActivation
    {
    public:
       explicit HostComponentHandler(Platform::PluginHandle* handle) : mHandle(handle) {}
@@ -1320,7 +1322,19 @@ namespace
              Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid))
          {
             addRef();
-            *obj = this;
+            *obj = static_cast<Steinberg::Vst::IComponentHandler*>(this);
+            return Steinberg::kResultOk;
+         }
+         if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::Vst::IComponentHandler2::iid))
+         {
+            addRef();
+            *obj = static_cast<Steinberg::Vst::IComponentHandler2*>(this);
+            return Steinberg::kResultOk;
+         }
+         if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::Vst::IComponentHandlerBusActivation::iid))
+         {
+            addRef();
+            *obj = static_cast<Steinberg::Vst::IComponentHandlerBusActivation*>(this);
             return Steinberg::kResultOk;
          }
          *obj = nullptr;
@@ -1338,6 +1352,7 @@ namespace
          return mRefCount;
       }
 
+      // IComponentHandler
       Steinberg::tresult PLUGIN_API beginEdit(Steinberg::Vst::ParamID id) override
       {
          RecordTouch(id);
@@ -1361,6 +1376,42 @@ namespace
       Steinberg::tresult PLUGIN_API restartComponent(Steinberg::int32 flags) override
       {
          (void)flags;
+         return Steinberg::kResultOk;
+      }
+
+      // IComponentHandler2
+      Steinberg::tresult PLUGIN_API setDirty(Steinberg::TBool state) override
+      {
+         (void)state;
+         return Steinberg::kResultOk;
+      }
+
+      Steinberg::tresult PLUGIN_API requestOpenEditor(Steinberg::FIDString name) override
+      {
+         (void)name;
+         return Steinberg::kResultOk;
+      }
+
+      Steinberg::tresult PLUGIN_API startGroupEdit() override
+      {
+         return Steinberg::kResultOk;
+      }
+
+      Steinberg::tresult PLUGIN_API finishGroupEdit() override
+      {
+         return Steinberg::kResultOk;
+      }
+
+      // IComponentHandlerBusActivation
+      Steinberg::tresult PLUGIN_API requestBusActivation(Steinberg::Vst::MediaType type,
+                                                         Steinberg::Vst::BusDirection dir,
+                                                         Steinberg::int32 index,
+                                                         Steinberg::TBool state) override
+      {
+         (void)type;
+         (void)dir;
+         (void)index;
+         (void)state;
          return Steinberg::kResultOk;
       }
 
@@ -2067,21 +2118,22 @@ namespace Platform
             v->arrived.store(true, std::memory_order_release);
             return;
          }
-         v->component = compRaw;
+         v->component = Steinberg::owned(compRaw);
 
          Steinberg::Vst::IEditController* ctrlRaw = nullptr;
          if (compRaw->queryInterface(Steinberg::Vst::IEditController::iid, (void**)&ctrlRaw) == Steinberg::kResultOk &&
              ctrlRaw != nullptr)
          {
-            v->controller = ctrlRaw;
+            v->controller = Steinberg::owned(ctrlRaw);
          }
          else
          {
             Steinberg::TUID controllerCID = {};
             if (compRaw->getControllerClassId(controllerCID) == Steinberg::kResultTrue)
             {
-               if (v->factory->createInstance(controllerCID, Steinberg::Vst::IEditController::iid, (void**)&ctrlRaw) == Steinberg::kResultOk)
-                  v->controller = ctrlRaw;
+               if (v->factory->createInstance(controllerCID, Steinberg::Vst::IEditController::iid, (void**)&ctrlRaw) == Steinberg::kResultOk &&
+                   ctrlRaw != nullptr)
+                  v->controller = Steinberg::owned(ctrlRaw);
             }
          }
 
@@ -2089,7 +2141,7 @@ namespace Platform
          if (compRaw->queryInterface(Steinberg::Vst::IAudioProcessor::iid, (void**)&procRaw) == Steinberg::kResultOk &&
              procRaw != nullptr)
          {
-            v->processor = procRaw;
+            v->processor = Steinberg::owned(procRaw);
          }
 
          v->arrived.store(true, std::memory_order_release);
@@ -2243,7 +2295,15 @@ namespace Platform
 
          std::memset(&v->processContext, 0, sizeof(v->processContext));
          v->processContext.sampleRate = rate;
-         v->processContext.state = Steinberg::Vst::ProcessContext::kPlaying | Steinberg::Vst::ProcessContext::kProjectTimeMusicValid;
+         v->processContext.projectTimeSamples = 0;
+         v->processContext.projectTimeMusic = 0.0;
+         v->processContext.tempo = 120.0;
+         v->processContext.timeSigNumerator = 4;
+         v->processContext.timeSigDenominator = 4;
+         v->processContext.state = Steinberg::Vst::ProcessContext::kPlaying |
+                                   Steinberg::Vst::ProcessContext::kProjectTimeMusicValid |
+                                   Steinberg::Vst::ProcessContext::kTempoValid |
+                                   Steinberg::Vst::ProcessContext::kTimeSigValid;
          v->processData.processContext = &v->processContext;
 
          return true;
@@ -2474,6 +2534,8 @@ namespace Platform
 
       v->processData.numSamples = frames;
       v->processContext.projectTimeSamples = v->sampleTime;
+      const double sr = h->sampleRate > 0.0 ? h->sampleRate : 48000.0;
+      v->processContext.projectTimeMusic = (double)v->sampleTime / sr * (120.0 / 60.0);
       v->sampleTime += frames;
 
       // Inputs
@@ -2793,7 +2855,7 @@ namespace Platform
             outError = "plugin has no custom GUI editor";
             return false;
          }
-         v->plugView = view;
+         v->plugView = Steinberg::owned(view);
       }
 
       Steinberg::ViewRect rect = {};
