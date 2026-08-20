@@ -1983,8 +1983,13 @@ public:
 
                if (gated)
                {
+                  int outNote = seqNote[idx];
+                  if (mUseGlobalScale.load(std::memory_order_relaxed))
+                     outNote = std::clamp(MusicTime::SnapToScale(outNote, Transport::Instance().Key(),
+                                                                  Transport::Instance().Scale(), MusicTime::kSnapNearest),
+                                          0, 127);
                   NoteEvent on;
-                  on.note = seqNote[idx];
+                  on.note = outNote;
                   on.velocity = seqVel[idx];
                   on.isNoteOn = true;
                   on.frameOffset = 0;
