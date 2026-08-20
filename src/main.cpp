@@ -9030,7 +9030,7 @@ namespace
       if (!blocklist.empty())
       {
          ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.55f, 0.25f, 1.0f));
-         if (ImGui::TreeNodeEx("Blocklisted VST3 bundles (crashed a previous scan)",
+         if (ImGui::TreeNodeEx("Blocklisted VST3 bundles (crashed or hung while scanning)",
                                 ImGuiTreeNodeFlags_None))
          {
             ImGui::PopStyleColor();
@@ -23197,13 +23197,46 @@ int main(int argc, char** argv)
       return RunDspTest();
 
    // Out-of-process half of the plugin scan: describe ONE bundle and exit. The
-   // parent (PluginScanner::ScanThreadMain) re-execs us once per bundle so that
-   // a plugin which cannot be loaded - damaged code pages earn an uncatchable
-   // SIGKILL from the kernel, and plenty of plugins simply crash in their own
-   // static initialisers - costs us a dead child process instead of the whole
-   // app. Output is one tab-separated record per class on stdout; anything else
-   // the plugin decides to print goes to stderr and is ignored.
+   // parent (Platform::EnumerateVST3Plugins) re-execs us once per bundle so
+   // that a plugin which cannot be loaded - damaged code pages earn an
+   // uncatchable SIGKILL from the kernel, and plenty of plugins simply crash
+   // in their own static initialisers - costs us a dead child process instead
+   // of the whole app. Output is one tab-separated record per class on
+   // stdout; anything else the plugin decides to print goes to stderr, which
+   // the parent redirects to /dev/null. No window, audio device, or node
+   // registry needed for this, so it returns well before glfwInit().
+   if (argc >= 3 && std::strcmp(argv[1], "--vst3-scan-bundle") == 0)
+   {
+#if INFINITE_ENABLE_VST3
+      // Must happen before DescribeVST3Bundle touches any plugin code - see
+      // the function's doc comment for why a scanned plugin can otherwise
+      // make this child process pop up as a spurious extra Infinite window.
+      Platform::SuppressAppUIForScanChild();
 
+      // Guards the tab-separated wire format below against a plugin whose
+      // self-reported name/vendor string happens to contain a tab or newline.
+      auto sanitize = [](std::string s)
+      {
+         for (char& c : s)
+            if (c == '\t' || c == '\n' || c == '\r')
+               c = ' ';
+         return s;
+      };
+      std::vector<Platform::PluginDesc> descs;
+      Platform::DescribeVST3Bundle(argv[2], descs);
+      for (const Platform::PluginDesc& d : descs)
+      {
+         std::printf("%s\t%s\t%s\t%s\t%s\t%d\n", sanitize(d.format).c_str(), sanitize(d.name).c_str(),
+                     sanitize(d.manufacturer).c_str(), sanitize(d.identifier).c_str(), sanitize(d.path).c_str(),
+                     d.acceptsNotes ? 1 : 0);
+      }
+      std::fflush(stdout);
+#endif
+      // Always 0: exit status communicates process health (did this bundle's
+      // code crash us?) to the parent's waitpid, not whether any class was
+      // found - a bundle with zero usable classes is a normal, clean miss.
+      return 0;
+   }
 
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
@@ -34846,5 +34879,17 @@ int main(int argc, char** argv)
    ImGui::DestroyContext();
    glfwDestroyWindow(window);
    glfwTerminate();
-   return 0;
+
+   // Not `return 0`: that runs the full C++/ObjC static-destructor chain
+   // (__cxa_finalize_ranges) before the process dies, which includes global
+   // destructors belonging to any third-party plugin framework still mapped
+   // into our address space. Seen live: Kilohearts' HeartCore crashes in its
+   // own global teardown on ordinary quit (SIGSEGV in a stale objc_msgSend
+   // "clear" call, called from exit() via __cxa_finalize_ranges) - nothing
+   // we did wrong, just an unload-order bug in code we don't control that
+   // has no business running in a process that's about to disappear anyway.
+   // Everything we actually need torn down already happened above; _Exit
+   // skips straight to process termination without running anyone else's
+   // destructors.
+   std::_Exit(0);
 }

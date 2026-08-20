@@ -335,8 +335,30 @@ namespace Platform
    bool DescribeAudioUnitBundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
 
    // Enumerates VST3 plugins (.vst3 bundles) found within the specified folders.
-   // Gated by INFINITE_ENABLE_VST3 at build time (no-op when disabled).
+   // Gated by INFINITE_ENABLE_VST3 at build time (no-op when disabled). Each
+   // bundle is probed out-of-process (see main.cpp's "--vst3-scan-bundle"
+   // child mode) so a plugin that crashes or hangs while its factory is being
+   // read only costs a dead/killed child, and the walk moves on to the next
+   // bundle instead of taking the whole app down mid-scan.
    void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out);
+
+   // Absolute path to this process's own executable (argv[0] resolved via
+   // _NSGetExecutablePath), used to re-exec ourselves for the VST3 scan's
+   // "--vst3-scan-bundle" child mode.
+   std::string ExecutablePath();
+
+   // Must be called first thing in the "--vst3-scan-bundle" child process,
+   // before any plugin code runs. The child is a re-exec of this same app
+   // binary, so it shares our bundle identity - if a scanned plugin's Cocoa
+   // UI classes touch [NSApplication sharedApplication] during their static
+   // init/factory instantiation (common for VST3 bundles with a Cocoa
+   // editor), AppKit lazily creates a default-policy shared application for
+   // *this* process and it shows up as its own Dock icon/window, i.e. a
+   // spurious extra "Infinite" instance. Creating the shared application
+   // ourselves first and setting it to the Prohibited activation policy
+   // claims that singleton before the plugin can, so nothing the plugin does
+   // afterward can make the child visible.
+   void SuppressAppUIForScanChild();
 
    // Resolves a dropped .vst3 bundle back to the plugin description(s) it contains.
    bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
@@ -349,13 +371,17 @@ namespace Platform
    // just the two OS-standard VST3 directories. No-op when VST3 is disabled.
    void SetVST3SearchFolders(const std::vector<std::string>& folders);
 
-   // Crash-safety for the VST3 scan. A bundle is written to a sentinel file
-   // immediately before it is probed in-process (CFBundleLoadExecutable /
-   // bundleEntry / bundleExit) and cleared right after a clean return. If the
-   // process is found dead mid-probe - the sentinel is non-empty at the next
-   // launch - that bundle's path is appended to a persisted blocklist and
-   // skipped by every future scan. Surface both lists in the Plugins panel,
-   // with a way to clear the blocklist and retry.
+   // Crash-safety for the VST3 scan. Each bundle is probed in a disposable
+   // child process (see EnumerateVST3Plugins); if that child is killed by a
+   // signal, exits nonzero, or simply hangs, its bundle path is appended to a
+   // persisted blocklist immediately - same scan, no relaunch needed - and
+   // skipped by every future scan. A sentinel file backs this up for the rare
+   // case where the child dies before even that: it is written immediately
+   // before the in-process probe inside the child (CFBundleLoadExecutable /
+   // bundleEntry / bundleExit) and cleared right after a clean return, so a
+   // sentinel still non-empty at the next launch blocklists that bundle too.
+   // Surface both lists in the Plugins panel, with a way to clear the
+   // blocklist and retry.
    std::vector<std::string> VST3Blocklist();
    void ClearVST3Blocklist();
 

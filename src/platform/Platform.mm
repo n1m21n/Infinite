@@ -3245,6 +3245,15 @@ namespace Platform
       return buf;
    }
 
+   void SuppressAppUIForScanChild()
+   {
+      @autoreleasepool
+      {
+         [NSApplication sharedApplication];
+         [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
+      }
+   }
+
    PluginHandle* PluginCreate(const PluginDesc& desc, double sampleRate, int maxBlockFrames)
    {
       if (desc.format == "vst3")
@@ -3284,17 +3293,28 @@ namespace Platform
          return h;
       }
 
-      // Asynchronous instantiation via AUv3 API. The completion handler can
-      // be called on an internal queue, so arrival fields are guarded by
-      // arrivalMutex.
-      [AUAudioUnit instantiateWithComponentDescription:cd
-                                               options:0
-                                     completionHandler:^(AUAudioUnit* au, NSError* error) {
+      // Synchronous AUv3 init, deliberately not the completion-handler async
+      // variant (instantiateWithComponentDescription:options:completionHandler:).
+      // That API is documented to run its handler "on an arbitrary queue" -
+      // in practice that means some of the plugin's own factory/init code can
+      // run off whatever thread called us, same class of bug as the VST3
+      // background-dispatch fix above. Seen live: Native Instruments' Qt-based
+      // plugins (Massive X, and presumably Pigments) hit a
+      // dispatch_assert_queue trap because Qt's Cocoa integration requires
+      // main-thread init and this async path didn't guarantee it. The
+      // synchronous initializer runs entirely on the calling thread (this is
+      // called from the main thread via AudioPluginNode::PluginCreate), which
+      // is what a spec-compliant host needs here. This does mean the call
+      // briefly blocks the caller instead of returning Pending immediately -
+      // same real tradeoff as every other compliant AU/VST3 host makes.
+      NSError* error = nil;
+      AUAudioUnit* au = [[AUAudioUnit alloc] initWithComponentDescription:cd options:0 error:&error];
+      {
          std::lock_guard<std::mutex> lock(h->arrivalMutex);
          h->arrivedUnit = au;
          h->arrivedError = error;
          h->arrived.store(true, std::memory_order_release);
-      }];
+      }
 
       return h;
    }
