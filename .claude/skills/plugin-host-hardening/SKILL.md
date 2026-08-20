@@ -6,9 +6,8 @@ description: The strategy and diagnostic method for stopping third-party VST3/AU
 Paths below are relative to the repo root (`/Users/namansoni/infinite`),
 not this skill directory.
 
-This work lives on the **`build/vst3-latest`** branch and is **private**
-— see the `repo-privacy-split` skill before any `git push`. VST3 hosting
-has never shipped to the public `origin`.
+This work lives on the **`build/vst3-latest`** branch, which has not been
+merged into `main`. VST3 hosting has never shipped to the public `origin`.
 
 ## The problem in one paragraph
 
