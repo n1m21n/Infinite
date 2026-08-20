@@ -520,6 +520,141 @@ namespace Platform
          out.push_back(std::move(d));
       return ProbeOutcome::Success;
    }
+
+   void ProbeVST3BundlesBatch(std::vector<std::string> bundlesToScan, std::vector<Platform::PluginDesc>& out)
+   {
+      const std::string exe = Platform::ScannerExecutablePath();
+      if (exe.empty() || !fs::exists(exe))
+      {
+         for (const auto& path : bundlesToScan)
+         {
+            if (IsBlocklistedPath(path))
+            {
+               RecordScanFailure(path);
+               continue;
+            }
+            const ProbeOutcome outcome = ProbeVST3BundleOutOfProcess(path, out);
+            if (outcome == ProbeOutcome::Crashed)
+            {
+               RecordScanFailure(path);
+               std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+               AddToBlocklistLocked(path);
+            }
+            else if (outcome == ProbeOutcome::CleanMiss)
+            {
+               RecordScanFailure(path);
+            }
+         }
+         return;
+      }
+
+      while (!bundlesToScan.empty())
+      {
+         auto it = bundlesToScan.begin();
+         while (it != bundlesToScan.end())
+         {
+            if (IsBlocklistedPath(*it))
+            {
+               RecordScanFailure(*it);
+               it = bundlesToScan.erase(it);
+            }
+            else
+            {
+               ++it;
+            }
+         }
+         if (bundlesToScan.empty())
+            break;
+
+         int pipeFds[2];
+         if (pipe(pipeFds) != 0)
+            break;
+
+         posix_spawn_file_actions_t actions;
+         posix_spawn_file_actions_init(&actions);
+         posix_spawn_file_actions_adddup2(&actions, pipeFds[1], STDOUT_FILENO);
+         posix_spawn_file_actions_addclose(&actions, pipeFds[0]);
+         posix_spawn_file_actions_addclose(&actions, pipeFds[1]);
+         posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
+
+         std::vector<std::string> argsStorage;
+         argsStorage.push_back("infinite-vst3-scanner");
+         argsStorage.push_back("--batch");
+         for (const auto& b : bundlesToScan)
+            argsStorage.push_back(b);
+
+         std::vector<char*> childArgv;
+         for (auto& s : argsStorage)
+            childArgv.push_back(s.data());
+         childArgv.push_back(nullptr);
+
+         pid_t pid = 0;
+         const int rc = posix_spawn(&pid, exe.c_str(), &actions, nullptr, childArgv.data(), *_NSGetEnviron());
+         posix_spawn_file_actions_destroy(&actions);
+         close(pipeFds[1]);
+         if (rc != 0)
+         {
+            close(pipeFds[0]);
+            break;
+         }
+
+         std::string output;
+         char buf[4096];
+         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+         bool timedOut = false;
+         for (;;)
+         {
+            const auto remaining = deadline - std::chrono::steady_clock::now();
+            if (remaining.count() <= 0)
+            {
+               timedOut = true;
+               break;
+            }
+            fd_set fds;
+            FD_ZERO(&fds);
+            FD_SET(pipeFds[0], &fds);
+            timeval tv;
+            tv.tv_sec = (long)std::chrono::duration_cast<std::chrono::seconds>(remaining).count();
+            tv.tv_usec = (long)(std::chrono::duration_cast<std::chrono::microseconds>(remaining).count() % 1000000);
+            const int sel = select(pipeFds[0] + 1, &fds, nullptr, nullptr, &tv);
+            if (sel < 0 && errno == EINTR)
+               continue;
+            if (sel <= 0)
+            {
+               timedOut = (sel == 0);
+               break;
+            }
+            const ssize_t n = read(pipeFds[0], buf, sizeof(buf));
+            if (n <= 0)
+               break;
+            output.append(buf, (size_t)n);
+         }
+         close(pipeFds[0]);
+
+         if (timedOut)
+         {
+            kill(pid, SIGKILL);
+            int status = 0;
+            waitpid(pid, &status, 0);
+            EnsureSentinelCheckedOnce();
+            break;
+         }
+
+         int status = 0;
+         waitpid(pid, &status, 0);
+
+         std::vector<Platform::PluginDesc> parsed = ParseProbeOutput(output);
+         for (Platform::PluginDesc& d : parsed)
+            out.push_back(std::move(d));
+
+         if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+         {
+            break;
+         }
+
+         EnsureSentinelCheckedOnce();
+      }
+   }
 }
 
 namespace Platform
@@ -1633,6 +1768,7 @@ namespace Platform
          gScanFailures.clear();
       }
 
+      std::vector<std::string> bundlesToScan;
       for (const std::string& root : folders)
       {
          if (root.empty())
@@ -1659,26 +1795,7 @@ namespace Platform
                {
                   if (entry.path().extension() == ".vst3")
                   {
-                     const std::string bundlePath = entry.path().string();
-                     if (IsBlocklistedPath(bundlePath))
-                     {
-                        VST3Trace("skipping blocklisted bundle: %s", bundlePath.c_str());
-                        RecordScanFailure(bundlePath);
-                     }
-                     else
-                     {
-                        const ProbeOutcome outcome = ProbeVST3BundleOutOfProcess(bundlePath, out);
-                        if (outcome == ProbeOutcome::Crashed)
-                        {
-                           RecordScanFailure(bundlePath);
-                           std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
-                           AddToBlocklistLocked(bundlePath);
-                        }
-                        else if (outcome == ProbeOutcome::CleanMiss)
-                        {
-                           RecordScanFailure(bundlePath);
-                        }
-                     }
+                     bundlesToScan.push_back(entry.path().string());
                   }
                   else
                   {
@@ -1691,6 +1808,8 @@ namespace Platform
             }
          }
       }
+
+      ProbeVST3BundlesBatch(std::move(bundlesToScan), out);
    }
 
    bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out)

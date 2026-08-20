@@ -299,6 +299,9 @@ if(INFINITE_ENABLE_VST3)
             "-framework OpenGL"
             "-framework IOSurface"
         )
+        target_link_options(infinite-vst3-scanner PRIVATE
+            "-Wl,-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_SOURCE_DIR}/cmake/Scanner-Info.plist"
+        )
         add_dependencies(Infinite infinite-vst3-scanner)
         add_custom_command(TARGET Infinite POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy
