@@ -627,17 +627,16 @@ function animateNatureBranches(timestamp) {
 
 
 // ==========================================================================
-// 3. Creative Streams Mini-Canvas Animations
+// 3. Creative Streams Mini-Canvas Animations (Fully Interactive)
 // ==========================================================================
 
-// Animation 1: Authentic GLSL Fragment Shader from Infinite (FormulaNode.cpp)
+// Animation 1: Authentic GLSL Fragment Shader with Interactive Liquid Flow & Touch Swirl
 function initWavesAnimation() {
   const canvas = document.getElementById('anim-waves');
   if (!canvas) return;
 
   const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
   if (!gl) {
-    // 2D Canvas Fallback
     initWaves2DFallback(canvas);
     return;
   }
@@ -649,33 +648,48 @@ function initWavesAnimation() {
     }
   `;
 
-  // Exact GLSL formula from Infinite app FormulaNode.cpp (Interference Waves Preset)
+  // GLSL formula with interactive fluid liquid vortex & chromatic wave distortion
   const fsSource = `
     precision highp float;
     uniform vec2 u_resolution;
     uniform float u_time;
-    uniform float uA;
-    uniform float uB;
-    uniform float uC;
-    uniform float uD;
+    uniform vec2 u_mouse;
+    uniform vec2 u_velocity;
+    uniform float u_touch;
 
     void main() {
       vec2 uv = gl_FragCoord.xy / u_resolution.xy;
       vec2 p = uv - vec2(0.5);
       p.x *= u_resolution.x / u_resolution.y;
       float t = u_time;
+
+      // Interactive Liquid Flow disturbance
+      vec2 m = u_mouse;
+      m.x *= u_resolution.x / u_resolution.y;
+      float dist = length(p - m);
       
+      // Fluid vortex & pressure wave
+      float fluidIntensity = u_touch * exp(-dist * 4.5);
+      vec2 swirl = vec2(-(p.y - m.y), p.x - m.x) * fluidIntensity * 2.2;
+      vec2 fluidDisplace = (swirl + u_velocity * fluidIntensity * 0.8) * 0.35;
+      
+      vec2 q = p - fluidDisplace;
+
+      // Infinite Interference Wave Formula
       float v = 0.0;
       for (int i = 0; i < 6; i++) {
         float fi = float(i);
-        vec2 src = 0.35 * vec2(cos(fi * 1.7 + t * 0.2 * (0.8 + uB)), sin(fi * 2.3 + t * 0.15 * (0.8 + uB)));
-        v += sin(length(p - src) * (26.0 + uA * 50.0) - t * 2.8);
+        vec2 src = 0.35 * vec2(cos(fi * 1.7 + t * 0.22), sin(fi * 2.3 + t * 0.16));
+        v += sin(length(q - src) * (26.0 + fluidIntensity * 20.0) - t * 2.6 + fluidIntensity * 3.14);
       }
       v /= 6.0;
+
+      // Color grading with liquid chromatic flare
+      vec3 col = 0.5 + 0.5 * cos(6.2831 * (vec3(0.02, 0.28, 0.55) + v * 1.25 + fluidIntensity * 0.35));
+      col += vec3(0.2, 0.08, 0.28) * fluidIntensity;
       
-      vec3 col = 0.5 + 0.5 * cos(6.2831 * (vec3(0.02, 0.28, 0.55) + v * 1.2 + uC));
-      // Subtle vignette & dark tone curve
-      col *= 1.0 - dot(p, p) * 0.45;
+      // Vignette
+      col *= 1.0 - dot(p, p) * 0.5;
       gl_FragColor = vec4(col, 1.0);
     }
   `;
@@ -704,7 +718,6 @@ function initWavesAnimation() {
   gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.warn(gl.getProgramInfoLog(program));
     initWaves2DFallback(canvas);
     return;
   }
@@ -712,21 +725,46 @@ function initWavesAnimation() {
   const positionBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-    -1, -1,
-     1, -1,
-    -1,  1,
-    -1,  1,
-     1, -1,
-     1,  1
+    -1, -1,  1, -1, -1,  1,
+    -1,  1,  1, -1,  1,  1
   ]), gl.STATIC_DRAW);
 
   const posAttr = gl.getAttribLocation(program, 'position');
   const resUniform = gl.getUniformLocation(program, 'u_resolution');
   const timeUniform = gl.getUniformLocation(program, 'u_time');
-  const uAUniform = gl.getUniformLocation(program, 'uA');
-  const uBUniform = gl.getUniformLocation(program, 'uB');
-  const uCUniform = gl.getUniformLocation(program, 'uC');
-  const uDUniform = gl.getUniformLocation(program, 'uD');
+  const mouseUniform = gl.getUniformLocation(program, 'u_mouse');
+  const velUniform = gl.getUniformLocation(program, 'u_velocity');
+  const touchUniform = gl.getUniformLocation(program, 'u_touch');
+
+  let mouseX = 0, mouseY = 0;
+  let prevMouseX = 0, prevMouseY = 0;
+  let velX = 0, velY = 0;
+  let touchIntensity = 0.0;
+  let isPointerActive = false;
+
+  function updatePointer(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const nx = (clientX - rect.left) / rect.width - 0.5;
+    const ny = -((clientY - rect.top) / rect.height - 0.5);
+
+    velX = (nx - prevMouseX) * 8.0;
+    velY = (ny - prevMouseY) * 8.0;
+    prevMouseX = mouseX = nx;
+    prevMouseY = mouseY = ny;
+    touchIntensity = 1.0;
+    isPointerActive = true;
+  }
+
+  canvas.addEventListener('mousemove', updatePointer, { passive: true });
+  canvas.addEventListener('mousedown', (e) => { isPointerActive = true; updatePointer(e); }, { passive: true });
+  window.addEventListener('mouseup', () => { isPointerActive = false; }, { passive: true });
+  canvas.addEventListener('mouseleave', () => { isPointerActive = false; }, { passive: true });
+
+  canvas.addEventListener('touchstart', (e) => { isPointerActive = true; updatePointer(e); }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { updatePointer(e); }, { passive: true });
+  canvas.addEventListener('touchend', () => { isPointerActive = false; }, { passive: true });
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -742,6 +780,13 @@ function initWavesAnimation() {
     const now = performance.now();
     const elapsed = (now - startTime) * 0.001;
 
+    // Smooth inertia and touch decay
+    if (!isPointerActive) {
+      touchIntensity += (0.0 - touchIntensity) * 0.04;
+    }
+    velX *= 0.88;
+    velY *= 0.88;
+
     gl.useProgram(program);
     gl.enableVertexAttribArray(posAttr);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -749,10 +794,9 @@ function initWavesAnimation() {
 
     gl.uniform2f(resUniform, canvas.width, canvas.height);
     gl.uniform1f(timeUniform, elapsed);
-    gl.uniform1f(uAUniform, 0.45 + 0.3 * Math.sin(elapsed * 0.4));
-    gl.uniform1f(uBUniform, 0.5 + 0.3 * Math.cos(elapsed * 0.3));
-    gl.uniform1f(uCUniform, (elapsed * 0.08) % 1.0);
-    gl.uniform1f(uDUniform, 0.5);
+    gl.uniform2f(mouseUniform, mouseX, mouseY);
+    gl.uniform2f(velUniform, velX, velY);
+    gl.uniform1f(touchUniform, touchIntensity);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
@@ -781,8 +825,7 @@ function initWaves2DFallback(canvas) {
       ctx.strokeStyle = `rgba(217, 119, 54, ${0.35 + Math.sin(y * 0.05 + t) * 0.25})`;
       for (let x = 0; x < w; x += 4 * dpr) {
         const d1 = Math.hypot(x - w * 0.35, y - h * 0.5);
-        const d2 = Math.hypot(x - w * 0.65, y - h * 0.5);
-        const wave = Math.sin(d1 * (0.08 / dpr) - t * 2) + Math.sin(d2 * (0.08 / dpr) - t * 2);
+        const wave = Math.sin(d1 * (0.08 / dpr) - t * 2);
         const py = y + wave * (6 * dpr);
         if (x === 0) ctx.moveTo(x, py); else ctx.lineTo(x, py);
       }
@@ -793,12 +836,16 @@ function initWaves2DFallback(canvas) {
   window.addEventListener('resize', resize, { passive: true });
 }
 
-// Animation 2: 3D Wavetable Movement
+// Animation 2: 3D Wavetable Synthesis with Interactive Position Scrubbing
 function initWavetableAnimation() {
   const canvas = document.getElementById('anim-wavetable');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   let t = 0;
+  let targetPos = 0.5;
+  let currentPos = 0.5;
+  let isDragging = false;
+  let userInteracting = false;
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -808,48 +855,299 @@ function initWavetableAnimation() {
   }
   resize();
 
+  function updateScrub(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const relX = (clientX - rect.left) / rect.width;
+    const relY = (clientY - rect.top) / rect.height;
+    // Scrub diagonally across 3D isometric stack
+    targetPos = Math.max(0, Math.min(1, relY * 0.7 + relX * 0.3));
+    userInteracting = true;
+  }
+
+  canvas.addEventListener('mousedown', (e) => { isDragging = true; updateScrub(e); });
+  window.addEventListener('mousemove', (e) => { if (isDragging) updateScrub(e); });
+  window.addEventListener('mouseup', () => { isDragging = false; });
+
+  canvas.addEventListener('touchstart', (e) => { isDragging = true; updateScrub(e); }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { if (isDragging) updateScrub(e); }, { passive: true });
+  canvas.addEventListener('touchend', () => { isDragging = false; });
+
   function draw() {
-    t += 0.025;
+    t += 0.028;
     const w = canvas.width;
     const h = canvas.height;
     const dpr = window.devicePixelRatio || 1;
+
+    // Smooth position interpolation
+    if (!userInteracting && !isDragging) {
+      targetPos = (Math.sin(t * 0.8) * 0.5 + 0.5);
+    }
+    currentPos += (targetPos - currentPos) * 0.12;
+
     ctx.fillStyle = '#0f1218';
     ctx.fillRect(0, 0, w, h);
 
-    const frames = 10;
-    const sliceWidth = w * 0.7;
+    const frames = 12;
+    const sliceWidth = w * 0.72;
+    const activeFrameFloat = currentPos * (frames - 1);
+    const activeFrameIdx = Math.round(activeFrameFloat);
 
-    for (let f = 0; f < frames; f++) {
-      const depth = f / frames;
-      const ox = w * 0.15 + (f - frames / 2) * (4 * dpr);
-      const oy = h * 0.28 + f * (10 * dpr);
-      const alpha = 0.2 + depth * 0.7;
-
+    // Draw background 3D grid guidelines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+    ctx.lineWidth = 1 * dpr;
+    for (let g = 0; g <= 4; g++) {
+      const gx = w * 0.14 + (sliceWidth * (g / 4));
       ctx.beginPath();
-      ctx.strokeStyle = f === Math.floor((Math.sin(t) * 0.5 + 0.5) * (frames - 1)) 
-        ? '#c2593f' 
-        : `rgba(233, 196, 106, ${alpha})`;
-      ctx.lineWidth = f === Math.floor((Math.sin(t) * 0.5 + 0.5) * (frames - 1)) ? 2.5 * dpr : 1.2 * dpr;
+      ctx.moveTo(gx - (frames / 2) * (5 * dpr), h * 0.22);
+      ctx.lineTo(gx + (frames / 2) * (5 * dpr), h * 0.22 + (frames - 1) * (11 * dpr));
+      ctx.stroke();
+    }
+
+    // Draw Stack of Wavetable Slices from Back to Front
+    for (let f = 0; f < frames; f++) {
+      const depth = f / (frames - 1);
+      const ox = w * 0.14 + (f - frames / 2) * (5 * dpr);
+      const oy = h * 0.24 + f * (11 * dpr);
+      
+      const distFromActive = Math.abs(f - activeFrameFloat);
+      const isActive = distFromActive < 0.85;
+      const proximityAlpha = Math.max(0.12, 1.0 - distFromActive * 0.35);
+
+      // Gradient Fill under the active slice
+      if (isActive) {
+        ctx.beginPath();
+        for (let x = 0; x <= sliceWidth; x += 4 * dpr) {
+          const u = x / sliceWidth;
+          const morph = (
+            Math.sin(u * Math.PI * (2 + f * 0.45) + t * 1.8) * 0.65 +
+            Math.sin(u * Math.PI * 4.0 + f * 0.8) * 0.35
+          ) * Math.sin(u * Math.PI);
+          const y = oy - morph * (26 * dpr);
+          if (x === 0) ctx.moveTo(ox + x, oy);
+          ctx.lineTo(ox + x, y);
+        }
+        ctx.lineTo(ox + sliceWidth, oy);
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(ox, oy - 28 * dpr, ox, oy);
+        grad.addColorStop(0, `rgba(224, 122, 95, ${0.35 * (1.0 - distFromActive)})`);
+        grad.addColorStop(1, 'rgba(224, 122, 95, 0.0)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      // Draw Slice Stroke
+      ctx.beginPath();
+      if (isActive) {
+        ctx.strokeStyle = `rgba(224, 122, 95, ${0.95 - distFromActive * 0.2})`;
+        ctx.lineWidth = (2.6 - distFromActive * 1.0) * dpr;
+      } else {
+        ctx.strokeStyle = `rgba(233, 196, 106, ${proximityAlpha * 0.45})`;
+        ctx.lineWidth = 1.1 * dpr;
+      }
 
       for (let x = 0; x <= sliceWidth; x += 3 * dpr) {
         const u = x / sliceWidth;
-        const morph = Math.sin(u * Math.PI * (2 + f * 0.5) + t * 2) * Math.cos(u * Math.PI + f * 0.3);
-        const y = oy - morph * (22 * dpr);
+        const morph = (
+          Math.sin(u * Math.PI * (2 + f * 0.45) + t * 1.8) * 0.65 +
+          Math.sin(u * Math.PI * 4.0 + f * 0.8) * 0.35
+        ) * Math.sin(u * Math.PI);
+        const y = oy - morph * (26 * dpr);
         if (x === 0) ctx.moveTo(ox + x, y);
         else ctx.lineTo(ox + x, y);
       }
       ctx.stroke();
     }
+
+    // Active Position Scrubber Indicator Line
+    const activeOy = h * 0.24 + activeFrameFloat * (11 * dpr);
+    const activeOx = w * 0.14 + (activeFrameFloat - frames / 2) * (5 * dpr);
+    ctx.beginPath();
+    ctx.arc(activeOx + sliceWidth + 10 * dpr, activeOy, 3.5 * dpr, 0, Math.PI * 2);
+    ctx.fillStyle = '#e07a5f';
+    ctx.fill();
+
+    // Subtle Position Notch Bar on Left
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillRect(w * 0.06, h * 0.25, 2 * dpr, h * 0.5);
+    ctx.fillStyle = '#e07a5f';
+    ctx.fillRect(w * 0.05, h * 0.25 + currentPos * (h * 0.5 - 6 * dpr), 4 * dpr, 6 * dpr);
   }
+
   createViewportLoop(canvas, draw);
   window.addEventListener('resize', resize, { passive: true });
 }
 
-// Animation 3: 3D Geometry Rotating Cube Render with Dynamic Particle System
+// Animation 3: 3D Geometry Rotating & Interactive Three.js Scene Cube
 function initParticlesAnimation() {
   const canvas = document.getElementById('anim-particles');
   if (!canvas) return;
+
+  // Use Three.js if available, otherwise pure WebGL 3D
+  if (typeof THREE !== 'undefined') {
+    initThreeJSCube(canvas);
+  } else {
+    initCanvas3DCube(canvas);
+  }
+}
+
+function initThreeJSCube(canvas) {
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 0, 4.2);
+
+  // Group for user rotation
+  const cubeGroup = new THREE.Group();
+  scene.add(cubeGroup);
+
+  // 1. Faceted Glass Polyhedral Core (Beveled Cube)
+  const boxGeo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+  const boxMat = new THREE.MeshBasicMaterial({
+    color: 0x4d7c67,
+    wireframe: false,
+    transparent: true,
+    opacity: 0.16
+  });
+  const coreMesh = new THREE.Mesh(boxGeo, boxMat);
+  cubeGroup.add(coreMesh);
+
+  // 2. Wireframe Outline
+  const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xe9c46a, linewidth: 2 });
+  const wireframe = new THREE.LineSegments(edgesGeo, lineMat);
+  cubeGroup.add(wireframe);
+
+  // 3. Glowing Corner Vertex Dots
+  const dotGeo = new THREE.BufferGeometry();
+  const boxPos = boxGeo.attributes.position.array;
+  const uniqueVerts = [];
+  for (let i = 0; i < boxPos.length; i += 3) {
+    const x = boxPos[i], y = boxPos[i+1], z = boxPos[i+2];
+    if (!uniqueVerts.some(v => Math.hypot(v[0]-x, v[1]-y, v[2]-z) < 0.01)) {
+      uniqueVerts.push([x, y, z]);
+    }
+  }
+  const vertArray = new Float32Array(uniqueVerts.flat());
+  dotGeo.setAttribute('position', new THREE.BufferAttribute(vertArray, 3));
+  const dotMat = new THREE.PointsMaterial({ color: 0xe07a5f, size: 0.14 });
+  const dotsMesh = new THREE.Points(dotGeo, dotMat);
+  cubeGroup.add(dotsMesh);
+
+  // 4. Orbiting Particle Halo
+  const particleCount = 48;
+  const partGeo = new THREE.BufferGeometry();
+  const partPositions = new Float32Array(particleCount * 3);
+  const partSpeeds = [];
+  const partRadii = [];
+  const partPhis = [];
+
+  for (let i = 0; i < particleCount; i++) {
+    const r = 1.4 + Math.random() * 1.4;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = (Math.random() - 0.5) * Math.PI;
+    partRadii.push(r);
+    partPhis.push(phi);
+    partSpeeds.push((0.01 + Math.random() * 0.015) * (Math.random() > 0.5 ? 1 : -1));
+
+    partPositions[i * 3] = r * Math.cos(theta) * Math.cos(phi);
+    partPositions[i * 3 + 1] = r * Math.sin(phi);
+    partPositions[i * 3 + 2] = r * Math.sin(theta) * Math.cos(phi);
+  }
+  partGeo.setAttribute('position', new THREE.BufferAttribute(partPositions, 3));
+  const particleMat = new THREE.PointsMaterial({
+    color: 0x81b29a,
+    size: 0.08,
+    transparent: true,
+    opacity: 0.85
+  });
+  const particlePoints = new THREE.Points(partGeo, particleMat);
+  cubeGroup.add(particlePoints);
+
+  // User Drag Rotation & Inertia
+  let isDragging = false;
+  let prevX = 0, prevY = 0;
+  let velRotX = 0.008, velRotY = 0.012;
+
+  function onPointerDown(e) {
+    isDragging = true;
+    prevX = e.touches ? e.touches[0].clientX : e.clientX;
+    prevY = e.touches ? e.touches[0].clientY : e.clientY;
+  }
+
+  function onPointerMove(e) {
+    if (!isDragging) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = x - prevX;
+    const dy = y - prevY;
+    velRotY = dx * 0.006;
+    velRotX = dy * 0.006;
+    prevX = x;
+    prevY = y;
+  }
+
+  function onPointerUp() {
+    isDragging = false;
+  }
+
+  canvas.addEventListener('mousedown', onPointerDown, { passive: true });
+  window.addEventListener('mousemove', onPointerMove, { passive: true });
+  window.addEventListener('mouseup', onPointerUp, { passive: true });
+
+  canvas.addEventListener('touchstart', onPointerDown, { passive: true });
+  canvas.addEventListener('touchmove', onPointerMove, { passive: true });
+  canvas.addEventListener('touchend', onPointerUp, { passive: true });
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  }
+  resize();
+
+  let pTime = 0;
+  function render() {
+    pTime++;
+    cubeGroup.rotation.y += velRotY;
+    cubeGroup.rotation.x += velRotX;
+
+    // Friction / damping back to gentle idle rotation
+    if (!isDragging) {
+      velRotY += (0.008 - velRotY) * 0.04;
+      velRotX += (0.004 - velRotX) * 0.04;
+    }
+
+    // Orbit particles
+    const positions = partGeo.attributes.position.array;
+    for (let i = 0; i < particleCount; i++) {
+      const theta = pTime * partSpeeds[i] + i * 1.2;
+      const r = partRadii[i];
+      const phi = partPhis[i];
+      positions[i * 3] = r * Math.cos(theta) * Math.cos(phi);
+      positions[i * 3 + 1] = r * Math.sin(phi);
+      positions[i * 3 + 2] = r * Math.sin(theta) * Math.cos(phi);
+    }
+    partGeo.attributes.position.needsUpdate = true;
+
+    renderer.render(scene, camera);
+  }
+
+  createViewportLoop(canvas, render);
+  window.addEventListener('resize', resize, { passive: true });
+}
+
+function initCanvas3DCube(canvas) {
   const ctx = canvas.getContext('2d');
+  let rotX = 0.4, rotY = 0.6;
+  let velX = 0.012, velY = 0.016;
+  let isDragging = false, prevX = 0, prevY = 0;
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -859,158 +1157,80 @@ function initParticlesAnimation() {
   }
   resize();
 
-  // Define 8 vertices of a 3D Cube centered at origin
   const cubeVertices = [
-    { x: -1, y: -1, z: -1 },
-    { x:  1, y: -1, z: -1 },
-    { x:  1, y:  1, z: -1 },
-    { x: -1, y:  1, z: -1 },
-    { x: -1, y: -1, z:  1 },
-    { x:  1, y: -1, z:  1 },
-    { x:  1, y:  1, z:  1 },
-    { x: -1, y:  1, z:  1 }
+    { x: -1, y: -1, z: -1 }, { x:  1, y: -1, z: -1 },
+    { x:  1, y:  1, z: -1 }, { x: -1, y:  1, z: -1 },
+    { x: -1, y: -1, z:  1 }, { x:  1, y: -1, z:  1 },
+    { x:  1, y:  1, z:  1 }, { x: -1, y:  1, z:  1 }
   ];
-
-  // 12 Edges connecting vertices
   const cubeEdges = [
-    [0, 1], [1, 2], [2, 3], [3, 0],
-    [4, 5], [5, 6], [6, 7], [7, 4],
-    [0, 4], [1, 5], [2, 6], [3, 7]
+    [0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]
   ];
 
-  // 6 Faces (vertex index quads)
-  const cubeFaces = [
-    [0, 1, 2, 3], // Back
-    [4, 5, 6, 7], // Front
-    [0, 1, 5, 4], // Bottom
-    [2, 3, 7, 6], // Top
-    [0, 3, 7, 4], // Left
-    [1, 2, 6, 5]  // Right
-  ];
-
-  // 3D Orbiting Particle System
-  const particleCount = 42;
-  const particles = [];
-  for (let i = 0; i < particleCount; i++) {
-    const radius = 1.3 + Math.random() * 1.6;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = (Math.random() - 0.5) * Math.PI;
-    const speed = (0.012 + Math.random() * 0.016) * (Math.random() > 0.5 ? 1 : -1);
-    particles.push({
-      radius,
-      theta,
-      phi,
-      speed,
-      size: 1.2 + Math.random() * 1.8,
-      color: ['#81b29a', '#e9c46a', '#e07a5f', '#6b6b99'][i % 4]
-    });
+  function onDown(e) {
+    isDragging = true;
+    prevX = e.touches ? e.touches[0].clientX : e.clientX;
+    prevY = e.touches ? e.touches[0].clientY : e.clientY;
   }
-
-  let rotX = 0.4;
-  let rotY = 0.6;
-  let rotZ = 0.2;
-
-  function project3D(v, w, h, dpr) {
-    let x1 = v.x * Math.cos(rotY) + v.z * Math.sin(rotY);
-    let z1 = -v.x * Math.sin(rotY) + v.z * Math.cos(rotY);
-
-    let y2 = v.y * Math.cos(rotX) - z1 * Math.sin(rotX);
-    let z2 = v.y * Math.sin(rotX) + z1 * Math.cos(rotX);
-
-    let x3 = x1 * Math.cos(rotZ) - y2 * Math.sin(rotZ);
-    let y3 = x1 * Math.sin(rotZ) + y2 * Math.cos(rotZ);
-
-    const fov = 3.2;
-    const scale = (Math.min(w, h) * 0.44) / (fov + z2);
-
-    return {
-      x: w * 0.5 + x3 * scale,
-      y: h * 0.5 + y3 * scale,
-      z: z2,
-      scale
-    };
+  function onMove(e) {
+    if (!isDragging) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    velY = (x - prevX) * 0.008;
+    velX = (y - prevY) * 0.008;
+    prevX = x; prevY = y;
   }
+  function onUp() { isDragging = false; }
+
+  canvas.addEventListener('mousedown', onDown, { passive: true });
+  window.addEventListener('mousemove', onMove, { passive: true });
+  window.addEventListener('mouseup', onUp, { passive: true });
+  canvas.addEventListener('touchstart', onDown, { passive: true });
+  canvas.addEventListener('touchmove', onMove, { passive: true });
+  canvas.addEventListener('touchend', onUp, { passive: true });
 
   function draw() {
-    rotX += 0.012;
-    rotY += 0.016;
-    rotZ += 0.007;
+    rotX += velX;
+    rotY += velY;
+    if (!isDragging) {
+      velX += (0.008 - velX) * 0.04;
+      velY += (0.012 - velY) * 0.04;
+    }
 
-    const w = canvas.width;
-    const h = canvas.height;
-    const dpr = window.devicePixelRatio || 1;
-
+    const w = canvas.width, h = canvas.height, dpr = window.devicePixelRatio || 1;
     ctx.fillStyle = '#0f1218';
     ctx.fillRect(0, 0, w, h);
 
-    // Project Cube Vertices
-    const projectedVertices = cubeVertices.map(v => project3D(v, w, h, dpr));
-
-    // Draw Semi-Transparent Depth-Sorted Cube Faces
-    const faceDepths = cubeFaces.map(face => {
-      const avgZ = (projectedVertices[face[0]].z + projectedVertices[face[1]].z + projectedVertices[face[2]].z + projectedVertices[face[3]].z) / 4;
-      return { face, avgZ };
-    });
-    faceDepths.sort((a, b) => b.avgZ - a.avgZ);
-
-    faceDepths.forEach(({ face, avgZ }) => {
-      ctx.beginPath();
-      ctx.moveTo(projectedVertices[face[0]].x, projectedVertices[face[0]].y);
-      ctx.lineTo(projectedVertices[face[1]].x, projectedVertices[face[1]].y);
-      ctx.lineTo(projectedVertices[face[2]].x, projectedVertices[face[2]].y);
-      ctx.lineTo(projectedVertices[face[3]].x, projectedVertices[face[3]].y);
-      ctx.closePath();
-      const faceAlpha = Math.max(0.04, 0.14 - avgZ * 0.06);
-      ctx.fillStyle = `rgba(77, 124, 103, ${faceAlpha})`;
-      ctx.fill();
+    const projected = cubeVertices.map(v => {
+      let x1 = v.x * Math.cos(rotY) + v.z * Math.sin(rotY);
+      let z1 = -v.x * Math.sin(rotY) + v.z * Math.cos(rotY);
+      let y2 = v.y * Math.cos(rotX) - z1 * Math.sin(rotX);
+      let z2 = v.y * Math.sin(rotX) + z1 * Math.cos(rotX);
+      const scale = (Math.min(w, h) * 0.42) / (3.2 + z2);
+      return { x: w * 0.5 + x1 * scale, y: h * 0.5 + y2 * scale };
     });
 
-    // Draw Cube Wireframe Edges
     ctx.lineWidth = 1.4 * dpr;
+    ctx.strokeStyle = '#e9c46a';
     cubeEdges.forEach(([i, j]) => {
-      const p1 = projectedVertices[i];
-      const p2 = projectedVertices[j];
-      const edgeDepth = (p1.z + p2.z) * 0.5;
-      const alpha = Math.max(0.25, 0.7 - edgeDepth * 0.2);
-
       ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      ctx.strokeStyle = `rgba(233, 196, 106, ${alpha})`;
+      ctx.moveTo(projected[i].x, projected[i].y);
+      ctx.lineTo(projected[j].x, projected[j].y);
       ctx.stroke();
     });
 
-    // Draw Cube Vertices Dots
-    projectedVertices.forEach(p => {
+    projected.forEach(p => {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 2.5 * dpr, 0, Math.PI * 2);
       ctx.fillStyle = '#e07a5f';
       ctx.fill();
     });
-
-    // Update and Draw Orbiting Particles with Depth Attenuation
-    particles.forEach(pt => {
-      pt.theta += pt.speed;
-      const p3x = pt.radius * Math.cos(pt.theta) * Math.cos(pt.phi);
-      const p3y = pt.radius * Math.sin(pt.phi);
-      const p3z = pt.radius * Math.sin(pt.theta) * Math.cos(pt.phi);
-
-      const proj = project3D({ x: p3x, y: p3y, z: p3z }, w, h, dpr);
-      const pAlpha = Math.max(0.2, Math.min(0.9, 0.65 - proj.z * 0.22));
-
-      ctx.beginPath();
-      ctx.arc(proj.x, proj.y, pt.size * dpr, 0, Math.PI * 2);
-      ctx.fillStyle = pt.color;
-      ctx.globalAlpha = pAlpha;
-      ctx.fill();
-    });
-    ctx.globalAlpha = 1.0;
   }
   createViewportLoop(canvas, draw);
   window.addEventListener('resize', resize, { passive: true });
 }
 
-// Animation 4: 4 Modulation Knobs with Cables
+// Animation 4: Universal Modulation with Fully Interactive Drag-to-Rotate Knobs & Live Cables
 function initKnobsAnimation() {
   const canvas = document.getElementById('anim-knobs');
   if (!canvas) return;
@@ -1025,56 +1245,192 @@ function initKnobsAnimation() {
   }
   resize();
 
+  const knobs = [
+    { id: 0, relX: 0.25, relY: 0.36, val: 0.65, baseSpeed: 1.0, color: '#e07a5f', isDragging: false },
+    { id: 1, relX: 0.75, relY: 0.36, val: 0.35, baseSpeed: -1.3, color: '#f4a261', isDragging: false },
+    { id: 2, relX: 0.32, relY: 0.72, val: 0.80, baseSpeed: 0.8, color: '#81b29a', isDragging: false },
+    { id: 3, relX: 0.72, relY: 0.72, val: 0.50, baseSpeed: -0.9, color: '#b8b8d1', isDragging: false }
+  ];
+
+  let activeKnob = null;
+  let dragStartY = 0;
+  let dragStartVal = 0;
+
+  function getEventPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) / rect.width,
+      y: (clientY - rect.top) / rect.height,
+      rawY: clientY
+    };
+  }
+
+  function onPointerDown(e) {
+    const pos = getEventPos(e);
+    knobs.forEach(k => {
+      const dist = Math.hypot(pos.x - k.relX, pos.y - k.relY);
+      if (dist < 0.18) {
+        activeKnob = k;
+        k.isDragging = true;
+        dragStartY = pos.rawY;
+        dragStartVal = k.val;
+      }
+    });
+  }
+
+  function onPointerMove(e) {
+    if (!activeKnob) return;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const deltaY = dragStartY - clientY;
+    // Drag up to increase value, down to decrease
+    activeKnob.val = Math.max(0.0, Math.min(1.0, dragStartVal + deltaY * 0.007));
+  }
+
+  function onPointerUp() {
+    if (activeKnob) {
+      activeKnob.isDragging = false;
+      activeKnob = null;
+    }
+  }
+
+  canvas.addEventListener('mousedown', onPointerDown);
+  window.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('mouseup', onPointerUp);
+
+  canvas.addEventListener('touchstart', onPointerDown, { passive: true });
+  canvas.addEventListener('touchmove', onPointerMove, { passive: true });
+  canvas.addEventListener('touchend', onPointerUp, { passive: true });
+
+  // Traveling signal pulses along patch cables
+  const cablePulses = [
+    { src: 0, dst: 1, prog: 0.0, speed: 0.015 },
+    { src: 2, dst: 3, prog: 0.5, speed: 0.018 }
+  ];
+
   function draw() {
-    t += 0.03;
+    t += 0.025;
     const w = canvas.width;
     const h = canvas.height;
     const dpr = window.devicePixelRatio || 1;
+
     ctx.fillStyle = '#0f1218';
     ctx.fillRect(0, 0, w, h);
 
-    const knobPositions = [
-      { x: w * 0.25, y: h * 0.38, speed: 1.0, color: '#e07a5f' },
-      { x: w * 0.75, y: h * 0.38, speed: -1.3, color: '#f4a261' },
-      { x: w * 0.38, y: h * 0.72, speed: 0.8, color: '#81b29a' },
-      { x: w * 0.68, y: h * 0.72, speed: -0.9, color: '#b8b8d1' }
-    ];
+    const positions = knobs.map(k => ({
+      x: k.relX * w,
+      y: k.relY * h,
+      val: k.val,
+      color: k.color,
+      isDragging: k.isDragging
+    }));
 
-    ctx.lineWidth = 1.8 * dpr;
+    // 1. Draw Glowing Patch Cables
+    // Cable 1: Top left to Top right
+    ctx.lineWidth = 2.0 * dpr;
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(244, 162, 97, 0.4)';
-    ctx.moveTo(knobPositions[0].x, knobPositions[0].y);
-    ctx.bezierCurveTo(w * 0.5, h * 0.1, w * 0.5, h * 0.6, knobPositions[1].x, knobPositions[1].y);
+    ctx.strokeStyle = 'rgba(244, 162, 97, 0.45)';
+    ctx.moveTo(positions[0].x, positions[0].y);
+    ctx.bezierCurveTo(w * 0.5, h * 0.1, w * 0.5, h * 0.58, positions[1].x, positions[1].y);
     ctx.stroke();
 
+    // Cable 2: Bottom left to Bottom right
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(129, 178, 154, 0.4)';
-    ctx.moveTo(knobPositions[2].x, knobPositions[2].y);
-    ctx.bezierCurveTo(w * 0.4, h * 0.95, w * 0.6, h * 0.95, knobPositions[3].x, knobPositions[3].y);
+    ctx.strokeStyle = 'rgba(129, 178, 154, 0.45)';
+    ctx.moveTo(positions[2].x, positions[2].y);
+    ctx.bezierCurveTo(w * 0.44, h * 0.94, w * 0.62, h * 0.94, positions[3].x, positions[3].y);
     ctx.stroke();
 
-    knobPositions.forEach((k, idx) => {
-      const angle = t * k.speed + idx * 1.5;
-      const r = 20 * dpr;
+    // 2. Animate Traveling Signal Pulses on Cables
+    cablePulses.forEach((pulse, idx) => {
+      const pSrc = positions[pulse.src];
+      const pDst = positions[pulse.dst];
+      const speedMultiplier = 0.5 + (knobs[pulse.src].val * 1.5);
+      pulse.prog = (pulse.prog + pulse.speed * speedMultiplier) % 1.0;
+
+      let px, py;
+      const u = pulse.prog;
+      if (idx === 0) {
+        // Cubic bezier interpolation for top cable
+        const c1x = w * 0.5, c1y = h * 0.1, c2x = w * 0.5, c2y = h * 0.58;
+        px = Math.pow(1-u, 3)*pSrc.x + 3*Math.pow(1-u, 2)*u*c1x + 3*(1-u)*Math.pow(u, 2)*c2x + Math.pow(u, 3)*pDst.x;
+        py = Math.pow(1-u, 3)*pSrc.y + 3*Math.pow(1-u, 2)*u*c1y + 3*(1-u)*Math.pow(u, 2)*c2y + Math.pow(u, 3)*pDst.y;
+      } else {
+        const c1x = w * 0.44, c1y = h * 0.94, c2x = w * 0.62, c2y = h * 0.94;
+        px = Math.pow(1-u, 3)*pSrc.x + 3*Math.pow(1-u, 2)*u*c1x + 3*(1-u)*Math.pow(u, 2)*c2x + Math.pow(u, 3)*pDst.x;
+        py = Math.pow(1-u, 3)*pSrc.y + 3*Math.pow(1-u, 2)*u*c1y + 3*(1-u)*Math.pow(u, 2)*c2y + Math.pow(u, 3)*pDst.y;
+      }
 
       ctx.beginPath();
-      ctx.arc(k.x, k.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = '#1c212a';
+      ctx.arc(px, py, 3.2 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = pSrc.color;
       ctx.fill();
-      ctx.lineWidth = 2 * dpr;
-      ctx.strokeStyle = k.color;
+    });
+
+    // 3. Draw 4 Interactive Rotary Knobs
+    knobs.forEach((k, idx) => {
+      const pos = positions[idx];
+      const r = 24 * dpr;
+
+      // Auto-modulate if not being dragged
+      if (!k.isDragging) {
+        k.val = Math.max(0, Math.min(1, k.val + Math.sin(t * k.baseSpeed + idx) * 0.003));
+      }
+
+      // Angle range: -135deg to +135deg (mapped from val 0.0 -> 1.0)
+      const startAngle = Math.PI * 0.75;
+      const totalSweep = Math.PI * 1.5;
+      const currentAngle = startAngle + k.val * totalSweep;
+
+      // Outer Track Arc (Background)
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r + 4 * dpr, startAngle, startAngle + totalSweep);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 2.5 * dpr;
       ctx.stroke();
 
-      const px = k.x + Math.cos(angle) * (r * 0.75);
-      const py = k.y + Math.sin(angle) * (r * 0.75);
+      // Active Colored Value Arc
       ctx.beginPath();
-      ctx.moveTo(k.x, k.y);
-      ctx.lineTo(px, py);
+      ctx.arc(pos.x, pos.y, r + 4 * dpr, startAngle, currentAngle);
+      ctx.strokeStyle = k.color;
       ctx.lineWidth = 2.5 * dpr;
-      ctx.strokeStyle = '#ffffff';
       ctx.stroke();
+
+      // Knob Body Outer Bezel
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = k.isDragging ? '#262d38' : '#1b2029';
+      ctx.fill();
+      ctx.strokeStyle = k.isDragging ? k.color : 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.stroke();
+
+      // Knob Inner Disc
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r * 0.75, 0, Math.PI * 2);
+      ctx.fillStyle = '#141820';
+      ctx.fill();
+
+      // Indicator Needle Dot & Pointer
+      const nx = pos.x + Math.cos(currentAngle) * (r * 0.65);
+      const ny = pos.y + Math.sin(currentAngle) * (r * 0.65);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      ctx.lineTo(nx, ny);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.2 * dpr;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Glowing Needle Tip Dot
+      ctx.beginPath();
+      ctx.arc(nx, ny, 2.2 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = k.color;
+      ctx.fill();
     });
   }
+
   createViewportLoop(canvas, draw);
   window.addEventListener('resize', resize, { passive: true });
 }

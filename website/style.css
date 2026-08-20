@@ -451,49 +451,46 @@ body {
   -webkit-user-select: none;
 }
 
-/* --------------------------------------------------------------------------
-   Capabilities (Animated Mini-Canvases with Smaller Clean Titles)
-   -------------------------------------------------------------------------- */
 .capabilities-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
 }
 
 .cap-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
-  border-radius: var(--radius-md);
+  background: #0f1218;
+  border: 1px solid rgba(45, 35, 25, 0.12);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform var(--transition-fast), border-color var(--transition-fast);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+.cap-card:active {
+  cursor: grabbing;
 }
 .cap-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: var(--pastel-terracotta);
+  box-shadow: 0 10px 28px rgba(194, 89, 63, 0.12);
 }
 
 .cap-canvas-box {
   width: 100%;
-  height: 145px;
-  background: #12151b;
+  height: 190px;
+  background: #0f1218;
   position: relative;
+  overflow: hidden;
 }
 .cap-canvas-box canvas {
   width: 100%;
   height: 100%;
   display: block;
-}
-
-.cap-title {
-  padding: 8px 10px;
-  font-size: var(--font-size-small);
-  font-weight: 600;
-  text-align: center;
-  color: var(--text-primary);
-  background: var(--bg-card);
-  border-top: 1px solid var(--border-card);
 }
 
 /* --------------------------------------------------------------------------
@@ -1208,18 +1205,32 @@ body {
   .hero-section { padding: 30px 0 18px; }
   .nature-canvas-wrapper { height: 340px; }
 
-  /* Creative streams: 2x2 grid layout on mobile */
+  /* Creative streams: 4 slidable square cards on mobile */
   .capabilities-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 14px;
+    padding: 6px 16px 18px;
+    margin-left: -16px;
+    margin-right: -16px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .capabilities-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .cap-card {
+    flex: 0 0 74vw;
+    max-width: 280px;
+    aspect-ratio: 1 / 1;
+    scroll-snap-align: center;
+    border-radius: var(--radius-lg);
   }
   .cap-canvas-box {
-    height: 125px;
-  }
-  .cap-title {
-    padding: 8px 6px;
-    font-size: 0.76rem;
-    line-height: 1.25;
+    height: 100%;
+    width: 100%;
   }
 
   .howto-item { grid-template-columns: 1fr; gap: 14px; padding: 16px; }

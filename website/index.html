@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=29">
+  <link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
   <!-- Ambient Cosmic Dust Canvas -->
@@ -128,36 +128,32 @@
         </div>
 
         <div class="capabilities-grid">
-          <!-- 1. Real GLSL Formula from Infinite Engine -->
-          <div class="cap-card">
+          <!-- 1. Real GLSL Formula from Infinite Engine with Interactive Liquid Flow -->
+          <div class="cap-card" data-cap="shader">
             <div class="cap-canvas-box">
               <canvas id="anim-waves"></canvas>
             </div>
-            <h3 class="cap-title">Real-Time Video & Shaders</h3>
           </div>
 
-          <!-- 2. Wavetable Position Movement Animation -->
-          <div class="cap-card">
+          <!-- 2. Wavetable Position Movement with Interactive Slide Scrubbing -->
+          <div class="cap-card" data-cap="wavetable">
             <div class="cap-canvas-box">
               <canvas id="anim-wavetable"></canvas>
             </div>
-            <h3 class="cap-title">Synthesizers & Sound Design</h3>
           </div>
 
-          <!-- 3. 3D Geometry rotating cube + orbital particle system -->
-          <div class="cap-card">
+          <!-- 3. 3D Geometry Rotating & Interactive Three.js Scene Cube -->
+          <div class="cap-card" data-cap="3d">
             <div class="cap-canvas-box">
               <canvas id="anim-particles"></canvas>
             </div>
-            <h3 class="cap-title">3D Geometry</h3>
           </div>
 
-          <!-- 4. 4 Modulation Knobs Moving with Cables -->
-          <div class="cap-card">
+          <!-- 4. Universal Modulation Interactive Drag-to-Rotate Knobs -->
+          <div class="cap-card" data-cap="knobs">
             <div class="cap-canvas-box">
               <canvas id="anim-knobs"></canvas>
             </div>
-            <h3 class="cap-title">Universal Modulation</h3>
           </div>
         </div>
       </div>
@@ -508,6 +504,8 @@
     </div>
   </footer>
 
-  <script src="app.js?v=24"></script>
+  <!-- Three.js for interactive 3D WebGL scenes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="app.js?v=25"></script>
 </body>
 </html>
