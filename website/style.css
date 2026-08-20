@@ -465,19 +465,9 @@ body {
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
-  cursor: grab;
   user-select: none;
   -webkit-user-select: none;
   touch-action: pan-y;
-}
-.cap-card:active {
-  cursor: grabbing;
-}
-.cap-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--pastel-terracotta);
-  box-shadow: 0 10px 28px rgba(194, 89, 63, 0.12);
 }
 
 .cap-canvas-box {
