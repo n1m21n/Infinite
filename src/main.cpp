@@ -64,6 +64,7 @@
 #include "nodes/TextNode.h"
 #include "nodes/FitNode.h"
 #include "nodes/VideoSourceNode.h"
+#include "nodes/VideoInNode.h"
 #include "nodes/NoiseNode.h"
 #include "nodes/TextureNode.h"
 #include "nodes/ResynthNode.h"
@@ -2355,6 +2356,7 @@ namespace
       REGISTER_NODE(FormulaNode, Formula, "Source");
       REGISTER_NODE(TextNode, Text, "Text");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
+      REGISTER_NODE(VideoInNode, Video In, "Source");
       REGISTER_NODE(SyphonInNode, Syphon In, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(TextureNode, Texture, "Source");
@@ -3733,6 +3735,59 @@ namespace
       }
       ImGui::Checkbox("loop", &n->loop);
       ModSlider("speed", &n->speed, -2.0f, 4.0f);
+   }
+
+   void DrawVideoInParams(VideoInNode* n)
+   {
+      ImGui::Checkbox("active", &n->active);
+      ImGui::SameLine();
+      ImGui::Checkbox("mirror", &n->mirror);
+
+      n->RefreshDevices();
+      const auto& devices = n->AvailableDevices();
+      if (devices.empty())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("No camera devices found.");
+         ImGui::PopTextWrapPos();
+      }
+      else
+      {
+         std::vector<std::string> deviceNames;
+         deviceNames.reserve(devices.size());
+         int currentDevIdx = 0;
+         for (size_t i = 0; i < devices.size(); i++)
+         {
+            std::string name = devices[i].localizedName;
+            if (devices[i].isDefault)
+               name += " (Default)";
+            deviceNames.push_back(name);
+            if (n->deviceId == devices[i].uniqueId || (n->deviceId.empty() && devices[i].isDefault))
+               currentDevIdx = (int)i;
+         }
+
+         DropdownButton("device", deviceNames, currentDevIdx, [n, &devices](int idx) {
+            if (idx >= 0 && idx < (int)devices.size())
+               n->deviceId = devices[idx].uniqueId;
+         });
+      }
+
+      DropdownButton("res", VideoInNode::ResolutionNames(), n->resolution, [n](int idx) {
+         n->resolution = idx;
+      });
+
+      if (!n->LastError().empty())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::PopTextWrapPos();
+      }
+      else if (n->IsRunning() && n->GetOutputWidth() > 0 && n->GetOutputHeight() > 0)
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("%dx%d", n->GetOutputWidth(), n->GetOutputHeight());
+         ImGui::PopTextWrapPos();
+      }
    }
 
    void DrawFitParams(FitNode* n)
@@ -32137,6 +32192,8 @@ int main(int argc, char** argv)
                DrawEnvironmentParams(n);
             else if (auto* n = dynamic_cast<VideoSourceNode*>(gn.node.get()))
                DrawVideoParams(n);
+            else if (auto* n = dynamic_cast<VideoInNode*>(gn.node.get()))
+               DrawVideoInParams(n);
             else if (auto* n = dynamic_cast<FitNode*>(gn.node.get()))
                DrawFitParams(n);
             else if (auto* n = dynamic_cast<ProjectionNode*>(gn.node.get()))
