@@ -2986,10 +2986,27 @@ namespace
                               srcLight == nullptr && !srcIsAudioNode && !srcIsNoteSource;
 
       // Audio/note pins are found generically via AudioInputSlot()/NoteInputSlot().
+      // AudioFileNode is a real IAudioSource (its samples flow through the
+      // DSP graph like any other audio node - see AnalyzeNodes.h), so
+      // srcIsAudioNode alone covers it here; the special-case
+      // "srcAudioFile != nullptr" carve-out this branch used to also accept
+      // was scoped too broadly (every AudioInputSlot(), not just
+      // OutputNode's recording slot) and let a cable land on Audio
+      // Displacement/Mixer/effects/Audio Out that read as permanent silence -
+      // see docs/plans/audio-file-into-dsp-graph.md.
       if (dstNode->node->AudioInputSlot(slot) != nullptr)
-         return srcIsAudioNode || srcAudioFile != nullptr;
+         return srcIsAudioNode;
       else if (dstNode->node->NoteInputSlot(slot) != nullptr)
          return srcIsNoteSource;
+      // dstAudio (Audio Analyze) is checked ahead of the srcIsAudioNode/
+      // srcIsNoteSource gate below because it needs to accept an
+      // AudioFileNode source specifically, and that source is now ALSO an
+      // IAudioSource (srcIsAudioNode true) - the gate would otherwise reject
+      // it before this branch is ever reached. This is the "fileSource"
+      // pointer mechanism (WireInputSlot), not an AudioCable - deliberately
+      // out of scope for this fix, see AudioAnalyzeNode::fileSource's comment.
+      else if (dstAudio != nullptr)
+         return srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
       else if (srcIsAudioNode || srcIsNoteSource)
          return false;
       else if (dstRender != nullptr)
@@ -3017,8 +3034,6 @@ namespace
          return srcIsImage;
       else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
          return false; // 3D cables only go into 3D nodes
-      else if (dstAudio != nullptr)
-         return srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
       else if (dstNode->node->ModulatorInputSlot(slot) != nullptr && !dstWantsImage)
          return srcIsModulator;
       else
@@ -5646,7 +5661,7 @@ namespace
       ImGui::PushStyleColor(ImGuiCol_Text, *value ? IM_COL32(255, 255, 255, 255)
                                                   : (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255)));
       const bool clicked = ImGui::Button(label, ImVec2(width, 0));
-      ImGui::PopStyleColor(4);
+      ImGui::PopStyleColor(5);
       ImGui::PopStyleVar();
       if (clicked)
          *value = !*value;
@@ -5681,7 +5696,13 @@ namespace
       // at slot 0 either, but it keeps its interactive-ADSR body rather than
       // falling back to the generic modulator meter. Any future pin-less
       // node that wants a bespoke body needs the same explicit addition.
-      if (dynamic_cast<AudioTextureNode*>(node) != nullptr)
+      // AudioFileNode became an IAudioSource so its samples flow through the
+      // DSP graph (see docs/plans/audio-file-into-dsp-graph.md), but it still
+      // wants its own file-picker/transport/level body (DrawAudioFileParams)
+      // rather than the generic v3 audio body, which has no case for it and
+      // would otherwise render an empty shell with just the pin - same
+      // reasoning as the AudioTextureNode carve-out just below.
+      if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -9071,11 +9092,78 @@ namespace
       else if (gPluginScanner.Index().empty())
          ImGui::TextDisabled("no plugins indexed yet - hit Rescan plugins");
 
+#if INFINITE_ENABLE_VST3
+      // VST3 folder management: AU is discovered entirely through the OS
+      // component registry and needs none of this, but VST3 has no registry -
+      // only the two OS-standard directories plus whatever the user adds here.
+      if (ImGui::TreeNodeEx("VST3 search folders", ImGuiTreeNodeFlags_None))
+      {
+         for (const std::string& folder : gPluginScanner.Folders())
+         {
+            ImGui::TextUnformatted(folder.c_str());
+            ImGui::SameLine();
+            ImGui::PushID(folder.c_str());
+            if (ImGui::SmallButton("Remove"))
+               gPluginScanner.RemoveFolder(folder);
+            ImGui::PopID();
+         }
+         if (ImGui::Button("Add VST3 folder...", ImVec2(-1.0f, 0)))
+         {
+            const std::string folder = Platform::OpenFolderDialog("Add VST3 folder");
+            if (!folder.empty())
+               gPluginScanner.AddFolder(folder);
+         }
+         ImGui::TreePop();
+      }
+
+      const std::vector<std::string> blocklist = Platform::VST3Blocklist();
+      if (!blocklist.empty())
+      {
+         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.55f, 0.25f, 1.0f));
+         if (ImGui::TreeNodeEx("Blocklisted VST3 bundles (crashed or hung while scanning)",
+                                ImGuiTreeNodeFlags_None))
+         {
+            ImGui::PopStyleColor();
+            for (const std::string& path : blocklist)
+               ImGui::TextWrapped("%s", path.c_str());
+            if (ImGui::Button("Clear blocklist and retry", ImVec2(-1.0f, 0)))
+               Platform::ClearVST3Blocklist();
+            ImGui::TreePop();
+         }
+         else
+         {
+            ImGui::PopStyleColor();
+         }
+      }
+
+      if (!gPluginScanner.FailedBundles().empty())
+      {
+         if (ImGui::TreeNodeEx("Bundles that failed to describe", ImGuiTreeNodeFlags_None))
+         {
+            for (const std::string& path : gPluginScanner.FailedBundles())
+               ImGui::TextWrapped("%s", path.c_str());
+            ImGui::TreePop();
+         }
+      }
+#else
+      ImGui::TextDisabled("VST3 support is not compiled into this build.");
+#endif
+
       ImGui::Separator();
 
       // Its own buffer, like the Samples and Media modes each have, so
       // switching tabs and back keeps this mode's in-progress query.
       static char pluginSearch[128] = "";
+      static bool sPluginSearchSeeded = false;
+      if (!sPluginSearchSeeded)
+      {
+         sPluginSearchSeeded = true;
+         if (const char* seed = getenv("INFINITE_PLUGINDRAGTEST_SEARCH"))
+         {
+            strncpy(pluginSearch, seed, sizeof(pluginSearch) - 1);
+            pluginSearch[sizeof(pluginSearch) - 1] = '\0';
+         }
+      }
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputTextWithHint("##pluginsearch", "search plugins...", pluginSearch, sizeof(pluginSearch));
 
@@ -9100,7 +9188,8 @@ namespace
                continue;
          }
 
-         std::string label = entry.name;
+         std::string label = "[" + (entry.format == "vst3" ? std::string("VST3") : std::string("AU")) +
+                              "] " + entry.name;
          if (!entry.manufacturer.empty())
             label += "  -  " + entry.manufacturer;
          ImGui::Selectable(label.c_str());
@@ -23449,13 +23538,46 @@ int main(int argc, char** argv)
       return RunDspTest();
 
    // Out-of-process half of the plugin scan: describe ONE bundle and exit. The
-   // parent (PluginScanner::ScanThreadMain) re-execs us once per bundle so that
-   // a plugin which cannot be loaded - damaged code pages earn an uncatchable
-   // SIGKILL from the kernel, and plenty of plugins simply crash in their own
-   // static initialisers - costs us a dead child process instead of the whole
-   // app. Output is one tab-separated record per class on stdout; anything else
-   // the plugin decides to print goes to stderr and is ignored.
+   // parent (Platform::EnumerateVST3Plugins) re-execs us once per bundle so
+   // that a plugin which cannot be loaded - damaged code pages earn an
+   // uncatchable SIGKILL from the kernel, and plenty of plugins simply crash
+   // in their own static initialisers - costs us a dead child process instead
+   // of the whole app. Output is one tab-separated record per class on
+   // stdout; anything else the plugin decides to print goes to stderr, which
+   // the parent redirects to /dev/null. No window, audio device, or node
+   // registry needed for this, so it returns well before glfwInit().
+   if (argc >= 3 && std::strcmp(argv[1], "--vst3-scan-bundle") == 0)
+   {
+#if INFINITE_ENABLE_VST3
+      // Must happen before DescribeVST3Bundle touches any plugin code - see
+      // the function's doc comment for why a scanned plugin can otherwise
+      // make this child process pop up as a spurious extra Infinite window.
+      Platform::SuppressAppUIForScanChild();
 
+      // Guards the tab-separated wire format below against a plugin whose
+      // self-reported name/vendor string happens to contain a tab or newline.
+      auto sanitize = [](std::string s)
+      {
+         for (char& c : s)
+            if (c == '\t' || c == '\n' || c == '\r')
+               c = ' ';
+         return s;
+      };
+      std::vector<Platform::PluginDesc> descs;
+      Platform::DescribeVST3Bundle(argv[2], descs);
+      for (const Platform::PluginDesc& d : descs)
+      {
+         std::printf("%s\t%s\t%s\t%s\t%s\t%d\n", sanitize(d.format).c_str(), sanitize(d.name).c_str(),
+                     sanitize(d.manufacturer).c_str(), sanitize(d.identifier).c_str(), sanitize(d.path).c_str(),
+                     d.acceptsNotes ? 1 : 0);
+      }
+      std::fflush(stdout);
+#endif
+      // Always 0: exit status communicates process health (did this bundle's
+      // code crash us?) to the parent's waitpid, not whether any class was
+      // found - a bundle with zero usable classes is a normal, clean miss.
+      return 0;
+   }
 
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
@@ -26453,7 +26575,7 @@ int main(int argc, char** argv)
             "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc"
          };
          // Plugin bundles, not files - see the branch that consumes this.
-         static const std::vector<std::string> kPluginBundleExt = { "component" };
+         static const std::vector<std::string> kPluginBundleExt = { "component", "vst3" };
          ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
@@ -26489,20 +26611,25 @@ int main(int argc, char** argv)
                continue;
             }
 
-            if (HasExtension(path, std::vector<std::string> { "vst3" }))
-            {
-               printf("VST3 plugins are not supported; please use Audio Unit (.component) plugins: %s\n", path.c_str());
-               continue;
-            }
-
             GraphNode* spawned = nullptr;
             if (HasExtension(path, kPluginBundleExt))
             {
+               const bool isVst3 = HasExtension(path, std::vector<std::string> { "vst3" });
+#if !INFINITE_ENABLE_VST3
+               if (isVst3)
+               {
+                  printf("VST3 support is not compiled into this build (build with "
+                         "-DINFINITE_ENABLE_VST3=ON): %s\n", path.c_str());
+                  continue;
+               }
+#endif
                std::vector<Platform::PluginDesc> found;
-               const bool resolved = Platform::DescribeAudioUnitBundle(path, found) && !found.empty();
+               const bool resolved = isVst3
+                  ? (Platform::DescribeVST3Bundle(path, found) && !found.empty())
+                  : (Platform::DescribeAudioUnitBundle(path, found) && !found.empty());
                if (!resolved)
                {
-                  printf("dropped plugin bundle could not be resolved to an audio component: %s\n",
+                  printf("dropped plugin bundle could not be resolved to a plugin: %s\n",
                          path.c_str());
                   continue;
                }
@@ -32677,7 +32804,7 @@ int main(int argc, char** argv)
                      auto* dstSetColorNode = dynamic_cast<SetColorNode*>(dstNode->node.get());
                      auto* dstMappingNode = dynamic_cast<MappingNode*>(dstNode->node.get());
 
-                     if (dstWantsAudio && !srcIsAudioNode && srcAudioFile == nullptr)
+                     if (dstWantsAudio && !srcIsAudioNode)
                         rejectReason = srcIsModulator
                            ? "A modulator can't drive an audio signal pin - only another audio source can"
                            : "This pin only accepts an audio source";
@@ -34947,20 +35074,12 @@ int main(int argc, char** argv)
                continue;
             }
 
-            if (dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr)
-            {
-               // an audio source has neither a texture nor a modulator tap
-               printf("%-22s [%-12s] audio source   OK\n",
-                      gn.typeName.c_str(), gn.category.c_str());
-               continue;
-            }
-
             if (dynamic_cast<IAudioSource*>(gn.node.get()) != nullptr ||
                 dynamic_cast<AudioOutputNode*>(gn.node.get()) != nullptr)
             {
-               // P2's audio-graph nodes emit real-time samples, not a
-               // texture or a 0-1 modulator value - same reasoning as
-               // AudioFileNode just above.
+               // P2's audio-graph nodes (AudioFileNode included, now that
+               // it's a real IAudioSource) emit real-time samples, not a
+               // texture or a 0-1 modulator value.
                printf("%-22s [%-12s] audio node     OK\n",
                       gn.typeName.c_str(), gn.category.c_str());
                continue;
@@ -35168,5 +35287,17 @@ int main(int argc, char** argv)
    ImGui::DestroyContext();
    glfwDestroyWindow(window);
    glfwTerminate();
-   return 0;
+
+   // Not `return 0`: that runs the full C++/ObjC static-destructor chain
+   // (__cxa_finalize_ranges) before the process dies, which includes global
+   // destructors belonging to any third-party plugin framework still mapped
+   // into our address space. Seen live: Kilohearts' HeartCore crashes in its
+   // own global teardown on ordinary quit (SIGSEGV in a stale objc_msgSend
+   // "clear" call, called from exit() via __cxa_finalize_ranges) - nothing
+   // we did wrong, just an unload-order bug in code we don't control that
+   // has no business running in a process that's about to disappear anyway.
+   // Everything we actually need torn down already happened above; _Exit
+   // skips straight to process termination without running anyone else's
+   // destructors.
+   std::_Exit(0);
 }

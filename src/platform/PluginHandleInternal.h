@@ -16,6 +16,8 @@
 
 namespace Platform
 {
+   struct PluginVST3State;
+
    struct PluginHandle
    {
       PluginDesc desc;
@@ -62,6 +64,9 @@ namespace Platform
       id editorSizeObserver = nil;
       bool editorUserResized = false;
       bool programmaticResize = false;
+
+      // --- VST3 backend state ---
+      PluginVST3State* vst3 = nullptr;
    };
 
    extern std::atomic<int> gOpenPluginEditorCount;

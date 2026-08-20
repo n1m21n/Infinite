@@ -19,3 +19,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Infinite's own source code is licensed under the MIT License above.
+
+Optionally building with `INFINITE_ENABLE_VST3=ON` links the Steinberg VST3 SDK,
+which is licensed under the GNU General Public License version 3 (GPLv3). When
+distributed with VST3 support enabled, the combined binary must be distributed
+under the terms of the GPLv3.

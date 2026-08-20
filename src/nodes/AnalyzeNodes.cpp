@@ -1,12 +1,20 @@
 #include "AnalyzeNodes.h"
 
+#include <Accelerate/Accelerate.h>
 #include <OpenGL/gl3.h>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <cstring>
 
 #include "GLUtil.h"
 #include "Transport.h"
 #include "core/Expression.h"
+#include "core/AudioTopologyRequest.h"
+#include "audio/AudioBuffer.h"
+#include "audio/AudioNode.h"
+#include "audio/ParamMailbox.h"
+#include "audio/SampleSlot.h"
 
 // =========================================================== Image Analyze
 
@@ -646,35 +654,346 @@ void AudioAnalyzeNode::CookIfNeeded(int frameId)
 }
 
 // ============================================================== Audio File
-
-AudioFileNode::~AudioFileNode()
+//
+// AudioFilePlayerAudioNode is AudioFileNode's audio-thread half - the same
+// two-object split SamplerNode/AudioSamplerNode use (see SamplerNode.h's
+// class comment). It owns a decoded Platform::SampleBuffer (handed over
+// through the same lock-free SampleSlot mailbox SamplerNode uses) and plays
+// it back at a fixed rate 1.0 (no pitch/speed controls on this node), while
+// independently running the same FFT-based level/band/onset analysis
+// Platform.mm's live-input Analyser used to do, so Levels() keeps working
+// unchanged for AudioAnalyzeNode's fileSource path and DrawAudioFileParams.
+// Everything here obeys the AudioNode real-time contract: every buffer is
+// fixed-size and preallocated as a member, no allocation/lock/std::string
+// touches the audio thread.
+namespace
 {
-   if (mHandle != nullptr)
-      Platform::AudioFileClose(mHandle);
+   constexpr int kFileVolumeParam = 0;
+   constexpr int kFileGainParam = 1;
+
+   constexpr int kFileFftLog2 = 10; // 1024-point FFT, same size Platform.mm's live analyser used
+   constexpr int kFileFftSize = 1 << kFileFftLog2;
+   constexpr int kFileSpectrumSize = kFileFftSize / 2;
+}
+
+class AudioFilePlayerAudioNode : public AudioNode
+{
+public:
+   AudioFilePlayerAudioNode()
+   {
+      // FFT setup allocates - main thread only, at construction, never on
+      // the audio thread (mirrors PaulStretchNode's mFftSetup lifetime).
+      mFftSetup = vDSP_create_fftsetup(kFileFftLog2, FFT_RADIX2);
+      vDSP_hann_window(mWindow, kFileFftSize, vDSP_HANN_NORM);
+   }
+
+   ~AudioFilePlayerAudioNode() override
+   {
+      if (mFftSetup != nullptr)
+         vDSP_destroy_fftsetup(mFftSetup);
+   }
+
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mSampleRate = sampleRate;
+      mMailbox.PrepareToPlay(sampleRate);
+      mMailbox.SetImmediate(kFileVolumeParam, mVolume.load(std::memory_order_relaxed));
+      mMailbox.SetImmediate(kFileGainParam, mGain.load(std::memory_order_relaxed));
+   }
+
+   // Main thread only. Hands over ownership of a freshly decoded buffer.
+   void PushBuffer(Platform::SampleBuffer* buf) { mSampleSlot.Push(buf); }
+
+   // Main thread only, once per frame from CookIfNeeded.
+   void DrainRetired() { mSampleSlot.DrainRetired(); }
+
+   void PushParams(float volume, float gain, float attack, float release, bool loop, bool monitor)
+   {
+      mVolume.store(volume, std::memory_order_relaxed);
+      mGain.store(gain, std::memory_order_relaxed);
+      mMailbox.Push(kFileVolumeParam, volume);
+      mMailbox.Push(kFileGainParam, gain);
+      mAttack.store(std::clamp(attack, 0.01f, 1.0f), std::memory_order_relaxed);
+      mRelease.store(std::clamp(release, 0.005f, 1.0f), std::memory_order_relaxed);
+      mLoop.store(loop, std::memory_order_relaxed);
+      mMonitor.store(monitor, std::memory_order_relaxed);
+   }
+
+   // Main thread. Transport control - plain atomics, no mailbox needed since
+   // these are one-shot requests/flags rather than smoothed audio params.
+   void RequestPlay() { mPlaying.store(true, std::memory_order_relaxed); }
+   void RequestPause() { mPlaying.store(false, std::memory_order_relaxed); }
+   void RequestRestart() { mRestartRequested.store(true, std::memory_order_release); }
+   bool IsPlaying() const { return mPlaying.load(std::memory_order_relaxed); }
+
+   // Main thread. mFramePos is only ever written by the audio thread and
+   // read here - a 64-bit atomic is lock-free on every platform this ships
+   // on, so this never blocks the audio thread.
+   double PositionSeconds() const
+   {
+      return mSampleRate > 0.0 ? (double)mFramePos.load(std::memory_order_relaxed) / mSampleRate : 0.0;
+   }
+
+   // Main thread. Latest published analysis snapshot - see the double-buffer
+   // comment on mLevelsPublish below for why this is lock-free-safe to read
+   // concurrently with the audio thread publishing a new one.
+   Platform::AudioLevels ReadLevels() const
+   {
+      Platform::AudioLevels out = mLevelsPublish[mLevelsReady.load(std::memory_order_acquire)];
+      // Onset is a one-shot flag: read-and-clear here (rather than letting
+      // the audio thread clear it after publishing) so a fast analysis
+      // cadence relative to CookIfNeeded's once-a-frame reads can never
+      // drop one - matches Platform.mm's old ReadFrom() contract exactly.
+      out.onset = mOnsetPending.exchange(false, std::memory_order_acq_rel);
+      return out;
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
+   {
+      // Adopt a newly loaded buffer, if any, at the top of the block - never
+      // mid-block. A fresh load always restarts from the top (matches the
+      // old AudioFileOpen/ScheduleFile, which always began at framePosition
+      // 0) and resets the analysis window so a previous file's spectrum
+      // doesn't bleed into the new one's first readings.
+      if (mSampleSlot.SwapIn())
+      {
+         mActiveBuffer = mSampleSlot.Active();
+         mPos = 0.0;
+         mFramePos.store(0, std::memory_order_relaxed);
+         mRingWrite = 0;
+         mRingCount = 0;
+         mPrevFlux = 0.0f;
+         std::memset(mPrevMagnitude, 0, sizeof(mPrevMagnitude));
+         mSmoothed = Platform::AudioLevels();
+      }
+
+      for (int ch = 0; ch < buffer.numChannels; ch++)
+         std::fill(buffer.channels[ch], buffer.channels[ch] + buffer.numFrames, 0.0f);
+
+      if (mRestartRequested.exchange(false, std::memory_order_acq_rel))
+      {
+         mPos = 0.0;
+         mFramePos.store(0, std::memory_order_relaxed);
+      }
+
+      const bool loop = mLoop.load(std::memory_order_relaxed);
+      const bool monitor = mMonitor.load(std::memory_order_relaxed);
+      const bool hasBuffer = mActiveBuffer != nullptr && mActiveBuffer->numFrames > 0;
+
+      for (int i = 0; i < buffer.numFrames; i++)
+      {
+         const float volume = mMailbox.SmoothedValue(kFileVolumeParam);
+         const float gain = mMailbox.SmoothedValue(kFileGainParam);
+
+         float raw = 0.0f;
+         if (hasBuffer && mPlaying.load(std::memory_order_relaxed))
+         {
+            raw = ReadSample(*mActiveBuffer, mPos);
+            mPos += 1.0;
+            if (mPos >= mActiveBuffer->numFrames)
+            {
+               if (loop)
+                  mPos -= mActiveBuffer->numFrames;
+               else
+               {
+                  mPos = (double)mActiveBuffer->numFrames;
+                  mPlaying.store(false, std::memory_order_relaxed);
+               }
+            }
+         }
+
+         const float outSample = raw * volume;
+         // Still analysed while `monitor` is off - "silent but still
+         // analysed" always meant this node's own output, just scoped to
+         // the graph now instead of to the hardware mixer.
+         PushAnalysisSample(outSample * gain);
+         for (int ch = 0; ch < buffer.numChannels; ch++)
+            buffer.channels[ch][i] = monitor ? outSample : 0.0f;
+      }
+
+      mFramePos.store((int64_t)mPos, std::memory_order_relaxed);
+      RunAnalysisIfWindowFull();
+   }
+
+private:
+   static float ReadSample(const Platform::SampleBuffer& buf, double pos)
+   {
+      // Rate is always exactly 1.0 (no pitch/speed on this node), so pos is
+      // always integral - a direct bounds-checked index is enough, no
+      // interpolation needed. Channel 0 only, same simplification
+      // SamplerNode's ReadSample makes for a multi-channel file.
+      const int i = (int)pos;
+      return (i >= 0 && i < buf.numFrames) ? buf.channelData[i] : 0.0f;
+   }
+
+   void PushAnalysisSample(float s)
+   {
+      mRing[mRingWrite] = s;
+      mRingWrite = (mRingWrite + 1) % kFileFftSize;
+      if (mRingCount < kFileFftSize)
+         mRingCount++;
+   }
+
+   // Runs the same FFT-based analysis Platform.mm's ProcessInto used to run
+   // on the tap callback, over the most recent kFileFftSize samples, once
+   // enough have arrived. Every buffer here is a fixed-size member - no
+   // allocation on this, the audio thread.
+   void RunAnalysisIfWindowFull()
+   {
+      if (mRingCount < kFileFftSize)
+         return;
+
+      for (int i = 0; i < kFileFftSize; i++)
+         mLinear[i] = mRing[(mRingWrite + i) % kFileFftSize];
+
+      float rms = 0.0f, peak = 0.0f;
+      for (int i = 0; i < kFileFftSize; i++)
+      {
+         const float v = mLinear[i];
+         rms += v * v;
+         peak = std::max(peak, std::fabs(v));
+      }
+      rms = std::sqrt(rms / (float)kFileFftSize);
+
+      vDSP_vmul(mLinear, 1, mWindow, 1, mWindowedScratch, 1, kFileFftSize);
+
+      DSPSplitComplex split = { mReal, mImag };
+      vDSP_ctoz((const DSPComplex*)mWindowedScratch, 2, &split, 1, kFileSpectrumSize);
+      vDSP_fft_zrip(mFftSetup, &split, 1, kFileFftLog2, FFT_FORWARD);
+
+      vDSP_zvabs(&split, 1, mMagnitude, 1, kFileSpectrumSize);
+      const float norm = 2.0f / (float)kFileFftSize;
+      for (int i = 0; i < kFileSpectrumSize; i++)
+         mMagnitude[i] *= norm;
+
+      float flux = 0.0f;
+      for (int i = 0; i < kFileSpectrumSize; i++)
+         flux += std::max(0.0f, mMagnitude[i] - mPrevMagnitude[i]);
+      const bool onset = flux > mPrevFlux * 1.6f && flux > 0.02f;
+      mPrevFlux = mPrevFlux * 0.7f + flux * 0.3f;
+      std::memcpy(mPrevMagnitude, mMagnitude, sizeof(mMagnitude));
+      if (onset)
+         mOnsetPending.store(true, std::memory_order_relaxed);
+
+      const double nyquist = mSampleRate * 0.5;
+      auto rangeEnergy = [this, nyquist](double fromHz, double toHz) {
+         const int lo = std::max(1, (int)(fromHz / nyquist * kFileSpectrumSize));
+         const int hi = std::min(kFileSpectrumSize - 1, (int)(toHz / nyquist * kFileSpectrumSize));
+         float sum = 0.0f; int count = 0;
+         for (int i = lo; i <= hi; i++) { sum += mMagnitude[i]; count++; }
+         return count > 0 ? sum / count : 0.0f;
+      };
+
+      float bands[Platform::kAudioBands] = { 0 };
+      for (int b = 0; b < Platform::kAudioBands; b++)
+      {
+         const double loHz = 20.0 * std::pow(nyquist / 20.0, (double)b / Platform::kAudioBands);
+         const double hiHz = 20.0 * std::pow(nyquist / 20.0, (double)(b + 1) / Platform::kAudioBands);
+         bands[b] = rangeEnergy(loHz, hiHz);
+      }
+
+      auto shape = [](float v) { return std::min(1.0f, std::sqrt(v * 12.0f)); };
+
+      const float attack = mAttack.load(std::memory_order_relaxed);
+      const float release = mRelease.load(std::memory_order_relaxed);
+      auto smooth = [attack, release](float prev, float target) {
+         const float rate = (target > prev) ? attack : release;
+         return prev + (target - prev) * rate;
+      };
+
+      mSmoothed.rms = smooth(mSmoothed.rms, std::min(1.0f, rms * 3.0f));
+      mSmoothed.peak = smooth(mSmoothed.peak, std::min(1.0f, peak));
+      mSmoothed.low = smooth(mSmoothed.low, shape((float)rangeEnergy(20.0, 250.0)));
+      mSmoothed.mid = smooth(mSmoothed.mid, shape((float)rangeEnergy(250.0, 2000.0)));
+      mSmoothed.high = smooth(mSmoothed.high, shape((float)rangeEnergy(2000.0, 16000.0)));
+      for (int b = 0; b < Platform::kAudioBands; b++)
+         mSmoothed.bands[b] = smooth(mSmoothed.bands[b], shape(bands[b]));
+
+      // Double-buffer publish: the audio thread always writes the buffer
+      // NOT currently marked ready, then flips the ready index - the same
+      // lock-free-ish handoff Platform.h documents for AudioLevels
+      // elsewhere (a torn read is, at worst, one stale frame of meter data).
+      const int next = 1 - mLevelsReady.load(std::memory_order_relaxed);
+      mLevelsPublish[next] = mSmoothed;
+      mLevelsReady.store(next, std::memory_order_release);
+   }
+
+   double mSampleRate = 44100.0;
+   ParamMailbox mMailbox;
+
+   std::atomic<float> mVolume { 0.8f };
+   std::atomic<float> mGain { 1.0f };
+   std::atomic<float> mAttack { 0.5f };
+   std::atomic<float> mRelease { 0.12f };
+   std::atomic<bool> mLoop { true };
+   std::atomic<bool> mMonitor { true };
+
+   std::atomic<bool> mPlaying { false };
+   std::atomic<bool> mRestartRequested { false };
+   std::atomic<int64_t> mFramePos { 0 };
+   double mPos = 0.0; // audio-thread-only playback cursor, in frames
+
+   Platform::SampleBuffer* mActiveBuffer = nullptr;
+   SampleSlot mSampleSlot;
+
+   FFTSetup mFftSetup = nullptr;
+   float mWindow[kFileFftSize] = {};
+   float mRing[kFileFftSize] = {};
+   int mRingWrite = 0;
+   int mRingCount = 0;
+   float mLinear[kFileFftSize] = {};
+   float mWindowedScratch[kFileFftSize] = {};
+   float mReal[kFileSpectrumSize] = {};
+   float mImag[kFileSpectrumSize] = {};
+   float mMagnitude[kFileSpectrumSize] = {};
+   float mPrevMagnitude[kFileSpectrumSize] = {};
+   float mPrevFlux = 0.0f;
+
+   Platform::AudioLevels mSmoothed;
+   Platform::AudioLevels mLevelsPublish[2];
+   std::atomic<int> mLevelsReady { 0 };
+   mutable std::atomic<bool> mOnsetPending { false };
+};
+
+AudioFileNode::AudioFileNode() = default;
+AudioFileNode::~AudioFileNode() = default;
+
+AudioNode* AudioFileNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioFilePlayerAudioNode>();
+   return mAudioNode.get();
 }
 
 bool AudioFileNode::Open(const std::string& path)
 {
+   auto* decoded = new Platform::SampleBuffer();
    std::string error;
-   Platform::AudioPlayerHandle* handle = Platform::AudioFileOpen(path, error);
-   if (handle == nullptr)
+   if (!Platform::DecodeAudioFileToBuffer(path, *decoded, error))
    {
-      mStatus = error;
+      delete decoded;
+      mStatus = error.empty() ? "failed to load" : error;
       return false;
    }
 
-   if (mHandle != nullptr)
-      Platform::AudioFileClose(mHandle);
-   mHandle = handle;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioFilePlayerAudioNode>();
 
-   size_t slash = path.find_last_of('/');
+   mDuration = decoded->sampleRate > 0.0 ? (double)decoded->numFrames / decoded->sampleRate : 0.0;
+   mAudioNode->PushBuffer(decoded);
+   mAudioNode->PushParams(volume, gain, attack, release, loop, monitor);
+   mAudioNode->RequestRestart();
+
+   const size_t slash = path.find_last_of('/');
    mFileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
    mFilePath = path;
    mStatus = "loaded";
+   mLoaded = true;
 
-   Platform::AudioFileSetLoop(mHandle, loop);
-   Platform::AudioFileSetVolume(mHandle, volume);
-   Platform::AudioFileSetMonitor(mHandle, monitor);
+   // RequiresAudioProcessing() now answers true - see its comment in
+   // AnalyzeNodes.h for why this node needs an AudioTopologyEntry even with
+   // no path to an Audio Out.
+   AudioTopologyRequest::Request();
    return true;
 }
 
@@ -686,12 +1005,34 @@ bool AudioFileNode::OpenViaDialog()
    return Open(path);
 }
 
-void AudioFileNode::Play() { Platform::AudioFilePlay(mHandle); }
-void AudioFileNode::Pause() { Platform::AudioFilePause(mHandle); }
-void AudioFileNode::Restart() { Platform::AudioFileRestart(mHandle); }
-bool AudioFileNode::IsPlaying() const { return Platform::AudioFileIsPlaying(mHandle); }
-double AudioFileNode::Duration() const { return Platform::AudioFileDuration(mHandle); }
-double AudioFileNode::Position() const { return Platform::AudioFilePosition(mHandle); }
+void AudioFileNode::Play()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioFilePlayerAudioNode>();
+   mAudioNode->RequestPlay();
+}
+
+void AudioFileNode::Pause()
+{
+   if (mAudioNode)
+      mAudioNode->RequestPause();
+}
+
+void AudioFileNode::Restart()
+{
+   if (mAudioNode)
+      mAudioNode->RequestRestart();
+}
+
+bool AudioFileNode::IsPlaying() const
+{
+   return mAudioNode && mAudioNode->IsPlaying();
+}
+
+double AudioFileNode::Position() const
+{
+   return mAudioNode ? mAudioNode->PositionSeconds() : 0.0;
+}
 
 void AudioFileNode::CookIfNeeded(int frameId)
 {
@@ -699,14 +1040,11 @@ void AudioFileNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
 
-   if (mHandle == nullptr)
-      return;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioFilePlayerAudioNode>();
 
-   Platform::AudioFileSetLoop(mHandle, loop);
-   Platform::AudioFileSetVolume(mHandle, volume);
-   Platform::AudioFileSetMonitor(mHandle, monitor);
-   Platform::AudioFileSetSmoothing(mHandle, attack, release);
-   Platform::AudioFileSetGain(mHandle, gain);
+   mAudioNode->PushParams(volume, gain, attack, release, loop, monitor);
+   mAudioNode->DrainRetired();
 
    // Following the transport keeps the track locked to the same play/pause the
    // rest of the patch obeys, so a recording lines up with the audio.
@@ -723,5 +1061,5 @@ void AudioFileNode::CookIfNeeded(int frameId)
       }
    }
 
-   Platform::AudioFileRead(mHandle, mLevels);
+   mLevels = mAudioNode->ReadLevels();
 }

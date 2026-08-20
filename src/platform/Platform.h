@@ -134,25 +134,11 @@ namespace Platform
    };
 
    // ---- audio file playback ----
-   // Each player owns its own engine and its own analyser, so a file and the
-   // live input can be analysed independently and at the same time.
-   struct AudioPlayerHandle;
-
+   // File playback moved into the DSP graph (AudioFileNode/AudioFilePlayerAudioNode
+   // in src/nodes/AnalyzeNodes.cpp) - it decodes via DecodeAudioFileToBuffer below
+   // and runs its own AudioNode like SamplerNode, rather than owning a private
+   // AVAudioEngine here. OpenAudioDialog is still shared with the file picker.
    std::string OpenAudioDialog();
-   AudioPlayerHandle* AudioFileOpen(const std::string& path, std::string& outError);
-   void AudioFileClose(AudioPlayerHandle* handle);
-   void AudioFilePlay(AudioPlayerHandle* handle);
-   void AudioFilePause(AudioPlayerHandle* handle);
-   void AudioFileRestart(AudioPlayerHandle* handle);
-   bool AudioFileIsPlaying(AudioPlayerHandle* handle);
-   void AudioFileSetLoop(AudioPlayerHandle* handle, bool loop);
-   void AudioFileSetVolume(AudioPlayerHandle* handle, float volume);
-   void AudioFileSetMonitor(AudioPlayerHandle* handle, bool audible);
-   double AudioFileDuration(AudioPlayerHandle* handle);
-   double AudioFilePosition(AudioPlayerHandle* handle);
-   bool AudioFileRead(AudioPlayerHandle* handle, AudioLevels& out);
-   void AudioFileSetSmoothing(AudioPlayerHandle* handle, float attack, float release);
-   void AudioFileSetGain(AudioPlayerHandle* handle, float gain);
 
    bool AudioStart(std::string& outError);
    void AudioStop();
@@ -310,7 +296,13 @@ namespace Platform
    // PluginHandle* and calls PluginRender from ProcessBlock; that one function
    // is the only real-time-safe entry point here, and it does nothing but call
    // a render block cached on the main thread at prepare time.
-   // Audio Units plugin hosting backend.
+   // Audio Unit and (optionally, build-time) VST3 plugin hosting backend.
+   // VST3 support is gated behind INFINITE_ENABLE_VST3, off by default: the
+   // Steinberg VST3 SDK is GPLv3-or-proprietary and this codebase is MIT, so
+   // building with VST3 enabled changes the license of the distributed binary
+   // - see LICENSE and docs/plans/audio/plugin-hosting.md. Every struct that
+   // crosses this boundary carries a `format` string ("au" or "vst3") so both
+   // backends share one surface.
    struct PluginDesc
    {
       std::string format = "au";
@@ -319,9 +311,10 @@ namespace Platform
       // Stable identity, and what a patch file stores - NOT a filesystem path,
       // which moves when a plugin is reinstalled elsewhere. For AU this is
       // "au:<type>:<subtype>:<manufacturer>" built from the component's four-
-      // char codes, e.g. "au:aufx:dely:appl".
+      // char codes, e.g. "au:aufx:dely:appl". For VST3 this is the factory
+      // class's FUID string, e.g. "vst3:<uid-hex>".
       std::string identifier;
-      std::string path; // Bundle directory path if loaded from bundle directly
+      std::string path; // Bundle directory path (e.g. for VST3 bundles)
 
       // True for 'aumu' (instrument) and 'aumf' (music effect) components -
       // the two component types that can meaningfully consume MIDI. This is
@@ -340,6 +333,64 @@ namespace Platform
    // if the path isn't a readable audio component bundle. One bundle can
    // declare several components, hence the vector.
    bool DescribeAudioUnitBundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
+
+   // Enumerates VST3 plugins (.vst3 bundles) found within the specified folders.
+   // Gated by INFINITE_ENABLE_VST3 at build time (no-op when disabled). Each
+   // bundle is probed out-of-process (see main.cpp's "--vst3-scan-bundle"
+   // child mode) so a plugin that crashes or hangs while its factory is being
+   // read only costs a dead/killed child, and the walk moves on to the next
+   // bundle instead of taking the whole app down mid-scan.
+   void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out);
+
+   // Absolute path to this process's own executable (argv[0] resolved via
+   // _NSGetExecutablePath), used to re-exec ourselves for the VST3 scan's
+   // "--vst3-scan-bundle" child mode.
+   std::string ExecutablePath();
+
+   // Must be called first thing in the "--vst3-scan-bundle" child process,
+   // before any plugin code runs. The child is a re-exec of this same app
+   // binary, so it shares our bundle identity - if a scanned plugin's Cocoa
+   // UI classes touch [NSApplication sharedApplication] during their static
+   // init/factory instantiation (common for VST3 bundles with a Cocoa
+   // editor), AppKit lazily creates a default-policy shared application for
+   // *this* process and it shows up as its own Dock icon/window, i.e. a
+   // spurious extra "Infinite" instance. Creating the shared application
+   // ourselves first and setting it to the Prohibited activation policy
+   // claims that singleton before the plugin can, so nothing the plugin does
+   // afterward can make the child visible.
+   void SuppressAppUIForScanChild();
+
+   // Resolves a dropped .vst3 bundle back to the plugin description(s) it contains.
+   bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
+
+   // Caches bundle path for a plugin identifier.
+   void CacheVST3BundlePath(const std::string& identifier, const std::string& bundlePath);
+
+   // User-added VST3 folders (PluginScanner::Folders()), kept in sync so that
+   // PluginVST3Create's on-demand bundle resolution can search them too, not
+   // just the two OS-standard VST3 directories. No-op when VST3 is disabled.
+   void SetVST3SearchFolders(const std::vector<std::string>& folders);
+
+   // Crash-safety for the VST3 scan. Each bundle is probed in a disposable
+   // child process (see EnumerateVST3Plugins); if that child is killed by a
+   // signal, exits nonzero, or simply hangs, its bundle path is appended to a
+   // persisted blocklist immediately - same scan, no relaunch needed - and
+   // skipped by every future scan. A sentinel file backs this up for the rare
+   // case where the child dies before even that: it is written immediately
+   // before the in-process probe inside the child (CFBundleLoadExecutable /
+   // bundleEntry / bundleExit) and cleared right after a clean return, so a
+   // sentinel still non-empty at the next launch blocklists that bundle too.
+   // Surface both lists in the Plugins panel, with a way to clear the
+   // blocklist and retry.
+   std::vector<std::string> VST3Blocklist();
+   void ClearVST3Blocklist();
+
+   // Bundles the most recent EnumerateVST3Plugins() call could not describe
+   // (corrupt bundle, wrong CPU architecture, no usable audio-effect class) by
+   // path. Reset at the start of every call; read immediately after it
+   // returns. Distinct from the blocklist: a scan failure here is a clean,
+   // reported miss, not evidence the bundle is dangerous to retry.
+   std::vector<std::string> VST3ScanFailures();
 
    struct PluginHandle;
 

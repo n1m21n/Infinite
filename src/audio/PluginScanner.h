@@ -17,7 +17,11 @@ class PluginScanner
 {
 public:
    // Bumped whenever Entry's shape or meaning changes; a cache written by a
-   static constexpr int kIndexSchemaVersion = 4; // Audio Units index
+   // different schema version is dropped rather than migrated, forcing one
+   // clean rescan. Bumped 4 -> 5 to force exactly that: schema 4 indexes
+   // predate the format=="au" load filter removal below and can hold zero
+   // VST3 entries even on a machine with VST3 plugins installed.
+   static constexpr int kIndexSchemaVersion = 5;
 
    using Entry = Platform::PluginDesc;
 
@@ -58,7 +62,7 @@ public:
    void SaveIndexToDisk() const;
 
 private:
-   void ScanThreadMain();
+   void ScanThreadMain(std::vector<std::string> vst3Folders);
 
    std::vector<std::string> mFolders;
    std::vector<Entry> mIndex;

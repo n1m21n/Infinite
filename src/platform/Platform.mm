@@ -1,4 +1,5 @@
 #include "Platform.h"
+#include "PluginVST3.h"
 #include <atomic>
 
 #import <objc/runtime.h>
@@ -2409,50 +2410,16 @@ namespace Platform
    }
 
    // ---------------------------------------------------------- file players
-
-   struct AudioPlayerHandle
-   {
-      AVAudioEngine* engine = nil;
-      AVAudioPlayerNode* player = nil;
-      AVAudioFile* file = nil;
-      AVAudioFormat* format = nil;
-      double duration = 0.0;
-      double sampleRate = 44100.0;
-      bool loop = true;
-      bool playing = false;
-      bool monitor = true;
-      Analyser analyser;
-   };
-
-   namespace
-   {
-      void ScheduleFile(AudioPlayerHandle* h)
-      {
-         if (h == nullptr || h->file == nil)
-            return;
-         h->file.framePosition = 0;
-         AVAudioPlayerNode* player = h->player;
-         AudioPlayerHandle* handle = h;
-         [player scheduleFile:h->file
-                       atTime:nil
-        completionCallbackType:AVAudioPlayerNodeCompletionDataPlayedBack
-             completionHandler:^(AVAudioPlayerNodeCompletionCallbackType) {
-            // Re-arm on the main queue: the callback fires on an audio thread
-            // and AVAudioFile is not safe to touch from there.
-            dispatch_async(dispatch_get_main_queue(), ^{
-               if (handle->loop && handle->playing)
-               {
-                  ScheduleFile(handle);
-                  [handle->player play];
-               }
-               else
-               {
-                  handle->playing = false;
-               }
-            });
-         }];
-      }
-   }
+   //
+   // File playback used to own a private AVAudioEngine/AVAudioPlayerNode here
+   // (played straight to the hardware mixer, independent of AudioEngine and
+   // of AudioDeviceOpen below) - that made Audio File audible with the DSP
+   // engine off and invisible to every other audio node, since nothing but
+   // its own Analyser tap ever saw its samples. AudioFileNode now decodes via
+   // DecodeAudioFileToBuffer just below and runs its own AudioNode
+   // (AudioFilePlayerAudioNode in src/nodes/AnalyzeNodes.cpp, modelled on
+   // SamplerNode/AudioSamplerNode) inside the real graph instead - see
+   // docs/plans/audio-file-into-dsp-graph.md.
 
    std::string OpenAudioDialog()
    {
@@ -2551,185 +2518,6 @@ namespace Platform
       }
    }
 
-   AudioPlayerHandle* AudioFileOpen(const std::string& path, std::string& outError)
-   {
-      @autoreleasepool
-      {
-         EnsureFftSetup();
-
-         NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
-         NSURL* url = [NSURL fileURLWithPath:nsPath];
-         NSError* err = nil;
-         AVAudioFile* file = [[AVAudioFile alloc] initForReading:url error:&err];
-         if (file == nil)
-         {
-            outError = err ? std::string([[err localizedDescription] UTF8String]) : "could not open audio file";
-            return nullptr;
-         }
-
-         AudioPlayerHandle* h = new AudioPlayerHandle();
-         h->file = file;
-         h->format = file.processingFormat;
-         h->sampleRate = h->format.sampleRate;
-         h->duration = (double)file.length / std::max(1.0, h->sampleRate);
-
-         h->engine = [[AVAudioEngine alloc] init];
-         h->player = [[AVAudioPlayerNode alloc] init];
-         [h->engine attachNode:h->player];
-         [h->engine connect:h->player to:[h->engine mainMixerNode] format:h->format];
-
-         const double rate = h->sampleRate;
-         AudioPlayerHandle* raw = h;
-         [h->player installTapOnBus:0 bufferSize:1024 format:h->format
-                              block:^(AVAudioPCMBuffer* buffer, AVAudioTime*) {
-            const float* const* channels = buffer.floatChannelData;
-            if (channels != nullptr)
-               ProcessInto(raw->analyser, channels[0], (int)buffer.frameLength, rate);
-         }];
-
-         [h->engine prepare];
-         if (![h->engine startAndReturnError:&err])
-         {
-            outError = err ? std::string([[err localizedDescription] UTF8String]) : "audio engine failed";
-            delete h;
-            return nullptr;
-         }
-
-         ScheduleFile(h);
-         outError.clear();
-         return h;
-      }
-   }
-
-   void AudioFileClose(AudioPlayerHandle* handle)
-   {
-      if (handle == nullptr)
-         return;
-      @autoreleasepool
-      {
-         // Order matters, and so does the @try. AVAudioEngine reports state
-         // errors by throwing an ObjC exception, and an uncaught one aborts the
-         // whole process - closing an audio file was killing the app outright
-         // with "nodeBussesVec.size() >= (inBus + 1)" when the player had
-         // already lost its busses. There is no API to ask whether a tap is
-         // still installed, so the only way to make teardown safe is to catch.
-         @try
-         {
-            [handle->player stop];
-            [handle->engine stop];
-            [handle->player removeTapOnBus:0];
-            [handle->engine detachNode:handle->player];
-         }
-         @catch (NSException* exception)
-         {
-            fprintf(stderr, "audio teardown: %s\n",
-                    [[exception reason] UTF8String] ? [[exception reason] UTF8String] : "unknown");
-         }
-         handle->player = nil;
-         handle->engine = nil;
-         handle->file = nil;
-         handle->format = nil;
-      }
-      delete handle;
-   }
-
-   void AudioFilePlay(AudioPlayerHandle* handle)
-   {
-      if (handle == nullptr)
-         return;
-      handle->playing = true;
-      [handle->player play];
-   }
-
-   void AudioFilePause(AudioPlayerHandle* handle)
-   {
-      if (handle == nullptr)
-         return;
-      handle->playing = false;
-      [handle->player pause];
-   }
-
-   void AudioFileRestart(AudioPlayerHandle* handle)
-   {
-      if (handle == nullptr)
-         return;
-      [handle->player stop];
-      ScheduleFile(handle);
-      if (handle->playing)
-         [handle->player play];
-   }
-
-   bool AudioFileIsPlaying(AudioPlayerHandle* handle)
-   {
-      return handle != nullptr && handle->playing;
-   }
-
-   void AudioFileSetLoop(AudioPlayerHandle* handle, bool loop)
-   {
-      if (handle != nullptr)
-         handle->loop = loop;
-   }
-
-   void AudioFileSetVolume(AudioPlayerHandle* handle, float volume)
-   {
-      if (handle != nullptr)
-         handle->player.volume = std::max(0.0f, std::min(1.0f, volume));
-   }
-
-   void AudioFileSetMonitor(AudioPlayerHandle* handle, bool audible)
-   {
-      if (handle == nullptr)
-         return;
-      handle->monitor = audible;
-      // Muting the mixer keeps the tap running, so analysis continues while
-      // the file is silent - useful when driving visuals from a backing track.
-      handle->engine.mainMixerNode.outputVolume = audible ? 1.0f : 0.0f;
-   }
-
-   double AudioFileDuration(AudioPlayerHandle* handle)
-   {
-      return handle ? handle->duration : 0.0;
-   }
-
-   double AudioFilePosition(AudioPlayerHandle* handle)
-   {
-      if (handle == nullptr || handle->player == nil)
-         return 0.0;
-      AVAudioTime* nodeTime = [handle->player lastRenderTime];
-      if (nodeTime == nil)
-         return 0.0;
-      AVAudioTime* playerTime = [handle->player playerTimeForNodeTime:nodeTime];
-      if (playerTime == nil)
-         return 0.0;
-      return (double)playerTime.sampleTime / std::max(1.0, playerTime.sampleRate);
-   }
-
-   bool AudioFileRead(AudioPlayerHandle* handle, AudioLevels& out)
-   {
-      if (handle == nullptr)
-      {
-         out = AudioLevels();
-         return false;
-      }
-      return ReadFrom(handle->analyser, out);
-   }
-
-   void AudioFileSetSmoothing(AudioPlayerHandle* handle, float attack, float release)
-   {
-      if (handle == nullptr)
-         return;
-      std::lock_guard<std::mutex> lock(handle->analyser.mutex);
-      handle->analyser.attack = std::min(1.0f, std::max(0.01f, attack));
-      handle->analyser.release = std::min(1.0f, std::max(0.005f, release));
-   }
-
-   void AudioFileSetGain(AudioPlayerHandle* handle, float gain)
-   {
-      if (handle == nullptr)
-         return;
-      std::lock_guard<std::mutex> lock(handle->analyser.mutex);
-      handle->analyser.gain = std::max(0.0f, gain);
-   }
 }
 
 // ================================================================ midi input
@@ -3406,6 +3194,46 @@ namespace Platform
       return !out.empty();
    }
 
+#if !INFINITE_ENABLE_VST3
+   void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out)
+   {
+      (void)folders;
+      (void)out;
+   }
+
+   bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out)
+   {
+      (void)bundlePath;
+      (void)out;
+      return false;
+   }
+
+   void CacheVST3BundlePath(const std::string& identifier, const std::string& bundlePath)
+   {
+      (void)identifier;
+      (void)bundlePath;
+   }
+
+   void SetVST3SearchFolders(const std::vector<std::string>& folders)
+   {
+      (void)folders;
+   }
+
+   std::vector<std::string> VST3Blocklist()
+   {
+      return {};
+   }
+
+   void ClearVST3Blocklist()
+   {
+   }
+
+   std::vector<std::string> VST3ScanFailures()
+   {
+      return {};
+   }
+#endif
+
    std::string ExecutablePath()
    {
       uint32_t size = 0;
@@ -3417,8 +3245,31 @@ namespace Platform
       return buf;
    }
 
+   void SuppressAppUIForScanChild()
+   {
+      @autoreleasepool
+      {
+         [NSApplication sharedApplication];
+         [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
+      }
+   }
+
    PluginHandle* PluginCreate(const PluginDesc& desc, double sampleRate, int maxBlockFrames)
    {
+      if (desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3Create(desc, sampleRate, maxBlockFrames);
+#else
+         PluginHandle* h = new PluginHandle();
+         h->desc = desc;
+         h->state = PluginLoadState::Failed;
+         h->loadError = "VST3 plugins are disabled in this build";
+         h->arrived.store(true, std::memory_order_release);
+         return h;
+#endif
+      }
+
       PluginHandle* h = new PluginHandle();
       h->desc = desc;
       h->sampleRate = sampleRate;
@@ -3442,17 +3293,28 @@ namespace Platform
          return h;
       }
 
-      // Asynchronous instantiation via AUv3 API. The completion handler can
-      // be called on an internal queue, so arrival fields are guarded by
-      // arrivalMutex.
-      [AUAudioUnit instantiateWithComponentDescription:cd
-                                               options:0
-                                     completionHandler:^(AUAudioUnit* au, NSError* error) {
+      // Synchronous AUv3 init, deliberately not the completion-handler async
+      // variant (instantiateWithComponentDescription:options:completionHandler:).
+      // That API is documented to run its handler "on an arbitrary queue" -
+      // in practice that means some of the plugin's own factory/init code can
+      // run off whatever thread called us, same class of bug as the VST3
+      // background-dispatch fix above. Seen live: Native Instruments' Qt-based
+      // plugins (Massive X, and presumably Pigments) hit a
+      // dispatch_assert_queue trap because Qt's Cocoa integration requires
+      // main-thread init and this async path didn't guarantee it. The
+      // synchronous initializer runs entirely on the calling thread (this is
+      // called from the main thread via AudioPluginNode::PluginCreate), which
+      // is what a spec-compliant host needs here. This does mean the call
+      // briefly blocks the caller instead of returning Pending immediately -
+      // same real tradeoff as every other compliant AU/VST3 host makes.
+      NSError* error = nil;
+      AUAudioUnit* au = [[AUAudioUnit alloc] initWithComponentDescription:cd options:0 error:&error];
+      {
          std::lock_guard<std::mutex> lock(h->arrivalMutex);
          h->arrivedUnit = au;
          h->arrivedError = error;
          h->arrived.store(true, std::memory_order_release);
-      }];
+      }
 
       return h;
    }
@@ -3582,6 +3444,16 @@ namespace Platform
          return PluginLoadState::Failed;
       }
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3Poll(h, outError);
+#else
+         outError = "VST3 plugins disabled";
+         return PluginLoadState::Failed;
+#endif
+      }
+
       if (h->state != PluginLoadState::Pending)
       {
          outError = h->loadError;
@@ -3635,6 +3507,16 @@ namespace Platform
          return false;
       }
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3Prepare(h, sampleRate, maxBlockFrames, outError);
+#else
+         outError = "VST3 plugins disabled";
+         return false;
+#endif
+      }
+
       if (h->state != PluginLoadState::Ready)
       {
          outError = "plugin not ready";
@@ -3666,6 +3548,16 @@ namespace Platform
    {
       if (h == nullptr)
          return;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3Destroy(h);
+#else
+         delete h;
+#endif
+         return;
+      }
 
       // Real teardown of the editor window/controller/observer. PluginCloseEditor
       // only hides the window (it is cached across open/close - see its
@@ -3728,6 +3620,14 @@ namespace Platform
    {
       if (h == nullptr)
          return;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3Render(h, in, inChannels, out, outChannels, numFrames);
+#endif
+         return;
+      }
 
       // Everything below is on the real-time thread: no Objective-C message
       // send, no ARC traffic, no allocation, no lock. The two blocks involved
@@ -3876,6 +3776,14 @@ namespace Platform
       if (h == nullptr)
          return;
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3ScheduleMIDIEvent(h, frameOffset, bytes, byteCount);
+#endif
+         return;
+      }
+
       if (h->scheduleMIDIEventBlockRaw == nullptr || bytes == nullptr || byteCount <= 0)
          return;
       __unsafe_unretained AUScheduleMIDIEventBlock schedule =
@@ -3889,6 +3797,15 @@ namespace Platform
    {
       if (h == nullptr)
          return 0;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3ParameterCount(h);
+#else
+         return 0;
+#endif
+      }
 
       if (h->unit == nil || h->unit.parameterTree == nil)
          return 0;
@@ -3919,6 +3836,15 @@ namespace Platform
       if (h == nullptr)
          return false;
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3ParameterInfo(h, index, out);
+#else
+         return false;
+#endif
+      }
+
       if (h->unit == nil || h->unit.parameterTree == nil)
          return false;
       NSArray<AUParameter*>* all = h->unit.parameterTree.allParameters;
@@ -3933,6 +3859,15 @@ namespace Platform
       if (h == nullptr)
          return false;
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3ParameterInfoByAddress(h, address, out);
+#else
+         return false;
+#endif
+      }
+
       if (h->unit == nil || h->unit.parameterTree == nil)
          return false;
       AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
@@ -3946,6 +3881,14 @@ namespace Platform
    {
       if (h == nullptr)
          return;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3SetParameter(h, address, value);
+#endif
+         return;
+      }
 
       if (h->unit == nil || h->unit.parameterTree == nil)
          return;
@@ -3965,6 +3908,15 @@ namespace Platform
       if (h == nullptr)
          return false;
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3GetParameter(h, address, outValue);
+#else
+         return false;
+#endif
+      }
+
       if (h->unit == nil || h->unit.parameterTree == nil)
          return false;
       AUParameter* p = [h->unit.parameterTree parameterWithAddress:(AUParameterAddress)address];
@@ -3979,6 +3931,14 @@ namespace Platform
       if (h == nullptr)
          return;
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3BeginLearn(h);
+#endif
+         return;
+      }
+
       h->learnedValid.store(false, std::memory_order_relaxed);
       h->learning.store(true, std::memory_order_release);
    }
@@ -3988,6 +3948,14 @@ namespace Platform
       if (h == nullptr)
          return;
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3EndLearn(h);
+#endif
+         return;
+      }
+
       h->learning.store(false, std::memory_order_release);
       h->learnedValid.store(false, std::memory_order_relaxed);
    }
@@ -3996,6 +3964,15 @@ namespace Platform
    {
       if (h == nullptr)
          return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3PollLearned(h, outAddress);
+#else
+         return false;
+#endif
+      }
 
       if (!h->learnedValid.load(std::memory_order_acquire))
          return false;
@@ -4100,6 +4077,16 @@ namespace Platform
          return false;
       }
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3OpenEditor(h, outError);
+#else
+         outError = "VST3 plugins disabled";
+         return false;
+#endif
+      }
+
       if (h->unit == nil || h->state != PluginLoadState::Ready)
       {
          outError = "plugin not loaded";
@@ -4156,6 +4143,14 @@ namespace Platform
       if (h == nullptr)
          return;
 
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         PluginVST3CloseEditor(h);
+#endif
+         return;
+      }
+
       if (h->editorWindow == nil)
          return;
       // Soft close: hide the window but keep it (and its view controller)
@@ -4170,6 +4165,15 @@ namespace Platform
    {
       if (h == nullptr)
          return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3EditorIsOpen(h);
+#else
+         return false;
+#endif
+      }
 
       return h->editorOpen.load(std::memory_order_acquire);
    }
@@ -4192,6 +4196,15 @@ namespace Platform
       outBase64.clear();
       if (h == nullptr)
          return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3SaveState(h, outBase64);
+#else
+         return false;
+#endif
+      }
 
       if (h->unit == nil)
          return false;
@@ -4218,6 +4231,15 @@ namespace Platform
    {
       if (h == nullptr || base64.empty())
          return false;
+
+      if (h->desc.format == "vst3")
+      {
+#if INFINITE_ENABLE_VST3
+         return PluginVST3RestoreState(h, base64);
+#else
+         return false;
+#endif
+      }
 
       if (h->unit == nil)
          return false;

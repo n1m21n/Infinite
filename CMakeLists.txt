@@ -31,10 +31,26 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glfw)
 
+# Optional VST3 plugin hosting backend. Off by default: the Steinberg VST3
+# SDK is GPLv3-or-proprietary, and linking it makes the distributed binary
+# GPLv3 too (see LICENSE). Do not flip this default without the user's
+# explicit sign-off - it's a licensing decision, not a technical one.
+option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" OFF)
+
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)
 set(STB_DIR external/stb)
 set(SYPHON_DIR external/syphon)
+
+if(INFINITE_ENABLE_VST3)
+    set(VST3_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/vst3sdk")
+    if(NOT EXISTS "${VST3_SDK_DIR}/pluginterfaces/vst/ivstaudioprocessor.h")
+        message(FATAL_ERROR "INFINITE_ENABLE_VST3 is ON, but Steinberg VST3 SDK was not found in external/vst3sdk.\n"
+                            "Please initialize submodules with:\n"
+                            "  git submodule update --init --recursive external/vst3sdk\n"
+                            "or clone the VST3 SDK into external/vst3sdk.")
+    endif()
+endif()
 
 set(SYPHON_SOURCES
     ${SYPHON_DIR}/src/SyphonCGL.c
@@ -215,6 +231,23 @@ set_source_files_properties(src/platform/Platform.mm src/audio/AudioFileWriter.m
     PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 set_source_files_properties(${SYPHON_SOURCES}
     PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")
+
+if(INFINITE_ENABLE_VST3)
+    target_compile_definitions(Infinite PRIVATE INFINITE_ENABLE_VST3=1)
+    target_include_directories(Infinite PRIVATE
+        ${VST3_SDK_DIR}
+        ${VST3_SDK_DIR}/pluginterfaces
+        ${VST3_SDK_DIR}/public.sdk
+    )
+    target_sources(Infinite PRIVATE
+        src/platform/PluginVST3.mm
+        ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
+        ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
+        ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
+    )
+    set_source_files_properties(src/platform/PluginVST3.mm
+        PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+endif()
 
 # imgui-node-editor 0.9.1 ships its own GetKeyIndex() shim, which collides with
 # ImGui's obsolete-keyio copy. Dropping the obsolete API leaves only the shim.
