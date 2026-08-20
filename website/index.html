@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=30">
+  <link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
   <!-- Ambient Cosmic Dust Canvas -->
@@ -127,34 +127,54 @@
           <h2 class="section-heading"><span class="cursive-text">Creative</span> Streams</h2>
         </div>
 
-        <div class="capabilities-grid">
+        <div class="capabilities-grid" id="capabilities-grid">
           <!-- 1. Real GLSL Formula from Infinite Engine with Interactive Liquid Flow -->
-          <div class="cap-card" data-cap="shader">
+          <div class="cap-card" data-cap="shader" data-index="0">
             <div class="cap-canvas-box">
               <canvas id="anim-waves"></canvas>
             </div>
           </div>
 
           <!-- 2. Wavetable Position Movement with Interactive Slide Scrubbing -->
-          <div class="cap-card" data-cap="wavetable">
+          <div class="cap-card" data-cap="wavetable" data-index="1">
             <div class="cap-canvas-box">
               <canvas id="anim-wavetable"></canvas>
             </div>
           </div>
 
           <!-- 3. 3D Geometry Rotating & Interactive Three.js Scene Cube -->
-          <div class="cap-card" data-cap="3d">
+          <div class="cap-card" data-cap="3d" data-index="2">
             <div class="cap-canvas-box">
               <canvas id="anim-particles"></canvas>
             </div>
           </div>
 
           <!-- 4. Universal Modulation Interactive Drag-to-Rotate Knobs -->
-          <div class="cap-card" data-cap="knobs">
+          <div class="cap-card" data-cap="knobs" data-index="3">
             <div class="cap-canvas-box">
               <canvas id="anim-knobs"></canvas>
             </div>
           </div>
+        </div>
+
+        <!-- Mobile Slider Pagination Indicator & Step Controls -->
+        <div class="cap-slider-controls" aria-label="Creative stream slider navigation">
+          <button class="cap-slider-btn cap-prev-btn" id="cap-prev-btn" aria-label="Previous square" title="Previous">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <div class="cap-slider-dots" id="cap-slider-dots">
+            <button class="cap-dot active" data-index="0" aria-label="Square 1: Shaders"></button>
+            <button class="cap-dot" data-index="1" aria-label="Square 2: Wavetable"></button>
+            <button class="cap-dot" data-index="2" aria-label="Square 3: 3D Geometry"></button>
+            <button class="cap-dot" data-index="3" aria-label="Square 4: Modulation"></button>
+          </div>
+          <button class="cap-slider-btn cap-next-btn" id="cap-next-btn" aria-label="Next square" title="Next">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
         </div>
       </div>
     </section>

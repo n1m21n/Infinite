@@ -1435,6 +1435,70 @@ function initKnobsAnimation() {
   window.addEventListener('resize', resize, { passive: true });
 }
 
+// Mobile Slider Navigator for Creative Streams
+function initMobileCapabilitiesSlider() {
+  const grid = document.getElementById('capabilities-grid');
+  const dots = document.querySelectorAll('#cap-slider-dots .cap-dot');
+  const prevBtn = document.getElementById('cap-prev-btn');
+  const nextBtn = document.getElementById('cap-next-btn');
+  const cards = document.querySelectorAll('.capabilities-grid .cap-card');
+
+  if (!grid || cards.length === 0) return;
+
+  let activeIndex = 0;
+
+  function setActiveDot(idx) {
+    activeIndex = Math.max(0, Math.min(cards.length - 1, idx));
+    dots.forEach((dot, i) => {
+      if (i === activeIndex) {
+        dot.classList.add('active');
+      } else {
+        dot.classList.remove('active');
+      }
+    });
+  }
+
+  function scrollToCard(idx) {
+    if (idx < 0 || idx >= cards.length) return;
+    const card = cards[idx];
+    const offset = card.offsetLeft - (grid.clientWidth - card.clientWidth) / 2;
+    grid.scrollTo({
+      left: Math.max(0, offset),
+      behavior: 'smooth'
+    });
+    setActiveDot(idx);
+  }
+
+  dots.forEach((dot, idx) => {
+    dot.addEventListener('click', () => {
+      scrollToCard(idx);
+    });
+  });
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      scrollToCard(activeIndex - 1);
+    });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      scrollToCard(activeIndex + 1);
+    });
+  }
+
+  let scrollTimeout = null;
+  grid.addEventListener('scroll', () => {
+    if (scrollTimeout) return;
+    scrollTimeout = requestAnimationFrame(() => {
+      scrollTimeout = null;
+      const scrollLeft = grid.scrollLeft;
+      const cardWidth = (cards[0].offsetWidth || 280) + 14;
+      const newIndex = Math.round(scrollLeft / cardWidth);
+      setActiveDot(newIndex);
+    });
+  }, { passive: true });
+}
+
 
 
 
@@ -1815,6 +1879,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initWavetableAnimation();
   initParticlesAnimation();
   initKnobsAnimation();
+  initMobileCapabilitiesSlider();
 
   initMinimalAudioPlayer();
   initRecipesToggle();

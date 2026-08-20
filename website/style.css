@@ -493,6 +493,10 @@ body {
   display: block;
 }
 
+.cap-slider-controls {
+  display: none;
+}
+
 /* --------------------------------------------------------------------------
    Listen (Seamless Audio Player: Pure Play Button + Amplitude Waveform)
    -------------------------------------------------------------------------- */
@@ -1231,6 +1235,52 @@ body {
   .cap-canvas-box {
     height: 100%;
     width: 100%;
+  }
+
+  /* Slider Controls: visible on mobile */
+  .cap-slider-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .cap-slider-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid var(--border-card);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  }
+  .cap-slider-btn:active {
+    transform: scale(0.92);
+    border-color: var(--pastel-terracotta);
+  }
+  .cap-slider-dots {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .cap-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(45, 35, 25, 0.2);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease;
+  }
+  .cap-dot.active {
+    width: 22px;
+    background: var(--pastel-terracotta);
   }
 
   .howto-item { grid-template-columns: 1fr; gap: 14px; padding: 16px; }
