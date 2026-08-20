@@ -346,6 +346,7 @@ namespace Platform
    // _NSGetExecutablePath), used to re-exec ourselves for the VST3 scan's
    // "--vst3-scan-bundle" child mode.
    std::string ExecutablePath();
+   std::string ScannerExecutablePath();
 
    // Must be called first thing in the "--vst3-scan-bundle" child process,
    // before any plugin code runs. The child is a re-exec of this same app

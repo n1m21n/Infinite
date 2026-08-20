@@ -247,6 +247,65 @@ if(INFINITE_ENABLE_VST3)
     )
     set_source_files_properties(src/platform/PluginVST3.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+
+    add_executable(infinite-vst3-scanner
+        src/scanner_main.mm
+        src/platform/PluginVST3.mm
+        src/platform/Platform.mm
+        ${SYPHON_SOURCES}
+        ${NODE_EDITOR_DIR}/crude_json.cpp
+        ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
+        ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
+        ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
+    )
+    target_include_directories(infinite-vst3-scanner PRIVATE
+        src src/core src/nodes src/platform src/audio
+        ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
+        ${NODE_EDITOR_DIR}
+        ${STB_DIR}
+        external/json
+        external/shine
+        ${SYPHON_DIR}/include
+        ${SYPHON_DIR}/src
+        ${VST3_SDK_DIR}
+        ${VST3_SDK_DIR}/pluginterfaces
+        ${VST3_SDK_DIR}/public.sdk
+    )
+    target_compile_definitions(infinite-vst3-scanner PRIVATE
+        INFINITE_ENABLE_VST3=1
+        GL_SILENCE_DEPRECATION
+    )
+    set_source_files_properties(src/scanner_main.mm
+        PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+
+    if(APPLE)
+        target_link_libraries(infinite-vst3-scanner PRIVATE
+            "-framework Cocoa"
+            "-framework CoreFoundation"
+            "-framework CoreAudio"
+            "-framework AudioToolbox"
+            "-framework AVFoundation"
+            "-framework CoreAudioKit"
+            "-framework AppKit"
+            "-framework CoreMedia"
+            "-framework CoreMIDI"
+            "-framework CoreVideo"
+            "-framework CoreGraphics"
+            "-framework ImageIO"
+            "-framework UniformTypeIdentifiers"
+            "-framework Accelerate"
+            "-framework ModelIO"
+            "-framework Vision"
+            "-framework OpenGL"
+            "-framework IOSurface"
+        )
+        add_dependencies(Infinite infinite-vst3-scanner)
+        add_custom_command(TARGET Infinite POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    "$<TARGET_FILE:infinite-vst3-scanner>"
+                    "$<TARGET_BUNDLE_DIR:Infinite>/Contents/MacOS/infinite-vst3-scanner"
+            COMMENT "Copying scanner helper into app bundle")
+    endif()
 endif()
 
 # imgui-node-editor 0.9.1 ships its own GetKeyIndex() shim, which collides with
@@ -300,7 +359,7 @@ if(APPLE)
     # The entitlements are not optional once plugins are hosted: see
     # cmake/Infinite.entitlements for which ones and why.
     add_custom_command(TARGET Infinite POST_BUILD
-        COMMAND codesign --force --sign -
+        COMMAND codesign --force --deep --sign -
                 --entitlements "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Infinite.entitlements"
                 "$<TARGET_BUNDLE_DIR:Infinite>"
         COMMENT "Ad-hoc signing the bundle")

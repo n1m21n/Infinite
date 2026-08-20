@@ -406,9 +406,15 @@ namespace Platform
 
    ProbeOutcome ProbeVST3BundleOutOfProcess(const std::string& bundlePath, std::vector<Platform::PluginDesc>& out)
    {
-      const std::string exe = Platform::ExecutablePath();
+      std::string exe = Platform::ScannerExecutablePath();
+      bool isDedicatedScanner = true;
+      if (exe.empty() || !fs::exists(exe))
+      {
+         exe = Platform::ExecutablePath();
+         isDedicatedScanner = false;
+      }
       if (exe.empty())
-         return ProbeOutcome::Crashed; // can't self-exec - treat like any other probe failure
+         return ProbeOutcome::Crashed;
 
       int pipeFds[2];
       if (pipe(pipeFds) != 0)
@@ -423,11 +429,25 @@ namespace Platform
       // has nowhere useful to put that, so it goes to /dev/null.
       posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
 
+      char argvDedicated[] = "infinite-vst3-scanner";
       char argv0[] = "Infinite";
       char flag[] = "--vst3-scan-bundle";
       std::vector<char> pathBuf(bundlePath.begin(), bundlePath.end());
       pathBuf.push_back('\0');
-      char* childArgv[] = { argv0, flag, pathBuf.data(), nullptr };
+      char* childArgv[4];
+      if (isDedicatedScanner)
+      {
+         childArgv[0] = argvDedicated;
+         childArgv[1] = pathBuf.data();
+         childArgv[2] = nullptr;
+      }
+      else
+      {
+         childArgv[0] = argv0;
+         childArgv[1] = flag;
+         childArgv[2] = pathBuf.data();
+         childArgv[3] = nullptr;
+      }
 
       pid_t pid = 0;
       const int rc = posix_spawn(&pid, exe.c_str(), &actions, nullptr, childArgv, *_NSGetEnviron());

@@ -1,6 +1,7 @@
 #include "Platform.h"
 #include "PluginVST3.h"
 #include <atomic>
+#include <filesystem>
 
 #import <objc/runtime.h>
 #import <Cocoa/Cocoa.h>
@@ -3243,6 +3244,21 @@ namespace Platform
          return std::string();
       buf.resize(strlen(buf.c_str()));
       return buf;
+   }
+
+   std::string ScannerExecutablePath()
+   {
+      std::string exe = ExecutablePath();
+      if (exe.empty())
+         return std::string();
+      std::filesystem::path p(exe);
+      std::filesystem::path scanner = p.parent_path() / "infinite-vst3-scanner";
+      if (std::filesystem::exists(scanner))
+         return scanner.string();
+      std::filesystem::path helper = p.parent_path().parent_path() / "Helpers" / "infinite-vst3-scanner";
+      if (std::filesystem::exists(helper))
+         return helper.string();
+      return std::string();
    }
 
    void SuppressAppUIForScanChild()
