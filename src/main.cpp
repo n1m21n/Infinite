@@ -28133,7 +28133,15 @@ int main(int argc, char** argv)
          ShapeNode circle;
          circle.shapeType = 0;
          circle.width = 256; circle.height = 256;
-         circle.size = 0.25f;
+         // aa0462a split the single `size` field into sizeX/sizeY (uSize is
+         // now a vec2 in the shader - see ShapeNode.cpp); `size` itself is
+         // dead, read nowhere in CookIfNeeded any more. Setting only `size`
+         // here left the circle at its sizeX/sizeY defaults (0.35 radius,
+         // pi*0.35^2 = 38.5% coverage) instead of the intended 0.25 (19.6%),
+         // which is what actually produced the 35.1%-vs-19.6% mismatch this
+         // fixture reported - the shape code never regressed.
+         circle.sizeX = 0.25f;
+         circle.sizeY = 0.25f;
          circle.posY = 0.75f;   // deliberately off-centre, see below
          circle.CookIfNeeded(9200);
 
