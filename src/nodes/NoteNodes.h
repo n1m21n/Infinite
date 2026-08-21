@@ -23,6 +23,7 @@ class AudioQuantizerNode;
 class AudioGlideNode;
 class AudioNoteEchoNode;
 class AudioNoteRouterNode;
+class AudioNoteMergeNode;
 class AudioArpeggiatorNode;
 class AudioNoteSequencerNode;
 class AudioRandomNoteGeneratorNode;
@@ -499,6 +500,39 @@ public:
 
 private:
    std::unique_ptr<AudioNoteRouterNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// The system's only note fan-in point: up to kSlots note inputs merged into
+// one output stream, in timestamp order. Each input's notes stay independent
+// voices matched by voice id (never pitch), so two inputs holding the same
+// note at once produce two overlapping voices rather than colliding.
+class NoteMergeNode : public INode, public INoteSource
+{
+public:
+   static constexpr int kSlots = 4;
+
+   static INode* Create() { return new NoteMergeNode(); }
+   NoteMergeNode();
+   ~NoteMergeNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override
+   {
+      return (slot >= 0 && slot < kSlots) ? &noteInputs[slot] : nullptr;
+   }
+   const char* InputLabel(int slot) const override;
+   AudioNode* GetAudioNode() override;
+
+   NoteCable noteInputs[kSlots];
+
+private:
+   std::unique_ptr<AudioNoteMergeNode> mAudioNode;
    int mLastCookFrame = -1;
 };
 

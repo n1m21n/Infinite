@@ -74,4 +74,14 @@ public:
    // AudioEngine.h) already guarantees the producer outlives any in-flight
    // callback using it.
    virtual void SetNoteInbox(NoteEventQueue* inbox, int cursor) { (void)inbox; (void)cursor; }
+
+   // Slot-aware inbox setter for a note consumer with more than one note
+   // input (currently only Note Merge). Default forwards slot 0 to the
+   // existing single-slot overload so every pre-existing consumer needs no
+   // change.
+   virtual void SetNoteInbox(int inputSlot, NoteEventQueue* inbox, int cursor)
+   {
+      if (inputSlot == 0)
+         SetNoteInbox(inbox, cursor);
+   }
 };

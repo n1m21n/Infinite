@@ -1828,6 +1828,97 @@ int NoteRouterNode::LastRoutedMask() const
    return mAudioNode ? mAudioNode->LastMask() : 0;
 }
 
+// ------------------------------------------------------------------- Merge
+// The system's only note fan-in point: up to kSlots inboxes, merged into one
+// outbox in timestamp order. voiceId is passed through byte-for-byte (never
+// regenerated - see VoiceAllocator::NoteOff), so identical pitches arriving
+// from different inputs at once become independent overlapping voices, not a
+// collision. source is rewritten to `this` on every forwarded event, same
+// convention as every other node in this file.
+class AudioNoteMergeNode : public AudioNode
+{
+public:
+   static constexpr int kSlots = NoteMergeNode::kSlots;
+
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override {}
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      // kSlots * 64 == NoteEventQueue::kCapacity, so the worst case (all
+      // slots fully saturated in one block) fits without overflow.
+      NoteEvent all[kSlots * 64];
+      int total = 0;
+
+      for (int s = 0; s < kSlots; s++)
+      {
+         if (mInbox[s] == nullptr)
+            continue;
+         NoteEvent evts[64];
+         const int n = mInbox[s]->Pop(mCursor[s], evts, 64);
+         for (int i = 0; i < n && total < kSlots * 64; i++)
+            all[total++] = evts[i];
+      }
+
+      std::stable_sort(all, all + total, [](const NoteEvent& a, const NoteEvent& b)
+      {
+         return a.frameOffset < b.frameOffset;
+      });
+
+      for (int i = 0; i < total; i++)
+      {
+         NoteEvent out = all[i];
+         out.source = this;
+         mOutbox.Push(out);
+      }
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+
+   void SetNoteInbox(int inputSlot, NoteEventQueue* inbox, int cursor) override
+   {
+      if (inputSlot >= 0 && inputSlot < kSlots)
+      {
+         mInbox[inputSlot] = inbox;
+         mCursor[inputSlot] = cursor;
+      }
+   }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox[kSlots] = {};
+   int mCursor[kSlots] = { -1, -1, -1, -1 };
+};
+
+NoteMergeNode::NoteMergeNode() = default;
+NoteMergeNode::~NoteMergeNode() = default;
+
+void NoteMergeNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteMergeNode>();
+}
+
+void NoteMergeNode::VisitParams(ParamVisitor& /*v*/)
+{
+   // No editable params - only the note-input cables.
+}
+
+AudioNode* NoteMergeNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteMergeNode>();
+   return mAudioNode.get();
+}
+
+const char* NoteMergeNode::InputLabel(int slot) const
+{
+   static const char* kLabels[kSlots] = { "1", "2", "3", "4" };
+   return (slot >= 0 && slot < kSlots) ? kLabels[slot] : nullptr;
+}
+
 // ---------------------------------------------------------------- Arpeggiator
 class AudioArpeggiatorNode : public AudioNode
 {
