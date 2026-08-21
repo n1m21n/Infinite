@@ -110,6 +110,25 @@ uint64_t AudioEngine::XrunCount() const
    return mXrunCount.load(std::memory_order_relaxed);
 }
 
+void AudioEngine::NotifyProcessorOverload()
+{
+   // Kept alongside, not instead of, the wall-clock heuristic in Process():
+   // kAudioDeviceProcessorOverload catches genuine render-thread overruns,
+   // but the heuristic also catches late/skipped-callback gaps (e.g.
+   // silence-substitution) that this notification may not cover. Either
+   // source bumping the same counter is a deliberate choice, not a race to
+   // fix - see the comment on kXrunGapMultiplier.
+   mXrunCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+// Trampoline for Platform.mm's kAudioDeviceProcessorOverload listener - see
+// its own comment on why it can't just #include AudioEngine.h and call the
+// method directly (AudioBuffer.h name collision with CoreAudioTypes.h).
+extern "C" void AudioEngine_NotifyProcessorOverload(void* engineInstance)
+{
+   static_cast<AudioEngine*>(engineInstance)->NotifyProcessorOverload();
+}
+
 double AudioEngine::LastBlockLoad() const
 {
    return mLastBlockLoad.load(std::memory_order_relaxed);

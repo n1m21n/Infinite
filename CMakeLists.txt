@@ -275,6 +275,7 @@ if(INFINITE_ENABLE_VST3)
     target_compile_definitions(infinite-vst3-scanner PRIVATE
         INFINITE_ENABLE_VST3=1
         GL_SILENCE_DEPRECATION
+        INFINITE_VST3_SCANNER=1
     )
     set_source_files_properties(src/scanner_main.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")

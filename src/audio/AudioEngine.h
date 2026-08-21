@@ -89,6 +89,13 @@ public:
    double SampleRate() const;
    uint64_t XrunCount() const;
 
+   // Called from Platform's kAudioDeviceProcessorOverload listener - a real
+   // CoreAudio overload notification, not the wall-clock heuristic Process()
+   // uses below. May land on an arbitrary CoreAudio-managed thread, so this
+   // must stay atomic-only: no locks, no allocation, nothing that touches
+   // main.cpp UI state.
+   void NotifyProcessorOverload();
+
    // True unless the engine believes it should be producing audio
    // (SampleRate() > 0) but no render callback has actually landed recently
    // enough to justify that belief. Deliberately not the same signal as the

@@ -1920,6 +1920,19 @@ namespace Platform
 
    // ------------------------------------------------- engine render bridge
 
+   // Trampoline into AudioEngine::NotifyProcessorOverload, defined in
+   // AudioEngine.cpp. Deliberately not "#include audio/AudioEngine.h" here:
+   // that header pulls in AudioBuffer.h, whose `struct AudioBuffer` collides
+   // (same unscoped name) with CoreAudioTypes.h's own AudioBuffer, which this
+   // file already has transitively via AVFoundation.h - a single extern "C"
+   // declaration sidesteps that without touching either struct's name.
+   // Guarded by INFINITE_VST3_SCANNER (see CMakeLists.txt): Platform.mm is
+   // also compiled into infinite-vst3-scanner, which never links
+   // AudioEngine.cpp, so the symbol would be undefined there.
+#if !defined(INFINITE_VST3_SCANNER)
+   extern "C" void AudioEngine_NotifyProcessorOverload(void* engineInstance);
+#endif
+
    struct AudioDeviceHandle
    {
       AVAudioEngine* engine = nil;
@@ -1931,6 +1944,20 @@ namespace Platform
       // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md
       // rule 3.
       id configChangeObserver = nil;
+
+      // The real output device, retained here so the processor-overload
+      // listener below can be removed against the exact object it was
+      // registered on. 0 if AudioDeviceOpen never resolved a valid device
+      // (mirrors the AudioUnitSetProperty silent-fallback case just above).
+      AudioObjectID outputDeviceId = 0;
+      // kAudioDeviceProcessorOverload listener - a real CoreAudio overload
+      // notification (see AudioEngine::NotifyProcessorOverload), as opposed
+      // to AudioEngine::Process's wall-clock heuristic. Same lifecycle rule
+      // as configChangeObserver just above: bound to outputDeviceId, so it
+      // must be removed (AudioDeviceClose) before that device reference is
+      // dropped, and removal requires passing back this exact block object,
+      // not just an equivalent one.
+      AudioObjectPropertyListenerBlock overloadListenerBlock = nil;
    };
 
    namespace
@@ -2301,6 +2328,29 @@ namespace Platform
             AudioObjectSetPropertyData(targetDevice, &bufferAddr, 0, nullptr, sizeof(frames), &frames);
          }
 
+         h->outputDeviceId = targetDevice;
+#if !defined(INFINITE_VST3_SCANNER)
+         if (targetDevice != 0)
+         {
+            // Real overload signal from CoreAudio, feeding the same counter
+            // AudioEngine::Process's wall-clock heuristic does - see
+            // AudioEngine::NotifyProcessorOverload's comment for why both
+            // stay live rather than one replacing the other. `engineInstance`
+            // is the AudioEngine passed in as `userData`; the block may run
+            // on any CoreAudio-managed thread, so it must do nothing but
+            // that one atomic increment.
+            AudioObjectPropertyAddress overloadAddr {
+               kAudioDeviceProcessorOverload, kAudioObjectPropertyScopeGlobal,
+               kAudioObjectPropertyElementMain
+            };
+            void* engineInstance = userData;
+            h->overloadListenerBlock = ^(UInt32 inNumberAddresses, const AudioObjectPropertyAddress* inAddresses) {
+               AudioEngine_NotifyProcessorOverload(engineInstance);
+            };
+            AudioObjectAddPropertyListenerBlock(targetDevice, &overloadAddr, nullptr, h->overloadListenerBlock);
+         }
+#endif
+
          AVAudioFormat* format = [mixer outputFormatForBus:0];
          if (format == nil || format.sampleRate <= 0)
             format = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100.0 channels:2];
@@ -2380,6 +2430,23 @@ namespace Platform
             [[NSNotificationCenter defaultCenter] removeObserver:h->configChangeObserver];
             h->configChangeObserver = nil;
          }
+
+#if !defined(INFINITE_VST3_SCANNER)
+         // Same "remove before the thing it's bound to goes away" rule as
+         // configChangeObserver above - outputDeviceId itself doesn't get
+         // freed by us, but a dangling listener block left registered
+         // against it would keep firing into a freed AudioEngine* capture
+         // for as long as the process device stays open.
+         if (h->outputDeviceId != 0 && h->overloadListenerBlock != nil)
+         {
+            AudioObjectPropertyAddress overloadAddr {
+               kAudioDeviceProcessorOverload, kAudioObjectPropertyScopeGlobal,
+               kAudioObjectPropertyElementMain
+            };
+            AudioObjectRemovePropertyListenerBlock(h->outputDeviceId, &overloadAddr, nullptr, h->overloadListenerBlock);
+            h->overloadListenerBlock = nil;
+         }
+#endif
 
          // Same teardown hazard as AudioSpikeStop/AudioFileClose: AVAudioEngine
          // throws an NSException on bad teardown state instead of returning an
