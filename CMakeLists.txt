@@ -189,6 +189,7 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/AudioTextureNode.cpp
     src/nodes/AudioRibbonNode.cpp
     src/nodes/AudioColorRampNode.cpp
+    src/nodes/ChromaColorNode.cpp
     src/audio/dsp/SpectralAdditiveSynth.cpp
     src/nodes/OscillatorNode.cpp
     src/nodes/MetallicNode.cpp

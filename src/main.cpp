@@ -109,6 +109,7 @@
 #include "nodes/AudioTextureNode.h"
 #include "nodes/AudioRibbonNode.h"
 #include "nodes/AudioColorRampNode.h"
+#include "nodes/ChromaColorNode.h"
 #include "nodes/OscillatorNode.h"
 #include "nodes/MetallicNode.h"
 #include "audio/Wavetable.h"
@@ -2506,6 +2507,7 @@ namespace
       REGISTER_NODE(BlendAudioNode, Blend Audio, "AudioUtility");
       REGISTER_NODE(AudioTextureNode, Audio Texture, "Audio");
       REGISTER_NODE(AudioColorRampNode, Audio Color Ramp, "Audio");
+      REGISTER_NODE(ChromaColorNode, Chroma Color, "Audio");
 
       // P3a Part 1 - note-transport proving nodes. See
       // docs/plans/audio/P3a-notes-prompt.md; Part 2 adds Note Filter/
@@ -2701,6 +2703,8 @@ namespace
          return 1;
       if (dynamic_cast<AudioColorRampNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<ChromaColorNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<RemoveBgNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<DrawNode*>(gn.node.get()) != nullptr)
@@ -2835,6 +2839,8 @@ namespace
          return slot == 0 ? &cramp->Input() : nullptr;
       if (auto* acr = dynamic_cast<AudioColorRampNode*>(gn.node.get()))
          return slot == 0 ? &acr->Input() : nullptr;
+      if (auto* cc = dynamic_cast<ChromaColorNode*>(gn.node.get()))
+         return slot == 0 ? &cc->Input() : nullptr;
       if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn.node.get()))
          return slot == 0 ? &rbg->Input() : nullptr;
       if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
@@ -5767,7 +5773,7 @@ namespace
       // would otherwise render an empty shell with just the pin - same
       // reasoning as the AudioTextureNode carve-out just below.
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
-          dynamic_cast<AudioColorRampNode*>(node) != nullptr)
+          dynamic_cast<AudioColorRampNode*>(node) != nullptr || dynamic_cast<ChromaColorNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -14909,6 +14915,151 @@ namespace
       }
    }
 
+   void DrawChromaColorEditor(ChromaColorNode* n)
+   {
+      const float size = kPreviewSize;
+      const float wheelH = 110.0f;
+      const float barH = 20.0f;
+      const float gap = 4.0f;
+
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      // 1. Interactive 12-TET Chromatic Synesthesia Wheel
+      ImVec2 center(origin.x + size * 0.5f, origin.y + wheelH * 0.5f);
+      const float baseInnerR = 18.0f;
+      const float baseOuterR = 44.0f;
+
+      // Draw 12 Slices
+      for (int i = 0; i < 12; i++)
+      {
+         int pitch = (n->layoutMode == ChromaColorNode::kLayoutCircleOfFifths) ?
+                     ChromaColorNode::CircleOfFifthsOrder(i) : i;
+
+         float a0 = (float)i * (2.0f * 3.14159265358979323846f / 12.0f) - 3.14159265358979323846f * 0.5f;
+         float a1 = (float)(i + 1) * (2.0f * 3.14159265358979323846f / 12.0f) - 3.14159265358979323846f * 0.5f;
+
+         float energy = std::clamp(n->GetPitchEnergy(pitch), 0.0f, 1.0f);
+         float outerR = baseOuterR + energy * 8.0f;
+         float innerR = baseInnerR;
+
+         float glow = n->minBrightness + (1.0f - n->minBrightness) * energy;
+         ImU32 col = IM_COL32((int)(std::clamp(n->pitchColors[pitch][0] * glow, 0.0f, 1.0f) * 255),
+                              (int)(std::clamp(n->pitchColors[pitch][1] * glow, 0.0f, 1.0f) * 255),
+                              (int)(std::clamp(n->pitchColors[pitch][2] * glow, 0.0f, 1.0f) * 255),
+                              (int)(160 + energy * 95));
+
+         // Pie slice polygon
+         const int segs = 6;
+         std::vector<ImVec2> poly;
+         poly.reserve(segs * 2 + 2);
+         for (int s = 0; s <= segs; s++)
+         {
+            float a = a0 + (a1 - a0) * ((float)s / (float)segs);
+            poly.push_back(ImVec2(center.x + std::cos(a) * outerR, center.y + std::sin(a) * outerR));
+         }
+         for (int s = segs; s >= 0; s--)
+         {
+            float a = a0 + (a1 - a0) * ((float)s / (float)segs);
+            poly.push_back(ImVec2(center.x + std::cos(a) * innerR, center.y + std::sin(a) * innerR));
+         }
+         dl->AddConvexPolyFilled(poly.data(), (int)poly.size(), col);
+         dl->AddPolyline(poly.data(), (int)poly.size(), IM_COL32(30, 30, 40, 180), true, 1.0f);
+
+         // Label note name
+         float midA = (a0 + a1) * 0.5f;
+         float labelR = (innerR + outerR) * 0.5f;
+         ImVec2 labelPos(center.x + std::cos(midA) * labelR - 4.0f, center.y + std::sin(midA) * labelR - 6.0f);
+         dl->AddText(labelPos, (energy > 0.4f) ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 200, 210, 200),
+                     ChromaColorNode::PitchName(pitch));
+      }
+
+      // Center disc displaying Detected Key
+      dl->AddCircleFilled(center, baseInnerR - 1.0f, IM_COL32(18, 18, 26, 255));
+      dl->AddCircle(center, baseInnerR - 1.0f, IM_COL32(80, 84, 100, 255), 16, 1.2f);
+
+      char keyBuf[16];
+      snprintf(keyBuf, sizeof(keyBuf), "%s%s", ChromaColorNode::PitchName(n->GetDetectedRoot()),
+               n->IsDetectedMinor() ? "m" : "M");
+      ImVec2 keySize = ImGui::CalcTextSize(keyBuf);
+      dl->AddText(ImVec2(center.x - keySize.x * 0.5f, center.y - keySize.y * 0.5f),
+                  IM_COL32(255, 230, 120, 255), keyBuf);
+
+      // 2. Harmonic Gradient Preview Strip below wheel
+      ImVec2 gradOrigin(origin.x, origin.y + wheelH + gap);
+      const int kSegments = 96;
+      for (int i = 0; i < kSegments; i++)
+      {
+         float t0 = (float)i / (float)kSegments;
+         float t1 = (float)(i + 1) / (float)kSegments;
+         float c0[3], c1[3];
+         n->EvaluateHarmonicRamp(t0, c0);
+         n->EvaluateHarmonicRamp(t1, c1);
+         ImVec2 tl(gradOrigin.x + t0 * size, gradOrigin.y);
+         ImVec2 br(gradOrigin.x + t1 * size + 1.0f, gradOrigin.y + barH);
+         ImU32 col0 = IM_COL32((int)(std::clamp(c0[0], 0.0f, 1.0f) * 255),
+                               (int)(std::clamp(c0[1], 0.0f, 1.0f) * 255),
+                               (int)(std::clamp(c0[2], 0.0f, 1.0f) * 255), 255);
+         ImU32 col1 = IM_COL32((int)(std::clamp(c1[0], 0.0f, 1.0f) * 255),
+                               (int)(std::clamp(c1[1], 0.0f, 1.0f) * 255),
+                               (int)(std::clamp(c1[2], 0.0f, 1.0f) * 255), 255);
+         dl->AddRectFilledMultiColor(tl, br, col0, col1, col1, col0);
+      }
+      dl->AddRect(gradOrigin, ImVec2(gradOrigin.x + size, gradOrigin.y + barH), IM_COL32(70, 74, 90, 255), 3.0f);
+
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, gradOrigin.y + barH + gap + 4.0f));
+   }
+
+   void DrawChromaColorParams(ChromaColorNode* n)
+   {
+      DrawChromaColorEditor(n);
+
+      // Key & Harmonic Badges
+      char keyBadge[64];
+      snprintf(keyBadge, sizeof(keyBadge), "Key: %s %s (%.0f%%)",
+               ChromaColorNode::PitchName(n->GetDetectedRoot()),
+               n->IsDetectedMinor() ? "Minor" : "Major",
+               n->GetKeyConfidence() * 100.0f);
+      ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.45f, 1.0f), "%s", keyBadge);
+      ImGui::SameLine();
+      ImGui::TextDisabled("| Cons: %.2f", n->GetConsonance());
+
+      DropdownButton("palette preset", ChromaColorNode::PresetNames(), n->palettePreset,
+                     [n](int i) {
+                        PushUndoCheckpoint();
+                        n->ApplyPreset(i);
+                        n->MarkDirty();
+                     });
+
+      DropdownButton("ramp layout", ChromaColorNode::LayoutNames(), n->layoutMode,
+                     [n](int i) {
+                        PushUndoCheckpoint();
+                        n->layoutMode = i;
+                        n->MarkDirty();
+                     });
+
+      ModSlider("gain", &n->gain, 0.1f, 10.0f);
+      ModSlider("attack (ms)", &n->attack, 1.0f, 200.0f);
+      ModSlider("decay (ms)", &n->decay, 10.0f, 1000.0f);
+      ModSlider("min brightness", &n->minBrightness, 0.0f, 1.0f);
+
+      if (n->Input().IsConnected())
+         ModSlider("image mix", &n->rampMix, 0.0f, 1.0f);
+
+      NodeSeparator("chromatic pitch colors");
+      for (int i = 0; i < 12; i++)
+      {
+         int pitch = (n->layoutMode == ChromaColorNode::kLayoutCircleOfFifths) ?
+                     ChromaColorNode::CircleOfFifthsOrder(i) : i;
+         ImGui::PushID(pitch + 40000);
+         char label[32];
+         float energy = n->GetPitchEnergy(pitch);
+         snprintf(label, sizeof(label), "%-2s (lvl: %.2f)", ChromaColorNode::PitchName(pitch), energy);
+         ColorSwatch(label, n->pitchColors[pitch], n);
+         ImGui::PopID();
+      }
+   }
+
    void DrawAudioRibbonParams(AudioRibbonNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
@@ -17253,6 +17404,8 @@ namespace
          return ar->GetAudioNode();
       if (auto* acr = dynamic_cast<AudioColorRampNode*>(node))
          return acr->GetAudioNode();
+      if (auto* cc = dynamic_cast<ChromaColorNode*>(node))
+         return cc->GetAudioNode();
       return node->AudioNodeForNotePorts();
    }
 
@@ -33182,6 +33335,8 @@ int main(int argc, char** argv)
                DrawAudioTextureParams(n);
             else if (auto* n = dynamic_cast<AudioColorRampNode*>(gn.node.get()))
                DrawAudioColorRampParams(n);
+            else if (auto* n = dynamic_cast<ChromaColorNode*>(gn.node.get()))
+               DrawChromaColorParams(n);
             else if (auto* n = dynamic_cast<SetColorNode*>(gn.node.get()))
                DrawSetColorParams(n);
             else if (auto* n = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
