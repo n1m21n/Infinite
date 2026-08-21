@@ -216,8 +216,9 @@ void AudioTextureNode::CookIfNeeded(int frameId)
       const int H = 512;
       EnsureTexture(W, H);
 
-      if ((int)mSmoothedData.size() != W)
-         mSmoothedData.assign(W, 0.0f);
+      const int specSize = 512; // FFT bins 0..511 (lower half of the 1024-point transform)
+      if ((int)mSmoothedData.size() != specSize)
+         mSmoothedData.assign(specSize, 0.0f);
 
       float re[1024];
       float im[1024];
@@ -231,18 +232,40 @@ void AudioTextureNode::CookIfNeeded(int frameId)
 
       WaveTerrainDsp::Radix2FFT::Instance().Forward(re, im);
 
-      std::vector<uint8_t> row((size_t)W * 4);
-      for (int i = 0; i < W; i++)
+      // Log-compress each bin's magnitude before smoothing. A harmonically
+      // sparse source (e.g. a wavetable) is near-zero in linear magnitude
+      // between its harmonics, so almost the whole spectrum would read as
+      // black without dB compression.
+      for (int i = 0; i < specSize; i++)
       {
          const float mag = sqrtf(re[i] * re[i] + im[i] * im[i]) * (2.0f / 1024.0f) * gain;
-         mSmoothedData[i] = mSmoothedData[i] * sWeight + mag * (1.0f - sWeight);
-         const float norm = std::clamp(mSmoothedData[i], 0.0f, 1.0f);
-         const uint8_t byte = (uint8_t)(norm * 255.0f);
+         const float dB = 20.0f * log10f(mag + 1e-6f);
+         const float specVal = std::clamp((dB + 60.0f) / 60.0f, 0.0f, 1.0f); // -60dB..0dB -> 0..1
+         mSmoothedData[i] = mSmoothedData[i] * sWeight + specVal * (1.0f - sWeight);
+      }
 
-         row[i * 4 + 0] = byte;
-         row[i * 4 + 1] = byte;
-         row[i * 4 + 2] = byte;
-         row[i * 4 + 3] = 255;
+      const float sampleRate = 44100.0f;
+      const float binWidth = sampleRate / 1024.0f;
+
+      std::vector<uint8_t> row((size_t)W * 4);
+      for (int x = 0; x < W; x++)
+      {
+         // Sample by log frequency (20Hz-20kHz) rather than linear bin index,
+         // so harmonic content spreads across the visible width instead of
+         // crowding into the first few columns.
+         const float pos = (float)x / (float)(W - 1);
+         const float freq = 20.0f * std::pow(1000.0f, pos);
+         const float binF = std::clamp(freq / binWidth, 0.0f, (float)(specSize - 1));
+         const int bin0 = std::clamp((int)binF, 0, specSize - 1);
+         const int bin1 = std::clamp(bin0 + 1, 0, specSize - 1);
+         const float frac = binF - (float)bin0;
+         const float norm = mSmoothedData[bin0] * (1.0f - frac) + mSmoothedData[bin1] * frac;
+         const uint8_t byte = (uint8_t)(std::clamp(norm, 0.0f, 1.0f) * 255.0f);
+
+         row[x * 4 + 0] = byte;
+         row[x * 4 + 1] = byte;
+         row[x * 4 + 2] = byte;
+         row[x * 4 + 3] = 255;
       }
 
       std::vector<uint8_t> pixels((size_t)W * H * 4);
