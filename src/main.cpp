@@ -2524,6 +2524,7 @@ namespace
       REGISTER_NODE(VibratoNode, Vibrato, "Modulators");
       REGISTER_NODE(NoteEchoNode, Note Echo, "Notes");
       REGISTER_NODE(NoteRouterNode, Note Router, "Notes");
+      REGISTER_NODE(NoteMergeNode, Note Merge, "Notes");
       REGISTER_NODE(ArpeggiatorNode, Arpeggiator, "Notes");
       REGISTER_NODE(NoteSequencerNode, Note Sequencer, "Notes");
       REGISTER_NODE(RandomNoteGeneratorNode, Random Note Generator, "Notes");
@@ -2917,8 +2918,10 @@ namespace
    // just call NoteInputSlot(0) directly rather than loop. AudioPluginNode's
    // note pin lives at slot 1 instead - so audio stays at slot 0 and existing
    // patches keep loading unchanged - which needed this bumped to 2 and that
-   // wiring pass turned into a real loop; see its comment.
-   const int kMaxNoteSlots = 2;
+   // wiring pass turned into a real loop; see its comment. NoteMergeNode's
+   // 4-way fan-in (mirroring NoteRouterNode's 4-way fan-out) needed this
+   // bumped again to 4.
+   const int kMaxNoteSlots = 4;
 
    // Defined near DisconnectAllTo/RemoveNodeByIndex, below; forward-declared
    // here since DisconnectLinkById (earlier in the file) needs to call it too.
@@ -10108,15 +10111,59 @@ namespace
       char stat[64];
       snprintf(stat, sizeof(stat), "%d repeats, %d pending", n->repeats, n->PendingCount());
 
-      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
       {
-         AudioKnobRow row(4);
-         row.Knob("delay", &n->delayMs, 10.0f, 1000.0f, "%.0fms", kKnobSmall);
+         AudioKnobRow row(2);
+         DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
+         row.End();
+      }
+      {
+         AudioKnobRow row(2);
          row.KnobInt("repeats", &n->repeats, 1, 8);
          row.Knob("decay", &n->decay, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.End();
+      }
+      {
+         AudioKnobRow row(2);
          row.KnobInt("transpose", &n->transposePerRepeat, -12, 12);
          row.End();
+      }
+
+      ImGui::Checkbox("Mute Dry##echoMuteDry", &n->muteDry);
+
+      EndAudioBody();
+   }
+
+   void DrawNoteMergeBody(GraphNode& gn, NoteMergeNode* n)
+   {
+      int active = 0;
+      for (int i = 0; i < NoteMergeNode::kSlots; i++)
+         if (n->noteInputs[i].IsConnected())
+            active++;
+
+      char stat[32];
+      snprintf(stat, sizeof(stat), "%d active", active);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      // Four lit dots showing which inputs are currently connected - the
+      // same visual language as Note Router's output dots, mirrored to
+      // inputs since Merge is fan-in rather than fan-out.
+      {
+         const float w = gAudioBodyW;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float dia = 14.0f;
+         const float gap = (w - (float)NoteMergeNode::kSlots * dia) / (float)(NoteMergeNode::kSlots + 1);
+         for (int i = 0; i < NoteMergeNode::kSlots; i++)
+         {
+            const float cx = origin.x + gap * (float)(i + 1) + dia * (float)i + dia * 0.5f;
+            const bool lit = n->noteInputs[i].IsConnected();
+            dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f,
+                                lit ? IM_COL32(120, 200, 255, 255) : IM_COL32(50, 53, 64, 255));
+         }
+         ImGui::Dummy(ImVec2(w, dia + 6.0f));
       }
 
       EndAudioBody();
@@ -13685,6 +13732,8 @@ namespace
          DrawNoteEchoBody(gn, n);
       else if (auto* n = dynamic_cast<NoteRouterNode*>(gn.node.get()))
          DrawNoteRouterBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteMergeNode*>(gn.node.get()))
+         DrawNoteMergeBody(gn, n);
       else if (auto* n = dynamic_cast<ArpeggiatorNode*>(gn.node.get()))
          DrawArpeggiatorBody(gn, n);
       else if (auto* n = dynamic_cast<NoteSequencerNode*>(gn.node.get()))
@@ -16686,6 +16735,7 @@ namespace
          { "Note Filter", "A gate on a note's pitch: scale snaps it to the nearest degree of the chosen scale/root, range drops anything outside lo..hi, and chance randomly drops the rest. A note that gets dropped has its note-off dropped with it, so nothing hangs." },
          { "Note Echo", "Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it." },
          { "Note Router", "The system's only note fan-out point: one input, four distinct outputs. Round Robin cycles through them, Random picks one per note, Chain advances only when the pitch changes (a held note stays put), and Probability rolls each output independently - a note can end up on several outputs at once, or (rarely) none, in which case it falls back to output 1. A note's whole lifetime (on through off) always stays on the output(s) it started on." },
+         { "Note Merge", "The system's only note fan-in point: up to four note inputs merged into one output stream, in timestamp order. Each input's notes stay independent voices matched by voice id, not pitch - so two inputs playing the same note at the same time sound as two overlapping voices, not a collision." },
          { "Arpeggiator", "Holds whatever notes are currently down and replays them one at a time on its own clock, either synced to tempo (a note division) or free-running in seconds. Up/Down/Up-Down/Down-Up/As Played order the held notes by pitch or by the order they were pressed; Converge alternates outside-in (lowest, highest, next-lowest...), Diverge alternates inside-out from the middle; Random picks one per step. Repeat x2/x4 fires each note 2 or 4 times in a row before advancing. Stairs Up/Down walks the pattern in overlapping two-note steps (C E, E G, G C...). Join and Spread only differ once octaves is above 1: Spread stacks the pattern octave-by-octave (C3 D3 E3, C4 D4 E4), Join interleaves each note's octaves together (C3 C4, D3 D4, E3 E4), and Join/Spread alternates between the two every full pass - at octaves = 1 all three play identically to Up. The 8-step gate grid below the readout is the primary control: click or drag across cells to mute individual steps without changing the note order (advancing past a muted step still moves the pattern forward, punching a rhythmic hole rather than skipping a note), and the lit cell tracks the currently-sounding step. Octaves stacks the pattern up to 4 octaves higher. Gate sets how much of each step the note actually sounds for before its off. Preset loads a complete starting point (mode, octaves, rate, gate and gate pattern) in one click." },
          { "Note Sequencer", "A self-playing step sequencer, up to 16 steps. Drag a bar's tall upper area to set that step's pitch, drag the thin strip below it to set velocity, click the strip to toggle the step on/off. Steps sets how many loop, rate is either synced to tempo (a note division) or free-running in seconds, gate is how much of each step the note actually sounds for." },
          { "Random Note Generator", "A generative source that free-runs on its own clock (synced to tempo or free-running seconds) rather than only reacting to a knob edit: each new note is the previous one plus a small random step (wander sets the max semitones), clamped to lo..hi and snapped to the chosen scale - a bounded random walk, not independent-per-step randomness, so the line wanders rather than jumps around." },
@@ -17394,43 +17444,54 @@ namespace
          std::set<NoteEventQueue*> resetOutboxes;
          for (GraphNode& gn : gNodes)
          {
-            NoteCable* cable = nullptr;
-            for (int slot = 0; slot < kMaxNoteSlots && cable == nullptr; slot++)
-               cable = gn.node->NoteInputSlot(slot);
-            if (cable == nullptr || !cable->IsConnected())
-               continue;
-            if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+            // Visit every slot the node exposes, not just the first - a
+            // multi-input consumer (Note Merge) can have several connected
+            // note pins whose producers all need their outbox reset.
+            for (int slot = 0; slot < kMaxNoteSlots; slot++)
             {
-               if (NoteEventQueue* outbox = producer->NoteOutbox(cable->GetOutputSlot()))
+               NoteCable* cable = gn.node->NoteInputSlot(slot);
+               if (cable == nullptr || !cable->IsConnected())
+                  continue;
+               if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
                {
-                  if (resetOutboxes.insert(outbox).second)
-                     outbox->ResetConsumers();
+                  if (NoteEventQueue* outbox = producer->NoteOutbox(cable->GetOutputSlot()))
+                  {
+                     if (resetOutboxes.insert(outbox).second)
+                        outbox->ResetConsumers();
+                  }
                }
             }
          }
       }
       for (GraphNode& gn : gNodes)
       {
-         NoteCable* cable = nullptr;
-         for (int slot = 0; slot < kMaxNoteSlots && cable == nullptr; slot++)
-            cable = gn.node->NoteInputSlot(slot);
-         if (cable == nullptr)
-            continue;
          AudioNode* consumer = AudioNodeOfAny(gn.node.get());
          if (consumer == nullptr)
             continue;
-         NoteEventQueue* inbox = nullptr;
-         int cursor = -1;
-         if (cable->IsConnected())
+         // Same "every slot, not just the first" widening as the reset pass
+         // above. Every slot the node actually exposes gets a fresh call
+         // this generation - including unconnected ones, set to
+         // nullptr/-1 - so a slot that was wired last generation and got
+         // disconnected doesn't leave a stale producer pointer behind on
+         // the audio node.
+         for (int slot = 0; slot < kMaxNoteSlots; slot++)
          {
-            if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+            NoteCable* cable = gn.node->NoteInputSlot(slot);
+            if (cable == nullptr)
+               continue;
+            NoteEventQueue* inbox = nullptr;
+            int cursor = -1;
+            if (cable->IsConnected())
             {
-               inbox = producer->NoteOutbox(cable->GetOutputSlot());
-               if (inbox != nullptr)
-                  cursor = inbox->RegisterConsumer();
+               if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+               {
+                  inbox = producer->NoteOutbox(cable->GetOutputSlot());
+                  if (inbox != nullptr)
+                     cursor = inbox->RegisterConsumer();
+               }
             }
+            consumer->SetNoteInbox(slot, inbox, cursor);
          }
-         consumer->SetNoteInbox(inbox, cursor);
       }
 
       const double sampleRate = AudioEngine::Instance().SampleRate();

@@ -1516,10 +1516,15 @@ public:
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
       const int numFrames = output.numFrames;
-      const float delayMs = mDelayMs.load(std::memory_order_relaxed);
+      const int rateMode = mRateMode.load(std::memory_order_relaxed);
+      const float rateBeatsP = std::max(0.015625f, mRateBeats.load(std::memory_order_relaxed));
+      const float rateSecondsP = std::max(0.01f, mRateSeconds.load(std::memory_order_relaxed));
       const int repeats = mRepeats.load(std::memory_order_relaxed);
       const float decay = mDecay.load(std::memory_order_relaxed) / 100.0f;
       const int transposeStep = mTransposeStep.load(std::memory_order_relaxed);
+      const bool muteDry = mMuteDry.load(std::memory_order_relaxed);
+      const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+      const double delayMs = rateMode == 0 ? (double)rateBeatsP * 60000.0 / bpm : (double)rateSecondsP * 1000.0;
       const double delaySamples = delayMs * 0.001 * mSampleRate;
 
       NoteEvent evts[64];
@@ -1529,10 +1534,15 @@ public:
       {
          const NoteEvent& in = evts[i];
 
-         // Repeat 0: dry passthrough, unchanged.
-         NoteEvent dry = in;
-         dry.source = this;
-         mOutbox.Push(dry);
+         // Repeat 0: dry passthrough, unchanged - unless muted (Ableton's
+         // Note Echo "Input: Mute"), in which case neither its note-on nor
+         // its note-off is ever emitted, so nothing is left dangling.
+         if (!muteDry)
+         {
+            NoteEvent dry = in;
+            dry.source = this;
+            mOutbox.Push(dry);
+         }
 
          for (int k = 1; k <= repeats; k++)
          {
@@ -1583,10 +1593,13 @@ public:
    // Main thread only.
    void PushParams(const NoteEchoNode& n)
    {
-      mDelayMs.store(n.delayMs, std::memory_order_relaxed);
+      mRateMode.store(n.rateMode, std::memory_order_relaxed);
+      mRateBeats.store(n.rateBeats, std::memory_order_relaxed);
+      mRateSeconds.store(n.rateSeconds, std::memory_order_relaxed);
       mRepeats.store(n.repeats, std::memory_order_relaxed);
       mDecay.store(n.decay, std::memory_order_relaxed);
       mTransposeStep.store(n.transposePerRepeat, std::memory_order_relaxed);
+      mMuteDry.store(n.muteDry, std::memory_order_relaxed);
    }
 
    int PendingCount() const { return mPendingCount.load(std::memory_order_relaxed); }
@@ -1617,10 +1630,13 @@ private:
    uint64_t mSamplePos = 0;
    Pending mPending[kMaxPending];
 
-   std::atomic<float> mDelayMs { 150.0f };
+   std::atomic<int> mRateMode { 1 };
+   std::atomic<float> mRateBeats { 0.25f };
+   std::atomic<float> mRateSeconds { 0.15f };
    std::atomic<int> mRepeats { 3 };
    std::atomic<float> mDecay { 60.0f };
    std::atomic<int> mTransposeStep { 0 };
+   std::atomic<bool> mMuteDry { false };
    std::atomic<int> mPendingCount { 0 };
 };
 
@@ -1639,10 +1655,13 @@ void NoteEchoNode::CookIfNeeded(int frameId)
 
 void NoteEchoNode::VisitParams(ParamVisitor& v)
 {
-   v.Float("delayMs", delayMs);
+   v.Int("rateMode", rateMode);
+   v.Float("rateBeats", rateBeats);
+   v.Float("rateSeconds", rateSeconds);
    v.Int("repeats", repeats);
    v.Float("decay", decay);
    v.Int("transposePerRepeat", transposePerRepeat);
+   v.Bool("muteDry", muteDry);
 }
 
 AudioNode* NoteEchoNode::GetAudioNode()
@@ -1826,6 +1845,97 @@ const char* NoteRouterNode::OutputLabel(int index) const
 int NoteRouterNode::LastRoutedMask() const
 {
    return mAudioNode ? mAudioNode->LastMask() : 0;
+}
+
+// ------------------------------------------------------------------- Merge
+// The system's only note fan-in point: up to kSlots inboxes, merged into one
+// outbox in timestamp order. voiceId is passed through byte-for-byte (never
+// regenerated - see VoiceAllocator::NoteOff), so identical pitches arriving
+// from different inputs at once become independent overlapping voices, not a
+// collision. source is rewritten to `this` on every forwarded event, same
+// convention as every other node in this file.
+class AudioNoteMergeNode : public AudioNode
+{
+public:
+   static constexpr int kSlots = NoteMergeNode::kSlots;
+
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override {}
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      // kSlots * 64 == NoteEventQueue::kCapacity, so the worst case (all
+      // slots fully saturated in one block) fits without overflow.
+      NoteEvent all[kSlots * 64];
+      int total = 0;
+
+      for (int s = 0; s < kSlots; s++)
+      {
+         if (mInbox[s] == nullptr)
+            continue;
+         NoteEvent evts[64];
+         const int n = mInbox[s]->Pop(mCursor[s], evts, 64);
+         for (int i = 0; i < n && total < kSlots * 64; i++)
+            all[total++] = evts[i];
+      }
+
+      std::stable_sort(all, all + total, [](const NoteEvent& a, const NoteEvent& b)
+      {
+         return a.frameOffset < b.frameOffset;
+      });
+
+      for (int i = 0; i < total; i++)
+      {
+         NoteEvent out = all[i];
+         out.source = this;
+         mOutbox.Push(out);
+      }
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+
+   void SetNoteInbox(int inputSlot, NoteEventQueue* inbox, int cursor) override
+   {
+      if (inputSlot >= 0 && inputSlot < kSlots)
+      {
+         mInbox[inputSlot] = inbox;
+         mCursor[inputSlot] = cursor;
+      }
+   }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox[kSlots] = {};
+   int mCursor[kSlots] = { -1, -1, -1, -1 };
+};
+
+NoteMergeNode::NoteMergeNode() = default;
+NoteMergeNode::~NoteMergeNode() = default;
+
+void NoteMergeNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteMergeNode>();
+}
+
+void NoteMergeNode::VisitParams(ParamVisitor& /*v*/)
+{
+   // No editable params - only the note-input cables.
+}
+
+AudioNode* NoteMergeNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteMergeNode>();
+   return mAudioNode.get();
+}
+
+const char* NoteMergeNode::InputLabel(int slot) const
+{
+   static const char* kLabels[kSlots] = { "1", "2", "3", "4" };
+   return (slot >= 0 && slot < kSlots) ? kLabels[slot] : nullptr;
 }
 
 // ---------------------------------------------------------------- Arpeggiator
