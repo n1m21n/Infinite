@@ -18115,28 +18115,42 @@ namespace
       SavePatchTo(path);
    }
 
-   // Set for one frame when a close/quit was deferred because the patch has
+   // Set for one frame when an action was deferred because the patch has
    // unsaved changes, so the UI pass knows to pop the confirmation modal.
    bool gShowUnsavedChangesModal = false;
+   // The action to run once the "Unsaved Changes" modal is resolved with
+   // something other than Cancel (Save or Don't Save).
+   std::function<void()> gPendingUnsavedAction;
+
+   // The single gate every action that would discard the current patch
+   // (New, Open, Open Recent, drag-drop, close/quit) should route through:
+   // runs `action` immediately if the patch has no unsaved changes,
+   // otherwise defers it behind the "Unsaved Changes" modal (Save / Don't
+   // Save / Cancel) and runs it only once the user resolves that prompt
+   // with something other than Cancel. Dev-harness exits
+   // (INFINITE_EXITAFTER, selftest modes, screenshot mode) call
+   // glfwSetWindowShouldClose directly and deliberately skip this - a
+   // scripted run should never block on a modal nobody can see.
+   void GuardUnsavedChanges(std::function<void()> action)
+   {
+      if (!gPatchDirty)
+      {
+         action();
+         return;
+      }
+      gPendingUnsavedAction = std::move(action);
+      gShowUnsavedChangesModal = true;
+   }
 
    // The single gate every real close path (Quit menu, Cmd+Q, red button)
-   // routes through. Dev-harness exits (INFINITE_EXITAFTER, selftest modes,
-   // screenshot mode) call glfwSetWindowShouldClose directly and deliberately
-   // skip this - a scripted run should never block on a modal nobody can see.
+   // routes through.
    void RequestClose(GLFWwindow* window)
    {
-      if (gPatchDirty)
-      {
-         // GLFW already set shouldClose before invoking the close callback
-         // that leads here (see _glfwInputWindowCloseRequest) - undo that so
-         // the app stays open until the modal is resolved.
-         glfwSetWindowShouldClose(window, GLFW_FALSE);
-         gShowUnsavedChangesModal = true;
-      }
-      else
-      {
-         glfwSetWindowShouldClose(window, GLFW_TRUE);
-      }
+      // GLFW already set shouldClose before invoking the close callback
+      // that leads here (see _glfwInputWindowCloseRequest) - undo that so
+      // the app stays open until we know whether it's safe to close.
+      glfwSetWindowShouldClose(window, GLFW_FALSE);
+      GuardUnsavedChanges([window]() { glfwSetWindowShouldClose(window, GLFW_TRUE); });
    }
 
    // Closes and forgets one projector window by its position in gProjectorWindows.
@@ -26278,12 +26292,12 @@ int main(int argc, char** argv)
          if (ImGui::BeginMenu("File"))
          {
             if (ImGui::MenuItem("New", "Cmd+N"))
-               NewPatch();
+               GuardUnsavedChanges([]() { NewPatch(); });
             if (ImGui::MenuItem("Open...", "Cmd+O"))
             {
                const std::string path = Platform::OpenPatchDialog();
                if (!path.empty())
-                  LoadPatchFrom(path);
+                  GuardUnsavedChanges([path]() { LoadPatchFrom(path); });
             }
 
             if (ImGui::BeginMenu("Open Recent", !Patch::Recents().empty()))
@@ -26297,7 +26311,7 @@ int main(int argc, char** argv)
                   const std::string name =
                      (slash == std::string::npos) ? entry : entry.substr(slash + 1);
                   if (ImGui::MenuItem(name.c_str()))
-                     LoadPatchFrom(entry);
+                     GuardUnsavedChanges([entry]() { LoadPatchFrom(entry); });
                   if (ImGui::IsItemHovered())
                      ImGui::SetTooltip("%s", entry.c_str());
                }
@@ -26989,7 +27003,7 @@ int main(int argc, char** argv)
 
             if (HasExtension(path, std::vector<std::string> { "inf", "infinite" }))
             {
-               LoadPatchFrom(path);
+               GuardUnsavedChanges([path]() { LoadPatchFrom(path); });
                gRequestFitView = true;
                continue;
             }
@@ -34965,19 +34979,26 @@ int main(int argc, char** argv)
             // the modal should stay up so the user can try again.
             if (!gPatchDirty)
             {
-               glfwSetWindowShouldClose(window, GLFW_TRUE);
+               if (gPendingUnsavedAction)
+                  gPendingUnsavedAction();
+               gPendingUnsavedAction = nullptr;
                ImGui::CloseCurrentPopup();
             }
          }
          ImGui::SameLine();
          if (ImGui::Button("Don't Save", ImVec2(100, 0)))
          {
-            glfwSetWindowShouldClose(window, GLFW_TRUE);
+            if (gPendingUnsavedAction)
+               gPendingUnsavedAction();
+            gPendingUnsavedAction = nullptr;
             ImGui::CloseCurrentPopup();
          }
          ImGui::SameLine();
          if (ImGui::Button("Cancel", ImVec2(100, 0)))
+         {
+            gPendingUnsavedAction = nullptr;
             ImGui::CloseCurrentPopup();
+         }
          ImGui::EndPopup();
       }
 
@@ -35614,10 +35635,10 @@ int main(int argc, char** argv)
          {
             const std::string path = Platform::OpenPatchDialog();
             if (!path.empty())
-               LoadPatchFrom(path);
+               GuardUnsavedChanges([path]() { LoadPatchFrom(path); });
          }
          else if (ImGui::IsKeyPressed(ImGuiKey_N, false))
-            NewPatch();
+            GuardUnsavedChanges([]() { NewPatch(); });
       }
 
       // Frame limiter. Sleeping most of the way there and spinning the last
