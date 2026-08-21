@@ -10197,9 +10197,11 @@ namespace
       }
 
       {
-         AudioKnobRow row(2);
+         const bool showProb = n->mode == NoteRouterNode::kProbability;
+         AudioKnobRow row(showProb ? 2 : 1);
          row.Dropdown("mode", kModes, n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; });
-         row.Knob("prob", &n->probability, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         if (showProb)
+            row.Knob("prob", &n->probability, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
          row.End();
       }
 
