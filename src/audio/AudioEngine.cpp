@@ -168,6 +168,25 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
    const int numFrames = std::min(deviceBuffer.numFrames, kAudioMaxBlockFrames);
    const int numChannels = std::min(deviceBuffer.numChannels, kAudioMaxChannels);
 
+   // PDC scratch: a delayed-copy landing spot per input pin, reused node to
+   // node (only one node's inputs are ever "in flight" at a time - the
+   // buffer a pin's CompensationDelay writes into is fully consumed by
+   // entry.node->ProcessBlock before the next entry runs). thread_local so
+   // it's allocated once per real-time thread, never per block or per node -
+   // same discipline as sInterleaveScratch below. Only touched for a pin
+   // whose CompensationDelay::IsActive() is true; the common all-zero-
+   // latency topology never writes to this at all.
+   static thread_local float sCompScratch[kAudioMaxNodeInputs][kAudioMaxChannels][kAudioMaxBlockFrames];
+   static thread_local float* sCompScratchChannels[kAudioMaxNodeInputs][kAudioMaxChannels];
+   static thread_local bool sCompScratchInited = false;
+   if (!sCompScratchInited)
+   {
+      for (int i = 0; i < kAudioMaxNodeInputs; i++)
+         for (int ch = 0; ch < kAudioMaxChannels; ch++)
+            sCompScratchChannels[i][ch] = sCompScratch[i][ch];
+      sCompScratchInited = true;
+   }
+
    for (AudioTopologyEntry& entry : list->topology.order)
    {
       AudioBuffer inputViews[kAudioMaxNodeInputs];
@@ -178,6 +197,17 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          if (idx < 0)
          {
             inputPtrs[i] = nullptr;
+         }
+         else if (entry.inputCompensation[i].IsActive())
+         {
+            AudioBuffer src = list->buffers[idx].View(numFrames, numChannels);
+            AudioBuffer delayed;
+            delayed.channels = sCompScratchChannels[i];
+            delayed.numChannels = numChannels;
+            delayed.numFrames = numFrames;
+            entry.inputCompensation[i].ProcessBlock(src, delayed);
+            inputViews[i] = delayed;
+            inputPtrs[i] = &inputViews[i];
          }
          else
          {
@@ -194,9 +224,32 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
    // touched off the audio thread.
    static thread_local std::vector<float> sInterleaveScratch;
 
-   for (const AudioTerminal& terminal : list->topology.terminalBufferIndices)
+   // Terminal-summation PDC scratch: one shared landing spot, reused
+   // terminal to terminal since each is summed into deviceBuffer (and
+   // captured) immediately, before the next terminal's turn - never two
+   // terminals' delayed copies needed live at once.
+   static thread_local float sTerminalScratch[kAudioMaxChannels][kAudioMaxBlockFrames];
+   static thread_local float* sTerminalScratchChannels[kAudioMaxChannels];
+   static thread_local bool sTerminalScratchInited = false;
+   if (!sTerminalScratchInited)
+   {
+      for (int ch = 0; ch < kAudioMaxChannels; ch++)
+         sTerminalScratchChannels[ch] = sTerminalScratch[ch];
+      sTerminalScratchInited = true;
+   }
+
+   for (AudioTerminal& terminal : list->topology.terminalBufferIndices)
    {
       AudioBuffer src = list->buffers[terminal.bufferIndex].View(numFrames, numChannels);
+      if (terminal.compensation.IsActive())
+      {
+         AudioBuffer delayed;
+         delayed.channels = sTerminalScratchChannels;
+         delayed.numChannels = numChannels;
+         delayed.numFrames = numFrames;
+         terminal.compensation.ProcessBlock(src, delayed);
+         src = delayed;
+      }
       for (int ch = 0; ch < numChannels; ch++)
          for (int i = 0; i < numFrames; i++)
             deviceBuffer.channels[ch][i] += src.channels[ch][i];

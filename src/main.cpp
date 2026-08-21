@@ -147,6 +147,7 @@
 #include "audio/dsp/TremoloKernel.h"
 #include "audio/dsp/FormantFilterKernel.h"
 #include "audio/dsp/WavetableShaperKernel.h"
+#include "audio/dsp/LimiterKernel.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -17021,6 +17022,90 @@ namespace
             entry.node->PrepareToPlay(sampleRate, kAudioMaxBlockFrames);
       }
 
+      // Plugin/effect delay compensation (PDC). There is no compensation
+      // machinery anywhere else in the topology to plug a latency number
+      // into - this is the one place that both knows every branch's
+      // cumulative latency and runs on the main thread, so it's also the
+      // one place that decides and allocates each branch's compensating
+      // delay (CompensationDelay::Prepare - see its own comment on why that
+      // must happen here, not in RunTopology).
+      //
+      // `order` is topologically sorted (CollectAudioChain only appends a
+      // node after every source it reads from) and each entry's
+      // outputBufferIndex is exactly its own position in `order` (set at
+      // push_back time above) - so a single forward pass can compute every
+      // entry's cumulative latency by looking up its already-computed
+      // inputs' cumulative latency by buffer index, with no separate
+      // topological sort needed.
+      //
+      // Cumulative latency = this node's own reported latency plus the
+      // latest-arriving (max) of its connected inputs' cumulative latency -
+      // a node's output is only as "early" as its slowest input, same logic
+      // any DAW's PDC uses. Note-only inputs carry no cumulative latency of
+      // their own (MIDI events aren't delayed by this pass at all) and
+      // aren't represented in inputBufferIndices, so they don't factor in.
+      std::vector<int> cumulativeLatency(order.size(), 0);
+      for (size_t k = 0; k < order.size(); k++)
+      {
+         AudioTopologyEntry& entry = order[k];
+         int maxUpstream = 0;
+         for (int i = 0; i < entry.numInputs; i++)
+         {
+            const int idx = entry.inputBufferIndices[i];
+            if (idx >= 0)
+               maxUpstream = std::max(maxUpstream, cumulativeLatency[(size_t)idx]);
+         }
+         cumulativeLatency[k] = entry.node->LatencySamples() + maxUpstream;
+      }
+
+      // At every merge point - a node with more than one connected input
+      // pin, or the terminal summation below - each branch but the
+      // slowest-arriving one needs a compensating delay equal to the gap, so
+      // every pin/terminal lands sample-aligned instead of comb-filtering
+      // against its siblings. A branch already at (or past) the max, or a
+      // node with only one connected pin, gets an inactive (unallocated)
+      // CompensationDelay - Prepare(0, ...) is the default-constructed
+      // state, so those pins are simply left untouched. Fixed capacity
+      // (kAudioMaxChannels), matching PooledBuffer::Allocate's own
+      // discipline, so a topology generation is never under-allocated if
+      // the device's actual channel count changes mid-generation.
+      for (AudioTopologyEntry& entry : order)
+      {
+         int maxAmongConnected = 0;
+         for (int i = 0; i < entry.numInputs; i++)
+         {
+            const int idx = entry.inputBufferIndices[i];
+            if (idx >= 0)
+               maxAmongConnected = std::max(maxAmongConnected, cumulativeLatency[(size_t)idx]);
+         }
+         for (int i = 0; i < entry.numInputs; i++)
+         {
+            const int idx = entry.inputBufferIndices[i];
+            if (idx < 0)
+               continue;
+            const int delay = maxAmongConnected - cumulativeLatency[(size_t)idx];
+            if (delay > 0)
+               entry.inputCompensation[i].Prepare(delay, kAudioMaxChannels);
+         }
+      }
+
+      // Same alignment one level up, across whichever Audio Out terminals
+      // are summed together into the device buffer in RunTopology.
+      {
+         int maxAmongTerminals = 0;
+         for (const AudioTerminal& terminal : terminals)
+            if (terminal.bufferIndex >= 0)
+               maxAmongTerminals = std::max(maxAmongTerminals, cumulativeLatency[(size_t)terminal.bufferIndex]);
+         for (AudioTerminal& terminal : terminals)
+         {
+            if (terminal.bufferIndex < 0)
+               continue;
+            const int delay = maxAmongTerminals - cumulativeLatency[(size_t)terminal.bufferIndex];
+            if (delay > 0)
+               terminal.compensation.Prepare(delay, kAudioMaxChannels);
+         }
+      }
+
       AudioTopology topology;
       topology.order = std::move(order);
       topology.terminalBufferIndices = std::move(terminals);
@@ -22402,6 +22487,249 @@ static int RunDspTest()
    return all ? 0 : 1;
 }
 
+// ===================================================== INFINITE_AUDIOPDCTEST
+//
+// Headless, numeric verification of plugin/effect delay compensation (PDC) -
+// the cumulative-latency pass in RebuildAudioTopology (this file, search
+// "Plugin/effect delay compensation") and the per-branch CompensationDelay it
+// prepares (src/audio/CompensationDelay.h), applied by AudioEngine::
+// RunTopology at terminal summation. Unlike AUDIOPARAMSWEEPTEST/DSPTEST above,
+// this reads raw samples rather than a peak/RMS signature, because the thing
+// under test - "do two impulses land on the same sample index" - only shows
+// up at that resolution.
+//
+// Same ProcessOffline entry point DSPTEST uses, but builds its topology by
+// hand rather than through DspTest::BuildLinearTopology (linear chains only,
+// no multi-terminal merge) - two Audio Out terminals summed at RunTopology,
+// which is the same CompensationDelay/terminal.compensation path a real
+// two-Audio-Out patch or a multi-input Mixer pin resolves through.
+namespace AudioPdcTest
+{
+   // A single-sample unit impulse, deterministic and stateless - every call
+   // writes 1.0 at frame 0, 0.0 elsewhere, so the impulse's peak index in a
+   // rendered block is trivially readable as "how many samples of latency
+   // did everything between here and the read point add."
+   class ImpulseSourceNode : public AudioNode
+   {
+   public:
+      void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
+      {
+         for (int ch = 0; ch < buffer.numChannels; ch++)
+         {
+            buffer.channels[ch][0] = 1.0f;
+            for (int i = 1; i < buffer.numFrames; i++)
+               buffer.channels[ch][i] = 0.0f;
+         }
+      }
+   };
+
+   // Wraps LimiterKernel directly - not AudioEffectRuntime's dry/wet mix -
+   // since that mix defaults to a fractional crossfade this test has no
+   // reason to fight; LimiterKernel is one of only two real kernels that
+   // report nonzero LatencySamples() (see FrequencyShifterKernel for the
+   // other), and its lookahead delay ring gives an exact, deterministic
+   // sample offset to check against.
+   class LimiterLatencyNode : public AudioNode
+   {
+   public:
+      void PrepareToPlay(double sampleRate, int maxBlockSize) override
+      {
+         mKernel.PrepareToPlay(sampleRate, maxBlockSize);
+      }
+      void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
+      {
+         const AudioBuffer* in = (numInputs > 0) ? inputs[0] : nullptr;
+         static const AudioBuffer kEmpty;
+         mKernel.ProcessBlock(in != nullptr ? *in : kEmpty, nullptr, output);
+      }
+      int LatencySamples() const override { return mKernel.LatencySamples(); }
+
+   private:
+      LimiterKernel mKernel;
+   };
+
+   struct Peak
+   {
+      int index = -1;
+      float value = 0.0f;
+   };
+
+   inline Peak FindPeak(const float* data, int numFrames)
+   {
+      Peak p;
+      for (int i = 0; i < numFrames; i++)
+      {
+         const float v = std::fabs(data[i]);
+         if (v > p.value)
+         {
+            p.value = v;
+            p.index = i;
+         }
+      }
+      return p;
+   }
+}
+
+static bool RunAudioPdcTest()
+{
+   using namespace AudioPdcTest;
+
+   const double kSampleRate = 48000.0;
+   const int kNumFrames = 512;
+   const int kNumChannels = 2;
+
+   ImpulseSourceNode source;
+   LimiterLatencyNode wet;
+   source.PrepareToPlay(kSampleRate, kNumFrames);
+   wet.PrepareToPlay(kSampleRate, kNumFrames);
+
+   const int wetLatency = wet.LatencySamples(); // LimiterKernel's lookahead, in samples
+   const int dryLatency = source.LatencySamples(); // 0
+
+   std::vector<float> chan0(kNumFrames), chan1(kNumFrames);
+   float* chans[kNumChannels] = { chan0.data(), chan1.data() };
+   AudioBuffer buffer;
+   buffer.channels = chans;
+   buffer.numChannels = kNumChannels;
+   buffer.numFrames = kNumFrames;
+
+   // Isolated dry-only run: one terminal, no sibling to compensate against
+   // (RebuildAudioTopology's terminal loop leaves a lone terminal's
+   // compensation inactive - see its comment), so this reads the source's
+   // natural, uncompensated arrival time.
+   AudioTopology dryOnly;
+   {
+      AudioTopologyEntry e;
+      e.node = &source;
+      e.outputBufferIndex = 0;
+      dryOnly.order.push_back(e);
+      dryOnly.numBuffers = 1;
+      dryOnly.terminalBufferIndices.push_back({ 0, nullptr });
+   }
+   AudioEngine::Instance().SetTopology(dryOnly);
+   AudioEngine::Instance().ProcessOffline(buffer);
+   const Peak dryAlone = FindPeak(chan0.data(), kNumFrames);
+
+   // Isolated wet-only run: same reasoning, reads LimiterKernel's actual
+   // internal delay-ring latency rather than trusting LatencySamples()'s
+   // self-report.
+   AudioTopology wetOnly;
+   {
+      AudioTopologyEntry se;
+      se.node = &source;
+      se.outputBufferIndex = 0;
+      wetOnly.order.push_back(se);
+      AudioTopologyEntry we;
+      we.node = &wet;
+      we.numInputs = 1;
+      we.inputBufferIndices[0] = 0;
+      we.outputBufferIndex = 1;
+      wetOnly.order.push_back(we);
+      wetOnly.numBuffers = 2;
+      wetOnly.terminalBufferIndices.push_back({ 1, nullptr });
+   }
+   AudioEngine::Instance().SetTopology(wetOnly);
+   AudioEngine::Instance().ProcessOffline(buffer);
+   const Peak wetAlone = FindPeak(chan0.data(), kNumFrames);
+
+   // Combined run: both paths, summed at two Audio Out terminals, with PDC
+   // computed the same way RebuildAudioTopology's terminal loop does (this
+   // file, "Same alignment one level up, across whichever Audio Out
+   // terminals") - mirrored here rather than shared, since that loop lives
+   // inside RebuildAudioTopology's editor-graph walk, which this headless
+   // fixture deliberately bypasses (same convention as DspTest::
+   // BuildLinearTopology above).
+   AudioTopology combined;
+   {
+      AudioTopologyEntry se;
+      se.node = &source;
+      se.outputBufferIndex = 0;
+      combined.order.push_back(se);
+      AudioTopologyEntry we;
+      we.node = &wet;
+      we.numInputs = 1;
+      we.inputBufferIndices[0] = 0;
+      we.outputBufferIndex = 1;
+      combined.order.push_back(we);
+      combined.numBuffers = 2;
+
+      const int cumulativeDry = dryLatency;
+      const int cumulativeWet = wet.LatencySamples() + cumulativeDry;
+      const int maxAmongTerminals = std::max(cumulativeDry, cumulativeWet);
+
+      AudioTerminal dryTerminal;
+      dryTerminal.bufferIndex = 0;
+      const int dryCompensation = maxAmongTerminals - cumulativeDry;
+      if (dryCompensation > 0)
+         dryTerminal.compensation.Prepare(dryCompensation, kAudioMaxChannels);
+      combined.terminalBufferIndices.push_back(dryTerminal);
+
+      AudioTerminal wetTerminal;
+      wetTerminal.bufferIndex = 1;
+      const int wetCompensation = maxAmongTerminals - cumulativeWet;
+      if (wetCompensation > 0)
+         wetTerminal.compensation.Prepare(wetCompensation, kAudioMaxChannels);
+      combined.terminalBufferIndices.push_back(wetTerminal);
+   }
+   AudioEngine::Instance().SetTopology(combined);
+   AudioEngine::Instance().ProcessOffline(buffer);
+   const Peak combinedPeak = FindPeak(chan0.data(), kNumFrames);
+
+   const int dryCompensation = wetLatency - dryLatency;
+   const int wetCompensation = 0;
+   const int dryMeasuredOffset = combinedPeak.index - dryAlone.index;
+   const int wetMeasuredOffset = combinedPeak.index - wetAlone.index;
+
+   printf("AUDIOPDCTEST path            reportedLatency  expectedCompensation  measuredOffset\n");
+   printf("AUDIOPDCTEST dry             %15d  %21d  %14d\n", dryLatency, dryCompensation, dryMeasuredOffset);
+   printf("AUDIOPDCTEST wet(Limiter)    %15d  %21d  %14d\n", wetLatency, wetCompensation, wetMeasuredOffset);
+
+   const bool hasLatency = wetLatency > 0; // sanity: LimiterKernel's lookahead must be nonzero for this to test anything
+   const bool dryOffsetOk = dryMeasuredOffset == dryCompensation;
+   const bool wetOffsetOk = wetMeasuredOffset == wetCompensation;
+   const bool alignedOk = combinedPeak.index == wetLatency; // "SAME sample index" - the actual invariant under test
+   const bool amplitudeOk = combinedPeak.value >= (dryAlone.value + wetAlone.value) * 0.9f;
+
+   printf("AUDIOPDCTEST has nonzero limiter latency: %d  %s\n", wetLatency, hasLatency ? "OK" : "FAIL (test cannot exercise PDC)");
+   printf("AUDIOPDCTEST dry branch delayed by exactly its compensation: %s\n", dryOffsetOk ? "OK" : "FAIL");
+   printf("AUDIOPDCTEST wet branch left untouched (already slowest): %s\n", wetOffsetOk ? "OK" : "FAIL");
+   printf("AUDIOPDCTEST impulses land on same sample index: expected %d  got %d  %s\n", wetLatency, combinedPeak.index,
+          alignedOk ? "OK" : "FAIL");
+   printf("AUDIOPDCTEST summed peak amplitude: expected >=%.4f  got %.4f  %s\n",
+          (dryAlone.value + wetAlone.value) * 0.9f, combinedPeak.value, amplitudeOk ? "OK" : "FAIL");
+
+   // Zero-latency-only patch: two terminals, neither branch carrying any
+   // latency, must allocate NO compensation delay line - the "don't allocate
+   // one" rule from CompensationDelay::Prepare's own comment (an inactive,
+   // 0-sample delay leaves mBuf empty, not a zero-length allocation).
+   AudioTopology zeroLatency;
+   {
+      AudioTopologyEntry se;
+      se.node = &source;
+      se.outputBufferIndex = 0;
+      zeroLatency.order.push_back(se);
+      zeroLatency.numBuffers = 1;
+
+      const int maxAmongTerminals = dryLatency; // both terminals read the same zero-latency buffer
+      AudioTerminal t0;
+      t0.bufferIndex = 0;
+      const int t0Compensation = maxAmongTerminals - dryLatency;
+      if (t0Compensation > 0)
+         t0.compensation.Prepare(t0Compensation, kAudioMaxChannels);
+      zeroLatency.terminalBufferIndices.push_back(t0);
+
+      AudioTerminal t1 = t0; // identical branch, so identical (inactive) compensation
+      zeroLatency.terminalBufferIndices.push_back(t1);
+   }
+   const bool zeroAllocOk = !zeroLatency.terminalBufferIndices[0].compensation.IsActive() &&
+                            !zeroLatency.terminalBufferIndices[1].compensation.IsActive();
+   printf("AUDIOPDCTEST zero-latency patch allocates no compensation delay: %s\n", zeroAllocOk ? "OK" : "FAIL");
+
+   const bool ok = hasLatency && dryOffsetOk && wetOffsetOk && alignedOk && amplitudeOk && zeroAllocOk;
+   printf("%s\n", ok ? "AUDIOPDCTEST OK" : "AUDIOPDCTEST FAIL");
+   return ok;
+}
+
 // ===================================================== INFINITE_AUDIOPARAMSWEEPTEST
 //
 // Generic sweep, not a fixture per node (docs/plans/audio/README.md §4/§7):
@@ -23591,6 +23919,15 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
+
+   if (getenv("INFINITE_AUDIOPDCTEST") != nullptr)
+   {
+      RunAudioPdcTest();
+      // Always 0, same reasoning as AUDIOPARAMSWEEPTEST above: the printf
+      // verdict line is driver.sh's only signal, not $? - a nonzero exit
+      // here would misreport a normal [FAIL] as [CRASH].
+      return 0;
+   }
 
    // Out-of-process half of the plugin scan: describe ONE bundle and exit. The
    // parent (Platform::EnumerateVST3Plugins) re-execs us once per bundle so

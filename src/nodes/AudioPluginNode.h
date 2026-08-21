@@ -95,6 +95,11 @@ public:
    // note pin's visibility is keyed off. False with no plugin loaded.
    bool AcceptsNotes() const { return mAcceptsNotes; }
 
+   // Mirrors AudioEffectNode::LatencySamples()'s shape: forwards to the
+   // audio-half object, which reads it off the published plugin handle. 0
+   // with no plugin loaded/published yet.
+   int LatencySamples() const;
+
    // Starts loading `desc`. Asynchronous - the node reports "loading..." until
    // CookIfNeeded sees the instantiation finish. Clears any existing mapping
    // list, since a different plugin's parameter addresses mean nothing to it.

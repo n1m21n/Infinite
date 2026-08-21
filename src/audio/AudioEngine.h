@@ -8,6 +8,7 @@
 #include "AudioBuffer.h"
 #include "AudioCaptureRing.h"
 #include "AudioNode.h"
+#include "CompensationDelay.h"
 #include "SamplePreviewPlayer.h"
 
 // Ceilings shared by the topology builder (main.cpp's RebuildAudioTopology)
@@ -32,6 +33,17 @@ struct AudioTopologyEntry
    int inputBufferIndices[kAudioMaxNodeInputs] = { -1, -1, -1, -1, -1, -1, -1, -1 };
    int numInputs = 0;
    int outputBufferIndex = -1;
+
+   // Plugin/effect delay compensation (PDC): per input pin, the
+   // CompensationDelay that pin's source branch needs so every pin merging
+   // into this node arrives sample-aligned - RebuildAudioTopology (main.cpp)
+   // computes each branch's cumulative latency and, for a multi-input node
+   // whose connected pins carry different cumulative latencies, prepares the
+   // shallower pins' delay to make up the difference; a pin whose branch is
+   // already the slowest (or the node has only one connected pin) gets an
+   // inactive (0-sample, unallocated) one. RunTopology applies these before
+   // handing the node its inputs - see its comment.
+   CompensationDelay inputCompensation[kAudioMaxNodeInputs];
 };
 
 // One connected Audio Out: the pooled buffer its source writes into, and
@@ -42,6 +54,14 @@ struct AudioTerminal
 {
    int bufferIndex = -1;
    AudioCaptureRing* capture = nullptr;
+
+   // Same PDC role as AudioTopologyEntry::inputCompensation, one level up:
+   // when more than one Audio Out (or one Audio Out among several) feeds the
+   // device buffer with different cumulative latency, each terminal but the
+   // slowest gets a compensating delay here so RunTopology's unconditional
+   // sum lands every terminal sample-aligned. Inactive for the common case
+   // of one terminal, or several with equal (usually zero) latency.
+   CompensationDelay compensation;
 };
 
 // A full audio-thread topology: nodes in a valid topological order (sources

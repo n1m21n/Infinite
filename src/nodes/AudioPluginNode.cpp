@@ -152,6 +152,18 @@ public:
       mNoteCursor = cursor;
    }
 
+   // Main thread only: RebuildAudioTopology's PDC pass reads whatever the
+   // currently published handle last reported (Platform::PluginConfigure/
+   // PluginVST3Configure cache it on the handle itself at prepare time - see
+   // PluginHandleInternal.h's latencySamples). 0 with nothing published yet,
+   // same as a plugin that genuinely reports none - the topology builder
+   // doesn't need to tell those apart.
+   int LatencySamples() const override
+   {
+      Platform::PluginHandle* handle = mHandle.load(std::memory_order_acquire);
+      return handle != nullptr ? Platform::PluginLatencySamples(handle) : 0;
+   }
+
    // Main thread only.
    void SetHandle(Platform::PluginHandle* handle) { mHandle.store(handle, std::memory_order_release); }
    void SetBypass(bool bypass) { mBypass.store(bypass, std::memory_order_relaxed); }
@@ -325,6 +337,11 @@ AudioNode* AudioPluginNode::GetAudioNode()
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioPluginAudioNode>();
    return mAudioNode.get();
+}
+
+int AudioPluginNode::LatencySamples() const
+{
+   return mAudioNode ? mAudioNode->LatencySamples() : 0;
 }
 
 void AudioPluginNode::DestroyAllHandles()

@@ -3413,6 +3413,14 @@ namespace Platform
             }
             h->resourcesAllocated = true;
 
+            // au.latency is a NSTimeInterval in seconds; the topology builder's
+            // PDC pass wants samples at this plugin's negotiated rate. Read
+            // here, not lazily from an accessor, since `rate` (the fallback-
+            // adjusted rate actually negotiated above) is only in scope in
+            // this function - Platform::PluginLatencySamples() just returns
+            // the cached value.
+            h->latencySamples = (int)std::lround(au.latency * rate);
+
             // Cached once, here, on the main thread. ProcessBlock calls the
             // block; it never messages the AUAudioUnit.
             h->renderBlockStrong = au.renderBlock;
@@ -3558,6 +3566,11 @@ namespace Platform
    PluginDesc PluginDescriptionOf(PluginHandle* h)
    {
       return h != nullptr ? h->desc : PluginDesc();
+   }
+
+   int PluginLatencySamples(PluginHandle* h)
+   {
+      return h != nullptr ? h->latencySamples : 0;
    }
 
    void PluginDestroy(PluginHandle* h)

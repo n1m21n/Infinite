@@ -434,6 +434,15 @@ namespace Platform
 
    PluginDesc PluginDescriptionOf(PluginHandle* handle);
 
+   // Samples of processing latency the loaded plugin itself reports
+   // (lookahead, oversampling, internal FFT windows, ...) at its currently
+   // prepared sample rate. 0 for a plugin that reports none, hasn't finished
+   // loading, or is null - never a special sentinel. Main thread only; the
+   // value is refreshed each time render resources are (re)allocated (see
+   // PluginConfigure/PluginVST3Configure) and read here, not recomputed, so
+   // this is cheap enough to call every RebuildAudioTopology.
+   int PluginLatencySamples(PluginHandle* handle);
+
    // THE real-time-safe entry point. Calls the cached AUAudioUnitRenderBlock
    // with a stack-allocated pull-input block that copies from `in`. No
    // Objective-C message send, no ARC retain/release, no allocation, no lock.

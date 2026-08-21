@@ -27,6 +27,16 @@ public:
    virtual void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) = 0;
    virtual void Reset() {}
 
+   // Samples of latency this node's own processing adds (lookahead,
+   // oversampling, a hosted plugin's reported latency, ...) at whatever rate
+   // it was last PrepareToPlay'd at. 0 (the default) for the overwhelming
+   // majority of nodes, which add none. Main thread only - read once per
+   // RebuildAudioTopology (main.cpp) to compute each branch's cumulative
+   // latency for plugin/effect delay compensation (PDC); never called from
+   // ProcessBlock or any other audio-thread path. See AudioEffectRuntime's
+   // and AudioPluginAudioNode's overrides.
+   virtual int LatencySamples() const { return 0; }
+
    // --- note ports (P3a) ---------------------------------------------------
    // Optional; the overwhelming majority of AudioNode subclasses carry no
    // note data and use neither. See docs/plans/audio/P3a-notes-prompt.md
