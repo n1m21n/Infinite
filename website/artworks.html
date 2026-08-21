@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infinite — Artworks</title>
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background-color: #000;
+      color: #fff;
+      overflow-x: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Seamless Borderless Artworks Grid */
+    .artworks-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      width: 100vw;
+      min-height: 100vh;
+      padding: 0;
+      margin: 0;
+      border: none;
+      outline: none;
+      background: #000;
+    }
+
+    @media (min-width: 1600px) {
+      .artworks-grid {
+        grid-template-columns: repeat(5, 1fr);
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .artworks-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    /* Mobile: Exactly 2 artworks per row */
+    @media (max-width: 768px) {
+      .artworks-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .art-cell {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      overflow: hidden;
+      background: #0d0c0b;
+      margin: 0;
+      padding: 0;
+      border: none;
+      outline: none;
+      content-visibility: auto;
+      contain-intrinsic-size: 300px 400px;
+    }
+
+    .art-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      margin: 0;
+      padding: 0;
+      border: none;
+      outline: none;
+      background: #000;
+      transition: transform 0.35s ease;
+    }
+
+    .art-cell:hover .art-video {
+      transform: scale(1.03);
+    }
+
+    /* Subtle Floating Navigation Button */
+    .floating-back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(18, 16, 14, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 9999px;
+      padding: 8px 15px;
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      opacity: 0.65;
+      transition: opacity 0.25s ease, background 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+      cursor: pointer;
+    }
+
+    .floating-back-btn:hover {
+      opacity: 1;
+      background: rgba(26, 23, 20, 0.95);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+      color: #fff;
+    }
+
+    .floating-back-btn svg {
+      width: 15px;
+      height: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Back Button to Return to Home -->
+  <a href="index.html" class="floating-back-btn" title="Back to Infinite">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="19" y1="12" x2="5" y2="12"></line>
+      <polyline points="12 19 5 12 12 5"></polyline>
+    </svg>
+    <span>Infinite</span>
+  </a>
+
+  <!-- Pure Borderless Video Artworks Grid with Instant Poster & Smart Lazy Streaming -->
+  <main class="artworks-grid">
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_01.jpg" data-src="assets/artworks/artwork_01.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_02.jpg" data-src="assets/artworks/artwork_02.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_03.jpg" data-src="assets/artworks/artwork_03.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_04.jpg" data-src="assets/artworks/artwork_04.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_05.jpg" data-src="assets/artworks/artwork_05.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_06.jpg" data-src="assets/artworks/artwork_06.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_07.jpg" data-src="assets/artworks/artwork_07.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_08.jpg" data-src="assets/artworks/artwork_08.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_09.jpg" data-src="assets/artworks/artwork_09.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_10.jpg" data-src="assets/artworks/artwork_10.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_11.jpg" data-src="assets/artworks/artwork_11.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_12.jpg" data-src="assets/artworks/artwork_12.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_13.jpg" data-src="assets/artworks/artwork_13.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_14.jpg" data-src="assets/artworks/artwork_14.mp4" loop muted playsinline preload="metadata"></video></div>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const videos = document.querySelectorAll('.art-video');
+
+      // Smart Intersection Observer for instant rendering, smooth scrolling, and zero lag
+      if ('IntersectionObserver' in window) {
+        const videoObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            const video = entry.target;
+            if (entry.isIntersecting) {
+              // Load video source if not already loaded
+              if (!video.src && video.dataset.src) {
+                video.src = video.dataset.src;
+                video.load();
+              }
+              const playPromise = video.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(() => {});
+              }
+            } else {
+              // Pause when out of view to save battery & CPU/GPU
+              if (video.src) {
+                video.pause();
+              }
+            }
+          });
+        }, {
+          rootMargin: '200px 0px',
+          threshold: 0.05
+        });
+
+        videos.forEach(v => videoObserver.observe(v));
+      } else {
+        // Fallback for older browsers
+        videos.forEach(v => {
+          if (v.dataset.src) v.src = v.dataset.src;
+          v.play().catch(() => {});
+        });
+      }
+
+      // Keyboard navigation: Escape key returns home
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          window.location.href = 'index.html';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

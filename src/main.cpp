@@ -103,10 +103,12 @@
 #include "nodes/AudioEffectNode.h"
 #include "nodes/WavetableNode.h"
 #include "nodes/WaveTerrainNode.h"
+#include "nodes/EquationNode.h"
 #include "nodes/ImageSpectralSynthNode.h"
 #include "nodes/AudioDisplacementNode.h"
 #include "nodes/AudioTextureNode.h"
 #include "nodes/AudioRibbonNode.h"
+#include "nodes/AudioColorRampNode.h"
 #include "nodes/OscillatorNode.h"
 #include "nodes/MetallicNode.h"
 #include "audio/Wavetable.h"
@@ -2482,6 +2484,7 @@ namespace
       REGISTER_NODE(OscillatorNode, Oscillator, "Synths");
       REGISTER_NODE(WavetableNode, Wavetable, "Synths");
       REGISTER_NODE(WaveTerrainNode, Wave Terrain, "Synths");
+      REGISTER_NODE(EquationNode, Equation Synth, "Synths");
       REGISTER_NODE(ImageSpectralSynthNode, Spectral Synth, "Synths");
       REGISTER_NODE(MetallicNode, Metallic, "Synths");
       REGISTER_NODE(SamplerNode, Sampler, "Synths");
@@ -2502,6 +2505,7 @@ namespace
       // compositing node (REGISTER_NODE(BlendNode, Blend, "Compositing") above).
       REGISTER_NODE(BlendAudioNode, Blend Audio, "AudioUtility");
       REGISTER_NODE(AudioTextureNode, Audio Texture, "Audio");
+      REGISTER_NODE(AudioColorRampNode, Audio Color Ramp, "Audio");
 
       // P3a Part 1 - note-transport proving nodes. See
       // docs/plans/audio/P3a-notes-prompt.md; Part 2 adds Note Filter/
@@ -2695,6 +2699,8 @@ namespace
          return 1;
       if (dynamic_cast<ColorRampNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<AudioColorRampNode*>(gn.node.get()) != nullptr)
+         return 2; // img (slot 0) + audio (slot 1)
       if (dynamic_cast<RemoveBgNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<DrawNode*>(gn.node.get()) != nullptr)
@@ -2827,6 +2833,8 @@ namespace
          return slot == 0 ? &curves->Input() : nullptr;
       if (auto* cramp = dynamic_cast<ColorRampNode*>(gn.node.get()))
          return slot == 0 ? &cramp->Input() : nullptr;
+      if (auto* acr = dynamic_cast<AudioColorRampNode*>(gn.node.get()))
+         return slot == 0 ? &acr->Input() : nullptr;
       if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn.node.get()))
          return slot == 0 ? &rbg->Input() : nullptr;
       if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
@@ -5758,7 +5766,8 @@ namespace
       // rather than the generic v3 audio body, which has no case for it and
       // would otherwise render an empty shell with just the pin - same
       // reasoning as the AudioTextureNode carve-out just below.
-      if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr)
+      if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
+          dynamic_cast<AudioColorRampNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -7689,6 +7698,240 @@ namespace
 
        EndAudioBody();
     }
+
+   void DrawEquationVisualizer(EquationNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool isLight = IsThemeLight();
+
+      const ImU32 bgCol = isLight ? IM_COL32(245, 247, 250, 255) : IM_COL32(16, 18, 24, 255);
+      const ImU32 borderCol = isLight ? IM_COL32(200, 205, 215, 255) : IM_COL32(40, 46, 60, 255);
+      const ImU32 gridCol = isLight ? IM_COL32(215, 220, 230, 180) : IM_COL32(32, 38, 52, 180);
+      const ImU32 axisCol = isLight ? IM_COL32(140, 150, 170, 240) : IM_COL32(70, 85, 115, 240);
+      const ImU32 textCol = isLight ? IM_COL32(120, 130, 145, 200) : IM_COL32(130, 145, 170, 200);
+
+      dl->AddRectFilled(origin, br, bgCol, 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      float originX = origin.x;
+      if (n->domainMode == EquationDsp::kDomainZeroToOne)
+         originX = origin.x + 8.0f;
+      else
+         originX = origin.x + w * 0.5f;
+
+      const float scaleY = (h * 0.5f - 8.0f);
+      dl->AddLine(ImVec2(origin.x, midY - scaleY), ImVec2(br.x, midY - scaleY), gridCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY - scaleY * 0.5f), ImVec2(br.x, midY - scaleY * 0.5f), gridCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY + scaleY * 0.5f), ImVec2(br.x, midY + scaleY * 0.5f), gridCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY + scaleY), ImVec2(br.x, midY + scaleY), gridCol, 1.0f);
+
+      for (int i = 1; i < 8; i++)
+      {
+         const float gx = origin.x + w * (float)i / 8.0f;
+         dl->AddLine(ImVec2(gx, origin.y), ImVec2(gx, br.y), gridCol, 1.0f);
+      }
+
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), axisCol, 1.5f);
+      dl->AddLine(ImVec2(originX, origin.y), ImVec2(originX, br.y), axisCol, 1.5f);
+
+      dl->AddText(ImVec2(origin.x + 4.0f, midY - scaleY - 1.0f), textCol, "+1");
+      dl->AddText(ImVec2(origin.x + 4.0f, midY + scaleY - 13.0f), textCol, "-1");
+      if (n->domainMode == EquationDsp::kDomainZeroToOne)
+      {
+         dl->AddText(ImVec2(origin.x + 4.0f, midY + 2.0f), textCol, "0");
+         dl->AddText(ImVec2(br.x - 14.0f, midY + 2.0f), textCol, "1");
+      }
+      else if (n->domainMode == EquationDsp::kDomainNegPiToPi)
+      {
+         dl->AddText(ImVec2(origin.x + 4.0f, midY + 2.0f), textCol, "-pi");
+         dl->AddText(ImVec2(originX + 3.0f, midY + 2.0f), textCol, "0");
+         dl->AddText(ImVec2(br.x - 22.0f, midY + 2.0f), textCol, "+pi");
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 4.0f, midY + 2.0f), textCol, "-1");
+         dl->AddText(ImVec2(originX + 3.0f, midY + 2.0f), textCol, "0");
+         dl->AddText(ImVec2(br.x - 14.0f, midY + 2.0f), textCol, "+1");
+      }
+
+      if (n->scopeCacheCount > 1 && n->ActiveVoices() > 0)
+      {
+         const int sc = n->scopeCacheCount;
+         dl->PathClear();
+         for (int i = 0; i < sc; i++)
+         {
+            const float t = (float)i / (float)(sc - 1);
+            const float sy = midY - n->scopeCache[i] * scaleY * 0.95f;
+            dl->PathLineTo(ImVec2(origin.x + t * w, sy));
+         }
+         dl->PathStroke(isLight ? IM_COL32(0, 160, 220, 50) : IM_COL32(0, 240, 255, 60), 0, 3.5f);
+      }
+
+      const auto& curve = n->PreviewCurve();
+      if (!curve.empty())
+      {
+         const int nPts = (int)curve.size();
+         dl->PathClear();
+         for (int i = 0; i < nPts; i++)
+         {
+            const float t = (float)i / (float)(nPts - 1);
+            const float cy = midY - std::clamp(curve[i], -1.5f, 1.5f) * scaleY;
+            dl->PathLineTo(ImVec2(origin.x + t * w, cy));
+         }
+         dl->PathStroke(isLight ? IM_COL32(0, 140, 240, 60) : IM_COL32(0, 200, 255, 75), 0, 4.0f);
+
+         dl->PathClear();
+         for (int i = 0; i < nPts; i++)
+         {
+            const float t = (float)i / (float)(nPts - 1);
+            const float cy = midY - std::clamp(curve[i], -1.5f, 1.5f) * scaleY;
+            dl->PathLineTo(ImVec2(origin.x + t * w, cy));
+         }
+         dl->PathStroke(isLight ? IM_COL32(0, 120, 220, 240) : IM_COL32(100, 240, 255, 250), 0, 1.8f);
+      }
+
+      if (!n->LastError().empty())
+      {
+         const std::string errText = "[!] " + n->LastError();
+         const ImVec2 txtSz = ImGui::CalcTextSize(errText.c_str());
+         const ImVec2 pillBr(br.x - 6.0f, origin.y + 6.0f + txtSz.y + 4.0f);
+         const ImVec2 pillTl(pillBr.x - txtSz.x - 10.0f, origin.y + 6.0f);
+         dl->AddRectFilled(pillTl, pillBr, IM_COL32(180, 40, 40, 230), 3.0f);
+         dl->AddText(ImVec2(pillTl.x + 5.0f, pillTl.y + 2.0f), IM_COL32(255, 240, 240, 255), errText.c_str());
+      }
+      else
+      {
+         const char* tag = "y = f(x)";
+         const ImVec2 txtSz = ImGui::CalcTextSize(tag);
+         const ImVec2 pillBr(br.x - 6.0f, origin.y + 6.0f + txtSz.y + 4.0f);
+         const ImVec2 pillTl(pillBr.x - txtSz.x - 8.0f, origin.y + 6.0f);
+         dl->AddRectFilled(pillTl, pillBr, isLight ? IM_COL32(220, 230, 240, 200) : IM_COL32(28, 36, 50, 200), 3.0f);
+         dl->AddText(ImVec2(pillTl.x + 4.0f, pillTl.y + 2.0f), isLight ? IM_COL32(0, 120, 200, 240) : IM_COL32(80, 210, 255, 240), tag);
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, borderCol, 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawEquationBody(GraphNode& gn, EquationNode* n)
+   {
+      const bool noteDriven = n->NoteInput().GetSource() != nullptr;
+      const int voices = n->ActiveVoices();
+
+      char stat[128];
+      if (noteDriven)
+         snprintf(stat, sizeof(stat), "Equation  -  %d voice%s", voices, voices == 1 ? "" : "s");
+      else
+         snprintf(stat, sizeof(stat), "Equation  -  free run %.0f Hz", n->frequency);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      // Header: Preset dropdown, Domain dropdown, Octave, Semi, Fine
+      {
+         const float w = gAudioContentW;
+         const float x0 = gAudioContentX;
+         const float y = ImGui::GetCursorScreenPos().y;
+         const float gap = 4.0f;
+         const float octW = 56.0f, semiW = 64.0f, fineW = 76.0f;
+         const float remW = std::max(140.0f, w - octW - semiW - fineW - gap * 4.0f);
+         const float preW = remW * 0.58f;
+         const float domW = remW * 0.42f;
+
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         AudioBareDropdown("eqPreset", EquationNode::PresetNames(), n->presetIndex,
+                           [n](int i) { PushUndoCheckpoint(); n->LoadPreset(i); }, preW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0 + preW + gap, y));
+         AudioBareDropdown("eqDom", EquationNode::DomainNames(), n->domainMode,
+                           [n](int i) { PushUndoCheckpoint(); n->domainMode = i; n->CompileEquation(); }, domW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0 + preW + domW + gap * 2.0f, y));
+         AudioSlider("fine", &n->fine, -50.0f, 50.0f, "%.1f c", fineW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
+         AudioBareDropdown("eqOct", OctaveNames(), n->octave + 4,
+                           [n](int i) { PushUndoCheckpoint(); n->octave = i - 4; }, octW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
+         AudioBareDropdown("eqSemi", SemiNames(), n->semi + 12,
+                           [n](int i) { PushUndoCheckpoint(); n->semi = i - 12; }, semiW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+      }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Interactive Cartesian X-Y Visualizer
+      DrawEquationVisualizer(n, 128.0f, gAudioContentW);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Formula Input Field
+      {
+         char buf[512];
+         std::strncpy(buf, n->formula.c_str(), sizeof(buf));
+         buf[sizeof(buf) - 1] = '\0';
+         ImGui::SetNextItemWidth(gAudioContentW);
+         if (ImGui::InputTextWithHint("##formula", "y = f(x, a, b, c, d, t)", buf, sizeof(buf)))
+         {
+            PushUndoCheckpoint();
+            n->formula = buf;
+            n->CompileEquation();
+         }
+      }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Section 1: Function Knobs (A, B, C, D)
+      BeginAudioSection("function parameters");
+      {
+         AudioKnobRow row(4, kKnobLarge);
+         row.Knob("A", &n->knobA, 0.0f, 1.0f, "%.3f");
+         row.Knob("B", &n->knobB, 0.0f, 1.0f, "%.3f");
+         row.Knob("C", &n->knobC, 0.0f, 1.0f, "%.3f");
+         row.Knob("D", &n->knobD, 0.0f, 1.0f, "%.3f");
+         row.End();
+      }
+      EndAudioSection();
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Section 2: Synth Voice & Filter
+      BeginAudioSection("voice & filter");
+      {
+         AudioKnobRow row1(4);
+         row1.Knob("volume", &n->volume, 0.0f, 2.0f, "%.2f");
+         row1.Knob("pan", &n->pan, -1.0f, 1.0f, "%.2f");
+         row1.KnobInt("unison", &n->unison, 1, EquationNode::kMaxUnison);
+         row1.Knob("detune", &n->detune, 0.0f, 100.0f, "%.1f c");
+         row1.End();
+
+         ImGui::Dummy(ImVec2(0.0f, 3.0f));
+         const bool filterOff = (n->filterType == 0);
+         AudioKnobRow row2(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
+         row2.DropdownKnob("eqFilter", EquationNode::FilterTypeNames(), n->filterType,
+                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
+                           "cutoff", &n->cutoff, 20.0f, 20000.0f, "%.0f Hz", filterOff);
+         row2.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f");
+         row2.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
+         row2.Knob("glide", &n->glide, 0.0f, 1.0f, "%.3f s");
+         row2.End();
+      }
+      EndAudioSection();
+
+      // Section 3: Amp Envelope
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::PushID("amp");
+      DrawEnvelopePanel("amp envelope", "##eqAmpEnv", &n->ampAttack,
+                        &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
+                        IM_COL32(50, 220, 255, 240));
+      ImGui::PopID();
+
+      EndAudioBody();
+   }
 
    void DrawImageSpectralSynthScope(ImageSpectralSynthNode* n, float h, float width)
    {
@@ -13390,6 +13633,8 @@ namespace
          DrawWavetableBody(gn, n);
       else if (auto* n = dynamic_cast<WaveTerrainNode*>(gn.node.get()))
          DrawWaveTerrainBody(gn, n);
+      else if (auto* n = dynamic_cast<EquationNode*>(gn.node.get()))
+         DrawEquationBody(gn, n);
       else if (auto* n = dynamic_cast<ImageSpectralSynthNode*>(gn.node.get()))
          DrawImageSpectralSynthBody(gn, n);
       else if (auto* n = dynamic_cast<MetallicNode*>(gn.node.get()))
@@ -14468,6 +14713,175 @@ namespace
       }
       ModSlider("gain", &n->gain, 0.1f, 10.0f);
       ModSlider("smoothing", &n->smoothing, 0.0f, 0.99f);
+   }
+
+   void DrawAudioColorRampEditor(AudioColorRampNode* n)
+   {
+      const float size = kPreviewSize;
+      const float barH = 64.0f;
+      const float gap = 4.0f;
+
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(14, 14, 20, 255), 3.0f);
+
+      const int count = std::clamp(n->bandCount, 2, AudioColorRampNode::kMaxBands);
+      const float* energies = n->GetBandEnergies();
+
+      auto toScreenX = [&](float x) { return origin.x + x * size; };
+
+      // 1. Per-band energy bars, coloured by that band's assigned colour -
+      // this is the live feedback for "which band is loud right now" and
+      // doubles as a preview of where each band's frequency range sits.
+      // Always shows a visible floor so the visualizer isn't blank at rest.
+      float prevX = 0.0f;
+      for (int b = 0; b < count; b++)
+      {
+         float nextX = (b == count - 1) ? 1.0f : n->crossoverPos[b];
+         float x0 = toScreenX(prevX) + 1.0f;
+         float x1 = toScreenX(nextX) - 1.0f;
+         if (x1 > x0)
+         {
+            float lvl = std::clamp(energies[b], 0.0f, 1.0f);
+            float h = barH * 0.10f + (barH * 0.85f) * lvl;
+            ImU32 col = IM_COL32((int)(std::clamp(n->bandColor[b][0], 0.0f, 1.0f) * 255),
+                                 (int)(std::clamp(n->bandColor[b][1], 0.0f, 1.0f) * 255),
+                                 (int)(std::clamp(n->bandColor[b][2], 0.0f, 1.0f) * 255), 255);
+            dl->AddRectFilled(ImVec2(x0, origin.y + barH - h), ImVec2(x1, origin.y + barH - 1.0f), col);
+         }
+         prevX = nextX;
+      }
+
+      // 2. Real-time continuous FFT curve overlay, for detail finer than the bands.
+      const auto& spec = n->GetSmoothedSpectrum();
+      if (!spec.empty())
+      {
+         std::vector<ImVec2> pts;
+         pts.reserve(96);
+         for (int i = 0; i < 96; i++)
+         {
+            float t = (float)i / 95.0f;
+            float freq = AudioColorRampNode::PosToFreq(t);
+            int bin = std::clamp((int)(freq * (1024.0f / 44100.0f)), 1, 511);
+            float mag = std::clamp(spec[bin] * 2.5f, 0.0f, 1.0f);
+            pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - 4.0f)));
+         }
+         dl->AddPolyline(pts.data(), (int)pts.size(), IM_COL32(255, 255, 255, 130), false, 1.2f);
+      }
+
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(70, 74, 90, 255), 3.0f);
+
+      // 3. Interactive band-boundary dividers, drawn directly on the spectrum.
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##acr_track", ImVec2(size, barH));
+      const bool hovered = ImGui::IsItemHovered();
+      const bool active = ImGui::IsItemActive();
+
+      auto toX = [&](float screenX) { return std::clamp((screenX - origin.x) / size, 0.01f, 0.99f); };
+
+      static AudioColorRampNode* sDragNode = nullptr;
+      static int sDragIndex = -1;
+
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      const int numDividers = count - 1;
+      int nearest = -1;
+      float nearestDist = 10.0f;
+      for (int i = 0; i < numDividers; i++)
+      {
+         float d = std::fabs(toScreenX(n->crossoverPos[i]) - mouse.x);
+         if (d < nearestDist)
+         {
+            nearestDist = d;
+            nearest = i;
+         }
+      }
+
+      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && nearest >= 0)
+      {
+         PushUndoCheckpoint();
+         sDragIndex = nearest;
+         sDragNode = n;
+      }
+      if (active && sDragNode == n && sDragIndex >= 0)
+      {
+         float minPos = (sDragIndex == 0) ? 0.02f : (n->crossoverPos[sDragIndex - 1] + 0.02f);
+         float maxPos = (sDragIndex == numDividers - 1) ? 0.98f : (n->crossoverPos[sDragIndex + 1] - 0.02f);
+         n->crossoverPos[sDragIndex] = std::clamp(toX(mouse.x), minPos, maxPos);
+         n->MarkDirty();
+      }
+      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+      {
+         sDragIndex = -1;
+         sDragNode = nullptr;
+      }
+
+      // Hovered divider's frequency goes in a fixed readout line below the
+      // track rather than a tooltip - a tooltip drawn from inside ed::Begin()/
+      // ed::End() (even Suspend()/Resume()-wrapped) fights the node editor's
+      // per-node draw-channel splitting and can blank the node body for a
+      // frame; see the "audio node value readout" note above SetAudioReadout.
+      char readout[48] = "";
+      for (int i = 0; i < numDividers; i++)
+      {
+         float x = toScreenX(n->crossoverPos[i]);
+         bool isHov = (nearest == i || (sDragNode == n && sDragIndex == i));
+         ImU32 lineCol = isHov ? IM_COL32(255, 220, 100, 230) : IM_COL32(255, 255, 255, 100);
+         dl->AddLine(ImVec2(x, origin.y + 2.0f), ImVec2(x, origin.y + barH - 2.0f), lineCol, isHov ? 2.5f : 1.5f);
+
+         if (isHov)
+         {
+            float hz = AudioColorRampNode::PosToFreq(n->crossoverPos[i]);
+            char hzText[32];
+            if (hz >= 1000.0f)
+               snprintf(hzText, sizeof(hzText), "%.1f kHz", hz / 1000.0f);
+            else
+               snprintf(hzText, sizeof(hzText), "%.0f Hz", hz);
+            snprintf(readout, sizeof(readout), "crossover %d: %s", i + 1, hzText);
+         }
+      }
+
+      const float readoutH = ImGui::GetTextLineHeight();
+      dl->AddText(ImVec2(origin.x, origin.y + barH + gap), IM_COL32(160, 166, 186, 255), readout);
+
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + barH + gap + readoutH + gap));
+   }
+
+   void DrawAudioColorRampParams(AudioColorRampNode* n)
+   {
+      DrawAudioColorRampEditor(n);
+
+      NodeSeparator("band colors");
+      for (int b = 0; b < n->bandCount; b++)
+      {
+         ImGui::PushID(b + 30000);
+         char label[32];
+         float f0 = (b == 0) ? 20.0f : AudioColorRampNode::PosToFreq(n->crossoverPos[b - 1]);
+         float f1 = (b == n->bandCount - 1) ? 20000.0f : AudioColorRampNode::PosToFreq(n->crossoverPos[b]);
+         if (f1 >= 1000.0f)
+            snprintf(label, sizeof(label), "B%d (%.0f-%.1fk)", b + 1, f0, f1 / 1000.0f);
+         else
+            snprintf(label, sizeof(label), "B%d (%.0f-%.0fHz)", b + 1, f0, f1);
+
+         ColorSwatch(label, n->bandColor[b], n);
+         ImGui::PopID();
+      }
+
+      DropdownButton("mode", AudioColorRampNode::ModeNames(), n->mode,
+                     [n](int i) { PushUndoCheckpoint(); n->mode = i; n->MarkDirty(); });
+      DropdownButton("interpolation", AudioColorRampNode::InterpNames(), n->interpMode,
+                     [n](int i) { PushUndoCheckpoint(); n->interpMode = i; n->MarkDirty(); });
+
+      int bCount = n->bandCount;
+      ImGui::SetNextItemWidth(kParamWidth);
+      if (ImGui::SliderInt("bands", &bCount, 2, AudioColorRampNode::kMaxBands))
+      {
+         PushUndoCheckpoint();
+         n->SetBandCount(bCount);
+      }
+
+      ModSlider("gain", &n->gain, 0.1f, 10.0f);
+      ModSlider("min glow", &n->minBrightness, 0.0f, 1.0f);
    }
 
    void DrawAudioRibbonParams(AudioRibbonNode* n)
@@ -16236,10 +16650,12 @@ namespace
          { "Plugin", "Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged." },
          { "Oscillator", "A synth oscillator with four classic waveforms (sine, triangle, saw, square), interactive amp envelope, unison, filter, hard sync, and fine/coarse tuning. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
+         { "Equation Synth", "A synth defined by a live formula (y = f(x, a, b, c, d, t)) instead of a fixed waveform - knobs a-d feed the equation directly, so turning them reshapes the waveform itself rather than modulating a preset one." },
          { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
+         { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
          { "EQ", "Five fixed bands (low shelf, three peaks, high shelf by default), each switchable to any of low shelf/peak/high shelf/hp 12/lp 12 and independently on or off. Drag a band's dot on the curve to set its frequency and gain, drag its diamond to set Q, double-click the dot to bypass that band - the knob row below always follows whichever band you last touched." },
          { "Dynamics", "A compressor: threshold, ratio, attack, release, makeup, a peak/RMS detector switch, and a sidechain switch that feeds the detector from the second input pin instead of the main signal. The graph shows the static transfer curve - input dB in, output dB out." },
          { "Delay", "A fractional delay line: time (tempo-synced by default, or free ms with 'sync to tempo' off), tone (bipolar tilt on the repeats), feedback (past 100% on purpose for self-oscillation - the output is soft-clipped, not the feedback itself), pan, duck (sidechains the wet signal off the dry input) and a bounce switch that cross-feeds left/right instead of repeating in place." },
@@ -16812,6 +17228,8 @@ namespace
          return at->GetAudioNode();
       if (auto* ar = dynamic_cast<AudioRibbonNode*>(node))
          return ar->GetAudioNode();
+      if (auto* acr = dynamic_cast<AudioColorRampNode*>(node))
+         return acr->GetAudioNode();
       return node->AudioNodeForNotePorts();
    }
 
@@ -22362,6 +22780,95 @@ static bool RunWaveTerrainFixture()
    return all;
 }
 
+static bool RunEquationFixture()
+{
+   bool all = true;
+   const double sr = 48000.0;
+   const int bs = 480;
+
+   // 1. AST parser & evaluation on mathematical equations
+   {
+      EquationDsp::AstNodePtr ast;
+      std::string err;
+      const bool p1 = EquationDsp::Parser::Parse("sin(2*pi*x) + a*cos(4*pi*x)", ast, err);
+      const bool parseOk = p1 && ast != nullptr && err.empty();
+      const double v0 = parseOk ? ast->Evaluate(0.25, 0.5, 0.0, 0.0, 0.0, 0.0) : 0.0;
+      const bool valOk = std::fabs(v0 - 0.5) < 1e-3; // sin(pi/2) + 0.5*cos(pi) = 1 - 0.5 = 0.5
+      printf("DSPTEST equation AST parse & evaluation: parse=%d val=%.4f (expected 0.5) %s\n",
+             (int)parseOk, v0, (parseOk && valOk) ? "OK" : "FAIL");
+      all &= (parseOk && valOk);
+   }
+
+   // 2. Anti-aliased wavetable FFT mip pyramid generation
+   {
+      EquationNode eq;
+      eq.formula = "4*x^3 - 3*x";
+      eq.domainMode = EquationDsp::kDomainNegOneToOne;
+      eq.CompileEquation();
+      eq.CookIfNeeded(1);
+
+      AudioNode* audio = eq.GetAudioNode();
+      audio->PrepareToPlay(sr, bs);
+
+      std::vector<float> bl(bs), br(bs);
+      float* chans[2] = { bl.data(), br.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = bs;
+
+      float rms = 0.0f;
+      for (int b = 0; b < 20; b++)
+      {
+         audio->ProcessBlock(nullptr, 0, buf);
+         for (int i = 0; i < bs; i++)
+            rms += bl[i] * bl[i];
+      }
+      const bool audioOk = rms > 1e-4f;
+      printf("DSPTEST equation bank synthesis & playback: rms=%.6f %s\n", rms, audioOk ? "OK" : "FAIL");
+      all &= audioOk;
+   }
+
+   // 3. Polyphonic voice count
+   {
+      EquationNode eq2;
+      AudioNode* audio2 = eq2.GetAudioNode();
+      audio2->PrepareToPlay(sr, bs);
+      eq2.CookIfNeeded(10);
+
+      NoteEventQueue inbox;
+      audio2->SetNoteInbox(&inbox, inbox.RegisterConsumer());
+
+      std::vector<float> bl(bs), br(bs);
+      float* chans[2] = { bl.data(), br.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = bs;
+
+      const int kHeldNotes = 3;
+      for (int n = 0; n < kHeldNotes; n++)
+      {
+         NoteEvent on;
+         on.note = 60 + n * 4;
+         on.voiceId = n + 1;
+         on.velocity = 0.8f;
+         on.isNoteOn = true;
+         on.frameOffset = 0;
+         inbox.Push(on);
+      }
+
+      audio2->ProcessBlock(nullptr, 0, buf);
+      const int voices = eq2.ActiveVoices();
+      const bool voiceCountOk = (voices == kHeldNotes);
+      printf("DSPTEST equation voice count for %d held notes: reported=%d %s\n", kHeldNotes, voices,
+             voiceCountOk ? "OK" : "FAIL");
+      all &= voiceCountOk;
+   }
+
+   return all;
+}
+
 // New DSP fixture (there was none before this pass): Audio Displacement
 // actually deforms the mesh under a live signal and relaxes back to rest
 // once the signal stops, rather than freezing in its last deformed pose
@@ -22492,11 +22999,12 @@ static int RunDspTest()
    const bool freqShifterOk = RunFrequencyShifterFixture();
    const bool spectralSynthOk = RunImageSpectralSynthFixture();
    const bool waveTerrainOk = RunWaveTerrainFixture();
+   const bool equationOk = RunEquationFixture();
    const bool audioDisplacementOk = RunAudioDisplacementFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk &&
                     paulStretchOk && granularOk && drumSeqOk && wavetableShaperOk && eqOk && noteStackOk &&
-                    freqShifterOk && spectralSynthOk && waveTerrainOk && audioDisplacementOk;
+                    freqShifterOk && spectralSynthOk && waveTerrainOk && equationOk && audioDisplacementOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
    return all ? 0 : 1;
 }
@@ -24244,6 +24752,7 @@ int main(int argc, char** argv)
                pluginFixture->LoadPlugin(fixturePlugin);
          }
          SpawnNode("Note Stack", "Notes", 4900.0f, 500.0f);             // 29
+         SpawnNode("Equation Synth", "Synths", 5400.0f, 20.0f);         // 30
          {
             // A tiny synthetic WAV, loaded immediately, so the visual smoke
             // test's screenshot shows the interactive waveform (bars, the
@@ -24268,7 +24777,7 @@ int main(int argc, char** argv)
             f.write("data", 4); writeU32(dataSize);
             f.write((const char*)fixturePcm.data(), dataSize);
             f.close();
-            if (auto* samplerFixture = dynamic_cast<SamplerNode*>(gNodes.back().node.get()))
+            if (auto* samplerFixture = dynamic_cast<SamplerNode*>(gNodes[24].node.get()))
                samplerFixture->LoadFile(fixtureWav);
          }
          {
@@ -32648,6 +33157,8 @@ int main(int argc, char** argv)
                DrawAudioRibbonParams(n);
             else if (auto* n = dynamic_cast<AudioTextureNode*>(gn.node.get()))
                DrawAudioTextureParams(n);
+            else if (auto* n = dynamic_cast<AudioColorRampNode*>(gn.node.get()))
+               DrawAudioColorRampParams(n);
             else if (auto* n = dynamic_cast<SetColorNode*>(gn.node.get()))
                DrawSetColorParams(n);
             else if (auto* n = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))

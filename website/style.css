@@ -425,6 +425,51 @@ body {
   line-height: var(--lh-normal);
 }
 
+.capabilities-section-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.capabilities-action {
+  display: flex;
+  justify-content: center;
+}
+
+.stream-artworks-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-card);
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all var(--transition-smooth);
+}
+
+.stream-artworks-btn:hover {
+  background: var(--bg-inner);
+  border-color: var(--pastel-terracotta);
+  color: var(--pastel-terracotta);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(194, 89, 63, 0.12);
+}
+
+.stream-artworks-btn svg {
+  transition: transform var(--transition-fast);
+}
+
+.stream-artworks-btn:hover svg {
+  transform: translateX(2px);
+}
+
 
 /* --------------------------------------------------------------------------
    Nature Connected Graph Canvas Section

@@ -183,10 +183,12 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/NoteNodes.cpp
     src/nodes/WavetableNode.cpp
     src/nodes/WaveTerrainNode.cpp
+    src/nodes/EquationNode.cpp
     src/nodes/ImageSpectralSynthNode.cpp
     src/nodes/AudioDisplacementNode.cpp
     src/nodes/AudioTextureNode.cpp
     src/nodes/AudioRibbonNode.cpp
+    src/nodes/AudioColorRampNode.cpp
     src/audio/dsp/SpectralAdditiveSynth.cpp
     src/nodes/OscillatorNode.cpp
     src/nodes/MetallicNode.cpp
