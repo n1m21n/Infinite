@@ -89,9 +89,15 @@ getting a file each:
   (the latter reads a frame as a transfer curve rather than an oscillator).
 - **`src/audio/SampleSlot.h`** — the main-thread-hands-a-buffer-to-the-audio-
   thread lifetime pattern (pending/active/retire-ring), shared by **Sampler**
-  (one instance), **PaulStretch** (one instance), and **Drum Sequencer** (eight, one per lane). Lifted out of
+  (one instance), **PaulStretch** (one instance), **Drum Sequencer** (eight, one per lane),
+  **Wave Terrain**, and **Equation Synth**. Lifted out of
   `SamplerNode.cpp` so a new sample-playing node never has to reimplement its
   own use-after-free trap.
+- **`src/nodes/EquationNode.h`/`.cpp` & `src/audio/dsp/EquationDsp.h`** — Desmos-style
+  mathematical equation oscillator synth node. Evaluates user math expressions
+  \(y = f(x, a, b, c, d)\) or presets in real-time, generates an exact 10-level
+  anti-aliased Fourier mip pyramid wavetable via 1024-point Radix-2 FFT, and renders
+  as a polyphonic synthesizer with ADSR envelopes, SVF filter, unison, and glide.
 - **`src/nodes/AudioPluginNode.h`/`.cpp`** — hosts a third-party plugin (Audio
   Units today) as an ordinary audio effect node. Unusually for this codebase it
   is a *three*-object node: the `INode` main-thread half, its `AudioNode` audio

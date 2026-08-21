@@ -103,6 +103,7 @@
 #include "nodes/AudioEffectNode.h"
 #include "nodes/WavetableNode.h"
 #include "nodes/WaveTerrainNode.h"
+#include "nodes/EquationNode.h"
 #include "nodes/ImageSpectralSynthNode.h"
 #include "nodes/AudioDisplacementNode.h"
 #include "nodes/AudioTextureNode.h"
@@ -2482,6 +2483,7 @@ namespace
       REGISTER_NODE(OscillatorNode, Oscillator, "Synths");
       REGISTER_NODE(WavetableNode, Wavetable, "Synths");
       REGISTER_NODE(WaveTerrainNode, Wave Terrain, "Synths");
+      REGISTER_NODE(EquationNode, Equation Synth, "Synths");
       REGISTER_NODE(ImageSpectralSynthNode, Spectral Synth, "Synths");
       REGISTER_NODE(MetallicNode, Metallic, "Synths");
       REGISTER_NODE(SamplerNode, Sampler, "Synths");
@@ -7689,6 +7691,240 @@ namespace
 
        EndAudioBody();
     }
+
+   void DrawEquationVisualizer(EquationNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool isLight = IsThemeLight();
+
+      const ImU32 bgCol = isLight ? IM_COL32(245, 247, 250, 255) : IM_COL32(16, 18, 24, 255);
+      const ImU32 borderCol = isLight ? IM_COL32(200, 205, 215, 255) : IM_COL32(40, 46, 60, 255);
+      const ImU32 gridCol = isLight ? IM_COL32(215, 220, 230, 180) : IM_COL32(32, 38, 52, 180);
+      const ImU32 axisCol = isLight ? IM_COL32(140, 150, 170, 240) : IM_COL32(70, 85, 115, 240);
+      const ImU32 textCol = isLight ? IM_COL32(120, 130, 145, 200) : IM_COL32(130, 145, 170, 200);
+
+      dl->AddRectFilled(origin, br, bgCol, 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      float originX = origin.x;
+      if (n->domainMode == EquationDsp::kDomainZeroToOne)
+         originX = origin.x + 8.0f;
+      else
+         originX = origin.x + w * 0.5f;
+
+      const float scaleY = (h * 0.5f - 8.0f);
+      dl->AddLine(ImVec2(origin.x, midY - scaleY), ImVec2(br.x, midY - scaleY), gridCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY - scaleY * 0.5f), ImVec2(br.x, midY - scaleY * 0.5f), gridCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY + scaleY * 0.5f), ImVec2(br.x, midY + scaleY * 0.5f), gridCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY + scaleY), ImVec2(br.x, midY + scaleY), gridCol, 1.0f);
+
+      for (int i = 1; i < 8; i++)
+      {
+         const float gx = origin.x + w * (float)i / 8.0f;
+         dl->AddLine(ImVec2(gx, origin.y), ImVec2(gx, br.y), gridCol, 1.0f);
+      }
+
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), axisCol, 1.5f);
+      dl->AddLine(ImVec2(originX, origin.y), ImVec2(originX, br.y), axisCol, 1.5f);
+
+      dl->AddText(ImVec2(origin.x + 4.0f, midY - scaleY - 1.0f), textCol, "+1");
+      dl->AddText(ImVec2(origin.x + 4.0f, midY + scaleY - 13.0f), textCol, "-1");
+      if (n->domainMode == EquationDsp::kDomainZeroToOne)
+      {
+         dl->AddText(ImVec2(origin.x + 4.0f, midY + 2.0f), textCol, "0");
+         dl->AddText(ImVec2(br.x - 14.0f, midY + 2.0f), textCol, "1");
+      }
+      else if (n->domainMode == EquationDsp::kDomainNegPiToPi)
+      {
+         dl->AddText(ImVec2(origin.x + 4.0f, midY + 2.0f), textCol, "-pi");
+         dl->AddText(ImVec2(originX + 3.0f, midY + 2.0f), textCol, "0");
+         dl->AddText(ImVec2(br.x - 22.0f, midY + 2.0f), textCol, "+pi");
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 4.0f, midY + 2.0f), textCol, "-1");
+         dl->AddText(ImVec2(originX + 3.0f, midY + 2.0f), textCol, "0");
+         dl->AddText(ImVec2(br.x - 14.0f, midY + 2.0f), textCol, "+1");
+      }
+
+      if (n->scopeCacheCount > 1 && n->ActiveVoices() > 0)
+      {
+         const int sc = n->scopeCacheCount;
+         dl->PathClear();
+         for (int i = 0; i < sc; i++)
+         {
+            const float t = (float)i / (float)(sc - 1);
+            const float sy = midY - n->scopeCache[i] * scaleY * 0.95f;
+            dl->PathLineTo(ImVec2(origin.x + t * w, sy));
+         }
+         dl->PathStroke(isLight ? IM_COL32(0, 160, 220, 50) : IM_COL32(0, 240, 255, 60), 0, 3.5f);
+      }
+
+      const auto& curve = n->PreviewCurve();
+      if (!curve.empty())
+      {
+         const int nPts = (int)curve.size();
+         dl->PathClear();
+         for (int i = 0; i < nPts; i++)
+         {
+            const float t = (float)i / (float)(nPts - 1);
+            const float cy = midY - std::clamp(curve[i], -1.5f, 1.5f) * scaleY;
+            dl->PathLineTo(ImVec2(origin.x + t * w, cy));
+         }
+         dl->PathStroke(isLight ? IM_COL32(0, 140, 240, 60) : IM_COL32(0, 200, 255, 75), 0, 4.0f);
+
+         dl->PathClear();
+         for (int i = 0; i < nPts; i++)
+         {
+            const float t = (float)i / (float)(nPts - 1);
+            const float cy = midY - std::clamp(curve[i], -1.5f, 1.5f) * scaleY;
+            dl->PathLineTo(ImVec2(origin.x + t * w, cy));
+         }
+         dl->PathStroke(isLight ? IM_COL32(0, 120, 220, 240) : IM_COL32(100, 240, 255, 250), 0, 1.8f);
+      }
+
+      if (!n->LastError().empty())
+      {
+         const std::string errText = "[!] " + n->LastError();
+         const ImVec2 txtSz = ImGui::CalcTextSize(errText.c_str());
+         const ImVec2 pillBr(br.x - 6.0f, origin.y + 6.0f + txtSz.y + 4.0f);
+         const ImVec2 pillTl(pillBr.x - txtSz.x - 10.0f, origin.y + 6.0f);
+         dl->AddRectFilled(pillTl, pillBr, IM_COL32(180, 40, 40, 230), 3.0f);
+         dl->AddText(ImVec2(pillTl.x + 5.0f, pillTl.y + 2.0f), IM_COL32(255, 240, 240, 255), errText.c_str());
+      }
+      else
+      {
+         const char* tag = "y = f(x)";
+         const ImVec2 txtSz = ImGui::CalcTextSize(tag);
+         const ImVec2 pillBr(br.x - 6.0f, origin.y + 6.0f + txtSz.y + 4.0f);
+         const ImVec2 pillTl(pillBr.x - txtSz.x - 8.0f, origin.y + 6.0f);
+         dl->AddRectFilled(pillTl, pillBr, isLight ? IM_COL32(220, 230, 240, 200) : IM_COL32(28, 36, 50, 200), 3.0f);
+         dl->AddText(ImVec2(pillTl.x + 4.0f, pillTl.y + 2.0f), isLight ? IM_COL32(0, 120, 200, 240) : IM_COL32(80, 210, 255, 240), tag);
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, borderCol, 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawEquationBody(GraphNode& gn, EquationNode* n)
+   {
+      const bool noteDriven = n->NoteInput().GetSource() != nullptr;
+      const int voices = n->ActiveVoices();
+
+      char stat[128];
+      if (noteDriven)
+         snprintf(stat, sizeof(stat), "Equation  -  %d voice%s", voices, voices == 1 ? "" : "s");
+      else
+         snprintf(stat, sizeof(stat), "Equation  -  free run %.0f Hz", n->frequency);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      // Header: Preset dropdown, Domain dropdown, Octave, Semi, Fine
+      {
+         const float w = gAudioContentW;
+         const float x0 = gAudioContentX;
+         const float y = ImGui::GetCursorScreenPos().y;
+         const float gap = 4.0f;
+         const float octW = 56.0f, semiW = 64.0f, fineW = 76.0f;
+         const float remW = std::max(140.0f, w - octW - semiW - fineW - gap * 4.0f);
+         const float preW = remW * 0.58f;
+         const float domW = remW * 0.42f;
+
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         AudioBareDropdown("eqPreset", EquationNode::PresetNames(), n->presetIndex,
+                           [n](int i) { PushUndoCheckpoint(); n->LoadPreset(i); }, preW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0 + preW + gap, y));
+         AudioBareDropdown("eqDom", EquationNode::DomainNames(), n->domainMode,
+                           [n](int i) { PushUndoCheckpoint(); n->domainMode = i; n->CompileEquation(); }, domW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0 + preW + domW + gap * 2.0f, y));
+         AudioSlider("fine", &n->fine, -50.0f, 50.0f, "%.1f c", fineW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
+         AudioBareDropdown("eqOct", OctaveNames(), n->octave + 4,
+                           [n](int i) { PushUndoCheckpoint(); n->octave = i - 4; }, octW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
+         AudioBareDropdown("eqSemi", SemiNames(), n->semi + 12,
+                           [n](int i) { PushUndoCheckpoint(); n->semi = i - 12; }, semiW);
+
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+      }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Interactive Cartesian X-Y Visualizer
+      DrawEquationVisualizer(n, 128.0f, gAudioContentW);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Formula Input Field
+      {
+         char buf[512];
+         std::strncpy(buf, n->formula.c_str(), sizeof(buf));
+         buf[sizeof(buf) - 1] = '\0';
+         ImGui::SetNextItemWidth(gAudioContentW);
+         if (ImGui::InputTextWithHint("##formula", "y = f(x, a, b, c, d, t)", buf, sizeof(buf)))
+         {
+            PushUndoCheckpoint();
+            n->formula = buf;
+            n->CompileEquation();
+         }
+      }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Section 1: Function Knobs (A, B, C, D)
+      BeginAudioSection("function parameters");
+      {
+         AudioKnobRow row(4, kKnobLarge);
+         row.Knob("A", &n->knobA, 0.0f, 1.0f, "%.3f");
+         row.Knob("B", &n->knobB, 0.0f, 1.0f, "%.3f");
+         row.Knob("C", &n->knobC, 0.0f, 1.0f, "%.3f");
+         row.Knob("D", &n->knobD, 0.0f, 1.0f, "%.3f");
+         row.End();
+      }
+      EndAudioSection();
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Section 2: Synth Voice & Filter
+      BeginAudioSection("voice & filter");
+      {
+         AudioKnobRow row1(4);
+         row1.Knob("volume", &n->volume, 0.0f, 2.0f, "%.2f");
+         row1.Knob("pan", &n->pan, -1.0f, 1.0f, "%.2f");
+         row1.KnobInt("unison", &n->unison, 1, EquationNode::kMaxUnison);
+         row1.Knob("detune", &n->detune, 0.0f, 100.0f, "%.1f c");
+         row1.End();
+
+         ImGui::Dummy(ImVec2(0.0f, 3.0f));
+         const bool filterOff = (n->filterType == 0);
+         AudioKnobRow row2(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
+         row2.DropdownKnob("eqFilter", EquationNode::FilterTypeNames(), n->filterType,
+                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
+                           "cutoff", &n->cutoff, 20.0f, 20000.0f, "%.0f Hz", filterOff);
+         row2.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f");
+         row2.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
+         row2.Knob("glide", &n->glide, 0.0f, 1.0f, "%.3f s");
+         row2.End();
+      }
+      EndAudioSection();
+
+      // Section 3: Amp Envelope
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::PushID("amp");
+      DrawEnvelopePanel("amp envelope", "##eqAmpEnv", &n->ampAttack,
+                        &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
+                        IM_COL32(50, 220, 255, 240));
+      ImGui::PopID();
+
+      EndAudioBody();
+   }
 
    void DrawImageSpectralSynthScope(ImageSpectralSynthNode* n, float h, float width)
    {
@@ -13390,6 +13626,8 @@ namespace
          DrawWavetableBody(gn, n);
       else if (auto* n = dynamic_cast<WaveTerrainNode*>(gn.node.get()))
          DrawWaveTerrainBody(gn, n);
+      else if (auto* n = dynamic_cast<EquationNode*>(gn.node.get()))
+         DrawEquationBody(gn, n);
       else if (auto* n = dynamic_cast<ImageSpectralSynthNode*>(gn.node.get()))
          DrawImageSpectralSynthBody(gn, n);
       else if (auto* n = dynamic_cast<MetallicNode*>(gn.node.get()))
@@ -22362,6 +22600,95 @@ static bool RunWaveTerrainFixture()
    return all;
 }
 
+static bool RunEquationFixture()
+{
+   bool all = true;
+   const double sr = 48000.0;
+   const int bs = 480;
+
+   // 1. AST parser & evaluation on mathematical equations
+   {
+      EquationDsp::AstNodePtr ast;
+      std::string err;
+      const bool p1 = EquationDsp::Parser::Parse("sin(2*pi*x) + a*cos(4*pi*x)", ast, err);
+      const bool parseOk = p1 && ast != nullptr && err.empty();
+      const double v0 = parseOk ? ast->Evaluate(0.25, 0.5, 0.0, 0.0, 0.0, 0.0) : 0.0;
+      const bool valOk = std::fabs(v0 - 0.5) < 1e-3; // sin(pi/2) + 0.5*cos(pi) = 1 - 0.5 = 0.5
+      printf("DSPTEST equation AST parse & evaluation: parse=%d val=%.4f (expected 0.5) %s\n",
+             (int)parseOk, v0, (parseOk && valOk) ? "OK" : "FAIL");
+      all &= (parseOk && valOk);
+   }
+
+   // 2. Anti-aliased wavetable FFT mip pyramid generation
+   {
+      EquationNode eq;
+      eq.formula = "4*x^3 - 3*x";
+      eq.domainMode = EquationDsp::kDomainNegOneToOne;
+      eq.CompileEquation();
+      eq.CookIfNeeded(1);
+
+      AudioNode* audio = eq.GetAudioNode();
+      audio->PrepareToPlay(sr, bs);
+
+      std::vector<float> bl(bs), br(bs);
+      float* chans[2] = { bl.data(), br.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = bs;
+
+      float rms = 0.0f;
+      for (int b = 0; b < 20; b++)
+      {
+         audio->ProcessBlock(nullptr, 0, buf);
+         for (int i = 0; i < bs; i++)
+            rms += bl[i] * bl[i];
+      }
+      const bool audioOk = rms > 1e-4f;
+      printf("DSPTEST equation bank synthesis & playback: rms=%.6f %s\n", rms, audioOk ? "OK" : "FAIL");
+      all &= audioOk;
+   }
+
+   // 3. Polyphonic voice count
+   {
+      EquationNode eq2;
+      AudioNode* audio2 = eq2.GetAudioNode();
+      audio2->PrepareToPlay(sr, bs);
+      eq2.CookIfNeeded(10);
+
+      NoteEventQueue inbox;
+      audio2->SetNoteInbox(&inbox, inbox.RegisterConsumer());
+
+      std::vector<float> bl(bs), br(bs);
+      float* chans[2] = { bl.data(), br.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = bs;
+
+      const int kHeldNotes = 3;
+      for (int n = 0; n < kHeldNotes; n++)
+      {
+         NoteEvent on;
+         on.note = 60 + n * 4;
+         on.voiceId = n + 1;
+         on.velocity = 0.8f;
+         on.isNoteOn = true;
+         on.frameOffset = 0;
+         inbox.Push(on);
+      }
+
+      audio2->ProcessBlock(nullptr, 0, buf);
+      const int voices = eq2.ActiveVoices();
+      const bool voiceCountOk = (voices == kHeldNotes);
+      printf("DSPTEST equation voice count for %d held notes: reported=%d %s\n", kHeldNotes, voices,
+             voiceCountOk ? "OK" : "FAIL");
+      all &= voiceCountOk;
+   }
+
+   return all;
+}
+
 // New DSP fixture (there was none before this pass): Audio Displacement
 // actually deforms the mesh under a live signal and relaxes back to rest
 // once the signal stops, rather than freezing in its last deformed pose
@@ -22492,11 +22819,12 @@ static int RunDspTest()
    const bool freqShifterOk = RunFrequencyShifterFixture();
    const bool spectralSynthOk = RunImageSpectralSynthFixture();
    const bool waveTerrainOk = RunWaveTerrainFixture();
+   const bool equationOk = RunEquationFixture();
    const bool audioDisplacementOk = RunAudioDisplacementFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk &&
                     paulStretchOk && granularOk && drumSeqOk && wavetableShaperOk && eqOk && noteStackOk &&
-                    freqShifterOk && spectralSynthOk && waveTerrainOk && audioDisplacementOk;
+                    freqShifterOk && spectralSynthOk && waveTerrainOk && equationOk && audioDisplacementOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
    return all ? 0 : 1;
 }
@@ -24244,6 +24572,7 @@ int main(int argc, char** argv)
                pluginFixture->LoadPlugin(fixturePlugin);
          }
          SpawnNode("Note Stack", "Notes", 4900.0f, 500.0f);             // 29
+         SpawnNode("Equation Synth", "Synths", 5400.0f, 20.0f);         // 30
          {
             // A tiny synthetic WAV, loaded immediately, so the visual smoke
             // test's screenshot shows the interactive waveform (bars, the
@@ -24268,7 +24597,7 @@ int main(int argc, char** argv)
             f.write("data", 4); writeU32(dataSize);
             f.write((const char*)fixturePcm.data(), dataSize);
             f.close();
-            if (auto* samplerFixture = dynamic_cast<SamplerNode*>(gNodes.back().node.get()))
+            if (auto* samplerFixture = dynamic_cast<SamplerNode*>(gNodes[24].node.get()))
                samplerFixture->LoadFile(fixtureWav);
          }
          {
