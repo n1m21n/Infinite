@@ -2917,8 +2917,10 @@ namespace
    // just call NoteInputSlot(0) directly rather than loop. AudioPluginNode's
    // note pin lives at slot 1 instead - so audio stays at slot 0 and existing
    // patches keep loading unchanged - which needed this bumped to 2 and that
-   // wiring pass turned into a real loop; see its comment.
-   const int kMaxNoteSlots = 2;
+   // wiring pass turned into a real loop; see its comment. NoteMergeNode's
+   // 4-way fan-in (mirroring NoteRouterNode's 4-way fan-out) needed this
+   // bumped again to 4.
+   const int kMaxNoteSlots = 4;
 
    // Defined near DisconnectAllTo/RemoveNodeByIndex, below; forward-declared
    // here since DisconnectLinkById (earlier in the file) needs to call it too.
@@ -10108,16 +10110,26 @@ namespace
       char stat[64];
       snprintf(stat, sizeof(stat), "%d repeats, %d pending", n->repeats, n->PendingCount());
 
-      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
       {
-         AudioKnobRow row(4);
-         row.Knob("delay", &n->delayMs, 10.0f, 1000.0f, "%.0fms", kKnobSmall);
+         AudioKnobRow row(2);
+         DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
+         row.End();
+      }
+      {
+         AudioKnobRow row(2);
          row.KnobInt("repeats", &n->repeats, 1, 8);
          row.Knob("decay", &n->decay, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.End();
+      }
+      {
+         AudioKnobRow row(2);
          row.KnobInt("transpose", &n->transposePerRepeat, -12, 12);
          row.End();
       }
+
+      ImGui::Checkbox("Mute Dry##echoMuteDry", &n->muteDry);
 
       EndAudioBody();
    }
@@ -17394,43 +17406,54 @@ namespace
          std::set<NoteEventQueue*> resetOutboxes;
          for (GraphNode& gn : gNodes)
          {
-            NoteCable* cable = nullptr;
-            for (int slot = 0; slot < kMaxNoteSlots && cable == nullptr; slot++)
-               cable = gn.node->NoteInputSlot(slot);
-            if (cable == nullptr || !cable->IsConnected())
-               continue;
-            if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+            // Visit every slot the node exposes, not just the first - a
+            // multi-input consumer (Note Merge) can have several connected
+            // note pins whose producers all need their outbox reset.
+            for (int slot = 0; slot < kMaxNoteSlots; slot++)
             {
-               if (NoteEventQueue* outbox = producer->NoteOutbox(cable->GetOutputSlot()))
+               NoteCable* cable = gn.node->NoteInputSlot(slot);
+               if (cable == nullptr || !cable->IsConnected())
+                  continue;
+               if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
                {
-                  if (resetOutboxes.insert(outbox).second)
-                     outbox->ResetConsumers();
+                  if (NoteEventQueue* outbox = producer->NoteOutbox(cable->GetOutputSlot()))
+                  {
+                     if (resetOutboxes.insert(outbox).second)
+                        outbox->ResetConsumers();
+                  }
                }
             }
          }
       }
       for (GraphNode& gn : gNodes)
       {
-         NoteCable* cable = nullptr;
-         for (int slot = 0; slot < kMaxNoteSlots && cable == nullptr; slot++)
-            cable = gn.node->NoteInputSlot(slot);
-         if (cable == nullptr)
-            continue;
          AudioNode* consumer = AudioNodeOfAny(gn.node.get());
          if (consumer == nullptr)
             continue;
-         NoteEventQueue* inbox = nullptr;
-         int cursor = -1;
-         if (cable->IsConnected())
+         // Same "every slot, not just the first" widening as the reset pass
+         // above. Every slot the node actually exposes gets a fresh call
+         // this generation - including unconnected ones, set to
+         // nullptr/-1 - so a slot that was wired last generation and got
+         // disconnected doesn't leave a stale producer pointer behind on
+         // the audio node.
+         for (int slot = 0; slot < kMaxNoteSlots; slot++)
          {
-            if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+            NoteCable* cable = gn.node->NoteInputSlot(slot);
+            if (cable == nullptr)
+               continue;
+            NoteEventQueue* inbox = nullptr;
+            int cursor = -1;
+            if (cable->IsConnected())
             {
-               inbox = producer->NoteOutbox(cable->GetOutputSlot());
-               if (inbox != nullptr)
-                  cursor = inbox->RegisterConsumer();
+               if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+               {
+                  inbox = producer->NoteOutbox(cable->GetOutputSlot());
+                  if (inbox != nullptr)
+                     cursor = inbox->RegisterConsumer();
+               }
             }
+            consumer->SetNoteInbox(slot, inbox, cursor);
          }
-         consumer->SetNoteInbox(inbox, cursor);
       }
 
       const double sampleRate = AudioEngine::Instance().SampleRate();

@@ -23,6 +23,7 @@ class AudioQuantizerNode;
 class AudioGlideNode;
 class AudioNoteEchoNode;
 class AudioNoteRouterNode;
+class AudioNoteMergeNode;
 class AudioArpeggiatorNode;
 class AudioNoteSequencerNode;
 class AudioRandomNoteGeneratorNode;
@@ -424,11 +425,15 @@ public:
 // Generates new notes over time from an incoming one - genuinely distinct
 // from the single-purpose editors above (Note Transpose, Velocity Curve, and
 // the rest), which only ever edit an event that's already there. Every
-// incoming event (on and off alike) is echoed `repeats`
-// times, each `delayMs` further apart, with velocity decaying and pitch
-// optionally shifting per repeat. The original event always passes through
-// unchanged first (repeat 0); this is a dry+wet echo, not a bypassable one -
-// mute it downstream if only the repeats are wanted.
+// incoming event (on and off alike) is echoed `repeats` times, each tap
+// further apart than the last, with velocity decaying and pitch optionally
+// shifting per repeat - the same shape as Ableton's Max for Live "Note Echo"
+// device (Sync/Delay Time, Pitch, Delay-as-velocity, Input Thru/Mute).
+// Spacing follows the same rateMode split as every other tempo-aware
+// generator in this file (Arpeggiator, Note Sequencer, ...): synced to a
+// beat division by default, or a free millisecond time. The original event
+// passes through unchanged first (repeat 0) unless muteDry swallows it, in
+// which case only the delayed copies are heard.
 class NoteEchoNode : public INode, public INoteSource
 {
 public:
@@ -446,10 +451,16 @@ public:
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
    AudioNode* GetAudioNode() override;
 
-   float delayMs = 150.0f;         // 10..1000
+   // rateMode defaults to free (1), matching every patch saved before this
+   // field existed - its default rateSeconds (0.15s = the old fixed 150ms)
+   // reproduces the old behaviour until the user opts into Synced.
+   int rateMode = 1;               // 0 = synced (rateBeats), 1 = free (rateSeconds)
+   float rateBeats = 0.25f;        // beats per tap, synced mode (default 1/16)
+   float rateSeconds = 0.15f;      // 0.02..2, free mode
    int repeats = 3;                // 1..8
    float decay = 60.0f;            // 0..100 percent, velocity multiplier per repeat
    int transposePerRepeat = 0;     // -12..12 semitones, applied cumulatively per repeat
+   bool muteDry = false;           // true = swallow the original event, only repeats sound
    NoteCable noteInput;
 
    int PendingCount() const; // main-thread readout for the visualizer
@@ -499,6 +510,41 @@ public:
 
 private:
    std::unique_ptr<AudioNoteRouterNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// The system's only note fan-in point: up to four note inputs merged into
+// one output stream, in timestamp order. Each input's notes stay independent
+// voices (matched by NoteEvent::voiceId, never by MIDI pitch - see
+// VoiceAllocator::NoteOff), so two inputs firing the same pitch at once
+// become two overlapping voices rather than a collision. No priority logic
+// (highest/lowest/last) lives here - that's NoteStackNode's job.
+class NoteMergeNode : public INode, public INoteSource
+{
+public:
+   static constexpr int kSlots = 4;
+
+   static INode* Create() { return new NoteMergeNode(); }
+   NoteMergeNode();
+   ~NoteMergeNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override
+   {
+      return (slot >= 0 && slot < kSlots) ? &noteInputs[slot] : nullptr;
+   }
+   const char* InputLabel(int slot) const override;
+   AudioNode* GetAudioNode() override;
+
+   NoteCable noteInputs[kSlots];
+
+private:
+   std::unique_ptr<AudioNoteMergeNode> mAudioNode;
    int mLastCookFrame = -1;
 };
 

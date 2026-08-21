@@ -1516,10 +1516,15 @@ public:
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
       const int numFrames = output.numFrames;
-      const float delayMs = mDelayMs.load(std::memory_order_relaxed);
+      const int rateMode = mRateMode.load(std::memory_order_relaxed);
+      const float rateBeatsP = std::max(0.015625f, mRateBeats.load(std::memory_order_relaxed));
+      const float rateSecondsP = std::max(0.01f, mRateSeconds.load(std::memory_order_relaxed));
       const int repeats = mRepeats.load(std::memory_order_relaxed);
       const float decay = mDecay.load(std::memory_order_relaxed) / 100.0f;
       const int transposeStep = mTransposeStep.load(std::memory_order_relaxed);
+      const bool muteDry = mMuteDry.load(std::memory_order_relaxed);
+      const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+      const double delayMs = rateMode == 0 ? (double)rateBeatsP * 60000.0 / bpm : (double)rateSecondsP * 1000.0;
       const double delaySamples = delayMs * 0.001 * mSampleRate;
 
       NoteEvent evts[64];
@@ -1529,10 +1534,15 @@ public:
       {
          const NoteEvent& in = evts[i];
 
-         // Repeat 0: dry passthrough, unchanged.
-         NoteEvent dry = in;
-         dry.source = this;
-         mOutbox.Push(dry);
+         // Repeat 0: dry passthrough, unchanged - unless muted (Ableton's
+         // Note Echo "Input: Mute"), in which case neither its note-on nor
+         // its note-off is ever emitted, so nothing is left dangling.
+         if (!muteDry)
+         {
+            NoteEvent dry = in;
+            dry.source = this;
+            mOutbox.Push(dry);
+         }
 
          for (int k = 1; k <= repeats; k++)
          {
@@ -1583,10 +1593,13 @@ public:
    // Main thread only.
    void PushParams(const NoteEchoNode& n)
    {
-      mDelayMs.store(n.delayMs, std::memory_order_relaxed);
+      mRateMode.store(n.rateMode, std::memory_order_relaxed);
+      mRateBeats.store(n.rateBeats, std::memory_order_relaxed);
+      mRateSeconds.store(n.rateSeconds, std::memory_order_relaxed);
       mRepeats.store(n.repeats, std::memory_order_relaxed);
       mDecay.store(n.decay, std::memory_order_relaxed);
       mTransposeStep.store(n.transposePerRepeat, std::memory_order_relaxed);
+      mMuteDry.store(n.muteDry, std::memory_order_relaxed);
    }
 
    int PendingCount() const { return mPendingCount.load(std::memory_order_relaxed); }
@@ -1617,10 +1630,13 @@ private:
    uint64_t mSamplePos = 0;
    Pending mPending[kMaxPending];
 
-   std::atomic<float> mDelayMs { 150.0f };
+   std::atomic<int> mRateMode { 1 };
+   std::atomic<float> mRateBeats { 0.25f };
+   std::atomic<float> mRateSeconds { 0.15f };
    std::atomic<int> mRepeats { 3 };
    std::atomic<float> mDecay { 60.0f };
    std::atomic<int> mTransposeStep { 0 };
+   std::atomic<bool> mMuteDry { false };
    std::atomic<int> mPendingCount { 0 };
 };
 
@@ -1639,10 +1655,13 @@ void NoteEchoNode::CookIfNeeded(int frameId)
 
 void NoteEchoNode::VisitParams(ParamVisitor& v)
 {
-   v.Float("delayMs", delayMs);
+   v.Int("rateMode", rateMode);
+   v.Float("rateBeats", rateBeats);
+   v.Float("rateSeconds", rateSeconds);
    v.Int("repeats", repeats);
    v.Float("decay", decay);
    v.Int("transposePerRepeat", transposePerRepeat);
+   v.Bool("muteDry", muteDry);
 }
 
 AudioNode* NoteEchoNode::GetAudioNode()
