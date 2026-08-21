@@ -24,7 +24,7 @@
     /* Seamless Borderless Artworks Grid */
     .artworks-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      grid-template-columns: repeat(4, 1fr);
       gap: 0;
       width: 100vw;
       min-height: 100vh;
@@ -35,21 +35,22 @@
       background: #000;
     }
 
-    @media (min-width: 1920px) {
+    @media (min-width: 1600px) {
       .artworks-grid {
-        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+        grid-template-columns: repeat(5, 1fr);
       }
     }
 
+    @media (max-width: 1100px) {
+      .artworks-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    /* Mobile: Exactly 2 artworks per row */
     @media (max-width: 768px) {
       .artworks-grid {
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      }
-    }
-
-    @media (max-width: 480px) {
-      .artworks-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
       }
     }
 
@@ -58,11 +59,13 @@
       width: 100%;
       aspect-ratio: 3 / 4;
       overflow: hidden;
-      background: #000;
+      background: #0d0c0b;
       margin: 0;
       padding: 0;
       border: none;
       outline: none;
+      content-visibility: auto;
+      contain-intrinsic-size: 300px 400px;
     }
 
     .art-video {
@@ -75,18 +78,18 @@
       border: none;
       outline: none;
       background: #000;
-      transition: transform 0.4s ease;
+      transition: transform 0.35s ease;
     }
 
     .art-cell:hover .art-video {
-      transform: scale(1.02);
+      transform: scale(1.03);
     }
 
     /* Subtle Floating Navigation Button */
     .floating-back-btn {
       position: fixed;
-      top: 20px;
-      left: 20px;
+      top: 18px;
+      left: 18px;
       z-index: 1000;
       display: flex;
       align-items: center;
@@ -95,13 +98,13 @@
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       color: rgba(255, 255, 255, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 9999px;
-      padding: 8px 16px;
+      padding: 8px 15px;
       font-size: 13px;
       font-weight: 500;
       text-decoration: none;
-      opacity: 0.6;
+      opacity: 0.65;
       transition: opacity 0.25s ease, background 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
       cursor: pointer;
     }
@@ -109,14 +112,14 @@
     .floating-back-btn:hover {
       opacity: 1;
       background: rgba(26, 23, 20, 0.95);
-      border-color: rgba(255, 255, 255, 0.25);
+      border-color: rgba(255, 255, 255, 0.3);
       transform: translateY(-1px);
       color: #fff;
     }
 
     .floating-back-btn svg {
-      width: 16px;
-      height: 16px;
+      width: 15px;
+      height: 15px;
     }
   </style>
 </head>
@@ -131,33 +134,65 @@
     <span>Infinite</span>
   </a>
 
-  <!-- Pure Borderless Video Artworks Grid -->
+  <!-- Pure Borderless Video Artworks Grid with Instant Poster & Smart Lazy Streaming -->
   <main class="artworks-grid">
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_01.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_02.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_03.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_04.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_05.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_06.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_07.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_08.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_09.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_10.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_11.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_12.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_13.mp4" autoplay loop muted playsinline preload="auto"></video></div>
-    <div class="art-cell"><video class="art-video" src="assets/artworks/artwork_14.mp4" autoplay loop muted playsinline preload="auto"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_01.jpg" data-src="assets/artworks/artwork_01.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_02.jpg" data-src="assets/artworks/artwork_02.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_03.jpg" data-src="assets/artworks/artwork_03.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_04.jpg" data-src="assets/artworks/artwork_04.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_05.jpg" data-src="assets/artworks/artwork_05.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_06.jpg" data-src="assets/artworks/artwork_06.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_07.jpg" data-src="assets/artworks/artwork_07.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_08.jpg" data-src="assets/artworks/artwork_08.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_09.jpg" data-src="assets/artworks/artwork_09.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_10.jpg" data-src="assets/artworks/artwork_10.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_11.jpg" data-src="assets/artworks/artwork_11.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_12.jpg" data-src="assets/artworks/artwork_12.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_13.jpg" data-src="assets/artworks/artwork_13.mp4" loop muted playsinline preload="metadata"></video></div>
+    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_14.jpg" data-src="assets/artworks/artwork_14.mp4" loop muted playsinline preload="metadata"></video></div>
   </main>
 
   <script>
-    // Ensure all videos play continuously
     document.addEventListener('DOMContentLoaded', () => {
-      const videos = document.querySelectorAll('video');
-      videos.forEach(v => {
-        v.play().catch(() => {});
-      });
+      const videos = document.querySelectorAll('.art-video');
 
-      // Press ESC to return to main page
+      // Smart Intersection Observer for instant rendering, smooth scrolling, and zero lag
+      if ('IntersectionObserver' in window) {
+        const videoObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            const video = entry.target;
+            if (entry.isIntersecting) {
+              // Load video source if not already loaded
+              if (!video.src && video.dataset.src) {
+                video.src = video.dataset.src;
+                video.load();
+              }
+              const playPromise = video.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(() => {});
+              }
+            } else {
+              // Pause when out of view to save battery & CPU/GPU
+              if (video.src) {
+                video.pause();
+              }
+            }
+          });
+        }, {
+          rootMargin: '200px 0px',
+          threshold: 0.05
+        });
+
+        videos.forEach(v => videoObserver.observe(v));
+      } else {
+        // Fallback for older browsers
+        videos.forEach(v => {
+          if (v.dataset.src) v.src = v.dataset.src;
+          v.play().catch(() => {});
+        });
+      }
+
+      // Keyboard navigation: Escape key returns home
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           window.location.href = 'index.html';
