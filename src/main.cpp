@@ -108,6 +108,7 @@
 #include "nodes/AudioDisplacementNode.h"
 #include "nodes/AudioTextureNode.h"
 #include "nodes/AudioRibbonNode.h"
+#include "nodes/AudioColorRampNode.h"
 #include "nodes/OscillatorNode.h"
 #include "nodes/MetallicNode.h"
 #include "audio/Wavetable.h"
@@ -2504,6 +2505,7 @@ namespace
       // compositing node (REGISTER_NODE(BlendNode, Blend, "Compositing") above).
       REGISTER_NODE(BlendAudioNode, Blend Audio, "AudioUtility");
       REGISTER_NODE(AudioTextureNode, Audio Texture, "Audio");
+      REGISTER_NODE(AudioColorRampNode, Audio Color Ramp, "Audio");
 
       // P3a Part 1 - note-transport proving nodes. See
       // docs/plans/audio/P3a-notes-prompt.md; Part 2 adds Note Filter/
@@ -2697,6 +2699,8 @@ namespace
          return 1;
       if (dynamic_cast<ColorRampNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<AudioColorRampNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<RemoveBgNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<DrawNode*>(gn.node.get()) != nullptr)
@@ -2829,6 +2833,8 @@ namespace
          return slot == 0 ? &curves->Input() : nullptr;
       if (auto* cramp = dynamic_cast<ColorRampNode*>(gn.node.get()))
          return slot == 0 ? &cramp->Input() : nullptr;
+      if (auto* acr = dynamic_cast<AudioColorRampNode*>(gn.node.get()))
+         return slot == 0 ? &acr->Input() : nullptr;
       if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn.node.get()))
          return slot == 0 ? &rbg->Input() : nullptr;
       if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
@@ -5760,7 +5766,8 @@ namespace
       // rather than the generic v3 audio body, which has no case for it and
       // would otherwise render an empty shell with just the pin - same
       // reasoning as the AudioTextureNode carve-out just below.
-      if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr)
+      if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
+          dynamic_cast<AudioColorRampNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -14708,6 +14715,200 @@ namespace
       ModSlider("smoothing", &n->smoothing, 0.0f, 0.99f);
    }
 
+   void DrawAudioColorRampEditor(AudioColorRampNode* n)
+   {
+      const float size = kPreviewSize;
+      const float barH = 30.0f;
+      const float gap = 4.0f;
+
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      // 1. Gradient preview strip
+      const int kSegments = 96;
+      for (int i = 0; i < kSegments; i++)
+      {
+         float t0 = (float)i / (float)kSegments;
+         float t1 = (float)(i + 1) / (float)kSegments;
+         float c0[3], c1[3];
+         n->EvaluateRamp(t0, c0);
+         n->EvaluateRamp(t1, c1);
+         ImVec2 tl(origin.x + t0 * size, origin.y);
+         ImVec2 br(origin.x + t1 * size + 1.0f, origin.y + barH);
+         ImU32 col0 = IM_COL32((int)(std::clamp(c0[0], 0.0f, 1.0f) * 255),
+                               (int)(std::clamp(c0[1], 0.0f, 1.0f) * 255),
+                               (int)(std::clamp(c0[2], 0.0f, 1.0f) * 255), 255);
+         ImU32 col1 = IM_COL32((int)(std::clamp(c1[0], 0.0f, 1.0f) * 255),
+                               (int)(std::clamp(c1[1], 0.0f, 1.0f) * 255),
+                               (int)(std::clamp(c1[2], 0.0f, 1.0f) * 255), 255);
+         dl->AddRectFilledMultiColor(tl, br, col0, col1, col1, col0);
+      }
+
+      // 2. Real-time spectrum curve overlay
+      const auto& spec = n->GetSmoothedSpectrum();
+      if (!spec.empty())
+      {
+         std::vector<ImVec2> pts;
+         pts.reserve(100);
+         pts.push_back(ImVec2(origin.x, origin.y + barH));
+         for (int i = 0; i < 96; i++)
+         {
+            float t = (float)i / 95.0f;
+            float freq = AudioColorRampNode::PosToFreq(t);
+            int bin = std::clamp((int)(freq * (1024.0f / 44100.0f)), 1, 511);
+            float mag = std::clamp(spec[bin] * 2.5f, 0.0f, 1.0f);
+            pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - 2.0f)));
+         }
+         pts.push_back(ImVec2(origin.x + size, origin.y + barH));
+         if (pts.size() >= 3)
+         {
+            dl->AddConvexPolyFilled(pts.data(), (int)pts.size(), IM_COL32(255, 255, 255, 45));
+            dl->AddPolyline(pts.data() + 1, (int)pts.size() - 2, IM_COL32(255, 255, 255, 140), false, 1.2f);
+         }
+      }
+
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(70, 74, 90, 255), 3.0f);
+
+      // 3. Interactive crossover track & handles
+      const float trackH = 20.0f;
+      ImVec2 trackOrigin(origin.x, origin.y + barH + gap);
+      ImVec2 trackBr(origin.x + size, trackOrigin.y + trackH);
+      dl->AddRectFilled(trackOrigin, trackBr, IM_COL32(16, 16, 22, 255), 3.0f);
+      dl->AddRect(trackOrigin, trackBr, IM_COL32(70, 74, 90, 255), 3.0f);
+
+      ImGui::SetCursorScreenPos(trackOrigin);
+      ImGui::InvisibleButton("##acr_track", ImVec2(size, trackH));
+      const bool hovered = ImGui::IsItemHovered();
+      const bool active = ImGui::IsItemActive();
+
+      auto toScreenX = [&](float x) { return trackOrigin.x + x * size; };
+      auto toX = [&](float screenX) { return std::clamp((screenX - trackOrigin.x) / size, 0.01f, 0.99f); };
+
+      static AudioColorRampNode* sDragNode = nullptr;
+      static int sDragIndex = -1;
+
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      const int numDividers = n->bandCount - 1;
+      int nearest = -1;
+      float nearestDist = 12.0f;
+      for (int i = 0; i < numDividers; i++)
+      {
+         float d = std::fabs(toScreenX(n->crossoverPos[i]) - mouse.x);
+         if (d < nearestDist)
+         {
+            nearestDist = d;
+            nearest = i;
+         }
+      }
+
+      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && nearest >= 0)
+      {
+         PushUndoCheckpoint();
+         sDragIndex = nearest;
+         sDragNode = n;
+      }
+      if (active && sDragNode == n && sDragIndex >= 0)
+      {
+         float minPos = (sDragIndex == 0) ? 0.05f : (n->crossoverPos[sDragIndex - 1] + 0.03f);
+         float maxPos = (sDragIndex == numDividers - 1) ? 0.95f : (n->crossoverPos[sDragIndex + 1] - 0.03f);
+         n->crossoverPos[sDragIndex] = std::clamp(toX(mouse.x), minPos, maxPos);
+         n->MarkDirty();
+      }
+      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+      {
+         sDragIndex = -1;
+         sDragNode = nullptr;
+      }
+
+      // Draw divider vertical lines and markers
+      for (int i = 0; i < numDividers; i++)
+      {
+         float x = toScreenX(n->crossoverPos[i]);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + barH), IM_COL32(255, 255, 255, 80), 1.0f);
+
+         bool isHov = (nearest == i || (sDragNode == n && sDragIndex == i));
+         ImU32 handleCol = isHov ? IM_COL32(255, 220, 100, 255) : IM_COL32(200, 204, 216, 255);
+         ImVec2 tip(x, trackOrigin.y + 2.0f);
+         float r = isHov ? 6.0f : 4.5f;
+         dl->AddTriangleFilled(ImVec2(x - r, tip.y + r * 1.5f), ImVec2(x + r, tip.y + r * 1.5f), tip, handleCol);
+
+         if (isHov && ImGui::IsItemHovered())
+         {
+            float hz = AudioColorRampNode::PosToFreq(n->crossoverPos[i]);
+            char hzText[32];
+            if (hz >= 1000.0f)
+               snprintf(hzText, sizeof(hzText), "%.1f kHz", hz / 1000.0f);
+            else
+               snprintf(hzText, sizeof(hzText), "%.0f Hz", hz);
+            ImGui::SetTooltip("Crossover %d: %s", i + 1, hzText);
+         }
+      }
+
+      // 4. Band energy activity meters inside track
+      const float* energies = n->GetBandEnergies();
+      float prevX = 0.0f;
+      for (int b = 0; b < n->bandCount; b++)
+      {
+         float nextX = (b == n->bandCount - 1) ? 1.0f : n->crossoverPos[b];
+         float x0 = toScreenX(prevX);
+         float x1 = toScreenX(nextX);
+         float bandW = std::max(0.0f, x1 - x0);
+
+         float lvl = std::clamp(energies[b], 0.0f, 1.0f);
+         float barW = bandW * lvl;
+         ImVec2 m0(x0 + 1.0f, trackBr.y - 4.0f);
+         ImVec2 m1(x0 + 1.0f + barW, trackBr.y - 1.0f);
+         ImU32 bandCol = IM_COL32((int)(n->bandColor[b][0] * 255), (int)(n->bandColor[b][1] * 255),
+                                  (int)(n->bandColor[b][2] * 255), 220);
+         dl->AddRectFilled(m0, m1, bandCol);
+
+         prevX = nextX;
+      }
+
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, trackBr.y + gap + 4.0f));
+   }
+
+   void DrawAudioColorRampParams(AudioColorRampNode* n)
+   {
+      DrawAudioColorRampEditor(n);
+
+      DropdownButton("mode", AudioColorRampNode::ModeNames(), n->mode,
+                     [n](int i) { PushUndoCheckpoint(); n->mode = i; n->MarkDirty(); });
+      DropdownButton("interpolation", AudioColorRampNode::InterpNames(), n->interpMode,
+                     [n](int i) { PushUndoCheckpoint(); n->interpMode = i; n->MarkDirty(); });
+
+      int bCount = n->bandCount;
+      if (ImGui::SliderInt("bands", &bCount, 2, AudioColorRampNode::kMaxBands))
+      {
+         PushUndoCheckpoint();
+         n->SetBandCount(bCount);
+      }
+
+      ModSlider("gain", &n->gain, 0.1f, 10.0f);
+      ModSlider("attack (ms)", &n->attack, 1.0f, 200.0f);
+      ModSlider("decay (ms)", &n->decay, 10.0f, 1000.0f);
+      ModSlider("min glow", &n->minBrightness, 0.0f, 1.0f);
+
+      if (n->Input().IsConnected())
+         ModSlider("image mix", &n->rampMix, 0.0f, 1.0f);
+
+      NodeSeparator("band colors");
+      for (int b = 0; b < n->bandCount; b++)
+      {
+         ImGui::PushID(b + 30000);
+         char label[32];
+         float f0 = (b == 0) ? 20.0f : AudioColorRampNode::PosToFreq(n->crossoverPos[b - 1]);
+         float f1 = (b == n->bandCount - 1) ? 20000.0f : AudioColorRampNode::PosToFreq(n->crossoverPos[b]);
+         if (f1 >= 1000.0f)
+            snprintf(label, sizeof(label), "B%d (%.0f-%.1fk)", b + 1, f0, f1 / 1000.0f);
+         else
+            snprintf(label, sizeof(label), "B%d (%.0f-%.0fHz)", b + 1, f0, f1);
+
+         ColorSwatch(label, n->bandColor[b], n);
+         ImGui::PopID();
+      }
+   }
+
    void DrawAudioRibbonParams(AudioRibbonNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
@@ -17050,6 +17251,8 @@ namespace
          return at->GetAudioNode();
       if (auto* ar = dynamic_cast<AudioRibbonNode*>(node))
          return ar->GetAudioNode();
+      if (auto* acr = dynamic_cast<AudioColorRampNode*>(node))
+         return acr->GetAudioNode();
       return node->AudioNodeForNotePorts();
    }
 
@@ -32977,6 +33180,8 @@ int main(int argc, char** argv)
                DrawAudioRibbonParams(n);
             else if (auto* n = dynamic_cast<AudioTextureNode*>(gn.node.get()))
                DrawAudioTextureParams(n);
+            else if (auto* n = dynamic_cast<AudioColorRampNode*>(gn.node.get()))
+               DrawAudioColorRampParams(n);
             else if (auto* n = dynamic_cast<SetColorNode*>(gn.node.get()))
                DrawSetColorParams(n);
             else if (auto* n = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
