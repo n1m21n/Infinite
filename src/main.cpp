@@ -2700,7 +2700,7 @@ namespace
       if (dynamic_cast<ColorRampNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<AudioColorRampNode*>(gn.node.get()) != nullptr)
-         return 1;
+         return 2; // img (slot 0) + audio (slot 1)
       if (dynamic_cast<RemoveBgNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<DrawNode*>(gn.node.get()) != nullptr)
@@ -14718,79 +14718,75 @@ namespace
    void DrawAudioColorRampEditor(AudioColorRampNode* n)
    {
       const float size = kPreviewSize;
-      const float barH = 30.0f;
+      const float barH = 64.0f;
       const float gap = 4.0f;
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      // 1. Gradient preview strip
-      const int kSegments = 96;
-      for (int i = 0; i < kSegments; i++)
+      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(14, 14, 20, 255), 3.0f);
+
+      const int count = std::clamp(n->bandCount, 2, AudioColorRampNode::kMaxBands);
+      const float* energies = n->GetBandEnergies();
+
+      auto toScreenX = [&](float x) { return origin.x + x * size; };
+
+      // 1. Per-band energy bars, coloured by that band's assigned colour -
+      // this is the live feedback for "which band is loud right now" and
+      // doubles as a preview of where each band's frequency range sits.
+      // Always shows a visible floor so the visualizer isn't blank at rest.
+      float prevX = 0.0f;
+      for (int b = 0; b < count; b++)
       {
-         float t0 = (float)i / (float)kSegments;
-         float t1 = (float)(i + 1) / (float)kSegments;
-         float c0[3], c1[3];
-         n->EvaluateRamp(t0, c0);
-         n->EvaluateRamp(t1, c1);
-         ImVec2 tl(origin.x + t0 * size, origin.y);
-         ImVec2 br(origin.x + t1 * size + 1.0f, origin.y + barH);
-         ImU32 col0 = IM_COL32((int)(std::clamp(c0[0], 0.0f, 1.0f) * 255),
-                               (int)(std::clamp(c0[1], 0.0f, 1.0f) * 255),
-                               (int)(std::clamp(c0[2], 0.0f, 1.0f) * 255), 255);
-         ImU32 col1 = IM_COL32((int)(std::clamp(c1[0], 0.0f, 1.0f) * 255),
-                               (int)(std::clamp(c1[1], 0.0f, 1.0f) * 255),
-                               (int)(std::clamp(c1[2], 0.0f, 1.0f) * 255), 255);
-         dl->AddRectFilledMultiColor(tl, br, col0, col1, col1, col0);
+         float nextX = (b == count - 1) ? 1.0f : n->crossoverPos[b];
+         float x0 = toScreenX(prevX) + 1.0f;
+         float x1 = toScreenX(nextX) - 1.0f;
+         if (x1 > x0)
+         {
+            float lvl = std::clamp(energies[b], 0.0f, 1.0f);
+            float h = barH * 0.10f + (barH * 0.85f) * lvl;
+            ImU32 col = IM_COL32((int)(std::clamp(n->bandColor[b][0], 0.0f, 1.0f) * 255),
+                                 (int)(std::clamp(n->bandColor[b][1], 0.0f, 1.0f) * 255),
+                                 (int)(std::clamp(n->bandColor[b][2], 0.0f, 1.0f) * 255), 255);
+            dl->AddRectFilled(ImVec2(x0, origin.y + barH - h), ImVec2(x1, origin.y + barH - 1.0f), col);
+         }
+         prevX = nextX;
       }
 
-      // 2. Real-time spectrum curve overlay
+      // 2. Real-time continuous FFT curve overlay, for detail finer than the bands.
       const auto& spec = n->GetSmoothedSpectrum();
       if (!spec.empty())
       {
          std::vector<ImVec2> pts;
-         pts.reserve(100);
-         pts.push_back(ImVec2(origin.x, origin.y + barH));
+         pts.reserve(96);
          for (int i = 0; i < 96; i++)
          {
             float t = (float)i / 95.0f;
             float freq = AudioColorRampNode::PosToFreq(t);
             int bin = std::clamp((int)(freq * (1024.0f / 44100.0f)), 1, 511);
             float mag = std::clamp(spec[bin] * 2.5f, 0.0f, 1.0f);
-            pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - 2.0f)));
+            pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - 4.0f)));
          }
-         pts.push_back(ImVec2(origin.x + size, origin.y + barH));
-         if (pts.size() >= 3)
-         {
-            dl->AddConvexPolyFilled(pts.data(), (int)pts.size(), IM_COL32(255, 255, 255, 45));
-            dl->AddPolyline(pts.data() + 1, (int)pts.size() - 2, IM_COL32(255, 255, 255, 140), false, 1.2f);
-         }
+         dl->AddPolyline(pts.data(), (int)pts.size(), IM_COL32(255, 255, 255, 130), false, 1.2f);
       }
 
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(70, 74, 90, 255), 3.0f);
 
-      // 3. Interactive crossover track & handles
-      const float trackH = 20.0f;
-      ImVec2 trackOrigin(origin.x, origin.y + barH + gap);
-      ImVec2 trackBr(origin.x + size, trackOrigin.y + trackH);
-      dl->AddRectFilled(trackOrigin, trackBr, IM_COL32(16, 16, 22, 255), 3.0f);
-      dl->AddRect(trackOrigin, trackBr, IM_COL32(70, 74, 90, 255), 3.0f);
-
-      ImGui::SetCursorScreenPos(trackOrigin);
-      ImGui::InvisibleButton("##acr_track", ImVec2(size, trackH));
+      // 3. Interactive band-boundary dividers, drawn directly on the spectrum.
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##acr_track", ImVec2(size, barH));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
 
-      auto toScreenX = [&](float x) { return trackOrigin.x + x * size; };
-      auto toX = [&](float screenX) { return std::clamp((screenX - trackOrigin.x) / size, 0.01f, 0.99f); };
+      auto toX = [&](float screenX) { return std::clamp((screenX - origin.x) / size, 0.01f, 0.99f); };
 
       static AudioColorRampNode* sDragNode = nullptr;
       static int sDragIndex = -1;
 
       const ImVec2 mouse = ImGui::GetIO().MousePos;
-      const int numDividers = n->bandCount - 1;
+      const int numDividers = count - 1;
       int nearest = -1;
-      float nearestDist = 12.0f;
+      float nearestDist = 10.0f;
       for (int i = 0; i < numDividers; i++)
       {
          float d = std::fabs(toScreenX(n->crossoverPos[i]) - mouse.x);
@@ -14809,8 +14805,8 @@ namespace
       }
       if (active && sDragNode == n && sDragIndex >= 0)
       {
-         float minPos = (sDragIndex == 0) ? 0.05f : (n->crossoverPos[sDragIndex - 1] + 0.03f);
-         float maxPos = (sDragIndex == numDividers - 1) ? 0.95f : (n->crossoverPos[sDragIndex + 1] - 0.03f);
+         float minPos = (sDragIndex == 0) ? 0.02f : (n->crossoverPos[sDragIndex - 1] + 0.02f);
+         float maxPos = (sDragIndex == numDividers - 1) ? 0.98f : (n->crossoverPos[sDragIndex + 1] - 0.02f);
          n->crossoverPos[sDragIndex] = std::clamp(toX(mouse.x), minPos, maxPos);
          n->MarkDirty();
       }
@@ -14820,19 +14816,20 @@ namespace
          sDragNode = nullptr;
       }
 
-      // Draw divider vertical lines and markers
+      // Hovered divider's frequency goes in a fixed readout line below the
+      // track rather than a tooltip - a tooltip drawn from inside ed::Begin()/
+      // ed::End() (even Suspend()/Resume()-wrapped) fights the node editor's
+      // per-node draw-channel splitting and can blank the node body for a
+      // frame; see the "audio node value readout" note above SetAudioReadout.
+      char readout[48] = "";
       for (int i = 0; i < numDividers; i++)
       {
          float x = toScreenX(n->crossoverPos[i]);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + barH), IM_COL32(255, 255, 255, 80), 1.0f);
-
          bool isHov = (nearest == i || (sDragNode == n && sDragIndex == i));
-         ImU32 handleCol = isHov ? IM_COL32(255, 220, 100, 255) : IM_COL32(200, 204, 216, 255);
-         ImVec2 tip(x, trackOrigin.y + 2.0f);
-         float r = isHov ? 6.0f : 4.5f;
-         dl->AddTriangleFilled(ImVec2(x - r, tip.y + r * 1.5f), ImVec2(x + r, tip.y + r * 1.5f), tip, handleCol);
+         ImU32 lineCol = isHov ? IM_COL32(255, 220, 100, 230) : IM_COL32(255, 255, 255, 100);
+         dl->AddLine(ImVec2(x, origin.y + 2.0f), ImVec2(x, origin.y + barH - 2.0f), lineCol, isHov ? 2.5f : 1.5f);
 
-         if (isHov && ImGui::IsItemHovered())
+         if (isHov)
          {
             float hz = AudioColorRampNode::PosToFreq(n->crossoverPos[i]);
             char hzText[32];
@@ -14840,57 +14837,19 @@ namespace
                snprintf(hzText, sizeof(hzText), "%.1f kHz", hz / 1000.0f);
             else
                snprintf(hzText, sizeof(hzText), "%.0f Hz", hz);
-            ImGui::SetTooltip("Crossover %d: %s", i + 1, hzText);
+            snprintf(readout, sizeof(readout), "crossover %d: %s", i + 1, hzText);
          }
       }
 
-      // 4. Band energy activity meters inside track
-      const float* energies = n->GetBandEnergies();
-      float prevX = 0.0f;
-      for (int b = 0; b < n->bandCount; b++)
-      {
-         float nextX = (b == n->bandCount - 1) ? 1.0f : n->crossoverPos[b];
-         float x0 = toScreenX(prevX);
-         float x1 = toScreenX(nextX);
-         float bandW = std::max(0.0f, x1 - x0);
+      const float readoutH = ImGui::GetTextLineHeight();
+      dl->AddText(ImVec2(origin.x, origin.y + barH + gap), IM_COL32(160, 166, 186, 255), readout);
 
-         float lvl = std::clamp(energies[b], 0.0f, 1.0f);
-         float barW = bandW * lvl;
-         ImVec2 m0(x0 + 1.0f, trackBr.y - 4.0f);
-         ImVec2 m1(x0 + 1.0f + barW, trackBr.y - 1.0f);
-         ImU32 bandCol = IM_COL32((int)(n->bandColor[b][0] * 255), (int)(n->bandColor[b][1] * 255),
-                                  (int)(n->bandColor[b][2] * 255), 220);
-         dl->AddRectFilled(m0, m1, bandCol);
-
-         prevX = nextX;
-      }
-
-      ImGui::SetCursorScreenPos(ImVec2(origin.x, trackBr.y + gap + 4.0f));
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + barH + gap + readoutH + gap));
    }
 
    void DrawAudioColorRampParams(AudioColorRampNode* n)
    {
       DrawAudioColorRampEditor(n);
-
-      DropdownButton("mode", AudioColorRampNode::ModeNames(), n->mode,
-                     [n](int i) { PushUndoCheckpoint(); n->mode = i; n->MarkDirty(); });
-      DropdownButton("interpolation", AudioColorRampNode::InterpNames(), n->interpMode,
-                     [n](int i) { PushUndoCheckpoint(); n->interpMode = i; n->MarkDirty(); });
-
-      int bCount = n->bandCount;
-      if (ImGui::SliderInt("bands", &bCount, 2, AudioColorRampNode::kMaxBands))
-      {
-         PushUndoCheckpoint();
-         n->SetBandCount(bCount);
-      }
-
-      ModSlider("gain", &n->gain, 0.1f, 10.0f);
-      ModSlider("attack (ms)", &n->attack, 1.0f, 200.0f);
-      ModSlider("decay (ms)", &n->decay, 10.0f, 1000.0f);
-      ModSlider("min glow", &n->minBrightness, 0.0f, 1.0f);
-
-      if (n->Input().IsConnected())
-         ModSlider("image mix", &n->rampMix, 0.0f, 1.0f);
 
       NodeSeparator("band colors");
       for (int b = 0; b < n->bandCount; b++)
@@ -14907,6 +14866,22 @@ namespace
          ColorSwatch(label, n->bandColor[b], n);
          ImGui::PopID();
       }
+
+      DropdownButton("mode", AudioColorRampNode::ModeNames(), n->mode,
+                     [n](int i) { PushUndoCheckpoint(); n->mode = i; n->MarkDirty(); });
+      DropdownButton("interpolation", AudioColorRampNode::InterpNames(), n->interpMode,
+                     [n](int i) { PushUndoCheckpoint(); n->interpMode = i; n->MarkDirty(); });
+
+      int bCount = n->bandCount;
+      ImGui::SetNextItemWidth(kParamWidth);
+      if (ImGui::SliderInt("bands", &bCount, 2, AudioColorRampNode::kMaxBands))
+      {
+         PushUndoCheckpoint();
+         n->SetBandCount(bCount);
+      }
+
+      ModSlider("gain", &n->gain, 0.1f, 10.0f);
+      ModSlider("min glow", &n->minBrightness, 0.0f, 1.0f);
    }
 
    void DrawAudioRibbonParams(AudioRibbonNode* n)
@@ -16675,10 +16650,12 @@ namespace
          { "Plugin", "Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged." },
          { "Oscillator", "A synth oscillator with four classic waveforms (sine, triangle, saw, square), interactive amp envelope, unison, filter, hard sync, and fine/coarse tuning. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
+         { "Equation Synth", "A synth defined by a live formula (y = f(x, a, b, c, d, t)) instead of a fixed waveform - knobs a-d feed the equation directly, so turning them reshapes the waveform itself rather than modulating a preset one." },
          { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
+         { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
          { "EQ", "Five fixed bands (low shelf, three peaks, high shelf by default), each switchable to any of low shelf/peak/high shelf/hp 12/lp 12 and independently on or off. Drag a band's dot on the curve to set its frequency and gain, drag its diamond to set Q, double-click the dot to bypass that band - the knob row below always follows whichever band you last touched." },
          { "Dynamics", "A compressor: threshold, ratio, attack, release, makeup, a peak/RMS detector switch, and a sidechain switch that feeds the detector from the second input pin instead of the main signal. The graph shows the static transfer curve - input dB in, output dB out." },
          { "Delay", "A fractional delay line: time (tempo-synced by default, or free ms with 'sync to tempo' off), tone (bipolar tilt on the repeats), feedback (past 100% on purpose for self-oscillation - the output is soft-clipped, not the feedback itself), pan, duck (sidechains the wet signal off the dry input) and a bounce switch that cross-feeds left/right instead of repeating in place." },

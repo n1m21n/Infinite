@@ -20,7 +20,6 @@ class AudioColorRampNode : public INode
 public:
    static constexpr int kMaxBands = 8;
    static constexpr int kDefaultBands = 4;
-   static constexpr int kOutputCount = 1 + kMaxBands; // Master + 8 bands
 
    enum Mode
    {
@@ -68,12 +67,6 @@ public:
 
    AudioNode* GetAudioNode();
 
-   // Modulator outputs: 0 = master level, 1..8 = band levels
-   int OutputCount() const override { return kOutputCount; }
-   const char* OutputLabel(int index) const override;
-   IModulator* ModulatorOutput(int index) override;
-   float ModulatorValue(int index) const;
-
    // Frequency and position math (Logarithmic 20Hz - 20kHz)
    static float PosToFreq(float pos);
    static float FreqToPos(float freq);
@@ -93,25 +86,21 @@ public:
    int interpMode = kInterpLinear;
    int bandCount = kDefaultBands;
    float gain = 1.0f;
-   float attack = 15.0f;           // ms
-   float decay = 120.0f;           // ms
    float minBrightness = 0.15f;    // Baseline color floor
-   float rampMix = 1.0f;           // Blend when image is connected
-   float saturationBoost = 1.2f;
 
    // Band split positions (log scale 0..1). For N bands, there are N-1 crossover dividers.
    float crossoverPos[kMaxBands - 1] = { 0.30f, 0.53f, 0.77f, 0.85f, 0.90f, 0.94f, 0.97f };
 
-   // Band colors (RGB)
+   // Band colors (RGB), low frequency to high - VIBGYOR read high to low.
    float bandColor[kMaxBands][3] = {
-      { 0.95f, 0.15f, 0.25f }, // Band 0: Deep Red/Crimson (Sub/Bass)
-      { 1.00f, 0.55f, 0.10f }, // Band 1: Amber/Gold (Low-Mids)
-      { 0.10f, 0.85f, 0.95f }, // Band 2: Electric Cyan (Mid-Highs)
-      { 0.80f, 0.30f, 1.00f }, // Band 3: Neon Violet/Lavender (Presence/Air)
-      { 0.20f, 0.95f, 0.40f }, // Band 4: Emerald Green
-      { 1.00f, 0.90f, 0.20f }, // Band 5: Bright Yellow
-      { 0.95f, 0.20f, 0.75f }, // Band 6: Hot Pink
-      { 0.30f, 0.50f, 1.00f }  // Band 7: Royal Blue
+      { 0.95f, 0.15f, 0.15f }, // Band 0: Red (Sub/Bass)
+      { 1.00f, 0.55f, 0.10f }, // Band 1: Orange (Low-Mids)
+      { 1.00f, 0.90f, 0.20f }, // Band 2: Yellow (Mids)
+      { 0.20f, 0.95f, 0.40f }, // Band 3: Green (Presence)
+      { 0.10f, 0.85f, 0.85f }, // Band 4: Cyan
+      { 0.20f, 0.45f, 1.00f }, // Band 5: Blue
+      { 0.45f, 0.20f, 0.95f }, // Band 6: Indigo
+      { 0.75f, 0.20f, 1.00f }  // Band 7: Violet (Air/Highs)
    };
 
    // Band sensitivity multipliers
@@ -120,13 +109,6 @@ public:
    void VisitParams(ParamVisitor& v) override;
 
 private:
-   struct ModTap : public IModulator
-   {
-      AudioColorRampNode* owner = nullptr;
-      int index = 0;
-      float Value01() override { return owner ? owner->ModulatorValue(index) : 0.0f; }
-   };
-
    bool EnsureShader();
    void RebuildLut();
    void ProcessAudioFFT();
@@ -135,10 +117,10 @@ private:
    AudioCable mAudioInput;
    ImageCable mInput;
 
-   ModTap mTaps[kOutputCount];
    GLUtil::Fbo mOut;
    unsigned int mProgram = 0;
    bool mShaderTried = false;
+   bool mHadInput = false;
    unsigned int mLutTex = 0;
    bool mLutDirty = true;
    unsigned long long mRevision = 1;

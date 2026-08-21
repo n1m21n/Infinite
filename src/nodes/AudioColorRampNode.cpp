@@ -31,12 +31,11 @@ namespace
       "out vec4 fragColor;\n"
       "uniform sampler2D uSrc;\n"
       "uniform sampler2D uLut;\n"
-      "uniform float uMix;\n"
       "void main() {\n"
       "   vec4 src = texture(uSrc, vUv);\n"
       "   float lum = dot(src.rgb, vec3(0.299, 0.587, 0.114));\n"
       "   vec3 ramped = texture(uLut, vec2(clamp(lum, 0.0, 1.0), 0.5)).rgb;\n"
-      "   fragColor = vec4(mix(src.rgb, ramped, uMix), src.a);\n"
+      "   fragColor = vec4(ramped, src.a);\n"
       "}\n";
 }
 
@@ -107,12 +106,6 @@ AudioColorRampNode::AudioColorRampNode()
    mAudioSink = std::make_unique<AudioColorRampAudioSink>();
    mAudioWindow.assign(1024, 0.0f);
    mSmoothedSpectrum.assign(512, 0.0f);
-
-   for (int i = 0; i < kOutputCount; i++)
-   {
-      mTaps[i].owner = this;
-      mTaps[i].index = i;
-   }
 }
 
 AudioColorRampNode::~AudioColorRampNode()
@@ -137,32 +130,6 @@ AudioNode* AudioColorRampNode::GetAudioNode()
    return mAudioSink.get();
 }
 
-const char* AudioColorRampNode::OutputLabel(int index) const
-{
-   if (index == 0) return "master";
-   static const char* kBandLabels[] = { "b1 (sub)", "b2 (low)", "b3 (mid)", "b4 (high)", "b5", "b6", "b7", "b8" };
-   if (index >= 1 && index <= kMaxBands)
-      return kBandLabels[index - 1];
-   return "out";
-}
-
-IModulator* AudioColorRampNode::ModulatorOutput(int index)
-{
-   if (index < 0 || index >= kOutputCount)
-      return nullptr;
-   return &mTaps[index];
-}
-
-float AudioColorRampNode::ModulatorValue(int index) const
-{
-   if (index == 0)
-      return std::clamp(mMasterEnergy, 0.0f, 1.0f);
-   const int b = index - 1;
-   if (b >= 0 && b < kMaxBands)
-      return std::clamp(mBandEnergies[b], 0.0f, 1.0f);
-   return 0.0f;
-}
-
 float AudioColorRampNode::PosToFreq(float pos)
 {
    pos = std::clamp(pos, 0.0f, 1.0f);
@@ -179,12 +146,14 @@ void AudioColorRampNode::SetBandCount(int count)
 {
    bandCount = std::clamp(count, 2, kMaxBands);
    for (int i = 0; i < bandCount - 1; i++)
-   {
-      float idealPos = (float)(i + 1) / (float)bandCount;
-      if (crossoverPos[i] <= 0.01f || crossoverPos[i] >= 0.99f)
-         crossoverPos[i] = idealPos;
-   }
+      crossoverPos[i] = (float)(i + 1) / (float)bandCount;
    mLutDirty = true;
+}
+
+namespace
+{
+   constexpr float kBandAttackMs = 15.0f;
+   constexpr float kBandDecayMs = 120.0f;
 }
 
 void AudioColorRampNode::ProcessAudioFFT()
@@ -260,13 +229,13 @@ void AudioColorRampNode::ProcessAudioFFT()
       float avg = (bandBinCounts[b] > 0) ? (rawBands[b] / std::sqrt((float)bandBinCounts[b])) : 0.0f;
       mRawBandEnergies[b] = avg * bandGain[b] * 3.5f;
 
-      const float tau = (mRawBandEnergies[b] > mBandEnergies[b]) ? (attack * 0.001f) : (decay * 0.001f);
+      const float tau = (mRawBandEnergies[b] > mBandEnergies[b]) ? (kBandAttackMs * 0.001f) : (kBandDecayMs * 0.001f);
       const float alpha = 1.0f - std::exp(-dt / std::max(0.001f, tau));
       mBandEnergies[b] += (mRawBandEnergies[b] - mBandEnergies[b]) * alpha;
       mBandEnergies[b] = std::clamp(mBandEnergies[b], 0.0f, 2.0f);
    }
 
-   const float masterTau = (totalEnergy * gain > mMasterEnergy) ? (attack * 0.001f) : (decay * 0.001f);
+   const float masterTau = (totalEnergy * gain > mMasterEnergy) ? (kBandAttackMs * 0.001f) : (kBandDecayMs * 0.001f);
    const float masterAlpha = 1.0f - std::exp(-dt / std::max(0.001f, masterTau));
    mMasterEnergy += ((totalEnergy * gain * 0.15f) - mMasterEnergy) * masterAlpha;
    mMasterEnergy = std::clamp(mMasterEnergy, 0.0f, 1.0f);
@@ -277,14 +246,71 @@ void AudioColorRampNode::EvaluateRamp(float t, float outRgb[3]) const
    t = std::clamp(t, 0.0f, 1.0f);
    const int count = std::clamp(bandCount, 2, kMaxBands);
 
+   if (mode == kModeSpectrum)
+   {
+      // Bypass the discrete band/crossover logic - sample the continuous FFT
+      // spectrum directly at ramp position t and blend the palette using it.
+      const int specSize = (int)mSmoothedSpectrum.size();
+      float mag = 0.0f;
+      if (specSize > 1)
+      {
+         const float binF = t * (float)(specSize - 1);
+         const int bin0 = std::clamp((int)binF, 0, specSize - 1);
+         const int bin1 = std::clamp(bin0 + 1, 0, specSize - 1);
+         const float frac = binF - (float)bin0;
+         mag = mSmoothedSpectrum[bin0] * (1.0f - frac) + mSmoothedSpectrum[bin1] * frac;
+      }
+      const float glow = minBrightness + (1.0f - minBrightness) * std::clamp(mag * 4.0f, 0.0f, 1.0f);
+
+      // Continuous palette blend across the full ramp (ignores discrete crossovers).
+      float f = t * (float)(count - 1);
+      int b0 = std::clamp((int)f, 0, count - 1);
+      int b1 = std::clamp(b0 + 1, 0, count - 1);
+      float bf = f - (float)b0;
+
+      outRgb[0] = (bandColor[b0][0] + (bandColor[b1][0] - bandColor[b0][0]) * bf) * glow;
+      outRgb[1] = (bandColor[b0][1] + (bandColor[b1][1] - bandColor[b0][1]) * bf) * glow;
+      outRgb[2] = (bandColor[b0][2] + (bandColor[b1][2] - bandColor[b0][2]) * bf) * glow;
+      return;
+   }
+
    // Calculate band center positions and effective colors
    float centers[kMaxBands];
    float colors[kMaxBands][3];
+   float boundaries[kMaxBands];
+
+   if (mode == kModeExpansion)
+   {
+      // Louder bands claim more of the 0..1 ramp: scale each band's base width
+      // by its energy, then renormalize so the boundaries still span 0..1.
+      float widths[kMaxBands];
+      float prevPos = 0.0f;
+      float totalWidth = 0.0f;
+      for (int b = 0; b < count; b++)
+      {
+         float next = (b == count - 1) ? 1.0f : crossoverPos[b];
+         float baseWidth = std::max(1e-4f, next - prevPos);
+         prevPos = next;
+         widths[b] = baseWidth * (1.0f + 3.0f * std::clamp(mBandEnergies[b], 0.0f, 1.0f));
+         totalWidth += widths[b];
+      }
+      float cum = 0.0f;
+      for (int b = 0; b < count; b++)
+      {
+         cum += widths[b] / totalWidth;
+         boundaries[b] = cum;
+      }
+   }
+   else
+   {
+      for (int b = 0; b < count; b++)
+         boundaries[b] = (b == count - 1) ? 1.0f : crossoverPos[b];
+   }
 
    float prev = 0.0f;
    for (int b = 0; b < count; b++)
    {
-      float next = (b == count - 1) ? 1.0f : crossoverPos[b];
+      float next = boundaries[b];
       centers[b] = (prev + next) * 0.5f;
       prev = next;
 
@@ -309,7 +335,7 @@ void AudioColorRampNode::EvaluateRamp(float t, float outRgb[3]) const
       int activeBand = count - 1;
       for (int b = 0; b < count - 1; b++)
       {
-         if (t < crossoverPos[b])
+         if (t < boundaries[b])
          {
             activeBand = b;
             break;
@@ -417,12 +443,17 @@ void AudioColorRampNode::CookIfNeeded(int frameId)
    if (!GLUtil::EnsureFbo(mOut, targetW, targetH))
       return;
 
-   // Recompile shader if input connection changed
-   if (mProgram != 0)
+   // Recompile shader if input connection state changed
+   const bool hasInput = mInput.IsConnected();
+   if (hasInput != mHadInput)
    {
-      glDeleteProgram(mProgram);
-      mProgram = 0;
+      if (mProgram != 0)
+      {
+         glDeleteProgram(mProgram);
+         mProgram = 0;
+      }
       mShaderTried = false;
+      mHadInput = hasInput;
    }
    if (!EnsureShader())
       return;
@@ -438,8 +469,6 @@ void AudioColorRampNode::CookIfNeeded(int frameId)
          glActiveTexture(GL_TEXTURE1);
          glBindTexture(GL_TEXTURE_2D, mLutTex);
          glUniform1i(glGetUniformLocation(mProgram, "uLut"), 1);
-
-         glUniform1f(glGetUniformLocation(mProgram, "uMix"), rampMix);
       }
       else
       {
@@ -456,11 +485,7 @@ void AudioColorRampNode::VisitParams(ParamVisitor& v)
    v.Int("interpMode", interpMode);
    v.Int("bandCount", bandCount);
    v.Float("gain", gain);
-   v.Float("attack", attack);
-   v.Float("decay", decay);
    v.Float("minBrightness", minBrightness);
-   v.Float("rampMix", rampMix);
-   v.Float("saturationBoost", saturationBoost);
 
    char key[32];
    for (int i = 0; i < kMaxBands - 1; i++)
