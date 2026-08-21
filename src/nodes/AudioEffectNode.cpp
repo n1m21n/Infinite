@@ -96,7 +96,7 @@ public:
 
    IEffectKernel& Kernel() { return *mKernel; }
    MeterRing& Meter() { return mMeter; }
-   int LatencySamples() const { return mKernel->LatencySamples(); }
+   int LatencySamples() const override { return mKernel->LatencySamples(); }
    MeterRing* KernelExtraMeter() { return mKernel->ExtraMeter(); }
 
 private:

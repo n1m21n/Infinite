@@ -2248,6 +2248,13 @@ namespace Platform
          }
          v->active = true;
 
+         // getLatencySamples() is only meaningful once setupProcessing has
+         // negotiated the real block size/rate above - some plugins compute
+         // lookahead/oversample latency from those. Read here, on the main
+         // thread, into the handle's cached value; Platform::
+         // PluginLatencySamples() just returns it.
+         h->latencySamples = (int)v->processor->getLatencySamples();
+
          // setProcessing is explicitly optional in the VST3 spec - a plugin that
          // has no start/stop notion may return kNotImplemented (Kilohearts'
          // snapins do), and that is not a load failure. Treating a non-OK

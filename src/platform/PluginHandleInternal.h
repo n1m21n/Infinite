@@ -43,6 +43,17 @@ namespace Platform
       int pluginInChannels = 0;
       int pluginOutChannels = 0;
 
+      // Plugin-reported processing latency in samples at `sampleRate`,
+      // refreshed each time render resources are (re)allocated - AU's
+      // PluginConfigure reads it from `au.latency` right after
+      // allocateRenderResourcesAndReturnError succeeds; VST3's
+      // PluginVST3Configure reads it from IAudioProcessor::getLatencySamples()
+      // right after setupProcessing/setActive succeed. Main thread only
+      // (same discipline as sampleRate/maxBlockFrames above); read by
+      // Platform::PluginLatencySamples(), which AudioPluginNode::
+      // LatencySamples() forwards to the topology builder's PDC pass.
+      int latencySamples = 0;
+
       AudioBufferList* outAbl = nullptr;   // allocated once at prepare, sized kPluginMaxChannels
       std::vector<float> inScratch;        // kPluginMaxChannels * maxBlockFrames
       std::vector<float> outScratch;       // ditto, used only when channel counts differ
