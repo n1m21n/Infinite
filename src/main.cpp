@@ -31,6 +31,11 @@
 #include <sys/stat.h>
 #include "platform/AppPaths.h"
 
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 namespace
 {
    // Test fixtures live in the OS temp directory; /tmp was hardcoded before
@@ -25348,6 +25353,14 @@ int main(int argc, char** argv)
       // the function's doc comment for why a scanned plugin can otherwise
       // make this child process pop up as a spurious extra Infinite window.
       Platform::SuppressAppUIForScanChild();
+
+#if defined(_WIN32)
+      // stdout defaults to text mode, which translates '\n' to '\r\n' and
+      // corrupts the tab-separated wire format below (the parent's
+      // ParseProbeOutput strips a trailing '\r' defensively as the other
+      // half of this fix).
+      _setmode(_fileno(stdout), _O_BINARY);
+#endif
 
       // Guards the tab-separated wire format below against a plugin whose
       // self-reported name/vendor string happens to contain a tab or newline.

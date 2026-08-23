@@ -3,16 +3,17 @@
 //   - Audio Units are macOS-only by definition; there is nothing to enumerate
 //     or host, so EnumerateAudioUnits finds nothing and DescribeAudioUnitBundle
 //     rejects every path.
-//   - VST3 hosting mirrors macOS behind INFINITE_ENABLE_VST3: when the flag is
-//     on, every PluginXxx entry point below dispatches into the Windows VST3
-//     backend (src/platform/win/PluginVST3Win.cpp), which hosts the SDK's
+//   - VST3 hosting mirrors macOS behind INFINITE_ENABLE_VST3 (on by default -
+//     see CMakeLists.txt): when the flag is on, every PluginXxx entry point
+//     below dispatches into the Windows VST3 backend
+//     (src/platform/win/PluginVST3Win.cpp), which hosts the SDK's
 //     IComponent/IEditController/IAudioProcessor directly, including a real
-//     HWND-embedded editor window. Still pending on Windows: full SEH crash
-//     guarding beyond state save/restore and editor calls, and out-of-process
-//     scanning - so EnumerateVST3Plugins/DescribeVST3Bundle stay no-ops here
-//     even with the flag on. When the flag is off (the default - VST3 SDK
-//     licensing, see CMakeLists.txt), every plugin instantiation produces a
-//     Failed-state handle instead.
+//     HWND-embedded editor window, out-of-process scanning via
+//     infinite-vst3-scanner.exe, and sentinel/blocklist crash safety. Still
+//     pending on Windows: full SEH crash guarding beyond state save/restore
+//     and editor calls (Tier 3 - see PluginVST3Win.cpp's header for why that
+//     tier isn't achievable this way at all). When the flag is off, every
+//     plugin instantiation produces a Failed-state handle instead.
 //
 // Every function tolerates a null handle - AudioPluginNode's retire path can
 // hand us one while a topology swap is in flight.
@@ -61,11 +62,9 @@ namespace Platform
       return false;
    }
 
+#if !INFINITE_ENABLE_VST3
    void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out)
    {
-      // Real scanning (targeted rescans, out-of-process isolation) is a
-      // follow-up; for now a plugin is only usable via an already-known
-      // desc.path or a same-session CacheVST3BundlePath hit.
       (void)folders;
       out.clear();
    }
@@ -77,13 +76,11 @@ namespace Platform
       return false;
    }
 
-#if !INFINITE_ENABLE_VST3
    void CacheVST3BundlePath(const std::string& identifier, const std::string& bundlePath)
    {
       (void)identifier;
       (void)bundlePath;
    }
-#endif
 
    void SetVST3SearchFolders(const std::vector<std::string>& folders)
    {
@@ -101,8 +98,13 @@ namespace Platform
    {
       return {};
    }
+#endif // !INFINITE_ENABLE_VST3
 
 #if INFINITE_ENABLE_VST3
+   // EnumerateVST3Plugins, DescribeVST3Bundle, CacheVST3BundlePath,
+   // SetVST3SearchFolders, VST3Blocklist, ClearVST3Blocklist, and
+   // VST3ScanFailures are all defined directly in the Platform namespace by
+   // PluginVST3Win.cpp when the flag is on - nothing to dispatch here.
 
    PluginHandle* PluginCreate(const PluginDesc& desc, double sampleRate, int maxBlockFrames)
    {

@@ -5,15 +5,16 @@
 // plus real editor-window (HWND) hosting with the same Tier-2 SEH crash-guard
 // discipline used for state save/restore.
 //
+// Also hosts the out-of-process scanning + crash-safety machinery
+// (EnumerateVST3Plugins, DescribeVST3Bundle, the sentinel/blocklist pair
+// under %APPDATA%\Infinite), ported from PluginVST3.mm's equivalent section
+// with CreateProcessW/pipes standing in for posix_spawn/select and
+// crude_json standing in for the same JSON blocklist format.
+//
 // Deliberately NOT ported in this phase (see the plan for the follow-up
 // sessions each of these becomes):
 //   - SEH crash guarding of realtime/instantiation calls (Tier 3 - not
 //     guardable this way; would need out-of-process hosting).
-//   - Out-of-process scanning, sentinel/blocklist persistence. Enumeration
-//     stays routed through PluginHostWin.cpp's existing no-op, so bundle
-//     resolution below only ever succeeds via desc.path or a same-session
-//     cache hit - never a fresh disk scan. This is a known, called-out gap,
-//     not a silent regression.
 
 #include "PluginVST3.h"
 
@@ -22,8 +23,13 @@
 #include "PluginHandleInternalWin.h"
 #include "WinCommon.h"
 
+#include <objbase.h>
+#include <ole2.h>
+#include <io.h>
+
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -35,6 +41,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "crude_json.h"
 
 #include "pluginterfaces/base/funknown.h"
 #include "pluginterfaces/base/ibstream.h"
@@ -225,10 +233,10 @@ namespace
 
 namespace Platform
 {
-   // Identifier -> bundle path cache, exactly as PluginVST3.mm's. Real disk
-   // scanning isn't ported yet (see file header), so this only ever gets
-   // populated from a desc.path that resolved successfully - still useful
-   // for re-resolving the same plugin later in the same process run.
+   // Identifier -> bundle path cache, exactly as PluginVST3.mm's. Populated
+   // both by a desc.path that resolved successfully and by every class
+   // DescribeVST3Bundle finds during a scan, so it is the thing a later
+   // resolve-by-identifier actually hits.
    static std::mutex gBundleMapMutex;
    static std::unordered_map<std::string, std::string> gVST3BundleMap;
 
@@ -243,6 +251,701 @@ namespace Platform
       std::lock_guard<std::mutex> lock(gBundleMapMutex);
       auto it = gVST3BundleMap.find(identifier);
       return it != gVST3BundleMap.end() ? it->second : std::string();
+   }
+}
+
+namespace
+{
+   namespace fsProbe = std::filesystem;
+
+   // ------------------------------------------------------------------------
+   // User-added VST3 search folders - mirrors PluginVST3.mm's
+   // gExtraVST3SearchFolders exactly (same call site: PluginScanner::Folders()
+   // via Platform::SetVST3SearchFolders).
+   // ------------------------------------------------------------------------
+   std::mutex gSearchFoldersMutex;
+   std::vector<std::string> gExtraVST3SearchFolders;
+
+   std::vector<std::string> GetExtraVST3SearchFolders()
+   {
+      std::lock_guard<std::mutex> lock(gSearchFoldersMutex);
+      return gExtraVST3SearchFolders;
+   }
+
+   // ------------------------------------------------------------------------
+   // Crash-safety: sentinel + blocklist
+   //
+   // DescribeVST3Bundle loads an arbitrary third party's compiled code
+   // in-process (LoadLibraryExW -> InitDll -> read factory -> ExitDll). A
+   // hostile or simply broken bundle can access-violate or abort from inside
+   // that call, which a C++ try/catch cannot intercept (and even SEH cannot
+   // safely recover a corrupted CRT heap from - see the Tier 3 note at the
+   // top of this file). The sentinel records which bundle is being probed
+   // *before* the call, so if this process is dead the next time the app
+   // launches, the last-probed path is still sitting in the sentinel file and
+   // gets blocklisted rather than killing every future scan the same way.
+   // Exact port of PluginVST3.mm's equivalent section, %APPDATA%\Infinite
+   // standing in for ~/Library/Application Support/Infinite.
+   // ------------------------------------------------------------------------
+
+   std::string SettingsDirForVST3()
+   {
+      wchar_t* appData = nullptr;
+      size_t len = 0;
+      if (_wdupenv_s(&appData, &len, L"APPDATA") != 0 || appData == nullptr)
+         return {};
+      std::wstring appDataW(appData);
+      free(appData);
+      if (appDataW.empty())
+         return {};
+      std::wstring dirW = appDataW + L"\\Infinite";
+      if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
+         dirW += L"\\plugin_drag_test";
+      CreateDirectoryW(appDataW.c_str(), nullptr);
+      CreateDirectoryW(dirW.c_str(), nullptr);
+      return WinCommon::WideToUtf8(dirW);
+   }
+
+   std::string VST3SentinelPath()
+   {
+      const std::string dir = SettingsDirForVST3();
+      return dir.empty() ? std::string() : dir + "\\PluginScanSentinel.txt";
+   }
+
+   std::string VST3BlocklistPath()
+   {
+      const std::string dir = SettingsDirForVST3();
+      return dir.empty() ? std::string() : dir + "\\PluginVST3Blocklist.json";
+   }
+
+   std::mutex gVST3SafetyMutex; // guards gBlocklist and every sentinel/failure op below
+   std::vector<std::string> gBlocklist;
+   std::vector<std::string> gScanFailures;
+   bool gBlocklistLoaded = false;
+
+   void LoadBlocklistLocked()
+   {
+      if (gBlocklistLoaded)
+         return;
+      gBlocklistLoaded = true;
+      const std::string path = VST3BlocklistPath();
+      if (path.empty())
+         return;
+      auto [json, ok] = crude_json::value::load(path);
+      if (!ok || !json.is_array())
+         return;
+      for (const crude_json::value& v : json.get<crude_json::array>())
+         if (v.is_string())
+            gBlocklist.push_back(v.get<crude_json::string>());
+   }
+
+   void SaveBlocklistLocked()
+   {
+      const std::string path = VST3BlocklistPath();
+      if (path.empty())
+         return;
+      crude_json::value json = crude_json::array {};
+      for (const std::string& p : gBlocklist)
+         json.push_back(crude_json::value(p));
+      json.save(path, 2);
+   }
+
+   // Checked once per process, before the first bundle is ever probed: if the
+   // previous run's sentinel is still sitting there non-empty, that run died
+   // mid-probe of that exact bundle.
+   void CheckSentinelForCrashLocked()
+   {
+      const std::string path = VST3SentinelPath();
+      if (path.empty())
+         return;
+      FILE* f = std::fopen(path.c_str(), "rb");
+      if (f == nullptr)
+         return;
+      char buf[4096] = {};
+      size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
+      std::fclose(f);
+      if (n == 0)
+         return;
+      std::string crashed(buf, n);
+      while (!crashed.empty() && (crashed.back() == '\n' || crashed.back() == '\r'))
+         crashed.pop_back();
+      if (crashed.empty())
+         return;
+
+      LoadBlocklistLocked();
+      if (std::find(gBlocklist.begin(), gBlocklist.end(), crashed) == gBlocklist.end())
+      {
+         VST3Trace("sentinel found non-empty at startup - blocklisting: %s", crashed.c_str());
+         gBlocklist.push_back(crashed);
+         SaveBlocklistLocked();
+      }
+      std::remove(path.c_str());
+   }
+
+   void EnsureSentinelCheckedOnce()
+   {
+      static std::once_flag once;
+      std::call_once(once, [] {
+         std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+         CheckSentinelForCrashLocked();
+      });
+   }
+
+   bool IsBlocklistedPath(const std::string& bundlePath)
+   {
+      std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+      LoadBlocklistLocked();
+      return std::find(gBlocklist.begin(), gBlocklist.end(), bundlePath) != gBlocklist.end();
+   }
+
+   // Written+flushed just before the in-process probe, cleared right after a
+   // clean return (success or ordinary failure). Deliberately not RAII: the
+   // whole point is to survive the case where the destructor never runs.
+   // _commit() is fsync()'s Windows equivalent - without it the write can
+   // still be sitting in the OS cache (never mind app-level buffering) at the
+   // moment a crashing plugin takes this process down with it.
+   void WriteSentinel(const std::string& bundlePath)
+   {
+      const std::string path = VST3SentinelPath();
+      if (path.empty())
+         return;
+      FILE* f = std::fopen(path.c_str(), "wb");
+      if (f == nullptr)
+         return;
+      std::fwrite(bundlePath.data(), 1, bundlePath.size(), f);
+      std::fflush(f);
+      _commit(_fileno(f));
+      std::fclose(f);
+   }
+
+   void ClearSentinel()
+   {
+      const std::string path = VST3SentinelPath();
+      if (!path.empty())
+         std::remove(path.c_str());
+   }
+
+   void RecordScanFailure(const std::string& bundlePath)
+   {
+      std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+      gScanFailures.push_back(bundlePath);
+   }
+
+   // Adds a bundle to the persisted blocklist immediately, in the same scan
+   // that caught it crashing/hanging - unlike the sentinel path above (which
+   // only catches a crash on the *next* launch), this fires the moment
+   // ProbeVST3BundleOutOfProcess sees a dead or unresponsive child.
+   void AddToBlocklistLocked(const std::string& bundlePath)
+   {
+      LoadBlocklistLocked();
+      if (std::find(gBlocklist.begin(), gBlocklist.end(), bundlePath) == gBlocklist.end())
+      {
+         gBlocklist.push_back(bundlePath);
+         SaveBlocklistLocked();
+      }
+   }
+
+   // ------------------------------------------------------------------------
+   // Out-of-process bundle probing
+   //
+   // DescribeVST3Bundle runs arbitrary third-party code in-process and is only
+   // safe to call directly from the "--vst3-scan-bundle" child mode in
+   // main.cpp, or from the dedicated infinite-vst3-scanner.exe's own main
+   // (src/scanner_main_win.cpp), where a crash costs one disposable process.
+   // EnumerateVST3Plugins below re-execs one of those binaries once per batch
+   // instead of calling DescribeVST3Bundle itself, so a crashing or hanging
+   // plugin never takes the scan - or the app - down with it.
+   // ------------------------------------------------------------------------
+
+   enum class ProbeOutcome
+   {
+      Success,   // child exited cleanly and described at least one class
+      CleanMiss, // child exited cleanly but found nothing usable - not a crash
+      Crashed,   // child was terminated, exited nonzero, or hung
+   };
+
+   // The child's stdout is text-mode by default on Windows, which would
+   // translate every '\n' it writes to '\r\n' and corrupt this tab-separated
+   // format (see the file-header note on _setmode in scanner_main_win.cpp and
+   // main.cpp's --vst3-scan-bundle child). Stripping a trailing '\r' here is
+   // the defensive second half of that fix - it means a stray un-fixed
+   // stdout somewhere still parses correctly instead of silently reporting
+   // every plugin as non-instrument (acceptsNotes == "1\r" != "1").
+   std::vector<Platform::PluginDesc> ParseProbeOutput(const std::string& output)
+   {
+      std::vector<Platform::PluginDesc> out;
+      size_t pos = 0;
+      while (pos < output.size())
+      {
+         size_t nl = output.find('\n', pos);
+         std::string line = output.substr(pos, nl == std::string::npos ? std::string::npos : nl - pos);
+         pos = (nl == std::string::npos) ? output.size() : nl + 1;
+         if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+         if (line.empty())
+            continue;
+
+         std::vector<std::string> fields;
+         size_t p = 0;
+         while (true)
+         {
+            size_t tab = line.find('\t', p);
+            fields.push_back(line.substr(p, tab == std::string::npos ? std::string::npos : tab - p));
+            if (tab == std::string::npos)
+               break;
+            p = tab + 1;
+         }
+         if (fields.size() != 6)
+            continue;
+
+         Platform::PluginDesc d;
+         d.format = fields[0];
+         d.name = fields[1];
+         d.manufacturer = fields[2];
+         d.identifier = fields[3];
+         d.path = fields[4];
+         d.acceptsNotes = fields[5] == "1";
+         out.push_back(std::move(d));
+      }
+      return out;
+   }
+
+   // Reads everything currently available from a non-blocking-mode pipe
+   // without blocking, using PeekNamedPipe to check for data first (an
+   // anonymous pipe's read handle can't be put in true overlapped/async
+   // mode). Returns false once the child has closed its write end (EOF) or
+   // the deadline passes.
+   struct DrainResult
+   {
+      std::string output;
+      bool timedOut = false;
+   };
+
+   DrainResult DrainChildStdout(HANDLE readHandle, HANDLE processHandle,
+                                 std::chrono::steady_clock::time_point deadline)
+   {
+      DrainResult result;
+      char buf[4096];
+      for (;;)
+      {
+         if (std::chrono::steady_clock::now() >= deadline)
+         {
+            result.timedOut = true;
+            break;
+         }
+
+         DWORD available = 0;
+         if (!PeekNamedPipe(readHandle, nullptr, 0, nullptr, &available, nullptr))
+            break; // pipe broken - child exited and closed its handle
+
+         if (available == 0)
+         {
+            // Nothing to read yet; poll rather than block so the deadline
+            // above is still honored against a hung child. Also bail out
+            // early if the child has already exited (WAIT_OBJECT_0) even
+            // though its handle might briefly linger.
+            if (WaitForSingleObject(processHandle, 0) == WAIT_OBJECT_0)
+            {
+               // Drain any final bytes written right before exit, then stop.
+               if (PeekNamedPipe(readHandle, nullptr, 0, nullptr, &available, nullptr) && available > 0)
+                  continue;
+               break;
+            }
+            Sleep(5);
+            continue;
+         }
+
+         DWORD toRead = (DWORD)std::min((size_t)available, sizeof(buf));
+         DWORD read = 0;
+         if (!ReadFile(readHandle, buf, toRead, &read, nullptr) || read == 0)
+            break;
+         result.output.append(buf, read);
+      }
+      return result;
+   }
+
+   // Spawns `exe` with the given argv (argv[0] is the display name only;
+   // actual process image comes from `exe`), redirecting stdout to a pipe
+   // this function drains and stderr to NUL (third-party plugin code prints
+   // whatever it wants there, and the scan has nowhere useful to put it).
+   // Mirrors PluginVST3.mm's posix_spawn + pipe + select loop with
+   // CreateProcessW + pipe + PeekNamedPipe.
+   bool RunProbeChild(const std::string& exe, const std::vector<std::string>& args,
+                       std::chrono::seconds timeout, std::string& outOutput, bool& outTimedOut,
+                       bool& outCleanExit)
+   {
+      outOutput.clear();
+      outTimedOut = false;
+      outCleanExit = false;
+
+      SECURITY_ATTRIBUTES saAttr = {};
+      saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+      saAttr.bInheritHandle = TRUE;
+      saAttr.lpSecurityDescriptor = nullptr;
+
+      HANDLE readPipe = nullptr;
+      HANDLE writePipe = nullptr;
+      if (!CreatePipe(&readPipe, &writePipe, &saAttr, 0))
+         return false;
+
+      // The read end must NOT be inherited by the child, or the child's copy
+      // of the write end never closes when the child exits (its own stdout
+      // handle keeps the pipe open) and the drain loop below would spin past
+      // its own deadline waiting for an EOF that never comes.
+      SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+
+      HANDLE nulWrite = CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ,
+                                    &saAttr, OPEN_EXISTING, 0, nullptr);
+
+      STARTUPINFOW si = {};
+      si.cb = sizeof(si);
+      si.dwFlags |= STARTF_USESTDHANDLES;
+      si.hStdOutput = writePipe;
+      si.hStdError = nulWrite;
+      si.hStdInput = nullptr;
+
+      std::wstring cmdLine = L"\"" + WinCommon::Utf8ToWide(exe) + L"\"";
+      for (const std::string& a : args)
+         cmdLine += L" \"" + WinCommon::Utf8ToWide(a) + L"\"";
+      std::vector<wchar_t> cmdLineBuf(cmdLine.begin(), cmdLine.end());
+      cmdLineBuf.push_back(L'\0');
+
+      PROCESS_INFORMATION pi = {};
+      const BOOL ok = CreateProcessW(WinCommon::Utf8ToWide(exe).c_str(), cmdLineBuf.data(), nullptr, nullptr,
+                                     TRUE /* inherit handles */, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+
+      // The parent's copies of the child-inherited handles must close now -
+      // otherwise the parent itself keeps the pipe/NUL handle alive and the
+      // drain loop's EOF-on-child-exit signal never arrives.
+      CloseHandle(writePipe);
+      if (nulWrite != nullptr && nulWrite != INVALID_HANDLE_VALUE)
+         CloseHandle(nulWrite);
+
+      if (!ok)
+      {
+         CloseHandle(readPipe);
+         return false;
+      }
+
+      const auto deadline = std::chrono::steady_clock::now() + timeout;
+      DrainResult drained = DrainChildStdout(readPipe, pi.hProcess, deadline);
+      CloseHandle(readPipe);
+      outOutput = std::move(drained.output);
+      outTimedOut = drained.timedOut;
+
+      if (outTimedOut)
+      {
+         VST3Trace("probe child timed out, terminating");
+         TerminateProcess(pi.hProcess, 1);
+         WaitForSingleObject(pi.hProcess, 2000);
+      }
+      else
+      {
+         WaitForSingleObject(pi.hProcess, 5000);
+      }
+
+      DWORD exitCode = 1;
+      GetExitCodeProcess(pi.hProcess, &exitCode);
+      outCleanExit = !outTimedOut && exitCode == 0;
+
+      CloseHandle(pi.hProcess);
+      CloseHandle(pi.hThread);
+      return true;
+   }
+
+   ProbeOutcome ProbeVST3BundleOutOfProcess(const std::string& bundlePath, std::vector<Platform::PluginDesc>& out)
+   {
+      std::string exe = Platform::ScannerExecutablePath();
+      bool isDedicatedScanner = true;
+      if (exe.empty() || !fsProbe::exists(exe))
+      {
+         exe = Platform::ExecutablePath();
+         isDedicatedScanner = false;
+      }
+      if (exe.empty())
+         return ProbeOutcome::Crashed;
+
+      std::vector<std::string> args;
+      if (!isDedicatedScanner)
+         args.push_back("--vst3-scan-bundle");
+      args.push_back(bundlePath);
+
+      std::string output;
+      bool timedOut = false;
+      bool cleanExit = false;
+      if (!RunProbeChild(exe, args, std::chrono::seconds(10), output, timedOut, cleanExit))
+         return ProbeOutcome::Crashed;
+
+      if (!cleanExit)
+      {
+         VST3Trace("bundle crashed or timed out during out-of-process probe: %s", bundlePath.c_str());
+         return ProbeOutcome::Crashed;
+      }
+
+      std::vector<Platform::PluginDesc> parsed = ParseProbeOutput(output);
+      if (parsed.empty())
+         return ProbeOutcome::CleanMiss;
+
+      for (Platform::PluginDesc& d : parsed)
+         out.push_back(std::move(d));
+      return ProbeOutcome::Success;
+   }
+
+   void ProbeVST3BundlesBatch(std::vector<std::string> bundlesToScan, std::vector<Platform::PluginDesc>& out)
+   {
+      const std::string exe = Platform::ScannerExecutablePath();
+      if (exe.empty() || !fsProbe::exists(exe))
+      {
+         // No dedicated scanner built (INFINITE_ENABLE_VST3 built the app but
+         // something went wrong with the scanner target) - fall back to
+         // probing one at a time via the self re-exec path, same as Mac's
+         // fallback.
+         for (const auto& path : bundlesToScan)
+         {
+            if (IsBlocklistedPath(path))
+            {
+               RecordScanFailure(path);
+               continue;
+            }
+            const ProbeOutcome outcome = ProbeVST3BundleOutOfProcess(path, out);
+            if (outcome == ProbeOutcome::Crashed)
+            {
+               RecordScanFailure(path);
+               std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+               AddToBlocklistLocked(path);
+            }
+            else if (outcome == ProbeOutcome::CleanMiss)
+            {
+               RecordScanFailure(path);
+            }
+         }
+         return;
+      }
+
+      while (!bundlesToScan.empty())
+      {
+         auto it = bundlesToScan.begin();
+         while (it != bundlesToScan.end())
+         {
+            if (IsBlocklistedPath(*it))
+            {
+               RecordScanFailure(*it);
+               it = bundlesToScan.erase(it);
+            }
+            else
+            {
+               ++it;
+            }
+         }
+         if (bundlesToScan.empty())
+            break;
+
+         std::vector<std::string> args;
+         args.push_back("--batch");
+         for (const auto& b : bundlesToScan)
+            args.push_back(b);
+
+         std::string output;
+         bool timedOut = false;
+         bool cleanExit = false;
+         if (!RunProbeChild(exe, args, std::chrono::seconds(60), output, timedOut, cleanExit))
+            break;
+
+         std::vector<Platform::PluginDesc> parsed = ParseProbeOutput(output);
+         for (Platform::PluginDesc& d : parsed)
+            out.push_back(std::move(d));
+
+         if (timedOut)
+         {
+            EnsureSentinelCheckedOnce();
+            break;
+         }
+         if (cleanExit)
+            break;
+
+         // Non-zero/killed exit with a partial or empty parse: the sentinel
+         // (written by whichever bundle the child was mid-probing) is what
+         // identifies and blocklists the offender on the next launch, same
+         // as the single-probe path.
+         EnsureSentinelCheckedOnce();
+      }
+   }
+}
+
+namespace Platform
+{
+   void SetVST3SearchFolders(const std::vector<std::string>& folders)
+   {
+      std::lock_guard<std::mutex> lock(gSearchFoldersMutex);
+      gExtraVST3SearchFolders = folders;
+   }
+
+   std::vector<std::string> VST3Blocklist()
+   {
+      std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+      LoadBlocklistLocked();
+      return gBlocklist;
+   }
+
+   void ClearVST3Blocklist()
+   {
+      std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+      LoadBlocklistLocked();
+      gBlocklist.clear();
+      SaveBlocklistLocked();
+   }
+
+   std::vector<std::string> VST3ScanFailures()
+   {
+      std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+      return gScanFailures;
+   }
+
+   // Recursive folder walk building the batch DescribeVST3Bundle probes.
+   // Unlike Mac (where only the directory-bundle form of ".vst3" exists), a
+   // plain single-file "Foo.vst3" DLL is also legal and common on Windows, so
+   // both forms are collected here - the directory form is not recursed into
+   // further once identified as a bundle.
+   void EnumerateVST3Plugins(const std::vector<std::string>& folders, std::vector<PluginDesc>& out)
+   {
+      EnsureSentinelCheckedOnce();
+      {
+         std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+         gScanFailures.clear();
+      }
+
+      std::vector<std::string> bundlesToScan;
+      for (const std::string& root : folders)
+      {
+         if (root.empty())
+            continue;
+         std::vector<fsProbe::path> dirStack;
+         dirStack.push_back(root);
+
+         while (!dirStack.empty())
+         {
+            fsProbe::path dir = std::move(dirStack.back());
+            dirStack.pop_back();
+
+            std::error_code ec;
+            fsProbe::directory_iterator it(dir, fsProbe::directory_options::skip_permission_denied, ec);
+            const fsProbe::directory_iterator end;
+            if (ec)
+               continue;
+
+            while (it != end)
+            {
+               const fsProbe::directory_entry entry = *it;
+               std::error_code entryEc;
+               if (entry.is_directory(entryEc) && !entryEc)
+               {
+                  if (entry.path().extension() == ".vst3")
+                     bundlesToScan.push_back(entry.path().string());
+                  else
+                     dirStack.push_back(entry.path());
+               }
+               else if (entry.is_regular_file(entryEc) && !entryEc && entry.path().extension() == ".vst3")
+               {
+                  bundlesToScan.push_back(entry.path().string());
+               }
+               it.increment(ec);
+               if (ec)
+                  break;
+            }
+         }
+      }
+
+      ProbeVST3BundlesBatch(std::move(bundlesToScan), out);
+   }
+
+   bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out)
+   {
+      EnsureSentinelCheckedOnce();
+      if (IsBlocklistedPath(bundlePath))
+      {
+         VST3Trace("refusing blocklisted bundle: %s", bundlePath.c_str());
+         return false;
+      }
+
+      // Sentinel window: everything between here and ClearSentinel() below
+      // runs arbitrary third-party code in-process (LoadLibraryExW, InitDll,
+      // the factory constructor). If this process doesn't survive that, the
+      // next launch finds the sentinel still pointing at this exact bundle
+      // and blocklists it instead of repeating the crash.
+      WriteSentinel(bundlePath);
+
+      Steinberg::IPluginFactory* factoryRaw = nullptr;
+      HMODULE module = LoadVST3Module(bundlePath, &factoryRaw);
+      if (module == nullptr || factoryRaw == nullptr)
+      {
+         ClearSentinel();
+         return false;
+      }
+
+      Steinberg::IPtr<Steinberg::IPluginFactory> factory(factoryRaw);
+      Steinberg::IPtr<Steinberg::IPluginFactory2> factory2;
+      factory->queryInterface(Steinberg::IPluginFactory2::iid, (void**)&factory2);
+
+      const Steinberg::int32 numClasses = factory->countClasses();
+      bool foundAny = false;
+
+      for (Steinberg::int32 i = 0; i < numClasses; i++)
+      {
+         Steinberg::PClassInfo classInfo = {};
+         Steinberg::PClassInfo2 classInfo2 = {};
+         std::string category;
+         std::string name;
+         std::string vendor;
+         std::string subCategories;
+         Steinberg::TUID classId = {};
+
+         if (factory2)
+         {
+            if (factory2->getClassInfo2(i, &classInfo2) == Steinberg::kResultOk)
+            {
+               category = classInfo2.category;
+               name = classInfo2.name;
+               vendor = classInfo2.vendor;
+               subCategories = classInfo2.subCategories;
+               std::memcpy(classId, classInfo2.cid, sizeof(Steinberg::TUID));
+            }
+         }
+         else
+         {
+            if (factory->getClassInfo(i, &classInfo) == Steinberg::kResultOk)
+            {
+               category = classInfo.category;
+               name = classInfo.name;
+               std::memcpy(classId, classInfo.cid, sizeof(Steinberg::TUID));
+            }
+         }
+
+         VST3Trace("  class[%d] category='%s' name='%s' uid=%s", (int)i, category.c_str(), name.c_str(),
+                   TUIDToHexString(classId).c_str());
+
+         if (category == kVstAudioEffectClass)
+         {
+            PluginDesc desc;
+            desc.format = "vst3";
+            desc.name = name;
+            desc.manufacturer = vendor;
+            desc.identifier = MakeVST3Identifier(classId);
+            desc.path = bundlePath;
+
+            std::string subCatLower = subCategories;
+            std::transform(subCatLower.begin(), subCatLower.end(), subCatLower.begin(), ::tolower);
+            desc.acceptsNotes = (subCatLower.find("instrument") != std::string::npos ||
+                                 subCatLower.find("synth") != std::string::npos);
+
+            CacheVST3BundlePath(desc.identifier, bundlePath);
+            out.push_back(std::move(desc));
+            foundAny = true;
+         }
+      }
+
+      UnloadVST3Module(module);
+      ClearSentinel();
+      return foundAny;
    }
 }
 
@@ -1241,6 +1944,63 @@ namespace
       FreeLibrary(module);
    }
 
+   // Arch-specific bundle subfolder name, matching the VST3 SDK's
+   // moduleinfo/bundle layout convention. Selected at compile time from the
+   // build target, not runtime - a given Infinite.exe only ever wants the
+   // subfolder matching its own architecture.
+#if defined(_M_ARM64EC)
+   constexpr const char* kVst3ArchFolder = "arm64ec-win";
+#elif defined(_M_ARM64)
+   constexpr const char* kVst3ArchFolder = "arm64-win";
+#else
+   constexpr const char* kVst3ArchFolder = "x86_64-win";
+#endif
+
+   // Bare-DLL fallback when the bundle doesn't use the conventional
+   // "<stem>.vst3" module name under Contents\<arch>-win\: scan that folder
+   // for any .vst3 file. Some plugins name the module differently from the
+   // bundle folder.
+   std::string FindVst3ModuleInArchFolder(const std::string& archFolderPath)
+   {
+      std::error_code ec;
+      if (!fs::is_directory(archFolderPath, ec))
+         return {};
+      for (const auto& entry : fs::directory_iterator(archFolderPath, ec))
+      {
+         if (ec)
+            break;
+         if (entry.is_regular_file(ec) && entry.path().extension() == ".vst3")
+            return entry.path().string();
+      }
+      return {};
+   }
+
+   // Fallback when the arch folder for this build target isn't present at
+   // all: scan every Contents\*-win\ folder for a .vst3 module. Covers
+   // plugins that only ship one architecture that doesn't match ours exactly
+   // (e.g. arm64ec-only builds run under x64 on ARM64 Windows via emulation).
+   std::string FindVst3ModuleInAnyArchFolder(const std::string& bundlePath)
+   {
+      std::error_code ec;
+      const std::string contentsPath = bundlePath + "\\Contents";
+      if (!fs::is_directory(contentsPath, ec))
+         return {};
+      for (const auto& archEntry : fs::directory_iterator(contentsPath, ec))
+      {
+         if (ec)
+            break;
+         if (!archEntry.is_directory(ec))
+            continue;
+         const std::string archName = archEntry.path().filename().string();
+         if (archName.size() < 4 || archName.compare(archName.size() - 4, 4, "-win") != 0)
+            continue;
+         std::string found = FindVst3ModuleInArchFolder(archEntry.path().string());
+         if (!found.empty())
+            return found;
+      }
+      return {};
+   }
+
    HMODULE LoadVST3Module(const std::string& bundlePath, Steinberg::IPluginFactory** outFactory)
    {
       if (outFactory != nullptr)
@@ -1252,14 +2012,32 @@ namespace
       std::string dllPath = bundlePath;
       if (fs::is_directory(bundlePath, ec))
       {
-         dllPath = bundlePath + "\\Contents\\x86_64-win\\" +
-                   fs::path(bundlePath).stem().string() + ".vst3";
+         const std::string archFolder = bundlePath + "\\Contents\\" + kVst3ArchFolder;
+         std::string conventional = archFolder + "\\" + fs::path(bundlePath).stem().string() + ".vst3";
+         if (fs::exists(conventional, ec))
+         {
+            dllPath = conventional;
+         }
+         else
+         {
+            std::string found = FindVst3ModuleInArchFolder(archFolder);
+            if (found.empty())
+               found = FindVst3ModuleInAnyArchFolder(bundlePath);
+            dllPath = found.empty() ? conventional : found;
+         }
       }
 
-      HMODULE module = LoadLibraryW(WinCommon::Utf8ToWide(dllPath).c_str());
+      // LOAD_WITH_ALTERED_SEARCH_PATH makes the module's own directory the
+      // first stop for its DLL imports, matching what CFBundleLoadExecutable
+      // gives us for free on Mac (a bundle's Frameworks/ dir is searched
+      // automatically). Plugins that ship helper DLLs next to their module
+      // fail to load without this. Requires an absolute path.
+      std::error_code absEc;
+      std::wstring dllPathW = WinCommon::Utf8ToWide(fs::absolute(dllPath, absEc).string());
+      HMODULE module = LoadLibraryExW(dllPathW.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
       if (module == nullptr)
       {
-         VST3Trace("LoadLibraryW failed: %s", dllPath.c_str());
+         VST3Trace("LoadLibraryExW failed: %s", dllPath.c_str());
          return nullptr;
       }
 
@@ -1441,11 +2219,39 @@ namespace Platform
                    bundlePath.c_str());
       }
 
-      // Step 3 (targeted rescan) on macOS also searches user-added folders via
-      // SetVST3SearchFolders; that plumbing isn't wired up on Windows yet
-      // (EnumerateVST3Plugins is still the no-op stub - see PluginHostWin.cpp),
-      // so a cache miss here just stays a miss rather than triggering a scan
-      // that can't find anything. Known gap, not a silent regression.
+      // Step 3: a targeted rescan, only if both of the above missed. Mirrors
+      // PluginVST3.mm's equivalent step - /Library/Audio/Plug-Ins/VST3 and
+      // ~/Library/Audio/Plug-Ins/VST3 become the two conventional Windows
+      // VST3 folders below.
+      if (bundlePath.empty())
+      {
+         std::vector<std::string> searchFolders;
+         wchar_t* commonProgramFiles = nullptr;
+         size_t cpfLen = 0;
+         if (_wdupenv_s(&commonProgramFiles, &cpfLen, L"COMMONPROGRAMFILES") == 0 && commonProgramFiles != nullptr)
+         {
+            searchFolders.push_back(WinCommon::WideToUtf8(std::wstring(commonProgramFiles) + L"\\VST3"));
+            free(commonProgramFiles);
+         }
+         wchar_t* localAppData = nullptr;
+         size_t ladLen = 0;
+         if (_wdupenv_s(&localAppData, &ladLen, L"LOCALAPPDATA") == 0 && localAppData != nullptr)
+         {
+            searchFolders.push_back(WinCommon::WideToUtf8(std::wstring(localAppData) + L"\\Programs\\Common\\VST3"));
+            free(localAppData);
+         }
+         for (const auto& extra : GetExtraVST3SearchFolders())
+            if (std::find(searchFolders.begin(), searchFolders.end(), extra) == searchFolders.end())
+               searchFolders.push_back(extra);
+         std::vector<PluginDesc> discovered;
+         VST3Trace("  cache miss; targeted rescan of %d folder(s)", (int)searchFolders.size());
+         for (const auto& f : searchFolders)
+            VST3Trace("    folder: %s", f.c_str());
+         EnumerateVST3Plugins(searchFolders, discovered);
+         bundlePath = GetCachedVST3BundlePath(desc.identifier);
+         VST3Trace("  rescan found %d plugin(s); cache lookup -> '%s'", (int)discovered.size(), bundlePath.c_str());
+      }
+
       if (bundlePath.empty())
       {
          std::string message = "VST3 not resolvable: " + desc.identifier;
@@ -2116,6 +2922,24 @@ namespace Platform
    // Editor Window
    // ------------------------------------------------------------------------
 
+   // Plugin editors commonly depend on OLE (drag-drop targets, common file
+   // dialogs invoked from a preset browser) on the thread that owns their
+   // HWND. Unlike the scoped CoInitializeEx pairs in PlatformWin.cpp's media
+   // paths, this must stay live for as long as any editor window might be
+   // open on this thread, which is the app's entire life once the first
+   // editor is opened - there is no natural single app-shutdown hook in this
+   // codebase to pair an OleUninitialize with, so it is left initialized and
+   // released by the OS at process exit, same as the window class registered
+   // by RegisterEditorWindowClassOnce() above.
+   void EnsureOleInitializedOnThisThreadOnce()
+   {
+      static thread_local bool initialized = false;
+      if (initialized)
+         return;
+      initialized = true;
+      OleInitialize(nullptr);
+   }
+
    bool PluginVST3OpenEditor(PluginHandle* h, std::string& outError)
    {
       if (h == nullptr || h->vst3 == nullptr || !h->vst3->controller || h->state != PluginLoadState::Ready)
@@ -2124,6 +2948,8 @@ namespace Platform
          return false;
       }
       PluginVST3State* v = h->vst3;
+
+      EnsureOleInitializedOnThisThreadOnce();
 
       if (v->editorUnstable.load(std::memory_order_relaxed))
       {

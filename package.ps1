@@ -15,6 +15,7 @@ $Root  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Build = Join-Path $Root "build-dist"
 $Stage = Join-Path $Root "dist\Infinite"
 $Exe   = Join-Path $Build "Release\Infinite.exe"
+$ScannerExe = Join-Path $Build "Release\infinite-vst3-scanner.exe"
 
 function Find-VsDevShell {
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -60,6 +61,9 @@ if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
 New-Item -ItemType Directory -Force (Split-Path -Parent $Stage) | Out-Null
 New-Item -ItemType Directory -Force $Stage | Out-Null
 Copy-Item $Exe $Stage
+# The out-of-process VST3 scanner (src/scanner_main_win.cpp) must sit next to
+# Infinite.exe - Platform::ScannerExecutablePath() looks for it there.
+if (Test-Path $ScannerExe) { Copy-Item $ScannerExe $Stage }
 
 Write-Host "==> done: $Stage\Infinite.exe"
 if ($Launch) {
