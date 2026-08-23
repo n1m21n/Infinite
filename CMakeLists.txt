@@ -317,6 +317,23 @@ set(WIN32_SOURCES
     external/glad/src/gl.c
 )
 
+# src/main.cpp is ~37k lines, and MSVC's x64 code generator hits an internal
+# compiler error on it at /O2's default /Ob2 - no C1001, no source line, just
+# a crashed CL.exe. ARM64 compiles the identical file fine, and it only began
+# failing once a month of feature work landed in the same translation unit, so
+# it reads as a complexity ceiling in codegen rather than bad source.
+#
+# /Ob1 restricts inline expansion to functions actually marked inline, which
+# cuts the per-function IR this file hands the optimiser. main.cpp is ImGui
+# drawing, the node editor and the headless fixtures - no per-sample audio
+# runs here, so the lost inlining does not cost anything measurable.
+#
+# The real fix is for this file to stop being 37k lines. Until then, keep this
+# scoped to the one file and the one compiler that needs it.
+if(MSVC)
+    set_source_files_properties(src/main.cpp PROPERTIES COMPILE_OPTIONS "/Ob1")
+endif()
+
 add_executable(Infinite ${COMMON_SOURCES})
 
 if(APPLE)
