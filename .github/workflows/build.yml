@@ -97,8 +97,10 @@ jobs:
       # no C1001, no source location, and attributed to whichever batch
       # happened to be mid-codegen rather than to the TU responsible.
       # Serial is slower but deterministic and actually attributable.
+      # NB: use MSBuild's explicit /maxcpucount:1 - `-m:1` is rejected with
+      # MSB1031 "Specify the maximum number of CPUs" when passed this way.
       - name: Build
-        run: cmake --build build --config Release -- -m:1
+        run: cmake --build build --config Release -- /maxcpucount:1
 
       # Skipped on ARM64: the x64 runner's binary is native there, but an
       # ARM64 binary cannot be executed by an x64 host and vice versa. The
