@@ -212,6 +212,11 @@ namespace
       HANDLE stopEvent = nullptr;
       HANDLE bufferEvent = nullptr;
       std::atomic<bool> running{ false };
+      // Latched by the render thread once WASAPI setup has either succeeded
+      // or given up, so AudioDeviceOpen can stop polling. `running` cannot be
+      // used for this - the thread clears it on the failure path, which is
+      // exactly what used to make Stop() skip the join.
+      std::atomic<bool> setupDone{ false };
 
       // Planar scratch handed to the callback, then interleaved into WASAPI.
       std::vector<float> planarScratch;    // channels * kPlanarCapacity
@@ -224,27 +229,22 @@ namespace
 
       ~RenderState() { Stop(); }
 
+      // Idempotent, and safe to call after the render thread has already
+      // exited on its own. The join is gated ONLY on joinable() - never on
+      // `running`, which the thread clears itself when setup fails. Getting
+      // that wrong left a joinable std::thread that nobody joined, so the
+      // next `thread = std::thread(...)` in AudioDeviceOpen (or ~RenderState
+      // at exit) called std::terminate() and the process vanished with no
+      // dialog. CaptureEngineBase::Stop() below has always had this shape.
       void Stop()
       {
-         if (!running.exchange(false))
-         {
-            if (stopEvent != nullptr)
-            {
-               CloseHandle(stopEvent);
-               stopEvent = nullptr;
-            }
-            if (bufferEvent != nullptr)
-            {
-               CloseHandle(bufferEvent);
-               bufferEvent = nullptr;
-            }
-            return;
-         }
+         running.store(false, std::memory_order_release);
 
          if (stopEvent != nullptr)
             SetEvent(stopEvent);
          if (thread.joinable())
             thread.join();
+         setupDone.store(false, std::memory_order_release);
 
          if (client != nullptr)
             client->Release();
@@ -337,14 +337,16 @@ namespace
          }
       }
 
-      if (gRender.renderer == nullptr || !SUCCEEDED(0)) // renderer null means setup failed
+      // A null renderer means setup failed somewhere above. Publish the
+      // outcome either way so the opener stops waiting; Stop() does the
+      // cleanup and the join.
+      if (gRender.renderer == nullptr)
       {
-         if (gRender.renderer == nullptr)
-         {
-            gRender.running.store(false, std::memory_order_release);
-            return;
-         }
+         gRender.running.store(false, std::memory_order_release);
+         gRender.setupDone.store(true, std::memory_order_release);
+         return;
       }
+      gRender.setupDone.store(true, std::memory_order_release);
 
       // Pump until stopped.
       HANDLE handles[2] = { gRender.stopEvent, gRender.bufferEvent };
@@ -494,11 +496,13 @@ namespace Platform
       // The thread performs full WASAPI setup before its pump; give it a
       // moment and report what was negotiated. A slow COM bring-up should not
       // fail the open outright - poll briefly.
+      // Wait on the thread's own handshake. The previous guard tested
+      // !thread.joinable(), which can never be true here - joinable() stays
+      // true until join() or detach() - so every failed open stalled the
+      // caller for the whole 4000 ms before reporting.
       for (int waitedMs = 0; waitedMs < 4000; waitedMs += 10)
       {
-         if (!gRender.thread.joinable())
-            break; // died
-         if (gRender.renderer != nullptr)
+         if (gRender.setupDone.load(std::memory_order_acquire))
             break;
          Sleep(10);
       }
