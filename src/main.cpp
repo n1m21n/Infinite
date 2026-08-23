@@ -2928,10 +2928,13 @@ namespace
    void RebuildAudioTopology();
 
    // Which geometry-ish pin a node exposes at a given slot, and how to set it.
-   // Geometry, camera and light connections are raw pointers rather than
-   // ImageCables, so saving and loading them needs this one place that knows
-   // the mapping - the same knowledge the link-drawing and connect paths use.
-   void ConnectGeometrySlot(GraphNode& dst, int slot, GraphNode& src)
+   // Geometry, camera, light and modulator connections are raw pointers rather
+   // than ImageCables, so saving and loading them needs this one place that
+   // knows the mapping - the same knowledge the link-drawing and connect paths
+   // use. srcOutput picks which of a multi-output source's pins is meant; it
+   // only matters for modulator pins today (geometry/camera/light sources all
+   // have a single output), which is why it defaults to 0.
+   void ConnectGeometrySlot(GraphNode& dst, int slot, GraphNode& src, int srcOutput = 0)
    {
       auto* geo = dynamic_cast<IGeometrySource*>(src.node.get());
       auto* cam = dynamic_cast<CameraNode*>(src.node.get());
@@ -2952,6 +2955,18 @@ namespace
          *field = geo;
          return;
       }
+      // Every modulator input pin (Range to Range, Smooth, Mod Depth, Compare,
+      // Envelope, CV to Pitch, Invert, Mod Curve, Math, OSC Send, ...) goes
+      // through the generic ModulatorInputSlot() accessor, exactly like the
+      // live drag-to-connect path does. This used to special-case MathNode
+      // only, so every *other* modulator-into-modulator cable was written to
+      // the patch by BuildPatchData and then silently dropped on the way back
+      // in - which made an undo, a redo or a file open detach the cable.
+      if (IModulator** modField = dst.node->ModulatorInputSlot(slot))
+      {
+         *modField = ModulatorForOutput(src.node.get(), srcOutput);
+         return;
+      }
       if (auto* setColor = dynamic_cast<SetColorNode*>(dst.node.get()))
       {
          if (slot == 2)
@@ -2962,14 +2977,6 @@ namespace
       {
          audio->fileSource = dynamic_cast<AudioFileNode*>(src.node.get());
          return;
-      }
-      if (auto* math = dynamic_cast<MathNode*>(dst.node.get()))
-      {
-         IModulator* mod = ModulatorForOutput(src.node.get(), 0);
-         if (slot == 0)
-            math->inputA = mod;
-         else
-            math->inputB = mod;
       }
    }
 
@@ -17913,7 +17920,11 @@ namespace
                   for (int o = 0; o < std::max(1, src.node->OutputCount()) && !found; o++)
                      if (ModulatorForOutput(src.node.get(), o) == wanted)
                      {
-                        data.geometry.push_back({ gn.index, slot, src.index });
+                        // The output index matters here in a way it doesn't for
+                        // geometry/camera/light pins: a modulator source can
+                        // expose several outputs, and dropping `o` re-attached
+                        // every restored cable to output 0.
+                        data.geometry.push_back({ gn.index, slot, src.index, o });
                         found = true;
                      }
                   if (found)
@@ -18063,7 +18074,7 @@ namespace
          GraphNode* dst = resolve(c.dstIndex);
          GraphNode* src = resolve(c.srcIndex);
          if (dst != nullptr && src != nullptr)
-            ConnectGeometrySlot(*dst, c.dstSlot, *src);
+            ConnectGeometrySlot(*dst, c.dstSlot, *src, c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.audio)
       {
@@ -28437,6 +28448,77 @@ int main(int argc, char** argv)
          printf("undo/redo do not grow their own stacks: %zu -> %zu  %s\n",
                 depthBefore, gUndoStack.size(), statOfSizeUnaffected ? "OK" : "FAIL");
          ok = ok && statOfSizeUnaffected;
+
+         // --- every modulator input pin survives an undo (regression) ---
+         // Modulator-into-modulator cables (Random -> Range to Range's `in`,
+         // and every other node exposing a ModulatorInputSlot) are raw
+         // IModulator* pointers rather than ImageCables, so they only come
+         // back if ConnectGeometrySlot knows how to re-seat them. It used to
+         // know about MathNode and nothing else, so every other such cable was
+         // written into the snapshot and then silently dropped on the way back
+         // in - one undo anywhere on the canvas detached the cable. Swept over
+         // the whole registry rather than a hand-written list, so a new
+         // modulator-input node cannot quietly reintroduce the hole.
+         {
+            int sweptTypes = 0;
+            std::vector<std::string> lostTypes;
+            for (const std::string& category : NodeFactory::Instance().GetCategories())
+            {
+               for (const std::string& typeName : NodeFactory::Instance().GetNodesInCategory(category))
+               {
+                  {
+                     std::unique_ptr<INode> probe(NodeFactory::Instance().MakeNode(typeName));
+                     if (probe == nullptr || probe->ModulatorInputCount() == 0)
+                        continue;
+                  }
+
+                  NewPatch();
+                  GraphNode* srcGn = SpawnNode("Random", "Modulators", 0.0f, 0.0f);
+                  GraphNode* dstGn = SpawnNode(typeName, category, 200.0f, 0.0f);
+                  if (srcGn == nullptr || dstGn == nullptr)
+                     continue;
+                  const int slotCount = dstGn->node->ModulatorInputCount();
+                  IModulator* wired = ModulatorForOutput(srcGn->node.get(), 0);
+                  for (int slot = 0; slot < slotCount; slot++)
+                     *dstGn->node->ModulatorInputSlot(slot) = wired;
+                  sweptTypes++;
+
+                  PushUndoCheckpoint();
+                  SpawnNode("Constant", "Modulators", 400.0f, 0.0f); // something to undo
+                  Undo();
+
+                  // Re-found by type name: Undo rebuilds the graph from
+                  // scratch, so every pointer captured above is stale.
+                  GraphNode* srcBack = nullptr;
+                  GraphNode* dstBack = nullptr;
+                  for (GraphNode& gn : gNodes)
+                  {
+                     if (gn.typeName == "Random")
+                        srcBack = &gn;
+                     else if (gn.typeName == typeName)
+                        dstBack = &gn;
+                  }
+                  bool intact = srcBack != nullptr && dstBack != nullptr;
+                  if (intact)
+                  {
+                     IModulator* expected = ModulatorForOutput(srcBack->node.get(), 0);
+                     for (int slot = 0; slot < slotCount && intact; slot++)
+                     {
+                        IModulator** field = dstBack->node->ModulatorInputSlot(slot);
+                        intact = field != nullptr && *field != nullptr && *field == expected;
+                     }
+                  }
+                  if (!intact)
+                     lostTypes.push_back(typeName);
+               }
+            }
+            const bool modCablesOk = sweptTypes > 0 && lostTypes.empty();
+            printf("modulator input cables survive undo: %d types swept, %zu lost", sweptTypes, lostTypes.size());
+            for (const std::string& t : lostTypes)
+               printf(" [%s]", t.c_str());
+            printf("  %s\n", modCablesOk ? "OK" : "FAIL");
+            ok = ok && modCablesOk;
+         }
 
          // --- opening a patch from disk clears history; undoing past it is not a thing ---
          SavePatchTo("/tmp/infinite_undotest.infinite");
