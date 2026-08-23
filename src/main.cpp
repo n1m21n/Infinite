@@ -257,12 +257,12 @@ namespace
 
    inline ImU32 ScopeGridCol()
    {
-      return IsThemeLight() ? IM_COL32(208, 215, 228, 255) : IM_COL32(255, 255, 255, 12);
+      return IsThemeLight() ? IM_COL32(208, 215, 228, 255) : IM_COL32(255, 255, 255, 26);
    }
 
    inline ImU32 ScopeMidLineCol()
    {
-      return IsThemeLight() ? IM_COL32(178, 186, 204, 255) : IM_COL32(255, 255, 255, 26);
+      return IsThemeLight() ? IM_COL32(178, 186, 204, 255) : IM_COL32(255, 255, 255, 46);
    }
 
    inline ImU32 ScopeTextCol()
@@ -11164,6 +11164,57 @@ namespace
       return kFilterVizMinDb + t * (kFilterVizMaxDb - kFilterVizMinDb);
    }
 
+   // Shared graticule for Audio Filter and EQ - decade-anchored frequency
+   // ticks plus dB ticks, both labeled. The two callers were previously
+   // drawing identical unlabeled tick loops (confirmed-safe dedup).
+   void DrawFilterGraticule(ImDrawList* dl, ImVec2 origin, float w, float h)
+   {
+      static const float kFreqTicks[] = { 20.0f, 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f,
+                                          2000.0f, 5000.0f, 10000.0f, 20000.0f };
+      const float textY = origin.y + h - ImGui::GetTextLineHeight() - 2.0f;
+      for (float f : kFreqTicks)
+      {
+         const bool isEdge = (f <= kFilterVizMinHz || f >= kFilterVizMaxHz);
+         const bool isDecadeAnchor = (f == 100.0f || f == 1000.0f || f == 10000.0f);
+         const float x = FilterVizFreqToX(f, origin.x, w);
+         if (!isEdge)
+            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + h),
+                        isDecadeAnchor ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
+
+         char buf[8];
+         if (f < 1000.0f)
+            snprintf(buf, sizeof(buf), "%.0f", f);
+         else
+            snprintf(buf, sizeof(buf), "%.0fk", f / 1000.0f);
+
+         if (f <= kFilterVizMinHz)
+            dl->AddText(ImVec2(origin.x + 3.0f, textY), ScopeTextCol(), buf);
+         else if (f >= kFilterVizMaxHz)
+            dl->AddText(ImVec2(origin.x + w - 3.0f - ImGui::CalcTextSize(buf).x, textY), ScopeTextCol(), buf);
+         else
+            dl->AddText(ImVec2(x - ImGui::CalcTextSize(buf).x * 0.5f, textY), ScopeTextCol(), buf);
+      }
+
+      static const float kDbTicks[] = { -18.0f, -12.0f, -6.0f, 0.0f, 6.0f, 12.0f, 18.0f };
+      static const bool kDbLabeled[] = { true, true, false, true, false, true, true };
+      for (int i = 0; i < 7; i++)
+      {
+         const float db = kDbTicks[i];
+         const float y = FilterVizDbToY(db, origin.y, h);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + w, y),
+                     db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
+         if (kDbLabeled[i])
+         {
+            char buf[8];
+            if (db == 0.0f)
+               snprintf(buf, sizeof(buf), "0");
+            else
+               snprintf(buf, sizeof(buf), "%+.0f", db);
+            dl->AddText(ImVec2(origin.x + 3.0f, y - (db == 0.0f ? 14.0f : 1.0f)), ScopeTextCol(), buf);
+         }
+      }
+   }
+
    // Full-width log-frequency response curve with a draggable handle per
    // band - the reason Audio Filter is built first (§1.1): X = freq,
    // Y = gain, scroll = Q, double-click = enable/disable. This *is* the
@@ -11186,22 +11237,8 @@ namespace
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
-      // Octave-ish frequency ticks and dB ticks - the graticule that keeps
-      // this from reading as blank at rest (§3f).
-      static const float kFreqTicks[] = { 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f,
-                                          2000.0f, 5000.0f, 10000.0f };
-      for (float f : kFreqTicks)
-      {
-         const float x = FilterVizFreqToX(f, origin.x, w);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
-      }
-      static const float kDbTicks[] = { -12.0f, 0.0f, 12.0f };
-      for (float db : kDbTicks)
-      {
-         const float y = FilterVizDbToY(db, origin.y, h);
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y),
-                     db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
-      }
+      // Graticule that keeps this from reading as blank at rest (§3f).
+      DrawFilterGraticule(dl, origin, w, h);
 
       const float type = n->Param("type");
       const float freq = n->Param("freq");
@@ -11415,20 +11452,7 @@ namespace
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
-      static const float kFreqTicks[] = { 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f,
-                                          2000.0f, 5000.0f, 10000.0f };
-      for (float f : kFreqTicks)
-      {
-         const float x = FilterVizFreqToX(f, origin.x, w);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
-      }
-      static const float kDbTicks[] = { -12.0f, 0.0f, 12.0f };
-      for (float db : kDbTicks)
-      {
-         const float y = FilterVizDbToY(db, origin.y, h);
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y),
-                     db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
-      }
+      DrawFilterGraticule(dl, origin, w, h);
 
       EqBandValues bands[5];
       ReadEqBands(n, bands);
@@ -11501,6 +11525,21 @@ namespace
          dl->AddQuadFilled(ImVec2(x0, baselineY), ImVec2(x1, baselineY), ImVec2(x1, y1), ImVec2(x0, y0),
                            isLight ? IM_COL32(30, 110, 230, 30) : IM_COL32(150, 214, 255, 22));
       }
+
+      // Persistent selected-band caption - unlike the hover readout below,
+      // this is visible at rest so the user always knows what's selected.
+      {
+         char freqBuf[16];
+         if (bands[selected].freq < 1000.0f)
+            snprintf(freqBuf, sizeof(freqBuf), "%.0f Hz", bands[selected].freq);
+         else
+            snprintf(freqBuf, sizeof(freqBuf), "%.2f kHz", bands[selected].freq / 1000.0f);
+         char capBuf[80];
+         snprintf(capBuf, sizeof(capBuf), "band %d \xC2\xB7 %s \xC2\xB7 %+.1f dB \xC2\xB7 Q %.2f", selected + 1,
+                  freqBuf, bands[selected].gain, bands[selected].q);
+         dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 4.0f), ScopeTextCol(), capBuf);
+      }
+
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
       {
