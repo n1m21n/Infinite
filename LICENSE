@@ -24,7 +24,8 @@ SOFTWARE.
 
 Infinite's own source code is licensed under the MIT License above.
 
-Optionally building with `INFINITE_ENABLE_VST3=ON` links the Steinberg VST3 SDK,
-which is licensed under the GNU General Public License version 3 (GPLv3). When
-distributed with VST3 support enabled, the combined binary must be distributed
-under the terms of the GPLv3.
+By default, the build links the Steinberg VST3 SDK (`INFINITE_ENABLE_VST3=ON`),
+which is licensed under the GNU General Public License version 3 (GPLv3). The
+distributed binary of a default build must therefore be distributed under the
+terms of the GPLv3. Building with `-DINFINITE_ENABLE_VST3=OFF` excludes the VST3
+SDK and the resulting binary remains under the plain MIT terms above.

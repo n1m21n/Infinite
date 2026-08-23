@@ -95,7 +95,7 @@ endif()
 # is GPLv3-or-proprietary, and linking it makes the distributed binary GPLv3
 # too (see LICENSE). Do not flip this default without the user's explicit
 # sign-off - it's a licensing decision, not a technical one.
-option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" OFF)
+option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" ON)
 
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)

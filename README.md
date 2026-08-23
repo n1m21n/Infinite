@@ -64,7 +64,7 @@ Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeS
 - **Native Third-Party Hosting**: Drag AU plugins directly onto the canvas or select from the auto-indexed **Plugins** library.
 - **Floating Native Editor Windows**: Plugins open in their native graphical interface.
 - **Parameter Mapping & Modulation**: Enable **configure**, touch any control in the plugin window, and it exposes an automated slider with its own modulation pin on the node canvas.
-- **VST3 is opt-in and off by default.** AU hosting ships unconditionally. VST3 hosting requires building with `-DINFINITE_ENABLE_VST3=ON` and the `external/vst3sdk` submodule (`git submodule update --init --recursive external/vst3sdk`), because the Steinberg VST3 SDK is GPLv3-or-commercial and Infinite's own source is MIT — enabling VST3 makes the *distributed binary* GPLv3 (see `LICENSE`). A default build has no VST3 support and the Plugins panel says so.
+- **VST3 ships by default**, alongside unconditional AU hosting. It requires the `external/vst3sdk` submodule (`git submodule update --init --recursive external/vst3sdk`); because the Steinberg VST3 SDK is GPLv3-or-commercial and Infinite's own source is MIT, a default build's *distributed binary* is GPLv3 (see `LICENSE`). Build with `-DINFINITE_ENABLE_VST3=OFF` to drop VST3 and keep the binary under plain MIT — that build has no VST3 support and the Plugins panel says so.
 
 ### 5. Procedural 3D Geometry & Simulation
 - **Unified Geometry Pipeline**: Modernized geometry pipeline supporting meshes, point clouds, and 3D spline curves over unified cables.
@@ -203,11 +203,12 @@ src/
 
 ## License
 
-Infinite is open-source software licensed under the **MIT License** — see [LICENSE](LICENSE).
+Infinite's own source is licensed under the **MIT License** — see [LICENSE](LICENSE). Because VST3 hosting is included by default and links the GPLv3-licensed Steinberg VST3 SDK, the distributed binary of a default build is GPLv3; build with `-DINFINITE_ENABLE_VST3=OFF` for a plain-MIT binary.
 
 **Vendored & Third-Party Dependencies:**
 - [Dear ImGui](https://github.com/ocornut/imgui) (MIT)
 - [imgui-node-editor](https://github.com/thedmd/imgui-node-editor) (MIT)
 - [stb](https://github.com/nothings/stb) (Public Domain)
 - [GLFW](https://github.com/glfw/glfw) (zlib)
+- [Steinberg VST3 SDK](https://github.com/steinbergmedia/vst3sdk) (GPLv3, or proprietary Steinberg license)
 

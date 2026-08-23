@@ -54,8 +54,11 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-        # No submodules: external/vst3sdk is the only one and VST3 hosting is
-        # off by default (a licensing opt-in, see CMakeLists.txt).
+        with:
+          # external/vst3sdk is the only submodule. INFINITE_ENABLE_VST3
+          # defaults ON (see CMakeLists.txt), so the SDK headers must always
+          # be present for the configure step below to succeed.
+          submodules: recursive
 
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -86,6 +89,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Configure
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }}
