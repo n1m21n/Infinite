@@ -102,9 +102,9 @@ set(NODE_EDITOR_DIR external/imgui-node-editor)
 set(STB_DIR external/stb)
 set(SYPHON_DIR external/syphon)
 
-if(INFINITE_ENABLE_VST3 AND NOT APPLE)
-    message(FATAL_ERROR "INFINITE_ENABLE_VST3 is only wired up on macOS right now; "
-                        "the Windows platform layer reports plugin hosting as unavailable.")
+if(INFINITE_ENABLE_VST3 AND NOT APPLE AND NOT WIN32)
+    message(FATAL_ERROR "INFINITE_ENABLE_VST3 is only wired up on macOS and Windows right now; "
+                        "this platform's layer reports plugin hosting as unavailable.")
 endif()
 
 if(INFINITE_ENABLE_VST3)
@@ -397,6 +397,28 @@ if(WIN32)
     # GUI-subsystem executable that still uses plain main(): MSVC's default
     # WinMain entry doesn't exist here, mainCRTStartup forwards to main().
     set_target_properties(Infinite PROPERTIES WIN32_EXECUTABLE TRUE)
+
+    if(INFINITE_ENABLE_VST3)
+        # Foundation-phase Windows VST3 hosting: the portable SDK-hosting
+        # logic (src/platform/win/PluginVST3Win.cpp) compiles and links, but
+        # unlike the macOS side there is no out-of-process scanner yet -
+        # enumeration stays routed through PluginHostWin.cpp's existing
+        # no-op stub. That's a known, temporary gap (see the Windows VST3
+        # hosting plan), not a silent regression: no codesign step is needed
+        # here either, since Windows has no equivalent requirement.
+        target_compile_definitions(Infinite PRIVATE INFINITE_ENABLE_VST3=1)
+        target_include_directories(Infinite PRIVATE
+            ${VST3_SDK_DIR}
+            ${VST3_SDK_DIR}/pluginterfaces
+            ${VST3_SDK_DIR}/public.sdk
+        )
+        target_sources(Infinite PRIVATE
+            src/platform/win/PluginVST3Win.cpp
+            ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
+        )
+    endif()
     target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
 elseif(APPLE)
     target_include_directories(Infinite PRIVATE
