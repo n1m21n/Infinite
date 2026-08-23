@@ -378,6 +378,10 @@ if(WIN32)
     target_link_libraries(Infinite PRIVATE
         opengl32 winmm ole32 shell32 gdi32 user32 advapi32
         gdiplus dwmapi
+        # avrt carries MMCSS (AvSetMmThreadCharacteristics), which the WASAPI
+        # render thread needs to be scheduled against its buffer deadline
+        # rather than as an ordinary thread.
+        avrt
         # mfplat/mfreadwrite cover decode+muxing; mfuuid carries the MF GUIDs;
         # mf carries camera device activation (MFEnumDeviceSources /
         # MFCreateDeviceSource).
