@@ -430,17 +430,13 @@
           <div class="section-label">First-Time Setup</div>
           <h2 class="section-heading">Opening Infinite on Windows in 3 Steps</h2>
           <p class="setup-intro">
-            The Windows build is a portable folder &mdash; there is no installer, and nothing is
-            written to your registry. It is unsigned, so Windows shows a one-time warning on the
-            first launch. Here is how to get past it:
-          </p>
-          <p class="setup-intro">
-            The download button gives you the <strong>Intel / AMD (x64)</strong> build, which is
-            what almost every PC needs. On an ARM machine &mdash; a Snapdragon X laptop, or a Mac
-            running Windows in Parallels &mdash; take the
+            The Windows build is a portable folder &mdash; no installer, nothing written to your
+            registry. It's unsigned, so Windows shows a one-time warning on first launch. Most PCs
+            need the <strong>Intel / AMD (x64)</strong> build from the download button; ARM
+            machines (Snapdragon X, or Windows in Parallels on a Mac) need the
             <a href="https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-windows-ARM64.zip">ARM64 build</a>
-            instead. Windows tells you which you have under
-            <strong>Settings &rarr; System &rarr; About &rarr; System type</strong>.
+            instead &mdash; check <strong>Settings &rarr; System &rarr; About &rarr; System type</strong>
+            if unsure. Here's how to open it:
           </p>
 
           <div class="steps-grid">
@@ -462,16 +458,6 @@
               <p class="step-desc">Patches save as <code>.infinite</code> files. Windows will not know what they are until you tell it once: right-click a patch, choose <strong>Open with &rarr; Choose another app</strong>, pick <code>Infinite.exe</code> and tick <strong>Always</strong>. Dragging a patch onto the canvas works right away, with no setup.</p>
             </div>
           </div>
-
-          <p class="setup-intro setup-note">
-            <strong>Windows is new here.</strong> The port landed with generous help from
-            <a href="https://github.com/ThatManMatthias" target="_blank" rel="noopener">ThatManMatthias</a>,
-            and it has had far less real-world use than the Mac build. Two things are known to be
-            off: MIDI clock sync does not drive the transport, and the Text 3D node sizes its
-            letters incorrectly. Everything else is expected to work &mdash; if it does not, please
-            <a href="https://github.com/n1m21n/Infinite/issues" target="_blank" rel="noopener">open an issue</a>
-            and say which build you took.
-          </p>
         </div>
       </div>
     </section>
