@@ -20,6 +20,25 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Link the MSVC runtime statically so a downloaded Infinite.exe runs on a
+# clean Windows install. The default (/MD) makes the exe depend on
+# MSVCP140.dll + VCRUNTIME140.dll from the Visual C++ redistributable, which
+# is NOT present on a stock Windows image - the failure is a launch-time
+# "MSVCP140.dll was not found" dialog, which is exactly the trap a
+# single-file portable build should not have. Same reasoning as building GLFW
+# from source above: a downloaded build must not depend on something else
+# being installed first.
+#
+# This must be set before the FetchContent_MakeAvailable calls below: every
+# target in the build has to agree on the CRT or the link fails with
+# mismatched _ITERATOR_DEBUG_LEVEL / RuntimeLibrary errors, and glfw and
+# libFLAC are both built from source here. CMP0091 (NEW as of the 3.16
+# minimum above) is what makes this variable authoritative instead of the
+# old flag-munging approach.
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 # GLFW is built from source and linked statically rather than taken from
 # Homebrew: a downloaded .app must not depend on /opt/homebrew existing. (On
 # Windows the same reasoning applies to any vcpkg/system copy.)

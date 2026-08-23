@@ -42,6 +42,7 @@ Severity, briefly:
 | 1.8 | MIDI note ring has N producers, not 1 | dropped/torn notes with 2+ controllers |
 | 1.9 | Capture-thread races | data race, and a use-after-free on the audio thread |
 | 1.10 | Assorted smaller items | see the block |
+| 1.11 | Exe imported the VC++ redist CRT | wouldn't launch on a clean Windows install (fixed) |
 
 ### 1.1 `PortableFft::Inverse` is broken (blocker)
 
@@ -464,6 +465,36 @@ event handle.
    RPC_E_CHANGED_MODE as usable-but-do-not-uninitialise and log it.
 ```
 
+### 1.11 The build was not actually self-contained (fixed)
+
+```
+package.ps1's header claims the staged exe needs no runtime DLLs ("the build
+links everything statically except system libraries"), and the README's
+Windows section repeats it. That was not true: MSVC defaults to the dynamic
+CRT (/MD), so Infinite.exe imported MSVCP140.dll and VCRUNTIME140.dll from
+the Visual C++ redistributable. On a clean Windows image - which is exactly
+what a first-time user or a fresh VM has - it died before main() with
+
+    The code execution cannot proceed because MSVCP140.dll was not found.
+
+Nothing in the build or the headless tests could see this: the CI runner has
+Visual Studio installed, so the DLLs are present there and every test passed.
+
+Fixed in CMakeLists.txt by setting
+
+    CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+
+before the FetchContent_MakeAvailable calls, so glfw, libFLAC and Infinite all
+agree on the static CRT (they must agree, or the link fails on mismatched
+RuntimeLibrary). build.yml now also asserts the shipped exe's import table
+contains no MSVCP140/VCRUNTIME140, so this cannot regress silently.
+
+Worth correcting the claim in package.ps1's header comment and in the README
+too - both still assert self-containment as a property of the old /MD build
+rather than of the static-CRT setting that now actually provides it.
+```
+
+
 ---
 
 ## Part 2 — Running the CI artifact in Parallels on an Apple Silicon Mac
@@ -474,9 +505,14 @@ both unrepresentative.
 
 1. **Get the build.** Open the Actions tab, pick the newest `Build` run on
    the branch you care about, and download the `Infinite-windows-*` artifact
-   from the run summary. Unzip it; `Infinite.exe` is self-contained (the build
-   links everything but system libraries statically). It is unsigned, so
-   SmartScreen will offer "More info → Run anyway".
+   from the run summary. Unzip it and run `Infinite.exe` — it needs no
+   installer and no other files. It is unsigned, so SmartScreen will offer
+   "More info → Run anyway".
+
+   (Builds before the static-CRT fix died at launch with "MSVCP140.dll was not
+   found" on a clean Windows image — see 1.11. If you hit that on an older
+   artifact, either grab a newer one or install the Visual C++ 2015-2022
+   redistributable in the guest.)
 
 2. **Which artifact.** Parallels on Apple Silicon runs Windows 11 on ARM.
    Try `Infinite-windows-ARM64` first — it runs natively. If that job failed

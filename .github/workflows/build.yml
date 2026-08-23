@@ -101,6 +101,29 @@ jobs:
         shell: bash
         run: ./.github/scripts/headless-tests.sh build/Release/Infinite.exe
 
+      # The exe is handed to people as a single portable file, so it must not
+      # import the Visual C++ redistributable's CRT - a /MD build dies at
+      # launch with "MSVCP140.dll was not found" on a stock Windows image,
+      # which is invisible to the build and to every headless test above.
+      # CMakeLists.txt links the CRT statically; this asserts it stayed that
+      # way. Import-table DLL names are plain ASCII in the PE, so a byte scan
+      # needs no dev-shell and works on both architectures.
+      - name: Assert no Visual C++ redistributable dependency
+        shell: pwsh
+        run: |
+          $bytes = [System.IO.File]::ReadAllBytes("build/Release/Infinite.exe")
+          $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+          $bad = @("MSVCP140", "VCRUNTIME140", "MSVCP140D", "VCRUNTIME140D") |
+                 Where-Object { $ascii -match $_ }
+          if ($bad) {
+            Write-Error ("Infinite.exe imports the VC++ redistributable CRT (" +
+                         ($bad -join ", ") +
+                         "). It will fail to launch on a clean Windows install. " +
+                         "CMAKE_MSVC_RUNTIME_LIBRARY should be MultiThreaded - see CMakeLists.txt.")
+            exit 1
+          }
+          Write-Host "OK: statically linked CRT, no vc_redist dependency."
+
       # package.ps1 is the local developer path (it drives its own configure
       # and hardcodes x64); here the build already exists, so just stage it.
       - name: Stage
