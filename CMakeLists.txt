@@ -334,9 +334,11 @@ set(WIN32_SOURCES
 #
 # main.cpp is ImGui drawing, the node editor and the headless fixtures - no
 # per-sample audio runs here, that is all in other TUs - so this is a real but
-# modest UI cost, on Windows only. Verify it applied by the D9025 "overriding
-# '/O2' with '/Od'" warning in the build log, not by grepping for the flag:
-# MSBuild does not echo compiler flags at default verbosity.
+# modest UI cost, on Windows only. Do not try to confirm this landed by
+# grepping the build log for the flag - MSBuild does not echo compiler flags at
+# default verbosity, and CMake does not pass this one on the command line
+# anyway: it becomes a per-file <Optimization>Disabled</Optimization> in
+# Infinite.vcxproj. The build workflow dumps that node so it stays checkable.
 #
 # The real fix is for this file to stop being 37k lines. Until then, keep this
 # scoped to the one file and the one compiler that needs it.
