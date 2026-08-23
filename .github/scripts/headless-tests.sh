@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+#
+# The subset of src/main.cpp's INFINITE_* self-tests that returns before
+# glfwInit() and therefore needs no GPU, no audio device and no window server.
+# Used by .github/workflows/build.yml on both platforms.
+#
+# Two verdict styles live in main.cpp and this script has to respect both
+# (see run-infinite-hygiene/SKILL.md, "verdict lines aren't exit codes"):
+#
+#   INFINITE_DSPTEST         - returns RunDspTest()'s real exit code.
+#   INFINITE_AUDIOPDCTEST    - deliberately always returns 0; the printf
+#                              verdict line is the only signal.
+#
+# INFINITE_AUDIOPARAMSWEEPTEST is run but NOT gated: it has a large documented
+# baseline of [FAIL] lines for params whose effect the sweep's bare rig cannot
+# observe (no sample loaded, note fields outside the outbox signature, ...).
+# Gating on it would mean encoding that baseline here and updating it on every
+# node change. We only assert it does not crash, which still catches a
+# platform layer that dies during node registration.
+
+set -uo pipefail
+
+BIN="${1:?usage: headless-tests.sh <path-to-infinite-binary>}"
+
+if [ ! -x "$BIN" ]; then
+   echo "FAIL: '$BIN' is not an executable file"
+   exit 1
+fi
+
+status=0
+
+# --- exit-code gated -------------------------------------------------------
+
+echo "== INFINITE_DSPTEST"
+if INFINITE_DSPTEST=1 "$BIN"; then
+   echo "   pass"
+else
+   echo "   FAIL (exit $?)"
+   status=1
+fi
+
+# --- verdict-line gated ----------------------------------------------------
+# Each of these always exits 0, so grep the printf line instead.
+
+check_verdict() {
+   local var="$1" expect="$2" out
+   echo "== $var"
+   if ! out="$(env "$var=1" "$BIN" 2>&1)"; then
+      echo "   FAIL (crashed, exit $?)"
+      printf '%s\n' "$out" | tail -20
+      status=1
+      return
+   fi
+   if printf '%s\n' "$out" | grep -q "$expect"; then
+      echo "   pass"
+   else
+      echo "   FAIL (no '$expect' in output)"
+      printf '%s\n' "$out" | tail -20
+      status=1
+   fi
+}
+
+check_verdict INFINITE_AUDIOPDCTEST "AUDIOPDCTEST OK"
+
+# --- crash-only (baseline too large to gate on) ----------------------------
+
+echo "== INFINITE_AUDIOPARAMSWEEPTEST (crash check only)"
+if INFINITE_AUDIOPARAMSWEEPTEST=1 "$BIN" > /dev/null 2>&1; then
+   echo "   pass (did not crash)"
+else
+   echo "   FAIL (crashed, exit $?)"
+   status=1
+fi
+
+echo
+if [ "$status" -eq 0 ]; then
+   echo "All headless self-tests passed."
+else
+   echo "Headless self-tests FAILED."
+fi
+exit "$status"

@@ -1,0 +1,95 @@
+name: Build
+
+# Compile-and-headless-test gate for both platforms, and the place Windows
+# builds come from at all - nobody on the project has a Windows machine, so
+# the runner is the only reliable Windows toolchain we have. Every run uploads
+# a downloadable Infinite.exe as a workflow artifact.
+#
+# Scope note: these runners have no GPU, no audio device, no camera and no
+# window server we can rely on, so the automated checks here deliberately
+# cover only what is verifiable without them:
+#
+#   * the build itself (the single biggest thing a cross-platform port breaks)
+#   * the self-tests in src/main.cpp that return before glfwInit()
+#
+# Everything GL/ImGui-driven - the ~50 fixtures in
+# .claude/skills/run-infinite-hygiene/driver.sh - still has to run on a real
+# desktop. See docs/WINDOWS_VERIFICATION.md for that half.
+
+on:
+  push:
+    branches: [main, 'feature/**', 'bugfix/**']
+  pull_request:
+  workflow_dispatch:
+
+# A force-push mid-run should cancel the superseded run, not queue behind it.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macOS (arm64)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        # No submodules: external/vst3sdk is the only one and VST3 hosting is
+        # off by default (a licensing opt-in, see CMakeLists.txt).
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j3
+
+      - name: Headless self-tests
+        run: ./.github/scripts/headless-tests.sh build/Infinite.app/Contents/MacOS/Infinite
+
+  windows:
+    name: Windows (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    # ARM64 is best-effort: it exists so an Apple Silicon Parallels VM (which
+    # runs Windows 11 on ARM) can run a native build instead of leaning on
+    # Windows' x64 emulation. x64 is the supported target and must stay green.
+    continue-on-error: ${{ matrix.arch == 'ARM64' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2022
+          - arch: ARM64
+            runner: windows-11-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }}
+
+      - name: Build
+        run: cmake --build build --config Release -- -m
+
+      # Skipped on ARM64: the x64 runner's binary is native there, but an
+      # ARM64 binary cannot be executed by an x64 host and vice versa. The
+      # ARM64 job is a compile check plus an artifact.
+      - name: Headless self-tests
+        if: matrix.arch == 'x64'
+        shell: bash
+        run: ./.github/scripts/headless-tests.sh build/Release/Infinite.exe
+
+      # package.ps1 is the local developer path (it drives its own configure
+      # and hardcodes x64); here the build already exists, so just stage it.
+      - name: Stage
+        shell: bash
+        run: |
+          mkdir -p dist/Infinite
+          cp build/Release/Infinite.exe dist/Infinite/
+          cp README.md LICENSE dist/Infinite/ 2>/dev/null || true
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-windows-${{ matrix.arch }}
+          path: dist/Infinite
+          if-no-files-found: error
