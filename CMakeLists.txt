@@ -317,27 +317,6 @@ set(WIN32_SOURCES
     external/glad/src/gl.c
 )
 
-# src/main.cpp is ~37k lines, and MSVC's x64 code generator hits an internal
-# compiler error on it at /O2's default /Ob2 - no C1001, no source line, just
-# a crashed CL.exe. ARM64 compiles the identical file fine, and it only began
-# failing once a month of feature work landed in the same translation unit, so
-# it reads as a complexity ceiling in codegen rather than bad source.
-#
-# /Ob1 (inlining only where marked) did not help, so this goes all the way to
-# /Od: no optimisation at all for this one file. If the crash is anywhere in
-# the optimiser, /Od removes it; if /Od still crashes, the fault is in codegen
-# proper and the flag is not the answer.
-#
-# main.cpp is ImGui drawing, the node editor and the headless fixtures - no
-# per-sample audio runs here - so unoptimised is a real but modest UI cost,
-# and only on Windows.
-#
-# The real fix is for this file to stop being 37k lines. Until then, keep this
-# scoped to the one file and the one compiler that needs it.
-if(MSVC)
-    set_source_files_properties(src/main.cpp PROPERTIES COMPILE_OPTIONS "/Od")
-endif()
-
 add_executable(Infinite ${COMMON_SOURCES})
 
 if(APPLE)
