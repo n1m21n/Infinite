@@ -1,6 +1,6 @@
 #include "Text3DNode.h"
 
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 
 #include "Platform.h"
 #include "Transport.h"

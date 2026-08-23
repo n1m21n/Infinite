@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 
 #include "core/INode.h"
 #include "core/AudioCable.h"

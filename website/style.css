@@ -978,6 +978,13 @@ body {
   margin-bottom: 20px;
 }
 
+/* Trailing note under a setup box's steps: same voice as .setup-intro, but it
+   follows the grid instead of introducing it, so it needs the space above. */
+.setup-note {
+  margin-top: 24px;
+  margin-bottom: 0;
+}
+
 .steps-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

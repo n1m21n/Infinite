@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <map>
+#include "platform/AppPaths.h"
 
 namespace CategoryColors
 {
@@ -253,10 +254,8 @@ int gCurrent = 0;
 // app's other Application Support state, not a bundled settings format.
 std::string ThemePath()
 {
-   const char* home = getenv("HOME");
-   if (home == nullptr)
-      return {};
-   return std::string(home) + "/Library/Application Support/Infinite.theme";
+   std::string dir = AppPaths::AppSupportDir();
+   return dir.empty() ? std::string() : dir + "/Infinite.theme";
 }
 }
 

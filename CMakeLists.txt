@@ -10,13 +10,54 @@ if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "" FORCE)
 endif()
 
-project(Infinite C CXX OBJC OBJCXX)
+# Objective-C/Objective-C++ are Apple-only languages; the Windows port keeps
+# the same source tree but swaps the platform layer for src/platform/win.
+project(Infinite LANGUAGES C CXX)
+if(APPLE)
+    enable_language(OBJC OBJCXX)
+elseif(WIN32)
+    # Needed to compile src/platform/win/Infinite.rc (app icon + version
+    # block). Harmless when no .rc is in the target's sources.
+    enable_language(RC)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Link the MSVC runtime statically so a downloaded Infinite.exe runs on a
+# clean Windows install. The default (/MD) makes the exe depend on
+# MSVCP140.dll + VCRUNTIME140.dll from the Visual C++ redistributable, which
+# is NOT present on a stock Windows image - the failure is a launch-time
+# "MSVCP140.dll was not found" dialog, which is exactly the trap a
+# single-file portable build should not have. Same reasoning as building GLFW
+# from source above: a downloaded build must not depend on something else
+# being installed first.
+#
+# This must be set before the FetchContent_MakeAvailable calls below: every
+# target in the build has to agree on the CRT or the link fails with
+# mismatched _ITERATOR_DEBUG_LEVEL / RuntimeLibrary errors, and glfw and
+# libFLAC are both built from source here. CMP0091 (NEW as of the 3.16
+# minimum above) is what makes this variable authoritative instead of the
+# old flag-munging approach.
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+    # One cl.exe invocation per translation unit instead of the Visual Studio
+    # generator's default of batching every source in a target into a single
+    # call. The batched form ends in a combined "Generating Code..." codegen
+    # pass, and that pass hit a reproducible internal compiler error on x64
+    # (MSVC 19.44) with no C1001 and no source location - so it was neither
+    # fixable nor attributable to a file. Unbatched, each TU stands alone:
+    # any future ICE names its own .cpp. Needs CMake 3.24; the variable is
+    # simply ignored by older versions, so the guard is documentation only.
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+        set(CMAKE_VS_NO_COMPILE_BATCHING ON)
+    endif()
+endif()
+
 # GLFW is built from source and linked statically rather than taken from
-# Homebrew: a downloaded .app must not depend on /opt/homebrew existing.
+# Homebrew: a downloaded .app must not depend on /opt/homebrew existing. (On
+# Windows the same reasoning applies to any vcpkg/system copy.)
 include(FetchContent)
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -31,16 +72,40 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glfw)
 
-# Optional VST3 plugin hosting backend. Off by default: the Steinberg VST3
-# SDK is GPLv3-or-proprietary, and linking it makes the distributed binary
-# GPLv3 too (see LICENSE). Do not flip this default without the user's
-# explicit sign-off - it's a licensing decision, not a technical one.
+# FLAC writing on Windows: dr_libs is decode-only, so the file writer links
+# the real libFLAC instead (static, no Ogg). macOS keeps CoreAudio's
+# ExtAudioFile and never compiles this in.
+if(WIN32)
+    set(BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(INSTALL_MANPAGES OFF CACHE BOOL "" FORCE)
+    set(WITH_OGG OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        flac
+        GIT_REPOSITORY https://github.com/xiph/flac.git
+        GIT_TAG 1.5.0
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(flac)
+endif()
+
+# Optional VST3 plugin hosting backend. Off by default: the Steinberg VST3 SDK
+# is GPLv3-or-proprietary, and linking it makes the distributed binary GPLv3
+# too (see LICENSE). Do not flip this default without the user's explicit
+# sign-off - it's a licensing decision, not a technical one.
 option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" OFF)
 
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)
 set(STB_DIR external/stb)
 set(SYPHON_DIR external/syphon)
+
+if(INFINITE_ENABLE_VST3 AND NOT APPLE)
+    message(FATAL_ERROR "INFINITE_ENABLE_VST3 is only wired up on macOS right now; "
+                        "the Windows platform layer reports plugin hosting as unavailable.")
+endif()
 
 if(INFINITE_ENABLE_VST3)
     set(VST3_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/vst3sdk")
@@ -52,41 +117,17 @@ if(INFINITE_ENABLE_VST3)
     endif()
 endif()
 
-set(SYPHON_SOURCES
-    ${SYPHON_DIR}/src/SyphonCGL.c
-    ${SYPHON_DIR}/src/SyphonDispatch.c
-    ${SYPHON_DIR}/src/SyphonOpenGLFunctions.c
-    ${SYPHON_DIR}/src/SyphonCFMessageReceiver.m
-    ${SYPHON_DIR}/src/SyphonCFMessageSender.m
-    ${SYPHON_DIR}/src/SyphonClient.m
-    ${SYPHON_DIR}/src/SyphonClientBase.m
-    ${SYPHON_DIR}/src/SyphonClientConnectionManager.m
-    ${SYPHON_DIR}/src/SyphonGLShader.m
-    ${SYPHON_DIR}/src/SyphonGLVertices.m
-    ${SYPHON_DIR}/src/SyphonIOSurfaceImageCore.m
-    ${SYPHON_DIR}/src/SyphonIOSurfaceImageLegacy.m
-    ${SYPHON_DIR}/src/SyphonImage.m
-    ${SYPHON_DIR}/src/SyphonImageBase.m
-    ${SYPHON_DIR}/src/SyphonMessageQueue.m
-    ${SYPHON_DIR}/src/SyphonMessageReceiver.m
-    ${SYPHON_DIR}/src/SyphonMessageSender.m
-    ${SYPHON_DIR}/src/SyphonMessaging.m
-    ${SYPHON_DIR}/src/SyphonOpenGLClient.m
-    ${SYPHON_DIR}/src/SyphonOpenGLImage.m
-    ${SYPHON_DIR}/src/SyphonOpenGLServer.m
-    ${SYPHON_DIR}/src/SyphonPrivate.m
-    ${SYPHON_DIR}/src/SyphonServer.m
-    ${SYPHON_DIR}/src/SyphonServerBase.m
-    ${SYPHON_DIR}/src/SyphonServerConnectionManager.m
-    ${SYPHON_DIR}/src/SyphonServerDirectory.m
-    ${SYPHON_DIR}/src/SyphonServerGLShader.m
-    ${SYPHON_DIR}/src/SyphonServerGLVertices.m
-    ${SYPHON_DIR}/src/SyphonServerRendererCoreGL.m
-    ${SYPHON_DIR}/src/SyphonServerRendererGL.m
-    ${SYPHON_DIR}/src/SyphonServerRendererLegacyGL.m
-)
+# ---- per-platform sources ---------------------------------------------------
+#
+# Everything OS-specific funnels through src/platform/Platform.h, so exactly
+# one platform backend TU set is ever compiled:
+#
+#   macOS : Platform.mm (CoreAudio/CoreMIDI/AVFoundation/...) + AudioFileWriter.mm
+#           + the Syphon library
+#   Win32 : src/platform/win/*.cpp (WASAPI/WinMM/Media Foundation/GDI+) +
+#           AudioFileWriter.cpp (dr_libs/shine) + the glad GL loader
 
-add_executable(Infinite MACOSX_BUNDLE
+set(COMMON_SOURCES
     src/main.cpp
     src/core/GLUtil.cpp
     src/core/CurveShape.cpp
@@ -105,16 +146,15 @@ add_executable(Infinite MACOSX_BUNDLE
     src/core/RemoteControl.cpp
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
-    src/platform/Platform.mm
     src/audio/AudioEngine.cpp
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp
     src/audio/AudioCaptureRing.cpp
-    src/audio/AudioFileWriter.mm
     external/shine/shine_mp3.c
     src/audio/AudioVoice.cpp
     src/audio/Wavetable.cpp
     src/audio/EffectDefs.cpp
+    src/audio/dsp/PortableFftFixture.cpp
     src/audio/dsp/AudioFilterKernel.cpp
     src/audio/dsp/EqKernel.cpp
     src/audio/dsp/DynamicsKernel.cpp
@@ -203,8 +243,6 @@ add_executable(Infinite MACOSX_BUNDLE
     src/audio/SampleScanner.cpp
     src/audio/PluginScanner.cpp
 
-    ${SYPHON_SOURCES}
-
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_tables.cpp
@@ -219,72 +257,217 @@ add_executable(Infinite MACOSX_BUNDLE
     ${NODE_EDITOR_DIR}/crude_json.cpp
 )
 
+set(SYPHON_SOURCES
+    ${SYPHON_DIR}/src/SyphonCGL.c
+    ${SYPHON_DIR}/src/SyphonDispatch.c
+    ${SYPHON_DIR}/src/SyphonOpenGLFunctions.c
+    ${SYPHON_DIR}/src/SyphonCFMessageReceiver.m
+    ${SYPHON_DIR}/src/SyphonCFMessageSender.m
+    ${SYPHON_DIR}/src/SyphonClient.m
+    ${SYPHON_DIR}/src/SyphonClientBase.m
+    ${SYPHON_DIR}/src/SyphonClientConnectionManager.m
+    ${SYPHON_DIR}/src/SyphonGLShader.m
+    ${SYPHON_DIR}/src/SyphonGLVertices.m
+    ${SYPHON_DIR}/src/SyphonIOSurfaceImageCore.m
+    ${SYPHON_DIR}/src/SyphonIOSurfaceImageLegacy.m
+    ${SYPHON_DIR}/src/SyphonImage.m
+    ${SYPHON_DIR}/src/SyphonImageBase.m
+    ${SYPHON_DIR}/src/SyphonMessageQueue.m
+    ${SYPHON_DIR}/src/SyphonMessageReceiver.m
+    ${SYPHON_DIR}/src/SyphonMessageSender.m
+    ${SYPHON_DIR}/src/SyphonMessaging.m
+    ${SYPHON_DIR}/src/SyphonOpenGLClient.m
+    ${SYPHON_DIR}/src/SyphonOpenGLImage.m
+    ${SYPHON_DIR}/src/SyphonOpenGLServer.m
+    ${SYPHON_DIR}/src/SyphonPrivate.m
+    ${SYPHON_DIR}/src/SyphonServer.m
+    ${SYPHON_DIR}/src/SyphonServerBase.m
+    ${SYPHON_DIR}/src/SyphonServerConnectionManager.m
+    ${SYPHON_DIR}/src/SyphonServerDirectory.m
+    ${SYPHON_DIR}/src/SyphonServerGLShader.m
+    ${SYPHON_DIR}/src/SyphonServerGLVertices.m
+    ${SYPHON_DIR}/src/SyphonServerRendererCoreGL.m
+    ${SYPHON_DIR}/src/SyphonServerRendererGL.m
+    ${SYPHON_DIR}/src/SyphonServerRendererLegacyGL.m
+)
+
+set(APPLE_SOURCES
+    src/platform/Platform.mm
+    src/audio/AudioFileWriter.mm
+    ${SYPHON_SOURCES}
+)
+
+set(WIN32_SOURCES
+    # Icon + version info. MSVC and MinGW both compile .rc files when the
+    # RC language is enabled (see enable_language below); without this the
+    # exe shows Explorer's generic application icon everywhere.
+    src/platform/win/Infinite.rc
+    src/platform/win/PlatformWin.cpp
+    src/platform/win/AudioDeviceWin.cpp
+    src/platform/win/MidiWin.cpp
+    src/platform/win/MediaWin.cpp
+    src/platform/win/MediaDecodeWin.cpp
+    src/platform/win/PluginHostWin.cpp
+    src/audio/AudioFileWriter.cpp
+    # zlib backend for tinyexr's EXR decode (see MediaDecodeWin.cpp).
+    external/miniz.c
+    # GL loader for the non-Apple branch of core/gl3.h. Must load via
+    # gladLoadGL((GLADloadfunc)glfwGetProcAddress) right after context
+    # creation - main.cpp does this at both glfwMakeContextCurrent sites.
+    external/glad/src/gl.c
+)
+
+# MSVC's x64 code generator hits an internal compiler error on src/main.cpp at
+# /O2 - no C1001, no source line, just CL.exe exiting with -529706956. ARM64
+# compiles the identical file, and it only started failing once a month of
+# feature work landed in this translation unit.
+#
+# Two cheaper theories were tested and both failed. /Ob1 (inline only where
+# marked) changed nothing, so it is not inlining. Giving main()'s 10k-line
+# frame loop its own function via a lambda changed nothing either - which
+# makes sense in hindsight: that moved the enormous body into the lambda's
+# operator() instead of shrinking it, so the largest single function the
+# backend has to work on was the same size as before.
+#
+# So the optimiser gets switched off for this one file. If the crash lives
+# anywhere in the optimiser, /Od removes it.
+#
+# main.cpp is ImGui drawing, the node editor and the headless fixtures - no
+# per-sample audio runs here, that is all in other TUs - so this is a real but
+# modest UI cost, on Windows only. Do not try to confirm this landed by
+# grepping the build log for the flag - MSBuild does not echo compiler flags at
+# default verbosity, and CMake does not pass this one on the command line
+# anyway: it becomes a per-file <Optimization>Disabled</Optimization> in
+# Infinite.vcxproj. The build workflow dumps that node so it stays checkable.
+#
+# The real fix is for this file to stop being 37k lines. Until then, keep this
+# scoped to the one file and the one compiler that needs it.
+if(MSVC)
+    set_source_files_properties(src/main.cpp PROPERTIES COMPILE_OPTIONS "/Od")
+endif()
+
+add_executable(Infinite ${COMMON_SOURCES})
+
+if(APPLE)
+    target_sources(Infinite PRIVATE ${APPLE_SOURCES})
+endif()
+
+if(WIN32)
+    target_sources(Infinite PRIVATE ${WIN32_SOURCES})
+endif()
+
 target_include_directories(Infinite PRIVATE
     src src/core src/nodes src/platform src/audio
     ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
     ${STB_DIR}
+    external
     external/json
     external/shine
-    ${SYPHON_DIR}/include
-    ${SYPHON_DIR}/src
+    external/glad/include
 )
 
 target_link_libraries(Infinite PRIVATE glfw)
 
-set_source_files_properties(src/platform/Platform.mm src/audio/AudioFileWriter.mm
-    PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
-set_source_files_properties(${SYPHON_SOURCES}
-    PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")
-
-if(INFINITE_ENABLE_VST3)
-    target_compile_definitions(Infinite PRIVATE INFINITE_ENABLE_VST3=1)
+if(WIN32)
+    # System libraries behind the Windows platform layer: WASAPI/MMDevice ride
+    # on ole32+mfplat, MIDI on winmm, Media Foundation decode/muxing on
+    # mfreadwrite+mfuuid, dialogs/text on shell32+gdiplus. Most of our TUs also
+    # carry matching #pragma comment(lib) lines; this list is the belt to that
+    # suspenders so MinGW-style toolchains link too.
+    target_link_libraries(Infinite PRIVATE
+        opengl32 winmm ole32 shell32 gdi32 user32 advapi32
+        gdiplus dwmapi
+        # mfplat/mfreadwrite cover decode+muxing; mfuuid carries the MF GUIDs;
+        # mf carries camera device activation (MFEnumDeviceSources /
+        # MFCreateDeviceSource).
+        mfplat mfreadwrite mfuuid mf
+        FLAC::FLAC
+    )
+    # M_PI etc. live behind _USE_MATH_DEFINES in MSVC's math.h; defining on the
+    # command line lands before any cmath include.
+    target_compile_definitions(Infinite PRIVATE
+        _USE_MATH_DEFINES
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        _CRT_SECURE_NO_WARNINGS
+        IMGUI_DISABLE_OBSOLETE_KEYIO
+        IMGUI_DEFINE_MATH_OPERATORS
+    )
+    # GUI-subsystem executable that still uses plain main(): MSVC's default
+    # WinMain entry doesn't exist here, mainCRTStartup forwards to main().
+    set_target_properties(Infinite PROPERTIES WIN32_EXECUTABLE TRUE)
+    target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
+elseif(APPLE)
     target_include_directories(Infinite PRIVATE
-        ${VST3_SDK_DIR}
-        ${VST3_SDK_DIR}/pluginterfaces
-        ${VST3_SDK_DIR}/public.sdk
-    )
-    target_sources(Infinite PRIVATE
-        src/platform/PluginVST3.mm
-        ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
-        ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
-        ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
-    )
-    set_source_files_properties(src/platform/PluginVST3.mm
-        PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
-
-    add_executable(infinite-vst3-scanner
-        src/scanner_main.mm
-        src/platform/PluginVST3.mm
-        src/platform/Platform.mm
-        ${SYPHON_SOURCES}
-        ${NODE_EDITOR_DIR}/crude_json.cpp
-        ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
-        ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
-        ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
-    )
-    target_include_directories(infinite-vst3-scanner PRIVATE
-        src src/core src/nodes src/platform src/audio
-        ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
-        ${NODE_EDITOR_DIR}
-        ${STB_DIR}
-        external/json
-        external/shine
         ${SYPHON_DIR}/include
         ${SYPHON_DIR}/src
-        ${VST3_SDK_DIR}
-        ${VST3_SDK_DIR}/pluginterfaces
-        ${VST3_SDK_DIR}/public.sdk
     )
-    target_compile_definitions(infinite-vst3-scanner PRIVATE
-        INFINITE_ENABLE_VST3=1
-        GL_SILENCE_DEPRECATION
-        INFINITE_VST3_SCANNER=1
-    )
-    set_source_files_properties(src/scanner_main.mm
-        PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+endif()
 
-    if(APPLE)
+# imgui-node-editor 0.9.1 ships its own GetKeyIndex() shim, which collides with
+# ImGui's obsolete-keyio copy. Dropping the obsolete API leaves only the shim.
+# (Windows sets these above alongside its other defines; keep the macOS path.)
+if(NOT WIN32)
+    target_compile_definitions(Infinite PRIVATE
+        IMGUI_DISABLE_OBSOLETE_KEYIO
+        IMGUI_DEFINE_MATH_OPERATORS
+    )
+endif()
+
+if(APPLE)
+    set_source_files_properties(src/platform/Platform.mm src/audio/AudioFileWriter.mm
+        PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    set_source_files_properties(${SYPHON_SOURCES}
+        PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")
+
+    if(INFINITE_ENABLE_VST3)
+        target_compile_definitions(Infinite PRIVATE INFINITE_ENABLE_VST3=1)
+        target_include_directories(Infinite PRIVATE
+            ${VST3_SDK_DIR}
+            ${VST3_SDK_DIR}/pluginterfaces
+            ${VST3_SDK_DIR}/public.sdk
+        )
+        target_sources(Infinite PRIVATE
+            src/platform/PluginVST3.mm
+            ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
+        )
+        set_source_files_properties(src/platform/PluginVST3.mm
+            PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+
+        add_executable(infinite-vst3-scanner
+            src/scanner_main.mm
+            src/platform/PluginVST3.mm
+            src/platform/Platform.mm
+            ${SYPHON_SOURCES}
+            ${NODE_EDITOR_DIR}/crude_json.cpp
+            ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
+        )
+        target_include_directories(infinite-vst3-scanner PRIVATE
+            src src/core src/nodes src/platform src/audio
+            ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
+            ${NODE_EDITOR_DIR}
+            ${STB_DIR}
+            external/json
+            external/shine
+            ${SYPHON_DIR}/include
+            ${SYPHON_DIR}/src
+            ${VST3_SDK_DIR}
+            ${VST3_SDK_DIR}/pluginterfaces
+            ${VST3_SDK_DIR}/public.sdk
+        )
+        target_compile_definitions(infinite-vst3-scanner PRIVATE
+            INFINITE_ENABLE_VST3=1
+            GL_SILENCE_DEPRECATION
+            INFINITE_VST3_SCANNER=1
+        )
+        set_source_files_properties(src/scanner_main.mm
+            PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+
         target_link_libraries(infinite-vst3-scanner PRIVATE
             "-framework Cocoa"
             "-framework CoreFoundation"
@@ -315,16 +498,7 @@ if(INFINITE_ENABLE_VST3)
                     "$<TARGET_BUNDLE_DIR:Infinite>/Contents/MacOS/infinite-vst3-scanner"
             COMMENT "Copying scanner helper into app bundle")
     endif()
-endif()
 
-# imgui-node-editor 0.9.1 ships its own GetKeyIndex() shim, which collides with
-# ImGui's obsolete-keyio copy. Dropping the obsolete API leaves only the shim.
-target_compile_definitions(Infinite PRIVATE
-    IMGUI_DISABLE_OBSOLETE_KEYIO
-    IMGUI_DEFINE_MATH_OPERATORS
-)
-
-if(APPLE)
     target_link_libraries(Infinite PRIVATE
         "-framework OpenGL"
         "-framework Cocoa"
@@ -353,6 +527,7 @@ if(APPLE)
     target_compile_definitions(Infinite PRIVATE GL_SILENCE_DEPRECATION)
 
     set_target_properties(Infinite PROPERTIES
+        MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "Infinite"
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.namansoni.infinite"
         MACOSX_BUNDLE_BUNDLE_VERSION "0.1"

@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=33">
+  <link rel="stylesheet" href="style.css?v=34">
 </head>
 <body>
   <!-- Ambient Cosmic Dust Canvas -->
@@ -65,7 +65,7 @@
 
         <!-- Concise consumer summary -->
         <p class="hero-subtitle">
-          Infinite is an all-in-one creative playground for Mac. You wire ideas together on a single boundless page where every element reacts in real time.
+          Infinite is an all-in-one creative playground for Mac and Windows. You wire ideas together on a single boundless page where every element reacts in real time.
         </p>
 
         <div class="hero-cta-group">
@@ -82,6 +82,10 @@
               <span>No signup, 100% open source</span>
             </div>
           </div>
+
+          <a href="#download" class="btn btn-secondary btn-lg">
+            <span>Download for Windows</span>
+          </a>
 
           <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
             <span>Explore Source Code</span>
@@ -419,25 +423,78 @@
       </div>
     </section>
 
+    <!-- First Time Setup on Windows (SmartScreen + patch files) -->
+    <section id="setup-windows" class="section">
+      <div class="container">
+        <div class="setup-box">
+          <div class="section-label">First-Time Setup</div>
+          <h2 class="section-heading">Opening Infinite on Windows in 3 Steps</h2>
+          <p class="setup-intro">
+            The Windows build is a portable folder &mdash; there is no installer, and nothing is
+            written to your registry. It is unsigned, so Windows shows a one-time warning on the
+            first launch. Here is how to get past it:
+          </p>
+          <p class="setup-intro">
+            The download button gives you the <strong>Intel / AMD (x64)</strong> build, which is
+            what almost every PC needs. On an ARM machine &mdash; a Snapdragon X laptop, or a Mac
+            running Windows in Parallels &mdash; take the
+            <a href="https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-windows-ARM64.zip">ARM64 build</a>
+            instead. Windows tells you which you have under
+            <strong>Settings &rarr; System &rarr; About &rarr; System type</strong>.
+          </p>
+
+          <div class="steps-grid">
+            <div class="step-card">
+              <div class="step-num">1</div>
+              <h4 class="step-title">Unblock the ZIP</h4>
+              <p class="step-desc">Right-click the downloaded ZIP, choose <strong>Properties</strong>, tick <strong>Unblock</strong> at the bottom, then <strong>OK</strong>. Now extract it. Doing this before extracting saves you from being asked about every file inside.</p>
+            </div>
+
+            <div class="step-card">
+              <div class="step-num">2</div>
+              <h4 class="step-title">Run Anyway</h4>
+              <p class="step-desc">Extract anywhere you like and run <code>Infinite.exe</code>. If Microsoft Defender SmartScreen appears, click <strong>More info</strong>, then <strong>Run anyway</strong>. Keep the whole folder together &mdash; <code>Infinite.exe</code> loads its assets from alongside itself.</p>
+            </div>
+
+            <div class="step-card">
+              <div class="step-num">3</div>
+              <h4 class="step-title">Opening Patches</h4>
+              <p class="step-desc">Patches save as <code>.infinite</code> files. Windows will not know what they are until you tell it once: right-click a patch, choose <strong>Open with &rarr; Choose another app</strong>, pick <code>Infinite.exe</code> and tick <strong>Always</strong>. Dragging a patch onto the canvas works right away, with no setup.</p>
+            </div>
+          </div>
+
+          <p class="setup-intro setup-note">
+            <strong>Windows is new here.</strong> The port landed with generous help from
+            <a href="https://github.com/ThatManMatthias" target="_blank" rel="noopener">ThatManMatthias</a>,
+            and it has had far less real-world use than the Mac build. Two things are known to be
+            off: MIDI clock sync does not drive the transport, and the Text 3D node sizes its
+            letters incorrectly. Everything else is expected to work &mdash; if it does not, please
+            <a href="https://github.com/n1m21n/Infinite/issues" target="_blank" rel="noopener">open an issue</a>
+            and say which build you took.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <!-- Download Section -->
     <section id="download" class="section">
       <div class="container">
         <div class="download-card">
           <div class="section-label">Ready to Create?</div>
-          <h2 class="section-heading">Download Infinite for macOS</h2>
+          <h2 class="section-heading">Download Infinite</h2>
 
           <div class="specs-grid">
             <div class="spec-col">
               <span class="spec-label">Version</span>
-              <span class="spec-val">v0.1-preview</span>
+              <span class="spec-val">v0.2-preview</span>
             </div>
             <div class="spec-col">
-              <span class="spec-label">Compatibility</span>
-              <span class="spec-val">macOS 11.0 Big Sur or later</span>
+              <span class="spec-label">macOS</span>
+              <span class="spec-val">11.0 Big Sur or later, Universal</span>
             </div>
             <div class="spec-col">
-              <span class="spec-label">Architecture</span>
-              <span class="spec-val">Universal (Apple Silicon + Intel)</span>
+              <span class="spec-label">Windows</span>
+              <span class="spec-val">10 or later, x64 &amp; ARM64</span>
             </div>
             <div class="spec-col">
               <span class="spec-label">License</span>
@@ -448,6 +505,9 @@
           <div class="download-actions">
             <a href="assets/Infinite.dmg" download="Infinite.dmg" class="btn btn-primary btn-lg">
               <span>Download for macOS</span>
+            </a>
+            <a href="https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-windows-x64.zip" class="btn btn-primary btn-lg">
+              <span>Download for Windows</span>
             </a>
             <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
               <span>View Repository on GitHub</span>

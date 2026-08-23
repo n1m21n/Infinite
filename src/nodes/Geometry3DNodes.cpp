@@ -1,6 +1,6 @@
 #include "Geometry3DNodes.h"
 
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 #include <algorithm>
 #include <cstdio>
 #include <cmath>

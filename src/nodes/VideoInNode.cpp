@@ -1,6 +1,6 @@
 #include "VideoInNode.h"
 
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 #include <algorithm>
 
 const std::vector<std::string>& VideoInNode::ResolutionNames()

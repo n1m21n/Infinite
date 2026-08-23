@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "INode.h"
+#include "platform/AppPaths.h"
 
 namespace Patch
 {
@@ -21,10 +22,8 @@ namespace
 
    std::string RecentsPath()
    {
-      const char* home = getenv("HOME");
-      if (home == nullptr)
-         return std::string();
-      return std::string(home) + "/Library/Application Support/Infinite.recents";
+      std::string dir = AppPaths::AppSupportDir();
+      return dir.empty() ? std::string() : dir + "/Infinite.recents";
    }
 
    // Written with %.9g so a float survives the round trip exactly rather than

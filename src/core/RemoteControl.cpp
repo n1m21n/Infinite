@@ -1,9 +1,6 @@
 #include "RemoteControl.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
+#include "platform/NetCompat.h"
 
 #include <cstdlib>
 #include <deque>
@@ -14,6 +11,7 @@
 #include <sstream>
 #include <sys/stat.h>
 #include <thread>
+#include "platform/AppPaths.h"
 
 using json = nlohmann::json;
 
@@ -37,12 +35,7 @@ namespace RemoteControl
 
       std::string SettingsDir()
       {
-         const char* home = getenv("HOME");
-         if (home == nullptr)
-            return std::string();
-         std::string dir = std::string(home) + "/Library/Application Support/Infinite";
-         mkdir(dir.c_str(), 0755); // fine if it already exists
-         return dir;
+         return AppPaths::AppSupportDir(); // creates if missing
       }
 
       std::string GenerateToken()
@@ -78,7 +71,7 @@ namespace RemoteControl
          char chunk[4096];
          for (;;)
          {
-            ssize_t n = recv(fd, chunk, sizeof(chunk), 0);
+            NetSsize n = NetCompat::NetRecv(fd, chunk, sizeof(chunk), 0);
             if (n <= 0)
                break; // closed or error
 
@@ -126,10 +119,10 @@ namespace RemoteControl
 
                std::string out = responseEnvelope.dump();
                out += "\n";
-               send(fd, out.data(), out.size(), 0);
+               NetCompat::NetSend(fd, out.data(), out.size(), 0);
             }
          }
-         close(fd);
+         NetCompat::NetClose(fd);
       }
 
       void AcceptLoop(int port)
@@ -139,7 +132,7 @@ namespace RemoteControl
             return;
 
          int yes = 1;
-         setsockopt(listenFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+         NetCompat::NetSetSockOpt(listenFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
          sockaddr_in addr{};
          addr.sin_family = AF_INET;
@@ -148,12 +141,12 @@ namespace RemoteControl
 
          if (bind(listenFd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
          {
-            close(listenFd);
+            NetCompat::NetClose(listenFd);
             return;
          }
          if (listen(listenFd, 4) != 0)
          {
-            close(listenFd);
+            NetCompat::NetClose(listenFd);
             return;
          }
 

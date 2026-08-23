@@ -1,7 +1,11 @@
 #include "AnalyzeNodes.h"
 
+#if defined(__APPLE__)
 #include <Accelerate/Accelerate.h>
-#include <OpenGL/gl3.h>
+#else
+#include "dsp/PortableFft.h"
+#endif
+#include "gl3.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -683,14 +687,21 @@ public:
    {
       // FFT setup allocates - main thread only, at construction, never on
       // the audio thread (mirrors PaulStretchNode's mFftSetup lifetime).
+#if defined(__APPLE__)
       mFftSetup = vDSP_create_fftsetup(kFileFftLog2, FFT_RADIX2);
       vDSP_hann_window(mWindow, kFileFftSize, vDSP_HANN_NORM);
+#else
+      mFft.Prepare(kFileFftLog2);
+      PortableFft::HannWindowNorm(mWindow, kFileFftSize);
+#endif
    }
 
    ~AudioFilePlayerAudioNode() override
    {
+#if defined(__APPLE__)
       if (mFftSetup != nullptr)
          vDSP_destroy_fftsetup(mFftSetup);
+#endif
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
@@ -855,6 +866,7 @@ private:
       }
       rms = std::sqrt(rms / (float)kFileFftSize);
 
+#if defined(__APPLE__)
       vDSP_vmul(mLinear, 1, mWindow, 1, mWindowedScratch, 1, kFileFftSize);
 
       DSPSplitComplex split = { mReal, mImag };
@@ -862,6 +874,13 @@ private:
       vDSP_fft_zrip(mFftSetup, &split, 1, kFileFftLog2, FFT_FORWARD);
 
       vDSP_zvabs(&split, 1, mMagnitude, 1, kFileSpectrumSize);
+#else
+      for (int i = 0; i < kFileFftSize; i++)
+         mWindowedScratch[i] = mLinear[i] * mWindow[i];
+      mFft.Forward(mWindowedScratch, kFileFftLog2, mReal, mImag);
+      for (int i = 0; i < kFileSpectrumSize; i++)
+         mMagnitude[i] = std::sqrt(mReal[i] * mReal[i] + mImag[i] * mImag[i]);
+#endif
       const float norm = 2.0f / (float)kFileFftSize;
       for (int i = 0; i < kFileSpectrumSize; i++)
          mMagnitude[i] *= norm;
@@ -936,7 +955,11 @@ private:
    Platform::SampleBuffer* mActiveBuffer = nullptr;
    SampleSlot mSampleSlot;
 
+#if defined(__APPLE__)
    FFTSetup mFftSetup = nullptr;
+#else
+   PortableFft::RealFft mFft;
+#endif
    float mWindow[kFileFftSize] = {};
    float mRing[kFileFftSize] = {};
    int mRingWrite = 0;

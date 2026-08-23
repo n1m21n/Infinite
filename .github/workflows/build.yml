@@ -1,0 +1,163 @@
+name: Build
+
+# Compile-and-headless-test gate for both platforms, and the place Windows
+# builds come from at all - nobody on the project has a Windows machine, so
+# the runner is the only reliable Windows toolchain we have. Every run uploads
+# a downloadable Infinite.exe as a workflow artifact.
+#
+# Scope note: these runners have no GPU, no audio device, no camera and no
+# window server we can rely on, so the automated checks here deliberately
+# cover only what is verifiable without them:
+#
+#   * the build itself (the single biggest thing a cross-platform port breaks)
+#   * the self-tests in src/main.cpp that return before glfwInit()
+#
+# Everything GL/ImGui-driven - the ~50 fixtures in
+# .claude/skills/run-infinite-hygiene/driver.sh - still has to run on a real
+# desktop. See docs/WINDOWS_VERIFICATION.md for that half.
+
+on:
+  push:
+    branches: [main, 'feature/**', 'bugfix/**']
+  pull_request:
+  workflow_dispatch:
+
+# A force-push mid-run should cancel the superseded run, not queue behind it.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The Windows platform layer arrived as a fork PR and may not be present on
+  # every branch this workflow runs on. Without this gate, merging the
+  # workflow to a main that has no src/platform/win would leave a permanently
+  # red Windows job. hashFiles() cannot be used in a job-level `if` (the
+  # workspace is empty before checkout), hence a real job.
+  detect:
+    name: Detect platform layers
+    runs-on: ubuntu-latest
+    outputs:
+      has_windows: ${{ steps.check.outputs.has_windows }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f src/platform/win/PlatformWin.cpp ]; then
+            echo "has_windows=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_windows=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No src/platform/win - skipping the Windows jobs."
+          fi
+
+  macos:
+    name: macOS (arm64)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        # No submodules: external/vst3sdk is the only one and VST3 hosting is
+        # off by default (a licensing opt-in, see CMakeLists.txt).
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j3
+
+      - name: Headless self-tests
+        run: ./.github/scripts/headless-tests.sh build/Infinite.app/Contents/MacOS/Infinite
+
+  windows:
+    name: Windows (${{ matrix.arch }})
+    needs: detect
+    if: needs.detect.outputs.has_windows == 'true'
+    runs-on: ${{ matrix.runner }}
+    # ARM64 is best-effort: it exists so an Apple Silicon Parallels VM (which
+    # runs Windows 11 on ARM) can run a native build instead of leaning on
+    # Windows' x64 emulation. x64 is the supported target and must stay green.
+    continue-on-error: ${{ matrix.arch == 'ARM64' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2022
+          - arch: ARM64
+            runner: windows-11-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }}
+
+      # MSBuild's default verbosity does not echo compiler flags, so a failing
+      # build gives no way to confirm that a per-source workaround actually
+      # reached CL. Print what the generator decided for main.cpp, which is
+      # the file MSVC's x64 backend has been crashing on.
+      - name: Show main.cpp compile settings
+        shell: pwsh
+        run: |
+          $proj = 'build/Infinite.vcxproj'
+          [xml]$xml = Get-Content $proj
+          $ns = @{ m = 'http://schemas.microsoft.com/developer/msbuild/2003' }
+          Select-Xml -Xml $xml -Namespace $ns -XPath "//m:ClCompile[contains(@Include,'main.cpp')]" |
+            ForEach-Object { $_.Node.OuterXml }
+          Write-Host '--- project-level ClCompile (Release) ---'
+          Select-Xml -Xml $xml -Namespace $ns -XPath "//m:ItemDefinitionGroup[contains(@Condition,'Release')]/m:ClCompile" |
+            ForEach-Object { $_.Node.OuterXml }
+
+      # Serial, and NOT `-m`: with compile batching disabled each TU is its own
+      # CL invocation, so a serial build gives a log where the filename printed
+      # last is genuinely the file that failed. That is what finally attributed
+      # the crash to main.cpp.
+      # NB: use MSBuild's explicit /maxcpucount:1 - `-m:1` is rejected with
+      # MSB1031 "Specify the maximum number of CPUs" when passed this way.
+      - name: Build
+        run: cmake --build build --config Release -- /maxcpucount:1
+
+      # Skipped on ARM64: the x64 runner's binary is native there, but an
+      # ARM64 binary cannot be executed by an x64 host and vice versa. The
+      # ARM64 job is a compile check plus an artifact.
+      - name: Headless self-tests
+        if: matrix.arch == 'x64'
+        shell: bash
+        run: ./.github/scripts/headless-tests.sh build/Release/Infinite.exe
+
+      # The exe is handed to people as a single portable file, so it must not
+      # import the Visual C++ redistributable's CRT - a /MD build dies at
+      # launch with "MSVCP140.dll was not found" on a stock Windows image,
+      # which is invisible to the build and to every headless test above.
+      # CMakeLists.txt links the CRT statically; this asserts it stayed that
+      # way. Import-table DLL names are plain ASCII in the PE, so a byte scan
+      # needs no dev-shell and works on both architectures.
+      - name: Assert no Visual C++ redistributable dependency
+        shell: pwsh
+        run: |
+          $bytes = [System.IO.File]::ReadAllBytes("build/Release/Infinite.exe")
+          $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+          $bad = @("MSVCP140", "VCRUNTIME140", "MSVCP140D", "VCRUNTIME140D") |
+                 Where-Object { $ascii -match $_ }
+          if ($bad) {
+            Write-Error ("Infinite.exe imports the VC++ redistributable CRT (" +
+                         ($bad -join ", ") +
+                         "). It will fail to launch on a clean Windows install. " +
+                         "CMAKE_MSVC_RUNTIME_LIBRARY should be MultiThreaded - see CMakeLists.txt.")
+            exit 1
+          }
+          Write-Host "OK: statically linked CRT, no vc_redist dependency."
+
+      # package.ps1 is the local developer path (it drives its own configure
+      # and hardcodes x64); here the build already exists, so just stage it.
+      - name: Stage
+        shell: bash
+        run: |
+          mkdir -p dist/Infinite
+          cp build/Release/Infinite.exe dist/Infinite/
+          cp README.md LICENSE dist/Infinite/ 2>/dev/null || true
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-windows-${{ matrix.arch }}
+          path: dist/Infinite
+          if-no-files-found: error

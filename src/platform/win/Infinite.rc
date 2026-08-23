@@ -1,0 +1,51 @@
+// Windows resources for Infinite.exe.
+//
+// Without an icon resource the exe gets the generic Win32 application icon in
+// Explorer, the taskbar and Alt-Tab. IDI_ICON1 being the LOWEST-numbered icon
+// resource is what makes Explorer pick it as the file's display icon, so keep
+// it first if more icons are ever added.
+//
+// The version block is what shows in the file's Properties > Details tab, and
+// is also what SmartScreen and most enterprise software inventories read. An
+// unsigned exe with no version info looks maximally anonymous, so it is worth
+// having even before code signing.
+
+#include <windows.h>
+
+IDI_ICON1 ICON "Infinite.ico"
+
+#define INFINITE_VERSION      0,2,0,0
+#define INFINITE_VERSION_STR  "0.2.0.0"
+
+VS_VERSION_INFO VERSIONINFO
+   FILEVERSION    INFINITE_VERSION
+   PRODUCTVERSION INFINITE_VERSION
+   FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+   FILEFLAGS      VS_FF_DEBUG
+#else
+   FILEFLAGS      0x0L
+#endif
+   FILEOS         VOS_NT_WINDOWS32
+   FILETYPE       VFT_APP
+   FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+   BLOCK "StringFileInfo"
+   BEGIN
+      // 0409 = en-US, 04B0 = Unicode.
+      BLOCK "040904B0"
+      BEGIN
+         VALUE "CompanyName",      "Infinite"
+         VALUE "FileDescription",  "Infinite - realtime modular visual and audio synthesizer"
+         VALUE "FileVersion",      INFINITE_VERSION_STR
+         VALUE "InternalName",     "Infinite"
+         VALUE "OriginalFilename", "Infinite.exe"
+         VALUE "ProductName",      "Infinite"
+         VALUE "ProductVersion",   INFINITE_VERSION_STR
+      END
+   END
+   BLOCK "VarFileInfo"
+   BEGIN
+      VALUE "Translation", 0x409, 0x4B0
+   END
+END

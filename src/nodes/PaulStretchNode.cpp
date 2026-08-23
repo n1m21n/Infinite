@@ -1,6 +1,10 @@
 #include "PaulStretchNode.h"
 
+#if defined(__APPLE__)
 #include <Accelerate/Accelerate.h>
+#else
+#include "dsp/PortableFft.h"
+#endif
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -109,7 +113,11 @@ class AudioPaulStretchNode : public AudioNode
 public:
    AudioPaulStretchNode()
    {
+#if defined(__APPLE__)
       mFftSetup = vDSP_create_fftsetup(kMaxLog2, FFT_RADIX2);
+#else
+      mFft.Prepare(kMaxLog2);
+#endif
 
       // Precalculate Hann windows for each supported window size
       mWindows.resize(PaulStretchNode::kNumWindowSizes);
@@ -139,11 +147,13 @@ public:
 
    ~AudioPaulStretchNode() override
    {
+#if defined(__APPLE__)
       if (mFftSetup != nullptr)
       {
          vDSP_destroy_fftsetup(mFftSetup);
          mFftSetup = nullptr;
       }
+#endif
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
@@ -363,13 +373,25 @@ public:
                mFftInput[i] = srcChannelData[sampleIdx] * window[i];
             }
 
-            // Real-to-complex FFT via Apple vDSP
+            // Real-to-complex FFT via Apple vDSP (or the portable radix-2
+            // elsewhere - same packing and scaling conventions either way).
+#if defined(__APPLE__)
             DSPSplitComplex splitComplex;
             splitComplex.realp = mSplitReal.data();
             splitComplex.imagp = mSplitImag.data();
 
             vDSP_ctoz((const DSPComplex*)mFftInput.data(), 2, &splitComplex, 1, numSpectrumBins);
             vDSP_fft_zrip(mFftSetup, &splitComplex, 1, log2N, FFT_FORWARD);
+#else
+            // Same member names as DSPSplitComplex so the shared
+            // reconstruction code below needs no per-platform variants.
+            struct SplitView
+            {
+               float* realp;
+               float* imagp;
+            } splitComplex { mSplitReal.data(), mSplitImag.data() };
+            mFft.Forward(mFftInput.data(), log2N, splitComplex.realp, splitComplex.imagp);
+#endif
 
             // Compute polar representation (magnitudes & original phases)
             // DC bin
@@ -455,8 +477,12 @@ public:
             }
 
             // Inverse FFT
+#if defined(__APPLE__)
             vDSP_fft_zrip(mFftSetup, &splitComplex, 1, log2N, FFT_INVERSE);
             vDSP_ztoc(&splitComplex, 1, (DSPComplex*)mFftOutput.data(), 2, numSpectrumBins);
+#else
+            mFft.Inverse(splitComplex.realp, splitComplex.imagp, log2N, mFftOutput.data());
+#endif
 
             // Synthesis windowing and normalization
             // 75% overlap of Hann^2 window produces a constant sum of 1.5 * (FFT size / 4)
@@ -514,7 +540,11 @@ public:
 private:
    double mSampleRate = 44100.0;
    FastRng mRng;
+#if defined(__APPLE__)
    FFTSetup mFftSetup = nullptr;
+#else
+   PortableFft::RealFft mFft;
+#endif
    std::vector<std::vector<float>> mWindows;
 
    std::vector<float> mFftInput;
