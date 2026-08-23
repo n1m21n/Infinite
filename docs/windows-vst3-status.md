@@ -24,11 +24,16 @@ style. SEH guarding extended to `createView`/`getSize`/`setFrame`/`attached`/
 `PluginOpenEditor`/`CloseEditor`/`EditorIsOpen`/`AnyPluginEditorOpen`/
 `PumpPluginEditorEvents` dispatch.
 
-**Phase 3 — Out-of-process scanning + loader hardening. Implemented this
-session; compiles and links on macOS (regression build), pushed for Windows
-x64 + ARM64 CI — not yet runtime-verified on Windows.**
-All eleven gaps below are addressed in code. See "What CI proves vs. what
-doesn't" at the bottom before relying on any of this at runtime.
+**Phase 3 — Out-of-process scanning + loader hardening. Done, CI-confirmed
+compiling/linking (Windows x64 + ARM64) — not yet runtime-verified on
+Windows.**
+All eleven gaps below are addressed in code. Landed in two pushes: the
+initial implementation, then a fix-up commit for two build errors CI caught
+(a forward-reference to `LoadVST3Module`/`UnloadVST3Module` that only the
+scanner target's unbatched per-TU compile surfaced, and a `LoadCursorW`
+ANSI/wide mismatch from `IDC_ARROW` under a non-`UNICODE` build). See "What
+CI proves vs. what doesn't" at the bottom before relying on any of this at
+runtime.
 
 No local MSVC in this environment — verification is compile-only via GitHub
 Actions CI (`.github/workflows/build.yml`, Windows x64 + ARM64 jobs). Never
