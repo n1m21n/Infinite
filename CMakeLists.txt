@@ -323,15 +323,19 @@ set(WIN32_SOURCES
 # failing once a month of feature work landed in the same translation unit, so
 # it reads as a complexity ceiling in codegen rather than bad source.
 #
-# /Ob1 restricts inline expansion to functions actually marked inline, which
-# cuts the per-function IR this file hands the optimiser. main.cpp is ImGui
-# drawing, the node editor and the headless fixtures - no per-sample audio
-# runs here, so the lost inlining does not cost anything measurable.
+# /Ob1 (inlining only where marked) did not help, so this goes all the way to
+# /Od: no optimisation at all for this one file. If the crash is anywhere in
+# the optimiser, /Od removes it; if /Od still crashes, the fault is in codegen
+# proper and the flag is not the answer.
+#
+# main.cpp is ImGui drawing, the node editor and the headless fixtures - no
+# per-sample audio runs here - so unoptimised is a real but modest UI cost,
+# and only on Windows.
 #
 # The real fix is for this file to stop being 37k lines. Until then, keep this
 # scoped to the one file and the one compiler that needs it.
 if(MSVC)
-    set_source_files_properties(src/main.cpp PROPERTIES COMPILE_OPTIONS "/Ob1")
+    set_source_files_properties(src/main.cpp PROPERTIES COMPILE_OPTIONS "/Od")
 endif()
 
 add_executable(Infinite ${COMMON_SOURCES})

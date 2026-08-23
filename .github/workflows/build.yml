@@ -90,13 +90,26 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }}
 
-      # Deliberately NOT `-m` (all cores). main.cpp is ~36k lines and several
-      # concurrent CL processes on a 4-core runner exhausted memory during
-      # MSVC's batched "Generating Code..." phase, which surfaces as a bare
-      # CL!RaiseException stack and `CL.exe exited with code -529706956` -
-      # no C1001, no source location, and attributed to whichever batch
-      # happened to be mid-codegen rather than to the TU responsible.
-      # Serial is slower but deterministic and actually attributable.
+      # MSBuild's default verbosity does not echo compiler flags, so a failing
+      # build gives no way to confirm that a per-source workaround actually
+      # reached CL. Print what the generator decided for main.cpp, which is
+      # the file MSVC's x64 backend has been crashing on.
+      - name: Show main.cpp compile settings
+        shell: pwsh
+        run: |
+          $proj = 'build/Infinite.vcxproj'
+          [xml]$xml = Get-Content $proj
+          $ns = @{ m = 'http://schemas.microsoft.com/developer/msbuild/2003' }
+          Select-Xml -Xml $xml -Namespace $ns -XPath "//m:ClCompile[contains(@Include,'main.cpp')]" |
+            ForEach-Object { $_.Node.OuterXml }
+          Write-Host '--- project-level ClCompile (Release) ---'
+          Select-Xml -Xml $xml -Namespace $ns -XPath "//m:ItemDefinitionGroup[contains(@Condition,'Release')]/m:ClCompile" |
+            ForEach-Object { $_.Node.OuterXml }
+
+      # Serial, and NOT `-m`: with compile batching disabled each TU is its own
+      # CL invocation, so a serial build gives a log where the filename printed
+      # last is genuinely the file that failed. That is what finally attributed
+      # the crash to main.cpp.
       # NB: use MSBuild's explicit /maxcpucount:1 - `-m:1` is rejected with
       # MSB1031 "Specify the maximum number of CPUs" when passed this way.
       - name: Build
