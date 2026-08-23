@@ -90,8 +90,15 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }}
 
+      # Deliberately NOT `-m` (all cores). main.cpp is ~36k lines and several
+      # concurrent CL processes on a 4-core runner exhausted memory during
+      # MSVC's batched "Generating Code..." phase, which surfaces as a bare
+      # CL!RaiseException stack and `CL.exe exited with code -529706956` -
+      # no C1001, no source location, and attributed to whichever batch
+      # happened to be mid-codegen rather than to the TU responsible.
+      # Serial is slower but deterministic and actually attributable.
       - name: Build
-        run: cmake --build build --config Release -- -m
+        run: cmake --build build --config Release -- -m:1
 
       # Skipped on ARM64: the x64 runner's binary is native there, but an
       # ARM64 binary cannot be executed by an x64 host and vice versa. The
