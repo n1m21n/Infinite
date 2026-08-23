@@ -317,6 +317,33 @@ set(WIN32_SOURCES
     external/glad/src/gl.c
 )
 
+# MSVC's x64 code generator hits an internal compiler error on src/main.cpp at
+# /O2 - no C1001, no source line, just CL.exe exiting with -529706956. ARM64
+# compiles the identical file, and it only started failing once a month of
+# feature work landed in this translation unit.
+#
+# Two cheaper theories were tested and both failed. /Ob1 (inline only where
+# marked) changed nothing, so it is not inlining. Giving main()'s 10k-line
+# frame loop its own function via a lambda changed nothing either - which
+# makes sense in hindsight: that moved the enormous body into the lambda's
+# operator() instead of shrinking it, so the largest single function the
+# backend has to work on was the same size as before.
+#
+# So the optimiser gets switched off for this one file. If the crash lives
+# anywhere in the optimiser, /Od removes it.
+#
+# main.cpp is ImGui drawing, the node editor and the headless fixtures - no
+# per-sample audio runs here, that is all in other TUs - so this is a real but
+# modest UI cost, on Windows only. Verify it applied by the D9025 "overriding
+# '/O2' with '/Od'" warning in the build log, not by grepping for the flag:
+# MSBuild does not echo compiler flags at default verbosity.
+#
+# The real fix is for this file to stop being 37k lines. Until then, keep this
+# scoped to the one file and the one compiler that needs it.
+if(MSVC)
+    set_source_files_properties(src/main.cpp PROPERTIES COMPILE_OPTIONS "/Od")
+endif()
+
 add_executable(Infinite ${COMMON_SOURCES})
 
 if(APPLE)

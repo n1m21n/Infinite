@@ -27025,20 +27025,7 @@ int main(int argc, char** argv)
    std::vector<int> clipboardOrigGroup;     // that item's owning group's index, or -1
    int frameId = 0;
 
-   // MSVC's x64 backend cannot generate code for this loop body as part of
-   // main(): it crashed with an internal compiler error - no C1001, no source
-   // line - once a month of feature work pushed the body past ~10k lines.
-   // ARM64's backend compiled the identical source, and disabling inlining
-   // made no difference, because the size is in the function itself.
-   //
-   // Wrapping the body in a lambda gives it its own function without touching
-   // a line of it: everything main() declared above is captured by reference,
-   // so nothing needed rewriting into parameters. This is safe here precisely
-   // because the body has no top-level `continue`/`break` and no `return` that
-   // exits main - every `return` inside belongs to a nested lambda.
-   //
-   // It is a workaround for a 12k-line main(), not an endorsement of one.
-   auto RunFrame = [&]()
+   while (!glfwWindowShouldClose(window))
    {
       gFrameStart = glfwGetTime();
       glfwPollEvents();
@@ -37185,10 +37172,7 @@ int main(int argc, char** argv)
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
-   };
-
-   while (!glfwWindowShouldClose(window))
-      RunFrame();
+   }
 
    CloseAllProjectorWindows();
    AudioEngine::Instance().Stop();
