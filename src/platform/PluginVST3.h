@@ -33,6 +33,8 @@ namespace Platform
    bool PluginVST3OpenEditor(PluginHandle* handle, std::string& outError);
    void PluginVST3CloseEditor(PluginHandle* handle);
    bool PluginVST3EditorIsOpen(PluginHandle* handle);
+   bool PluginVST3AnyEditorOpen();
+   bool PluginVST3PumpEditorEvents();
 
    bool PluginVST3SaveState(PluginHandle* handle, std::string& outBase64);
    bool PluginVST3RestoreState(PluginHandle* handle, const std::string& base64);

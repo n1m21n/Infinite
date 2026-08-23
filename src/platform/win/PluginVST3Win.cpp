@@ -1,14 +1,14 @@
 // Windows VST3 hosting - the portable ~75% of PluginVST3.mm (host glue
 // classes, create/init/process/parameter/state logic) ported essentially
 // unchanged, plus the genuinely Windows-specific pieces that are actually
-// needed for anything to instantiate at all (DLL loading, UTF-16 handling).
+// needed for anything to instantiate at all (DLL loading, UTF-16 handling),
+// plus real editor-window (HWND) hosting with the same Tier-2 SEH crash-guard
+// discipline used for state save/restore.
 //
 // Deliberately NOT ported in this phase (see the plan for the follow-up
 // sessions each of these becomes):
-//   - Editor window (HWND creation/embedding, kPlatformTypeHWND, resize).
-//     PluginVST3OpenEditor below stubs this out cleanly.
-//   - SEH crash guarding beyond state save/restore. Editor-related guarding
-//     has nothing to guard yet since there's no editor to open.
+//   - SEH crash guarding of realtime/instantiation calls (Tier 3 - not
+//     guardable this way; would need out-of-process hosting).
 //   - Out-of-process scanning, sentinel/blocklist persistence. Enumeration
 //     stays routed through PluginHostWin.cpp's existing no-op, so bundle
 //     resolution below only ever succeeds via desc.path or a same-session
@@ -1027,6 +1027,49 @@ namespace
       Steinberg::IPtr<Steinberg::Vst::IConnectionPoint> mSrc;
       Steinberg::IPtr<Steinberg::Vst::IConnectionPoint> mDst;
    };
+
+   // ------------------------------------------------------------------------
+   // Host-side IPlugFrame - required so a plugin's resizable GUI can ask us
+   // to resize its window. Without this, resizeView() has no host object to
+   // call, and a resizable-GUI plugin either can't resize or crashes trying.
+   // ------------------------------------------------------------------------
+   class HostPlugFrame : public Steinberg::IPlugFrame
+   {
+   public:
+      explicit HostPlugFrame(Platform::PluginHandle* handle) : mHandle(handle) {}
+
+      Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid, void** obj) override
+      {
+         if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::IPlugFrame::iid) ||
+             Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid))
+         {
+            addRef();
+            *obj = this;
+            return Steinberg::kResultOk;
+         }
+         *obj = nullptr;
+         return Steinberg::kNoInterface;
+      }
+
+      Steinberg::uint32 PLUGIN_API addRef() override { return ++mRefCount; }
+      Steinberg::uint32 PLUGIN_API release() override
+      {
+         if (--mRefCount == 0)
+         {
+            delete this;
+            return 0;
+         }
+         return mRefCount;
+      }
+
+      Steinberg::tresult PLUGIN_API resizeView(Steinberg::IPlugView* view, Steinberg::ViewRect* newSize) override;
+
+      void detach() { mHandle = nullptr; }
+
+   private:
+      std::atomic<uint32_t> mRefCount { 1 };
+      Platform::PluginHandle* mHandle = nullptr;
+   };
 }
 
 namespace Platform
@@ -1092,7 +1135,41 @@ namespace Platform
       // Set once a crash guard catches this instance faulting inside
       // getState/setState. See RunPluginCallGuarded below.
       std::atomic<bool> stateCallsUnstable { false };
+
+      // Editor window state. Windows equivalent of the NSWindow/delegate
+      // pair on PluginVST3.mm's PluginHandle - kept here instead, on the
+      // opaque VST3-only state, because the process-wide open-editor
+      // counter (gWinOpenPluginEditorCount, below) lives in this file
+      // rather than in a shared Platform.mm the way Mac's does.
+      HWND editorHwnd = nullptr;
+      Steinberg::IPtr<HostPlugFrame> plugFrame;
+      std::atomic<bool> editorOpen { false };
+
+      // Distinguishes the host resizing the HWND because the plugin asked
+      // (HostPlugFrame::resizeView) from the user dragging the window's own
+      // resize border - SetWindowPos synchronously delivers WM_SIZE back
+      // into the same WndProc before it returns, so without this flag
+      // onSize() would be called twice for one logical resize.
+      bool resizingFromPlugin = false;
+
+      // Set once a crash guard catches this instance faulting inside
+      // createView/getSize/attached/onSize. Independent from
+      // stateCallsUnstable - a plugin can have a broken editor and a
+      // perfectly fine getState(), or vice versa.
+      std::atomic<bool> editorUnstable { false };
    };
+
+   // Defined further down, alongside the rest of the crash-guard machinery;
+   // forward-declared here (inside the same unnamed namespace nested in
+   // Platform, which is shared across the whole translation unit) so it can
+   // be used ahead of that point - by PluginVST3Destroy below, and by
+   // HostPlugFrame::resizeView, which needs to call it but lives in a
+   // different (global-scope) unnamed namespace and so must reach this one
+   // through the qualified name Platform::RunPluginCallGuarded.
+   namespace
+   {
+      bool RunPluginCallGuarded(const char* what, PluginHandle* h, const std::function<void()>& fn);
+   }
 }
 
 namespace
@@ -1105,6 +1182,43 @@ namespace
          return;
       mHandle->vst3->learnedAddress.store((unsigned long long)id, std::memory_order_relaxed);
       mHandle->vst3->learnedValid.store(true, std::memory_order_release);
+   }
+
+   Steinberg::tresult PLUGIN_API HostPlugFrame::resizeView(Steinberg::IPlugView* view, Steinberg::ViewRect* newSize)
+   {
+      if (mHandle == nullptr || mHandle->vst3 == nullptr || newSize == nullptr)
+         return Steinberg::kResultFalse;
+      Platform::PluginVST3State* v = mHandle->vst3;
+      // Editor may already be gone (window closed, or this call landed
+      // after teardown) - the plugin's timer can fire against
+      // half-torn-down state.
+      if (v->editorHwnd == nullptr || v->plugView != view)
+         return Steinberg::kResultFalse;
+
+      const int width = newSize->right - newSize->left;
+      const int height = newSize->bottom - newSize->top;
+      if (width <= 0 || height <= 0)
+         return Steinberg::kResultFalse;
+
+      RECT rect = { 0, 0, width, height };
+      const DWORD style = (DWORD)GetWindowLongPtrW(v->editorHwnd, GWL_STYLE);
+      const DWORD exStyle = (DWORD)GetWindowLongPtrW(v->editorHwnd, GWL_EXSTYLE);
+      AdjustWindowRectEx(&rect, style, FALSE, exStyle);
+
+      v->resizingFromPlugin = true;
+      SetWindowPos(v->editorHwnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top,
+                   SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+      // Per IPlugFrame::resizeView's own doc comment: the host must call
+      // IPlugView::onSize() after handling the resize.
+      const bool ok = Platform::RunPluginCallGuarded("onSize", mHandle, [&] { view->onSize(newSize); });
+      v->resizingFromPlugin = false;
+      if (!ok)
+      {
+         v->editorUnstable.store(true, std::memory_order_relaxed);
+         return Steinberg::kResultFalse;
+      }
+      return Steinberg::kResultTrue;
    }
 
    using GetPluginFactoryProc = Steinberg::IPluginFactory* (*)();
@@ -1178,6 +1292,88 @@ namespace
       if (outFactory != nullptr)
          *outFactory = factory;
       return module;
+   }
+
+   // ------------------------------------------------------------------------
+   // Editor window plumbing.
+   //
+   // Process-wide count of open plugin editor windows, kept in lockstep with
+   // every PluginVST3State's editorOpen flag (see SetPluginEditorOpenWin
+   // below) so PluginVST3AnyEditorOpen() is a cheap atomic read rather than a
+   // walk over every handle.
+   // ------------------------------------------------------------------------
+   std::atomic<int> gWinOpenPluginEditorCount { 0 };
+
+   void SetPluginEditorOpenWin(Platform::PluginHandle* h, bool open)
+   {
+      if (h == nullptr || h->vst3 == nullptr)
+         return;
+      bool was = h->vst3->editorOpen.exchange(open, std::memory_order_acq_rel);
+      if (was == open)
+         return;
+      if (open)
+         gWinOpenPluginEditorCount.fetch_add(1, std::memory_order_relaxed);
+      else
+         gWinOpenPluginEditorCount.fetch_sub(1, std::memory_order_relaxed);
+   }
+
+   constexpr wchar_t kEditorWindowClassName[] = L"InfinitePluginEditorWindow";
+
+   // User clicked the window's own close button (or Alt-F4'd it). Treated
+   // the same as the node's "close" toggle (PluginVST3CloseEditor's
+   // counterpart on Mac): soft-close only - hide the window, flip the open
+   // flag, but leave plugView/editorHwnd alive so reopening just re-shows
+   // the plugin's real editor instead of re-requesting a view a second time.
+   // Real teardown only happens in PluginVST3CloseEditor/PluginVST3Destroy.
+   LRESULT CALLBACK PluginEditorWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+   {
+      if (msg == WM_NCCREATE)
+      {
+         auto* createStruct = reinterpret_cast<CREATESTRUCTW*>(lParam);
+         SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)createStruct->lpCreateParams);
+         return DefWindowProcW(hwnd, msg, wParam, lParam);
+      }
+
+      auto* h = reinterpret_cast<Platform::PluginHandle*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+
+      if (msg == WM_CLOSE)
+      {
+         SetPluginEditorOpenWin(h, false);
+         ShowWindow(hwnd, SW_HIDE);
+         return 0;
+      }
+
+      if (msg == WM_SIZE)
+      {
+         if (h != nullptr && h->vst3 != nullptr && h->vst3->plugView && !h->vst3->resizingFromPlugin &&
+             wParam != SIZE_MINIMIZED)
+         {
+            RECT client = {};
+            GetClientRect(hwnd, &client);
+            Steinberg::ViewRect newSize(0, 0, client.right - client.left, client.bottom - client.top);
+            Platform::PluginVST3State* v = h->vst3;
+            if (!Platform::RunPluginCallGuarded("onSize", h, [&] { v->plugView->onSize(&newSize); }))
+               v->editorUnstable.store(true, std::memory_order_relaxed);
+         }
+         return DefWindowProcW(hwnd, msg, wParam, lParam);
+      }
+
+      return DefWindowProcW(hwnd, msg, wParam, lParam);
+   }
+
+   ATOM RegisterEditorWindowClassOnce()
+   {
+      static const ATOM atom = [] {
+         WNDCLASSEXW wc = {};
+         wc.cbSize = sizeof(wc);
+         wc.style = CS_HREDRAW | CS_VREDRAW;
+         wc.lpfnWndProc = PluginEditorWndProc;
+         wc.hInstance = GetModuleHandleW(nullptr);
+         wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+         wc.lpszClassName = kEditorWindowClassName;
+         return RegisterClassExW(&wc);
+      }();
+      return atom;
    }
 }
 
@@ -1587,12 +1783,28 @@ namespace Platform
 
       PluginVST3State* v = h->vst3;
 
-      // No editor window teardown here (editor hosting isn't ported this
-      // phase - see PluginVST3OpenEditor below), so v->plugView is always
-      // null in practice; guarded anyway in case that changes.
+      // removed() must happen while the editor HWND is still alive - detach
+      // the plugin from its view first, only then tear down the window it
+      // was living in. (Guarded: a plugin whose editor already faulted once
+      // can fault again here.)
       if (v->plugView)
       {
+         RunPluginCallGuarded("removed", h, [&] { v->plugView->removed(); });
          v->plugView = nullptr;
+      }
+
+      if (v->editorHwnd != nullptr)
+      {
+         HWND hwnd = v->editorHwnd;
+         v->editorHwnd = nullptr;
+         SetPluginEditorOpenWin(h, false);
+         DestroyWindow(hwnd);
+      }
+
+      if (v->plugFrame)
+      {
+         v->plugFrame->detach();
+         v->plugFrame = nullptr;
       }
 
       if (v->compToCtrlProxy)
@@ -1901,27 +2113,163 @@ namespace Platform
    }
 
    // ------------------------------------------------------------------------
-   // Editor window - not ported this phase. HWND creation/embedding via
-   // kPlatformTypeHWND is real, substantial work (see the plan) and becomes
-   // its own follow-up session.
+   // Editor Window
    // ------------------------------------------------------------------------
 
    bool PluginVST3OpenEditor(PluginHandle* h, std::string& outError)
    {
-      (void)h;
-      outError = "VST3 editor hosting is not yet available on Windows";
-      return false;
+      if (h == nullptr || h->vst3 == nullptr || !h->vst3->controller || h->state != PluginLoadState::Ready)
+      {
+         outError = "plugin not loaded";
+         return false;
+      }
+      PluginVST3State* v = h->vst3;
+
+      if (v->editorUnstable.load(std::memory_order_relaxed))
+      {
+         outError = "plugin's editor crashed previously and is disabled for this session";
+         return false;
+      }
+
+      if (v->editorHwnd != nullptr)
+      {
+         ShowWindow(v->editorHwnd, SW_SHOW);
+         SetForegroundWindow(v->editorHwnd);
+         SetPluginEditorOpenWin(h, true);
+         return true;
+      }
+
+      if (!v->plugView)
+      {
+         Steinberg::IPlugView* view = nullptr;
+         if (!RunPluginCallGuarded("createView", h, [&] { view = v->controller->createView(Steinberg::Vst::ViewType::kEditor); }))
+         {
+            v->editorUnstable.store(true, std::memory_order_relaxed);
+            outError = "plugin crashed creating its editor view";
+            return false;
+         }
+         if (view == nullptr)
+         {
+            outError = "plugin has no custom GUI editor";
+            return false;
+         }
+         v->plugView = Steinberg::owned(view);
+      }
+
+      Steinberg::ViewRect rect = {};
+      if (!RunPluginCallGuarded("getSize", h, [&] { v->plugView->getSize(&rect); }))
+      {
+         v->editorUnstable.store(true, std::memory_order_relaxed);
+         outError = "plugin crashed sizing its editor view";
+         return false;
+      }
+      int width = rect.right - rect.left;
+      int height = rect.bottom - rect.top;
+      if (width < 120 || height < 80)
+      {
+         width = 640;
+         height = 420;
+      }
+
+      bool canResize = false;
+      RunPluginCallGuarded("canResize", h, [&] { canResize = v->plugView->canResize() == Steinberg::kResultTrue; });
+
+      RegisterEditorWindowClassOnce();
+
+      DWORD style = WS_OVERLAPPEDWINDOW;
+      if (!canResize)
+         style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
+
+      RECT wr = { 0, 0, width, height };
+      AdjustWindowRectEx(&wr, style, FALSE, 0);
+
+      HWND hwnd = CreateWindowExW(0, kEditorWindowClassName, WinCommon::Utf8ToWide(h->desc.name).c_str(),
+                                  style, CW_USEDEFAULT, CW_USEDEFAULT, wr.right - wr.left, wr.bottom - wr.top,
+                                  nullptr, nullptr, GetModuleHandleW(nullptr), h);
+      if (hwnd == nullptr)
+      {
+         outError = "failed to create editor window";
+         return false;
+      }
+
+      // Spec requires setFrame() before attached() - it is how a plugin with
+      // a resizable GUI learns who to ask for a resize. Serum2 relies on
+      // this (calls plugFrame->resizeView() from its own GUI timer).
+      if (!v->plugFrame)
+         v->plugFrame = Steinberg::owned(new HostPlugFrame(h));
+      if (!RunPluginCallGuarded("setFrame", h, [&] { v->plugView->setFrame(v->plugFrame); }))
+      {
+         v->editorUnstable.store(true, std::memory_order_relaxed);
+         outError = "plugin crashed setting its editor frame";
+         DestroyWindow(hwnd);
+         return false;
+      }
+
+      if (!RunPluginCallGuarded("attached", h, [&] { v->plugView->attached((void*)hwnd, Steinberg::kPlatformTypeHWND); }))
+      {
+         v->editorUnstable.store(true, std::memory_order_relaxed);
+         outError = "plugin crashed opening its editor";
+         // The plugin may already have installed GUI timers/observers by
+         // this point (this is exactly the Serum2 crash shape: a fault mid-
+         // attached() leaves them armed against half-constructed state).
+         // removed() first while the window is still alive, then tear down
+         // the window - not the reverse.
+         RunPluginCallGuarded("removed", h, [&] { v->plugView->removed(); });
+         v->plugView = nullptr;
+         DestroyWindow(hwnd);
+         return false;
+      }
+
+      v->editorHwnd = hwnd;
+      ShowWindow(hwnd, SW_SHOW);
+      SetForegroundWindow(hwnd);
+      SetPluginEditorOpenWin(h, true);
+      return true;
    }
 
    void PluginVST3CloseEditor(PluginHandle* h)
    {
-      (void)h;
+      if (h == nullptr || h->vst3 == nullptr || h->vst3->editorHwnd == nullptr)
+         return;
+      PluginVST3State* v = h->vst3;
+
+      // Fully detach, not just hide: a merely-hidden window left the
+      // plugin's view attached() and its GUI timer armed indefinitely.
+      // removed() first while the window is still alive, matching the same
+      // ordering used on the attached()-failure and destroy paths.
+      if (v->plugView)
+      {
+         RunPluginCallGuarded("removed", h, [&] { v->plugView->removed(); });
+         v->plugView = nullptr;
+      }
+
+      HWND hwnd = v->editorHwnd;
+      v->editorHwnd = nullptr;
+      SetPluginEditorOpenWin(h, false);
+      DestroyWindow(hwnd);
    }
 
    bool PluginVST3EditorIsOpen(PluginHandle* h)
    {
-      (void)h;
-      return false;
+      return h != nullptr && h->vst3 != nullptr && h->vst3->editorOpen.load(std::memory_order_acquire);
+   }
+
+   bool PluginVST3AnyEditorOpen()
+   {
+      return gWinOpenPluginEditorCount.load(std::memory_order_relaxed) > 0;
+   }
+
+   bool PluginVST3PumpEditorEvents()
+   {
+      MSG msg;
+      bool any = false;
+      while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
+      {
+         any = true;
+         TranslateMessage(&msg);
+         DispatchMessageW(&msg);
+      }
+      return any;
    }
 
    // ------------------------------------------------------------------------

@@ -6,13 +6,13 @@
 //   - VST3 hosting mirrors macOS behind INFINITE_ENABLE_VST3: when the flag is
 //     on, every PluginXxx entry point below dispatches into the Windows VST3
 //     backend (src/platform/win/PluginVST3Win.cpp), which hosts the SDK's
-//     IComponent/IEditController/IAudioProcessor directly. Still pending on
-//     Windows: the editor window (HWND embedding), full SEH crash guarding
-//     beyond state save/restore, and out-of-process scanning - so
-//     EnumerateVST3Plugins/DescribeVST3Bundle stay no-ops here and
-//     PluginOpenEditor reports unavailable, even with the flag on. When the
-//     flag is off (the default - VST3 SDK licensing, see CMakeLists.txt),
-//     every plugin instantiation produces a Failed-state handle instead.
+//     IComponent/IEditController/IAudioProcessor directly, including a real
+//     HWND-embedded editor window. Still pending on Windows: full SEH crash
+//     guarding beyond state save/restore and editor calls, and out-of-process
+//     scanning - so EnumerateVST3Plugins/DescribeVST3Bundle stay no-ops here
+//     even with the flag on. When the flag is off (the default - VST3 SDK
+//     licensing, see CMakeLists.txt), every plugin instantiation produces a
+//     Failed-state handle instead.
 //
 // Every function tolerates a null handle - AudioPluginNode's retire path can
 // hand us one while a topology swap is in flight.
@@ -242,33 +242,34 @@ namespace Platform
 
    bool PluginOpenEditor(PluginHandle* handle, std::string& outError)
    {
-      // Editor window (HWND embedding) is a separate follow-up session -
-      // report unavailable rather than crash or silently no-op, same as the
-      // no-VST3 build below.
-      (void)handle;
-      outError = "VST3 editor hosting is not yet available on Windows";
-      return false;
+      outError.clear();
+      if (handle == nullptr || handle->vst3 == nullptr)
+      {
+         outError = kUnavailableError;
+         return false;
+      }
+      return PluginVST3OpenEditor(handle, outError);
    }
 
    void PluginCloseEditor(PluginHandle* handle)
    {
-      (void)handle;
+      if (handle != nullptr && handle->vst3 != nullptr)
+         PluginVST3CloseEditor(handle);
    }
 
    bool PluginEditorIsOpen(PluginHandle* handle)
    {
-      (void)handle;
-      return false;
+      return handle != nullptr && handle->vst3 != nullptr && PluginVST3EditorIsOpen(handle);
    }
 
    bool AnyPluginEditorOpen()
    {
-      return false;
+      return PluginVST3AnyEditorOpen();
    }
 
    bool PumpPluginEditorEvents()
    {
-      return false;
+      return PluginVST3PumpEditorEvents();
    }
 
    bool PluginSaveState(PluginHandle* handle, std::string& outBase64)
