@@ -66,7 +66,7 @@ public:
    float glide = 0.0f;       // portamento, seconds
    float pitchBend = 0.0f;   // -2..2 semitones global pitch bend
    float fmDepth = 0.0f;     // audio-rate FM / PM depth
-   int fmMode = 0;           // 0 = Phase Modulation, 1 = Exponential FM
+   int fmMode = 0;           // 0 = Phase Modulation, 1 = Linear Through-Zero FM
 
    NoteCable noteInput;
    AudioCable fmInput;

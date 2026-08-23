@@ -101,7 +101,7 @@ struct WavetableSynthParams
    float glide = 0.0f;
    float pitchBend = 0.0f;
    float fmDepth = 0.0f;
-   int fmMode = 0; // 0: Phase Modulation / Linear FM, 1: Exponential FM
+   int fmMode = 0; // 0: Phase Modulation, 1: Linear Through-Zero FM
 };
 
 class WavetableNode : public INode, public IAudioSource
@@ -174,7 +174,7 @@ public:
    // range +/-2 st matches the standard MIDI wheel range.
    float pitchBend = 0.0f;   // -2..2 semitones
    float fmDepth = 0.0f;     // audio-rate FM / PM modulation depth
-   int fmMode = 0;           // 0 = Phase Modulation, 1 = Exponential FM
+   int fmMode = 0;           // 0 = Phase Modulation, 1 = Linear Through-Zero FM
 
    NoteCable noteInput;
    AudioCable fmInput;

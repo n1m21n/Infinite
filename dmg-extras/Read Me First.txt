@@ -1,0 +1,36 @@
+Infinite — Installation Notes
+==============================
+
+If macOS says "Infinite is damaged and can't be opened," it isn't
+actually damaged. Apple's Gatekeeper shows that message for any app that
+hasn't been notarized through a paid Apple Developer Program membership
+($99/year), which this project doesn't have. Infinite is ad-hoc signed
+and built straight from the public source on GitHub — it's just missing
+the certificate Apple charges for to skip that warning.
+
+How to open it (pick one):
+
+1. Easiest — the included script
+   - Drag Infinite.app into your Applications folder.
+   - Double-click "Fix & Open Infinite.command" (also in this DMG).
+   - It tells you exactly what it's about to do and asks you to confirm
+     before it does anything.
+
+2. Manual — Terminal
+   - Drag Infinite.app into your Applications folder.
+   - Open Terminal and run:
+       xattr -cr /Applications/Infinite.app
+   - Then open Infinite normally.
+
+What that command actually does: it clears the "quarantine" flag macOS
+attaches to anything downloaded from a browser. That flag, combined with
+the lack of notarization, is what triggers the "damaged" warning. Clearing
+it does not touch any other app on your Mac, does not disable Gatekeeper
+system-wide, and does not grant Infinite any extra permissions — it just
+tells macOS "I've looked at this one and I trust it."
+
+You're welcome to open both this file and the script in a text editor
+before running anything. Neither downloads or contacts anything — they
+only unblock the app you already have sitting in Applications.
+
+Source code: https://github.com/n1m21n/Infinite

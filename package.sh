@@ -68,6 +68,10 @@ cp -R "$APP" "$STAGE/"
 if [ -f "$ROOT/Infinite_Node_Reference_Manual.pdf" ]; then
     cp "$ROOT/Infinite_Node_Reference_Manual.pdf" "$STAGE/"
 fi
+if [ -d "$ROOT/dmg-extras" ]; then
+    cp -R "$ROOT/dmg-extras/." "$STAGE/"
+    chmod +x "$STAGE/Fix & Open Infinite.command"
+fi
 ln -s /Applications "$STAGE/Applications"
 
 echo "==> building dmg"

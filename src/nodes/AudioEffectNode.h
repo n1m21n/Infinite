@@ -97,6 +97,10 @@ public:
 
    float Level() const { return mLevel; }
    int LatencySamples() const;
+   // Main thread only. Post-mix mono samples for a live spectrum trace (EQ's
+   // visualizer is the only caller today) - returns 0 if the audio node
+   // hasn't been created yet (no CookIfNeeded call landed before this draw).
+   int ReadSpectrumSamples(float* out, int maxCount);
    // Kernel-published extra meter values beyond AudioEffectRuntime's own
    // generic post-mix peak - Dynamics publishes {instantaneous input dB,
    // gain-reduction dB} for its transfer-curve visualizer's operating-point

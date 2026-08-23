@@ -228,6 +228,15 @@ namespace WavetableSynthCore
    {
       return 440.0f * powf(2.0f, (note - 69.0f) / 12.0f);
    }
+
+   // Linear through-zero FM (fmMode == 1): the modulator adds a frequency
+   // offset in Hz proportional to the carrier, the DX7/Serum/Massive-X/
+   // Operator convention - not a pitch-multiplying exponential FM, which
+   // scales the wrong way (a modulator that should double the carrier's
+   // *frequency offset* instead barely moves it in cents at low carrier
+   // frequencies and blows past Nyquist at high ones). Tuned so a full-scale
+   // modulator at depth 1.0 drives roughly a 4x frequency excursion.
+   constexpr float kFmLinScale = 4.0f;
 }
 
 // ------------------------------------------------------------- audio thread
@@ -365,7 +374,10 @@ public:
             extFm /= (float)fmChans;
          }
          const float fmPhaseOffset = (fmMode == 0) ? (extFm * sm.fmDepth) : 0.0f;
-         const float fmExpSemitones = (fmMode == 1) ? (extFm * sm.fmDepth * 12.0f) : 0.0f;
+         // Linear through-zero FM: a ratio on the carrier's frequency, applied
+         // AFTER pitch-bend/vibrato's exponential math below, not folded into
+         // the semitone sum - see kFmLinScale's comment.
+         const float fmLinRatio = (fmMode == 1) ? (1.0f + extFm * sm.fmDepth * kFmLinScale) : 1.0f;
 
          float outL = 0.0f, outR = 0.0f;
 
@@ -387,13 +399,17 @@ public:
                   continue;
                }
                const float semitones = (float)(eng[e].octave * 12 + eng[e].semi) * 100.0f + sm.eng[e].fine +
-                                       (sm.pitchBend + fmExpSemitones) * 100.0f;
-               // Exponential FM has no ceiling of its own - a full-scale
-               // modulator can otherwise push the carrier past Nyquist.
-               const float freq = std::clamp(base * powf(2.0f, semitones / 1200.0f), 20.0f,
+                                       sm.pitchBend * 100.0f;
+               // Carrier pitch (pre-FM) clamped to its own sane range first...
+               const float carrierFreq = std::clamp(base * powf(2.0f, semitones / 1200.0f), 20.0f,
+                                                    (float)mSampleRate * 0.45f);
+               // ...then linear FM is applied and clamped separately, since
+               // it can legitimately drive the instantaneous frequency
+               // negative (through zero) rather than just toward silence.
+               const float freq = std::clamp(carrierFreq * fmLinRatio, -(float)mSampleRate * 0.45f,
                                              (float)mSampleRate * 0.45f);
                float l = 0.0f, r = 0.0f;
-               RenderEngine(eng[e], sm.eng[e], freq, mFreeEngine[e], eng[1 - e].on ? prevOut[1 - e] : 0.0f,
+               RenderEngine(eng[e], sm.eng[e], freq, carrierFreq, mFreeEngine[e], eng[1 - e].on ? prevOut[1 - e] : 0.0f,
                             eng[1 - e].on, 0.0f, fmPhaseOffset, l, r);
                const float g = (e == 0 ? mixA : mixB) * sm.eng[e].volume;
                outL += l * g;
@@ -444,13 +460,16 @@ public:
 
                   const float semitones = (float)(eng[e].octave * 12 + eng[e].semi) * 100.0f +
                                           sm.eng[e].fine + eng[e].pitchAmount * pitchEnv * 100.0f +
-                                          (sm.pitchBend + fmExpSemitones) * 100.0f + v.bend * 100.0f;
-                  // Exponential FM has no ceiling of its own - a full-scale
-                  // modulator can otherwise push the carrier past Nyquist.
-                  const float freq = std::clamp(base * powf(2.0f, semitones / 1200.0f), 20.0f,
+                                          sm.pitchBend * 100.0f + v.bend * 100.0f;
+                  // Carrier pitch (pre-FM) clamped to its own sane range
+                  // first, then linear FM applied and clamped separately -
+                  // see the free-running path's identical comment above.
+                  const float carrierFreq = std::clamp(base * powf(2.0f, semitones / 1200.0f), 20.0f,
+                                                       (float)mSampleRate * 0.45f);
+                  const float freq = std::clamp(carrierFreq * fmLinRatio, -(float)mSampleRate * 0.45f,
                                                 (float)mSampleRate * 0.45f);
                   float l = 0.0f, r = 0.0f;
-                  RenderEngine(eng[e], sm.eng[e], freq, v.eng[e], eng[1 - e].on ? prevOut[1 - e] : 0.0f,
+                  RenderEngine(eng[e], sm.eng[e], freq, carrierFreq, v.eng[e], eng[1 - e].on ? prevOut[1 - e] : 0.0f,
                                eng[1 - e].on, filtEnv, fmPhaseOffset, l, r);
                   const float g = (e == 0 ? mixA : mixB) * sm.eng[e].volume * ampEnv * velGain;
                   outL += l * g;
@@ -662,14 +681,18 @@ private:
    // One unison stack of one engine, for one voice, for one sample. `st` is
    // the caller's persistent state - this advances its phases and publishes
    // its `lastOut` for the other engine to read next sample.
-   void RenderEngine(const EngineBlock& eb, const SmoothedEngine& se, float freq,
+   // `freq` is the (possibly through-zero, FM-modulated) playback frequency;
+   // `carrierFreq` is the same voice's pre-FM pitch, always positive - the
+   // cross-mod/sync operator below tracks carrierFreq so a hard-synced
+   // oscillator's sync rate doesn't itself warp with FM depth.
+   void RenderEngine(const EngineBlock& eb, const SmoothedEngine& se, float freq, float carrierFreq,
                      EngineState& st, float otherOut, bool otherOn, float filtEnv,
                      float fmPhaseOffset, float& outL, float& outR)
    {
       using namespace WavetableSynthCore;
       outL = 0.0f;
       outR = 0.0f;
-      if (freq <= 0.0f)
+      if (freq == 0.0f)
       {
          st.lastOut = 0.0f;
          return;
@@ -682,7 +705,7 @@ private:
       const bool crossMod = SynthModes::WarpIsCrossModulated(eb.warpMode);
       float mod = 0.0f;
       {
-         const double opInc = (double)(freq * std::max(0.01f, se.warpRatio)) / mSampleRate;
+         const double opInc = (double)(carrierFreq * std::max(0.01f, se.warpRatio)) / mSampleRate;
          const float opOut = sinf(2.0f * (float)M_PI * (float)st.opPhase);
          st.opPhase += opInc;
          st.opPhase -= floor(st.opPhase);
@@ -709,7 +732,9 @@ private:
          const float voiceFreq = freq * powf(2.0f, spread / 1200.0f);
          const double inc = (double)voiceFreq / mSampleRate;
 
-         const int mip = Wavetable::MipForPhaseInc(inc);
+         // abs(): through-zero FM can make inc negative, but mip selection is
+         // about the rate of change's magnitude (aliasing risk), not its sign.
+         const int mip = Wavetable::MipForPhaseInc(std::abs(inc));
          const float* lo = Wavetable::Frame(eb.table, frameLo, mip);
          const float* hi = Wavetable::Frame(eb.table, frameHi, mip);
 
