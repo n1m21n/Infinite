@@ -41,6 +41,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # old flag-munging approach.
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+    # One cl.exe invocation per translation unit instead of the Visual Studio
+    # generator's default of batching every source in a target into a single
+    # call. The batched form ends in a combined "Generating Code..." codegen
+    # pass, and that pass hit a reproducible internal compiler error on x64
+    # (MSVC 19.44) with no C1001 and no source location - so it was neither
+    # fixable nor attributable to a file. Unbatched, each TU stands alone:
+    # any future ICE names its own .cpp. Needs CMake 3.24; the variable is
+    # simply ignored by older versions, so the guard is documentation only.
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+        set(CMAKE_VS_NO_COMPILE_BATCHING ON)
+    endif()
 endif()
 
 # GLFW is built from source and linked statically rather than taken from
