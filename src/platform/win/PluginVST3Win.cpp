@@ -57,7 +57,6 @@ namespace
 {
    namespace fs = std::filesystem;
 
-   void VST3Trace(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
    void VST3Trace(const char* fmt, ...)
    {
       static const bool enabled = getenv("INFINITE_VST3TRACE") != nullptr;
