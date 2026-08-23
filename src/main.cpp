@@ -3657,9 +3657,27 @@ namespace
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModSlider("size x", &n->sizeX, 0.01f, 1.0f);
       ModSlider("size y", &n->sizeY, 0.01f, 1.0f);
-      ModSlider("corner/thick", &n->cornerRadius, 0.0f, 0.3f);
-      ModSliderInt("sides", &n->sides, 3, 20);
-      ModSlider("inner ratio", &n->innerRatio, 0.05f, 1.0f);
+      // corner/thick, sides, and inner ratio only affect a subset of shapes
+      // (see the sdf switch in ShapeNode.cpp) - hide them everywhere else so
+      // the panel doesn't offer knobs that silently do nothing.
+      switch (n->shapeType)
+      {
+         case 3: case 7: case 9: case 18:  // Rounded Rect, Ring, Line, Chevron
+            ModSlider("corner/thick", &n->cornerRadius, 0.0f, 0.3f); break;
+         default: break;
+      }
+      switch (n->shapeType)
+      {
+         case 5: case 6: case 14: case 19:  // Polygon, Star, Gear, Blob
+            ModSliderInt("sides", &n->sides, 3, 20); break;
+         default: break;
+      }
+      switch (n->shapeType)
+      {
+         case 6: case 14: case 15: case 16:  // Star, Gear, Superellipse, Pie
+            ModSlider("inner ratio", &n->innerRatio, 0.05f, 1.0f); break;
+         default: break;
+      }
       ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
       ModSlider("pos x", &n->posX, 0.0f, 1.0f);
       ModSlider("pos y", &n->posY, 0.0f, 1.0f);
