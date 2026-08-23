@@ -17,10 +17,14 @@
 //             the IMAG array holds 2*Re(X_N/2) (Nyquist) - same packing zrip
 //             uses.
 //
-//   Inverse:  expects the caller to hand back a standard-DFT-scaled packed
-//             spectrum (PaulStretch's processing paths all halve Forward's
-//             x2 before reconstructing) and applies the textbook 1/N, so
-//             forward-then-inverse reproduces the input exactly.
+//   Inverse:  matches vDSP_fft_zrip's FFT_INVERSE exactly, which is what the
+//             shared (unfenced) normalisation in PaulStretchNode assumes -
+//             it applies normScale = 1/(N*1.5) to whichever backend ran, so
+//             the two must agree bit-for-bit in scaling, not just in shape.
+//             vDSP's inverse is UNNORMALISED: on a standard-DFT-scaled
+//             packed spectrum (PaulStretch's paths all halve Forward's x2
+//             before reconstructing) it yields N*x, not x. So there is no
+//             1/N here on purpose. Forward-then-inverse round-trips to N*x.
 //
 // Tables are prepared once for a maximum size (main thread, construction);
 // runs at smaller power-of-two sizes reuse them via stride indexing, which
@@ -66,6 +70,14 @@ namespace PortableFft
 
          mRe.resize(maxN);
          mIm.resize(maxN);
+         // Inverse() needs somewhere to assemble its mirrored spectrum that
+         // is NOT mRe/mIm: RunCore's first loop does mRe[i] = inReal[r]
+         // through a non-identity permutation, so handing it mRe as input
+         // corrupts the data as it goes. Sized here so the class stays
+         // allocation-free after Prepare() - Inverse() runs on the audio
+         // thread via AudioPaulStretchNode::ProcessBlock.
+         mStageRe.resize(maxN);
+         mStageIm.resize(maxN);
          return true;
       }
 
@@ -97,39 +109,47 @@ namespace PortableFft
       {
          const int n = 1 << log2N;
 
-         // Undo the packing (inverse of Forward's unscramble), including the
-         // x2: core sees plain complex bins.
-         mRe[0] = inReal[0] * 0.5f;
-         mIm[0] = 0.0f;
-         mRe[n / 2] = inImag[0] * 0.5f;
-         mIm[n / 2] = 0.0f;
+         // Undo the packing (inverse of Forward's unscramble) so the core
+         // sees plain complex bins. No 0.5 here: the caller has already
+         // halved Forward's x2, so inReal/inImag are standard-DFT-scaled
+         // and any further scaling would diverge from vDSP.
+         mStageRe[0] = inReal[0];
+         mStageIm[0] = 0.0f;
+         mStageRe[n / 2] = inImag[0];
+         mStageIm[n / 2] = 0.0f;
          for (int k = 1; k < n / 2; k++)
          {
-            mRe[k] = inReal[k] * 0.5f;
-            mIm[k] = inImag[k] * 0.5f;
+            mStageRe[k] = inReal[k];
+            mStageIm[k] = inImag[k];
          }
          for (int k = n / 2 + 1; k < n; k++) // Hermitian mirror
          {
-            mRe[k] = mRe[n - k];
-            mIm[k] = -mIm[n - k];
+            mStageRe[k] = mStageRe[n - k];
+            mStageIm[k] = -mStageIm[n - k];
          }
 
-         RunCore(mRe.data(), mIm.data(), log2N, true);
+         RunCore(mStageRe.data(), mStageIm.data(), log2N, true, /*inverse=*/true);
 
-         // Textbook-normalized inverse: the core above accumulates the
-         // unnormalized sum (= N*x), so divide back down. Combined with
-         // Forward's x2 this makes forward-then-inverse reproduce the input,
-         // which is the invariant PaulStretchNode's passthrough path relies
-         // on ("bit-accurate passthrough reconstruction").
-         const float invN = 1.0f / (float)n;
+         // Deliberately unnormalised, matching vDSP_fft_zrip(FFT_INVERSE):
+         // the core accumulates the raw sum (= N*x). PaulStretchNode's
+         // normScale = 1/(FFTSize*1.5) is shared by both backends and is what
+         // takes this back down, together with the 75% Hann^2 overlap-add.
+         // Dividing by N here would make Windows output 1/N of macOS.
          for (int i = 0; i < n; i++)
-            outSamples[i] = mRe[i] * invN;
+            outSamples[i] = mRe[i];
       }
 
    private:
       // Decimation-in-time, in place, on either a real-only input (imag =
-      // 0) or full complex data. Reads/writes mRe/mIm[0..n).
-      void RunCore(const float* inReal, const float* inImag, int log2N, bool complexIn)
+      // 0) or full complex data. Reads/writes mRe/mIm[0..n), so inReal/inImag
+      // must NOT alias them - see the staging buffers in Prepare().
+      //
+      // `inverse` conjugates the twiddle factors. The tables are built at a
+      // negative angle (the forward kernel), so without this the "inverse"
+      // is another forward transform, which over a Hermitian-mirrored
+      // spectrum returns the input TIME-REVERSED rather than reconstructed.
+      void RunCore(const float* inReal, const float* inImag, int log2N, bool complexIn,
+                   bool inverse = false)
       {
          const int n = 1 << log2N;
          const int revShift = mMaxLog2 - log2N;
@@ -152,7 +172,9 @@ namespace PortableFft
                {
                   const int tw = j * step;
                   const float wr = mCos[tw];
-                  const float wi = mSin[tw]; // negative angle already baked in
+                  // Tables hold exp(-i*theta); negating the sine gives the
+                  // conjugate exp(+i*theta) the inverse transform needs.
+                  const float wi = inverse ? -mSin[tw] : mSin[tw];
                   const int a = start + j;
                   const int b = a + half;
                   const float tr = mRe[b] * wr - mIm[b] * wi;
@@ -169,7 +191,8 @@ namespace PortableFft
       int mMaxLog2 = 0;
       std::vector<int> mRev;
       std::vector<float> mCos, mSin;
-      std::vector<float> mRe, mIm; // scratch, sized to MaxSize
+      std::vector<float> mRe, mIm;           // core scratch, sized to MaxSize
+      std::vector<float> mStageRe, mStageIm; // Inverse()'s input staging
 
  public:
       RealFft() = default;

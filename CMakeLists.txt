@@ -15,6 +15,10 @@ endif()
 project(Infinite LANGUAGES C CXX)
 if(APPLE)
     enable_language(OBJC OBJCXX)
+elseif(WIN32)
+    # Needed to compile src/platform/win/Infinite.rc (app icon + version
+    # block). Harmless when no .rc is in the target's sources.
+    enable_language(RC)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -281,6 +285,10 @@ set(APPLE_SOURCES
 )
 
 set(WIN32_SOURCES
+    # Icon + version info. MSVC and MinGW both compile .rc files when the
+    # RC language is enabled (see enable_language below); without this the
+    # exe shows Explorer's generic application icon everywhere.
+    src/platform/win/Infinite.rc
     src/platform/win/PlatformWin.cpp
     src/platform/win/AudioDeviceWin.cpp
     src/platform/win/MidiWin.cpp

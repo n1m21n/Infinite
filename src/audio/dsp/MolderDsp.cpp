@@ -1,6 +1,15 @@
 #include "MolderDsp.h"
 
-#include <Accelerate/Accelerate.h>
+// Accelerate on Apple; the portable radix-2 backend everywhere else. Every
+// vDSP call in this file is confined to FftContext below, and PortableFft's
+// Forward/Inverse are deliberate drop-ins for the exact vDSP_ctoz +
+// vDSP_fft_zrip (+ vDSP_ztoc) pairs used there - same x2-scaled zrip packing,
+// same unnormalised inverse - so the surrounding maths is untouched.
+#if defined(__APPLE__)
+   #include <Accelerate/Accelerate.h>
+#else
+   #include "PortableFft.h"
+#endif
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -177,7 +186,11 @@ namespace MolderDsp
    {
       struct FftContext
       {
+#if defined(__APPLE__)
          FFTSetup setup = nullptr;
+#else
+         PortableFft::RealFft fft;
+#endif
          int fftSize = 2048;
          int log2n = 11;
          std::vector<float> window;      // Hann, periodic (N-point)
@@ -188,7 +201,11 @@ namespace MolderDsp
          {
             fftSize = size;
             log2n = Log2(size);
+#if defined(__APPLE__)
             setup = vDSP_create_fftsetup((vDSP_Length)log2n, FFT_RADIX2);
+#else
+            fft.Prepare(log2n);
+#endif
             window.resize(size);
             for (int i = 0; i < size; ++i)
                window[i] = 0.5f * (1.0f - cosf(kTwoPi * (float)i / (float)size));
@@ -200,8 +217,10 @@ namespace MolderDsp
 
          ~FftContext()
          {
+#if defined(__APPLE__)
             if (setup != nullptr)
                vDSP_destroy_fftsetup(setup);
+#endif
          }
 
          // Extracts a centred, windowed frame from mono[0..len) starting at
@@ -223,21 +242,25 @@ namespace MolderDsp
                   timeDomainOut[i] = s;
             }
 
+#if defined(__APPLE__)
             DSPSplitComplex split;
             split.realp = real.data();
             split.imagp = imag.data();
             vDSP_ctoz((const DSPComplex*)input.data(), 2, &split, 1, fftSize / 2);
             vDSP_fft_zrip(setup, &split, 1, (vDSP_Length)log2n, FFT_FORWARD);
+#else
+            fft.Forward(input.data(), log2n, real.data(), imag.data());
+#endif
 
             const int nBins = fftSize / 2;
-            mag[0] = std::fabs(split.realp[0] * 0.5f);
+            mag[0] = std::fabs(real[0] * 0.5f);
             phase[0] = 0.0f;
-            mag[nBins] = std::fabs(split.imagp[0] * 0.5f);
+            mag[nBins] = std::fabs(imag[0] * 0.5f);
             phase[nBins] = 0.0f;
             for (int k = 1; k < nBins; ++k)
             {
-               const float re = split.realp[k] * 0.5f;
-               const float im = split.imagp[k] * 0.5f;
+               const float re = real[k] * 0.5f;
+               const float im = imag[k] * 0.5f;
                mag[k] = sqrtf(re * re + im * im);
                phase[k] = atan2f(im, re);
             }
@@ -250,12 +273,19 @@ namespace MolderDsp
          // the raw IFFT + window).
          void InverseToWindowed(float* out)
          {
+            std::vector<float> raw(fftSize);
+#if defined(__APPLE__)
             DSPSplitComplex split;
             split.realp = real.data();
             split.imagp = imag.data();
             vDSP_fft_zrip(setup, &split, 1, (vDSP_Length)log2n, FFT_INVERSE);
-            std::vector<float> raw(fftSize);
             vDSP_ztoc(&split, 1, (DSPComplex*)raw.data(), 2, fftSize / 2);
+#else
+            // Note PortableFft::Inverse does not clobber its input, whereas
+            // zrip transforms real/imag in place. Nothing here reads them
+            // afterwards, so the two stay interchangeable.
+            fft.Inverse(real.data(), imag.data(), log2n, raw.data());
+#endif
             for (int i = 0; i < fftSize; ++i)
                out[i] = raw[i] * window[i];
          }
