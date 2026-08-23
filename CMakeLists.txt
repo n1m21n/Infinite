@@ -95,16 +95,16 @@ endif()
 # is GPLv3-or-proprietary, and linking it makes the distributed binary GPLv3
 # too (see LICENSE). Do not flip this default without the user's explicit
 # sign-off - it's a licensing decision, not a technical one.
-option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" OFF)
+option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" ON)
 
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)
 set(STB_DIR external/stb)
 set(SYPHON_DIR external/syphon)
 
-if(INFINITE_ENABLE_VST3 AND NOT APPLE)
-    message(FATAL_ERROR "INFINITE_ENABLE_VST3 is only wired up on macOS right now; "
-                        "the Windows platform layer reports plugin hosting as unavailable.")
+if(INFINITE_ENABLE_VST3 AND NOT APPLE AND NOT WIN32)
+    message(FATAL_ERROR "INFINITE_ENABLE_VST3 is only wired up on macOS and Windows right now; "
+                        "this platform's layer reports plugin hosting as unavailable.")
 endif()
 
 if(INFINITE_ENABLE_VST3)
@@ -401,6 +401,71 @@ if(WIN32)
     # GUI-subsystem executable that still uses plain main(): MSVC's default
     # WinMain entry doesn't exist here, mainCRTStartup forwards to main().
     set_target_properties(Infinite PROPERTIES WIN32_EXECUTABLE TRUE)
+
+    if(INFINITE_ENABLE_VST3)
+        # Windows VST3 hosting: the portable SDK-hosting logic
+        # (src/platform/win/PluginVST3Win.cpp) also hosts out-of-process
+        # scanning + crash-safety (sentinel/blocklist under %APPDATA%\Infinite),
+        # mirroring macOS. No codesign step is needed here, since Windows has
+        # no equivalent requirement.
+        target_compile_definitions(Infinite PRIVATE INFINITE_ENABLE_VST3=1)
+        target_include_directories(Infinite PRIVATE
+            ${VST3_SDK_DIR}
+            ${VST3_SDK_DIR}/pluginterfaces
+            ${VST3_SDK_DIR}/public.sdk
+        )
+        target_sources(Infinite PRIVATE
+            src/platform/win/PluginVST3Win.cpp
+            ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
+        )
+
+        # Out-of-process scanner helper, mirroring the macOS
+        # infinite-vst3-scanner target below: a disposable console-subsystem
+        # process that loads one plugin bundle at a time so a crashing or
+        # hanging plugin only costs a dead child, never the app itself.
+        add_executable(infinite-vst3-scanner
+            src/scanner_main_win.cpp
+            src/platform/win/PluginVST3Win.cpp
+            src/platform/win/PlatformWin.cpp
+            ${NODE_EDITOR_DIR}/crude_json.cpp
+            ${VST3_SDK_DIR}/pluginterfaces/base/coreiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp
+            ${VST3_SDK_DIR}/public.sdk/source/common/commoniids.cpp
+        )
+        target_include_directories(infinite-vst3-scanner PRIVATE
+            src src/core src/nodes src/platform src/audio
+            ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
+            ${NODE_EDITOR_DIR}
+            ${STB_DIR}
+            external/json
+            external/shine
+            ${VST3_SDK_DIR}
+            ${VST3_SDK_DIR}/pluginterfaces
+            ${VST3_SDK_DIR}/public.sdk
+        )
+        target_compile_definitions(infinite-vst3-scanner PRIVATE
+            INFINITE_ENABLE_VST3=1
+            NOMINMAX
+            WIN32_LEAN_AND_MEAN
+            _CRT_SECURE_NO_WARNINGS
+            INFINITE_VST3_SCANNER=1
+        )
+        # Console subsystem, not WIN32_EXECUTABLE: this process only ever
+        # talks to its parent over a stdout pipe (see RunProbeChild in
+        # PluginVST3Win.cpp), so it needs plain main()/console CRT startup,
+        # not the GUI subsystem Infinite.exe uses.
+        target_link_libraries(infinite-vst3-scanner PRIVATE
+            ole32 shell32 gdi32 user32 advapi32
+        )
+        add_dependencies(Infinite infinite-vst3-scanner)
+        add_custom_command(TARGET Infinite POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    "$<TARGET_FILE:infinite-vst3-scanner>"
+                    "$<TARGET_FILE_DIR:Infinite>/infinite-vst3-scanner.exe"
+            COMMENT "Copying scanner helper next to Infinite.exe")
+    endif()
     target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
 elseif(APPLE)
     target_include_directories(Infinite PRIVATE

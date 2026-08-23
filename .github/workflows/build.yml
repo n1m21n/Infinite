@@ -54,8 +54,11 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-        # No submodules: external/vst3sdk is the only one and VST3 hosting is
-        # off by default (a licensing opt-in, see CMakeLists.txt).
+        with:
+          # external/vst3sdk is the only submodule. INFINITE_ENABLE_VST3
+          # defaults ON (see CMakeLists.txt), so the SDK headers must always
+          # be present for the configure step below to succeed.
+          submodules: recursive
 
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -86,6 +89,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Configure
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }}
@@ -133,18 +138,21 @@ jobs:
       - name: Assert no Visual C++ redistributable dependency
         shell: pwsh
         run: |
-          $bytes = [System.IO.File]::ReadAllBytes("build/Release/Infinite.exe")
-          $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
-          $bad = @("MSVCP140", "VCRUNTIME140", "MSVCP140D", "VCRUNTIME140D") |
-                 Where-Object { $ascii -match $_ }
-          if ($bad) {
-            Write-Error ("Infinite.exe imports the VC++ redistributable CRT (" +
-                         ($bad -join ", ") +
-                         "). It will fail to launch on a clean Windows install. " +
-                         "CMAKE_MSVC_RUNTIME_LIBRARY should be MultiThreaded - see CMakeLists.txt.")
-            exit 1
+          $exes = @("build/Release/Infinite.exe", "build/Release/infinite-vst3-scanner.exe")
+          foreach ($exe in $exes) {
+            $bytes = [System.IO.File]::ReadAllBytes($exe)
+            $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+            $bad = @("MSVCP140", "VCRUNTIME140", "MSVCP140D", "VCRUNTIME140D") |
+                   Where-Object { $ascii -match $_ }
+            if ($bad) {
+              Write-Error ("$exe imports the VC++ redistributable CRT (" +
+                           ($bad -join ", ") +
+                           "). It will fail to launch on a clean Windows install. " +
+                           "CMAKE_MSVC_RUNTIME_LIBRARY should be MultiThreaded - see CMakeLists.txt.")
+              exit 1
+            }
+            Write-Host "OK: $exe is statically linked, no vc_redist dependency."
           }
-          Write-Host "OK: statically linked CRT, no vc_redist dependency."
 
       # package.ps1 is the local developer path (it drives its own configure
       # and hardcodes x64); here the build already exists, so just stage it.
@@ -153,6 +161,7 @@ jobs:
         run: |
           mkdir -p dist/Infinite
           cp build/Release/Infinite.exe dist/Infinite/
+          cp build/Release/infinite-vst3-scanner.exe dist/Infinite/
           cp README.md LICENSE dist/Infinite/ 2>/dev/null || true
 
       - name: Upload
