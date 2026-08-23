@@ -154,6 +154,7 @@ set(COMMON_SOURCES
     src/audio/AudioVoice.cpp
     src/audio/Wavetable.cpp
     src/audio/EffectDefs.cpp
+    src/audio/dsp/PortableFftFixture.cpp
     src/audio/dsp/AudioFilterKernel.cpp
     src/audio/dsp/EqKernel.cpp
     src/audio/dsp/DynamicsKernel.cpp
