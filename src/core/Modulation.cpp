@@ -11,15 +11,22 @@ void Modulation::Bind(int nodeIndex, int paramIndex, int modulatorNodeIndex, int
    Source source;
    source.nodeIndex = modulatorNodeIndex;
    source.outputIndex = outputIndex;
-   // Capture the pre-modulation value now, while it's still whatever the
-   // knob was showing: every real call site (drag-connect in main.cpp, the
-   // self-test fixtures) invokes Bind() from within the same frame that
-   // registered this param via RegisterParam, so FrameParams already has it.
+   // Capture the pre-modulation value and the destination's declared range
+   // now, while it's still whatever the knob was showing: every real call
+   // site (drag-connect in main.cpp, the self-test fixtures) invokes Bind()
+   // from within the same frame that registered this param via
+   // RegisterParam, so FrameParams already has it.
    for (const ParamRef& ref : mFrameParams)
    {
       if (ref.nodeIndex == nodeIndex && ref.paramIndex == paramIndex && ref.value != nullptr)
       {
          source.centre = *ref.value;
+         // Full declared span, i.e. today's override behaviour - see the
+         // Source::hasRange comment for why this is the deliberately
+         // conservative default rather than swinging from centre.
+         source.lo = ref.minValue;
+         source.hi = ref.maxValue;
+         source.hasRange = true;
          break;
       }
    }
@@ -31,25 +38,56 @@ void Modulation::RestoreLink(int nodeIndex, int paramIndex, const Source& source
    mLinks[Key(nodeIndex, paramIndex)] = source;
 }
 
-void Modulation::SetPolarity(int nodeIndex, int paramIndex, int polarity, float depth)
+void Modulation::SetRange(int nodeIndex, int paramIndex, float lo, float hi)
 {
    auto it = mLinks.find(Key(nodeIndex, paramIndex));
    if (it == mLinks.end())
       return;
-   it->second.polarity = polarity;
-   it->second.depth = depth;
+   it->second.lo = lo;
+   it->second.hi = hi;
+   it->second.hasRange = true;
+}
+
+Modulation::Source Modulation::ResolvedSourceFor(const ParamRef& ref)
+{
+   auto it = mLinks.find(Key(ref.nodeIndex, ref.paramIndex));
+   if (it == mLinks.end())
+      return Source();
+   Source& s = it->second;
+   if (!s.hasRange)
+   {
+      // First time this (necessarily just-loaded) binding's destination has
+      // actually drawn a frame, so ref's declared min/max are finally known -
+      // derive the equivalent lo/hi from the legacy fields exactly once.
+      if (s.polarity == Source::kBipolar)
+      {
+         const float span = s.depth * (ref.maxValue - ref.minValue);
+         s.lo = s.centre - span;
+         s.hi = s.centre + span;
+      }
+      else
+      {
+         s.lo = ref.minValue;
+         s.hi = ref.maxValue;
+      }
+      s.hasRange = true;
+   }
+   return s;
 }
 
 void Modulation::Unbind(int nodeIndex, int paramIndex)
 {
    const Key key(nodeIndex, paramIndex);
    auto it = mLinks.find(key);
-   // Bipolar mode leaves the knob live and meaningful, so unbinding restores
-   // it to where the user left it rather than freezing at whatever the
-   // modulator happened to be at. Absolute mode keeps its long-standing
-   // behaviour (the value just stays wherever the modulator last wrote it) -
-   // there is no "knob position" to return to when the binding overrode the
-   // parameter outright.
+   // Legacy bipolar bindings left the knob live and meaningful, so unbinding
+   // restored it to where the user left it rather than freezing at whatever
+   // the modulator happened to be at. A fresh binding always defaults its
+   // range to the destination's full span (see Bind()) and its polarity
+   // stays kAbsolute - the new lo/hi UI (SetRange) never touches polarity -
+   // so this remains exactly the old kAbsolute behaviour for every binding
+   // made since this field existed: the value just stays wherever the
+   // modulator last wrote it, since there is no single "knob position" a
+   // freely-ranged binding was swinging around.
    if (it != mLinks.end() && it->second.polarity == Source::kBipolar)
    {
       for (const ParamRef& ref : mFrameParams)

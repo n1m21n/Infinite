@@ -45,7 +45,8 @@ namespace PatchJson
          out["modulation"].push_back({ {"dstIndex", m.dstIndex}, {"dstParam", m.dstParam},
                                         {"srcIndex", m.srcIndex}, {"srcOutput", m.srcOutput},
                                         {"polarity", m.polarity}, {"depth", m.depth},
-                                        {"centre", m.centre} });
+                                        {"centre", m.centre}, {"lo", m.lo}, {"hi", m.hi},
+                                        {"hasRange", m.hasRange} });
 
       out["palette"] = json::array();
       for (const Patch::PaletteRecord& p : data.palette)

@@ -29,6 +29,10 @@ struct ParamRef
    float* value = nullptr;
    float minValue = 0.0f;
    float maxValue = 1.0f;
+   // Grid the destination snaps to before clamping - 0 means continuous,
+   // 1 means an integer destination (ModSliderInt/ModKnobInt). See
+   // ShapeToParam in main.cpp's modulation apply loop.
+   float step = 0.0f;
    std::string name;
 };
 
@@ -44,45 +48,74 @@ public:
 
    struct Source
    {
-      // A binding's polarity is a property of the *connection*, not the
-      // modulator - see docs/plans/modulators/README.md. kAbsolute is the
-      // default and must stay the default: it is today's override behaviour,
-      // and every existing patch and every freshly-dragged cable has to load
-      // and behave exactly as it always has.
+      // Legacy polarity concept - a binding used to be either an absolute
+      // override (kAbsolute) or a swing around a captured centre (kBipolar).
+      // Both are now just special cases of the lo/hi range below and the
+      // apply loop no longer branches on this; it is kept, alongside
+      // depth/centre, purely so a patch saved before lo/hi existed decodes
+      // to the identical range it swung before - see RestoreLink/EnsureRange
+      // in the .cpp. kAbsolute (0) is the default read for a "mod" line
+      // with no polarity token at all, matching pre-existing patch files.
       enum Polarity { kAbsolute = 0, kBipolar };
 
       int nodeIndex = -1;
       int outputIndex = 0;
       int polarity = kAbsolute;
-      // Only meaningful when polarity == kBipolar. -1..1, matching
+      // Only meaningful for the legacy kBipolar conversion. -1..1, matching
       // ModDepthNode's convention (negative inverts).
       float depth = 1.0f;
-      // The destination parameter's own value at the instant the binding was
-      // created (or, for a patch load, whatever was saved) - the centre a
-      // kBipolar binding swings around. Captured once and never touched
-      // again by the apply loop, since *value is being overwritten by the
-      // modulator every frame from then on and can't be read back safely.
+      // The destination parameter's value at the instant the binding was
+      // created (or, for a patch load, whatever was saved). Only meaningful
+      // for the legacy conversion now - see EnsureRange.
       float centre = 0.0f;
+
+      // The range this binding writes into the destination, in the
+      // destination parameter's own units: the apply loop computes
+      // lo + (hi - lo) * clamp(v01, 0, 1), then snaps/clamps that to the
+      // destination's own grid (ShapeToParam in main.cpp). This is the
+      // single thing the apply loop reads to know what to write.
+      float lo = 0.0f;
+      float hi = 0.0f;
+      // False only for a Source freshly decoded from a "mod" line that had
+      // no lo/hi tokens (an old patch) - EnsureRange derives lo/hi from
+      // polarity/depth/centre the first time this binding's destination
+      // param is actually drawn (it can't happen at load time: the
+      // destination hasn't rendered a frame yet, so its declared min/max
+      // aren't known - see RestoreLink) and flips this true. Every other
+      // Source (freshly bound, or already converted) has it true.
+      bool hasRange = false;
    };
 
-   // Creates a fresh binding, always kAbsolute, capturing the destination
-   // parameter's current value as `centre` (read through this frame's
-   // FrameParams - see the .cpp for why that's safe at every real call site).
+   // Creates a fresh binding, defaulting the range to the destination's full
+   // declared span (today's override behaviour), and capturing the
+   // destination's current value as `centre` for legacy compatibility -
+   // both read through this frame's FrameParams (see the .cpp for why
+   // that's safe at every real call site).
    void Bind(int nodeIndex, int paramIndex, int modulatorNodeIndex, int outputIndex = 0);
-   // Patch load only: installs a Source exactly as read from disk, including
-   // its persisted centre - unlike Bind(), it must NOT recompute centre from
-   // the current frame, since the node whose value should become centre may
-   // not have drawn a single frame yet.
+   // Patch load only: installs a Source exactly as read from disk. Unlike
+   // Bind(), it must NOT derive anything from the current frame, since the
+   // node whose value should become centre/lo/hi may not have drawn a
+   // single frame yet - see EnsureRange, which does that derivation lazily
+   // once the destination has actually been drawn.
    void RestoreLink(int nodeIndex, int paramIndex, const Source& source);
-   // Changes an existing binding's polarity/depth in place, leaving
-   // nodeIndex/outputIndex/centre untouched. No-op if nothing is bound there.
-   void SetPolarity(int nodeIndex, int paramIndex, int polarity, float depth);
+   // Sets an existing binding's lo/hi directly, in destination units -
+   // leaves nodeIndex/outputIndex/centre/polarity/depth untouched. No-op if
+   // nothing is bound there.
+   void SetRange(int nodeIndex, int paramIndex, float lo, float hi);
    void Unbind(int nodeIndex, int paramIndex);
    void UnbindAllFor(int nodeIndex); // node deleted: drop it as target and as source
 
    // nodeIndex is -1 when the parameter is not modulated.
    Source ModulatorFor(int nodeIndex, int paramIndex) const;
    bool IsModulated(int nodeIndex, int paramIndex) const { return ModulatorFor(nodeIndex, paramIndex).nodeIndex >= 0; }
+   // Same as ModulatorFor, but first derives lo/hi from the legacy
+   // polarity/depth/centre fields if this Source hasn't been converted yet
+   // (see Source::hasRange) - ref supplies the destination's declared
+   // min/max for that one-time conversion. This is what the apply loop
+   // calls; ModulatorFor above stays a plain lookup for every other caller
+   // (the binding-menu popup, the self-test fixtures) that doesn't have a
+   // ParamRef in hand.
+   Source ResolvedSourceFor(const ParamRef& ref);
 
    const std::map<Key, Source>& Links() const { return mLinks; }
 
