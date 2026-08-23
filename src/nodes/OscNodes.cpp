@@ -31,7 +31,7 @@ void OscReceiveNode::StopListener()
    // does elsewhere in this codebase (RemoteControl's accept loop) - there is
    // no portable "cancel this blocking syscall" short of shutting the fd down.
    shutdown(mSocket, SHUT_RDWR);
-   close(mSocket);
+   NetCompat::NetClose(mSocket);
    mSocket = -1;
    if (mThread.joinable())
       mThread.join();
@@ -56,7 +56,7 @@ void OscReceiveNode::RestartListenerIfNeeded()
 
    if (bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
    {
-      close(fd);
+      NetCompat::NetClose(fd);
       return;
    }
 
@@ -177,7 +177,7 @@ void OscSendNode::CookIfNeeded(int frameId)
       std::vector<uint8_t> packet = OscMessage::EncodeFloat(address, value);
       NetCompat::NetSendTo(fd, packet.data(), packet.size(), 0,
                            reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
-      close(fd);
+      NetCompat::NetClose(fd);
    }
 
    mLastSent = value;

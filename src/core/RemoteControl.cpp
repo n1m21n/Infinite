@@ -122,7 +122,7 @@ namespace RemoteControl
                NetCompat::NetSend(fd, out.data(), out.size(), 0);
             }
          }
-         close(fd);
+         NetCompat::NetClose(fd);
       }
 
       void AcceptLoop(int port)
@@ -141,12 +141,12 @@ namespace RemoteControl
 
          if (bind(listenFd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
          {
-            close(listenFd);
+            NetCompat::NetClose(listenFd);
             return;
          }
          if (listen(listenFd, 4) != 0)
          {
-            close(listenFd);
+            NetCompat::NetClose(listenFd);
             return;
          }
 

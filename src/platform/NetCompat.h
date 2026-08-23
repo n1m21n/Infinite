@@ -6,8 +6,13 @@
 // POSIX socket API. On Windows this header pulls in winsock2/ws2tcpip and
 // papers over the small differences:
 //
-//   - `close(fd)` becomes closesocket (via macro - both call sites close
-//     sockets and nothing else, so the narrow macro is safe in these TUs)
+//   - NetClose(fd) maps to closesocket. This used to be `#define close(fd)
+//     closesocket(fd)`, which was NOT safe: an unscoped macro named `close`
+//     also hits <fstream>'s basic_filebuf::close() when a TU includes both
+//     (RemoteControl.cpp does), mangling those declarations in that one TU
+//     while every other TU in the same MSVC codegen batch sees the real
+//     ones. That produced a stream of C4003 warnings and then an internal
+//     compiler error during "Generating Code". Use the function.
 //   - SHUT_RDWR -> SD_BOTH
 //   - socklen_t doesn't exist on Windows
 //   - WSAStartup must run before any socket call; the ProcessScope object
@@ -33,7 +38,6 @@
    #ifndef SHUT_RDWR
       #define SHUT_RDWR SD_BOTH
    #endif
-   #define close(fd) closesocket(fd)
 
    namespace NetCompat
    {
@@ -73,6 +77,7 @@
          return ::setsockopt(static_cast<SOCKET>(fd), level, optname,
                              static_cast<const char*>(optval), static_cast<int>(optlen));
       }
+      inline int NetClose(int fd) { return ::closesocket(static_cast<SOCKET>(fd)); }
    }
 #else
    #include <arpa/inet.h>
@@ -88,5 +93,6 @@
       inline NetSsize NetSend(int fd, const void* buf, size_t len, int flags) { return ::send(fd, buf, len, flags); }
       inline NetSsize NetSendTo(int fd, const void* buf, size_t len, int flags, const sockaddr* to, socklen_t tolen) { return ::sendto(fd, buf, len, flags, to, tolen); }
       inline int NetSetSockOpt(int fd, int level, int optname, const void* optval, socklen_t optlen) { return ::setsockopt(fd, level, optname, optval, optlen); }
+      inline int NetClose(int fd) { return ::close(fd); }
    }
 #endif
