@@ -1,3 +1,9 @@
+# This Fork
+This fork is completed vibe-coded and it was made to run entirely on Windows. I will not be maintaining this to keep up with the current version. I don't own a Mac so I can't see what the official version actually looks like so if there are any immediate bugs please notify me. Theoretically this can also run on Mac. 
+
+
+
+
 # Infinite
 
 A unified node-based audiovisual modular workstation for **macOS** and **Windows**. Real-time GPU image and video compositing, procedural 3D geometry and simulation, and a full modular synthesizer and DSP rack with plugin hosting (Audio Unit on macOS; VST3 hosting available as an opt-in build flag, see below) — all interconnected through a universal modulation graph.
