@@ -23,10 +23,16 @@
 #include "dsp/PortableFft.h"
 
 #include <audioclient.h>
+#include <avrt.h>
 #include <mmdeviceapi.h>
 // Must follow mmdeviceapi.h: it leans on propkeydef.h's DEFINE_PROPERTYKEY
 // declaration that mmdeviceapi's include chain sets up.
 #include <functiondiscoverykeys_devpkey.h>
+
+// MMCSS, for the render thread's scheduling priority (see ProAudioScope).
+#ifdef _MSC_VER
+#pragma comment(lib, "avrt.lib")
+#endif
 
 #include <algorithm>
 #include <atomic>
@@ -119,6 +125,36 @@ namespace
          ok = SUCCEEDED(hr); // S_FALSE (already initialized) counts as success
       }
       ~ComScope() { if (ok) CoUninitialize(); }
+   };
+
+   // Opts the render thread into the Multimedia Class Scheduler Service for
+   // the duration of its life. Without this it is an ordinary thread at
+   // ordinary priority, freely preempted by our own UI thread compiling a
+   // shader, a plugin scan, or anything else the machine feels like running -
+   // and every preemption that outlasts the buffer deadline is an audible
+   // click, because WASAPI plays whatever is in the buffer regardless.
+   //
+   // macOS never needed an equivalent: CoreAudio invokes the render callback
+   // on its own HAL I/O thread, which the kernel has already granted
+   // time-constraint scheduling. On Windows the deadline guarantee is opt-in,
+   // and "Pro Audio" is the MMCSS profile meant for exactly this.
+   //
+   // Failure is deliberately non-fatal. MMCSS can decline (it is a system
+   // service and can be disabled), and audio at ordinary priority is still
+   // audio - it just glitches under load, which is what we had before.
+   struct ProAudioScope
+   {
+      HANDLE task = nullptr;
+      ProAudioScope()
+      {
+         DWORD taskIndex = 0;
+         task = AvSetMmThreadCharacteristicsW(L"Pro Audio", &taskIndex);
+         if (task == nullptr)
+            task = AvSetMmThreadCharacteristicsW(L"Audio", &taskIndex);
+      }
+      ~ProAudioScope() { if (task != nullptr) AvRevertMmThreadCharacteristics(task); }
+      ProAudioScope(const ProAudioScope&) = delete;
+      ProAudioScope& operator=(const ProAudioScope&) = delete;
    };
 
    void RefreshDeviceList(IMMDeviceEnumerator* enumerator)
@@ -277,6 +313,7 @@ namespace
    void RenderThreadMain(std::wstring endpointId, bool registerNotifications)
    {
       ComScope com;
+      ProAudioScope proAudio; // reverted on every exit path, including the early return below
 
       if (com.ok)
       {
