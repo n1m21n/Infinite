@@ -1,7 +1,10 @@
 #include "WaveTerrainNode.h"
 
+// GLFW_INCLUDE_NONE keeps glfw3.h from pulling a system GL header ahead of
+// glad - glad/gl.h hard-errors if any GL header was included before it.
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>

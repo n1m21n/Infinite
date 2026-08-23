@@ -1,6 +1,6 @@
 #include "ResynthNode.h"
 
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>

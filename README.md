@@ -1,6 +1,6 @@
 # Infinite
 
-A unified node-based audiovisual modular workstation for macOS. Real-time GPU image and video compositing, procedural 3D geometry and simulation, and a full modular synthesizer and DSP rack with Audio Unit plugin hosting (VST3 hosting available as an opt-in build flag, see below) — all interconnected through a universal modulation graph.
+A unified node-based audiovisual modular workstation for **macOS** and **Windows**. Real-time GPU image and video compositing, procedural 3D geometry and simulation, and a full modular synthesizer and DSP rack with plugin hosting (Audio Unit on macOS; VST3 hosting available as an opt-in build flag, see below) — all interconnected through a universal modulation graph.
 
 Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeSynth/BespokeSynth)'s module system — a registry of node types, typed cables, and a pull-based cook-once-per-frame DAG — extended across GPU textures, procedural geometry, and real-time audio buffers.
 
@@ -80,8 +80,21 @@ Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeS
 ## Installation
 
 ### Requirements
-- **macOS 11.0+** (Apple Silicon or Intel).
-- Built as a self-contained universal binary linking system frameworks — no external package managers or dependencies required.
+- **macOS 11.0+** (Apple Silicon or Intel), or **Windows 10 / 11** (x64).
+- Built as a self-contained binary linking only system frameworks/libraries — no external package managers or dependencies required.
+
+### Platform notes (Windows)
+The Windows build swaps every Apple framework for its Windows counterpart behind the same `src/platform/Platform.h` facade:
+
+| macOS | Windows |
+|---|---|
+| CoreAudio (WASAPI-equivalent device I/O) | **WASAPI** shared-mode render + capture |
+| CoreMIDI | **WinMM** MIDI in/out |
+| AVFoundation (video decode, camera, H.264 recording) | **Media Foundation** (H.264/AAC MP4 muxing, camera capture) |
+| ImageIO / ModelIO / CoreText | **stb_image / tinyexr**, hand-rolled OBJ-PLY-STL importers, **GDI+** typography |
+| Audio Unit plugins, Syphon, Vision (Remove Background) | Not available — the nodes report it gracefully |
+
+FLAC decoding uses dr_libs and FLAC encoding links [libFLAC](https://github.com/xiph/flac); MP3 export uses the vendored shine encoder — identical on both platforms. WAV/MP3/FLAC export, PNG export, and H.264 video recording with audio all work on Windows.
 
 ### Opening the Application (Gatekeeper)
 The build is ad-hoc signed:
@@ -95,6 +108,7 @@ The build is ad-hoc signed:
 
 ## Build from Source
 
+### macOS
 Requires **CMake 3.16+** and **Xcode Command Line Tools**:
 
 ```bash
@@ -113,6 +127,34 @@ open build/Infinite.app
 To create a standalone DMG installer:
 ```bash
 ./package.sh
+```
+
+### Windows
+Requires **CMake 3.16+** and **Visual Studio 2022/2026** with the *Desktop development with C++* workload (MSVC v143+, Windows SDK). GLFW and libFLAC are fetched automatically by CMake; everything else is system libraries.
+
+From a Developer PowerShell (or any shell where `cl` resolves):
+
+```powershell
+# 1. Clone the repository
+git clone https://github.com/n1m21n/Infinite.git
+cd Infinite
+
+# 2. Configure and build
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+
+# 3. Launch Infinite
+.\build\Release\Infinite.exe
+```
+
+To build and stage a distributable folder (`dist\Infinite\Infinite.exe`):
+```powershell
+powershell -ExecutionPolicy Bypass -File package.ps1
+```
+
+Headless self-checks (the binary prints `DSPTEST OK` and exits 0 when the DSP rack is healthy):
+```powershell
+$env:INFINITE_DSPTEST = "1"; .\build\Release\Infinite.exe; Remove-Item Env:INFINITE_DSPTEST
 ```
 
 ---
@@ -142,7 +184,8 @@ src/
 ├── core/         # INode, ImageCable, NodeFactory, Transport, Modulation, GLUtil, Mesh
 ├── nodes/        # Node family implementations (2D, 3D, Audio, Synths, Notes, Modulators)
 ├── audio/        # Audio engine, DSP kernels, Wavetable core, SampleSlot, PluginScanner
-└── platform/     # macOS shims: CoreAudio, AudioUnit hosting (+ opt-in VST3), AVFoundation, Vision
+└── platform/     # OS layer behind one facade: Platform.mm (CoreAudio/AU/AVFoundation) on macOS,
+                  # win/*.cpp (WASAPI/WinMM/Media Foundation/GDI+) on Windows
 ```
 
 - **`INode`**: Core interface implemented by all nodes, providing `CookIfNeeded(frameId)` with memoised DAG execution.

@@ -55,7 +55,8 @@ private:
    // WAV state
    FILE* mFile = nullptr;
 
-   // FLAC state (CoreAudio ExtAudioFileRef opaque pointer)
+   // FLAC state (libFLAC stream encoder on Windows, named for the CoreAudio
+   // handle it held before the port)
    void* mExtAudioFile = nullptr;
 
    // MP3 state

@@ -1,6 +1,6 @@
 #include "OutputNode.h"
 
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 
 #include "AnalyzeNodes.h"
 

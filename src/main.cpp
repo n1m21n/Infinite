@@ -1,7 +1,11 @@
 #define GLFW_INCLUDE_NONE
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 #include <GLFW/glfw3.h>
-#include <CoreFoundation/CoreFoundation.h>
+#if defined(__APPLE__)
+   // No CF symbols remain in this file, but the include predates the Windows
+   // port and macOS toolchains expect it in the preamble - keep it Apple-only.
+   #include <CoreFoundation/CoreFoundation.h>
+#endif
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -25,6 +29,17 @@
 #include <cstdlib>
 #include <cstring>
 #include <sys/stat.h>
+#include "platform/AppPaths.h"
+
+namespace
+{
+   // Test fixtures live in the OS temp directory; /tmp was hardcoded before
+   // the Windows port.
+   std::string TmpPath(const std::string& name)
+   {
+      return AppPaths::TempDir() + "/" + name;
+   }
+}
 #include <functional>
 #include <chrono>
 #include <cstdint>
@@ -13572,13 +13587,13 @@ namespace
    }
 
    // Where the next recording lands: the folder last picked via Choose...,
-   // or ~/Desktop when nothing has been picked yet.
+   // or the user's Desktop when nothing has been picked yet.
    std::string RecordingDirFor(const AudioOutputNode* n)
    {
       if (!n->recordDirectory.empty())
          return n->recordDirectory;
-      const char* home = getenv("HOME");
-      return home != nullptr ? std::string(home) + "/Desktop" : ".";
+      const std::string home = AppPaths::HomeDir();
+      return home.empty() ? "." : home + "/Desktop";
    }
 
    void DrawAudioOutBody(GraphNode& gn, AudioOutputNode* n)
@@ -20675,7 +20690,7 @@ static bool RunSamplerFixture()
       pcm[i] = (int16_t)((t * 2.0f - 1.0f) * 32000.0f);
    }
 
-   const std::string path = "/tmp/infinite_sampler_fixture.wav";
+   const std::string path = TmpPath("infinite_sampler_fixture.wav");
    {
       std::ofstream f(path, std::ios::binary);
       auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
@@ -20936,7 +20951,7 @@ static bool RunPaulStretchFixture()
       pcm[i] = (int16_t)(std::sin(t * 440.0f * 6.283185f) * 30000.0f);
    }
 
-   const std::string path = "/tmp/infinite_paulstretch_fixture.wav";
+   const std::string path = TmpPath("infinite_paulstretch_fixture.wav");
    {
       std::ofstream f(path, std::ios::binary);
       auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
@@ -21082,7 +21097,7 @@ static bool RunGranularFixture()
       pcm[i] = (int16_t)(std::sin(t * 440.0f * 6.283185f) * 30000.0f);
    }
 
-   const std::string path = "/tmp/infinite_granular_fixture.wav";
+   const std::string path = TmpPath("infinite_granular_fixture.wav");
    {
       std::ofstream f(path, std::ios::binary);
       auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
@@ -21342,8 +21357,8 @@ static bool RunDrumSequencerFixture()
    const int savedNum = transport.TimeSigNumerator();
    const int savedDen = transport.TimeSigDenominator();
 
-   const std::string shortClickPath = WriteClickWav("/tmp/infinite_drumseq_click.wav", 4000, sampleRate);
-   const std::string longClickPath = WriteSustainedWav("/tmp/infinite_drumseq_sustain.wav", kSustainFrames, sampleRate);
+   const std::string shortClickPath = WriteClickWav(TmpPath("infinite_drumseq_click.wav"), 4000, sampleRate);
+   const std::string longClickPath = WriteSustainedWav(TmpPath("infinite_drumseq_sustain.wav"), kSustainFrames, sampleRate);
 
    auto resetTransport = [&]()
    {
@@ -24578,6 +24593,17 @@ int main(int argc, char** argv)
    }
 
    glfwMakeContextCurrent(window);
+#if !defined(__APPLE__)
+   // On Windows core/gl3.h resolves to the glad2 loader; every GL entry point
+   // is a function pointer until it's populated. All other windows share this
+   // context, so one load here covers the app.
+   if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress))
+   {
+      fprintf(stderr, "gladLoadGL failed (no OpenGL 3.3+ driver?)\n");
+      glfwTerminate();
+      return 1;
+   }
+#endif
    glfwSwapInterval(1);
    Platform::PreventAppNap();
 
@@ -24624,16 +24650,9 @@ int main(int argc, char** argv)
    glfwSetDropCallback(window, OnFilesDropped);
    ImGui_ImplOpenGL3_Init("#version 150");
 
-   // Cocoa chdir's a bundled app into Contents/Resources, so anything written
-   // with a relative path lands inside the .app - which breaks its code
-   // signature on first launch and can get the app reported as damaged. Keep
-   // all mutable state in Application Support instead.
-   std::string settingsDir;
-   if (const char* home = getenv("HOME"))
-   {
-      settingsDir = std::string(home) + "/Library/Application Support/Infinite";
-      mkdir(settingsDir.c_str(), 0755); // fine if it already exists
-   }
+   // Keep all mutable state (settings, indexes, imgui.ini) in the per-user
+   // application-data directory rather than next to the executable.
+   std::string settingsDir = AppPaths::AppSupportDir();
    // Restores whatever was indexed last run with no rescan - scanning only
    // ever happens from an explicit Refresh click in the Samples/Media panel.
    gSampleScanner.LoadFromDisk();
@@ -24822,7 +24841,7 @@ int main(int argc, char** argv)
             // start/end handles, the loop-range dimming) rather than the
             // empty "no sample loaded" placeholder every other run of this
             // fixture would otherwise show forever.
-            const std::string fixtureWav = "/tmp/infinite_audiouitest_sampler.wav";
+            const std::string fixtureWav = TmpPath("infinite_audiouitest_sampler.wav");
             const int fixtureFrames = 2205;
             std::vector<int16_t> fixturePcm(fixtureFrames);
             for (int i = 0; i < fixtureFrames; i++)
@@ -24848,7 +24867,7 @@ int main(int argc, char** argv)
             // and an armed step or two so the fixture's screenshot shows the
             // grid's velocity fills and the strip's real filename instead of
             // the empty "no sample loaded" placeholder forever.
-            const std::string drumWav = "/tmp/infinite_audiouitest_drum.wav";
+            const std::string drumWav = TmpPath("infinite_audiouitest_drum.wav");
             const int drumFrames = 400;
             std::vector<int16_t> drumPcm(drumFrames, 0);
             for (int i = 0; i < drumFrames && i < 200; i++)
@@ -24957,8 +24976,8 @@ int main(int argc, char** argv)
          for (const std::string& stale : std::vector<std::string>(gSampleScanner.Folders()))
             gSampleScanner.RemoveFolder(stale);
 
-         mkdir("/tmp/infinite_samplerdrag", 0755);
-         const std::string wavPath = "/tmp/infinite_samplerdrag/sample.wav";
+         AppPaths::EnsureDir(TmpPath("infinite_samplerdrag"));
+         const std::string wavPath = TmpPath("infinite_samplerdrag/sample.wav");
          const int numFrames = 4410;
          std::vector<int16_t> pcm(numFrames);
          for (int i = 0; i < numFrames; i++)
@@ -24977,7 +24996,7 @@ int main(int argc, char** argv)
          f.write((const char*)pcm.data(), dataSize);
          f.close();
 
-         gSampleScanner.AddFolder("/tmp/infinite_samplerdrag");
+         gSampleScanner.AddFolder(TmpPath("infinite_samplerdrag"));
          gSampleScanner.StartScan();
       }
       else if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
@@ -25010,13 +25029,13 @@ int main(int argc, char** argv)
          for (const std::string& stale : std::vector<std::string>(gMediaScanner.Folders()))
             gMediaScanner.RemoveFolder(stale);
 
-         mkdir("/tmp/infinite_mediadrag", 0755);
-         const std::string pngPath = "/tmp/infinite_mediadrag/fixture.png";
+         AppPaths::EnsureDir(TmpPath("infinite_mediadrag"));
+         const std::string pngPath = TmpPath("infinite_mediadrag/fixture.png");
          const int side = 8;
          std::vector<unsigned char> pixels(side * side * 4, 255);
          stbi_write_png(pngPath.c_str(), side, side, 4, pixels.data(), side * 4);
 
-         gMediaScanner.AddFolder("/tmp/infinite_mediadrag");
+         gMediaScanner.AddFolder(TmpPath("infinite_mediadrag"));
          gMediaScanner.StartScan();
       }
       else if (getenv("INFINITE_BYPASSTEST") != nullptr)
@@ -25355,7 +25374,7 @@ int main(int argc, char** argv)
          auto* curve = static_cast<CurveNode*>(gNodes[12].node.get());
          auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[13].node.get());
          auto* shape = static_cast<GeometryNode*>(gNodes[14].node.get());
-         audioFile->Open("/tmp/models/tone.wav");
+         audioFile->Open(TmpPath("models/tone.wav"));
          audioFile->monitor = false;
 
          geo->shape = 4; geo->detail = 33; geo->posX = 1.25f;
@@ -25647,7 +25666,7 @@ int main(int argc, char** argv)
          // higher mip as NaN, which is what used to render the lit geometry
          // solid black (the diffuse term always samples the topmost mip).
          envPixels[0] = envPixels[1] = envPixels[2] = 1.0e30f;
-         const std::string envPath = "/tmp/infinite_envtest.hdr";
+         const std::string envPath = TmpPath("infinite_envtest.hdr");
          stbi_write_hdr(envPath.c_str(), ew, eh, 3, envPixels.data());
 
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);     // 0 - the reflective sphere
@@ -26172,17 +26191,16 @@ int main(int argc, char** argv)
 
    // Cocoa chdir's a bundled app to Contents/Resources, so a bare relative path
    // would silently write inside the .app. Default somewhere the user can find.
+   const std::string desktopDir = []() {
+      const std::string home = AppPaths::HomeDir();
+      return home.empty() ? std::string(".") : home + "/Desktop";
+   }();
+
    char exportPath[512] = "";
-   if (const char* home = getenv("HOME"))
-      snprintf(exportPath, sizeof(exportPath), "%s/Desktop/infinite_output.png", home);
-   else
-      snprintf(exportPath, sizeof(exportPath), "infinite_output.png");
+   snprintf(exportPath, sizeof(exportPath), "%s/infinite_output.png", desktopDir.c_str());
 
    char recordPath[512] = "";
-   if (const char* home = getenv("HOME"))
-      snprintf(recordPath, sizeof(recordPath), "%s/Desktop/infinite_output.mp4", home);
-   else
-      snprintf(recordPath, sizeof(recordPath), "infinite_output.mp4");
+   snprintf(recordPath, sizeof(recordPath), "%s/infinite_output.mp4", desktopDir.c_str());
 
    if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
    {
@@ -26588,7 +26606,7 @@ int main(int argc, char** argv)
             if (frameId >= sPhaseFrame + 3)
             {
                auto* samplerNode = static_cast<SamplerNode*>(gNodes[0].node.get());
-               const bool ok = samplerNode->FilePath() == "/tmp/infinite_samplerdrag/sample.wav";
+               const bool ok = samplerNode->FilePath() == TmpPath("infinite_samplerdrag/sample.wav");
                printf("SAMPLERDRAG drop onto node: path='%s' %s\n", samplerNode->FilePath().c_str(),
                       ok ? "OK" : "FAIL");
                printf("%s\n", ok ? "SAMPLERDRAGTEST OK" : "SAMPLERDRAGTEST FAIL");
@@ -26746,7 +26764,7 @@ int main(int argc, char** argv)
             if (frameId >= sPhaseFrame + 3)
             {
                auto* imageNode = static_cast<ImageSourceNode*>(gNodes[0].node.get());
-               const bool ok = imageNode->LoadedPath() == "/tmp/infinite_mediadrag/fixture.png";
+               const bool ok = imageNode->LoadedPath() == TmpPath("infinite_mediadrag/fixture.png");
                printf("MEDIADRAG drop onto node: path='%s' %s\n", imageNode->LoadedPath().c_str(),
                       ok ? "OK" : "FAIL");
                printf("%s\n", ok ? "MEDIADRAGTEST OK" : "MEDIADRAGTEST FAIL");
@@ -27686,7 +27704,7 @@ int main(int argc, char** argv)
          if (frameId == 2)
          {
             out->recordFps = 30;
-            bool started = out->StartRecording("/tmp/infinite_rectest.mov");
+            bool started = out->StartRecording(TmpPath("infinite_rectest.mov"));
             printf("start recording: %d (%s)\n", (int)started, out->RecordStatus().c_str());
          }
          if (frameId == 5)
@@ -28439,8 +28457,8 @@ int main(int argc, char** argv)
          ok = ok && statOfSizeUnaffected;
 
          // --- opening a patch from disk clears history; undoing past it is not a thing ---
-         SavePatchTo("/tmp/infinite_undotest.infinite");
-         LoadPatchFrom("/tmp/infinite_undotest.infinite");
+         SavePatchTo(TmpPath("infinite_undotest.infinite"));
+         LoadPatchFrom(TmpPath("infinite_undotest.infinite"));
          const bool loadClearsUndo = gUndoStack.empty() && gRedoStack.empty();
          printf("loading a patch clears undo history: %zu undo, %zu redo  %s\n",
                 gUndoStack.size(), gRedoStack.size(), loadClearsUndo ? "OK" : "FAIL");
@@ -28526,8 +28544,8 @@ int main(int argc, char** argv)
          CommentNode* c = findComment();
          const std::string original = c != nullptr ? c->text : std::string();
 
-         SavePatchTo("/tmp/infinite_commenttest.infinite");
-         LoadPatchFrom("/tmp/infinite_commenttest.infinite");
+         SavePatchTo(TmpPath("infinite_commenttest.infinite"));
+         LoadPatchFrom(TmpPath("infinite_commenttest.infinite"));
          CommentNode* reloaded = findComment(); // load rebuilt every node
          const bool savedOk = reloaded != nullptr && reloaded->text == original;
          printf("comment save/load: %zu lines -> %zu lines  %s\n",
@@ -29620,7 +29638,7 @@ int main(int argc, char** argv)
 
          // 1. Saving from outside the editor context must not crash. This is
          //    the exact path the File menu and Cmd+S take.
-         const bool saved = SavePatchTo("/tmp/infinite_bugtest.infinite");
+         const bool saved = SavePatchTo(TmpPath("infinite_bugtest.infinite"));
          printf("save from outside editor context: %d\n", (int)saved);
 
          // 2. Moving a Geometry node must move what an operator downstream
@@ -30718,7 +30736,7 @@ int main(int argc, char** argv)
          {
             printf("audio source loaded: %d (%s)\n", (int)static_cast<AudioFileNode*>(gNodes[2].node.get())->IsLoaded(),
                    static_cast<AudioFileNode*>(gNodes[2].node.get())->Status().c_str());
-            const bool started = out->StartRecording("/tmp/infinite_audiorec.mov");
+            const bool started = out->StartRecording(TmpPath("infinite_audiorec.mov"));
             printf("start: %d (%s)\n", (int)started, out->RecordStatus().c_str());
          }
          if (frameId == 62) // ~2 seconds at 30fps
@@ -30733,7 +30751,7 @@ int main(int argc, char** argv)
             out->StopRecording();
             printf("recorded %d frames (of up to 60), status: %s\n", frames, out->RecordStatus().c_str());
 
-            const Platform::MovieInfo withAudio = Platform::InspectMovie("/tmp/infinite_audiorec.mov");
+            const Platform::MovieInfo withAudio = Platform::InspectMovie(TmpPath("infinite_audiorec.mov"));
             const double expectedDuration = (double)frames / 30.0;
             printf("with-audio movie: video=%d audio=%d duration=%.2fs (expected ~%.2fs)\n",
                    withAudio.hasVideo, withAudio.hasAudio, withAudio.duration, expectedDuration);
@@ -30741,17 +30759,17 @@ int main(int argc, char** argv)
             // A control recording with includeAudio off, so the difference is
             // attributable to the checkbox and not to something environmental.
             out->includeAudio = false;
-            out->StartRecording("/tmp/infinite_videoonly.mov");
+            out->StartRecording(TmpPath("infinite_videoonly.mov"));
          }
          if (frameId == 122)
          {
             const int frames = out->RecordedFrames();
             out->StopRecording();
-            const Platform::MovieInfo videoOnly = Platform::InspectMovie("/tmp/infinite_videoonly.mov");
+            const Platform::MovieInfo videoOnly = Platform::InspectMovie(TmpPath("infinite_videoonly.mov"));
             printf("video-only movie: video=%d audio=%d duration=%.2fs (%d frames)\n",
                    videoOnly.hasVideo, videoOnly.hasAudio, videoOnly.duration, frames);
 
-            const Platform::MovieInfo withAudio = Platform::InspectMovie("/tmp/infinite_audiorec.mov");
+            const Platform::MovieInfo withAudio = Platform::InspectMovie(TmpPath("infinite_audiorec.mov"));
             const bool ok = withAudio.hasVideo && withAudio.hasAudio &&
                             videoOnly.hasVideo && !videoOnly.hasAudio &&
                             withAudio.duration > 0.5;
@@ -30761,7 +30779,7 @@ int main(int argc, char** argv)
 
       if (getenv("INFINITE_PATCHTEST") != nullptr && frameId == 4)
       {
-         const std::string path = "/tmp/infinite_roundtrip.infinite";
+         const std::string path = TmpPath("infinite_roundtrip.infinite");
          const size_t nodesBefore = gNodes.size();
          const bool saved = SavePatchTo(path);
 
@@ -31430,7 +31448,7 @@ int main(int argc, char** argv)
 
       if (getenv("INFINITE_AUDIOGRAPHTEST") != nullptr && frameId == 4)
       {
-         const std::string path = "/tmp/infinite_audiographtest.infinite";
+         const std::string path = TmpPath("infinite_audiographtest.infinite");
          const bool saved = SavePatchTo(path);
          const size_t nodesBefore = gNodes.size();
          const bool loaded = LoadPatchFrom(path);

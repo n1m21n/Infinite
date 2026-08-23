@@ -1,9 +1,6 @@
 #include "OscNodes.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
+#include "platform/NetCompat.h"
 
 #include <cmath>
 
@@ -70,7 +67,7 @@ void OscReceiveNode::RestartListenerIfNeeded()
       uint8_t buffer[1024];
       for (;;)
       {
-         ssize_t n = recv(fd, buffer, sizeof(buffer), 0);
+         NetSsize n = NetCompat::NetRecv(fd, buffer, sizeof(buffer), 0);
          if (mStop.load())
             break;
          if (n <= 0)
@@ -178,7 +175,8 @@ void OscSendNode::CookIfNeeded(int frameId)
       addr.sin_addr.s_addr = inet_addr(host.c_str());
 
       std::vector<uint8_t> packet = OscMessage::EncodeFloat(address, value);
-      sendto(fd, packet.data(), packet.size(), 0, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+      NetCompat::NetSendTo(fd, packet.data(), packet.size(), 0,
+                           reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
       close(fd);
    }
 

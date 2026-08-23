@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
+#include "platform/AppPaths.h"
 
 namespace
 {
@@ -96,16 +97,12 @@ namespace AudioRecordings
 {
    std::string GetRecordingsDirectory()
    {
-      const char* home = getenv("HOME");
-      std::string base;
-      if (home != nullptr)
-         base = std::string(home) + "/Library/Application Support/Infinite";
-      else
-         base = "/tmp/Infinite";
+      std::string base = AppPaths::AppSupportDir();
+      if (base.empty())
+         base = AppPaths::TempDir() + "/Infinite";
 
-      mkdir(base.c_str(), 0755);
       std::string dir = base + "/Recordings";
-      mkdir(dir.c_str(), 0755);
+      AppPaths::EnsureDir(dir);
       return dir;
    }
 

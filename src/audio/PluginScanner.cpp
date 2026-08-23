@@ -4,10 +4,13 @@
 #include <cerrno>
 #include <cstdlib>
 #include <filesystem>
-#include <sys/stat.h>
-#include <unistd.h>
+#if !defined(_WIN32)
+   #include <sys/stat.h>
+   #include <unistd.h>
+#endif
 
 #include "crude_json.h"
+#include "platform/AppPaths.h"
 
 namespace
 {
@@ -15,13 +18,14 @@ namespace
 
    std::string SettingsDir()
    {
-      const char* home = getenv("HOME");
-      if (home == nullptr)
+      std::string dir = AppPaths::AppSupportDir(); // creates if missing
+      if (dir.empty())
          return std::string();
-      std::string dir = std::string(home) + "/Library/Application Support/Infinite";
       if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
+      {
          dir += "/plugin_drag_test";
-      mkdir(dir.c_str(), 0755);
+         AppPaths::EnsureDir(dir);
+      }
       return dir;
    }
 
@@ -83,10 +87,17 @@ void PluginScanner::StartScan(const std::string& folder)
    }
    else
    {
+#if defined(_WIN32)
+      // Steinberg's system-wide VST3 location; the per-user %LOCALAPPDATA%
+      // one only exists if the user or an installer created it.
+      if (const char* common = getenv("COMMONPROGRAMFILES"))
+         vst3Folders.push_back(std::string(common) + "\\VST3");
+#else
       vst3Folders.push_back("/Library/Audio/Plug-Ins/VST3");
       const char* home = getenv("HOME");
       if (home != nullptr)
          vst3Folders.push_back(std::string(home) + "/Library/Audio/Plug-Ins/VST3");
+#endif
       for (const std::string& userFolder : mFolders)
          if (std::find(vst3Folders.begin(), vst3Folders.end(), userFolder) == vst3Folders.end())
             vst3Folders.push_back(userFolder);

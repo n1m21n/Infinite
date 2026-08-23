@@ -1,6 +1,6 @@
 #include "GLUtil.h"
 
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 #include <cstdio>
 #include <cstdlib>
 

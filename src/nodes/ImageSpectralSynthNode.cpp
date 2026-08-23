@@ -1,5 +1,8 @@
 #include "ImageSpectralSynthNode.h"
 
+// GLFW_INCLUDE_NONE keeps glfw3.h from pulling a system GL header ahead of
+// glad (glad/gl.h hard-errors if a GL header landed first).
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <algorithm>
 #include <cmath>
@@ -17,7 +20,7 @@
 #include "core/GLUtil.h"
 
 #ifdef __APPLE__
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 #else
 #include <GL/gl.h>
 #endif
