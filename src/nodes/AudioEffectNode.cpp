@@ -73,6 +73,7 @@ public:
       mKernel->ProcessBlock(in, sidechainPtr, wet);
 
       float peak = 0.0f;
+      float monoBuf[kAudioMaxBlockFrames];
       for (int i = 0; i < output.numFrames; i++)
       {
          const float m = std::clamp(mMixSmoother.Process(mMixTarget.load(std::memory_order_relaxed)), 0.0f, 1.0f);
@@ -81,14 +82,22 @@ public:
          const float angle = m * (float)M_PI * 0.5f;
          const float dryGain = cosf(angle);
          const float wetGain = sinf(angle);
+         float monoSum = 0.0f;
          for (int ch = 0; ch < numChannels; ch++)
          {
             const float v = in.channels[ch][i] * dryGain + wet.channels[ch][i] * wetGain;
             output.channels[ch][i] = v;
             peak = std::max(peak, std::fabs(v));
+            monoSum += v;
          }
+         monoBuf[i] = numChannels > 0 ? monoSum / (float)numChannels : 0.0f;
       }
       mMeter.Write(&peak, 1);
+      // Post-mix mono signal for the EQ visualizer's live spectrum trace -
+      // same lock-free MeterRing, same full-rate write AudioColorRampNode
+      // already does for its own FFT (AudioColorRampNode.cpp), just tapped
+      // here instead of via a dedicated sink node.
+      mSpectrumRing.Write(monoBuf, output.numFrames);
    }
 
    // Main thread only.
@@ -98,6 +107,8 @@ public:
    MeterRing& Meter() { return mMeter; }
    int LatencySamples() const override { return mKernel->LatencySamples(); }
    MeterRing* KernelExtraMeter() { return mKernel->ExtraMeter(); }
+   // Main thread only.
+   int ReadSpectrumSamples(float* out, int maxCount) { return mSpectrumRing.Read(out, maxCount); }
 
 private:
    static constexpr int kMaxChannels = 8;
@@ -121,6 +132,7 @@ private:
    int mMaxBlockSize = 0;
 
    MeterRing mMeter;
+   MeterRing mSpectrumRing;
 };
 
 AudioEffectNode::AudioEffectNode(const EffectDef& def) : mix(def.defaultMix), mDef(def)
@@ -186,4 +198,9 @@ AudioNode* AudioEffectNode::GetAudioNode()
 int AudioEffectNode::LatencySamples() const
 {
    return mAudioNode ? mAudioNode->LatencySamples() : 0;
+}
+
+int AudioEffectNode::ReadSpectrumSamples(float* out, int maxCount)
+{
+   return mAudioNode ? mAudioNode->ReadSpectrumSamples(out, maxCount) : 0;
 }
