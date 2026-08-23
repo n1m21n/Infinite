@@ -190,11 +190,13 @@ add_executable(Infinite MACOSX_BUNDLE
     src/nodes/AudioRibbonNode.cpp
     src/nodes/AudioColorRampNode.cpp
     src/audio/dsp/SpectralAdditiveSynth.cpp
+    src/audio/dsp/MolderDsp.cpp
     src/nodes/OscillatorNode.cpp
     src/nodes/MetallicNode.cpp
     src/nodes/AudioEffectNode.cpp
     src/nodes/SamplerNode.cpp
     src/nodes/PaulStretchNode.cpp
+    src/nodes/MolderNode.cpp
     src/nodes/GranularNode.cpp
     src/nodes/DrumSequencerNode.cpp
     src/nodes/AudioPluginNode.cpp

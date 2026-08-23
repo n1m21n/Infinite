@@ -110,6 +110,24 @@ getting a file each:
   node carries a documented `AUDIOPARAMSWEEPTEST` baseline), and swapping or
   unloading a plugin retires the old handle for one generation before
   destroying it, mirroring `AudioEngine::SetTopology`.
+- **`src/nodes/MolderNode.h`/`.cpp` & `src/audio/dsp/MolderDsp.h`/`.cpp`** —
+  analysis/genome/additive-resynthesis sample-mangling synth: a source
+  sample is decomposed once (YIN pitch, per-frame STFT partial tracking
+  with a voiced/unvoiced gate, sinusoids-plus-residual split) into an
+  `Analysis`, and each "roll" mutates a small deterministic `Genome` (a
+  seeded xorshift32 replayed `generation` times, so a patch persists just
+  two integers rather than the genome itself) and re-renders a playable
+  sample from `Analysis x Genome`. Unlike every other audio node here, this
+  is a **three**-thread node, not two: both `Analyze()` and `Render()` are
+  full-buffer, tens-to-hundreds-of-milliseconds operations that would blow
+  `CookIfNeeded`'s <5us budget, so they run on a dedicated worker
+  `std::thread` (one job in flight at a time, joined before the next
+  starts — `SampleScanner`'s thread shape) and hand a finished result to
+  the main thread through a single `mResultReady` atomic flip, never a
+  mutex. The rendered buffer then reaches the audio thread through the
+  ordinary `SampleSlot`. The destructor sets an abort flag and joins the
+  worker before any member is freed, so a delete mid-analysis can't
+  use-after-free a worker still writing into the node.
 - **`src/audio/PluginScanner.h`/`.cpp`** — `SampleScanner`'s thread +
   `PollResults()` + disk-cache shape, over a component-registry query instead
   of a directory walk, so it has no user-managed folder list. Backs the docked

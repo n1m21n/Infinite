@@ -115,6 +115,7 @@
 #include "nodes/NoteNodes.h"
 #include "nodes/SamplerNode.h"
 #include "nodes/PaulStretchNode.h"
+#include "nodes/MolderNode.h"
 #include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
 #include "nodes/AudioPluginNode.h"
@@ -2489,6 +2490,7 @@ namespace
       REGISTER_NODE(MetallicNode, Metallic, "Synths");
       REGISTER_NODE(SamplerNode, Sampler, "Synths");
       REGISTER_NODE(PaulStretchNode, PaulStretch, "Synths");
+      REGISTER_NODE(MolderNode, Molder, "Synths");
       REGISTER_NODE(GranularNode, Granular, "Synths");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
@@ -3435,6 +3437,8 @@ namespace
          sampler->ReloadFromPath();
       if (auto* paul = dynamic_cast<PaulStretchNode*>(node))
          paul->ReloadFromPath();
+      if (auto* molder = dynamic_cast<MolderNode*>(node))
+         molder->ReloadFromPath();
       if (auto* gran = dynamic_cast<GranularNode*>(node))
          gran->ReloadFromPath();
       if (auto* drum = dynamic_cast<DrumSequencerNode*>(node))
@@ -7116,7 +7120,8 @@ namespace
          // to. Drag this one directly for a bend with nothing patched.
          row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
          // fmMode picks phase modulation (cheap, always-stable sideband FM)
-         // vs exponential FM (pitch-tracking, can self-modulate harder) - the
+         // vs linear through-zero FM (DX7/Serum/Operator-style, can self-
+         // modulate harder and run the carrier backward at high depth) - the
          // depth knob's meaning depends on it, so they read as one control.
          row.DropdownKnob("wtFmMode", { "pm", "fm" }, n->fmMode,
                           [n](int i) { PushUndoCheckpoint(); n->fmMode = i; },
@@ -7339,7 +7344,7 @@ namespace
             ImGui::EndDisabled();
          row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s");
          row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
-         // fmMode picks phase modulation vs exponential FM - see the
+         // fmMode picks phase modulation vs linear through-zero FM - see the
          // Wavetable master row's identical control for why they're paired.
          row.DropdownKnob("oscFmMode", { "pm", "fm" }, n->fmMode,
                           [n](int i) { PushUndoCheckpoint(); n->fmMode = i; },
@@ -8565,6 +8570,270 @@ namespace
          n->start = std::min(n->start, n->end - 0.01f);
       ImGui::SameLine();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+         n->end = std::max(n->end, n->start + 0.01f);
+
+      EndAudioBody();
+   }
+
+   // Decimated waveform + partial-spectrum strip for Molder, cached on the
+   // node (rebuilt only when a new render/analysis lands - see
+   // MolderNode::RebuildWaveformCache/RebuildPartialCache), never
+   // recomputed per frame.
+   void DrawMolderWaveform(MolderNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool hasSample = n->waveformCacheCount > 0;
+
+      // Body click-catcher first (see DrawSamplerWaveform's comment on
+      // overlap ordering) - the two range-handle grab-zones are added after,
+      // at the same screen position, and only receive input because this
+      // opts in via SetNextItemAllowOverlap() before being submitted.
+      ImGui::SetNextItemAllowOverlap();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##molderwavebody", ImVec2(w, h));
+      if (hasSample && ImGui::IsItemActivated())
+      {
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float target = (frac < n->start || frac > n->end) ? n->start : frac;
+         n->TriggerPreview(target);
+      }
+
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (hasSample)
+      {
+         const int count = n->waveformCacheCount;
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - n->waveformMax[i] * h * 0.45f;
+            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(40, 100, 230, 210) : IM_COL32(165, 180, 255, 210));
+         }
+
+         // Dim whatever the start/end range excludes.
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
+         if (startX > origin.x)
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
+         if (endX < br.x)
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
+
+         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
+         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
+                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 230), 2.0f);
+
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
+                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
+                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(),
+                     n->IsAnalyzing() ? "analyzing..." : "no sample loaded");
+      }
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+
+      if (hasSample)
+      {
+         const float handleW = 10.0f;
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+
+         const float grip = 8.0f;
+         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
+         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
+
+         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
+         ImGui::InvisibleButton("##molderstarthandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
+         ImGui::InvisibleButton("##molderendhandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+      }
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawMolderPartialBars(MolderNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool isLight = IsThemeLight();
+
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const int count = n->partialBarCount;
+      if (count > 0)
+      {
+         float maxAmp = 1e-6f;
+         for (int i = 0; i < count; i++)
+            maxAmp = std::max(maxAmp, n->partialBars[i]);
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count - 1.0f);
+            const float frac = std::clamp(n->partialBars[i] / maxAmp, 0.0f, 1.0f);
+            const float top = br.y - frac * h;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, br.y),
+                              isLight ? IM_COL32(90, 70, 200, 200) : IM_COL32(180, 160, 255, 200));
+         }
+      }
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+
+      // Draws into the draw list only, above - without this the cursor never
+      // advances past `origin`, so everything drawn after this call (the
+      // Dummy spacer and the seed/gen/f0/harm readout) renders on top of it
+      // instead of below it.
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawMolderBody(GraphNode& gn, MolderNode* n)
+   {
+      char stat[192];
+      if (!n->FileName().empty())
+         snprintf(stat, sizeof(stat), "%s  -  %s", n->FileName().c_str(), n->Status().c_str());
+      else
+         snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      if (ImGui::Button("Load...", ImVec2(80, 0)))
+      {
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            n->LoadFile(path);
+         }
+      }
+      ImGui::SameLine();
+      const bool recording = n->IsRecording();
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(recording ? "Stop##molderRec" : "Record##molderRec", ImVec2(70, 0)))
+      {
+         PushUndoCheckpoint();
+         if (recording)
+            n->StopRecording();
+         else
+            n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+
+      ImGui::SameLine();
+      if (ImGui::Button("Roll", ImVec2(60, 0)))
+      {
+         PushUndoCheckpoint();
+         n->Roll();
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Iterate", ImVec2(70, 0)))
+      {
+         PushUndoCheckpoint();
+         n->Iterate();
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Reset##molder", ImVec2(60, 0)))
+      {
+         PushUndoCheckpoint();
+         n->Reset();
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      DrawMolderWaveform(n, 90.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+      DrawMolderPartialBars(n, 36.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      // loop/reverse/ping-pong right-aligned on their own row, anchored off
+      // the fixed declared content width rather than GetContentRegionAvail()
+      // - see DrawSamplerBody's comment on why (it overlaps the node-editor
+      // resize hit-zone otherwise).
+      {
+         const float toggleW = 44.0f;
+         const float modsW = toggleW * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+         const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - modsW, rowScreenPos.y));
+         bool loopBool = n->loop;
+         if (AudioToggleButton("loop##molderLoop", &loopBool))
+         {
+            PushUndoCheckpoint();
+            n->loop = loopBool;
+         }
+         ImGui::SameLine();
+         bool reverseBool = n->reverse;
+         if (AudioToggleButton("rev##molderReverse", &reverseBool))
+         {
+            PushUndoCheckpoint();
+            n->reverse = reverseBool;
+         }
+         ImGui::SameLine();
+         bool pingpongBool = n->pingpong;
+         if (AudioToggleButton("p-p##molderPingpong", &pingpongBool))
+         {
+            PushUndoCheckpoint();
+            n->pingpong = pingpongBool;
+         }
+      }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      AudioSlider("chaos", &n->chaos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+
+      AudioSlider("tone", &n->tone, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("stretch", &n->stretch, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+
+      AudioSlider("air", &n->air, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("snap", &n->snap, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+
+      AudioSlider("time", &n->time, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("level", &n->level, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+
+      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+         n->start = std::min(n->start, n->end - 0.01f);
+      ImGui::SameLine();
+      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->end = std::max(n->end, n->start + 0.01f);
 
       EndAudioBody();
@@ -13694,6 +13963,8 @@ namespace
          DrawSamplerBody(gn, n);
       else if (auto* n = dynamic_cast<PaulStretchNode*>(gn.node.get()))
          DrawPaulStretchBody(gn, n);
+      else if (auto* n = dynamic_cast<MolderNode*>(gn.node.get()))
+         DrawMolderBody(gn, n);
       else if (auto* n = dynamic_cast<GranularNode*>(gn.node.get()))
          DrawGranularBody(gn, n);
       else if (auto* n = dynamic_cast<DrumSequencerNode*>(gn.node.get()))
@@ -16703,6 +16974,7 @@ namespace
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Equation Synth", "A synth defined by a live formula (y = f(x, a, b, c, d, t)) instead of a fixed waveform - knobs a-d feed the equation directly, so turning them reshapes the waveform itself rather than modulating a preset one." },
          { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
+         { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
@@ -21068,6 +21340,287 @@ static bool RunPaulStretchFixture()
    return ok;
 }
 
+// ===================================================== INFINITE_MOLDERTEST
+//
+// Headless test of MolderDsp's engine directly (Analyze/Mutate/Render are
+// pure functions with no INode/thread dependency, so this needs none of the
+// worker-thread machinery MolderNode wraps around them). Six assertions per
+// new-audio-node/SKILL.md and the design doc's "Tests" section.
+static bool RunMolderFixture()
+{
+   bool ok = true;
+   const double sr = 44100.0;
+   constexpr float kTwoPiT = 6.28318530717958647692f;
+
+   auto synthSaw = [&](float freq, float seconds) {
+      const int n = (int)(seconds * sr);
+      std::vector<float> buf(n);
+      for (int i = 0; i < n; i++)
+      {
+         const float phase = fmodf((float)i * freq / (float)sr, 1.0f);
+         buf[i] = 2.0f * phase - 1.0f;
+      }
+      return buf;
+   };
+   auto synthSine = [&](float freq, float seconds) {
+      const int n = (int)(seconds * sr);
+      std::vector<float> buf(n);
+      for (int i = 0; i < n; i++)
+         buf[i] = sinf(kTwoPiT * freq * (float)i / (float)sr);
+      return buf;
+   };
+
+   // ---- 1. pitch: sawtooth and a bass sine, both within 1% -------------
+   {
+      auto saw = synthSaw(220.0f, 2.0f);
+      MolderDsp::Analysis a;
+      MolderDsp::Analyze(saw.data(), (int)saw.size(), sr, a);
+      const float err = a.valid ? fabsf(a.globalF0 - 220.0f) / 220.0f : 1.0f;
+      if (!(a.valid && err < 0.01f))
+      {
+         printf("MOLDERTEST pitch saw220 got %.2f Hz FAIL\n", a.globalF0);
+         ok = false;
+      }
+
+      // The autocorrelation trap: a broken detector reports ~1500Hz here.
+      auto bass = synthSine(55.0f, 2.0f);
+      MolderDsp::Analysis a2;
+      MolderDsp::Analyze(bass.data(), (int)bass.size(), sr, a2);
+      const float err2 = a2.valid ? fabsf(a2.globalF0 - 55.0f) / 55.0f : 1.0f;
+      if (!(a2.valid && err2 < 0.01f))
+      {
+         printf("MOLDERTEST pitch sine55 got %.2f Hz FAIL\n", a2.globalF0);
+         ok = false;
+      }
+   }
+
+   // ---- 2. voicing gate: noise gated off, sawtooth sustain gated on ----
+   {
+      std::vector<float> noise(88200);
+      uint32_t rngState = 12345u;
+      for (float& v : noise)
+      {
+         rngState ^= rngState << 13; rngState ^= rngState >> 17; rngState ^= rngState << 5;
+         v = ((float)(rngState & 0x00FFFFFFu) / 16777216.0f) * 2.0f - 1.0f;
+      }
+      MolderDsp::Analysis an;
+      MolderDsp::Analyze(noise.data(), (int)noise.size(), sr, an);
+      bool framesQuiet = true;
+      for (float v : an.frameVoicing)
+         if (v > 0.01f) framesQuiet = false;
+      if (!(an.globalConfidence < 0.25f && framesQuiet))
+      {
+         printf("MOLDERTEST voicing white noise not gated (conf %.2f) FAIL\n", an.globalConfidence);
+         ok = false;
+      }
+
+      // Noise burst through a highpass-ish differentiator with exponential
+      // decay - a cheap stand-in for a hi-hat transient.
+      std::vector<float> hat(8192, 0.0f);
+      float prev = 0.0f;
+      for (size_t i = 0; i < hat.size(); i++)
+      {
+         rngState ^= rngState << 13; rngState ^= rngState >> 17; rngState ^= rngState << 5;
+         const float w = ((float)(rngState & 0x00FFFFFFu) / 16777216.0f) * 2.0f - 1.0f;
+         const float hp = w - prev;
+         prev = w;
+         const float env = expf(-(float)i / 800.0f);
+         hat[i] = hp * env;
+      }
+      MolderDsp::Analysis ah;
+      MolderDsp::Analyze(hat.data(), (int)hat.size(), sr, ah);
+      bool hatQuiet = true;
+      for (float v : ah.frameVoicing)
+         if (v > 0.25f) hatQuiet = false;
+      if (!hatQuiet)
+      {
+         printf("MOLDERTEST voicing hat-like burst not gated FAIL\n");
+         ok = false;
+      }
+
+      auto saw = synthSaw(220.0f, 2.0f);
+      MolderDsp::Analysis as;
+      MolderDsp::Analyze(saw.data(), (int)saw.size(), sr, as);
+      const int mid = as.numFrames / 2;
+      if (!(as.valid && mid >= 0 && mid < (int)as.frameVoicing.size() && as.frameVoicing[mid] > 0.5f))
+      {
+         printf("MOLDERTEST voicing saw sustain got %.2f FAIL\n",
+                (as.valid && mid < (int)as.frameVoicing.size()) ? as.frameVoicing[mid] : -1.0f);
+         ok = false;
+      }
+   }
+
+   // ---- 3/4/6: reconstruction, silenced partials, no-aliasing ----------
+   {
+      // A short fade-in/out rather than an abrupt digital on/off: a real
+      // sample has a physical attack, and short-time windowed analysis has
+      // an inherent latency of roughly half an FFT window at a genuinely
+      // instantaneous onset (frame 0's buffer is half real signal, half
+      // silence, and correctly reports lower energy for it) - a hard
+      // square-edge onset is not representative of what this node analyses
+      // in practice.
+      auto saw = synthSaw(220.0f, 1.0f);
+      {
+         const int fadeLen = std::min((int)saw.size() / 4, (int)(sr * 0.02));
+         for (int i = 0; i < fadeLen; i++)
+         {
+            const float g = 0.5f - 0.5f * cosf(kTwoPiT * 0.5f * (float)i / (float)fadeLen);
+            saw[i] *= g;
+            saw[saw.size() - 1 - i] *= g;
+         }
+      }
+      MolderDsp::Analysis a;
+      MolderDsp::Analyze(saw.data(), (int)saw.size(), sr, a);
+
+      if (!a.valid)
+      {
+         printf("MOLDERTEST analysis of reconstruction source invalid FAIL\n");
+         ok = false;
+      }
+      else
+      {
+         auto RmsErrDb = [](const std::vector<float>& ref, const std::vector<float>& test) {
+            double errSum = 0.0, refSum = 0.0;
+            const int n = (int)std::min(ref.size(), test.size());
+            for (int i = 0; i < n; i++)
+            {
+               const double d = (double)ref[i] - (double)test[i];
+               errSum += d * d;
+               refSum += (double)ref[i] * (double)ref[i];
+            }
+            return 10.0 * log10((errSum + 1e-12) / (refSum + 1e-12));
+         };
+
+         // 3. Baseline genome must reconstruct the source to < -20dB RMS error.
+         // KNOWN GAP: a single sustained partial (pure sine) clears this bar
+         // comfortably (~-22dB) once past the analysis's inherent onset
+         // latency; a dense, unbandlimited 48-harmonic sawtooth (harmonics
+         // only ~10 bins apart at 220Hz/2048-pt FFT, well inside reach of
+         // each other's Hann mainlobe) currently lands around -6 to -7dB.
+         // Two genuine bugs were found and fixed getting here (on top of
+         // the phase back-propagation reference, warp-curve clamp, and
+         // per-frame frequency drift fixes from before): (1) the
+         // fractional-bin phase correction below had the wrong sign and
+         // was half the analytically-derived magnitude, scrambling
+         // relative phase between harmonics with distinct fractional-bin
+         // offsets; (2) Render's oscillator used sinf(phase) while the
+         // analysis extracts phase in the atan2/cosine convention (a real
+         // DFT bin's phase is defined for x[n]=A*cos(wn+phase), not
+         // A*sin(wn+phase)) - a systematic pi/2 error on every partial.
+         // Fixing both took this from -1.5dB to -6.7dB (harmonic count 1/2
+         // individually clear -20dB; error grows with harmonic count as
+         // mainlobes increasingly overlap). What's left is a harder
+         // problem than either of those: real per-harmonic mainlobe-overlap
+         // compensation (subtracting each neighbour's predicted leakage
+         // before re-estimating a harmonic's own magnitude/phase) or a
+         // proper spectral-envelope phase model - not a tuning constant.
+         MolderDsp::Genome baseline;
+         std::vector<float> rendered;
+         MolderDsp::Render(a, baseline, rendered);
+         const double errDb = RmsErrDb(saw, rendered);
+         if (!(errDb < -20.0))
+         {
+            printf("MOLDERTEST reconstruction error %.1f dB FAIL\n", errDb);
+            ok = false;
+         }
+
+         // 4. Every partial silenced -> render equals the residual alone,
+         // within -40dB (compare against tonal-bank-off, residual-only render).
+         MolderDsp::Genome silenced = baseline;
+         for (int h = 0; h < MolderDsp::kMaxPartials; h++)
+            silenced.partialAmp[h] = 0.0f;
+         std::vector<float> silencedRender;
+         MolderDsp::Render(a, silenced, silencedRender);
+         std::vector<float> residualOnly((size_t)a.sourceLen, 0.0f);
+         for (int i = 0; i < a.sourceLen; i++)
+            residualOnly[i] = a.residualSteady[i] + a.residualTransient[i];
+         const double residualErrDb = RmsErrDb(residualOnly, silencedRender);
+         if (!(residualErrDb < -40.0))
+         {
+            printf("MOLDERTEST silenced-partials residual match %.1f dB FAIL\n", residualErrDb);
+            ok = false;
+         }
+
+         // 6. +24st pitch shift must not alias: energy above 0.45*sr stays
+         // well below the render's total energy. A one-pole highpass can't
+         // isolate a band this close to Nyquist (its rolloff is only
+         // 6dB/octave and the band is under an octave wide) - probe with a
+         // small Goertzel bank instead, one bin per few hundred Hz across
+         // [0.45*sr, 0.5*sr).
+         MolderDsp::Genome shifted = baseline;
+         shifted.pitchShiftSemitones = 24.0f;
+         std::vector<float> shiftedRender;
+         MolderDsp::Render(a, shifted, shiftedRender);
+         auto GoertzelPower = [&](float freq) {
+            const double w = kTwoPiT * freq / sr;
+            const double coeff = 2.0 * cos(w);
+            double s1 = 0.0, s2 = 0.0;
+            for (float x : shiftedRender)
+            {
+               const double s0 = (double)x + coeff * s1 - s2;
+               s2 = s1;
+               s1 = s0;
+            }
+            return s1 * s1 + s2 * s2 - coeff * s1 * s2;
+         };
+         double aboveEnergy = 0.0;
+         constexpr int kProbes = 8;
+         for (int p = 0; p < kProbes; p++)
+            aboveEnergy += GoertzelPower((float)(0.46 + 0.035 * p) * (float)sr);
+         double totalEnergy = 0.0;
+         for (float s : shiftedRender) totalEnergy += (double)s * s;
+         totalEnergy *= (double)shiftedRender.size() / (double)kProbes; // put both sums on comparable per-bin scale
+         const double aboveDb = 10.0 * log10((aboveEnergy + 1e-15) / (totalEnergy + 1e-15));
+         if (!(aboveDb < -20.0))
+         {
+            printf("MOLDERTEST pitch+24 above-band energy %.1f dB FAIL\n", aboveDb);
+            ok = false;
+         }
+      }
+   }
+
+   // ---- 5. determinism: same (seed, generation) -> bit-identical genome -
+   {
+      auto saw = synthSaw(220.0f, 0.5f);
+      MolderDsp::Analysis a;
+      MolderDsp::Analyze(saw.data(), (int)saw.size(), sr, a);
+
+      auto replay = [](uint32_t seed, int generation, float chaos) {
+         MolderDsp::Genome g;
+         MolderDsp::Rng rng(seed);
+         for (int i = 0; i < generation; i++)
+            MolderDsp::Mutate(g, chaos, rng);
+         return g;
+      };
+
+      const MolderDsp::Genome g1 = replay(4242u, 7, 0.6f);
+      const MolderDsp::Genome g2 = replay(4242u, 7, 0.6f);
+      bool identical = memcmp(&g1, &g2, sizeof(MolderDsp::Genome)) == 0;
+      if (!identical)
+      {
+         printf("MOLDERTEST determinism: same seed/generation diverged FAIL\n");
+         ok = false;
+      }
+
+      // Save -> load -> replay must reproduce the same genome (MolderNode
+      // only ever persists seed + generation, never the genome itself).
+      MolderNode node;
+      node.chaos = 0.6f;
+      std::vector<std::pair<std::string, std::string>> params;
+      Patch::SaveParams(&node, params);
+      MolderNode reloaded;
+      Patch::LoadParams(&reloaded, params);
+      if (reloaded.Seed() != node.Seed() || reloaded.Generation() != node.Generation())
+      {
+         printf("MOLDERTEST save/load seed+generation mismatch FAIL\n");
+         ok = false;
+      }
+   }
+
+   printf("%s\n", ok ? "MOLDERTEST OK" : "MOLDERTEST FAIL");
+   return ok;
+}
+
 // Granular Synthesizer's DSP fixture: loads a real WAV, triggers granular playback,
 // and asserts that position, scan, grain length, density, spray, pitch shift,
 // window shapes, and volume produce finite, valid audio outputs.
@@ -24012,6 +24565,89 @@ static bool RunFmModeDebugCheck()
    return ok;
 }
 
+// RunFmModeDebugCheck above only confirms fmMode's *plumbing* reaches the
+// audio node - it never renders a sample. This actually renders through
+// OscillatorNode's free-running path with a full-scale sine "fm in"
+// modulator, at fmDepth 0 and 2, for both fmMode values, and checks that the
+// rendered signal audibly moves (zero-crossing count as a cheap brightness/
+// instantaneous-frequency proxy). This is the regression test for
+// docs/prompts/fm-mode-linear-through-zero-prompt.md: before that fix,
+// "fm" mode was exponential pitch FM, which barely moved a 220Hz carrier at
+// any sane depth (a fraction of a semitone per unit of modulator swing)
+// while "pm" moved it drastically - the two modes should both move by a
+// comparable order of magnitude at the same depth, not leave the gap the
+// old exponential math did.
+static bool RunFmRenderCheck()
+{
+   bool ok = true;
+   const double sampleRate = 44100.0;
+   const int blockSize = 1024;
+   const int numBlocks = 8;
+   const float modFreqHz = 5000.0f; // well above the 220Hz carrier - real FM, not vibrato
+
+   auto renderZeroCrossings = [&](int fmMode, float fmDepth) -> int
+   {
+      OscillatorNode n;
+      n.waveform = OscillatorNode::kSine;
+      n.frequency = 220.0f;
+      n.fmMode = fmMode;
+      n.fmDepth = fmDepth;
+      n.CookIfNeeded(1);
+      AudioNode* audioNode = n.GetAudioNode();
+      audioNode->PrepareToPlay(sampleRate, blockSize);
+
+      std::vector<float> modBuf(blockSize), outBuf(blockSize);
+      float* modPtr = modBuf.data();
+      float* outPtr = outBuf.data();
+      AudioBuffer modBuffer;
+      modBuffer.channels = &modPtr;
+      modBuffer.numChannels = 1;
+      modBuffer.numFrames = blockSize;
+      AudioBuffer outBuffer;
+      outBuffer.channels = &outPtr;
+      outBuffer.numChannels = 1;
+      outBuffer.numFrames = blockSize;
+      const AudioBuffer* inputs[2] = { nullptr, &modBuffer };
+
+      double phase = 0.0;
+      const double phaseInc = 2.0 * M_PI * (double)modFreqHz / sampleRate;
+      std::vector<float> lastBlock;
+      for (int blk = 0; blk < numBlocks; blk++)
+      {
+         for (int i = 0; i < blockSize; i++)
+         {
+            modBuf[i] = (float)sin(phase);
+            phase += phaseInc;
+         }
+         audioNode->ProcessBlock(inputs, 2, outBuffer);
+         if (blk == numBlocks - 1)
+            lastBlock.assign(outBuf.begin(), outBuf.end());
+      }
+
+      int crossings = 0;
+      for (size_t i = 1; i < lastBlock.size(); i++)
+         if ((lastBlock[i - 1] < 0.0f) != (lastBlock[i] < 0.0f))
+            crossings++;
+      return crossings;
+   };
+
+   for (int fmMode = 0; fmMode <= 1; fmMode++)
+   {
+      const int atZero = renderZeroCrossings(fmMode, 0.0f);
+      const int atDepth = renderZeroCrossings(fmMode, 2.0f);
+      const int moved = std::abs(atDepth - atZero);
+      const char* label = fmMode == 0 ? "pm" : "fm";
+      const bool pass = moved >= 4;
+      printf("  [%s] fmMode=%s zero-crossings depth0=%d depth2=%d (moved %d)\n",
+             pass ? "pass" : "FAIL", label, atZero, atDepth, moved);
+      if (!pass)
+         ok = false;
+   }
+
+   printf("%s\n", ok ? "FM RENDER CHECK OK" : "FM RENDER CHECK FAIL");
+   return ok;
+}
+
 
 // ====================================================== INFINITE_PLUGINSCANTEST
 //
@@ -24490,6 +25126,7 @@ int main(int argc, char** argv)
       RegisterNodes();
       RunAudioParamSweepTest();
       RunFmModeDebugCheck();
+      RunFmRenderCheck();
       // Always 0, never the sweep's own pass/fail - the printf verdict line
       // is the only signal every other INFINITE_* fixture uses (see
       // run-infinite-hygiene/SKILL.md's "verdict lines aren't exit codes"
@@ -24504,6 +25141,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
+
+   if (getenv("INFINITE_MOLDERTEST") != nullptr)
+      return RunMolderFixture() ? 0 : 1;
 
    if (getenv("INFINITE_AUDIOPDCTEST") != nullptr)
    {
@@ -34767,6 +35407,13 @@ int main(int argc, char** argv)
                   // Dropped onto an existing Granular: swap its file.
                   PushUndoCheckpoint();
                   targetGran->LoadFile(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (MolderNode* targetMolder = FindNodeUnderCanvasPoint<MolderNode>(canvasMouse))
+               {
+                  // Dropped onto an existing Molder: swap its source and re-analyze.
+                  PushUndoCheckpoint();
+                  targetMolder->LoadFile(gSampleDragPath);
                   gPatchDirty = true;
                }
                else if (overCanvas)
