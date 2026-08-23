@@ -258,6 +258,12 @@ namespace
 {
    namespace fsProbe = std::filesystem;
 
+   // Forward declarations: DescribeVST3Bundle below (in the Platform block
+   // right after this one) needs these before their full definitions, which
+   // live further down in the module-loading section of this file.
+   HMODULE LoadVST3Module(const std::string& bundlePath, Steinberg::IPluginFactory** outFactory);
+   void UnloadVST3Module(HMODULE module);
+
    // ------------------------------------------------------------------------
    // User-added VST3 search folders - mirrors PluginVST3.mm's
    // gExtraVST3SearchFolders exactly (same call site: PluginScanner::Folders()
@@ -2147,7 +2153,11 @@ namespace
          wc.style = CS_HREDRAW | CS_VREDRAW;
          wc.lpfnWndProc = PluginEditorWndProc;
          wc.hInstance = GetModuleHandleW(nullptr);
-         wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+         // IDC_ARROW resolves to an ANSI LPSTR unless the UNICODE macro is
+         // defined for the translation unit (it isn't, here or on the main
+         // Infinite target) - spell out the wide resource ID explicitly
+         // instead of relying on that macro.
+         wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
          wc.lpszClassName = kEditorWindowClassName;
          return RegisterClassExW(&wc);
       }();
