@@ -28,6 +28,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The Windows platform layer arrived as a fork PR and may not be present on
+  # every branch this workflow runs on. Without this gate, merging the
+  # workflow to a main that has no src/platform/win would leave a permanently
+  # red Windows job. hashFiles() cannot be used in a job-level `if` (the
+  # workspace is empty before checkout), hence a real job.
+  detect:
+    name: Detect platform layers
+    runs-on: ubuntu-latest
+    outputs:
+      has_windows: ${{ steps.check.outputs.has_windows }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f src/platform/win/PlatformWin.cpp ]; then
+            echo "has_windows=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_windows=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No src/platform/win - skipping the Windows jobs."
+          fi
+
   macos:
     name: macOS (arm64)
     runs-on: macos-14
@@ -47,6 +68,8 @@ jobs:
 
   windows:
     name: Windows (${{ matrix.arch }})
+    needs: detect
+    if: needs.detect.outputs.has_windows == 'true'
     runs-on: ${{ matrix.runner }}
     # ARM64 is best-effort: it exists so an Apple Silicon Parallels VM (which
     # runs Windows 11 on ARM) can run a native build instead of leaning on
