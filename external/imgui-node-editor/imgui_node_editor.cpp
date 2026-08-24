@@ -2478,17 +2478,24 @@ ed::Control ed::EditorContext::BuildControl(bool allowOffscreen)
             // Node with a hole
             ImGui::PushID(node->m_ID.AsPointer());
 
+            // Narrowed from the upstream 8 edge/corner regions + Header to
+            // just Header + Center: Infinite's groups auto-fit to their
+            // members every frame (see AutoFitGroupToMembers in main.cpp),
+            // so an edge-resize handle would be overwritten the very next
+            // frame anyway - the affordance was lying. Dropping the 8 edge
+            // regions means no region can ever pivot SizeAction, which is
+            // what disables resizing outright (see SizeAction::Accept's
+            // pivot check) and clears the resize cursor. Adding Center makes
+            // the box's empty interior interactive so dragging it moves the
+            // whole group, not just its header - do not remove Center
+            // without re-adding a header-only drag path in its place, and do
+            // not restore the edge regions without also reverting the
+            // reasoning above; a future upstream refresh of this file should
+            // re-apply this narrowing rather than silently drop it.
             static const NodeRegion c_Regions[] =
             {
-                NodeRegion::TopLeft,
-                NodeRegion::TopRight,
-                NodeRegion::BottomLeft,
-                NodeRegion::BottomRight,
-                NodeRegion::Top,
-                NodeRegion::Bottom,
-                NodeRegion::Left,
-                NodeRegion::Right,
                 NodeRegion::Header,
+                NodeRegion::Center,
             };
 
             for (auto region : c_Regions)
