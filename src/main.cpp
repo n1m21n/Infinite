@@ -332,16 +332,21 @@ namespace
    }
 
    // True for a NodeFactory-registered name a user should be able to spawn
-   // going forward. Currently only excludes GeometryOpNode's three deprecated
-   // `*Selected` ops (see the Op enum comment in GeometryOpNodes.h) - they
-   // stay registered so old patches and internal test fixtures can still name
+   // going forward. Excludes GeometryOpNode's three deprecated `*Selected`
+   // ops (see the Op enum comment in GeometryOpNodes.h) - they stay
+   // registered so old patches and internal test fixtures can still name
    // them, but a fresh graph should reach for the general op + selectionOnly
-   // instead. Every spawn-menu / search-list enumeration site should filter
-   // through this rather than NodeFactory's raw listing.
+   // instead. Also excludes "Group": groups are only ever created via Cmd+G
+   // on a selection (SpawnNode("Group", ...) is still called from there, and
+   // from patch load), never hand-placed from the palette - a bare Group
+   // node has nothing inside it to auto-fit to, so palette-spawning one
+   // would just place an empty, permanently-zero-size box. Every spawn-menu /
+   // search-list enumeration site should filter through this rather than
+   // NodeFactory's raw listing.
    bool IsUserSpawnable(const std::string& name)
    {
       return name != "Delete Selected" && name != "Transform Selected" &&
-             name != "Extrude Selected";
+             name != "Extrude Selected" && name != "Group";
    }
 
    // GeometryOpNode shares one node type across every mesh operator, and its
@@ -16289,12 +16294,13 @@ namespace
    // every frame, in both directions - so dragging a node towards the edge
    // stretches the box and dragging it back shrinks the box down again.
    //
-   // Because the box is fully derived from the member set, a manual resize
-   // does not survive as a size; what it does instead is decide membership.
-   // Dragging an edge out over a loose node adopts that node on the next
-   // frame, and the box then refits around the enlarged set - so resizing
-   // still reads as "reach out and grab that one too", which is the only
-   // thing resizing a group is ever really for.
+   // Edge/corner resizing no longer exists (imgui-node-editor's c_Regions
+   // list was narrowed to Header+Center - see the comment at its
+   // definition), so the box's size is purely a function of its members: the
+   // only way to grow it is to drag a loose node in, and the only way to
+   // shrink it is to drag a member out. That still reads as "reach out and
+   // grab that one too", it just happens by moving the node instead of
+   // dragging the box's edge over it.
    //
    // Runs before the group draws itself, using last frame's box (this node's
    // position plus the width/height/headerH already synced onto n) against
@@ -16375,9 +16381,14 @@ namespace
    // Drawn as an ed::Group() rather than through the normal pin/param flow: a
    // group has no image in or out, and it needs the library's own notion of
    // "group" (a node the editor drags its geometric contents along with) to
-   // get the stick-together behavior at all. The label sits above the
-   // resizable box as the node's only ordinary content, so it becomes the
-   // group's Header region - the part the editor lets you drag by.
+   // get the stick-together behavior at all. The label sits above the box as
+   // the node's only ordinary content, so it becomes the group's Header
+   // region; the box's Center region is also interactive (see the c_Regions
+   // comment in imgui_node_editor.cpp), so pressing anywhere in the box's
+   // empty interior drags the whole group too, not just the header. Known
+   // trade-off: this also means a rubber-band drag can no longer start from
+   // inside a group's box - only from outside it - since empty interior
+   // space now belongs to the group rather than to the canvas.
    //
    // The header is plain text, not a text field: an ImGui widget spanning
    // most of the header would capture clicks itself (the same reason a
@@ -16386,9 +16397,12 @@ namespace
    // trigger. Renaming instead happens in-place on double-click.
    //
    // ed::Group(size) only honors `size` the first frame a node becomes a
-   // group; after that the library tracks the user's own resize (and our own
-   // growth, via SetGroupSize) internally and ignores whatever we pass. So
-   // width/height here exist purely to seed that first frame and to survive
+   // group; after that the library tracks its own notion of the node's size
+   // (and our own growth, via SetGroupSize) internally and ignores whatever
+   // we pass. Edge/corner resizing is disabled (see the c_Regions comment in
+   // imgui_node_editor.cpp), so SetGroupSize's every-frame call from
+   // AutoFitGroupToMembers is the only thing that ever changes it. Width/
+   // height here exist purely to seed that first frame and to survive
    // save/load - every subsequent frame they are overwritten from the node's
    // actual measured size, the same pattern liveX/liveY use for position.
    void DrawGroupNode(GraphNode& gn, GroupNode* n)
@@ -17760,7 +17774,7 @@ namespace
          { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
          { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
          { "Comment", "A free-floating note on the canvas - has no image input or output, just text. Double-click to edit." },
-         { "Group", "A resizable box that owns whatever nodes are geometrically inside it - drag it and its members move together, right-click > Ungroup dissolves it (or ungroup one member from its own context menu)." },
+         { "Group", "Created with Cmd+G on a selection, not spawned from the palette. Sizes itself automatically to fit its members - drag a node in to grow the box, drag one out to shrink it. Drag anywhere inside the box to move the whole group; right-click > Ungroup (or Cmd+Shift+G) dissolves it, leaving members in place (or ungroup one member from its own context menu)." },
          { "Null", "A pass-through node: its output is exactly its input, unchanged. Useful as a stable junction point to branch a cable to several destinations, or as a placeholder while rewiring." },
          { "Viewport", "Shows its input at actual pixel size in its own resizable window, separate from the small node preview - useful for judging detail without zooming the whole canvas." },
 
