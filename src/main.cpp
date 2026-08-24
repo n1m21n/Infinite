@@ -3251,6 +3251,135 @@ namespace
       return true;
    }
 
+   // Connections captured for a copy/duplicate cluster, in terms of *original*
+   // gNodes indices - resolved against the fresh copies (and, for external
+   // sources, re-validated against the live graph) only at apply time, since
+   // the graph can change between capture and apply (Cmd+C to Cmd+V) or even
+   // within the same frame (a node in the cluster could reference another
+   // that failed to spawn).
+   struct ClusterLink
+   {
+      int srcIndex = -1;       // orig gNodes index of the plain-slot source
+      int srcOutputIndex = 0;
+      int dstIndex = -1;       // orig gNodes index of the destination (always in the cluster)
+      int dstSlot = 0;
+   };
+   struct ClusterModLink
+   {
+      int dstIndex = -1;
+      int paramIndex = 0;
+      Modulation::Source source; // source.nodeIndex is the ORIGINAL modulator's gNodes index
+   };
+   struct ClusterPaletteLink
+   {
+      int dstIndex = -1;
+      int colorIndex = 0;
+      int paletteOrigIndex = -1;
+      int swatchIndex = 0;
+   };
+
+   // Snapshots every connection landing on a node in `indices`, split into the
+   // three storage kinds a connection can live in (see docs/plans - plain
+   // input slots, modulator->param bindings, palette->swatch bindings). Reads
+   // gLinks for the first (safe: gLinks is rebuilt earlier in this same frame,
+   // before any of copy/paste/duplicate run) and the live binding maps for the
+   // other two, since those are gated on collapsed-param/color-pin visibility
+   // and would silently miss a collapsed node's bindings if read from gLinks.
+   //
+   // Outbound-only connections (a cluster node feeding something outside the
+   // cluster) are deliberately not captured: only links whose *destination*
+   // is in `indices` are kept, since re-wiring an original's sole consumer
+   // onto the copy instead would silently steal it.
+   void CaptureClusterLinks(const std::set<int>& indices,
+                             std::vector<ClusterLink>& outLinks,
+                             std::vector<ClusterModLink>& outModLinks,
+                             std::vector<ClusterPaletteLink>& outPaletteLinks)
+   {
+      outLinks.clear();
+      outModLinks.clear();
+      outPaletteLinks.clear();
+
+      for (const LinkInfo& link : gLinks)
+      {
+         if (!GraphNode::IsInputPin(link.dstPin) || !GraphNode::IsOutputPin(link.srcPin))
+            continue; // param/colour-pin links are read from the binding maps below instead
+         const int dstIndex = GraphNode::NodeIndexFromPin(link.dstPin);
+         if (!indices.count(dstIndex))
+            continue;
+         outLinks.push_back({ GraphNode::NodeIndexFromPin(link.srcPin),
+                               GraphNode::OutputIndexFromPin(link.srcPin),
+                               dstIndex, GraphNode::InputSlotFromPin(link.dstPin) });
+      }
+      for (const auto& entry : Modulation::Instance().Links())
+      {
+         if (!indices.count(entry.first.first))
+            continue;
+         outModLinks.push_back({ entry.first.first, entry.first.second, entry.second });
+      }
+      for (const auto& entry : PaletteBinding::Instance().Links())
+      {
+         if (!indices.count(entry.first.first))
+            continue;
+         outPaletteLinks.push_back({ entry.first.first, entry.first.second,
+                                      entry.second.nodeIndex, entry.second.swatchIndex });
+      }
+   }
+
+   // Rewires captured links onto the fresh copies. `newByOrig` maps each
+   // original cluster index to its copy. A source that was itself copied is
+   // rewired to the copy (internal topology preserved); a source outside the
+   // cluster is rewired to the *original* external node, re-validated via
+   // FindNodeByIndex since it may have been deleted since capture. Caller is
+   // expected to already be inside a gSuppressUndoCheckpoints region so this
+   // reads as one undo step alongside the spawn.
+   void ApplyClusterLinks(const std::map<int, GraphNode*>& newByOrig,
+                           const std::vector<ClusterLink>& links,
+                           const std::vector<ClusterModLink>& modLinks,
+                           const std::vector<ClusterPaletteLink>& paletteLinks)
+   {
+      for (const ClusterLink& link : links)
+      {
+         auto dstIt = newByOrig.find(link.dstIndex);
+         if (dstIt == newByOrig.end())
+            continue;
+         int resolvedSrcIndex = link.srcIndex;
+         auto srcIt = newByOrig.find(link.srcIndex);
+         if (srcIt != newByOrig.end())
+            resolvedSrcIndex = srcIt->second->index;
+         else if (FindNodeByIndex(link.srcIndex) == nullptr)
+            continue;
+         std::string err;
+         ConnectNodes(resolvedSrcIndex, link.srcOutputIndex, dstIt->second->index, link.dstSlot, err);
+      }
+      for (const ClusterModLink& modLink : modLinks)
+      {
+         auto dstIt = newByOrig.find(modLink.dstIndex);
+         if (dstIt == newByOrig.end())
+            continue;
+         Modulation::Source source = modLink.source;
+         auto srcIt = newByOrig.find(source.nodeIndex);
+         if (srcIt != newByOrig.end())
+            source.nodeIndex = srcIt->second->index;
+         else if (FindNodeByIndex(source.nodeIndex) == nullptr)
+            continue;
+         Modulation::Instance().RestoreLink(dstIt->second->index, modLink.paramIndex, source);
+      }
+      for (const ClusterPaletteLink& paletteLink : paletteLinks)
+      {
+         auto dstIt = newByOrig.find(paletteLink.dstIndex);
+         if (dstIt == newByOrig.end())
+            continue;
+         int resolvedPaletteIndex = paletteLink.paletteOrigIndex;
+         auto srcIt = newByOrig.find(paletteLink.paletteOrigIndex);
+         if (srcIt != newByOrig.end())
+            resolvedPaletteIndex = srcIt->second->index;
+         else if (FindNodeByIndex(paletteLink.paletteOrigIndex) == nullptr)
+            continue;
+         PaletteBinding::Instance().Bind(dstIt->second->index, paletteLink.colorIndex,
+                                          resolvedPaletteIndex, paletteLink.swatchIndex);
+      }
+   }
+
    // Node types worth suggesting first in the search popup when a cable was
    // dragged out of `srcNode`'s output and dropped on empty canvas: every
    // registered, user-spawnable type that has at least one input slot
@@ -16549,7 +16678,7 @@ namespace
                { "Type an exact value", "Double-click a slider" },
                { "Pan the canvas", "Drag empty canvas" },
                { "Rubber-band select", "Shift + drag" },
-               { "Duplicate", "Cmd+C / Cmd+V, or Shift+D to duplicate in place" },
+               { "Duplicate", "Cmd+C / Cmd+V, or Shift+D / Cmd+D to duplicate in place" },
                { "Select several", "Shift + drag a box around them, or Shift-click (or Ctrl-click) each one to add it. Then move, duplicate or delete as a group." },
                { "Delete", "Select, then Delete or Backspace" },
                { "Zoom", "Scroll (speed is adjustable in the Menu)" },
@@ -25630,6 +25759,11 @@ int main(int argc, char** argv)
    std::vector<INode*> clipboardSources;    // live sources to copy params from
    std::vector<int> clipboardOrigIndex;     // gNodes index each item had at copy time
    std::vector<int> clipboardOrigGroup;     // that item's owning group's index, or -1
+   // Connections landing on the copied cluster, captured at Cmd+C time since
+   // the graph can change before Cmd+V runs (see ApplyClusterLinks).
+   std::vector<ClusterLink> clipboardLinks;
+   std::vector<ClusterModLink> clipboardModLinks;
+   std::vector<ClusterPaletteLink> clipboardPaletteLinks;
    int frameId = 0;
 
    while (!glfwWindowShouldClose(window))
@@ -33486,8 +33620,9 @@ int main(int argc, char** argv)
          }
       }
 
-      // Shift+D duplicates whatever is selected without touching the clipboard.
-      if (!typing && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D, false))
+      // Shift+D (or Cmd/Ctrl+D) duplicates whatever is selected without
+      // touching the clipboard.
+      if (!typing && (io.KeyShift || cmdOrCtrl) && ImGui::IsKeyPressed(ImGuiKey_D, false))
       {
          const int count = ed::GetSelectedObjectCount();
          if (count > 0)
@@ -33511,6 +33646,13 @@ int main(int argc, char** argv)
                      toDup.insert(it->second.begin(), it->second.end());
                }
             }
+
+            // Captured now, against the still-live selection, before any
+            // SpawnNode call below can reallocate gNodes.
+            std::vector<ClusterLink> dupLinks;
+            std::vector<ClusterModLink> dupModLinks;
+            std::vector<ClusterPaletteLink> dupPaletteLinks;
+            CaptureClusterLinks(toDup, dupLinks, dupModLinks, dupPaletteLinks);
 
             // Resolve everything first: SpawnNode can reallocate gNodes.
             const ImVec2 off = ClusterOffset(toDup);
@@ -33568,6 +33710,7 @@ int main(int argc, char** argv)
                if (auto* g = dynamic_cast<GroupNode*>(groupIt->second->node.get()))
                   gGroupMembers[g].insert(memberIt->second->index);
             }
+            ApplyClusterLinks(newByOrig, dupLinks, dupModLinks, dupPaletteLinks);
             gSuppressUndoCheckpoints = false;
          }
       }
@@ -33711,6 +33854,9 @@ int main(int argc, char** argv)
          clipboardSources.clear();
          clipboardOrigIndex.clear();
          clipboardOrigGroup.clear();
+         clipboardLinks.clear();
+         clipboardModLinks.clear();
+         clipboardPaletteLinks.clear();
          int count = ed::GetSelectedObjectCount();
          if (count > 0)
          {
@@ -33744,6 +33890,7 @@ int main(int argc, char** argv)
                clipboardOrigIndex.push_back(gn->index);
                clipboardOrigGroup.push_back(IndexOfGroupNode(GroupOwning(gn->index)));
             }
+            CaptureClusterLinks(toCopy, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
          }
       }
 
@@ -33806,6 +33953,7 @@ int main(int argc, char** argv)
             if (auto* g = dynamic_cast<GroupNode*>(groupIt->second->node.get()))
                gGroupMembers[g].insert(memberIt->second->index);
          }
+         ApplyClusterLinks(newByOrig, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
          gSuppressUndoCheckpoints = false;
       }
 
