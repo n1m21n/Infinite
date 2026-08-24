@@ -14806,6 +14806,76 @@ namespace
       }
    }
 
+   // The row bank as an actual matrix rather than a column of "x1 .xx y1 .xx
+   // z1 .xx" text lines: one bordered cell per (row, axis), value centred, a
+   // draggable output pin sitting in the cell's bottom-right corner. Pin ids
+   // are computed the same way ModSlider computes param pin ids (nodeIndex is
+   // gCurrentNodeIndex, already set by the surrounding BeginNodeParams call),
+   // rather than going through GraphNode::OutputPinId() - this function only
+   // sees the node, not its GraphNode wrapper.
+   void DrawGeometryTableGrid(GeometryTableNode* n, int nodeIndex)
+   {
+      const int rowCount = n->RowCount();
+      const float cellW = kPreviewSize / 3.0f;
+      const float cellH = 34.0f;
+      const float gridW = cellW * 3.0f;
+      const float gridH = cellH * (float)rowCount;
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const bool isLight = IsThemeLight();
+      const ImU32 borderCol = isLight ? IM_COL32(60, 68, 85, 140) : IM_COL32(210, 218, 235, 70);
+      const ImU32 textCol = isLight ? IM_COL32(35, 40, 52, 255) : IM_COL32(222, 228, 240, 255);
+      const ImU32 pinFill = isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255);
+      const ImU32 pinRing = isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255);
+
+      dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, 8.0f, 0, 1.5f);
+      for (int r = 1; r < rowCount; r++)
+      {
+         const float y = origin.y + cellH * (float)r;
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + gridW, y), borderCol, 1.0f);
+      }
+      for (int c = 1; c < 3; c++)
+      {
+         const float x = origin.x + cellW * (float)c;
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + gridH), borderCol, 1.0f);
+      }
+
+      for (int r = 0; r < rowCount; r++)
+      {
+         for (int a = 0; a < 3; a++)
+         {
+            const ImVec2 cellMin(origin.x + cellW * (float)a, origin.y + cellH * (float)r);
+            const ImVec2 cellMax(cellMin.x + cellW, cellMin.y + cellH);
+            const int outputIndex = 4 + r * 3 + a;
+
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%.2f", n->DisplayValue(outputIndex));
+            const ImVec2 textSize = ImGui::CalcTextSize(buf);
+            dl->AddText(ImVec2(cellMin.x + (cellW - textSize.x) * 0.5f,
+                               cellMin.y + (cellH - textSize.y) * 0.5f), textCol, buf);
+
+            // The pin itself, positioned in the cell's bottom-right corner -
+            // same BeginPin/Dummy/EndPin shape as the generic DrawPin(), just
+            // placed by absolute screen position instead of inline layout.
+            ImGui::PushID(outputIndex);
+            const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kOutputBase + outputIndex;
+            ed::BeginPin(pinId, ed::PinKind::Output);
+            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            const ImVec2 pinCenter(cellMax.x - 9.0f, cellMax.y - 9.0f);
+            ImGui::SetCursorScreenPos(ImVec2(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f));
+            ImGui::Dummy(ImVec2(kPinHit, kPinHit));
+            dl->AddCircleFilled(pinCenter, kPinRadius * 0.75f, pinFill);
+            dl->AddCircle(pinCenter, kPinRadius * 0.75f, pinRing, 0, 1.5f);
+            ed::EndPin();
+            ImGui::PopID();
+         }
+      }
+
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + gridH));
+      ImGui::Dummy(ImVec2(gridW, 0.0f));
+   }
+
    void DrawGeometryTableParams(GeometryTableNode* n)
    {
       if (n->HasSamples())
@@ -14839,17 +14909,12 @@ namespace
       NodeSeparator("table");
       if (!n->HasSamples())
          ImGui::TextDisabled("(unpatched - holding 0.5)");
-      else
-      {
-         const int rowCount = n->RowCount();
-         for (int r = 0; r < rowCount; r++)
-         {
-            float w[3];
-            n->SampleRow(r, w);
-            ImGui::TextDisabled("x%d % .2f  y%d % .2f  z%d % .2f",
-                                r + 1, w[0], r + 1, w[1], r + 1, w[2]);
-         }
-      }
+      // Drawn either way, unpatched or not: every row pin needs to exist and
+      // be draggable this frame regardless of whether it currently reads a
+      // real sample or the neutral 0.5 fallback (§3's "hold at 0.5" rule) -
+      // the generic output-pin row above is capped to the 4 aggregates for
+      // this node type specifically so it never draws these same pin ids too.
+      DrawGeometryTableGrid(n, gCurrentNodeIndex);
    }
 
    void DrawOceanParams(OceanNode* n)
@@ -35498,7 +35563,13 @@ int main(int argc, char** argv)
          // it a blank texture. No pin, no way to make that mistake.
          if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment)
          {
-            const int outputs = std::max(1, gn.node->OutputCount());
+            // GeometryTableNode draws its row pins (index 4 and up) itself,
+            // inline in the table grid in its params panel - only the four
+            // aggregates (cx/cy/cz/spread) go through the generic row here.
+            // Drawing the same pin id through ed::BeginPin() twice in one
+            // frame is not something imgui-node-editor supports.
+            auto* geoTable = dynamic_cast<GeometryTableNode*>(gn.node.get());
+            const int outputs = geoTable != nullptr ? 4 : std::max(1, gn.node->OutputCount());
             std::vector<float> pinW(outputs);
             float itemW = 0.0f;
             for (int o = 0; o < outputs; o++)

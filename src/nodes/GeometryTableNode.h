@@ -56,6 +56,16 @@ public:
    // sweep test - the analogue of PathNode::CurrentPoint.
    void SampleRow(int row, float outWorld[3]) const;
 
+   // The current (post-normalise, post-smooth) 0..1 value at output `index`,
+   // for the grid the params panel draws - same value ModulatorOutput(index)
+   // hands out, read without going through the IModulator indirection.
+   float DisplayValue(int index) const
+   {
+      if (index < 0 || index >= 4 + 3 * RowCount())
+         return 0.5f;
+      return mSmoothedInit ? mSmoothed[index] : 0.5f;
+   }
+
    int sampleMode = kVertex;
    int rows = 4;
    int sortMode = kSortNone;
