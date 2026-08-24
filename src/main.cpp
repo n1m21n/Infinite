@@ -14855,16 +14855,26 @@ namespace
             dl->AddText(ImVec2(cellMin.x + (cellW - textSize.x) * 0.5f,
                                cellMin.y + (cellH - textSize.y) * 0.5f), textCol, buf);
 
-            // The pin itself, positioned in the cell's bottom-right corner -
-            // same BeginPin/Dummy/EndPin shape as the generic DrawPin(), just
-            // placed by absolute screen position instead of inline layout.
+            // The pin itself, positioned in the cell's bottom-right corner.
+            // NOTE: EndPin() normally derives the pin's hit bounds from the
+            // ImGui group opened by BeginPin() - that group's rect is anchored
+            // at whatever the layout cursor was *before* BeginPin() and grows
+            // via the window's monotonic CursorMaxPos. That works for pins
+            // drawn in natural left-to-right/top-to-bottom flow (DrawPin(),
+            // ModSlider's param pins), but here every cell jumps the cursor
+            // to an absolute position and never advances it, so each
+            // successive pin's group-derived bounds would balloon to include
+            // every prior cell too - only the last-drawn pin would end up
+            // hit-testable across the whole grid. ed::PinRect() sets the
+            // pin's bounds explicitly, sidestepping that group-bounds path.
             ImGui::PushID(outputIndex);
             const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kOutputBase + outputIndex;
             ed::BeginPin(pinId, ed::PinKind::Output);
             ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
             const ImVec2 pinCenter(cellMax.x - 9.0f, cellMax.y - 9.0f);
-            ImGui::SetCursorScreenPos(ImVec2(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f));
-            ImGui::Dummy(ImVec2(kPinHit, kPinHit));
+            const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
+            const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
+            ed::PinRect(pinMin, pinMax);
             dl->AddCircleFilled(pinCenter, kPinRadius * 0.75f, pinFill);
             dl->AddCircle(pinCenter, kPinRadius * 0.75f, pinRing, 0, 1.5f);
             ed::EndPin();
