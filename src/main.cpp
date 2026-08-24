@@ -109,6 +109,7 @@ namespace
 #include "nodes/UtilityNodes.h"
 #include "nodes/PointDistributionNodes.h"
 #include "nodes/PathNode.h"
+#include "nodes/GeometryTableNode.h"
 #include "nodes/CurveNode.h"
 #include "nodes/OceanNode.h"
 #include "nodes/SimulationNodes.h"
@@ -2563,6 +2564,7 @@ namespace
       REGISTER_NODE(MidiCCNode, MIDI CC, "Modulators");
       REGISTER_NODE(MidiTriggerNode, MIDI Trigger, "Modulators");
       REGISTER_NODE(PathNode, Path, "Modulators");
+      REGISTER_NODE(GeometryTableNode, Geometry Table, "Modulators");
       REGISTER_NODE(ConstantNode, Constant, "Modulators");
       REGISTER_NODE(NullModulatorNode, Null Modulator, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
@@ -2837,6 +2839,8 @@ namespace
          return 1; // an optional point cloud to surface
       if (dynamic_cast<PathNode*>(gn.node.get()) != nullptr)
          return 2; // an optional curve, or geometry to travel around
+      if (dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr)
+         return 1; // geometry to sample
       if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
@@ -14802,6 +14806,127 @@ namespace
       }
    }
 
+   // The row bank as an actual matrix rather than a column of "x1 .xx y1 .xx
+   // z1 .xx" text lines: one bordered cell per (row, axis), value centred, a
+   // draggable output pin sitting in the cell's bottom-right corner. Pin ids
+   // are computed the same way ModSlider computes param pin ids (nodeIndex is
+   // gCurrentNodeIndex, already set by the surrounding BeginNodeParams call),
+   // rather than going through GraphNode::OutputPinId() - this function only
+   // sees the node, not its GraphNode wrapper.
+   void DrawGeometryTableGrid(GeometryTableNode* n, int nodeIndex)
+   {
+      const int rowCount = n->RowCount();
+      const float cellW = kPreviewSize / 3.0f;
+      const float cellH = 34.0f;
+      const float gridW = cellW * 3.0f;
+      const float gridH = cellH * (float)rowCount;
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const bool isLight = IsThemeLight();
+      const ImU32 borderCol = isLight ? IM_COL32(60, 68, 85, 140) : IM_COL32(210, 218, 235, 70);
+      const ImU32 textCol = isLight ? IM_COL32(35, 40, 52, 255) : IM_COL32(222, 228, 240, 255);
+      const ImU32 pinFill = isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255);
+      const ImU32 pinRing = isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255);
+
+      dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, 8.0f, 0, 1.5f);
+      for (int r = 1; r < rowCount; r++)
+      {
+         const float y = origin.y + cellH * (float)r;
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + gridW, y), borderCol, 1.0f);
+      }
+      for (int c = 1; c < 3; c++)
+      {
+         const float x = origin.x + cellW * (float)c;
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + gridH), borderCol, 1.0f);
+      }
+
+      for (int r = 0; r < rowCount; r++)
+      {
+         for (int a = 0; a < 3; a++)
+         {
+            const ImVec2 cellMin(origin.x + cellW * (float)a, origin.y + cellH * (float)r);
+            const ImVec2 cellMax(cellMin.x + cellW, cellMin.y + cellH);
+            const int outputIndex = 4 + r * 3 + a;
+
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%.2f", n->DisplayValue(outputIndex));
+            const ImVec2 textSize = ImGui::CalcTextSize(buf);
+            dl->AddText(ImVec2(cellMin.x + (cellW - textSize.x) * 0.5f,
+                               cellMin.y + (cellH - textSize.y) * 0.5f), textCol, buf);
+
+            // The pin itself, positioned in the cell's bottom-right corner.
+            // NOTE: EndPin() normally derives the pin's hit bounds from the
+            // ImGui group opened by BeginPin() - that group's rect is anchored
+            // at whatever the layout cursor was *before* BeginPin() and grows
+            // via the window's monotonic CursorMaxPos. That works for pins
+            // drawn in natural left-to-right/top-to-bottom flow (DrawPin(),
+            // ModSlider's param pins), but here every cell jumps the cursor
+            // to an absolute position and never advances it, so each
+            // successive pin's group-derived bounds would balloon to include
+            // every prior cell too - only the last-drawn pin would end up
+            // hit-testable across the whole grid. ed::PinRect() sets the
+            // pin's bounds explicitly, sidestepping that group-bounds path.
+            ImGui::PushID(outputIndex);
+            const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kOutputBase + outputIndex;
+            ed::BeginPin(pinId, ed::PinKind::Output);
+            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            const ImVec2 pinCenter(cellMax.x - 9.0f, cellMax.y - 9.0f);
+            const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
+            const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
+            ed::PinRect(pinMin, pinMax);
+            dl->AddCircleFilled(pinCenter, kPinRadius * 0.75f, pinFill);
+            dl->AddCircle(pinCenter, kPinRadius * 0.75f, pinRing, 0, 1.5f);
+            ed::EndPin();
+            ImGui::PopID();
+         }
+      }
+
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + gridH));
+      ImGui::Dummy(ImVec2(gridW, 0.0f));
+   }
+
+   void DrawGeometryTableParams(GeometryTableNode* n)
+   {
+      if (n->HasSamples())
+         ImGui::TextDisabled("following %d points", n->SampleCount());
+      else
+         ImGui::TextDisabled("no geometry");
+
+      NodeSeparator("sampling");
+      DropdownButton("mode", GeometryTableNode::SampleModeNames(), n->sampleMode,
+                     [n](int i) { n->sampleMode = i; });
+      ModSliderInt("rows", &n->rows, 1, 16);
+      DropdownButton("sort", GeometryTableNode::SortModeNames(), n->sortMode,
+                     [n](int i) { n->sortMode = i; });
+      ModSlider("offset", &n->offset, 0.0f, 1.0f);
+
+      if (n->sampleMode == GeometryTableNode::kContour)
+      {
+         ModSliderInt("axis 0=X 1=Y 2=Z", &n->sliceAxis, 0, 2);
+         ModSlider("slice at", &n->slicePosition, -3.0f, 3.0f);
+      }
+      if (n->sampleMode == GeometryTableNode::kScatter)
+         ModSlider("seed", &n->seed, 0.0f, 32.0f);
+
+      NodeSeparator("range");
+      DropdownButton("space", GeometryTableNode::SpaceNames(), n->space,
+                     [n](int i) { n->space = i; });
+      if (n->space == GeometryTableNode::kSpaceFixed)
+         ModSlider("extent", &n->extent, 0.1f, 10.0f);
+      ModSlider("smooth", &n->smooth, 0.0f, 1.0f);
+
+      NodeSeparator("table");
+      if (!n->HasSamples())
+         ImGui::TextDisabled("(unpatched - holding 0.5)");
+      // Drawn either way, unpatched or not: every row pin needs to exist and
+      // be draggable this frame regardless of whether it currently reads a
+      // real sample or the neutral 0.5 fallback (§3's "hold at 0.5" rule) -
+      // the generic output-pin row above is capped to the 4 aggregates for
+      // this node type specifically so it never draws these same pin ids too.
+      DrawGeometryTableGrid(n, gCurrentNodeIndex);
+   }
+
    void DrawOceanParams(OceanNode* n)
    {
       NodeSeparator("surface");
@@ -17976,6 +18101,7 @@ namespace
          { "Macro Knob", "A single named slider (0-1, with a response curve and invert) meant to be patched out to several other sliders at once - one control that fans out to many parameters." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
          { "Path", "Outputs a moving 3D point (X/Y/Z, each patchable separately) travelling around a built-in shape (circle, helix, spiral, lissajous, etc.) at a beat-synced speed, or along the points of a patched-in geometry/curve source instead." },
+         { "Geometry Table", "Samples up to 16 points off a patched geometry source and outputs each as its own X/Y/Z modulator, plus a centroid (cx/cy/cz) and spread aggregate that stay meaningful however the row count or point set changes. Vertex mode reads native vertices (or a point cloud's points, which always wins over its own billboard mesh); Scatter reads an area-weighted random sample instead; Contour walks the mesh's boundary/slice outline (or a patched curve) in order. Sort turns the table into something specific - by axis for a ramp bank, by angle for a phase-ordered ring, by distance from the centre. offset scrubs a read head across the sampled set without re-sampling, so it's the one control worth binding to an LFO. Fixed space maps world units through `extent` (how far the object may travel, not how big it is); Bounds self-scales to the sampled set's own bounding box, which means a rigid translation of the source produces no change - that's by design, not a bug." },
          { "Constant", "Outputs one fixed number - the simplest possible modulator, useful for feeding a Math input or a modulation slot that expects a cable rather than manual control." },
          { "Null Modulator", "Pass-through modulation node that accepts an incoming modulator and forwards it to its output. Useful for monitoring, signal routing, or placeholders." },
          { "Palette", "Samples colours from a reference image, loaded here or patched in - a patched cable overrides the loaded file, but the file is kept so unplugging falls back to it. Drag its 'out' onto the square dot beside any colour swatch to bind it - each new cable takes the next swatch, and clicking a bound swatch steps it. Its image output is a gradient of the palette." },
@@ -31896,6 +32022,50 @@ int main(int argc, char** argv)
             results.push_back({ "PathNode(follow)", ok, hadGeometry, dx, dy, dz });
          }
 
+         // GeometryTableNode also drives modulator outputs rather than a mesh,
+         // so like PathNode(follow) it gets its own variant reading a probe
+         // accessor - SampleRow() - instead of GetMesh()+GetModelMatrix().
+         // space is pinned to Fixed: Bounds mode self-scales to the sampled
+         // set's own bounding box, so it legitimately does not move under a
+         // rigid translation (§4.3) and would fail this check for a reason
+         // that isn't a bug. A fresh cube/probe pair is used rather than
+         // reusing probeMesh/probe, both of which the PathNode(follow) block
+         // above already repurposed.
+         {
+            GeometryNode tableProbeMesh;
+            tableProbeMesh.shape = 1; // cube
+            tableProbeMesh.detail = 4;
+            TransformProbeSource tableProbe;
+            tableProbe.wrapped = &tableProbeMesh;
+
+            GeometryTableNode table;
+            table.geometrySource = &tableProbe;
+            table.sampleMode = GeometryTableNode::kVertex;
+            table.space = GeometryTableNode::kSpaceFixed;
+            table.smooth = 0.0f;
+
+            tableProbe.matrix = Mat4::Identity();
+            table.CookIfNeeded(frame++);
+            float before[3]; table.SampleRow(0, before);
+            const bool hadBefore = table.HasSamples();
+
+            tableProbe.matrix = Mat4::Translation(5.0f, 7.0f, 3.0f);
+            table.CookIfNeeded(frame++);
+            float after[3]; table.SampleRow(0, after);
+            const bool hadAfter = table.HasSamples();
+
+            const bool hadGeometry = hadBefore && hadAfter;
+            float dx = 0, dy = 0, dz = 0;
+            bool ok = false;
+            if (hadGeometry)
+            {
+               dx = after[0] - before[0]; dy = after[1] - before[1]; dz = after[2] - before[2];
+               ok = std::fabs(dx - 5.0f) < 1e-3f && std::fabs(dy - 7.0f) < 1e-3f &&
+                    std::fabs(dz - 3.0f) < 1e-3f;
+            }
+            results.push_back({ "GeometryTableNode", ok, hadGeometry, dx, dy, dz });
+         }
+
          bool allOk = true;
          for (const Result& r : results)
          {
@@ -32030,10 +32200,14 @@ int main(int argc, char** argv)
 
          // MappingNode itself is excluded on purpose: it *sets* the mapping
          // transform from its own params rather than forwarding one, so it is
-         // not a passthrough case this check applies to. InstanceOnPointsNode
-         // and PathNode are excluded for the same reason TRANSFORMSWEEPTEST
-         // gives them their own variant - neither reduces to a plain
-         // GetMappingTransform() a caller would read.
+         // not a passthrough case this check applies to. InstanceOnPointsNode,
+         // PathNode and GeometryTableNode are excluded for the same reason
+         // TRANSFORMSWEEPTEST gives them their own variant - none of them
+         // reduces to a plain GetMappingTransform() a caller would read.
+         // GeometryTableNode specifically forwards no mapping transform
+         // because it forwards no geometry at all - it consumes an
+         // IGeometrySource and emits modulator outputs, nothing downstream
+         // ever reads a mapping off it.
          bool allOk = true;
          for (const Result& r : results)
          {
@@ -34843,7 +35017,8 @@ int main(int argc, char** argv)
          const bool multiOutModulator =
             dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr ||
-            dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr;
+            dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr ||
+            dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr;
          IGeometrySource* geoSourceForViewport = dynamic_cast<IGeometrySource*>(gn.node.get());
          const bool isAudioBodyNode = IsAudioBodyNode(gn.node.get());
          if (multiOutModulator)
@@ -35118,6 +35293,8 @@ int main(int argc, char** argv)
                DrawCommentParams(n);
             else if (auto* n = dynamic_cast<PathNode*>(gn.node.get()))
                DrawPathParams(n);
+            else if (auto* n = dynamic_cast<GeometryTableNode*>(gn.node.get()))
+               DrawGeometryTableParams(n);
             else if (auto* n = dynamic_cast<ConstantNode*>(gn.node.get()))
             {
                ModSlider("value", &n->value, 0.0f, 1.0f);
@@ -35396,7 +35573,13 @@ int main(int argc, char** argv)
          // it a blank texture. No pin, no way to make that mistake.
          if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment)
          {
-            const int outputs = std::max(1, gn.node->OutputCount());
+            // GeometryTableNode draws its row pins (index 4 and up) itself,
+            // inline in the table grid in its params panel - only the four
+            // aggregates (cx/cy/cz/spread) go through the generic row here.
+            // Drawing the same pin id through ed::BeginPin() twice in one
+            // frame is not something imgui-node-editor supports.
+            auto* geoTable = dynamic_cast<GeometryTableNode*>(gn.node.get());
+            const int outputs = geoTable != nullptr ? 4 : std::max(1, gn.node->OutputCount());
             std::vector<float> pinW(outputs);
             float itemW = 0.0f;
             for (int o = 0; o < outputs; o++)

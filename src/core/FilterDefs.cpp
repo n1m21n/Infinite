@@ -438,7 +438,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "void main() {\n"
         "   vec2 offset;\n"
         "   if (uHasSrc2 == 1) {\n"
-        "      vec3 m = texture(uSrc2, vUv * max(uScale, 0.01)).rgb;\n"
+        "      vec3 m = texture(uSrc2, fract(vUv * max(uScale, 0.01))).rgb;\n"
         "      offset = (m.rg - 0.5) * 2.0;\n"
         "   } else {\n"
         "      float n = sin(vUv.x * 20.0 * uScale + uTime) * cos(vUv.y * 20.0 * uScale - uTime);\n"
