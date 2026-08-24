@@ -84,6 +84,13 @@ public:
       // aren't known - see RestoreLink) and flips this true. Every other
       // Source (freshly bound, or already converted) has it true.
       bool hasRange = false;
+
+      // The binding still exists and still shows in the matrix, it just
+      // stops being written by the apply loop, leaving the destination
+      // param at whatever value it last held. The param field stays
+      // read-only-locked, because the cable is still patched - matching
+      // how HasExpression behaves under a live cable.
+      bool enabled = true;
    };
 
    // Creates a fresh binding, defaulting the range to the destination's full
@@ -102,6 +109,10 @@ public:
    // leaves nodeIndex/outputIndex/centre/polarity/depth untouched. No-op if
    // nothing is bound there.
    void SetRange(int nodeIndex, int paramIndex, float lo, float hi);
+   // Enables or disables an existing binding in place, leaving everything
+   // else about it untouched. No-op if nothing is bound there, mirroring
+   // SetRange().
+   void SetEnabled(int nodeIndex, int paramIndex, bool on);
    void Unbind(int nodeIndex, int paramIndex);
    void UnbindAllFor(int nodeIndex); // node deleted: drop it as target and as source
 
@@ -142,16 +153,27 @@ public:
    // restart from 1 on a new patch, so a link left over from the previous one
    // does not go stale - it silently re-attaches to whichever node happens to
    // land on that index next.
-   void Clear() { mLinks.clear(); mExpressions.clear(); mExpressionErrors.clear(); }
+   void Clear() { mLinks.clear(); mExpressions.clear(); mExpressionErrors.clear(); mKnownParams.clear(); }
 
    // Parameters registered during the current frame's node drawing.
    void ClearFrameParams() { mFrameParams.clear(); }
-   void RegisterParam(const ParamRef& ref) { mFrameParams.push_back(ref); }
+   void RegisterParam(const ParamRef& ref);
    const std::vector<ParamRef>& FrameParams() const { return mFrameParams; }
+
+   // Sticky per-parameter metadata, accumulated from RegisterParam and never
+   // cleared per-frame. The matrix panel needs a destination's name/min/max/
+   // step even on frames where that param didn't draw - a collapsed node
+   // (showParams == false) registers nothing, and a top/left-docked panel
+   // draws before the canvas has registered anything at all this frame.
+   // Cleared only by Clear(). The `value` pointer is deliberately nulled in
+   // the stored copy: the raw float* is only valid within the frame that
+   // registered it - never store or dereference it from here.
+   const ParamRef* KnownParam(int nodeIndex, int paramIndex) const;
 
 private:
    std::map<Key, Source> mLinks;
    std::map<Key, std::string> mExpressions;
    std::map<Key, std::string> mExpressionErrors;
    std::vector<ParamRef> mFrameParams;
+   std::map<Key, ParamRef> mKnownParams;
 };

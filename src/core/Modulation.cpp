@@ -75,6 +75,14 @@ Modulation::Source Modulation::ResolvedSourceFor(const ParamRef& ref)
    return s;
 }
 
+void Modulation::SetEnabled(int nodeIndex, int paramIndex, bool on)
+{
+   auto it = mLinks.find(Key(nodeIndex, paramIndex));
+   if (it == mLinks.end())
+      return;
+   it->second.enabled = on;
+}
+
 void Modulation::Unbind(int nodeIndex, int paramIndex)
 {
    const Key key(nodeIndex, paramIndex);
@@ -133,6 +141,20 @@ Modulation::Source Modulation::ModulatorFor(int nodeIndex, int paramIndex) const
 {
    auto it = mLinks.find(Key(nodeIndex, paramIndex));
    return it != mLinks.end() ? it->second : Source();
+}
+
+void Modulation::RegisterParam(const ParamRef& ref)
+{
+   mFrameParams.push_back(ref);
+   ParamRef known = ref;
+   known.value = nullptr;
+   mKnownParams[Key(ref.nodeIndex, ref.paramIndex)] = known;
+}
+
+const ParamRef* Modulation::KnownParam(int nodeIndex, int paramIndex) const
+{
+   auto it = mKnownParams.find(Key(nodeIndex, paramIndex));
+   return it != mKnownParams.end() ? &it->second : nullptr;
 }
 
 const std::string* Modulation::ExpressionFor(int nodeIndex, int paramIndex) const

@@ -27,7 +27,7 @@ class INode;
 //   geo <dstIndex> <dstSlot> <srcIndex>
 //   aud <dstIndex> <dstSlot> <srcIndex>
 //   note <dstIndex> <dstSlot> <srcIndex>
-//   mod <dstIndex> <dstParam> <srcIndex> <srcOutput> <polarity> <depth> <centre> [<lo> <hi>]
+//   mod <dstIndex> <dstParam> <srcIndex> <srcOutput> <polarity> <depth> <centre> [<lo> <hi> [<enabled>]]
 //     polarity/depth/centre are trailing additions (per-binding modulation
 //     polarity - see Modulation::Source): missing on older patches, where
 //     >>'s failed-extraction behaviour leaves them at their defaults
@@ -39,6 +39,10 @@ class INode;
 //     ModRecord::hasRange is left false and the range is derived from
 //     polarity/depth/centre the first time the destination is drawn (see
 //     Modulation::ResolvedSourceFor) rather than read from the file.
+//     enabled is the last, and only ever written alongside lo/hi (never on
+//     its own, since the tokens are positional and a lone enabled token
+//     would decode as lo) - missing on any older patch, where it defaults
+//     to true, matching a binding that has always been written.
 //   pal <dstIndex> <dstColor> <srcIndex> <srcSwatch>
 //   expr <dstIndex> <dstParam> <expression text to end of line>
 //   glob <name> <expression text to end of line>
@@ -91,6 +95,9 @@ namespace Patch
       float lo = 0.0f;
       float hi = 0.0f;
       bool hasRange = false;
+      // See Modulation::Source::enabled. Only meaningful (and only ever
+      // written) alongside lo/hi - see the format comment above.
+      bool enabled = true;
    };
 
    // A palette node driving one colour swatch on another node.
