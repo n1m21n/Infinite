@@ -18,6 +18,10 @@
 
 set -uo pipefail
 
+# Runs headless and repeatedly; never let UpdateCheck::Start() make a
+# network call from here.
+export INFINITE_NO_UPDATE_CHECK=1
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
 

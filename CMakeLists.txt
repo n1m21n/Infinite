@@ -13,6 +13,20 @@ endif()
 # Objective-C/Objective-C++ are Apple-only languages; the Windows port keeps
 # the same source tree but swaps the platform layer for src/platform/win.
 project(Infinite LANGUAGES C CXX)
+
+# Single source of truth for the app version - drives the macOS bundle
+# properties, the Windows .rc version block, and the in-app update checker's
+# "am I current" comparison. Bump this (and INFINITE_VERSION_RC below it,
+# kept in sync by hand) when cutting a release; nothing else should hardcode
+# a version string.
+set(INFINITE_VERSION "0.2.0")
+# VERSIONINFO (src/platform/win/Infinite.rc.in) wants four dot/comma-separated
+# numeric components but INFINITE_VERSION is three; kept as an explicit
+# second value rather than derived, so bump both together when cutting a
+# release.
+set(INFINITE_VERSION_RC "0,2,0,0")
+string(REPLACE "," "." INFINITE_VERSION_RC_STR "${INFINITE_VERSION_RC}")
+
 if(APPLE)
     enable_language(OBJC OBJCXX)
 elseif(WIN32)
@@ -146,6 +160,7 @@ set(COMMON_SOURCES
     src/core/RemoteControl.cpp
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
+    src/core/UpdateCheck.cpp
     src/audio/AudioEngine.cpp
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp
@@ -297,11 +312,21 @@ set(APPLE_SOURCES
     ${SYPHON_SOURCES}
 )
 
+# Generated from the .in template so the version block tracks
+# INFINITE_VERSION/INFINITE_VERSION_RC instead of carrying its own literal.
+# The icon path is substituted as an absolute path because the generated .rc
+# lives in the build dir, not next to Infinite.ico.
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/win/Infinite.rc.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/Infinite.rc
+    @ONLY
+)
+
 set(WIN32_SOURCES
     # Icon + version info. MSVC and MinGW both compile .rc files when the
     # RC language is enabled (see enable_language below); without this the
     # exe shows Explorer's generic application icon everywhere.
-    src/platform/win/Infinite.rc
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/Infinite.rc
     src/platform/win/PlatformWin.cpp
     src/platform/win/AudioDeviceWin.cpp
     src/platform/win/MidiWin.cpp
@@ -348,6 +373,10 @@ endif()
 
 add_executable(Infinite ${COMMON_SOURCES})
 
+# Exposes INFINITE_VERSION to C++ as a string literal (UpdateCheck.cpp,
+# User-Agent header, etc.).
+target_compile_definitions(Infinite PRIVATE INFINITE_VERSION_STRING="${INFINITE_VERSION}")
+
 if(APPLE)
     target_sources(Infinite PRIVATE ${APPLE_SOURCES})
 endif()
@@ -387,6 +416,9 @@ if(WIN32)
         # MFCreateDeviceSource).
         mfplat mfreadwrite mfuuid mf
         FLAC::FLAC
+        # WinHTTP backs Platform::HttpGet (UpdateCheck's GitHub Releases
+        # request) - not otherwise linked anywhere in this target.
+        winhttp
     )
     # M_PI etc. live behind _USE_MATH_DEFINES in MSVC's math.h; defining on the
     # command line lands before any cmath include.
@@ -599,8 +631,8 @@ if(APPLE)
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "Infinite"
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.namansoni.infinite"
-        MACOSX_BUNDLE_BUNDLE_VERSION "0.1"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${INFINITE_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${INFINITE_VERSION}"
         MACOSX_BUNDLE_ICON_FILE "Infinite"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in"
         RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns"

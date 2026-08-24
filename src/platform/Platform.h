@@ -732,6 +732,23 @@ namespace Platform
    // Returns true only when a new frame was received and written.
    bool CameraReadFrame(CameraHandle* handle, std::vector<unsigned char>& outPixels,
                         int& outWidth, int& outHeight, unsigned long long& outFrameSeq);
+
+   // ---- networking (update checker) ----------------------------------------
+
+   // Hands a URL to the OS's default browser. Fire-and-forget: there is no
+   // success callback, and a malformed or non-http(s) URL is dropped rather
+   // than passed through, so this can never be used to launch a local
+   // executable by way of a file:// or shell URL.
+   void OpenExternalUrl(const std::string& url);
+
+   // Blocking HTTPS GET. Call from a worker thread, never the render or audio
+   // thread. Returns false on any transport, TLS, or non-2xx failure and fills
+   // outError; outBody is only valid when it returns true. Bounded by
+   // timeoutSeconds and a hard response-size cap so a hung or hostile endpoint
+   // can't stall or balloon the caller.
+   bool HttpGet(const std::string& url, const std::string& userAgent,
+                std::string& outBody, std::string& outError,
+                int timeoutSeconds = 10);
 }
 
 

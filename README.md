@@ -104,6 +104,9 @@ The build is ad-hoc signed:
    xattr -dr com.apple.quarantine /Applications/Infinite.app
    ```
 
+### Update Checks
+On launch, Infinite makes a single unauthenticated GET request to GitHub's Releases API to check whether a newer version is available. It sends nothing but a version string in the User-Agent header, and no data is collected. If a newer version exists, a small badge appears in the menu bar that links to the download page; it can be dismissed. Set `INFINITE_NO_UPDATE_CHECK=1` in the environment to disable this entirely.
+
 ---
 
 ## Build from Source

@@ -5129,6 +5129,110 @@ namespace Platform
       handle->lastReadSeq = fb.frameSeq;
       return true;
    }
+
+   void OpenExternalUrl(const std::string& url)
+   {
+      if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
+         return;
+
+      @autoreleasepool
+      {
+         NSString* nsUrl = [NSString stringWithUTF8String:url.c_str()];
+         NSURL* parsed = [NSURL URLWithString:nsUrl];
+         if (parsed != nil)
+            [[NSWorkspace sharedWorkspace] openURL:parsed];
+      }
+   }
+
+   bool HttpGet(const std::string& url, const std::string& userAgent,
+                std::string& outBody, std::string& outError,
+                int timeoutSeconds)
+   {
+      outBody.clear();
+      outError.clear();
+
+      if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
+      {
+         outError = "url must be http(s)";
+         return false;
+      }
+
+      @autoreleasepool
+      {
+         NSURL* nsUrl = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
+         if (nsUrl == nil)
+         {
+            outError = "malformed url";
+            return false;
+         }
+
+         NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:nsUrl];
+         [request setValue:[NSString stringWithUTF8String:userAgent.c_str()] forHTTPHeaderField:@"User-Agent"];
+         [request setTimeoutInterval:(NSTimeInterval)timeoutSeconds];
+
+         NSURLSessionConfiguration* config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+         config.timeoutIntervalForRequest = (NSTimeInterval)timeoutSeconds;
+         NSURLSession* session = [NSURLSession sessionWithConfiguration:config];
+
+         // The contract is blocking (called from a worker thread), so drive
+         // the async dataTaskWithRequest: to completion with a semaphore
+         // rather than exposing a callback up through Platform's C++ API.
+         dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+         __block bool success = false;
+         __block std::string body;
+         __block std::string error;
+
+         static constexpr size_t kMaxBodyBytes = 1 * 1024 * 1024;
+
+         NSURLSessionDataTask* task = [session dataTaskWithRequest:request
+            completionHandler:^(NSData* data, NSURLResponse* response, NSError* nsError)
+            {
+               if (nsError != nil)
+               {
+                  error = std::string([[nsError localizedDescription] UTF8String]);
+               }
+               else
+               {
+                  NSInteger statusCode = [(NSHTTPURLResponse*)response statusCode];
+                  if (statusCode < 200 || statusCode >= 300)
+                  {
+                     error = "http status " + std::to_string((long)statusCode);
+                  }
+                  else if (data != nil)
+                  {
+                     size_t n = std::min((size_t)[data length], kMaxBodyBytes);
+                     body.assign((const char*)[data bytes], n);
+                     success = ((size_t)[data length]) <= kMaxBodyBytes;
+                     if (!success)
+                        error = "response exceeded size cap";
+                  }
+                  else
+                  {
+                     success = true;
+                  }
+               }
+               dispatch_semaphore_signal(sema);
+            }];
+         [task resume];
+
+         dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeoutSeconds + 2) * NSEC_PER_SEC);
+         if (dispatch_semaphore_wait(sema, deadline) != 0)
+         {
+            [task cancel];
+            outError = "timed out";
+            return false;
+         }
+
+         if (!success)
+         {
+            outError = error.empty() ? "request failed" : error;
+            return false;
+         }
+
+         outBody = std::move(body);
+         return true;
+      }
+   }
 }
 
 
