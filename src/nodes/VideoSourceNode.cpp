@@ -110,8 +110,20 @@ void VideoSourceNode::CookIfNeeded(int frameId)
 
    if (mDuration > 0.0)
    {
-      if (mPosition > mDuration)
-         mPosition = loop ? std::fmod(mPosition, mDuration) : mDuration;
+      if (loop)
+      {
+         mPosition = std::fmod(mPosition, mDuration);
+         if (mPosition < 0.0)
+            mPosition += mDuration; // fmod keeps the sign of the dividend
+      }
+      else
+      {
+         mPosition = std::clamp(mPosition, 0.0, mDuration);
+      }
+   }
+   else
+   {
+      mPosition = std::max(mPosition, 0.0);
    }
 
    if (Platform::VideoFrameAt(mVideo, mPosition, mFrame) && !mFrame.empty())
