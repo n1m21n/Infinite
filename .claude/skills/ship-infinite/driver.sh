@@ -104,6 +104,58 @@ step_release() {
     fi
     gh release upload "$tag" website/assets/Infinite.dmg --clobber
     echo "    uploaded website/assets/Infinite.dmg onto release $tag"
+
+    step_release_windows "$tag"
+}
+
+# --------------------------------------------------------- release-windows ---
+# Windows binaries can't be built on this (macOS) machine, so instead of
+# compiling them this pulls the x64/ARM64 .exe already built by the
+# `windows` job in .github/workflows/build.yml for the commit just pushed,
+# repacks them to match the existing Release asset layout (an `Infinite/`
+# folder with the exe + README + LICENSE, zipped), and uploads them onto
+# the same GitHub Release the DMG just went to. Best-effort: a missing `gh`,
+# a still-running/failed CI run, or a run with no Windows artifacts (e.g.
+# both jobs failed) all just print a warning and return - they never fail
+# the release step, since the DMG/website deploy already succeeded by the
+# time this runs.
+step_release_windows() {
+    local tag="${1:?tag required}"
+    echo "==> release: syncing Windows zips onto release $tag from CI"
+
+    local sha
+    sha=$(git rev-parse HEAD)
+    local run_id
+    run_id=$(gh run list --workflow=build.yml --branch main --status success \
+        --json databaseId,headSha --limit 20 \
+        --jq "[.[] | select(.headSha == \"$sha\")][0].databaseId" 2>/dev/null)
+    if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+        echo "    no successful CI run found yet for $sha - skipping Windows asset sync"
+        echo "    (CI may still be running; re-run 'release' once it's green, or upload manually)"
+        return 0
+    fi
+
+    local work
+    work=$(mktemp -d)
+    local arch ok=0
+    for arch in x64 ARM64; do
+        local art="Infinite-windows-$arch"
+        if ! gh run download "$run_id" -n "$art" -D "$work/$art" >/dev/null 2>&1; then
+            echo "    $art artifact not found on run $run_id - skipping (job may have failed/continue-on-error)"
+            continue
+        fi
+        local stage="$work/stage-$arch/Infinite"
+        mkdir -p "$stage"
+        cp "$work/$art"/* "$stage/" 2>/dev/null
+        (cd "$work/stage-$arch" && zip -qr "$work/$art.zip" Infinite)
+        gh release upload "$tag" "$work/$art.zip" --clobber
+        echo "    uploaded $art.zip onto release $tag"
+        ok=1
+    done
+    rm -rf "$work"
+    if [ "$ok" -eq 0 ]; then
+        echo "    no Windows artifacts uploaded - release $tag's Windows zips are unchanged"
+    fi
 }
 
 # ----------------------------------------------------------------- cleanup ---
@@ -168,6 +220,7 @@ case "$STEP" in
     push) step_push ;;
     nodediff) shift; step_nodediff "$@" ;;
     release) step_release ;;
+    release-windows) shift; step_release_windows "$@" ;;
     cleanup) step_cleanup ;;
     all)
         echo "Use individual subcommands (verify/review/commit/push/nodediff/release/cleanup)."

@@ -1,6 +1,6 @@
 ---
 name: ship-infinite
-description: Verify, review, commit, and push uncommitted Infinite changes, build the distributable DMG, and publish it via the GitHub Pages website (n1m21n.github.io/Infinite) — plus flag node-catalog changes that need the Node Reference Manual updated, and clean up junk/duplicate tracked files. Use when asked to "ship this", "release Infinite", "cut a release", "build and publish the DMG", "push and deploy", or "clean up the repo before release".
+description: Verify, review, commit, and push uncommitted Infinite changes, build the distributable macOS DMG, pull the CI-built Windows x64/ARM64 zips, and publish all of it via the GitHub Pages website (n1m21n.github.io/Infinite) and the latest GitHub Release — plus flag node-catalog changes that need the Node Reference Manual updated, and clean up junk/duplicate tracked files. Use when asked to "ship this", "release Infinite", "cut a release", "build and publish the DMG", "push and deploy", or "clean up the repo before release".
 ---
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`), not
@@ -19,11 +19,15 @@ in order:
 .claude/skills/ship-infinite/driver.sh commit "<message>"   # git add -A && commit
 .claude/skills/ship-infinite/driver.sh push                 # git push
 .claude/skills/ship-infinite/driver.sh nodediff <base-ref>   # e.g. origin/main~1 — reports node-table changes
-.claude/skills/ship-infinite/driver.sh release               # package.sh: builds DMG, copies into website/assets
+.claude/skills/ship-infinite/driver.sh release               # DMG (package.sh) + Windows zips (from CI) + Release upload
 # then commit + push again so the new DMG (and any doc/cleanup changes) deploy:
 .claude/skills/ship-infinite/driver.sh commit "Release: rebuild DMG"
 .claude/skills/ship-infinite/driver.sh push
 ```
+
+`release` needs the `push` above to have already landed on `main`, since
+the Windows half pulls binaries CI built for that exact commit — see
+[Release (Windows)](#release-windows) below.
 
 Pushing to `main` is what deploys the site — `.github/workflows/deploy-pages.yml`
 already runs on every push to `main` and republishes the whole `website/`
@@ -90,6 +94,29 @@ there's no release yet), this step prints a warning and continues rather
 than failing the pipeline — the website deploy from `commit`/`push` still
 goes through either way.
 
+## Release (Windows)
+
+There's no Windows machine here to build on, so this doesn't build
+anything — it fetches the `Infinite-windows-x64` and `Infinite-windows-ARM64`
+binaries that `.github/workflows/build.yml`'s `windows` job already built
+for the exact commit at `HEAD` (`gh run list --workflow=build.yml --branch
+main` filtered to that SHA), repacks each into the same `Infinite/` folder
++ zip layout the existing Release assets use (exe + README + LICENSE), and
+uploads them onto the release with `gh release upload --clobber`. Runs
+automatically as part of `release`, right after the DMG upload; can also
+be run standalone once CI has finished for a commit already on `main`:
+
+```bash
+.claude/skills/ship-infinite/driver.sh release-windows <tag>   # e.g. v0.2-preview
+```
+
+Best-effort, matching how the macOS DMG upload behaves: no `gh`, no
+successful CI run yet for `HEAD`, or a run where a Windows job failed (the
+ARM64 job is `continue-on-error`, so the workflow can be green with only
+the x64 artifact present) all just print a warning and return — they never
+fail the overall `release` step, since the DMG and website deploy already
+went through by the time this runs.
+
 ## Cleanup
 
 ```bash
@@ -145,3 +172,8 @@ the tagline in `README.md`'s first paragraph and `website/index.html`'s
 - Pushing to `main` deploys the public site immediately (no staging
   environment, no manual approval step in the GitHub Actions workflow) —
   `push` after a `release` run is a live deploy, not a dry run.
+- Running `release` immediately after `push` races CI: the Windows job
+  takes a few minutes, so if you run `release` right away it may not find
+  a successful run for `HEAD` yet and will skip the Windows upload with a
+  warning rather than wait for one. Re-run `release-windows <tag>` once
+  the `windows` job on `main` is green — see [Release (Windows)](#release-windows).
