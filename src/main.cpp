@@ -568,6 +568,23 @@ namespace
    int gModBindingMenuNode = -1;
    int gModBindingMenuParam = -1;
    bool gOpenModBindingMenu = false;
+   // Hover-and-type for the ##modbind popup's lo/hi fields, matching the
+   // hover+type convention every other param field in this file uses (see
+   // gTypedParam) rather than relying on DragFloat/DragInt's own
+   // double-click/Ctrl+click text-entry, which is easy to miss since nothing
+   // in the popup hints it exists. field: 0=lo, 1=hi, -1=none active.
+   int gModRangeTypedField = -1;
+   std::string gModRangeTypedText;
+   bool gModRangeTypedJustOpened = false;
+   // Seeded-digit entry (hover + press a digit key) needs the field to open
+   // one frame *after* the keypress rather than the same frame - see
+   // gTypedParamPendingInit's comment at BeginTypedEditFromCurrent for why:
+   // InputText's own select-all only takes effect once it's confirmed active,
+   // which can land a frame after SetKeyboardFocusHere, so driving selection
+   // off a flag races with that and produces exactly the double-char/can't-
+   // replace-the-seed behaviour this is avoiding.
+   bool gModRangeTypedPendingInit = false;
+   bool gModRangeTypedNoAutoSelect = false;
    // The node browser lives in a docked panel rather than only the canvas popup,
    // so modules can be found without knowing the double-click gesture exists.
    bool gNodePanelOpen = false;
@@ -578,6 +595,15 @@ namespace
    // above - not serialized to patch data or tracked by undo.
    std::vector<int> gViewportPanelNodes;
    int gViewportPanelDock = 1;        // 0 = bottom, 1 = right, 2 = left
+   // The dockable modulation matrix panel: a spreadsheet-style table of every
+   // active modulation binding. Session UI state only, like gNodePanelOpen and
+   // gViewportPanelNodes above - not serialized to patch data or tracked by undo.
+   bool  gModMatrixOpen = false;
+   int   gModMatrixDock = 0;              // 0 = bottom, 1 = right, 2 = left, 3 = top
+   float gModMatrixWidth = 420.0f;
+   float gModMatrixHeight = 240.0f;
+   const float kModMatrixMinWidth = 300.0f;   // eight columns need real room
+   const float kModMatrixMinHeight = 140.0f;
    ImVec2 gViewCenterCanvas(0.0f, 0.0f); // captured inside the editor for spawning
    ImVec2 gGraphScreenTL(0.0f, 0.0f);    // graph canvas's screen-space rect,
    ImVec2 gGraphScreenSize(0.0f, 0.0f);  // captured the same way, for the minimap overlay
@@ -1073,7 +1099,7 @@ namespace
    // so an audio slider is modulatable and expression-drivable on exactly
    // the same terms as every other param in the app.
    bool ModSlider(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
-                  float width = kParamWidth, bool audioStyle = false)
+                  float width = kParamWidth, bool audioStyle = false, float step = 0.0f)
    {
       const int nodeIndex = gCurrentNodeIndex;
       const int paramIndex = gParamCounter++;
@@ -1084,6 +1110,7 @@ namespace
       ref.value = value;
       ref.minValue = minV;
       ref.maxValue = maxV;
+      ref.step = step;
       ref.name = label;
       Modulation::Instance().RegisterParam(ref);
 
@@ -1387,10 +1414,14 @@ namespace
       if (!Modulation::Instance().IsModulated(key.first, key.second))
          slot = (float)*value;
 
-      bool changed = ModSlider(label, &slot, (float)minV, (float)maxV, "%.0f", width, audioStyle);
+      bool changed = ModSlider(label, &slot, (float)minV, (float)maxV, "%.0f", width, audioStyle, /*step=*/1.0f);
       // lroundf, not (int)(x + 0.5f): the latter truncates toward zero, so
       // -3.7 lands on -3 instead of -4 and every negative-range param (octave,
-      // semi, transpose) is biased upward by half a step.
+      // semi, transpose) is biased upward by half a step. Clamp after
+      // rounding, matching ModKnobInt below - a typed value or an unclamped
+      // modulator source (see ShapeToParam) can otherwise land the backing
+      // float past minV/maxV.
+      slot = std::clamp(slot, (float)minV, (float)maxV);
       *value = (int)lroundf(slot);
       return changed;
    }
@@ -1522,7 +1553,8 @@ namespace
    // knowing which it has.
    bool VFaderFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                     float height, ImU32 fillColor, bool readOnly, float cellW = 0.0f,
-                    FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
+                    FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                    bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f)
    {
       const float cell = cellW > 0.0f ? cellW : kFaderWidth;
       const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -1570,6 +1602,10 @@ namespace
       const float top = p.y + 6.0f;
       const float bottom = p.y + height - 6.0f;
       const float capY = bottom - t * (bottom - top);
+      // Modulation range band (item 6), same intent as KnobFloat's arc band
+      // above - only ever passed when read-only-modulated.
+      const float capYLo = hasRange ? bottom - ValueToPos01(rangeLo) * (bottom - top) : 0.0f;
+      const float capYHi = hasRange ? bottom - ValueToPos01(rangeHi) * (bottom - top) : 0.0f;
 
       const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1579,6 +1615,9 @@ namespace
                            IM_COL32(215, 220, 230, 255), 3.0f);
          dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
                      IM_COL32(180, 185, 200, 255), 3.0f);
+         if (hasRange)
+            dl->AddRectFilled(ImVec2(cx - 5.0f, std::min(capYLo, capYHi)), ImVec2(cx + 5.0f, std::max(capYLo, capYHi)),
+                              IM_COL32(255, 190, 90, 100));
          if (t > 0.0f)
             dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
 
@@ -1617,6 +1656,9 @@ namespace
                            IM_COL32(14, 15, 20, 255), 3.0f);
          dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
                      IM_COL32(58, 62, 76, 255), 3.0f);
+         if (hasRange)
+            dl->AddRectFilled(ImVec2(cx - 5.0f, std::min(capYLo, capYHi)), ImVec2(cx + 5.0f, std::max(capYLo, capYHi)),
+                              IM_COL32(255, 190, 90, 120));
          if (t > 0.0f)
             dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
 
@@ -1675,7 +1717,8 @@ namespace
 
    bool KnobFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                   float diameter, ImU32 fillColor, bool readOnly, float cellW = 0.0f,
-                  FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
+                  FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                  bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f)
    {
       const float kTwoPi = 6.28318530717958647692f;
       const float aMin = 0.75f * kTwoPi * 0.5f; // 135 deg
@@ -1728,6 +1771,11 @@ namespace
       const float radius = diameter * 0.5f - 2.0f;
       const float t = ValueToPos01(*value);
       const float angle = aMin + t * (aMax - aMin);
+      // Modulation range band (item 6): the lo..hi span this knob is bound
+      // to, drawn as a dim arc under the value fill - Bitwig/Ableton-style.
+      // Only ever passed when the knob is read-only-modulated (see ModKnob).
+      const float angleLo = hasRange ? aMin + ValueToPos01(rangeLo) * (aMax - aMin) : 0.0f;
+      const float angleHi = hasRange ? aMin + ValueToPos01(rangeHi) * (aMax - aMin) : 0.0f;
 
       const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1737,6 +1785,11 @@ namespace
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(242, 245, 250, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
          dl->PathStroke(IM_COL32(195, 200, 212, 255), 0, 3.0f);
+         if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
+         {
+            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
+            dl->PathStroke(IM_COL32(255, 190, 90, 110), 0, 5.0f);
+         }
          if (t > 0.0f)
          {
             dl->PathArcTo(center, radius + 2.5f, aMin, angle, 32);
@@ -1755,6 +1808,11 @@ namespace
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(22, 23, 30, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
          dl->PathStroke(IM_COL32(58, 62, 76, 255), 0, 3.0f);
+         if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
+         {
+            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
+            dl->PathStroke(IM_COL32(255, 190, 90, 130), 0, 5.0f);
+         }
          if (t > 0.0f)
          {
             dl->PathArcTo(center, radius + 2.5f, aMin, angle, 32);
@@ -1822,22 +1880,24 @@ namespace
    // all the pin placement below actually needs from it.
    bool ModKnob(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
                 float diameter = kKnobDiameter, float cellW = 0.0f,
-                AudioWidgetStyle style = AudioWidgetStyle::Knob)
+                AudioWidgetStyle style = AudioWidgetStyle::Knob, float step = 0.0f)
    {
-      auto DrawWidget = [&](float* v, ImU32 col, bool readOnly) -> bool
+      auto DrawWidget = [&](float* v, ImU32 col, bool readOnly, bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f) -> bool
       {
          if (style == AudioWidgetStyle::VFaderDb)
             return VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                                ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos);
+                                ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos, hasRange, rangeLo, rangeHi);
          if (style == AudioWidgetStyle::KnobDb)
             return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                              ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos);
+                              ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos, hasRange, rangeLo, rangeHi);
          if (style == AudioWidgetStyle::KnobFreq)
             return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                              FrequencyTaper::PosToValue, FrequencyTaper::ValueToPos);
+                              FrequencyTaper::PosToValue, FrequencyTaper::ValueToPos, hasRange, rangeLo, rangeHi);
          return style == AudioWidgetStyle::VFader
-            ? VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f)
-            : KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
+            ? VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
+                          nullptr, nullptr, hasRange, rangeLo, rangeHi)
+            : KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
+                       nullptr, nullptr, hasRange, rangeLo, rangeHi);
       };
       const float widgetW = (style == AudioWidgetStyle::VFader || style == AudioWidgetStyle::VFaderDb)
                                ? kFaderWidth : diameter;
@@ -1851,6 +1911,7 @@ namespace
       ref.value = value;
       ref.minValue = minV;
       ref.maxValue = maxV;
+      ref.step = step;
       ref.name = label;
       Modulation::Instance().RegisterParam(ref);
 
@@ -1961,7 +2022,8 @@ namespace
       else if (modulated)
       {
          float shown = *value;
-         DrawWidget(&shown, IM_COL32(255, 190, 90, 255), /*readOnly=*/true);
+         const Modulation::Source src = Modulation::Instance().ResolvedSourceFor(ref);
+         DrawWidget(&shown, IM_COL32(255, 190, 90, 255), /*readOnly=*/true, /*hasRange=*/true, src.lo, src.hi);
          DrawModulationBindingMenu(nodeIndex, paramIndex, ImGui::IsItemHovered());
       }
       else if (hasExpr && !exprErrored)
@@ -2077,7 +2139,8 @@ namespace
             slot = (float)*value;
       }
 
-      bool changed = ModKnob(label, &slot, (float)minV, (float)maxV, "%.0f", diameter, cellW);
+      bool changed = ModKnob(label, &slot, (float)minV, (float)maxV, "%.0f", diameter, cellW,
+                             AudioWidgetStyle::Knob, /*step=*/1.0f);
       slot = std::clamp(slot, (float)minV, (float)maxV);
       *value = (int)lroundf(slot);
       gIntParamLastWritten[key] = *value;
@@ -16952,6 +17015,385 @@ namespace
       }
    }
 
+   // The dock picker for the modulation matrix, shared by the panel's own
+   // right-click menu and the Menu dropdown - see ViewportPanelDockCombo.
+   void ModMatrixDockCombo()
+   {
+      static const char* kDockLabels[] = { "Bottom", "Right", "Left", "Top" };
+      if (ImGui::BeginCombo("##modmatrixdock", kDockLabels[gModMatrixDock]))
+      {
+         for (int i = 0; i < 4; i++)
+            if (ImGui::Selectable(kDockLabels[i], i == gModMatrixDock))
+               gModMatrixDock = i;
+         ImGui::EndCombo();
+      }
+   }
+
+   // The modulation matrix's table body: one row per active binding (see
+   // Modulation::Links), additive to the per-param ##modbind popup above -
+   // that popup stays the only way to edit a single binding from its own
+   // knob; this is an overview of all of them at once.
+   // A DragFloat with the same hover-and-type-a-digit / double-click-to-type
+   // interaction every other param field gets from ModSlider, reusing that
+   // same gTypedParam/HandleParamTypeHotkeys machinery. Lo/Hi cells aren't
+   // real registered ParamRefs though - no pin, no expression - so they get
+   // their own synthetic editKey namespace (negative paramIndex) rather than
+   // the caller's real (nodeIndex, paramIndex), which is always >= 0 (see
+   // gParamCounter) and would otherwise collide with that same destination
+   // node's own knob elsewhere in the graph.
+   bool TypableRangeField(const char* strId, const std::pair<int, int>& editKey, float* value,
+                          float step, float minV, float maxV, const char* fmt)
+   {
+      bool changed = false;
+      if (gTypedParam.count(editKey) > 0)
+      {
+         if (gTypedParamJustOpened == editKey)
+         {
+            ImGui::SetKeyboardFocusHere();
+            gTypedParamJustOpened = std::pair<int, int>(-1, -1);
+         }
+         char buf[64];
+         snprintf(buf, sizeof(buf), "%s", gTypedParamText[editKey].c_str());
+         const std::string typedId = std::string("##typed") + strId;
+         const bool entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf),
+                                               ImGuiInputTextFlags_EnterReturnsTrue);
+         gTypedParamText[editKey] = buf;
+         if (gTypedParamPendingInit.count(editKey) && ImGui::IsItemActive())
+         {
+            if (ImGuiInputTextState* state = ImGui::GetInputTextState(ImGui::GetItemID()))
+            {
+               if (gTypedParamNoAutoSelect.count(editKey))
+               {
+                  state->Stb.cursor = state->CurLenW;
+                  state->ClearSelection();
+               }
+               else
+               {
+                  state->SelectAll();
+               }
+            }
+            gTypedParamPendingInit.erase(editKey);
+         }
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (entered || ImGui::IsItemDeactivated())
+         {
+            const std::string trimmed = TrimCopy(gTypedParamText[editKey]);
+            if (!trimmed.empty())
+            {
+               char* end = nullptr;
+               float parsed = strtof(trimmed.c_str(), &end);
+               if (end != trimmed.c_str())
+               {
+                  *value = std::clamp(parsed, std::min(minV, maxV), std::max(minV, maxV));
+                  changed = true;
+               }
+            }
+            gTypedParam.erase(editKey);
+            gTypedParamText.erase(editKey);
+            gTypedParamNoAutoSelect.erase(editKey);
+            gTypedParamPendingInit.erase(editKey);
+         }
+      }
+      else
+      {
+         changed = ImGui::DragFloat(strId, value, step, minV, maxV, fmt);
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            BeginTypedEditFromCurrent(editKey, editKey.first, editKey.second, value, fmt, /*hasExpr=*/false);
+         if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
+            HandleParamTypeHotkeys(editKey, value);
+      }
+      return changed;
+   }
+
+   void DrawModMatrixTable()
+   {
+      Modulation& mod = Modulation::Instance();
+
+      const ImVec2 panelOrigin = ImGui::GetCursorScreenPos();
+      const ImVec2 panelSize = ImGui::GetContentRegionAvail();
+
+      if (mod.Links().empty())
+      {
+         ImGui::TextDisabled("No active modulations.");
+         ImGui::TextDisabled("Patch a modulator into a parameter to see it here.");
+      }
+      else
+      {
+         const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                       ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+         if (ImGui::BeginTable("##modmatrixtable", 9, flags))
+         {
+            // Fixed, non-resizable widths rather than the stretch/drag
+            // behaviour ImGui tables default to - dragging columns around
+            // just to read a value was the user's actual complaint. Two
+            // presets, keyed off the panel's own dock orientation (see the
+            // identical `vertical` convention in DrawModMatrixDocked): the
+            // left/right dock is narrow, so its columns run tighter than
+            // the top/bottom dock's.
+            // One shared width for every data column (Source through Hi) -
+            // Destination/Parameter's own width, picked as the size that
+            // still fits the longest destination/param names comfortably -
+            // rather than each column sized to its own content, so the
+            // table reads as a symmetrical grid instead of a ragged one.
+            const bool vertical = gModMatrixDock == 1 || gModMatrixDock == 2;
+            const float wCol = vertical ? 57.0f : 130.0f; // vertical is 130 * 0.6 - 40% narrower
+
+            ImGui::TableSetupScrollFreeze(0, 1);
+            ImGui::TableSetupColumn("##en", ImGuiTableColumnFlags_WidthFixed, 18.0f);
+            ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn("Destination", ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn("Parameter", ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn("Lo", ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn("Hi", ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn("##inv", ImGuiTableColumnFlags_WidthFixed, 30.0f);
+            ImGui::TableSetupColumn("##unbind", ImGuiTableColumnFlags_WidthFixed, 20.0f);
+            ImGui::TableHeadersRow();
+
+            // Row actions mutate mLinks. SetEnabled/SetRange only mutate a
+            // Source in place, but Unbind erases it - break immediately
+            // after that fires rather than continuing to iterate a map
+            // that just lost the element the for-loop machinery is on.
+            for (const auto& link : mod.Links())
+            {
+               const int dstIndex = link.first.first;
+               const int dstParam = link.first.second;
+
+               GraphNode* dstNode = FindNodeByIndex(dstIndex);
+               GraphNode* srcNode = FindNodeByIndex(link.second.nodeIndex);
+               if (dstNode == nullptr || srcNode == nullptr)
+                  continue; // stale - deleted node, undo/redo rewound past it
+
+               ImGui::PushID(dstIndex * 1000 + dstParam);
+               ImGui::TableNextRow();
+
+               // Resolve against this frame's ParamRef when the destination
+               // drew this frame (the same lazy legacy-conversion pass the
+               // knob itself uses via ResolvedSourceFor); otherwise fall
+               // back to the plain lookup, which may still show an
+               // un-derived lo/hi (0, 0) for a just-loaded legacy binding
+               // whose destination hasn't drawn a single frame since.
+               const ParamRef* frameRef = nullptr;
+               for (const ParamRef& r : mod.FrameParams())
+               {
+                  if (r.nodeIndex == dstIndex && r.paramIndex == dstParam)
+                  {
+                     frameRef = &r;
+                     break;
+                  }
+               }
+               const Modulation::Source src = frameRef != nullptr
+                                                  ? mod.ResolvedSourceFor(*frameRef)
+                                                  : mod.ModulatorFor(dstIndex, dstParam);
+
+               const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
+               const bool isInt = known != nullptr && known->step > 0.0f;
+
+               bool unbound = false;
+
+               // Enable toggle
+               ImGui::TableNextColumn();
+               const ImU32 dotColour = src.enabled ? IM_COL32(120, 220, 140, 255)
+                                                    : IM_COL32(110, 110, 120, 255);
+               const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
+               const float dotH = ImGui::GetTextLineHeight();
+               ImGui::Dummy(ImVec2(dotH, dotH));
+               if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+               {
+                  PushUndoCheckpoint();
+                  mod.SetEnabled(dstIndex, dstParam, !src.enabled);
+               }
+               ImGui::GetWindowDrawList()->AddCircleFilled(
+                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, dotColour);
+
+               const ImVec4 textColour = src.enabled ? ImGui::GetStyle().Colors[ImGuiCol_Text]
+                                                      : ImGui::GetStyle().Colors[ImGuiCol_TextDisabled];
+               ImGui::PushStyleColor(ImGuiCol_Text, textColour);
+
+               // Source
+               ImGui::TableNextColumn();
+               if (ImGui::Selectable(NodeTitle(*srcNode).c_str(), false))
+                  gPendingSelect.push_back(srcNode->NodeId());
+
+               // Destination
+               ImGui::TableNextColumn();
+               if (ImGui::Selectable(NodeTitle(*dstNode).c_str(), false))
+                  gPendingSelect.push_back(dstNode->NodeId());
+
+               // Parameter
+               ImGui::TableNextColumn();
+               if (known != nullptr)
+                  ImGui::TextUnformatted(known->name.c_str());
+               else
+                  ImGui::Text("param %d", dstParam);
+
+               // Value - this frame's live value only; a collapsed node's
+               // destination hasn't registered a float* to read this frame.
+               ImGui::TableNextColumn();
+               if (frameRef != nullptr && frameRef->value != nullptr)
+                  ImGui::Text(isInt ? "%.0f" : "%.3f", *frameRef->value);
+               else
+                  ImGui::TextUnformatted("--");
+
+               ImGui::PopStyleColor();
+
+               // Lo / Hi
+               float lo = src.lo, hi = src.hi;
+               const float minV = known != nullptr ? known->minValue : lo;
+               const float maxV = known != nullptr ? known->maxValue : hi;
+               const float step = isInt ? 1.0f : std::max(0.0001f, (maxV - minV) * 0.01f);
+               bool rangeChanged = false;
+
+               const std::pair<int, int> loKey(dstIndex, -(dstParam * 2 + 1));
+               const std::pair<int, int> hiKey(dstIndex, -(dstParam * 2 + 2));
+
+               ImGui::TableNextColumn();
+               ImGui::SetNextItemWidth(-FLT_MIN);
+               rangeChanged |= TypableRangeField("##lo", loKey, &lo, step, minV, maxV,
+                                                 isInt ? "%.0f" : "%.3f");
+
+               ImGui::TableNextColumn();
+               ImGui::SetNextItemWidth(-FLT_MIN);
+               rangeChanged |= TypableRangeField("##hi", hiKey, &hi, step, minV, maxV,
+                                                 isInt ? "%.0f" : "%.3f");
+
+               if (rangeChanged)
+               {
+                  lo = std::clamp(lo, minV, maxV);
+                  hi = std::clamp(hi, minV, maxV);
+                  if (isInt)
+                  {
+                     lo = std::round(lo);
+                     hi = std::round(hi);
+                  }
+                  mod.SetRange(dstIndex, dstParam, lo, hi);
+               }
+
+               // Invert - matches the ##modbind popup's own Invert, which
+               // doesn't checkpoint either (a range edit, not a structural
+               // change like Unbind or the enable toggle above).
+               ImGui::TableNextColumn();
+               if (ImGui::SmallButton("Inv"))
+                  mod.SetRange(dstIndex, dstParam, src.hi, src.lo);
+
+               // Unbind
+               ImGui::TableNextColumn();
+               if (ImGui::SmallButton("X"))
+               {
+                  PushUndoCheckpoint();
+                  mod.Unbind(dstIndex, dstParam);
+                  unbound = true;
+               }
+
+               ImGui::PopID();
+
+               if (unbound)
+                  break; // just erased from the map this loop is iterating
+            }
+
+            ImGui::EndTable();
+         }
+      }
+
+      // Right-click anywhere on the panel - empty space, the table, or a
+      // row - to reposition or close it. A plain rect test against the
+      // mouse, not BeginPopupContextWindow: a scrolling table owns a nested
+      // child window, so a context-window helper attached here would only
+      // see hover in the gaps around it, not over the table itself - see
+      // DrawViewportPanelContainer's identical comment.
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      const bool overPanel = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
+                             mouse.y >= panelOrigin.y && mouse.y < panelOrigin.y + panelSize.y;
+      if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+         ImGui::OpenPopup("##modmatrixctx");
+
+      if (ImGui::BeginPopup("##modmatrixctx"))
+      {
+         static const char* kDockLabels[] = { "Bottom", "Right", "Left", "Top" };
+         for (int i = 0; i < 4; i++)
+            if (ImGui::MenuItem(kDockLabels[i], nullptr, i == gModMatrixDock))
+               gModMatrixDock = i;
+         ImGui::Separator();
+         if (ImGui::MenuItem("Close panel"))
+            gModMatrixOpen = false;
+         ImGui::EndPopup();
+      }
+   }
+
+   // The panel's outer frame at every dock position - identical grip/border
+   // structure to DrawViewportPanelDocked, just keyed off the matrix's own
+   // dock/size globals and calling DrawModMatrixTable for its content.
+   void DrawModMatrixDocked(const char* id, const ImVec2& size)
+   {
+      const float kGrip = 6.0f;
+      const int dock = gModMatrixDock;
+      const bool vertical = (dock == 1 || dock == 2);  // grip is a column, not a row
+      const bool gripFirst = (dock == 0 || dock == 1); // canvas is above / to the left
+
+      ImGui::BeginChild(id, size, false);
+      const ImVec2 inner = ImGui::GetContentRegionAvail();
+
+      auto grip = [&]()
+      {
+         ImGui::InvisibleButton("##modmatrixgrip",
+                                vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
+                                         : ImVec2(std::max(1.0f, inner.x), kGrip));
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
+         if (ImGui::IsItemActive())
+         {
+            const ImVec2 d = ImGui::GetIO().MouseDelta;
+            switch (dock)
+            {
+               case 0: gModMatrixHeight -= d.y; break;
+               case 1: gModMatrixWidth -= d.x; break;
+               case 2: gModMatrixWidth += d.x; break;
+               default: gModMatrixHeight += d.y; break;
+            }
+            gModMatrixWidth = std::max(kModMatrixMinWidth, gModMatrixWidth);
+            gModMatrixHeight = std::max(kModMatrixMinHeight, gModMatrixHeight);
+         }
+      };
+
+      if (gripFirst)
+      {
+         grip();
+         if (vertical)
+            ImGui::SameLine();
+      }
+
+      const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+      ImGui::BeginChild("##modmatrixpanelcontent",
+                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), 0)
+                                 : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
+                        false);
+      DrawModMatrixTable();
+      ImGui::EndChild();
+
+      if (!gripFirst)
+      {
+         if (vertical)
+            ImGui::SameLine();
+         grip();
+      }
+      ImGui::EndChild();
+
+      const ImVec2 tl = ImGui::GetItemRectMin();
+      const ImVec2 br = ImGui::GetItemRectMax();
+      const ImU32 line = IM_COL32(70, 74, 90, 255);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      switch (dock)
+      {
+         case 0: dl->AddLine(tl, ImVec2(br.x, tl.y), line); break;          // bottom dock -> top edge
+         case 1: dl->AddLine(tl, ImVec2(tl.x, br.y), line); break;          // right dock -> left edge
+         case 2: dl->AddLine(ImVec2(br.x, tl.y), br, line); break;          // left dock -> right edge
+         default: dl->AddLine(ImVec2(tl.x, br.y), br, line); break;         // top dock -> bottom edge
+      }
+   }
+
    void DrawModulatorMeter(IModulator* mod, int nodeIndex)
    {
       const float value = mod->Value01();
@@ -18374,7 +18816,9 @@ namespace
       for (const auto& link : Modulation::Instance().Links())
          data.modulation.push_back({ link.first.first, link.first.second,
                                      link.second.nodeIndex, link.second.outputIndex,
-                                     link.second.polarity, link.second.depth, link.second.centre });
+                                     link.second.polarity, link.second.depth, link.second.centre,
+                                     link.second.lo, link.second.hi, link.second.hasRange,
+                                     link.second.enabled });
       for (const auto& link : PaletteBinding::Instance().Links())
          data.palette.push_back({ link.first.first, link.first.second,
                                   link.second.nodeIndex, link.second.swatchIndex });
@@ -18547,6 +18991,15 @@ namespace
             source.polarity = m.polarity;
             source.depth = m.depth;
             source.centre = m.centre;
+            // m.hasRange is only true when the file actually had lo/hi
+            // tokens (see the "mod" tag parsing in Patch.cpp) - leaving it
+            // false here is what makes ResolvedSourceFor derive the range
+            // from polarity/depth/centre the first time this destination is
+            // drawn, exactly reproducing the pre-lo/hi swing for an old patch.
+            source.lo = m.lo;
+            source.hi = m.hi;
+            source.hasRange = m.hasRange;
+            source.enabled = m.enabled;
             Modulation::Instance().RestoreLink(dst->index, m.dstParam, source);
          }
       }
@@ -25311,6 +25764,21 @@ int RunPluginScanTest()
    return 0;
 }
 
+// A destination parameter's declared min/max is a hard contract - no cable,
+// expression, or typed value can push it outside that range, because
+// everything downstream (mesh generation, buffer sizing, ...) trusts the
+// range and does not re-check it. `ref.step` additionally snaps to the
+// destination's own grid first (1.0 for an integer param, 0 = continuous)
+// so an integer param modulated to its top step lands exactly on maxValue
+// rather than one step past it, and so a value never gets clamped to a
+// non-integral point on an integer param's scale.
+float ShapeToParam(const ParamRef& ref, float v)
+{
+   if (ref.step > 0.0f)
+      v = std::round(v / ref.step) * ref.step;
+   return std::clamp(v, ref.minValue, ref.maxValue);
+}
+
 int main(int argc, char** argv)
 {
    if (getenv("INFINITE_AUDIOPARAMSWEEPTEST") != nullptr)
@@ -25598,7 +26066,8 @@ int main(int argc, char** argv)
          getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_MODTEST") != nullptr ||
          getenv("INFINITE_SIZETEST") != nullptr || getenv("INFINITE_INPUTTEST") != nullptr ||
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
-         getenv("INFINITE_PICKERTEST") != nullptr || getenv("INFINITE_OSCTEST") != nullptr;
+         getenv("INFINITE_PICKERTEST") != nullptr || getenv("INFINITE_OSCTEST") != nullptr ||
+         getenv("INFINITE_MODBOUNDSTEST") != nullptr || getenv("INFINITE_MODMATRIXTEST") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
       {
@@ -26993,6 +27462,24 @@ int main(int argc, char** argv)
             SpawnNode("Macro XY", "Modulators", 60.0f, 500.0f);
             gNodes[0].showParams = true;
          }
+         if (getenv("INFINITE_MODBOUNDSTEST") != nullptr)
+         {
+            // clampOutput=false lets this modulator's Value01() genuinely
+            // leave [0,1] on demand (see RangeToRangeNode::Value01) - the
+            // exact mechanism of the original out-of-range bug, and the
+            // simplest way to reproduce it without a real Random node.
+            SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f);
+            gNodes[0].showParams = true; // params must be drawn for them to register
+         }
+         if (getenv("INFINITE_MODMATRIXTEST") != nullptr)
+         {
+            // Range to Range, not LFO: a deterministic constantIn (like
+            // INFINITE_MODBOUNDSTEST's fixture) so the enable/disable test
+            // can force a value change on demand instead of waiting on an
+            // LFO's own period.
+            SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f);
+            gNodes[0].showParams = true; // params must be drawn for them to register
+         }
          if (getenv("INFINITE_OSCTEST") != nullptr)
          {
             // Constant -> OSC Send -> (UDP, loopback) -> OSC Receive, proving a
@@ -27650,7 +28137,6 @@ int main(int argc, char** argv)
          }
       }
 
-      Modulation::Instance().ClearFrameParams();
       PaletteBinding::Instance().ClearFrameColors();
       gDrawnParamPins.clear();
       gDrawnColorPins.clear();
@@ -27815,6 +28301,23 @@ int main(int argc, char** argv)
                                      kViewportPanelMinHeight, 800.0f, "%.0f px");
                if (ImGui::MenuItem("Close viewport panel"))
                   gViewportPanelNodes.clear();
+            }
+
+            ImGui::SeparatorText("Modulation matrix");
+            ImGui::Checkbox("Show modulation matrix", &gModMatrixOpen);
+            if (gModMatrixOpen)
+            {
+               ImGui::SetNextItemWidth(170);
+               ModMatrixDockCombo();
+               ImGui::SetNextItemWidth(170);
+               // Only the axis the current dock actually reserves - see the
+               // identical comment on the viewport panel's own sliders above.
+               if (gModMatrixDock == 1 || gModMatrixDock == 2)
+                  ImGui::SliderFloat("Width", &gModMatrixWidth,
+                                     kModMatrixMinWidth, 900.0f, "%.0f px");
+               else
+                  ImGui::SliderFloat("Height", &gModMatrixHeight,
+                                     kModMatrixMinHeight, 800.0f, "%.0f px");
             }
 
             ImGui::SeparatorText("Performance");
@@ -28282,6 +28785,10 @@ int main(int argc, char** argv)
       const bool viewportRight = viewportPanelOpen && gViewportPanelDock == 1;
       const bool viewportLeft = viewportPanelOpen && gViewportPanelDock == 2;
       const bool viewportTop = viewportPanelOpen && gViewportPanelDock == 3;
+      const bool matrixBottom = gModMatrixOpen && gModMatrixDock == 0;
+      const bool matrixRight = gModMatrixOpen && gModMatrixDock == 1;
+      const bool matrixLeft = gModMatrixOpen && gModMatrixDock == 2;
+      const bool matrixTop = gModMatrixOpen && gModMatrixDock == 3;
 
       // Drop the 3D render state of any node no longer in the panel. Done
       // here, at the top of the next frame, rather than at the moment its
@@ -28304,11 +28811,30 @@ int main(int argc, char** argv)
       // panel below its minimum indefinitely once something pushed it there.
       {
          const ImVec2 room = ImGui::GetContentRegionAvail();
-         const float maxHeight = std::max(kViewportPanelMinHeight, room.y - 150.0f);
+         // The matrix competes for the same room, so each panel's clamp
+         // subtracts the other's current footprint when they'd otherwise
+         // share a row/column - a same-side or same-row pair (e.g. both
+         // right-docked) still fits because the draw order below chains
+         // them with SameLine rather than overlapping.
+         const bool matrixHorizontal = gModMatrixOpen && (gModMatrixDock == 1 || gModMatrixDock == 2);
+         const bool matrixVertical = gModMatrixOpen && (gModMatrixDock == 0 || gModMatrixDock == 3);
+         const float maxHeight = std::max(kViewportPanelMinHeight,
+                                          room.y - 150.0f - (matrixVertical ? gModMatrixHeight : 0.0f));
          const float maxWidth = std::max(kViewportPanelMinWidth,
-                                         room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f));
+                                         room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
+                                         (matrixHorizontal ? gModMatrixWidth : 0.0f));
          gViewportPanelHeight = std::min(std::max(gViewportPanelHeight, kViewportPanelMinHeight), maxHeight);
          gViewportPanelWidth = std::min(std::max(gViewportPanelWidth, kViewportPanelMinWidth), maxWidth);
+
+         const bool viewportHorizontal = viewportPanelOpen && (gViewportPanelDock == 1 || gViewportPanelDock == 2);
+         const bool viewportVertical = viewportPanelOpen && (gViewportPanelDock == 0 || gViewportPanelDock == 3);
+         const float maxMatrixHeight = std::max(kModMatrixMinHeight,
+                                                room.y - 150.0f - (viewportVertical ? gViewportPanelHeight : 0.0f));
+         const float maxMatrixWidth = std::max(kModMatrixMinWidth,
+                                               room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
+                                               (viewportHorizontal ? gViewportPanelWidth : 0.0f));
+         gModMatrixHeight = std::min(std::max(gModMatrixHeight, kModMatrixMinHeight), maxMatrixHeight);
+         gModMatrixWidth = std::min(std::max(gModMatrixWidth, kModMatrixMinWidth), maxMatrixWidth);
       }
 
       // Measured before the top/left panels below consume any of it, so the
@@ -28321,29 +28847,52 @@ int main(int argc, char** argv)
       // dock never does. That gap is easy to forget in this budget; forgetting
       // it is exactly what grows the outer window's own scrollbar (see the
       // NoScrollbar comment on its Begin() call above).
-      const float topBottomGap = (viewportTop || viewportBottom) ? ImGui::GetStyle().ItemSpacing.y : 0.0f;
-      const float graphHeight =
-         std::max(150.0f, ImGui::GetContentRegionAvail().y -
-                             ((viewportTop || viewportBottom) ? gViewportPanelHeight + topBottomGap : 0.0f));
+      // Each top/bottom-docked panel is its own row, so each costs one extra
+      // ItemSpacing.y that a SameLine'd left/right dock never does.
+      // Undercounting this is exactly what grows the shell window's own
+      // scrollbar.
+      float topBottom = 0.0f;
+      int   topBottomRows = 0;
+      if (viewportTop || viewportBottom) { topBottom += gViewportPanelHeight; topBottomRows++; }
+      if (matrixTop  || matrixBottom)    { topBottom += gModMatrixHeight;     topBottomRows++; }
+      const float graphHeight = std::max(150.0f,
+         ImGui::GetContentRegionAvail().y - topBottom - topBottomRows * ImGui::GetStyle().ItemSpacing.y);
 
-      // Top- and left-docked viewport panels draw before the canvas: nothing
-      // else in this window reserves space above or left of it, so each has
-      // to consume its own room here, before the canvas cursor position (and
+      // Top- and left-docked panels draw before the canvas: nothing else in
+      // this window reserves space above or left of it, so each has to
+      // consume its own room here, before the canvas cursor position (and
       // gGraphScreenTL below) reflect it.
       if (viewportTop)
          DrawViewportPanelDocked("##viewportpanel_top", ImVec2(0, gViewportPanelHeight));
+      if (matrixTop)
+         DrawModMatrixDocked("##modmatrix_top", ImVec2(0, gModMatrixHeight));
       if (viewportLeft)
       {
          DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));
          ImGui::SameLine();
       }
+      if (matrixLeft)
+      {
+         DrawModMatrixDocked("##modmatrix_left", ImVec2(gModMatrixWidth, graphHeight));
+         ImGui::SameLine();
+      }
 
-      // One combined reservation for both right-docked panels, computed
+      // Cleared here rather than at the top of the frame: a top/left-docked
+      // matrix panel draws before the graph below (see the comment above),
+      // so it just read *last* frame's FrameParams above - clearing only
+      // now, after that read and before the graph repopulates it, is what
+      // lets that panel show a real (one-frame-stale) Value instead of "--"
+      // every frame. A right/bottom-docked matrix draws after the graph and
+      // is unaffected either way, since by then this frame's params are in.
+      Modulation::Instance().ClearFrameParams();
+
+      // One combined reservation for every right-docked panel, computed
       // together so ImGui's SameLine() chaining after ed::End() lays them out
       // side by side instead of one clipping the other or the two overlapping.
       float rightReserved = 0.0f;
       if (gNodePanelOpen) rightReserved += kNodePanelWidth;
       if (viewportRight) rightReserved += gViewportPanelWidth;
+      if (matrixRight) rightReserved += gModMatrixWidth;
       const float graphWidth = rightReserved > 0.0f
                                   ? std::max(200.0f, ImGui::GetContentRegionAvail().x - rightReserved)
                                   : 0.0f;
@@ -35456,6 +36005,16 @@ int main(int argc, char** argv)
                      gViewportPanelNodes.push_back(gn->index);
                }
             }
+            // Same entry point as "Open in viewport panel" above, just for a
+            // modulator source rather than an image/geometry one - opens (or
+            // just surfaces, if already open) the docked overview of every
+            // active binding, since that's the panel that shows this node's
+            // own outgoing links.
+            if (dynamic_cast<IModulator*>(gn->node.get()) != nullptr)
+            {
+               if (ImGui::MenuItem("Show modulation matrix"))
+                  gModMatrixOpen = true;
+            }
             // Same gate as "Open in viewport panel": modulators, meters,
             // cameras/lights and comments don't produce an image, so opening
             // one in its own window would just show a blank/garbage texture.
@@ -35543,6 +36102,10 @@ int main(int argc, char** argv)
       {
          ImGui::OpenPopup("##modbind");
          gOpenModBindingMenu = false;
+         gModRangeTypedField = -1;
+         gModRangeTypedText.clear();
+         gModRangeTypedPendingInit = false;
+         gModRangeTypedNoAutoSelect = false;
       }
       if (ImGui::BeginPopup("##modbind"))
       {
@@ -35555,19 +36118,163 @@ int main(int argc, char** argv)
          }
          else
          {
-            const Modulation::Source src = mod.ModulatorFor(gModBindingMenuNode, gModBindingMenuParam);
-            const bool bipolar = src.polarity == Modulation::Source::kBipolar;
-            if (ImGui::MenuItem("Absolute", nullptr, !bipolar))
-               mod.SetPolarity(gModBindingMenuNode, gModBindingMenuParam, Modulation::Source::kAbsolute, src.depth);
-            if (ImGui::MenuItem("Bipolar", nullptr, bipolar))
-               mod.SetPolarity(gModBindingMenuNode, gModBindingMenuParam, Modulation::Source::kBipolar, src.depth);
-            if (bipolar)
+            // The destination's own declared min/max/step, looked up the same
+            // way Bind() does - this frame's FrameParams, keyed by
+            // (nodeIndex, paramIndex). Needed so the fields below can be
+            // edited (and clamped) in the parameter's own units rather than
+            // the meaningless 0..1 a modulator itself deals in.
+            const ParamRef* destRef = nullptr;
+            for (const ParamRef& r : mod.FrameParams())
             {
-               float depth = src.depth;
-               ImGui::SetNextItemWidth(140.0f);
-               // -1..1, matching ModDepthNode's convention: negative inverts.
-               if (ImGui::SliderFloat("Depth", &depth, -1.0f, 1.0f, "%.2f"))
-                  mod.SetPolarity(gModBindingMenuNode, gModBindingMenuParam, Modulation::Source::kBipolar, depth);
+               if (r.nodeIndex == gModBindingMenuNode && r.paramIndex == gModBindingMenuParam)
+               {
+                  destRef = &r;
+                  break;
+               }
+            }
+            if (destRef == nullptr)
+            {
+               // The param didn't draw this frame (e.g. a collapsed node) -
+               // nothing to edit against, so just offer Unbind.
+               ImGui::TextDisabled("(parameter not visible)");
+            }
+            else
+            {
+               const Modulation::Source src = mod.ResolvedSourceFor(*destRef);
+               float lo = src.lo, hi = src.hi;
+               const bool isInt = destRef->step > 0.0f;
+               ImGui::TextUnformatted(destRef->name.c_str());
+
+               bool changed = false;
+               // Hover-and-type: matches the convention every other param
+               // field in this file uses (see gTypedParam/
+               // BeginTypedEditFromCurrent/HandleParamTypeHotkeys) instead of
+               // depending on DragFloat's own double-click/Ctrl+click
+               // text-entry, which nothing here hints exists. field 0=lo,
+               // 1=hi. Double-clicking a field, or hovering it and typing a
+               // digit/'-', swaps it for a focused text box seeded from
+               // either the current value or the keystroke.
+               auto drawField = [&](int field, const char* dragId, const char* typedId,
+                                    const char* fmt, float& v)
+               {
+                  if (gModRangeTypedField == field)
+                  {
+                     ImGui::SetNextItemWidth(90.0f);
+                     if (gModRangeTypedJustOpened)
+                     {
+                        ImGui::SetKeyboardFocusHere();
+                        gModRangeTypedJustOpened = false;
+                     }
+                     char buf[64];
+                     snprintf(buf, sizeof(buf), "%s", gModRangeTypedText.c_str());
+                     const bool entered = ImGui::InputText(typedId, buf, sizeof(buf),
+                                                            ImGuiInputTextFlags_EnterReturnsTrue);
+                     gModRangeTypedText = buf;
+                     // Same race BeginTypedEditFromCurrent's comment
+                     // describes: InputText's own select-all only runs once
+                     // it's confirmed active, which can land a frame after
+                     // SetKeyboardFocusHere - relying on that timing instead
+                     // of driving selection explicitly is what made typing
+                     // over the seeded digit unreliable (append instead of
+                     // replace, needing extra digits to "overwrite" it).
+                     if (gModRangeTypedPendingInit && ImGui::IsItemActive())
+                     {
+                        if (ImGuiInputTextState* state = ImGui::GetInputTextState(ImGui::GetItemID()))
+                        {
+                           if (gModRangeTypedNoAutoSelect)
+                           {
+                              state->Stb.cursor = state->CurLenW;
+                              state->ClearSelection();
+                           }
+                           else
+                           {
+                              state->SelectAll();
+                           }
+                        }
+                        gModRangeTypedPendingInit = false;
+                     }
+                     if (entered || ImGui::IsItemDeactivated())
+                     {
+                        char* end = nullptr;
+                        const float parsed = strtof(gModRangeTypedText.c_str(), &end);
+                        if (end != gModRangeTypedText.c_str())
+                        {
+                           v = parsed;
+                           changed = true;
+                        }
+                        gModRangeTypedField = -1;
+                        gModRangeTypedText.clear();
+                        gModRangeTypedPendingInit = false;
+                        gModRangeTypedNoAutoSelect = false;
+                     }
+                  }
+                  else
+                  {
+                     ImGui::SetNextItemWidth(90.0f);
+                     const float step = isInt ? 1.0f : (destRef->maxValue - destRef->minValue) * 0.01f;
+                     changed |= ImGui::DragFloat(dragId, &v, step, destRef->minValue, destRef->maxValue, fmt);
+                     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                     {
+                        char seed[64];
+                        snprintf(seed, sizeof(seed), isInt ? "%.0f" : "%.3f", v);
+                        gModRangeTypedField = field;
+                        gModRangeTypedText = seed;
+                        gModRangeTypedJustOpened = true;
+                        gModRangeTypedPendingInit = true;
+                        gModRangeTypedNoAutoSelect = false;
+                     }
+                     else if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
+                     {
+                        std::string seed;
+                        for (int k = 0; k < 10; k++)
+                        {
+                           if (ImGui::IsKeyPressed((ImGuiKey)(ImGuiKey_0 + k), false))
+                           {
+                              seed = std::string(1, char('0' + k));
+                              break;
+                           }
+                        }
+                        if (seed.empty() && ImGui::IsKeyPressed(ImGuiKey_Minus, false))
+                           seed = "-";
+                        if (!seed.empty())
+                        {
+                           gModRangeTypedField = field;
+                           gModRangeTypedText = seed;
+                           gModRangeTypedJustOpened = true;
+                           gModRangeTypedPendingInit = true;
+                           gModRangeTypedNoAutoSelect = true;
+                        }
+                     }
+                  }
+               };
+               drawField(0, "##lo", "##lotyped", isInt ? "lo %.0f" : "lo %.3f", lo);
+               ImGui::SameLine();
+               drawField(1, "##hi", "##hityped", isInt ? "hi %.0f" : "hi %.3f", hi);
+
+               if (changed)
+               {
+                  lo = std::clamp(lo, destRef->minValue, destRef->maxValue);
+                  hi = std::clamp(hi, destRef->minValue, destRef->maxValue);
+                  if (isInt)
+                  {
+                     lo = std::round(lo);
+                     hi = std::round(hi);
+                  }
+                  mod.SetRange(gModBindingMenuNode, gModBindingMenuParam, lo, hi);
+               }
+               ImGui::Separator();
+               if (ImGui::MenuItem("Full range"))
+                  mod.SetRange(gModBindingMenuNode, gModBindingMenuParam, destRef->minValue, destRef->maxValue);
+               if (ImGui::MenuItem("Around current"))
+               {
+                  const float span = (destRef->maxValue - destRef->minValue) * 0.25f;
+                  const float centre = destRef->value != nullptr ? *destRef->value : src.centre;
+                  mod.SetRange(gModBindingMenuNode, gModBindingMenuParam,
+                              std::clamp(centre - span, destRef->minValue, destRef->maxValue),
+                              std::clamp(centre + span, destRef->minValue, destRef->maxValue));
+               }
+               if (ImGui::MenuItem("Invert"))
+                  mod.SetRange(gModBindingMenuNode, gModBindingMenuParam, src.hi, src.lo);
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Unbind"))
@@ -36244,12 +36951,22 @@ int main(int argc, char** argv)
          DrawViewportPanelDocked("##viewportpanel_right", ImVec2(gViewportPanelWidth, graphHeight));
       }
 
+      // Right-docked matrix panel, chained after the viewport panel the same
+      // way.
+      if (matrixRight)
+      {
+         ImGui::SameLine();
+         DrawModMatrixDocked("##modmatrix_right", ImVec2(gModMatrixWidth, graphHeight));
+      }
+
       // Bottom-docked viewport panel: a fresh, full-width row below the
       // canvas (and below the row above, if that one drew anything) rather
       // than same-line - see the graphHeight calc above ed::Begin(), which
       // already reserved this space.
       if (viewportBottom)
          DrawViewportPanelDocked("##viewportpanel_bottom", ImVec2(0, gViewportPanelHeight));
+      if (matrixBottom)
+         DrawModMatrixDocked("##modmatrix_bottom", ImVec2(0, gModMatrixHeight));
 
       ImGui::End();
 
@@ -36580,9 +37297,11 @@ int main(int argc, char** argv)
          {
             if (ref.value == nullptr)
                continue;
-            const Modulation::Source src = modulation.ModulatorFor(ref.nodeIndex, ref.paramIndex);
+            const Modulation::Source src = modulation.ResolvedSourceFor(ref);
             if (src.nodeIndex >= 0)
             {
+               if (!src.enabled)
+                  continue;   // binding intact, just not written this frame
                // A wired modulator always wins over a typed expression - see
                // Modulation::SetExpression.
                GraphNode* modNode = FindNodeByIndex(src.nodeIndex);
@@ -36593,29 +37312,14 @@ int main(int argc, char** argv)
                   continue;
                // Value01() is documented to return 0..1, but InvertNode and
                // RangeToRangeNode (clampOutput=false) deliberately violate
-               // that on purpose, and a kAbsolute binding lets them
-               // extrapolate past the destination's declared range instead
-               // of being silently flattened at the edge - see
-               // docs/plans/modulators/00-modulation-polarity.md §4. So,
-               // unlike before, v01 is not force-clamped here.
-               const float v01 = modulator->Value01();
-               if (src.polarity == Modulation::Source::kBipolar)
-               {
-                  // Swings around wherever the knob was sitting when the
-                  // cable landed (src.centre, captured once at Bind()/patch-
-                  // load time - see Modulation::Bind), rather than overriding
-                  // the parameter outright the way kAbsolute does. Clamped to
-                  // the destination's range: unlike kAbsolute, "push past the
-                  // knob's own range" isn't a meaningful ask for a control
-                  // that's still centred on a value inside it.
-                  const float swung =
-                     src.centre + (v01 - 0.5f) * 2.0f * src.depth * (ref.maxValue - ref.minValue);
-                  *ref.value = std::min(ref.maxValue, std::max(ref.minValue, swung));
-               }
-               else
-               {
-                  *ref.value = ref.minValue + (ref.maxValue - ref.minValue) * v01;
-               }
+               // that on purpose as a signal-shaping tool - see
+               // docs/plans/modulators/00-modulation-polarity.md §4. That's
+               // fine as long as it stays a signal between modulator nodes:
+               // clamping v01 here means it can no longer reach past
+               // src.lo/src.hi into a destination param, which is a hard
+               // contract (see ShapeToParam).
+               const float v01 = std::clamp(modulator->Value01(), 0.0f, 1.0f);
+               *ref.value = ShapeToParam(ref, src.lo + (src.hi - src.lo) * v01);
                continue;
             }
             const std::string* expr = modulation.ExpressionFor(ref.nodeIndex, ref.paramIndex);
@@ -36643,7 +37347,7 @@ int main(int argc, char** argv)
             if (hadHi) siblings["hi"] = prevHi; else siblings.erase("hi");
             if (evaluated)
             {
-               *ref.value = std::min(std::max(result, ref.minValue), ref.maxValue);
+               *ref.value = ShapeToParam(ref, result);
                modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, std::string());
             }
             else
@@ -36824,6 +37528,265 @@ int main(int argc, char** argv)
          }
          if (frameId == 44)
             glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+
+      if (getenv("INFINITE_MODBOUNDSTEST") != nullptr)
+      {
+         static int sidesParam = -1;
+         static int rotParam = -1;
+         static bool test1Ok = false, test2Ok = false, test3Ok = true;
+         static int test5RotIdx = -1, test5NodeIdx = -1;
+         auto* shape = static_cast<ShapeNode*>(gNodes[0].node.get());
+         auto* r2r = static_cast<RangeToRangeNode*>(gNodes[2].node.get());
+         Modulation& mod = Modulation::Instance();
+
+         if (frameId == 1)
+         {
+            for (const ParamRef& ref : mod.FrameParams())
+            {
+               if (ref.nodeIndex == gNodes[0].index && ref.name == "sides") sidesParam = ref.paramIndex;
+               if (ref.nodeIndex == gNodes[0].index && ref.name == "rotation") rotParam = ref.paramIndex;
+            }
+            printf("sides param=%d rotation param=%d\n", sidesParam, rotParam);
+            // Modulator returning 4.0 (out of [0,1], the pre-fix crash case):
+            // constantIn=1 maps through inLow..inHigh=0..1 to outLow..outHigh.
+            r2r->outLow = -2.0f;
+            r2r->outHigh = 4.0f;
+            r2r->constantIn = 1.0f;
+            r2r->clampOutput = false;
+            mod.Bind(gNodes[0].index, sidesParam, gNodes[2].index);
+         }
+         if (frameId == 5)
+         {
+            // Test 1: a modulator returning 4.0 must still land sides inside
+            // [3,20] and integral, even though nothing clamps Value01() itself.
+            // Check the raw backing slot (see ModSliderInt/gIntParamStore),
+            // not just the rounded-and-clamped int it copies back to - that
+            // catches ShapeToParam failing to snap/clamp, not just
+            // ModSliderInt's own redundant safety net masking it.
+            const float slot = gIntParamStore[{ gNodes[0].index, sidesParam }];
+            test1Ok = shape->sides >= 3 && shape->sides <= 20 &&
+                      slot >= 3.0f && slot <= 20.0f &&
+                      std::fabs(slot - std::round(slot)) < 1e-5f;
+            printf("test1 (out-of-range-high) sides=%d slot=%.4f  %s\n", shape->sides, slot,
+                   test1Ok ? "OK" : "- BUG");
+            // Now the -2.0 case.
+            r2r->constantIn = 0.0f; // -> outLow = -2.0
+         }
+         if (frameId == 8)
+         {
+            // Test 2: a modulator returning -2.0 must land at exactly minValue.
+            test2Ok = shape->sides == 3;
+            printf("test2 (out-of-range-low) sides=%d  %s\n", shape->sides,
+                   test2Ok ? "OK" : "- BUG");
+            // Narrow the binding to lo=5,hi=9 and sweep a clean 0..1 modulator
+            // across it - every resulting value must land in {5,6,7,8,9}.
+            // Reconfiguring here takes two frames to become visible in
+            // shape->sides (one for Bind/SetRange's effect to reach the apply
+            // loop, one for ModSliderInt to copy the rounded slot back into
+            // the int) - confirmed empirically against test1/test2's own
+            // wider buffers - so the sweep below sets a value and checks it
+            // two frames later rather than on the same frame.
+            mod.SetRange(gNodes[0].index, sidesParam, 5.0f, 9.0f);
+            r2r->outLow = 0.0f;
+            r2r->outHigh = 1.0f;
+            r2r->clampOutput = true;
+            r2r->constantIn = 0.0f; // -> sides = 5
+         }
+         const float sweep[] = { 0.25f, 0.5f, 0.75f, 1.0f };
+         if (frameId == 10 || frameId == 12 || frameId == 14 || frameId == 16)
+         {
+            if (shape->sides < 5 || shape->sides > 9)
+               test3Ok = false;
+            r2r->constantIn = sweep[(frameId - 10) / 2];
+         }
+         if (frameId == 18)
+         {
+            if (shape->sides < 5 || shape->sides > 9)
+               test3Ok = false;
+            printf("test3 (lo=5 hi=9 sweep) sides=%d  %s\n", shape->sides,
+                   test3Ok ? "OK" : "- BUG");
+            SavePatchTo(TmpPath("infinite_modboundstest.infinite"));
+         }
+         if (frameId == 20)
+         {
+            NewPatch();
+            LoadPatchFrom(TmpPath("infinite_modboundstest.infinite"));
+         }
+         if (frameId == 22)
+         {
+            // Test 4: save/reload must reproduce the same lo/hi exactly - the
+            // record's hasRange was already true before saving, so this reads
+            // straight off the loaded Source with no derivation involved.
+            int reloadedSides = -1;
+            int reloadedNodeIdx = -1;
+            for (GraphNode& gn : gNodes)
+            {
+               if (dynamic_cast<ShapeNode*>(gn.node.get()) != nullptr)
+                  reloadedNodeIdx = gn.index;
+            }
+            for (const ParamRef& ref : mod.FrameParams())
+            {
+               if (ref.nodeIndex == reloadedNodeIdx && ref.name == "sides") reloadedSides = ref.paramIndex;
+            }
+            const Modulation::Source reloaded = mod.ModulatorFor(reloadedNodeIdx, reloadedSides);
+            const bool test4Ok = reloaded.hasRange &&
+                                  std::fabs(reloaded.lo - 5.0f) < 1e-4f &&
+                                  std::fabs(reloaded.hi - 9.0f) < 1e-4f;
+            printf("test4 (save/reload) hasRange=%d lo=%.3f hi=%.3f  %s\n",
+                   reloaded.hasRange, reloaded.lo, reloaded.hi, test4Ok ? "OK" : "- BUG");
+
+            // Test 5: a legacy record (only polarity/depth/centre, no lo/hi -
+            // hasRange false) must derive the identical swing on first draw
+            // that the old bipolar behaviour produced.
+            int rotIdx = -1;
+            for (const ParamRef& ref : mod.FrameParams())
+            {
+               if (ref.nodeIndex == reloadedNodeIdx && ref.name == "rotation") rotIdx = ref.paramIndex;
+            }
+            Modulation::Source legacy;
+            legacy.nodeIndex = gNodes[2].index;
+            legacy.outputIndex = 0;
+            legacy.polarity = Modulation::Source::kBipolar;
+            legacy.depth = 0.3f;
+            legacy.centre = 10.0f;
+            legacy.hasRange = false;
+            mod.RestoreLink(reloadedNodeIdx, rotIdx, legacy);
+            test5RotIdx = rotIdx;
+            test5NodeIdx = reloadedNodeIdx;
+         }
+         if (frameId == 24)
+         {
+            // A couple of frames after RestoreLink, ModSlider has drawn
+            // rotation modulated and called ResolvedSourceFor, converting it -
+            // matching the same two-frame lag as everything else here.
+            const Modulation::Source resolved = mod.ModulatorFor(test5NodeIdx, test5RotIdx);
+            const float expectedLo = 10.0f - 0.3f * 360.0f;
+            const float expectedHi = 10.0f + 0.3f * 360.0f;
+            const bool test5Ok = resolved.hasRange &&
+                                 std::fabs(resolved.lo - expectedLo) < 1e-3f &&
+                                 std::fabs(resolved.hi - expectedHi) < 1e-3f;
+            printf("test5 (legacy bipolar derive) hasRange=%d lo=%.3f hi=%.3f expected lo=%.3f hi=%.3f  %s\n",
+                   resolved.hasRange, resolved.lo, resolved.hi, expectedLo, expectedHi,
+                   test5Ok ? "OK" : "- BUG");
+            // No self-close here: INFINITE_EXITAFTER owns closing the window
+            // and flushing stdout (see its handler below) - a self-close
+            // would race it and drop this frame's printf output when stdout
+            // is fully-buffered (i.e. always, once redirected to a file).
+            printf("%s\n", (test1Ok && test2Ok && test3Ok) ? "MOD BOUNDS TEST OK" : "SUSPECT");
+         }
+      }
+
+      if (getenv("INFINITE_MODMATRIXTEST") != nullptr)
+      {
+         static int sidesParam = -1;
+         static bool test1Ok = false, test2Ok = false, test3Ok = false, test4Ok = false;
+         static int sidesAtDisable = 0;
+         static bool movedWhileEnabled = false;
+         auto* shape = static_cast<ShapeNode*>(gNodes[0].node.get());
+         auto* r2r = static_cast<RangeToRangeNode*>(gNodes[2].node.get());
+         Modulation& mod = Modulation::Instance();
+
+         if (frameId == 1)
+         {
+            for (const ParamRef& ref : mod.FrameParams())
+               if (ref.nodeIndex == gNodes[0].index && ref.name == "sides")
+                  sidesParam = ref.paramIndex;
+            printf("sides param=%d\n", sidesParam);
+            r2r->outLow = 3.0f;
+            r2r->outHigh = 20.0f;
+            r2r->clampOutput = true;
+            r2r->constantIn = 0.0f; // -> sides = 3
+            mod.Bind(gNodes[0].index, sidesParam, gNodes[2].index);
+         }
+         if (frameId == 3)
+         {
+            // Test 1: the binding exists and Links() reports it, matching
+            // what the matrix table iterates.
+            test1Ok = mod.Links().size() == 1 &&
+                      mod.ModulatorFor(gNodes[0].index, sidesParam).nodeIndex == gNodes[2].index;
+            printf("test1 (link exists) links=%zu  %s\n", mod.Links().size(),
+                   test1Ok ? "OK" : "- BUG");
+            gNodes[0].showParams = false; // collapse the modulated node
+         }
+         if (frameId == 5)
+         {
+            // Test 2: KnownParam is sticky - it must still resolve the
+            // destination's name/range even though this collapsed node
+            // registered nothing in FrameParams this frame.
+            bool registeredThisFrame = false;
+            for (const ParamRef& ref : mod.FrameParams())
+               if (ref.nodeIndex == gNodes[0].index && ref.paramIndex == sidesParam)
+                  registeredThisFrame = true;
+            const ParamRef* known = mod.KnownParam(gNodes[0].index, sidesParam);
+            test2Ok = !registeredThisFrame && known != nullptr && known->name == "sides";
+            printf("test2 (sticky KnownParam while collapsed) registered=%d known=%p name=%s  %s\n",
+                   registeredThisFrame, (const void*)known, known ? known->name.c_str() : "(null)",
+                   test2Ok ? "OK" : "- BUG");
+            gNodes[0].showParams = true; // reopen
+            r2r->constantIn = 1.0f; // -> sides should move towards 20 while still enabled
+         }
+         if (frameId == 8)
+         {
+            // Positive control: prove the binding actually drives the
+            // value while enabled, so freezing it after disable (below)
+            // means something.
+            movedWhileEnabled = shape->sides != 3;
+            printf("moved while enabled: sides=%d %s\n", shape->sides,
+                   movedWhileEnabled ? "MOVED" : "DID NOT MOVE");
+            mod.SetEnabled(gNodes[0].index, sidesParam, false);
+            sidesAtDisable = shape->sides;
+            r2r->constantIn = 0.0f; // try to pull it back to 3 - must have no effect once disabled
+         }
+         if (frameId == 13)
+         {
+            // Test 3: a disabled binding stops being written - sides must
+            // still be exactly what it was the frame it was disabled, even
+            // though the modulator driving it (now aimed back at the other
+            // end of its range) keeps changing.
+            test3Ok = movedWhileEnabled && shape->sides == sidesAtDisable;
+            printf("test3 (disabled freezes value) at=%d now=%d  %s\n",
+                   sidesAtDisable, shape->sides, test3Ok ? "OK" : "- BUG");
+            SavePatchTo(TmpPath("infinite_modmatrixtest.infinite"));
+            // Also check the RemoteControl JSON export carries enabled=false
+            // through PatchJson::ToJson - the text patch and the JSON view
+            // must agree.
+            nlohmann::json out = PatchJson::ToJson(BuildPatchData());
+            bool jsonEnabledFalse = false;
+            for (const auto& m : out["modulation"])
+            {
+               if (m["dstIndex"] == gNodes[0].index && m["dstParam"] == sidesParam)
+                  jsonEnabledFalse = (m["enabled"] == false);
+            }
+            printf("test4a (json enabled=false) %s\n", jsonEnabledFalse ? "OK" : "- BUG");
+            test4Ok = jsonEnabledFalse;
+         }
+         if (frameId == 15)
+         {
+            NewPatch();
+            LoadPatchFrom(TmpPath("infinite_modmatrixtest.infinite"));
+         }
+         if (frameId == 17)
+         {
+            // Test 4 (continued): the text patch round-trip must reproduce
+            // the same disabled binding.
+            int reloadedNodeIdx = -1, reloadedSidesParam = -1;
+            for (GraphNode& gn : gNodes)
+               if (dynamic_cast<ShapeNode*>(gn.node.get()) != nullptr)
+                  reloadedNodeIdx = gn.index;
+            for (const ParamRef& ref : mod.FrameParams())
+               if (ref.nodeIndex == reloadedNodeIdx && ref.name == "sides")
+                  reloadedSidesParam = ref.paramIndex;
+            const Modulation::Source reloaded = mod.ModulatorFor(reloadedNodeIdx, reloadedSidesParam);
+            const bool textEnabledFalse = !reloaded.enabled;
+            printf("test4b (text patch enabled=false) %s\n", textEnabledFalse ? "OK" : "- BUG");
+            test4Ok = test4Ok && textEnabledFalse;
+
+            // No self-close here: INFINITE_EXITAFTER owns closing the window
+            // and flushing stdout - see the identical comment on
+            // INFINITE_MODBOUNDSTEST above.
+            printf("%s\n", (test1Ok && test2Ok && test3Ok && test4Ok) ? "MOD MATRIX TEST OK" : "SUSPECT");
+         }
       }
 
       if (getenv("INFINITE_OSCTEST") != nullptr)

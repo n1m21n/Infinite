@@ -210,9 +210,26 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
    for (const CableRecord& c : data.notes)
       file << "note " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const ModRecord& m : data.modulation)
+   {
       file << "mod " << m.dstIndex << " " << m.dstParam << " "
            << m.srcIndex << " " << m.srcOutput << " "
-           << m.polarity << " " << FloatToString(m.depth) << " " << FloatToString(m.centre) << "\n";
+           << m.polarity << " " << FloatToString(m.depth) << " " << FloatToString(m.centre);
+      // Only ever omitted for a binding that was loaded from a pre-lo/hi
+      // patch and never actually drawn a frame before being saved again
+      // (so EnsureRange never ran) - see ModRecord::hasRange. Everything
+      // else always has a resolved range by the time it's saved.
+      // enabled is positional and trails lo/hi, so a disabled binding that
+      // hasn't resolved a range yet still needs one written to carry
+      // enabled at all - force hasRange so the tokens line up.
+      const bool hasRange = m.hasRange || !m.enabled;
+      if (hasRange)
+      {
+         file << " " << FloatToString(m.lo) << " " << FloatToString(m.hi);
+         if (!m.enabled)
+            file << " 0";
+      }
+      file << "\n";
+   }
    for (const PaletteRecord& p : data.palette)
       file << "pal " << p.dstIndex << " " << p.dstColor << " "
            << p.srcIndex << " " << p.srcSwatch << "\n";
@@ -355,6 +372,18 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          m.depth = 1.0f;
          m.centre = 0.0f;
          in >> m.dstIndex >> m.dstParam >> m.srcIndex >> m.srcOutput >> m.polarity >> m.depth >> m.centre;
+         // lo/hi are a later addition still; missing on any patch saved
+         // before they existed (or a legacy binding this session never
+         // resolved a range for - see the write site), where >>'s
+         // failed-extraction behaviour leaves them at 0/0 and hasRange
+         // false - the field comment on ModRecord::hasRange covers what
+         // happens next (lazy derivation from polarity/depth/centre).
+         m.hasRange = static_cast<bool>(in >> m.lo >> m.hi);
+         // enabled trails lo/hi and is only ever written alongside them;
+         // missing (any older patch, or a patch saved before this field
+         // existed) leaves it at its default of true.
+         int enabled = 1;
+         m.enabled = !(in >> enabled) || enabled != 0;
          outData.modulation.push_back(m);
       }
       else if (tag == "pal")

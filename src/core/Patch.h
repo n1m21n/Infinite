@@ -27,12 +27,22 @@ class INode;
 //   geo <dstIndex> <dstSlot> <srcIndex>
 //   aud <dstIndex> <dstSlot> <srcIndex>
 //   note <dstIndex> <dstSlot> <srcIndex>
-//   mod <dstIndex> <dstParam> <srcIndex> <srcOutput> <polarity> <depth> <centre>
+//   mod <dstIndex> <dstParam> <srcIndex> <srcOutput> <polarity> <depth> <centre> [<lo> <hi> [<enabled>]]
 //     polarity/depth/centre are trailing additions (per-binding modulation
 //     polarity - see Modulation::Source): missing on older patches, where
 //     >>'s failed-extraction behaviour leaves them at their defaults
 //     (polarity 0 = absolute, depth 1.0, centre 0.0), i.e. today's override
 //     behaviour, unchanged.
+//     lo/hi are a further trailing addition (the destination-units range a
+//     binding writes into its target - see Modulation::Source::lo/hi):
+//     missing on any patch saved before this field existed, in which case
+//     ModRecord::hasRange is left false and the range is derived from
+//     polarity/depth/centre the first time the destination is drawn (see
+//     Modulation::ResolvedSourceFor) rather than read from the file.
+//     enabled is the last, and only ever written alongside lo/hi (never on
+//     its own, since the tokens are positional and a lone enabled token
+//     would decode as lo) - missing on any older patch, where it defaults
+//     to true, matching a binding that has always been written.
 //   pal <dstIndex> <dstColor> <srcIndex> <srcSwatch>
 //   expr <dstIndex> <dstParam> <expression text to end of line>
 //   glob <name> <expression text to end of line>
@@ -76,6 +86,18 @@ namespace Patch
       int polarity = 0;
       float depth = 1.0f;
       float centre = 0.0f;
+      // Destination-units range this binding writes into - see
+      // Modulation::Source::lo/hi. hasRange is false only when this record
+      // was read from a patch saved before lo/hi existed (no tokens present
+      // on the "mod" line), in which case lo/hi below are left at their
+      // defaults and must NOT be trusted - the range is derived from
+      // polarity/depth/centre lazily instead. See the format comment above.
+      float lo = 0.0f;
+      float hi = 0.0f;
+      bool hasRange = false;
+      // See Modulation::Source::enabled. Only meaningful (and only ever
+      // written) alongside lo/hi - see the format comment above.
+      bool enabled = true;
    };
 
    // A palette node driving one colour swatch on another node.
