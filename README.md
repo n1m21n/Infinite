@@ -1,5 +1,7 @@
 # Infinite
 
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
+
 A unified node-based audiovisual modular workstation for **macOS** and **Windows**. Real-time GPU image and video compositing, procedural 3D geometry and simulation, and a full modular synthesizer and DSP rack with plugin hosting (Audio Unit on macOS; VST3 hosting on both platforms, on by default — see below) — all interconnected through a universal modulation graph.
 
 Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeSynth/BespokeSynth)'s module system — a registry of node types, typed cables, and a pull-based cook-once-per-frame DAG — extended across GPU textures, procedural geometry, and real-time audio buffers.
