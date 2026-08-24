@@ -3714,15 +3714,26 @@ namespace
 
    void DrawShapeParams(ShapeNode* n)
    {
+      // Not every shape uses corner/sides/inner ratio - e.g. a Circle has no
+      // corners and no sides, a Triangle's side count is fixed at 3. Hide the
+      // params a shape ignores so the panel doesn't show dead controls.
+      // Keep in sync with the uShape switch in ShapeNode.cpp's fragment shader.
+      const bool usesCorner = n->shapeType == 3 || n->shapeType == 7 || n->shapeType == 9 || n->shapeType == 18;
+      const bool usesSides = n->shapeType == 5 || n->shapeType == 6 || n->shapeType == 14 || n->shapeType == 19;
+      const bool usesInner = n->shapeType == 6 || n->shapeType == 14 || n->shapeType == 15 || n->shapeType == 16;
+
       DropdownButton("shape", ShapeNode::ShapeNames(), n->shapeType,
                      [n](int i) { n->shapeType = i; });
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModSlider("size x", &n->sizeX, 0.01f, 1.0f);
       ModSlider("size y", &n->sizeY, 0.01f, 1.0f);
-      ModSlider("corner/thick", &n->cornerRadius, 0.0f, 0.3f);
-      ModSliderInt("sides", &n->sides, 3, 20);
-      ModSlider("inner ratio", &n->innerRatio, 0.05f, 1.0f);
+      if (usesCorner)
+         ModSlider("corner/thick", &n->cornerRadius, 0.0f, 0.3f);
+      if (usesSides)
+         ModSliderInt("sides", &n->sides, 3, 20);
+      if (usesInner)
+         ModSlider("inner ratio", &n->innerRatio, 0.05f, 1.0f);
       ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
       ModSlider("pos x", &n->posX, 0.0f, 1.0f);
       ModSlider("pos y", &n->posY, 0.0f, 1.0f);
