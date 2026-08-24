@@ -27505,6 +27505,10 @@ int main(int argc, char** argv)
       else if (wantsFixture)
       {
          SpawnNode("Shape", "Source", 60.0f, 60.0f);
+         // Default shapeType (0, circle) doesn't use the "sides" param, so it
+         // never registers - several tests below look it up by name. Use a
+         // polygon shape type so "sides" is always present in the fixture.
+         static_cast<ShapeNode*>(gNodes[0].node.get())->shapeType = 5;
          if (getenv("INFINITE_RESYNTHTEST") != nullptr)
          {
             SpawnNode("Resynthesize", "Resynth", 380.0f, 60.0f);
