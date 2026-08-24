@@ -17139,6 +17139,7 @@ namespace
             // Source in place, but Unbind erases it - break immediately
             // after that fires rather than continuing to iterate a map
             // that just lost the element the for-loop machinery is on.
+            int rowCount = 0;
             for (const auto& link : mod.Links())
             {
                const int dstIndex = link.first.first;
@@ -17151,6 +17152,7 @@ namespace
 
                ImGui::PushID(dstIndex * 1000 + dstParam);
                ImGui::TableNextRow();
+               rowCount++;
 
                // Resolve against this frame's ParamRef when the destination
                // drew this frame (the same lazy legacy-conversion pass the
@@ -17274,6 +17276,25 @@ namespace
 
                if (unbound)
                   break; // just erased from the map this loop is iterating
+            }
+
+            // Grid lines only run as far down as there are real rows to draw
+            // them between - the user wants the horizontal lines filled in
+            // the rest of the way regardless, like a spreadsheet, rather
+            // than having the ruled area grow every time a binding is added.
+            // Pad out with empty rows until the table's own borders reach
+            // the bottom of the panel.
+            const float rowH = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().CellPadding.y * 2.0f;
+            const float used = rowH * (rowCount + 1); // +1 for the header row
+            const int fillerRows = (int)std::max(0.0f, (panelSize.y - used) / rowH);
+            for (int i = 0; i < fillerRows; ++i)
+            {
+               ImGui::TableNextRow();
+               for (int col = 0; col < 9; ++col)
+               {
+                  ImGui::TableNextColumn();
+                  ImGui::Dummy(ImVec2(1.0f, ImGui::GetTextLineHeight()));
+               }
             }
 
             ImGui::EndTable();
