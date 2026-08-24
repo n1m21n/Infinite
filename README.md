@@ -1,12 +1,6 @@
-# This Fork
-This fork is completed vibe-coded and it was made to run entirely on Windows. I will not be maintaining this to keep up with the current version. I don't own a Mac so I can't see what the official version actually looks like so if there are any immediate bugs please notify me. Theoretically this can also run on Mac. 
-
-
-
-
 # Infinite
 
-A unified node-based audiovisual modular workstation for **macOS** and **Windows**. Real-time GPU image and video compositing, procedural 3D geometry and simulation, and a full modular synthesizer and DSP rack with plugin hosting (Audio Unit on macOS; VST3 hosting available as an opt-in build flag, see below) — all interconnected through a universal modulation graph.
+A unified node-based audiovisual modular workstation for **macOS** and **Windows**. Real-time GPU image and video compositing, procedural 3D geometry and simulation, and a full modular synthesizer and DSP rack with plugin hosting (Audio Unit on macOS; VST3 hosting on both platforms, on by default — see below) — all interconnected through a universal modulation graph.
 
 Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeSynth/BespokeSynth)'s module system — a registry of node types, typed cables, and a pull-based cook-once-per-frame DAG — extended across GPU textures, procedural geometry, and real-time audio buffers.
 
@@ -32,7 +26,7 @@ Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeS
 | **3D Scene & Rendering** | **Camera** (FOV, orbit, perspective/orthographic), **Light** (directional, point, spot, ambient), **HDRI** (32-bit float .hdr / .exr equirectangular image-based lighting and reflections), **Material** (Cook-Torrance GGX PBR, roughness, metallic, emission), **Displacement**, **Mapping**, **Render 3D** (ACES tonemapping, multisampled AA up to 8x, shared interactive orbit viewport) |
 | **Synths & Sound Generators** | **Wavetable** (12 factory tables, 8 morphable frames, bandlimited mip levels, sub-oscillator, unison detune, filter, ADSR envelope), **Metallic** (modal physical modeling resonator for bells, plates, tubes, mallets, damping, and dispersion), **Granular** (real-time granular texture engine with grain size, jitter, spray, density, speed, and pitch randomization), **PaulStretch** (spectral extreme time-stretching for ambient soundscapes), **Sampler** (multi-folder disk scanning, root note pitch tracking, loop points), **Drum Sequencer** (8-track step sequencer with lane mutes/solos, swing, and pattern chaining), **Oscillator** (multi-waveform analog oscillator) |
 | **Notes & MIDI** | **MIDI Notes** (live USB/Bluetooth MIDI keyboard and controller input with clock sync), **Note Stack**, **Arpeggiator** (tempo-synced with multiple patterns and octave ranges), **Note Sequencer**, **Random Note Generator**, **Chorder**, **Note Strum**, **Bouncing Balls** (physics-based polyphonic note generator), **Note Transpose**, **Pitch Bend**, **Velocity Curve**, **Gate**, **Humanizer**, **Quantizer**, **Glide**, **Note Echo**, **Note Router**, **Note Capturer** |
-| **Audio Effects & DSP** | **Plugin** (hosts third-party **Audio Unit [AU]** plugins, and **VST3** plugins when built with `-DINFINITE_ENABLE_VST3=ON` — see below — with native GUI windows and mapped modulatable params), **Audio Filter** (analog-modeled LP/HP/BP/Notch), **EQ** (multi-band parametric equalizer with interactive curve visualizer), **Dynamics** (compressor/expander/gate with gain reduction meter), **Limiter** (lookahead brickwall limiter), **Delay** (tempo-synced stereo ping-pong), **Reverb** (algorithmic diffusion), **Drive** (tube saturation and distortion), **Stereo** (width enhancer and Haas imager), **Pitch Shifter**, **Frequency Shifter** (Bode frequency shift), **Chorus**, **Flanger**, **Phaser**, **Bitcrush**, **Transient Shaper**, **Stutter**, **Ring Mod**, **Tremolo**, **Formant Filter** (vowel morphing A-E-I-O-U), **Wavetable Shaper** |
+| **Audio Effects & DSP** | **Plugin** (hosts third-party **Audio Unit [AU]** plugins, and **VST3** plugins (on by default; build with `-DINFINITE_ENABLE_VST3=OFF` to drop it — see below) with native GUI windows and mapped modulatable params), **Audio Filter** (analog-modeled LP/HP/BP/Notch), **EQ** (multi-band parametric equalizer with interactive curve visualizer), **Dynamics** (compressor/expander/gate with gain reduction meter), **Limiter** (lookahead brickwall limiter), **Delay** (tempo-synced stereo ping-pong), **Reverb** (algorithmic diffusion), **Drive** (tube saturation and distortion), **Stereo** (width enhancer and Haas imager), **Pitch Shifter**, **Frequency Shifter** (Bode frequency shift), **Chorus**, **Flanger**, **Phaser**, **Bitcrush**, **Transient Shaper**, **Stutter**, **Ring Mod**, **Tremolo**, **Formant Filter** (vowel morphing A-E-I-O-U), **Wavetable Shaper** |
 | **Audio Utility & Routing** | **Gain**, **Audio In**, **Audio Out**, **Mixer** (multi-channel summing), **Splitter** (signal fan-out), **Blend Audio**, **Envelope** (multi-stage ADSR generator), **Note to CV**, **Audio to CV** (envelope and pitch follower) |
 | **Modulators & CV** | **LFO** (tempo-synced waveforms), **Random**, **Pattern** (8-step CV sequence), **Math**, **Compare**, **Range to Range**, **Smoothing** (lag generator), **Invert**, **Mod Depth**, **Mod Curve**, **CV to Pitch**, **Macro Knob**, **Macro XY** (recordable and loopable 2D path pad), **MIDI CC**, **MIDI Trigger**, **Path** (6 geometric trajectory curves), **Constant**, **Image Analyze** (video-to-CV extraction), **Audio Analyze** (8-band FFT spectrum and onset extraction), **Audio File** |
 | **Output** | **Output** (PNG export + hardware-accelerated H.264/MOV video recording with synchronized audio soundtrack), **Syphon Out** (zero-copy real-time GPU video broadcaster to OBS, Resolume, MadMapper, TouchDesigner, etc.) |
@@ -60,7 +54,7 @@ Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeS
 - **PaulStretch**: Real-time phase-randomized spectral FFT time-stretching turning any sample into lush ambient textures without shifting pitch.
 - **Multi-Sample Player & Drum Sequencer**: Multi-folder background sample scanning, automatic root note pitch tracking, 8-track drum machine with per-lane samples and swing.
 
-### 4. Audio Unit (AU) Plugin Hosting, with Optional VST3
+### 4. Audio Unit (AU) Plugin Hosting, with VST3 On by Default
 - **Native Third-Party Hosting**: Drag AU plugins directly onto the canvas or select from the auto-indexed **Plugins** library.
 - **Floating Native Editor Windows**: Plugins open in their native graphical interface.
 - **Parameter Mapping & Modulation**: Enable **configure**, touch any control in the plugin window, and it exposes an automated slider with its own modulation pin on the node canvas.
@@ -196,7 +190,7 @@ src/
 
 - **`INode`**: Core interface implemented by all nodes, providing `CookIfNeeded(frameId)` with memoised DAG execution.
 - **`AudioNode` & `IEffectKernel`**: Thread-safe audio processing nodes running inside a realtime CoreAudio pull callback.
-- **`AudioPluginNode`**: Thread-safe AU (always) / VST3 (opt-in build) plugin host bridging GUI parameter automation with the audio callback.
+- **`AudioPluginNode`**: Thread-safe AU (always) / VST3 (default build) plugin host bridging GUI parameter automation with the audio callback.
 - **`GLUtil` & `Mesh`**: Shader compilation, FBO caching, vertex buffers, and instanced OpenGL 3.2 rendering.
 
 ---
