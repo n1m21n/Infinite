@@ -1,5 +1,11 @@
 // Windows resources for Infinite.exe.
 //
+// Generated from Infinite.rc.in by CMake's configure_file() - do not edit the
+// generated .rc directly, edit this template. The version block comes from
+// INFINITE_VERSION/INFINITE_VERSION_RC in CMakeLists.txt, so it can't drift
+// from the macOS bundle version or the in-app update checker's baseline the
+// way a hand-maintained literal here did before.
+//
 // Without an icon resource the exe gets the generic Win32 application icon in
 // Explorer, the taskbar and Alt-Tab. IDI_ICON1 being the LOWEST-numbered icon
 // resource is what makes Explorer pick it as the file's display icon, so keep
@@ -12,10 +18,12 @@
 
 #include <windows.h>
 
-IDI_ICON1 ICON "Infinite.ico"
+// Absolute path: this generated .rc lives in the build directory, not next
+// to Infinite.ico, so a relative reference would fail to resolve.
+IDI_ICON1 ICON "@CMAKE_CURRENT_SOURCE_DIR@/src/platform/win/Infinite.ico"
 
-#define INFINITE_VERSION      0,2,0,0
-#define INFINITE_VERSION_STR  "0.2.0.0"
+#define INFINITE_VERSION      @INFINITE_VERSION_RC@
+#define INFINITE_VERSION_STR  "@INFINITE_VERSION_RC_STR@"
 
 VS_VERSION_INFO VERSIONINFO
    FILEVERSION    INFINITE_VERSION

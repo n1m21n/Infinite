@@ -75,6 +75,11 @@ namespace
 #include "core/NoteCable.h"
 #include "core/RemoteControl.h"
 #include "core/PatchJson.h"
+#include "core/UpdateCheck.h"
+
+#ifndef INFINITE_VERSION_STRING
+#define INFINITE_VERSION_STRING "0.0.0"
+#endif
 #include "nodes/ImageSourceNode.h"
 #include "nodes/ShapeNode.h"
 #include "nodes/FormulaNode.h"
@@ -26174,6 +26179,11 @@ int main(int argc, char** argv)
    // explicit Rescan.
    gPluginScanner.LoadFromDisk();
 
+   // One GitHub Releases request, once per launch - see src/core/UpdateCheck.h.
+   // No-ops under the self-test env vars, so headless/CI runs never touch
+   // the network.
+   UpdateCheck::Start();
+
    static std::string iniPath = settingsDir.empty() ? std::string("imgui.ini")
                                                     : settingsDir + "/imgui.ini";
    static std::string graphPath = settingsDir.empty() ? std::string("Infinite.json")
@@ -27800,6 +27810,9 @@ int main(int argc, char** argv)
       // thread only.
       PollAudioRecovery();
 
+      // Update-checker worker handoff - once a frame, main thread only.
+      UpdateCheck::Poll();
+
       // Per-frame audio housekeeping off the audio thread (currently just
       // freeing sample-preview buffers the audio thread has retired) - see
       // AudioEngine::PumpMainThread.
@@ -28760,6 +28773,8 @@ int main(int argc, char** argv)
                gGlobalsOpen = true;
             if (ImGui::MenuItem("Help / module reference"))
                gHelpOpen = true;
+            if (ImGui::MenuItem("Check for updates"))
+               UpdateCheck::Start(); // manual re-check for anyone who dismissed the badge
 
             ImGui::Separator();
             if (ImGui::MenuItem("Quit"))
@@ -28968,6 +28983,34 @@ int main(int argc, char** argv)
          const float itemGap = ImGui::GetStyle().ItemSpacing.x * 4.0f;
          const float searchX = readoutX - searchWidth - itemGap;
          const float audioX = searchX - audioWidth - itemGap;
+
+         // Update badge, one more link to the left of audioX in the same
+         // right-to-left chain. Rendered only when an update is actually
+         // available - the slot collapses entirely otherwise, so the common
+         // case costs nothing visually and doesn't disturb audioX/searchX/
+         // readoutX's positions.
+         if (UpdateCheck::UpdateAvailable())
+         {
+            const char* updateLabel = "update available";
+            const float updateWidth = ImGui::CalcTextSize(updateLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+            const float updateX = audioX - updateWidth - itemGap;
+
+            ImGui::SameLine(updateX);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.95f, 0.75f, 0.35f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.82f, 0.42f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.85f, 0.65f, 0.28f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.12f, 0.10f, 0.02f, 1.0f));
+            if (ImGui::Button(updateLabel))
+               Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/#download");
+            ImGui::PopStyleColor(4);
+            if (ImGui::IsItemHovered())
+            {
+               ImGui::SetTooltip("version %s is available (you have %s) - click to download",
+                                  UpdateCheck::LatestVersion().c_str(), INFINITE_VERSION_STRING);
+            }
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               UpdateCheck::Dismiss();
+         }
 
          {
             const ImVec4 audioColor = !audioEngineOn ? ImVec4(0.55f, 0.55f, 0.58f, 1.0f)
@@ -38464,6 +38507,7 @@ int main(int argc, char** argv)
 
    CloseAllProjectorWindows();
    AudioEngine::Instance().Stop();
+   UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
    gNodes.clear();
    ed::DestroyEditor(gEditor);
    ImGui_ImplOpenGL3_Shutdown();

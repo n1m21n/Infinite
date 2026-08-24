@@ -20,6 +20,9 @@
 
 set -uo pipefail
 
+# Headless/CI: never let UpdateCheck::Start() make a network call.
+export INFINITE_NO_UPDATE_CHECK=1
+
 BIN="${1:?usage: headless-tests.sh <path-to-infinite-binary>}"
 
 if [ ! -x "$BIN" ]; then

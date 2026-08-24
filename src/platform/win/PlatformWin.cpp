@@ -10,7 +10,9 @@
 
 #include "WinCommon.h"
 
+#include <shellapi.h>
 #include <shlobj.h>
+#include <winhttp.h>
 #include <wrl/client.h>
 
 #include <algorithm>
@@ -198,6 +200,21 @@ namespace
    {
       return (float)f.value + (float)f.fract / 65536.0f;
    }
+
+   // Closes a WinHTTP handle on every exit path (including early returns on
+   // error) without goto-cleanup. HttpGet() opens up to four of these
+   // (session/connect/request, plus the implicit ones WinHttp owns) and each
+   // one leaks a handle if a single error path forgets to close it.
+   struct WinHttpHandleGuard
+   {
+      HINTERNET handle = nullptr;
+      WinHttpHandleGuard() = default;
+      explicit WinHttpHandleGuard(HINTERNET h) : handle(h) {}
+      ~WinHttpHandleGuard() { if (handle) WinHttpCloseHandle(handle); }
+      WinHttpHandleGuard(const WinHttpHandleGuard&) = delete;
+      WinHttpHandleGuard& operator=(const WinHttpHandleGuard&) = delete;
+      operator HINTERNET() const { return handle; }
+   };
 }
 
 namespace Platform
@@ -635,5 +652,128 @@ namespace Platform
       // all platforms; double-click-to-open associations were implemented
       // with Apple Events and have no Windows counterpart wired up yet.
       return false;
+   }
+
+   // ---- networking (update checker) ----------------------------------------
+
+   void OpenExternalUrl(const std::string& url)
+   {
+      if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
+         return;
+
+      const std::wstring wideUrl = WinCommon::Utf8ToWide(url);
+      ShellExecuteW(nullptr, L"open", wideUrl.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+   }
+
+   bool HttpGet(const std::string& url, const std::string& userAgent,
+                std::string& outBody, std::string& outError,
+                int timeoutSeconds)
+   {
+      outBody.clear();
+      outError.clear();
+
+      const bool isHttps = url.rfind("https://", 0) == 0;
+      if (!isHttps && url.rfind("http://", 0) != 0)
+      {
+         outError = "url must be http(s)";
+         return false;
+      }
+
+      URL_COMPONENTS parts;
+      ZeroMemory(&parts, sizeof(parts));
+      parts.dwStructSize = sizeof(parts);
+      wchar_t hostBuf[256] = {};
+      wchar_t pathBuf[2048] = {};
+      parts.lpszHostName = hostBuf;
+      parts.dwHostNameLength = (DWORD)(sizeof(hostBuf) / sizeof(hostBuf[0]));
+      parts.lpszUrlPath = pathBuf;
+      parts.dwUrlPathLength = (DWORD)(sizeof(pathBuf) / sizeof(pathBuf[0]));
+
+      const std::wstring wideUrl = WinCommon::Utf8ToWide(url);
+      if (!WinHttpCrackUrl(wideUrl.c_str(), 0, 0, &parts))
+      {
+         outError = "malformed url";
+         return false;
+      }
+
+      WinHttpHandleGuard session(WinHttpOpen(WinCommon::Utf8ToWide(userAgent).c_str(),
+         WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
+      if (!session.handle)
+      {
+         outError = "WinHttpOpen failed";
+         return false;
+      }
+
+      const int timeoutMs = timeoutSeconds * 1000;
+      WinHttpSetTimeouts(session, timeoutMs, timeoutMs, timeoutMs, timeoutMs);
+
+      WinHttpHandleGuard connect(WinHttpConnect(session, parts.lpszHostName, parts.nPort, 0));
+      if (!connect.handle)
+      {
+         outError = "WinHttpConnect failed";
+         return false;
+      }
+
+      WinHttpHandleGuard request(WinHttpOpenRequest(connect, L"GET", parts.lpszUrlPath,
+         nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+         isHttps ? WINHTTP_FLAG_SECURE : 0));
+      if (!request.handle)
+      {
+         outError = "WinHttpOpenRequest failed";
+         return false;
+      }
+
+      if (!WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+             WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+          !WinHttpReceiveResponse(request, nullptr))
+      {
+         outError = "request failed (network or TLS error)";
+         return false;
+      }
+
+      DWORD statusCode = 0;
+      DWORD statusSize = sizeof(statusCode);
+      WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+         WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
+      if (statusCode < 200 || statusCode >= 300)
+      {
+         outError = "http status " + std::to_string((long)statusCode);
+         return false;
+      }
+
+      static constexpr size_t kMaxBodyBytes = 1 * 1024 * 1024;
+      std::string body;
+      for (;;)
+      {
+         DWORD available = 0;
+         if (!WinHttpQueryDataAvailable(request, &available))
+         {
+            outError = "WinHttpQueryDataAvailable failed";
+            return false;
+         }
+         if (available == 0)
+            break;
+
+         if (body.size() + available > kMaxBodyBytes)
+         {
+            outError = "response exceeded size cap";
+            return false;
+         }
+
+         size_t oldSize = body.size();
+         body.resize(oldSize + available);
+         DWORD read = 0;
+         if (!WinHttpReadData(request, &body[oldSize], available, &read))
+         {
+            outError = "WinHttpReadData failed";
+            return false;
+         }
+         body.resize(oldSize + read);
+         if (read == 0)
+            break;
+      }
+
+      outBody = std::move(body);
+      return true;
    }
 }
