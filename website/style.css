@@ -208,6 +208,17 @@ body {
   font-size: var(--font-size-small);
 }
 
+.btn-icon {
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .btn-lg {
   padding: 12px 28px;
   font-size: var(--font-size-medium);
