@@ -6735,6 +6735,7 @@ namespace
       ImVec2 pR; // release end (Rx, 0.0)
       float x0, topY, baseY, spanY;
       float wA, wD, wShelf, wR;
+      float timeW; // usable width minus the shelf - what wA/wD/wR are drawn from
    };
 
    inline ADSRLayout ComputeADSRLayout(ImVec2 origin, float w, float h, float attackMs, float decayMs,
@@ -6756,6 +6757,7 @@ namespace
       // Proportional sustain plateau representing key-held state (18% of usable width)
       l.wShelf = std::clamp(usableW * 0.18f, 14.0f, 36.0f);
       const float timeW = usableW - l.wShelf;
+      l.timeW = timeW;
 
       // Perceptual duration power curve (t^0.45): provides balanced visual proportion across 0..4000ms
       auto PowWeight = [&](float ms) {
@@ -6763,14 +6765,44 @@ namespace
          return std::pow(t01, 0.45f);
       };
 
-      const float wA_raw = PowWeight(attackMs) + 0.08f;
-      const float wD_raw = PowWeight(decayMs) + 0.08f;
-      const float wR_raw = PowWeight(releaseMs) + 0.08f;
+      const float wA_raw = PowWeight(attackMs);
+      const float wD_raw = PowWeight(decayMs);
+      const float wR_raw = PowWeight(releaseMs);
       const float totalW = wA_raw + wD_raw + wR_raw;
 
-      l.wA = (wA_raw / totalW) * timeW;
-      l.wD = (wD_raw / totalW) * timeW;
-      l.wR = (wR_raw / totalW) * timeW;
+      if (totalW <= 0.0f)
+      {
+         // A=D=R=0: nothing to distribute. Lay the shape out as a vertical
+         // rise, the shelf, and a vertical fall instead of dividing by zero.
+         l.wA = 0.0f;
+         l.wD = 0.0f;
+         l.wR = 0.0f;
+      }
+      else
+      {
+         // A 0 ms stage gets exactly 0 width - no floor, so it reads as a
+         // true vertical edge instead of a fake sliver of slope.
+         l.wA = attackMs > 0.0f ? (wA_raw / totalW) * timeW : 0.0f;
+         l.wD = decayMs > 0.0f ? (wD_raw / totalW) * timeW : 0.0f;
+         l.wR = releaseMs > 0.0f ? (wR_raw / totalW) * timeW : 0.0f;
+
+         // Per-stage pixel floor so a short-but-nonzero stage stays
+         // grabbable, applied only to the nonzero stages, then rescaled so
+         // the three still sum to timeW.
+         const float kMinPx = 2.0f;
+         if (attackMs > 0.0f) l.wA = std::max(l.wA, kMinPx);
+         if (decayMs > 0.0f) l.wD = std::max(l.wD, kMinPx);
+         if (releaseMs > 0.0f) l.wR = std::max(l.wR, kMinPx);
+
+         const float flooredSum = l.wA + l.wD + l.wR;
+         if (flooredSum > 0.0f)
+         {
+            const float scale = timeW / flooredSum;
+            l.wA *= scale;
+            l.wD *= scale;
+            l.wR *= scale;
+         }
+      }
 
       const float ax = l.x0 + l.wA;
       const float dx = ax + l.wD;
@@ -6852,9 +6884,32 @@ namespace
             const float d0 = ImLengthSqr(ImVec2(layout.pA.x - m.x, layout.pA.y - m.y));
             const float d1 = ImLengthSqr(ImVec2(layout.pD.x - m.x, layout.pD.y - m.y));
             const float d3 = ImLengthSqr(ImVec2(layout.pR.x - m.x, layout.pR.y - m.y));
-            float best = d0; sHeld = 0;
-            if (d1 < best) { best = d1; sHeld = 1; }
-            if (d3 < best) { best = d3; sHeld = 3; }
+            // Zero-width stages can land two handles on the same point (or
+            // within a couple px of each other once the floor in
+            // ComputeADSRLayout stops padding them apart). Plain nearest-wins
+            // with a strict "<" always resolves those ties to attack, which
+            // makes the decay handle permanently ungrabbable. Break ties by
+            // preferring whichever candidate's current time value is
+            // smaller, so a collapsed stack hands you the zero-length stage
+            // first and dragging right immediately grows it.
+            struct Candidate { float dist; int handle; float timeVal; };
+            Candidate cands[3] = {
+               { std::sqrt(d0), 0, *attackMs },
+               { std::sqrt(d1), 1, *decayMs },
+               { std::sqrt(d3), 3, *releaseMs },
+            };
+            int bestIdx = 0;
+            for (int i = 1; i < 3; i++)
+            {
+               const float kTieEpsPx = 2.0f;
+               if (cands[i].dist < cands[bestIdx].dist - kTieEpsPx)
+                  bestIdx = i;
+               else if (cands[i].dist < cands[bestIdx].dist + kTieEpsPx &&
+                        cands[i].timeVal < cands[bestIdx].timeVal)
+                  bestIdx = i;
+            }
+            sHeld = cands[bestIdx].handle;
+            float best = cands[bestIdx].dist * cands[bestIdx].dist;
             if (best > 160.0f && m.x >= layout.pD.x && m.x <= layout.pS.x)
             {
                sHeld = 2; // sustain plateau
@@ -6870,7 +6925,11 @@ namespace
 
          auto AdjustTime = [&](float initialVal, float deltaX) -> float {
             float curWeight = std::pow(std::clamp(initialVal / maxTimeMs, 0.0f, 1.0f), 0.45f);
-            curWeight = std::clamp(curWeight + deltaX / (w * 0.45f), 0.0f, 1.0f);
+            // Scale the drag by the width actually available to the three
+            // stages (timeW), not the whole widget width - w also includes
+            // the padding and the sustain shelf, so a drag was previously
+            // undershooting the pixels the handle is actually moving across.
+            curWeight = std::clamp(curWeight + deltaX / (layout.timeW * 0.45f), 0.0f, 1.0f);
             return std::pow(curWeight, 2.222f) * maxTimeMs;
          };
 
@@ -6895,44 +6954,60 @@ namespace
          layout = ComputeADSRLayout(origin, w, h, *attackMs, *decayMs, *sustain, *releaseMs, maxTimeMs);
       }
 
-      // Build smooth multi-segment curve points (Attack rise, Exponential Decay, Sustain shelf, Exponential Release)
+      // Build multi-segment curve points (Attack rise, Decay, Sustain shelf,
+      // Release). Linear segments - both Envelope::Process (AudioVoice.h)
+      // and EnvelopeNode::Value01 (ModulatorNodes.cpp) step linearly, so a
+      // curved display would be drawing a shape the audio never makes.
       std::vector<ImVec2> curvePts;
-      curvePts.reserve(36);
+      curvePts.reserve(24);
 
-      // 1. Attack curve (smooth rise)
-      const int kAttSteps = 6;
-      for (int i = 0; i <= kAttSteps; i++)
+      // 1. Attack. A zero-width stage emits just its two endpoints - a
+      // stack of coincident interpolated points at the same x antialiases
+      // into a fuzzy vertical bar instead of a crisp vertical edge.
+      curvePts.push_back(ImVec2(layout.x0, layout.baseY));
+      if (layout.pA.x - layout.x0 >= 0.5f)
       {
-         const float u = (float)i / (float)kAttSteps;
-         const float px = layout.x0 + u * (layout.pA.x - layout.x0);
-         const float py = layout.baseY - std::pow(u, 0.90f) * layout.spanY;
-         curvePts.push_back(ImVec2(px, py));
+         const int kAttSteps = 6;
+         for (int i = 1; i < kAttSteps; i++)
+         {
+            const float u = (float)i / (float)kAttSteps;
+            const float px = layout.x0 + u * (layout.pA.x - layout.x0);
+            const float py = layout.baseY - u * layout.spanY;
+            curvePts.push_back(ImVec2(px, py));
+         }
       }
+      curvePts.push_back(layout.pA);
 
-      // 2. Decay curve (analog exponential decay)
-      const int kDecSteps = 10;
-      for (int i = 1; i <= kDecSteps; i++)
+      // 2. Decay.
+      if (layout.pD.x - layout.pA.x >= 0.5f)
       {
-         const float u = (float)i / (float)kDecSteps;
-         const float px = layout.pA.x + u * (layout.pD.x - layout.pA.x);
-         const float expFactor = (1.0f - std::exp(-2.8f * u)) / (1.0f - std::exp(-2.8f));
-         const float py = layout.topY + expFactor * (layout.pD.y - layout.topY);
-         curvePts.push_back(ImVec2(px, py));
+         const int kDecSteps = 10;
+         for (int i = 1; i < kDecSteps; i++)
+         {
+            const float u = (float)i / (float)kDecSteps;
+            const float px = layout.pA.x + u * (layout.pD.x - layout.pA.x);
+            const float py = layout.topY + u * (layout.pD.y - layout.topY);
+            curvePts.push_back(ImVec2(px, py));
+         }
       }
+      curvePts.push_back(layout.pD);
 
       // 3. Sustain shelf
       curvePts.push_back(layout.pS);
 
-      // 4. Release curve (analog exponential decay to zero)
-      const int kRelSteps = 10;
-      for (int i = 1; i <= kRelSteps; i++)
+      // 4. Release.
+      if (layout.pR.x - layout.pS.x >= 0.5f)
       {
-         const float u = (float)i / (float)kRelSteps;
-         const float px = layout.pS.x + u * (layout.pR.x - layout.pS.x);
-         const float expFactor = (1.0f - std::exp(-2.8f * u)) / (1.0f - std::exp(-2.8f));
-         const float py = layout.pS.y + expFactor * (layout.baseY - layout.pS.y);
-         curvePts.push_back(ImVec2(px, py));
+         const int kRelSteps = 10;
+         for (int i = 1; i < kRelSteps; i++)
+         {
+            const float u = (float)i / (float)kRelSteps;
+            const float px = layout.pS.x + u * (layout.pR.x - layout.pS.x);
+            const float py = layout.pS.y + u * (layout.baseY - layout.pS.y);
+            curvePts.push_back(ImVec2(px, py));
+         }
       }
+      curvePts.push_back(layout.pR);
 
       // Draw glowing shaded fill under curve
       dl->PathClear();
@@ -6970,6 +7045,21 @@ namespace
 
       dl->PopClipRect();
       dl->AddRect(origin, br, (hovered || active) ? IM_COL32(110, 140, 180, 255) : ScopeBorderCol(), 4.0f);
+
+      // State the panel's timebase so the fit-to-width layout is honest
+      // instead of hidden: without this, a 200 ms envelope and an 8 s
+      // envelope draw identically.
+      {
+         const float totalMs = *attackMs + *decayMs + *releaseMs;
+         char timeText[24];
+         if (totalMs >= 1000.0f)
+            snprintf(timeText, sizeof(timeText), "%.1f s", totalMs / 1000.0f);
+         else
+            snprintf(timeText, sizeof(timeText), "%.0f ms", totalMs);
+         const ImVec2 tsz = ImGui::CalcTextSize(timeText);
+         dl->AddText(ImVec2(br.x - 6.0f - tsz.x, br.y - 4.0f - tsz.y),
+                     isLight ? IM_COL32(60, 68, 85, 160) : IM_COL32(140, 150, 172, 140), timeText);
+      }
 
       // Rich Readout & Status info
       if (hovered || active)
@@ -9971,11 +10061,49 @@ namespace
       static bool sPluginSearchSeeded = false;
       if (!sPluginSearchSeeded)
       {
-         sPluginSearchSeeded = true;
          if (const char* seed = getenv("INFINITE_PLUGINDRAGTEST_SEARCH"))
          {
             strncpy(pluginSearch, seed, sizeof(pluginSearch) - 1);
             pluginSearch[sizeof(pluginSearch) - 1] = '\0';
+            sPluginSearchSeeded = true;
+         }
+         else if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
+         {
+            // Narrow the list to a single row before the drag gesture runs.
+            // With every installed plugin listed, PluginScanner::PollResults
+            // can swap the whole index in between the row the fixture
+            // latched onto and the row actually under the cursor when the
+            // drag starts, landing the drop on a different plugin (same
+            // manufacturer, different name) than the one that was expected.
+            // A one-row list removes the swap target entirely. Wait for the
+            // scan to settle with at least one result before picking it.
+            if (!gPluginScanner.IsScanning() && !gPluginScanner.Index().empty())
+            {
+               auto countMatches = [&](const std::string& query) {
+                  std::string ql = query;
+                  std::transform(ql.begin(), ql.end(), ql.begin(), ::tolower);
+                  int n = 0;
+                  for (const PluginScanner::Entry& e : gPluginScanner.Index())
+                  {
+                     std::string hay = e.name + " " + e.manufacturer;
+                     std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+                     if (hay.find(ql) != std::string::npos)
+                        n++;
+                  }
+                  return n;
+               };
+               const PluginScanner::Entry& first = gPluginScanner.Index()[0];
+               std::string query = first.name;
+               if (countMatches(query) != 1)
+                  query = first.name + " " + first.manufacturer;
+               strncpy(pluginSearch, query.c_str(), sizeof(pluginSearch) - 1);
+               pluginSearch[sizeof(pluginSearch) - 1] = '\0';
+               sPluginSearchSeeded = true;
+            }
+         }
+         else
+         {
+            sPluginSearchSeeded = true;
          }
       }
       ImGui::SetNextItemWidth(-1.0f);
@@ -28236,7 +28364,7 @@ int main(int argc, char** argv)
             sRowCenter = ImVec2((gPluginDragTestRowRect.x + gPluginDragTestRowRect.z) * 0.5f,
                                 (gPluginDragTestRowRect.y + gPluginDragTestRowRect.w) * 0.5f);
             sTargetScreen = gPluginDragTestTargetScreen;
-            sExpectedId = gPluginDragTestRowId;
+            sExpectedId.clear();
             sPhase = 1;
             sPhaseFrame = frameId;
             gTestMouse = sRowCenter;
@@ -28256,6 +28384,13 @@ int main(int argc, char** argv)
             const float f = std::min(1.0f, (float)(frameId - sPhaseFrame) / 6.0f);
             gTestMouse = ImVec2(sRowCenter.x + (sTargetScreen.x - sRowCenter.x) * f,
                                 sRowCenter.y + (sTargetScreen.y - sRowCenter.y) * f);
+            // Latched here, at the moment the drag actually starts (the
+            // panel sets gPluginDragDesc from IsMouseDragging, not from the
+            // phase-0 row snapshot), rather than pre-latched before the
+            // button press - this is what removes the swap window instead
+            // of just narrowing it.
+            if (sExpectedId.empty() && !gPluginDragDesc.identifier.empty())
+               sExpectedId = gPluginDragDesc.identifier;
             if (frameId >= sPhaseFrame + 8)
             {
                btn(false);
@@ -28266,6 +28401,8 @@ int main(int argc, char** argv)
          else if (sPhase == 3)
          {
             gTestMouse = sTargetScreen;
+            if (sExpectedId.empty() && !gPluginDragDesc.identifier.empty())
+               sExpectedId = gPluginDragDesc.identifier;
             if (frameId >= sPhaseFrame + 3)
             {
                auto* pluginNode = static_cast<AudioPluginNode*>(gNodes[0].node.get());
@@ -38498,7 +38635,15 @@ int main(int argc, char** argv)
             if (getenv("INFINITE_MEDIADRAGTEST") != nullptr && gMediaDragTestPhase == 0)
                printf("MEDIADRAGTEST FAIL (timed out waiting for a usable row)\n");
             if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr && gPluginDragTestPhase == 0)
-               printf("PLUGINDRAGTEST FAIL (timed out waiting for a usable row)\n");
+            {
+               // An empty plugin index isn't a failure of the drag
+               // mechanism - it just means this host has nothing installed
+               // to drag.
+               if (gPluginScanner.Index().empty())
+                  printf("PLUGINDRAGTEST SKIP (no plugins installed on this host)\n");
+               else
+                  printf("PLUGINDRAGTEST FAIL (timed out waiting for a usable row)\n");
+            }
             fflush(stdout);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
