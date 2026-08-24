@@ -219,6 +219,7 @@ set(COMMON_SOURCES
     src/nodes/Text3DNode.cpp
     src/nodes/UtilityNodes.cpp
     src/nodes/PathNode.cpp
+    src/nodes/GeometryTableNode.cpp
     src/nodes/OceanNode.cpp
     src/nodes/SimulationNodes.cpp
     src/nodes/GenerativeNodes.cpp
