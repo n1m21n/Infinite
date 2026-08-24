@@ -545,10 +545,9 @@ AudioAnalyzeNode::AudioAnalyzeNode()
    }
 }
 
-AudioAnalyzeNode::~AudioAnalyzeNode()
-{
-   // The audio tap is process-wide; leave it running for any other audio nodes.
-}
+// ~AudioAnalyzeNode, AudioNodeForNotePorts and CookIfNeeded all need
+// AudioAnalyzerAudioNode complete, so they are defined below its class body
+// rather than here.
 
 const char* AudioAnalyzeNode::OutputLabel(int index) const
 {
@@ -584,8 +583,8 @@ void AudioAnalyzeNode::Stop()
 
 bool AudioAnalyzeNode::IsRunning() const
 {
-   if (fileSource != nullptr)
-      return fileSource->IsLoaded();
+   if (input.IsConnected())
+      return true; // a patched source is always "running" - it just may be silent
    return Platform::AudioIsRunning();
 }
 
@@ -613,49 +612,6 @@ float AudioAnalyzeNode::Value(int index) const
    return std::min(1.0f, std::max(0.0f, v * gain));
 }
 
-void AudioAnalyzeNode::CookIfNeeded(int frameId)
-{
-   if (mLastCookFrame == frameId)
-      return;
-   mLastCookFrame = frameId;
-
-   Platform::AudioSetSmoothing(attack, release);
-   Platform::AudioSetGain(1.0f);
-
-   Platform::AudioLevels levels;
-   bool running = false;
-   if (fileSource != nullptr)
-   {
-      fileSource->CookIfNeeded(frameId);
-      levels = fileSource->Levels();
-      running = fileSource->IsLoaded();
-   }
-   else
-   {
-      running = Platform::AudioRead(levels);
-   }
-
-   const double now = Transport::Instance().Seconds();
-   const double dt = std::max(0.0, std::min(0.25, now - mLastSeconds));
-   mLastSeconds = now;
-
-   if (running)
-   {
-      mLevels = levels;
-      // Onset is a one-shot flag; stretch it into a decaying envelope so it is
-      // actually usable as a modulation source.
-      if (levels.onset)
-         mOnsetEnvelope = 1.0f;
-      else if (onsetHold > 0.0f)
-         mOnsetEnvelope = std::max(0.0f, mOnsetEnvelope - (float)(dt / onsetHold));
-      else
-         mOnsetEnvelope = 0.0f;
-   }
-   else
-   {
-      mOnsetEnvelope = 0.0f;
-   }
-}
 
 // ============================================================== Audio File
 //
@@ -675,28 +631,38 @@ namespace
    constexpr int kFileVolumeParam = 0;
    constexpr int kFileGainParam = 1;
 
-   constexpr int kFileFftLog2 = 10; // 1024-point FFT, same size Platform.mm's live analyser used
-   constexpr int kFileFftSize = 1 << kFileFftLog2;
-   constexpr int kFileSpectrumSize = kFileFftSize / 2;
+   constexpr int kAnalysisFftLog2 = 10; // 1024-point FFT, same size Platform.mm's live analyser used
+   constexpr int kAnalysisFftSize = 1 << kAnalysisFftLog2;
+   constexpr int kAnalysisSpectrumSize = kAnalysisFftSize / 2;
 }
 
-class AudioFilePlayerAudioNode : public AudioNode
+// The FFT level/band/onset analysis that used to live inline in
+// AudioFilePlayerAudioNode, lifted out so AudioAnalyzerAudioNode (Audio
+// Analyze's own audio-thread half) can run the identical analysis on whatever
+// audio cable is patched into it. Both callers get the same numbers for the
+// same signal, which is the point: an Audio File analysed through a cable must
+// read exactly as it did through the old fileSource pointer.
+//
+// Owns its FFT setup, so construct and destroy it on the main thread only.
+// Push()/RunIfWindowFull() are the audio-thread half and obey the AudioNode
+// real-time contract - every buffer is a fixed-size member, nothing allocates.
+// ReadLevels() is the main-thread reader; see the double-buffer publish at the
+// bottom of RunIfWindowFull for why that is safe without a lock.
+class SpectrumAnalyser
 {
 public:
-   AudioFilePlayerAudioNode()
+   SpectrumAnalyser()
    {
-      // FFT setup allocates - main thread only, at construction, never on
-      // the audio thread (mirrors PaulStretchNode's mFftSetup lifetime).
 #if defined(__APPLE__)
-      mFftSetup = vDSP_create_fftsetup(kFileFftLog2, FFT_RADIX2);
-      vDSP_hann_window(mWindow, kFileFftSize, vDSP_HANN_NORM);
+      mFftSetup = vDSP_create_fftsetup(kAnalysisFftLog2, FFT_RADIX2);
+      vDSP_hann_window(mWindow, kAnalysisFftSize, vDSP_HANN_NORM);
 #else
-      mFft.Prepare(kFileFftLog2);
-      PortableFft::HannWindowNorm(mWindow, kFileFftSize);
+      mFft.Prepare(kAnalysisFftLog2);
+      PortableFft::HannWindowNorm(mWindow, kAnalysisFftSize);
 #endif
    }
 
-   ~AudioFilePlayerAudioNode() override
+   ~SpectrumAnalyser()
    {
 #if defined(__APPLE__)
       if (mFftSetup != nullptr)
@@ -704,9 +670,177 @@ public:
 #endif
    }
 
+   void SetSampleRate(double sampleRate) { mSampleRate = sampleRate; }
+
+   void SetSmoothing(float attack, float release)
+   {
+      mAttack.store(std::clamp(attack, 0.01f, 1.0f), std::memory_order_relaxed);
+      mRelease.store(std::clamp(release, 0.005f, 1.0f), std::memory_order_relaxed);
+   }
+
+   // Audio thread. Drops the accumulated window so a new source's spectrum
+   // doesn't bleed into the previous one's readings.
+   void Reset()
+   {
+      mRingWrite = 0;
+      mRingCount = 0;
+      mPrevFlux = 0.0f;
+      std::memset(mPrevMagnitude, 0, sizeof(mPrevMagnitude));
+      mSmoothed = Platform::AudioLevels();
+   }
+
+   void Push(float s)
+   {
+      mRing[mRingWrite] = s;
+      mRingWrite = (mRingWrite + 1) % kAnalysisFftSize;
+      if (mRingCount < kAnalysisFftSize)
+         mRingCount++;
+   }
+
+   // Main thread. Latest published analysis snapshot.
+   Platform::AudioLevels ReadLevels() const
+   {
+      Platform::AudioLevels out = mLevelsPublish[mLevelsReady.load(std::memory_order_acquire)];
+      // Onset is a one-shot flag: read-and-clear here (rather than letting
+      // the audio thread clear it after publishing) so a fast analysis
+      // cadence relative to CookIfNeeded's once-a-frame reads can never
+      // drop one - matches Platform.mm's old ReadFrom() contract exactly.
+      out.onset = mOnsetPending.exchange(false, std::memory_order_acq_rel);
+      return out;
+   }
+
+   // Runs the same FFT-based analysis Platform.mm's ProcessInto used to run
+   // on the tap callback, over the most recent kAnalysisFftSize samples, once
+   // enough have arrived. Every buffer here is a fixed-size member - no
+   // allocation on this, the audio thread.
+   void RunIfWindowFull()
+   {
+      if (mRingCount < kAnalysisFftSize)
+         return;
+
+      for (int i = 0; i < kAnalysisFftSize; i++)
+         mLinear[i] = mRing[(mRingWrite + i) % kAnalysisFftSize];
+
+      float rms = 0.0f, peak = 0.0f;
+      for (int i = 0; i < kAnalysisFftSize; i++)
+      {
+         const float v = mLinear[i];
+         rms += v * v;
+         peak = std::max(peak, std::fabs(v));
+      }
+      rms = std::sqrt(rms / (float)kAnalysisFftSize);
+
+#if defined(__APPLE__)
+      vDSP_vmul(mLinear, 1, mWindow, 1, mWindowedScratch, 1, kAnalysisFftSize);
+
+      DSPSplitComplex split = { mReal, mImag };
+      vDSP_ctoz((const DSPComplex*)mWindowedScratch, 2, &split, 1, kAnalysisSpectrumSize);
+      vDSP_fft_zrip(mFftSetup, &split, 1, kAnalysisFftLog2, FFT_FORWARD);
+
+      vDSP_zvabs(&split, 1, mMagnitude, 1, kAnalysisSpectrumSize);
+#else
+      for (int i = 0; i < kAnalysisFftSize; i++)
+         mWindowedScratch[i] = mLinear[i] * mWindow[i];
+      mFft.Forward(mWindowedScratch, kAnalysisFftLog2, mReal, mImag);
+      for (int i = 0; i < kAnalysisSpectrumSize; i++)
+         mMagnitude[i] = std::sqrt(mReal[i] * mReal[i] + mImag[i] * mImag[i]);
+#endif
+      const float norm = 2.0f / (float)kAnalysisFftSize;
+      for (int i = 0; i < kAnalysisSpectrumSize; i++)
+         mMagnitude[i] *= norm;
+
+      float flux = 0.0f;
+      for (int i = 0; i < kAnalysisSpectrumSize; i++)
+         flux += std::max(0.0f, mMagnitude[i] - mPrevMagnitude[i]);
+      const bool onset = flux > mPrevFlux * 1.6f && flux > 0.02f;
+      mPrevFlux = mPrevFlux * 0.7f + flux * 0.3f;
+      std::memcpy(mPrevMagnitude, mMagnitude, sizeof(mMagnitude));
+      if (onset)
+         mOnsetPending.store(true, std::memory_order_relaxed);
+
+      const double nyquist = mSampleRate * 0.5;
+      auto rangeEnergy = [this, nyquist](double fromHz, double toHz) {
+         const int lo = std::max(1, (int)(fromHz / nyquist * kAnalysisSpectrumSize));
+         const int hi = std::min(kAnalysisSpectrumSize - 1, (int)(toHz / nyquist * kAnalysisSpectrumSize));
+         float sum = 0.0f; int count = 0;
+         for (int i = lo; i <= hi; i++) { sum += mMagnitude[i]; count++; }
+         return count > 0 ? sum / count : 0.0f;
+      };
+
+      float bands[Platform::kAudioBands] = { 0 };
+      for (int b = 0; b < Platform::kAudioBands; b++)
+      {
+         const double loHz = 20.0 * std::pow(nyquist / 20.0, (double)b / Platform::kAudioBands);
+         const double hiHz = 20.0 * std::pow(nyquist / 20.0, (double)(b + 1) / Platform::kAudioBands);
+         bands[b] = rangeEnergy(loHz, hiHz);
+      }
+
+      auto shape = [](float v) { return std::min(1.0f, std::sqrt(v * 12.0f)); };
+
+      const float attack = mAttack.load(std::memory_order_relaxed);
+      const float release = mRelease.load(std::memory_order_relaxed);
+      auto smooth = [attack, release](float prev, float target) {
+         const float rate = (target > prev) ? attack : release;
+         return prev + (target - prev) * rate;
+      };
+
+      mSmoothed.rms = smooth(mSmoothed.rms, std::min(1.0f, rms * 3.0f));
+      mSmoothed.peak = smooth(mSmoothed.peak, std::min(1.0f, peak));
+      mSmoothed.low = smooth(mSmoothed.low, shape((float)rangeEnergy(20.0, 250.0)));
+      mSmoothed.mid = smooth(mSmoothed.mid, shape((float)rangeEnergy(250.0, 2000.0)));
+      mSmoothed.high = smooth(mSmoothed.high, shape((float)rangeEnergy(2000.0, 16000.0)));
+      for (int b = 0; b < Platform::kAudioBands; b++)
+         mSmoothed.bands[b] = smooth(mSmoothed.bands[b], shape(bands[b]));
+
+      // Double-buffer publish: the audio thread always writes the buffer
+      // NOT currently marked ready, then flips the ready index - the same
+      // lock-free-ish handoff Platform.h documents for AudioLevels
+      // elsewhere (a torn read is, at worst, one stale frame of meter data).
+      const int next = 1 - mLevelsReady.load(std::memory_order_relaxed);
+      mLevelsPublish[next] = mSmoothed;
+      mLevelsReady.store(next, std::memory_order_release);
+   }
+
+private:
+   double mSampleRate = 44100.0;
+   std::atomic<float> mAttack { 0.5f };
+   std::atomic<float> mRelease { 0.12f };
+
+#if defined(__APPLE__)
+   FFTSetup mFftSetup = nullptr;
+#else
+   PortableFft::RealFft mFft;
+#endif
+   float mWindow[kAnalysisFftSize] = {};
+   float mRing[kAnalysisFftSize] = {};
+   int mRingWrite = 0;
+   int mRingCount = 0;
+   float mLinear[kAnalysisFftSize] = {};
+   float mWindowedScratch[kAnalysisFftSize] = {};
+   float mReal[kAnalysisSpectrumSize] = {};
+   float mImag[kAnalysisSpectrumSize] = {};
+   float mMagnitude[kAnalysisSpectrumSize] = {};
+   float mPrevMagnitude[kAnalysisSpectrumSize] = {};
+   float mPrevFlux = 0.0f;
+
+   Platform::AudioLevels mSmoothed;
+   Platform::AudioLevels mLevelsPublish[2];
+   std::atomic<int> mLevelsReady { 0 };
+   mutable std::atomic<bool> mOnsetPending { false };
+};
+
+class AudioFilePlayerAudioNode : public AudioNode
+{
+public:
+   // SpectrumAnalyser's constructor allocates its FFT setup - main thread
+   // only, never on the audio thread (mirrors PaulStretchNode's mFftSetup
+   // lifetime).
+   AudioFilePlayerAudioNode() = default;
+
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
       mSampleRate = sampleRate;
+      mAnalyser.SetSampleRate(sampleRate);
       mMailbox.PrepareToPlay(sampleRate);
       mMailbox.SetImmediate(kFileVolumeParam, mVolume.load(std::memory_order_relaxed));
       mMailbox.SetImmediate(kFileGainParam, mGain.load(std::memory_order_relaxed));
@@ -724,8 +858,7 @@ public:
       mGain.store(gain, std::memory_order_relaxed);
       mMailbox.Push(kFileVolumeParam, volume);
       mMailbox.Push(kFileGainParam, gain);
-      mAttack.store(std::clamp(attack, 0.01f, 1.0f), std::memory_order_relaxed);
-      mRelease.store(std::clamp(release, 0.005f, 1.0f), std::memory_order_relaxed);
+      mAnalyser.SetSmoothing(attack, release);
       mLoop.store(loop, std::memory_order_relaxed);
       mMonitor.store(monitor, std::memory_order_relaxed);
    }
@@ -745,19 +878,9 @@ public:
       return mSampleRate > 0.0 ? (double)mFramePos.load(std::memory_order_relaxed) / mSampleRate : 0.0;
    }
 
-   // Main thread. Latest published analysis snapshot - see the double-buffer
-   // comment on mLevelsPublish below for why this is lock-free-safe to read
-   // concurrently with the audio thread publishing a new one.
-   Platform::AudioLevels ReadLevels() const
-   {
-      Platform::AudioLevels out = mLevelsPublish[mLevelsReady.load(std::memory_order_acquire)];
-      // Onset is a one-shot flag: read-and-clear here (rather than letting
-      // the audio thread clear it after publishing) so a fast analysis
-      // cadence relative to CookIfNeeded's once-a-frame reads can never
-      // drop one - matches Platform.mm's old ReadFrom() contract exactly.
-      out.onset = mOnsetPending.exchange(false, std::memory_order_acq_rel);
-      return out;
-   }
+   // Main thread. Latest published analysis snapshot - lock-free-safe to
+   // read concurrently with the audio thread publishing a new one.
+   Platform::AudioLevels ReadLevels() const { return mAnalyser.ReadLevels(); }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
    {
@@ -771,11 +894,7 @@ public:
          mActiveBuffer = mSampleSlot.Active();
          mPos = 0.0;
          mFramePos.store(0, std::memory_order_relaxed);
-         mRingWrite = 0;
-         mRingCount = 0;
-         mPrevFlux = 0.0f;
-         std::memset(mPrevMagnitude, 0, sizeof(mPrevMagnitude));
-         mSmoothed = Platform::AudioLevels();
+         mAnalyser.Reset();
       }
 
       for (int ch = 0; ch < buffer.numChannels; ch++)
@@ -817,13 +936,13 @@ public:
          // Still analysed while `monitor` is off - "silent but still
          // analysed" always meant this node's own output, just scoped to
          // the graph now instead of to the hardware mixer.
-         PushAnalysisSample(outSample * gain);
+         mAnalyser.Push(outSample * gain);
          for (int ch = 0; ch < buffer.numChannels; ch++)
             buffer.channels[ch][i] = monitor ? outSample : 0.0f;
       }
 
       mFramePos.store((int64_t)mPos, std::memory_order_relaxed);
-      RunAnalysisIfWindowFull();
+      mAnalyser.RunIfWindowFull();
    }
 
 private:
@@ -837,113 +956,12 @@ private:
       return (i >= 0 && i < buf.numFrames) ? buf.channelData[i] : 0.0f;
    }
 
-   void PushAnalysisSample(float s)
-   {
-      mRing[mRingWrite] = s;
-      mRingWrite = (mRingWrite + 1) % kFileFftSize;
-      if (mRingCount < kFileFftSize)
-         mRingCount++;
-   }
-
-   // Runs the same FFT-based analysis Platform.mm's ProcessInto used to run
-   // on the tap callback, over the most recent kFileFftSize samples, once
-   // enough have arrived. Every buffer here is a fixed-size member - no
-   // allocation on this, the audio thread.
-   void RunAnalysisIfWindowFull()
-   {
-      if (mRingCount < kFileFftSize)
-         return;
-
-      for (int i = 0; i < kFileFftSize; i++)
-         mLinear[i] = mRing[(mRingWrite + i) % kFileFftSize];
-
-      float rms = 0.0f, peak = 0.0f;
-      for (int i = 0; i < kFileFftSize; i++)
-      {
-         const float v = mLinear[i];
-         rms += v * v;
-         peak = std::max(peak, std::fabs(v));
-      }
-      rms = std::sqrt(rms / (float)kFileFftSize);
-
-#if defined(__APPLE__)
-      vDSP_vmul(mLinear, 1, mWindow, 1, mWindowedScratch, 1, kFileFftSize);
-
-      DSPSplitComplex split = { mReal, mImag };
-      vDSP_ctoz((const DSPComplex*)mWindowedScratch, 2, &split, 1, kFileSpectrumSize);
-      vDSP_fft_zrip(mFftSetup, &split, 1, kFileFftLog2, FFT_FORWARD);
-
-      vDSP_zvabs(&split, 1, mMagnitude, 1, kFileSpectrumSize);
-#else
-      for (int i = 0; i < kFileFftSize; i++)
-         mWindowedScratch[i] = mLinear[i] * mWindow[i];
-      mFft.Forward(mWindowedScratch, kFileFftLog2, mReal, mImag);
-      for (int i = 0; i < kFileSpectrumSize; i++)
-         mMagnitude[i] = std::sqrt(mReal[i] * mReal[i] + mImag[i] * mImag[i]);
-#endif
-      const float norm = 2.0f / (float)kFileFftSize;
-      for (int i = 0; i < kFileSpectrumSize; i++)
-         mMagnitude[i] *= norm;
-
-      float flux = 0.0f;
-      for (int i = 0; i < kFileSpectrumSize; i++)
-         flux += std::max(0.0f, mMagnitude[i] - mPrevMagnitude[i]);
-      const bool onset = flux > mPrevFlux * 1.6f && flux > 0.02f;
-      mPrevFlux = mPrevFlux * 0.7f + flux * 0.3f;
-      std::memcpy(mPrevMagnitude, mMagnitude, sizeof(mMagnitude));
-      if (onset)
-         mOnsetPending.store(true, std::memory_order_relaxed);
-
-      const double nyquist = mSampleRate * 0.5;
-      auto rangeEnergy = [this, nyquist](double fromHz, double toHz) {
-         const int lo = std::max(1, (int)(fromHz / nyquist * kFileSpectrumSize));
-         const int hi = std::min(kFileSpectrumSize - 1, (int)(toHz / nyquist * kFileSpectrumSize));
-         float sum = 0.0f; int count = 0;
-         for (int i = lo; i <= hi; i++) { sum += mMagnitude[i]; count++; }
-         return count > 0 ? sum / count : 0.0f;
-      };
-
-      float bands[Platform::kAudioBands] = { 0 };
-      for (int b = 0; b < Platform::kAudioBands; b++)
-      {
-         const double loHz = 20.0 * std::pow(nyquist / 20.0, (double)b / Platform::kAudioBands);
-         const double hiHz = 20.0 * std::pow(nyquist / 20.0, (double)(b + 1) / Platform::kAudioBands);
-         bands[b] = rangeEnergy(loHz, hiHz);
-      }
-
-      auto shape = [](float v) { return std::min(1.0f, std::sqrt(v * 12.0f)); };
-
-      const float attack = mAttack.load(std::memory_order_relaxed);
-      const float release = mRelease.load(std::memory_order_relaxed);
-      auto smooth = [attack, release](float prev, float target) {
-         const float rate = (target > prev) ? attack : release;
-         return prev + (target - prev) * rate;
-      };
-
-      mSmoothed.rms = smooth(mSmoothed.rms, std::min(1.0f, rms * 3.0f));
-      mSmoothed.peak = smooth(mSmoothed.peak, std::min(1.0f, peak));
-      mSmoothed.low = smooth(mSmoothed.low, shape((float)rangeEnergy(20.0, 250.0)));
-      mSmoothed.mid = smooth(mSmoothed.mid, shape((float)rangeEnergy(250.0, 2000.0)));
-      mSmoothed.high = smooth(mSmoothed.high, shape((float)rangeEnergy(2000.0, 16000.0)));
-      for (int b = 0; b < Platform::kAudioBands; b++)
-         mSmoothed.bands[b] = smooth(mSmoothed.bands[b], shape(bands[b]));
-
-      // Double-buffer publish: the audio thread always writes the buffer
-      // NOT currently marked ready, then flips the ready index - the same
-      // lock-free-ish handoff Platform.h documents for AudioLevels
-      // elsewhere (a torn read is, at worst, one stale frame of meter data).
-      const int next = 1 - mLevelsReady.load(std::memory_order_relaxed);
-      mLevelsPublish[next] = mSmoothed;
-      mLevelsReady.store(next, std::memory_order_release);
-   }
 
    double mSampleRate = 44100.0;
    ParamMailbox mMailbox;
 
    std::atomic<float> mVolume { 0.8f };
    std::atomic<float> mGain { 1.0f };
-   std::atomic<float> mAttack { 0.5f };
-   std::atomic<float> mRelease { 0.12f };
    std::atomic<bool> mLoop { true };
    std::atomic<bool> mMonitor { true };
 
@@ -955,28 +973,132 @@ private:
    Platform::SampleBuffer* mActiveBuffer = nullptr;
    SampleSlot mSampleSlot;
 
-#if defined(__APPLE__)
-   FFTSetup mFftSetup = nullptr;
-#else
-   PortableFft::RealFft mFft;
-#endif
-   float mWindow[kFileFftSize] = {};
-   float mRing[kFileFftSize] = {};
-   int mRingWrite = 0;
-   int mRingCount = 0;
-   float mLinear[kFileFftSize] = {};
-   float mWindowedScratch[kFileFftSize] = {};
-   float mReal[kFileSpectrumSize] = {};
-   float mImag[kFileSpectrumSize] = {};
-   float mMagnitude[kFileSpectrumSize] = {};
-   float mPrevMagnitude[kFileSpectrumSize] = {};
-   float mPrevFlux = 0.0f;
-
-   Platform::AudioLevels mSmoothed;
-   Platform::AudioLevels mLevelsPublish[2];
-   std::atomic<int> mLevelsReady { 0 };
-   mutable std::atomic<bool> mOnsetPending { false };
+   SpectrumAnalyser mAnalyser;
 };
+
+// ------------------------------------------------- Audio Analyze (audio half)
+//
+// Audio Analyze's own AudioNode. It exists so the node can analyse ANY audio
+// cable patched into it rather than only an Audio File: the file node could be
+// read through a direct AudioFileNode* because it happened to own an analyser
+// of its own, but a Filter, a Mixer, an Oscillator or Audio In has no such
+// thing to borrow, and the only place their signal exists at all is a buffer on
+// the audio thread. So Audio Analyze runs its own SpectrumAnalyser over its
+// input buffer, exactly the analysis AudioFilePlayerAudioNode runs over its own
+// output, and publishes the same Platform::AudioLevels for CookIfNeeded to read.
+//
+// Passes its input through to its output unchanged, so it can also sit inline
+// in a chain rather than only hanging off it as a tap.
+class AudioAnalyzerAudioNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mAnalyser.SetSampleRate(sampleRate);
+   }
+
+   void PushParams(float attack, float release) { mAnalyser.SetSmoothing(attack, release); }
+
+   Platform::AudioLevels ReadLevels() const { return mAnalyser.ReadLevels(); }
+
+   void Reset() override { mAnalyser.Reset(); }
+
+   void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& buffer) override
+   {
+      const AudioBuffer* in = (numInputs > 0) ? inputs[0] : nullptr;
+      for (int i = 0; i < buffer.numFrames; i++)
+      {
+         // Analyse the mono sum of whatever arrived, matching what the file
+         // player analyses (its single channel) and what Platform.mm's live
+         // tap analyses (channel 0 of the mic).
+         float mono = 0.0f;
+         if (in != nullptr && in->numChannels > 0 && i < in->numFrames)
+         {
+            for (int ch = 0; ch < in->numChannels; ch++)
+               mono += in->channels[ch][i];
+            mono /= (float)in->numChannels;
+         }
+         mAnalyser.Push(mono);
+         for (int ch = 0; ch < buffer.numChannels; ch++)
+            buffer.channels[ch][i] = (in != nullptr && ch < in->numChannels && i < in->numFrames)
+                                        ? in->channels[ch][i]
+                                        : mono;
+      }
+      mAnalyser.RunIfWindowFull();
+   }
+
+private:
+   SpectrumAnalyser mAnalyser;
+};
+
+// The three AudioAnalyzeNode members that need AudioAnalyzerAudioNode complete
+// (see the placeholder comment up at the node's other definitions).
+
+AudioAnalyzeNode::~AudioAnalyzeNode()
+{
+   // The live mic tap is process-wide; leave it running for any other audio
+   // nodes. mAudioNode is this node's own and dies with it.
+}
+
+void AudioAnalyzeNode::EnsureAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioAnalyzerAudioNode>();
+}
+
+AudioNode* AudioAnalyzeNode::AudioNodeForNotePorts()
+{
+   EnsureAudioNode();
+   return mAudioNode.get();
+}
+
+void AudioAnalyzeNode::CookIfNeeded(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   mLastCookFrame = frameId;
+
+   Platform::AudioSetSmoothing(attack, release);
+   Platform::AudioSetGain(1.0f);
+
+   Platform::AudioLevels levels;
+   bool running = false;
+   if (input.IsConnected())
+   {
+      // The cable's own upstream node is cooked by the normal graph walk;
+      // all that is needed here is this frame's params and the latest
+      // snapshot the audio thread published.
+      EnsureAudioNode();
+      mAudioNode->PushParams(attack, release);
+      levels = mAudioNode->ReadLevels();
+      running = true;
+   }
+   else
+   {
+      running = Platform::AudioRead(levels);
+   }
+
+   const double now = Transport::Instance().Seconds();
+   const double dt = std::max(0.0, std::min(0.25, now - mLastSeconds));
+   mLastSeconds = now;
+
+   if (running)
+   {
+      mLevels = levels;
+      // Onset is a one-shot flag; stretch it into a decaying envelope so it is
+      // actually usable as a modulation source.
+      if (levels.onset)
+         mOnsetEnvelope = 1.0f;
+      else if (onsetHold > 0.0f)
+         mOnsetEnvelope = std::max(0.0f, mOnsetEnvelope - (float)(dt / onsetHold));
+      else
+         mOnsetEnvelope = 0.0f;
+   }
+   else
+   {
+      mOnsetEnvelope = 0.0f;
+   }
+}
 
 AudioFileNode::AudioFileNode() = default;
 AudioFileNode::~AudioFileNode() = default;

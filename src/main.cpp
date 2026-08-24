@@ -2808,8 +2808,9 @@ namespace
          return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
-      if (dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr)
-         return 1;
+      // (Audio Analyze used to need an entry here for its fileSource pin; it
+      // has a real AudioInputSlot now and is counted by the generic audio/note
+      // probe below, like every other audio consumer.)
       if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<ModelSourceNode*>(gn.node.get()) != nullptr)
@@ -3071,9 +3072,15 @@ namespace
             setColor->paletteInput = dynamic_cast<IPaletteSource*>(src.node.get());
          return;
       }
+      // Legacy patches only. Audio Analyze's source used to be a bare
+      // AudioFileNode* recorded in the geometry link table; it is now an
+      // ordinary AudioCable saved and restored by the generic audio-cable
+      // passes. Restoring an old entry as a cable is what migrates those
+      // patches - the next save writes it through the audio path instead.
       if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst.node.get()))
       {
-         audio->fileSource = dynamic_cast<AudioFileNode*>(src.node.get());
+         if (dynamic_cast<IAudioSource*>(src.node.get()) != nullptr)
+            audio->input.Connect(src.node.get());
          return;
       }
    }
@@ -3087,13 +3094,12 @@ namespace
    bool IsInputSlotCompatible(GraphNode* dstNode, int slot,
                                bool srcIsModulator, IPaletteSource* srcPalette,
                                IGeometrySource* srcGeometry, CameraNode* srcCamera,
-                               LightNode* srcLight, AudioFileNode* srcAudioFile,
+                               LightNode* srcLight,
                                bool srcIsEnvironment, bool srcIsAudioNode, bool srcIsNoteSource)
    {
       if (dstNode == nullptr || dstNode->node == nullptr)
          return false;
 
-      auto* dstAudio = dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get());
       auto* dstRender = dynamic_cast<Render3DNode*>(dstNode->node.get());
       auto* dstMaterial = dynamic_cast<MaterialNode*>(dstNode->node.get());
       auto* dstDisplacement = dynamic_cast<DisplacementNode*>(dstNode->node.get());
@@ -3117,15 +3123,12 @@ namespace
          return srcIsAudioNode;
       else if (dstNode->node->NoteInputSlot(slot) != nullptr)
          return srcIsNoteSource;
-      // dstAudio (Audio Analyze) is checked ahead of the srcIsAudioNode/
-      // srcIsNoteSource gate below because it needs to accept an
-      // AudioFileNode source specifically, and that source is now ALSO an
-      // IAudioSource (srcIsAudioNode true) - the gate would otherwise reject
-      // it before this branch is ever reached. This is the "fileSource"
-      // pointer mechanism (WireInputSlot), not an AudioCable - deliberately
-      // out of scope for this fix, see AudioAnalyzeNode::fileSource's comment.
-      else if (dstAudio != nullptr)
-         return srcAudioFile != nullptr; // only an Audio File feeds Audio Analyze
+      // Audio Analyze used to need a branch of its own here, accepting an
+      // AudioFileNode and nothing else, because it read that node's published
+      // AudioLevels through a bare pointer instead of taking audio. It now
+      // owns a real AudioNode and a real AudioInputSlot(0), so the generic
+      // audio-pin branch above already accepts any IAudioSource for it -
+      // exactly the broadening that special case was blocking.
       else if (srcIsAudioNode || srcIsNoteSource)
          return false;
       else if (dstRender != nullptr)
@@ -3167,7 +3170,6 @@ namespace
    // one that was actually dragged from.
    void WireInputSlot(GraphNode& srcNode, GraphNode& dstNode, int slot, int srcOutputIndex = 0)
    {
-      auto* dstAudio = dynamic_cast<AudioAnalyzeNode*>(dstNode.node.get());
       auto* dstRender = dynamic_cast<Render3DNode*>(dstNode.node.get());
       auto* dstSetColor = dynamic_cast<SetColorNode*>(dstNode.node.get());
 
@@ -3175,7 +3177,6 @@ namespace
       auto* srcCamera = dynamic_cast<CameraNode*>(srcNode.node.get());
       auto* srcLight = dynamic_cast<LightNode*>(srcNode.node.get());
       auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode.node.get());
-      auto* srcAudioFile = dynamic_cast<AudioFileNode*>(srcNode.node.get());
 
       if (dstRender != nullptr)
       {
@@ -3205,10 +3206,6 @@ namespace
       {
          dstSetColor->TextureInput().Connect(srcNode.node.get());
          dstSetColor->source = SetColorNode::kTexture;
-      }
-      else if (dstAudio != nullptr)
-      {
-         dstAudio->fileSource = srcAudioFile;
       }
       else if (IModulator** slotField = dstNode.node->ModulatorInputSlot(slot))
       {
@@ -3333,7 +3330,6 @@ namespace
       const bool srcIsModulator = dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr ||
                                    ModulatorForOutput(srcNode->node.get(), srcOutputIndex) != nullptr;
       auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode->node.get());
-      auto* srcAudioFile = dynamic_cast<AudioFileNode*>(srcNode->node.get());
       auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode->node.get());
       auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
       auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
@@ -3342,7 +3338,7 @@ namespace
       const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
 
       if (!IsInputSlotCompatible(dstNode, dstSlot, srcIsModulator, srcPalette, srcGeometry, srcCamera,
-                                  srcLight, srcAudioFile, srcIsEnvironment, srcIsAudioNode, srcIsNoteSource))
+                                  srcLight, srcIsEnvironment, srcIsAudioNode, srcIsNoteSource))
       {
          outError = "incompatible source/destination for this slot";
          return false;
@@ -3519,7 +3515,6 @@ namespace
       auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode->node.get());
       auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
       auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
-      auto* srcAudioFile = dynamic_cast<AudioFileNode*>(srcNode->node.get());
       const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
       const bool srcIsAudioNode = dynamic_cast<IAudioSource*>(srcNode->node.get()) != nullptr;
       const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
@@ -3541,7 +3536,7 @@ namespace
             for (int slot = 0; slot < slotCount; ++slot)
             {
                if (IsInputSlotCompatible(&probe, slot, srcIsModulator, srcPalette, srcGeometry,
-                                          srcCamera, srcLight, srcAudioFile, srcIsEnvironment,
+                                          srcCamera, srcLight, srcIsEnvironment,
                                           srcIsAudioNode, srcIsNoteSource))
                {
                   compatible = true;
@@ -5476,7 +5471,10 @@ namespace
       const float b = n->RawB();
       const float res = n->Value(ImageAnalyzeNode::kResult);
 
-      // Color swatch + Result meter
+      const float colW = kParamWidth;
+      const float gutter = 16.0f;
+
+      // Color swatch + Result meter (header, full width)
       ImVec4 col(r, g, b, 1.0f);
       ImGui::ColorButton("##ImageAnalyzeSwatch", col, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoDragDrop, ImVec2(24, 24));
       ImGui::SameLine();
@@ -5485,40 +5483,32 @@ namespace
       ImGui::ProgressBar(std::clamp(res, 0.0f, 1.0f), ImVec2(kPreviewSize * 0.55f, 0), "");
       ImGui::EndGroup();
 
-      ImGui::Separator();
+      // --- Left Column ---
+      ImGui::BeginGroup();
 
-      // Output taps readout
-      for (int i = 0; i < ImageAnalyzeNode::kOutputCount; i++)
-      {
-         const float v = n->Value(i);
-         ImGui::Text("%-9s", n->OutputLabel(i));
-         ImGui::SameLine();
-         ImGui::ProgressBar(std::clamp(v, 0.0f, 1.0f), ImVec2(kPreviewSize * 0.55f, 0), "");
-      }
-
-      ImGui::Separator();
-
+      NodeSeparator("sample", colW);
       DropdownButton("sample mode", ImageAnalyzeNode::SampleModeNames(), n->sampleMode,
-                     [n](int i) { PushUndoCheckpoint(); n->sampleMode = i; });
+                     [n](int i) { PushUndoCheckpoint(); n->sampleMode = i; }, colW);
 
       if (n->sampleMode == ImageAnalyzeNode::kPointProbe ||
           n->sampleMode == ImageAnalyzeNode::kBoxRegion ||
           n->sampleMode == ImageAnalyzeNode::kCenterWeighted)
       {
-         ModSlider("probe U", &n->probeU, 0.0f, 1.0f);
-         ModSlider("probe V", &n->probeV, 0.0f, 1.0f);
+         ModSlider("probe U", &n->probeU, 0.0f, 1.0f, "%.3f", colW);
+         ModSlider("probe V", &n->probeV, 0.0f, 1.0f, "%.3f", colW);
          if (n->sampleMode == ImageAnalyzeNode::kBoxRegion)
-            ModSlider("radius", &n->probeRadius, 0.01f, 0.5f);
+            ModSlider("radius", &n->probeRadius, 0.01f, 0.5f, "%.3f", colW);
       }
 
+      NodeSeparator("operation", colW);
       DropdownButton("operation", ImageAnalyzeNode::MathOpNames(), n->mathOp,
-                     [n](int i) { PushUndoCheckpoint(); n->mathOp = i; });
+                     [n](int i) { PushUndoCheckpoint(); n->mathOp = i; }, colW);
 
       if (n->mathOp == ImageAnalyzeNode::kCustomExpression)
       {
          char buf[256];
          snprintf(buf, sizeof(buf), "%s", n->customFormula.c_str());
-         ImGui::SetNextItemWidth(kParamWidth);
+         ImGui::SetNextItemWidth(colW);
          if (ImGui::InputText("formula", buf, sizeof(buf)))
          {
             n->customFormula = buf;
@@ -5533,17 +5523,36 @@ namespace
          }
       }
 
-      ModSlider("gain", &n->gain, 0.0f, 8.0f);
-      ModSlider("offset", &n->offset, -1.0f, 1.0f);
-      ModSlider("power", &n->power, 0.1f, 5.0f);
+      NodeSeparator("shaping", colW);
+      ModSlider("gain", &n->gain, 0.0f, 8.0f, "%.3f", colW);
+      ModSlider("offset", &n->offset, -1.0f, 1.0f, "%.3f", colW);
+      ModSlider("power", &n->power, 0.1f, 5.0f, "%.3f", colW);
       ImGui::Checkbox("invert", &n->invert);
       ImGui::Checkbox("clamp 0..1", &n->clamp01);
 
-      ImGui::Separator();
-      ModSlider("smoothing", &n->smoothing, 0.0f, 0.99f);
-      ModSlider("samples / sec", &n->sampleRate, 1.0f, 60.0f, "%.0f");
-      ImGui::SetNextItemWidth(kParamWidth);
-      ImGui::SliderInt("sample res", &n->sampleSize, 8, 256);
+      NodeSeparator("sampling", colW);
+      ModSlider("smoothing", &n->smoothing, 0.0f, 0.99f, "%.3f", colW);
+      ModSlider("samples / sec", &n->sampleRate, 1.0f, 60.0f, "%.0f", colW);
+      ModSliderInt("sample res", &n->sampleSize, 8, 256, colW);
+
+      ImGui::EndGroup();
+
+      // --- Right Column ---
+      ImGui::SameLine(0.0f, gutter);
+      ImGui::BeginGroup();
+
+      NodeSeparator("outputs", colW);
+      const float labelW = 60.0f;
+      const float barW = colW - labelW;
+      for (int i = 0; i < ImageAnalyzeNode::kOutputCount; i++)
+      {
+         const float v = n->Value(i);
+         ImGui::Text("%-9s", n->OutputLabel(i));
+         ImGui::SameLine(labelW);
+         ImGui::ProgressBar(std::clamp(v, 0.0f, 1.0f), ImVec2(barW, 0), "");
+      }
+
+      ImGui::EndGroup();
    }
 
    void DrawNullModulatorParams(NullModulatorNode* n)
@@ -6016,8 +6025,16 @@ namespace
       // rather than the generic v3 audio body, which has no case for it and
       // would otherwise render an empty shell with just the pin - same
       // reasoning as the AudioTextureNode carve-out just below.
+      // AudioAnalyzeNode needs the identical carve-out for the identical
+      // reason: broadening its input from an AudioFileNode* pointer to a real
+      // AudioCable (so it accepts any audio source) gave it an AudioInputSlot(0),
+      // which silently flipped this gate true. That both suppressed its eye
+      // toggle and handed it to DrawAudioNodeBody, which has no case for it -
+      // so the node rendered as a bare pin column with no params at all. It
+      // keeps DrawAudioAnalyzeParams behind the eye like the other analyzers.
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
-          dynamic_cast<AudioColorRampNode*>(node) != nullptr)
+          dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
+          dynamic_cast<AudioAnalyzeNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -10168,9 +10185,16 @@ namespace
    // mean either "nothing arriving" or "not listening yet".
    void DrawAudioInBody(GraphNode& gn, AudioInputNode* n)
    {
-      char stat[48];
-      snprintf(stat, sizeof(stat), "%+.1f dB   %s",
-               n->gainDb, Platform::AudioInputCaptureIsRunning() ? "mic in - live" : "mic in - idle");
+      // "idle" alone can't distinguish "no node has pumped the tap yet" from
+      // "macOS refused the microphone" - report the pump's own reason when it
+      // has one (AudioInputNode::Status).
+      char stat[96];
+      if (Platform::AudioInputCaptureIsRunning())
+         snprintf(stat, sizeof(stat), "%+.1f dB   mic in - live", n->gainDb);
+      else if (!n->Status().empty())
+         snprintf(stat, sizeof(stat), "%+.1f dB   %s", n->gainDb, n->Status().c_str());
+      else
+         snprintf(stat, sizeof(stat), "%+.1f dB   mic in - idle", n->gainDb);
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
@@ -14652,10 +14676,25 @@ namespace
 
    void DrawAudioAnalyzeParams(AudioAnalyzeNode* n)
    {
-      if (n->fileSource != nullptr)
+      const float colW = kParamWidth;
+      const float gutter = 16.0f;
+      const float bodyW = colW * 2 + gutter;
+
+      if (n->input.IsConnected())
       {
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(0.5f, 0.9f, 1.0f, 1.0f), "source: Audio File");
+         // Name the actual node rather than the old hardcoded "Audio File" -
+         // any audio source can be patched in here now.
+         const char* srcName = "patched source";
+         for (GraphNode& src : gNodes)
+         {
+            if (src.node.get() == n->input.GetSource())
+            {
+               srcName = src.typeName.c_str();
+               break;
+            }
+         }
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bodyW);
+         ImGui::TextColored(ImVec4(0.5f, 0.9f, 1.0f, 1.0f), "source: %s", srcName);
          ImGui::PopTextWrapPos();
       }
       else
@@ -14663,15 +14702,15 @@ namespace
          if (Platform::AudioIsRunning())
          {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-            if (ImGui::Button("Stop listening", ImVec2(kPreviewSize, 0)))
+            if (ImGui::Button("Stop listening", ImVec2(bodyW, 0)))
                n->Stop();
             ImGui::PopStyleColor();
          }
-         else if (ImGui::Button("Start listening", ImVec2(kPreviewSize, 0)))
+         else if (ImGui::Button("Start listening", ImVec2(bodyW, 0)))
          {
             n->Start();
          }
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bodyW);
          ImGui::TextDisabled("%s", n->Status().c_str());
          ImGui::PopTextWrapPos();
       }
@@ -14680,10 +14719,10 @@ namespace
       const Platform::AudioLevels& levels = n->Levels();
       ImVec2 origin = ImGui::GetCursorScreenPos();
       const float h = 60.0f;
-      ImGui::Dummy(ImVec2(kPreviewSize, h));
+      ImGui::Dummy(ImVec2(bodyW, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), IM_COL32(16, 16, 22, 255), 3.0f);
-      const float bw = kPreviewSize / (float)Platform::kAudioBands;
+      dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), IM_COL32(16, 16, 22, 255), 3.0f);
+      const float bw = bodyW / (float)Platform::kAudioBands;
       for (int i = 0; i < Platform::kAudioBands; i++)
       {
          const float v = std::min(1.0f, levels.bands[i] * n->gain);
@@ -14691,18 +14730,34 @@ namespace
                            ImVec2(origin.x + (i + 1) * bw - 1, origin.y + h),
                            IM_COL32(120, 200, 255, 235));
       }
-      dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), IM_COL32(70, 74, 90, 255), 3.0f);
+      dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), IM_COL32(70, 74, 90, 255), 3.0f);
 
+      // --- Left Column ---
+      ImGui::BeginGroup();
+
+      NodeSeparator("response", colW);
+      ModSlider("gain", &n->gain, 0.1f, 16.0f, "%.3f", colW);
+      ModSlider("attack", &n->attack, 0.02f, 1.0f, "%.3f", colW);
+      ModSlider("release", &n->release, 0.005f, 1.0f, "%.3f", colW);
+      ModSlider("onset hold", &n->onsetHold, 0.02f, 1.0f, "%.3f", colW);
+
+      ImGui::EndGroup();
+
+      // --- Right Column ---
+      ImGui::SameLine(0.0f, gutter);
+      ImGui::BeginGroup();
+
+      NodeSeparator("outputs", colW);
+      const float labelW = 50.0f;
+      const float barW = colW - labelW;
       for (int i = 0; i < 5; i++)
       {
          ImGui::Text("%-6s", n->OutputLabel(i));
-         ImGui::SameLine();
-         ImGui::ProgressBar(n->Value(i), ImVec2(kPreviewSize * 0.6f, 0), "");
+         ImGui::SameLine(labelW);
+         ImGui::ProgressBar(n->Value(i), ImVec2(barW, 0), "");
       }
-      ModSlider("gain", &n->gain, 0.1f, 16.0f);
-      ModSlider("attack", &n->attack, 0.02f, 1.0f);
-      ModSlider("release", &n->release, 0.005f, 1.0f);
-      ModSlider("onset hold", &n->onsetHold, 0.02f, 1.0f);
+
+      ImGui::EndGroup();
    }
 
    void DrawPathParams(PathNode* n)
@@ -17848,10 +17903,6 @@ namespace
          if (slot >= 0 && slot < Switcher3DNode::kSlots)
             sw3->inputs[slot] = nullptr;
       }
-      else if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst->node.get()))
-      {
-         audio->fileSource = nullptr;
-      }
       else if (IModulator** slotField = dst->node->ModulatorInputSlot(GraphNode::InputSlotFromPin(dstPin)))
       {
          *slotField = nullptr;
@@ -17930,7 +17981,7 @@ namespace
          { "Palette", "Samples colours from a reference image, loaded here or patched in - a patched cable overrides the loaded file, but the file is kept so unplugging falls back to it. Drag its 'out' onto the square dot beside any colour swatch to bind it - each new cable takes the next swatch, and clicking a bound swatch steps it. Its image output is a gradient of the palette." },
          { "Audio File", "Loads an audio file for playback and Audio Analyze to read. Keeps analysing even while muted - the 'audible' checkbox only controls monitoring." },
          { "Image Analyze", "Turns an image or video into control values and modulation channels. Supports UV point probes, ROI boxes, 22 math/color operations, custom algebraic formulas, and multiple modulation output taps." },
-         { "Audio Analyze", "Extracts level/frequency-band values from an Audio File for modulation." },
+         { "Audio Analyze", "Extracts level, band and onset values from audio for modulation - patch any audio source into it (Audio In, Audio File, a Filter, a Mixer, an Oscillator) and every output can drive any slider in the graph. With nothing patched in it falls back to its own Start listening button, a live tap on the system's default input device. It passes its input straight through, so it can sit inline in a chain as well as hang off one as a tap. Outputs: level, low/mid/high, onset, and b1-b8, eight raw frequency bands running low to high." },
          { "Plugin", "Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged." },
          { "Oscillator", "A synth oscillator with four classic waveforms (sine, triangle, saw, square), interactive amp envelope, unison, filter, hard sync, and fine/coarse tuning. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
@@ -17938,7 +17989,7 @@ namespace
          { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
-         { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
+         { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
          { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
          { "EQ", "Five fixed bands (low shelf, three peaks, high shelf by default), each switchable to any of low shelf/peak/high shelf/hp 12/lp 12 and independently on or off. Drag a band's dot on the curve to set its frequency and gain, drag its diamond to set Q, double-click the dot to bypass that band - the knob row below always follows whichever band you last touched." },
@@ -18457,11 +18508,9 @@ namespace
                      *field = nullptr;
             }
          }
-         if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(other.node.get()))
-         {
-            if (dyingFile != nullptr && audio->fileSource == dyingFile)
-               audio->fileSource = nullptr;
-         }
+         // Audio Analyze's source used to need clearing by hand here; it is an
+         // ordinary AudioCable now, so the generic audio/note teardown loop
+         // below covers it like every other audio consumer.
          for (int slot = 0, modCount = other.node->ModulatorInputCount(); slot < modCount; slot++)
          {
             IModulator** slotField = other.node->ModulatorInputSlot(slot);
@@ -19132,8 +19181,6 @@ namespace
                }
             }
          }
-         if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
-            record(audio->fileSource, 0);
          if (int count = gn.node->ModulatorInputCount())
          {
             for (int slot = 0; slot < count; slot++)
@@ -35350,15 +35397,46 @@ int main(int argc, char** argv)
          if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment)
          {
             const int outputs = std::max(1, gn.node->OutputCount());
+            std::vector<float> pinW(outputs);
             float itemW = 0.0f;
             for (int o = 0; o < outputs; o++)
-               itemW += kPinHit + 4.0f + ImGui::CalcTextSize(gn.node->OutputLabel(o)).x + (o ? 10.0f : 0.0f);
-            float pad = std::max(0.0f, contentW - itemW);
-            ImGui::Dummy(ImVec2(pad, 1.0f));
-            for (int o = 0; o < outputs; o++)
             {
-               ImGui::SameLine(0.0f, o == 0 ? 0.0f : 10.0f);
-               DrawPin(gn.OutputPinId(o), ed::PinKind::Output, gn.node->OutputLabel(o), true);
+               pinW[o] = kPinHit + 4.0f + ImGui::CalcTextSize(gn.node->OutputLabel(o)).x;
+               itemW += pinW[o] + (o ? 10.0f : 0.0f);
+            }
+            if (itemW <= contentW)
+            {
+               float pad = std::max(0.0f, contentW - itemW);
+               ImGui::Dummy(ImVec2(pad, 1.0f));
+               for (int o = 0; o < outputs; o++)
+               {
+                  ImGui::SameLine(0.0f, o == 0 ? 0.0f : 10.0f);
+                  DrawPin(gn.OutputPinId(o), ed::PinKind::Output, gn.node->OutputLabel(o), true);
+               }
+            }
+            else
+            {
+               // Too many pins to fit one row: wrap greedily, rows left-aligned.
+               float rowW = 0.0f;
+               bool firstInRow = true;
+               for (int o = 0; o < outputs; o++)
+               {
+                  float w = pinW[o];
+                  bool wouldOverflow = !firstInRow && (rowW + 10.0f + w > contentW);
+                  if (wouldOverflow)
+                  {
+                     firstInRow = true;
+                     rowW = 0.0f;
+                  }
+                  if (!firstInRow)
+                  {
+                     ImGui::SameLine(0.0f, 10.0f);
+                     rowW += 10.0f;
+                  }
+                  DrawPin(gn.OutputPinId(o), ed::PinKind::Output, gn.node->OutputLabel(o), true);
+                  rowW += w;
+                  firstInRow = false;
+               }
             }
          }
 
@@ -35479,20 +35557,9 @@ int main(int argc, char** argv)
                   }
          }
 
-         auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get());
-         if (audio != nullptr && audio->fileSource != nullptr)
-         {
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == audio->fileSource)
-               {
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(0),
-                                     src.OutputPinId(), gn.InputPinId(0) });
-                  break;
-               }
-            }
-         }
-
+         // Audio Analyze's own link used to be drawn by hand here from its
+         // fileSource pointer; it is an AudioCable now, so the generic
+         // AudioInputSlot pass above already draws it.
          int modCount = gn.node->ModulatorInputCount();
          if (modCount == 0)
             continue;
@@ -35612,7 +35679,6 @@ int main(int argc, char** argv)
                                            (dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr ||
                                             ModulatorForOutput(srcNode->node.get(), srcOutputIndex) != nullptr);
                auto* srcPalette = srcNode ? dynamic_cast<IPaletteSource*>(srcNode->node.get()) : nullptr;
-               auto* srcAudioFile = srcNode ? dynamic_cast<AudioFileNode*>(srcNode->node.get()) : nullptr;
                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
                auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
                auto* srcLight = srcNode ? dynamic_cast<LightNode*>(srcNode->node.get()) : nullptr;
@@ -35637,7 +35703,7 @@ int main(int argc, char** argv)
                   {
                      valid = IsInputSlotCompatible(dstNode, GraphNode::InputSlotFromPin(b),
                                                     srcIsModulator, srcPalette, srcGeometry, srcCamera,
-                                                    srcLight, srcAudioFile, srcIsEnvironment,
+                                                    srcLight, srcIsEnvironment,
                                                     srcIsAudioNode, srcIsNoteSource);
                      if (valid && srcIsAudioNode &&
                          WouldCreateAudioCycle(srcNode->node.get(), dstNode->node.get()))
@@ -35754,7 +35820,7 @@ int main(int argc, char** argv)
                      }
                      else if (dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) != nullptr)
                      {
-                        rejectReason = "Audio Analyze only accepts an Audio File node";
+                        rejectReason = "Audio Analyze accepts any audio source - Audio In, Audio File, an effect, a Mixer";
                      }
                      else if (dstNode->node->ModulatorInputSlot(slot) != nullptr && dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) == nullptr)
                      {
@@ -37146,7 +37212,6 @@ int main(int argc, char** argv)
                   auto* srcGeometry = dynamic_cast<IGeometrySource*>(dragSrcNode->node.get());
                   auto* srcCamera = dynamic_cast<CameraNode*>(dragSrcNode->node.get());
                   auto* srcLight = dynamic_cast<LightNode*>(dragSrcNode->node.get());
-                  auto* srcAudioFile = dynamic_cast<AudioFileNode*>(dragSrcNode->node.get());
                   const bool srcIsEnvironment =
                      dynamic_cast<EnvironmentNode*>(dragSrcNode->node.get()) != nullptr;
                   const bool srcIsAudioNode =
@@ -37158,7 +37223,7 @@ int main(int argc, char** argv)
                   for (int slot = 0; slot < slotCount; ++slot)
                   {
                      if (IsInputSlotCompatible(spawned, slot, srcIsModulator, srcPalette, srcGeometry,
-                                                srcCamera, srcLight, srcAudioFile, srcIsEnvironment,
+                                                srcCamera, srcLight, srcIsEnvironment,
                                                 srcIsAudioNode, srcIsNoteSource))
                      {
                         // No PushUndoCheckpoint() here: SpawnNode() above already

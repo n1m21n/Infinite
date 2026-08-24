@@ -213,10 +213,14 @@ public:
    // Current input level (0..1, post-trim), for the inline meter visualizer.
    float Level() const { return mLevel; }
 
+   // Why the tap isn't live, or empty when it is. See CookIfNeeded.
+   const std::string& Status() const { return mStatus; }
+
    float gainDb = 0.0f;
 
 private:
    std::unique_ptr<AudioCaptureNode> mAudioNode;
+   std::string mStatus;
    int mLastCookFrame = -1;
    float mLevel = 0.0f;
 };

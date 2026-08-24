@@ -2182,7 +2182,41 @@ namespace Platform
 
       InputRing gInputRing[2];
       int gInputCaptureWantCount = 0; // how many AudioInputNode instances are alive
-      bool gInputTapInstalled = false; // whether the tap is actually live on the CURRENT engine
+      bool gInputTapInstalled = false; // whether the tap is actually live on gInputEngine
+
+      // The capture tap's OWN engine, deliberately not the render engine
+      // AudioDeviceOpen runs. On macOS an AVAudioEngine's inputNode and
+      // outputNode are backed by one AUHAL, and AudioDeviceOpen sets that
+      // unit's device with kAudioOutputUnitProperty_CurrentDevice on the
+      // GLOBAL scope - which pins the input side to the chosen *output*
+      // device too. Pick any output-only device in the picker (the built-in
+      // speakers are a separate AudioObjectID from the built-in microphone
+      // on every modern Mac, as is any USB DAC) and that device reports
+      // zero input channels, so inputFormatForBus:0 came back with
+      // channelCount == 0, the tap never installed, and Audio In sat at
+      // "idle" forever while blaming the microphone privacy setting. A
+      // dedicated engine with no device override follows the system default
+      // *input* device instead - the same thing AudioStart (Audio Analyze's
+      // separate live tap) has always done.
+      AVAudioEngine* gInputEngine = nil;
+
+      // Set by AudioDeviceOpen/Close. The capture engine runs at the input
+      // device's native rate while AudioInputCaptureRead is drained from the
+      // render callback at the *output* device's rate; without matching them
+      // a 48k mic feeding a 44.1k render clock overruns the ring by ~9% and
+      // a 44.1k mic feeding 48k starves it, either way as a steady stream of
+      // dropouts. 0 while no render device is open - the tap then writes
+      // through unresampled, since there is no consumer clock to match yet.
+      std::atomic<double> gRenderSampleRate { 0.0 };
+
+      // Producer-side resampler state and scratch. Only ever touched by the
+      // tap block (a single producer), so plain globals rather than atomics;
+      // static rather than stack because the upsampling worst case
+      // (44.1k -> 192k over a 1024-frame tap buffer) is far too big to put
+      // on a CoreAudio thread's stack.
+      constexpr int kInputTapMaxOut = 8192;
+      double gInputResamplePos = 0.0;
+      float gInputResampleScratch[2][kInputTapMaxOut] = {};
    }
 
    void AudioInputCaptureAddRef() { gInputCaptureWantCount++; }
@@ -2193,52 +2227,141 @@ namespace Platform
          gInputCaptureWantCount--;
    }
 
+   void AudioInputCaptureTeardown()
+   {
+      if (gInputEngine == nil)
+      {
+         gInputTapInstalled = false;
+         return;
+      }
+      @autoreleasepool
+      {
+         // Same teardown hazard AudioDeviceClose documents: AVAudioEngine
+         // throws an NSException on bad teardown state rather than returning
+         // an error, and an uncaught one aborts the process.
+         @try
+         {
+            [[gInputEngine inputNode] removeTapOnBus:0];
+            [gInputEngine stop];
+         }
+         @catch (NSException* exception)
+         {
+            fprintf(stderr, "audio input capture teardown: %s\n",
+                    [[exception reason] UTF8String] ? [[exception reason] UTF8String] : "unknown");
+         }
+         gInputEngine = nil;
+      }
+      gInputTapInstalled = false;
+      gInputRing[0].Clear();
+      gInputRing[1].Clear();
+   }
+
    void AudioInputCapturePump(std::string& outError)
    {
       if (gInputCaptureWantCount <= 0)
       {
-         if (gInputTapInstalled && gDeviceHandle != nullptr)
-         {
-            @autoreleasepool
-            {
-               [[gDeviceHandle->engine inputNode] removeTapOnBus:0];
-            }
-         }
-         gInputTapInstalled = false;
+         AudioInputCaptureTeardown();
          return;
       }
 
       if (gInputTapInstalled)
-         return; // already live on the current engine - nothing to do
-
-      if (gDeviceHandle == nullptr)
-      {
-         outError = "output device not open yet";
-         return;
-      }
+         return; // already live - nothing to do
 
       @autoreleasepool
       {
-         AVAudioInputNode* input = [gDeviceHandle->engine inputNode];
+         // Merely touching inputNode is what triggers macOS's microphone TCC
+         // prompt, so check the authorization status first: "denied" and
+         // "not yet answered" both produce a tap that delivers pure silence,
+         // and reporting that as a live mic is exactly the failure the node's
+         // status line exists to prevent.
+         const AVAuthorizationStatus mic = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+         if (mic == AVAuthorizationStatusDenied || mic == AVAuthorizationStatusRestricted)
+         {
+            outError = "microphone access denied (System Settings > Privacy & Security > Microphone)";
+            return;
+         }
+         if (mic == AVAuthorizationStatusNotDetermined)
+         {
+            // Ask once and bail for now; the next Pump (this runs every frame
+            // from AudioInputNode::CookIfNeeded) picks it up once the user
+            // answers, so there is nothing to retry by hand.
+            static bool sRequested = false;
+            if (!sRequested)
+            {
+               sRequested = true;
+               [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL){}];
+            }
+            outError = "waiting for microphone permission";
+            return;
+         }
+
+         gInputEngine = [[AVAudioEngine alloc] init];
+         AVAudioInputNode* input = [gInputEngine inputNode];
          AVAudioFormat* format = [input inputFormatForBus:0];
          if (format == nil || format.sampleRate <= 0 || format.channelCount == 0)
          {
-            outError = "no audio input available (check System Settings > Privacy > Microphone)";
+            outError = "no audio input device available";
+            gInputEngine = nil;
             return;
          }
 
          gInputRing[0].Clear();
          gInputRing[1].Clear();
+         gInputResamplePos = 0.0;
 
+         const double inRate = format.sampleRate;
          [input installTapOnBus:0 bufferSize:1024 format:format
                           block:^(AVAudioPCMBuffer* buffer, AVAudioTime*) {
             const float* const* channels = buffer.floatChannelData;
             if (channels == nullptr)
                return;
             const int numFrames = (int)buffer.frameLength;
-            gInputRing[0].Write(channels[0], numFrames);
-            gInputRing[1].Write(buffer.format.channelCount > 1 ? channels[1] : channels[0], numFrames);
+            if (numFrames <= 0)
+               return;
+            const float* src[2] = {
+               channels[0],
+               buffer.format.channelCount > 1 ? channels[1] : channels[0]
+            };
+
+            const double outRate = gRenderSampleRate.load(std::memory_order_relaxed);
+            if (outRate <= 0.0 || std::fabs(outRate - inRate) < 1.0)
+            {
+               gInputRing[0].Write(src[0], numFrames);
+               gInputRing[1].Write(src[1], numFrames);
+               gInputResamplePos = 0.0;
+               return;
+            }
+
+            // Linear resample to the render clock. Good enough for a mic
+            // input stage and, unlike an AVAudioConverter, allocation-free.
+            const double step = inRate / outRate;
+            double pos = gInputResamplePos;
+            int n = 0;
+            while (pos < (double)numFrames && n < kInputTapMaxOut)
+            {
+               const int i0 = std::max(0, (int)pos);
+               const int i1 = std::min(i0 + 1, numFrames - 1);
+               const float frac = (float)(pos - (double)i0);
+               gInputResampleScratch[0][n] = src[0][i0] + (src[0][i1] - src[0][i0]) * frac;
+               gInputResampleScratch[1][n] = src[1][i0] + (src[1][i1] - src[1][i0]) * frac;
+               n++;
+               pos += step;
+            }
+            gInputResamplePos = pos - (double)numFrames; // carry the sub-sample phase into the next buffer
+            gInputRing[0].Write(gInputResampleScratch[0], n);
+            gInputRing[1].Write(gInputResampleScratch[1], n);
          }];
+
+         NSError* err = nil;
+         [gInputEngine prepare];
+         if (![gInputEngine startAndReturnError:&err])
+         {
+            outError = err ? std::string([[err localizedDescription] UTF8String])
+                           : "input engine failed to start";
+            [input removeTapOnBus:0];
+            gInputEngine = nil;
+            return;
+         }
 
          gInputTapInstalled = true;
          outError.clear();
@@ -2408,6 +2531,9 @@ namespace Platform
 
          gDeviceHandle = h;
          outSampleRate = sampleRate;
+         // The rate AudioInputCaptureRead will be drained at - see
+         // gRenderSampleRate's comment for why the capture tap needs it.
+         gRenderSampleRate.store(sampleRate, std::memory_order_relaxed);
          outError.clear();
          return true;
       }
@@ -2453,14 +2579,12 @@ namespace Platform
          // error, and an uncaught one aborts the process.
          @try
          {
-            // Any live AudioInputCaptureStart tap is on this same engine's
-            // inputNode - drop it before the engine goes away, or the tap
-            // block would keep firing (or dangle) against a stopped engine.
-            if (gInputTapInstalled)
-            {
-               [[h->engine inputNode] removeTapOnBus:0];
-               gInputTapInstalled = false;
-            }
+            // The input-capture tap used to live on this same engine and had
+            // to be dropped here; it now runs on its own gInputEngine (see
+            // AudioInputCapturePump) whose lifetime is independent of the
+            // render device, so there is nothing to detach - only the render
+            // clock the tap resamples to goes away.
+            gRenderSampleRate.store(0.0, std::memory_order_relaxed);
             [h->engine stop];
             [h->engine detachNode:h->source];
          }

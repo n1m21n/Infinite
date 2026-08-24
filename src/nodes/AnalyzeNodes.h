@@ -8,9 +8,11 @@
 #include "ImageCable.h"
 #include "Modulation.h"
 #include "Platform.h"
+#include "core/AudioCable.h"
 
 class AudioFilePlayerAudioNode; // defined in AnalyzeNodes.cpp - see SamplerNode.h's
                                  // forward-declare-in-header/define-in-cpp pattern
+class AudioAnalyzerAudioNode;   // ditto
 
 // --- Image Analyze ------------------------------------------------------
 // Reduces an image or video to control values and modulation channels.
@@ -204,10 +206,8 @@ public:
    AudioNode* GetAudioNode() override;
 
    // While a file is loaded this node must keep processing every block even
-   // with no path to an Audio Out - both to advance its own playhead and
-   // because Levels()/AudioAnalyzeNode's fileSource pointer mechanism reads
-   // it directly rather than through an AudioCable RebuildAudioTopology
-   // would otherwise discover it through. Same pattern as SamplerNode's
+   // with no path to an Audio Out - both to advance its own playhead and so
+   // its own Levels() meter keeps reading. Same pattern as SamplerNode's
    // IsRecording()-gated override.
    bool RequiresAudioProcessing() const override { return IsLoaded(); }
 
@@ -266,8 +266,26 @@ private:
 };
 
 // --- Audio Analyze ------------------------------------------------------
-// Live audio in, control values out. Makes every parameter in the graph
+// Audio in, control values out. Makes every parameter in the graph
 // audio-reactive, since any of these outputs can be patched into any slider.
+//
+// Three sources, in priority order:
+//   1. Whatever is patched into its audio input pin - ANY IAudioSource, not
+//      just an Audio File. Analysed by this node's own audio-thread half
+//      (AudioAnalyzerAudioNode, AnalyzeNodes.cpp) running the same
+//      SpectrumAnalyser the file player runs, over the buffer the cable
+//      delivers. This replaced a bare `AudioFileNode* fileSource` pointer,
+//      which could only ever reach a node that happened to publish
+//      AudioLevels of its own - so a Filter, a Mixer, an Oscillator or Audio
+//      In had nothing to offer it and the link was refused outright.
+//   2. Failing that, the node's own Start/Stop live mic tap
+//      (Platform::AudioStart/AudioRead), which is a separate AVAudioEngine
+//      on the default *input* device and stays as the zero-patching default.
+//
+// Not an IAudioSource: it does pass its input through on the audio thread, but
+// its graph-visible output is a set of modulator values, so it exposes its
+// AudioNode via AudioNodeForNotePorts() (see INode.h's comment on exactly this
+// distinction) rather than becoming cable-connectable as a source.
 class AudioAnalyzeNode : public INode
 {
 public:
@@ -299,8 +317,20 @@ public:
    float Value(int index) const;
    const Platform::AudioLevels& Levels() const { return mLevels; }
 
-   // When a file node is patched in, it is analysed instead of the live input.
-   AudioFileNode* fileSource = nullptr;
+   // The audio source being analysed, when one is patched in.
+   AudioCable input;
+   AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "audio" : nullptr; }
+
+   // See the class comment: this node owns an AudioNode but is not itself an
+   // audio source, so the topology builder finds it through here.
+   AudioNode* AudioNodeForNotePorts() override;
+
+   // A patched-in source must keep being analysed even with nothing
+   // downstream of this node - there never is anything downstream, since its
+   // real outputs are modulator values, not an audio buffer. Same pattern as
+   // AudioFileNode's IsLoaded()-gated override.
+   bool RequiresAudioProcessing() const override { return input.IsConnected(); }
 
    bool Start();
    void Stop();
@@ -326,7 +356,10 @@ private:
       float Value01() override { return owner ? owner->Value(index) : 0.0f; }
    };
 
+   void EnsureAudioNode();
+
    Tap mTaps[kOutputCount];
+   std::unique_ptr<AudioAnalyzerAudioNode> mAudioNode;
    Platform::AudioLevels mLevels;
    float mOnsetEnvelope = 0.0f;
    double mLastSeconds = 0.0;

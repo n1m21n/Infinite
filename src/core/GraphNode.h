@@ -9,12 +9,12 @@
 // ids imgui-node-editor needs for the node itself and each of its pins.
 //
 // Id layout keeps pin<->node lookup arithmetic-only. Node i owns the block
-// [i*1000, i*1000+999]:
-//    +0            the node
-//    +1 .. +99     image input pins  (slot = offset-1)
-//    +100 .. +899  parameter pins    (param = offset-100)
-//    +900 .. +989  colour pins       (colour = offset-900)
-//    +990 .. +998  output pins
+// [i*1050, i*1050+1049]:
+//    +0             the node
+//    +1 .. +99      image input pins  (slot = offset-1)
+//    +100 .. +899   parameter pins    (param = offset-100)
+//    +900 .. +989   colour pins       (colour = offset-900)
+//    +990 .. +1049  output pins       (output = offset-990), 60 slots
 // Link ids live in their own range and are tracked separately, so they can never
 // collide with node or pin ids.
 //
@@ -22,12 +22,19 @@
 // parameter counter. Parameter indices are patch-file keys, so slipping colour
 // pins into the same sequence would renumber every slider that follows a swatch
 // and silently repoint the modulation in existing patches.
+//
+// The output block used to stop at +998 (kStride was 1000), which only fit 9
+// outputs before OutputPinId() overflowed into the next node's block (offset
+// wraps past kStride back to 0) - silently corrupting the highest-numbered
+// output pin(s) on any node with 10+ outputs (ImageAnalyzeNode's `cy`,
+// AudioAnalyzeNode's `b6`-`b8`). kStride was widened to 1050 to give the
+// output block real headroom instead of just enough for what exists today.
 struct GraphNode
 {
-   static const int kStride = 1000;
+   static const int kStride = 1050;
    static const int kParamBase = 100;
    static const int kColorBase = 900;
-   static const int kOutputBase = 990; // outputs occupy 990..998
+   static const int kOutputBase = 990; // outputs occupy 990..1049
 
    std::unique_ptr<INode> node;
    std::string typeName;

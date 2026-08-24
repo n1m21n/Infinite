@@ -356,8 +356,16 @@ public:
       // Platform::AudioInputCaptureRead is lock-free and zero-fills on
       // underrun, so this is safe to call unconditionally even before the
       // tap has produced its first block (or if mic permission was denied).
-      float* chans[2] = { buffer.channels[0], buffer.numChannels > 1 ? buffer.channels[1] : buffer.channels[0] };
-      const int captured = Platform::AudioInputCaptureRead(chans, buffer.numFrames, 2);
+      //
+      // Captured into a private scratch pair rather than straight into
+      // `buffer`: on a mono output buffer both entries of a
+      // buffer.channels-derived array point at the same memory, so the
+      // right-channel read overwrote the left one it had just filled and
+      // drained ring 0 into nothing. Scratch also keeps the gain loop below
+      // reading source samples rather than samples it has already scaled.
+      const int frames = std::min(buffer.numFrames, kMaxCaptureFrames);
+      float* chans[2] = { mScratch[0], mScratch[1] };
+      const int captured = Platform::AudioInputCaptureRead(chans, frames, 2);
 
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)
@@ -365,7 +373,7 @@ public:
          const float linear = DspMath::DbToLinear(mMailbox.SmoothedValue(kGainDbParam));
          for (int ch = 0; ch < buffer.numChannels; ch++)
          {
-            const float s = (captured > 0) ? buffer.channels[std::min(ch, captured - 1)][i] : 0.0f;
+            const float s = (captured > 0 && i < frames) ? mScratch[std::min(ch, captured - 1)][i] : 0.0f;
             const float v = s * linear;
             buffer.channels[ch][i] = v;
             peak = std::max(peak, std::fabs(v));
@@ -384,9 +392,12 @@ public:
    MeterRing& Meter() { return mMeter; }
 
 private:
+   static constexpr int kMaxCaptureFrames = kAudioMaxBlockFrames;
+
    ParamMailbox mMailbox;
    MeterRing mMeter;
    std::atomic<float> mGainDb { 0.0f };
+   float mScratch[2][kMaxCaptureFrames] = {};
 };
 
 AudioInputNode::AudioInputNode() { Platform::AudioInputCaptureAddRef(); }
@@ -402,8 +413,13 @@ void AudioInputNode::CookIfNeeded(int frameId)
       mAudioNode = std::make_unique<AudioCaptureNode>();
    mAudioNode->PushParams(gainDb);
 
+   // The pump's error used to be collected into a local and dropped on the
+   // floor, so every reason the tap can fail to install - permission denied,
+   // permission not answered yet, no input device - looked identical to
+   // "listening, but the room is quiet". Keep it for the body's status line.
    std::string error;
    Platform::AudioInputCapturePump(error); // no-op once the tap is already live
+   mStatus = Platform::AudioInputCaptureIsRunning() ? std::string() : error;
 
    float peak = 0.0f;
    if (mAudioNode->Meter().ReadLatest(peak))
