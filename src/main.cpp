@@ -600,6 +600,8 @@ namespace
    // gViewportPanelNodes above - not serialized to patch data or tracked by undo.
    bool  gModMatrixOpen = false;
    int   gModMatrixDock = 0;              // 0 = bottom, 1 = right, 2 = left, 3 = top
+   int   gModMatrixFillRows = -1;         // INFINITE_MODMATRIXGEOM probe only
+   float gModMatrixScrollMax = -1.0f;     // INFINITE_MODMATRIXGEOM probe only
    float gModMatrixWidth = 420.0f;
    float gModMatrixHeight = 240.0f;
    const float kModMatrixMinWidth = 300.0f;   // eight columns need real room
@@ -17117,7 +17119,17 @@ namespace
       {
          const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                                        ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
-         if (ImGui::BeginTable("##modmatrixtable", 9, flags))
+         // An explicit, fixed outer_size.y - with ScrollY and the default
+         // (0,0), ImGui auto-extends the table's own height to fit its
+         // content instead of clipping/scrolling at a fixed size (see the
+         // outer_size comment atop imgui_tables.cpp: "outer_size.y = 0.0f
+         // -> will auto extend"). That auto-extension is what actually
+         // drove the fill-to-bottom loop below to runaway - each filler
+         // row grew the table, which grew what GetWindowHeight() reported
+         // for it, so the loop's own target kept receding. Pinning the
+         // height to this panel's available height (captured above, before
+         // the table exists) gives the loop a stable target to fill to.
+         if (ImGui::BeginTable("##modmatrixtable", 9, flags, ImVec2(0.0f, panelSize.y)))
          {
             // Fixed, non-resizable widths rather than the stretch/drag
             // behaviour ImGui tables default to - dragging columns around
@@ -17150,7 +17162,6 @@ namespace
             // Source in place, but Unbind erases it - break immediately
             // after that fires rather than continuing to iterate a map
             // that just lost the element the for-loop machinery is on.
-            int rowCount = 0;
             for (const auto& link : mod.Links())
             {
                const int dstIndex = link.first.first;
@@ -17163,7 +17174,6 @@ namespace
 
                ImGui::PushID(dstIndex * 1000 + dstParam);
                ImGui::TableNextRow();
-               rowCount++;
 
                // Resolve against this frame's ParamRef when the destination
                // drew this frame (the same lazy legacy-conversion pass the
@@ -17293,19 +17303,52 @@ namespace
             // them between - the user wants the horizontal lines filled in
             // the rest of the way regardless, like a spreadsheet, rather
             // than having the ruled area grow every time a binding is added.
-            // Pad out with empty rows until the table's own borders reach
-            // the bottom of the panel.
-            const float rowH = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().CellPadding.y * 2.0f;
-            const float used = rowH * (rowCount + 1); // +1 for the header row
-            const int fillerRows = (int)std::max(0.0f, (panelSize.y - used) / rowH);
-            for (int i = 0; i < fillerRows; ++i)
+            //
+            // Everything here is in window-LOCAL coordinates (GetCursorPosY
+            // adds the window's own scroll back in), never screen ones. A
+            // screen-space target makes the row count a function of how far
+            // the user has scrolled: scrolling down slides the cursor up the
+            // screen while the target stays pinned, so the loop appends one
+            // more row per scroll step, which lengthens the scroll range,
+            // which lets the user scroll further - an endlessly growing
+            // table, which is exactly the "infinite scroll" bug this
+            // replaced. In local coordinates the count depends only on the
+            // panel's fixed height, so it is identical at every scroll
+            // offset.
+            //
+            // Row height is measured from the rows actually emitted rather
+            // than estimated - a real data row (carrying a DragFloat and a
+            // SmallButton) is taller than a plain empty one, so a static
+            // estimate undershot and left an unruled gap at the bottom.
+            const float scrollbarH =
+               ImGui::GetScrollMaxX() > 0.0f ? ImGui::GetStyle().ScrollbarSize : 0.0f;
+            const float visibleH = ImGui::GetWindowHeight() - scrollbarH;
+            float rowH = ImGui::GetTextLineHeightWithSpacing() +
+                         ImGui::GetStyle().CellPadding.y * 2.0f;
+            int guard = 0;
+            while (ImGui::GetCursorPosY() + rowH <= visibleH && guard++ < 500)
             {
+               const float before = ImGui::GetCursorPosY();
                ImGui::TableNextRow();
                for (int col = 0; col < 9; ++col)
                {
                   ImGui::TableNextColumn();
                   ImGui::Dummy(ImVec2(1.0f, ImGui::GetTextLineHeight()));
                }
+               const float after = ImGui::GetCursorPosY();
+               if (after <= before)
+                  break; // cursor stalled - never spin
+               rowH = after - before;
+            }
+
+            // Geometry probe for INFINITE_MODMATRIXGEOM (see the assertions
+            // near the other frame-driven fixtures): the filler count and
+            // the resulting scroll range must not depend on scroll offset.
+            if (getenv("INFINITE_MODMATRIXGEOM") != nullptr)
+            {
+               gModMatrixFillRows = guard;
+               gModMatrixScrollMax = ImGui::GetScrollMaxY();
+               ImGui::SetScrollY(ImGui::GetScrollMaxY()); // pin to the bottom
             }
 
             ImGui::EndTable();
@@ -17379,9 +17422,19 @@ namespace
             ImGui::SameLine();
       }
 
+      // Both branches now pass an explicit, fixed height rather than 0
+      // ("auto-fit to content") for the vertical case: an auto-height
+      // child here feeds into DrawModMatrixTable's ScrollY table, which
+      // itself auto-sizes to "available" space when given no outer_size.y -
+      // the two auto-sizes compound as filler rows are added (each row
+      // grows the child, which grows the table's available region, which
+      // lets it add more rows), spinning the fill-to-bottom loop out to
+      // its guard cap and producing a vastly oversized scroll area. A
+      // fixed height for both orientations keeps that loop's target
+      // stable.
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
       ImGui::BeginChild("##modmatrixpanelcontent",
-                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), 0)
+                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
                         false);
       DrawModMatrixTable();
@@ -26081,7 +26134,8 @@ int main(int argc, char** argv)
          getenv("INFINITE_SIZETEST") != nullptr || getenv("INFINITE_INPUTTEST") != nullptr ||
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr || getenv("INFINITE_OSCTEST") != nullptr ||
-         getenv("INFINITE_MODBOUNDSTEST") != nullptr || getenv("INFINITE_MODMATRIXTEST") != nullptr;
+         getenv("INFINITE_MODBOUNDSTEST") != nullptr || getenv("INFINITE_MODMATRIXTEST") != nullptr ||
+         getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
       {
@@ -27484,6 +27538,22 @@ int main(int argc, char** argv)
             // simplest way to reproduce it without a real Random node.
             SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f);
             gNodes[0].showParams = true; // params must be drawn for them to register
+         }
+         if (getenv("INFINITE_MODMATRIXGEOM") != nullptr)
+         {
+            // A bound link is required: DrawModMatrixTable shows "No active
+            // modulations" and never calls BeginTable at all when
+            // mod.Links() is empty, which would make the geometry probe
+            // below trivially (and meaninglessly) pass.
+            SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f);
+            gNodes[0].showParams = true; // params must be drawn for them to register
+            gModMatrixOpen = true;
+            // Defaults to the right dock (the orientation the scroll bug
+            // showed up in); INFINITE_MODMATRIXDOCK overrides it so the
+            // other three can be checked too.
+            gModMatrixDock = getenv("INFINITE_MODMATRIXDOCK") != nullptr
+                                ? atoi(getenv("INFINITE_MODMATRIXDOCK"))
+                                : 1;
          }
          if (getenv("INFINITE_MODMATRIXTEST") != nullptr)
          {
@@ -37688,6 +37758,50 @@ int main(int argc, char** argv)
             // would race it and drop this frame's printf output when stdout
             // is fully-buffered (i.e. always, once redirected to a file).
             printf("%s\n", (test1Ok && test2Ok && test3Ok) ? "MOD BOUNDS TEST OK" : "SUSPECT");
+         }
+      }
+
+      if (getenv("INFINITE_MODMATRIXGEOM") != nullptr)
+      {
+         // The matrix pads itself out with empty rows so its horizontal
+         // grid lines reach the bottom of the panel. That padding must be
+         // computed in scroll-invariant coordinates: a screen-space target
+         // grew the table by one row per scroll step, so the scroll range
+         // extended every time the user reached the bottom and the table
+         // scrolled without end. The probe above pins scroll to the bottom
+         // every frame, so an offset-dependent count shows up here as a
+         // row count (and scroll range) that keeps climbing.
+         //
+         // Needs one bound link: DrawModMatrixTable shows "No active
+         // modulations" and skips BeginTable entirely with none, which
+         // would make the checks below trivially pass without ever
+         // exercising the fill loop.
+         static int sidesParam = -1;
+         Modulation& mod = Modulation::Instance();
+         if (frameId == 1)
+         {
+            for (const ParamRef& ref : mod.FrameParams())
+               if (ref.nodeIndex == gNodes[0].index && ref.name == "sides")
+                  sidesParam = ref.paramIndex;
+            mod.Bind(gNodes[0].index, sidesParam, gNodes[2].index);
+         }
+         static int firstRows = -1;
+         static bool drifted = false;
+         if (gModMatrixFillRows >= 0)
+         {
+            if (firstRows < 0 && frameId > 3)
+               firstRows = gModMatrixFillRows;
+            else if (firstRows >= 0 && gModMatrixFillRows != firstRows)
+               drifted = true;
+         }
+         if (frameId == 24)
+         {
+            const bool ok = !drifted && firstRows > 0 && gModMatrixScrollMax <= 0.0f;
+            printf("modmatrix geom (fill stable under scroll) rows=%d firstRows=%d "
+                   "drifted=%d scrollMax=%.1f  %s\n",
+                   gModMatrixFillRows, firstRows, (int)drifted, gModMatrixScrollMax,
+                   ok ? "OK" : "- BUG");
+            printf("%s\n", ok ? "MOD MATRIX GEOM OK" : "SUSPECT");
          }
       }
 
