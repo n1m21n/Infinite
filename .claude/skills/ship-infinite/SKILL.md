@@ -74,6 +74,22 @@ nodes are expected to follow — see the `new-audio-node`/`new-effect-node`/
 `new-geometry-node` skills). A node type registered without a matching
 help-text entry won't be flagged by name, only by its `REGISTER_NODE` line.
 
+## One release, not one per version
+
+This project keeps exactly **one** downloadable GitHub Release (whichever
+one GitHub marks "latest") — `release` never runs `gh release create`, it
+always uploads onto the existing latest release with `--clobber`. Older
+tagged releases (e.g. `v0.1`) predate this policy and are left alone as
+history, but new versions do not get their own tag/release; only the
+current DMG/zips are ever downloadable from the Releases page. If you
+genuinely want a new versioned release (a real major-version cut, not a
+routine rebuild), that's a deliberate `gh release create` run by hand —
+outside this skill.
+
+Since assets are clobbered onto the same tag, the tag's release notes are
+the only place version history can live — see
+[Changelog](#changelog) below for how that's kept.
+
 ## Release (DMG)
 
 `release` runs `package.sh` unmodified — see that file for what it does
@@ -116,6 +132,45 @@ ARM64 job is `continue-on-error`, so the workflow can be green with only
 the x64 artifact present) all just print a warning and return — they never
 fail the overall `release` step, since the DMG and website deploy already
 went through by the time this runs.
+
+## Changelog
+
+Runs automatically as the last step of `release`, right after the Windows
+upload. Since this project only ever has one downloadable release (see
+above), the release notes are where version history has to accumulate —
+so this appends a dated, auto-generated entry rather than overwriting the
+hand-written description at the top of the notes:
+
+```
+## Changelog
+
+### 2026-08-24
+- Add in-app update checker for macOS and Windows
+- Remove Group from the palette, disable resizing, drag from anywhere
+```
+
+New entries are inserted newest-first, right under the `## Changelog`
+heading (created on first run if it doesn't exist yet). The commit list
+comes from `git log --no-merges <last-shipped-sha>..HEAD`, with commits
+whose subject starts with `Release: ` filtered out (those are DMG-rebuild
+mechanics, not user-facing changes).
+
+"Last shipped" is tracked in a committed marker file,
+`.claude/skills/ship-infinite/last-release-sha.txt` — not the release's
+git tag, because the tag's commit never moves (assets are clobbered onto
+it without retagging), so the tag alone can't tell you what's new since
+last time. The marker file updates every `release` run and needs to be
+committed and pushed like any other change — it's part of what the
+follow-up `commit`/`push` after `release` should include. The very first
+time this runs (no marker file yet) it just records the current commit as
+a baseline and logs nothing, since there's no prior release to diff
+against.
+
+Can also be run standalone:
+
+```bash
+.claude/skills/ship-infinite/driver.sh changelog <tag>   # e.g. v0.2-preview
+```
 
 ## Cleanup
 

@@ -106,6 +106,84 @@ step_release() {
     echo "    uploaded website/assets/Infinite.dmg onto release $tag"
 
     step_release_windows "$tag"
+    step_changelog "$tag"
+}
+
+# -------------------------------------------------------------- changelog ---
+# This project keeps exactly ONE downloadable release (whatever GitHub marks
+# "latest") — asset uploads above always --clobber onto it rather than
+# tagging a new release per version. So the version history has to live in
+# that release's notes instead of in a list of separate releases. This
+# appends a dated "## Changelog" entry summarizing commits since the last
+# time this ran, rather than replacing the hand-written description above
+# the Downloads table.
+#
+# "Since last time" is tracked via a committed marker file (SHA_FILE) rather
+# than the release's git tag, because the tag's commit never moves (assets
+# are clobbered onto the same tag without retagging) — the tag alone can't
+# tell you what's new.
+step_changelog() {
+    local tag="${1:?tag required}"
+    echo "==> release: updating changelog on release $tag"
+
+    local sha_file=".claude/skills/ship-infinite/last-release-sha.txt"
+    local head_sha
+    head_sha=$(git rev-parse HEAD)
+
+    if [ ! -f "$sha_file" ]; then
+        echo "    no $sha_file yet — recording current HEAD as the baseline, nothing to log this run"
+        echo "$head_sha" > "$sha_file"
+        return 0
+    fi
+    local last_sha
+    last_sha=$(cat "$sha_file")
+    if [ "$last_sha" = "$head_sha" ]; then
+        echo "    HEAD unchanged since last changelog update — skipping"
+        return 0
+    fi
+
+    local entries
+    entries=$(git log --no-merges --pretty=format:'%s' "$last_sha..$head_sha" \
+        | grep -vi '^Release: ' || true)
+    if [ -z "$entries" ]; then
+        echo "    no non-release commits since last changelog update — skipping"
+        echo "$head_sha" > "$sha_file"
+        return 0
+    fi
+
+    local today
+    today=$(date +%Y-%m-%d)
+    local new_section
+    new_section="### $today"$'\n'
+    while IFS= read -r line; do
+        new_section+="- $line"$'\n'
+    done <<< "$entries"
+
+    local body tmp section_file
+    body=$(gh release view "$tag" --json body -q .body)
+    tmp=$(mktemp)
+    if echo "$body" | grep -q '^## Changelog$'; then
+        # Insert the new dated section right under the heading (newest first).
+        # `awk -v` can't hold a multi-line string on macOS's stock awk, so
+        # this goes through `sed ... r <file>` instead.
+        section_file=$(mktemp)
+        { echo ""; printf "%s" "$new_section"; } > "$section_file"
+        sed "/^## Changelog\$/r $section_file" <<< "$body" > "$tmp"
+        rm -f "$section_file"
+    else
+        {
+            echo "$body"
+            echo ""
+            echo "## Changelog"
+            echo ""
+            printf "%s" "$new_section"
+        } > "$tmp"
+    fi
+
+    gh release edit "$tag" --notes-file "$tmp"
+    rm -f "$tmp"
+    echo "$head_sha" > "$sha_file"
+    echo "    added changelog entry for $today ($(echo "$entries" | wc -l | tr -d ' ') commit(s))"
 }
 
 # --------------------------------------------------------- release-windows ---
@@ -221,6 +299,7 @@ case "$STEP" in
     nodediff) shift; step_nodediff "$@" ;;
     release) step_release ;;
     release-windows) shift; step_release_windows "$@" ;;
+    changelog) shift; step_changelog "$@" ;;
     cleanup) step_cleanup ;;
     all)
         echo "Use individual subcommands (verify/review/commit/push/nodediff/release/cleanup)."
