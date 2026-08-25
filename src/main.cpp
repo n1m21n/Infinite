@@ -913,19 +913,43 @@ namespace
       const float spacing = ImGui::GetStyle().ItemSpacing.x;
       const float avail = ImGui::GetContentRegionAvail().x;
       const float arrowW = ImGui::GetFrameHeight();
-      const float typeW = typeNames.empty() ? 0.0f : std::max(40.0f, (avail - spacing) * 0.5f);
-      const float sortW = typeNames.empty()
-         ? std::max(40.0f, avail - spacing - arrowW)
-         : std::max(40.0f, avail - spacing - typeW - spacing - arrowW);
+      // DropdownButton appends its own trailing "sort"/"type" caption after
+      // the button, on the same line (see DropdownButton) - budget for that
+      // text and the SameLine spacing on each side of it, or the type
+      // dropdown runs past the panel's right edge instead of ending flush
+      // with it like every other full-width control in this strip.
+      const float sortLabelW = ImGui::CalcTextSize("sort").x;
+      const float typeLabelW = typeNames.empty() ? 0.0f : ImGui::CalcTextSize("type").x;
+      float remaining = avail - arrowW - sortLabelW - 2.0f * spacing;
+      if (!typeNames.empty())
+         remaining -= typeLabelW + 2.0f * spacing;
+      const float typeW = typeNames.empty() ? 0.0f : std::max(40.0f, remaining * 0.5f);
+      const float sortW = typeNames.empty() ? std::max(40.0f, remaining) : std::max(40.0f, remaining - typeW);
 
       DropdownButton("sort", sortNames, state.sortMode, [&state](int i) { state.sortMode = i; }, sortW);
 
       ImGui::SameLine();
-      // U+2191/U+2193 (up/down arrow) rather than a font glyph outside
-      // Basic Latin - see the play-button comment in DrawLibrarySearchPanel
-      // for why this file draws icons as vector shapes or these arrows
-      // instead of trusting the loaded font to have the character.
-      if (ImGui::Button(state.descending ? "\xe2\x86\x93" : "\xe2\x86\x91", ImVec2(arrowW, 0)))
+      // Drawn as a vector triangle on the button, not a Unicode arrow
+      // character - see the play/pause button's comment in
+      // DrawLibrarySearchPanel: the UI font has no glyph range beyond Basic
+      // Latin, so U+2191/U+2193 here rendered as a literal '?'.
+      const bool dirClicked = ImGui::Button("##sortdir", ImVec2(arrowW, 0));
+      {
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 bmin = ImGui::GetItemRectMin();
+         const ImVec2 bmax = ImGui::GetItemRectMax();
+         const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+         const float h = (bmax.y - bmin.y) * 0.22f;
+         const float w = h * 0.95f;
+         const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(255, 255, 255, 255) : IM_COL32(215, 218, 228, 255);
+         if (state.descending)
+            dl->AddTriangleFilled(ImVec2(center.x - w, center.y - h * 0.5f), ImVec2(center.x + w, center.y - h * 0.5f),
+                                   ImVec2(center.x, center.y + h * 0.7f), col);
+         else
+            dl->AddTriangleFilled(ImVec2(center.x - w, center.y + h * 0.5f), ImVec2(center.x + w, center.y + h * 0.5f),
+                                   ImVec2(center.x, center.y - h * 0.7f), col);
+      }
+      if (dirClicked)
          state.descending = !state.descending;
 
       if (!typeNames.empty())
@@ -9993,7 +10017,32 @@ namespace
          ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
          if (scanning)
             ImGui::BeginDisabled();
-         if (ImGui::Button("\xe2\x86\xbb", ImVec2(btnW, 0))) // U+21BB clockwise open circle arrow
+         // Drawn as a vector arc-with-arrowhead, not the U+21BB clockwise
+         // arrow character it used to be - this font has no glyph range
+         // beyond Basic Latin (see DrawBrowserFilterStrip's sort-direction
+         // comment), so that rendered as a literal '?'.
+         const bool refreshClicked = ImGui::Button("##refreshfolder", ImVec2(btnW, 0));
+         {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            const float r = (bmax.y - bmin.y) * 0.28f;
+            const ImU32 col = ImGui::IsItemHovered() || scanning ? IM_COL32(255, 255, 255, 255) : IM_COL32(215, 218, 228, 255);
+            const float aMin = -2.35f, aMax = 2.0f; // ~250 degree sweep, gap at lower-left
+            dl->PathArcTo(center, r, aMin, aMax, 16);
+            dl->PathStroke(col, 0, 1.6f);
+            const ImVec2 tip(center.x + r * cosf(aMax), center.y + r * sinf(aMax));
+            const ImVec2 tangent(-sinf(aMax), cosf(aMax));
+            const ImVec2 normal(-tangent.y, tangent.x);
+            const float headLen = r * 0.9f;
+            dl->AddTriangleFilled(
+               ImVec2(tip.x + normal.x * headLen * 0.55f, tip.y + normal.y * headLen * 0.55f),
+               ImVec2(tip.x - normal.x * headLen * 0.55f, tip.y - normal.y * headLen * 0.55f),
+               ImVec2(tip.x + tangent.x * headLen * 0.7f, tip.y + tangent.y * headLen * 0.7f),
+               col);
+         }
+         if (refreshClicked)
             folderToScan = folder;
          if (scanning)
             ImGui::EndDisabled();
