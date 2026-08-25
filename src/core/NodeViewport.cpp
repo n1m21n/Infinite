@@ -91,15 +91,23 @@ namespace
       "   fragColor = vec4(color, 1.0);\n"
       "}\n";
 
-   // Selection overlay, same idea as Render3DNode's kSelectVertSrc/kSelectFragSrc
-   // in Geometry3DNodes.cpp - flat, unlit tint so it reads as an annotation
-   // rather than a material.
+   // Selection overlay - flat, unlit tint so it reads as an annotation rather
+   // than a material. Render3DNode has no selection overlay of its own (the
+   // highlight only ever appears here and in the viewport-panel cards), so
+   // this isn't mirroring anything - it just needs the same instanced/
+   // un-instanced model choice kVertSrc uses, or an instanced source draws the
+   // highlight once at unit scale instead of on every instance.
    const char* kSelectVertSrc =
       "#version 150\n"
       "in vec3 aPos;\n"
+      "in mat4 aInstance;\n"
       "uniform mat4 uModel;\n"
       "uniform mat4 uViewProj;\n"
-      "void main() { gl_Position = uViewProj * uModel * vec4(aPos, 1.0); }\n";
+      "uniform int uInstanced;\n"
+      "void main() {\n"
+      "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "   gl_Position = uViewProj * model * vec4(aPos, 1.0);\n"
+      "}\n";
 
    const char* kSelectFragSrc =
       "#version 150\n"
@@ -214,6 +222,9 @@ namespace
 
       unsigned int program = glCreateProgram();
       glBindAttribLocation(program, 0, "aPos");
+      // Attribs 2-5 are free in mSelVao (it otherwise uses only attrib 0) -
+      // same mat4-occupies-four-locations layout as LinkLitProgram's aInstance.
+      glBindAttribLocation(program, 2, "aInstance");
       glAttachShader(program, vert);
       glAttachShader(program, frag);
       glLinkProgram(program);
@@ -805,6 +816,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          const float selColor[3] = { 1.0f, 0.42f, 0.12f };
          glUniform3fv(glGetUniformLocation(selectionProgram, "uColor"), 1, selColor);
          glUniform1f(glGetUniformLocation(selectionProgram, "uOpacity"), 0.55f);
+         glUniform1i(glGetUniformLocation(selectionProgram, "uInstanced"), instanced ? 1 : 0);
 
          glDepthFunc(GL_LEQUAL);
          glEnable(GL_POLYGON_OFFSET_FILL);
@@ -814,7 +826,42 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
          glBindVertexArray(mSelVao);
-         glDrawElements(GL_TRIANGLES, mSelIndexCount, GL_UNSIGNED_INT, nullptr);
+         // mInstanceVbo is generated/populated in the main draw block above,
+         // which always runs before this - by the time we get here in an
+         // instanced frame it's guaranteed non-zero. Configuring these attribs
+         // here (not in UpdateSelectionBuffer, which can run before the main
+         // block has ever created mInstanceVbo) avoids binding buffer 0.
+         if (instanced && !mSelInstanceAttribsOn)
+         {
+            glBindBuffer(GL_ARRAY_BUFFER, mInstanceVbo);
+            for (int col = 0; col < 4; col++)
+            {
+               const unsigned int loc = 2 + col;
+               glEnableVertexAttribArray(loc);
+               glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
+                                     (void*)(size_t)(col * 4 * sizeof(float)));
+               glVertexAttribDivisor(loc, 1);
+            }
+            mSelInstanceAttribsOn = true;
+         }
+         else if (!instanced && mSelInstanceAttribsOn)
+         {
+            for (int col = 0; col < 4; col++)
+            {
+               glDisableVertexAttribArray(2 + col);
+               glVertexAttribDivisor(2 + col, 0);
+            }
+            mSelInstanceAttribsOn = false;
+         }
+         if (instanced)
+         {
+            glDrawElementsInstanced(GL_TRIANGLES, mSelIndexCount, GL_UNSIGNED_INT, nullptr,
+                                    (GLsizei)mInstanceCount);
+         }
+         else
+         {
+            glDrawElements(GL_TRIANGLES, mSelIndexCount, GL_UNSIGNED_INT, nullptr);
+         }
          glBindVertexArray(0);
          glUseProgram(0);
 

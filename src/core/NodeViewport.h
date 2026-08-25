@@ -78,6 +78,12 @@ private:
    unsigned int mSelVao = 0, mSelIbo = 0;
    int mSelIndexCount = 0;
    unsigned long long mSelRevision = (unsigned long long)-1;
+   // Whether mSelVao's aInstance attribs (2-5) currently point at mInstanceVbo.
+   // Configured in the draw path alongside mInstanceAttribsOn, never inside
+   // UpdateSelectionBuffer - mInstanceVbo may still be 0 (ungenerated) the
+   // first time UpdateSelectionBuffer runs, and binding it there would wire
+   // mSelVao's attribs to buffer 0 permanently.
+   bool mSelInstanceAttribsOn = false;
 
    // A pure point-cloud source (Particle System) has no mesh at all - GetMesh()
    // is a permanently-empty stub, see ParticleSystemNode::GetMesh

@@ -39042,5 +39042,16 @@ int main(int argc, char** argv)
    // Everything we actually need torn down already happened above; _Exit
    // skips straight to process termination without running anyone else's
    // destructors.
+   //
+   // _Exit also skips the normal atexit-driven stdio flush, unlike exit()/
+   // return from main. The INFINITE_EXITAFTER harness path already knew this
+   // and fflush(stdout)'d itself before requesting the close - but any
+   // self-test that calls glfwSetWindowShouldClose() directly on its own
+   // verdict (most of them do, e.g. INFINITE_MINIVIEWPORTTEST) reaches here
+   // without ever going through that branch, so its buffered printf verdict
+   // silently vanished whenever stdout was redirected to a file (i.e. every
+   // driver.sh run). One flush here covers every self-test's exit path
+   // instead of requiring each one to remember its own.
+   fflush(stdout);
    std::_Exit(0);
 }
