@@ -3,6 +3,8 @@
 #include "gl3.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 #include "Transport.h"
 
@@ -127,6 +129,109 @@ DrawNode::Stamp DrawNode::MakeStamp(float x, float y, float seed) const
    return s;
 }
 
+// Delta-encoded: "v1" then a stream of terms. A "B..." term updates the
+// running brush state (emitted only when it changes); any other term is a
+// stamp inheriting that state. Keeping brush state out of most stamps is
+// what keeps a real drawing (tens of thousands of stamps) from producing a
+// multi-megabyte patch line - see the comment on VisitParams.
+std::string DrawNode::EncodeRecording(const std::vector<RecordedStamp>& recorded)
+{
+   std::string out = "v1";
+   Stamp running;
+   bool haveState = false;
+   char buf[160];
+   for (const RecordedStamp& r : recorded)
+   {
+      const Stamp& s = r.stamp;
+      const bool changed = !haveState ||
+         s.brush != running.brush || s.size != running.size || s.opacity != running.opacity ||
+         s.hardness != running.hardness || s.erase != running.erase ||
+         s.color[0] != running.color[0] || s.color[1] != running.color[1] || s.color[2] != running.color[2];
+      if (changed)
+      {
+         snprintf(buf, sizeof(buf), ";B%d,%.6g,%.6g,%.6g,%d,%.6g,%.6g,%.6g",
+                  s.brush, (double)s.size, (double)s.opacity, (double)s.hardness,
+                  s.erase ? 1 : 0, (double)s.color[0], (double)s.color[1], (double)s.color[2]);
+         out += buf;
+         running = s;
+         haveState = true;
+      }
+      snprintf(buf, sizeof(buf), ";%.6g,%.6g,%.6g,%.9g", (double)s.x, (double)s.y, (double)s.seed, r.beat);
+      out += buf;
+   }
+   return out;
+}
+
+std::vector<DrawNode::RecordedStamp> DrawNode::DecodeRecording(const std::string& str)
+{
+   std::vector<RecordedStamp> recorded;
+   Stamp running;
+   bool haveState = false;
+   bool first = true;
+   size_t start = 0;
+   while (start <= str.size())
+   {
+      const size_t sep = str.find(';', start);
+      const std::string term = str.substr(start, sep == std::string::npos ? std::string::npos : sep - start);
+
+      if (first)
+      {
+         first = false; // version tag, ignored - nothing to parse yet
+      }
+      else if (!term.empty() && term[0] == 'B')
+      {
+         const std::string body = term.substr(1);
+         std::vector<std::string> parts;
+         size_t p = 0;
+         while (p <= body.size())
+         {
+            const size_t c = body.find(',', p);
+            parts.push_back(body.substr(p, c == std::string::npos ? std::string::npos : c - p));
+            if (c == std::string::npos)
+               break;
+            p = c + 1;
+         }
+         if (parts.size() >= 8)
+         {
+            Stamp s;
+            s.brush = atoi(parts[0].c_str());
+            s.size = (float)atof(parts[1].c_str());
+            s.opacity = (float)atof(parts[2].c_str());
+            s.hardness = (float)atof(parts[3].c_str());
+            s.erase = atoi(parts[4].c_str()) != 0;
+            s.color[0] = (float)atof(parts[5].c_str());
+            s.color[1] = (float)atof(parts[6].c_str());
+            s.color[2] = (float)atof(parts[7].c_str());
+            running = s;
+            haveState = true;
+         }
+         // malformed brush term: skip it, keep the previous running state
+      }
+      else if (!term.empty() && haveState)
+      {
+         const size_t c1 = term.find(',');
+         const size_t c2 = c1 == std::string::npos ? std::string::npos : term.find(',', c1 + 1);
+         const size_t c3 = c2 == std::string::npos ? std::string::npos : term.find(',', c2 + 1);
+         if (c1 != std::string::npos && c2 != std::string::npos && c3 != std::string::npos)
+         {
+            RecordedStamp r;
+            r.stamp = running;
+            r.stamp.x = (float)atof(term.substr(0, c1).c_str());
+            r.stamp.y = (float)atof(term.substr(c1 + 1, c2 - c1 - 1).c_str());
+            r.stamp.seed = (float)atof(term.substr(c2 + 1, c3 - c2 - 1).c_str());
+            r.beat = atof(term.substr(c3 + 1).c_str());
+            recorded.push_back(r);
+         }
+         // malformed stamp term: skip it
+      }
+
+      if (sep == std::string::npos)
+         break;
+      start = sep + 1;
+   }
+   return recorded;
+}
+
 void DrawNode::StartRecording()
 {
    mRecorded.clear();
@@ -173,7 +278,7 @@ void DrawNode::BeginStroke(float x, float y)
    mSeedCounter += 3.77f;
    const Stamp s = MakeStamp(x, y, mSeedCounter);
    mPending.push_back(s);
-   if (mRecording)
+   if (mRecording && mRecorded.size() < kMaxRecordedStamps)
       mRecorded.push_back({ s, Transport::Instance().Beats() - mRecordStartBeat });
    mStrokeCount++;
 }
@@ -208,7 +313,7 @@ void DrawNode::ContinueStroke(float x, float y)
       }
       const Stamp s = MakeStamp(mLastX + dx * t + jx, mLastY + dy * t + jy, mSeedCounter);
       mPending.push_back(s);
-      if (mRecording)
+      if (mRecording && mRecorded.size() < kMaxRecordedStamps)
          mRecorded.push_back({ s, Transport::Instance().Beats() - mRecordStartBeat });
    }
    mLastX = x;

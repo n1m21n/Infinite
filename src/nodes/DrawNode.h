@@ -53,6 +53,7 @@ public:
    size_t RecordedStamps() const { return mRecorded.size(); }
    double RecordedLength() const { return mRecorded.empty() ? 0.0 : mRecorded.back().beat; }
    double PlayheadBeats() const { return mPlayhead; }
+   bool RecordingCapped() const { return mRecorded.size() >= kMaxRecordedStamps; }
 
    bool loopPlayback = true;
    float playSpeed = 1.0f;
@@ -68,9 +69,15 @@ public:
    float canvasWidth = 1024.0f;
    float canvasHeight = 1024.0f;
 
-   // The painted canvas and stroke recording are runtime state, not settings -
-   // like a video frame, they are not reasonable to round-trip through a text
-   // patch file. Only the brush configuration is persisted.
+   // The painted canvas is runtime state, not a setting - like a video frame,
+   // it is not reasonable to round-trip through a text patch file. The stroke
+   // recording, however, is just a list of small structs (the same shape of
+   // data MacroXYNode's XY-pad path already persists), so it is encoded into a
+   // Text param. Brush state is delta-encoded - emitted only when it changes
+   // from the previous stamp - because a real drawing can produce tens of
+   // thousands of stamps, and PushUndoCheckpoint saves every node's params on
+   // every graph edit, so a naive per-stamp encoding would bloat both the
+   // patch file and the (200-deep) undo stack.
    void VisitParams(ParamVisitor& v) override
    {
       v.Bool("loopPlayback", loopPlayback); v.Float("playSpeed", playSpeed);
@@ -79,6 +86,9 @@ public:
       v.Float("spacing", spacing); v.Float("jitter", jitter);
       v.Bool("eraser", eraser); v.Color("color", color);
       v.Float("canvasWidth", canvasWidth); v.Float("canvasHeight", canvasHeight);
+      std::string encoded = EncodeRecording(mRecorded);
+      v.Text("recording", encoded);
+      mRecorded = DecodeRecording(encoded);
    }
 
 private:
@@ -107,6 +117,11 @@ private:
 
    bool EnsureShaders();
    void FlushStamps();
+
+   static std::string EncodeRecording(const std::vector<RecordedStamp>& recorded);
+   static std::vector<RecordedStamp> DecodeRecording(const std::string& s);
+
+   static constexpr size_t kMaxRecordedStamps = 200000;
 
    ImageCable mInput;
    GLUtil::Fbo mCanvas;     // the painted layer alone

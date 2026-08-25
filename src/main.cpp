@@ -16833,6 +16833,8 @@ namespace
          ImGui::TextDisabled("%zu marks over %.1f beats", n->RecordedStamps(), n->RecordedLength());
          if (n->IsPlayingBack())
             ImGui::TextColored(ImVec4(0.5f, 0.95f, 0.6f, 1.0f), "playhead %.1f", n->PlayheadBeats());
+         if (n->RecordingCapped())
+            ImGui::TextDisabled("recording capped - further strokes won't be recorded");
       }
       ImGui::Checkbox("loop replay", &n->loopPlayback);
       ModSlider("replay speed", &n->playSpeed, 0.1f, 4.0f);
