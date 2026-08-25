@@ -18443,7 +18443,7 @@ namespace
             ImGui::TableHeadersRow();
             struct Row { const char* a; const char* b; };
             static const Row rows[] = {
-               { "Add a node", "Right-click or double-click the canvas, then type to filter" },
+               { "Add a node", "Right-click or double-click the canvas, then type to filter - or press Shift+N anywhere (Shift+N again closes it)" },
                { "Note on the canvas", "Press / and start typing. Double-click an existing note to edit it." },
                { "Connect", "Drag from a node's 'out' dot to another node's input dot" },
                { "Modulate a parameter", "Drag a modulator's 'out' onto the small dot beside any slider" },
@@ -18453,7 +18453,12 @@ namespace
                { "Rubber-band select", "Shift + drag" },
                { "Duplicate", "Cmd+C / Cmd+V, or Shift+D / Cmd+D to duplicate in place" },
                { "Select several", "Shift + drag a box around them, or Shift-click (or Ctrl-click) each one to add it. Then move, duplicate or delete as a group." },
-               { "Delete", "Select, then Delete or Backspace" },
+               { "Delete", "Select, then Delete, Backspace or Shift+X" },
+               { "Delete a cable", "Click the cable, then press X" },
+               { "Open in the viewport panel", "Select nodes, then Shift+V (again to close them)" },
+               { "Hide / show params", "Shift+H - the selected nodes, or every node when nothing is selected" },
+               { "Modulation matrix", "Shift+M toggles the docked matrix of every active binding" },
+               { "Audio engine on / off", "Shift+K, same as the top bar's Start/Stop Audio" },
                { "Zoom", "Scroll (speed is adjustable in the Menu)" },
                { "Play / pause everything", "Play button in the top bar" },
             };
@@ -28102,6 +28107,14 @@ int main(int argc, char** argv)
 
    char searchBuf[128] = "";
    bool searchJustOpened = false;
+   // Shift+N is a toggle, so the keyboard block (which runs before the popup is
+   // drawn) needs to know whether the picker is already up. ImGui::IsPopupOpen
+   // can't be trusted from there - the other OpenPopup("search") call sites sit
+   // inside ed::BeginCreate()/Suspend() scopes with their own ID stacks - so the
+   // popup reports its own visibility here instead, one frame behind, and the
+   // close is deferred to inside the popup where CloseCurrentPopup() is legal.
+   bool searchPopupOpen = false;
+   bool searchRequestClose = false;
    std::vector<std::string> clipboard;      // typeNames copied
    std::vector<INode*> clipboardSources;    // live sources to copy params from
    std::vector<int> clipboardOrigIndex;     // gNodes index each item had at copy time
@@ -36371,8 +36384,194 @@ int main(int argc, char** argv)
           ImGui::IsKeyPressed(ImGuiKey_Space, false))
          Transport::Instance().TogglePlay();
 
+      // ---- Shift+<letter> canvas shortcuts ----
+      // One family, all reachable with the left hand while the right stays on
+      // the trackpad: V/X act on the selection, M/N/H/K are canvas-wide
+      // toggles. All of them are gated on Shift alone (never Cmd/Ctrl), so
+      // they can't collide with the system/menu bindings above.
+      const bool shiftOnly = !cmdOrCtrl && io.KeyShift;
+
+      // Shift+V: open every eligible selected node in the docked viewport
+      // panel. A toggle rather than a one-way add - if everything eligible in
+      // the selection already has a card, the same keystroke closes them,
+      // so the panel doesn't accumulate cards with no keyboard way back out.
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_V, false))
+      {
+         const int count = ed::GetSelectedObjectCount();
+         if (count > 0)
+         {
+            std::vector<ed::NodeId> selNodes(count);
+            const int nodeCount = ed::GetSelectedNodes(selNodes.data(), count);
+
+            std::vector<int> eligible;
+            for (int i = 0; i < nodeCount; i++)
+            {
+               GraphNode* gn = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+               // Same gate as the "Open in viewport panel" context-menu entry,
+               // so the keyboard can never open a card the menu wouldn't -
+               // modulators, cameras/lights, comments and audio nodes have no
+               // texture to show and would render an empty box.
+               if (gn != nullptr && CanShowInViewportPanel(*gn))
+                  eligible.push_back(gn->index);
+            }
+
+            bool allOpen = !eligible.empty();
+            for (int idx : eligible)
+            {
+               if (std::find(gViewportPanelNodes.begin(), gViewportPanelNodes.end(), idx) ==
+                   gViewportPanelNodes.end())
+                  allOpen = false;
+            }
+            for (int idx : eligible)
+            {
+               auto it = std::find(gViewportPanelNodes.begin(), gViewportPanelNodes.end(), idx);
+               if (allOpen)
+               {
+                  if (it != gViewportPanelNodes.end())
+                     gViewportPanelNodes.erase(it);
+               }
+               else if (it == gViewportPanelNodes.end())
+               {
+                  gViewportPanelNodes.push_back(idx);
+               }
+            }
+         }
+      }
+
+      // Shift+M: the docked modulation matrix, same panel the modulator
+      // context menu's "Show modulation matrix" opens.
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_M, false))
+         gModMatrixOpen = !gModMatrixOpen;
+
+      // Shift+N: the type-to-filter node picker, without having to find empty
+      // canvas to double-click. Pressed again it closes, so the same key gets
+      // you back out. The close has to be deferred into the popup body (see
+      // searchRequestClose) and is deliberately NOT gated on `typing`, since
+      // the picker's own text field owns the keyboard the whole time it's up.
+      // Safe to claim: the picker lowercases both query and candidate names,
+      // so a capital letter is never needed to find a node.
+      if (!cmdOrCtrl && io.KeyShift && (!typing || searchPopupOpen) &&
+          ImGui::IsKeyPressed(ImGuiKey_N, false))
+      {
+         if (searchPopupOpen)
+         {
+            searchRequestClose = true;
+         }
+         else
+         {
+            // The pointer is only meaningful over the canvas; anywhere else the
+            // middle of the view is the only sensible spawn point - same rule
+            // the "/" comment shortcut above uses.
+            const ImVec2 mouse = ImGui::GetMousePos();
+            const bool overGraph = mouse.x >= gGraphScreenTL.x &&
+                                   mouse.y >= gGraphScreenTL.y &&
+                                   mouse.x <= gGraphScreenTL.x + gGraphScreenSize.x &&
+                                   mouse.y <= gGraphScreenTL.y + gGraphScreenSize.y;
+            gSpawnPos = overGraph ? ed::ScreenToCanvas(mouse) : gViewCenterCanvas;
+            gLinkDragSourcePin = -1;
+            gLinkDragSuggestions.clear();
+            searchBuf[0] = '\0';
+            searchJustOpened = true;
+            ImGui::OpenPopup("search");
+         }
+         // The 'N' is already queued as a character for this frame; without
+         // this every picker opened from the keyboard starts pre-filled with
+         // it (and the closing press would type into whatever takes focus next).
+         io.InputQueueCharacters.resize(0);
+      }
+
+      // Shift+H: hide/show node params. With a selection it toggles just those
+      // nodes; with nothing selected it acts on the whole canvas, mirroring the
+      // menu's "Show all params"/"Hide all params" pair as one key. Audio nodes
+      // are skipped - their params are always visible by design (see the
+      // context menu's identical carve-out), so they must not count toward
+      // "is anything showing?" either, or a canvas of audio nodes would make
+      // the first press a no-op.
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_H, false))
+      {
+         std::vector<GraphNode*> targets;
+         const int count = ed::GetSelectedObjectCount();
+         if (count > 0)
+         {
+            std::vector<ed::NodeId> selNodes(count);
+            const int nodeCount = ed::GetSelectedNodes(selNodes.data(), count);
+            for (int i = 0; i < nodeCount; i++)
+            {
+               GraphNode* gn = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+               if (gn != nullptr && !IsAudioBodyNode(gn->node.get()))
+                  targets.push_back(gn);
+            }
+         }
+         else
+         {
+            for (GraphNode& gn : gNodes)
+               if (!IsAudioBodyNode(gn.node.get()))
+                  targets.push_back(&gn);
+         }
+
+         if (!targets.empty())
+         {
+            // "Anything still showing" -> hide, else show. A mixed selection
+            // therefore collapses first and expands second, which is the
+            // behaviour that reads as a toggle rather than a shuffle.
+            bool anyShown = false;
+            for (GraphNode* gn : targets)
+               anyShown = anyShown || gn->showParams;
+            for (GraphNode* gn : targets)
+               gn->showParams = !anyShown;
+         }
+      }
+
+      // Shift+K: the audio engine, same on/off the toolbar's Start/Stop Audio
+      // button drives - routed through StartAudioEngine rather than
+      // AudioEngine::Start() so a patch loaded while the engine was off gets
+      // re-prepared at the device's rate (see StartAudioEngine's comment).
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_K, false))
+      {
+         if (AudioEngine::Instance().SampleRate() > 0.0)
+         {
+            AudioEngine::Instance().Stop();
+         }
+         else
+         {
+            gAudioStartError.clear();
+            if (!StartAudioEngine(gAudioStartError))
+               fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
+         }
+      }
+
+      // X on its own deletes selected cables and nothing else, so a mis-aimed
+      // click on a node can't silently take the node with it. Shift+X is the
+      // broader "delete what's selected", handled by the Delete/Backspace
+      // block below.
+      if (!typing && !cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_X, false))
+      {
+         const int count = ed::GetSelectedObjectCount();
+         if (count > 0)
+         {
+            std::vector<ed::LinkId> selLinks(count);
+            const int linkCount = ed::GetSelectedLinks(selLinks.data(), count);
+            if (linkCount > 0)
+            {
+               // One checkpoint for the batch - DisconnectLinkById pushes its
+               // own otherwise, so undoing a multi-cable delete would claw
+               // back one cable per press (same fix as the block below).
+               PushUndoCheckpoint();
+               gSuppressUndoCheckpoints = true;
+               for (int i = 0; i < linkCount; i++)
+               {
+                  DisconnectLinkById((int)selLinks[i].Get());
+                  ed::DeleteLink(selLinks[i]);
+               }
+               gSuppressUndoCheckpoints = false;
+               ed::ClearSelection();
+            }
+         }
+      }
+
       if (!typing && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
-                      ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
+                      ImGui::IsKeyPressed(ImGuiKey_Backspace, false) ||
+                      (shiftOnly && ImGui::IsKeyPressed(ImGuiKey_X, false))))
       {
          int count = ed::GetSelectedObjectCount();
          if (count > 0)
@@ -37532,6 +37731,15 @@ int main(int argc, char** argv)
       ImGui::SetNextWindowSizeConstraints(ImVec2(300, 0), ImVec2(400, 440));
       if (ImGui::BeginPopup("search"))
       {
+         searchPopupOpen = true;
+         // Shift+N pressed again while the picker was up - see searchRequestClose.
+         if (searchRequestClose)
+         {
+            searchRequestClose = false;
+            searchPopupOpen = false;
+            searchJustOpened = false;
+            ImGui::CloseCurrentPopup();
+         }
          if (searchJustOpened)
          {
             ImGui::SetKeyboardFocusHere();
@@ -37664,6 +37872,8 @@ int main(int argc, char** argv)
          // inherit a stale suggestion list from an earlier drag.
          gLinkDragSourcePin = -1;
          gLinkDragSuggestions.clear();
+         searchPopupOpen = false;
+         searchRequestClose = false;
       }
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(220, 0), ImVec2(420, 480));
