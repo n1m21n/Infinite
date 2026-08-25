@@ -1,189 +1,227 @@
-# Infinite
+# Infinite Windows R31a
 
-A unified node-based audiovisual modular workstation for macOS and Windows. Real-time GPU image and video compositing, procedural 3D geometry and simulation, and a full modular synthesizer and DSP rack with Audio Unit hosting on macOS or VST3 hosting on Windows, all interconnected through a universal modulation graph.
+[![Windows x64](https://github.com/ricardopalmieri/Infinite/actions/workflows/windows-build.yml/badge.svg?branch=windows%2Fr31a-snapshot)](https://github.com/ricardopalmieri/Infinite/actions/workflows/windows-build.yml)
+[![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
+[![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-> **Windows source build:** run `install-dependencies.bat` once, accept the automatic UAC prompt, then run `build-windows.bat`. **Prebuilt GitHub Release:** extract the runtime ZIP, run `install-runtime.bat` once, then use `run-windows.bat`. Do not run the dependency compiler installer for a prebuilt release. The port uses WASAPI/MIDI through JUCE, VST3, Spout2, OpenCV, FFmpeg and Assimp. See [WINDOWS_BUILD.md](WINDOWS_BUILD.md) for the complete feature map and troubleshooting.
+Infinite is a node-based audiovisual modular workstation combining realtime image and video processing, procedural 3D, audio synthesis, DSP, plugin hosting, MIDI, OSC and cross-domain CV modulation.
 
-Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeSynth/BespokeSynth)'s module system — a registry of node types, typed cables, and a pull-based cook-once-per-frame DAG — extended across GPU textures, procedural geometry, and real-time audio buffers.
+This branch contains the complete community Windows R31a port. It was developed from upstream commit [`788404a`](https://github.com/n1m21n/Infinite/commit/788404af4b378941394e2d5dcc45c5542cc903fd) and tested as a standalone Windows 11 application.
 
-![node graph](docs/screenshot.png)
+> The original project was created by [Naman Soni](https://github.com/n1m21n). The Windows R31a port was developed and tested by [Ricardo Palmieri](https://github.com/ricardopalmieri) / Noisetupi. This branch is provided for testing, collaboration and eventual upstream integration.
 
----
+![Infinite node graph](docs/screenshot.png)
 
-## Features Overview
+## Download
 
-**160+ node types across comprehensive creative domains:**
+Download the latest prebuilt Windows package from:
 
-| Category | Description & Nodes |
+**[Infinite Windows R31a Releases](https://github.com/ricardopalmieri/Infinite/releases/tag/windows-r31a)**
+
+The prebuilt package contains `Infinite.exe`, runtime files, FFmpeg, segmentation models, documentation and launch helpers.
+
+### Run the prebuilt version
+
+1. Download `Infinite-Windows-R31a-x64.zip`.
+2. Extract the complete ZIP to a writable folder.
+3. Run `install-runtime.bat` once.
+4. Run `run-windows.bat` or open `Infinite.exe`.
+
+Do not run the application from inside the ZIP.
+
+## Windows R31a highlights
+
+### Native Windows build and runtime
+
+- Windows 10 and Windows 11 x64 support.
+- Visual Studio 2022, CMake presets and vcpkg manifest workflow.
+- Automated dependency installation with UAC elevation and visible progress.
+- Reproducible source and distributable package scripts.
+- GUI executable without an additional terminal window.
+- Runtime logging, startup diagnostics, crash reporting and autosave recovery.
+- High-performance GPU preference for NVIDIA Optimus and AMD PowerXpress systems.
+
+### Audio, MIDI and VST3
+
+- JUCE-based WASAPI audio input and output.
+- Configurable device, sample rate and audio buffer.
+- Windows MIDI input, output and clock support.
+- VST3 hosting with native plugin editor windows.
+- Isolated VST3 scanner helper so a crashing plugin does not terminate Infinite.
+- Plugin search folders, rescan, blocklist recovery, parameter mapping and state persistence.
+- Plugin buffer renegotiation after audio engine restart.
+- Invalid sample protection to prevent one plugin from corrupting the complete audio graph.
+- Low-latency audio capture without the former multi-second input queue.
+
+### Spout2 and external output
+
+- Spout2 sender and receiver support.
+- Windows nodes are displayed as `Syphon/Spout In` and `Syphon/Spout Out` while retaining patch compatibility.
+- Resizable output windows for Viewport, Null and visual output nodes.
+- F11 borderless fullscreen on the monitor containing the output window.
+- Topmost projector output that remains visible while the main UI is operated.
+- Hidden cursor in fullscreen output mode.
+
+### Video, cameras and recording
+
+- Video playback with synchronized video and audio outputs.
+- Loop, reverse, speed, trim, restart and four externally triggerable cue points.
+- Background video decoding to avoid blocking the interface.
+- Background camera capture with explicit device activation.
+- Aspect-ratio preservation in Projection and Fit workflows.
+- Configurable output resolution through the visual graph.
+- Asynchronous video recording and FFmpeg audio/video muxing.
+- File chooser for recording destination and filename.
+
+### DirectML and background removal
+
+- U2Net and U2Net Human segmentation models.
+- Windows ML and DirectML acceleration through DirectX 12.
+- NVIDIA, AMD and Intel DX12 adapter support.
+- Automatic selection of the high-performance GPU on hybrid systems.
+- OpenCV DNN CPU fallback when DirectML is unavailable.
+- Asynchronous inference that discards stale requests instead of blocking UI, audio or output.
+- Adjustable mask rate, threshold, feather, edge contrast, background color and mix.
+
+### Interface and workflow
+
+- IBM Plex Sans interface font.
+- Uppercase interface labels and restored top menu presentation.
+- Category color system for 2D visual, 3D, audio, UI and utility nodes.
+- Alphabetical node and selector lists.
+- Collapsible category browser and automatic search focus.
+- Resizable library and parameter sidebars.
+- Image thumbnails in the media browser.
+- Universal preview monitor control for visual and 3D nodes.
+- Node bypass controls and CV inputs for applicable buttons and selectors.
+- UI Button, horizontal slider, vertical slider and XY modulation nodes.
+- Keyboard value entry by double-clicking sliders and knobs.
+- Persistent audio, video, FPS, viewport and interface settings.
+- GPU usage and VRAM indicators in the system status area.
+
+### Nodes and sequencing
+
+- Text rendering on Windows through an asynchronous native raster worker.
+- Functional Feedback delay node with explicit loop-memory clearing.
+- Note Sequencer with 1 to 128 steps, page navigation and exact note entry.
+- Drum Sequencer expanded beyond the original 16-step limitation.
+- Audio Texture visual modes and improved preview control.
+- Video and visual nodes aligned to a consistent interaction pattern.
+
+## Platform mapping
+
+| Original macOS integration | Windows R31a implementation |
 |---|---|
-| **Source** | **Image**, **Video** (synchronized video/audio outputs, trim, restart and 4 triggerable cue points), **Syphon/Spout In** (real-time GPU video receiver from OBS, Resolume, TouchDesigner, etc.), **Shape** (10 SDF primitives), **Noise** (6 kinds: Value, Perlin, Voronoi, Ridged, Simplex, White), **Ramp** (5 gradient types: Linear, Radial, Angle, Diamond, Box), **Texture** (Voronoi, Brick, Magic, Wave, Musgrave), **Draw** (paintable canvas with 6 procedural brushes, eraser, and transport-synced stroke recording), **Formula** (live GLSL fragment editor with 16 presets) |
-| **Text** | **Text** (typography rendered via CoreText/CoreGraphics on macOS or an asynchronous GDI+ worker on Windows, with system fonts, kerning, line spacing, alignment, wrapping and outlines) |
-| **2D Effects** | **Blur** family (Gaussian, Box, Motion, Radial), **Bloom**, **Diffuse Glow**, **Unsharp Mask**, **Twirl**, **Pinch-Punch**, **Ripple**, **Lens Distortion**, **Displace**, **Liquify**, **6 Glitch modes**, **Symmetry**, **Kaleidoscope**, **Mirror Tile**, **Halftone**, **Sobel Edge**, **Edge Outline**, **Pixelate**, **Noise**, **Vignette**, **Transform** |
-| **Color & Grading** | **Curves** (interactive Photoshop-style spline editor for RGB & Luma), **Color Ramp** (up to 32 editable gradient stops), **Color Adjustments** (all-in-one grading chain), **LUT** (.cube 3D lookup tables), **Gradient Map**, **Channel Mixer**, **Brightness/Contrast**, **Levels**, **HSL**, **Exposure**, **Color Balance**, **Invert**, **Posterize**, **Threshold**, **Palette** (Oklab k-means dominant palette extraction) |
-| **Compositing** | **Blend** (31 blend modes), **Layer Stack** (4 reorderable layers with blend modes and opacities), **Switcher** (timed input cycler), **Fit** (resolution and aspect ratio adaptor), **Outer Glow**, **Drop Shadow**, **Color Overlay**, **Group**, **Comment**, **Null**, **Viewport** |
-| **Feedback & Generative** | **Feedback** (one-frame legal delay loop), **Trails**, **Reaction-Diffusion** (Gray-Scott simulation), **Resynthesize** (iterative generative resampler with recorded XY pad mutation pathways) |
-| **Mask & Segmentation** | **Remove Background** (Apple Vision on macOS; asynchronous U2Net/U2Net Human through OpenCV DNN on Windows), **Chroma Key**, **Luma Key** |
-| **3D Geometry & Procedural** | **Geometry** (8 primitives: Cube, Sphere, Icosphere, Cylinder, Cone, Torus, Plane, Disc), **Model 3D** (OBJ, PLY, STL, USD/USDZ import), **Text 3D** (extruded typography), **Ocean** (Gerstner waves simulation), **Curves** (3D splines with taper/bevel), **Point Distribution** (**Distribute Points on Faces**, **Distribute Points in Grid**, **Points to Vertices**, **Merge by Distance**), **Mesh Deconstruction** (**Mesh to Points**, **Mesh to Edges**, **Mesh to Faces**), **Set Color** (per-element vertex color grading), **Wrap** (conformal and arc-length cylindrical/spherical wrapping), **Geometry Ops** (Transform, Array, Subdivide [Loop], Smooth [Taubin], Mirror, Screw, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist), **Instance on Points** (single-draw-call GPU instancing), **Metaballs**, **Resynthesize 3D** |
-| **Physics & Simulation** | **Particle System** (gravity, turbulence, bounce floor, lifespan), **Cloth** (Position-Based Dynamics [PBD] soft body & cloth solver with pin constraints and collision) |
-| **3D Scene & Rendering** | **Camera** (FOV, orbit, perspective/orthographic), **Light** (directional, point, spot, ambient), **HDRI** (32-bit float .hdr / .exr equirectangular image-based lighting and reflections), **Material** (Cook-Torrance GGX PBR, roughness, metallic, emission), **Displacement**, **Mapping**, **Render 3D** (ACES tonemapping, multisampled AA up to 8x, shared interactive orbit viewport) |
-| **Synths & Sound Generators** | **Wavetable** (12 factory tables, 8 morphable frames, bandlimited mip levels, sub-oscillator, unison detune, filter, ADSR envelope), **Metallic** (modal physical modeling resonator for bells, plates, tubes, mallets, damping, and dispersion), **Granular** (real-time granular texture engine with grain size, jitter, spray, density, speed, and pitch randomization), **PaulStretch** (spectral extreme time-stretching for ambient soundscapes), **Sampler** (multi-folder disk scanning, root note pitch tracking, loop points), **Drum Sequencer** (8-track step sequencer with lane mutes/solos, swing, and pattern chaining), **Oscillator** (multi-waveform analog oscillator) |
-| **Notes & MIDI** | **MIDI Notes** (live USB/Bluetooth MIDI keyboard and controller input with clock sync), **Note Stack**, **Arpeggiator** (tempo-synced with multiple patterns and octave ranges), **Note Sequencer** (1-128 steps in editable 16-step pages), **Random Note Generator**, **Chorder**, **Note Strum**, **Bouncing Balls** (physics-based polyphonic note generator), **Note Transpose**, **Pitch Bend**, **Velocity Curve**, **Gate**, **Humanizer**, **Quantizer**, **Glide**, **Note Echo**, **Note Router**, **Note Capturer** |
-| **Audio Effects & DSP** | **Plugin** (hosts third-party **Audio Unit [AU]** plugins, and **VST3** plugins when built with `-DINFINITE_ENABLE_VST3=ON` — see below — with native GUI windows and mapped modulatable params), **Audio Filter** (analog-modeled LP/HP/BP/Notch), **EQ** (multi-band parametric equalizer with interactive curve visualizer), **Dynamics** (compressor/expander/gate with gain reduction meter), **Limiter** (lookahead brickwall limiter), **Delay** (tempo-synced stereo ping-pong), **Reverb** (algorithmic diffusion), **Drive** (tube saturation and distortion), **Stereo** (width enhancer and Haas imager), **Pitch Shifter**, **Frequency Shifter** (Bode frequency shift), **Chorus**, **Flanger**, **Phaser**, **Bitcrush**, **Transient Shaper**, **Stutter**, **Ring Mod**, **Tremolo**, **Formant Filter** (vowel morphing A-E-I-O-U), **Wavetable Shaper** |
-| **Audio Utility & Routing** | **Gain**, **Audio In**, **Audio Out**, **Mixer** (multi-channel summing), **Splitter** (signal fan-out), **Blend Audio**, **Envelope** (multi-stage ADSR generator), **Note to CV**, **Audio to CV** (envelope and pitch follower) |
-| **Modulators & CV** | **LFO** (tempo-synced waveforms), **Random**, **Pattern** (8-step CV sequence), **Math**, **Compare**, **Range to Range**, **Smoothing** (lag generator), **Invert**, **Mod Depth**, **Mod Curve**, **CV to Pitch**, **Macro Knob**, **Macro XY** (recordable and loopable 2D path pad), **MIDI CC**, **MIDI Trigger**, **Path** (6 geometric trajectory curves), **Constant**, **Image Analyze** (video-to-CV extraction), **Audio Analyze** (8-band FFT spectrum and onset extraction), **Audio File** |
-| **Output** | **Output** (PNG export + asynchronous triple-PBO OpenGL capture, worker-based H.264/MOV encoding and synchronized audio soundtrack), **Syphon/Spout Out** (real-time GPU video broadcaster to OBS, Resolume, MadMapper, TouchDesigner, etc.) |
+| CoreAudio | JUCE and WASAPI |
+| CoreMIDI | JUCE Windows MIDI |
+| Audio Unit plugins | VST3 plugins |
+| Syphon | Spout2 |
+| AVFoundation video and camera | OpenCV, DirectShow and FFmpeg |
+| CoreText / CoreGraphics text | Windows native text rasterization |
+| Apple Vision segmentation | Windows ML, DirectML and OpenCV DNN |
+| ModelIO import | Assimp |
+| macOS output windows | Win32 multi-monitor output windows |
 
+## Build from source
 
----
+### Requirements
 
-## Key Capabilities & Systems
+- Windows 10 or Windows 11 x64.
+- Windows Package Manager (`winget`).
+- Approximately 35 GB of free disk space for the first dependency build.
+- Internet access during dependency installation.
 
-### 1. Dual Realtime Audio & Visual Graph
-- **Two synchronized DAG engines**: A high-throughput pull-based GPU texture pipeline (GLSL 150 / OpenGL 3.2 Core) runs in tandem with a sample-accurate, pull-based Bespoke-style audio graph.
-- **Unified Global Transport**: Master play/pause and tempo (BPM) keep modulators, video decoders, particle solvers, audio LFOs, arpeggiators, and drum sequences in deterministic lockstep.
+### Clone the Windows branch
 
-### 2. Universal Cross-Domain Modulation
-- **Modulate anything from anything**: Sliders, knobs, checkboxes, toggles, action triggers, selectors, bypass controls and hosted plugin parameters expose CV inputs wherever the operation can run without an interactive file/system dialog.
-- **Discrete CV rules**: values below `0.5` turn a boolean off and values at or above `0.5` turn it on; action buttons fire once on the rising edge; selectors divide `0..1` evenly across their available entries.
-- **Cross-Domain Analysis**:
-  - **Image Analyze** extracts luminance, contrast, RGB channels, saturation, motion vectors, and spatial centroids from live video to modulate synth filters, pitch, or geometry.
-  - **Audio Analyze** transforms live microphone input or audio files into 8 frequency spectrum bands, low/mid/high energy levels, and onset triggers to drive shader ripples, particle turbulence, or 3D extrusions.
-  - **Audio to CV & Note to CV** convert audio amplitude envelopes, pitch tracking, and MIDI note velocity into control voltage signals.
-
-### 3. Synthesis & Physical Modeling Engines
-- **Wavetable Synthesis**: Multi-table oscillator engine with 12 factory tables, 8 morphable frames, bandlimited mip levels, sub-oscillator, unison stereo detuning, filter, and ADSR envelopes.
-- **Metallic Physical Modeling**: Modal resonator synthesis simulating struck bells, metallic plates, tubes, bars, and membranes with adjustable damping, stiffness, brightness, and dispersion.
-- **Granular Synthesis**: Real-time granular engine with live position scrubbing, grain size, jitter, density, spray, and pitch randomization.
-- **PaulStretch**: Real-time phase-randomized spectral FFT time-stretching turning any sample into lush ambient textures without shifting pitch.
-- **Multi-Sample Player & Drum Sequencer**: Multi-folder background sample scanning, automatic root note pitch tracking, 8-track drum machine with per-lane samples and swing.
-
-### 4. Audio Unit (AU) Plugin Hosting, with Optional VST3
-- **Native Third-Party Hosting**: Drag AU plugins directly onto the canvas or select from the auto-indexed **Plugins** library.
-- **Floating Native Editor Windows**: Plugins open in their native graphical interface.
-- **Parameter Mapping & Modulation**: Enable **configure**, touch any control in the plugin window, and it exposes an automated slider with its own modulation pin on the node canvas.
-- **VST3 is opt-in and off by default.** AU hosting ships unconditionally. VST3 hosting requires building with `-DINFINITE_ENABLE_VST3=ON` and the `external/vst3sdk` submodule (`git submodule update --init --recursive external/vst3sdk`), because the Steinberg VST3 SDK is GPLv3-or-commercial and Infinite's own source is MIT — enabling VST3 makes the *distributed binary* GPLv3 (see `LICENSE`). A default build has no VST3 support and the Plugins panel says so.
-
-### 5. Procedural 3D Geometry & Simulation
-- **Unified Geometry Pipeline**: Modernized geometry pipeline supporting meshes, point clouds, and 3D spline curves over unified cables.
-- **Procedural Point Scattering**: Distribute points over mesh surfaces (Poisson disk / random) or inside 3D grids, merge by distance, and convert points to vertices.
-- **Per-Element Vertex Coloring**: Assign vertex colors via `Set Color` ramps or mesh normals, rendered live in viewports and 3D renders.
-- **Single-Draw-Call Instancing**: Scatter tens of thousands of geometry instances via `Instance on Points` in a single GPU `glDrawElementsInstanced` call.
-- **Physics Solvers**: Fixed-timestep Particle Systems and Position-Based Dynamics (PBD) Cloth and soft-body solvers that freeze deterministically with transport pause.
-- **Physically Based Rendering (PBR)**: Cook-Torrance GGX shading with Fresnel, ACES tonemapping, 32-bit HDRI environment lighting, and multisampled antialiasing up to 8x.
-
-### 6. Workflow & Canvas Ergonomics
-- **Link-Drag-to-Search**: Drag a patch cable out from any output pin and drop it onto empty canvas to open the node search immediately, without constructing every registered module. The selected connection is type-checked before it is made.
-- **Live 1:1 Previews Everywhere**: Every node renders an active thumbnail preview showing live video frames, 3D meshes with vertex colors, or audio waveform/spectrum visualizations.
-- **Dockable Viewport Panel**: View and interact with 3D scenes or composited outputs in a dedicated dockable/floating viewport window with shared camera orbit controls.
-- **Bypass & Mute Controls**: Instantly bypass effect nodes to pass signals through untouched, or mute sound generators with one click.
-- **Human-Readable Text Patches**: Patches are saved in a clean, line-based text format that is easy to version-control, inspect, and diff.
-- **Crash Recovery and Diagnostics**: Configurable autosave recovery plus a persistent runtime log under `%LOCALAPPDATA%\Infinite` on Windows.
-
----
-
-## Installation
-
-### Windows 10/11 x64
-
-To compile from source:
-
-1. Run `install-dependencies.bat` once and accept the UAC prompt.
-2. After it finishes successfully, run `build-windows.bat` without administrator privileges.
-3. Launch `dist\Infinite-Windows-x64\run-windows.bat`.
-
-To install a prebuilt GitHub Release:
-
-1. Extract `Infinite-Windows-x64.zip`.
-2. Run `install-runtime.bat` once.
-3. Run `run-windows.bat` or `Infinite.exe`.
-
-`install-dependencies.bat` is only for developers compiling the source. The first dependency build requires substantial disk space and can take a while because vcpkg compiles OpenCV. `install-runtime.bat` is only for users of the already compiled release.
-
-### macOS
-
-#### Requirements
-- **macOS 11.0+** (Apple Silicon or Intel).
-- Built as a self-contained universal binary linking system frameworks — no external package managers or dependencies required.
-
-#### Opening the Application (Gatekeeper)
-The build is ad-hoc signed:
-1. **To open for the first time**: Right-click (or Control-click) `Infinite.app` in Finder → **Open** → click **Open**.
-2. If macOS reports the app is damaged or blocked by quarantine, clear the quarantine attribute:
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/Infinite.app
-   ```
-
----
-
-## Build from Source
-
-For Windows, use the two `.bat` files described above or follow [WINDOWS_BUILD.md](WINDOWS_BUILD.md). Revision 31A moves Windows Text rasterization to a latest-only GDI+ worker, replaces synchronous Output readback with triple-PBO OpenGL capture, CFR pacing and worker-side audio I/O, and keeps the opaque worker construction compatible with MSVC. Revision 29's universal CV inputs remain available for suitable module checkboxes, state/action buttons, selectors and bypass controls. The R22 change also remains: gated NVIDIA Maxine modules are removed and Mask > Remove Background is accelerated through Windows ML and DirectML/DX12 with an OpenCV CPU fallback.
-
-### macOS
-
-Requires **CMake 3.16+** and **Xcode Command Line Tools**:
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/n1m21n/Infinite.git
+```bat
+git clone --branch windows/r31a-snapshot --recursive https://github.com/ricardopalmieri/Infinite.git
 cd Infinite
-
-# 2. Configure and build
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j8
-
-# 3. Launch Infinite
-open build/Infinite.app
 ```
 
-To create a standalone DMG installer:
-```bash
-./package.sh
+### Install build dependencies
+
+```bat
+install-dependencies.bat
 ```
 
----
+Accept the UAC prompt. The installer prepares Git, CMake, Visual Studio Build Tools, vcpkg, OpenCV, Spout2, Assimp, Windows ML, DirectML, FFmpeg and the segmentation models.
 
-## Canvas & Keyboard Shortcuts
+The first installation can take a long time because large C++ dependencies may be compiled locally.
 
-| Action | Shortcut / Gesture |
-|---|---|
-| **Add Node** | Right-click or double-click empty canvas, then type to search |
-| **Connect Cable** | Drag from an `out` pin to an `in` pin |
-| **Link-Drag-to-Search** | Drag a cable to empty canvas and release to auto-spawn and connect |
-| **Modulate Parameter** | Drag a modulator output onto the small pin beside any slider |
-| **Pan Canvas** | Drag empty canvas or middle-click drag |
-| **Rubber-Band Select** | Shift + drag across nodes |
-| **Duplicate Selection** | `Cmd+C` / `Cmd+V`, or **`Shift+D`** in place |
-| **Delete Selection** | `Backspace` or `Delete` |
-| **Exact Value Input** | Double-click any slider or knob |
-| **Add File Source** | Drag any image, video, audio sample, 3D model, or plugin onto canvas |
-| **Bypass Node** | Click the power/bypass icon on the node header |
+### Compile and package
 
----
-
-## Architecture Overview
-
-```
-src/
-├── core/         # INode, ImageCable, NodeFactory, Transport, Modulation, GLUtil, Mesh
-├── nodes/        # Node family implementations (2D, 3D, Audio, Synths, Notes, Modulators)
-├── audio/        # Audio engine, DSP kernels, Wavetable core, SampleSlot, PluginScanner
-└── platform/     # macOS shims: CoreAudio, AudioUnit hosting (+ opt-in VST3), AVFoundation, Vision
+```bat
+build-windows.bat
 ```
 
-- **`INode`**: Core interface implemented by all nodes, providing `CookIfNeeded(frameId)` with memoised DAG execution.
-- **`AudioNode` & `IEffectKernel`**: Thread-safe audio processing nodes running inside a realtime CoreAudio pull callback.
-- **`AudioPluginNode`**: Thread-safe AU (always) / VST3 (opt-in build) plugin host bridging GUI parameter automation with the audio callback.
-- **`GLUtil` & `Mesh`**: Shader compilation, FBO caching, vertex buffers, and instanced OpenGL 3.2 rendering.
+Build outputs:
 
----
+```text
+dist\Infinite-Windows-x64\Infinite.exe
+dist\Infinite-Windows-x64.zip
+```
+
+Detailed build instructions and troubleshooting are available in [WINDOWS_BUILD.md](WINDOWS_BUILD.md).
+
+## Runtime files and user data
+
+Infinite stores Windows user data under `%LOCALAPPDATA%\Infinite`:
+
+```text
+Infinite.settings
+Infinite.log
+Infinite-startup.log
+autosave recovery files
+VST3 scan logs and blocklist
+segmentation models
+```
+
+These files are not stored in the repository or inside patch documents.
+
+## Troubleshooting
+
+- Run `diagnose-windows.bat` if the application exits during startup.
+- Use `Rescan plugins` after changing VST3 folders.
+- Confirm that Spout sender and receiver use the same GPU.
+- Update the GPU driver if DirectML fails, then use the CPU fallback while investigating.
+- Confirm that `ffmpeg.exe` is beside `Infinite.exe` when recording or playing video audio.
+- Avoid running the project from OneDrive-synchronized or read-only folders during the first build.
+
+## Project structure
+
+```text
+src/core/       graph, patch, transport, modulation and rendering infrastructure
+src/nodes/      visual, 3D, audio, MIDI, CV and UI nodes
+src/audio/      audio engine, DSP, plugin scanning and file writing
+src/platform/   macOS and Windows platform implementations
+cmake/          platform resources
+scripts/        source and runtime packaging
+assets/         icons, fonts and example patches
+```
+
+## Upstream and contributing
+
+The canonical upstream project is [n1m21n/Infinite](https://github.com/n1m21n/Infinite).
+
+Windows R31a is preserved as a tested snapshot. Compatibility work with newer upstream commits should happen in a separate branch so this reference build remains reproducible.
+
+Bug reports should include:
+
+- Windows version.
+- CPU and GPU.
+- Audio interface and buffer size.
+- Steps to reproduce.
+- `%LOCALAPPDATA%\Infinite\Infinite.log` or the output from `diagnose-windows.bat`.
+
+## Credits
+
+- Original Infinite project: [Naman Soni](https://github.com/n1m21n).
+- Windows R31a port and testing: [Ricardo Palmieri](https://github.com/ricardopalmieri) / Noisetupi.
+- Infinite's module architecture is a descendant of [BespokeSynth](https://github.com/BespokeSynth/BespokeSynth).
+- Third-party projects include Dear ImGui, imgui-node-editor, GLFW, JUCE, OpenCV, FFmpeg, Spout2, Assimp, Windows ML, DirectML, stb and others listed in the build files.
 
 ## License
 
-Infinite is open-source software licensed under the **MIT License** — see [LICENSE](LICENSE).
+The original Infinite source is distributed under the MIT License. The Windows build links third-party components with their own terms, including JUCE, VST3, FFmpeg, OpenCV, Spout2, Assimp, Windows ML, ONNX Runtime and DirectML.
 
-**Vendored & Third-Party Dependencies:**
-- [Dear ImGui](https://github.com/ocornut/imgui) (MIT)
-- [imgui-node-editor](https://github.com/thedmd/imgui-node-editor) (MIT)
-- [stb](https://github.com/nothings/stb) (Public Domain)
-- [GLFW](https://github.com/glfw/glfw) (zlib)
+Review [LICENSE](LICENSE) and all applicable third-party licenses before redistributing a compiled binary. JUCE may require a commercial license or compliance with its open-source license, depending on how the binary is distributed.
