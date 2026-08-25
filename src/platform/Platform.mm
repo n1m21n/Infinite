@@ -271,6 +271,12 @@ namespace Platform
 
 namespace Platform
 {
+   struct CachedVideoFrame
+   {
+      double pts = 0.0;
+      std::vector<unsigned char> pixels;
+   };
+
    struct VideoHandle
    {
       AVAsset* asset = nil;
@@ -284,6 +290,13 @@ namespace Platform
       double nextPts = -1.0;     // pts of the decoded-but-not-yet-current frame
       std::vector<unsigned char> pending; // that frame's pixels
       bool finished = false;
+
+      // Frames decoded while recovering from a backward seek (reverse playback),
+      // kept around so the next several reverse steps don't each pay for a fresh
+      // reader rebuild + partial-GOP redecode. FIFO by pts, capped by byte size.
+      std::deque<CachedVideoFrame> frameCache;
+      size_t cacheBytes = 0;
+      static constexpr size_t kMaxCacheBytes = 64 * 1024 * 1024;
    };
 
    namespace
@@ -377,6 +390,45 @@ namespace Platform
          CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
          CFRelease(sample);
          return true;
+      }
+
+      // Appends a decoded frame to the reverse-playback cache, evicting the
+      // oldest entries (FIFO) to stay under the byte cap. Assumes callers only
+      // push frames in increasing pts order, so the deque stays contiguous.
+      void PushCacheFrame(VideoHandle* h, double pts, const std::vector<unsigned char>& pixels)
+      {
+         const size_t frameBytes = pixels.size();
+         if (frameBytes == 0 || frameBytes > VideoHandle::kMaxCacheBytes)
+            return;
+
+         h->frameCache.push_back({pts, pixels});
+         h->cacheBytes += frameBytes;
+
+         while (h->cacheBytes > VideoHandle::kMaxCacheBytes && !h->frameCache.empty())
+         {
+            h->cacheBytes -= h->frameCache.front().pixels.size();
+            h->frameCache.pop_front();
+         }
+      }
+
+      // Serves a request directly from the reverse-playback cache when possible.
+      bool TryUseCache(VideoHandle* h, double seconds, std::vector<unsigned char>& outPixels)
+      {
+         if (h->frameCache.empty())
+            return false;
+         if (seconds + 0.001 < h->frameCache.front().pts)
+            return false; // requested time is older than anything cached
+
+         for (auto it = h->frameCache.rbegin(); it != h->frameCache.rend(); ++it)
+         {
+            if (it->pts <= seconds + 0.001)
+            {
+               outPixels = it->pixels;
+               h->currentPts = it->pts;
+               return true;
+            }
+         }
+         return false;
       }
    }
 
@@ -938,19 +990,30 @@ namespace Platform
    {
       if (handle == nullptr)
          return false;
+      if (seconds < 0.0)
+         return false;
 
       @autoreleasepool
       {
-         // going backwards (loop or scrub) means rebuilding the sequential reader
+         bool seekedBackward = false;
+
+         // going backwards (loop or scrub) means rebuilding the sequential reader,
+         // unless the target frame is already sitting in the reverse-playback cache
          if (seconds + 0.001 < handle->currentPts)
          {
+            if (TryUseCache(handle, seconds, outPixels))
+               return true;
+
             std::string err;
             if (handle->reader != nil)
                [handle->reader cancelReading];
             handle->reader = nil;
             handle->output = nil;
-            if (!StartReader(handle, 0.0, err))
+            handle->frameCache.clear();
+            handle->cacheBytes = 0;
+            if (!StartReader(handle, std::max(0.0, seconds - 0.25), err))
                return false;
+            seekedBackward = true;
          }
 
          bool produced = false;
@@ -969,7 +1032,26 @@ namespace Platform
             handle->currentPts = handle->nextPts;
             handle->nextPts = -1.0;
             produced = true;
+            if (seekedBackward)
+               PushCacheFrame(handle, handle->currentPts, outPixels);
          }
+
+         // Keep decoding a bit further so the next several reverse steps can be
+         // served from cache instead of another reader rebuild + redecode.
+         if (seekedBackward && produced)
+         {
+            for (int guard = 0; guard < 240 && handle->cacheBytes < VideoHandle::kMaxCacheBytes; guard++)
+            {
+               if (handle->nextPts < 0.0)
+               {
+                  if (!DecodeNext(handle))
+                     break;
+               }
+               PushCacheFrame(handle, handle->nextPts, handle->pending);
+               handle->nextPts = -1.0;
+            }
+         }
+
          return produced;
       }
    }
