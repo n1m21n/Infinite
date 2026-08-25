@@ -48,16 +48,24 @@ namespace
       return h;
    }
 
+   // Walks the same PassthroughSource() chain as WrapsInstancer below, but
+   // returns the instancer itself so a caller can also read its instance
+   // count - see GeometryOpNode::UpstreamInstanceCount.
+   InstanceOnPointsNode* FindInstancer(IGeometrySource* s)
+   {
+      for (; s != nullptr; s = s->PassthroughSource())
+      {
+         if (auto* instancer = dynamic_cast<InstanceOnPointsNode*>(s))
+            return instancer;
+      }
+      return nullptr;
+   }
+
    // Whether a source is, or sits behind a chain of mesh-transforming wrapper
    // nodes on top of, an InstanceOnPoints - see IGeometrySource::PassthroughSource.
    bool WrapsInstancer(IGeometrySource* s)
    {
-      for (; s != nullptr; s = s->PassthroughSource())
-      {
-         if (dynamic_cast<InstanceOnPointsNode*>(s) != nullptr)
-            return true;
-      }
-      return false;
+      return FindInstancer(s) != nullptr;
    }
 }
 
@@ -97,6 +105,17 @@ Mat4 GeometryOpNode::GetInstanceGroupMatrix() const
    if (op == kTransform && !bypassed && WrapsInstancer(input))
       return Mat4::Multiply(TransformMatrix(), upstream);
    return upstream;
+}
+
+bool GeometryOpNode::ActsOnInstanceStamp() const
+{
+   return !bypassed && WrapsInstancer(input);
+}
+
+size_t GeometryOpNode::UpstreamInstanceCount() const
+{
+   InstanceOnPointsNode* instancer = FindInstancer(input);
+   return instancer ? instancer->InstanceCount() : 0;
 }
 
 GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const

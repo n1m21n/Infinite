@@ -7493,7 +7493,7 @@ namespace
       return names;
    }
 
-   void DrawOscillatorWaveform(int waveform, float h, float width)
+   void DrawOscillatorWaveform(int waveform, float phase, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -7525,9 +7525,10 @@ namespace
       if (waveform == OscillatorNode::kSquare)
       {
          const float cycleW = w / cycles;
-         for (int c = 0; c < 2; c++)
+         const float startX = origin.x - phase * cycleW;
+         for (int c = 0; c < 3; c++)
          {
-            const float x0 = origin.x + c * cycleW;
+            const float x0 = startX + c * cycleW;
             const float xMid = x0 + cycleW * 0.5f;
             const float x1 = x0 + cycleW;
 
@@ -7546,9 +7547,10 @@ namespace
       else if (waveform == OscillatorNode::kSaw)
       {
          const float cycleW = w / cycles;
-         for (int c = 0; c < 2; c++)
+         const float startX = origin.x - phase * cycleW;
+         for (int c = 0; c < 3; c++)
          {
-            const float x0 = origin.x + c * cycleW;
+            const float x0 = startX + c * cycleW;
             const float x1 = x0 + cycleW;
             pts.push_back(ImVec2(x0, midY + amp));
             pts.push_back(ImVec2(x1, midY - amp));
@@ -7559,9 +7561,10 @@ namespace
       else if (waveform == OscillatorNode::kTriangle)
       {
          const float cycleW = w / cycles;
-         for (int c = 0; c < 2; c++)
+         const float startX = origin.x - phase * cycleW;
+         for (int c = 0; c < 3; c++)
          {
-            const float x0 = origin.x + c * cycleW;
+            const float x0 = startX + c * cycleW;
             const float x1 = x0 + cycleW * 0.25f;
             const float x2 = x0 + cycleW * 0.75f;
             const float x3 = x0 + cycleW;
@@ -7579,7 +7582,7 @@ namespace
          for (int i = 0; i <= kSteps; i++)
          {
             const float t = (float)i / (float)kSteps;
-            const float y = sinf(2.0f * (float)M_PI * cycles * t);
+            const float y = sinf(2.0f * (float)M_PI * (cycles * t + phase));
             pts.push_back(ImVec2(origin.x + t * w, midY - y * amp));
          }
       }
@@ -7653,7 +7656,7 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       // Waveform display
-      DrawOscillatorWaveform(n->waveform, 100.0f, gAudioContentW);
+      DrawOscillatorWaveform(n->waveform, n->engine.phase, 100.0f, gAudioContentW);
       ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
       // Two knob rows of four
@@ -15489,7 +15492,25 @@ namespace
       DropdownButton("operation", sVisibleOpNames, visibleCurrent,
          [n](int i) { n->op = sVisibleOpIndices[i]; });
       if (n->input != nullptr)
-         ImGui::TextDisabled("%zu triangles out", n->TriangleCount());
+      {
+         // Downstream of an Instance on Points, every op but Transform runs
+         // once on the shared stamp mesh rather than per instance - state
+         // which frame of reference is in effect right where the triangle
+         // count would otherwise read as "the whole scatter" (see
+         // GeometryOpNode::ActsOnInstanceStamp / the kTransform case in
+         // GetMesh()).
+         if (n->ActsOnInstanceStamp())
+         {
+            if (n->op == GeometryOpNode::kTransform)
+               ImGui::TextDisabled("moving the whole instanced group (%zu copies)",
+                                    n->UpstreamInstanceCount());
+            else
+               ImGui::TextDisabled("%zu triangles out - applied to the instanced shape, %zu copies",
+                                    n->TriangleCount(), n->UpstreamInstanceCount());
+         }
+         else
+            ImGui::TextDisabled("%zu triangles out", n->TriangleCount());
+      }
       if (GeometryOpSupportsSelectionOnly(n->op))
          ImGui::Checkbox("selection only", &n->selectionOnly);
 
@@ -18197,7 +18218,7 @@ namespace
          { "Mesh to Points", "Samples the input mesh's vertices as a point cloud, for feeding Instance on Points or Metaballs." },
          { "Mesh to Edges", "Samples points along the input mesh's edges as a point cloud, for feeding Instance on Points or Metaballs." },
          { "Mesh to Faces", "Samples each face's centre point of the input mesh as a point cloud, for feeding Instance on Points or Metaballs." },
-         { "Instance on Points", "Stamps a shape at every point of a point source, drawn in one instanced call. Input A is the points source (Faces/Edges/Points sampler, a point cloud, etc.), input B is the shape to stamp at each point - both are required before it draws anything." },
+         { "Instance on Points", "Stamps a shape at every point of a point source, drawn in one instanced call. Input A is the points source (Faces/Edges/Points sampler, a point cloud, etc.), input B is the shape to stamp at each point - both are required before it draws anything. Any node chained after this one operates on the shape being stamped, once, not on the realized scatter - except Transform, which is the exception that moves the whole scatter as one rigid group." },
          { "Wrap", "Bends or conforms the source input onto the target input. Cylindrical rolls it around one axis at the target's radius with no distortion at all - letterforms, spacing and extrusion depth survive intact, which is what curves 3D text around a sphere or cylinder. Spherical adds the same bend the other way so long text also curves over the poles. Nearest Surface snaps every vertex to the closest point on the target instead: right for conforming a dense mesh to irregular geometry, but it squashes flat text. With a target connected the bend radius follows the target's size, so scaling the target moves the source with it - radius scale tunes it as a multiplier. With no target, radius sets the bend outright." },
          { "Camera", "A 3D viewpoint. Patch it into a Render 3D node's camera input to render from it instead of the default view." },
          { "Light", "A light source for the 3D scene. Render 3D takes up to 3 lights - patch more in and only the first 3 are used." },
@@ -35194,7 +35215,20 @@ int main(int argc, char** argv)
             dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
             char line[64] = "";
             if (auto* o = dynamic_cast<GeometryOpNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", o->TriangleCount());
+            {
+               // Same frame-of-reference call-out as DrawGeometryOpParams'
+               // status line, just shorter - this is the one place a
+               // collapsed node's stamp-vs-group behaviour is visible at all.
+               if (o->ActsOnInstanceStamp())
+               {
+                  if (o->op == GeometryOpNode::kTransform)
+                     snprintf(line, sizeof(line), "moving group (%zu copies)", o->UpstreamInstanceCount());
+                  else
+                     snprintf(line, sizeof(line), "%zu tris, stamped x%zu", o->TriangleCount(), o->UpstreamInstanceCount());
+               }
+               else
+                  snprintf(line, sizeof(line), "%zu triangles", o->TriangleCount());
+            }
             else if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu instances", inst->InstanceCount());
             else if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
