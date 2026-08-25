@@ -2603,10 +2603,13 @@ namespace
             [i]() -> INode* { return ShapeNode::CreateFor(i); }, "Source");
       }
       REGISTER_NODE(FormulaNode, Formula, "Source");
-      REGISTER_NODE(TextNode, Text, "Text");
+      REGISTER_NODE(TextNode, Text, "Source");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");
-      REGISTER_NODE(SyphonInNode, Syphon In, "Source");
+      // Syphon In is a source (an image feed into the patch), but grouped
+      // with Utility rather than Source - alongside Syphon Out and the other
+      // app-to-app/IO nodes, not the generators and loaders Source holds.
+      REGISTER_NODE(SyphonInNode, Syphon In, "Utility");
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(TextureNode, Texture, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
@@ -2678,24 +2681,34 @@ namespace
       REGISTER_NODE(EnvironmentNode, HDRI, "3D");
       REGISTER_NODE(Render3DNode, Render 3D, "3D");
       REGISTER_NODE(DrawNode, Draw, "Source");
-      REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
+      // Resynth merged into Effects - see CategoryColors.h/.cpp; it was
+      // always a single-node category ("a video resynthesis family"), and
+      // Effects is what a user reaches for it under.
+      REGISTER_NODE(ResynthNode, Resynthesize, "Effects");
       REGISTER_NODE(FitNode, Fit, "Compositing");
       REGISTER_NODE(CommentNode, Comment, "Compositing");
       REGISTER_NODE(GroupNode, Group, "Compositing");
       REGISTER_NODE(NullNode, Null, "Compositing");
       REGISTER_NODE(ViewportNode, Viewport, "Compositing");
-      REGISTER_NODE(CurvesNode, Curves, "Color");
-      REGISTER_NODE(ColorRampNode, Color Ramp, "Color");
-      REGISTER_NODE(RemoveBgNode, Remove Background, "Mask");
-      REGISTER_NODE(FeedbackNode, Feedback, "Feedback");
-      REGISTER_NODE(TrailsNode, Trails, "Feedback");
-      REGISTER_NODE(ReactionDiffusionNode, Reaction Diffusion, "Feedback");
+      // Color, Mask and Feedback all merged into Compositing - each was a
+      // small category whose nodes are, in practice, ways of combining or
+      // managing image flow, same as Compositing's original members.
+      REGISTER_NODE(CurvesNode, Curves, "Compositing");
+      REGISTER_NODE(ColorRampNode, Color Ramp, "Compositing");
+      REGISTER_NODE(RemoveBgNode, Remove Background, "Compositing");
+      REGISTER_NODE(FeedbackNode, Feedback, "Compositing");
+      REGISTER_NODE(TrailsNode, Trails, "Compositing");
+      REGISTER_NODE(ReactionDiffusionNode, Reaction Diffusion, "Compositing");
       REGISTER_NODE(BlendNode, Blend, "Compositing");
       REGISTER_NODE(LayerStackNode, Layer Stack, "Compositing");
       REGISTER_NODE(SwitcherNode, Switcher, "Compositing");
-      REGISTER_NODE(OutputNode, Output, "Output");
-      REGISTER_NODE(SyphonOutNode, Syphon Out, "Output");
-      REGISTER_NODE(ProjectionNode, Projection, "Output");
+      // Output/AudioUtility/OSC all merged into Utility below - the node's
+      // own display name stays "Output" (not renamed to "Export") since
+      // Patch.cpp looks nodes up by exact typeName on load; renaming it
+      // would silently drop the node from any already-saved patch.
+      REGISTER_NODE(OutputNode, Output, "Utility");
+      REGISTER_NODE(SyphonOutNode, Syphon Out, "Utility");
+      REGISTER_NODE(ProjectionNode, Projection, "Utility");
       REGISTER_NODE(LFONode, LFO, "Modulators");
       REGISTER_NODE(RandomNode, Random, "Modulators");
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
@@ -2719,14 +2732,13 @@ namespace
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
-      REGISTER_NODE(OscReceiveNode, OSC Receive, "OSC");
-      REGISTER_NODE(OscSendNode, OSC Send, "OSC");
+      REGISTER_NODE(OscReceiveNode, OSC Receive, "Utility");
+      REGISTER_NODE(OscSendNode, OSC Send, "Utility");
 
       // P2 audio-graph proof nodes - see docs/plans/audio/README.md P2.
-      // Category deliberately "AudioUtility" not "Audio Utility": Patch.cpp's
+      // Category names must stay one word: Patch.cpp's
       // "node <index> <category> <typeName>" line reads category with `>>`
-      // (a single whitespace-delimited token) - every existing category is
-      // one word for exactly that reason, and a space in a new one corrupts
+      // (a single whitespace-delimited token), and a space in one corrupts
       // the save format (confirmed: it silently ate the type name on load).
       REGISTER_NODE(OscillatorNode, Oscillator, "Synths");
       REGISTER_NODE(WavetableNode, Wavetable, "Synths");
@@ -2742,18 +2754,23 @@ namespace
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
       REGISTER_NODE(AudioPluginNode, Plugin, "AudioEffects");
-      REGISTER_NODE(GainNode, Gain, "AudioUtility");
-      REGISTER_NODE(AudioInputNode, Audio In, "AudioUtility");
-      REGISTER_NODE(AudioOutputNode, Audio Out, "AudioUtility");
+      // AudioUtility folded into Utility, alongside Output/Projection/Syphon/
+      // OSC above - see CategoryColors.h/.cpp.
+      REGISTER_NODE(GainNode, Gain, "Utility");
+      REGISTER_NODE(AudioInputNode, Audio In, "Utility");
+      REGISTER_NODE(AudioOutputNode, Audio Out, "Utility");
       // P2.8 routing nodes - the system's only summing/fan-out points, see
       // docs/plans/audio/audio-graph-semantics.md §1/§2.
-      REGISTER_NODE(MixerNode, Mixer, "AudioUtility");
-      REGISTER_NODE(SplitterNode, Splitter, "AudioUtility");
+      REGISTER_NODE(MixerNode, Mixer, "Utility");
+      REGISTER_NODE(SplitterNode, Splitter, "Utility");
       // "Blend Audio" not "Blend" - that name is taken by the image
       // compositing node (REGISTER_NODE(BlendNode, Blend, "Compositing") above).
-      REGISTER_NODE(BlendAudioNode, Blend Audio, "AudioUtility");
-      REGISTER_NODE(AudioTextureNode, Audio Texture, "Audio");
-      REGISTER_NODE(AudioColorRampNode, Audio Color Ramp, "Audio");
+      REGISTER_NODE(BlendAudioNode, Blend Audio, "Utility");
+      // The "Audio" category (just these two nodes) is gone - Audio Texture
+      // is a source (a waveform/spectrum image generator), Audio Color Ramp
+      // is a way of coloring based on audio, i.e. compositing.
+      REGISTER_NODE(AudioTextureNode, Audio Texture, "Source");
+      REGISTER_NODE(AudioColorRampNode, Audio Color Ramp, "Compositing");
 
       // P3a Part 1 - note-transport proving nodes. See
       // docs/plans/audio/P3a-notes-prompt.md; Part 2 adds Note Filter/
@@ -18794,18 +18811,12 @@ namespace
    const char* CategoryHelpText(const std::string& category)
    {
       if (category == "Source") return "A source node - generates or loads an image with no image input of its own.";
-      if (category == "Text") return "Renders text as an image.";
       if (category == "Effects") return "Transforms one image into another. Its parameters (and the shape of its name) describe what it changes; see Menu > Help > Module reference for the effect families.";
-      if (category == "Color") return "Adjusts the colour of its input. See Menu > Help > Module reference, 'Color' section, for the full family.";
-      if (category == "Compositing") return "Combines images, or otherwise manages how they flow through the patch.";
+      if (category == "Compositing") return "Combines images, or otherwise manages how they flow through the patch - including colour, mask, and feedback/loop nodes. See Menu > Help > Module reference for the full family.";
       if (category == "Modulators") return "Produces a changing number over time, not an image. Patch its output onto the small dot beside any slider to drive that parameter.";
-      if (category == "Feedback") return "Reads back a previous frame to build loops - trails, echoes, growth. See Menu > Help > 'Using Feedback'.";
-      if (category == "Mask") return "Produces a mask, or isolates part of the image by colour or luminance.";
-      if (category == "Resynth") return "Iteratively regenerates the image, each generation drifting from its source.";
       if (category == "3D") return "Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights.";
       if (category == "Notes") return "Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.";
-      if (category == "Output") return "Terminal node: shows, exports or records the final result.";
-      if (category == "OSC") return "Sends or receives Open Sound Control messages over UDP to talk to other apps (TouchDesigner, Max, lighting rigs). Loopback/LAN only.";
+      if (category == "Utility") return "Utility node: audio routing, terminal/output nodes (shows, exports or records the final result), Syphon and OSC I/O.";
       return "No additional notes for this node.";
    }
 
@@ -18944,8 +18955,6 @@ namespace
                { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
                { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
                { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
-            } },
-            { "Text", {
                { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
             } },
             { "Effects", {
@@ -18957,16 +18966,7 @@ namespace
                { "Symmetry", "Symmetry (mirror about X, Y or both), Kaleidoscope (segment count, rotation, zoom) and Mirror Tile." },
                { "Stylise", "Halftone (mono or CMY-style colour), Sobel edge detection and Edge Outline." },
                { "Pixelate / Noise / Vignette", "Block pixelation, additive grain and a vignette with its own centre." },
-            } },
-            { "Color", {
-               { "Basic", "Brightness/contrast, exposure, levels (black/white point + gamma), invert, posterize, threshold." },
-               { "Curves", "Per-channel spline curve editor - drag control points on Red/Green/Blue/Luminance, Photoshop Curves-style." },
-               { "LUT", "Applies a lookup-table image patched into the second input." },
-               { "Gradient Map", "Remaps luminance onto a two-colour gradient." },
-               { "Channel Mixer", "Rebuilds each output channel from a weighted mix of the input channels - set all three rows equal for a weighted greyscale." },
-               { "HSL / Colour Balance", "Hue, saturation and lightness; per-axis colour shifts." },
-               { "Color Adjustments", "All-in-one grading chain - brightness/contrast, levels, colour balance, HSL, vibrance, tone shaper, channel mixer and an optional black & white stage - so a common grade doesn't need eight nodes wired in series." },
-               { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
+               { "Resynthesize", "Each generation reads the previous one, so the image drifts away from the source. The XY pad blends four named mutation effects assigned to its corners; Randomise re-rolls which four. The orb's path can be recorded, looped and replayed in time." },
             } },
             { "Compositing", {
                { "Transform", "Translate, scale, rotate, flip horizontal and flip vertical." },
@@ -18975,6 +18975,18 @@ namespace
                { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
                { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
                { "Drop Shadow / Outer Glow / Colour Overlay", "Layer-effect style filters." },
+               { "Basic", "Brightness/contrast, exposure, levels (black/white point + gamma), invert, posterize, threshold." },
+               { "Curves", "Per-channel spline curve editor - drag control points on Red/Green/Blue/Luminance, Photoshop Curves-style." },
+               { "LUT", "Applies a lookup-table image patched into the second input." },
+               { "Gradient Map", "Remaps luminance onto a two-colour gradient." },
+               { "Channel Mixer", "Rebuilds each output channel from a weighted mix of the input channels - set all three rows equal for a weighted greyscale." },
+               { "HSL / Colour Balance", "Hue, saturation and lightness; per-axis colour shifts." },
+               { "Color Adjustments", "All-in-one grading chain - brightness/contrast, levels, colour balance, HSL, vibrance, tone shaper, channel mixer and an optional black & white stage - so a common grade doesn't need eight nodes wired in series." },
+               { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
+               { "Remove Background", "On-device segmentation via the OS - no model download, no network, no key. Subject mode needs macOS 14, Person mode macOS 12. Segmentation is slow, so the mask is computed on demand and cached; for video use auto-refresh, which runs on a beat interval rather than every frame." },
+               { "Feedback", "Outputs the previous frame. Nothing visible on its own - it is the delay that makes a loop legal. See 'Using Feedback' above." },
+               { "Trails", "A pre-wired feedback loop: decaying accumulation with drift, zoom, rotation and hue rotation. Reach for this before wiring a loop by hand." },
+               { "Reaction-Diffusion", "Gray-Scott chemical simulation, six presets. Needs no input; patch one in and its luminance varies the feed rate so the pattern grows differently through light and dark." },
             } },
             { "Modulators", {
                { "LFO", "Sine, triangle, saw up/down, square and sample-and-hold. Rate in beats, plus phase and an output range." },
@@ -18988,23 +19000,10 @@ namespace
                { "Invert", "Mirrors a modulator around a low/high pivot. Defaults to 0..1 for a classic 1-v flip; set low/high to match an unclamped source to mirror it correctly." },
                { "Mod Curve", "Remaps a modulator through a draggable transfer curve - an S-curve, staircase, or exponential response, all things a slider can't express." },
             } },
-            { "Feedback", {
-               { "Feedback", "Outputs the previous frame. Nothing visible on its own - it is the delay that makes a loop legal. See 'Using Feedback' above." },
-               { "Trails", "A pre-wired feedback loop: decaying accumulation with drift, zoom, rotation and hue rotation. Reach for this before wiring a loop by hand." },
-               { "Reaction-Diffusion", "Gray-Scott chemical simulation, six presets. Needs no input; patch one in and its luminance varies the feed rate so the pattern grows differently through light and dark." },
-            } },
-            { "Mask", {
-               { "Remove Background", "On-device segmentation via the OS - no model download, no network, no key. Subject mode needs macOS 14, Person mode macOS 12. Segmentation is slow, so the mask is computed on demand and cached; for video use auto-refresh, which runs on a beat interval rather than every frame." },
-            } },
-            { "Resynth", {
-               { "Resynthesize", "Each generation reads the previous one, so the image drifts away from the source. The XY pad blends four named mutation effects assigned to its corners; Randomise re-rolls which four. The orb's path can be recorded, looped and replayed in time." },
-            } },
-            { "Output", {
+            { "Utility", {
                { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
                { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
                { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
-            } },
-            { "OSC", {
                { "OSC Receive", "Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin." },
                { "OSC Send", "Sends its patched modulator input as an Open Sound Control message (address + float) to a host:port over UDP, on change (past an epsilon) or at least every interval - the one node in the patch with no output of its own." },
             } },
@@ -26440,8 +26439,8 @@ static bool RunBrowserSortTest()
       check(CategoryColors::SemanticRank("Source") < CategoryColors::SemanticRank("3D"), "category rank: 2D before 3D");
       check(CategoryColors::SemanticRank("3D") < CategoryColors::SemanticRank("Synths"),
             "category rank: 3D before audio");
-      check(CategoryColors::SemanticRank("AudioEffects") < CategoryColors::SemanticRank("Output"),
-            "category rank: audio before utility/Output");
+      check(CategoryColors::SemanticRank("AudioEffects") < CategoryColors::SemanticRank("Utility"),
+            "category rank: audio before utility");
       check(CategoryColors::SemanticRank("NotARealCategory") == CategoryColors::SemanticRank("AlsoNotReal"),
             "category rank: unknown categories sort last, together");
 
@@ -27255,10 +27254,10 @@ int main(int argc, char** argv)
          SpawnNode("MIDI Notes", "Notes", 20.0f, 20.0f);            // 0
          SpawnNode("Wavetable", "Synths", 20.0f, 440.0f);           // 1
          SpawnNode("Envelope", "Modulators", 540.0f, 20.0f);        // 2
-         SpawnNode("Gain", "AudioUtility", 1040.0f, 440.0f);        // 3
-         SpawnNode("Mixer", "AudioUtility", 1040.0f, 760.0f);       // 4
-         SpawnNode("Splitter", "AudioUtility", 1300.0f, 440.0f);    // 5
-         SpawnNode("Audio Out", "AudioUtility", 1300.0f, 580.0f);   // 6
+         SpawnNode("Gain", "Utility", 1040.0f, 440.0f);        // 3
+         SpawnNode("Mixer", "Utility", 1040.0f, 760.0f);       // 4
+         SpawnNode("Splitter", "Utility", 1300.0f, 440.0f);    // 5
+         SpawnNode("Audio Out", "Utility", 1300.0f, 580.0f);   // 6
          SpawnNode("Audio Filter", "AudioEffects", 1650.0f, 20.0f); // 7
          SpawnNode("Dynamics", "AudioEffects", 1650.0f, 780.0f);    // 8
          SpawnNode("Delay", "AudioEffects", 2160.0f, 20.0f);        // 9
@@ -27503,8 +27502,8 @@ int main(int argc, char** argv)
       else if (getenv("INFINITE_BYPASSTEST") != nullptr)
       {
          SpawnNode("Shape", "Source", 40.0f, 40.0f);   // 0 white circle
-         SpawnNode("invert", "Color", 320.0f, 40.0f);  // 1
-         SpawnNode("Output", "Output", 600.0f, 40.0f); // 2
+         SpawnNode("invert", "Compositing", 320.0f, 40.0f);  // 1
+         SpawnNode("Output", "Utility", 600.0f, 40.0f); // 2
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[2], 0)->Connect(gNodes[1].node.get());
       }
@@ -27788,7 +27787,7 @@ int main(int argc, char** argv)
       else if (getenv("INFINITE_AUDIORECTEST") != nullptr)
       {
          SpawnNode("Shape", "Source", 40.0f, 40.0f);       // 0
-         SpawnNode("Output", "Output", 320.0f, 40.0f);     // 1
+         SpawnNode("Output", "Utility", 320.0f, 40.0f);     // 1
          SpawnNode("Audio File", "Modulators", 40.0f, 400.0f); // 2
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          auto* audio = static_cast<AudioFileNode*>(gNodes[2].node.get());
@@ -27815,8 +27814,8 @@ int main(int argc, char** argv)
          SpawnNode("Camera", "3D", 320.0f, 400.0f);        // 3
          SpawnNode("Light", "3D", 320.0f, 620.0f);         // 4
          SpawnNode("Render 3D", "3D", 880.0f, 40.0f);      // 5
-         SpawnNode("invert", "Color", 1160.0f, 40.0f);     // 6
-         SpawnNode("Output", "Output", 1440.0f, 40.0f);    // 7
+         SpawnNode("invert", "Compositing", 1160.0f, 40.0f);     // 6
+         SpawnNode("Output", "Utility", 1440.0f, 40.0f);    // 7
          SpawnNode("Path", "Modulators", 40.0f, 800.0f);   // 8
          SpawnNode("Audio File", "Modulators", 40.0f, 1000.0f); // 9
          SpawnNode("Particle System", "3D", 40.0f, 1200.0f);    // 10
@@ -27902,7 +27901,7 @@ int main(int argc, char** argv)
          // (later, at frameId checkpoints below) mid-chain delete survival.
          SpawnNode("Wavetable", "Synths", 40.0f, 40.0f);         // 0
          SpawnNode("Gain", "Synths", 320.0f, 40.0f);             // 1
-         SpawnNode("Audio Out", "AudioUtility", 600.0f, 40.0f); // 2
+         SpawnNode("Audio Out", "Utility", 600.0f, 40.0f); // 2
 
          auto* osc = static_cast<WavetableNode*>(gNodes[0].node.get());
          auto* gain = static_cast<GainNode*>(gNodes[1].node.get());
@@ -27952,7 +27951,7 @@ int main(int argc, char** argv)
 
          GraphNode* wtGn = SpawnNode("Wavetable", "Synths", 40.0f, 40.0f);
          const int wtIndex = wtGn->index;
-         GraphNode* outGn = SpawnNode("Audio Out", "AudioUtility", 320.0f, 40.0f);
+         GraphNode* outGn = SpawnNode("Audio Out", "Utility", 320.0f, 40.0f);
          const int outIndex = outGn->index;
          // Re-resolve - SpawnNode's push_back into gNodes can reallocate and
          // invalidate the pointer the earlier SpawnNode call returned.
@@ -28028,7 +28027,7 @@ int main(int argc, char** argv)
 
          GraphNode* wtGn = SpawnNode("Wavetable", "Synths", 40.0f, 40.0f);
          const int wtIndex = wtGn->index;
-         GraphNode* outGn = SpawnNode("Audio Out", "AudioUtility", 320.0f, 40.0f);
+         GraphNode* outGn = SpawnNode("Audio Out", "Utility", 320.0f, 40.0f);
          const int outIndex = outGn->index;
          wtGn = FindNodeByIndex(wtIndex);
          outGn = FindNodeByIndex(outIndex);
@@ -28165,7 +28164,7 @@ int main(int argc, char** argv)
          SpawnNode("Render 3D", "3D", 820.0f, 40.0f);      // 3
          SpawnNode("Shape", "Source", 40.0f, 500.0f);      // 4
          SpawnNode("Null", "Compositing", 300.0f, 500.0f); // 5
-         SpawnNode("Output", "Output", 560.0f, 500.0f);    // 6
+         SpawnNode("Output", "Utility", 560.0f, 500.0f);    // 6
 
          auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
          auto* null3d = static_cast<Null3DNode*>(gNodes[1].node.get());
@@ -28254,12 +28253,12 @@ int main(int argc, char** argv)
          SpawnNode("Light", "3D", 40.0f, 920.0f);                  // 5 key
          SpawnNode("Light", "3D", 40.0f, 1080.0f);                 // 6 fill/rim
          SpawnNode("Render 3D", "3D", 620.0f, 420.0f);             // 7
-         SpawnNode("hsl", "Color", 900.0f, 420.0f);                // 8
-         SpawnNode("colorbalance", "Color", 900.0f, 560.0f);       // 9
+         SpawnNode("hsl", "Compositing", 900.0f, 420.0f);                // 8
+         SpawnNode("colorbalance", "Compositing", 900.0f, 560.0f);       // 9
          SpawnNode("bloom", "Effects", 900.0f, 700.0f);            // 10
          SpawnNode("vignette", "Effects", 900.0f, 840.0f);         // 11
-         SpawnNode("brightnesscontrast", "Color", 900.0f, 980.0f); // 12
-         SpawnNode("Output", "Output", 1180.0f, 420.0f);           // 13
+         SpawnNode("brightnesscontrast", "Compositing", 900.0f, 980.0f); // 12
+         SpawnNode("Output", "Utility", 1180.0f, 420.0f);           // 13
 
          auto* cube = static_cast<GeometryNode*>(gNodes[0].node.get());
          cube->detail = 32;
@@ -28484,7 +28483,7 @@ int main(int argc, char** argv)
       }
       else if (getenv("INFINITE_TEXTFIT") != nullptr)
       {
-         SpawnNode("Text", "Text", 40.0f, 40.0f);
+         SpawnNode("Text", "Source", 40.0f, 40.0f);
          auto* t = static_cast<TextNode*>(gNodes[0].node.get());
          t->text = "naman is a weirdo and this line is deliberately long enough to need several rows";
          t->fontName = "Verdana";
@@ -28499,11 +28498,11 @@ int main(int argc, char** argv)
       }
       else if (getenv("INFINITE_SHOWCASE4") != nullptr)
       {
-         SpawnNode("Reaction Diffusion", "Feedback", 40.0f, 40.0f);
-         SpawnNode("Curves", "Color", 300.0f, 40.0f);
+         SpawnNode("Reaction Diffusion", "Compositing", 40.0f, 40.0f);
+         SpawnNode("Curves", "Compositing", 300.0f, 40.0f);
          SpawnNode("Shape", "Source", 560.0f, 40.0f);
-         SpawnNode("Trails", "Feedback", 820.0f, 40.0f);
-         SpawnNode("Resynthesize", "Resynth", 1080.0f, 40.0f);
+         SpawnNode("Trails", "Compositing", 820.0f, 40.0f);
+         SpawnNode("Resynthesize", "Effects", 1080.0f, 40.0f);
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[3], 0)->Connect(gNodes[2].node.get());
          CableFor(gNodes[4], 0)->Connect(gNodes[0].node.get());
@@ -28524,11 +28523,11 @@ int main(int argc, char** argv)
          // Same heavy visual load as INFINITE_SHOWCASE4 (Reaction Diffusion
          // at stepsPerFrame=24 feeding Curves/Shape/Trails) so the FPS-delta
          // measurement below has real GPU work to lose, not a synthetic one.
-         SpawnNode("Reaction Diffusion", "Feedback", 40.0f, 40.0f);
-         SpawnNode("Curves", "Color", 300.0f, 40.0f);
+         SpawnNode("Reaction Diffusion", "Compositing", 40.0f, 40.0f);
+         SpawnNode("Curves", "Compositing", 300.0f, 40.0f);
          SpawnNode("Shape", "Source", 560.0f, 40.0f);
-         SpawnNode("Trails", "Feedback", 820.0f, 40.0f);
-         SpawnNode("Resynthesize", "Resynth", 1080.0f, 40.0f);
+         SpawnNode("Trails", "Compositing", 820.0f, 40.0f);
+         SpawnNode("Resynthesize", "Effects", 1080.0f, 40.0f);
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[3], 0)->Connect(gNodes[2].node.get());
          CableFor(gNodes[4], 0)->Connect(gNodes[0].node.get());
@@ -28577,9 +28576,9 @@ int main(int argc, char** argv)
          // dev-only: a representative patch, used to generate the README image
          SpawnNode("Shape", "Source", 40.0f, 40.0f);
          SpawnNode("glitch", "Effects", 320.0f, 40.0f);
-         SpawnNode("Text", "Text", 600.0f, 40.0f);
+         SpawnNode("Text", "Source", 600.0f, 40.0f);
          SpawnNode("Layer Stack", "Compositing", 880.0f, 40.0f);
-         SpawnNode("Output", "Output", 1160.0f, 40.0f);
+         SpawnNode("Output", "Utility", 1160.0f, 40.0f);
          SpawnNode("LFO", "Modulators", 320.0f, 560.0f);
 
          auto* shape = static_cast<ShapeNode*>(gNodes[0].node.get());
@@ -28615,12 +28614,12 @@ int main(int argc, char** argv)
          static_cast<ShapeNode*>(gNodes[0].node.get())->shapeType = 5;
          if (getenv("INFINITE_RESYNTHTEST") != nullptr)
          {
-            SpawnNode("Resynthesize", "Resynth", 380.0f, 60.0f);
+            SpawnNode("Resynthesize", "Effects", 380.0f, 60.0f);
             CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
             gNodes[1].showParams = true;
          }
          else
-            SpawnNode("Output", "Output", 380.0f, 60.0f);
+            SpawnNode("Output", "Utility", 380.0f, 60.0f);
          if (getenv("INFINITE_RECTEST") != nullptr)
             CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          if (getenv("INFINITE_HIDETEST") != nullptr)
@@ -28678,8 +28677,8 @@ int main(int argc, char** argv)
             // round trip through the actual wire format rather than just
             // exercising the C++ classes in isolation.
             SpawnNode("Constant", "Modulators", 60.0f, 500.0f);   // gNodes[2]
-            SpawnNode("OSC Send", "OSC", 300.0f, 500.0f);         // gNodes[3]
-            SpawnNode("OSC Receive", "OSC", 540.0f, 500.0f);      // gNodes[4]
+            SpawnNode("OSC Send", "Utility", 300.0f, 500.0f);         // gNodes[3]
+            SpawnNode("OSC Receive", "Utility", 540.0f, 500.0f);      // gNodes[4]
             gNodes[2].showParams = true;
             gNodes[3].showParams = true;
             gNodes[4].showParams = true;
@@ -33862,8 +33861,8 @@ int main(int argc, char** argv)
                upstreamNoteIndex = SpawnIndex("MIDI Notes", "Notes", 40.0f, 260.0f);
             if (ok && cand.shape.isAudioSource)
             {
-               downstreamGainIndex = SpawnIndex("Gain", "AudioUtility", 320.0f, 40.0f);
-               downstreamOutIndex = SpawnIndex("Audio Out", "AudioUtility", 600.0f, 40.0f);
+               downstreamGainIndex = SpawnIndex("Gain", "Utility", 320.0f, 40.0f);
+               downstreamOutIndex = SpawnIndex("Audio Out", "Utility", 600.0f, 40.0f);
             }
             else if (ok && cand.shape.audioInputSlots > 0)
             {
@@ -33871,7 +33870,7 @@ int main(int argc, char** argv)
                // IAudioSource (Audio Out is the only current example) still
                // needs an upstream feed so its own input cable has something
                // real to clear on delete.
-               upstreamGainIndex = SpawnIndex("Gain", "AudioUtility", 40.0f, 260.0f);
+               upstreamGainIndex = SpawnIndex("Gain", "Utility", 40.0f, 260.0f);
             }
             if (ok && cand.shape.isNoteSource && cand.shape.noteInputSlots == 0)
             {
@@ -34290,7 +34289,7 @@ int main(int argc, char** argv)
 
          const int modIdx = SpawnIndex("Oscillator", "Synths", 40.0f, 700.0f);
          const int filterIdx = SpawnIndex("Audio Filter", "AudioEffects", 320.0f, 700.0f);
-         const int upstreamGainIdx = SpawnIndex("Gain", "AudioUtility", 40.0f, 760.0f);
+         const int upstreamGainIdx = SpawnIndex("Gain", "Utility", 40.0f, 760.0f);
          GraphNode* mod = FindNodeByIndex(modIdx);
          GraphNode* filter = FindNodeByIndex(filterIdx);
          GraphNode* upstreamGain = FindNodeByIndex(upstreamGainIdx);

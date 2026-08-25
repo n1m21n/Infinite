@@ -5,7 +5,7 @@
 
 // Per-category node tinting (header/border/label), with a handful of curated
 // presets rather than a free colour-picker per category - a fixed vocabulary
-// of 11 categories doesn't need a full editor, and picking from known,
+// of 9 categories doesn't need a full editor, and picking from known,
 // already-balanced palettes (Nord, Dracula, ...) means every preset looks
 // deliberate rather than user-mixed. The current pick is persisted next to
 // the app's other preferences (see Patch::Recents for the same pattern).
