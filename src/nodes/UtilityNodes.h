@@ -163,6 +163,15 @@ public:
    {
       return input ? input->SurfaceTextureRevision() : 0;
    }
+   // A null is a no-op on the cable: forwarding these two keeps an upstream
+   // InstanceOnPoints (and a Transform wrapping it) visible to the consumers
+   // that walk the passthrough chain, instead of collapsing the scatter to a
+   // single stamp mesh.
+   IGeometrySource* PassthroughSource() const override { return input; }
+   Mat4 GetInstanceGroupMatrix() const override
+   {
+      return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
@@ -211,6 +220,13 @@ public:
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Forwarded alongside PassthroughSource: a node that claims to pass an
+   // instancer through has to pass the wrapping Transform's group matrix
+   // through with it, or the scatter draws at the origin.
+   Mat4 GetInstanceGroupMatrix() const override
+   {
+      return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    ImageCable& TextureInput() { return mMaps[kMapAlbedo]; }

@@ -151,7 +151,7 @@ getting a file each:
 
 ### Invariants for `IGeometrySource`-consuming nodes
 
-Three rules every node with a single `IGeometrySource*` input (or `sourceInput`/
+Four rules every node with a single `IGeometrySource*` input (or `sourceInput`/
 `instanceShape`/etc.) is expected to follow, each backed by an automated
 sweep in `geometry-transform-sweep` (also run as part of
 `run-infinite-hygiene`) rather than left to manual review:
@@ -184,8 +184,20 @@ sweep in `geometry-transform-sweep` (also run as part of
    (`MeshToPointsNode`, both `DistributePoints*` nodes, `CurveNode`) — the
    render then cached its first frame forever and no upstream edit ever showed
    up in the viewport. `RENDER3DCACHESWEEPTEST` checks this generically.
+4. **If you pass geometry through, pass the instancing through with it.**
+   `InstanceOnPointsNode::GetMesh()` returns the single stamp mesh and carries
+   its N placements separately, so consumers walk `PassthroughSource()` to find
+   the instancer (`Render3DNode::FindInstancer`, `NodeViewport`'s copy) and read
+   `GetInstanceGroupMatrix()` to pick up a wrapping Transform's rigid move.
+   A forwarding node must override **both or neither** — `Null3DNode`,
+   `DisplacementNode` and `WrapNode` had neither, so instances vanished behind
+   them; `MaterialNode`, `SetColorNode`, `MergeByDistanceNode` and
+   `Switcher3DNode` had only the first, so a wrapping Transform's move was
+   silently discarded. A node with several geometry inputs must forward the
+   group matrix from the same input its `PassthroughSource()` returns.
+   `INSTANCESWEEPTEST` checks this generically.
 
-If you add a new node type in this category, wire it into all three sweeps
+If you add a new node type in this category, wire it into all four sweeps
 rather than hand-writing a one-off check — see `geometry-transform-sweep`'s
 SKILL.md, "Adding a new node type to a sweep."
 

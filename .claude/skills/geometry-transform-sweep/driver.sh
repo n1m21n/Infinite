@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generic node-type sweeps for Infinite's 3D geometry nodes.
 #
-# Runs three env-var-gated fixtures (src/main.cpp, search "SWEEPTEST") through
+# Runs the env-var-gated fixtures (src/main.cpp, search "SWEEPTEST") through
 # the real compiled .app binary. Each wraps a real mesh source in a small
 # probe IGeometrySource and wires it into every node type that takes a
 # geometry input (GeometryOpNode, DisplacementNode, MeshResynthNode,
@@ -34,6 +34,14 @@
 #     from two of those three accessors (MeshToPointsNode, both
 #     DistributePoints* nodes, CurveNode) - the render then cached its first
 #     frame forever and no upstream edit ever showed up in the viewport.
+#   - INSTANCESWEEPTEST — a node that forwards its geometry input's mesh also
+#     forwards the instancing side-channels: the PassthroughSource() chain
+#     walk still reaches an upstream InstanceOnPoints through it, and a
+#     wrapping Transform's GetInstanceGroupMatrix() survives. Caught a real
+#     bug: Null3D, Displacement and Wrap overrode neither, so instances
+#     collapsed to a single stamp behind them, and Material, Set Color, Merge
+#     by Distance and Switcher 3D forwarded the chain but not the group
+#     matrix, so a Transform wrapping the instancer was silently discarded.
 #
 # None of these are a fixed fixture like run-infinite-hygiene's BUGTEST
 # checks - they exist to keep covering every geometry-consuming node type as
@@ -97,6 +105,7 @@ SWEEPS=(
   "Mapping-transform forwarding:MAPPINGSWEEPTEST:MAPPING SWEEP OK:MAPPING SWEEP FAIL:/tmp/infinite_mapping_sweep.log"
   "Revision stability:REVISIONSWEEPTEST:REVISION SWEEP OK:REVISION SWEEP FAIL:/tmp/infinite_revision_sweep.log"
   "Render 3D cache invalidation:RENDER3DCACHESWEEPTEST:RENDER3D CACHE SWEEP OK:RENDER3D CACHE SWEEP FAIL:/tmp/infinite_render3d_cache_sweep.log"
+  "Instancing passthrough:INSTANCESWEEPTEST:INSTANCE SWEEP OK:INSTANCE SWEEP FAIL:/tmp/infinite_instance_sweep.log"
 )
 
 overallOk=1

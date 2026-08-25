@@ -298,6 +298,12 @@ public:
       return input ? input->GetMappingTransform() : MappingTransform();
    }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Forwarded alongside PassthroughSource - see MaterialNode for why the two
+   // have to travel together.
+   Mat4 GetInstanceGroupMatrix() const override
+   {
+      return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
 
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }

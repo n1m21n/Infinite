@@ -50,6 +50,10 @@ public:
    // chain like InstanceOnPoints -> Switcher 3D -> Render 3D still draws
    // every instance instead of collapsing to a single un-instanced copy.
    IGeometrySource* PassthroughSource() const override;
+   // Same active input as PassthroughSource, so the two can't disagree about
+   // which slot is live - a Transform wrapping the instancer upstream of the
+   // switcher still moves the whole scatter.
+   Mat4 GetInstanceGroupMatrix() const override;
 
    INode* BypassSource() override
    {
