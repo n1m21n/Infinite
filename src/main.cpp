@@ -30264,6 +30264,77 @@ int main(int argc, char** argv)
          printf("%s\n", phase4Ok ? "PHASE 4 OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_INSTANCESELECTTEST") != nullptr && frameId == 4)
+      {
+         // Instance-domain selection (local-prompts/instance-selection.md Part
+         // 1): a Select downstream of an InstanceOnPoints must mask instance
+         // placements, not the shared stamp's faces. Scatter a cube stamp over
+         // a sphere's vertices (spread roughly over a unit sphere), then
+         // Select by radius around the origin - a real subset should come
+         // back selected, not none/all, and it must stay put across frames
+         // with nothing changed.
+         GeometryNode sphere;
+         sphere.shape = 2; sphere.detail = 3; // plenty of vertices, spread over ~unit radius
+         sphere.CookIfNeeded(50000);
+
+         GeometryNode stamp;
+         stamp.shape = 1; stamp.detail = 0; // small cube stamp
+         stamp.CookIfNeeded(50001);
+
+         InstanceOnPointsNode instancer;
+         instancer.pointSource = &sphere;
+         instancer.instanceShape = &stamp;
+         instancer.pointMode = 0; // vertices
+         instancer.CookIfNeeded(50002);
+         const size_t instanceCount = instancer.InstanceTransforms().size();
+
+         GeometryOpNode select;
+         select.input = &instancer;
+         select.op = GeometryOpNode::kSelect;
+         select.selectMode = MeshOps::kSelectRadius;
+         // A UV/icosphere's vertices all sit at the same distance from its
+         // own centre, so centring the radius test there would trivially
+         // select all-or-nothing regardless of the threshold. Centring it on
+         // a point on the sphere's surface instead makes the 3D chord
+         // distance to every other vertex vary continuously, giving a real
+         // partial split - radius 1.0 selects roughly the near hemisphere.
+         select.selectA = 1.0f; select.selectB = 0.0f; select.selectC = 0.0f;
+         select.selectSeed = 1.0f;
+         select.CookIfNeeded(50003);
+         select.GetMesh();
+
+         auto countSelected = [](const std::vector<unsigned char>* mask) {
+            size_t n = 0;
+            if (mask)
+               for (unsigned char v : *mask)
+                  if (v) n++;
+            return n;
+         };
+
+         const std::vector<unsigned char>* mask = select.InstanceSelection();
+         const size_t selectedCount = countSelected(mask);
+         const bool maskSizeOk = mask != nullptr && mask->size() == instanceCount;
+         const bool maskRangeOk = maskSizeOk && selectedCount > 0 && selectedCount < instanceCount;
+         // Leaving the stamp mesh alone is the whole point of the instance-
+         // domain branch (GeometryOpNode::GetMesh's kSelect case) - a bug that
+         // fell back to face-masking the stamp would still pass the range
+         // check above by accident, so check this too.
+         const bool stampUntouchedOk = select.GetMesh().faceMask.empty();
+
+         // Stable across frames: re-cook at a later frameId with nothing
+         // changed and confirm the mask is byte-identical.
+         select.CookIfNeeded(50004);
+         select.GetMesh();
+         const std::vector<unsigned char>* mask2 = select.InstanceSelection();
+         const bool stableOk = mask2 != nullptr && mask != nullptr && *mask2 == *mask;
+
+         const bool ok = instanceCount > 0 && maskSizeOk && maskRangeOk && stampUntouchedOk && stableOk;
+         printf("instance select: %zu instances, %zu selected (mask size %zu), "
+                "stamp untouched=%d, stable=%d  %s\n",
+                instanceCount, selectedCount, mask ? mask->size() : (size_t)0,
+                (int)stampUntouchedOk, (int)stableOk, ok ? "INSTANCE SELECT OK" : "FAIL");
+      }
+
       if (getenv("INFINITE_PADPATHTEST") != nullptr && frameId == 4)
       {
          // A real recorded performance, not the generic mutator's mangled

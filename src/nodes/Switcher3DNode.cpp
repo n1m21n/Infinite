@@ -64,6 +64,24 @@ Mat4 Switcher3DNode::GetInstanceGroupMatrix() const
    return active ? active->GetInstanceGroupMatrix() : Mat4::Identity();
 }
 
+const std::vector<unsigned char>* Switcher3DNode::InstanceSelection() const
+{
+   IGeometrySource* active = Active();
+   return active ? active->InstanceSelection() : nullptr;
+}
+
+unsigned long long Switcher3DNode::InstanceSelectionRevision() const
+{
+   IGeometrySource* active = Active();
+   return active ? active->InstanceSelectionRevision() : 0;
+}
+
+const std::vector<Mat4>* Switcher3DNode::InstanceTransformOverride() const
+{
+   IGeometrySource* active = Active();
+   return active ? active->InstanceTransformOverride() : nullptr;
+}
+
 Mat4 Switcher3DNode::GetModelMatrix() const
 {
    IGeometrySource* active = Active();

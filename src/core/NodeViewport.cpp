@@ -30,6 +30,32 @@ namespace
       }
       return nullptr;
    }
+
+   // Same chain-walk, for the first non-null InstanceTransformOverride() (a
+   // selectionOnly Delete/Transform downstream of the instancer) - see
+   // GeometryOpNode::InstanceTransformOverride. Falls back to the instancer's
+   // own placements when nothing overrides.
+   const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, InstanceOnPointsNode* instancer)
+   {
+      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
+      {
+         if (const std::vector<Mat4>* override_ = s->InstanceTransformOverride())
+            return *override_;
+      }
+      return instancer->InstanceTransforms();
+   }
+
+   // Same chain-walk for the instance selection mask, used by the selection
+   // overlay's instance-domain fallback (whole instances tinted, not faces).
+   const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source)
+   {
+      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
+      {
+         if (const std::vector<unsigned char>* mask = s->InstanceSelection())
+            return mask;
+      }
+      return nullptr;
+   }
    // Position + normal + UV, no instancing. Cheapest lit look that still
    // reads as a solid: ambient + one fixed directional light + a small
    // specular kick so curvature is visible on a flat-lit preview. UV is
@@ -631,7 +657,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
       {
          lo[0] = lo[1] = lo[2] = 1e30f;
          hi[0] = hi[1] = hi[2] = -1e30f;
-         for (const Mat4& xform : instancer->InstanceTransforms())
+         for (const Mat4& xform : ResolveInstanceTransforms(geo, instancer))
          {
             const Mat4 m = instanceGroupMatrix == Mat4::Identity()
                ? xform : Mat4::Multiply(instanceGroupMatrix, xform);
@@ -754,9 +780,9 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
       if (mInstanceVbo == 0)
          glGenBuffers(1, &mInstanceVbo);
       if (instanceRevision != mInstanceRevision || !(instanceGroupMatrix == mInstanceGroupMatrix) ||
-          !mInstanceAttribsOn)
+          !mInstanceAttribsOn || revision != mInstanceOverrideRevision)
       {
-         const std::vector<Mat4>& xforms = instancer->InstanceTransforms();
+         const std::vector<Mat4>& xforms = ResolveInstanceTransforms(geo, instancer);
          std::vector<Mat4> composed;
          const std::vector<Mat4>* uploadXforms = &xforms;
          if (!(instanceGroupMatrix == Mat4::Identity()))
@@ -779,6 +805,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          }
          mInstanceRevision = instanceRevision;
          mInstanceGroupMatrix = instanceGroupMatrix;
+         mInstanceOverrideRevision = revision;
          mInstanceCount = (int)uploadXforms->size();
          mInstanceAttribsOn = true;
       }
@@ -805,9 +832,37 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    glUseProgram(0);
    } // !usePointCloud
 
-   if (!usePointCloud && selectionProgram != 0 && !mesh.faceMask.empty())
+   // Instance-domain selection (a Select downstream of an instancer) leaves
+   // mesh.faceMask empty - there's nothing on the shared stamp to mask - and
+   // instead masks entries in InstanceSelection(). See the fallback used
+   // below: whole selected instances get tinted rather than a per-face
+   // highlight, per local-prompts/instance-selection.md Part 1 step 5.
+   const std::vector<unsigned char>* instanceSelection = instanced ? ResolveInstanceSelection(geo) : nullptr;
+   const bool hasInstanceSelection = instanceSelection != nullptr && !instanceSelection->empty();
+
+   if (!usePointCloud && selectionProgram != 0 && (!mesh.faceMask.empty() || hasInstanceSelection))
    {
-      UpdateSelectionBuffer(mesh, revision);
+      if (!mesh.faceMask.empty())
+      {
+         UpdateSelectionBuffer(mesh, revision);
+      }
+      else if (mSelRevision != revision)
+      {
+         // No faceMask to filter by - mSelIbo holds the whole stamp instead,
+         // so every face of a selected instance draws, not a subset of faces.
+         mSelRevision = revision;
+         if (mSelVao == 0) glGenVertexArrays(1, &mSelVao);
+         if (mSelIbo == 0) glGenBuffers(1, &mSelIbo);
+         glBindVertexArray(mSelVao);
+         glBindBuffer(GL_ARRAY_BUFFER, mVbo);
+         glEnableVertexAttribArray(0);
+         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mSelIbo);
+         glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int),
+                      mesh.indices.data(), GL_STATIC_DRAW);
+         glBindVertexArray(0);
+         mSelIndexCount = (int)mesh.indices.size();
+      }
       if (mSelIndexCount > 0)
       {
          glUseProgram(selectionProgram);
@@ -826,14 +881,27 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
          glBindVertexArray(mSelVao);
-         // mInstanceVbo is generated/populated in the main draw block above,
-         // which always runs before this - by the time we get here in an
-         // instanced frame it's guaranteed non-zero. Configuring these attribs
-         // here (not in UpdateSelectionBuffer, which can run before the main
-         // block has ever created mInstanceVbo) avoids binding buffer 0.
-         if (instanced && !mSelInstanceAttribsOn)
+         if (hasInstanceSelection)
          {
-            glBindBuffer(GL_ARRAY_BUFFER, mInstanceVbo);
+            // Filter to just the selected instances' composed transforms and
+            // point mSelVao's instance attribs at that buffer instead of the
+            // full mInstanceVbo - only entering this whole outer block is
+            // already gated on an actual redraw, so rebuilding here every
+            // time costs nothing extra.
+            std::vector<Mat4> filtered;
+            const std::vector<Mat4>& xforms = ResolveInstanceTransforms(geo, instancer);
+            filtered.reserve(xforms.size());
+            for (size_t i = 0; i < xforms.size(); i++)
+            {
+               if (i >= instanceSelection->size() || !(*instanceSelection)[i])
+                  continue;
+               filtered.push_back(instanceGroupMatrix == Mat4::Identity()
+                  ? xforms[i] : Mat4::Multiply(instanceGroupMatrix, xforms[i]));
+            }
+            if (mSelInstanceOverrideVbo == 0)
+               glGenBuffers(1, &mSelInstanceOverrideVbo);
+            glBindBuffer(GL_ARRAY_BUFFER, mSelInstanceOverrideVbo);
+            glBufferData(GL_ARRAY_BUFFER, filtered.size() * sizeof(Mat4), filtered.data(), GL_STATIC_DRAW);
             for (int col = 0; col < 4; col++)
             {
                const unsigned int loc = 2 + col;
@@ -842,25 +910,64 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
                                      (void*)(size_t)(col * 4 * sizeof(float)));
                glVertexAttribDivisor(loc, 1);
             }
+            mSelInstanceOverrideCount = (int)filtered.size();
             mSelInstanceAttribsOn = true;
-         }
-         else if (!instanced && mSelInstanceAttribsOn)
-         {
-            for (int col = 0; col < 4; col++)
-            {
-               glDisableVertexAttribArray(2 + col);
-               glVertexAttribDivisor(2 + col, 0);
-            }
-            mSelInstanceAttribsOn = false;
-         }
-         if (instanced)
-         {
             glDrawElementsInstanced(GL_TRIANGLES, mSelIndexCount, GL_UNSIGNED_INT, nullptr,
-                                    (GLsizei)mInstanceCount);
+                                    (GLsizei)mSelInstanceOverrideCount);
          }
          else
          {
-            glDrawElements(GL_TRIANGLES, mSelIndexCount, GL_UNSIGNED_INT, nullptr);
+            // mInstanceVbo is generated/populated in the main draw block above,
+            // which always runs before this - by the time we get here in an
+            // instanced frame it's guaranteed non-zero. Configuring these attribs
+            // here (not in UpdateSelectionBuffer, which can run before the main
+            // block has ever created mInstanceVbo) avoids binding buffer 0.
+            if (instanced && !mSelInstanceAttribsOn)
+            {
+               glBindBuffer(GL_ARRAY_BUFFER, mInstanceVbo);
+               for (int col = 0; col < 4; col++)
+               {
+                  const unsigned int loc = 2 + col;
+                  glEnableVertexAttribArray(loc);
+                  glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
+                                        (void*)(size_t)(col * 4 * sizeof(float)));
+                  glVertexAttribDivisor(loc, 1);
+               }
+               mSelInstanceAttribsOn = true;
+            }
+            else if (instanced)
+            {
+               // Already pointed at mInstanceVbo from a previous frame, but the
+               // instance-selection branch above may have last pointed these
+               // same locations at mSelInstanceOverrideVbo instead - rebind
+               // unconditionally rather than trusting mSelInstanceAttribsOn to
+               // mean "pointed at the right buffer".
+               glBindBuffer(GL_ARRAY_BUFFER, mInstanceVbo);
+               for (int col = 0; col < 4; col++)
+               {
+                  const unsigned int loc = 2 + col;
+                  glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
+                                        (void*)(size_t)(col * 4 * sizeof(float)));
+               }
+            }
+            else if (mSelInstanceAttribsOn)
+            {
+               for (int col = 0; col < 4; col++)
+               {
+                  glDisableVertexAttribArray(2 + col);
+                  glVertexAttribDivisor(2 + col, 0);
+               }
+               mSelInstanceAttribsOn = false;
+            }
+            if (instanced)
+            {
+               glDrawElementsInstanced(GL_TRIANGLES, mSelIndexCount, GL_UNSIGNED_INT, nullptr,
+                                       (GLsizei)mInstanceCount);
+            }
+            else
+            {
+               glDrawElements(GL_TRIANGLES, mSelIndexCount, GL_UNSIGNED_INT, nullptr);
+            }
          }
          glBindVertexArray(0);
          glUseProgram(0);

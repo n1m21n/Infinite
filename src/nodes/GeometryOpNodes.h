@@ -100,6 +100,21 @@ public:
    // "move x/y/z", "rotate x/y/z", "scale x/y/z" for those two operations.
    Mat4 TransformMatrix() const;
 
+   // Non-null only when op == kSelect and this node sits downstream of an
+   // InstanceOnPoints: the per-instance mask built in GetMesh() (parallel to
+   // the instancer's InstanceTransforms()), instead of the usual per-face
+   // Mesh::faceMask. Any other op forwards whatever it received from input,
+   // same as PassthroughSource. Reflects whatever GetMesh() last built, so
+   // callers need to have called GetMesh()/MeshRevision() on this node first
+   // this frame - same ordering every other passthrough accessor here relies on.
+   const std::vector<unsigned char>* InstanceSelection() const override;
+   unsigned long long InstanceSelectionRevision() const override;
+   // Non-null only when op is kDelete or kTransform with selectionOnly on and
+   // WrapsInstancer(input): the instance transform list after this node's
+   // edit (deleted/moved entries), replacing what the instancer would
+   // otherwise hand back. See GetMesh()'s kDelete/kTransform cases.
+   const std::vector<Mat4>* InstanceTransformOverride() const override;
+
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
@@ -260,6 +275,13 @@ private:
       // triangle-count proxy cannot see a reselection and a downstream
       // Delete/Transform/Extrude Selected kept its stale cached output.
       unsigned long long upstreamRevision = 0;
+      // The raw instancer's InstanceRevision() when WrapsInstancer(input) -
+      // needed because InstanceOnPointsNode::MeshRevision() only reflects the
+      // stamp shape's revision, not a scatter/instance-transform change, so
+      // upstreamRevision alone is blind to "the points moved" and a
+      // downstream instance-domain Select/Delete/Transform would keep a mask
+      // or override built against the old placements.
+      unsigned long long upstreamInstanceRevision = 0;
       bool operator==(const Signature& o) const
       {
          return op == o.op && count == o.count && levels == o.levels && axis == o.axis &&
@@ -278,7 +300,8 @@ private:
                 moveAlongNormals == o.moveAlongNormals &&
                 rx == o.rx && ry == o.ry && rz == o.rz &&
                 sx == o.sx && sy == o.sy && sz == o.sz && spinBeats == o.spinBeats &&
-                upstream == o.upstream && upstreamRevision == o.upstreamRevision;
+                upstream == o.upstream && upstreamRevision == o.upstreamRevision &&
+                upstreamInstanceRevision == o.upstreamInstanceRevision;
       }
    };
 
@@ -289,6 +312,17 @@ private:
    bool mHasBuilt = false;
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
+
+   // Populated by GetMesh() only for op == kSelect downstream of an
+   // instancer; empty otherwise (InstanceSelection() forwards input's in
+   // that case instead of pointing at this, so an always-empty-but-non-null
+   // vector here can't be mistaken for a real all-unselected mask).
+   std::vector<unsigned char> mInstanceSelection;
+   unsigned long long mInstanceSelectionRevision = 0;
+   // Populated by GetMesh() only for kDelete/kTransform with selectionOnly
+   // downstream of an instancer - see InstanceTransformOverride().
+   std::vector<Mat4> mInstanceTransformOverride;
+   bool mHasInstanceTransformOverride = false;
 };
 
 // --- Displacement ---------------------------------------------------------
@@ -342,6 +376,20 @@ public:
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
+   // Forwarded alongside PassthroughSource/GetInstanceGroupMatrix above -
+   // Displacement never selects or edits instances itself.
+   const std::vector<unsigned char>* InstanceSelection() const override
+   {
+      return input ? input->InstanceSelection() : nullptr;
+   }
+   unsigned long long InstanceSelectionRevision() const override
+   {
+      return input ? input->InstanceSelectionRevision() : 0;
+   }
+   const std::vector<Mat4>* InstanceTransformOverride() const override
+   {
+      return input ? input->InstanceTransformOverride() : nullptr;
    }
 
    IGeometrySource* input = nullptr;
@@ -654,6 +702,18 @@ public:
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
    }
+   const std::vector<unsigned char>* InstanceSelection() const override
+   {
+      return input ? input->InstanceSelection() : nullptr;
+   }
+   unsigned long long InstanceSelectionRevision() const override
+   {
+      return input ? input->InstanceSelectionRevision() : 0;
+   }
+   const std::vector<Mat4>* InstanceTransformOverride() const override
+   {
+      return input ? input->InstanceTransformOverride() : nullptr;
+   }
 
    IGeometrySource* input = nullptr;
    IPaletteSource* paletteInput = nullptr;
@@ -766,6 +826,18 @@ public:
    Mat4 GetInstanceGroupMatrix() const override
    {
       return sourceInput ? sourceInput->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
+   const std::vector<unsigned char>* InstanceSelection() const override
+   {
+      return sourceInput ? sourceInput->InstanceSelection() : nullptr;
+   }
+   unsigned long long InstanceSelectionRevision() const override
+   {
+      return sourceInput ? sourceInput->InstanceSelectionRevision() : 0;
+   }
+   const std::vector<Mat4>* InstanceTransformOverride() const override
+   {
+      return sourceInput ? sourceInput->InstanceTransformOverride() : nullptr;
    }
 
    IGeometrySource* sourceInput = nullptr;

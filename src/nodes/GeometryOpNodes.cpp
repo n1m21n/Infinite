@@ -48,16 +48,29 @@ namespace
       return h;
    }
 
-   // Whether a source is, or sits behind a chain of mesh-transforming wrapper
-   // nodes on top of, an InstanceOnPoints - see IGeometrySource::PassthroughSource.
-   bool WrapsInstancer(IGeometrySource* s)
+   // Walks the PassthroughSource chain looking for the raw InstanceOnPoints -
+   // see IGeometrySource::PassthroughSource.
+   InstanceOnPointsNode* FindRawInstancer(IGeometrySource* s)
    {
       for (; s != nullptr; s = s->PassthroughSource())
       {
-         if (dynamic_cast<InstanceOnPointsNode*>(s) != nullptr)
-            return true;
+         if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(s))
+            return inst;
       }
-      return false;
+      return nullptr;
+   }
+
+   // Whether a source is, or sits behind a chain of mesh-transforming wrapper
+   // nodes on top of, an InstanceOnPoints.
+   bool WrapsInstancer(IGeometrySource* s) { return FindRawInstancer(s) != nullptr; }
+
+   // Same hash MeshOps::Select uses internally (Mesh.cpp's anonymous-namespace
+   // SelectHash) - kept identical so kSelectRandom means the same threshold in
+   // the instance domain as it does on faces.
+   float InstanceSelectHash(float seed, size_t index)
+   {
+      const float x = std::sin((seed + 1.0f) * (float)(index + 1) * 12.9898f) * 43758.5453f;
+      return x - std::floor(x);
    }
 }
 
@@ -94,7 +107,13 @@ Mat4 GeometryOpNode::TransformMatrix() const
 Mat4 GeometryOpNode::GetInstanceGroupMatrix() const
 {
    const Mat4 upstream = input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
-   if (op == kTransform && !bypassed && WrapsInstancer(input))
+   // selectionOnly moves only the masked instances, published as a per-instance
+   // InstanceTransformOverride() in GetMesh() instead - folding the same move
+   // into the whole-group matrix here as well would apply it twice (once per
+   // instance, once again to the group). Without selectionOnly there is no
+   // per-instance override, so the whole-group matrix is the only place the
+   // move happens, same as before this feature existed.
+   if (op == kTransform && !bypassed && WrapsInstancer(input) && !selectionOnly)
       return Mat4::Multiply(TransformMatrix(), upstream);
    return upstream;
 }
@@ -135,6 +154,8 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    // other mask-only operators leave the vertex/index count unchanged, so a
    // count was blind to exactly the changes those nodes make.
    s.upstreamRevision = input ? input->MeshRevision() : 0;
+   if (InstanceOnPointsNode* instancer = FindRawInstancer(input))
+      s.upstreamInstanceRevision = instancer->InstanceRevision();
    return s;
 }
 
@@ -173,9 +194,36 @@ const Mesh& GeometryOpNode::GetMesh()
          // scale into the stamp's vertices here would apply it once per instance
          // in the stamp's *local* frame (inflating/smearing every copy) instead
          // of moving the whole scattered result as one rigid group. Leave the
-         // stamp mesh untouched and let GetInstanceGroupMatrix() carry it.
+         // stamp mesh untouched and let GetInstanceGroupMatrix() (whole group)
+         // or the per-instance override below (selectionOnly) carry it.
          if (WrapsInstancer(input))
+         {
             mCache = src;
+            if (selectionOnly)
+            {
+               // Move only the masked instances - GetInstanceGroupMatrix() backs
+               // off to the upstream-unchanged matrix in this case (see its
+               // comment) so the move isn't applied a second time to everyone.
+               InstanceOnPointsNode* instancer = FindRawInstancer(input);
+               const std::vector<Mat4>* upstreamOverride = input->InstanceTransformOverride();
+               const std::vector<Mat4>& base =
+                  upstreamOverride ? *upstreamOverride : instancer->InstanceTransforms();
+               const std::vector<unsigned char>* mask = input->InstanceSelection();
+               const Mat4 xform = TransformMatrix();
+               mInstanceTransformOverride = base;
+               if (mask)
+               {
+                  for (size_t i = 0; i < mInstanceTransformOverride.size(); i++)
+                     if (i < mask->size() && (*mask)[i])
+                        mInstanceTransformOverride[i] = Mat4::Multiply(xform, mInstanceTransformOverride[i]);
+               }
+               mHasInstanceTransformOverride = true;
+            }
+            else
+            {
+               mHasInstanceTransformOverride = false;
+            }
+         }
          else if (selectionOnly)
             mCache = MeshOps::TransformSelected(src, TransformMatrix(), moveAlongNormals, normalAmount);
          else
@@ -230,11 +278,108 @@ const Mesh& GeometryOpNode::GetMesh()
          mCache = MeshOps::Screw(src, screwSteps, turns, rise, radiusOffset, axis);
          break;
       case kDelete:
-         mCache = MeshOps::DeleteSelected(selectionOnly ? src : MeshOps::ClearSelection(src), keepSelected);
+         if (selectionOnly && WrapsInstancer(input))
+         {
+            // Instance-domain delete: drop (or, with keepSelected, keep only)
+            // the masked instances from the transform list instead of touching
+            // the shared stamp mesh - see InstanceTransformOverride().
+            mCache = src;
+            InstanceOnPointsNode* instancer = FindRawInstancer(input);
+            const std::vector<Mat4>* upstreamOverride = input->InstanceTransformOverride();
+            const std::vector<Mat4>& base =
+               upstreamOverride ? *upstreamOverride : instancer->InstanceTransforms();
+            const std::vector<unsigned char>* mask = input->InstanceSelection();
+            mInstanceTransformOverride.clear();
+            mInstanceTransformOverride.reserve(base.size());
+            for (size_t i = 0; i < base.size(); i++)
+            {
+               const bool selected = mask && i < mask->size() && (*mask)[i];
+               // Named for what is kept, not what is dropped - same convention
+               // as MeshOps::DeleteSelected's keepSelected.
+               if (selected == keepSelected)
+                  mInstanceTransformOverride.push_back(base[i]);
+            }
+            mHasInstanceTransformOverride = true;
+         }
+         else
+         {
+            mCache = MeshOps::DeleteSelected(selectionOnly ? src : MeshOps::ClearSelection(src), keepSelected);
+            mHasInstanceTransformOverride = false;
+         }
          break;
       case kSelect:
-         mCache = MeshOps::Select(src, selectMode, selectA, selectB, selectC, axis,
-                                  selectSeed, selectInvert, selectAppend);
+         if (WrapsInstancer(input))
+         {
+            // Instance-domain select: leave the shared stamp mesh alone and
+            // mask instances instead - see InstanceSelection(). Mirrors
+            // MeshOps::Select's per-mode math (Mesh.cpp), substituting each
+            // instance's translation/local-Y for a face's centre/normal.
+            mCache = src;
+            InstanceOnPointsNode* instancer = FindRawInstancer(input);
+            const std::vector<Mat4>* upstreamOverride = input->InstanceTransformOverride();
+            const std::vector<Mat4>& transforms =
+               upstreamOverride ? *upstreamOverride : instancer->InstanceTransforms();
+            const std::vector<unsigned char>* previous = input->InstanceSelection();
+            const size_t n = transforms.size();
+            const int k = std::max(0, std::min(axis, 2));
+            mInstanceSelection.assign(n, 0);
+            for (size_t i = 0; i < n; i++)
+            {
+               bool hit;
+               switch (selectMode)
+               {
+                  case MeshOps::kSelectIndex:
+                  {
+                     const long long start = (long long)selectA;
+                     const long long cnt = (long long)selectB;
+                     const long long stride = std::max(1LL, (long long)selectC);
+                     const long long rel = (long long)i - start;
+                     hit = rel >= 0 && (cnt <= 0 || rel < cnt * stride) && (rel % stride) == 0;
+                     break;
+                  }
+                  case MeshOps::kSelectAxis:
+                     hit = transforms[i].m[12 + k] >= selectA && transforms[i].m[12 + k] <= selectB;
+                     break;
+                  case MeshOps::kSelectNormal:
+                  {
+                     // Local +Y axis (column 1) - the instance's surface normal
+                     // when alignToNormal is on (the default). With it off every
+                     // instance shares one orientation and this mode degenerates
+                     // to all-or-nothing, same as the tooltip should say.
+                     const float normal[3] = { transforms[i].m[4], transforms[i].m[5], transforms[i].m[6] };
+                     const float sign = (selectC >= 0.0f) ? 1.0f : -1.0f;
+                     hit = (normal[k] * sign) >= selectA;
+                     break;
+                  }
+                  case MeshOps::kSelectRandom:
+                     hit = InstanceSelectHash(selectSeed, i) < selectA;
+                     break;
+                  case MeshOps::kSelectRadius:
+                  {
+                     const float dx = transforms[i].m[12] - selectA;
+                     const float dy = transforms[i].m[13] - selectB;
+                     const float dz = transforms[i].m[14] - selectC;
+                     hit = std::sqrt(dx * dx + dy * dy + dz * dz) <= selectSeed;
+                     break;
+                  }
+                  case MeshOps::kSelectAll:
+                  default:
+                     hit = true;
+                     break;
+               }
+               if (selectInvert)
+                  hit = !hit;
+               if (selectAppend && previous && i < previous->size() && (*previous)[i])
+                  hit = true;
+               mInstanceSelection[i] = hit ? 1 : 0;
+            }
+            mInstanceSelectionRevision = NextMeshRevision();
+         }
+         else
+         {
+            mCache = MeshOps::Select(src, selectMode, selectA, selectB, selectC, axis,
+                                     selectSeed, selectInvert, selectAppend);
+         }
          break;
       case kDeleteSelected:
          mCache = MeshOps::DeleteSelected(src, keepSelected);
@@ -274,6 +419,28 @@ unsigned long long GeometryOpNode::MeshRevision()
       return input->MeshRevision();
    GetMesh();
    return mMeshRevision;
+}
+
+const std::vector<unsigned char>* GeometryOpNode::InstanceSelection() const
+{
+   if (op == kSelect && !bypassed && WrapsInstancer(input))
+      return &mInstanceSelection;
+   return input ? input->InstanceSelection() : nullptr;
+}
+
+unsigned long long GeometryOpNode::InstanceSelectionRevision() const
+{
+   if (op == kSelect && !bypassed && WrapsInstancer(input))
+      return mInstanceSelectionRevision;
+   return input ? input->InstanceSelectionRevision() : 0;
+}
+
+const std::vector<Mat4>* GeometryOpNode::InstanceTransformOverride() const
+{
+   if ((op == kDelete || op == kTransform) && !bypassed && selectionOnly &&
+       WrapsInstancer(input) && mHasInstanceTransformOverride)
+      return &mInstanceTransformOverride;
+   return input ? input->InstanceTransformOverride() : nullptr;
 }
 
 Material GeometryOpNode::GetMaterial() const

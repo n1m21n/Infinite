@@ -167,6 +167,20 @@ public:
    // transform this way needs to return anything else.
    virtual Mat4 GetInstanceGroupMatrix() const { return Mat4::Identity(); }
 
+   // Per-instance selection produced by a Select node downstream of an
+   // InstanceOnPoints. Parallel to InstanceOnPointsNode::InstanceTransforms() -
+   // index i here masks InstanceTransforms()[i] (or the override below, if
+   // any). nullptr when nothing in the chain has selected instances.
+   virtual const std::vector<unsigned char>* InstanceSelection() const { return nullptr; }
+   virtual unsigned long long InstanceSelectionRevision() const { return 0; }
+
+   // Instance transforms after this node's edit, replacing the instancer's
+   // own list - e.g. Delete(selectionOnly) dropping masked entries, or
+   // Transform(selectionOnly) moving only the masked ones. nullptr when this
+   // node doesn't modify them, meaning "read InstanceTransforms() from the
+   // instancer unchanged".
+   virtual const std::vector<Mat4>* InstanceTransformOverride() const { return nullptr; }
+
    // Optional components alongside (or instead of) the mesh above. A source
    // with no point cloud / curve of its own returns nullptr, which callers
    // treat identically to "not connected to the right kind of thing" - the
@@ -507,6 +521,15 @@ private:
       // which doesn't bump the instancer's own InstanceRevision() - still
       // triggers a re-upload.
       Mat4 instanceGroupMatrix;
+      // A selectionOnly Delete/Transform downstream of the instancer publishes
+      // its own transform list via InstanceTransformOverride() instead of
+      // touching the instancer, so neither instanceRevision nor
+      // instanceGroupMatrix above catch it changing on its own. The owning
+      // node bumps its own MeshRevision() on every real rebuild of that list
+      // (GetMesh() always stamps a fresh revision, override or not), so this
+      // mirrors `revision`/`meshRevision` at the point the instance buffer was
+      // last uploaded.
+      unsigned long long instanceOverrideRevision = 0;
    };
 
    bool EnsureResources(int w, int h, int sampleCount);
