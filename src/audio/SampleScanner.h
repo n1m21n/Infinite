@@ -30,6 +30,12 @@ public:
       std::string fileName;      // display name
       std::string fileNameLower; // lowercased display name for fast filter matching
       std::string folderRoot;    // which added folder this came from
+      // Lowercased, no leading dot - matches how MediaExtensions.h stores
+      // its lists. Populated at scan time and re-derived from `path` at
+      // LoadFromDisk (see SampleScanner.cpp) rather than persisted, so the
+      // on-disk index format - and PluginScanner-style schema version - is
+      // unchanged by adding this field.
+      std::string extension;
    };
 
    explicit SampleScanner(Kind kind = Kind::Audio);
