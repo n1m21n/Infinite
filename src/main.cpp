@@ -26626,6 +26626,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_HIDETEST") != nullptr ||
          getenv("INFINITE_MACROTEST") != nullptr ||
          getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_MODTEST") != nullptr ||
+         getenv("INFINITE_RECTEARDOWNTEST") != nullptr ||
          getenv("INFINITE_SIZETEST") != nullptr || getenv("INFINITE_INPUTTEST") != nullptr ||
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr || getenv("INFINITE_OSCTEST") != nullptr ||
@@ -28012,7 +28013,7 @@ int main(int argc, char** argv)
          }
          else
             SpawnNode("Output", "Output", 380.0f, 60.0f);
-         if (getenv("INFINITE_RECTEST") != nullptr)
+         if (getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_RECTEARDOWNTEST") != nullptr)
             CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          if (getenv("INFINITE_HIDETEST") != nullptr)
          {
@@ -29747,6 +29748,38 @@ int main(int argc, char** argv)
 
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
+      }
+
+      if (getenv("INFINITE_RECTEARDOWNTEST") != nullptr)
+      {
+         // Tearing down mid-take - by deleting the Output node, or by the
+         // window closing and its destructor running - must not crash or
+         // hang on the encoder worker join, and must not leak the triple-
+         // buffered PBOs. See local-prompts/13-async-video-readback.md's
+         // teardown section. INFINITE_RECTEARDOWNTEST=quit exercises the
+         // destructor path (StopRecording never called explicitly); any
+         // other value (e.g. "delete") exercises RemoveNodeByIndex.
+         const bool viaQuit = std::string(getenv("INFINITE_RECTEARDOWNTEST")) == "quit";
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         if (frameId == 2)
+         {
+            bool started = out->StartRecording(TmpPath("infinite_recteardown.mov"));
+            printf("start recording: %d (%s)\n", (int)started, out->RecordStatus().c_str());
+         }
+         if (frameId == 10)
+         {
+            printf("tearing down mid-recording (still recording=%d) via %s\n",
+                   (int)out->IsRecording(), viaQuit ? "quit" : "delete");
+            if (viaQuit)
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+            else
+            {
+               RemoveNodeByIndex(gNodes[1].index);
+               printf("delete-mid-record: survived  OK\n");
+            }
+         }
+         if (!viaQuit && frameId == 12)
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
       if (getenv("INFINITE_RESYNTHTEST") != nullptr)

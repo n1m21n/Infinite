@@ -8,6 +8,7 @@
 #include "AudioCable.h"
 #include "GLUtil.h"
 #include "Platform.h"
+#include "gl3.h" // GLsync, for the recording readback fences below
 #include "audio/AudioCaptureRing.h"
 
 // Terminal node. Passes its input through into its own FBO (identity pass) so it
@@ -69,6 +70,14 @@ private:
    void CaptureFrame();
    void DrainAudioCapture();
 
+   // Triple-buffered PBO readback: CaptureFrame issues an async glReadPixels
+   // into the write slot and fences it, then separately checks whether the
+   // read slot (two frames behind) has become available. Never blocks the
+   // render thread - see local-prompts/13-async-video-readback.md.
+   void AllocateReadbackBuffers();
+   void ReleaseReadbackBuffers();
+   void FlushReadbacks(); // blocking drain, used on StopRecording/teardown
+
    ImageCable mInput;
    AudioCable mAudioInput;
    AudioCaptureRing mCaptureRing;
@@ -78,10 +87,20 @@ private:
    int mLastCookFrame = -1;
 
    Platform::RecorderHandle* mRecorder = nullptr;
-   std::vector<unsigned char> mReadback;
    int mRecordW = 0;
    int mRecordH = 0;
    std::string mRecordStatus;
    int mLastFrames = 0;
    int mLastDropped = 0;
+
+   static constexpr int kPboCount = 3;
+   struct PboSlot
+   {
+      unsigned int pbo = 0;
+      GLsync fence = nullptr;
+      bool pending = false; // readback issued into this slot, not yet consumed
+   };
+   PboSlot mPbo[kPboCount];
+   int mPboWriteIndex = 0;
+   int mPboReadIndex = 0;
 };
