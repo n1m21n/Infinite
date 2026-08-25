@@ -30,7 +30,7 @@ class DrumSequencerNode : public INode, public IAudioSource
 {
 public:
    static constexpr int kNumLanes = 8;
-   static constexpr int kMaxSteps = 8;
+   static constexpr int kMaxSteps = 128;
    static constexpr int kVoicesPerLane = 4;
    static constexpr int kWaveCache = 128;
 
@@ -105,6 +105,7 @@ public:
    // ---- global ---------------------------------------------------------
    int rate = 12;      // MusicTime::RateDivision, stored as plain int (see Transport.h's mScale for why)
    int numSteps = 8;    // 1..kMaxSteps
+   int editPage = 0;     // UI page, 16 steps at a time
    float swing = 0.0f;  // 0..1
    float volume = 0.8f; // node output level
    bool run = true;

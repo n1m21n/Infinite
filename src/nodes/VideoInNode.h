@@ -20,7 +20,7 @@ public:
    unsigned long long TextureRevision() const override { return mRevision; }
    void CookIfNeeded(int frameId) override;
 
-   bool active = true;
+   bool active = false;
    std::string deviceId;
    int resolution = 0; // 0 = Auto, 1 = 1080p, 2 = 720p, 3 = 480p
    bool mirror = true;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -46,7 +47,7 @@ private:
    std::atomic<float> mLastValue{ 0.5f };
    std::thread mThread;
    std::atomic<bool> mStop{ false };
-   int mSocket = -1;
+   std::intptr_t mSocket = -1;
    int mBoundPort = -1;
 
    // The receive thread reads this to filter incoming packets by address;

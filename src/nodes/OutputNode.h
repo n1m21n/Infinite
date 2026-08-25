@@ -38,6 +38,8 @@ public:
    void StopRecording();
    bool IsRecording() const { return mRecorder != nullptr; }
    int RecordedFrames() const;
+   int PendingFrames() const;
+   int DroppedFrames() const;
    const std::string& RecordStatus() const { return mRecordStatus; }
 
    int recordFps = 30;
@@ -61,6 +63,11 @@ private:
    bool EnsureShader();
    void CaptureFrame();
    void DrainAudioCapture();
+   bool EnsureReadbackBuffers();
+   void ReleaseReadbackBuffers();
+   bool SubmitReadback(int repeatCount);
+   bool DrainOneReadback(bool waitForGpu);
+   void FlushReadbacks();
 
    ImageCable mInput;
    AudioCable mAudioInput;
@@ -71,8 +78,26 @@ private:
    int mLastCookFrame = -1;
 
    Platform::RecorderHandle* mRecorder = nullptr;
-   std::vector<unsigned char> mReadback;
    int mRecordW = 0;
    int mRecordH = 0;
    std::string mRecordStatus;
+
+   // Three persistently allocated pixel-pack buffers keep GPU readback two
+   // frames behind rendering. glReadPixels therefore never serialises the UI
+   // against the current OpenGL frame, while the existing encoder thread owns
+   // colour conversion and compression.
+   unsigned int mCaptureFbo = 0;
+   unsigned int mReadbackPbos[3] {0, 0, 0};
+   GLsync mReadbackFences[3] {nullptr, nullptr, nullptr};
+   int mReadbackRepeats[3] {0, 0, 0};
+   int mReadbackWrite = 0;
+   int mReadbackRead = 0;
+   int mReadbackPending = 0;
+   size_t mReadbackBytes = 0;
+   double mRecordStartedSeconds = 0.0;
+   int mActiveRecordFps = 30;
+   long long mScheduledFrames = 0;
+   int mReadbacksCompleted = 0;
+   double mReadbackWaitTotalMs = 0.0;
+   double mReadbackWaitMaxMs = 0.0;
 };

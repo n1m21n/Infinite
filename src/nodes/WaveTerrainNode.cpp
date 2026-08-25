@@ -1,7 +1,8 @@
 #include "WaveTerrainNode.h"
 
+#include "platform/OpenGLHeaders.h"
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-#include <OpenGL/gl3.h>
 #include <algorithm>
 #include <atomic>
 #include <cmath>

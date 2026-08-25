@@ -433,6 +433,33 @@ namespace Platform
       }
    }
 
+   std::string SaveVideoDialog(const std::string& suggestedName,
+                               const std::string& initialDirectory)
+   {
+      @autoreleasepool
+      {
+         NSSavePanel* panel = [NSSavePanel savePanel];
+         [panel setTitle:@"Save output video"];
+         [panel setNameFieldStringValue:[NSString stringWithUTF8String:
+            suggestedName.empty() ? "infinite-output.mp4" : suggestedName.c_str()]];
+         if (!initialDirectory.empty())
+            [panel setDirectoryURL:[NSURL fileURLWithPath:
+               [NSString stringWithUTF8String:initialDirectory.c_str()]]];
+         if (@available(macOS 11.0, *))
+         {
+            NSMutableArray<UTType*>* types = [NSMutableArray array];
+            UTType* mp4 = [UTType typeWithFilenameExtension:@"mp4"];
+            UTType* mov = [UTType typeWithFilenameExtension:@"mov"];
+            if (mp4 != nil) [types addObject:mp4];
+            if (mov != nil) [types addObject:mov];
+            [panel setAllowedContentTypes:types];
+         }
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         return std::string([[[panel URL] path] UTF8String]);
+      }
+   }
+
    std::string OpenModelDialog()
    {
       @autoreleasepool
@@ -1298,7 +1325,8 @@ namespace Platform
       }
    }
 
-   bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels)
+   bool RecorderAppend(RecorderHandle* handle, std::vector<unsigned char>&& pixels,
+                       int repeatCount)
    {
       if (handle == nullptr)
          return false;
@@ -1334,13 +1362,24 @@ namespace Platform
          }
          CVPixelBufferUnlockBaseAddress(buffer, 0);
 
-         CMTime when = CMTimeMake(handle->frameIndex, handle->fps);
-         BOOL ok = [handle->adaptor appendPixelBuffer:buffer withPresentationTime:when];
-         CVPixelBufferRelease(buffer);
-         if (ok)
+         BOOL ok = YES;
+         int written = 0;
+         for (int i = 0; i < std::max(1, repeatCount); ++i)
+         {
+            if (!handle->input.isReadyForMoreMediaData)
+            {
+               ok = NO;
+               break;
+            }
+            CMTime when = CMTimeMake(handle->frameIndex, handle->fps);
+            ok = [handle->adaptor appendPixelBuffer:buffer withPresentationTime:when];
+            if (!ok) break;
             handle->frameIndex++;
+            ++written;
+         }
+         CVPixelBufferRelease(buffer);
 
-         if (ok && handle->audioInput != nil)
+         if (written > 0 && handle->audioInput != nil)
          {
             // Catches audio up to the end of the video frame just written, so
             // the two tracks cannot drift apart by more than one video frame.
@@ -1348,8 +1387,14 @@ namespace Platform
                (int64_t)((double)handle->frameIndex / (double)handle->fps * handle->audioSampleRate);
             AppendAudioUpTo(handle, targetFrames);
          }
-         return ok == YES;
+         return written > 0 && ok == YES;
       }
+   }
+
+   std::vector<unsigned char> RecorderAcquireFrameBuffer(RecorderHandle* handle)
+   {
+      if (handle == nullptr) return {};
+      return std::vector<unsigned char>((size_t)handle->width * handle->height * 4);
    }
 
    bool RecorderStop(RecorderHandle* handle, std::string& outError)
@@ -1387,6 +1432,9 @@ namespace Platform
       return handle ? (int)handle->frameIndex : 0;
    }
 
+   int RecorderPendingFrameCount(RecorderHandle*) { return 0; }
+   int RecorderDroppedFrameCount(RecorderHandle*) { return 0; }
+
    MovieInfo InspectMovie(const std::string& path)
    {
       MovieInfo info;
@@ -1406,10 +1454,18 @@ namespace Platform
 
 namespace Platform
 {
-   bool SubjectMask(const std::vector<unsigned char>& rgbaPixels, int width, int height,
-                    MattingMode mode, std::vector<unsigned char>& outMask,
-                    std::string& outError)
+   bool ReadGpuStats(GpuStats& out)
    {
+      out = GpuStats{};
+      return false;
+   }
+
+   bool SubjectMask(const std::vector<unsigned char>& rgbaPixels, int width, int height,
+                    MattingMode mode, MattingBackend,
+                    std::vector<unsigned char>& outMask, std::string& outError,
+                    std::string* outBackend)
+   {
+      if (outBackend) *outBackend = "Apple Vision";
       if (width <= 0 || height <= 0 || rgbaPixels.size() < (size_t)width * height * 4)
       {
          outError = "bad image";
@@ -2263,8 +2319,10 @@ namespace Platform
    }
 
    bool AudioDeviceOpen(AudioRenderCallback callback, void* userData, double& outSampleRate, std::string& outError,
-                        uint32_t requestedDeviceId, double requestedSampleRate, int requestedBufferFrames)
+                        uint32_t requestedDeviceId, double requestedSampleRate, int requestedBufferFrames,
+                        uint32_t requestedInputDeviceId)
    {
+      (void)requestedInputDeviceId;
       if (gDeviceHandle != nullptr)
          return true;
 
@@ -5130,5 +5188,3 @@ namespace Platform
       return true;
    }
 }
-
-

@@ -1,14 +1,19 @@
 #pragma once
 
+#include <condition_variable>
+#include <cstdint>
+#include <deque>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "INode.h"
 #include "ImageCable.h"
 #include "GLUtil.h"
 
-// Background removal using the OS's own on-device segmentation - no model
-// download, no network, no API key.
+// Background removal using Apple Vision on macOS and U2Net through Windows ML
+// + DirectML/DX12 on Windows, with a portable OpenCV CPU fallback.
 //
 // Masking costs a GPU readback plus a Vision pass, which is far too slow to run
 // every frame at video rates, so the mask is computed on demand (or at a capped
@@ -19,6 +24,7 @@ class RemoveBgNode : public INode
 public:
    static INode* Create() { return new RemoveBgNode(); }
    static const std::vector<std::string>& ModeNames();
+   static const std::vector<std::string>& BackendNames();
    static const std::vector<std::string>& OutputModeNames();
 
    ~RemoveBgNode() override;
@@ -36,35 +42,64 @@ public:
    bool HasMask() const { return mMaskTex != 0; }
 
    int mode = 0;         // 0 = subject, 1 = person
+   int backend = 0;      // 0 = auto GPU, 1 = DirectML only, 2 = CPU
    int outputMode = 0;   // 0 = cutout, 1 = mask only, 2 = background only
    float feather = 0.0f;
    float threshold = 0.5f;
    float contrast = 1.0f;
-   bool autoRefresh = false;      // recompute periodically, for video
+   bool autoRefresh = true;       // retained for old patches; Windows refresh is always live
    float refreshBeats = 1.0f;
+   float refreshFps = 5.0f;
+   int frameCache = 2;
    float bgColor[3] = { 0.0f, 0.0f, 0.0f };
    float bgOpacity = 0.0f;
 
    void VisitParams(ParamVisitor& v) override
    {
-      v.Int("mode", mode); v.Int("outputMode", outputMode);
+      v.Int("mode", mode); v.Int("backend", backend); v.Int("outputMode", outputMode);
       v.Float("feather", feather); v.Float("threshold", threshold);
       v.Float("contrast", contrast);
       v.Bool("autoRefresh", autoRefresh); v.Float("refreshBeats", refreshBeats);
+      v.Float("refreshFps", refreshFps);
+      v.Int("frameCache", frameCache);
       v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
    }
 
 private:
    bool EnsureShader();
-   void ComputeMask(unsigned int srcTex, int w, int h);
+   void QueueMask(unsigned int srcTex, int w, int h);
+   void WorkerLoop();
+   void ConsumeCompletedMask();
 
    ImageCable mInput;
    GLUtil::Fbo mOut;
    unsigned int mProgram = 0;
    unsigned int mMaskTex = 0;
+   unsigned int mPairedSourceTex = 0;
    bool mShaderTried = false;
    bool mNeedsMask = false;
    int mLastCookFrame = -1;
-   double mLastMaskBeat = -1000.0;
+   double mLastMaskRequestSeconds = -1000.0;
    std::string mStatus = "press Remove Background";
+
+   std::thread mWorker;
+   std::mutex mWorkerMutex;
+   std::condition_variable mWorkerWake;
+   bool mWorkerStop = false;
+   bool mProcessing = false;
+   struct FrameRequest
+   {
+      std::vector<unsigned char> pixels;
+      int width = 0, height = 0, mode = 0, backend = 0;
+      uint64_t serial = 0;
+   };
+   std::deque<FrameRequest> mRequests;
+   uint64_t mNextSerial = 0;
+   std::vector<unsigned char> mCompletedMask;
+   std::vector<unsigned char> mCompletedSource;
+   int mCompletedWidth = 0;
+   int mCompletedHeight = 0;
+   uint64_t mCompletedSerial = 0;
+   uint64_t mUploadedSerial = 0;
+   std::string mCompletedStatus;
 };

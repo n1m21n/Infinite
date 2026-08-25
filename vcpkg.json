@@ -1,0 +1,29 @@
+{
+  "name": "infinite-windows",
+  "version-string": "0.1.0-windows",
+  "description": "Windows dependencies for Infinite",
+  "builtin-baseline": "127402f1c75bb3d5ff6bce04b285faa4930a5aca",
+  "supports": "windows & x64",
+  "dependencies": [
+    "assimp",
+    "glew",
+    {
+      "name": "opencv4",
+      "default-features": false,
+      "features": [
+        "dnn",
+        "dshow",
+        "ffmpeg",
+        "fs",
+        "intrinsics",
+        "jpeg",
+        "msmf",
+        "png",
+        "thread",
+        "tiff",
+        "webp"
+      ]
+    },
+    "spout2"
+  ]
+}

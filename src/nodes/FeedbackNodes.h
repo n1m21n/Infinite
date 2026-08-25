@@ -27,6 +27,7 @@ public:
 
    ImageCable& Input() { return mInput; }
    INode* BypassSource() override { return mInput.GetSource(); }
+   void Clear();
 
    float delayFrames = 1.0f; // held for information; the delay is always one frame
 

@@ -1,6 +1,6 @@
 #include "VideoInNode.h"
 
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 #include <algorithm>
 
 const std::vector<std::string>& VideoInNode::ResolutionNames()
@@ -16,7 +16,6 @@ const std::vector<std::string>& VideoInNode::ResolutionNames()
 
 VideoInNode::VideoInNode()
 {
-   RefreshDevices();
 }
 
 VideoInNode::~VideoInNode()
@@ -127,17 +126,10 @@ void VideoInNode::CookIfNeeded(int frameId)
       {
          CloseCamera();
       }
-      else if (mCamera != nullptr && deviceId == mLastDeviceId)
+      else if (mCamera != nullptr && deviceId == mLastDeviceId && resolution == mLastResolution)
       {
          if (mirror != mLastMirror)
             Platform::CameraSetMirror(mCamera, mirror);
-         if (resolution != mLastResolution)
-         {
-            Platform::CameraResolution res = (resolution >= 0 && resolution < (int)Platform::CameraResolution::Count)
-               ? (Platform::CameraResolution)resolution
-               : Platform::CameraResolution::Auto;
-            Platform::CameraSetResolution(mCamera, res);
-         }
       }
       else
       {

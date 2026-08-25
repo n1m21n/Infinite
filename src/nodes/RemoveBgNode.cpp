@@ -1,14 +1,21 @@
 #include "RemoveBgNode.h"
 
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 #include <algorithm>
+#include <chrono>
+#include <cstdio>
 
 #include "Platform.h"
-#include "Transport.h"
 
 namespace
 {
+#if defined(_WIN32)
+   const std::vector<std::string> kModeNames = { "Subject - U2Net", "Person - U2Net Human" };
+   const std::vector<std::string> kBackendNames = { "Auto GPU (DX12)", "DirectML only", "CPU" };
+#else
    const std::vector<std::string> kModeNames = { "Subject (macOS 14+)", "Person (macOS 12+)" };
+   const std::vector<std::string> kBackendNames = { "On-device" };
+#endif
    const std::vector<std::string> kOutputModeNames = { "Cutout", "Mask only", "Background only" };
 
    const char* kFragSrc =
@@ -54,13 +61,24 @@ namespace
 }
 
 const std::vector<std::string>& RemoveBgNode::ModeNames() { return kModeNames; }
+const std::vector<std::string>& RemoveBgNode::BackendNames() { return kBackendNames; }
 const std::vector<std::string>& RemoveBgNode::OutputModeNames() { return kOutputModeNames; }
 
 RemoveBgNode::~RemoveBgNode()
 {
+   {
+      std::lock_guard<std::mutex> lock(mWorkerMutex);
+      mWorkerStop = true;
+   }
+   mWorkerWake.notify_one();
+   if (mWorker.joinable())
+      mWorker.join();
+
    GLUtil::DestroyFbo(mOut);
    if (mMaskTex != 0)
       glDeleteTextures(1, &mMaskTex);
+   if (mPairedSourceTex != 0)
+      glDeleteTextures(1, &mPairedSourceTex);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
 }
@@ -74,9 +92,16 @@ bool RemoveBgNode::EnsureShader()
    return mProgram != 0;
 }
 
-void RemoveBgNode::ComputeMask(unsigned int srcTex, int w, int h)
+void RemoveBgNode::QueueMask(unsigned int srcTex, int w, int h)
 {
-   // Read the source back off the GPU so Vision can see it.
+   {
+      std::lock_guard<std::mutex> lock(mWorkerMutex);
+      if (mRequests.size() >= (size_t)std::clamp(frameCache, 1, 16))
+         return;
+   }
+   // Only the GL readback remains on the render thread. Model inference runs
+   // on a latest-frame worker below, so a slow mask can never stall the UI,
+   // projector or audio graph and queued video frames never build a backlog.
    std::vector<unsigned char> pixels((size_t)w * h * 4);
    GLint prevFbo = 0;
    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
@@ -89,16 +114,110 @@ void RemoveBgNode::ComputeMask(unsigned int srcTex, int w, int h)
    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
    glDeleteFramebuffers(1, &fbo);
 
-   std::vector<unsigned char> mask;
-   std::string error;
-   const Platform::MattingMode mattingMode =
-      (mode == 1) ? Platform::MattingMode::Person : Platform::MattingMode::Subject;
-
-   if (!Platform::SubjectMask(pixels, w, h, mattingMode, mask, error))
    {
-      mStatus = error;
-      return;
+      std::lock_guard<std::mutex> lock(mWorkerMutex);
+      FrameRequest request;
+      request.pixels = std::move(pixels);
+      request.width = w; request.height = h;
+      request.mode = mode; request.backend = backend;
+      request.serial = ++mNextSerial;
+      const size_t limit = (size_t)std::clamp(frameCache, 1, 16);
+      while (mRequests.size() >= limit)
+         mRequests.pop_front();
+      mRequests.push_back(std::move(request));
+      mStatus = mProcessing ? "processing - frames cached" : "processing mask";
    }
+   if (!mWorker.joinable())
+      mWorker = std::thread(&RemoveBgNode::WorkerLoop, this);
+   mWorkerWake.notify_one();
+}
+
+void RemoveBgNode::WorkerLoop()
+{
+   for (;;)
+   {
+      std::vector<unsigned char> pixels;
+      int w = 0, h = 0, requestedMode = 0, requestedBackend = 0;
+      uint64_t serial = 0;
+      {
+         std::unique_lock<std::mutex> lock(mWorkerMutex);
+         mWorkerWake.wait(lock, [this] { return mWorkerStop || !mRequests.empty(); });
+         if (mWorkerStop)
+            return;
+         FrameRequest request = std::move(mRequests.front());
+         mRequests.pop_front();
+         pixels = std::move(request.pixels);
+         w = request.width; h = request.height;
+         requestedMode = request.mode; requestedBackend = request.backend;
+         serial = request.serial;
+         mProcessing = true;
+      }
+
+      std::vector<unsigned char> mask;
+      std::string error;
+      const auto started = std::chrono::steady_clock::now();
+      const Platform::MattingMode mattingMode = requestedMode == 1
+         ? Platform::MattingMode::Person : Platform::MattingMode::Subject;
+      Platform::MattingBackend mattingBackend = Platform::MattingBackend::Auto;
+      if (requestedBackend == 1) mattingBackend = Platform::MattingBackend::DirectML;
+      else if (requestedBackend == 2) mattingBackend = Platform::MattingBackend::Cpu;
+      std::string usedBackend;
+      const bool ok = Platform::SubjectMask(pixels, w, h, mattingMode, mattingBackend,
+                                            mask, error, &usedBackend);
+      const double elapsedMs = std::chrono::duration<double, std::milli>(
+         std::chrono::steady_clock::now() - started).count();
+
+      {
+         std::lock_guard<std::mutex> lock(mWorkerMutex);
+         if (ok)
+         {
+            mCompletedMask = std::move(mask);
+            mCompletedSource = pixels;
+            mCompletedWidth = w;
+            mCompletedHeight = h;
+            mCompletedSerial = serial;
+            char status[96];
+            std::snprintf(status, sizeof(status), "mask ready - %s - %.0f ms",
+                          usedBackend.empty() ? "on-device" : usedBackend.c_str(), elapsedMs);
+            mCompletedStatus = status;
+         }
+         else
+         {
+            mCompletedMask.clear();
+            mCompletedSource.clear();
+            mCompletedWidth = 0;
+            mCompletedHeight = 0;
+            mCompletedSerial = serial;
+            mCompletedStatus = error;
+         }
+         mProcessing = false;
+      }
+   }
+}
+
+void RemoveBgNode::ConsumeCompletedMask()
+{
+   std::vector<unsigned char> mask;
+   std::vector<unsigned char> source;
+   int w = 0, h = 0;
+   std::string status;
+   {
+      std::lock_guard<std::mutex> lock(mWorkerMutex);
+      if (mCompletedSerial == 0 || mCompletedSerial == mUploadedSerial)
+         return;
+      mUploadedSerial = mCompletedSerial;
+      mask = mCompletedMask;
+      source = mCompletedSource;
+      w = mCompletedWidth;
+      h = mCompletedHeight;
+      status = mCompletedStatus;
+      if (mProcessing || !mRequests.empty())
+         status += " - updating";
+   }
+
+   mStatus = status;
+   if (mask.empty() || w <= 0 || h <= 0)
+      return;
 
    if (mMaskTex == 0)
       glGenTextures(1, &mMaskTex);
@@ -111,7 +230,17 @@ void RemoveBgNode::ComputeMask(unsigned int srcTex, int w, int h)
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
    glBindTexture(GL_TEXTURE_2D, 0);
 
-   mStatus = "mask ready";
+   if (mPairedSourceTex == 0)
+      glGenTextures(1, &mPairedSourceTex);
+   glBindTexture(GL_TEXTURE_2D, mPairedSourceTex);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, source.data());
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glBindTexture(GL_TEXTURE_2D, 0);
+
 }
 
 void RemoveBgNode::CookIfNeeded(int frameId)
@@ -134,31 +263,20 @@ void RemoveBgNode::CookIfNeeded(int frameId)
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
-   // Auto-refresh is rate-limited by the transport, not the frame rate:
-   // segmentation is far too expensive to run every frame.
-   if (autoRefresh)
-   {
-      const double beat = Transport::Instance().Beats();
-      if (beat < mLastMaskBeat || beat - mLastMaskBeat >= std::max(0.1f, refreshBeats))
-      {
-         mNeedsMask = true;
-         mLastMaskBeat = beat;
-      }
-   }
+   ConsumeCompletedMask();
 
-   if (mNeedsMask)
-   {
-      mNeedsMask = false;
-      ComputeMask(srcTex, w, h);
-   }
+   autoRefresh = true;
+   mNeedsMask = false;
+   QueueMask(srcTex, w, h);
+   const unsigned int pairedSrc = (mMaskTex != 0 && mPairedSourceTex != 0) ? mPairedSourceTex : srcTex;
 
-   GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, w, h]()
+   GLUtil::RunShaderPass(mOut, mProgram, [this, pairedSrc, w, h]()
    {
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, srcTex);
+      glBindTexture(GL_TEXTURE_2D, pairedSrc);
       glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 0);
       glActiveTexture(GL_TEXTURE1);
-      glBindTexture(GL_TEXTURE_2D, mMaskTex != 0 ? mMaskTex : srcTex);
+      glBindTexture(GL_TEXTURE_2D, mMaskTex != 0 ? mMaskTex : pairedSrc);
       glUniform1i(glGetUniformLocation(mProgram, "uMask"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uHasMask"), mMaskTex != 0 ? 1 : 0);
       glUniform2f(glGetUniformLocation(mProgram, "uTexel"), 1.0f / w, 1.0f / h);

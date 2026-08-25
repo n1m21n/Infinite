@@ -1,6 +1,6 @@
 #include "FilterNode.h"
 
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 #include <cstdio>
 #include <string>
 

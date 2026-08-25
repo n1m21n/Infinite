@@ -1,14 +1,10 @@
 #include "OscNodes.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include <cmath>
 
 #include "Transport.h"
 #include "core/OscMessage.h"
+#include "platform/SocketCompat.h"
 
 // ---------------------------------------------------------------------------
 // OscReceiveNode
@@ -33,8 +29,8 @@ void OscReceiveNode::StopListener()
    // Unblocks the thread's recvfrom() the same way closing a socket already
    // does elsewhere in this codebase (RemoteControl's accept loop) - there is
    // no portable "cancel this blocking syscall" short of shutting the fd down.
-   shutdown(mSocket, SHUT_RDWR);
-   close(mSocket);
+   InfiniteShutdownSocket(static_cast<InfiniteSocket>(mSocket));
+   InfiniteCloseSocket(static_cast<InfiniteSocket>(mSocket));
    mSocket = -1;
    if (mThread.joinable())
       mThread.join();
@@ -48,8 +44,10 @@ void OscReceiveNode::RestartListenerIfNeeded()
       return;
    StopListener();
 
-   int fd = socket(AF_INET, SOCK_DGRAM, 0);
-   if (fd < 0)
+   if (!InfiniteSocketsReady())
+      return;
+   InfiniteSocket fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+   if (fd == kInfiniteInvalidSocket)
       return;
 
    sockaddr_in addr{};
@@ -59,7 +57,7 @@ void OscReceiveNode::RestartListenerIfNeeded()
 
    if (bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
    {
-      close(fd);
+      InfiniteCloseSocket(fd);
       return;
    }
 
@@ -70,7 +68,7 @@ void OscReceiveNode::RestartListenerIfNeeded()
       uint8_t buffer[1024];
       for (;;)
       {
-         ssize_t n = recv(fd, buffer, sizeof(buffer), 0);
+         const int n = recv(fd, reinterpret_cast<char*>(buffer), static_cast<int>(sizeof(buffer)), 0);
          if (mStop.load())
             break;
          if (n <= 0)
@@ -169,8 +167,10 @@ void OscSendNode::CookIfNeeded(int frameId)
    // UDP send is connectionless and effectively non-blocking at this scale -
    // fine to fire directly from the main-thread tick rather than routing
    // through a background thread the way the receive side needs to.
-   int fd = socket(AF_INET, SOCK_DGRAM, 0);
-   if (fd >= 0)
+   if (!InfiniteSocketsReady())
+      return;
+   InfiniteSocket fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+   if (fd != kInfiniteInvalidSocket)
    {
       sockaddr_in addr{};
       addr.sin_family = AF_INET;
@@ -178,8 +178,9 @@ void OscSendNode::CookIfNeeded(int frameId)
       addr.sin_addr.s_addr = inet_addr(host.c_str());
 
       std::vector<uint8_t> packet = OscMessage::EncodeFloat(address, value);
-      sendto(fd, packet.data(), packet.size(), 0, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-      close(fd);
+      sendto(fd, reinterpret_cast<const char*>(packet.data()), static_cast<int>(packet.size()), 0,
+             reinterpret_cast<sockaddr*>(&addr), static_cast<int>(sizeof(addr)));
+      InfiniteCloseSocket(fd);
    }
 
    mLastSent = value;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 #include <functional>
 #include <string>
 #include <vector>
@@ -48,6 +48,11 @@ namespace GLUtil
    // color where alpha is 0.
    void DrawTextureToScreen(unsigned int tex, int windowW, int windowH,
                              int texW = 0, int texH = 0, bool checkerBg = false);
+
+   // VAOs are not shared by GLFW OpenGL contexts even when textures,
+   // programs and buffers are. Call while an auxiliary context is current,
+   // immediately before destroying its window.
+   void ForgetCurrentContextObjects();
 
    // Reads an existing GPU texture's pixels back to the CPU as RGBA floats,
    // for nodes that need to sample a texture per-vertex rather than per-pixel

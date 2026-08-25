@@ -3,9 +3,37 @@
 #include <string>
 #include <vector>
 
+struct GLFWwindow;
+
 // Thin macOS shims kept out of the C++ translation units.
 namespace Platform
 {
+   struct GpuStats
+   {
+      bool available = false;
+      float gpuPercent = 0.0f;
+      float memoryPercent = 0.0f;
+      unsigned long long memoryUsedBytes = 0;
+      unsigned long long memoryTotalBytes = 0;
+      std::string name;
+   };
+
+   // Lightweight, cached whole-adapter telemetry. The Windows backend uses
+   // NVML dynamically when an NVIDIA driver provides it, so the executable
+   // gains no new runtime dependency.
+   bool ReadGpuStats(GpuStats& out);
+
+   // Windows projector policy: a normal decorated window while positioning,
+   // then borderless/topmost on F11 without switching to exclusive fullscreen.
+   void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost,
+                              bool hideCursor);
+   void ReassertOutputWindowTopmost(GLFWwindow* window);
+
+   // Initializes the JUCE message/device layer used by the Windows backend.
+   // The Windows main thread calls this before any scanner worker can start.
+   // Other platforms do not need to call it.
+   void EnsureJuceInitialised();
+
    // Holds an NSProcessInfo activity token that opts the process out of App
    // Nap for as long as the app runs. Without this, macOS treats a window
    // that isn't receiving input as idle/background and throttles its timer
@@ -59,6 +87,10 @@ namespace Platform
    // Patch files. Save returns the chosen path, or "" if cancelled.
    std::string OpenPatchDialog();
    std::string SavePatchDialog(const std::string& suggestedName);
+   // Native Save As dialog for the Output node. The returned path already
+   // carries the selected .mp4/.mov extension, or is empty when cancelled.
+   std::string SaveVideoDialog(const std::string& suggestedName,
+                               const std::string& initialDirectory = std::string());
 
    // ---- text outlines -----------------------------------------------------
    // Glyph outlines for a laid-out string, flattened to polygons in font units
@@ -103,18 +135,25 @@ namespace Platform
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels);
 
    // ---- background removal ----
-   // Uses Vision's on-device segmentation: no model download, no network, no
-   // API key. Subject lifting (any salient foreground) needs macOS 14; person
-   // segmentation works from macOS 12. Returns false with a reason otherwise.
+   // Apple uses Vision. Windows uses the packaged U2Net models through Windows
+   // ML/DirectML or OpenCV CPU. Returns false with a reason otherwise.
    enum class MattingMode
    {
       Subject, // any salient foreground object (macOS 14+)
       Person   // people only (macOS 12+)
    };
 
+   enum class MattingBackend
+   {
+      Auto,       // DirectML/DX12 on Windows, then CPU fallback
+      DirectML,   // require DirectML/DX12
+      Cpu         // OpenCV DNN CPU path
+   };
+
    bool SubjectMask(const std::vector<unsigned char>& rgbaPixels, int width, int height,
-                    MattingMode mode, std::vector<unsigned char>& outMask,
-                    std::string& outError);
+                    MattingMode mode, MattingBackend backend,
+                    std::vector<unsigned char>& outMask, std::string& outError,
+                    std::string* outBackend = nullptr);
 
    // ---- audio input ----
    // Taps the default input device and keeps a running spectrum. Everything is
@@ -182,7 +221,7 @@ namespace Platform
    // readback already worked before this was added.
    bool AudioDeviceOpen(AudioRenderCallback callback, void* userData, double& outSampleRate, std::string& outError,
                         uint32_t requestedDeviceId = 0, double requestedSampleRate = 0.0,
-                        int requestedBufferFrames = 0);
+                        int requestedBufferFrames = 0, uint32_t requestedInputDeviceId = 0);
    void AudioDeviceClose();
 
    // Actual buffer frame size CoreAudio reports for the given device right
@@ -647,12 +686,22 @@ namespace Platform
                                  bool loopAudio = true,
                                  double liveAudioSampleRate = 0.0,
                                  int liveAudioChannels = 2);
+   // Returns a reusable correctly-sized RGBA buffer. The Windows recorder
+   // recycles encoded buffers so 1080p capture does not allocate and clear
+   // another ~8 MB vector on the render thread for every frame.
+   std::vector<unsigned char> RecorderAcquireFrameBuffer(RecorderHandle* handle);
    // `pixels` is RGBA8 bottom-up, exactly as glReadPixels returns it.
-   bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels);
+   // repeatCount writes the same captured image more than once without
+   // duplicating its raw RGBA allocation. It preserves constant-frame-rate
+   // timing when rendering momentarily misses a capture deadline.
+   bool RecorderAppend(RecorderHandle* handle, std::vector<unsigned char>&& pixels,
+                       int repeatCount = 1);
    // Appends interleaved float audio frames to the movie's audio track.
    bool RecorderAppendAudio(RecorderHandle* handle, const float* interleavedSamples, int numFrames);
    bool RecorderStop(RecorderHandle* handle, std::string& outError);
    int RecorderFrameCount(RecorderHandle* handle);
+   int RecorderPendingFrameCount(RecorderHandle* handle);
+   int RecorderDroppedFrameCount(RecorderHandle* handle);
 
    // Inspects a finished recording. Used by the audio-mux self-test, and handy
    // for the UI later if recording ever needs to report back what it actually
@@ -733,5 +782,3 @@ namespace Platform
    bool CameraReadFrame(CameraHandle* handle, std::vector<unsigned char>& outPixels,
                         int& outWidth, int& outHeight, unsigned long long& outFrameSeq);
 }
-
-

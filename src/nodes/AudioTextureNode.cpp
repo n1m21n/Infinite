@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-static const std::vector<std::string> kModeNames = { "Waveform", "Spectrum" };
+static const std::vector<std::string> kModeNames = { "Waveform", "Spectrum", "Oscilloscope", "Spectrogram" };
 static const std::vector<std::string> kWindowSizeNames = { "512", "1024", "2048", "4096" };
 const int AudioTextureNode::kWindowSizes[] = { 512, 1024, 2048, 4096 };
 
@@ -149,7 +149,7 @@ void AudioTextureNode::CookIfNeeded(int frameId)
    if (!mAudioInput.IsConnected())
       return;
 
-   const int winSize = (mode == kModeSpectrum)
+   const int winSize = (mode == kModeSpectrum || mode == kModeSpectrogram)
       ? 1024
       : kWindowSizes[std::clamp(windowSizeIndex, 0, 3)];
 
@@ -210,7 +210,36 @@ void AudioTextureNode::CookIfNeeded(int frameId)
 
       mRevision++;
    }
-   else if (mode == kModeSpectrum)
+   else if (mode == kModeOscilloscope)
+   {
+      const int W = 512, H = 256;
+      EnsureTexture(W, H);
+      std::vector<uint8_t> pixels((size_t)W * H * 4, 0);
+      for (size_t i = 3; i < pixels.size(); i += 4) pixels[i] = 255;
+      auto drawPoint = [&](int x, int y) {
+         for (int dy = -1; dy <= 1; ++dy)
+         {
+            const int yy = std::clamp(y + dy, 0, H - 1);
+            const size_t p = ((size_t)yy * W + (size_t)std::clamp(x, 0, W - 1)) * 4;
+            pixels[p] = 90; pixels[p + 1] = 220; pixels[p + 2] = 170;
+         }
+      };
+      int prevY = H / 2;
+      for (int x = 0; x < W; ++x)
+      {
+         const int sample = std::clamp((int)((long long)x * winSize / W), 0, winSize - 1);
+         const float raw = std::clamp(mWindow[sample] * gain, -1.0f, 1.0f);
+         const int y = (int)((1.0f - (raw + 1.0f) * 0.5f) * (H - 1));
+         const int lo = std::min(prevY, y), hi = std::max(prevY, y);
+         for (int yy = lo; yy <= hi; ++yy) drawPoint(x, yy);
+         prevY = y;
+      }
+      glBindTexture(GL_TEXTURE_2D, mTexture);
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+      glBindTexture(GL_TEXTURE_2D, 0);
+      mRevision++;
+   }
+   else if (mode == kModeSpectrum || mode == kModeSpectrogram)
    {
       const int W = 512;
       const int H = 512;
@@ -268,10 +297,27 @@ void AudioTextureNode::CookIfNeeded(int frameId)
          row[x * 4 + 3] = 255;
       }
 
-      std::vector<uint8_t> pixels((size_t)W * H * 4);
-      for (int y = 0; y < H; y++)
+      std::vector<uint8_t> pixels;
+      if (mode == kModeSpectrogram)
       {
-         std::copy(row.begin(), row.end(), pixels.begin() + (size_t)y * W * 4);
+         if (mHistoryPixels.size() != (size_t)W * H * 4)
+            mHistoryPixels.assign((size_t)W * H * 4, 0);
+         std::move_backward(mHistoryPixels.begin(), mHistoryPixels.end() - (size_t)W * 4, mHistoryPixels.end());
+         for (int x = 0; x < W; ++x)
+         {
+            const uint8_t v = row[(size_t)x * 4];
+            mHistoryPixels[(size_t)x * 4 + 0] = (uint8_t)(v * 0.25f);
+            mHistoryPixels[(size_t)x * 4 + 1] = (uint8_t)(v * 0.75f);
+            mHistoryPixels[(size_t)x * 4 + 2] = v;
+            mHistoryPixels[(size_t)x * 4 + 3] = 255;
+         }
+         pixels = mHistoryPixels;
+      }
+      else
+      {
+         pixels.resize((size_t)W * H * 4);
+         for (int y = 0; y < H; y++)
+            std::copy(row.begin(), row.end(), pixels.begin() + (size_t)y * W * 4);
       }
 
       glBindTexture(GL_TEXTURE_2D, mTexture);

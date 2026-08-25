@@ -1,6 +1,6 @@
 #include "BlendNode.h"
 
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 
 #include "BlendModes.h"
 

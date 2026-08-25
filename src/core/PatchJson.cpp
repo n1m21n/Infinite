@@ -21,6 +21,7 @@ namespace PatchJson
          jn["bypassed"] = n.bypassed;
          jn["showMiniViewport"] = n.showMiniViewport;
          jn["showAdvancedParams"] = n.showAdvancedParams;
+         jn["showPreview"] = n.showPreview;
          jn["params"] = json::object();
          for (const auto& p : n.params)
             jn["params"][p.first] = p.second;
@@ -60,6 +61,24 @@ namespace PatchJson
       out["globals"] = json::array();
       for (const Patch::GlobalRecord& g : data.globals)
          out["globals"].push_back({ {"name", g.name}, {"expr", g.expr} });
+
+      if (data.settings.present)
+      {
+         const Patch::SceneSettings& s = data.settings;
+         out["settings"] = {
+            {"audioOutputDeviceId", s.audioOutputDeviceId}, {"audioInputDeviceId", s.audioInputDeviceId},
+            {"audioSampleRate", s.audioSampleRate}, {"audioBufferFrames", s.audioBufferFrames},
+            {"audioOversample", s.audioOversample}, {"targetFps", s.targetFps}, {"vsync", s.vsync},
+            {"snapToGrid", s.snapToGrid}, {"gridSnap", s.gridSnap}, {"zoomSensitivity", s.zoomSensitivity},
+            {"minimapEnabled", s.minimapEnabled}, {"minimapCorner", s.minimapCorner},
+            {"minimapSize", s.minimapSize}, {"minimapOpacity", s.minimapOpacity},
+            {"nodePanelOpen", s.nodePanelOpen}, {"nodePanelWidth", s.nodePanelWidth},
+            {"viewportPanelDock", s.viewportPanelDock},
+            {"viewportPanelWidth", s.viewportPanelWidth}, {"viewportPanelHeight", s.viewportPanelHeight},
+            {"themePreset", s.themePreset}, {"diagnosticLog", s.diagnosticLog},
+            {"autosaveEnabled", s.autosaveEnabled}, {"autosaveSeconds", s.autosaveSeconds}
+         };
+      }
 
       return out;
    }

@@ -1,6 +1,6 @@
 #include "PaletteNode.h"
 
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 #include <algorithm>
 #include <cmath>
 

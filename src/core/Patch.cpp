@@ -1,6 +1,7 @@
 #include "Patch.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -8,6 +9,7 @@
 #include <sstream>
 
 #include "INode.h"
+#include "platform/SettingsPaths.h"
 
 namespace Patch
 {
@@ -21,10 +23,72 @@ namespace
 
    std::string RecentsPath()
    {
-      const char* home = getenv("HOME");
-      if (home == nullptr)
+      const std::string dir = InfiniteSettingsDirectory();
+      if (dir.empty())
          return std::string();
-      return std::string(home) + "/Library/Application Support/Infinite.recents";
+      return dir + "/Infinite.recents";
+   }
+
+   std::string AppSettingsPath()
+   {
+      const std::string dir = InfiniteSettingsDirectory();
+      return dir.empty() ? std::string("Infinite.settings") : dir + "/Infinite.settings";
+   }
+
+   void WriteSettingsLines(std::ostream& file, const SceneSettings& s, const char* prefix)
+   {
+      const std::string p = (prefix != nullptr && prefix[0] != '\0') ? std::string(prefix) + " " : std::string();
+      file << p << "audioOutputDeviceId " << s.audioOutputDeviceId << "\n";
+      file << p << "audioInputDeviceId " << s.audioInputDeviceId << "\n";
+      file << p << "audioSampleRate " << s.audioSampleRate << "\n";
+      file << p << "audioBufferFrames " << s.audioBufferFrames << "\n";
+      file << p << "audioOversample " << s.audioOversample << "\n";
+      file << p << "targetFps " << s.targetFps << "\n";
+      file << p << "vsync " << (s.vsync ? 1 : 0) << "\n";
+      file << p << "snapToGrid " << (s.snapToGrid ? 1 : 0) << "\n";
+      file << p << "gridSnap " << s.gridSnap << "\n";
+      file << p << "zoomSensitivity " << s.zoomSensitivity << "\n";
+      file << p << "minimapEnabled " << (s.minimapEnabled ? 1 : 0) << "\n";
+      file << p << "minimapCorner " << s.minimapCorner << "\n";
+      file << p << "minimapSize " << s.minimapSize << "\n";
+      file << p << "minimapOpacity " << s.minimapOpacity << "\n";
+      file << p << "nodePanelOpen " << (s.nodePanelOpen ? 1 : 0) << "\n";
+      file << p << "nodePanelWidth " << s.nodePanelWidth << "\n";
+      file << p << "viewportPanelDock " << s.viewportPanelDock << "\n";
+      file << p << "viewportPanelWidth " << s.viewportPanelWidth << "\n";
+      file << p << "viewportPanelHeight " << s.viewportPanelHeight << "\n";
+      file << p << "themePreset " << s.themePreset << "\n";
+      file << p << "diagnosticLog " << (s.diagnosticLog ? 1 : 0) << "\n";
+      file << p << "autosaveEnabled " << (s.autosaveEnabled ? 1 : 0) << "\n";
+      file << p << "autosaveSeconds " << s.autosaveSeconds << "\n";
+   }
+
+   void ReadSettingValue(const std::string& key, std::istringstream& in, SceneSettings& s)
+   {
+      s.present = true;
+      if (key == "audioOutputDeviceId") in >> s.audioOutputDeviceId;
+      else if (key == "audioInputDeviceId") in >> s.audioInputDeviceId;
+      else if (key == "audioSampleRate") in >> s.audioSampleRate;
+      else if (key == "audioBufferFrames") in >> s.audioBufferFrames;
+      else if (key == "audioOversample") in >> s.audioOversample;
+      else if (key == "targetFps") in >> s.targetFps;
+      else if (key == "vsync") { int v = 0; in >> v; s.vsync = v != 0; }
+      else if (key == "snapToGrid") { int v = 0; in >> v; s.snapToGrid = v != 0; }
+      else if (key == "gridSnap") in >> s.gridSnap;
+      else if (key == "zoomSensitivity") in >> s.zoomSensitivity;
+      else if (key == "minimapEnabled") { int v = 0; in >> v; s.minimapEnabled = v != 0; }
+      else if (key == "minimapCorner") in >> s.minimapCorner;
+      else if (key == "minimapSize") in >> s.minimapSize;
+      else if (key == "minimapOpacity") in >> s.minimapOpacity;
+      else if (key == "nodePanelOpen") { int v = 0; in >> v; s.nodePanelOpen = v != 0; }
+      else if (key == "nodePanelWidth") in >> s.nodePanelWidth;
+      else if (key == "viewportPanelDock") in >> s.viewportPanelDock;
+      else if (key == "viewportPanelWidth") in >> s.viewportPanelWidth;
+      else if (key == "viewportPanelHeight") in >> s.viewportPanelHeight;
+      else if (key == "themePreset") in >> s.themePreset;
+      else if (key == "diagnosticLog") { int v = 0; in >> v; s.diagnosticLog = v != 0; }
+      else if (key == "autosaveEnabled") { int v = 0; in >> v; s.autosaveEnabled = v != 0; }
+      else if (key == "autosaveSeconds") in >> s.autosaveSeconds;
    }
 
    // Written with %.9g so a float survives the round trip exactly rather than
@@ -197,7 +261,8 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "node " << node.index << " " << node.category << " " << node.typeName << "\n";
       file << "  pos " << FloatToString(px) << " " << FloatToString(py) << "\n";
       file << "  flags " << (node.showParams ? 1 : 0) << " " << (node.bypassed ? 1 : 0) << " "
-           << (node.showMiniViewport ? 1 : 0) << " " << (node.showAdvancedParams ? 1 : 0) << "\n";
+           << (node.showMiniViewport ? 1 : 0) << " " << (node.showAdvancedParams ? 1 : 0) << " "
+           << (node.showPreview ? 1 : 0) << "\n";
       for (const auto& p : node.params)
          file << "  " << p.first << " " << p.second << "\n";
       file << "end\n";
@@ -221,6 +286,8 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "expr " << e.dstIndex << " " << e.dstParam << " " << EscapeLine(e.text) << "\n";
    for (const GlobalRecord& g : data.globals)
       file << "glob " << g.name << " " << EscapeLine(g.expr) << "\n";
+   if (data.settings.present)
+      WriteSettingsLines(file, data.settings, "setting");
 
    if (!file.good())
    {
@@ -305,12 +372,17 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          // `in` is a fresh istringstream over just this line (see the
          // getline loop above), so a missing 4th token cannot corrupt any
          // later line's parsing the way it would on a shared whole-file stream.
-         int show = 0, bypass = 0, miniViewport = 0, advanced = 0;
+         // Preview defaults on so patches written before the fifth flag keep
+         // their original appearance and behaviour.
+         int show = 0, bypass = 0, miniViewport = 0, advanced = 0, preview = 1;
          in >> show >> bypass >> miniViewport >> advanced;
+         if (!(in >> preview))
+            preview = 1;
          current.showParams = show != 0;
          current.bypassed = bypass != 0;
          current.showMiniViewport = miniViewport != 0;
          current.showAdvancedParams = advanced != 0;
+         current.showPreview = preview != 0;
       }
       else if (inNode && (tag == "f" || tag == "i" || tag == "b" || tag == "c" || tag == "s"))
       {
@@ -387,6 +459,12 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          if (!g.name.empty())
             outData.globals.push_back(g);
       }
+      else if (tag == "setting")
+      {
+         std::string key;
+         in >> key;
+         ReadSettingValue(key, in, outData.settings);
+      }
       // Anything else is from a newer version and is deliberately ignored.
    }
 
@@ -436,5 +514,39 @@ void SaveRecents()
    std::ofstream file(path);
    for (const std::string& entry : sRecents)
       file << entry << "\n";
+}
+
+bool LoadAppSettings(SceneSettings& out)
+{
+   std::ifstream file(AppSettingsPath());
+   if (!file)
+      return false;
+   std::string line;
+   while (std::getline(file, line))
+   {
+      std::istringstream in(line);
+      std::string key;
+      in >> key;
+      if (!key.empty())
+         ReadSettingValue(key, in, out);
+   }
+   return out.present;
+}
+
+bool SaveAppSettings(const SceneSettings& settings, std::string& outError)
+{
+   std::ofstream file(AppSettingsPath(), std::ios::trunc);
+   if (!file)
+   {
+      outError = "could not open app settings for writing";
+      return false;
+   }
+   WriteSettingsLines(file, settings, "");
+   if (!file.good())
+   {
+      outError = "write failed while saving app settings";
+      return false;
+   }
+   return true;
 }
 }

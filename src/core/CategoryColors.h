@@ -47,6 +47,12 @@ namespace CategoryColors
    // entry), so an unrecognised category dims rather than crashes.
    const Color& ColorFor(const std::string& category);
 
+   // Stable family order used by both node browsers: 2D/video, 3D, audio,
+   // then utility/control categories. Categories inside a family remain
+   // alphabetical. Keeping this beside ColorFor guarantees that catalogue
+   // order and the visible colour code can never drift apart.
+   int FamilyRank(const std::string& category);
+
    // Reads the saved preset name (if any) from ~/Library/Application
    // Support/Infinite.theme. Call once at startup, before the first frame.
    void LoadPreference();

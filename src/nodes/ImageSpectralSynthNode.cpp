@@ -1,5 +1,7 @@
 #include "ImageSpectralSynthNode.h"
 
+#include "platform/OpenGLHeaders.h"
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <algorithm>
 #include <cmath>
@@ -15,12 +17,6 @@
 #include "audio/SampleSlot.h"
 #include "audio/dsp/SpectralAdditiveSynth.h"
 #include "core/GLUtil.h"
-
-#ifdef __APPLE__
-#include <OpenGL/gl3.h>
-#else
-#include <GL/gl.h>
-#endif
 
 namespace
 {

@@ -1,10 +1,15 @@
 #include "AnalyzeNodes.h"
 
+#if defined(__APPLE__)
 #include <Accelerate/Accelerate.h>
-#include <OpenGL/gl3.h>
+#else
+#include <juce_dsp/juce_dsp.h>
+#endif
+#include "platform/OpenGLHeaders.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <complex>
 #include <cstring>
 
 #include "GLUtil.h"
@@ -683,14 +688,21 @@ public:
    {
       // FFT setup allocates - main thread only, at construction, never on
       // the audio thread (mirrors PaulStretchNode's mFftSetup lifetime).
+#if defined(__APPLE__)
       mFftSetup = vDSP_create_fftsetup(kFileFftLog2, FFT_RADIX2);
       vDSP_hann_window(mWindow, kFileFftSize, vDSP_HANN_NORM);
+#else
+      for (int i = 0; i < kFileFftSize; ++i)
+         mWindow[i] = 0.5f * (1.0f - std::cos(2.0f * (float)M_PI * (float)i / (float)(kFileFftSize - 1)));
+#endif
    }
 
    ~AudioFilePlayerAudioNode() override
    {
+#if defined(__APPLE__)
       if (mFftSetup != nullptr)
          vDSP_destroy_fftsetup(mFftSetup);
+#endif
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
@@ -855,13 +867,20 @@ private:
       }
       rms = std::sqrt(rms / (float)kFileFftSize);
 
+#if defined(__APPLE__)
       vDSP_vmul(mLinear, 1, mWindow, 1, mWindowedScratch, 1, kFileFftSize);
-
       DSPSplitComplex split = { mReal, mImag };
       vDSP_ctoz((const DSPComplex*)mWindowedScratch, 2, &split, 1, kFileSpectrumSize);
       vDSP_fft_zrip(mFftSetup, &split, 1, kFileFftLog2, FFT_FORWARD);
 
       vDSP_zvabs(&split, 1, mMagnitude, 1, kFileSpectrumSize);
+#else
+      for (int i = 0; i < kFileFftSize; ++i)
+         mComplexInput[i] = { mLinear[i] * mWindow[i], 0.0f };
+      mFft.perform(mComplexInput, mComplexOutput, false);
+      for (int i = 0; i < kFileSpectrumSize; ++i)
+         mMagnitude[i] = std::abs(mComplexOutput[i]);
+#endif
       const float norm = 2.0f / (float)kFileFftSize;
       for (int i = 0; i < kFileSpectrumSize; i++)
          mMagnitude[i] *= norm;
@@ -936,15 +955,23 @@ private:
    Platform::SampleBuffer* mActiveBuffer = nullptr;
    SampleSlot mSampleSlot;
 
+#if defined(__APPLE__)
    FFTSetup mFftSetup = nullptr;
+#else
+   juce::dsp::FFT mFft { kFileFftLog2 };
+   juce::dsp::Complex<float> mComplexInput[kFileFftSize] = {};
+   juce::dsp::Complex<float> mComplexOutput[kFileFftSize] = {};
+#endif
    float mWindow[kFileFftSize] = {};
    float mRing[kFileFftSize] = {};
    int mRingWrite = 0;
    int mRingCount = 0;
    float mLinear[kFileFftSize] = {};
    float mWindowedScratch[kFileFftSize] = {};
+#if defined(__APPLE__)
    float mReal[kFileSpectrumSize] = {};
    float mImag[kFileSpectrumSize] = {};
+#endif
    float mMagnitude[kFileSpectrumSize] = {};
    float mPrevMagnitude[kFileSpectrumSize] = {};
    float mPrevFlux = 0.0f;

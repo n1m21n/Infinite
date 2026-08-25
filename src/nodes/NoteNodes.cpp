@@ -2609,6 +2609,7 @@ void NoteSequencerNode::VisitParams(ParamVisitor& v)
    v.Float("rateSeconds", rateSeconds);
    v.Float("gatePercent", gatePercent);
    v.Bool("useGlobalScale", useGlobalScale);
+   v.Int("editStep", editStep);
    for (int i = 0; i < kMaxSteps; i++)
    {
       char key[16];

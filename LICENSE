@@ -28,3 +28,9 @@ Optionally building with `INFINITE_ENABLE_VST3=ON` links the Steinberg VST3 SDK,
 which is licensed under the GNU General Public License version 3 (GPLv3). When
 distributed with VST3 support enabled, the combined binary must be distributed
 under the terms of the GPLv3.
+
+The Windows build also uses JUCE 8 for WASAPI, MIDI and VST3 hosting. JUCE is
+available under its commercial licence or the GNU Affero General Public
+License version 3 (AGPLv3). Distributing a Windows binary built from this
+package therefore requires compliance with JUCE's applicable licence. See
+https://juce.com/legal/juce-8-licence/ before redistribution.

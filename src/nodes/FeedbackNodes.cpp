@@ -1,6 +1,6 @@
 #include "FeedbackNodes.h"
 
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 #include <algorithm>
 #include <cmath>
 
@@ -31,6 +31,14 @@ bool FeedbackNode::EnsureShader()
    mShaderTried = true;
    mProgram = GLUtil::CompileProgram(kCopyFrag);
    return mProgram != 0;
+}
+
+void FeedbackNode::Clear()
+{
+   GLUtil::DestroyFbo(mBuffers[0]);
+   GLUtil::DestroyFbo(mBuffers[1]);
+   mWrite = 0;
+   mLastCookFrame = -1;
 }
 
 void FeedbackNode::CookIfNeeded(int frameId)

@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 
 #include "core/INode.h"
 #include "core/AudioCable.h"
@@ -19,6 +19,8 @@ public:
    {
       kModeWaveform = 0,
       kModeSpectrum,
+      kModeOscilloscope,
+      kModeSpectrogram,
       kModeCount
    };
 
@@ -68,5 +70,6 @@ private:
 
    std::vector<float> mWindow;
    std::vector<float> mSmoothedData;
+   std::vector<unsigned char> mHistoryPixels;
    int mLastCookFrame = -1;
 };

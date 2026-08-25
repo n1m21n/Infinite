@@ -4,10 +4,8 @@
 #include <cerrno>
 #include <cstdlib>
 #include <filesystem>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include "crude_json.h"
+#include "platform/SettingsPaths.h"
 
 namespace
 {
@@ -15,13 +13,13 @@ namespace
 
    std::string SettingsDir()
    {
-      const char* home = getenv("HOME");
-      if (home == nullptr)
+      std::string dir = InfiniteSettingsDirectory();
+      if (dir.empty())
          return std::string();
-      std::string dir = std::string(home) + "/Library/Application Support/Infinite";
       if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
          dir += "/plugin_drag_test";
-      mkdir(dir.c_str(), 0755);
+      std::error_code error;
+      fs::create_directories(fs::u8path(dir), error);
       return dir;
    }
 
@@ -75,7 +73,7 @@ void PluginScanner::StartScan(const std::string& folder)
    mFound.store(0, std::memory_order_relaxed);
 
    // VST3 folders to walk this scan: either the one folder the caller asked
-   // for, or the standard macOS locations plus every user-added folder.
+   // for, or the platform-standard locations plus every user-added folder.
    std::vector<std::string> vst3Folders;
    if (!folder.empty())
    {
@@ -83,10 +81,19 @@ void PluginScanner::StartScan(const std::string& folder)
    }
    else
    {
+#if defined(_WIN32)
+      if (const char* common = getenv("CommonProgramFiles"))
+         vst3Folders.push_back((fs::u8path(common) / "VST3").u8string());
+      if (const char* commonX86 = getenv("CommonProgramFiles(x86)"))
+         vst3Folders.push_back((fs::u8path(commonX86) / "VST3").u8string());
+      if (const char* local = getenv("LOCALAPPDATA"))
+         vst3Folders.push_back((fs::u8path(local) / "Programs" / "Common" / "VST3").u8string());
+#else
       vst3Folders.push_back("/Library/Audio/Plug-Ins/VST3");
       const char* home = getenv("HOME");
       if (home != nullptr)
          vst3Folders.push_back(std::string(home) + "/Library/Audio/Plug-Ins/VST3");
+#endif
       for (const std::string& userFolder : mFolders)
          if (std::find(vst3Folders.begin(), vst3Folders.end(), userFolder) == vst3Folders.end())
             vst3Folders.push_back(userFolder);

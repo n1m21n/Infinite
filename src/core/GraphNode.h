@@ -34,6 +34,10 @@ struct GraphNode
    std::string category;
    int index = 0;
    bool showParams = false; // params start collapsed so the preview leads
+   // Inline image/video/render preview. This is separate from showParams: the
+   // eye expands controls, while the monitor icon can stop a costly preview
+   // without changing the node's controls or its downstream graph output.
+   bool showPreview = true;
    // Per-node mini 3D viewport (geometry-producing nodes only). On by default
    // for a new node - seeing what a node actually produced is worth more than
    // the render cost, and NodeViewport::Render already skips redrawing when

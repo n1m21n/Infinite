@@ -6,10 +6,9 @@
 #include <fstream>
 #include <sstream>
 
-#include <sys/stat.h>
-
 #include "crude_json.h"
 #include "audio/MediaExtensions.h"
+#include "platform/SettingsPaths.h"
 
 namespace
 {
@@ -21,10 +20,9 @@ namespace
    // translation unit, and this is three lines.
    std::string SettingsDir()
    {
-      const char* home = getenv("HOME");
-      if (home == nullptr)
+      std::string dir = InfiniteSettingsDirectory();
+      if (dir.empty())
          return std::string();
-      std::string dir = std::string(home) + "/Library/Application Support/Infinite";
       // Mirrors main.cpp's INFINITE_DRAGTEST throwaway-settings-file pattern:
       // INFINITE_SAMPLERDRAGTEST/INFINITE_MEDIADRAGTEST drive real
       // AddFolder/RemoveFolder/StartScan calls against whatever this resolves
@@ -38,7 +36,8 @@ namespace
          dir += "/sampler_drag_test";
       else if (getenv("INFINITE_MEDIADRAGTEST") != nullptr)
          dir += "/media_drag_test";
-      mkdir(dir.c_str(), 0755);
+      std::error_code error;
+      fs::create_directories(fs::u8path(dir), error);
       return dir;
    }
 

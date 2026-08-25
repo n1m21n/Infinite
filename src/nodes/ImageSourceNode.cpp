@@ -1,6 +1,6 @@
 #include "ImageSourceNode.h"
 
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 #include <vector>
 
 #include "Platform.h"

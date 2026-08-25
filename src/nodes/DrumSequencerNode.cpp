@@ -606,6 +606,7 @@ void DrumSequencerNode::PushDirtyParams()
 
 void DrumSequencerNode::VisitParams(ParamVisitor& v)
 {
+   v.Int("editPage", editPage);
    char name[32];
    for (int lane = 0; lane < kNumLanes; lane++)
    {

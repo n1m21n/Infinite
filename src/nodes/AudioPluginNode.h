@@ -179,6 +179,7 @@ private:
 
    double mPreparedRate = 0.0;
    int mPreparedBlock = 0;
+   uint64_t mPreparedEngineGeneration = 0;
 
    bool mConfiguring = false;
    // Base64 fullState. Refreshed from the live plugin inside VisitParams (see

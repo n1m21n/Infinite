@@ -12,9 +12,8 @@ namespace
 {
    // 0xB0 7B/78 - All Notes Off / All Sound Off, channel 0 (every event this
    // bridge sends is channel 0 - see the pitch-bend comment below on why MPE
-   // was not adopted). Fire-and-forget: safe to call from either thread, since
-   // AUScheduleMIDIEventBlock is documented real-time-safe from any thread,
-   // not just the render thread.
+   // was not adopted). Called only by the audio half: JUCE's MidiBuffer is a
+   // single-thread object, so graph edits request a flush through an atomic.
    void FlushPluginNotes(Platform::PluginHandle* handle)
    {
       if (handle == nullptr)
@@ -65,6 +64,16 @@ public:
          if (handle != nullptr)
             SendPitchBendRangeRpn(handle);
          mLastSeenHandle = handle;
+      }
+
+      // Main-thread graph edits request a flush atomically; MIDI bytes are
+      // appended here on the audio thread so JUCE's MidiBuffer never has two
+      // concurrent writers.
+      if (mFlushRequested.exchange(false, std::memory_order_acq_rel) && handle != nullptr)
+      {
+         FlushPluginNotes(handle);
+         mActiveVoiceCount = 0;
+         mLastStartedVoiceId = 0;
       }
 
       // Bypass never touches the handle, so a voice held at the moment of the
@@ -133,20 +142,13 @@ public:
    // disconnected (or the graph is tearing this node's note input down) -
    // whatever the old inbox's producer left held in the plugin would
    // otherwise sustain forever, since nothing will ever deliver its note-off
-   // once the inbox pointer is gone. Flush here, the same way the bypass
-   // rising edge and the main-thread half's Unload/LoadPlugin/re-prepare sites
-   // do. Called from the main thread (RebuildAudioTopology), same as the
-   // plain pointer write to mNoteInbox already was before this change - no
-   // new synchronization requirement over what already existed here.
+   // once the inbox pointer is gone. The main thread only raises an atomic
+   // request here; ProcessBlock appends the actual MIDI flush next callback.
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
    {
       if (inbox == nullptr && mNoteInbox != nullptr)
       {
-         Platform::PluginHandle* handle = mHandle.load(std::memory_order_acquire);
-         if (handle != nullptr)
-            FlushPluginNotes(handle);
-         mActiveVoiceCount = 0;
-         mLastStartedVoiceId = 0;
+         mFlushRequested.store(true, std::memory_order_release);
       }
       mNoteInbox = inbox;
       mNoteCursor = cursor;
@@ -300,6 +302,7 @@ private:
 
    std::atomic<Platform::PluginHandle*> mHandle { nullptr };
    std::atomic<bool> mBypass { false };
+   std::atomic<bool> mFlushRequested { false };
    NoteEventQueue* mNoteInbox = nullptr; // set by SetNoteInbox; see its comment
    int mNoteCursor = -1; // set by SetNoteInbox alongside mNoteInbox
    std::atomic<double> mSampleRate { 0.0 };
@@ -405,11 +408,6 @@ void AudioPluginNode::LoadPlugin(const Platform::PluginDesc& desc)
    if (!mAcceptsNotes)
       noteInput.Disconnect();
 
-   // A note the outgoing plugin is holding would otherwise sustain forever -
-   // nothing will ever deliver its note-off once mLive is unpublished below.
-   if (mLive != nullptr)
-      FlushPluginNotes(mLive);
-
    // Unpublish before creating: the previous plugin must stop being reachable
    // from the audio thread the moment the user asks for a different one, not
    // whenever the new one finishes loading.
@@ -429,10 +427,17 @@ void AudioPluginNode::LoadPlugin(const Platform::PluginDesc& desc)
    mLoadFailed = false;
    mPreparedRate = 0.0;
    mPreparedBlock = 0;
+   mPreparedEngineGeneration = 0;
    mStatus = "loading " + desc.name + "...";
 
    const double rate = AudioEngine::Instance().SampleRate();
-   mHandle = Platform::PluginCreate(desc, rate, kAudioMaxBlockFrames);
+   int block = mAudioNode ? mAudioNode->MaxBlockSize() : 0;
+   if (block <= 0)
+      block = (int)Platform::AudioDeviceBufferFrames();
+   if (block <= 0)
+      block = 512;
+   block = std::clamp(block, 64, kAudioMaxBlockFrames);
+   mHandle = Platform::PluginCreate(desc, rate, block);
 }
 
 void AudioPluginNode::ReloadFromIdentity()
@@ -467,10 +472,6 @@ void AudioPluginNode::ReloadFromIdentity()
 
 void AudioPluginNode::Unload()
 {
-   // Same reasoning as LoadPlugin's flush: a note held in the plugin at
-   // unload time would otherwise never get its note-off.
-   if (mLive != nullptr)
-      FlushPluginNotes(mLive);
    if (mAudioNode)
       mAudioNode->SetHandle(nullptr);
    SetConfiguring(false);
@@ -648,22 +649,27 @@ void AudioPluginNode::CookIfNeeded(int frameId)
    double rate = AudioEngine::Instance().SampleRate();
    if (rate <= 0.0)
       rate = mAudioNode->SampleRate();
-   if (rate > 0.0 && (rate != mPreparedRate || mPreparedBlock != kAudioMaxBlockFrames))
+   int block = mAudioNode->MaxBlockSize();
+   if (block <= 0)
+      block = (int)Platform::AudioDeviceBufferFrames();
+   if (block <= 0)
+      block = 512;
+   block = std::clamp(block, 64, kAudioMaxBlockFrames);
+   const uint64_t engineGeneration = AudioEngine::Instance().StartGeneration();
+   if (rate > 0.0 && (rate != mPreparedRate || mPreparedBlock != block ||
+                      mPreparedEngineGeneration != engineGeneration))
    {
-      // A note held across this unpublish window would otherwise sustain
-      // forever - the re-prepare below tears down and rebuilds the plugin's
-      // render resources, but its held-note state goes with it either way.
-      FlushPluginNotes(mHandle);
       mAudioNode->SetHandle(nullptr);
       std::string error;
-      if (!Platform::PluginPrepare(mHandle, rate, kAudioMaxBlockFrames, error))
+      if (!Platform::PluginPrepare(mHandle, rate, block, error))
       {
          mLoadFailed = true;
          mStatus = error.empty() ? std::string("prepare failed") : error;
          return;
       }
       mPreparedRate = rate;
-      mPreparedBlock = kAudioMaxBlockFrames;
+      mPreparedBlock = block;
+      mPreparedEngineGeneration = engineGeneration;
 
       // 3. A restored patch's plugin state is applied here, once, after the
       //    plugin is fully prepared - fullState invalidates render resources,

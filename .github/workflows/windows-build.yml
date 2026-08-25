@@ -1,0 +1,89 @@
+name: Windows x64
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - "vcpkg.json"
+      - ".github/workflows/windows-build.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - "vcpkg.json"
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 180
+    env:
+      VCPKG_ROOT: C:\vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: C:\vcpkg\archives
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\archives
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-${{ runner.os }}-
+
+      - name: Bootstrap vcpkg
+        shell: cmd
+        run: C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+
+      - name: Install dependencies
+        shell: cmd
+        run: C:\vcpkg\vcpkg.exe install --triplet x64-windows-static --x-manifest-root="%GITHUB_WORKSPACE%"
+
+      - name: Install Windows ML and DirectML
+        shell: powershell
+        run: |
+          $version = '2.2.12'
+          $base = Join-Path $env:RUNNER_TEMP 'InfiniteBuild\windowsml'
+          $root = Join-Path $base "Microsoft.Windows.AI.MachineLearning.$version"
+          $archive = Join-Path $base "Microsoft.Windows.AI.MachineLearning.$version.zip"
+          New-Item -ItemType Directory -Path $base -Force | Out-Null
+          Invoke-WebRequest "https://api.nuget.org/v3-flatcontainer/microsoft.windows.ai.machinelearning/$version/microsoft.windows.ai.machinelearning.$version.nupkg" -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $root -Force
+          if (-not (Test-Path (Join-Path $root 'build\cmake'))) {
+            throw 'Windows ML CMake package was not found after extraction.'
+          }
+          "INFINITE_WINDOWSML_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure
+        shell: cmd
+        run: cmake --preset windows-vs2022
+
+      - name: Build
+        shell: cmd
+        run: cmake --build --preset windows-release
+
+      - name: Download segmentation models
+        shell: powershell
+        run: |
+          $modelDir = Join-Path $env:LOCALAPPDATA 'Infinite\models'
+          New-Item -ItemType Directory -Path $modelDir -Force | Out-Null
+          Invoke-WebRequest 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx' -OutFile (Join-Path $modelDir 'u2net.onnx')
+          Invoke-WebRequest 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net_human_seg.onnx' -OutFile (Join-Path $modelDir 'u2net_human_seg.onnx')
+
+      - name: Install FFmpeg for the runtime package
+        shell: powershell
+        run: choco install ffmpeg -y --no-progress
+
+      - name: Package
+        shell: powershell
+        run: .\scripts\package-windows.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-Windows-x64
+          path: dist/Infinite-Windows-x64.zip
+          if-no-files-found: error

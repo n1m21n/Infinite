@@ -27,8 +27,8 @@ namespace RemoteControl
                                        nlohmann::json& outResult, std::string& outError)>;
 
    // Starts the accept thread bound to 127.0.0.1:port. Writes a random auth
-   // token to ~/Library/Application Support/Infinite/control_token (creating
-   // the directory if needed). Safe to call once at startup; no-op if a
+   // token to the platform settings directory (creating it if needed). Safe
+   // to call once at startup; no-op if a
    // server is already running.
    void Start(int port);
 

@@ -1,4 +1,5 @@
 #include "CategoryColors.h"
+#include "platform/SettingsPaths.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -253,10 +254,10 @@ int gCurrent = 0;
 // app's other Application Support state, not a bundled settings format.
 std::string ThemePath()
 {
-   const char* home = getenv("HOME");
-   if (home == nullptr)
+   const std::string dir = InfiniteSettingsDirectory();
+   if (dir.empty())
       return {};
-   return std::string(home) + "/Library/Application Support/Infinite.theme";
+   return dir + "/Infinite.theme";
 }
 }
 
@@ -286,12 +287,34 @@ void SetPreset(int index)
    }
 }
 
+int FamilyRank(const std::string& category)
+{
+   if (category == "Source" || category == "Text" || category == "Compositing" ||
+       category == "Color" || category == "Mask" || category == "Feedback" ||
+       category == "Resynth" || category == "Effects" || category == "Output")
+      return 0;
+   if (category == "3D")
+      return 1;
+   if (category == "Audio" || category == "Synths" || category == "AudioEffects" ||
+       category == "AudioUtility" || category == "Notes")
+      return 2;
+   return 3;
+}
+
 const Color& ColorFor(const std::string& category)
 {
-   static const Color kFallback = { 0.42f, 0.44f, 0.50f }; // unrecognised category
-   const Table& table = Presets()[gCurrent].categories;
-   auto it = table.find(category);
-   return it != table.end() ? it->second : kFallback;
+   static const Color kVisual2D = { 0.49f, 0.91f, 0.58f }; // light green
+   static const Color kVisual3D = { 0.93f, 0.35f, 0.82f }; // magenta
+   static const Color kSound = { 0.36f, 0.68f, 1.00f };    // blue
+   static const Color kOther = { 0.95f, 0.72f, 0.24f };    // gold
+   const int family = FamilyRank(category);
+   if (family == 1)
+      return kVisual3D;
+   if (family == 2)
+      return kSound;
+   if (family == 0)
+      return kVisual2D;
+   return kOther;
 }
 
 const UiTheme& CurrentUiTheme()

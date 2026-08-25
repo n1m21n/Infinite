@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 
 #include "core/Transport.h"
 #include "platform/Platform.h"
@@ -51,9 +52,11 @@ bool AudioEngine::Start(std::string& outError)
 {
    double sampleRate = 0.0;
    if (!Platform::AudioDeviceOpen(&AudioEngine::RenderThunk, this, sampleRate, outError,
-                                  mRequestedDeviceId, mRequestedSampleRate, mRequestedBufferFrames))
+                                  mRequestedDeviceId, mRequestedSampleRate, mRequestedBufferFrames,
+                                  mRequestedInputDeviceId))
       return false;
    mSampleRate.store(sampleRate, std::memory_order_relaxed);
+   mStartGeneration.fetch_add(1, std::memory_order_relaxed);
    mStartedAtMs.store(NowMs(), std::memory_order_relaxed);
    mPreviewPlayer.PrepareToPlay(sampleRate);
    Transport::Instance().NotifyAudioEngineStarted(sampleRate);
@@ -287,6 +290,26 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
             sInterleaveScratch[(size_t)i * 2 + 1] = r;
          }
          terminal.capture->Write(sInterleaveScratch.data(), numFrames * 2);
+      }
+   }
+
+   // Last line of defence for the hardware stream. A faulty plugin or DSP
+   // node must never poison every downstream terminal with NaN/Inf, nor send
+   // an unbounded value to the driver. Keep generous headroom so normal
+   // internal gain staging is untouched; the actual output device can still
+   // apply its own final limiting/conversion policy.
+   constexpr float kSafetyCeiling = 16.0f;
+   for (int ch = 0; ch < numChannels; ch++)
+   {
+      float* samples = deviceBuffer.channels[ch];
+      if (samples == nullptr)
+         continue;
+      for (int i = 0; i < numFrames; i++)
+      {
+         float v = samples[i];
+         if (!std::isfinite(v))
+            v = 0.0f;
+         samples[i] = std::clamp(v, -kSafetyCeiling, kSafetyCeiling);
       }
    }
 }

@@ -1,6 +1,8 @@
 build/
 build-*/
 dist/
+vcpkg_installed/
+CMakeUserPresets.json
 *.dmg
 !website/assets/*.dmg
 !website/*.dmg

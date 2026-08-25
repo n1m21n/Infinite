@@ -1,6 +1,8 @@
 # Infinite
 
-A unified node-based audiovisual modular workstation for macOS. Real-time GPU image and video compositing, procedural 3D geometry and simulation, and a full modular synthesizer and DSP rack with Audio Unit plugin hosting (VST3 hosting available as an opt-in build flag, see below) — all interconnected through a universal modulation graph.
+A unified node-based audiovisual modular workstation for macOS and Windows. Real-time GPU image and video compositing, procedural 3D geometry and simulation, and a full modular synthesizer and DSP rack with Audio Unit hosting on macOS or VST3 hosting on Windows, all interconnected through a universal modulation graph.
+
+> **Windows source build:** run `install-dependencies.bat` once, accept the automatic UAC prompt, then run `build-windows.bat`. **Prebuilt GitHub Release:** extract the runtime ZIP, run `install-runtime.bat` once, then use `run-windows.bat`. Do not run the dependency compiler installer for a prebuilt release. The port uses WASAPI/MIDI through JUCE, VST3, Spout2, OpenCV, FFmpeg and Assimp. See [WINDOWS_BUILD.md](WINDOWS_BUILD.md) for the complete feature map and troubleshooting.
 
 Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeSynth/BespokeSynth)'s module system — a registry of node types, typed cables, and a pull-based cook-once-per-frame DAG — extended across GPU textures, procedural geometry, and real-time audio buffers.
 
@@ -14,22 +16,22 @@ Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeS
 
 | Category | Description & Nodes |
 |---|---|
-| **Source** | **Image**, **Video** (hardware-accelerated AVFoundation), **Syphon In** (zero-copy real-time GPU video receiver from OBS, Resolume, TouchDesigner, etc.), **Shape** (10 SDF primitives), **Noise** (6 kinds: Value, Perlin, Voronoi, Ridged, Simplex, White), **Ramp** (5 gradient types: Linear, Radial, Angle, Diamond, Box), **Texture** (Voronoi, Brick, Magic, Wave, Musgrave), **Draw** (paintable canvas with 6 procedural brushes, eraser, and transport-synced stroke recording), **Formula** (live GLSL fragment editor with 16 presets) |
-| **Text** | **Text** (typography rendered via CoreText / CoreGraphics with any system font, kerning, line spacing, and alignment) |
+| **Source** | **Image**, **Video** (synchronized video/audio outputs, trim, restart and 4 triggerable cue points), **Syphon/Spout In** (real-time GPU video receiver from OBS, Resolume, TouchDesigner, etc.), **Shape** (10 SDF primitives), **Noise** (6 kinds: Value, Perlin, Voronoi, Ridged, Simplex, White), **Ramp** (5 gradient types: Linear, Radial, Angle, Diamond, Box), **Texture** (Voronoi, Brick, Magic, Wave, Musgrave), **Draw** (paintable canvas with 6 procedural brushes, eraser, and transport-synced stroke recording), **Formula** (live GLSL fragment editor with 16 presets) |
+| **Text** | **Text** (typography rendered via CoreText/CoreGraphics on macOS or an asynchronous GDI+ worker on Windows, with system fonts, kerning, line spacing, alignment, wrapping and outlines) |
 | **2D Effects** | **Blur** family (Gaussian, Box, Motion, Radial), **Bloom**, **Diffuse Glow**, **Unsharp Mask**, **Twirl**, **Pinch-Punch**, **Ripple**, **Lens Distortion**, **Displace**, **Liquify**, **6 Glitch modes**, **Symmetry**, **Kaleidoscope**, **Mirror Tile**, **Halftone**, **Sobel Edge**, **Edge Outline**, **Pixelate**, **Noise**, **Vignette**, **Transform** |
 | **Color & Grading** | **Curves** (interactive Photoshop-style spline editor for RGB & Luma), **Color Ramp** (up to 32 editable gradient stops), **Color Adjustments** (all-in-one grading chain), **LUT** (.cube 3D lookup tables), **Gradient Map**, **Channel Mixer**, **Brightness/Contrast**, **Levels**, **HSL**, **Exposure**, **Color Balance**, **Invert**, **Posterize**, **Threshold**, **Palette** (Oklab k-means dominant palette extraction) |
 | **Compositing** | **Blend** (31 blend modes), **Layer Stack** (4 reorderable layers with blend modes and opacities), **Switcher** (timed input cycler), **Fit** (resolution and aspect ratio adaptor), **Outer Glow**, **Drop Shadow**, **Color Overlay**, **Group**, **Comment**, **Null**, **Viewport** |
 | **Feedback & Generative** | **Feedback** (one-frame legal delay loop), **Trails**, **Reaction-Diffusion** (Gray-Scott simulation), **Resynthesize** (iterative generative resampler with recorded XY pad mutation pathways) |
-| **Mask & Segmentation** | **Remove Background** (on-device Apple Vision ML subject segmentation — zero latency, no network, no API key), **Chroma Key**, **Luma Key** |
+| **Mask & Segmentation** | **Remove Background** (Apple Vision on macOS; asynchronous U2Net/U2Net Human through OpenCV DNN on Windows), **Chroma Key**, **Luma Key** |
 | **3D Geometry & Procedural** | **Geometry** (8 primitives: Cube, Sphere, Icosphere, Cylinder, Cone, Torus, Plane, Disc), **Model 3D** (OBJ, PLY, STL, USD/USDZ import), **Text 3D** (extruded typography), **Ocean** (Gerstner waves simulation), **Curves** (3D splines with taper/bevel), **Point Distribution** (**Distribute Points on Faces**, **Distribute Points in Grid**, **Points to Vertices**, **Merge by Distance**), **Mesh Deconstruction** (**Mesh to Points**, **Mesh to Edges**, **Mesh to Faces**), **Set Color** (per-element vertex color grading), **Wrap** (conformal and arc-length cylindrical/spherical wrapping), **Geometry Ops** (Transform, Array, Subdivide [Loop], Smooth [Taubin], Mirror, Screw, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist), **Instance on Points** (single-draw-call GPU instancing), **Metaballs**, **Resynthesize 3D** |
 | **Physics & Simulation** | **Particle System** (gravity, turbulence, bounce floor, lifespan), **Cloth** (Position-Based Dynamics [PBD] soft body & cloth solver with pin constraints and collision) |
 | **3D Scene & Rendering** | **Camera** (FOV, orbit, perspective/orthographic), **Light** (directional, point, spot, ambient), **HDRI** (32-bit float .hdr / .exr equirectangular image-based lighting and reflections), **Material** (Cook-Torrance GGX PBR, roughness, metallic, emission), **Displacement**, **Mapping**, **Render 3D** (ACES tonemapping, multisampled AA up to 8x, shared interactive orbit viewport) |
 | **Synths & Sound Generators** | **Wavetable** (12 factory tables, 8 morphable frames, bandlimited mip levels, sub-oscillator, unison detune, filter, ADSR envelope), **Metallic** (modal physical modeling resonator for bells, plates, tubes, mallets, damping, and dispersion), **Granular** (real-time granular texture engine with grain size, jitter, spray, density, speed, and pitch randomization), **PaulStretch** (spectral extreme time-stretching for ambient soundscapes), **Sampler** (multi-folder disk scanning, root note pitch tracking, loop points), **Drum Sequencer** (8-track step sequencer with lane mutes/solos, swing, and pattern chaining), **Oscillator** (multi-waveform analog oscillator) |
-| **Notes & MIDI** | **MIDI Notes** (live USB/Bluetooth MIDI keyboard and controller input with clock sync), **Note Stack**, **Arpeggiator** (tempo-synced with multiple patterns and octave ranges), **Note Sequencer**, **Random Note Generator**, **Chorder**, **Note Strum**, **Bouncing Balls** (physics-based polyphonic note generator), **Note Transpose**, **Pitch Bend**, **Velocity Curve**, **Gate**, **Humanizer**, **Quantizer**, **Glide**, **Note Echo**, **Note Router**, **Note Capturer** |
+| **Notes & MIDI** | **MIDI Notes** (live USB/Bluetooth MIDI keyboard and controller input with clock sync), **Note Stack**, **Arpeggiator** (tempo-synced with multiple patterns and octave ranges), **Note Sequencer** (1-128 steps in editable 16-step pages), **Random Note Generator**, **Chorder**, **Note Strum**, **Bouncing Balls** (physics-based polyphonic note generator), **Note Transpose**, **Pitch Bend**, **Velocity Curve**, **Gate**, **Humanizer**, **Quantizer**, **Glide**, **Note Echo**, **Note Router**, **Note Capturer** |
 | **Audio Effects & DSP** | **Plugin** (hosts third-party **Audio Unit [AU]** plugins, and **VST3** plugins when built with `-DINFINITE_ENABLE_VST3=ON` — see below — with native GUI windows and mapped modulatable params), **Audio Filter** (analog-modeled LP/HP/BP/Notch), **EQ** (multi-band parametric equalizer with interactive curve visualizer), **Dynamics** (compressor/expander/gate with gain reduction meter), **Limiter** (lookahead brickwall limiter), **Delay** (tempo-synced stereo ping-pong), **Reverb** (algorithmic diffusion), **Drive** (tube saturation and distortion), **Stereo** (width enhancer and Haas imager), **Pitch Shifter**, **Frequency Shifter** (Bode frequency shift), **Chorus**, **Flanger**, **Phaser**, **Bitcrush**, **Transient Shaper**, **Stutter**, **Ring Mod**, **Tremolo**, **Formant Filter** (vowel morphing A-E-I-O-U), **Wavetable Shaper** |
 | **Audio Utility & Routing** | **Gain**, **Audio In**, **Audio Out**, **Mixer** (multi-channel summing), **Splitter** (signal fan-out), **Blend Audio**, **Envelope** (multi-stage ADSR generator), **Note to CV**, **Audio to CV** (envelope and pitch follower) |
 | **Modulators & CV** | **LFO** (tempo-synced waveforms), **Random**, **Pattern** (8-step CV sequence), **Math**, **Compare**, **Range to Range**, **Smoothing** (lag generator), **Invert**, **Mod Depth**, **Mod Curve**, **CV to Pitch**, **Macro Knob**, **Macro XY** (recordable and loopable 2D path pad), **MIDI CC**, **MIDI Trigger**, **Path** (6 geometric trajectory curves), **Constant**, **Image Analyze** (video-to-CV extraction), **Audio Analyze** (8-band FFT spectrum and onset extraction), **Audio File** |
-| **Output** | **Output** (PNG export + hardware-accelerated H.264/MOV video recording with synchronized audio soundtrack), **Syphon Out** (zero-copy real-time GPU video broadcaster to OBS, Resolume, MadMapper, TouchDesigner, etc.) |
+| **Output** | **Output** (PNG export + asynchronous triple-PBO OpenGL capture, worker-based H.264/MOV encoding and synchronized audio soundtrack), **Syphon/Spout Out** (real-time GPU video broadcaster to OBS, Resolume, MadMapper, TouchDesigner, etc.) |
 
 
 ---
@@ -41,7 +43,8 @@ Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeS
 - **Unified Global Transport**: Master play/pause and tempo (BPM) keep modulators, video decoders, particle solvers, audio LFOs, arpeggiators, and drum sequences in deterministic lockstep.
 
 ### 2. Universal Cross-Domain Modulation
-- **Modulate anything from anything**: Every slider across image shaders, 3D geometry transforms, audio synths, and hosted plugin parameters has a modulation pin.
+- **Modulate anything from anything**: Sliders, knobs, checkboxes, toggles, action triggers, selectors, bypass controls and hosted plugin parameters expose CV inputs wherever the operation can run without an interactive file/system dialog.
+- **Discrete CV rules**: values below `0.5` turn a boolean off and values at or above `0.5` turn it on; action buttons fire once on the rising edge; selectors divide `0..1` evenly across their available entries.
 - **Cross-Domain Analysis**:
   - **Image Analyze** extracts luminance, contrast, RGB channels, saturation, motion vectors, and spatial centroids from live video to modulate synth filters, pitch, or geometry.
   - **Audio Analyze** transforms live microphone input or audio files into 8 frequency spectrum bands, low/mid/high energy levels, and onset triggers to drive shader ripples, particle turbulence, or 3D extrusions.
@@ -69,21 +72,40 @@ Architecturally it is a descendant of [BespokeSynth](https://github.com/BespokeS
 - **Physically Based Rendering (PBR)**: Cook-Torrance GGX shading with Fresnel, ACES tonemapping, 32-bit HDRI environment lighting, and multisampled antialiasing up to 8x.
 
 ### 6. Workflow & Canvas Ergonomics
-- **Link-Drag-to-Search**: Drag a patch cable out from any output pin and drop it onto empty canvas to automatically open the node search popup pre-filtered for compatible nodes — wire nodes in a single motion.
+- **Link-Drag-to-Search**: Drag a patch cable out from any output pin and drop it onto empty canvas to open the node search immediately, without constructing every registered module. The selected connection is type-checked before it is made.
 - **Live 1:1 Previews Everywhere**: Every node renders an active thumbnail preview showing live video frames, 3D meshes with vertex colors, or audio waveform/spectrum visualizations.
 - **Dockable Viewport Panel**: View and interact with 3D scenes or composited outputs in a dedicated dockable/floating viewport window with shared camera orbit controls.
 - **Bypass & Mute Controls**: Instantly bypass effect nodes to pass signals through untouched, or mute sound generators with one click.
 - **Human-Readable Text Patches**: Patches are saved in a clean, line-based text format that is easy to version-control, inspect, and diff.
+- **Crash Recovery and Diagnostics**: Configurable autosave recovery plus a persistent runtime log under `%LOCALAPPDATA%\Infinite` on Windows.
 
 ---
 
 ## Installation
 
-### Requirements
+### Windows 10/11 x64
+
+To compile from source:
+
+1. Run `install-dependencies.bat` once and accept the UAC prompt.
+2. After it finishes successfully, run `build-windows.bat` without administrator privileges.
+3. Launch `dist\Infinite-Windows-x64\run-windows.bat`.
+
+To install a prebuilt GitHub Release:
+
+1. Extract `Infinite-Windows-x64.zip`.
+2. Run `install-runtime.bat` once.
+3. Run `run-windows.bat` or `Infinite.exe`.
+
+`install-dependencies.bat` is only for developers compiling the source. The first dependency build requires substantial disk space and can take a while because vcpkg compiles OpenCV. `install-runtime.bat` is only for users of the already compiled release.
+
+### macOS
+
+#### Requirements
 - **macOS 11.0+** (Apple Silicon or Intel).
 - Built as a self-contained universal binary linking system frameworks — no external package managers or dependencies required.
 
-### Opening the Application (Gatekeeper)
+#### Opening the Application (Gatekeeper)
 The build is ad-hoc signed:
 1. **To open for the first time**: Right-click (or Control-click) `Infinite.app` in Finder → **Open** → click **Open**.
 2. If macOS reports the app is damaged or blocked by quarantine, clear the quarantine attribute:
@@ -94,6 +116,10 @@ The build is ad-hoc signed:
 ---
 
 ## Build from Source
+
+For Windows, use the two `.bat` files described above or follow [WINDOWS_BUILD.md](WINDOWS_BUILD.md). Revision 31A moves Windows Text rasterization to a latest-only GDI+ worker, replaces synchronous Output readback with triple-PBO OpenGL capture, CFR pacing and worker-side audio I/O, and keeps the opaque worker construction compatible with MSVC. Revision 29's universal CV inputs remain available for suitable module checkboxes, state/action buttons, selectors and bypass controls. The R22 change also remains: gated NVIDIA Maxine modules are removed and Mask > Remove Background is accelerated through Windows ML and DirectML/DX12 with an OpenCV CPU fallback.
+
+### macOS
 
 Requires **CMake 3.16+** and **Xcode Command Line Tools**:
 
@@ -161,4 +187,3 @@ Infinite is open-source software licensed under the **MIT License** — see [LIC
 - [imgui-node-editor](https://github.com/thedmd/imgui-node-editor) (MIT)
 - [stb](https://github.com/nothings/stb) (Public Domain)
 - [GLFW](https://github.com/glfw/glfw) (zlib)
-

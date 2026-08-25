@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -16,7 +17,7 @@ class INode;
 //   infinite-patch 1
 //   node <index> <category> <type name to end of line>
 //     pos <x> <y>
-//     flags <showParams> <bypassed> <showMiniViewport> <showAdvancedParams>
+//     flags <showParams> <bypassed> <showMiniViewport> <showAdvancedParams> <showPreview>
 //     f <name> <value>          float
 //     i <name> <value>          int
 //     b <name> <0|1>            bool
@@ -50,6 +51,7 @@ namespace Patch
       bool bypassed = false;
       bool showMiniViewport = false;
       bool showAdvancedParams = false; // audio nodes only, see GraphNode.h
+      bool showPreview = true;
       // Raw key/value lines, replayed into the node through its ParamVisitor.
       std::vector<std::pair<std::string, std::string>> params;
    };
@@ -105,6 +107,38 @@ namespace Patch
       std::string expr;
    };
 
+   // Patch-wide playback/editor settings. They are also mirrored to an app
+   // preference file so a new session starts with the last setup. `present`
+   // keeps old patches backward-compatible: opening one does not replace the
+   // current machine setup with these default member values.
+   struct SceneSettings
+   {
+      bool present = false;
+      uint32_t audioOutputDeviceId = 0;
+      uint32_t audioInputDeviceId = 0;
+      double audioSampleRate = 0.0;
+      int audioBufferFrames = 512;
+      float audioOversample = 1.0f;
+      int targetFps = 60;
+      bool vsync = true;
+      bool snapToGrid = true;
+      float gridSnap = 20.0f;
+      float zoomSensitivity = 0.5f;
+      bool minimapEnabled = false;
+      int minimapCorner = 2;
+      float minimapSize = 190.0f;
+      float minimapOpacity = 0.85f;
+      bool nodePanelOpen = false;
+      float nodePanelWidth = 300.0f;
+      int viewportPanelDock = 1;
+      float viewportPanelWidth = 320.0f;
+      float viewportPanelHeight = 260.0f;
+      int themePreset = 0;
+      bool diagnosticLog = true;
+      bool autosaveEnabled = true;
+      int autosaveSeconds = 30;
+   };
+
    struct Data
    {
       std::vector<NodeRecord> nodes;
@@ -116,6 +150,7 @@ namespace Patch
       std::vector<PaletteRecord> palette;
       std::vector<ExprRecord> expressions;
       std::vector<GlobalRecord> globals;
+      SceneSettings settings;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);
@@ -130,4 +165,7 @@ namespace Patch
    void NoteRecent(const std::string& path);
    void LoadRecents();
    void SaveRecents();
+
+   bool LoadAppSettings(SceneSettings& out);
+   bool SaveAppSettings(const SceneSettings& settings, std::string& outError);
 }

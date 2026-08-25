@@ -605,16 +605,16 @@ private:
 };
 
 // A self-driving step sequencer (README.md §3, arity table: no note input,
-// generates its own stream). Up to 16 steps, each an independent (note,
+// generates its own stream). Up to 128 steps, each an independent (note,
 // velocity, enabled) triple edited as a vertical bar - drag sets pitch,
 // the thin strip below sets velocity, the dot toggles the step on/off.
-// `steps` controls how many of the 16 loop before wrapping, the same
+// `steps` controls how many of the 128 loop before wrapping, the same
 // "length vs. fixed slot count" split Pattern (the modulator step sequencer)
 // already uses.
 class NoteSequencerNode : public INode, public INoteSource
 {
 public:
-   static constexpr int kMaxSteps = 16;
+   static constexpr int kMaxSteps = 128;
 
    static INode* Create() { return new NoteSequencerNode(); }
    NoteSequencerNode();
@@ -634,6 +634,8 @@ public:
    float rateSeconds = 0.2f;  // seconds per step, free mode
    float gatePercent = 70.0f; // 0..100, percent of the step the note stays on
    bool useGlobalScale = false;
+   int editPage = 0; // UI-only page, 16 steps at a time
+   int editStep = 0; // selected step for exact MIDI/note-name editing
 
    int stepNote[kMaxSteps];
    float stepVelocity[kMaxSteps];

@@ -1,10 +1,5 @@
 #include "RemoteControl.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include <cstdlib>
 #include <deque>
 #include <fstream>
@@ -12,8 +7,10 @@
 #include <mutex>
 #include <random>
 #include <sstream>
-#include <sys/stat.h>
 #include <thread>
+
+#include "platform/SettingsPaths.h"
+#include "platform/SocketCompat.h"
 
 using json = nlohmann::json;
 
@@ -37,12 +34,7 @@ namespace RemoteControl
 
       std::string SettingsDir()
       {
-         const char* home = getenv("HOME");
-         if (home == nullptr)
-            return std::string();
-         std::string dir = std::string(home) + "/Library/Application Support/Infinite";
-         mkdir(dir.c_str(), 0755); // fine if it already exists
-         return dir;
+         return InfiniteSettingsDirectory();
       }
 
       std::string GenerateToken()
@@ -71,14 +63,14 @@ namespace RemoteControl
       // socket closes or a fatal error). Runs on the accept thread - a single
       // client (the MCP server) is the expected case, so connections are
       // handled sequentially rather than one thread per client.
-      void ServeConnection(int fd, const Handler* handlerHolder)
+      void ServeConnection(InfiniteSocket fd, const Handler* handlerHolder)
       {
          (void)handlerHolder;
          std::string buffer;
          char chunk[4096];
          for (;;)
          {
-            ssize_t n = recv(fd, chunk, sizeof(chunk), 0);
+            const int n = recv(fd, chunk, static_cast<int>(sizeof(chunk)), 0);
             if (n <= 0)
                break; // closed or error
 
@@ -126,20 +118,23 @@ namespace RemoteControl
 
                std::string out = responseEnvelope.dump();
                out += "\n";
-               send(fd, out.data(), out.size(), 0);
+               send(fd, out.data(), static_cast<int>(out.size()), 0);
             }
          }
-         close(fd);
+         InfiniteCloseSocket(fd);
       }
 
       void AcceptLoop(int port)
       {
-         int listenFd = socket(AF_INET, SOCK_STREAM, 0);
-         if (listenFd < 0)
+         if (!InfiniteSocketsReady())
+            return;
+         InfiniteSocket listenFd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+         if (listenFd == kInfiniteInvalidSocket)
             return;
 
          int yes = 1;
-         setsockopt(listenFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+         setsockopt(listenFd, SOL_SOCKET, SO_REUSEADDR,
+                    reinterpret_cast<const char*>(&yes), static_cast<int>(sizeof(yes)));
 
          sockaddr_in addr{};
          addr.sin_family = AF_INET;
@@ -148,19 +143,19 @@ namespace RemoteControl
 
          if (bind(listenFd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
          {
-            close(listenFd);
+            InfiniteCloseSocket(listenFd);
             return;
          }
          if (listen(listenFd, 4) != 0)
          {
-            close(listenFd);
+            InfiniteCloseSocket(listenFd);
             return;
          }
 
          for (;;)
          {
-            int clientFd = accept(listenFd, nullptr, nullptr);
-            if (clientFd < 0)
+            InfiniteSocket clientFd = accept(listenFd, nullptr, nullptr);
+            if (clientFd == kInfiniteInvalidSocket)
                continue;
             ServeConnection(clientFd, nullptr);
          }

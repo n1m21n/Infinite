@@ -1,6 +1,6 @@
 #include "ProjectionNode.h"
 
-#include <OpenGL/gl3.h>
+#include "platform/OpenGLHeaders.h"
 #include <algorithm>
 #include <cmath>
 
@@ -286,7 +286,7 @@ void ProjectionNode::EnsureMesh()
    glBindVertexArray(0);
 }
 
-void ProjectionNode::UpdateMeshVertices()
+void ProjectionNode::UpdateMeshVertices(int targetW, int targetH, int inputW, int inputH)
 {
    EnsureMesh();
 
@@ -327,6 +327,27 @@ void ProjectionNode::UpdateMeshVertices()
 
    std::vector<float> verts;
    verts.reserve((kGridSubdiv + 1) * (kGridSubdiv + 1) * 4);
+
+   // Fit the undistorted source inside the requested output before applying
+   // the corner/mesh warp. This keeps pixels square and adds black bars when
+   // the source and projector have different aspect ratios instead of
+   // silently stretching the image.
+   float fitX = 0.0f, fitY = 0.0f, fitW = 1.0f, fitH = 1.0f;
+   if (preserveAspect && targetW > 0 && targetH > 0 && inputW > 0 && inputH > 0)
+   {
+      const float sourceAspect = (float)inputW / (float)inputH;
+      const float targetAspect = (float)targetW / (float)targetH;
+      if (sourceAspect > targetAspect)
+      {
+         fitH = targetAspect / sourceAspect;
+         fitY = (1.0f - fitH) * 0.5f;
+      }
+      else if (sourceAspect < targetAspect)
+      {
+         fitW = sourceAspect / targetAspect;
+         fitX = (1.0f - fitW) * 0.5f;
+      }
+   }
 
    for (int j = 0; j <= kGridSubdiv; ++j)
    {
@@ -379,6 +400,9 @@ void ProjectionNode::UpdateMeshVertices()
                 (1.0f - fx) * fy * q01.y + fx * fy * q11.y;
          }
 
+         X = fitX + X * fitW;
+         Y = fitY + Y * fitH;
+
          // Map X, Y in [0, 1] screen space to OpenGL clip space [-1, 1]
          float clipX = X * 2.0f - 1.0f;
          float clipY = 1.0f - Y * 2.0f;
@@ -411,16 +435,22 @@ void ProjectionNode::CookIfNeeded(int frameId)
    unsigned int srcTex = mInput.Pull(frameId);
    bool hasInput = (srcTex != 0);
 
+   int inputW = 0;
+   int inputH = 0;
+   if (hasInput && mInput.GetSource() != nullptr)
+   {
+      inputW = mInput.GetSource()->GetOutputWidth();
+      inputH = mInput.GetSource()->GetOutputHeight();
+   }
+
    int targetW = (int)std::max(16.0f, width);
    int targetH = (int)std::max(16.0f, height);
    if (matchInput && hasInput)
    {
-      int inW = mInput.GetSource()->GetOutputWidth();
-      int inH = mInput.GetSource()->GetOutputHeight();
-      if (inW > 0 && inH > 0)
+      if (inputW > 0 && inputH > 0)
       {
-         targetW = inW;
-         targetH = inH;
+         targetW = inputW;
+         targetH = inputH;
       }
    }
 
@@ -433,6 +463,9 @@ void ProjectionNode::CookIfNeeded(int frameId)
    sig.width = targetW;
    sig.height = targetH;
    sig.matchInput = matchInput;
+   sig.preserveAspect = preserveAspect;
+   sig.inputWidth = inputW;
+   sig.inputHeight = inputH;
    sig.mode = mode;
    sig.patternMode = patternMode;
    sig.gridW = gridW;
@@ -455,7 +488,7 @@ void ProjectionNode::CookIfNeeded(int frameId)
    mHasBuilt = true;
    ++mRevision;
 
-   UpdateMeshVertices();
+   UpdateMeshVertices(targetW, targetH, inputW, inputH);
 
    GLint prevFbo = 0;
    GLint prevVp[4];

@@ -92,6 +92,7 @@ public:
    // Platform::AudioDeviceOpen. 0 / 0.0 mean "system default" / "device's
    // current setting" - see Platform::AudioDeviceOpen's doc comment.
    void SetRequestedDevice(uint32_t deviceId) { mRequestedDeviceId = deviceId; }
+   void SetRequestedInputDevice(uint32_t deviceId) { mRequestedInputDeviceId = deviceId; }
    void SetRequestedSampleRate(double sampleRate) { mRequestedSampleRate = sampleRate; }
    void SetRequestedBufferFrames(int frames) { mRequestedBufferFrames = frames; }
 
@@ -108,6 +109,11 @@ public:
 
    double SampleRate() const;
    uint64_t XrunCount() const;
+   // Increments after every successful device start. Plugin hosts use this
+   // to re-run prepareToPlay even when a stop/start negotiates the same rate
+   // and block size: many VST3 instruments keep device-owned state that is
+   // invalid after the stream has been restarted.
+   uint64_t StartGeneration() const { return mStartGeneration.load(std::memory_order_relaxed); }
 
    // Called from Platform's kAudioDeviceProcessorOverload listener - a real
    // CoreAudio overload notification, not the wall-clock heuristic Process()
@@ -200,6 +206,7 @@ private:
    void RunTopology(ProcessList* list, AudioBuffer& deviceBuffer);
 
    std::atomic<double> mSampleRate { 0.0 };
+   std::atomic<uint64_t> mStartGeneration { 0 };
    std::atomic<uint64_t> mXrunCount { 0 };
    std::atomic<double> mLastCallbackMs { -1.0 };
    std::atomic<double> mLastBlockLoad { 0.0 };
@@ -210,6 +217,7 @@ private:
    std::atomic<double> mStartedAtMs { -1.0 };
 
    uint32_t mRequestedDeviceId = 0;
+   uint32_t mRequestedInputDeviceId = 0;
    double mRequestedSampleRate = 0.0;
    int mRequestedBufferFrames = 0;
 

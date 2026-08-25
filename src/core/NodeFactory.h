@@ -30,8 +30,9 @@ public:
    void Register(const std::string& name, CreateNodeFn createFn, const std::string& category);
    INode* MakeNode(const std::string& name);
 
-   // category -> ordered list of node names, in registration order (used to
-   // build the spawn menu grouped Source/Effects/Compositing/Text/Output).
+   // Categories are grouped by the semantic colour family and sorted
+   // alphabetically inside it; node names are alphabetical inside each
+   // category. Every browser therefore gets the same predictable order.
    const std::vector<std::string>& GetCategories() const { return mCategoryOrder; }
    const std::vector<std::string>& GetNodesInCategory(const std::string& category) const;
 

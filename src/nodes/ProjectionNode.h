@@ -55,7 +55,8 @@ public:
    int mode = 0; // 0 = CornerPin, 1 = MeshGrid
    float width = 1920.0f;
    float height = 1080.0f;
-   bool matchInput = false;
+   bool matchInput = true;
+   bool preserveAspect = true;
    int patternMode = 0; // 0 = Off, 1 = Grid, 2 = Crosshairs, 3 = ColorBars, 4 = Combined
 
    int gridW = 2;
@@ -74,6 +75,7 @@ public:
       v.Float("width", width);
       v.Float("height", height);
       v.Bool("matchInput", matchInput);
+      v.Bool("preserveAspect", preserveAspect);
       v.Int("patternMode", patternMode);
       v.Int("gridW", gridW);
       v.Int("gridH", gridH);
@@ -93,7 +95,7 @@ public:
 private:
    bool EnsureShader();
    void EnsureMesh();
-   void UpdateMeshVertices();
+   void UpdateMeshVertices(int targetW, int targetH, int inputW, int inputH);
 
    struct Signature
    {
@@ -101,6 +103,9 @@ private:
       int width = 0;
       int height = 0;
       bool matchInput = false;
+      bool preserveAspect = true;
+      int inputWidth = 0;
+      int inputHeight = 0;
       int mode = 0;
       int patternMode = 0;
       int gridW = 0;
@@ -112,6 +117,7 @@ private:
       {
          return upstreamRev == o.upstreamRev &&
                 width == o.width && height == o.height && matchInput == o.matchInput &&
+                preserveAspect == o.preserveAspect && inputWidth == o.inputWidth && inputHeight == o.inputHeight &&
                 mode == o.mode && patternMode == o.patternMode &&
                 gridW == o.gridW && gridH == o.gridH && hasInput == o.hasInput &&
                 points == o.points;
