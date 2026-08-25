@@ -100,6 +100,16 @@ public:
    // "move x/y/z", "rotate x/y/z", "scale x/y/z" for those two operations.
    Mat4 TransformMatrix() const;
 
+   // True when this op sits downstream of an Instance on Points, i.e.
+   // GetMesh() is operating on the shared stamp mesh rather than on a
+   // realized copy per instance (every op except kTransform, which moves the
+   // whole instanced group instead - see the kTransform case in GetMesh()).
+   // Lets the UI state which frame of reference is in effect.
+   bool ActsOnInstanceStamp() const;
+   // Instance count of the upstream InstanceOnPoints when
+   // ActsOnInstanceStamp() is true, so the UI can quote it; 0 otherwise.
+   size_t UpstreamInstanceCount() const;
+
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
