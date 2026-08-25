@@ -649,9 +649,31 @@ namespace Platform
                                  int liveAudioChannels = 2);
    // `pixels` is RGBA8 bottom-up, exactly as glReadPixels returns it.
    bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels);
+
+   // Hands the caller a buffer from the recorder's own pool, already sized
+   // width*height*4. Recycling these is what lets the render thread hand off
+   // ownership instead of copying into the encoder's memory on the spot.
+   std::vector<unsigned char> RecorderAcquireFrameBuffer(RecorderHandle* handle);
+
+   // Takes ownership. `repeatCount` writes the same frame that many times, for
+   // the constant-frame-rate padding case; 1 is the normal path.
+   bool RecorderAppend(RecorderHandle* handle, std::vector<unsigned char>&& pixels,
+                       int repeatCount = 1);
+
+   // Frames handed to the encoder that it has not written yet.
+   int RecorderPendingFrameCount(RecorderHandle* handle);
+   // Frames the encoder could not accept and discarded, for the whole take.
+   int RecorderDroppedFrameCount(RecorderHandle* handle);
+
    // Appends interleaved float audio frames to the movie's audio track.
    bool RecorderAppendAudio(RecorderHandle* handle, const float* interleavedSamples, int numFrames);
-   bool RecorderStop(RecorderHandle* handle, std::string& outError);
+
+   // Drains the encoder queue and joins its worker before returning, so the
+   // movie is complete rather than truncated. outFrameCount/outDroppedCount,
+   // if given, are filled with the final totals after that drain - reading
+   // RecorderFrameCount() beforehand can race the worker's last few writes.
+   bool RecorderStop(RecorderHandle* handle, std::string& outError,
+                     int* outFrameCount = nullptr, int* outDroppedCount = nullptr);
    int RecorderFrameCount(RecorderHandle* handle);
 
    // Inspects a finished recording. Used by the audio-mux self-test, and handy
@@ -662,6 +684,7 @@ namespace Platform
       bool hasVideo = false;
       bool hasAudio = false;
       double duration = 0.0;
+      int frameCount = 0;
    };
    MovieInfo InspectMovie(const std::string& path);
 

@@ -35,7 +35,9 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <condition_variable>
 #include <cstring>
+#include <deque>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -874,8 +876,7 @@ namespace Platform
          int width = 0;
          int height = 0;
          double fps = 30.0;
-         long long frameCount = 0;
-         std::vector<unsigned char> bgraScratch; // reused per appended frame
+         std::atomic<long long> frameCount { 0 }; // written only on the encoder thread
 
          // Live-audio streaming mode (RecorderAppendAudio).
          double liveRate = 0.0;
@@ -883,7 +884,8 @@ namespace Platform
          long long liveSamplesWritten = 0;
 
          // File-mux mode: decoded once, written at Stop when the final video
-         // duration is known (looped or truncated to match).
+         // duration is known (looped or truncated to match). Written on the
+         // encoder thread too, from WriteFileAudioTrack at Stop.
          std::string audioPath;
          bool loopAudio = true;
          SampleBuffer fileAudio;
@@ -891,8 +893,52 @@ namespace Platform
          bool finalized = false;
          std::string stopError;
 
+         // ---- encoder worker --------------------------------------------
+         // The render thread (OutputNode) only ever touches queueMutex/
+         // poolMutex and the atomics below; WriteSample and the RGBA->BGRA
+         // swizzle run entirely on `worker`.
+         static constexpr size_t kMaxQueueDepth = 4;
+         static constexpr size_t kMaxPoolSize = 8;
+
+         struct QueuedFrame
+         {
+            std::vector<unsigned char> pixels;
+            int repeatCount = 1;
+         };
+
+         std::mutex queueMutex;
+         std::condition_variable queueCv;
+         std::deque<QueuedFrame> frameQueue;
+         bool stopRequested = false;
+
+         std::mutex poolMutex;
+         std::vector<std::vector<unsigned char>> bufferPool;
+
+         std::atomic<int> pendingCount { 0 };
+         std::atomic<int> droppedCount { 0 };
+
+         std::thread worker;
+
+         // IMFSinkWriter::WriteSample calls must be serialized - previously
+         // true by accident because every call came from the same (render)
+         // thread; now video writes happen on `worker` while live audio
+         // (RecorderAppendAudio) still writes from whichever thread the
+         // caller is on, so both paths take this before touching `writer`.
+         std::mutex writerMutex;
+
          ~RecorderHandleMf()
          {
+            // Should already be stopped by RecorderStop by the time this
+            // runs; this only covers the abnormal-teardown path (e.g. the
+            // app exiting mid-recording without a clean Stop).
+            {
+               std::lock_guard<std::mutex> lock(queueMutex);
+               stopRequested = true;
+            }
+            queueCv.notify_one();
+            if (worker.joinable())
+               worker.join();
+
             if (writer != nullptr)
             {
                if (!finalized)
@@ -1049,7 +1095,10 @@ namespace Platform
             hr = sample->SetSampleDuration(
                (LONGLONG)((double)frames * 10000000.0 / rate));
          if (SUCCEEDED(hr))
+         {
+            std::lock_guard<std::mutex> lock(rec->writerMutex);
             hr = rec->writer->WriteSample(rec->audioStreamId, sample);
+         }
          SafeRelease(&sample);
          SafeRelease(&buffer);
          if (FAILED(hr))
@@ -1096,6 +1145,69 @@ namespace Platform
             written += framesThisCall;
          }
          return true;
+      }
+
+      // Runs for the lifetime of the recording on `rec->worker`. Blocks on
+      // `queueCv` between frames - the queue is a push producer (OutputNode),
+      // not something this loop can poll cheaply, so a condition variable is
+      // the natural fit (same shape as CameraThreadMain's pull loop, just
+      // waiting on data instead of a stop flag alone).
+      void RecorderWorkerThreadMain(RecorderHandleMf* rec)
+      {
+         ComScope com;
+         MfScope mf;
+         if (!com.ok || !mf.ok)
+            return;
+
+         std::vector<unsigned char> bgraScratch((size_t)rec->width * rec->height * 4);
+
+         for (;;)
+         {
+            RecorderHandleMf::QueuedFrame frame;
+            {
+               std::unique_lock<std::mutex> lock(rec->queueMutex);
+               rec->queueCv.wait(lock, [rec] { return !rec->frameQueue.empty() || rec->stopRequested; });
+               if (rec->frameQueue.empty())
+                  break; // stopRequested and fully drained
+               frame = std::move(rec->frameQueue.front());
+               rec->frameQueue.pop_front();
+            }
+
+            for (int i = 0; i < frame.repeatCount; i++)
+            {
+               RgbaBottomUpToBgraTopDown(frame.pixels.data(), rec->width, rec->height, bgraScratch);
+
+               IMFMediaBuffer* buffer = BufferFromMemory((BYTE*)bgraScratch.data(), (DWORD)bgraScratch.size());
+               if (buffer != nullptr)
+               {
+                  IMFSample* sample = nullptr;
+                  HRESULT hr = MFCreateSample(&sample);
+                  if (SUCCEEDED(hr))
+                     hr = sample->AddBuffer(buffer);
+                  if (SUCCEEDED(hr))
+                  {
+                     const LONGLONG t = FrameNumberToHns(rec->frameCount, rec->fps);
+                     hr = sample->SetSampleTime(t);
+                     if (SUCCEEDED(hr))
+                        hr = sample->SetSampleDuration(FrameNumberToHns(rec->frameCount + 1, rec->fps) - t);
+                  }
+                  if (SUCCEEDED(hr))
+                  {
+                     std::lock_guard<std::mutex> lock(rec->writerMutex);
+                     hr = rec->writer->WriteSample(rec->videoStreamId, sample);
+                  }
+                  SafeRelease(&sample);
+                  SafeRelease(&buffer);
+                  if (SUCCEEDED(hr))
+                     rec->frameCount++;
+               }
+               rec->pendingCount.fetch_sub(1, std::memory_order_relaxed);
+            }
+
+            std::lock_guard<std::mutex> poolLock(rec->poolMutex);
+            if (rec->bufferPool.size() < RecorderHandleMf::kMaxPoolSize)
+               rec->bufferPool.push_back(std::move(frame.pixels));
+         }
       }
    }
 
@@ -1161,48 +1273,69 @@ namespace Platform
          return nullptr;
       }
 
-      rec->bgraScratch.resize((size_t)rec->width * rec->height * 4);
+      rec->worker = std::thread(RecorderWorkerThreadMain, rec);
       return reinterpret_cast<RecorderHandle*>(rec);
    }
 
-   bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels)
+   std::vector<unsigned char> RecorderAcquireFrameBuffer(RecorderHandle* handle)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      if (rec == nullptr)
+         return {};
+      const size_t bytes = (size_t)rec->width * rec->height * 4;
+      std::lock_guard<std::mutex> lock(rec->poolMutex);
+      if (!rec->bufferPool.empty())
+      {
+         std::vector<unsigned char> buf = std::move(rec->bufferPool.back());
+         rec->bufferPool.pop_back();
+         buf.resize(bytes);
+         return buf;
+      }
+      return std::vector<unsigned char>(bytes);
+   }
+
+   bool RecorderAppend(RecorderHandle* handle, std::vector<unsigned char>&& pixels, int repeatCount)
    {
       auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
       if (rec == nullptr || rec->writer == nullptr || rec->videoStreamId == kInvalidStreamId)
          return false;
       if ((int)pixels.size() < rec->width * rec->height * 4)
          return false;
-      ComScope com;
-      if (!com.ok)
-         return false;
+      if (repeatCount < 1)
+         repeatCount = 1;
 
-      RgbaBottomUpToBgraTopDown(pixels.data(), rec->width, rec->height, rec->bgraScratch);
-
-      IMFMediaBuffer* buffer = BufferFromMemory((BYTE*)rec->bgraScratch.data(),
-                                                (DWORD)rec->bgraScratch.size());
-      if (buffer == nullptr)
-         return false;
-
-      IMFSample* sample = nullptr;
-      HRESULT hr = MFCreateSample(&sample);
-      if (SUCCEEDED(hr))
-         hr = sample->AddBuffer(buffer);
-      if (SUCCEEDED(hr))
+      std::lock_guard<std::mutex> lock(rec->queueMutex);
+      if (rec->frameQueue.size() >= RecorderHandleMf::kMaxQueueDepth)
       {
-         const LONGLONG t = FrameNumberToHns(rec->frameCount, rec->fps);
-         hr = sample->SetSampleTime(t);
-         if (SUCCEEDED(hr))
-            hr = sample->SetSampleDuration(FrameNumberToHns(rec->frameCount + 1, rec->fps) - t);
-      }
-      if (SUCCEEDED(hr))
-         hr = rec->writer->WriteSample(rec->videoStreamId, sample);
-      SafeRelease(&sample);
-      SafeRelease(&buffer);
-      if (FAILED(hr))
+         rec->droppedCount.fetch_add(1, std::memory_order_relaxed);
+         std::lock_guard<std::mutex> poolLock(rec->poolMutex);
+         if (rec->bufferPool.size() < RecorderHandleMf::kMaxPoolSize)
+            rec->bufferPool.push_back(std::move(pixels));
          return false;
+      }
 
-      rec->frameCount++;
+      rec->pendingCount.fetch_add(repeatCount, std::memory_order_relaxed);
+      rec->frameQueue.push_back({ std::move(pixels), repeatCount });
+      rec->queueCv.notify_one();
       return true;
+   }
+
+   bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels)
+   {
+      std::vector<unsigned char> copy = pixels;
+      return RecorderAppend(handle, std::move(copy), 1);
+   }
+
+   int RecorderPendingFrameCount(RecorderHandle* handle)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      return rec ? rec->pendingCount.load(std::memory_order_relaxed) : 0;
+   }
+
+   int RecorderDroppedFrameCount(RecorderHandle* handle)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      return rec ? rec->droppedCount.load(std::memory_order_relaxed) : 0;
    }
 
    bool RecorderAppendAudio(RecorderHandle* handle, const float* interleavedSamples,
@@ -1220,7 +1353,8 @@ namespace Platform
                                         rec->liveChannels);
    }
 
-   bool RecorderStop(RecorderHandle* handle, std::string& outError)
+   bool RecorderStop(RecorderHandle* handle, std::string& outError,
+                     int* outFrameCount, int* outDroppedCount)
    {
       outError.clear();
       auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
@@ -1232,6 +1366,26 @@ namespace Platform
          outError = "COM unavailable";
          return false;
       }
+
+      // Let the worker drain whatever is still queued before touching
+      // frameCount or the writer - WriteFileAudioTrack below needs the final
+      // video duration, and Finalize must not race the worker's WriteSample
+      // calls. A stop is allowed to take a few milliseconds; the alternative
+      // is a truncated movie.
+      {
+         std::lock_guard<std::mutex> lock(rec->queueMutex);
+         rec->stopRequested = true;
+      }
+      rec->queueCv.notify_one();
+      if (rec->worker.joinable())
+         rec->worker.join();
+
+      // Read after the join above, not before - the worker's last few
+      // writes land between the caller's pre-stop snapshot and here.
+      if (outFrameCount != nullptr)
+         *outFrameCount = (int)rec->frameCount;
+      if (outDroppedCount != nullptr)
+         *outDroppedCount = rec->droppedCount.load(std::memory_order_relaxed);
 
       // File-audio mode muxes here, now that the movie's real duration is known.
       if (!rec->audioPath.empty() && !rec->finalized)
@@ -1298,6 +1452,42 @@ namespace Platform
          SafeRelease(&native);
       }
       SafeRelease(&reader);
+
+      if (info.hasVideo)
+      {
+         // Walks the actual encoded sample stream rather than deriving a
+         // count from duration*fps - that would report the requested rate
+         // even for a take that silently dropped frames and padded to length.
+         IMFSourceReader* countReader = nullptr;
+         if (SUCCEEDED(MFCreateSourceReaderFromURL(WinCommon::Utf8ToWide(path).c_str(), nullptr,
+                                                    &countReader)))
+         {
+            countReader->SetStreamSelection((DWORD)MF_SOURCE_READER_ALL_STREAMS, FALSE);
+            countReader->SetStreamSelection((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, TRUE);
+
+            int count = 0;
+            for (;;)
+            {
+               DWORD streamIndex = 0, flags = 0;
+               LONGLONG ts = 0;
+               IMFSample* sample = nullptr;
+               const HRESULT readHr = countReader->ReadSample(
+                  (DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, &streamIndex, &flags, &ts, &sample);
+               if (FAILED(readHr) || (flags & MF_SOURCE_READERF_ENDOFSTREAM))
+               {
+                  SafeRelease(&sample);
+                  break;
+               }
+               if (sample != nullptr)
+               {
+                  count++;
+                  SafeRelease(&sample);
+               }
+            }
+            info.frameCount = count;
+            SafeRelease(&countReader);
+         }
+      }
       return info;
    }
 }

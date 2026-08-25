@@ -29730,6 +29730,21 @@ int main(int argc, char** argv)
             printf("frames captured: %d\n", out->RecordedFrames());
             out->StopRecording();
             printf("stop: %s\n", out->RecordStatus().c_str());
+
+            // Check what StopRecording *reported* against what actually
+            // landed on disk, walking the real encoded sample stream rather
+            // than trusting duration - this is the regression the async PBO
+            // + encoder-queue rewrite is most likely to get wrong (a
+            // readback that never got drained, or the reported count
+            // silently drifting from the file).
+            const int lastFrames = out->LastRecordedFrames();
+            const int lastDropped = out->LastDroppedFrames();
+            const Platform::MovieInfo info = Platform::InspectMovie(TmpPath("infinite_rectest.mov"));
+            const bool framesOk = info.frameCount == lastFrames;
+            printf("written frames: %d (reported %d, dropped %d)  %s\n",
+                   info.frameCount, lastFrames, lastDropped,
+                   framesOk ? "RECFRAMES OK" : "SUSPECT - frame count mismatch");
+
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
@@ -35786,6 +35801,20 @@ int main(int argc, char** argv)
                      n->StopRecording();
                   ImGui::PopStyleColor();
                   ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), "REC  %d frames", n->RecordedFrames());
+                  const int pending = n->PendingFrames();
+                  const int dropped = n->DroppedFrames();
+                  if (pending > 0)
+                  {
+                     ImGui::SameLine();
+                     ImGui::TextDisabled("(%d pending)", pending);
+                  }
+                  if (dropped > 0)
+                  {
+                     // Same orange as the VST3 blocklist warning - "this is a
+                     // problem, not an error": the encoder is losing frames,
+                     // but recording is continuing.
+                     ImGui::TextColored(ImVec4(0.9f, 0.55f, 0.25f, 1.0f), "%d frames dropped - encoder can't keep up", dropped);
+                  }
                }
                else
                {

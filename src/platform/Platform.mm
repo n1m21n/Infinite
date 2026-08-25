@@ -5,6 +5,7 @@
 
 #import <objc/runtime.h>
 #import <Cocoa/Cocoa.h>
+#import <dispatch/dispatch.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -33,6 +34,7 @@
 #include <cmath>
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <deque>
 #include <functional>
 #include <mutex>
@@ -1066,7 +1068,7 @@ namespace Platform
       int width = 0;
       int height = 0;
       int fps = 30;
-      long long frameIndex = 0;
+      std::atomic<long long> frameIndex { 0 }; // written only on encodeQueue; read from any thread
 
       // Audio, all optional - nil/zero when the recording is video-only.
       AVAssetWriterInput* audioInput = nil;
@@ -1077,7 +1079,88 @@ namespace Platform
       int64_t audioFramesWritten = 0;
       bool audioLoop = true;
       bool audioExhausted = false; // file ended and looping is off
+
+      // ---- encoder worker -------------------------------------------------
+      // The render thread (OutputNode) only ever touches queueMutex/poolMutex
+      // and the atomics below; everything past that point - appendPixelBuffer,
+      // the CVPixelBuffer copy, the audio catch-up - runs on encodeQueue.
+      static constexpr size_t kMaxQueueDepth = 4;
+      static constexpr size_t kMaxPoolSize = 8;
+
+      struct QueuedFrame
+      {
+         std::vector<unsigned char> pixels;
+         int repeatCount = 1;
+      };
+
+      std::mutex queueMutex;
+      std::condition_variable queueCv;
+      std::deque<QueuedFrame> frameQueue;
+      bool stopRequested = false;
+
+      std::mutex poolMutex;
+      std::vector<std::vector<unsigned char>> bufferPool;
+
+      std::atomic<int> pendingCount { 0 };
+      std::atomic<int> droppedCount { 0 };
+
+      dispatch_queue_t encodeQueue = nil;
+      dispatch_semaphore_t workerDone = nil;
    };
+
+   namespace
+   {
+      // Copies `pixels` (RGBA8 bottom-up) into a fresh CVPixelBuffer and
+      // appends it to the writer, then catches audio up to the new frame
+      // boundary. This is the body of the old synchronous RecorderAppend -
+      // now only ever called from the encoder queue.
+      bool AppendPixelsToWriter(RecorderHandle* h, const std::vector<unsigned char>& pixels);
+
+      // Runs for the lifetime of the recording on `encodeQueue`. Blocks on
+      // `queueCv` between frames rather than using
+      // requestMediaDataWhenReadyOnQueue: that API only re-invokes its block
+      // on a not-ready -> ready transition of the writer input, so if the
+      // queue drains while the input happens to still be ready, a frame
+      // pushed after that point would never be picked up. A dedicated queue
+      // that blocks itself waiting for work sidesteps that and still keeps
+      // every AVAssetWriter call serialized on one queue, which is the part
+      // AVFoundation actually requires.
+      void RecorderWorkerLoop(RecorderHandle* h)
+      {
+         for (;;)
+         {
+            RecorderHandle::QueuedFrame frame;
+            {
+               std::unique_lock<std::mutex> lock(h->queueMutex);
+               h->queueCv.wait(lock, [h] { return !h->frameQueue.empty() || h->stopRequested; });
+               if (h->frameQueue.empty())
+                  break; // stopRequested and fully drained
+               frame = std::move(h->frameQueue.front());
+               h->frameQueue.pop_front();
+            }
+
+            for (int i = 0; i < frame.repeatCount; i++)
+            {
+               // The writer input's readiness can lag by a frame or two even
+               // though expectsMediaDataInRealTime is NO; this queue is ours
+               // alone, so a short spin-wait here costs nothing else.
+               while (!h->input.isReadyForMoreMediaData)
+                  [NSThread sleepForTimeInterval:0.001];
+               AppendPixelsToWriter(h, frame.pixels);
+               h->pendingCount.fetch_sub(1, std::memory_order_relaxed);
+            }
+
+            std::lock_guard<std::mutex> poolLock(h->poolMutex);
+            if (h->bufferPool.size() < RecorderHandle::kMaxPoolSize)
+               h->bufferPool.push_back(std::move(frame.pixels));
+         }
+
+         [h->input markAsFinished];
+         if (h->audioInput != nil)
+            [h->audioInput markAsFinished];
+         dispatch_semaphore_signal(h->workerDone);
+      }
+   }
 
    namespace
    {
@@ -1171,6 +1254,58 @@ namespace Platform
                CFRelease(sb);
             }
             h->audioFramesWritten += h->audioScratch.frameLength;
+         }
+      }
+
+      // Body of the encoder worker's per-frame work: copy into a CVPixelBuffer,
+      // append it, catch audio up to the new frame boundary. Only ever called
+      // from encodeQueue - see RecorderWorkerLoop's comment for why.
+      bool AppendPixelsToWriter(RecorderHandle* h, const std::vector<unsigned char>& pixels)
+      {
+         @autoreleasepool
+         {
+            CVPixelBufferRef buffer = NULL;
+            CVReturn status = CVPixelBufferPoolCreatePixelBuffer(NULL, h->adaptor.pixelBufferPool, &buffer);
+            if (status != kCVReturnSuccess || buffer == NULL)
+               return false;
+
+            CVPixelBufferLockBaseAddress(buffer, 0);
+            unsigned char* dst = (unsigned char*)CVPixelBufferGetBaseAddress(buffer);
+            const size_t dstStride = CVPixelBufferGetBytesPerRow(buffer);
+            const int w = h->width;
+            const int height = h->height;
+
+            // incoming is RGBA bottom-up from glReadPixels; the writer wants BGRA top-down
+            for (int y = 0; y < height; y++)
+            {
+               const unsigned char* srcRow = pixels.data() + (size_t)(height - 1 - y) * w * 4;
+               unsigned char* dstRow = dst + (size_t)y * dstStride;
+               for (int x = 0; x < w; x++)
+               {
+                  dstRow[x * 4 + 0] = srcRow[x * 4 + 2];
+                  dstRow[x * 4 + 1] = srcRow[x * 4 + 1];
+                  dstRow[x * 4 + 2] = srcRow[x * 4 + 0];
+                  dstRow[x * 4 + 3] = 255;
+               }
+            }
+            CVPixelBufferUnlockBaseAddress(buffer, 0);
+
+            const long long frame = h->frameIndex.load(std::memory_order_relaxed);
+            CMTime when = CMTimeMake(frame, h->fps);
+            BOOL ok = [h->adaptor appendPixelBuffer:buffer withPresentationTime:when];
+            CVPixelBufferRelease(buffer);
+            if (ok)
+               h->frameIndex.fetch_add(1, std::memory_order_relaxed);
+
+            if (ok && h->audioInput != nil)
+            {
+               // Catches audio up to the end of the video frame just written, so
+               // the two tracks cannot drift apart by more than one video frame.
+               const int64_t targetFrames = (int64_t)((double)(frame + (ok ? 1 : 0)) /
+                                                       (double)h->fps * h->audioSampleRate);
+               AppendAudioUpTo(h, targetFrames);
+            }
+            return ok == YES;
          }
       }
    }
@@ -1333,6 +1468,10 @@ namespace Platform
          h->audioFormat = audioFormat;
          h->audioSampleRate = audioSampleRate;
 
+         h->encodeQueue = dispatch_queue_create("com.infinite.recorder.encode", DISPATCH_QUEUE_SERIAL);
+         h->workerDone = dispatch_semaphore_create(0);
+         dispatch_async(h->encodeQueue, ^{ RecorderWorkerLoop(h); });
+
          return h;
       }
    }
@@ -1380,71 +1519,87 @@ namespace Platform
       }
    }
 
-   bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels)
+   std::vector<unsigned char> RecorderAcquireFrameBuffer(RecorderHandle* handle)
    {
       if (handle == nullptr)
-         return false;
-
-      @autoreleasepool
+         return {};
+      const size_t bytes = (size_t)handle->width * handle->height * 4;
+      std::lock_guard<std::mutex> lock(handle->poolMutex);
+      if (!handle->bufferPool.empty())
       {
-         if (!handle->input.isReadyForMoreMediaData)
-            return false;
-
-         CVPixelBufferRef buffer = NULL;
-         CVReturn status = CVPixelBufferPoolCreatePixelBuffer(NULL, handle->adaptor.pixelBufferPool, &buffer);
-         if (status != kCVReturnSuccess || buffer == NULL)
-            return false;
-
-         CVPixelBufferLockBaseAddress(buffer, 0);
-         unsigned char* dst = (unsigned char*)CVPixelBufferGetBaseAddress(buffer);
-         const size_t dstStride = CVPixelBufferGetBytesPerRow(buffer);
-         const int w = handle->width;
-         const int h = handle->height;
-
-         // incoming is RGBA bottom-up from glReadPixels; the writer wants BGRA top-down
-         for (int y = 0; y < h; y++)
-         {
-            const unsigned char* srcRow = pixels.data() + (size_t)(h - 1 - y) * w * 4;
-            unsigned char* dstRow = dst + (size_t)y * dstStride;
-            for (int x = 0; x < w; x++)
-            {
-               dstRow[x * 4 + 0] = srcRow[x * 4 + 2];
-               dstRow[x * 4 + 1] = srcRow[x * 4 + 1];
-               dstRow[x * 4 + 2] = srcRow[x * 4 + 0];
-               dstRow[x * 4 + 3] = 255;
-            }
-         }
-         CVPixelBufferUnlockBaseAddress(buffer, 0);
-
-         CMTime when = CMTimeMake(handle->frameIndex, handle->fps);
-         BOOL ok = [handle->adaptor appendPixelBuffer:buffer withPresentationTime:when];
-         CVPixelBufferRelease(buffer);
-         if (ok)
-            handle->frameIndex++;
-
-         if (ok && handle->audioInput != nil)
-         {
-            // Catches audio up to the end of the video frame just written, so
-            // the two tracks cannot drift apart by more than one video frame.
-            const int64_t targetFrames =
-               (int64_t)((double)handle->frameIndex / (double)handle->fps * handle->audioSampleRate);
-            AppendAudioUpTo(handle, targetFrames);
-         }
-         return ok == YES;
+         std::vector<unsigned char> buf = std::move(handle->bufferPool.back());
+         handle->bufferPool.pop_back();
+         buf.resize(bytes);
+         return buf;
       }
+      return std::vector<unsigned char>(bytes);
    }
 
-   bool RecorderStop(RecorderHandle* handle, std::string& outError)
+   bool RecorderAppend(RecorderHandle* handle, std::vector<unsigned char>&& pixels, int repeatCount)
    {
       if (handle == nullptr)
          return false;
+      if (repeatCount < 1)
+         repeatCount = 1;
+
+      std::lock_guard<std::mutex> lock(handle->queueMutex);
+      if (handle->frameQueue.size() >= RecorderHandle::kMaxQueueDepth)
+      {
+         handle->droppedCount.fetch_add(1, std::memory_order_relaxed);
+         std::lock_guard<std::mutex> poolLock(handle->poolMutex);
+         if (handle->bufferPool.size() < RecorderHandle::kMaxPoolSize)
+            handle->bufferPool.push_back(std::move(pixels));
+         return false;
+      }
+
+      handle->pendingCount.fetch_add(repeatCount, std::memory_order_relaxed);
+      handle->frameQueue.push_back({ std::move(pixels), repeatCount });
+      handle->queueCv.notify_one();
+      return true;
+   }
+
+   bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels)
+   {
+      std::vector<unsigned char> copy = pixels;
+      return RecorderAppend(handle, std::move(copy), 1);
+   }
+
+   int RecorderPendingFrameCount(RecorderHandle* handle)
+   {
+      return handle ? handle->pendingCount.load(std::memory_order_relaxed) : 0;
+   }
+
+   int RecorderDroppedFrameCount(RecorderHandle* handle)
+   {
+      return handle ? handle->droppedCount.load(std::memory_order_relaxed) : 0;
+   }
+
+   bool RecorderStop(RecorderHandle* handle, std::string& outError,
+                     int* outFrameCount, int* outDroppedCount)
+   {
+      if (handle == nullptr)
+         return false;
+
+      // Let the worker drain whatever is still queued and call markAsFinished
+      // itself once it does - see RecorderWorkerLoop. A stop is allowed to
+      // take a few milliseconds; the alternative is a truncated movie.
+      {
+         std::lock_guard<std::mutex> lock(handle->queueMutex);
+         handle->stopRequested = true;
+      }
+      handle->queueCv.notify_one();
+      dispatch_semaphore_wait(handle->workerDone, DISPATCH_TIME_FOREVER);
+
+      // Read after the drain above, not before - the worker's last few
+      // writes land between the caller's pre-stop snapshot and here.
+      if (outFrameCount != nullptr)
+         *outFrameCount = (int)handle->frameIndex.load(std::memory_order_relaxed);
+      if (outDroppedCount != nullptr)
+         *outDroppedCount = (int)handle->droppedCount.load(std::memory_order_relaxed);
 
       __block bool done = false;
       @autoreleasepool
       {
-         [handle->input markAsFinished];
-         if (handle->audioInput != nil)
-            [handle->audioInput markAsFinished];
          [handle->writer finishWritingWithCompletionHandler:^{ done = true; }];
 
          // finishWriting is async; the encoder is fast enough that a short spin is fine
@@ -1466,7 +1621,7 @@ namespace Platform
 
    int RecorderFrameCount(RecorderHandle* handle)
    {
-      return handle ? (int)handle->frameIndex : 0;
+      return handle ? (int)handle->frameIndex.load(std::memory_order_relaxed) : 0;
    }
 
    MovieInfo InspectMovie(const std::string& path)
@@ -1476,9 +1631,45 @@ namespace Platform
       {
          NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
          AVURLAsset* asset = [AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:nsPath] options:nil];
-         info.hasVideo = [asset tracksWithMediaType:AVMediaTypeVideo].count > 0;
+         NSArray<AVAssetTrack*>* videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
+         info.hasVideo = videoTracks.count > 0;
          info.hasAudio = [asset tracksWithMediaType:AVMediaTypeAudio].count > 0;
          info.duration = CMTimeGetSeconds(asset.duration);
+
+         if (info.hasVideo)
+         {
+            // Walks the actual encoded sample stream rather than deriving a
+            // count from duration*fps - that would report the requested rate
+            // even for a take that silently dropped frames and padded to length.
+            NSError* err = nil;
+            AVAssetReader* reader = [[AVAssetReader alloc] initWithAsset:asset error:&err];
+            if (reader != nil)
+            {
+               // Passthrough (outputSettings:nil) hands back compressed NALU
+               // buffers, which for H.264 do not map 1:1 onto displayed
+               // frames - forcing decompression here is what actually makes
+               // one CMSampleBuffer mean one frame.
+               NSDictionary* decodeSettings = @{ (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA) };
+               AVAssetReaderTrackOutput* output =
+                  [[AVAssetReaderTrackOutput alloc] initWithTrack:videoTracks.firstObject
+                                                    outputSettings:decodeSettings];
+               if ([reader canAddOutput:output])
+               {
+                  [reader addOutput:output];
+                  if ([reader startReading])
+                  {
+                     int count = 0;
+                     CMSampleBufferRef sb = NULL;
+                     while ((sb = [output copyNextSampleBuffer]) != NULL)
+                     {
+                        count++;
+                        CFRelease(sb);
+                     }
+                     info.frameCount = count;
+                  }
+               }
+            }
+         }
       }
       return info;
    }

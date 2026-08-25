@@ -101,13 +101,23 @@ void OutputNode::StopRecording()
    mCaptureRing.enabled.store(false, std::memory_order_relaxed);
    DrainAudioCapture();
 
-   const int frames = Platform::RecorderFrameCount(mRecorder);
+   // Final counts come out of RecorderStop itself, after it has joined the
+   // encoder worker - reading them beforehand can race the worker's last
+   // few writes and under-report what actually landed in the file.
+   int frames = 0;
+   int dropped = 0;
    std::string error;
-   const bool ok = Platform::RecorderStop(mRecorder, error);
+   const bool ok = Platform::RecorderStop(mRecorder, error, &frames, &dropped);
    mRecorder = nullptr;
+   mLastFrames = frames;
+   mLastDropped = dropped;
 
    if (ok)
+   {
       mRecordStatus = "saved " + std::to_string(frames) + " frames";
+      if (dropped > 0)
+         mRecordStatus += " (" + std::to_string(dropped) + " dropped)";
+   }
    else
       mRecordStatus = error;
 }

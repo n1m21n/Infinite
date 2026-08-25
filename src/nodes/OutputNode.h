@@ -39,6 +39,13 @@ public:
    bool IsRecording() const { return mRecorder != nullptr; }
    int RecordedFrames() const;
    const std::string& RecordStatus() const { return mRecordStatus; }
+   int PendingFrames() const { return Platform::RecorderPendingFrameCount(mRecorder); }
+   int DroppedFrames() const { return Platform::RecorderDroppedFrameCount(mRecorder); }
+   // Final totals from the take that just ended, once StopRecording has
+   // drained the queue and joined the encoder - unlike DroppedFrames()
+   // above, still valid after mRecorder is gone.
+   int LastRecordedFrames() const { return mLastFrames; }
+   int LastDroppedFrames() const { return mLastDropped; }
 
    int recordFps = 30;
    bool includeAudio = false;
@@ -75,4 +82,6 @@ private:
    int mRecordW = 0;
    int mRecordH = 0;
    std::string mRecordStatus;
+   int mLastFrames = 0;
+   int mLastDropped = 0;
 };
