@@ -50,4 +50,14 @@ namespace CategoryColors
    // Reads the saved preset name (if any) from ~/Library/Application
    // Support/Infinite.theme. Call once at startup, before the first frame.
    void LoadPreference();
+
+   // Where a category falls in the "2D/video, 3D, audio, then utility"
+   // grouping used to order the Modules mode's category-filter dropdown
+   // (see docs/plans - the docked node-browser panel's sort/filter strip).
+   // Lower sorts first. Kept next to ColorFor rather than in main.cpp so the
+   // catalogue order used for that dropdown and the colour code above can't
+   // drift apart as categories are added. Does NOT feed ColorFor or
+   // NodeFactory's own registration order - those are unaffected.
+   // A category with no entry here (not in the table above) sorts last.
+   int SemanticRank(const std::string& category);
 }

@@ -298,6 +298,24 @@ const UiTheme& CurrentUiTheme()
    return Presets()[gCurrent].ui;
 }
 
+int SemanticRank(const std::string& category)
+{
+   // 2D/video, then 3D, then audio, then utility - see the header comment.
+   // "Resynth" groups with the 2D/video categories (it is a video
+   // resynthesis family, one node today, per the Presets() comment above),
+   // not with audio despite the name.
+   static const std::vector<std::string> kOrder = {
+      "Source", "Text", "Compositing", "Color", "Mask", "Feedback", "Effects", "Resynth",
+      "3D",
+      "Notes", "Synths", "AudioEffects", "AudioUtility",
+      "Modulators", "Output",
+   };
+   for (size_t i = 0; i < kOrder.size(); i++)
+      if (kOrder[i] == category)
+         return (int)i;
+   return (int)kOrder.size();
+}
+
 void LoadPreference()
 {
    const std::string path = ThemePath();
