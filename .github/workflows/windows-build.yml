@@ -35,9 +35,10 @@ jobs:
           key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
           restore-keys: vcpkg-${{ runner.os }}-
 
-      - name: Fetch pinned vcpkg baseline
+      - name: Prepare vcpkg and fetch pinned baseline
         shell: powershell
         run: |
+          New-Item -ItemType Directory -Force -Path "$env:VCPKG_DEFAULT_BINARY_CACHE" | Out-Null
           git -C "$env:VCPKG_ROOT" fetch --force origin 127402f1c75bb3d5ff6bce04b285faa4930a5aca      
 
       - name: Bootstrap vcpkg
