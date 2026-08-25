@@ -1,6 +1,6 @@
 ---
 name: geometry-transform-sweep
-description: Generic sweeps across every Infinite 3D node type that consumes an IGeometrySource, checking three invariants at once — that moving/rotating/scaling an upstream source propagates to a node's final output, that a Mapping node's UV/offset/rotate/scale propagates the same way, and that a node's revision/generation stamp doesn't change when nothing actually did. Use when asked to "check for transform bugs", "test node combinations", "sweep the geometry nodes", "does moving a source actually update the render", "why doesn't my Mapping node do anything", "why did my simulation reset", or after adding/touching any node with a geometry input.
+description: Generic sweeps across every Infinite 3D node type that consumes an IGeometrySource, checking four invariants at once — that moving/rotating/scaling an upstream source propagates to a node's final output, that a Mapping node's UV/offset/rotate/scale propagates the same way, and that a node's revision/generation stamp doesn't change when nothing actually did, and that a node claiming to pass geometry through doesn't swallow an upstream Instance on Points or a wrapping Transform's group matrix. Use when asked to "check for transform bugs", "why did my instances disappear", "test node combinations", "sweep the geometry nodes", "does moving a source actually update the render", "why doesn't my Mapping node do anything", "why did my simulation reset", or after adding/touching any node with a geometry input.
 ---
 
 Paths below are relative to the repo root (`/Users/namansoni/infinite`), not
@@ -12,12 +12,12 @@ this skill directory.
 .claude/skills/geometry-transform-sweep/driver.sh
 ```
 
-Add `--skip-build` to reuse the existing `build/` tree. Runs all three
-sweeps below in one pass.
+Add `--skip-build` to reuse the existing `build/` tree. Runs every sweep
+below in one pass.
 
 ## What this catches
 
-Three real bug classes found in this codebase, each generalized into a sweep
+Real bug classes found in this codebase, each generalized into a sweep
 that covers every node type at once instead of a fixture per node someone
 remembered to write:
 
@@ -49,6 +49,20 @@ remembered to write:
    this bug (`mTexGeneration` bumped unconditionally on every cook while a
    texture was connected, whether or not the pixels changed).
 
+4. **Swallowed instancing** (`INSTANCESWEEPTEST`) — `InstanceOnPointsNode`
+   returns the single *stamp* mesh from `GetMesh()` and carries its N
+   placements separately, so every consumer that wants the scatter walks
+   `PassthroughSource()` to find the instancer and reads
+   `GetInstanceGroupMatrix()` off the chain head to pick up a wrapping
+   Transform. A node that takes a geometry input and drops either one turns N
+   instances into one un-instanced stamp, or draws the whole scatter back at
+   the origin — silently, no error. `Null3DNode` (whose entire job is to be a
+   no-op passthrough), `DisplacementNode` and `WrapNode` dropped
+   `PassthroughSource()`; `MaterialNode`, `SetColorNode`,
+   `MergeByDistanceNode` and `Switcher3DNode` forwarded `PassthroughSource()`
+   without the group matrix, so `Instance on Points -> Transform -> Material
+   -> Render 3D` ignored the Transform entirely.
+
 See `ARCHITECTURE.md`, "Node Library" → "Invariants for
 `IGeometrySource`-consuming nodes" for the two rules #2 and #3 exist to
 enforce, spelled out as ongoing rules for anyone adding a new node type.
@@ -56,7 +70,7 @@ enforce, spelled out as ongoing rules for anyone adding a new node type.
 ## How it works
 
 `src/main.cpp` (search `TRANSFORMSWEEPTEST`, `MAPPINGSWEEPTEST`,
-`REVISIONSWEEPTEST`) defines a small fake `IGeometrySource` probe per sweep
+`REVISIONSWEEPTEST`, `INSTANCESWEEPTEST`) defines a small fake `IGeometrySource` probe per sweep
 that forwards everything to a real mesh except the one field under test, and
 wires that probe into every node type that takes a geometry input. That
 decouples "does this consumer correctly use its input's X" from needing to
@@ -104,6 +118,22 @@ input — confirming a static input doesn't force a topology rebuild by proxy.
 Covered: `GeometryOpNode`, `DisplacementNode` (with a texture connected),
 `MeshResynthNode`, `ClothNode` (constraint-count variant).
 
+**Instancing sweep**: builds a real chain — `Instance on Points` fed by a cube
+and a sphere stamp, then a `GeometryOpNode` in `kTransform` moving the group by
+(5, 7, 3) — and wires the node under test downstream of that Transform. One
+check covers both halves: the same `PassthroughSource()` walk Render 3D and the
+mini viewport use has to reach the instancer through the node, and
+`node->GetInstanceGroupMatrix()` has to still carry the 5/7/3 move. No probe
+`IGeometrySource` here, unlike the other three — the walk ends in a
+`dynamic_cast<InstanceOnPointsNode*>`, so it needs the real class.
+
+Covered: `GeometryOpNode`, `Null3DNode`, `DisplacementNode`, `MaterialNode`,
+`SetColorNode`, `MergeByDistanceNode`, `WrapNode`, `Switcher3DNode`. Nodes that
+consume an instancer's *output* rather than passing its stamp through
+(`MeshToPointsNode`, `JoinGeometryNode`, `ClothNode`, the `DistributePoints*`
+family) are excluded on purpose — "the instancer is still upstream" is not a
+claim they make or should make.
+
 ## Adding a new node type to a sweep
 
 Any new node class that takes an `IGeometrySource*` (or `ICurveSource*`,
@@ -117,6 +147,12 @@ being a sweep rather than a fixture library.
   after wiring `node.input = &probe`.
 - **Transform / mapping sweeps, node with its own draw path** (instancing,
   path-follow): copy the shape of `checkInstancing` / the `PathNode` block.
+- **Instancing sweep**: if the node forwards a single geometry input's mesh
+  (rather than building new geometry from it), it must override *both*
+  `PassthroughSource()` and `GetInstanceGroupMatrix()` — never one without the
+  other — and add one `checkPassthrough("NewNode", &node)` line. A node with
+  several inputs must forward from the same input its `PassthroughSource()`
+  picks, so the two can't disagree about which one is live.
 - **Revision sweep**: cook the node twice with nothing changed and compare
   its stamp (`MeshRevision()` for most nodes); if the node has a
   texture/image input, connect a real, static (non-animated) source the same

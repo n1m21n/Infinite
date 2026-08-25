@@ -32220,6 +32220,126 @@ int main(int argc, char** argv)
          printf("%s\n", allOk ? "MAPPING SWEEP OK" : "MAPPING SWEEP FAIL");
       }
 
+      // The instancing side-channels, same generic-probe shape as the two
+      // sweeps above. InstanceOnPointsNode's GetMesh() returns the single
+      // stamp mesh and carries its N placements separately, so every consumer
+      // that wants the scatter walks PassthroughSource() to find the
+      // instancer (Render3DNode::FindInstancer, NodeViewport's copy) and
+      // reads GetInstanceGroupMatrix() off the chain head to pick up a
+      // wrapping Transform. A node that takes a geometry input, forwards
+      // every other side-channel, and silently drops these two turns N
+      // instances into one un-instanced stamp - with no error anywhere.
+      // Found via a real bug: Null3DNode (a node whose entire job is to be a
+      // no-op passthrough), DisplacementNode and WrapNode dropped
+      // PassthroughSource, and MaterialNode/SetColorNode/MergeByDistanceNode/
+      // Switcher3DNode forwarded PassthroughSource without the group matrix,
+      // so `Instance on Points -> Transform -> Material -> Render 3D` drew
+      // the scatter back at the origin.
+      if (getenv("INFINITE_INSTANCESWEEPTEST") != nullptr && frameId == 6)
+      {
+         GeometryNode pointsMesh;
+         pointsMesh.shape = 1; // cube
+         pointsMesh.detail = 4;
+         GeometryNode stampMesh;
+         stampMesh.shape = 2; // sphere
+         stampMesh.detail = 3;
+
+         InstanceOnPointsNode inst;
+         inst.pointSource = &pointsMesh;
+         inst.instanceShape = &stampMesh;
+         inst.pointMode = 0; // vertices
+         inst.maxPoints = 50;
+         inst.instanceScale = 1.0f;
+         inst.scaleRandom = 0.0f;
+         inst.rotationRandom = 0.0f;
+         inst.alignToNormal = false;
+
+         // The wrapping Transform whose move has to survive the node under
+         // test - see GeometryOpNode::GetInstanceGroupMatrix.
+         GeometryOpNode groupXform;
+         groupXform.op = GeometryOpNode::kTransform;
+         groupXform.input = &inst;
+         groupXform.offsetX = 5.0f;
+         groupXform.offsetY = 7.0f;
+         groupXform.offsetZ = 3.0f;
+
+         int frame = 23000;
+         auto cook = [&](IGeometrySource* g) {
+            if (auto* n = dynamic_cast<INode*>(g)) n->CookIfNeeded(frame);
+            frame++;
+         };
+         // Same walk as Render3DNode::FindInstancer / NodeViewport's copy.
+         auto reachesInstancer = [](IGeometrySource* s) {
+            for (; s != nullptr; s = s->PassthroughSource())
+               if (dynamic_cast<InstanceOnPointsNode*>(s) != nullptr)
+                  return true;
+            return false;
+         };
+
+         struct Result { std::string name; bool foundInstancer; bool groupOk; };
+         std::vector<Result> results;
+         // `node` is wired downstream of groupXform, so one check covers both
+         // invariants at once: the chain walk has to reach the instancer
+         // through it, and the Transform's 5/7/3 move has to arrive intact.
+         auto checkPassthrough = [&](const char* name, IGeometrySource* node)
+         {
+            cook(node);
+            const Mat4 g = node->GetInstanceGroupMatrix();
+            const bool groupOk = std::fabs(g.m[12] - 5.0f) < 1e-3f &&
+                                 std::fabs(g.m[13] - 7.0f) < 1e-3f &&
+                                 std::fabs(g.m[14] - 3.0f) < 1e-3f;
+            results.push_back({ name, reachesInstancer(node), groupOk });
+         };
+
+         GeometryOpNode opNode; opNode.op = GeometryOpNode::kSubdivide; opNode.input = &groupXform;
+         checkPassthrough("GeometryOpNode", &opNode);
+
+         Null3DNode nullNode; nullNode.input = &groupXform;
+         checkPassthrough("Null3DNode", &nullNode);
+
+         DisplacementNode dispNode; dispNode.input = &groupXform;
+         checkPassthrough("DisplacementNode", &dispNode);
+
+         MaterialNode matNode; matNode.input = &groupXform;
+         checkPassthrough("MaterialNode", &matNode);
+
+         SetColorNode setColorNode; setColorNode.input = &groupXform;
+         checkPassthrough("SetColorNode", &setColorNode);
+
+         MergeByDistanceNode mergeNode; mergeNode.input = &groupXform; mergeNode.threshold = 0.0f;
+         checkPassthrough("MergeByDistanceNode", &mergeNode);
+
+         GeometryNode wrapTarget;
+         wrapTarget.shape = 2; // sphere
+         wrapTarget.detail = 4;
+         WrapNode wrapNode; wrapNode.sourceInput = &groupXform; wrapNode.targetInput = &wrapTarget;
+         wrapNode.blend = 0.0f;
+         checkPassthrough("WrapNode", &wrapNode);
+
+         Switcher3DNode sw3Node;
+         sw3Node.inputs[0] = &groupXform;
+         sw3Node.manual = true;
+         sw3Node.manualSlot = 0;
+         checkPassthrough("Switcher3DNode", &sw3Node);
+
+         // Excluded on purpose: nodes that consume an instancer's *output*
+         // rather than passing its stamp through - MeshToPointsNode,
+         // JoinGeometryNode, ClothNode, the DistributePoints* family - build
+         // their own geometry from GetMesh(), so "the instancer is still
+         // upstream" is not a claim they make or should make.
+         bool allOk = true;
+         for (const Result& r : results)
+         {
+            const bool ok = r.foundInstancer && r.groupOk;
+            printf("  [%s] %-24s %s%s\n", ok ? "pass" : "FAIL", r.name.c_str(),
+                   r.foundInstancer ? "" : "instancer not reachable through PassthroughSource ",
+                   r.groupOk ? "" : "group matrix dropped");
+            if (!ok)
+               allOk = false;
+         }
+         printf("%s\n", allOk ? "INSTANCE SWEEP OK" : "INSTANCE SWEEP FAIL");
+      }
+
       // A different bug class from the two sweeps above: not a dropped
       // side-channel, but a revision/generation stamp that bumps when nothing
       // actually changed. Found via a real bug: DisplacementNode bumped

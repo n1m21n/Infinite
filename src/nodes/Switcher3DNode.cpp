@@ -58,6 +58,12 @@ IGeometrySource* Switcher3DNode::PassthroughSource() const
    return Active();
 }
 
+Mat4 Switcher3DNode::GetInstanceGroupMatrix() const
+{
+   IGeometrySource* active = Active();
+   return active ? active->GetInstanceGroupMatrix() : Mat4::Identity();
+}
+
 Mat4 Switcher3DNode::GetModelMatrix() const
 {
    IGeometrySource* active = Active();

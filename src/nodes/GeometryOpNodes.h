@@ -335,6 +335,14 @@ public:
    {
       return input ? input->GetMappingTransform() : MappingTransform();
    }
+   // Displacement moves the stamp's vertices, it doesn't build the mesh from
+   // scratch - so an upstream InstanceOnPoints stays visible to the chain
+   // walk (displace the stamp, then scatter it), group matrix included.
+   IGeometrySource* PassthroughSource() const override { return input; }
+   Mat4 GetInstanceGroupMatrix() const override
+   {
+      return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
 
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
@@ -640,6 +648,12 @@ public:
       return input ? input->GetMappingTransform() : MappingTransform();
    }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Forwarded alongside PassthroughSource - see MaterialNode for why the two
+   // have to travel together.
+   Mat4 GetInstanceGroupMatrix() const override
+   {
+      return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
 
    IGeometrySource* input = nullptr;
    IPaletteSource* paletteInput = nullptr;
@@ -744,6 +758,15 @@ public:
       return sourceInput ? sourceInput->SurfaceTextureRevision() : 0;
    }
    MappingTransform GetMappingTransform() const override { return sourceInput ? sourceInput->GetMappingTransform() : MappingTransform(); }
+   // The source mesh is the stamp; wrapping it onto the target is a stamp-level
+   // op like every other one, so an upstream InstanceOnPoints keeps scattering
+   // the wrapped mesh. Never targetInput - that's the thing being wrapped onto,
+   // not where this node's mesh comes from.
+   IGeometrySource* PassthroughSource() const override { return sourceInput; }
+   Mat4 GetInstanceGroupMatrix() const override
+   {
+      return sourceInput ? sourceInput->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
 
    IGeometrySource* sourceInput = nullptr;
    IGeometrySource* targetInput = nullptr;
