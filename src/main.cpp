@@ -28,6 +28,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+#include <filesystem>
 #include <sys/stat.h>
 #include "platform/AppPaths.h"
 
@@ -19210,6 +19212,22 @@ namespace
    bool gPatchDirty = false;
    std::string gPatchStatus;
 
+   // ---- autosave / crash recovery ----
+   bool gAutosaveEnabled = true;
+   int gAutosaveSeconds = 60;
+   double gLastAutosaveTime = 0.0;
+
+   // Set once at startup (CheckAutosaveRecovery) when the previous run's
+   // marker was present and its autosave parsed. The first frame's UI pops
+   // the recovery modal; gPendingRecoveryData is what Recover applies.
+   bool gShowAutosaveRecoveryModal = false;
+   Patch::Data gPendingRecoveryData;
+   std::string gAutosaveRecoveryTimestamp;
+   // Non-empty only when the marker was present, an autosave file existed,
+   // but Patch::Read failed on it - surfaced via gPatchStatus rather than a
+   // second modal.
+   std::string gAutosaveRecoveryError;
+
    // ---- saving ----
    // Everything SavePatchTo used to build in place, minus the file write -
    // shared with undo/redo, which snapshots this same in-memory shape rather
@@ -19380,6 +19398,178 @@ namespace
       return data;
    }
 
+   // Self-tests exercising this mechanism (AUTOSAVETEST, AUTOSAVEMARKERTEST)
+   // redirect to their own file so they never read, write, or delete the
+   // real user's crash-recovery state - the same reasoning as
+   // INFINITE_DRAGTEST's separate graphPath a few hundred lines up.
+   bool UsingAutosaveTestPaths()
+   {
+      return getenv("INFINITE_AUTOSAVETEST") != nullptr || getenv("INFINITE_AUTOSAVEMARKERTEST") != nullptr;
+   }
+
+   std::string AutosavePath()
+   {
+      std::string dir = AppPaths::AppSupportDir();
+      if (dir.empty())
+         return {};
+      return dir + (UsingAutosaveTestPaths() ? "/Infinite.autosave-test.inf" : "/Infinite.autosave.inf");
+   }
+
+   std::string AutosaveMarkerPath()
+   {
+      std::string dir = AppPaths::AppSupportDir();
+      if (dir.empty())
+         return {};
+      return dir + (UsingAutosaveTestPaths() ? "/Infinite.session-active-test" : "/Infinite.session-active");
+   }
+
+   // Mirrors CategoryColors::ThemePath()/LoadPreference(): one flat
+   // preference file next to the app's other Application Support state.
+   std::string AutosaveSettingsPath()
+   {
+      std::string dir = AppPaths::AppSupportDir();
+      return dir.empty() ? std::string() : dir + "/Infinite.autosave-settings";
+   }
+
+   void LoadAutosaveSettings()
+   {
+      const std::string path = AutosaveSettingsPath();
+      if (path.empty())
+         return;
+      std::ifstream file(path);
+      std::string line;
+      if (std::getline(file, line) && !line.empty())
+         gAutosaveEnabled = (line != "0");
+      if (std::getline(file, line) && !line.empty())
+      {
+         const int seconds = atoi(line.c_str());
+         if (seconds > 0)
+            gAutosaveSeconds = seconds;
+      }
+   }
+
+   void SaveAutosaveSettings()
+   {
+      const std::string path = AutosaveSettingsPath();
+      if (path.empty())
+         return;
+      std::ofstream file(path);
+      file << (gAutosaveEnabled ? "1" : "0") << "\n" << gAutosaveSeconds << "\n";
+   }
+
+   void DiscardAutosave()
+   {
+      const std::string path = AutosavePath();
+      if (!path.empty())
+      {
+         std::error_code ec;
+         std::filesystem::remove(path, ec);
+      }
+   }
+
+   // Writes the live graph to the autosave file, atomically: write a .tmp
+   // then rename it over the real path, so a crash mid-write leaves the
+   // previous autosave intact instead of a truncated file that fails to
+   // parse. std::filesystem::rename is atomic within a filesystem on POSIX
+   // but fails on Windows if the destination exists, hence the remove+retry
+   // fallback - not fully atomic there (a window exists where neither file
+   // is present) but strictly better than writing in place.
+   bool WriteAutosaveNow()
+   {
+      const std::string path = AutosavePath();
+      if (path.empty())
+         return false;
+      const Patch::Data data = BuildPatchData();
+      const std::string temp = path + ".tmp";
+      std::string error;
+      if (!Patch::Write(temp, data, error))
+         return false;
+
+      std::error_code ec;
+      std::filesystem::rename(temp, path, ec);
+      if (ec)
+      {
+         ec.clear();
+         std::filesystem::remove(path, ec);
+         ec.clear();
+         std::filesystem::rename(temp, path, ec);
+      }
+      return !ec;
+   }
+
+   // Called once per frame from the main loop. Deliberately does not check
+   // gPatchDirty. Several continuous controls update live while dragged and
+   // create their undo checkpoint only at gesture end, so a crash mid-gesture
+   // must still recover the values the user was actually seeing and hearing.
+   void PollAutosave()
+   {
+      if (!gAutosaveEnabled || gNodes.empty())
+         return;
+      const double now = glfwGetTime();
+      if (gLastAutosaveTime > 0.0 && now - gLastAutosaveTime < (double)gAutosaveSeconds)
+         return;
+      gLastAutosaveTime = now;
+      WriteAutosaveNow();
+   }
+
+   // Called once at startup, after the graph and GL are initialised but
+   // before the first frame is presented. Reads the *previous* run's
+   // marker/autosave (if any) so the first frame's UI can offer recovery,
+   // then writes a fresh marker for *this* run regardless of what it found -
+   // a run that exits cleanly deletes it again at the single post-loop
+   // cleanup site.
+   void CheckAutosaveRecovery()
+   {
+      const std::string marker = AutosaveMarkerPath();
+      const std::string autosave = AutosavePath();
+      if (!marker.empty() && std::filesystem::exists(marker))
+      {
+         if (!autosave.empty() && std::filesystem::exists(autosave))
+         {
+            Patch::Data data;
+            std::string error;
+            if (Patch::Read(autosave, data, error))
+            {
+               gPendingRecoveryData = std::move(data);
+               gShowAutosaveRecoveryModal = true;
+
+               std::error_code ec;
+               const auto ftime = std::filesystem::last_write_time(autosave, ec);
+               if (!ec)
+               {
+                  // Pre-C++20: file_time_type isn't system_clock, so rebase
+                  // through "now" on both clocks rather than assuming a
+                  // shared epoch.
+                  const auto sctp = std::chrono::system_clock::now() +
+                     std::chrono::duration_cast<std::chrono::system_clock::duration>(
+                        ftime - std::filesystem::file_time_type::clock::now());
+                  const std::time_t tt = std::chrono::system_clock::to_time_t(sctp);
+                  if (std::tm* tmVal = std::localtime(&tt))
+                  {
+                     char buf[64] = "";
+                     std::strftime(buf, sizeof(buf), "%b %d, %I:%M %p", tmVal);
+                     gAutosaveRecoveryTimestamp = buf;
+                  }
+               }
+            }
+            else
+            {
+               // Corrupt autosave: say so and leave the file on disk rather
+               // than deleting it - a corrupt file the user can still find
+               // and inspect beats one silently erased.
+               gAutosaveRecoveryError = error;
+               gPatchStatus = "Autosave found but could not be read: " + error;
+            }
+         }
+         // Marker present, no autosave: nothing to offer, not an error.
+      }
+
+      if (!marker.empty())
+      {
+         std::ofstream m(marker);
+      }
+   }
+
    bool SavePatchTo(const std::string& path)
    {
       Patch::Data data = BuildPatchData();
@@ -19394,6 +19584,11 @@ namespace
       gPatchDirty = false;
       gPatchStatus = "Saved";
       Patch::NoteRecent(path);
+      // Whatever the autosave was covering is now safely on disk under the
+      // user's own file - see §3: leaving it around would offer to recover
+      // already-saved work on the next launch.
+      DiscardAutosave();
+      gLastAutosaveTime = 0.0;
       return true;
    }
 
@@ -19601,6 +19796,10 @@ namespace
       gPatchStatus = "Opened";
       Patch::NoteRecent(path);
       gRequestFitView = true;
+      // The autosave from whatever was open before is no longer relevant
+      // now that the user has deliberately loaded something else - see §3.
+      DiscardAutosave();
+      gLastAutosaveTime = 0.0;
       return true;
    }
 
@@ -26313,6 +26512,90 @@ int RunPluginScanTest()
    return 0;
 }
 
+// ====================================================== INFINITE_AUTOSAVEMARKERTEST
+//
+// The four cases where the crash-detection logic actually breaks (see
+// CheckAutosaveRecovery): marker absent, marker + valid autosave, marker +
+// no autosave, marker + corrupt autosave. Calls the real production
+// function against files redirected by UsingAutosaveTestPaths (this env var
+// is one of the two that triggers the redirect) rather than reimplementing
+// the check, so a regression in the real function is what this catches.
+// Headless like PLUGINSCANTEST above - no GL/ImGui needed.
+int RunAutosaveMarkerTest()
+{
+   const std::string marker = AutosaveMarkerPath();
+   const std::string autosave = AutosavePath();
+   if (marker.empty() || autosave.empty())
+   {
+      printf("autosave marker test: no AppSupportDir available on this machine  SKIP\n");
+      return 0;
+   }
+
+   bool overallOk = true;
+   auto Check = [&](const char* label, bool ok)
+   {
+      printf("  [%s] %s\n", ok ? "pass" : "FAIL", label);
+      if (!ok)
+         overallOk = false;
+   };
+   auto Reset = [&]()
+   {
+      gShowAutosaveRecoveryModal = false;
+      gAutosaveRecoveryError.clear();
+      gAutosaveRecoveryTimestamp.clear();
+      gPendingRecoveryData = Patch::Data();
+   };
+
+   Patch::Data validData;
+   {
+      Patch::NodeRecord rec;
+      rec.index = 1;
+      rec.category = "Source";
+      rec.typeName = "Shape";
+      validData.nodes.push_back(rec);
+   }
+
+   // Case 1: no marker -> no prompt.
+   std::filesystem::remove(marker);
+   std::filesystem::remove(autosave);
+   Reset();
+   CheckAutosaveRecovery();
+   Check("marker absent -> no prompt", !gShowAutosaveRecoveryModal);
+   std::filesystem::remove(marker); // undo the fresh marker CheckAutosaveRecovery() just wrote for "this run"
+
+   // Case 2: marker + valid autosave -> prompt.
+   { std::ofstream m(marker); }
+   std::string writeError;
+   Patch::Write(autosave, validData, writeError);
+   Reset();
+   CheckAutosaveRecovery();
+   Check("marker + valid autosave -> prompt", gShowAutosaveRecoveryModal && !gPendingRecoveryData.nodes.empty());
+   std::filesystem::remove(marker);
+   std::filesystem::remove(autosave);
+
+   // Case 3: marker + no autosave -> no prompt, no error.
+   { std::ofstream m(marker); }
+   Reset();
+   CheckAutosaveRecovery();
+   Check("marker + no autosave -> no prompt, no error", !gShowAutosaveRecoveryModal && gAutosaveRecoveryError.empty());
+   std::filesystem::remove(marker);
+
+   // Case 4: marker + corrupt autosave -> no crash, file left on disk.
+   { std::ofstream m(marker); }
+   { std::ofstream bad(autosave); bad << "not a valid patch file\n"; }
+   Reset();
+   CheckAutosaveRecovery();
+   const bool stillOnDisk = std::filesystem::exists(autosave);
+   Check("marker + corrupt autosave -> no crash, file left on disk",
+         !gShowAutosaveRecoveryModal && !gAutosaveRecoveryError.empty() && stillOnDisk);
+
+   std::filesystem::remove(marker);
+   std::filesystem::remove(autosave);
+
+   printf("%s\n", overallOk ? "AUTOSAVE MARKER TEST OK" : "SUSPECT");
+   return 0;
+}
+
 // A destination parameter's declared min/max is a hard contract - no cable,
 // expression, or typed value can push it outside that range, because
 // everything downstream (mesh generation, buffer sizing, ...) trusts the
@@ -26351,6 +26634,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_PLUGINSCANTEST") != nullptr)
       return RunPluginScanTest();
+
+   if (getenv("INFINITE_AUTOSAVEMARKERTEST") != nullptr)
+      return RunAutosaveMarkerTest();
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
@@ -26561,12 +26847,21 @@ int main(int argc, char** argv)
    config.EnableSmoothZoom = true; // trackpad momentum made stepped zoom feel jumpy
    Patch::LoadRecents();
    CategoryColors::LoadPreference();
+   LoadAutosaveSettings();
 
    gEditor = ed::CreateEditor(&config);
    ed::SetCurrentEditor(gEditor); // ed::GetStyle() below needs a current editor
 
    RegisterNodes();
    ApplyTheme();
+
+   // Skipped under the dev-test harness (INFINITE_EXITAFTER) so that running
+   // the self-test suite never reads, consumes, or overwrites a genuine
+   // crash marker/autosave left by the real app - see UsingAutosaveTestPaths
+   // for the two tests that deliberately exercise this function directly
+   // against their own redirected files instead.
+   if (getenv("INFINITE_EXITAFTER") == nullptr)
+      CheckAutosaveRecovery();
 
    // Embedded local control server (see docs/plans - RemoteControl) - lets an
    // external tool (the Infinite MCP server) drive this running instance.
@@ -27256,6 +27551,61 @@ int main(int argc, char** argv)
          inst->pointSource = geo;
          inst->instanceShape = shape;
          inst->cloudSource = particles;
+      }
+      else if (getenv("INFINITE_AUTOSAVETEST") != nullptr)
+      {
+         // One of each list BuildPatchData populates: an image cable, a
+         // geometry chain with camera/light pins, an audio cable, a note
+         // cable, a modulation link, a palette binding, a per-param
+         // expression, and an expression global.
+         SpawnNode("Geometry", "3D", 40.0f, 40.0f);        // 0
+         SpawnNode("Smooth", "3D", 320.0f, 40.0f);         // 1
+         SpawnNode("Material", "3D", 600.0f, 40.0f);       // 2
+         SpawnNode("Camera", "3D", 320.0f, 400.0f);        // 3
+         SpawnNode("Light", "3D", 320.0f, 620.0f);         // 4
+         SpawnNode("Render 3D", "3D", 880.0f, 40.0f);      // 5
+         SpawnNode("Output", "Output", 1160.0f, 40.0f);    // 6
+         SpawnNode("Path", "Modulators", 40.0f, 800.0f);   // 7: modulator source
+         SpawnNode("Palette", "Modulators", 40.0f, 1000.0f); // 8: palette source
+         SpawnNode("Ramp", "Source", 320.0f, 1000.0f);       // 9: palette target
+         SpawnNode("Wavetable", "Synths", 40.0f, 1200.0f);   // 10: audio source
+         SpawnNode("MIDI Notes", "Notes", 40.0f, 1400.0f);   // 11: note source
+         SpawnNode("Note Filter", "Notes", 320.0f, 1400.0f); // 12: note dest
+
+         auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* smooth = static_cast<GeometryOpNode*>(gNodes[1].node.get());
+         auto* mat = static_cast<MaterialNode*>(gNodes[2].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[5].node.get());
+         auto* out = static_cast<OutputNode*>(gNodes[6].node.get());
+         auto* path = static_cast<PathNode*>(gNodes[7].node.get());
+         auto* palette = static_cast<PaletteNode*>(gNodes[8].node.get());
+         auto* ramp = static_cast<RampNode*>(gNodes[9].node.get());
+         auto* wave = static_cast<WavetableNode*>(gNodes[10].node.get());
+         auto* midi = static_cast<MidiNotesNode*>(gNodes[11].node.get());
+         auto* filter = static_cast<NoteFilterNode*>(gNodes[12].node.get());
+
+         geo->shape = 4; geo->detail = 33; geo->posX = 1.25f;
+         geo->color[0] = 0.11f; geo->color[1] = 0.22f; geo->color[2] = 0.33f;
+         geo->emission = 2.5f;
+         smooth->iterations = 7; smooth->amount = 0.66f;
+         mat->metallic = 0.77f; mat->roughness = 0.11f;
+         render->samples = 3; render->exposure = 1.8f; render->width = 512.0f;
+         palette->swatchCount = 3;
+
+         smooth->input = geo;
+         mat->input = smooth;
+         render->geometry[0] = mat;
+         render->camera = static_cast<CameraNode*>(gNodes[3].node.get());
+         render->lights[0] = static_cast<LightNode*>(gNodes[4].node.get());
+         out->Input().Connect(render);                    // image cable
+         out->AudioInput().Connect(wave);                 // audio cable
+         if (NoteCable* noteIn = filter->NoteInputSlot(0))
+            noteIn->Connect(midi);                        // note cable
+
+         Modulation::Instance().Bind(gNodes[0].index, 6, gNodes[7].index, 2);
+         Modulation::Instance().SetExpression(gNodes[0].index, 3, "sin(t)");
+         PaletteBinding::Instance().Bind(gNodes[9].index, 0, gNodes[8].index, 0);
+         ExprGlobals::All().push_back({ "myGlobal", "t*0.5", 0.0f, std::string() });
       }
       else if (getenv("INFINITE_DELETECRASHTEST") != nullptr)
       {
@@ -28131,6 +28481,10 @@ int main(int argc, char** argv)
       gFrameStart = glfwGetTime();
       glfwPollEvents();
 
+      // Same dev-harness carve-out as the startup check above.
+      if (getenv("INFINITE_EXITAFTER") == nullptr)
+         PollAutosave();
+
       // Apply any RemoteControl RPC requests queued by the network thread
       // since last frame, before any ed:: drawing reads the graph this frame.
       RemoteControl::DrainPending(HandleRpcCommand);
@@ -28970,6 +29324,18 @@ int main(int argc, char** argv)
                      }
                   ImGui::EndCombo();
                }
+            }
+
+            ImGui::SeparatorText("Autosave");
+            {
+               if (ImGui::Checkbox("Autosave enabled", &gAutosaveEnabled))
+                  SaveAutosaveSettings();
+               ImGui::SetNextItemWidth(170);
+               int seconds = gAutosaveSeconds;
+               if (ImGui::SliderInt("Interval", &seconds, 15, 300, "%d sec"))
+                  gAutosaveSeconds = seconds;
+               if (ImGui::IsItemDeactivatedAfterEdit())
+                  SaveAutosaveSettings();
             }
 
             ImGui::SeparatorText("Audio");
@@ -33167,6 +33533,87 @@ int main(int argc, char** argv)
          printf("%s\n", (saved && cleared && loaded && nodesBefore == gNodes.size() &&
                          haveAll && params && wiring && geomLinks && mods)
                            ? "PATCH ROUND TRIP OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_AUTOSAVETEST") != nullptr && frameId == 4)
+      {
+         const size_t nodesBefore = gNodes.size();
+         const bool wrote = WriteAutosaveNow();
+
+         // Wiped between write and read, so anything that appears afterwards
+         // genuinely came out of the autosave rather than surviving in memory.
+         NewPatch();
+         const bool cleared = gNodes.empty();
+
+         Patch::Data data;
+         std::string error;
+         const bool read = Patch::Read(AutosavePath(), data, error);
+         if (read)
+            ApplyPatchData(data);
+
+         printf("wrote=%d cleared=%d read=%d  nodes %zu -> %zu\n",
+                wrote, cleared, read, nodesBefore, gNodes.size());
+
+         GeometryNode* geo = nullptr;
+         GeometryOpNode* smooth = nullptr;
+         MaterialNode* mat = nullptr;
+         Render3DNode* render = nullptr;
+         PathNode* path = nullptr;
+         PaletteNode* palette = nullptr;
+         RampNode* ramp = nullptr;
+         WavetableNode* wave = nullptr;
+         MidiNotesNode* midi = nullptr;
+         NoteFilterNode* filter = nullptr;
+         OutputNode* out = nullptr;
+         for (GraphNode& gn : gNodes)
+         {
+            if (!geo) geo = dynamic_cast<GeometryNode*>(gn.node.get());
+            if (!smooth) smooth = dynamic_cast<GeometryOpNode*>(gn.node.get());
+            if (!mat) mat = dynamic_cast<MaterialNode*>(gn.node.get());
+            if (!render) render = dynamic_cast<Render3DNode*>(gn.node.get());
+            if (!path) path = dynamic_cast<PathNode*>(gn.node.get());
+            if (!palette) palette = dynamic_cast<PaletteNode*>(gn.node.get());
+            if (!ramp) ramp = dynamic_cast<RampNode*>(gn.node.get());
+            if (!wave) wave = dynamic_cast<WavetableNode*>(gn.node.get());
+            if (!midi) midi = dynamic_cast<MidiNotesNode*>(gn.node.get());
+            if (!filter) filter = dynamic_cast<NoteFilterNode*>(gn.node.get());
+            if (!out) out = dynamic_cast<OutputNode*>(gn.node.get());
+         }
+
+         const bool haveAll = geo && smooth && mat && render && path && palette &&
+                              ramp && wave && midi && filter && out;
+         bool params = false, wiring = false, mods = false, palettes = false,
+              exprs = false, globals = false;
+         if (haveAll)
+         {
+            params = geo->shape == 4 && geo->detail == 33 &&
+                     std::fabs(geo->posX - 1.25f) < 1e-5f &&
+                     std::fabs(geo->color[2] - 0.33f) < 1e-5f &&
+                     std::fabs(geo->emission - 2.5f) < 1e-5f &&
+                     smooth->iterations == 7 && std::fabs(smooth->amount - 0.66f) < 1e-5f &&
+                     std::fabs(mat->metallic - 0.77f) < 1e-5f &&
+                     std::fabs(mat->roughness - 0.11f) < 1e-5f &&
+                     render->samples == 3 && std::fabs(render->exposure - 1.8f) < 1e-5f &&
+                     std::fabs(render->width - 512.0f) < 1e-5f &&
+                     palette->swatchCount == 3;
+
+            wiring = smooth->input == geo && mat->input == smooth &&
+                     render->geometry[0] == mat && render->camera != nullptr &&
+                     render->lights[0] != nullptr && out->Input().IsConnected() &&
+                     out->AudioInput().IsConnected() &&
+                     filter->NoteInputSlot(0) != nullptr && filter->NoteInputSlot(0)->IsConnected();
+
+            mods = !Modulation::Instance().Links().empty();
+            palettes = !PaletteBinding::Instance().Links().empty();
+            exprs = !Modulation::Instance().Expressions().empty();
+            globals = !ExprGlobals::All().empty();
+         }
+
+         printf("params=%d wiring=%d modulation=%d palette=%d expr=%d globals=%d\n",
+                params, wiring, mods, palettes, exprs, globals);
+         printf("%s\n", (wrote && cleared && read && nodesBefore == gNodes.size() &&
+                         haveAll && params && wiring && mods && palettes && exprs && globals)
+                           ? "AUTOSAVE ROUND TRIP OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_DELETECRASHTEST") != nullptr && frameId == 4)
@@ -38338,6 +38785,49 @@ int main(int argc, char** argv)
          ImGui::EndPopup();
       }
 
+      if (gShowAutosaveRecoveryModal)
+      {
+         ImGui::OpenPopup("Recover Autosave");
+         gShowAutosaveRecoveryModal = false;
+      }
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      if (ImGui::BeginPopupModal("Recover Autosave", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+      {
+         ImGui::Text("Infinite closed unexpectedly.");
+         if (!gAutosaveRecoveryTimestamp.empty())
+            ImGui::Text("A recovered version of your work from %s is available.",
+                        gAutosaveRecoveryTimestamp.c_str());
+         else
+            ImGui::Text("A recovered version of your work is available.");
+         ImGui::Separator();
+         if (ImGui::Button("Recover", ImVec2(100, 0)))
+         {
+            ApplyPatchData(gPendingRecoveryData);
+            gUndoStack.clear();
+            gRedoStack.clear();
+            gPatchPath.clear();          // it is not the user's file - force Save As
+            gPatchDirty = true;          // it is unsaved work, and should say so
+            gPatchStatus = "Recovered autosave. Save the project to keep it.";
+            // A recovery that leaves the file behind offers itself again on
+            // the next launch.
+            DiscardAutosave();
+            ImGui::CloseCurrentPopup();
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Discard", ImVec2(100, 0)))
+         {
+            DiscardAutosave();
+            const std::string marker = AutosaveMarkerPath();
+            if (!marker.empty())
+            {
+               std::error_code ec;
+               std::filesystem::remove(marker, ec);
+            }
+            ImGui::CloseCurrentPopup();
+         }
+         ImGui::EndPopup();
+      }
+
       // Keep the title bar in sync with the open document. GLFW has no
       // native "dirty dot" hook, so the bullet is just part of the string -
       // the same convention every other non-native-document-model app uses.
@@ -39332,6 +39822,23 @@ int main(int argc, char** argv)
             fflush(stdout);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
+      }
+   }
+
+   // Every real close path (Quit menu, red button, Cmd+Q) routes through
+   // RequestClose -> glfwSetWindowShouldClose, and every dev-harness exit
+   // sets the same flag directly - so this fall-through is the single place
+   // every one of them converges, and the only place a clean exit needs to
+   // delete the marker. Same INFINITE_EXITAFTER carve-out as the startup
+   // check: a harness run never created the real marker, so it must not
+   // delete it either - see UsingAutosaveTestPaths.
+   if (getenv("INFINITE_EXITAFTER") == nullptr)
+   {
+      const std::string marker = AutosaveMarkerPath();
+      if (!marker.empty())
+      {
+         std::error_code ec;
+         std::filesystem::remove(marker, ec);
       }
    }
 

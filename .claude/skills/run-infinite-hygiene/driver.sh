@@ -89,6 +89,7 @@ TESTS=(
   "PHASE1TEST:35"
   "DELETECRASHTEST:8"
   "AUDIOGRAPHTEST:8"
+  "AUTOSAVETEST:8"
   "DRAGTEST:35"
   "WTDRAGTEST:35"
   "AUDIOPARAMSWEEPTEST:1"
@@ -103,6 +104,7 @@ TESTS=(
   # Headless (exits before glfwInit), so the frame budget is irrelevant to it -
   # it polls a real asynchronous AU instantiation on its own bounded timer.
   "PLUGINSCANTEST:1"
+  "AUTOSAVEMARKERTEST:1"
 )
 
 step() { printf '\n== %s ==\n' "$1"; }
