@@ -64,6 +64,33 @@ namespace
       return nullptr;
    }
 
+   // Walks the same chain looking for the first non-null
+   // InstanceTransformOverride() - a selectionOnly Delete/Transform downstream
+   // of the instancer replacing its raw placements (see
+   // GeometryOpNode::InstanceTransformOverride). Falls back to the
+   // instancer's own InstanceTransforms() when nothing overrides.
+   const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, InstanceOnPointsNode* instancer)
+   {
+      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
+      {
+         if (const std::vector<Mat4>* override_ = s->InstanceTransformOverride())
+            return *override_;
+      }
+      return instancer->InstanceTransforms();
+   }
+
+   // Same chain-walk for the instance selection mask, used by the overlay -
+   // see IGeometrySource::InstanceSelection.
+   const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source)
+   {
+      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
+      {
+         if (const std::vector<unsigned char>* mask = s->InstanceSelection())
+            return mask;
+      }
+      return nullptr;
+   }
+
    // Depth-only pass from the light's point of view. Shares the instancing
    // attribute layout with the main shader so an instanced source casts shadows
    // from all its copies rather than just the base mesh.
@@ -1349,7 +1376,12 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       if (auto* instancer = FindInstancer(source))
       {
          sig.instanceRev[i] = instancer->InstanceRevision();
-         sig.instanceCount[i] = instancer->InstanceCount();
+         // The override (a selectionOnly Delete/Transform's own transform
+         // list, see InstanceTransformOverride()) can hold fewer or more
+         // entries than the raw instancer - reflected here so a mask/override
+         // change that happens not to bump meshRev[i] (it always does today,
+         // but this is the honest count either way) still shows up.
+         sig.instanceCount[i] = ResolveInstanceTransforms(source, instancer).size();
          sig.instanceGroupMatrix[i] = source->GetInstanceGroupMatrix();
       }
       for (int m = kMapRoughness; m < kMapCount; m++)
@@ -2102,9 +2134,9 @@ void Render3DNode::CookIfNeeded(int frameId)
          // compared on its own to catch a param edit with no other change.
          const Mat4 groupMatrix = source->GetInstanceGroupMatrix();
          if (gpu.instanceRevision != instanceRevision || !gpu.instanceAttribsOn ||
-             !(gpu.instanceGroupMatrix == groupMatrix))
+             !(gpu.instanceGroupMatrix == groupMatrix) || gpu.instanceOverrideRevision != revision)
          {
-            const std::vector<Mat4>& xforms = instancer->InstanceTransforms();
+            const std::vector<Mat4>& xforms = ResolveInstanceTransforms(source, instancer);
             std::vector<Mat4> composed;
             const std::vector<Mat4>* uploadXforms = &xforms;
             if (!(groupMatrix == Mat4::Identity()))
@@ -2150,6 +2182,7 @@ void Render3DNode::CookIfNeeded(int frameId)
 
             gpu.instanceRevision = instanceRevision;
             gpu.instanceGroupMatrix = groupMatrix;
+            gpu.instanceOverrideRevision = revision;
             gpu.instanceCount = (int)xforms.size();
             gpu.instanceAttribsOn = true;
             mLastUploads++;

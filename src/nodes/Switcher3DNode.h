@@ -54,6 +54,11 @@ public:
    // which slot is live - a Transform wrapping the instancer upstream of the
    // switcher still moves the whole scatter.
    Mat4 GetInstanceGroupMatrix() const override;
+   // Same active-input forwarding for the instance selection mask/override -
+   // see MaterialNode for why these travel with PassthroughSource.
+   const std::vector<unsigned char>* InstanceSelection() const override;
+   unsigned long long InstanceSelectionRevision() const override;
+   const std::vector<Mat4>* InstanceTransformOverride() const override;
 
    INode* BypassSource() override
    {

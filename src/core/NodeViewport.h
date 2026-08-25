@@ -72,12 +72,37 @@ private:
    bool mInstanceAttribsOn = false;
    unsigned long long mInstanceRevision = (unsigned long long)-1;
    Mat4 mInstanceGroupMatrix;
+   // Mirrors Render3DNode::GpuMesh::instanceOverrideRevision - the mesh
+   // revision last seen when the instance buffer was uploaded, so a
+   // selectionOnly Delete/Transform's InstanceTransformOverride() changing
+   // (without touching the raw instancer's own revision or group matrix)
+   // still triggers a re-upload. See ResolveInstanceTransforms in
+   // NodeViewport.cpp.
+   unsigned long long mInstanceOverrideRevision = (unsigned long long)-1;
 
    // Selected faces as their own index buffer, same technique as
    // Render3DNode's GpuMesh::selVao/selIbo (Geometry3DNodes.h).
    unsigned int mSelVao = 0, mSelIbo = 0;
    int mSelIndexCount = 0;
    unsigned long long mSelRevision = (unsigned long long)-1;
+   // Whether mSelVao's aInstance attribs (2-5) currently point at mInstanceVbo.
+   // Configured in the draw path alongside mInstanceAttribsOn, never inside
+   // UpdateSelectionBuffer - mInstanceVbo may still be 0 (ungenerated) the
+   // first time UpdateSelectionBuffer runs, and binding it there would wire
+   // mSelVao's attribs to buffer 0 permanently.
+   bool mSelInstanceAttribsOn = false;
+
+   // Instance-domain selection fallback (Part 1 step 5 of
+   // local-prompts/instance-selection.md): the stamp mesh has no faceMask to
+   // build mSelVao/mSelIbo from (Select operated on instance placements, not
+   // faces), so instead mSelIbo holds the *whole* stamp's indices and this
+   // holds just the selected instances' composed transforms, drawn instanced
+   // over only that subset - whole instances tint, not a per-face highlight.
+   // Rebuilt whenever the instance-selection draw block runs at all (which
+   // only happens on an actual redraw already gated above), so it carries no
+   // revision cache of its own.
+   unsigned int mSelInstanceOverrideVbo = 0;
+   int mSelInstanceOverrideCount = 0;
 
    // A pure point-cloud source (Particle System) has no mesh at all - GetMesh()
    // is a permanently-empty stub, see ParticleSystemNode::GetMesh
