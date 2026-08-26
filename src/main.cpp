@@ -747,6 +747,7 @@ namespace
    bool gFormulaEditorOpen = false;
    bool gGlobalsOpen = false;
    bool gHelpOpen = false;
+   bool gUpdateCheckModalOpen = false; // OpenPopup() is called from the menu item; this only gates BeginPopupModal
 
    // Files dropped on the window, consumed on the next frame so the spawn can
    // happen inside the editor where canvas coordinates are meaningful.
@@ -29120,7 +29121,11 @@ int main(int argc, char** argv)
             if (ImGui::MenuItem("Help / module reference"))
                gHelpOpen = true;
             if (ImGui::MenuItem("Check for updates"))
+            {
                UpdateCheck::Start(); // manual re-check for anyone who dismissed the badge
+               gUpdateCheckModalOpen = true;
+               ImGui::OpenPopup("Check for updates");
+            }
 
             ImGui::Separator();
             if (ImGui::MenuItem("Quit"))
@@ -38336,6 +38341,82 @@ int main(int argc, char** argv)
             ImGui::CloseCurrentPopup();
          }
          ImGui::EndPopup();
+      }
+
+      // ---- check for updates modal ----
+      // OpenPopup() was already called from the menu item (src/main.cpp,
+      // "Check for updates"); this only gates BeginPopupModal, mirroring the
+      // gGlobalsOpen/gHelpOpen bool-driven pattern rather than nesting a
+      // modal inside the BeginMenu block above.
+      if (gUpdateCheckModalOpen)
+      {
+         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+         ImGui::SetNextWindowSize(ImVec2(380, 0), ImGuiCond_Appearing);
+         if (ImGui::BeginPopupModal("Check for updates", &gUpdateCheckModalOpen, ImGuiWindowFlags_AlwaysAutoResize))
+         {
+            UpdateCheck::Status status = UpdateCheck::GetStatus();
+            switch (status)
+            {
+               case UpdateCheck::Status::Idle:
+               case UpdateCheck::Status::Checking:
+               {
+                  // Text-only "spinner" - a handful of dots cycling off the
+                  // clock, so the modal never looks frozen while the request
+                  // is in flight.
+                  int dots = ((int)(ImGui::GetTime() * 2.0) % 4);
+                  ImGui::Text("Checking for updates%.*s", dots, "...");
+                  break;
+               }
+               case UpdateCheck::Status::UpToDate:
+                  ImGui::Text("You're running the latest version (%s).", INFINITE_VERSION_STRING);
+                  break;
+               case UpdateCheck::Status::UpdateAvailable:
+                  ImGui::Text("Version %s is available (you have %s).",
+                              UpdateCheck::ResultVersion().c_str(), INFINITE_VERSION_STRING);
+                  break;
+               case UpdateCheck::Status::Failed:
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.45f, 0.4f, 1.0f));
+                  ImGui::TextWrapped("%s", UpdateCheck::LastError().c_str());
+                  ImGui::PopStyleColor();
+                  break;
+            }
+
+            ImGui::Separator();
+
+            if (status == UpdateCheck::Status::UpdateAvailable)
+            {
+               if (ImGui::Button("Download latest version"))
+                  Platform::OpenExternalUrl(UpdateCheck::DownloadUrl());
+               ImGui::SameLine();
+               if (ImGui::Button("Later"))
+               {
+                  gUpdateCheckModalOpen = false;
+                  ImGui::CloseCurrentPopup();
+               }
+            }
+            else if (status == UpdateCheck::Status::Failed)
+            {
+               if (ImGui::Button("Retry"))
+                  UpdateCheck::Start();
+               ImGui::SameLine();
+               if (ImGui::Button("Close"))
+               {
+                  gUpdateCheckModalOpen = false;
+                  ImGui::CloseCurrentPopup();
+               }
+            }
+            else if (status == UpdateCheck::Status::UpToDate)
+            {
+               if (ImGui::Button("Close"))
+               {
+                  gUpdateCheckModalOpen = false;
+                  ImGui::CloseCurrentPopup();
+               }
+            }
+            // Idle/Checking: no buttons yet, just wait for Poll() to land a result.
+
+            ImGui::EndPopup();
+         }
       }
 
       // Keep the title bar in sync with the open document. GLFW has no

@@ -26,11 +26,30 @@ namespace
    std::thread gWorker;
    std::atomic<bool> gRunning { false };
    std::atomic<bool> gResultReady { false };
+
+   // What one WorkerMain run produces, guarded by gResultMutex until Poll()
+   // copies it out.
+   struct PendingResult
+   {
+      bool ok = false;              // fetch + parse succeeded
+      std::string error;            // set when !ok
+      std::string latestTag;        // raw tag_name from GitHub; set when ok
+      bool isNewer = false;         // latestTag is newer than the running version
+      std::string downloadUrl;      // resolved platform asset URL; set when isNewer
+      std::string badgeLatest;      // latestTag if isNewer and not dismissed, else empty
+   };
+
    std::mutex gResultMutex;
-   std::string gPendingLatest;      // guarded by gResultMutex; empty = no update found
+   PendingResult gPending;          // guarded by gResultMutex
    bool gHaveResult = false;
    std::string gLatestVersion;      // main-thread copy, only touched by Poll()/Dismiss()
    bool gUpdateAvailable = false;
+
+   // Modal-facing state - main thread only, touched by Poll()/Start().
+   Status gModalStatus = Status::Idle;
+   std::string gModalVersion;
+   std::string gModalError;
+   std::string gModalDownloadUrl;
 
    // Mirrors CategoryColors::ThemePath()'s comment: one flat preference file
    // next to the app's other Application Support state, not a bundled
@@ -117,6 +136,47 @@ namespace
       return false;
    }
 
+   // Picks the release asset name for the platform/arch this binary was
+   // built for. Empty when this platform has no packaged asset (falls back
+   // to the release page).
+   std::string ExpectedAssetName()
+   {
+#if defined(__APPLE__)
+      return "Infinite.dmg";
+#elif defined(_WIN32)
+#if defined(_M_ARM64) || defined(__aarch64__)
+      return "Infinite-windows-ARM64.zip";
+#else
+      return "Infinite-windows-x64.zip";
+#endif
+#else
+      return {};
+#endif
+   }
+
+   // assets[].browser_download_url for the platform asset, else the
+   // release's html_url, else the website's download section - in that
+   // order, per docs/plans/update-checker-prompt.md.
+   std::string ResolveDownloadUrl(const json& release)
+   {
+      std::string expected = ExpectedAssetName();
+      if (!expected.empty() && release.contains("assets") && release["assets"].is_array())
+      {
+         for (const json& asset : release["assets"])
+         {
+            if (!asset.contains("name") || !asset["name"].is_string())
+               continue;
+            if (asset["name"].get<std::string>() != expected)
+               continue;
+            if (asset.contains("browser_download_url") && asset["browser_download_url"].is_string())
+               return asset["browser_download_url"].get<std::string>();
+         }
+      }
+      if (release.contains("html_url") && release["html_url"].is_string())
+         return release["html_url"].get<std::string>();
+      return "https://n1m21n.github.io/Infinite/#download";
+   }
+
    void WorkerMain()
    {
       std::string body, error;
@@ -124,42 +184,60 @@ namespace
       bool ok = Platform::HttpGet("https://api.github.com/repos/n1m21n/Infinite/releases/latest",
                                    userAgent, body, error, 10);
 
-      std::string latestTag;
-      if (ok)
+      PendingResult result;
+      json release;
+      if (!ok)
+      {
+         result.error = error.empty() ? "network request failed" : error;
+      }
+      else
       {
          // A rate-limit or error response is still valid JSON, just a
-         // different shape - treat any parse/lookup failure as "no result"
-         // rather than letting it propagate as a crash.
+         // different shape - treat any parse/lookup failure as a reportable
+         // Failed result rather than letting it propagate as a crash or
+         // silently look like "up to date".
          try
          {
-            json j = json::parse(body);
-            if (j.contains("tag_name") && j["tag_name"].is_string())
-               latestTag = j["tag_name"].get<std::string>();
+            release = json::parse(body);
+            if (release.contains("tag_name") && release["tag_name"].is_string())
+            {
+               result.ok = true;
+               result.latestTag = release["tag_name"].get<std::string>();
+            }
+            else if (release.contains("message") && release["message"].is_string())
+            {
+               result.error = release["message"].get<std::string>();
+            }
+            else
+            {
+               result.error = "unexpected response from GitHub";
+            }
          }
          catch (...)
          {
-            latestTag.clear();
+            result.error = "invalid response from GitHub";
          }
       }
 
-      if (!latestTag.empty())
+      if (result.ok)
       {
          std::vector<int> local = ParseVersion(INFINITE_VERSION_STRING);
-         std::vector<int> remote = ParseVersion(latestTag);
-         if (!IsNewer(local, remote))
-            latestTag.clear();
-      }
+         std::vector<int> remote = ParseVersion(result.latestTag);
+         result.isNewer = IsNewer(local, remote);
 
-      if (!latestTag.empty())
-      {
-         std::string dismissed = LoadDismissedVersion();
-         if (!dismissed.empty() && !IsNewer(ParseVersion(dismissed), ParseVersion(latestTag)))
-            latestTag.clear(); // already dismissed this version (or newer)
+         if (result.isNewer)
+         {
+            result.downloadUrl = ResolveDownloadUrl(release);
+
+            std::string dismissed = LoadDismissedVersion();
+            if (dismissed.empty() || IsNewer(ParseVersion(dismissed), remote))
+               result.badgeLatest = result.latestTag; // not dismissed (or a newer one arrived since)
+         }
       }
 
       {
          std::lock_guard<std::mutex> lock(gResultMutex);
-         gPendingLatest = latestTag;
+         gPending = result;
       }
       gResultReady.store(true, std::memory_order_release);
       gRunning.store(false, std::memory_order_relaxed);
@@ -168,12 +246,17 @@ namespace
 
 void Start()
 {
-   if (getenv("INFINITE_NO_UPDATE_CHECK") != nullptr)
+   if (getenv("INFINITE_NO_UPDATE_CHECK") != nullptr || getenv("IMAGERESYNTH_SELFTEST") != nullptr)
+   {
+      // Resolve synchronously rather than leaving GetStatus() at Idle - a
+      // modal driven off it must not spin on "Checking..." forever, and the
+      // self-test harness must never make a network call.
+      gModalStatus = Status::Failed;
+      gModalError = "Update checks are disabled in this build.";
       return;
-   if (getenv("IMAGERESYNTH_SELFTEST") != nullptr)
-      return;
+   }
    if (gRunning.exchange(true, std::memory_order_acq_rel))
-      return; // already in flight
+      return; // already in flight; GetStatus() reports Checking via gRunning
 
    if (gWorker.joinable())
       gWorker.join(); // previous run finished; reap before starting a new one
@@ -190,10 +273,54 @@ void Poll()
    if (!lock.owns_lock())
       return; // worker mid-write; try again next frame
 
-   gLatestVersion = gPendingLatest;
+   PendingResult result = gPending;
+   lock.unlock();
+   gResultReady.store(false, std::memory_order_relaxed);
+
+   // Badge - unchanged behaviour, always dismissal-filtered.
+   gLatestVersion = result.badgeLatest;
    gUpdateAvailable = !gLatestVersion.empty();
    gHaveResult = true;
-   gResultReady.store(false, std::memory_order_relaxed);
+
+   // Modal - always the true state, dismissal-independent.
+   if (!result.ok)
+   {
+      gModalStatus = Status::Failed;
+      gModalError = result.error.empty() ? "update check failed" : result.error;
+   }
+   else if (result.isNewer)
+   {
+      gModalStatus = Status::UpdateAvailable;
+      gModalVersion = result.latestTag;
+      gModalDownloadUrl = result.downloadUrl;
+   }
+   else
+   {
+      gModalStatus = Status::UpToDate;
+      gModalVersion = result.latestTag;
+   }
+}
+
+Status GetStatus()
+{
+   if (gRunning.load(std::memory_order_relaxed))
+      return Status::Checking;
+   return gModalStatus;
+}
+
+const std::string& ResultVersion()
+{
+   return gModalVersion;
+}
+
+const std::string& LastError()
+{
+   return gModalError;
+}
+
+const std::string& DownloadUrl()
+{
+   return gModalDownloadUrl;
 }
 
 bool UpdateAvailable()
