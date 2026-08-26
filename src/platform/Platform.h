@@ -103,9 +103,16 @@ namespace Platform
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels);
 
    // ---- background removal ----
-   // Uses Vision's on-device segmentation: no model download, no network, no
-   // API key. Subject lifting (any salient foreground) needs macOS 14; person
-   // segmentation works from macOS 12. Returns false with a reason otherwise.
+   // macOS uses Vision's on-device segmentation: no model download, no
+   // network, no API key. Subject lifting (any salient foreground) needs
+   // macOS 14; person segmentation works from macOS 12. Returns false with a
+   // reason otherwise.
+   //
+   // Windows has no Vision equivalent, so it bundles a small on-device model
+   // (u2netp, see assets/models/NOTICE.txt) run through ONNX Runtime with the
+   // DirectML execution provider instead - still no network access or API
+   // key at runtime, just a model file shipped with the build rather than
+   // fetched from the OS. See src/platform/win/PlatformWin.cpp.
    enum class MattingMode
    {
       Subject, // any salient foreground object (macOS 14+)

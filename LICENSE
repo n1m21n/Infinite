@@ -29,3 +29,12 @@ which is licensed under the GNU General Public License version 3 (GPLv3). The
 distributed binary of a default build must therefore be distributed under the
 terms of the GPLv3. Building with `-DINFINITE_ENABLE_VST3=OFF` excludes the VST3
 SDK and the resulting binary remains under the plain MIT terms above.
+
+The Windows build bundles `assets/models/u2netp.onnx`, the small U^2-Net
+variant's weights, for on-device background removal (macOS uses Vision
+instead and does not ship this file). Those weights are from
+https://github.com/xuebinqin/U-2-Net and are licensed under the Apache
+License 2.0; see `assets/models/NOTICE.txt`. The Windows build also links
+ONNX Runtime (MIT) and, for GPU acceleration, the `Microsoft.AI.DirectML`
+NuGet redistributable, under its own license terms - see CMakeLists.txt and
+the license file NuGet stages alongside it.

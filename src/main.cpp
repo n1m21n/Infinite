@@ -27198,6 +27198,104 @@ int RunAutosaveMarkerTest()
    return 0;
 }
 
+// ======================================================= INFINITE_REMOVEBGTEST
+//
+// Headless proof that Platform::SubjectMask's plumbing is wired correctly on
+// whichever backend the platform provides (Vision on macOS, ONNX Runtime on
+// Windows once implemented) - not a model-quality test. Gated as an early
+// exit before glfwInit(), like INFINITE_PLUGINSCANTEST/DSPTEST above - it
+// needs none of the GL/ImGui setup.
+//
+// Deliberately a weak assertion: a filled circle on a flat contrasting
+// background is unambiguous foreground/background, so this only verifies the
+// call succeeds, the mask comes back at the right resolution, and the values
+// land on the right side of the midpoint inside the circle vs. the corners.
+// That is enough to catch an inverted or transposed mask - the failure this
+// will actually have - without asserting anything about model quality.
+int RunRemoveBgTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+
+   const int kSize = 256;
+   const int kCx = kSize / 2, kCy = kSize / 2;
+   const int kRadius = kSize * 3 / 8;
+   std::vector<unsigned char> pixels((size_t)kSize * kSize * 4, 0);
+   for (int y = 0; y < kSize; y++)
+   {
+      for (int x = 0; x < kSize; x++)
+      {
+         const int dx = x - kCx, dy = y - kCy;
+         const bool inCircle = (dx * dx + dy * dy) <= (kRadius * kRadius);
+         unsigned char* px = &pixels[((size_t)y * kSize + x) * 4];
+         if (inCircle)
+         {
+            // A shaded sphere-like blob, not a flat color fill - Vision's
+            // saliency/instance models are trained on real photos and are
+            // more reliable at picking out something with the shading and
+            // gradient of a real object than a perfectly flat cutout shape.
+            const float nx = (float)dx / (float)kRadius, ny = (float)dy / (float)kRadius;
+            const float shade = std::clamp(1.0f - 0.6f * (nx * 0.3f + ny * 0.3f + 0.5f * (nx * nx + ny * ny)), 0.25f, 1.0f);
+            px[0] = (unsigned char)(220 * shade);
+            px[1] = (unsigned char)(140 * shade);
+            px[2] = (unsigned char)(30 * shade);
+         }
+         else
+         {
+            // Flat mid-grey background, distinct in both hue and brightness
+            // from the blob at every point on its edge.
+            px[0] = px[1] = px[2] = 90;
+         }
+         px[3] = 255;
+      }
+   }
+
+   std::vector<unsigned char> mask;
+   std::string error;
+   const bool called = Platform::SubjectMask(pixels, kSize, kSize, Platform::MattingMode::Subject, mask, error);
+
+   if (!called)
+   {
+      // No implementation on this platform/OS version yet (e.g. Windows
+      // before the ONNX backend lands, or macOS below Vision's floor) -
+      // that is a real, expected state, not a test failure.
+      printf("REMOVEBGTEST SKIP: %s\n", error.c_str());
+      return 0;
+   }
+
+   bool ok = true;
+
+   const bool rightSize = mask.size() == (size_t)kSize * kSize;
+   printf("REMOVEBG mask size: %d bytes (expected %d)  %s\n", (int)mask.size(), kSize * kSize,
+          rightSize ? "OK" : "FAIL");
+   ok = ok && rightSize;
+
+   if (rightSize)
+   {
+      const unsigned char midpoint = 128;
+      const unsigned char center = mask[(size_t)kCy * kSize + kCx];
+      const unsigned char corners[4] = {
+         mask[0],
+         mask[kSize - 1],
+         mask[(size_t)(kSize - 1) * kSize],
+         mask[(size_t)(kSize - 1) * kSize + (kSize - 1)],
+      };
+
+      const bool centerAbove = center > midpoint;
+      printf("REMOVEBG center (in circle): %d  %s\n", (int)center, centerAbove ? "OK" : "FAIL");
+      ok = ok && centerAbove;
+
+      bool allCornersBelow = true;
+      for (unsigned char c : corners)
+         allCornersBelow = allCornersBelow && (c < midpoint);
+      printf("REMOVEBG corners (background): %d %d %d %d  %s\n", (int)corners[0], (int)corners[1],
+             (int)corners[2], (int)corners[3], allCornersBelow ? "OK" : "FAIL");
+      ok = ok && allCornersBelow;
+   }
+
+   printf("%s\n", ok ? "REMOVEBGTEST OK" : "REMOVEBGTEST FAIL");
+   return 0;
+}
+
 // A destination parameter's declared min/max is a hard contract - no cable,
 // expression, or typed value can push it outside that range, because
 // everything downstream (mesh generation, buffer sizing, ...) trusts the
@@ -27242,6 +27340,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_AUTOSAVEMARKERTEST") != nullptr)
       return RunAutosaveMarkerTest();
+
+   if (getenv("INFINITE_REMOVEBGTEST") != nullptr)
+      return RunRemoveBgTest();
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();

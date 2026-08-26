@@ -16,6 +16,9 @@ $Build = Join-Path $Root "build-dist"
 $Stage = Join-Path $Root "dist\Infinite"
 $Exe   = Join-Path $Build "Release\Infinite.exe"
 $ScannerExe = Join-Path $Build "Release\infinite-vst3-scanner.exe"
+$OrtDll = Join-Path $Build "Release\onnxruntime.dll"
+$DmlDll = Join-Path $Build "Release\DirectML.dll"
+$ModelDir = Join-Path $Build "Release\assets\models"
 
 function Find-VsDevShell {
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -64,6 +67,13 @@ Copy-Item $Exe $Stage
 # The out-of-process VST3 scanner (src/scanner_main_win.cpp) must sit next to
 # Infinite.exe - Platform::ScannerExecutablePath() looks for it there.
 if (Test-Path $ScannerExe) { Copy-Item $ScannerExe $Stage }
+# ONNX Runtime + DirectML EP and the bundled u2netp model, for
+# Platform::SubjectMask (background removal) - see CMakeLists.txt's
+# POST_BUILD copy comment for why these three are needed next to the exe.
+Copy-Item $OrtDll $Stage
+Copy-Item $DmlDll $Stage
+New-Item -ItemType Directory -Force (Join-Path $Stage "assets\models") | Out-Null
+Copy-Item (Join-Path $ModelDir "u2netp.onnx") (Join-Path $Stage "assets\models")
 
 Write-Host "==> done: $Stage\Infinite.exe"
 if ($Launch) {

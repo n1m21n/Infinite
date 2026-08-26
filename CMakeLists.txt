@@ -103,6 +103,58 @@ if(WIN32)
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(flac)
+
+    # ONNX Runtime + DirectML EP, for Platform::SubjectMask's Windows
+    # implementation (src/platform/win/PlatformWin.cpp) - on-device background
+    # removal since Windows has no equivalent to Apple's Vision framework.
+    #
+    # Fetched as prebuilt NuGet packages rather than built from source: ONNX
+    # Runtime is a very large build, and a .nupkg is just a zip, downloadable
+    # straight from nuget.org without the nuget/dotnet CLI. Two separate
+    # packages are needed:
+    #   - Microsoft.ML.OnnxRuntime.DirectML: onnxruntime.dll/.lib built with
+    #     the DirectML execution provider compiled in, plus
+    #     dml_provider_factory.h (OrtSessionOptionsAppendExecutionProvider_DML).
+    #     The plain onnxruntime-win-x64-*.zip GitHub release asset does NOT
+    #     have DirectML support - confirmed by inspecting it - so it won't do.
+    #   - Microsoft.AI.DirectML: DirectML.dll itself. onnxruntime.dll dynamically
+    #     imports it (confirmed via string-scanning the DLL) but does not embed
+    #     it, so it's a separate runtime dependency that must ship alongside.
+    # Neither package's headers are otherwise touched - we only ever call the
+    # ORT C++ API plus the one DML provider-registration function, never the
+    # DirectML API directly, so Microsoft.AI.DirectML contributes just the
+    # .dll, nothing to link or include.
+    set(ONNXRUNTIME_DML_VERSION "1.20.1")
+    set(DIRECTML_VERSION "1.15.4")
+
+    # Matches the -A argument package.ps1/build.yml pass to cmake's Visual
+    # Studio generator (the only generator this Windows port supports).
+    set(INFINITE_WIN_ARCH "x64")
+    if(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64")
+        set(INFINITE_WIN_ARCH "arm64")
+    endif()
+
+    FetchContent_Declare(
+        onnxruntime_dml
+        URL "https://www.nuget.org/api/v2/package/Microsoft.ML.OnnxRuntime.DirectML/${ONNXRUNTIME_DML_VERSION}"
+        URL_HASH SHA256=6763468507b7cfc777b1334b3e174c11a540ddacb7bd4354bc2e0ec89e56eec2
+        DOWNLOAD_NAME "onnxruntime-directml-${ONNXRUNTIME_DML_VERSION}.zip"
+    )
+    FetchContent_Declare(
+        directml_redist
+        URL "https://www.nuget.org/api/v2/package/Microsoft.AI.DirectML/${DIRECTML_VERSION}"
+        URL_HASH SHA256=4e7cb7ddce8cf837a7a75dc029209b520ca0101470fcdf275c1f49736a3615b9
+        DOWNLOAD_NAME "directml-${DIRECTML_VERSION}.zip"
+    )
+    FetchContent_MakeAvailable(onnxruntime_dml directml_redist)
+
+    # Package layout, from inspecting the .nupkg contents directly:
+    #   onnxruntime_dml: build/native/include/*.h, runtimes/win-<arch>/native/onnxruntime.{dll,lib}
+    #   directml_redist: bin/<arch>-win/DirectML.dll  (note the reversed arch/win order)
+    set(ONNXRUNTIME_INCLUDE_DIR "${onnxruntime_dml_SOURCE_DIR}/build/native/include")
+    set(ONNXRUNTIME_LIB "${onnxruntime_dml_SOURCE_DIR}/runtimes/win-${INFINITE_WIN_ARCH}/native/onnxruntime.lib")
+    set(ONNXRUNTIME_DLL "${onnxruntime_dml_SOURCE_DIR}/runtimes/win-${INFINITE_WIN_ARCH}/native/onnxruntime.dll")
+    set(DIRECTML_DLL "${directml_redist_SOURCE_DIR}/bin/${INFINITE_WIN_ARCH}-win/DirectML.dll")
 endif()
 
 # VST3 plugin hosting backend. On by default: the Steinberg VST3 SDK is
@@ -420,7 +472,25 @@ if(WIN32)
         # WinHTTP backs Platform::HttpGet (UpdateCheck's GitHub Releases
         # request) - not otherwise linked anywhere in this target.
         winhttp
+        "${ONNXRUNTIME_LIB}"
     )
+    target_include_directories(Infinite PRIVATE "${ONNXRUNTIME_INCLUDE_DIR}")
+    # onnxruntime.dll, DirectML.dll (its own runtime dependency - see the
+    # FetchContent comment above) and the bundled model weights all need to
+    # sit next to Infinite.exe to run, exactly like infinite-vst3-scanner.exe
+    # below. package.ps1 and .github/workflows/build.yml duplicate this same
+    # copy for the distributed zip.
+    add_custom_command(TARGET Infinite POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${ONNXRUNTIME_DLL}"
+                "${DIRECTML_DLL}"
+                "$<TARGET_FILE_DIR:Infinite>"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/assets/models"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/u2netp.onnx"
+                "$<TARGET_FILE_DIR:Infinite>/assets/models/u2netp.onnx"
+        COMMENT "Copying onnxruntime.dll, DirectML.dll and the u2netp model next to Infinite.exe")
     # M_PI etc. live behind _USE_MATH_DEFINES in MSVC's math.h; defining on the
     # command line lands before any cmath include.
     target_compile_definitions(Infinite PRIVATE

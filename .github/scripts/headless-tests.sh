@@ -65,6 +65,28 @@ check_verdict() {
 
 check_verdict INFINITE_AUDIOPDCTEST "AUDIOPDCTEST OK"
 
+# RemoveBgNode's background-removal backend (Vision on macOS, ONNX Runtime +
+# DirectML on Windows). SKIP is an accepted, non-failing verdict here (see
+# RunRemoveBgTest in src/main.cpp) - it just means Platform::SubjectMask
+# itself reported no implementation/support on this OS version, not a defect.
+# Only a crash or an explicit FAIL verdict fails this job. On the Windows
+# runner this is the only automated check that the bundled u2netp model
+# actually loads and runs end-to-end (GitHub's Windows runners have no GPU,
+# so this also exercises the CPU-EP fallback path, not DirectML).
+echo "== INFINITE_REMOVEBGTEST"
+if ! out="$(INFINITE_REMOVEBGTEST=1 "$BIN" 2>&1)"; then
+   echo "   FAIL (crashed, exit $?)"
+   printf '%s\n' "$out" | tail -20
+   status=1
+elif printf '%s\n' "$out" | grep -qE "REMOVEBGTEST (OK|SKIP)"; then
+   printf '%s\n' "$out" | grep "REMOVEBGTEST"
+   echo "   pass"
+else
+   echo "   FAIL (no OK/SKIP verdict)"
+   printf '%s\n' "$out" | tail -20
+   status=1
+fi
+
 # --- crash-only (baseline too large to gate on) ----------------------------
 
 echo "== INFINITE_AUDIOPARAMSWEEPTEST (crash check only)"

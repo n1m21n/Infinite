@@ -1,19 +1,32 @@
 #pragma once
 
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "INode.h"
 #include "ImageCable.h"
 #include "GLUtil.h"
+#include "Platform.h"
 
-// Background removal using the OS's own on-device segmentation - no model
-// download, no network, no API key.
+// Background removal using on-device segmentation (Vision on macOS, a
+// bundled ONNX model on Windows - see Platform::SubjectMask) - no network
+// access or API key either way.
 //
-// Masking costs a GPU readback plus a Vision pass, which is far too slow to run
-// every frame at video rates, so the mask is computed on demand (or at a capped
-// interval for moving footage) and cached. The mask is then applied on the GPU
-// each frame, which is cheap.
+// Masking costs a GPU readback plus a segmentation pass, which is far too
+// slow to run every frame at video rates (worse still on Windows, where
+// there is no fast fixed-function path like Vision), so the mask is computed
+// on a background worker thread with a latest-only request queue: never more
+// than one request in flight and one queued, so a slow segmentation pass
+// never builds an unbounded backlog and never stalls the render thread.
+//
+// The mask a worker produces is only ever composited with the exact source
+// frame it was computed from (see mPairedSrcTex) - never with whatever frame
+// happens to be current when the result arrives - so a moving subject never
+// shows a mask torn from N frames of motion ago.
 class RemoveBgNode : public INode
 {
 public:
@@ -55,16 +68,64 @@ public:
    }
 
 private:
+   // One pending request slot - not a deque. A new frame overwrites whatever
+   // was queued but not yet picked up by the worker; it never queues behind
+   // a backlog of stale frames.
+   struct FrameRequest
+   {
+      std::vector<unsigned char> pixels;
+      int width = 0, height = 0;
+      Platform::MattingMode mode = Platform::MattingMode::Subject;
+      uint64_t serial = 0;
+   };
+
+   // Carries the mask back paired with a copy of the exact source pixels it
+   // was computed from, so the two are always composited together.
+   struct FrameResult
+   {
+      std::vector<unsigned char> mask;
+      std::vector<unsigned char> pixels;
+      int width = 0, height = 0;
+      uint64_t serial = 0;
+      bool ok = false;
+      std::string error;
+   };
+
    bool EnsureShader();
-   void ComputeMask(unsigned int srcTex, int w, int h);
+   void SubmitMaskRequest(unsigned int srcTex, int w, int h);
+   void PollMaskResult();
+   void EnsureWorkerStarted();
+   void WorkerThreadMain();
 
    ImageCable mInput;
    GLUtil::Fbo mOut;
    unsigned int mProgram = 0;
    unsigned int mMaskTex = 0;
+   unsigned int mPairedSrcTex = 0; // the frame mMaskTex was computed from - main thread/GL only
    bool mShaderTried = false;
    bool mNeedsMask = false;
    int mLastCookFrame = -1;
    double mLastMaskBeat = -1000.0;
    std::string mStatus = "press Remove Background";
+
+   // Cross-thread ownership: the main thread owns this node and every GL
+   // object; the worker thread only ever reads its own request copy and
+   // writes into mPendingResult. The worker never touches a GL object - it
+   // receives already-read-back CPU pixels and returns CPU pixels.
+   std::thread mWorkerThread;
+   bool mWorkerStarted = false;
+
+   std::mutex mRequestMutex;
+   std::condition_variable mRequestCv;
+   FrameRequest mPendingRequest;   // guarded by mRequestMutex
+   bool mRequestPending = false;   // guarded by mRequestMutex
+   bool mStopWorker = false;       // guarded by mRequestMutex
+
+   std::mutex mResultMutex;
+   FrameResult mPendingResult;           // guarded by mResultMutex
+   std::atomic<bool> mResultReady { false };
+
+   uint64_t mNextSerial = 1;
+   uint64_t mLastAppliedSerial = 0;
+   bool mMaskInFlight = false;
 };
