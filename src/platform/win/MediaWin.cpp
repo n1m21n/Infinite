@@ -175,6 +175,26 @@ namespace
       return (LONGLONG)((double)frame * 10000000.0 / fps);
    }
 
+   // Attributes for source reader creation that turn on the Video Processor
+   // MFT (MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING). Without this,
+   // a reader can only hand out whatever subtype the raw decoder produces
+   // (e.g. NV12 for H.264); a later SetCurrentMediaType asking for RGB32
+   // fails with MF_E_INVALIDMEDIATYPE since there's no MFT to do the
+   // conversion. Returns nullptr on failure - callers fall back to no
+   // attributes rather than failing the open outright.
+   IMFAttributes* CreateAdvancedVideoProcessingAttributes()
+   {
+      IMFAttributes* attrs = nullptr;
+      if (FAILED(MFCreateAttributes(&attrs, 1)))
+         return nullptr;
+      if (FAILED(attrs->SetUINT32(MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, TRUE)))
+      {
+         SafeRelease(&attrs);
+         return nullptr;
+      }
+      return attrs;
+   }
+
    // ---- video decode ---------------------------------------------------------
 
    struct VideoHandleMf
@@ -182,6 +202,7 @@ namespace
       IMFSourceReader* reader = nullptr;
       int width = 0;
       int height = 0;
+      LONG stride = 0; // bytes per row of the negotiated RGB32 type; negative means bottom-up
       double durationSeconds = 0.0;
       long long lastDeliveredFrameHns = -1; // timestamp of the frame in outPixels
       std::vector<unsigned char> currentPixels;
@@ -237,8 +258,17 @@ namespace
       }
       UINT64 size64 = 0;
       actual->GetUINT64(MF_MT_FRAME_SIZE, &size64);
-      SafeRelease(&actual);
       UnpackFrameSize(size64, (UINT32&)video->width, (UINT32&)video->height);
+
+      // Some paths through the Video Processor MFT report a negative
+      // (bottom-up) default stride rather than a tightly-packed positive
+      // one - never assume width * 4.
+      UINT32 strideU32 = 0;
+      if (SUCCEEDED(actual->GetUINT32(MF_MT_DEFAULT_STRIDE, &strideU32)))
+         video->stride = (LONG)strideU32;
+      else
+         video->stride = (LONG)video->width * 4;
+      SafeRelease(&actual);
       return true;
    }
 
@@ -280,9 +310,18 @@ namespace
       hr = buffer->Lock(&data, nullptr, nullptr);
       if (SUCCEEDED(hr))
       {
-         // Contiguous buffers are tightly packed: stride is exactly one row.
-         Rgb32ToRgbaFlipped(data, (LONG)(video->width * 4), video->width, video->height,
-                            false, outPixels);
+         LONG stride = video->stride;
+         const unsigned char* rowData = data;
+         if (stride < 0)
+         {
+            // Bottom-up: the pointer already refers to the image's top-left
+            // corner in display order once we walk backwards from the last
+            // row, so shift to that row and flip the stride sign to walk
+            // forward from there.
+            rowData = data + stride * (video->height - 1);
+            stride = -stride;
+         }
+         Rgb32ToRgbaFlipped(rowData, stride, video->width, video->height, false, outPixels);
          buffer->Unlock();
       }
       SafeRelease(&buffer);
@@ -312,8 +351,10 @@ namespace Platform
       }
 
       auto* video = new VideoHandleMf();
-      HRESULT hr = MFCreateSourceReaderFromURL(WinCommon::Utf8ToWide(path).c_str(), nullptr,
+      IMFAttributes* readerAttrs = CreateAdvancedVideoProcessingAttributes();
+      HRESULT hr = MFCreateSourceReaderFromURL(WinCommon::Utf8ToWide(path).c_str(), readerAttrs,
                                                &video->reader);
+      SafeRelease(&readerAttrs);
       if (FAILED(hr))
       {
          delete video;
@@ -630,7 +671,9 @@ namespace Platform
             return;
          }
 
-         hr = MFCreateSourceReaderFromMediaSource(source, nullptr, &reader);
+         IMFAttributes* readerAttrs = CreateAdvancedVideoProcessingAttributes();
+         hr = MFCreateSourceReaderFromMediaSource(source, readerAttrs, &reader);
+         SafeRelease(&readerAttrs);
          if (FAILED(hr))
          {
             fail("wrapping camera in a source reader", hr);
