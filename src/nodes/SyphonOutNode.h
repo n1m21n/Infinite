@@ -8,7 +8,10 @@
 
 // Syphon Out node: broadcasts any connected video, 3D render, or visual shader
 // to other macOS apps (Resolume, OBS, TouchDesigner, MadMapper) in real-time
-// via zero-copy GPU memory sharing (IOSurface).
+// via zero-copy GPU memory sharing (IOSurface). On Windows, the same
+// Platform::Syphon* surface is backed by Spout2 instead (see
+// src/platform/win/PlatformWinSyphon.cpp), so this node works unchanged there
+// too, publishing to a Spout sender rather than a Syphon server.
 class SyphonOutNode : public INode
 {
 public:
