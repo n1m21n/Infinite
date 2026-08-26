@@ -40,7 +40,7 @@ What each node type does: math, state, per-node parameter UI.
 | BlendNode | Two-input compositing |
 | LayerStackNode | Four-input stacked compositing |
 | FitNode | Resolution adaptor (TouchDesigner "Fit TOP"-style) |
-| VideoSourceNode | Video file source, synced to `Transport` |
+| VideoSourceNode | Video file source, synced to `Transport`; also an `IAudioSource` — second output plays the clip's own audio track on the same clock |
 | ModulatorNodes | LFO/Random/Pattern/Math — control-value emitters |
 | NoiseNode | Value/Perlin/Voronoi/ridged noise |
 | ResynthNode | Iterative image resynthesizer |
@@ -148,6 +148,19 @@ getting a file each:
   `DrawAudioNodeBody` — see `.claude/skills/new-audio-node/SKILL.md` for the
   exact wiring sites and `.claude/skills/audio-node-ui/SKILL.md` for the
   layout grammar.
+- **`src/nodes/VideoSourceNode.h`/`.cpp`** — the first node with both an image
+  output *and* an audio output on the same `INode` (`OutputCount() == 2`;
+  output 0 is the picture, output 1 is `IAudioSource`). Its `VideoAudioNode`
+  audio half doesn't run an independent playback clock: it reads from the
+  exact `mPosition` the picture side already integrates on the main thread
+  (which already bakes in `speed`, including negative/reverse), published
+  once per frame via a single `std::atomic<double>`, so the two outputs can't
+  drift onto different clocks even though sub-frame lip-sync is not
+  guaranteed. `IAudioSource::IsAudioOutputIndex(int)` exists because of this
+  node specifically — every other `IAudioSource` has exactly one output and
+  it's the audio one, but the four `srcIsAudioNode` dispatch sites in
+  `main.cpp` need to know *which* of this node's two outputs a dragged cable
+  came from before treating it as an audio source.
 
 ### Invariants for `IGeometrySource`-consuming nodes
 

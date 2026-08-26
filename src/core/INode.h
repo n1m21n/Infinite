@@ -34,6 +34,17 @@ public:
    // unobservable there. Default false: the overwhelming majority of audio
    // sources generate their own signal and are perfectly testable this way.
    virtual bool IsHardwareDriven() const { return false; }
+
+   // True if `index` (an INode::OutputCount() output index) is this node's
+   // audio-buffer output. Every existing IAudioSource has exactly one output
+   // and it is the audio one, hence the default of true regardless of index.
+   // VideoSourceNode is the first node with both an image output and an
+   // audio output on the same INode, so the audio-consuming dispatch sites
+   // (IsInputSlotCompatible et al., which currently ask "is this node an
+   // IAudioSource" with no notion of which pin was dragged) need this to
+   // avoid treating the node's image output as an audio source too - see
+   // main.cpp's `srcIsAudioNode` call sites.
+   virtual bool IsAudioOutputIndex(int /*index*/) const { return true; }
 };
 
 // Mix-in for a node that produces or forwards note events (Note Sequencer;
