@@ -3,6 +3,11 @@
 #include <string>
 #include <vector>
 
+// Opaque forward declaration - avoids pulling GLFW's headers into every TU
+// that includes this facade just for the Windows-only output-window entry
+// points below.
+struct GLFWwindow;
+
 // Thin macOS shims kept out of the C++ translation units.
 namespace Platform
 {
@@ -800,6 +805,25 @@ namespace Platform
    bool HttpGet(const std::string& url, const std::string& userAgent,
                 std::string& outBody, std::string& outError,
                 int timeoutSeconds = 10);
+
+   // ---- output/projector window (Windows only) ----------------------------
+   // Windows has no OS-level "make this app window fullscreen" affordance -
+   // maximise keeps the title bar and taskbar, and an ordinary window stays
+   // activatable/non-topmost in the normal Z-order, so it drops behind the
+   // editor the moment focus moves back to it. macOS instead gets a real
+   // fullscreen Space via NSWindow (handled entirely with GLFW_DECORATED/
+   // GLFW_FLOATING window attribs in main.cpp, no Platform.mm entry point
+   // needed), so these are declared for _WIN32 only - Platform.mm provides
+   // no definition and none should be added.
+   //
+   // Windows projector policy: a normal decorated window while the user is
+   // positioning it, then borderless + HWND_TOPMOST on fullscreen instead of
+   // exclusive fullscreen. SWP_NOACTIVATE means the editor keeps keyboard
+   // focus while the output stays visible on the other display.
+#if defined(_WIN32)
+   void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost, bool hideCursor);
+   void ReassertOutputWindowTopmost(GLFWwindow* window);
+#endif
 }
 
 

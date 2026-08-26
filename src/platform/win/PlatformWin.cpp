@@ -10,6 +10,13 @@
 
 #include "WinCommon.h"
 
+// For ConfigureOutputWindow/ReassertOutputWindowTopmost's glfwGetWin32Window
+// call - this file otherwise has no reason to see GLFW at all. Must come
+// after WinCommon.h, which already defines WIN32_LEAN_AND_MEAN/NOMINMAX.
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
+
 #include <shellapi.h>
 #include <shlobj.h>
 #include <winhttp.h>
@@ -939,5 +946,45 @@ namespace Platform
 
       outBody = std::move(body);
       return true;
+   }
+
+   // ---- output/projector window --------------------------------------------
+   // See Platform.h's comment on why this exists only on Windows: there is no
+   // OS-level "make this window fullscreen" affordance here, so main.cpp
+   // fakes one with a borderless, always-on-top window instead of exclusive
+   // GLFW fullscreen (which would auto-iconify / drop behind the editor the
+   // moment focus moves to the other display).
+   void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost, bool hideCursor)
+   {
+      HWND hwnd = glfwGetWin32Window(window);
+      if (hwnd == nullptr)
+         return;
+
+      LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+      if (borderless)
+         style = (style & ~WS_OVERLAPPEDWINDOW) | WS_POPUP;
+      else
+         style = (style & ~WS_POPUP) | WS_OVERLAPPEDWINDOW;
+      SetWindowLongPtrW(hwnd, GWL_STYLE, style);
+
+      SetWindowPos(hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+
+      glfwSetInputMode(window, GLFW_CURSOR, hideCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL);
+   }
+
+   // Windows will silently demote a HWND_TOPMOST window in real situations -
+   // another app going topmost, a UAC prompt, display hot-plug, a resolution
+   // change - so main.cpp's projector loop calls this on a throttle (not
+   // every frame) while a projector window is fullscreen, to keep it pinned
+   // above everything else.
+   void ReassertOutputWindowTopmost(GLFWwindow* window)
+   {
+      HWND hwnd = glfwGetWin32Window(window);
+      if (hwnd == nullptr)
+         return;
+
+      SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
    }
 }
