@@ -69,9 +69,11 @@ namespace Patch
       int dstIndex = 0;
       int dstSlot = 0;
       int srcIndex = 0;
-      // Which of the source's note outputs this cable reads (NoteCable::
-      // GetOutputSlot()). Unused (always 0) for cable/geo/aud records - only
-      // Note Router has more than one note output.
+      // Which of the source's note/audio outputs this cable reads
+      // (NoteCable::GetOutputSlot() / AudioCable::GetOutputSlot()). Unused
+      // (always 0) for plain image cable records - only Note Router has more
+      // than one note output, and only a node like VideoSourceNode (image +
+      // audio on separate outputs) has more than one audio output.
       int srcOutput = 0;
    };
 

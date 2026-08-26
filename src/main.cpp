@@ -784,7 +784,7 @@ namespace
    bool gFormulaEditorOpen = false;
    bool gGlobalsOpen = false;
    bool gHelpOpen = false;
-   bool gUpdateCheckModalOpen = false; // OpenPopup() is called from the menu item; this only gates BeginPopupModal
+   bool gShowUpdateCheckModal = false;
 
    // Files dropped on the window, consumed on the next frame so the spawn can
    // happen inside the editor where canvas coordinates are meaningful.
@@ -3396,7 +3396,7 @@ namespace
       }
       else if (AudioCable* audioCable = dstNode.node->AudioInputSlot(slot))
       {
-         audioCable->Connect(srcNode.node.get());
+         audioCable->Connect(srcNode.node.get(), srcOutputIndex);
       }
       else if (NoteCable* noteCable = dstNode.node->NoteInputSlot(slot))
       {
@@ -6540,7 +6540,10 @@ namespace
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
 
-         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
+         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
+         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
+
+         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
          ImGui::InvisibleButton("##samplerstarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
@@ -6549,7 +6552,7 @@ namespace
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
-         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
+         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
          ImGui::InvisibleButton("##samplerendhandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
@@ -6643,7 +6646,10 @@ namespace
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
 
-         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
+         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
+         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
+
+         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
          ImGui::InvisibleButton("##paulstretchstarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
@@ -6652,7 +6658,7 @@ namespace
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
-         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
+         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
          ImGui::InvisibleButton("##paulstretchendhandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
@@ -6675,12 +6681,15 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool hasSample = n->waveformCacheCount > 0;
 
+      const float s = std::clamp(n->start, 0.0f, 0.99f);
+      const float e = std::clamp(n->end, s + 0.01f, 1.0f);
+
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##granularwavebody", ImVec2(w, h));
       if (hasSample && (ImGui::IsItemActivated() || (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))))
       {
-         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, s, e);
          n->Seek(frac);
       }
 
@@ -6704,8 +6713,8 @@ namespace
                               isLight ? IM_COL32(40, 90, 200, 200) : IM_COL32(140, 160, 220, 175));
          }
 
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         const float startX = origin.x + w * s;
+         const float endX = origin.x + w * e;
          const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 140);
          if (startX > origin.x)
             dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
@@ -6720,7 +6729,7 @@ namespace
             if (gr.amp < 0.01f)
                continue;
 
-            const float gx = origin.x + w * std::clamp(gr.position, 0.0f, 1.0f);
+            const float gx = origin.x + w * std::clamp(gr.position, s, e);
             const float gy = midY + (gr.pan * 0.38f * h);
             const float radius = 2.0f + gr.amp * 3.5f;
 
@@ -6743,8 +6752,8 @@ namespace
             }
          }
 
-         // Current playing playhead (pos)
-         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
+         // Current playing playhead (pos) strictly within [s, e]
+         const float px = origin.x + w * std::clamp(n->Playhead(), s, e);
          dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
                      isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 205, 80, 235), 2.0f);
          const float pGrip = 8.0f;
@@ -6768,8 +6777,8 @@ namespace
       if (hasSample)
       {
          const float handleW = 10.0f;
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         const float startX = origin.x + w * s;
+         const float endX = origin.x + w * e;
 
          const float grip = 8.0f;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
@@ -6781,21 +6790,32 @@ namespace
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
 
-         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
+         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
+         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
+
+         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
          ImGui::InvisibleButton("##granularstarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
+         {
             n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
+            if (n->position < n->start)
+               n->Seek(n->start);
+         }
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
-         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
+         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
          ImGui::InvisibleButton("##granularendhandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
+         {
             n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
+            if (n->position > n->end)
+               n->Seek(n->end);
+         }
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
       }
@@ -9230,7 +9250,10 @@ namespace
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
 
-         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
+         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
+         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
+
+         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
          ImGui::InvisibleButton("##molderstarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
@@ -9239,7 +9262,7 @@ namespace
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
-         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
+         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
          ImGui::InvisibleButton("##molderendhandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
@@ -9461,7 +9484,7 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       // Row 1: Position & Scan
-      if (AudioSlider("pos", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      if (AudioSlider("pos", &n->position, n->start, n->end, "%.3f", AudioHalfWidth()))
       {
          PushUndoCheckpoint();
          n->Seek(n->position);
@@ -9513,10 +9536,18 @@ namespace
 
       // Row 9: Trim Start & End
       if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+      {
          n->start = std::min(n->start, n->end - 0.01f);
+         if (n->position < n->start)
+            n->Seek(n->start);
+      }
       ImGui::SameLine();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+      {
          n->end = std::max(n->end, n->start + 0.01f);
+         if (n->position > n->end)
+            n->Seek(n->end);
+      }
 
       EndAudioBody();
    }
@@ -9618,7 +9649,10 @@ namespace
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y),
                                ImVec2(endGripX, br.y - grip), endCol);
 
-         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
+         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
+         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
+
+         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
          ImGui::InvisibleButton("##drumlanestarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
@@ -9627,7 +9661,7 @@ namespace
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
-         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
+         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
          ImGui::InvisibleButton("##drumlaneendhandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
@@ -19749,7 +19783,7 @@ namespace
             {
                if (src.node.get() == cable->GetSource())
                {
-                  data.audio.push_back({ gn.index, slot, src.index });
+                  data.audio.push_back({ gn.index, slot, src.index, cable->GetOutputSlot() });
                   break;
                }
             }
@@ -20175,7 +20209,7 @@ namespace
          if (dst == nullptr || src == nullptr)
             continue;
          if (AudioCable* cable = dst->node->AudioInputSlot(c.dstSlot))
-            cable->Connect(src->node.get());
+            cable->Connect(src->node.get(), c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.notes)
       {
@@ -24000,6 +24034,68 @@ static bool RunGranularFixture()
                   printf("GRANULARTEST record patch reload failed FAIL\n");
                   ok = false;
                }
+            }
+         }
+      }
+
+      // Trim bounds test: verify playhead, seek, and grain positions stay strictly within [start, end]
+      {
+         GranularNode trimNode;
+         if (trimNode.LoadFile(path))
+         {
+            trimNode.start = 0.3f;
+            trimNode.end = 0.6f;
+            trimNode.position = 0.1f; // Out of bounds
+            trimNode.CookIfNeeded(10);
+            if (trimNode.position < 0.299f || trimNode.position > 0.601f)
+            {
+               printf("GRANULARTEST initial position not clamped to [start, end] FAIL\n");
+               ok = false;
+            }
+
+            trimNode.Seek(0.8f); // Out of bounds seek
+            if (trimNode.position < 0.299f || trimNode.position > 0.601f || trimNode.Playhead() > 0.601f)
+            {
+               printf("GRANULARTEST seek beyond end not clamped FAIL\n");
+               ok = false;
+            }
+
+            AudioNode* an = trimNode.GetAudioNode();
+            an->PrepareToPlay((double)sampleRate, 512);
+            trimNode.scan = 1.5f;
+            trimNode.randomPos = 0.8f; // Wide spray
+            trimNode.CookIfNeeded(11);
+
+            std::vector<float> l(512, 0.0f), r(512, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer buf;
+            buf.channels = chans;
+            buf.numChannels = 2;
+            buf.numFrames = 512;
+
+            for (int b = 0; b < 20; ++b)
+            {
+               an->ProcessBlock(nullptr, 0, buf);
+               trimNode.CookIfNeeded(12 + b);
+               const float ph = trimNode.Playhead();
+               if (ph < 0.299f || ph > 0.601f)
+               {
+                  printf("GRANULARTEST playhead out of bounds: %.4f not in [0.3, 0.6] FAIL\n", ph);
+                  ok = false;
+                  break;
+               }
+
+               const auto& snap = trimNode.VisualSnapshot();
+               for (int g = 0; g < snap.count; ++g)
+               {
+                  if (snap.grains[g].position < 0.299f || snap.grains[g].position > 0.601f)
+                  {
+                     printf("GRANULARTEST grain position out of bounds: %.4f not in [0.3, 0.6] FAIL\n", snap.grains[g].position);
+                     ok = false;
+                     break;
+                  }
+               }
+               if (!ok) break;
             }
          }
       }
@@ -30689,8 +30785,7 @@ int main(int argc, char** argv)
             if (ImGui::MenuItem("Check for updates"))
             {
                UpdateCheck::Start(); // manual re-check for anyone who dismissed the badge
-               gUpdateCheckModalOpen = true;
-               ImGui::OpenPopup("Check for updates");
+               gShowUpdateCheckModal = true;
             }
 
             ImGui::Separator();
@@ -37768,7 +37863,7 @@ int main(int argc, char** argv)
                if (src.node.get() == cable->GetSource())
                {
                   gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(), gn.InputPinId(slot) });
+                                     src.OutputPinId(cable->GetOutputSlot()), gn.InputPinId(slot) });
                   break;
                }
             }
@@ -40302,79 +40397,72 @@ int main(int argc, char** argv)
       }
 
       // ---- check for updates modal ----
-      // OpenPopup() was already called from the menu item (src/main.cpp,
-      // "Check for updates"); this only gates BeginPopupModal, mirroring the
-      // gGlobalsOpen/gHelpOpen bool-driven pattern rather than nesting a
-      // modal inside the BeginMenu block above.
-      if (gUpdateCheckModalOpen)
+      if (gShowUpdateCheckModal)
       {
-         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-         ImGui::SetNextWindowSize(ImVec2(380, 0), ImGuiCond_Appearing);
-         if (ImGui::BeginPopupModal("Check for updates", &gUpdateCheckModalOpen, ImGuiWindowFlags_AlwaysAutoResize))
+         ImGui::OpenPopup("Check for updates");
+         gShowUpdateCheckModal = false;
+      }
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      ImGui::SetNextWindowSize(ImVec2(380, 0), ImGuiCond_Appearing);
+      bool isUpdateCheckOpen = true;
+      if (ImGui::BeginPopupModal("Check for updates", &isUpdateCheckOpen, ImGuiWindowFlags_AlwaysAutoResize))
+      {
+         if (!isUpdateCheckOpen)
+            ImGui::CloseCurrentPopup();
+
+         UpdateCheck::Status status = UpdateCheck::GetStatus();
+         switch (status)
          {
-            UpdateCheck::Status status = UpdateCheck::GetStatus();
-            switch (status)
+            case UpdateCheck::Status::Idle:
+            case UpdateCheck::Status::Checking:
             {
-               case UpdateCheck::Status::Idle:
-               case UpdateCheck::Status::Checking:
-               {
-                  // Text-only "spinner" - a handful of dots cycling off the
-                  // clock, so the modal never looks frozen while the request
-                  // is in flight.
-                  int dots = ((int)(ImGui::GetTime() * 2.0) % 4);
-                  ImGui::Text("Checking for updates%.*s", dots, "...");
-                  break;
-               }
-               case UpdateCheck::Status::UpToDate:
-                  ImGui::Text("You're running the latest version (%s).", INFINITE_VERSION_STRING);
-                  break;
-               case UpdateCheck::Status::UpdateAvailable:
-                  ImGui::Text("Version %s is available (you have %s).",
-                              UpdateCheck::ResultVersion().c_str(), INFINITE_VERSION_STRING);
-                  break;
-               case UpdateCheck::Status::Failed:
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.45f, 0.4f, 1.0f));
-                  ImGui::TextWrapped("%s", UpdateCheck::LastError().c_str());
-                  ImGui::PopStyleColor();
-                  break;
+               // Text-only "spinner" - a handful of dots cycling off the
+               // clock, so the modal never looks frozen while the request
+               // is in flight.
+               int dots = ((int)(ImGui::GetTime() * 2.0) % 4);
+               ImGui::Text("Checking for updates%.*s", dots, "...");
+               break;
             }
-
-            ImGui::Separator();
-
-            if (status == UpdateCheck::Status::UpdateAvailable)
-            {
-               if (ImGui::Button("Download latest version"))
-                  Platform::OpenExternalUrl(UpdateCheck::DownloadUrl());
-               ImGui::SameLine();
-               if (ImGui::Button("Later"))
-               {
-                  gUpdateCheckModalOpen = false;
-                  ImGui::CloseCurrentPopup();
-               }
-            }
-            else if (status == UpdateCheck::Status::Failed)
-            {
-               if (ImGui::Button("Retry"))
-                  UpdateCheck::Start();
-               ImGui::SameLine();
-               if (ImGui::Button("Close"))
-               {
-                  gUpdateCheckModalOpen = false;
-                  ImGui::CloseCurrentPopup();
-               }
-            }
-            else if (status == UpdateCheck::Status::UpToDate)
-            {
-               if (ImGui::Button("Close"))
-               {
-                  gUpdateCheckModalOpen = false;
-                  ImGui::CloseCurrentPopup();
-               }
-            }
-            // Idle/Checking: no buttons yet, just wait for Poll() to land a result.
-
-            ImGui::EndPopup();
+            case UpdateCheck::Status::UpToDate:
+               ImGui::Text("You're running the latest version (%s).", INFINITE_VERSION_STRING);
+               break;
+            case UpdateCheck::Status::UpdateAvailable:
+               ImGui::Text("Version %s is available (you have %s).",
+                           UpdateCheck::ResultVersion().c_str(), INFINITE_VERSION_STRING);
+               break;
+            case UpdateCheck::Status::Failed:
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.45f, 0.4f, 1.0f));
+               ImGui::TextWrapped("%s", UpdateCheck::LastError().c_str());
+               ImGui::PopStyleColor();
+               break;
          }
+
+         ImGui::Separator();
+
+         if (status == UpdateCheck::Status::UpdateAvailable)
+         {
+            if (ImGui::Button("Download latest version"))
+               Platform::OpenExternalUrl(UpdateCheck::DownloadUrl());
+            ImGui::SameLine();
+            if (ImGui::Button("Later"))
+               ImGui::CloseCurrentPopup();
+         }
+         else if (status == UpdateCheck::Status::Failed)
+         {
+            if (ImGui::Button("Retry"))
+               UpdateCheck::Start();
+            ImGui::SameLine();
+            if (ImGui::Button("Close"))
+               ImGui::CloseCurrentPopup();
+         }
+         else if (status == UpdateCheck::Status::UpToDate)
+         {
+            if (ImGui::Button("Close"))
+               ImGui::CloseCurrentPopup();
+         }
+         // Idle/Checking: no buttons yet, just wait for Poll() to land a result.
+
+         ImGui::EndPopup();
       }
 
       if (gShowAutosaveRecoveryModal)

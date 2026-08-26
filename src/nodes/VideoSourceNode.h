@@ -85,6 +85,8 @@ private:
    unsigned int mTex = 0;
    int mWidth = 0;
    int mHeight = 0;
+   int mTexWidth = 0;
+   int mTexHeight = 0;
    bool mHasPlaceholder = false;
    double mDuration = 0.0;
    double mPosition = 0.0;

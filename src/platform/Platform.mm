@@ -297,13 +297,6 @@ namespace Platform
       double duration = 0.0;
       double currentPts = -1.0;  // presentation time of the frame we last handed out
       double nextPts = -1.0;     // pts of the decoded-but-not-yet-current frame
-      // Furthest pts this reader instance has actually decoded to, via
-      // DecodeNext - unlike currentPts, never rewritten by a cache hit, so it
-      // stays a true marker of the physical reader's position even while
-      // reverse playback walks currentPts backward through frameCache without
-      // touching the reader at all. See its use in VideoFrameAt for why this
-      // needs to be tracked separately.
-      double physicalPts = -1.0;
       std::vector<unsigned char> pending; // that frame's pixels
       bool finished = false;
 
@@ -312,13 +305,7 @@ namespace Platform
       // reader rebuild + partial-GOP redecode. FIFO by pts, capped by byte size.
       std::deque<CachedVideoFrame> frameCache;
       size_t cacheBytes = 0;
-      // 256MB covers kReverseLookbackSeconds (2s) of raw RGBA frames up
-      // through roughly 1080p at 30fps (2s * 30 * 1920*1080*4 =~ 498MB is the
-      // worst case that gets truncated rather than fully covered - the FIFO
-      // eviction below keeps the frames closest to the current position, the
-      // ones actually needed next, so a truncated cache degrades to more
-      // frequent rebuilds rather than breaking).
-      static constexpr size_t kMaxCacheBytes = 256 * 1024 * 1024;
+      static constexpr size_t kMaxCacheBytes = 512 * 1024 * 1024;
    };
 
    namespace
@@ -359,7 +346,6 @@ namespace Platform
          h->finished = false;
          h->currentPts = -1.0;
          h->nextPts = -1.0;
-         h->physicalPts = -1.0;
          return true;
       }
 
@@ -378,7 +364,6 @@ namespace Platform
 
          CMTime pts = CMSampleBufferGetPresentationTimeStamp(sample);
          h->nextPts = CMTimeGetSeconds(pts);
-         h->physicalPts = h->nextPts;
 
          CVImageBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sample);
          if (pixelBuffer == NULL)
@@ -417,13 +402,15 @@ namespace Platform
       }
 
       // Appends a decoded frame to the reverse-playback cache, evicting the
-      // oldest entries (FIFO) to stay under the byte cap. Assumes callers only
-      // push frames in increasing pts order, so the deque stays contiguous.
+      // oldest entries (FIFO) to stay under the byte cap.
       void PushCacheFrame(VideoHandle* h, double pts, const std::vector<unsigned char>& pixels)
       {
          const size_t frameBytes = pixels.size();
          if (frameBytes == 0 || frameBytes > VideoHandle::kMaxCacheBytes)
             return;
+
+         if (!h->frameCache.empty() && pts <= h->frameCache.back().pts + 0.0001)
+            return; // avoid duplicate timestamps
 
          h->frameCache.push_back({pts, pixels});
          h->cacheBytes += frameBytes;
@@ -440,19 +427,24 @@ namespace Platform
       {
          if (h->frameCache.empty())
             return false;
-         if (seconds + 0.001 < h->frameCache.front().pts)
-            return false; // requested time is older than anything cached
+         if (seconds < h->frameCache.front().pts - 0.01 || seconds > h->frameCache.back().pts + 0.04)
+            return false; // outside cached span
 
+         const CachedVideoFrame* best = nullptr;
          for (auto it = h->frameCache.rbegin(); it != h->frameCache.rend(); ++it)
          {
             if (it->pts <= seconds + 0.001)
             {
-               outPixels = it->pixels;
-               h->currentPts = it->pts;
-               return true;
+               best = &(*it);
+               break;
             }
          }
-         return false;
+         if (best == nullptr)
+            best = &h->frameCache.front();
+
+         outPixels = best->pixels;
+         h->currentPts = best->pts;
+         return true;
       }
    }
 
@@ -1012,22 +1004,26 @@ namespace Platform
 
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels)
    {
-      if (handle == nullptr)
-         return false;
-      if (seconds < 0.0)
+      if (handle == nullptr || seconds < 0.0)
          return false;
 
       @autoreleasepool
       {
-         bool seekedBackward = false;
+         // 1. If the target frame is in the reverse/scrub cache, serve it immediately!
+         if (TryUseCache(handle, seconds, outPixels))
+            return true;
 
-         // going backwards (loop or scrub) means rebuilding the sequential reader,
-         // unless the target frame is already sitting in the reverse-playback cache
-         if (seconds + 0.001 < handle->currentPts)
+         // 2. Cache miss: check if existing reader can legitimately decode forward to `seconds`.
+         // The reader is only valid for forward decoding if it exists, is not finished,
+         // is positioned before `seconds`, and is within 1.0s of `seconds`.
+         const bool canResumeForward = (handle->reader != nil) &&
+                                       (!handle->finished) &&
+                                       (handle->currentPts >= 0.0) &&
+                                       (handle->currentPts <= seconds) &&
+                                       (seconds <= handle->currentPts + 1.0);
+
+         if (!canResumeForward)
          {
-            if (TryUseCache(handle, seconds, outPixels))
-               return true;
-
             std::string err;
             if (handle->reader != nil)
                [handle->reader cancelReading];
@@ -1035,51 +1031,19 @@ namespace Platform
             handle->output = nil;
             handle->frameCache.clear();
             handle->cacheBytes = 0;
-            // Look back far enough that one rebuild covers several upcoming
-            // reverse steps, not just the single frame being requested right
-            // now - see the class comment on frameCache for why this matters.
-            if (!StartReader(handle, std::max(0.0, seconds - kReverseLookbackSeconds), err))
-               return false;
-            seekedBackward = true;
-         }
-         else if (handle->physicalPts >= 0.0 && seconds + 0.001 < handle->physicalPts)
-         {
-            // Forward playback resuming from behind where the reader
-            // physically sits: reverse steps just before this only walked
-            // frameCache (see TryUseCache), which moves currentPts backward
-            // without the underlying AVAssetReader ever rewinding - it's
-            // still parked at physicalPts, wherever the last real decode
-            // left it. Falling into the plain forward loop below as-is would
-            // pull whatever the reader has queued up next - a frame from
-            // near physicalPts, far ahead of `seconds` - and then
-            // immediately break without producing anything, stalling every
-            // call until `seconds` organically climbs back up to
-            // physicalPts. Rebuild from exactly `seconds` instead: this is a
-            // forward resume, not a scrub, so no lookback is needed.
-            std::string err;
-            if (handle->reader != nil)
-               [handle->reader cancelReading];
-            handle->reader = nil;
-            handle->output = nil;
-            if (!StartReader(handle, seconds, err))
+
+            // When moving backward, look back to populate upcoming reverse frames.
+            // When jumping forward, seek directly to `seconds`.
+            double startFrom = seconds;
+            if (handle->currentPts < 0.0 || seconds < handle->currentPts)
+               startFrom = std::max(0.0, seconds - kReverseLookbackSeconds);
+
+            if (!StartReader(handle, startFrom, err))
                return false;
          }
 
+         // 3. Decode forward until the frame covering `seconds` is reached
          bool produced = false;
-         // Decode forward from the lookback point until the pending frame is
-         // in the future. Every frame decoded along the way - not just the
-         // one actually returned - gets cached: those are the frames between
-         // (seconds - lookback) and `seconds`, i.e. exactly the ones a
-         // continuing reverse-playback (strictly decreasing `seconds` on
-         // each call) will ask for next. There used to be a second loop here
-         // that kept decoding past `seconds` into the future to "pre-fill"
-         // the cache, but frames past `seconds` can never satisfy a
-         // subsequent reverse lookup (TryUseCache only ever matches
-         // pts <= seconds, and seconds only shrinks from here) - they just
-         // burned decode time and, once the byte cap was hit, evicted the
-         // actually-useful backward history via the FIFO eviction below,
-         // forcing a full reader rebuild on almost every reverse step. Not
-         // pre-filling forward is the fix, not an oversight.
          for (int guard = 0; guard < 240; guard++)
          {
             if (handle->nextPts < 0.0)
@@ -1094,8 +1058,15 @@ namespace Platform
             handle->currentPts = handle->nextPts;
             handle->nextPts = -1.0;
             produced = true;
-            if (seekedBackward)
-               PushCacheFrame(handle, handle->currentPts, outPixels);
+
+            // Cache every decoded frame so reverse playback and scrubbing can reuse it
+            PushCacheFrame(handle, handle->currentPts, outPixels);
+         }
+
+         if (!produced && !handle->pending.empty())
+         {
+            outPixels = handle->pending;
+            produced = true;
          }
 
          return produced;
@@ -3139,13 +3110,40 @@ namespace Platform
                   kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, &blockBuffer);
                if (status == noErr)
                {
-                  const int buffers = std::min((int)list->mNumberBuffers, channels);
-                  for (int ch = 0; ch < buffers; ch++)
+                  if (list->mNumberBuffers >= (UInt32)channels)
                   {
-                     const float* data = (const float*)list->mBuffers[ch].mData;
-                     const int n = (int)(list->mBuffers[ch].mDataByteSize / sizeof(float));
+                     // Non-interleaved: one buffer per channel
+                     for (int ch = 0; ch < channels; ch++)
+                     {
+                        const float* data = (const float*)list->mBuffers[ch].mData;
+                        const int n = (int)(list->mBuffers[ch].mDataByteSize / sizeof(float));
+                        if (data != nullptr && n > 0)
+                           perChannel[ch].insert(perChannel[ch].end(), data, data + n);
+                     }
+                  }
+                  else if (list->mNumberBuffers == 1 && channels > 1)
+                  {
+                     // Interleaved: single buffer containing [L0, R0, L1, R1, ...]
+                     const float* data = (const float*)list->mBuffers[0].mData;
+                     const int totalFloats = (int)(list->mBuffers[0].mDataByteSize / sizeof(float));
+                     const int framesInBuf = totalFloats / channels;
+                     if (data != nullptr && framesInBuf > 0)
+                     {
+                        for (int ch = 0; ch < channels; ch++)
+                           perChannel[ch].reserve(perChannel[ch].size() + framesInBuf);
+                        for (int f = 0; f < framesInBuf; f++)
+                        {
+                           for (int ch = 0; ch < channels; ch++)
+                              perChannel[ch].push_back(data[(size_t)f * channels + ch]);
+                        }
+                     }
+                  }
+                  else if (channels == 1 && list->mNumberBuffers >= 1)
+                  {
+                     const float* data = (const float*)list->mBuffers[0].mData;
+                     const int n = (int)(list->mBuffers[0].mDataByteSize / sizeof(float));
                      if (data != nullptr && n > 0)
-                        perChannel[ch].insert(perChannel[ch].end(), data, data + n);
+                        perChannel[0].insert(perChannel[0].end(), data, data + n);
                   }
                }
                if (blockBuffer != nullptr)

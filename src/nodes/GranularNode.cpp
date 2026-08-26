@@ -267,7 +267,7 @@ public:
       if (mSeekPending.exchange(false, std::memory_order_acq_rel))
       {
          const float sPos = mSeekPos.load(std::memory_order_relaxed);
-         mScanPlayhead = std::clamp((double)sPos, 0.0, 1.0);
+         mScanPlayhead = (double)sPos;
       }
 
       if (!hasSample)
@@ -278,7 +278,12 @@ public:
       }
 
       // 4. Load atomic parameters
-      const float basePos = std::clamp(mPosition.load(std::memory_order_relaxed), 0.0f, 1.0f);
+      const float trimStart = std::clamp(mStart.load(std::memory_order_relaxed), 0.0f, 0.99f);
+      const float trimEnd = std::clamp(mEnd.load(std::memory_order_relaxed), trimStart + 0.01f, 1.0f);
+      const bool isLooping = mLoop.load(std::memory_order_relaxed);
+      const double trimRange = std::max(0.001, (double)(trimEnd - trimStart));
+
+      const float basePos = std::clamp(mPosition.load(std::memory_order_relaxed), trimStart, trimEnd);
       const float scanSpeed = mScan.load(std::memory_order_relaxed);
       const float grainLenMs = std::clamp(mGrainLength.load(std::memory_order_relaxed), 5.0f, 1000.0f);
       const float grainDensity = std::clamp(mDensity.load(std::memory_order_relaxed), 1.0f, 100.0f);
@@ -299,19 +304,30 @@ public:
       const float dryWetMix = std::clamp(mMix.load(std::memory_order_relaxed), 0.0f, 1.0f);
       const float masterVol = std::max(0.0f, mVolume.load(std::memory_order_relaxed));
 
-      const float trimStart = std::clamp(mStart.load(std::memory_order_relaxed), 0.0f, 0.99f);
-      const float trimEnd = std::clamp(mEnd.load(std::memory_order_relaxed), trimStart + 0.01f, 1.0f);
-      const bool isLooping = mLoop.load(std::memory_order_relaxed);
-
       const int sampleFrames = activeSample->numFrames;
       const float* srcL = activeSample->channelData.data();
       const float* srcR = (activeSample->channels > 1) ? (activeSample->channelData.data() + sampleFrames) : srcL;
       const double srRatio = (activeSample->sampleRate > 0.0) ? (activeSample->sampleRate / mSampleRate) : 1.0;
 
+      const double trimStartFrame = (double)trimStart * (double)sampleFrames;
+      const double trimEndFrame = (double)trimEnd * (double)sampleFrames;
+      const double trimFrameRange = std::max(1.0, trimEndFrame - trimStartFrame);
+
+      // Keep scan playhead within trim bounds
+      if (mScanPlayhead < (double)trimStart || mScanPlayhead > (double)trimEnd)
+      {
+         if (isLooping && trimRange > 0.0001)
+         {
+            double offset = std::fmod(mScanPlayhead - (double)trimStart, trimRange);
+            if (offset < 0.0) offset += trimRange;
+            mScanPlayhead = (double)trimStart + offset;
+         }
+         mScanPlayhead = std::clamp(mScanPlayhead, (double)trimStart, (double)trimEnd);
+      }
+
       float* dstL = output.channels[0];
       float* dstR = (output.numChannels > 1) ? output.channels[1] : dstL;
 
-      const double trimRange = std::max(0.001, (double)(trimEnd - trimStart));
       const double sampleDurationSec = (double)sampleFrames / (activeSample->sampleRate > 0.0 ? activeSample->sampleRate : mSampleRate);
 
       // 5. Per-sample granular synthesis
@@ -328,17 +344,14 @@ public:
          {
             const double scanDelta = ((double)scanSpeed / (sampleDurationSec * mSampleRate));
             mScanPlayhead += scanDelta;
-            if (isLooping)
+            if (isLooping && trimRange > 0.0001)
             {
                while (mScanPlayhead >= (double)trimEnd)
                   mScanPlayhead -= trimRange;
                while (mScanPlayhead < (double)trimStart)
                   mScanPlayhead += trimRange;
             }
-            else
-            {
-               mScanPlayhead = std::clamp(mScanPlayhead, (double)trimStart, (double)trimEnd);
-            }
+            mScanPlayhead = std::clamp(mScanPlayhead, (double)trimStart, (double)trimEnd);
          }
 
          // Grain spawn timer
@@ -378,23 +391,19 @@ public:
             const float effectiveLenMs = std::max(2.0f, grainLenMs * durRand);
             g.totalFrames = std::max(8, (int)(effectiveLenMs * 0.001f * (float)mSampleRate));
 
-            // Grain spawn position
+            // Grain spawn position strictly within [trimStart, trimEnd]
             double effectivePosFrac = basePos;
             if (std::abs(scanSpeed) > 0.001f || isFrozen)
                effectivePosFrac = mScanPlayhead;
 
             effectivePosFrac += (double)(mRng.NextSignedFloat() * rndPos * 0.5f);
-            if (isLooping)
+            if (isLooping && trimRange > 0.0001)
             {
-               while (effectivePosFrac >= (double)trimEnd)
-                  effectivePosFrac -= trimRange;
-               while (effectivePosFrac < (double)trimStart)
-                  effectivePosFrac += trimRange;
+               double offset = std::fmod(effectivePosFrac - (double)trimStart, trimRange);
+               if (offset < 0.0) offset += trimRange;
+               effectivePosFrac = (double)trimStart + offset;
             }
-            else
-            {
-               effectivePosFrac = std::clamp(effectivePosFrac, (double)trimStart, (double)trimEnd);
-            }
+            effectivePosFrac = std::clamp(effectivePosFrac, (double)trimStart, (double)trimEnd);
 
             g.samplePos = effectivePosFrac * (double)sampleFrames;
 
@@ -404,12 +413,20 @@ public:
             const bool isRev = (revChance > 0.0f && mRng.NextFloat() < revChance);
             g.sampleStep = (isRev ? -1.0 : 1.0) * pitchRatio * srRatio;
 
-            // If reverse, advance start position so grain reads backward from there
+            // If reverse, advance start position so grain reads backward from there within [trimStart, trimEnd]
             if (isRev)
             {
                g.samplePos += (double)g.totalFrames * pitchRatio * srRatio;
-               if (g.samplePos >= (double)sampleFrames)
-                  g.samplePos = (double)sampleFrames - 1.0;
+               if (isLooping && trimFrameRange > 1.0)
+               {
+                  double offset = std::fmod(g.samplePos - trimStartFrame, trimFrameRange);
+                  if (offset < 0.0) offset += trimFrameRange;
+                  g.samplePos = trimStartFrame + offset;
+               }
+               else
+               {
+                  g.samplePos = std::clamp(g.samplePos, trimStartFrame, std::max(trimStartFrame, trimEndFrame - 1.0));
+               }
             }
 
             // Pan calculation
@@ -435,6 +452,22 @@ public:
             if (!gr.active)
                continue;
 
+            // Bounds check against trim range before reading
+            if (gr.samplePos < trimStartFrame || gr.samplePos >= trimEndFrame)
+            {
+               if (isLooping && trimFrameRange > 1.0)
+               {
+                  double offset = std::fmod(gr.samplePos - trimStartFrame, trimFrameRange);
+                  if (offset < 0.0) offset += trimFrameRange;
+                  gr.samplePos = trimStartFrame + offset;
+               }
+               else
+               {
+                  gr.active = false;
+                  continue;
+               }
+            }
+
             const float winPhase = (float)gr.currentFrame / (float)(gr.totalFrames > 1 ? gr.totalFrames - 1 : 1);
             const float env = EvaluateWindow(gr.windowType, winPhase) * gr.gain;
 
@@ -445,13 +478,14 @@ public:
             grainSumR += sR * env * gr.panR;
 
             gr.samplePos += gr.sampleStep;
-            // Wrap or bounds check
-            if (gr.samplePos < 0.0 || gr.samplePos >= (double)sampleFrames)
+            // Wrap or bounds check against trim range
+            if (gr.samplePos < trimStartFrame || gr.samplePos >= trimEndFrame)
             {
-               if (isLooping)
+               if (isLooping && trimFrameRange > 1.0)
                {
-                  while (gr.samplePos >= (double)sampleFrames) gr.samplePos -= (double)sampleFrames;
-                  while (gr.samplePos < 0.0) gr.samplePos += (double)sampleFrames;
+                  double offset = std::fmod(gr.samplePos - trimStartFrame, trimFrameRange);
+                  if (offset < 0.0) offset += trimFrameRange;
+                  gr.samplePos = trimStartFrame + offset;
                }
                else
                {
@@ -483,7 +517,7 @@ public:
       }
 
       // 6. Update MeterRing and visual snapshot
-      const float playheadPos = (float)mScanPlayhead;
+      const float playheadPos = std::clamp((float)mScanPlayhead, trimStart, trimEnd);
       mPlayheadRing.Write(&playheadPos, 1);
 
       int activeCount = 0;
@@ -505,7 +539,7 @@ public:
          const float normPos = (float)(gr.samplePos / (double)std::max(1, sampleFrames));
          const float winPhase = (float)gr.currentFrame / (float)(gr.totalFrames > 1 ? gr.totalFrames - 1 : 1);
          const float amp = EvaluateWindow(gr.windowType, winPhase);
-         snap.grains[snapCount].position = std::clamp(normPos, 0.0f, 1.0f);
+         snap.grains[snapCount].position = std::clamp(normPos, trimStart, trimEnd);
          snap.grains[snapCount].amp = amp;
          snap.grains[snapCount].pan = gr.panR - gr.panL; // -1 to +1
          snap.grains[snapCount].pitchRatio = (float)std::abs(gr.sampleStep / srRatio);
@@ -552,6 +586,10 @@ void GranularNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
 
+   start = std::clamp(start, 0.0f, 0.99f);
+   end = std::clamp(end, start + 0.01f, 1.0f);
+   position = std::clamp(position, start, end);
+
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioGranularNode>();
 
@@ -584,7 +622,9 @@ void GranularNode::CookIfNeeded(int frameId)
    // Drain playhead and voice counts from audio thread
    float ph = 0.0f;
    if (mAudioNode->PlayheadRing().ReadLatest(ph))
-      mPlayhead = ph;
+      mPlayhead = std::clamp(ph, start, end);
+   else
+      mPlayhead = std::clamp(mPlayhead, start, end);
 
    float voiceCount = 0.0f;
    if (mAudioNode->ActiveVoiceRing().ReadLatest(voiceCount))
@@ -638,7 +678,9 @@ AudioNode* GranularNode::GetAudioNode()
 
 void GranularNode::Seek(float frac)
 {
-   position = std::clamp(frac, 0.0f, 1.0f);
+   const float s = std::clamp(start, 0.0f, 0.99f);
+   const float e = std::clamp(end, s + 0.01f, 1.0f);
+   position = std::clamp(frac, s, e);
    mPlayhead = position;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioGranularNode>();
