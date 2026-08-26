@@ -115,6 +115,13 @@ set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)
 set(STB_DIR external/stb)
 set(SYPHON_DIR external/syphon)
+# Windows counterpart to SYPHON_DIR: Spout2's "SpoutGL" library, vendored as
+# plain source (not FetchContent/vcpkg) the same way SYPHON_DIR is - see
+# external/spout2/VENDORED_COMMIT.txt for the exact upstream commit. SpoutGL
+# is the minimal DirectX11/OpenGL-interop core (Spout.*, SpoutSender.*,
+# SpoutReceiver.*, ...) without the full repo's D3D12/example/installer
+# clutter that its own CMakeLists would otherwise pull in.
+set(SPOUT_DIR external/spout2/SPOUTSDK/SpoutGL)
 
 if(INFINITE_ENABLE_VST3 AND NOT APPLE AND NOT WIN32)
     message(FATAL_ERROR "INFINITE_ENABLE_VST3 is only wired up on macOS and Windows right now; "
@@ -139,7 +146,8 @@ endif()
 #   macOS : Platform.mm (CoreAudio/CoreMIDI/AVFoundation/...) + AudioFileWriter.mm
 #           + the Syphon library
 #   Win32 : src/platform/win/*.cpp (WASAPI/WinMM/Media Foundation/GDI+) +
-#           AudioFileWriter.cpp (dr_libs/shine) + the glad GL loader
+#           AudioFileWriter.cpp (dr_libs/shine) + the glad GL loader +
+#           the SpoutGL library (Windows counterpart to Syphon)
 
 set(COMMON_SOURCES
     src/main.cpp
@@ -313,6 +321,20 @@ set(APPLE_SOURCES
     ${SYPHON_SOURCES}
 )
 
+set(SPOUT_SOURCES
+    ${SPOUT_DIR}/Spout.cpp
+    ${SPOUT_DIR}/SpoutGL.cpp
+    ${SPOUT_DIR}/SpoutCopy.cpp
+    ${SPOUT_DIR}/SpoutDirectX.cpp
+    ${SPOUT_DIR}/SpoutFrameCount.cpp
+    ${SPOUT_DIR}/SpoutGLextensions.cpp
+    ${SPOUT_DIR}/SpoutReceiver.cpp
+    ${SPOUT_DIR}/SpoutSender.cpp
+    ${SPOUT_DIR}/SpoutSenderNames.cpp
+    ${SPOUT_DIR}/SpoutSharedMemory.cpp
+    ${SPOUT_DIR}/SpoutUtils.cpp
+)
+
 # Generated from the .in template so the version block tracks
 # INFINITE_VERSION/INFINITE_VERSION_RC instead of carrying its own literal.
 # The icon path is substituted as an absolute path because the generated .rc
@@ -329,6 +351,10 @@ set(WIN32_SOURCES
     # exe shows Explorer's generic application icon everywhere.
     ${CMAKE_CURRENT_BINARY_DIR}/generated/Infinite.rc
     src/platform/win/PlatformWin.cpp
+    # GL-only half of the Spout bridge (glad), kept out of PlatformWin.cpp's
+    # TU since that file also includes SpoutGL's headers, which drag in the
+    # legacy <GL/gl.h> - see SpoutGLBridge.h for why the two can't mix.
+    src/platform/win/SpoutGLBridge.cpp
     src/platform/win/AudioDeviceWin.cpp
     src/platform/win/MidiWin.cpp
     src/platform/win/MediaWin.cpp
@@ -341,6 +367,14 @@ set(WIN32_SOURCES
     # gladLoadGL((GLADloadfunc)glfwGetProcAddress) right after context
     # creation - main.cpp does this at both glfwMakeContextCurrent sites.
     external/glad/src/gl.c
+    # Windows counterpart to APPLE_SOURCES' ${SYPHON_SOURCES}, backing the
+    # Syphon In/Out nodes' Platform::Syphon* surface. Split into its own
+    # translation unit (rather than living in PlatformWin.cpp) because it
+    # needs SpoutGL's headers, which drag in DirectX11 and the legacy
+    # <GL/gl.h> - see PlatformWinSyphon.cpp for why that must stay out of
+    # PlatformWin.cpp (also compiled into the GL/DX-free scanner helper).
+    src/platform/win/PlatformWinSyphon.cpp
+    ${SPOUT_SOURCES}
 )
 
 # MSVC's x64 code generator hits an internal compiler error on src/main.cpp at
@@ -400,6 +434,15 @@ target_include_directories(Infinite PRIVATE
 target_link_libraries(Infinite PRIVATE glfw)
 
 if(WIN32)
+    # SpoutGL's own headers (Spout.h chain) plus sse2neon.h, which its
+    # SIMD-optimised pixel copy path (SpoutCopy.h/SpoutSenderNames.h) includes
+    # only under _M_ARM64 - needed for the arm64 leg of the CI build even
+    # though this repo has no other ARM NEON code.
+    target_include_directories(Infinite PRIVATE
+        ${SPOUT_DIR}
+        external/sse2neon
+    )
+
     # System libraries behind the Windows platform layer: WASAPI/MMDevice ride
     # on ole32+mfplat, MIDI on winmm, Media Foundation decode/muxing on
     # mfreadwrite+mfuuid, dialogs/text on shell32+gdiplus. Most of our TUs also
@@ -420,6 +463,10 @@ if(WIN32)
         # WinHTTP backs Platform::HttpGet (UpdateCheck's GitHub Releases
         # request) - not otherwise linked anywhere in this target.
         winhttp
+        # d3d11 + dxgi back SpoutGL's DirectX11 shared-texture path
+        # (SpoutDirectX.cpp); dxgi also has its own #pragma comment(lib) but
+        # MinGW-style toolchains don't process those, same reasoning as above.
+        d3d11 dxgi
     )
     # M_PI etc. live behind _USE_MATH_DEFINES in MSVC's math.h; defining on the
     # command line lands before any cmath include.

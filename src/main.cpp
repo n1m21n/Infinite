@@ -331,6 +331,16 @@ namespace
          return "paul stretch";
       if (name == "Granular")
          return "granular";
+#if defined(_WIN32)
+      // Registered type key stays "Syphon In"/"Syphon Out" (patch files key
+      // off it), but the Windows implementation is backed by Spout2, not
+      // Syphon (which is macOS-only IOSurface/Mach-port tech) - see
+      // src/platform/win/PlatformWinSyphon.cpp.
+      if (name == "Syphon In")
+         return "spout in";
+      if (name == "Syphon Out")
+         return "spout out";
+#endif
       std::string out = name;
       std::transform(out.begin(), out.end(), out.begin(),
                      [](unsigned char c) { return (char)std::tolower(c); });
@@ -3768,7 +3778,11 @@ namespace
       if (servers.empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+#if defined(_WIN32)
+         ImGui::TextDisabled("No active Spout senders found.");
+#else
          ImGui::TextDisabled("No active Syphon servers found.");
+#endif
          ImGui::PopTextWrapPos();
       }
       else
@@ -18195,7 +18209,11 @@ namespace
 
          // ---------------- Output ----------------
          { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
+#if defined(_WIN32)
+         { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other Windows applications in real-time via Spout, zero-copy GPU texture sharing." },
+#else
          { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
+#endif
          { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
 
          // ---------------- OSC ----------------
@@ -18589,7 +18607,11 @@ namespace
             } },
             { "Output", {
                { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
-               { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
+      #if defined(_WIN32)
+         { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other Windows applications in real-time via Spout, zero-copy GPU texture sharing." },
+#else
+         { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
+#endif
                { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
             } },
             { "OSC", {
@@ -22817,6 +22839,135 @@ static bool RunMolderFixture()
    return ok;
 }
 
+// ================================================== INFINITE_SPOUTLOOPTEST
+//
+// In-process loopback of Platform::Syphon* (backed by Spout2 on Windows,
+// see src/platform/win/PlatformWinSyphon.cpp): create a server and a client
+// in the same process, publish a small synthetic texture, receive it back,
+// and check the read-back pixels match - the one thing verifiable without a
+// second real app or real Windows hardware (see local-prompts/11-spout-windows.md
+// section 6). Needs a live GL context, so this runs after glfwCreateWindow +
+// gladLoadGL in main(), not in the pre-GLFW dispatch block above.
+//
+// Skips (does not FAIL) on macOS - Syphon itself needs no such test, it's
+// real inter-app tech exercised by using it, not by a loopback fixture - and
+// skips again on a Windows machine without WGL_NV_DX_interop2, per the
+// spec's "fail soft, don't crash" requirement: this fixture can't tell "no
+// interop hardware" apart from "something is broken" without real hardware
+// to compare against, so it treats "never got a frame" as SKIP, not FAIL.
+static bool RunSpoutLoopTest()
+{
+#if !defined(_WIN32)
+   printf("SPOUTLOOPTEST SKIP (Spout is Windows-only)\n");
+   return true;
+#else
+   using namespace Platform;
+
+   const std::string senderName = "InfiniteSpoutLoopTest";
+   SyphonServerHandle* server = SyphonServerCreate(senderName);
+   if (server == nullptr)
+   {
+      printf("SPOUTLOOPTEST FAIL (SyphonServerCreate returned null)\n");
+      return false;
+   }
+
+   // Solid red in the top-left quadrant, solid blue everywhere else: a
+   // diagonal split, unlike a plain top/bottom split, is disturbed by either
+   // a vertical *or* horizontal flip bug, not just a wrong-color one.
+   const int w = 64, h = 64;
+   std::vector<unsigned char> srcPixels(w * h * 4);
+   for (int y = 0; y < h; y++)
+   {
+      for (int x = 0; x < w; x++)
+      {
+         unsigned char* p = &srcPixels[(size_t)(y * w + x) * 4];
+         bool topLeft = x < w / 2 && y < h / 2;
+         p[0] = topLeft ? 255 : 0;
+         p[1] = 0;
+         p[2] = topLeft ? 0 : 255;
+         p[3] = 255;
+      }
+   }
+
+   unsigned int srcTex = 0;
+   glGenTextures(1, &srcTex);
+   glBindTexture(GL_TEXTURE_2D, srcTex);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, srcPixels.data());
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glBindTexture(GL_TEXTURE_2D, 0);
+
+   SyphonClientHandle* client = SyphonClientCreate();
+   SyphonServerPublish(server, srcTex, w, h, false);
+   bool connected = client != nullptr && SyphonClientConnect(client, "Spout", senderName);
+
+   bool ok = true;
+   bool skipped = false;
+   if (!connected)
+   {
+      printf("SPOUTLOOPTEST SKIP (no Spout sender visible - likely no WGL_NV_DX_interop2 on this machine)\n");
+      skipped = true;
+   }
+   else
+   {
+      unsigned int recvTex = 0;
+      int recvW = 0, recvH = 0;
+      // One-frame lag by design (see PlatformWinSyphon.cpp): the first
+      // GetFrameTexture call after a size change only reallocates and
+      // returns 0, the copy happens on the next call.
+      for (int attempt = 0; attempt < 10 && recvTex == 0; attempt++)
+      {
+         SyphonServerPublish(server, srcTex, w, h, false);
+         recvTex = SyphonClientGetFrameTexture(client, recvW, recvH);
+      }
+
+      if (recvTex == 0)
+      {
+         printf("SPOUTLOOPTEST SKIP (never received a frame - likely no WGL_NV_DX_interop2 on this machine)\n");
+         skipped = true;
+      }
+      else if (recvW != w || recvH != h)
+      {
+         printf("SPOUTLOOPTEST FAIL (size mismatch: got %dx%d, expected %dx%d)\n", recvW, recvH, w, h);
+         ok = false;
+      }
+      else
+      {
+         // recvTex is GL_TEXTURE_RECTANGLE, per SyphonClientGetFrameTexture's
+         // documented contract, so read it back through an FBO.
+         unsigned int fbo = 0;
+         glGenFramebuffers(1, &fbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, recvTex, 0);
+         std::vector<unsigned char> readBack((size_t)w * h * 4);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, readBack.data());
+         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+         glDeleteFramebuffers(1, &fbo);
+
+         auto pixelAt = [&](int x, int y) { return &readBack[(size_t)(y * w + x) * 4]; };
+         unsigned char* tl = pixelAt(w / 4, h / 4);
+         unsigned char* br = pixelAt(3 * w / 4, 3 * h / 4);
+         bool topLeftRed = tl[0] > 200 && tl[2] < 50;
+         bool bottomRightBlue = br[2] > 200 && br[0] < 50;
+         if (!topLeftRed || !bottomRightBlue)
+         {
+            printf("SPOUTLOOPTEST FAIL (pixel/orientation mismatch: topLeft=(%d,%d,%d) bottomRight=(%d,%d,%d))\n",
+                   tl[0], tl[1], tl[2], br[0], br[1], br[2]);
+            ok = false;
+         }
+      }
+   }
+
+   SyphonClientDestroy(client);
+   glDeleteTextures(1, &srcTex);
+   SyphonServerDestroy(server);
+
+   if (!skipped)
+      printf("%s\n", ok ? "SPOUTLOOPTEST OK" : "SPOUTLOOPTEST FAIL");
+   return ok;
+#endif
+}
+
 // Granular Synthesizer's DSP fixture: loads a real WAV, triggers granular playback,
 // and asserts that position, scan, grain length, density, spray, pitch shift,
 // window shapes, and volume produce finite, valid audio outputs.
@@ -26450,6 +26601,18 @@ int main(int argc, char** argv)
       return 1;
    }
 #endif
+
+   if (getenv("INFINITE_SPOUTLOOPTEST") != nullptr)
+   {
+      // Needs a live GL context (textures, FBOs), unlike the pre-GLFW
+      // fixtures dispatched above main()'s window setup - hence the check
+      // lives here instead of alongside MOLDERTEST/DSPTEST/etc.
+      bool ok = RunSpoutLoopTest();
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      return ok ? 0 : 1;
+   }
+
    glfwSwapInterval(1);
    Platform::PreventAppNap();
 

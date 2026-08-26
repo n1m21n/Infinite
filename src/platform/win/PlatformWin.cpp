@@ -587,59 +587,14 @@ namespace Platform
 
    // ---- Syphon inter-app video sharing ------------------------------------
 
-   // Syphon is macOS technology (IOSurface + Mach ports). On Windows the
-   // nodes exist but report no servers and never connect; a future port
-   // could map this surface onto Spout.
-   namespace
-   {
-      struct SyphonStubHandle { int unused = 0; };
-   }
-
-   SyphonServerHandle* SyphonServerCreate(const std::string&)
-   {
-      return nullptr;
-   }
-
-   void SyphonServerUpdateName(SyphonServerHandle*, const std::string&) {}
-   void SyphonServerPublish(SyphonServerHandle*, unsigned int, int, int, bool) {}
-   bool SyphonServerHasClients(SyphonServerHandle*)
-   {
-      return false;
-   }
-
-   void SyphonServerDestroy(SyphonServerHandle*) {}
-
-   std::vector<SyphonServerInfo> SyphonGetAvailableServers()
-   {
-      return {};
-   }
-
-   SyphonClientHandle* SyphonClientCreate()
-   {
-      return nullptr;
-   }
-
-   bool SyphonClientConnect(SyphonClientHandle*, const std::string&, const std::string&, const std::string&)
-   {
-      return false;
-   }
-
-   bool SyphonClientIsConnected(SyphonClientHandle*)
-   {
-      return false;
-   }
-
-   bool SyphonClientHasNewFrame(SyphonClientHandle*)
-   {
-      return false;
-   }
-
-   unsigned int SyphonClientGetFrameTexture(SyphonClientHandle*, int&, int&)
-   {
-      return 0;
-   }
-
-   void SyphonClientDestroy(SyphonClientHandle*) {}
+   // The real implementation (backed by Spout2) lives in
+   // PlatformWinSyphon.cpp, not here: it needs SpoutGL's headers, which pull
+   // in DirectX11 and the legacy <GL/gl.h>, and this file is also compiled
+   // into the infinite-vst3-scanner helper target, which has no GL/DX
+   // context and must stay a lightweight console-only process. Splitting
+   // the Syphon/Spout code into its own translation unit - added to
+   // WIN32_SOURCES for the main Infinite target only - keeps the scanner
+   // build untouched by it.
 
    // ---- Finder document opening ------------------------------------------
 

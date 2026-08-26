@@ -8,7 +8,10 @@
 
 // Syphon In node: ingests real-time video/graphics from any active Syphon server
 // on macOS (Resolume, OBS, TouchDesigner, MadMapper, Unreal, Unity) via zero-copy
-// GPU texture sharing (IOSurface) into the node graph.
+// GPU texture sharing (IOSurface) into the node graph. On Windows, the same
+// Platform::Syphon* surface is backed by Spout2 instead (see
+// src/platform/win/PlatformWinSyphon.cpp), so this node works unchanged there
+// too, connecting to Spout senders rather than Syphon servers.
 class SyphonInNode : public INode
 {
 public:
