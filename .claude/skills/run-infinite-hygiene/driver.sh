@@ -103,6 +103,11 @@ TESTS=(
   # Headless (exits before glfwInit), so the frame budget is irrelevant to it -
   # it polls a real asynchronous AU instantiation on its own bounded timer.
   "PLUGINSCANTEST:1"
+  # Headless (exits before glfwInit), like PLUGINSCANTEST above. Prints
+  # "REMOVEBGTEST SKIP" rather than OK/FAIL on a platform/OS with no
+  # SubjectMask backend yet - that's an expected state, not a failure, so it
+  # is intentionally not treated as one below.
+  "REMOVEBGTEST:1"
 )
 
 step() { printf '\n== %s ==\n' "$1"; }

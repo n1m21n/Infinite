@@ -2,6 +2,7 @@
 
 #include "gl3.h"
 #include <algorithm>
+#include <mutex>
 
 #include "Platform.h"
 #include "Transport.h"
@@ -58,9 +59,21 @@ const std::vector<std::string>& RemoveBgNode::OutputModeNames() { return kOutput
 
 RemoveBgNode::~RemoveBgNode()
 {
+   if (mWorkerStarted)
+   {
+      {
+         std::lock_guard<std::mutex> lock(mRequestMutex);
+         mStopWorker = true;
+      }
+      mRequestCv.notify_one();
+      mWorkerThread.join();
+   }
+
    GLUtil::DestroyFbo(mOut);
    if (mMaskTex != 0)
       glDeleteTextures(1, &mMaskTex);
+   if (mPairedSrcTex != 0)
+      glDeleteTextures(1, &mPairedSrcTex);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
 }
@@ -74,9 +87,53 @@ bool RemoveBgNode::EnsureShader()
    return mProgram != 0;
 }
 
-void RemoveBgNode::ComputeMask(unsigned int srcTex, int w, int h)
+void RemoveBgNode::EnsureWorkerStarted()
 {
-   // Read the source back off the GPU so Vision can see it.
+   if (mWorkerStarted)
+      return;
+   mWorkerStarted = true;
+   mWorkerThread = std::thread(&RemoveBgNode::WorkerThreadMain, this);
+}
+
+// Runs entirely on the worker thread. Reads only its own request copy off
+// the stack and never touches a GL object - inference happens on CPU
+// pixels in, CPU pixels out.
+void RemoveBgNode::WorkerThreadMain()
+{
+   for (;;)
+   {
+      FrameRequest req;
+      {
+         std::unique_lock<std::mutex> lock(mRequestMutex);
+         mRequestCv.wait(lock, [this] { return mRequestPending || mStopWorker; });
+         if (mStopWorker && !mRequestPending)
+            return;
+         req = std::move(mPendingRequest);
+         mRequestPending = false;
+      }
+
+      FrameResult result;
+      result.width = req.width;
+      result.height = req.height;
+      result.serial = req.serial;
+      result.pixels = req.pixels; // paired with the mask below, regardless of outcome
+
+      result.ok = Platform::SubjectMask(req.pixels, req.width, req.height, req.mode, result.mask, result.error);
+
+      {
+         std::lock_guard<std::mutex> lock(mResultMutex);
+         mPendingResult = std::move(result);
+      }
+      mResultReady.store(true, std::memory_order_release);
+   }
+}
+
+void RemoveBgNode::SubmitMaskRequest(unsigned int srcTex, int w, int h)
+{
+   EnsureWorkerStarted();
+
+   // Read the source back off the GPU so the worker can see it - this part
+   // must stay on the render thread, since only it may touch GL objects.
    std::vector<unsigned char> pixels((size_t)w * h * 4);
    GLint prevFbo = 0;
    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
@@ -89,14 +146,47 @@ void RemoveBgNode::ComputeMask(unsigned int srcTex, int w, int h)
    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
    glDeleteFramebuffers(1, &fbo);
 
-   std::vector<unsigned char> mask;
-   std::string error;
-   const Platform::MattingMode mattingMode =
-      (mode == 1) ? Platform::MattingMode::Person : Platform::MattingMode::Subject;
+   FrameRequest req;
+   req.pixels = std::move(pixels);
+   req.width = w;
+   req.height = h;
+   req.mode = (mode == 1) ? Platform::MattingMode::Person : Platform::MattingMode::Subject;
+   req.serial = mNextSerial++;
 
-   if (!Platform::SubjectMask(pixels, w, h, mattingMode, mask, error))
    {
-      mStatus = error;
+      std::lock_guard<std::mutex> lock(mRequestMutex);
+      mPendingRequest = std::move(req); // replaces whatever was queued but not yet picked up
+      mRequestPending = true;
+   }
+   mRequestCv.notify_one();
+
+   mMaskInFlight = true;
+   mStatus = "computing...";
+}
+
+// Main thread only, called once per CookIfNeeded: cheap (try_lock), picks up
+// a finished result without ever blocking on the worker thread.
+void RemoveBgNode::PollMaskResult()
+{
+   if (!mResultReady.load(std::memory_order_acquire))
+      return;
+
+   std::unique_lock<std::mutex> lock(mResultMutex, std::try_to_lock);
+   if (!lock.owns_lock())
+      return; // worker thread mid-write to mPendingResult; try again next frame
+
+   FrameResult result = std::move(mPendingResult);
+   mResultReady.store(false, std::memory_order_relaxed);
+   lock.unlock();
+
+   if (result.serial <= mLastAppliedSerial)
+      return; // stale/duplicate; a newer result already applied
+   mLastAppliedSerial = result.serial;
+   mMaskInFlight = false;
+
+   if (!result.ok)
+   {
+      mStatus = result.error;
       return;
    }
 
@@ -104,7 +194,21 @@ void RemoveBgNode::ComputeMask(unsigned int srcTex, int w, int h)
       glGenTextures(1, &mMaskTex);
    glBindTexture(GL_TEXTURE_2D, mMaskTex);
    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, mask.data());
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, result.width, result.height, 0, GL_RED, GL_UNSIGNED_BYTE, result.mask.data());
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glBindTexture(GL_TEXTURE_2D, 0);
+
+   // The frame the mask was computed from, uploaded the same raw way as the
+   // mask itself so the two stay in the same UV convention - composited
+   // together below instead of the (possibly newer) live source frame.
+   if (mPairedSrcTex == 0)
+      glGenTextures(1, &mPairedSrcTex);
+   glBindTexture(GL_TEXTURE_2D, mPairedSrcTex);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, result.width, result.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, result.pixels.data());
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -134,8 +238,12 @@ void RemoveBgNode::CookIfNeeded(int frameId)
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
+   PollMaskResult();
+
    // Auto-refresh is rate-limited by the transport, not the frame rate:
-   // segmentation is far too expensive to run every frame.
+   // segmentation is far too expensive to run every frame. With the worker
+   // in place, a request that arrives while nothing is in flight is honoured
+   // immediately rather than waiting for the next beat boundary.
    if (autoRefresh)
    {
       const double beat = Transport::Instance().Beats();
@@ -146,16 +254,21 @@ void RemoveBgNode::CookIfNeeded(int frameId)
       }
    }
 
-   if (mNeedsMask)
+   if (mNeedsMask && !mMaskInFlight)
    {
       mNeedsMask = false;
-      ComputeMask(srcTex, w, h);
+      SubmitMaskRequest(srcTex, w, h);
    }
 
-   GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, w, h]()
+   // Once a mask exists, always composite it with the exact frame it was
+   // computed from (mPairedSrcTex), never the live srcTex - otherwise a
+   // moving subject would tear against a mask that lags behind it.
+   unsigned int colorTex = (mMaskTex != 0 && mPairedSrcTex != 0) ? mPairedSrcTex : srcTex;
+
+   GLUtil::RunShaderPass(mOut, mProgram, [this, colorTex, srcTex, w, h]()
    {
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, srcTex);
+      glBindTexture(GL_TEXTURE_2D, colorTex);
       glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, mMaskTex != 0 ? mMaskTex : srcTex);

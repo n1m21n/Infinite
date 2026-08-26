@@ -128,6 +128,19 @@ getting a file each:
   ordinary `SampleSlot`. The destructor sets an abort flag and joins the
   worker before any member is freed, so a delete mid-analysis can't
   use-after-free a worker still writing into the node.
+- **`src/nodes/RemoveBgNode.h`/`.cpp`** — background removal via
+  `Platform::SubjectMask` (Vision on macOS, ONNX Runtime on Windows). Another
+  `SampleScanner`-shaped worker `std::thread`, but with a **latest-only**
+  request slot rather than a run-to-completion job queue: a `FrameRequest`
+  arriving while one is already queued replaces it outright, so a slow
+  segmentation pass on a video input never backs up. The completed
+  `FrameResult` carries the mask *and* a copy of the source pixels it was
+  computed from (matched by a monotonic `serial`), and `CookIfNeeded`
+  composites the mask exclusively against that paired source texture, never
+  the live current frame — otherwise a moving subject's mask would visibly
+  lag the frame it's applied to. The worker never touches a GL object; the
+  main thread does the GPU readback before handing off and the two texture
+  uploads after picking up a result.
 - **`src/audio/PluginScanner.h`/`.cpp`** — `SampleScanner`'s thread +
   `PollResults()` + disk-cache shape, over a component-registry query instead
   of a directory walk, so it has no user-managed folder list. Backs the docked
