@@ -35638,15 +35638,17 @@ int main(int argc, char** argv)
             {
                if (n->exportImagePath.empty())
                {
-                  if (const char* home = getenv("HOME"))
-                     n->exportImagePath = std::string(home) + "/Desktop/infinite_output." + (n->imageFormat == 1 ? "jpg" : "png");
+                  const std::string home = AppPaths::HomeDir();
+                  if (!home.empty())
+                     n->exportImagePath = home + "/Desktop/infinite_output." + (n->imageFormat == 1 ? "jpg" : "png");
                   else
                      n->exportImagePath = "infinite_output." + std::string(n->imageFormat == 1 ? "jpg" : "png");
                }
                if (n->recordVideoPath.empty())
                {
-                  if (const char* home = getenv("HOME"))
-                     n->recordVideoPath = std::string(home) + "/Desktop/infinite_output." + (n->videoFormat == 1 ? "mov" : "mp4");
+                  const std::string home = AppPaths::HomeDir();
+                  if (!home.empty())
+                     n->recordVideoPath = home + "/Desktop/infinite_output." + (n->videoFormat == 1 ? "mov" : "mp4");
                   else
                      n->recordVideoPath = "infinite_output." + std::string(n->videoFormat == 1 ? "mov" : "mp4");
                }
