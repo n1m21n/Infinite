@@ -40633,7 +40633,7 @@ int main(int argc, char** argv)
             for (const ParamRef& ref : mod.FrameParams())
             {
                if (ref.nodeIndex != gNodes[0].index) continue;
-               if (ref.name == "size") sizeParam = ref.paramIndex;
+               if (ref.name == "size x") sizeParam = ref.paramIndex;
                if (ref.name == "rotation") rotParam = ref.paramIndex;
             }
             // X drives size, Y drives rotation - one pad, two destinations
@@ -40650,14 +40650,14 @@ int main(int argc, char** argv)
          }
          if (frameId == 5)
          {
-            printf("padX=%.2f -> size=%.4f (expect %.4f)\n", xy->padX, sh->size, 0.01f + 0.49f * 0.25f);
+            printf("padX=%.2f -> size=%.4f (expect %.4f)\n", xy->padX, sh->sizeX, 0.01f + 0.49f * 0.25f);
             printf("padY=%.2f -> rotation=%.4f (expect %.4f)\n", xy->padY, sh->rotation, -180.0f + 360.0f * 0.75f);
             xy->padX = 0.9f; xy->padY = 0.1f;
          }
          if (frameId == 8)
          {
-            printf("after move: size=%.4f rotation=%.4f  %s\n", sh->size, sh->rotation,
-                   (std::fabs(sh->size - (0.01f + 0.49f * 0.9f)) < 0.01f &&
+            printf("after move: size=%.4f rotation=%.4f  %s\n", sh->sizeX, sh->rotation,
+                   (std::fabs(sh->sizeX - (0.01f + 0.49f * 0.9f)) < 0.01f &&
                     std::fabs(sh->rotation - (-180.0f + 360.0f * 0.1f)) < 3.0f)
                       ? "INDEPENDENT OUTPUTS OK" : "MISMATCH");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -40671,7 +40671,7 @@ int main(int argc, char** argv)
          {
             for (const ParamRef& ref : mod.FrameParams())
             {
-               if (ref.nodeIndex == gNodes[0].index && ref.name == "size")
+               if (ref.nodeIndex == gNodes[0].index && ref.name == "size x")
                   mod.Bind(ref.nodeIndex, ref.paramIndex, gNodes[2].index);
             }
             printf("bound: links=%zu (frameParams=%zu)\n", mod.Links().size(), mod.FrameParams().size());
@@ -40716,12 +40716,12 @@ int main(int argc, char** argv)
       {
          if (frameId == 1)
          {
-            // Shape.size is param index 4 (shape dropdown isn't a ModSlider):
-            // width, height, size, aspect... resolve it by name instead of guessing.
+            // Shape's size was split into "size x" / "size y" ModSliders;
+            // resolve by name rather than guessing the param index.
             int sizeParam = -1;
             for (const ParamRef& ref : Modulation::Instance().FrameParams())
             {
-               if (ref.nodeIndex == gNodes[0].index && ref.name == "size")
+               if (ref.nodeIndex == gNodes[0].index && ref.name == "size x")
                   sizeParam = ref.paramIndex;
             }
             printf("size param index = %d\n", sizeParam);
@@ -40734,7 +40734,7 @@ int main(int argc, char** argv)
             auto* sh = static_cast<ShapeNode*>(gNodes[0].node.get());
             auto* lfo = static_cast<LFONode*>(gNodes[2].node.get());
             printf("f%-3d beats=%.3f lfo=%.3f  shape.size=%.4f\n",
-                   frameId, Transport::Instance().Beats(), lfo->Value01(), sh->size);
+                   frameId, Transport::Instance().Beats(), lfo->Value01(), sh->sizeX);
          }
          if (frameId == 44)
             glfwSetWindowShouldClose(window, GLFW_TRUE);
