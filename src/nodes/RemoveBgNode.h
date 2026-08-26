@@ -12,8 +12,9 @@
 #include "GLUtil.h"
 #include "Platform.h"
 
-// Background removal using the OS's own on-device segmentation - no model
-// download, no network, no API key.
+// Background removal using on-device segmentation (Vision on macOS, a
+// bundled ONNX model on Windows - see Platform::SubjectMask) - no network
+// access or API key either way.
 //
 // Masking costs a GPU readback plus a segmentation pass, which is far too
 // slow to run every frame at video rates (worse still on Windows, where

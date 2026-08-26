@@ -1,0 +1,26 @@
+u2netp.onnx
+============
+
+Weights for U^2-Net (small variant, "u2netp"), used on Windows as the
+salient-object detection backend for Platform::SubjectMask
+(src/platform/win/PlatformWin.cpp), matting `MattingMode::Subject` and
+`MattingMode::Person` alike (see that file for why Person maps to the same
+model on Windows).
+
+Source:  https://github.com/xuebinqin/U-2-Net
+License: Apache License 2.0 (see https://github.com/xuebinqin/U-2-Net/blob/master/LICENSE)
+Fetched: https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx
+         (an unmodified re-host of the original weights; verified against
+         the upstream repo's LICENSE before committing here)
+
+@article{Qin_2020_U2Net,
+  title = {U2-Net: Going Deeper with Nested U-Structure for Salient Object Detection},
+  author = {Qin, Xuebin and Zhang, Zichen and Huang, Chenyang and Dehghan, Masood and Zaiane, Osmar and Jagersand, Martin},
+  journal = {Pattern Recognition},
+  volume = {106},
+  pages = {107404},
+  year = {2020}
+}
+
+Not used on macOS - the macOS build's Platform::SubjectMask uses Vision
+instead and never loads this file.

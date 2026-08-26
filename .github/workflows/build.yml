@@ -159,9 +159,15 @@ jobs:
       - name: Stage
         shell: bash
         run: |
-          mkdir -p dist/Infinite
+          mkdir -p dist/Infinite/assets/models
           cp build/Release/Infinite.exe dist/Infinite/
           cp build/Release/infinite-vst3-scanner.exe dist/Infinite/
+          # onnxruntime.dll + DirectML.dll (Platform::SubjectMask's backend)
+          # and the bundled u2netp model - CMakeLists.txt's POST_BUILD step
+          # already staged these next to the exe in the build tree.
+          cp build/Release/onnxruntime.dll dist/Infinite/
+          cp build/Release/DirectML.dll dist/Infinite/
+          cp build/Release/assets/models/u2netp.onnx dist/Infinite/assets/models/
           cp README.md LICENSE dist/Infinite/ 2>/dev/null || true
 
       - name: Upload
