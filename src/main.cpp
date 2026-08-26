@@ -859,7 +859,8 @@ namespace
    }
 
    void DropdownButton(const char* label, const std::vector<std::string>& options,
-                       int current, std::function<void(int)> onSelect, float width = kParamWidth)
+                       int current, std::function<void(int)> onSelect, float width = kParamWidth,
+                       bool showCaption = true)
    {
       if (options.empty())
          return;
@@ -872,6 +873,8 @@ namespace
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
       }
+      if (!showCaption)
+         return;
       ImGui::SameLine();
       // anything after "##" is an ImGui uniquifier, not part of the visible name
       std::string shown(label);
@@ -913,20 +916,14 @@ namespace
       const float spacing = ImGui::GetStyle().ItemSpacing.x;
       const float avail = ImGui::GetContentRegionAvail().x;
       const float arrowW = ImGui::GetFrameHeight();
-      // DropdownButton appends its own trailing "sort"/"type" caption after
-      // the button, on the same line (see DropdownButton) - budget for that
-      // text and the SameLine spacing on each side of it, or the type
-      // dropdown runs past the panel's right edge instead of ending flush
-      // with it like every other full-width control in this strip.
-      const float sortLabelW = ImGui::CalcTextSize("sort").x;
-      const float typeLabelW = typeNames.empty() ? 0.0f : ImGui::CalcTextSize("type").x;
-      float remaining = avail - arrowW - sortLabelW - 2.0f * spacing;
-      if (!typeNames.empty())
-         remaining -= typeLabelW + 2.0f * spacing;
+      // No trailing "sort"/"type" caption on these two (showCaption=false
+      // below), so the remaining width just splits between the two
+      // dropdowns and the direction-arrow button.
+      const float remaining = avail - arrowW - 2.0f * spacing;
       const float typeW = typeNames.empty() ? 0.0f : std::max(40.0f, remaining * 0.5f);
       const float sortW = typeNames.empty() ? std::max(40.0f, remaining) : std::max(40.0f, remaining - typeW);
 
-      DropdownButton("sort", sortNames, state.sortMode, [&state](int i) { state.sortMode = i; }, sortW);
+      DropdownButton("sort", sortNames, state.sortMode, [&state](int i) { state.sortMode = i; }, sortW, false);
 
       ImGui::SameLine();
       // Drawn as a vector triangle on the button, not a Unicode arrow
@@ -955,7 +952,7 @@ namespace
       if (!typeNames.empty())
       {
          ImGui::SameLine();
-         DropdownButton("type", typeNames, state.typeFilter, [&state](int i) { state.typeFilter = i; }, typeW);
+         DropdownButton("type", typeNames, state.typeFilter, [&state](int i) { state.typeFilter = i; }, typeW, false);
       }
 
       return strcmp(before.query, state.query) != 0 || before.sortMode != state.sortMode ||
