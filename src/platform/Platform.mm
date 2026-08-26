@@ -273,6 +273,13 @@ namespace Platform
 
 namespace Platform
 {
+   // How far behind the requested time a backward-seek reader rebuild starts
+   // decoding from. Every frame between (seconds - this) and seconds lands in
+   // frameCache (see VideoFrameAt), so this is directly how many seconds of
+   // continued reverse playback one rebuild buys before the next one - too
+   // small and reverse stutters on a rebuild almost every frame.
+   constexpr double kReverseLookbackSeconds = 2.0;
+
    struct CachedVideoFrame
    {
       double pts = 0.0;
@@ -290,6 +297,13 @@ namespace Platform
       double duration = 0.0;
       double currentPts = -1.0;  // presentation time of the frame we last handed out
       double nextPts = -1.0;     // pts of the decoded-but-not-yet-current frame
+      // Furthest pts this reader instance has actually decoded to, via
+      // DecodeNext - unlike currentPts, never rewritten by a cache hit, so it
+      // stays a true marker of the physical reader's position even while
+      // reverse playback walks currentPts backward through frameCache without
+      // touching the reader at all. See its use in VideoFrameAt for why this
+      // needs to be tracked separately.
+      double physicalPts = -1.0;
       std::vector<unsigned char> pending; // that frame's pixels
       bool finished = false;
 
@@ -298,7 +312,13 @@ namespace Platform
       // reader rebuild + partial-GOP redecode. FIFO by pts, capped by byte size.
       std::deque<CachedVideoFrame> frameCache;
       size_t cacheBytes = 0;
-      static constexpr size_t kMaxCacheBytes = 64 * 1024 * 1024;
+      // 256MB covers kReverseLookbackSeconds (2s) of raw RGBA frames up
+      // through roughly 1080p at 30fps (2s * 30 * 1920*1080*4 =~ 498MB is the
+      // worst case that gets truncated rather than fully covered - the FIFO
+      // eviction below keeps the frames closest to the current position, the
+      // ones actually needed next, so a truncated cache degrades to more
+      // frequent rebuilds rather than breaking).
+      static constexpr size_t kMaxCacheBytes = 256 * 1024 * 1024;
    };
 
    namespace
@@ -339,6 +359,7 @@ namespace Platform
          h->finished = false;
          h->currentPts = -1.0;
          h->nextPts = -1.0;
+         h->physicalPts = -1.0;
          return true;
       }
 
@@ -357,6 +378,7 @@ namespace Platform
 
          CMTime pts = CMSampleBufferGetPresentationTimeStamp(sample);
          h->nextPts = CMTimeGetSeconds(pts);
+         h->physicalPts = h->nextPts;
 
          CVImageBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sample);
          if (pixelBuffer == NULL)
@@ -1013,13 +1035,51 @@ namespace Platform
             handle->output = nil;
             handle->frameCache.clear();
             handle->cacheBytes = 0;
-            if (!StartReader(handle, std::max(0.0, seconds - 0.25), err))
+            // Look back far enough that one rebuild covers several upcoming
+            // reverse steps, not just the single frame being requested right
+            // now - see the class comment on frameCache for why this matters.
+            if (!StartReader(handle, std::max(0.0, seconds - kReverseLookbackSeconds), err))
                return false;
             seekedBackward = true;
          }
+         else if (handle->physicalPts >= 0.0 && seconds + 0.001 < handle->physicalPts)
+         {
+            // Forward playback resuming from behind where the reader
+            // physically sits: reverse steps just before this only walked
+            // frameCache (see TryUseCache), which moves currentPts backward
+            // without the underlying AVAssetReader ever rewinding - it's
+            // still parked at physicalPts, wherever the last real decode
+            // left it. Falling into the plain forward loop below as-is would
+            // pull whatever the reader has queued up next - a frame from
+            // near physicalPts, far ahead of `seconds` - and then
+            // immediately break without producing anything, stalling every
+            // call until `seconds` organically climbs back up to
+            // physicalPts. Rebuild from exactly `seconds` instead: this is a
+            // forward resume, not a scrub, so no lookback is needed.
+            std::string err;
+            if (handle->reader != nil)
+               [handle->reader cancelReading];
+            handle->reader = nil;
+            handle->output = nil;
+            if (!StartReader(handle, seconds, err))
+               return false;
+         }
 
          bool produced = false;
-         // decode forward until the pending frame is in the future
+         // Decode forward from the lookback point until the pending frame is
+         // in the future. Every frame decoded along the way - not just the
+         // one actually returned - gets cached: those are the frames between
+         // (seconds - lookback) and `seconds`, i.e. exactly the ones a
+         // continuing reverse-playback (strictly decreasing `seconds` on
+         // each call) will ask for next. There used to be a second loop here
+         // that kept decoding past `seconds` into the future to "pre-fill"
+         // the cache, but frames past `seconds` can never satisfy a
+         // subsequent reverse lookup (TryUseCache only ever matches
+         // pts <= seconds, and seconds only shrinks from here) - they just
+         // burned decode time and, once the byte cap was hit, evicted the
+         // actually-useful backward history via the FIFO eviction below,
+         // forcing a full reader rebuild on almost every reverse step. Not
+         // pre-filling forward is the fix, not an oversight.
          for (int guard = 0; guard < 240; guard++)
          {
             if (handle->nextPts < 0.0)
@@ -1036,22 +1096,6 @@ namespace Platform
             produced = true;
             if (seekedBackward)
                PushCacheFrame(handle, handle->currentPts, outPixels);
-         }
-
-         // Keep decoding a bit further so the next several reverse steps can be
-         // served from cache instead of another reader rebuild + redecode.
-         if (seekedBackward && produced)
-         {
-            for (int guard = 0; guard < 240 && handle->cacheBytes < VideoHandle::kMaxCacheBytes; guard++)
-            {
-               if (handle->nextPts < 0.0)
-               {
-                  if (!DecodeNext(handle))
-                     break;
-               }
-               PushCacheFrame(handle, handle->nextPts, handle->pending);
-               handle->nextPts = -1.0;
-            }
          }
 
          return produced;
@@ -2977,6 +3021,157 @@ namespace Platform
          for (int ch = 0; ch < channels; ++ch)
             std::copy(channelData[ch], channelData[ch] + frames,
                       outBuffer.channelData.begin() + (size_t)ch * (size_t)frames);
+
+         outError.clear();
+         return true;
+      }
+   }
+
+   // Reads a video container's audio track via AVAssetReader (not
+   // AVAudioFile - see the declaration comment in Platform.h for why),
+   // requesting non-interleaved 32-bit float output so each AudioBuffer in
+   // the returned list is already one planar channel, matching SampleBuffer's
+   // own layout with no interleave/deinterleave step needed.
+   bool DecodeVideoAudioTrackToBuffer(const std::string& path, SampleBuffer& outBuffer, std::string& outError)
+   {
+      @autoreleasepool
+      {
+         NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
+         NSURL* url = [NSURL fileURLWithPath:nsPath];
+         AVAsset* asset = [AVAsset assetWithURL:url];
+         if (asset == nil)
+         {
+            outError = "could not open file";
+            return false;
+         }
+
+         NSArray<AVAssetTrack*>* tracks = [asset tracksWithMediaType:AVMediaTypeAudio];
+         if ([tracks count] == 0)
+         {
+            // Not an error - a silent clip is a normal case for VJ footage.
+            // Callers check for exactly this string to tell the two apart.
+            outError = "no audio track in this file";
+            return false;
+         }
+         AVAssetTrack* track = [tracks firstObject];
+
+         NSError* err = nil;
+         AVAssetReader* reader = [[AVAssetReader alloc] initWithAsset:asset error:&err];
+         if (reader == nil)
+         {
+            outError = err ? std::string([[err localizedDescription] UTF8String]) : "reader failed";
+            return false;
+         }
+
+         NSDictionary* settings = @{
+            AVFormatIDKey : @(kAudioFormatLinearPCM),
+            AVLinearPCMIsFloatKey : @YES,
+            AVLinearPCMBitDepthKey : @32,
+            AVLinearPCMIsNonInterleaved : @YES,
+            AVLinearPCMIsBigEndianKey : @NO
+         };
+         AVAssetReaderTrackOutput* output = [[AVAssetReaderTrackOutput alloc] initWithTrack:track
+                                                                              outputSettings:settings];
+         output.alwaysCopiesSampleData = NO;
+         if (![reader canAddOutput:output])
+         {
+            outError = "cannot add audio output";
+            return false;
+         }
+         [reader addOutput:output];
+
+         if (![reader startReading])
+         {
+            outError = reader.error ? std::string([[reader.error localizedDescription] UTF8String])
+                                     : "startReading failed";
+            return false;
+         }
+
+         // A movie's audio track is mono/stereo in the overwhelming majority
+         // of cases; 8 covers 7.1 with room to spare. A track wider than this
+         // fails loudly below rather than silently truncating channels.
+         constexpr int kMaxChannels = 8;
+         int channels = 0;
+         double sampleRate = 0.0;
+         std::vector<std::vector<float>> perChannel;
+
+         while (true)
+         {
+            CMSampleBufferRef sample = [output copyNextSampleBuffer];
+            if (sample == NULL)
+               break;
+
+            if (channels == 0)
+            {
+               CMFormatDescriptionRef desc = CMSampleBufferGetFormatDescription(sample);
+               const AudioStreamBasicDescription* asbd =
+                  desc ? CMAudioFormatDescriptionGetStreamBasicDescription(desc) : nullptr;
+               if (asbd != nullptr && asbd->mChannelsPerFrame > 0 &&
+                   (int)asbd->mChannelsPerFrame <= kMaxChannels)
+               {
+                  channels = (int)asbd->mChannelsPerFrame;
+                  sampleRate = asbd->mSampleRate;
+                  perChannel.resize(channels);
+               }
+            }
+
+            if (channels > 0)
+            {
+               // Two-call pattern (query size, then fill) is required, not
+               // just sufficient: passing a fixed buffer sized generously
+               // larger than what's needed still fails with
+               // kCMSampleBufferError_ArrayTooSmall (-12737) - this API
+               // insists on the exact size the first call reports, at least
+               // combined with Assure16ByteAlignment. Confirmed against a
+               // real recorded file where a `kMaxChannels`-sized stack
+               // buffer (136 bytes) failed and the 24-byte exact size
+               // succeeded.
+               size_t neededSize = 0;
+               CMBlockBufferRef blockBuffer = nullptr;
+               CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+                  sample, &neededSize, NULL, 0, kCFAllocatorDefault, kCFAllocatorDefault,
+                  kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, &blockBuffer);
+
+               std::vector<unsigned char> storage(neededSize);
+               AudioBufferList* list = reinterpret_cast<AudioBufferList*>(storage.data());
+               OSStatus status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+                  sample, NULL, list, neededSize, kCFAllocatorDefault, kCFAllocatorDefault,
+                  kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, &blockBuffer);
+               if (status == noErr)
+               {
+                  const int buffers = std::min((int)list->mNumberBuffers, channels);
+                  for (int ch = 0; ch < buffers; ch++)
+                  {
+                     const float* data = (const float*)list->mBuffers[ch].mData;
+                     const int n = (int)(list->mBuffers[ch].mDataByteSize / sizeof(float));
+                     if (data != nullptr && n > 0)
+                        perChannel[ch].insert(perChannel[ch].end(), data, data + n);
+                  }
+               }
+               if (blockBuffer != nullptr)
+                  CFRelease(blockBuffer);
+            }
+
+            CFRelease(sample);
+         }
+
+         if (channels <= 0 || perChannel[0].empty())
+         {
+            outError = "failed to decode audio track";
+            return false;
+         }
+
+         const int frames = (int)perChannel[0].size();
+         outBuffer.channels = channels;
+         outBuffer.numFrames = frames;
+         outBuffer.sampleRate = sampleRate;
+         outBuffer.channelData.resize((size_t)channels * (size_t)frames);
+         for (int ch = 0; ch < channels; ch++)
+         {
+            const int n = std::min(frames, (int)perChannel[ch].size());
+            std::copy(perChannel[ch].begin(), perChannel[ch].begin() + n,
+                      outBuffer.channelData.begin() + (size_t)ch * (size_t)frames);
+         }
 
          outError.clear();
          return true;

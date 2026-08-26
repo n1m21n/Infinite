@@ -482,6 +482,137 @@ namespace Platform
       return produced;
    }
 
+   // Decodes a video container's audio track in full, up front, into a
+   // planar-float SampleBuffer - the same shape DecodeAudioFileToBuffer
+   // (MediaDecodeWin.cpp) produces for a plain audio file, so downstream
+   // (SampleSlotT, the sampler playback path) needs no second buffer type.
+   // Mirrors VideoOpen's IMFSourceReader-over-URL pattern above, just
+   // selecting the audio stream and MFAudioFormat_Float instead of the video
+   // stream and RGB32. Main-thread only, matching the macOS AVAssetReader
+   // path - not real-time safe.
+   bool DecodeVideoAudioTrackToBuffer(const std::string& path, SampleBuffer& outBuffer, std::string& outError)
+   {
+      outError.clear();
+      MfScope mf;
+      ComScope com;
+      if (!mf.ok || !com.ok)
+      {
+         outError = "could not initialize Media Foundation";
+         return false;
+      }
+
+      IMFSourceReader* reader = nullptr;
+      HRESULT hr = MFCreateSourceReaderFromURL(WinCommon::Utf8ToWide(path).c_str(), nullptr, &reader);
+      if (FAILED(hr))
+      {
+         outError = WinCommon::HrToString("opening file", hr);
+         return false;
+      }
+
+      // Selecting the audio stream fails when the container has none - that
+      // is a normal case for a lot of VJ footage, not an error. Callers check
+      // for exactly this string to tell the two apart.
+      if (FAILED(reader->SetStreamSelection(MF_SOURCE_READER_FIRST_AUDIO_STREAM, TRUE)))
+      {
+         SafeRelease(&reader);
+         outError = "no audio track in this file";
+         return false;
+      }
+
+      IMFMediaType* type = nullptr;
+      hr = MFCreateMediaType(&type);
+      if (SUCCEEDED(hr))
+         hr = type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+      if (SUCCEEDED(hr))
+         hr = type->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_Float);
+      if (SUCCEEDED(hr))
+         hr = reader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, nullptr, type);
+      SafeRelease(&type);
+      if (FAILED(hr))
+      {
+         SafeRelease(&reader);
+         outError = "no audio track in this file";
+         return false;
+      }
+
+      IMFMediaType* actual = nullptr;
+      hr = reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, &actual);
+      if (FAILED(hr))
+      {
+         SafeRelease(&reader);
+         outError = WinCommon::HrToString("reading negotiated audio format", hr);
+         return false;
+      }
+      UINT32 channels = 0, sampleRate = 0;
+      actual->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &channels);
+      actual->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &sampleRate);
+      SafeRelease(&actual);
+      if (channels == 0 || sampleRate == 0)
+      {
+         SafeRelease(&reader);
+         outError = "unreadable audio format";
+         return false;
+      }
+
+      // Read the whole track, interleaved (Media Foundation's float PCM
+      // decoders always deliver interleaved), then deinterleave into
+      // SampleBuffer's planar layout below.
+      std::vector<float> interleaved;
+      for (;;)
+      {
+         DWORD flags = 0;
+         IMFSample* sample = nullptr;
+         hr = reader->ReadSample(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, nullptr, &flags, nullptr, &sample);
+         if (FAILED(hr))
+         {
+            SafeRelease(&reader);
+            outError = WinCommon::HrToString("audio decode", hr);
+            return false;
+         }
+         if (flags & MF_SOURCE_READERF_ENDOFSTREAM || sample == nullptr)
+         {
+            SafeRelease(&sample);
+            break;
+         }
+
+         IMFMediaBuffer* buffer = nullptr;
+         hr = sample->ConvertToContiguousBuffer(&buffer);
+         if (SUCCEEDED(hr))
+         {
+            BYTE* data = nullptr;
+            DWORD dataLen = 0;
+            if (SUCCEEDED(buffer->Lock(&data, nullptr, &dataLen)))
+            {
+               const float* samples = reinterpret_cast<const float*>(data);
+               const size_t count = dataLen / sizeof(float);
+               interleaved.insert(interleaved.end(), samples, samples + count);
+               buffer->Unlock();
+            }
+            SafeRelease(&buffer);
+         }
+         SafeRelease(&sample);
+      }
+      SafeRelease(&reader);
+
+      if (interleaved.empty())
+      {
+         outError = "failed to decode audio track";
+         return false;
+      }
+
+      const int frames = (int)(interleaved.size() / channels);
+      outBuffer.channels = (int)channels;
+      outBuffer.numFrames = frames;
+      outBuffer.sampleRate = (double)sampleRate;
+      outBuffer.channelData.assign((size_t)channels * (size_t)frames, 0.0f);
+      for (int i = 0; i < frames; i++)
+         for (UINT32 ch = 0; ch < channels; ch++)
+            outBuffer.channelData[(size_t)ch * (size_t)frames + i] = interleaved[(size_t)i * channels + ch];
+
+      outError.clear();
+      return true;
+   }
+
    // ---- camera ---------------------------------------------------------------
 
    namespace

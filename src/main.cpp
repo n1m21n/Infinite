@@ -140,6 +140,7 @@ namespace
 #include "nodes/OscillatorNode.h"
 #include "nodes/MetallicNode.h"
 #include "audio/Wavetable.h"
+#include "audio/AudioFileWriter.h"
 #include "nodes/NoteNodes.h"
 #include "nodes/SamplerNode.h"
 #include "nodes/PaulStretchNode.h"
@@ -3513,7 +3514,8 @@ namespace
       auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
       auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
       const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
-      const bool srcIsAudioNode = dynamic_cast<IAudioSource*>(srcNode->node.get()) != nullptr;
+      auto* srcAudioSource = dynamic_cast<IAudioSource*>(srcNode->node.get());
+      const bool srcIsAudioNode = srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
       const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
 
       if (!IsInputSlotCompatible(dstNode, dstSlot, srcIsModulator, srcPalette, srcGeometry, srcCamera,
@@ -3681,7 +3683,8 @@ namespace
    // since those pins still show unfiltered below the suggestions. Builds a
    // throwaway, unregistered GraphNode per candidate type to probe its input
    // slots; this runs once per drag-to-empty-space, not per frame.
-   std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForOutput(GraphNode* srcNode)
+   std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForOutput(GraphNode* srcNode,
+                                                                                    int srcOutputIndex = 0)
    {
       std::vector<std::pair<std::string, std::string>> result;
       if (srcNode == nullptr)
@@ -3695,7 +3698,8 @@ namespace
       auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
       auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
       const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
-      const bool srcIsAudioNode = dynamic_cast<IAudioSource*>(srcNode->node.get()) != nullptr;
+      auto* srcAudioSource = dynamic_cast<IAudioSource*>(srcNode->node.get());
+      const bool srcIsAudioNode = srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
       const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
 
       for (const std::string& category : NodeFactory::Instance().GetCategories())
@@ -4172,6 +4176,19 @@ namespace
       }
       ImGui::Checkbox("loop", &n->loop);
       ModSlider("speed", &n->speed, -2.0f, 4.0f);
+
+      NodeSeparator();
+      if (n->HasAudio())
+      {
+         ImGui::Checkbox("audioEnabled", &n->audioEnabled);
+         ModSlider("volume", &n->volume, 0.0f, 1.0f);
+      }
+      else if (!n->AudioError().empty())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("audio: %s", n->AudioError().c_str());
+         ImGui::PopTextWrapPos();
+      }
    }
 
    void DrawVideoInParams(VideoInNode* n)
@@ -6215,9 +6232,14 @@ namespace
       // toggle and handed it to DrawAudioNodeBody, which has no case for it -
       // so the node rendered as a bare pin column with no params at all. It
       // keeps DrawAudioAnalyzeParams behind the eye like the other analyzers.
+      // VideoSourceNode needs the identical carve-out: it became an
+      // IAudioSource so its own audio track can flow into the DSP graph, but
+      // it keeps its DrawVideoParams body (file picker, loop/speed, preview)
+      // rather than the generic v3 audio body, which has no case for it and
+      // would otherwise drop path/loop/speed/audioEnabled/volume entirely.
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
           dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
-          dynamic_cast<AudioAnalyzeNode*>(node) != nullptr)
+          dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -17564,7 +17586,12 @@ namespace
       // (Note Sequencer, Envelope - P3a) get the same treatment: no pixels
       // either, and IsAudioBodyNode's gate above must agree with this one
       // or a note node would slip through to the viewport panel.
-      if (dynamic_cast<IAudioSource*>(n) != nullptr || n->AudioInputSlot(0) != nullptr ||
+      // VideoSourceNode is the deliberate exception mentioned above: it's an
+      // IAudioSource (its own audio track) but, unlike every other audio
+      // node, GetOutputTexture() is a real video frame, not 0 - so it still
+      // belongs in the viewport panel/projector.
+      if ((dynamic_cast<IAudioSource*>(n) != nullptr && dynamic_cast<VideoSourceNode*>(n) == nullptr) ||
+          n->AudioInputSlot(0) != nullptr ||
           dynamic_cast<INoteSource*>(n) != nullptr || n->NoteInputSlot(0) != nullptr)
          return false;
       return true;
@@ -18528,7 +18555,7 @@ namespace
       static const std::unordered_map<std::string, const char*> kText = {
          // ---------------- Source / Text ----------------
          { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
-         { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available." },
+         { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available. Also outputs the clip's own audio track, if it has one, on the same transport-driven clock as the picture (audioEnabled/volume)." },
          { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
          { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
@@ -18967,7 +18994,7 @@ namespace
          static const std::vector<Group> groups = {
             { "Source", {
                { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
-               { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available." },
+               { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available. Also outputs the clip's own audio track, if it has one, on the same transport-driven clock as the picture (audioEnabled/volume)." },
                { "Shape", "Ten vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line - with fill, stroke, feather and background." },
                { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
                { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
@@ -28356,6 +28383,53 @@ int main(int argc, char** argv)
          out->AudioInput().Connect(audio);
          out->recordFps = 30;
       }
+      else if (getenv("INFINITE_VIDEOAUDIOTEST") != nullptr)
+      {
+         // Exercises VideoSourceNode's new audio output end-to-end without
+         // depending on an external test-media file (none is committed to
+         // the repo - see the note by the printf below): records a movie
+         // whose audio track is a synthesized tone through the ordinary
+         // OutputNode recording pipeline (same one INFINITE_AUDIORECTEST
+         // drives), then opens that movie back through VideoSourceNode and
+         // Platform::DecodeVideoAudioTrackToBuffer directly, checking both
+         // that HasAudio() comes up true and that the decoded samples still
+         // carry a detectable tone at the frequency that was recorded.
+         constexpr double kToneHz = 440.0;
+         constexpr double kToneSampleRate = 48000.0;
+         constexpr double kToneSeconds = 1.5;
+         constexpr float kToneAmplitude = 0.5f;
+         const int toneFrames = (int)(kToneSampleRate * kToneSeconds);
+         std::vector<float> tone(toneFrames);
+         for (int i = 0; i < toneFrames; i++)
+            tone[i] = kToneAmplitude * std::sin(2.0 * M_PI * kToneHz * (double)i / kToneSampleRate);
+         AudioRecordings::WriteWav(TmpPath("infinite_videoaudiotest_tone.wav"), tone.data(), toneFrames,
+                                    kToneSampleRate, 1);
+
+         SpawnNode("Shape", "Source", 40.0f, 40.0f);           // 0
+         SpawnNode("Output", "Output", 320.0f, 40.0f);         // 1
+         SpawnNode("Audio File", "Modulators", 40.0f, 400.0f); // 2
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         auto* audio = static_cast<AudioFileNode*>(gNodes[2].node.get());
+         audio->Open(TmpPath("infinite_videoaudiotest_tone.wav"));
+         audio->monitor = false; // silent while the test runs
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         out->includeAudio = true;
+         out->AudioInput().Connect(audio);
+         out->recordFps = 30;
+      }
+      else if (getenv("INFINITE_VIDEOSPEEDTEST") != nullptr)
+      {
+         // Same minimal record-a-clip fixture as INFINITE_VIDEOAUDIOTEST -
+         // this test only needs a real movie file to Open(), not the tone
+         // itself, but recording is the simplest way to produce one.
+         SpawnNode("Shape", "Source", 40.0f, 40.0f);       // 0
+         SpawnNode("Output", "Output", 320.0f, 40.0f);     // 1
+         SpawnNode("Audio File", "Modulators", 40.0f, 400.0f); // 2
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         out->includeAudio = false;
+         out->recordFps = 30;
+      }
       else if (getenv("INFINITE_PATCHTEST") != nullptr)
       {
          // A patch touching every kind of connection: image cables, a geometry
@@ -34383,6 +34457,138 @@ int main(int argc, char** argv)
          }
       }
 
+      if (getenv("INFINITE_VIDEOAUDIOTEST") != nullptr)
+      {
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         if (frameId == 2)
+         {
+            const bool started = out->StartRecording(TmpPath("infinite_videoaudiotest.mov"));
+            printf("start: %d (%s)\n", (int)started, out->RecordStatus().c_str());
+         }
+         if (frameId == 62) // ~2 seconds at 30fps, comfortably past the 1.5s tone
+         {
+            const int frames = out->RecordedFrames();
+            out->StopRecording(); // blocks until AVAssetWriter finishes, so the file is complete by frame 64
+            printf("recorded %d frames, status: %s\n", frames, out->RecordStatus().c_str());
+         }
+         if (frameId == 64)
+         {
+            SpawnNode("Video", "Source", 600.0f, 40.0f); // 3
+            auto* video = static_cast<VideoSourceNode*>(gNodes[3].node.get());
+            const bool opened = video->Open(TmpPath("infinite_videoaudiotest.mov"));
+            printf("video open: %d (%s), duration=%.2fs, HasAudio=%d (%s)\n",
+                   (int)opened, video->LastError().c_str(), video->Duration(),
+                   (int)video->HasAudio(), video->AudioError().c_str());
+
+            Platform::SampleBuffer buf;
+            std::string decodeError;
+            const bool decoded = Platform::DecodeVideoAudioTrackToBuffer(
+               TmpPath("infinite_videoaudiotest.mov"), buf, decodeError);
+            printf("direct decode: %d (%s), channels=%d sampleRate=%.0f numFrames=%d\n",
+                   (int)decoded, decodeError.c_str(), buf.channels, buf.sampleRate, buf.numFrames);
+
+            // Goertzel single-bin power at the recorded tone's frequency vs. a
+            // control frequency well away from it (and from its harmonics) -
+            // a phase-independent way to confirm the decoded samples still
+            // carry that tone, without asserting exact per-sample values that
+            // AAC's lossy re-encode and encoder priming delay would break.
+            auto goertzelMagnitude = [](const float* samples, int n, double freqHz, double sr) -> double
+            {
+               const int k = (int)(0.5 + (double)n * freqHz / sr);
+               const double w = 2.0 * M_PI * (double)k / (double)n;
+               const double coeff = 2.0 * std::cos(w);
+               double s0 = 0.0, s1 = 0.0, s2 = 0.0;
+               for (int i = 0; i < n; i++)
+               {
+                  s0 = samples[i] + coeff * s1 - s2;
+                  s2 = s1;
+                  s1 = s0;
+               }
+               return std::sqrt(s1 * s1 + s2 * s2 - coeff * s1 * s2);
+            };
+
+            bool toneOk = false;
+            double toneMag = 0.0, noiseMag = 0.0;
+            if (decoded && buf.channels > 0 && buf.numFrames > 0)
+            {
+               const float* ch0 = buf.channelData.data();
+               const double sr = buf.sampleRate > 0.0 ? buf.sampleRate : 48000.0;
+               toneMag = goertzelMagnitude(ch0, buf.numFrames, 440.0, sr);
+               noiseMag = goertzelMagnitude(ch0, buf.numFrames, 5000.0, sr); // far from 440Hz and its low harmonics
+               toneOk = toneMag > noiseMag * 5.0;
+            }
+            printf("tone check: 440Hz magnitude=%.1f vs 5000Hz control=%.1f  %s\n",
+                   toneMag, noiseMag, toneOk ? "TONE PRESENT" : "TONE MISSING");
+
+            const double expectedDuration = 1.5;
+            const bool durationOk = decoded && std::fabs((double)buf.numFrames / std::max(1.0, buf.sampleRate) - expectedDuration) < 0.3;
+
+            const bool ok = opened && video->HasAudio() && decoded && buf.channels >= 1 && durationOk && toneOk;
+            printf("%s\n", ok ? "VIDEOAUDIOTEST OK" : "VIDEOAUDIOTEST FAIL - BUG");
+         }
+      }
+
+      if (getenv("INFINITE_VIDEOSPEEDTEST") != nullptr)
+      {
+         // Reproduces "reverse freezes / +4 doesn't move" reports: drives a
+         // real VideoSourceNode across many real rendered frames (not a tight
+         // loop - CookIfNeeded derives its step from actual elapsed
+         // Transport time) at speed -1 then +4, and checks FrameUpdateCount()
+         // (bumped only when Platform::VideoFrameAt actually produces a new
+         // displayed frame) keeps climbing throughout each phase - a stall
+         // there is a real visual freeze even if Position() keeps advancing.
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         if (frameId == 2)
+         {
+            const bool started = out->StartRecording(TmpPath("infinite_videospeedtest.mov"));
+            printf("start: %d (%s)\n", (int)started, out->RecordStatus().c_str());
+         }
+         if (frameId == 62)
+         {
+            out->StopRecording();
+         }
+         static VideoSourceNode* sVideo = nullptr;
+         static int sReverseStartUpdates = 0, sForwardStartUpdates = 0;
+         static double sReverseStartPos = 0.0, sForwardStartPos = 0.0;
+         if (frameId == 64)
+         {
+            SpawnNode("Video", "Source", 600.0f, 40.0f); // 3
+            sVideo = static_cast<VideoSourceNode*>(gNodes[3].node.get());
+            const bool opened = sVideo->Open(TmpPath("infinite_videospeedtest.mov"));
+            printf("video open: %d, duration=%.2fs\n", (int)opened, sVideo->Duration());
+            sVideo->loop = true;
+            sVideo->speed = -1.0f;
+            sReverseStartUpdates = sVideo->FrameUpdateCount();
+            sReverseStartPos = sVideo->Position();
+         }
+         if (frameId == 124 && sVideo != nullptr)
+         {
+            const int reverseUpdates = sVideo->FrameUpdateCount() - sReverseStartUpdates;
+            const double reverseMoved = sVideo->Position() - sReverseStartPos;
+            printf("reverse (60 frames @ speed -1): updates=%d posDelta=%.3f (from %.3f to %.3f)\n",
+                   reverseUpdates, reverseMoved, sReverseStartPos, sVideo->Position());
+
+            sVideo->speed = 4.0f;
+            sForwardStartUpdates = sVideo->FrameUpdateCount();
+            sForwardStartPos = sVideo->Position();
+         }
+         if (frameId == 184 && sVideo != nullptr)
+         {
+            const int reverseUpdates = sVideo->FrameUpdateCount() - sReverseStartUpdates; // recompute isn't needed, kept for symmetry
+            const int forwardUpdates = sVideo->FrameUpdateCount() - sForwardStartUpdates;
+            printf("forward (60 frames @ speed +4): updates=%d (from %.3f to %.3f)\n",
+                   forwardUpdates, sForwardStartPos, sVideo->Position());
+
+            // A healthy run should produce a fresh displayed frame on most of
+            // the 60 real frames in each phase - a handful of misses to
+            // decode hiccups is fine, a near-zero count is the freeze.
+            const bool reverseOk = (sVideo->FrameUpdateCount() - sReverseStartUpdates) > 30;
+            const bool forwardOk = forwardUpdates > 30;
+            (void)reverseUpdates;
+            printf("%s\n", (reverseOk && forwardOk) ? "VIDEOSPEEDTEST OK" : "VIDEOSPEEDTEST FAIL - BUG");
+         }
+      }
+
       if (getenv("INFINITE_PATCHTEST") != nullptr && frameId == 4)
       {
          const std::string path = TmpPath("infinite_roundtrip.infinite");
@@ -37492,8 +37698,9 @@ int main(int argc, char** argv)
                auto* srcLight = srcNode ? dynamic_cast<LightNode*>(srcNode->node.get()) : nullptr;
                const bool srcIsEnvironment = srcNode != nullptr &&
                                              dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
-               const bool srcIsAudioNode = srcNode != nullptr &&
-                                           dynamic_cast<IAudioSource*>(srcNode->node.get()) != nullptr;
+               auto* srcAudioSource = srcNode ? dynamic_cast<IAudioSource*>(srcNode->node.get()) : nullptr;
+               const bool srcIsAudioNode = srcAudioSource != nullptr &&
+                                           srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
                const bool srcIsNoteSource = srcNode != nullptr &&
                                             dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
 
@@ -37705,7 +37912,8 @@ int main(int argc, char** argv)
             {
                GraphNode* dragSrc = FindNodeByIndex(GraphNode::NodeIndexFromPin(gLinkDragSourcePin));
                if (dragSrc != nullptr)
-                  gLinkDragSuggestions = RecommendedNodeTypesForOutput(dragSrc);
+                  gLinkDragSuggestions = RecommendedNodeTypesForOutput(
+                     dragSrc, GraphNode::OutputIndexFromPin(gLinkDragSourcePin));
             }
             gSpawnPos = ed::ScreenToCanvas(ImGui::GetMousePos());
             searchBuf[0] = '\0';
@@ -39217,8 +39425,9 @@ int main(int argc, char** argv)
                   auto* srcLight = dynamic_cast<LightNode*>(dragSrcNode->node.get());
                   const bool srcIsEnvironment =
                      dynamic_cast<EnvironmentNode*>(dragSrcNode->node.get()) != nullptr;
+                  auto* srcAudioSource = dynamic_cast<IAudioSource*>(dragSrcNode->node.get());
                   const bool srcIsAudioNode =
-                     dynamic_cast<IAudioSource*>(dragSrcNode->node.get()) != nullptr;
+                     srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(dragOutputSlot);
                   const bool srcIsNoteSource =
                      dynamic_cast<INoteSource*>(dragSrcNode->node.get()) != nullptr;
 

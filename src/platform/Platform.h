@@ -102,6 +102,27 @@ namespace Platform
    // Seeking backwards restarts the reader, which is how looping works.
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels);
 
+   // Decodes a video container's audio track into the same planar-float
+   // SampleBuffer (defined below) the audio-file path already produces.
+   // Returns false with a reason in outError when the file has no audio
+   // track - which is a normal case for a lot of VJ footage, not a failure -
+   // vs. an actual decode failure; callers distinguish the two by checking
+   // whether outError is exactly "no audio track in this file".
+   //
+   // Decodes the whole track up front, into memory (a three-minute stereo
+   // 48kHz track is ~70MB - acceptable, and it's what SampleSlotT and the
+   // sampler playback path already assume). Streaming decode from the audio
+   // thread would be a much larger change and is deliberately not what this
+   // does - don't "improve" it into one without deciding that separately.
+   //
+   // Main-thread only - not real-time safe. Cannot reuse DecodeAudioFileToBuffer:
+   // that goes through AVAudioFile, an audio-file API that does not reliably
+   // open movie containers, unlike AVAssetReader here (same class the video
+   // decoder above already uses).
+   struct SampleBuffer;
+   bool DecodeVideoAudioTrackToBuffer(const std::string& path, SampleBuffer& outBuffer,
+                                      std::string& outError);
+
    // ---- background removal ----
    // macOS uses Vision's on-device segmentation: no model download, no
    // network, no API key. Subject lifting (any salient foreground) needs

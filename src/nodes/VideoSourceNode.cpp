@@ -1,11 +1,175 @@
 #include "VideoSourceNode.h"
 
 #include "gl3.h"
+#include <GLFW/glfw3.h>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 
 #include "Transport.h"
+#include "audio/AudioBuffer.h"
+#include "audio/AudioNode.h"
+#include "audio/ParamMailbox.h"
+#include "audio/SampleSlot.h"
 
+namespace
+{
+   constexpr int kAudioEnabledParam = 0;
+   constexpr int kVolumeParam = 1;
+   constexpr int kSpeedParam = 2;
+
+   // Frames of drift between the free-running read position and a freshly
+   // published one beyond which this is treated as a seek/loop-wrap rather
+   // than ordinary playback, and the read position snaps instead of ramping
+   // across the block - ramping a loop-wrap (duration -> 0) would otherwise
+   // sweep audibly through the whole buffer once per loop.
+   constexpr double kDiscontinuitySeconds = 0.5;
+}
+
+// ------------------------------------------------------------- audio thread
+//
+// Position is a free-running read cursor advanced every block by `speed`
+// (source frames per audio-thread sample, so pitch tracks speed exactly like
+// tape/VCR playback), corrected only when it drifts far from
+// mPublishedPositionSeconds - the atomic the INode half
+// (VideoSourceNode::CookIfNeeded) writes once per graph frame from the same
+// Transport-driven mPosition the picture uses. It does not read Transport for
+// position - only for IsPlaying(), the same way AudioSamplerNode does, to
+// freeze audio alongside picture on pause.
+//
+// This free-run-with-correction split exists because the published position
+// only updates once per graph (video) frame, while ProcessBlock runs at the
+// audio thread's own much finer block rate: naively re-deriving the step from
+// (published - lastPublished) every block held the read position flat for
+// every block in between updates, then jumped it once - audible as a
+// stepped/zippered signal, not a real playing tone. Advancing continuously by
+// the known `speed` and only correcting on genuine discontinuities (loop
+// wrap, scrub, seek) fixes that while keeping video as the position's
+// ultimate source of truth - see local-prompts/15-video-source-audio-
+// track.md ("2.1 The clock").
+class VideoAudioNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mMailbox.PrepareToPlay(sampleRate);
+      mMailbox.SetImmediate(kAudioEnabledParam, mAudioEnabled ? 1.0f : 0.0f);
+      mMailbox.SetImmediate(kVolumeParam, mVolume);
+      mMailbox.SetImmediate(kSpeedParam, mSpeed);
+   }
+
+   // Main thread only.
+   void PushBuffer(Platform::SampleBuffer* buf) { mSampleSlot.Push(buf); }
+   void DrainRetired() { mSampleSlot.DrainRetired(); }
+   void PublishPosition(double seconds) { mPublishedPositionSeconds.store(seconds, std::memory_order_relaxed); }
+   void PushParams(bool audioEnabled, float volume, float speed)
+   {
+      mAudioEnabled = audioEnabled;
+      mVolume = volume;
+      mSpeed = speed;
+      mMailbox.Push(kAudioEnabledParam, audioEnabled ? 1.0f : 0.0f);
+      mMailbox.Push(kVolumeParam, volume);
+      mMailbox.Push(kSpeedParam, speed);
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
+   {
+      for (int ch = 0; ch < buffer.numChannels; ch++)
+         std::fill(buffer.channels[ch], buffer.channels[ch] + buffer.numFrames, 0.0f);
+
+      // Adopt a newly decoded buffer at the top of the block, never mid-block -
+      // same retire-not-destroy contract as AudioSamplerNode.
+      if (mSampleSlot.SwapIn())
+      {
+         mActiveBuffer = mSampleSlot.Active();
+         mHavePosition = false; // don't ramp from the old buffer's timeline into the new one
+      }
+
+      if (mActiveBuffer == nullptr || mActiveBuffer->numFrames <= 0 || mActiveBuffer->channels <= 0)
+         return;
+
+      // Gate-only checks - audioEnabled/Transport don't need per-sample
+      // precision, unlike volume/speed below, which shape the signal itself.
+      if (mMailbox.SmoothedValue(kAudioEnabledParam) <= 0.5f || !Transport::Instance().IsPlaying())
+         return;
+
+      const double sr = mActiveBuffer->sampleRate > 0.0 ? mActiveBuffer->sampleRate : 48000.0;
+      const double publishedSeconds = mPublishedPositionSeconds.load(std::memory_order_relaxed);
+      const double publishedFrame = std::clamp(publishedSeconds * sr, 0.0, (double)(mActiveBuffer->numFrames - 1));
+
+      if (!mHavePosition)
+      {
+         mFreeRunFrame = publishedFrame;
+         mHavePosition = true;
+      }
+
+      // Only correct on a genuine discontinuity (seek/loop-wrap/scrub) -
+      // ordinary playback free-runs on `speed` below rather than re-deriving
+      // its step from consecutive published values, which are only fresh
+      // once per video frame and would otherwise hold the read position flat
+      // for every audio block in between (see the class comment).
+      const double discontinuityFrames = kDiscontinuitySeconds * sr;
+      if (std::fabs(publishedFrame - mFreeRunFrame) > discontinuityFrames)
+         mFreeRunFrame = publishedFrame; // snap, don't sweep through the buffer
+
+      // mMailbox's OnePole smoothers are tuned (SetTimeConstant, PrepareToPlay)
+      // for a genuine one-step-per-sample cadence. SmoothedValue must be
+      // called once per output sample, not once per block, or the smoother's
+      // internal clock runs at block-rate instead of sample-rate and a param
+      // change takes (block size) times longer than its real 5ms time
+      // constant to settle - e.g. ~500 blocks at a small buffer size stretches
+      // a 5ms ramp into several audible seconds, which is exactly why
+      // dialling speed back to 1x used to leave the pitch drifting back for
+      // seconds instead of snapping in near-instantly.
+      const double mailboxSr = mMailbox.SampleRate() > 0.0 ? mMailbox.SampleRate() : sr;
+      double cursor = mFreeRunFrame;
+      for (int i = 0; i < buffer.numFrames; i++)
+      {
+         const float speed = mMailbox.SmoothedValue(kSpeedParam);
+         const float volume = mMailbox.SmoothedValue(kVolumeParam);
+         // Source frames advanced per audio-thread output sample: this is
+         // what ties pitch to speed exactly like a tape/VCR (2x speed reads
+         // the source twice as fast per output sample => an octave up), and
+         // a negative speed reads backward for reverse playback.
+         const double stepPerSample = (double)speed * sr / mailboxSr;
+         for (int ch = 0; ch < buffer.numChannels; ch++)
+            buffer.channels[ch][i] = ReadSample(*mActiveBuffer, ch, cursor) * volume;
+         cursor += stepPerSample;
+      }
+
+      mFreeRunFrame = cursor;
+   }
+
+private:
+   // Linear interpolation between the two nearest frames of `channel`
+   // (clamped to the buffer's actual channel count, so a mono track feeding
+   // a stereo graph just repeats its one channel rather than reading past
+   // the end of channelData).
+   static float ReadSample(const Platform::SampleBuffer& buf, int channel, double posFrames)
+   {
+      const int ch = std::min(channel, buf.channels - 1);
+      const float* data = buf.channelData.data() + (size_t)ch * (size_t)buf.numFrames;
+      const int i0 = (int)std::floor(posFrames);
+      if (i0 < 0 || i0 >= buf.numFrames - 1)
+         return (i0 >= 0 && i0 < buf.numFrames) ? data[i0] : 0.0f;
+      const float frac = (float)(posFrames - i0);
+      return data[i0] + (data[i0 + 1] - data[i0]) * frac;
+   }
+
+   SampleSlot mSampleSlot;
+   Platform::SampleBuffer* mActiveBuffer = nullptr;
+   ParamMailbox mMailbox;
+   bool mAudioEnabled = true;
+   float mVolume = 1.0f;
+   float mSpeed = 1.0f;
+   std::atomic<double> mPublishedPositionSeconds { 0.0 };
+   double mFreeRunFrame = 0.0;
+   bool mHavePosition = false;
+};
+
+// --------------------------------------------------------------- main thread
+
+VideoSourceNode::VideoSourceNode() = default;
 VideoSourceNode::~VideoSourceNode()
 {
    if (mVideo != nullptr)
@@ -17,6 +181,13 @@ VideoSourceNode::~VideoSourceNode()
 void VideoSourceNode::EnsurePlaceholder()
 {
    if (mTex != 0)
+      return;
+
+   // No GL context in headless test/sweep runs (AUDIOPARAMSWEEPTEST runs
+   // before glfwInit) - this node became reachable from there the moment it
+   // implemented IAudioSource, alongside every other GL call in this file.
+   // See the identical guard in WaveTerrainNode::RenderPreview.
+   if (glfwGetCurrentContext() == nullptr)
       return;
 
    const int kSize = 256;
@@ -49,6 +220,25 @@ void VideoSourceNode::EnsurePlaceholder()
    mHasPlaceholder = true;
 }
 
+void VideoSourceNode::LoadAudioTrack(const std::string& path)
+{
+   auto* decoded = new Platform::SampleBuffer();
+   std::string error;
+   if (!Platform::DecodeVideoAudioTrackToBuffer(path, *decoded, error))
+   {
+      delete decoded;
+      mAudioLoaded = false;
+      mAudioError = error;
+      return;
+   }
+
+   mAudioLoaded = true;
+   mAudioError.clear();
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<VideoAudioNode>();
+   mAudioNode->PushBuffer(decoded);
+}
+
 bool VideoSourceNode::Open(const std::string& path)
 {
    if (path.empty())
@@ -71,6 +261,8 @@ bool VideoSourceNode::Open(const std::string& path)
    mHasPlaceholder = false;
    mPosition = 0.0;
    mLastTransportSeconds = Transport::Instance().Seconds();
+
+   LoadAudioTrack(path);
    return true;
 }
 
@@ -88,6 +280,13 @@ unsigned int VideoSourceNode::GetOutputTexture()
    return mTex;
 }
 
+AudioNode* VideoSourceNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<VideoAudioNode>();
+   return mAudioNode.get();
+}
+
 void VideoSourceNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -95,6 +294,12 @@ void VideoSourceNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
 
    EnsurePlaceholder();
+
+   if (mAudioNode)
+   {
+      mAudioNode->PushParams(audioEnabled, volume, speed);
+      mAudioNode->DrainRetired();
+   }
 
    if (mVideo == nullptr)
       return;
@@ -126,7 +331,15 @@ void VideoSourceNode::CookIfNeeded(int frameId)
       mPosition = std::max(mPosition, 0.0);
    }
 
-   if (Platform::VideoFrameAt(mVideo, mPosition, mFrame) && !mFrame.empty())
+   // Published for the audio half to read - see VideoAudioNode's class
+   // comment. Written every cook, whether or not this node currently has an
+   // audio-consuming cable, so a cable patched in later starts in sync
+   // rather than from a stale position.
+   if (mAudioNode)
+      mAudioNode->PublishPosition(mPosition);
+
+   if (glfwGetCurrentContext() != nullptr &&
+       Platform::VideoFrameAt(mVideo, mPosition, mFrame) && !mFrame.empty())
    {
       const int w = Platform::VideoWidth(mVideo);
       const int h = Platform::VideoHeight(mVideo);
@@ -139,6 +352,7 @@ void VideoSourceNode::CookIfNeeded(int frameId)
          mWidth = w;
          mHeight = h;
          mHasPlaceholder = false;
+         mFrameUpdateCount++;
       }
    }
 }
