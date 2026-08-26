@@ -673,6 +673,9 @@ namespace
    {
       GLFWwindow* window = nullptr;
       int nodeIndex = -1; // GraphNode::index this window shows
+      bool fullscreen = false;
+      int monitorIndex = -1;   // display it was last placed on by us
+      int windowedX = 100, windowedY = 100, windowedW = 1280, windowedH = 720; // restore box
    };
    std::vector<ProjectorWindow> gProjectorWindows;
    // Bottom-left by default: the module browser docks on the right, and the
@@ -20792,13 +20795,222 @@ namespace
       gProjectorViewports.clear();
    }
 
+   // Finds the open projector window (if any) showing this node index.
+   // Replaces the inline linear-search loop the context menu used to do
+   // itself every frame.
+   ProjectorWindow* FindProjectorWindow(int nodeIndex)
+   {
+      for (ProjectorWindow& pw : gProjectorWindows)
+         if (pw.nodeIndex == nodeIndex)
+            return &pw;
+      return nullptr;
+   }
+
+   // Which monitor a window is physically on right now, by largest overlap
+   // between the window's rect and each monitor's workarea. Needed because
+   // ProjectorWindow::monitorIndex only reflects where WE last placed the
+   // window - it goes stale the instant the user drags the window by its
+   // title bar to a different display. Returns -1 if GLFW reports no
+   // monitors at all.
+   int ProjectorMonitorIndex(GLFWwindow* w)
+   {
+      int wx, wy, ww, wh;
+      glfwGetWindowPos(w, &wx, &wy);
+      glfwGetWindowSize(w, &ww, &wh);
+
+      int monitorCount = 0;
+      GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+      if (monitorCount <= 0)
+         return -1;
+
+      int bestIndex = 0;
+      long long bestOverlap = -1;
+      for (int i = 0; i < monitorCount; i++)
+      {
+         int mx, my, mw, mh;
+         glfwGetMonitorWorkarea(monitors[i], &mx, &my, &mw, &mh);
+
+         const int ox0 = std::max(wx, mx);
+         const int oy0 = std::max(wy, my);
+         const int ox1 = std::min(wx + ww, mx + mw);
+         const int oy1 = std::min(wy + wh, my + mh);
+         const long long overlap = (ox1 > ox0 && oy1 > oy0)
+                                       ? (long long)(ox1 - ox0) * (long long)(oy1 - oy0)
+                                       : 0;
+         if (overlap > bestOverlap)
+         {
+            bestOverlap = overlap;
+            bestIndex = i;
+         }
+      }
+      return bestIndex;
+   }
+
+   // Enters or leaves fullscreen on a projector window, targeting a specific
+   // monitor. Deliberately NOT exclusive GLFW fullscreen
+   // (glfwSetWindowMonitor with a monitor) - exclusive fullscreen is exactly
+   // what auto-iconifies / drops the window behind the editor the moment
+   // keyboard focus moves to the other display, which is the original bug.
+   // Borderless + always-on-top (topmost on Windows, GLFW_FLOATING on macOS)
+   // keeps the output window visible and undecorated while leaving the
+   // editor window free to keep keyboard focus. Do not "simplify" this back
+   // to glfwSetWindowMonitor.
+   void SetProjectorFullscreen(ProjectorWindow& pw, int monitorIndex, bool fullscreen)
+   {
+      GLFWwindow* w = pw.window;
+
+      int monitorCount = 0;
+      GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+      if (monitorCount <= 0)
+         return;
+      monitorIndex = std::clamp(monitorIndex, 0, monitorCount - 1);
+      GLFWmonitor* monitor = monitors[monitorIndex];
+
+      if (fullscreen)
+      {
+         if (!pw.fullscreen)
+         {
+            // Save the current windowed box so Leaving can restore it.
+            glfwGetWindowPos(w, &pw.windowedX, &pw.windowedY);
+            glfwGetWindowSize(w, &pw.windowedW, &pw.windowedH);
+         }
+
+         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+         int mx, my;
+         glfwGetMonitorPos(monitor, &mx, &my);
+         glfwSetWindowPos(w, mx, my);
+         if (mode != nullptr)
+            glfwSetWindowSize(w, mode->width, mode->height);
+
+#if defined(_WIN32)
+         Platform::ConfigureOutputWindow(w, /*borderless=*/true, /*topmost=*/true, /*hideCursor=*/true);
+#else
+         glfwSetWindowAttrib(w, GLFW_DECORATED, GLFW_FALSE);
+         glfwSetWindowAttrib(w, GLFW_FLOATING, GLFW_TRUE);
+         glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+#endif
+      }
+      else
+      {
+         // Restore the saved windowed box, clamped to the target monitor's
+         // workarea - re-centre it if the saved rect no longer intersects
+         // that monitor at all (e.g. it was placed on a display that's since
+         // been unplugged or the box was saved on a different monitor).
+         int mx, my, mw, mh;
+         glfwGetMonitorWorkarea(monitor, &mx, &my, &mw, &mh);
+
+         int rx = pw.windowedX, ry = pw.windowedY;
+         int rw = std::min(pw.windowedW, mw);
+         int rh = std::min(pw.windowedH, mh);
+
+         const bool intersects = (rx < mx + mw) && (rx + rw > mx) && (ry < my + mh) && (ry + rh > my);
+         if (!intersects)
+         {
+            rx = mx + (mw - rw) / 2;
+            ry = my + (mh - rh) / 2;
+         }
+         else
+         {
+            rx = std::clamp(rx, mx, mx + mw - rw);
+            ry = std::clamp(ry, my, my + mh - rh);
+         }
+
+#if defined(_WIN32)
+         Platform::ConfigureOutputWindow(w, /*borderless=*/false, /*topmost=*/false, /*hideCursor=*/false);
+#else
+         glfwSetWindowAttrib(w, GLFW_DECORATED, GLFW_TRUE);
+         glfwSetWindowAttrib(w, GLFW_FLOATING, GLFW_FALSE);
+         glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+#endif
+         glfwSetWindowPos(w, rx, ry);
+         glfwSetWindowSize(w, rw, rh);
+      }
+
+      pw.fullscreen = fullscreen;
+      pw.monitorIndex = monitorIndex;
+      glfwShowWindow(w);
+   }
+
+   // Moves a projector window to a different monitor. If it's fullscreen,
+   // re-enters fullscreen on the new monitor; otherwise just centres the
+   // existing windowed box in the new monitor's workarea (shrinking it to
+   // fit if needed) and records the new monitorIndex.
+   void MoveProjectorToMonitor(ProjectorWindow& pw, int monitorIndex)
+   {
+      if (pw.fullscreen)
+      {
+         SetProjectorFullscreen(pw, monitorIndex, true);
+         return;
+      }
+
+      int monitorCount = 0;
+      GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+      if (monitorCount <= 0)
+         return;
+      monitorIndex = std::clamp(monitorIndex, 0, monitorCount - 1);
+      GLFWmonitor* monitor = monitors[monitorIndex];
+
+      int mx, my, mw, mh;
+      glfwGetMonitorWorkarea(monitor, &mx, &my, &mw, &mh);
+
+      int ww, wh;
+      glfwGetWindowSize(pw.window, &ww, &wh);
+      ww = std::min(ww, mw);
+      wh = std::min(wh, mh);
+
+      const int x = mx + (mw - ww) / 2;
+      const int y = my + (mh - wh) / 2;
+      glfwSetWindowPos(pw.window, x, y);
+      glfwSetWindowSize(pw.window, ww, wh);
+
+      pw.monitorIndex = monitorIndex;
+   }
+
+   // F11-style toggle. Going IN, targets whichever monitor the window is
+   // physically on right now (ProjectorMonitorIndex) rather than the stored
+   // monitorIndex, since the user may have dragged it since it was last
+   // moved programmatically. Going OUT, uses the stored monitorIndex (the
+   // monitor fullscreen actually filled) so the restored box is clamped
+   // against the right workarea.
+   void ToggleProjectorFullscreen(ProjectorWindow& pw)
+   {
+      if (pw.fullscreen)
+         SetProjectorFullscreen(pw, pw.monitorIndex, false);
+      else
+         SetProjectorFullscreen(pw, ProjectorMonitorIndex(pw.window), true);
+   }
+
+   // F11 toggles fullscreen; Escape leaves fullscreen and ONLY that - it
+   // must never close the window (that's still "Close window" from the
+   // context menu / the OS close button).
+   void ProjectorKeyCallback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/)
+   {
+      if (action != GLFW_PRESS)
+         return;
+
+      ProjectorWindow* pw = nullptr;
+      for (ProjectorWindow& p : gProjectorWindows)
+         if (p.window == window)
+         {
+            pw = &p;
+            break;
+         }
+      if (pw == nullptr)
+         return;
+
+      if (key == GLFW_KEY_F11)
+         ToggleProjectorFullscreen(*pw);
+      else if (key == GLFW_KEY_ESCAPE && pw->fullscreen)
+         SetProjectorFullscreen(*pw, pw->monitorIndex, false);
+   }
+
    // Opens a new projector window on `gn`. An ordinary decorated/resizable
-   // window, not tied to any monitor - the user drags it to a projector or
-   // second screen and fullscreens it themselves with the OS's own window
-   // controls, same as they would any other app window. Any number of these
-   // can be open at once, one per node. `mainWindow` is passed in as the GL
-   // share context so the projector window sees the exact same textures/FBOs
-   // the editor already produced - no cross-context copy.
+   // window at first - fullscreen (borderless + always-on-top) is entered
+   // explicitly via F11 or the "Output window" context menu, not by the OS's
+   // own window controls; see SetProjectorFullscreen for why. Any number of
+   // these can be open at once, one per node. `mainWindow` is passed in as
+   // the GL share context so the projector window sees the exact same
+   // textures/FBOs the editor already produced - no cross-context copy.
    void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn)
    {
       // Already have one open for this node - nothing to do (the context menu
@@ -20815,18 +21027,56 @@ namespace
          h = 720;
       }
 
+      // Open at a *positioning* size, not the source's native size - a 4K
+      // source opening a 4K window is unusable to drag around on a 1080p
+      // laptop panel. F11/fullscreen resizes it to the target monitor's full
+      // mode anyway, so this only affects the windowed box.
+      const double scale = std::min(1.0, std::min(960.0 / (double)w, 540.0 / (double)h));
+      w = std::max(320, (int)(w * scale));
+      h = std::max(180, (int)(h * scale));
+
       glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
       glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
       glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
       glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
       glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+      // GLFW window hints are sticky global state - without resetting this,
+      // an earlier window that went fullscreen (which sets FLOATING TRUE)
+      // would leak that attribute into every later window created.
+      glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
       GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitle(gn).c_str(), nullptr, mainWindow);
-      glfwMakeContextCurrent(mainWindow);
       if (projWindow == nullptr)
+      {
+         glfwMakeContextCurrent(mainWindow);
          return;
+      }
 
-      gProjectorWindows.push_back({ projWindow, gn.index });
+      // Offset from the main window rather than wherever the OS happens to
+      // drop it, so opening several in a row doesn't stack them exactly on
+      // top of each other.
+      int mainX = 0, mainY = 0;
+      glfwGetWindowPos(mainWindow, &mainX, &mainY);
+      glfwSetWindowPos(projWindow, mainX + 60, mainY + 60);
+
+      glfwSetKeyCallback(projWindow, ProjectorKeyCallback);
+
+      // The main window owns vsync - without this, each projector context
+      // inherits a driver-default swap interval, which is a second vsync
+      // wait per frame per open projector window.
+      glfwMakeContextCurrent(projWindow);
+      glfwSwapInterval(0);
+      glfwMakeContextCurrent(mainWindow);
+
+      ProjectorWindow pw;
+      pw.window = projWindow;
+      pw.nodeIndex = gn.index;
+      pw.windowedX = mainX + 60;
+      pw.windowedY = mainY + 60;
+      pw.windowedW = w;
+      pw.windowedH = h;
+      pw.monitorIndex = ProjectorMonitorIndex(projWindow);
+      gProjectorWindows.push_back(pw);
    }
 
 }
@@ -38729,14 +38979,32 @@ int main(int argc, char** argv)
             // Same gate as "Open in viewport panel": modulators, meters,
             // cameras/lights and comments don't produce an image, so opening
             // one in its own window would just show a blank/garbage texture.
-            bool hasProjectorWindow = false;
-            for (const ProjectorWindow& pw : gProjectorWindows)
-               if (pw.nodeIndex == gn->index)
-                  hasProjectorWindow = true;
-            if (CanShowInViewportPanel(*gn) && hasProjectorWindow)
+            ProjectorWindow* projector = FindProjectorWindow(gn->index);
+            if (CanShowInViewportPanel(*gn) && projector != nullptr)
             {
-               if (ImGui::MenuItem("Close window"))
-                  CloseProjectorWindowFor(gn->index);
+               if (ImGui::BeginMenu("Output window"))
+               {
+                  if (ImGui::MenuItem("Fullscreen", "F11", projector->fullscreen))
+                     ToggleProjectorFullscreen(*projector);
+                  if (ImGui::BeginMenu("Display"))
+                  {
+                     int monitorCount = 0;
+                     GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+                     for (int i = 0; i < monitorCount; i++)
+                     {
+                        const char* name = glfwGetMonitorName(monitors[i]);
+                        char label[64];
+                        snprintf(label, sizeof(label), "%d: %s", i + 1, name != nullptr ? name : "Display");
+                        if (ImGui::MenuItem(label, nullptr, projector->monitorIndex == i))
+                           MoveProjectorToMonitor(*projector, i);
+                     }
+                     ImGui::EndMenu();
+                  }
+                  ImGui::Separator();
+                  if (ImGui::MenuItem("Close window"))
+                     CloseProjectorWindowFor(gn->index);
+                  ImGui::EndMenu();
+               }
             }
             else if (CanShowInViewportPanel(*gn))
             {
@@ -40996,6 +41264,15 @@ int main(int argc, char** argv)
       // window's node into that window. Runs after the editor's own swap so
       // it never shows last frame's texture a frame behind the graph.
       // Iterate backwards since a dead source erases its window mid-loop.
+      //
+      // Windows will demote a HWND_TOPMOST window in real situations
+      // (another app going topmost, a UAC prompt, display hot-plug, a
+      // resolution change), so a fullscreen projector's topmost state is
+      // reasserted on a throttle - cheap and imperceptible at 0.5s, wasteful
+      // to do every frame.
+      static double sLastTopmostRefresh = 0.0;
+      const double now = glfwGetTime();
+      const bool refreshTopmost = now - sLastTopmostRefresh >= 0.5;
       for (size_t i = gProjectorWindows.size(); i-- > 0; )
       {
          GraphNode* src = FindNodeByIndex(gProjectorWindows[i].nodeIndex);
@@ -41008,6 +41285,10 @@ int main(int argc, char** argv)
          }
 
          GLFWwindow* projWindow = gProjectorWindows[i].window;
+#if defined(_WIN32)
+         if (gProjectorWindows[i].fullscreen && refreshTopmost)
+            Platform::ReassertOutputWindowTopmost(projWindow);
+#endif
          glfwMakeContextCurrent(projWindow);
          int pw, ph;
          glfwGetFramebufferSize(projWindow, &pw, &ph);
@@ -41046,6 +41327,8 @@ int main(int argc, char** argv)
          }
          glfwSwapBuffers(projWindow);
       }
+      if (refreshTopmost && !gProjectorWindows.empty())
+         sLastTopmostRefresh = now;
       if (!gProjectorWindows.empty())
          glfwMakeContextCurrent(window);
 
