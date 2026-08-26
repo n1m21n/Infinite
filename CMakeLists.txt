@@ -594,6 +594,7 @@ if(WIN32)
             ${VST3_SDK_DIR}
             ${VST3_SDK_DIR}/pluginterfaces
             ${VST3_SDK_DIR}/public.sdk
+            "${ONNXRUNTIME_INCLUDE_DIR}"
         )
         target_compile_definitions(infinite-vst3-scanner PRIVATE
             INFINITE_ENABLE_VST3=1
@@ -607,7 +608,7 @@ if(WIN32)
         # PluginVST3Win.cpp), so it needs plain main()/console CRT startup,
         # not the GUI subsystem Infinite.exe uses.
         target_link_libraries(infinite-vst3-scanner PRIVATE
-            ole32 shell32 gdi32 user32 advapi32 winhttp
+            glfw "${ONNXRUNTIME_LIB}" ole32 shell32 gdi32 user32 advapi32 winhttp
         )
         add_dependencies(Infinite infinite-vst3-scanner)
         add_custom_command(TARGET Infinite POST_BUILD
