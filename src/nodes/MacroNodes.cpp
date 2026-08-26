@@ -49,10 +49,7 @@ std::vector<MacroXYNode::PadPoint> MacroXYNode::DecodePath(const std::string& s)
 
 float MacroKnobNode::Value01()
 {
-   float v = std::min(1.0f, std::max(0.0f, value));
-   if (curve != 1.0f)
-      v = std::pow(v, std::max(0.05f, curve));
-   return invert ? 1.0f - v : v;
+   return std::min(1.0f, std::max(0.0f, value));
 }
 
 void MacroXYNode::StartRecording()

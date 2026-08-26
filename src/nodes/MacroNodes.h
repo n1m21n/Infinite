@@ -23,14 +23,11 @@ public:
    float Value01() override;
 
    float value = 0.5f;
-   float curve = 1.0f;   // <1 eases in, >1 eases out
-   bool invert = false;
    std::string label = "Macro";
 
    void VisitParams(ParamVisitor& v) override
    {
-      v.Float("value", value); v.Float("curve", curve);
-      v.Bool("invert", invert); v.Text("label", label);
+      v.Float("value", value); v.Text("label", label);
    }
 };
 

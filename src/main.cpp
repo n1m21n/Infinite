@@ -4996,6 +4996,17 @@ namespace
       ModSlider("seed", &n->seed, 0.0f, 100.0f);
    }
 
+   // The macro's body is the knob - that is literally the whole node. Same
+   // diameter every other audio/modulator knob in the app uses (kKnobStd):
+   // KnobFloat's face shading and tick are pixel-offset constants tuned for
+   // that size, so scaling the diameter up on its own (108 in an earlier
+   // pass) didn't make a bigger knob, it made a flat disc with a thin ring.
+   void DrawMacroKnobBody(MacroKnobNode* n)
+   {
+      const std::string caption = n->label.empty() ? std::string("macro") : n->label;
+      ModKnob(caption.c_str(), &n->value, 0.0f, 1.0f, "%.3f", kKnobStd, kPreviewSize);
+   }
+
    void DrawMacroKnobParams(MacroKnobNode* n)
    {
       char buf[64];
@@ -5003,11 +5014,6 @@ namespace
       ImGui::SetNextItemWidth(kParamWidth);
       if (ImGui::InputText("name", buf, sizeof(buf)))
          n->label = buf;
-
-      ImGui::SetNextItemWidth(kPreviewSize);
-      ImGui::SliderFloat("##macro", &n->value, 0.0f, 1.0f, "%.3f");
-      ModSlider("curve", &n->curve, 0.2f, 4.0f);
-      ImGui::Checkbox("invert", &n->invert);
    }
 
    void DrawMidiCCParams(MidiCCNode* n)
@@ -37075,6 +37081,13 @@ int main(int argc, char** argv)
          const bool isAudioBodyNode = IsAudioBodyNode(gn.node.get());
          if (multiOutModulator)
             ; // these draw their own meters in the params panel
+         else if (auto* macroKnob = dynamic_cast<MacroKnobNode*>(gn.node.get()))
+         {
+            // Ahead of the generic modulator-meter branch on purpose: the
+            // macro's body IS its knob, and the value-history graph that
+            // branch draws is a flat line for a control only a hand moves.
+            DrawMacroKnobBody(macroKnob);
+         }
          else if (!isAudioBodyNode && dynamic_cast<IModulator*>(gn.node.get()) != nullptr)
          {
             // Audio/note nodes are excluded here even when they implement
