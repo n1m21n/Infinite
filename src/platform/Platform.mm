@@ -1119,6 +1119,7 @@ namespace Platform
       std::atomic<int> pendingCount { 0 };
       std::atomic<int> droppedCount { 0 };
 
+      std::mutex writerMutex;
       dispatch_queue_t encodeQueue = nil;
       dispatch_semaphore_t workerDone = nil;
    };
@@ -1154,25 +1155,49 @@ namespace Platform
                h->frameQueue.pop_front();
             }
 
+            if (h->writer.status != AVAssetWriterStatusWriting)
+            {
+               h->pendingCount.fetch_sub(frame.repeatCount, std::memory_order_relaxed);
+               break;
+            }
+
             for (int i = 0; i < frame.repeatCount; i++)
             {
                // The writer input's readiness can lag by a frame or two even
                // though expectsMediaDataInRealTime is NO; this queue is ours
                // alone, so a short spin-wait here costs nothing else.
-               while (!h->input.isReadyForMoreMediaData)
+               int spins = 0;
+               while (!h->input.isReadyForMoreMediaData && h->writer.status == AVAssetWriterStatusWriting && spins++ < 1000)
                   [NSThread sleepForTimeInterval:0.001];
-               AppendPixelsToWriter(h, frame.pixels);
+
+               if (h->writer.status != AVAssetWriterStatusWriting || !h->input.isReadyForMoreMediaData)
+               {
+                  h->pendingCount.fetch_sub(frame.repeatCount - i, std::memory_order_relaxed);
+                  break;
+               }
+
+               if (!AppendPixelsToWriter(h, frame.pixels))
+               {
+                  h->pendingCount.fetch_sub(frame.repeatCount - i, std::memory_order_relaxed);
+                  break;
+               }
                h->pendingCount.fetch_sub(1, std::memory_order_relaxed);
             }
 
             std::lock_guard<std::mutex> poolLock(h->poolMutex);
             if (h->bufferPool.size() < RecorderHandle::kMaxPoolSize)
                h->bufferPool.push_back(std::move(frame.pixels));
+
+            if (h->writer.status != AVAssetWriterStatusWriting)
+               break;
          }
 
-         [h->input markAsFinished];
-         if (h->audioInput != nil)
-            [h->audioInput markAsFinished];
+         if (h->writer.status == AVAssetWriterStatusWriting)
+         {
+            [h->input markAsFinished];
+            if (h->audioInput != nil)
+               [h->audioInput markAsFinished];
+         }
          dispatch_semaphore_signal(h->workerDone);
       }
    }
@@ -1307,12 +1332,17 @@ namespace Platform
 
             const long long frame = h->frameIndex.load(std::memory_order_relaxed);
             CMTime when = CMTimeMake(frame, h->fps);
-            BOOL ok = [h->adaptor appendPixelBuffer:buffer withPresentationTime:when];
+            BOOL ok = NO;
+            {
+               std::lock_guard<std::mutex> lock(h->writerMutex);
+               if (h->writer.status == AVAssetWriterStatusWriting)
+                  ok = [h->adaptor appendPixelBuffer:buffer withPresentationTime:when];
+            }
             CVPixelBufferRelease(buffer);
             if (ok)
                h->frameIndex.fetch_add(1, std::memory_order_relaxed);
 
-            if (ok && h->audioInput != nil)
+            if (ok && h->audioInput != nil && h->audioFile != nil)
             {
                // Catches audio up to the end of the video frame just written, so
                // the two tracks cannot drift apart by more than one video frame.
@@ -1494,6 +1524,10 @@ namespace Platform
    bool RecorderAppendAudio(RecorderHandle* h, const float* interleavedSamples, int numFrames)
    {
       if (h == nullptr || h->audioInput == nil || interleavedSamples == nullptr || numFrames <= 0)
+         return false;
+
+      std::lock_guard<std::mutex> lock(h->writerMutex);
+      if (h->writer.status != AVAssetWriterStatusWriting)
          return false;
 
       @autoreleasepool

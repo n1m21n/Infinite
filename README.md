@@ -94,7 +94,7 @@ The Windows build swaps every Apple framework for its Windows counterpart behind
 | CoreMIDI | **WinMM** MIDI in/out |
 | AVFoundation (video decode, camera, H.264 recording) | **Media Foundation** (H.264/AAC MP4 muxing, camera capture) |
 | ImageIO / ModelIO / CoreText | **stb_image / tinyexr**, hand-rolled OBJ-PLY-STL importers, **GDI+** typography |
-| Audio Unit plugins, Syphon, Vision (Remove Background) | Not available — the nodes report it gracefully |
+| Audio Unit plugins (macOS only) | Syphon via **Spout2 / SpoutGL**, Remove Background via **ONNX Runtime + DirectML** |
 
 FLAC decoding uses dr_libs and FLAC encoding links [libFLAC](https://github.com/xiph/flac); MP3 export uses the vendored shine encoder — identical on both platforms. WAV/MP3/FLAC export, PNG export, and H.264 video recording with audio all work on Windows.
 
