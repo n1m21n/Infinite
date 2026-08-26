@@ -61,6 +61,12 @@
 	#endif
 #endif
 
+#ifdef _WIN32
+#include <windows.h>
+#include <mmsystem.h>
+#include <timeapi.h>
+#endif
+
 // Common utility functions namespace
 #include "SpoutUtils.h"
 
