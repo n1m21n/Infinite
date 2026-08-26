@@ -55,6 +55,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # old flag-munging approach.
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    add_compile_options(/Zc:preprocessor)
 
     # One cl.exe invocation per translation unit instead of the Visual Studio
     # generator's default of batching every source in a target into a single
