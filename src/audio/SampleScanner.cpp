@@ -67,12 +67,16 @@ namespace
    // but FLAC support varies by macOS version. A file that lists here but
    // fails to decode later surfaces through SamplerNode::Status() rather
    // than being silently excluded from the index.
-   bool HasAudioExtension(const fs::path& p)
+   //
+   // `extNoDot` is the already-lowercased extension with the leading dot
+   // stripped (see ExtensionNoDot below) - callers compute it once per file
+   // and pass it in here rather than each Has*Extension re-deriving it from
+   // the path.
+   bool HasAudioExtension(const std::string& extNoDot)
    {
-      static const char* kExts[] = { ".wav", ".aif", ".aiff", ".caf", ".m4a", ".mp3", ".flac" };
-      const std::string ext = ToLower(p.extension().string());
+      static const char* kExts[] = { "wav", "aif", "aiff", "caf", "m4a", "mp3", "flac" };
       for (const char* e : kExts)
-         if (ext == e)
+         if (extNoDot == e)
             return true;
       return false;
    }
@@ -82,21 +86,25 @@ namespace
    // error (ImageSourceNode/VideoSourceNode status), it isn't excluded from
    // the index. Lists come from MediaExtensions.h so the scanner classifies
    // a path identically to the OS drop handler and drag-resolution logic.
-   bool HasMediaExtension(const fs::path& p)
+   bool HasMediaExtension(const std::string& extNoDot)
    {
-      const std::string ext = ToLower(p.extension().string());
-      if (ext.empty() || ext[0] != '.')
-         return false;
-      const std::string bare = ext.substr(1);
       const auto& video = MediaExtensions::Video();
       const auto& image = MediaExtensions::Image();
-      return std::find(video.begin(), video.end(), bare) != video.end() ||
-             std::find(image.begin(), image.end(), bare) != image.end();
+      return std::find(video.begin(), video.end(), extNoDot) != video.end() ||
+             std::find(image.begin(), image.end(), extNoDot) != image.end();
    }
 
-   bool HasExtensionForKind(SampleScanner::Kind kind, const fs::path& p)
+   bool HasExtensionForKind(SampleScanner::Kind kind, const std::string& extNoDot)
    {
-      return kind == SampleScanner::Kind::Media ? HasMediaExtension(p) : HasAudioExtension(p);
+      return kind == SampleScanner::Kind::Media ? HasMediaExtension(extNoDot) : HasAudioExtension(extNoDot);
+   }
+
+   // Lowercased, no leading dot - what SampleScanner::Entry::extension
+   // stores (see SampleScanner.h), matching MediaExtensions.h's convention.
+   std::string ExtensionNoDot(const fs::path& p)
+   {
+      const std::string ext = ToLower(p.extension().string());
+      return (ext.empty() || ext[0] != '.') ? ext : ext.substr(1);
    }
 }
 
@@ -183,15 +191,20 @@ void SampleScanner::ScanThreadMain(std::vector<std::string> folders)
                   dirStack.push_back(entry.path());
                }
             }
-            else if (!isHidden && entry.is_regular_file(entryEc) && !entryEc && HasExtensionForKind(mKind, entry.path()))
+            else if (!isHidden && entry.is_regular_file(entryEc) && !entryEc)
             {
-               Entry e;
-               e.path = entry.path().string();
-               e.fileName = name;
-               e.fileNameLower = ToLower(name);
-               e.folderRoot = root;
-               found.push_back(std::move(e));
-               mFilesFound.fetch_add(1, std::memory_order_relaxed);
+               const std::string extNoDot = ExtensionNoDot(entry.path());
+               if (HasExtensionForKind(mKind, extNoDot))
+               {
+                  Entry e;
+                  e.path = entry.path().string();
+                  e.fileName = name;
+                  e.fileNameLower = ToLower(name);
+                  e.folderRoot = root;
+                  e.extension = extNoDot;
+                  found.push_back(std::move(e));
+                  mFilesFound.fetch_add(1, std::memory_order_relaxed);
+               }
             }
 
             it.increment(ec);
@@ -273,7 +286,13 @@ void SampleScanner::LoadFromDisk()
             if (v["folderRoot"].is_string())
                e.folderRoot = v["folderRoot"].get<crude_json::string>();
             if (!e.path.empty())
+            {
+               // Derived from the path rather than read from disk (see the
+               // field comment in SampleScanner.h) - the on-disk index
+               // predates this field and never wrote it.
+               e.extension = ExtensionNoDot(fs::path(e.path));
                mIndex.push_back(std::move(e));
+            }
          }
       }
    }

@@ -459,6 +459,27 @@ namespace
    SampleScanner gMediaScanner(SampleScanner::Kind::Media);
    PluginScanner gPluginScanner;
    int gSearchPanelMode = 0; // 0 = Modules, 1 = Samples, 2 = Media, 3 = Plugins
+
+   // Shared sort/filter state for the docked node-browser panel's control
+   // strip (DrawBrowserFilterStrip, below DropdownButton). One instance per
+   // mode, not one shared instance - same reasoning as the four independent
+   // `static char` search buffers this replaces (see the comment at
+   // DrawLibrarySearchPanel's cache setup): each mode keeps its own sort,
+   // filter and in-progress query when the user switches tabs and back.
+   // `sortMode` and `typeFilter` are indices into that mode's own option
+   // list (see the per-mode DrawBrowserFilterStrip call sites) - their
+   // meaning is per-mode, not shared.
+   struct BrowserFilterState
+   {
+      char query[128] = "";
+      int  sortMode = 0;
+      int  typeFilter = 0;
+      bool descending = false;
+   };
+   BrowserFilterState gModulesFilter;
+   BrowserFilterState gSampleFilter;
+   BrowserFilterState gMediaFilter;
+   BrowserFilterState gPluginFilter;
    // INFINITE_SAMPLERDRAGTEST only: the Samples panel's result row screen
    // rect, captured live each frame it's drawn so the synthetic drag driver
    // can aim at the real widget rather than a guessed position.
@@ -841,7 +862,8 @@ namespace
    }
 
    void DropdownButton(const char* label, const std::vector<std::string>& options,
-                       int current, std::function<void(int)> onSelect, float width = kParamWidth)
+                       int current, std::function<void(int)> onSelect, float width = kParamWidth,
+                       bool showCaption = true)
    {
       if (options.empty())
          return;
@@ -854,6 +876,8 @@ namespace
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
       }
+      if (!showCaption)
+         return;
       ImGui::SameLine();
       // anything after "##" is an ImGui uniquifier, not part of the visible name
       std::string shown(label);
@@ -861,6 +885,127 @@ namespace
       if (hash != std::string::npos)
          shown = shown.substr(0, hash);
       ImGui::TextDisabled("%s", shown.c_str());
+   }
+
+   // Search box + sort dropdown + type-filter dropdown for one mode of the
+   // docked node-browser panel (see BrowserFilterState above). `sortNames`
+   // and `typeNames` are that mode's own option lists; an empty `typeNames`
+   // hides the type control entirely rather than showing a one-option
+   // dropdown (Plugins does this when VST3 support isn't compiled in).
+   //
+   // Two rows: the search box full width on its own row (already the
+   // convention every mode used before this), sort and type sharing a
+   // second row at half width each - derived from the content region the
+   // same way the mode tab row above derives its quarter-width, not
+   // hardcoded. The ascending/descending toggle is a small arrow button
+   // appended to the sort dropdown rather than a third dropdown, to keep
+   // the strip to two rows.
+   //
+   // Returns true on any frame the query changed, or (one frame later,
+   // since DropdownButton's own choice lands through the global gDropdown
+   // popup rendered at the end of the frame) the sort/type/direction
+   // changed. Advisory only - each mode's own cache rebuild condition
+   // compares the state fields directly and is the real source of truth.
+   bool DrawBrowserFilterStrip(BrowserFilterState& state,
+                               const char* searchHint,
+                               const std::vector<std::string>& sortNames,
+                               const std::vector<std::string>& typeNames)
+   {
+      const BrowserFilterState before = state;
+
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint("##browserquery", searchHint, state.query, sizeof(state.query));
+
+      const float spacing = ImGui::GetStyle().ItemSpacing.x;
+      const float avail = ImGui::GetContentRegionAvail().x;
+      const float arrowW = ImGui::GetFrameHeight();
+      // No trailing "sort"/"type" caption on these two (showCaption=false
+      // below), so the remaining width just splits between the two
+      // dropdowns and the direction-arrow button.
+      const float remaining = avail - arrowW - 2.0f * spacing;
+      const float typeW = typeNames.empty() ? 0.0f : std::max(40.0f, remaining * 0.5f);
+      const float sortW = typeNames.empty() ? std::max(40.0f, remaining) : std::max(40.0f, remaining - typeW);
+
+      DropdownButton("sort", sortNames, state.sortMode, [&state](int i) { state.sortMode = i; }, sortW, false);
+
+      ImGui::SameLine();
+      // Drawn as a vector triangle on the button, not a Unicode arrow
+      // character - see the play/pause button's comment in
+      // DrawLibrarySearchPanel: the UI font has no glyph range beyond Basic
+      // Latin, so U+2191/U+2193 here rendered as a literal '?'.
+      const bool dirClicked = ImGui::Button("##sortdir", ImVec2(arrowW, 0));
+      {
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 bmin = ImGui::GetItemRectMin();
+         const ImVec2 bmax = ImGui::GetItemRectMax();
+         const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+         const float h = (bmax.y - bmin.y) * 0.22f;
+         const float w = h * 0.95f;
+         const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(255, 255, 255, 255) : IM_COL32(215, 218, 228, 255);
+         if (state.descending)
+            dl->AddTriangleFilled(ImVec2(center.x - w, center.y - h * 0.5f), ImVec2(center.x + w, center.y - h * 0.5f),
+                                   ImVec2(center.x, center.y + h * 0.7f), col);
+         else
+            dl->AddTriangleFilled(ImVec2(center.x - w, center.y + h * 0.5f), ImVec2(center.x + w, center.y + h * 0.5f),
+                                   ImVec2(center.x, center.y - h * 0.7f), col);
+      }
+      if (dirClicked)
+         state.descending = !state.descending;
+
+      if (!typeNames.empty())
+      {
+         ImGui::SameLine();
+         DropdownButton("type", typeNames, state.typeFilter, [&state](int i) { state.typeFilter = i; }, typeW, false);
+      }
+
+      return strcmp(before.query, state.query) != 0 || before.sortMode != state.sortMode ||
+             before.typeFilter != state.typeFilter || before.descending != state.descending;
+   }
+
+   // Persisted sort/filter selections for the four browser panel modes -
+   // NOT the free-typed query text, which (like the theme preset) is a
+   // per-session choice, not a saved preference. Mirrors
+   // CategoryColors::ThemePath()/LoadPreference(): one flat file next to the
+   // app's other Application Support state, not a bundled settings format.
+   // Four modes worth of three ints is a handful of numbers, so they share
+   // one file rather than four.
+   std::string BrowserFilterPrefsPath()
+   {
+      const std::string dir = AppPaths::AppSupportDir();
+      return dir.empty() ? std::string() : dir + "/Infinite.browserfilters";
+   }
+
+   void LoadBrowserFilterPrefs()
+   {
+      const std::string path = BrowserFilterPrefsPath();
+      if (path.empty())
+         return;
+      std::ifstream file(path);
+      if (!file)
+         return;
+      BrowserFilterState* states[4] = { &gModulesFilter, &gSampleFilter, &gMediaFilter, &gPluginFilter };
+      for (int i = 0; i < 4; i++)
+      {
+         int sortMode = 0, typeFilter = 0, descending = 0;
+         if (!(file >> sortMode >> typeFilter >> descending))
+            break;
+         states[i]->sortMode = sortMode;
+         states[i]->typeFilter = typeFilter;
+         states[i]->descending = (descending != 0);
+      }
+   }
+
+   void SaveBrowserFilterPrefs()
+   {
+      const std::string path = BrowserFilterPrefsPath();
+      if (path.empty())
+         return;
+      std::ofstream file(path);
+      if (!file)
+         return;
+      const BrowserFilterState* states[4] = { &gModulesFilter, &gSampleFilter, &gMediaFilter, &gPluginFilter };
+      for (int i = 0; i < 4; i++)
+         file << states[i]->sortMode << " " << states[i]->typeFilter << " " << (states[i]->descending ? 1 : 0) << "\n";
    }
 
    // ---- modulatable parameters --------------------------------------------
@@ -2458,10 +2603,13 @@ namespace
             [i]() -> INode* { return ShapeNode::CreateFor(i); }, "Source");
       }
       REGISTER_NODE(FormulaNode, Formula, "Source");
-      REGISTER_NODE(TextNode, Text, "Text");
+      REGISTER_NODE(TextNode, Text, "Source");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");
-      REGISTER_NODE(SyphonInNode, Syphon In, "Source");
+      // Syphon In is a source (an image feed into the patch), but grouped
+      // with Utility rather than Source - alongside Syphon Out and the other
+      // app-to-app/IO nodes, not the generators and loaders Source holds.
+      REGISTER_NODE(SyphonInNode, Syphon In, "Utility");
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(TextureNode, Texture, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
@@ -2533,24 +2681,34 @@ namespace
       REGISTER_NODE(EnvironmentNode, HDRI, "3D");
       REGISTER_NODE(Render3DNode, Render 3D, "3D");
       REGISTER_NODE(DrawNode, Draw, "Source");
-      REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
+      // Resynth merged into Effects - see CategoryColors.h/.cpp; it was
+      // always a single-node category ("a video resynthesis family"), and
+      // Effects is what a user reaches for it under.
+      REGISTER_NODE(ResynthNode, Resynthesize, "Effects");
       REGISTER_NODE(FitNode, Fit, "Compositing");
       REGISTER_NODE(CommentNode, Comment, "Compositing");
       REGISTER_NODE(GroupNode, Group, "Compositing");
       REGISTER_NODE(NullNode, Null, "Compositing");
       REGISTER_NODE(ViewportNode, Viewport, "Compositing");
-      REGISTER_NODE(CurvesNode, Curves, "Color");
-      REGISTER_NODE(ColorRampNode, Color Ramp, "Color");
-      REGISTER_NODE(RemoveBgNode, Remove Background, "Mask");
-      REGISTER_NODE(FeedbackNode, Feedback, "Feedback");
-      REGISTER_NODE(TrailsNode, Trails, "Feedback");
-      REGISTER_NODE(ReactionDiffusionNode, Reaction Diffusion, "Feedback");
+      // Color, Mask and Feedback all merged into Compositing - each was a
+      // small category whose nodes are, in practice, ways of combining or
+      // managing image flow, same as Compositing's original members.
+      REGISTER_NODE(CurvesNode, Curves, "Compositing");
+      REGISTER_NODE(ColorRampNode, Color Ramp, "Compositing");
+      REGISTER_NODE(RemoveBgNode, Remove Background, "Compositing");
+      REGISTER_NODE(FeedbackNode, Feedback, "Compositing");
+      REGISTER_NODE(TrailsNode, Trails, "Compositing");
+      REGISTER_NODE(ReactionDiffusionNode, Reaction Diffusion, "Compositing");
       REGISTER_NODE(BlendNode, Blend, "Compositing");
       REGISTER_NODE(LayerStackNode, Layer Stack, "Compositing");
       REGISTER_NODE(SwitcherNode, Switcher, "Compositing");
-      REGISTER_NODE(OutputNode, Output, "Output");
-      REGISTER_NODE(SyphonOutNode, Syphon Out, "Output");
-      REGISTER_NODE(ProjectionNode, Projection, "Output");
+      // Output/AudioUtility/OSC all merged into Utility below - the node's
+      // own display name stays "Output" (not renamed to "Export") since
+      // Patch.cpp looks nodes up by exact typeName on load; renaming it
+      // would silently drop the node from any already-saved patch.
+      REGISTER_NODE(OutputNode, Output, "Utility");
+      REGISTER_NODE(SyphonOutNode, Syphon Out, "Utility");
+      REGISTER_NODE(ProjectionNode, Projection, "Utility");
       REGISTER_NODE(LFONode, LFO, "Modulators");
       REGISTER_NODE(RandomNode, Random, "Modulators");
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
@@ -2574,14 +2732,13 @@ namespace
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
-      REGISTER_NODE(OscReceiveNode, OSC Receive, "OSC");
-      REGISTER_NODE(OscSendNode, OSC Send, "OSC");
+      REGISTER_NODE(OscReceiveNode, OSC Receive, "Utility");
+      REGISTER_NODE(OscSendNode, OSC Send, "Utility");
 
       // P2 audio-graph proof nodes - see docs/plans/audio/README.md P2.
-      // Category deliberately "AudioUtility" not "Audio Utility": Patch.cpp's
+      // Category names must stay one word: Patch.cpp's
       // "node <index> <category> <typeName>" line reads category with `>>`
-      // (a single whitespace-delimited token) - every existing category is
-      // one word for exactly that reason, and a space in a new one corrupts
+      // (a single whitespace-delimited token), and a space in one corrupts
       // the save format (confirmed: it silently ate the type name on load).
       REGISTER_NODE(OscillatorNode, Oscillator, "Synths");
       REGISTER_NODE(WavetableNode, Wavetable, "Synths");
@@ -2597,18 +2754,23 @@ namespace
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
       REGISTER_NODE(AudioPluginNode, Plugin, "AudioEffects");
-      REGISTER_NODE(GainNode, Gain, "AudioUtility");
-      REGISTER_NODE(AudioInputNode, Audio In, "AudioUtility");
-      REGISTER_NODE(AudioOutputNode, Audio Out, "AudioUtility");
+      // AudioUtility folded into Utility, alongside Output/Projection/Syphon/
+      // OSC above - see CategoryColors.h/.cpp.
+      REGISTER_NODE(GainNode, Gain, "Utility");
+      REGISTER_NODE(AudioInputNode, Audio In, "Utility");
+      REGISTER_NODE(AudioOutputNode, Audio Out, "Utility");
       // P2.8 routing nodes - the system's only summing/fan-out points, see
       // docs/plans/audio/audio-graph-semantics.md §1/§2.
-      REGISTER_NODE(MixerNode, Mixer, "AudioUtility");
-      REGISTER_NODE(SplitterNode, Splitter, "AudioUtility");
+      REGISTER_NODE(MixerNode, Mixer, "Utility");
+      REGISTER_NODE(SplitterNode, Splitter, "Utility");
       // "Blend Audio" not "Blend" - that name is taken by the image
       // compositing node (REGISTER_NODE(BlendNode, Blend, "Compositing") above).
-      REGISTER_NODE(BlendAudioNode, Blend Audio, "AudioUtility");
-      REGISTER_NODE(AudioTextureNode, Audio Texture, "Audio");
-      REGISTER_NODE(AudioColorRampNode, Audio Color Ramp, "Audio");
+      REGISTER_NODE(BlendAudioNode, Blend Audio, "Utility");
+      // The "Audio" category (just these two nodes) is gone - Audio Texture
+      // is a source (a waveform/spectrum image generator), Audio Color Ramp
+      // is a way of coloring based on audio, i.e. compositing.
+      REGISTER_NODE(AudioTextureNode, Audio Texture, "Source");
+      REGISTER_NODE(AudioColorRampNode, Audio Color Ramp, "Compositing");
 
       // P3a Part 1 - note-transport proving nodes. See
       // docs/plans/audio/P3a-notes-prompt.md; Part 2 adds Note Filter/
@@ -9704,6 +9866,132 @@ namespace
       EndAudioBody();
    }
 
+   // Sort/filter option lists and predicates for the Samples and Media
+   // modes' browser filter strip, and the comparator behind their sort
+   // control - all pulled out as free functions (rather than inlined in
+   // DrawLibrarySearchPanel's cache-rebuild block) so RunBrowserSortTest can
+   // exercise the exact same logic the panel draws with, not a re-typed copy
+   // of it (see INFINITE_BROWSERSORTTEST below).
+
+   const std::vector<std::string>& SampleTypeFilterNames()
+   {
+      // AIFF covers both "aif" and "aiff" - same format, two adjacent
+      // entries for it would be noise (see HasAudioExtension).
+      static const std::vector<std::string> names = { "All", "WAV", "AIFF", "CAF", "M4A", "MP3", "FLAC" };
+      return names;
+   }
+
+   bool SampleEntryMatchesTypeFilter(const SampleScanner::Entry& e, int typeFilter)
+   {
+      switch (typeFilter)
+      {
+         case 1: return e.extension == "wav";
+         case 2: return e.extension == "aif" || e.extension == "aiff";
+         case 3: return e.extension == "caf";
+         case 4: return e.extension == "m4a";
+         case 5: return e.extension == "mp3";
+         case 6: return e.extension == "flac";
+         default: return true; // 0 = All, and any out-of-range index
+      }
+   }
+
+   // "All", "Video", "Image", then every individual extension from
+   // MediaExtensions.h in the same order that header lists them - the
+   // authority the OS drop handler already uses, not a second list.
+   const std::vector<std::string>& MediaTypeFilterNames()
+   {
+      static const std::vector<std::string> names = [] {
+         std::vector<std::string> v = { "All", "Video", "Image" };
+         for (const std::string& ext : MediaExtensions::Video())
+         {
+            std::string upper = ext;
+            std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+            v.push_back(upper);
+         }
+         for (const std::string& ext : MediaExtensions::Image())
+         {
+            std::string upper = ext;
+            std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+            v.push_back(upper);
+         }
+         return v;
+      }();
+      return names;
+   }
+
+   bool MediaEntryMatchesTypeFilter(const SampleScanner::Entry& e, int typeFilter)
+   {
+      const auto& video = MediaExtensions::Video();
+      const auto& image = MediaExtensions::Image();
+      if (typeFilter == 0)
+         return true;
+      if (typeFilter == 1)
+         return std::find(video.begin(), video.end(), e.extension) != video.end();
+      if (typeFilter == 2)
+         return std::find(image.begin(), image.end(), e.extension) != image.end();
+      const int videoIdx = typeFilter - 3;
+      if (videoIdx >= 0 && videoIdx < (int)video.size())
+         return e.extension == video[videoIdx];
+      const int imageIdx = videoIdx - (int)video.size();
+      if (imageIdx >= 0 && imageIdx < (int)image.size())
+         return e.extension == image[imageIdx];
+      return true; // out-of-range index
+   }
+
+   // Shared by Samples and Media - both draw from SampleScanner::Entry and
+   // both modes' sort option list is the same three names (see
+   // DrawLibrarySearchPanel). sortMode: 0 Name, 1 File type, 2 Folder.
+   // Every branch falls through to the lowercased-name compare (with a raw
+   // fileName tiebreak) so ties within a type/folder still read
+   // alphabetically, and File-type/Folder ties don't need their own
+   // tiebreak beyond that. Compares the already-lowercased fileNameLower
+   // rather than folding per call - std::sort/stable_sort invoke the
+   // predicate O(n log n) times, and per-call allocation there is what
+   // stalls a sort visibly past a few thousand entries.
+   bool CompareSampleEntries(const SampleScanner::Entry* a, const SampleScanner::Entry* b, int sortMode)
+   {
+      if (sortMode == 1 && a->extension != b->extension)
+         return a->extension < b->extension;
+      if (sortMode == 2 && a->folderRoot != b->folderRoot)
+         return a->folderRoot < b->folderRoot;
+      if (a->fileNameLower != b->fileNameLower)
+         return a->fileNameLower < b->fileNameLower;
+      return a->fileName < b->fileName; // stable tiebreak - see the comment above
+   }
+
+   // The actual filter+sort a scanner index goes through, factored out of
+   // DrawLibrarySearchPanel's cache-rebuild block so INFINITE_BROWSERSORTTEST
+   // (below RunPluginScanTest) exercises this exact code path against
+   // synthetic data rather than a re-typed copy of it. `lowerQuery` must
+   // already be lowercased (callers already have it that way, to avoid
+   // lowercasing it once per row).
+   std::vector<const SampleScanner::Entry*> FilterAndSortSampleEntries(
+      const std::vector<SampleScanner::Entry>& index, const std::string& lowerQuery,
+      const BrowserFilterState& state, bool mediaKind)
+   {
+      std::vector<const SampleScanner::Entry*> filtered;
+      filtered.reserve(index.size());
+      for (const SampleScanner::Entry& entry : index)
+      {
+         if (!lowerQuery.empty() && entry.fileNameLower.find(lowerQuery) == std::string::npos)
+            continue;
+         const bool typeMatch = mediaKind ? MediaEntryMatchesTypeFilter(entry, state.typeFilter)
+                                           : SampleEntryMatchesTypeFilter(entry, state.typeFilter);
+         if (!typeMatch)
+            continue;
+         filtered.push_back(&entry);
+      }
+
+      const int sortMode = state.sortMode;
+      std::stable_sort(filtered.begin(), filtered.end(),
+                        [sortMode](const SampleScanner::Entry* a, const SampleScanner::Entry* b) {
+                           return CompareSampleEntries(a, b, sortMode);
+                        });
+      if (state.descending)
+         std::reverse(filtered.begin(), filtered.end());
+      return filtered;
+   }
+
    // The Samples/Media modes of the docked node-browser panel (docs/plans/
    // audio/README.md P3e): folder list management, a background-thread scan
    // (SampleScanner), filter-as-you-type over the persisted index, and a
@@ -9746,7 +10034,32 @@ namespace
          ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
          if (scanning)
             ImGui::BeginDisabled();
-         if (ImGui::Button("\xe2\x86\xbb", ImVec2(btnW, 0))) // U+21BB clockwise open circle arrow
+         // Drawn as a vector arc-with-arrowhead, not the U+21BB clockwise
+         // arrow character it used to be - this font has no glyph range
+         // beyond Basic Latin (see DrawBrowserFilterStrip's sort-direction
+         // comment), so that rendered as a literal '?'.
+         const bool refreshClicked = ImGui::Button("##refreshfolder", ImVec2(btnW, 0));
+         {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            const float r = (bmax.y - bmin.y) * 0.28f;
+            const ImU32 col = ImGui::IsItemHovered() || scanning ? IM_COL32(255, 255, 255, 255) : IM_COL32(215, 218, 228, 255);
+            const float aMin = -2.35f, aMax = 2.0f; // ~250 degree sweep, gap at lower-left
+            dl->PathArcTo(center, r, aMin, aMax, 16);
+            dl->PathStroke(col, 0, 1.6f);
+            const ImVec2 tip(center.x + r * cosf(aMax), center.y + r * sinf(aMax));
+            const ImVec2 tangent(-sinf(aMax), cosf(aMax));
+            const ImVec2 normal(-tangent.y, tangent.x);
+            const float headLen = r * 0.9f;
+            dl->AddTriangleFilled(
+               ImVec2(tip.x + normal.x * headLen * 0.55f, tip.y + normal.y * headLen * 0.55f),
+               ImVec2(tip.x - normal.x * headLen * 0.55f, tip.y - normal.y * headLen * 0.55f),
+               ImVec2(tip.x + tangent.x * headLen * 0.7f, tip.y + tangent.y * headLen * 0.7f),
+               col);
+         }
+         if (refreshClicked)
             folderToScan = folder;
          if (scanning)
             ImGui::EndDisabled();
@@ -9780,22 +10093,28 @@ namespace
       {
          std::string lastQuery;
          uint64_t lastIndexVersion = 0;
+         int lastSortMode = -1;
+         int lastTypeFilter = -1;
+         bool lastDescending = false;
          std::vector<const SampleScanner::Entry*> filtered;
       };
       static LibraryFilterCache sSampleCache;
       static LibraryFilterCache sMediaCache;
       LibraryFilterCache& cache = mediaKind ? sMediaCache : sSampleCache;
 
-      // Two independent buffers (not one shared static) so the Samples and
-      // Media modes each keep their own in-progress query when the user
-      // switches tabs and back.
-      static char sampleSearch[128] = "";
-      static char mediaSearch[128] = "";
-      char* searchBuf = mediaKind ? mediaSearch : sampleSearch;
-      ImGui::SetNextItemWidth(-1.0f);
-      ImGui::InputTextWithHint("##librarysearch", searchHint, searchBuf, 128);
+      // Two independent BrowserFilterStates (not one shared instance) so the
+      // Samples and Media modes each keep their own in-progress query, sort
+      // and filter when the user switches tabs and back - this is what the
+      // old per-mode `static char` search buffers here used to guarantee for
+      // the query alone.
+      BrowserFilterState& filterState = mediaKind ? gMediaFilter : gSampleFilter;
+      static const std::vector<std::string> kLibrarySortNames = { "Name", "File type", "Folder" };
+      const bool filterChanged = DrawBrowserFilterStrip(
+         filterState, searchHint, kLibrarySortNames, mediaKind ? MediaTypeFilterNames() : SampleTypeFilterNames());
+      if (filterChanged)
+         SaveBrowserFilterPrefs();
 
-      std::string q = searchBuf;
+      std::string q = filterState.query;
       std::transform(q.begin(), q.end(), q.begin(), ::tolower);
 
       // The button un-latches by itself once the file finishes playing -
@@ -9804,28 +10123,23 @@ namespace
       if (!mediaKind && !gPreviewingSamplePath.empty() && !AudioEngine::Instance().Preview().IsPlaying())
          gPreviewingSamplePath.clear();
 
-      // Filtered only when query or index version changes (0 ms when idle/scrolling/browsing).
-      // Pre-computed lowercase fileNameLower eliminates per-entry string allocation.
-      if (cache.lastQuery != q || cache.lastIndexVersion != scanner.IndexVersion())
+      // Rebuilt only when the query, the index, or any sort/filter control
+      // changes (0 ms when idle/scrolling/browsing). Sorting is strictly
+      // more expensive than filtering, so it happens in this same
+      // cache-rebuild block rather than the draw loop below - miss any one
+      // of these five keys and that control silently stops updating the
+      // list the moment the user touches it.
+      if (cache.lastQuery != q || cache.lastIndexVersion != scanner.IndexVersion() ||
+          cache.lastSortMode != filterState.sortMode || cache.lastTypeFilter != filterState.typeFilter ||
+          cache.lastDescending != filterState.descending)
       {
-         cache.filtered.clear();
-         const auto& index = scanner.Index();
-         cache.filtered.reserve(index.size());
-         if (q.empty())
-         {
-            for (const SampleScanner::Entry& entry : index)
-               cache.filtered.push_back(&entry);
-         }
-         else
-         {
-            for (const SampleScanner::Entry& entry : index)
-            {
-               if (entry.fileNameLower.find(q) != std::string::npos)
-                  cache.filtered.push_back(&entry);
-            }
-         }
+         cache.filtered = FilterAndSortSampleEntries(scanner.Index(), q, filterState, mediaKind);
+
          cache.lastQuery = q;
          cache.lastIndexVersion = scanner.IndexVersion();
+         cache.lastSortMode = filterState.sortMode;
+         cache.lastTypeFilter = filterState.typeFilter;
+         cache.lastDescending = filterState.descending;
       }
 
       const auto& filtered = cache.filtered;
@@ -9998,6 +10312,81 @@ namespace
       ImGui::PopID();
    }
 
+   // Case-insensitive ASCII fold-and-compare - same fold SampleScanner's
+   // ToLower uses, byte-wise rather than std::locale collation (see
+   // CompareSampleEntries's comment; that decision applies here too).
+   // Plugin counts are dozens to low hundreds, not the thousands a scanned
+   // sample library can hold, so folding per comparison call (rather than a
+   // precomputed lowercase field on Platform::PluginDesc) is cheap enough
+   // here.
+   bool ILess(const std::string& a, const std::string& b)
+   {
+      std::string la = a, lb = b;
+      std::transform(la.begin(), la.end(), la.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+      std::transform(lb.begin(), lb.end(), lb.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+      return la != lb ? la < lb : a < b; // stable tiebreak on the raw string
+   }
+
+   const std::vector<std::string>& PluginTypeFilterNames()
+   {
+      static const std::vector<std::string> names = { "All", "AU", "VST3" };
+      return names;
+   }
+
+   bool PluginEntryMatchesTypeFilter(const PluginScanner::Entry& e, int typeFilter)
+   {
+      switch (typeFilter)
+      {
+         case 1: return e.format == "au";
+         case 2: return e.format == "vst3";
+         default: return true; // 0 = All, and any out-of-range index
+      }
+   }
+
+   // sortMode: 0 Name, 1 Format, 2 Manufacturer. Every branch falls through
+   // to the name compare so ties within a format/manufacturer still read
+   // alphabetically.
+   bool ComparePluginEntries(const PluginScanner::Entry* a, const PluginScanner::Entry* b, int sortMode)
+   {
+      if (sortMode == 1 && a->format != b->format)
+         return a->format < b->format;
+      if (sortMode == 2 && a->manufacturer != b->manufacturer)
+         return ILess(a->manufacturer, b->manufacturer);
+      return ILess(a->name, b->name);
+   }
+
+   // Same reasoning as FilterAndSortSampleEntries above - factored out so
+   // INFINITE_BROWSERSORTTEST exercises the real filter+sort path.
+   // `lowerQuery` must already be lowercased.
+   std::vector<const PluginScanner::Entry*> FilterAndSortPluginEntries(
+      const std::vector<PluginScanner::Entry>& index, const std::string& lowerQuery, const BrowserFilterState& state)
+   {
+      std::vector<const PluginScanner::Entry*> filtered;
+      filtered.reserve(index.size());
+      for (const PluginScanner::Entry& entry : index)
+      {
+         if (!lowerQuery.empty())
+         {
+            std::string hay = entry.name + " " + entry.manufacturer;
+            std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+            if (hay.find(lowerQuery) == std::string::npos)
+               continue;
+         }
+         if (!PluginEntryMatchesTypeFilter(entry, state.typeFilter))
+            continue;
+         filtered.push_back(&entry);
+      }
+
+      const int sortMode = state.sortMode;
+      std::stable_sort(filtered.begin(), filtered.end(),
+                        [sortMode](const PluginScanner::Entry* a, const PluginScanner::Entry* b) {
+                           return ComparePluginEntries(a, b, sortMode);
+                        });
+      if (state.descending)
+         std::reverse(filtered.begin(), filtered.end());
+      return filtered;
+   }
+
    // The Plugins mode of the docked node-browser panel. Same shape as
    // DrawLibrarySearchPanel above, minus the folder machinery: Audio Unit
    // discovery is a registry query, not a directory walk, so there is nothing
@@ -10082,16 +10471,16 @@ namespace
 
       ImGui::Separator();
 
-      // Its own buffer, like the Samples and Media modes each have, so
-      // switching tabs and back keeps this mode's in-progress query.
-      static char pluginSearch[128] = "";
+      // Its own BrowserFilterState, like the Samples and Media modes each
+      // have, so switching tabs and back keeps this mode's in-progress
+      // query, sort and filter.
       static bool sPluginSearchSeeded = false;
       if (!sPluginSearchSeeded)
       {
          if (const char* seed = getenv("INFINITE_PLUGINDRAGTEST_SEARCH"))
          {
-            strncpy(pluginSearch, seed, sizeof(pluginSearch) - 1);
-            pluginSearch[sizeof(pluginSearch) - 1] = '\0';
+            strncpy(gPluginFilter.query, seed, sizeof(gPluginFilter.query) - 1);
+            gPluginFilter.query[sizeof(gPluginFilter.query) - 1] = '\0';
             sPluginSearchSeeded = true;
          }
          else if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
@@ -10102,6 +10491,9 @@ namespace
             // latched onto and the row actually under the cursor when the
             // drag starts, landing the drop on a different plugin (same
             // manufacturer, different name) than the one that was expected.
+            // Sorting is a second way that can happen now - the query still
+            // narrows the *set* to one row regardless of sort order, so this
+            // logic is unaffected by which sort mode is active.
             // A one-row list removes the swap target entirely. Wait for the
             // scan to settle with at least one result before picking it.
             if (!gPluginScanner.IsScanning() && !gPluginScanner.Index().empty())
@@ -10123,8 +10515,8 @@ namespace
                std::string query = first.name;
                if (countMatches(query) != 1)
                   query = first.name + " " + first.manufacturer;
-               strncpy(pluginSearch, query.c_str(), sizeof(pluginSearch) - 1);
-               pluginSearch[sizeof(pluginSearch) - 1] = '\0';
+               strncpy(gPluginFilter.query, query.c_str(), sizeof(gPluginFilter.query) - 1);
+               gPluginFilter.query[sizeof(gPluginFilter.query) - 1] = '\0';
                sPluginSearchSeeded = true;
             }
          }
@@ -10133,11 +10525,51 @@ namespace
             sPluginSearchSeeded = true;
          }
       }
-      ImGui::SetNextItemWidth(-1.0f);
-      ImGui::InputTextWithHint("##pluginsearch", "search plugins...", pluginSearch, sizeof(pluginSearch));
 
-      std::string q = pluginSearch;
+      static const std::vector<std::string> kPluginSortNames = { "Name", "Format", "Manufacturer" };
+      // Empty typeNames under !INFINITE_ENABLE_VST3 hides the type control
+      // rather than showing a dropdown with one real option (AU) - the
+      // index only ever holds AU entries in that build anyway.
+#if INFINITE_ENABLE_VST3
+      const std::vector<std::string>& pluginTypeNames = PluginTypeFilterNames();
+#else
+      static const std::vector<std::string> pluginTypeNames;
+#endif
+      const bool filterChanged =
+         DrawBrowserFilterStrip(gPluginFilter, "search plugins...", kPluginSortNames, pluginTypeNames);
+      if (filterChanged)
+         SaveBrowserFilterPrefs();
+
+      std::string q = gPluginFilter.query;
       std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+
+      struct PluginFilterCache
+      {
+         std::string lastQuery;
+         uint64_t lastIndexVersion = 0;
+         int lastSortMode = -1;
+         int lastTypeFilter = -1;
+         bool lastDescending = false;
+         std::vector<const PluginScanner::Entry*> filtered;
+      };
+      static PluginFilterCache sCache;
+
+      // Plugins mode had no filter cache before this change - it filtered
+      // inline every frame, which was fine with no sort. Sorting needs one,
+      // same LibraryFilterCache shape as Samples/Media (see that struct) -
+      // a third instance, not a new abstraction.
+      if (sCache.lastQuery != q || sCache.lastIndexVersion != gPluginScanner.IndexVersion() ||
+          sCache.lastSortMode != gPluginFilter.sortMode || sCache.lastTypeFilter != gPluginFilter.typeFilter ||
+          sCache.lastDescending != gPluginFilter.descending)
+      {
+         sCache.filtered = FilterAndSortPluginEntries(gPluginScanner.Index(), q, gPluginFilter);
+
+         sCache.lastQuery = q;
+         sCache.lastIndexVersion = gPluginScanner.IndexVersion();
+         sCache.lastSortMode = gPluginFilter.sortMode;
+         sCache.lastTypeFilter = gPluginFilter.typeFilter;
+         sCache.lastDescending = gPluginFilter.descending;
+      }
 
       ImGui::BeginChild("##pluginpanellist", ImVec2(0, 0), false);
       // INFINITE_PLUGINDRAGTEST captures the FIRST matching row, not the last:
@@ -10147,15 +10579,9 @@ namespace
       // row is always on screen. (The Samples/Media modes capture the last row
       // because their fixtures stage a folder with exactly one file in it.)
       bool testRowCaptured = false;
-      for (const PluginScanner::Entry& entry : gPluginScanner.Index())
+      for (const PluginScanner::Entry* entryPtr : sCache.filtered)
       {
-         if (!q.empty())
-         {
-            std::string hay = entry.name + " " + entry.manufacturer;
-            std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
-            if (hay.find(q) == std::string::npos)
-               continue;
-         }
+         const PluginScanner::Entry& entry = *entryPtr;
 
          std::string label = "[" + (entry.format == "vst3" ? std::string("VST3") : std::string("AU")) +
                               "] " + entry.name;
@@ -18385,18 +18811,12 @@ namespace
    const char* CategoryHelpText(const std::string& category)
    {
       if (category == "Source") return "A source node - generates or loads an image with no image input of its own.";
-      if (category == "Text") return "Renders text as an image.";
       if (category == "Effects") return "Transforms one image into another. Its parameters (and the shape of its name) describe what it changes; see Menu > Help > Module reference for the effect families.";
-      if (category == "Color") return "Adjusts the colour of its input. See Menu > Help > Module reference, 'Color' section, for the full family.";
-      if (category == "Compositing") return "Combines images, or otherwise manages how they flow through the patch.";
+      if (category == "Compositing") return "Combines images, or otherwise manages how they flow through the patch - including colour, mask, and feedback/loop nodes. See Menu > Help > Module reference for the full family.";
       if (category == "Modulators") return "Produces a changing number over time, not an image. Patch its output onto the small dot beside any slider to drive that parameter.";
-      if (category == "Feedback") return "Reads back a previous frame to build loops - trails, echoes, growth. See Menu > Help > 'Using Feedback'.";
-      if (category == "Mask") return "Produces a mask, or isolates part of the image by colour or luminance.";
-      if (category == "Resynth") return "Iteratively regenerates the image, each generation drifting from its source.";
       if (category == "3D") return "Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights.";
       if (category == "Notes") return "Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.";
-      if (category == "Output") return "Terminal node: shows, exports or records the final result.";
-      if (category == "OSC") return "Sends or receives Open Sound Control messages over UDP to talk to other apps (TouchDesigner, Max, lighting rigs). Loopback/LAN only.";
+      if (category == "Utility") return "Utility node: audio routing, terminal/output nodes (shows, exports or records the final result), Syphon and OSC I/O.";
       return "No additional notes for this node.";
    }
 
@@ -18535,8 +18955,6 @@ namespace
                { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
                { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
                { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
-            } },
-            { "Text", {
                { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
             } },
             { "Effects", {
@@ -18548,16 +18966,7 @@ namespace
                { "Symmetry", "Symmetry (mirror about X, Y or both), Kaleidoscope (segment count, rotation, zoom) and Mirror Tile." },
                { "Stylise", "Halftone (mono or CMY-style colour), Sobel edge detection and Edge Outline." },
                { "Pixelate / Noise / Vignette", "Block pixelation, additive grain and a vignette with its own centre." },
-            } },
-            { "Color", {
-               { "Basic", "Brightness/contrast, exposure, levels (black/white point + gamma), invert, posterize, threshold." },
-               { "Curves", "Per-channel spline curve editor - drag control points on Red/Green/Blue/Luminance, Photoshop Curves-style." },
-               { "LUT", "Applies a lookup-table image patched into the second input." },
-               { "Gradient Map", "Remaps luminance onto a two-colour gradient." },
-               { "Channel Mixer", "Rebuilds each output channel from a weighted mix of the input channels - set all three rows equal for a weighted greyscale." },
-               { "HSL / Colour Balance", "Hue, saturation and lightness; per-axis colour shifts." },
-               { "Color Adjustments", "All-in-one grading chain - brightness/contrast, levels, colour balance, HSL, vibrance, tone shaper, channel mixer and an optional black & white stage - so a common grade doesn't need eight nodes wired in series." },
-               { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
+               { "Resynthesize", "Each generation reads the previous one, so the image drifts away from the source. The XY pad blends four named mutation effects assigned to its corners; Randomise re-rolls which four. The orb's path can be recorded, looped and replayed in time." },
             } },
             { "Compositing", {
                { "Transform", "Translate, scale, rotate, flip horizontal and flip vertical." },
@@ -18566,6 +18975,18 @@ namespace
                { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
                { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
                { "Drop Shadow / Outer Glow / Colour Overlay", "Layer-effect style filters." },
+               { "Basic", "Brightness/contrast, exposure, levels (black/white point + gamma), invert, posterize, threshold." },
+               { "Curves", "Per-channel spline curve editor - drag control points on Red/Green/Blue/Luminance, Photoshop Curves-style." },
+               { "LUT", "Applies a lookup-table image patched into the second input." },
+               { "Gradient Map", "Remaps luminance onto a two-colour gradient." },
+               { "Channel Mixer", "Rebuilds each output channel from a weighted mix of the input channels - set all three rows equal for a weighted greyscale." },
+               { "HSL / Colour Balance", "Hue, saturation and lightness; per-axis colour shifts." },
+               { "Color Adjustments", "All-in-one grading chain - brightness/contrast, levels, colour balance, HSL, vibrance, tone shaper, channel mixer and an optional black & white stage - so a common grade doesn't need eight nodes wired in series." },
+               { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
+               { "Remove Background", "On-device segmentation via the OS - no model download, no network, no key. Subject mode needs macOS 14, Person mode macOS 12. Segmentation is slow, so the mask is computed on demand and cached; for video use auto-refresh, which runs on a beat interval rather than every frame." },
+               { "Feedback", "Outputs the previous frame. Nothing visible on its own - it is the delay that makes a loop legal. See 'Using Feedback' above." },
+               { "Trails", "A pre-wired feedback loop: decaying accumulation with drift, zoom, rotation and hue rotation. Reach for this before wiring a loop by hand." },
+               { "Reaction-Diffusion", "Gray-Scott chemical simulation, six presets. Needs no input; patch one in and its luminance varies the feed rate so the pattern grows differently through light and dark." },
             } },
             { "Modulators", {
                { "LFO", "Sine, triangle, saw up/down, square and sample-and-hold. Rate in beats, plus phase and an output range." },
@@ -18579,23 +19000,10 @@ namespace
                { "Invert", "Mirrors a modulator around a low/high pivot. Defaults to 0..1 for a classic 1-v flip; set low/high to match an unclamped source to mirror it correctly." },
                { "Mod Curve", "Remaps a modulator through a draggable transfer curve - an S-curve, staircase, or exponential response, all things a slider can't express." },
             } },
-            { "Feedback", {
-               { "Feedback", "Outputs the previous frame. Nothing visible on its own - it is the delay that makes a loop legal. See 'Using Feedback' above." },
-               { "Trails", "A pre-wired feedback loop: decaying accumulation with drift, zoom, rotation and hue rotation. Reach for this before wiring a loop by hand." },
-               { "Reaction-Diffusion", "Gray-Scott chemical simulation, six presets. Needs no input; patch one in and its luminance varies the feed rate so the pattern grows differently through light and dark." },
-            } },
-            { "Mask", {
-               { "Remove Background", "On-device segmentation via the OS - no model download, no network, no key. Subject mode needs macOS 14, Person mode macOS 12. Segmentation is slow, so the mask is computed on demand and cached; for video use auto-refresh, which runs on a beat interval rather than every frame." },
-            } },
-            { "Resynth", {
-               { "Resynthesize", "Each generation reads the previous one, so the image drifts away from the source. The XY pad blends four named mutation effects assigned to its corners; Randomise re-rolls which four. The orb's path can be recorded, looped and replayed in time." },
-            } },
-            { "Output", {
+            { "Utility", {
                { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
                { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
                { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
-            } },
-            { "OSC", {
                { "OSC Receive", "Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin." },
                { "OSC Send", "Sends its patched modulator input as an Open Sound Control message (address + float) to a host:port over UDP, on change (past an epsilon) or at least every interval - the one node in the patch with no output of its own." },
             } },
@@ -26047,6 +26455,199 @@ static bool RunFmRenderCheck()
 }
 
 
+// ====================================================== INFINITE_BROWSERSORTTEST
+//
+// Pure-function proof for the docked node-browser panel's sort/filter strip
+// (docs/plans - "Search panel: a shared sort + filter strip across all four
+// modes"): synthetic scanner indexes with known names/extensions/folders, run
+// through the exact FilterAndSortSampleEntries/FilterAndSortPluginEntries/
+// ILess+CategoryColors::SemanticRank functions the panel itself calls, with
+// asserted output order and length. This is the only thing that catches a
+// forgotten cache key (see LibraryFilterCache's comment) before it ships -
+// a missing key doesn't crash or throw, it just makes a control silently do
+// nothing, which no build-time check can see.
+//
+// No GL/ImGui/NodeFactory registration needed - gated as an early exit
+// before glfwInit() for the same reason INFINITE_DSPTEST is.
+static bool RunBrowserSortTest()
+{
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      printf("BROWSERSORTTEST %s: %s\n", what, cond ? "OK" : "FAIL");
+      if (!cond)
+         ok = false;
+   };
+
+   // ---- Samples: name / file type / folder sort, AIFF grouping, descending, tiebreak ----
+   {
+      auto makeEntry = [](const std::string& folder, const std::string& fileName, const std::string& ext) {
+         SampleScanner::Entry e;
+         e.folderRoot = folder;
+         e.fileName = fileName;
+         e.fileNameLower = fileName;
+         std::transform(e.fileNameLower.begin(), e.fileNameLower.end(), e.fileNameLower.begin(), ::tolower);
+         e.path = folder + "/" + fileName;
+         e.extension = ext;
+         return e;
+      };
+      std::vector<SampleScanner::Entry> index = {
+         makeEntry("/f1", "Beta.wav", "wav"),
+         makeEntry("/f1", "alpha.aiff", "aiff"),
+         makeEntry("/f2", "Gamma.mp3", "mp3"),
+         makeEntry("/f2", "delta.flac", "flac"),
+         makeEntry("/f1", "alpha.aif", "aif"),
+         makeEntry("/f1", "Track.wav", "wav"),
+         makeEntry("/f1", "track.WAV", "wav"), // case-tie against the entry above
+      };
+
+      BrowserFilterState state;
+      state.sortMode = 0; // Name
+      auto byName = FilterAndSortSampleEntries(index, "", state, /*mediaKind=*/false);
+      const std::vector<std::string> expectedNames = {
+         "alpha.aif", "alpha.aiff", "Beta.wav", "delta.flac", "Gamma.mp3", "Track.wav", "track.WAV"
+      };
+      bool nameOrderOk = byName.size() == expectedNames.size();
+      for (size_t i = 0; nameOrderOk && i < byName.size(); i++)
+         nameOrderOk = (byName[i]->fileName == expectedNames[i]);
+      check(nameOrderOk, "sample name sort ascending order");
+      // Case-tie ("Track.wav" vs "track.WAV") is broken by the raw
+      // fileName compare, not left to shuffle - see CompareSampleEntries.
+      check(byName.size() == 7 && byName[5]->fileName == "Track.wav" && byName[6]->fileName == "track.WAV",
+            "sample name sort stable case tiebreak");
+
+      state.descending = true;
+      auto byNameDesc = FilterAndSortSampleEntries(index, "", state, false);
+      bool descIsReverse = byNameDesc.size() == byName.size();
+      for (size_t i = 0; descIsReverse && i < byName.size(); i++)
+         descIsReverse = (byNameDesc[i] == byName[byName.size() - 1 - i]);
+      check(descIsReverse, "sample name sort descending reverses ascending");
+
+      BrowserFilterState typeState;
+      typeState.typeFilter = 2; // AIFF - covers both "aif" and "aiff"
+      auto aiffOnly = FilterAndSortSampleEntries(index, "", typeState, false);
+      check(aiffOnly.size() == 2, "sample AIFF filter groups aif+aiff, length");
+
+      BrowserFilterState folderState;
+      folderState.sortMode = 2; // Folder
+      auto byFolder = FilterAndSortSampleEntries(index, "", folderState, false);
+      bool folderGrouped = true;
+      for (size_t i = 1; i < byFolder.size(); i++)
+         if (byFolder[i]->folderRoot < byFolder[i - 1]->folderRoot)
+            folderGrouped = false;
+      check(folderGrouped, "sample folder sort groups by folderRoot");
+
+      BrowserFilterState typeSortState;
+      typeSortState.sortMode = 1; // File type
+      auto byType = FilterAndSortSampleEntries(index, "", typeSortState, false);
+      bool typeGrouped = true;
+      for (size_t i = 1; i < byType.size(); i++)
+         if (byType[i]->extension < byType[i - 1]->extension)
+            typeGrouped = false;
+      check(typeGrouped, "sample file-type sort groups by extension");
+
+      BrowserFilterState queryState;
+      auto queried = FilterAndSortSampleEntries(index, "alpha", queryState, false);
+      check(queried.size() == 2, "sample query filters by substring, length");
+   }
+
+   // ---- Media: Video/Image grouping, individual extension filter ----
+   {
+      auto makeEntry = [](const std::string& fileName, const std::string& ext) {
+         SampleScanner::Entry e;
+         e.fileName = fileName;
+         e.fileNameLower = fileName;
+         std::transform(e.fileNameLower.begin(), e.fileNameLower.end(), e.fileNameLower.begin(), ::tolower);
+         e.extension = ext;
+         return e;
+      };
+      std::vector<SampleScanner::Entry> index = {
+         makeEntry("clip.mov", "mov"), makeEntry("clip.mp4", "mp4"),
+         makeEntry("photo.png", "png"), makeEntry("photo.jpg", "jpg"),
+      };
+      BrowserFilterState videoState;
+      videoState.typeFilter = 1; // Video
+      auto video = FilterAndSortSampleEntries(index, "", videoState, /*mediaKind=*/true);
+      check(video.size() == 2, "media Video type filter length");
+
+      BrowserFilterState imageState;
+      imageState.typeFilter = 2; // Image
+      auto image = FilterAndSortSampleEntries(index, "", imageState, true);
+      check(image.size() == 2, "media Image type filter length");
+
+      // Individual-extension options start right after "All"/"Video"/"Image".
+      const auto& names = MediaTypeFilterNames();
+      const int pngIndex = 3 + (int)MediaExtensions::Video().size() +
+         (int)(std::find(MediaExtensions::Image().begin(), MediaExtensions::Image().end(), "png") -
+               MediaExtensions::Image().begin());
+      BrowserFilterState pngState;
+      pngState.typeFilter = pngIndex;
+      auto pngOnly = FilterAndSortSampleEntries(index, "", pngState, true);
+      check(pngIndex < (int)names.size() && pngOnly.size() == 1 && pngOnly[0]->extension == "png",
+            "media individual-extension filter (png)");
+   }
+
+   // ---- Plugins: Name / Format / Manufacturer sort, AU/VST3 filter ----
+   {
+      auto makeEntry = [](const std::string& format, const std::string& name, const std::string& mfr) {
+         PluginScanner::Entry e;
+         e.format = format;
+         e.name = name;
+         e.manufacturer = mfr;
+         e.identifier = format + ":" + name;
+         return e;
+      };
+      std::vector<PluginScanner::Entry> index = {
+         makeEntry("au", "Zeta", "Acme"),
+         makeEntry("vst3", "alpha", "Zenith"),
+         makeEntry("au", "Beta", "Zenith"),
+      };
+
+      BrowserFilterState nameState;
+      auto byName = FilterAndSortPluginEntries(index, "", nameState);
+      check(byName.size() == 3 && byName[0]->name == "alpha" && byName[1]->name == "Beta" &&
+               byName[2]->name == "Zeta",
+            "plugin name sort ascending order");
+
+      BrowserFilterState formatState;
+      formatState.sortMode = 1; // Format
+      auto byFormat = FilterAndSortPluginEntries(index, "", formatState);
+      check(byFormat.size() == 3 && byFormat[0]->format == "au" && byFormat[1]->format == "au" &&
+               byFormat[2]->format == "vst3",
+            "plugin format sort groups au before vst3");
+
+      BrowserFilterState mfrState;
+      mfrState.sortMode = 2; // Manufacturer
+      auto byMfr = FilterAndSortPluginEntries(index, "", mfrState);
+      check(byMfr.size() == 3 && byMfr[0]->manufacturer == "Acme", "plugin manufacturer sort");
+
+      BrowserFilterState auState;
+      auState.typeFilter = 1; // AU
+      auto auOnly = FilterAndSortPluginEntries(index, "", auState);
+      check(auOnly.size() == 2, "plugin AU type filter length");
+
+      BrowserFilterState vst3State;
+      vst3State.typeFilter = 2; // VST3
+      auto vst3Only = FilterAndSortPluginEntries(index, "", vst3State);
+      check(vst3Only.size() == 1 && vst3Only[0]->name == "alpha", "plugin VST3 type filter length");
+   }
+
+   // ---- Modules: category semantic rank ordering ----
+   {
+      check(CategoryColors::SemanticRank("Source") < CategoryColors::SemanticRank("3D"), "category rank: 2D before 3D");
+      check(CategoryColors::SemanticRank("3D") < CategoryColors::SemanticRank("Synths"),
+            "category rank: 3D before audio");
+      check(CategoryColors::SemanticRank("AudioEffects") < CategoryColors::SemanticRank("Utility"),
+            "category rank: audio before utility");
+      check(CategoryColors::SemanticRank("NotARealCategory") == CategoryColors::SemanticRank("AlsoNotReal"),
+            "category rank: unknown categories sort last, together");
+
+      check(ILess("alpha", "Beta") && !ILess("Beta", "alpha"), "module name compare is case-insensitive");
+   }
+
+   printf("%s\n", ok ? "BROWSER SORT TEST PASS" : "BROWSER SORT TEST FAIL");
+   return ok;
+}
+
 // ====================================================== INFINITE_PLUGINSCANTEST
 //
 // Headless proof that the whole Platform plugin-hosting layer works with no UI
@@ -26633,6 +27234,9 @@ int main(int argc, char** argv)
       return 0;
    }
 
+   if (getenv("INFINITE_BROWSERSORTTEST") != nullptr)
+      return RunBrowserSortTest() ? 0 : 1;
+
    if (getenv("INFINITE_PLUGINSCANTEST") != nullptr)
       return RunPluginScanTest();
 
@@ -26849,6 +27453,7 @@ int main(int argc, char** argv)
    Patch::LoadRecents();
    CategoryColors::LoadPreference();
    LoadAutosaveSettings();
+   LoadBrowserFilterPrefs();
 
    gEditor = ed::CreateEditor(&config);
    ed::SetCurrentEditor(gEditor); // ed::GetStyle() below needs a current editor
@@ -26943,10 +27548,10 @@ int main(int argc, char** argv)
          SpawnNode("MIDI Notes", "Notes", 20.0f, 20.0f);            // 0
          SpawnNode("Wavetable", "Synths", 20.0f, 440.0f);           // 1
          SpawnNode("Envelope", "Modulators", 540.0f, 20.0f);        // 2
-         SpawnNode("Gain", "AudioUtility", 1040.0f, 440.0f);        // 3
-         SpawnNode("Mixer", "AudioUtility", 1040.0f, 760.0f);       // 4
-         SpawnNode("Splitter", "AudioUtility", 1300.0f, 440.0f);    // 5
-         SpawnNode("Audio Out", "AudioUtility", 1300.0f, 580.0f);   // 6
+         SpawnNode("Gain", "Utility", 1040.0f, 440.0f);        // 3
+         SpawnNode("Mixer", "Utility", 1040.0f, 760.0f);       // 4
+         SpawnNode("Splitter", "Utility", 1300.0f, 440.0f);    // 5
+         SpawnNode("Audio Out", "Utility", 1300.0f, 580.0f);   // 6
          SpawnNode("Audio Filter", "AudioEffects", 1650.0f, 20.0f); // 7
          SpawnNode("Dynamics", "AudioEffects", 1650.0f, 780.0f);    // 8
          SpawnNode("Delay", "AudioEffects", 2160.0f, 20.0f);        // 9
@@ -27191,8 +27796,8 @@ int main(int argc, char** argv)
       else if (getenv("INFINITE_BYPASSTEST") != nullptr)
       {
          SpawnNode("Shape", "Source", 40.0f, 40.0f);   // 0 white circle
-         SpawnNode("invert", "Color", 320.0f, 40.0f);  // 1
-         SpawnNode("Output", "Output", 600.0f, 40.0f); // 2
+         SpawnNode("invert", "Compositing", 320.0f, 40.0f);  // 1
+         SpawnNode("Output", "Utility", 600.0f, 40.0f); // 2
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[2], 0)->Connect(gNodes[1].node.get());
       }
@@ -27476,7 +28081,7 @@ int main(int argc, char** argv)
       else if (getenv("INFINITE_AUDIORECTEST") != nullptr)
       {
          SpawnNode("Shape", "Source", 40.0f, 40.0f);       // 0
-         SpawnNode("Output", "Output", 320.0f, 40.0f);     // 1
+         SpawnNode("Output", "Utility", 320.0f, 40.0f);     // 1
          SpawnNode("Audio File", "Modulators", 40.0f, 400.0f); // 2
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          auto* audio = static_cast<AudioFileNode*>(gNodes[2].node.get());
@@ -27503,8 +28108,8 @@ int main(int argc, char** argv)
          SpawnNode("Camera", "3D", 320.0f, 400.0f);        // 3
          SpawnNode("Light", "3D", 320.0f, 620.0f);         // 4
          SpawnNode("Render 3D", "3D", 880.0f, 40.0f);      // 5
-         SpawnNode("invert", "Color", 1160.0f, 40.0f);     // 6
-         SpawnNode("Output", "Output", 1440.0f, 40.0f);    // 7
+         SpawnNode("invert", "Compositing", 1160.0f, 40.0f);     // 6
+         SpawnNode("Output", "Utility", 1440.0f, 40.0f);    // 7
          SpawnNode("Path", "Modulators", 40.0f, 800.0f);   // 8
          SpawnNode("Audio File", "Modulators", 40.0f, 1000.0f); // 9
          SpawnNode("Particle System", "3D", 40.0f, 1200.0f);    // 10
@@ -27645,7 +28250,7 @@ int main(int argc, char** argv)
          // (later, at frameId checkpoints below) mid-chain delete survival.
          SpawnNode("Wavetable", "Synths", 40.0f, 40.0f);         // 0
          SpawnNode("Gain", "Synths", 320.0f, 40.0f);             // 1
-         SpawnNode("Audio Out", "AudioUtility", 600.0f, 40.0f); // 2
+         SpawnNode("Audio Out", "Utility", 600.0f, 40.0f); // 2
 
          auto* osc = static_cast<WavetableNode*>(gNodes[0].node.get());
          auto* gain = static_cast<GainNode*>(gNodes[1].node.get());
@@ -27695,7 +28300,7 @@ int main(int argc, char** argv)
 
          GraphNode* wtGn = SpawnNode("Wavetable", "Synths", 40.0f, 40.0f);
          const int wtIndex = wtGn->index;
-         GraphNode* outGn = SpawnNode("Audio Out", "AudioUtility", 320.0f, 40.0f);
+         GraphNode* outGn = SpawnNode("Audio Out", "Utility", 320.0f, 40.0f);
          const int outIndex = outGn->index;
          // Re-resolve - SpawnNode's push_back into gNodes can reallocate and
          // invalidate the pointer the earlier SpawnNode call returned.
@@ -27771,7 +28376,7 @@ int main(int argc, char** argv)
 
          GraphNode* wtGn = SpawnNode("Wavetable", "Synths", 40.0f, 40.0f);
          const int wtIndex = wtGn->index;
-         GraphNode* outGn = SpawnNode("Audio Out", "AudioUtility", 320.0f, 40.0f);
+         GraphNode* outGn = SpawnNode("Audio Out", "Utility", 320.0f, 40.0f);
          const int outIndex = outGn->index;
          wtGn = FindNodeByIndex(wtIndex);
          outGn = FindNodeByIndex(outIndex);
@@ -27908,7 +28513,7 @@ int main(int argc, char** argv)
          SpawnNode("Render 3D", "3D", 820.0f, 40.0f);      // 3
          SpawnNode("Shape", "Source", 40.0f, 500.0f);      // 4
          SpawnNode("Null", "Compositing", 300.0f, 500.0f); // 5
-         SpawnNode("Output", "Output", 560.0f, 500.0f);    // 6
+         SpawnNode("Output", "Utility", 560.0f, 500.0f);    // 6
 
          auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
          auto* null3d = static_cast<Null3DNode*>(gNodes[1].node.get());
@@ -27997,12 +28602,12 @@ int main(int argc, char** argv)
          SpawnNode("Light", "3D", 40.0f, 920.0f);                  // 5 key
          SpawnNode("Light", "3D", 40.0f, 1080.0f);                 // 6 fill/rim
          SpawnNode("Render 3D", "3D", 620.0f, 420.0f);             // 7
-         SpawnNode("hsl", "Color", 900.0f, 420.0f);                // 8
-         SpawnNode("colorbalance", "Color", 900.0f, 560.0f);       // 9
+         SpawnNode("hsl", "Compositing", 900.0f, 420.0f);                // 8
+         SpawnNode("colorbalance", "Compositing", 900.0f, 560.0f);       // 9
          SpawnNode("bloom", "Effects", 900.0f, 700.0f);            // 10
          SpawnNode("vignette", "Effects", 900.0f, 840.0f);         // 11
-         SpawnNode("brightnesscontrast", "Color", 900.0f, 980.0f); // 12
-         SpawnNode("Output", "Output", 1180.0f, 420.0f);           // 13
+         SpawnNode("brightnesscontrast", "Compositing", 900.0f, 980.0f); // 12
+         SpawnNode("Output", "Utility", 1180.0f, 420.0f);           // 13
 
          auto* cube = static_cast<GeometryNode*>(gNodes[0].node.get());
          cube->detail = 32;
@@ -28227,7 +28832,7 @@ int main(int argc, char** argv)
       }
       else if (getenv("INFINITE_TEXTFIT") != nullptr)
       {
-         SpawnNode("Text", "Text", 40.0f, 40.0f);
+         SpawnNode("Text", "Source", 40.0f, 40.0f);
          auto* t = static_cast<TextNode*>(gNodes[0].node.get());
          t->text = "naman is a weirdo and this line is deliberately long enough to need several rows";
          t->fontName = "Verdana";
@@ -28242,11 +28847,11 @@ int main(int argc, char** argv)
       }
       else if (getenv("INFINITE_SHOWCASE4") != nullptr)
       {
-         SpawnNode("Reaction Diffusion", "Feedback", 40.0f, 40.0f);
-         SpawnNode("Curves", "Color", 300.0f, 40.0f);
+         SpawnNode("Reaction Diffusion", "Compositing", 40.0f, 40.0f);
+         SpawnNode("Curves", "Compositing", 300.0f, 40.0f);
          SpawnNode("Shape", "Source", 560.0f, 40.0f);
-         SpawnNode("Trails", "Feedback", 820.0f, 40.0f);
-         SpawnNode("Resynthesize", "Resynth", 1080.0f, 40.0f);
+         SpawnNode("Trails", "Compositing", 820.0f, 40.0f);
+         SpawnNode("Resynthesize", "Effects", 1080.0f, 40.0f);
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[3], 0)->Connect(gNodes[2].node.get());
          CableFor(gNodes[4], 0)->Connect(gNodes[0].node.get());
@@ -28267,11 +28872,11 @@ int main(int argc, char** argv)
          // Same heavy visual load as INFINITE_SHOWCASE4 (Reaction Diffusion
          // at stepsPerFrame=24 feeding Curves/Shape/Trails) so the FPS-delta
          // measurement below has real GPU work to lose, not a synthetic one.
-         SpawnNode("Reaction Diffusion", "Feedback", 40.0f, 40.0f);
-         SpawnNode("Curves", "Color", 300.0f, 40.0f);
+         SpawnNode("Reaction Diffusion", "Compositing", 40.0f, 40.0f);
+         SpawnNode("Curves", "Compositing", 300.0f, 40.0f);
          SpawnNode("Shape", "Source", 560.0f, 40.0f);
-         SpawnNode("Trails", "Feedback", 820.0f, 40.0f);
-         SpawnNode("Resynthesize", "Resynth", 1080.0f, 40.0f);
+         SpawnNode("Trails", "Compositing", 820.0f, 40.0f);
+         SpawnNode("Resynthesize", "Effects", 1080.0f, 40.0f);
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[3], 0)->Connect(gNodes[2].node.get());
          CableFor(gNodes[4], 0)->Connect(gNodes[0].node.get());
@@ -28320,9 +28925,9 @@ int main(int argc, char** argv)
          // dev-only: a representative patch, used to generate the README image
          SpawnNode("Shape", "Source", 40.0f, 40.0f);
          SpawnNode("glitch", "Effects", 320.0f, 40.0f);
-         SpawnNode("Text", "Text", 600.0f, 40.0f);
+         SpawnNode("Text", "Source", 600.0f, 40.0f);
          SpawnNode("Layer Stack", "Compositing", 880.0f, 40.0f);
-         SpawnNode("Output", "Output", 1160.0f, 40.0f);
+         SpawnNode("Output", "Utility", 1160.0f, 40.0f);
          SpawnNode("LFO", "Modulators", 320.0f, 560.0f);
 
          auto* shape = static_cast<ShapeNode*>(gNodes[0].node.get());
@@ -28358,12 +28963,12 @@ int main(int argc, char** argv)
          static_cast<ShapeNode*>(gNodes[0].node.get())->shapeType = 5;
          if (getenv("INFINITE_RESYNTHTEST") != nullptr)
          {
-            SpawnNode("Resynthesize", "Resynth", 380.0f, 60.0f);
+            SpawnNode("Resynthesize", "Effects", 380.0f, 60.0f);
             CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
             gNodes[1].showParams = true;
          }
          else
-            SpawnNode("Output", "Output", 380.0f, 60.0f);
+            SpawnNode("Output", "Utility", 380.0f, 60.0f);
          if (getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_RECTEARDOWNTEST") != nullptr)
             CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          if (getenv("INFINITE_HIDETEST") != nullptr)
@@ -28421,8 +29026,8 @@ int main(int argc, char** argv)
             // round trip through the actual wire format rather than just
             // exercising the C++ classes in isolation.
             SpawnNode("Constant", "Modulators", 60.0f, 500.0f);   // gNodes[2]
-            SpawnNode("OSC Send", "OSC", 300.0f, 500.0f);         // gNodes[3]
-            SpawnNode("OSC Receive", "OSC", 540.0f, 500.0f);      // gNodes[4]
+            SpawnNode("OSC Send", "Utility", 300.0f, 500.0f);         // gNodes[3]
+            SpawnNode("OSC Receive", "Utility", 540.0f, 500.0f);      // gNodes[4]
             gNodes[2].showParams = true;
             gNodes[3].showParams = true;
             gNodes[4].showParams = true;
@@ -33753,8 +34358,8 @@ int main(int argc, char** argv)
                upstreamNoteIndex = SpawnIndex("MIDI Notes", "Notes", 40.0f, 260.0f);
             if (ok && cand.shape.isAudioSource)
             {
-               downstreamGainIndex = SpawnIndex("Gain", "AudioUtility", 320.0f, 40.0f);
-               downstreamOutIndex = SpawnIndex("Audio Out", "AudioUtility", 600.0f, 40.0f);
+               downstreamGainIndex = SpawnIndex("Gain", "Utility", 320.0f, 40.0f);
+               downstreamOutIndex = SpawnIndex("Audio Out", "Utility", 600.0f, 40.0f);
             }
             else if (ok && cand.shape.audioInputSlots > 0)
             {
@@ -33762,7 +34367,7 @@ int main(int argc, char** argv)
                // IAudioSource (Audio Out is the only current example) still
                // needs an upstream feed so its own input cable has something
                // real to clear on delete.
-               upstreamGainIndex = SpawnIndex("Gain", "AudioUtility", 40.0f, 260.0f);
+               upstreamGainIndex = SpawnIndex("Gain", "Utility", 40.0f, 260.0f);
             }
             if (ok && cand.shape.isNoteSource && cand.shape.noteInputSlots == 0)
             {
@@ -34181,7 +34786,7 @@ int main(int argc, char** argv)
 
          const int modIdx = SpawnIndex("Oscillator", "Synths", 40.0f, 700.0f);
          const int filterIdx = SpawnIndex("Audio Filter", "AudioEffects", 320.0f, 700.0f);
-         const int upstreamGainIdx = SpawnIndex("Gain", "AudioUtility", 40.0f, 760.0f);
+         const int upstreamGainIdx = SpawnIndex("Gain", "Utility", 40.0f, 760.0f);
          GraphNode* mod = FindNodeByIndex(modIdx);
          GraphNode* filter = FindNodeByIndex(filterIdx);
          GraphNode* upstreamGain = FindNodeByIndex(upstreamGainIdx);
@@ -38514,45 +39119,133 @@ int main(int argc, char** argv)
 
          if (gSearchPanelMode == 0)
          {
-            static char panelSearch[128] = "";
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::InputTextWithHint("##panelsearch", "search modules...", panelSearch, sizeof(panelSearch));
+            // Category-filter dropdown options, ordered by
+            // CategoryColors::SemanticRank (2D/video, 3D, audio, then
+            // utility) rather than NodeFactory's registration order - a
+            // dropdown of a dozen-plus categories in arbitrary order is
+            // hard to scan. NodeFactory's own GetCategories() order (what
+            // the grouped Category view below iterates) is untouched; this
+            // reordering is only the filter dropdown's option list.
+            std::vector<std::string> categoryIds; // index 0 is "All" (empty id)
+            std::vector<std::string> categoryNames;
+            {
+               std::vector<std::string> cats = NodeFactory::Instance().GetCategories();
+               std::stable_sort(cats.begin(), cats.end(), [](const std::string& a, const std::string& b) {
+                  return CategoryColors::SemanticRank(a) < CategoryColors::SemanticRank(b);
+               });
+               categoryIds.push_back(std::string());
+               categoryNames.push_back("All");
+               for (const std::string& c : cats)
+               {
+                  categoryIds.push_back(c);
+                  categoryNames.push_back(DisplayName(c));
+               }
+            }
 
-            std::string q = panelSearch;
+            static const std::vector<std::string> kModuleSortNames = { "Category", "Name" };
+            if (DrawBrowserFilterStrip(gModulesFilter, "search modules...", kModuleSortNames, categoryNames))
+               SaveBrowserFilterPrefs();
+
+            std::string q = gModulesFilter.query;
             std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+            const bool sortByName = (gModulesFilter.sortMode == 1);
+            const std::string categoryFilter =
+               (gModulesFilter.typeFilter > 0 && gModulesFilter.typeFilter < (int)categoryIds.size())
+                  ? categoryIds[gModulesFilter.typeFilter] : std::string();
 
             std::string spawnName, spawnCategory;
             ImGui::Separator();
             ImGui::BeginChild("##nodepanellist", ImVec2(0, 0), false);
-            for (const std::string& category : NodeFactory::Instance().GetCategories())
-            {
-               // With a query the categories are only drawn when something in them
-               // matches, so an empty heading never sits there on its own.
-               std::vector<std::string> matches;
-               for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
-               {
-                  if (!IsUserSpawnable(name))
-                     continue;
-                  if (q.empty())
-                  {
-                     matches.push_back(name);
-                     continue;
-                  }
-                  std::string hay = name + " " + category;
-                  std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
-                  if (hay.find(q) != std::string::npos)
-                     matches.push_back(name);
-               }
-               if (matches.empty())
-                  continue;
 
-               ImGui::SeparatorText(DisplayName(category).c_str());
-               for (const std::string& name : matches)
+            // No cache: at ~170 entries, filtering+sorting this list from
+            // NodeFactory every frame is well under the cost that made
+            // LibraryFilterCache necessary for the Samples/Media/Plugins
+            // modes' thousands-of-entries case (see that struct's comment).
+            // Measured, not assumed - revisit if this mode's entry count
+            // grows by an order of magnitude.
+            if (sortByName)
+            {
+               // Flat alphabetical list across all categories, no headings -
+               // a flat list interrupted by category headings is neither
+               // one thing nor the other.
+               std::vector<std::pair<std::string, std::string>> matches; // name, category
+               for (const std::string& category : NodeFactory::Instance().GetCategories())
                {
-                  if (ImGui::Selectable(DisplayName(name).c_str()))
+                  if (!categoryFilter.empty() && category != categoryFilter)
+                     continue;
+                  for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                   {
-                     spawnName = name;
-                     spawnCategory = category;
+                     if (!IsUserSpawnable(name))
+                        continue;
+                     if (!q.empty())
+                     {
+                        std::string hay = name + " " + category;
+                        std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+                        if (hay.find(q) == std::string::npos)
+                           continue;
+                     }
+                     matches.emplace_back(name, category);
+                  }
+               }
+               // Case-insensitive fold, with a stable tiebreak on the raw
+               // name (see ILess) so entries differing only in case don't
+               // shuffle between frames.
+               std::stable_sort(matches.begin(), matches.end(),
+                                 [](const std::pair<std::string, std::string>& a,
+                                    const std::pair<std::string, std::string>& b) {
+                  return ILess(a.first, b.first);
+               });
+               if (gModulesFilter.descending)
+                  std::reverse(matches.begin(), matches.end());
+
+               for (const auto& match : matches)
+               {
+                  if (ImGui::Selectable(DisplayName(match.first).c_str()))
+                  {
+                     spawnName = match.first;
+                     spawnCategory = match.second;
+                  }
+               }
+            }
+            else
+            {
+               // Category view (default - today's behaviour, unchanged for
+               // people who don't touch the sort control): grouped
+               // headings in NodeFactory's own registration order.
+               for (const std::string& category : NodeFactory::Instance().GetCategories())
+               {
+                  if (!categoryFilter.empty() && category != categoryFilter)
+                     continue;
+                  // With a query the categories are only drawn when something in them
+                  // matches, so an empty heading never sits there on its own.
+                  std::vector<std::string> matches;
+                  for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+                  {
+                     if (!IsUserSpawnable(name))
+                        continue;
+                     if (q.empty())
+                     {
+                        matches.push_back(name);
+                        continue;
+                     }
+                     std::string hay = name + " " + category;
+                     std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+                     if (hay.find(q) != std::string::npos)
+                        matches.push_back(name);
+                  }
+                  if (matches.empty())
+                     continue;
+                  if (gModulesFilter.descending)
+                     std::reverse(matches.begin(), matches.end());
+
+                  ImGui::SeparatorText(DisplayName(category).c_str());
+                  for (const std::string& name : matches)
+                  {
+                     if (ImGui::Selectable(DisplayName(name).c_str()))
+                     {
+                        spawnName = name;
+                        spawnCategory = category;
+                     }
                   }
                }
             }

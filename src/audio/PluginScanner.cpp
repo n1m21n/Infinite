@@ -147,6 +147,7 @@ void PluginScanner::PollResults()
    mFailed = std::move(mPendingFailed);
    mPendingFailed.clear();
    mResultReady.store(false, std::memory_order_relaxed);
+   ++mIndexVersion;
    lock.unlock();
 
    SaveIndexToDisk();
@@ -241,6 +242,7 @@ void PluginScanner::LoadFromDisk()
 
       mIndex.push_back(std::move(e));
    }
+   ++mIndexVersion;
 }
 
 void PluginScanner::SaveFoldersToDisk() const

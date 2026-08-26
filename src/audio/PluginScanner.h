@@ -44,6 +44,10 @@ public:
    void PollResults();
 
    const std::vector<Entry>& Index() const { return mIndex; }
+   // Bumped whenever mIndex is replaced (PollResults, LoadFromDisk) - lets a
+   // caller's own cache (the Plugins mode's filter/sort cache, see main.cpp)
+   // key off it the same way SampleScanner::IndexVersion() already does.
+   uint64_t IndexVersion() const { return mIndexVersion; }
 
    // Bundles the last scan could not describe, by path: each one crashed or
    // hung its child process rather than returning a description. Surfaced in
@@ -66,6 +70,7 @@ private:
 
    std::vector<std::string> mFolders;
    std::vector<Entry> mIndex;
+   uint64_t mIndexVersion { 1 };
    std::vector<std::string> mFailed;
 
    std::thread mScanThread;

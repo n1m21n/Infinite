@@ -272,14 +272,14 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Flip Vertical", "uFlipV", T::Bool, 0.0f, 1.0f, 0.0f) } },
 
       // ---------------- Color adjustments ----------------
-      { "invert", "Color",
+      { "invert", "Compositing",
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
         "   fragColor = vec4(1.0 - c.rgb, c.a);\n"
         "}\n",
         {} },
 
-      { "posterize", "Color",
+      { "posterize", "Compositing",
         "uniform float uLevels;\n"
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
@@ -289,7 +289,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { P("Levels", "uLevels", T::Float, 2.0f, 32.0f, 6.0f) } },
 
-      { "threshold", "Color",
+      { "threshold", "Compositing",
         "uniform float uThreshold;\n"
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
@@ -298,7 +298,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { P("Threshold", "uThreshold", T::Float, 0.0f, 1.0f, 0.5f) } },
 
-      { "exposure", "Color",
+      { "exposure", "Compositing",
         "uniform float uExposure;\n"
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
@@ -531,7 +531,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         { P("Tiles", "uTiles", T::Float, 1.0f, 12.0f, 2.0f) } },
 
       // ---------------- Keying ----------------
-      { "chroma key", "Mask",
+      { "chroma key", "Compositing",
         "uniform vec3 uKeyColor;\n"
         "uniform float uTolerance;\n"
         "uniform float uSoftness;\n"
@@ -564,7 +564,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Spill Removal", "uSpill", T::Float, 0.0f, 1.0f, 0.5f),
           E("show", "uShowMatte", { "Keyed", "Matte" }, 0) } },
 
-      { "luma key", "Mask",
+      { "luma key", "Compositing",
         "uniform float uLow;\n"
         "uniform float uHigh;\n"
         "uniform float uSoftness;\n"
@@ -695,7 +695,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Spread", "uSpread", T::Float, 0.5f, 8.0f, 1.0f),
           P("Mix", "uMix", T::Float, 0.0f, 1.0f, 1.0f) } },
 
-      { "lookup", "Color",
+      { "lookup", "Compositing",
         // Second input is the palette: this pixel's luminance indexes across it.
         "uniform float uMix;\n"
         "uniform int uChannel;\n"
@@ -783,7 +783,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Colour", "uColor", T::Color, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f) } },
 
       // ---------------- Color: LUT ----------------
-      { "lut", "Color",
+      { "lut", "Compositing",
         // Second input is a HALD/strip LUT image: an N*N by N grid of slices.
         "uniform float uSize;\n"
         "uniform float uMix;\n"
@@ -806,7 +806,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Mix", "uMix", T::Float, 0.0f, 1.0f, 1.0f) },
         2 },
 
-      { "gradientmap", "Color",
+      { "gradientmap", "Compositing",
         "uniform vec3 uShadowColor;\n"
         "uniform vec3 uHighlightColor;\n"
         "uniform float uMix;\n"
@@ -820,7 +820,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Highlight", "uHighlightColor", T::Color, 0.0f, 1.0f, 1.0f, 0.85f, 0.4f),
           P("Mix", "uMix", T::Float, 0.0f, 1.0f, 1.0f) } },
 
-      { "color adjustments", "Color",
+      { "color adjustments", "Compositing",
         // All-in-one grading node consolidating the separate brightness/contrast,
         // levels, color balance, hsl, vibrance, tone shaper, channelmixer and
         // blackandwhite nodes into a single chain, so a common grade doesn't
