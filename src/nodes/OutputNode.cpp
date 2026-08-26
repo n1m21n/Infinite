@@ -6,6 +6,8 @@
 
 #include "audio/AudioEngine.h"
 
+#include <cstring>
+
 namespace
 {
    const char* kFragSrc =
@@ -18,12 +20,10 @@ namespace
 
 OutputNode::~OutputNode()
 {
+   // Deleting the node mid-recording must not lose the frames already queued
+   // in the PBO pipeline, and must not leak the PBOs themselves.
    if (mRecorder != nullptr)
-   {
-      std::string ignored;
-      Platform::RecorderStop(mRecorder, ignored);
-      mRecorder = nullptr;
-   }
+      StopRecording();
    GLUtil::DestroyFbo(mOut);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
@@ -87,6 +87,8 @@ bool OutputNode::StartRecording(const std::string& path)
       return false;
    }
 
+   AllocateReadbackBuffers();
+
    mRecordStatus = (includeAudio && (!audioPath.empty() || liveAudioSampleRate > 0.0))
                       ? "recording with audio..."
                       : "recording...";
@@ -101,13 +103,29 @@ void OutputNode::StopRecording()
    mCaptureRing.enabled.store(false, std::memory_order_relaxed);
    DrainAudioCapture();
 
-   const int frames = Platform::RecorderFrameCount(mRecorder);
+   // Blocking drain: the last couple of PBO readbacks in flight must reach
+   // the recorder's own queue before it's told to stop, or the movie comes
+   // out short by exactly the number of buffers in the pipeline.
+   FlushReadbacks();
+
+   // Final counts come out of RecorderStop itself, after it has joined the
+   // encoder worker - reading them beforehand can race the worker's last
+   // few writes and under-report what actually landed in the file.
+   int frames = 0;
+   int dropped = 0;
    std::string error;
-   const bool ok = Platform::RecorderStop(mRecorder, error);
+   const bool ok = Platform::RecorderStop(mRecorder, error, &frames, &dropped);
    mRecorder = nullptr;
+   ReleaseReadbackBuffers();
+   mLastFrames = frames;
+   mLastDropped = dropped;
 
    if (ok)
+   {
       mRecordStatus = "saved " + std::to_string(frames) + " frames";
+      if (dropped > 0)
+         mRecordStatus += " (" + std::to_string(dropped) + " dropped)";
+   }
    else
       mRecordStatus = error;
 }
@@ -130,6 +148,87 @@ int OutputNode::RecordedFrames() const
    return Platform::RecorderFrameCount(mRecorder);
 }
 
+void OutputNode::AllocateReadbackBuffers()
+{
+   GLint prevPbo = 0;
+   glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prevPbo);
+
+   const GLsizeiptr bytes = (GLsizeiptr)mRecordW * mRecordH * 4;
+   for (int i = 0; i < kPboCount; i++)
+   {
+      glGenBuffers(1, &mPbo[i].pbo);
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, mPbo[i].pbo);
+      glBufferData(GL_PIXEL_PACK_BUFFER, bytes, nullptr, GL_STREAM_READ);
+      mPbo[i].fence = nullptr;
+      mPbo[i].pending = false;
+   }
+   mPboWriteIndex = 0;
+   mPboReadIndex = 0;
+
+   glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prevPbo);
+}
+
+void OutputNode::ReleaseReadbackBuffers()
+{
+   for (int i = 0; i < kPboCount; i++)
+   {
+      if (mPbo[i].fence != nullptr)
+      {
+         glDeleteSync(mPbo[i].fence);
+         mPbo[i].fence = nullptr;
+      }
+      if (mPbo[i].pbo != 0)
+      {
+         glDeleteBuffers(1, &mPbo[i].pbo);
+         mPbo[i].pbo = 0;
+      }
+      mPbo[i].pending = false;
+   }
+}
+
+void OutputNode::FlushReadbacks()
+{
+   if (mRecorder == nullptr)
+      return;
+
+   GLint prevPbo = 0;
+   glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prevPbo);
+
+   const size_t bytes = (size_t)mRecordW * mRecordH * 4;
+   // A generous but finite bound rather than a literal indefinite wait - if
+   // the driver never signals, StopRecording should still return.
+   const GLuint64 kFlushTimeoutNs = 5000000000ull; // 5s
+
+   for (int i = 0; i < kPboCount; i++)
+   {
+      PboSlot& slot = mPbo[mPboReadIndex];
+      mPboReadIndex = (mPboReadIndex + 1) % kPboCount;
+      if (!slot.pending)
+         continue;
+
+      const GLenum waitResult = glClientWaitSync(slot.fence, GL_SYNC_FLUSH_COMMANDS_BIT, kFlushTimeoutNs);
+      if (waitResult == GL_ALREADY_SIGNALED || waitResult == GL_CONDITION_SATISFIED)
+      {
+         glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.pbo);
+         const void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, (GLsizeiptr)bytes, GL_MAP_READ_BIT);
+         if (mapped != nullptr)
+         {
+            std::vector<unsigned char> buf = Platform::RecorderAcquireFrameBuffer(mRecorder);
+            buf.resize(bytes);
+            memcpy(buf.data(), mapped, bytes);
+            glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+            Platform::RecorderAppend(mRecorder, std::move(buf));
+         }
+      }
+
+      glDeleteSync(slot.fence);
+      slot.fence = nullptr;
+      slot.pending = false;
+   }
+
+   glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prevPbo);
+}
+
 void OutputNode::CaptureFrame()
 {
    if (mRecorder == nullptr)
@@ -137,31 +236,77 @@ void OutputNode::CaptureFrame()
 
    DrainAudioCapture();
 
-   // Read back the locked-size region; if the graph resolution changed mid-take
-   // we still feed the encoder frames of the size it was opened with.
-   // If the graph resolution changed mid-take, only read what actually exists
-   // and leave the rest of the frame black rather than reading out of bounds.
    const int w = mRecordW;
    const int h = mRecordH;
-   if (mOut.w < w || mOut.h < h)
+
+   GLint prevPbo = 0;
+   glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prevPbo);
+
+   if (mOut.w >= w && mOut.h >= h)
    {
-      mReadback.assign((size_t)w * h * 4, 0);
-      return;
+      // Issue an async readback into the write slot, if it isn't still
+      // waiting to be consumed by the read side below - glReadPixels into a
+      // bound PBO returns immediately (a GPU-to-GPU copy), so this never
+      // stalls the render thread.
+      PboSlot& writeSlot = mPbo[mPboWriteIndex];
+      if (!writeSlot.pending)
+      {
+         GLint prevFbo = 0;
+         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+         GLuint fbo = 0;
+         glGenFramebuffers(1, &fbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, GLUtil::FboTexture(mOut), 0);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+
+         glBindBuffer(GL_PIXEL_PACK_BUFFER, writeSlot.pbo);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+         writeSlot.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+         writeSlot.pending = true;
+         mPboWriteIndex = (mPboWriteIndex + 1) % kPboCount;
+
+         glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+         glDeleteFramebuffers(1, &fbo);
+      }
    }
-   mReadback.assign((size_t)w * h * 4, 0);
+   else
+   {
+      // The graph resolution shrank mid-take: the locked-size region no
+      // longer fits, so feed the encoder a black frame of the take's size
+      // rather than reading out of bounds or leaving the movie short.
+      std::vector<unsigned char> blank = Platform::RecorderAcquireFrameBuffer(mRecorder);
+      blank.assign((size_t)w * h * 4, 0);
+      Platform::RecorderAppend(mRecorder, std::move(blank));
+   }
 
-   GLint prevFbo = 0;
-   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
-   GLuint fbo = 0;
-   glGenFramebuffers(1, &fbo);
-   glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, GLUtil::FboTexture(mOut), 0);
-   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-   glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, mReadback.data());
-   glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
-   glDeleteFramebuffers(1, &fbo);
+   // Separately, check whether the read slot - up to kPboCount-1 frames
+   // behind the write above - has become available. Zero-timeout: if it
+   // isn't ready, do nothing and try again next frame.
+   PboSlot& readSlot = mPbo[mPboReadIndex];
+   if (readSlot.pending)
+   {
+      const GLenum waitResult = glClientWaitSync(readSlot.fence, 0, 0);
+      if (waitResult == GL_ALREADY_SIGNALED || waitResult == GL_CONDITION_SATISFIED)
+      {
+         glBindBuffer(GL_PIXEL_PACK_BUFFER, readSlot.pbo);
+         const size_t bytes = (size_t)w * h * 4;
+         const void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, (GLsizeiptr)bytes, GL_MAP_READ_BIT);
+         if (mapped != nullptr)
+         {
+            std::vector<unsigned char> buf = Platform::RecorderAcquireFrameBuffer(mRecorder);
+            buf.resize(bytes);
+            memcpy(buf.data(), mapped, bytes);
+            glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+            Platform::RecorderAppend(mRecorder, std::move(buf));
+         }
+         glDeleteSync(readSlot.fence);
+         readSlot.fence = nullptr;
+         readSlot.pending = false;
+         mPboReadIndex = (mPboReadIndex + 1) % kPboCount;
+      }
+   }
 
-   Platform::RecorderAppend(mRecorder, mReadback);
+   glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prevPbo);
 }
 
 void OutputNode::CookIfNeeded(int frameId)

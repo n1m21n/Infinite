@@ -26627,6 +26627,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_HIDETEST") != nullptr ||
          getenv("INFINITE_MACROTEST") != nullptr ||
          getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_MODTEST") != nullptr ||
+         getenv("INFINITE_RECTEARDOWNTEST") != nullptr ||
          getenv("INFINITE_SIZETEST") != nullptr || getenv("INFINITE_INPUTTEST") != nullptr ||
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr || getenv("INFINITE_OSCTEST") != nullptr ||
@@ -28013,7 +28014,7 @@ int main(int argc, char** argv)
          }
          else
             SpawnNode("Output", "Output", 380.0f, 60.0f);
-         if (getenv("INFINITE_RECTEST") != nullptr)
+         if (getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_RECTEARDOWNTEST") != nullptr)
             CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          if (getenv("INFINITE_HIDETEST") != nullptr)
          {
@@ -29735,8 +29736,55 @@ int main(int argc, char** argv)
             printf("frames captured: %d\n", out->RecordedFrames());
             out->StopRecording();
             printf("stop: %s\n", out->RecordStatus().c_str());
+
+            // Check what StopRecording *reported* against what actually
+            // landed on disk, walking the real encoded sample stream rather
+            // than trusting duration - this is the regression the async PBO
+            // + encoder-queue rewrite is most likely to get wrong (a
+            // readback that never got drained, or the reported count
+            // silently drifting from the file).
+            const int lastFrames = out->LastRecordedFrames();
+            const int lastDropped = out->LastDroppedFrames();
+            const Platform::MovieInfo info = Platform::InspectMovie(TmpPath("infinite_rectest.mov"));
+            const bool framesOk = info.frameCount == lastFrames;
+            printf("written frames: %d (reported %d, dropped %d)  %s\n",
+                   info.frameCount, lastFrames, lastDropped,
+                   framesOk ? "RECFRAMES OK" : "SUSPECT - frame count mismatch");
+
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
+      }
+
+      if (getenv("INFINITE_RECTEARDOWNTEST") != nullptr)
+      {
+         // Tearing down mid-take - by deleting the Output node, or by the
+         // window closing and its destructor running - must not crash or
+         // hang on the encoder worker join, and must not leak the triple-
+         // buffered PBOs. See local-prompts/13-async-video-readback.md's
+         // teardown section. INFINITE_RECTEARDOWNTEST=quit exercises the
+         // destructor path (StopRecording never called explicitly); any
+         // other value (e.g. "delete") exercises RemoveNodeByIndex.
+         const bool viaQuit = std::string(getenv("INFINITE_RECTEARDOWNTEST")) == "quit";
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         if (frameId == 2)
+         {
+            bool started = out->StartRecording(TmpPath("infinite_recteardown.mov"));
+            printf("start recording: %d (%s)\n", (int)started, out->RecordStatus().c_str());
+         }
+         if (frameId == 10)
+         {
+            printf("tearing down mid-recording (still recording=%d) via %s\n",
+                   (int)out->IsRecording(), viaQuit ? "quit" : "delete");
+            if (viaQuit)
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+            else
+            {
+               RemoveNodeByIndex(gNodes[1].index);
+               printf("delete-mid-record: survived  OK\n");
+            }
+         }
+         if (!viaQuit && frameId == 12)
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
       if (getenv("INFINITE_RESYNTHTEST") != nullptr)
@@ -35793,6 +35841,20 @@ int main(int argc, char** argv)
                      n->StopRecording();
                   ImGui::PopStyleColor();
                   ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), "REC  %d frames", n->RecordedFrames());
+                  const int pending = n->PendingFrames();
+                  const int dropped = n->DroppedFrames();
+                  if (pending > 0)
+                  {
+                     ImGui::SameLine();
+                     ImGui::TextDisabled("(%d pending)", pending);
+                  }
+                  if (dropped > 0)
+                  {
+                     // Same orange as the VST3 blocklist warning - "this is a
+                     // problem, not an error": the encoder is losing frames,
+                     // but recording is continuing.
+                     ImGui::TextColored(ImVec4(0.9f, 0.55f, 0.25f, 1.0f), "%d frames dropped - encoder can't keep up", dropped);
+                  }
                }
                else
                {
