@@ -28,7 +28,7 @@ namespace
    constexpr int kPingpongParam = 5; // ditto
    // reverse travels via the plain mReverse atomic instead - see ProcessBlock/TriggerVoice.
 
-   constexpr int kMaxVoices = 8;
+   constexpr int kMaxVoices = 16;
    constexpr int kReferenceNote = 60; // sample's own recorded pitch plays back at rate 1.0
 
    // Recording capacity: 30s mono at a generous upper-bound sample rate.
@@ -133,8 +133,8 @@ public:
    // Main thread only, called once per frame from CookIfNeeded.
    void DrainRetired() { mSampleSlot.DrainRetired(); }
 
-   void PushParams(float pitch, float finetune, float speed, float volume, float start, float end, bool loop,
-                    bool reverse, bool pingpong)
+   void PushParams(float pitch, float finetune, float speed, float volume, float start, float end, float position,
+                    float decay, bool loop, bool reverse, bool pingpong)
    {
       mPitch.store(pitch, std::memory_order_relaxed);
       mFinetune.store(finetune, std::memory_order_relaxed);
@@ -142,6 +142,8 @@ public:
       mVolume.store(volume, std::memory_order_relaxed);
       mStart.store(start, std::memory_order_relaxed);
       mEnd.store(end, std::memory_order_relaxed);
+      mPosition.store(position, std::memory_order_relaxed);
+      mDecay.store(decay, std::memory_order_relaxed);
       mLoop.store(loop, std::memory_order_relaxed);
       mReverse.store(reverse, std::memory_order_relaxed);
       mPingpong.store(pingpong, std::memory_order_relaxed);
@@ -154,6 +156,12 @@ public:
    }
 
    MeterRing& PlayheadRing() { return mPlayheadRing; }
+
+   void GetVisualSnapshot(SamplerVoiceSnapshot& out)
+   {
+      const int rIdx = mVisualReadIdx.load(std::memory_order_acquire);
+      out = mVisualSnapshots[rIdx];
+   }
 
    // Main thread. Auditions the loaded sample from `frac` right away,
    // independent of the note graph and the transport - the last-write-wins
@@ -230,6 +238,15 @@ public:
 
       if (mActiveBuffer == nullptr || mActiveBuffer->numFrames <= 0)
          return;
+
+      const float decaySec = mDecay.load(std::memory_order_relaxed);
+      if (decaySec != mLastDecaySec)
+      {
+         mLastDecaySec = decaySec;
+         const float decayMs = std::max(10.0f, decaySec * 1000.0f);
+         mVoices.SetADSR(2.0f, decayMs, 0.0f, decayMs);
+         mSelfEnv.SetADSR(2.0f, decayMs, 0.0f, decayMs);
+      }
 
       // The audition button's Stop always releases the self voice, whoever
       // currently owns it.
@@ -381,6 +398,27 @@ public:
       }
       mNotesSounding.store(anyNoteActive, std::memory_order_relaxed);
       mActiveNoteCount.store(activeNoteCount, std::memory_order_relaxed);
+
+      // Snapshot active voice playheads for multi-note polyphonic UI rendering
+      const int sampleFrames = mActiveBuffer ? mActiveBuffer->numFrames : 1;
+      const int wIdx = (mVisualWriteIdx.load(std::memory_order_relaxed) + 1) % 3;
+      SamplerVoiceSnapshot& snap = mVisualSnapshots[wIdx];
+      snap.selfActive = mSelfEnv.IsActive();
+      snap.selfPos = snap.selfActive ? (float)(mSelfPos / std::max(1, sampleFrames)) : -1.0f;
+      snap.selfAmp = snap.selfActive ? mSelfEnv.Level() : 0.0f;
+      int snapCount = 0;
+      for (int v = 0; v < mVoices.NumVoices() && snapCount < SamplerVoiceSnapshot::kMaxVisualVoices; v++)
+      {
+         if (!mVoices.IsVoiceActive(v))
+            continue;
+         snap.voices[snapCount].position = (float)(mVoicePos[v] / std::max(1, sampleFrames));
+         snap.voices[snapCount].amp = std::clamp(mVoices.EnvelopeAt(v).Level() * mVoices.VelocityAt(v), 0.0f, 1.0f);
+         snap.voices[snapCount].note = mVoices.NoteAt(v);
+         snapCount++;
+      }
+      snap.count = snapCount;
+      mVisualWriteIdx.store(wIdx, std::memory_order_release);
+      mVisualReadIdx.store(wIdx, std::memory_order_release);
    }
 
 private:
@@ -429,7 +467,13 @@ private:
       if (overrideStartFrac >= 0.0f)
          frac = std::clamp(overrideStartFrac, startFrac, endFrac);
       else
-         frac = initialDirSign < 0.0f ? endFrac : startFrac;
+      {
+         const float posFrac = std::clamp(mPosition.load(std::memory_order_relaxed), startFrac, endFrac);
+         if (initialDirSign < 0.0f)
+            frac = (posFrac <= startFrac) ? endFrac : posFrac;
+         else
+            frac = posFrac;
+      }
 
       mVoicePos[idx] = mActiveBuffer != nullptr ? (double)frac * mActiveBuffer->numFrames : 0.0;
       mVoiceNote[idx] = note;
@@ -472,7 +516,13 @@ private:
       if (overrideStartFrac >= 0.0f)
          frac = std::clamp(overrideStartFrac, startFrac, endFrac); // manual preview click - never start outside the range
       else
-         frac = initialDirSign < 0.0f ? endFrac : startFrac;
+      {
+         const float posFrac = std::clamp(mPosition.load(std::memory_order_relaxed), startFrac, endFrac);
+         if (initialDirSign < 0.0f)
+            frac = (posFrac <= startFrac) ? endFrac : posFrac;
+         else
+            frac = posFrac;
+      }
 
       mSelfPos = mActiveBuffer != nullptr ? (double)frac * mActiveBuffer->numFrames : 0.0;
       mSelfEnv.NoteOn();
@@ -517,6 +567,9 @@ private:
    std::atomic<float> mVolume { 0.8f };
    std::atomic<float> mStart { 0.0f };
    std::atomic<float> mEnd { 1.0f };
+   std::atomic<float> mPosition { 0.0f };
+   std::atomic<float> mDecay { 2.0f };
+   float mLastDecaySec = -1.0f;
    std::atomic<bool> mLoop { false };
    std::atomic<bool> mReverse { false };
    std::atomic<bool> mPingpong { false };
@@ -524,6 +577,10 @@ private:
    std::vector<float> mRecordBuffer;      // preallocated once in PrepareToPlay
    std::atomic<int> mRecordWritePos { 0 };
    std::atomic<bool> mRecording { false };
+
+   SamplerVoiceSnapshot mVisualSnapshots[3];
+   std::atomic<int> mVisualWriteIdx { 0 };
+   std::atomic<int> mVisualReadIdx { 0 };
 };
 
 SamplerNode::SamplerNode() = default;
@@ -536,12 +593,14 @@ void SamplerNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioSamplerNode>();
-   mAudioNode->PushParams(pitch, finetune, speed, volume, start, end, loop, reverse, pingpong);
+   position = std::clamp(position, start, end);
+   mAudioNode->PushParams(pitch, finetune, speed, volume, start, end, position, decay, loop, reverse, pingpong);
    mAudioNode->DrainRetired();
 
    float playhead = 0.0f;
    if (mAudioNode->PlayheadRing().ReadLatest(playhead))
       mPlayhead = playhead;
+   mAudioNode->GetVisualSnapshot(mLatestVisualSnapshot);
    mIsPlaying = mAudioNode->IsPlaying();
    mNotesSounding = mAudioNode->NotesSounding();
    mActiveNoteCount = mAudioNode->ActiveNoteCount();
@@ -556,6 +615,8 @@ void SamplerNode::VisitParams(ParamVisitor& v)
    v.Float("speed", speed);
    v.Float("start", start);
    v.Float("end", end);
+   v.Float("position", position);
+   v.Float("decay", decay);
    v.Float("volume", volume);
    v.Bool("loop", loop);
    v.Bool("reverse", reverse);
@@ -677,6 +738,7 @@ void SamplerNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::strin
    // A fresh buffer has neither been scrubbed nor range-trimmed yet.
    start = 0.0f;
    end = 1.0f;
+   position = 0.0f;
 }
 
 void SamplerNode::ReloadFromPath()
@@ -685,8 +747,12 @@ void SamplerNode::ReloadFromPath()
    {
       float savedStart = start;
       float savedEnd = end;
+      float savedPos = position;
+      float savedDecay = decay;
       LoadFile(mFilePath);
       start = savedStart;
       end = savedEnd;
+      position = std::clamp(savedPos, start, end);
+      decay = savedDecay;
    }
 }

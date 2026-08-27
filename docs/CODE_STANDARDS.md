@@ -6,6 +6,8 @@ already written down elsewhere — it points to it. If a rule below and a
 skill/doc disagree, the more specific doc wins; update this file.
 
 Related docs: [ARCHITECTURE.md](../ARCHITECTURE.md) (where code lives),
+[WINDOWS_COMPATIBILITY_STANDARDS.md](WINDOWS_COMPATIBILITY_STANDARDS.md) (Windows compatibility, architecture & performance standards),
+[WINDOWS_VERIFICATION.md](WINDOWS_VERIFICATION.md) (Windows port verification & review defects),
 `.claude/skills/infinite-code-review/SKILL.md` (the four review standards:
 accuracy, experimentality, design, quality), `.claude/skills/new-audio-node/`,
 `.claude/skills/new-effect-node/`, `.claude/skills/new-geometry-node/` (the

@@ -13,6 +13,23 @@ namespace Platform
    struct SampleBuffer;
 }
 
+// Visual snapshot of active voices for multi-note polyphonic playhead rendering.
+struct SamplerVoiceSnapshot
+{
+   static constexpr int kMaxVisualVoices = 16;
+   struct Item
+   {
+      float position = 0.0f; // 0..1 normalized position in sample buffer
+      float amp = 1.0f;      // 0..1 current envelope amplitude for visual decay
+      int note = 60;          // MIDI note number
+   };
+   Item voices[kMaxVisualVoices];
+   int count = 0;
+   float selfPos = -1.0f;     // Position of self/audition voice (0..1) if active, else -1.0f
+   float selfAmp = 0.0f;      // Self voice amplitude (0..1)
+   bool selfActive = false;
+};
+
 // A sample player: load or record a buffer, scrub/audition it by clicking
 // the waveform, and play it back one-shot or looping (forward, reversed, or
 // ping-pong) with independent pitch/finetune/speed/volume controls.
@@ -123,12 +140,15 @@ public:
    // Current playhead of the most recently triggered voice, 0..1 of the
    // loaded sample's length, drained from the audio node's MeterRing.
    float Playhead() const { return mPlayhead; }
+   const SamplerVoiceSnapshot& VisualSnapshot() const { return mLatestVisualSnapshot; }
 
    float pitch = 0.0f;    // semitones, +/-24, on top of the note-relative pitch
    float finetune = 0.0f; // cents, +/-50, stacks on top of pitch
    float speed = 1.0f;    // -2..2 varispeed: scales rate and pitch together
    float start = 0.0f;    // 0..1, left edge of the playback/loop range
    float end = 1.0f;      // 0..1, right edge of the playback/loop range
+   float position = 0.0f; // 0..1, playback start position clamped within [start, end]
+   float decay = 2.0f;    // seconds, voice envelope decay & release length
    float volume = 0.8f;   // 0..1
    bool loop = false;
    bool reverse = false;  // plays start<-end instead of start->end
@@ -149,6 +169,7 @@ private:
    std::string mFileName;
    std::string mStatus = "no sample loaded";
    float mPlayhead = 0.0f;
+   SamplerVoiceSnapshot mLatestVisualSnapshot;
    bool mIsPlaying = false;
    bool mNotesSounding = false;
    int mActiveNoteCount = 0;

@@ -6460,13 +6460,8 @@ namespace
       if (hasSample && ImGui::IsItemActivated())
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
-         // A click outside the start/end range starts from the range's
-         // start rather than from the click point - clicking past the red
-         // marker used to trigger a voice already past its own end bound,
-         // which either played silently for a frame or two before stopping
-         // (reads as "unresponsive") or, for a click left of the green
-         // marker in reverse/pingpong, played audibly outside the range.
-         const float target = (frac < n->start || frac > n->end) ? n->start : frac;
+         const float target = std::clamp(frac, n->start, n->end);
+         n->position = target;
          n->TriggerPreview(target);
       }
 
@@ -6501,9 +6496,33 @@ namespace
          if (endX < br.x)
             dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
 
-         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
-         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 230), 2.0f);
+         // Primary position playhead: always visible in yellow/amber at `position`,
+         // showing the starting point for incoming/future voices.
+         const float posClamped = std::clamp(n->position, n->start, n->end);
+         const float posX = origin.x + w * posClamped;
+         const ImU32 yellowCol = isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 240);
+         dl->AddLine(ImVec2(posX, origin.y), ImVec2(posX, br.y), yellowCol, 2.0f);
+
+         // Active voices in flight: drawn as white playheads whose opacity
+         // fades out in sync with each voice's envelope decay time.
+         const auto& snap = n->VisualSnapshot();
+         if (snap.selfActive && snap.selfPos >= 0.0f && snap.selfAmp >= 0.002f)
+         {
+            const float px = origin.x + w * std::clamp(snap.selfPos, 0.0f, 1.0f);
+            const int alpha = (int)(snap.selfAmp * 255.0f);
+            const ImU32 whiteCol = isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha);
+            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), whiteCol, 1.5f);
+         }
+         for (int v = 0; v < snap.count; v++)
+         {
+            const auto& voice = snap.voices[v];
+            if (voice.amp < 0.002f)
+               continue;
+            const float px = origin.x + w * std::clamp(voice.position, 0.0f, 1.0f);
+            const int alpha = (int)(voice.amp * 255.0f);
+            const ImU32 whiteCol = isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha);
+            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), whiteCol, 1.5f);
+         }
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
                      isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
@@ -9053,10 +9072,20 @@ namespace
       ImGui::SameLine();
       AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
          n->start = std::min(n->start, n->end - 0.01f);
+         n->position = std::clamp(n->position, n->start, n->end);
+      }
       ImGui::SameLine();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
          n->end = std::max(n->end, n->start + 0.01f);
+         n->position = std::clamp(n->position, n->start, n->end);
+      }
+      if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+         n->position = std::clamp(n->position, n->start, n->end);
+      ImGui::SameLine();
+      AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth());
 
       EndAudioBody();
    }

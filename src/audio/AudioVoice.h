@@ -80,6 +80,7 @@ public:
    }
 
    bool IsActive() const { return mStage != Stage::Idle; }
+   float Level() const { return mLevel; }
 
 private:
    enum class Stage
