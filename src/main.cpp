@@ -26447,7 +26447,12 @@ namespace AudioParamSweep
       if (cand.shape.noteInputSlots > 0)
       {
          PushHeldNoteOn(rig);
-         rig.audio->SetNoteInbox(&rig.inbox, rig.inbox.RegisterConsumer());
+         // Slot-aware on purpose: firstNoteInputSlot is 1 for WaveTerrain/
+         // ImageSpectralSynth/Plugin, and going through the same overload the
+         // topology builder uses is what keeps this sweep honest about the
+         // slot dispatch (see WireNoteInboxLikeTopology).
+         rig.audio->SetNoteInbox(std::max(0, cand.shape.firstNoteInputSlot), &rig.inbox,
+                                 rig.inbox.RegisterConsumer());
       }
       if (NoteEventQueue* outbox = rig.audio->NoteOutbox())
          rig.outboxCursor = outbox->RegisterConsumer();
@@ -27178,6 +27183,27 @@ static bool RunBrowserSortTest()
    return ok;
 }
 
+// Wire a note consumer's inbox the way the real topology builder does: through
+// the slot-aware SetNoteInbox(slot, ...) overload, at whichever slot the node
+// actually exposes its note pin on. Every fixture below must use this rather
+// than calling SetNoteInbox(inbox, cursor) directly - the direct call bypasses
+// the virtual slot dispatch that RebuildAudioTopology goes through, which is
+// exactly how a bug that made every slot-1 note consumer (AudioPluginNode,
+// WaveTerrainNode, ImageSpectralSynthNode) silently deaf got past these tests.
+inline void WireNoteInboxLikeTopology(INode* node, AudioNode* audio, NoteEventQueue* inbox, int cursor)
+{
+   int slot = 0;
+   for (int i = 0; i < 8; i++)
+   {
+      if (node->NoteInputSlot(i) != nullptr)
+      {
+         slot = i;
+         break;
+      }
+   }
+   audio->SetNoteInbox(slot, inbox, cursor);
+}
+
 // ====================================================== INFINITE_PLUGINSCANTEST
 //
 // Headless proof that the whole Platform plugin-hosting layer works with no UI
@@ -27507,7 +27533,7 @@ int RunPluginScanTest()
          {
             NoteEventQueue queue;
             const int queueCursor = queue.RegisterConsumer();
-            audio->SetNoteInbox(&queue, queueCursor);
+            WireNoteInboxLikeTopology(&node, audio, &queue, queueCursor);
 
             // No audio input driven here - an instrument like DLSMusicDevice
             // has no input bus, and this test is about the note bridge, not
@@ -27583,7 +27609,7 @@ int RunPluginScanTest()
             AudioNode* audio2 = node2.GetAudioNode();
             audio2->PrepareToPlay(kRate, kFrames);
             NoteEventQueue queue2;
-            audio2->SetNoteInbox(&queue2, queue2.RegisterConsumer());
+            WireNoteInboxLikeTopology(&node2, audio2, &queue2, queue2.RegisterConsumer());
             NoteEvent earlyOn;
             earlyOn.note = 60;
             earlyOn.velocity = 1.0f;
@@ -27629,7 +27655,7 @@ int RunPluginScanTest()
                   std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             node.CookIfNeeded(1000);
-            audio->SetNoteInbox(&queue, queueCursor); // reloaded node's audio object is the same object; inbox/cursor unchanged
+            WireNoteInboxLikeTopology(&node, audio, &queue, queueCursor); // reloaded node's audio object is the same object; inbox/cursor unchanged
             audio->ProcessBlock(inputs, 0, outBuf);
             const float afterSwapPeak = peakOf();
             const bool noStuckNoteAcrossSwap = heldSounding && node.IsReady() && afterSwapPeak <= 1.0e-4f;

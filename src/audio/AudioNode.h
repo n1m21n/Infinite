@@ -76,12 +76,24 @@ public:
    virtual void SetNoteInbox(NoteEventQueue* inbox, int cursor) { (void)inbox; (void)cursor; }
 
    // Slot-aware inbox setter for a note consumer with more than one note
-   // input (currently only Note Merge). Default forwards slot 0 to the
-   // existing single-slot overload so every pre-existing consumer needs no
-   // change.
+   // input (currently only Note Merge, which overrides this). Every other
+   // consumer exposes exactly ONE note pin, so whichever slot the topology
+   // builder calls with is that pin - forward unconditionally, never
+   // `if (inputSlot == 0)`.
+   //
+   // The slot number is NOT always 0: a node whose slot 0 is an audio input
+   // puts its note pin at slot 1 (AudioPluginNode, WaveTerrainNode,
+   // ImageSpectralSynthNode). Gating this forward on slot 0 silently dropped
+   // their inbox - the override was never called, mNoteInbox stayed nullptr,
+   // and the node was mute no matter what was wired into it. That is exactly
+   // how VST3/AU instruments lost their note input; do not reintroduce it.
+   //
+   // Forwarding every slot is safe because the builder only calls this for
+   // slots where NoteInputSlot(slot) is non-null (see RebuildAudioTopology's
+   // note pass in main.cpp) - a node never sees a slot it doesn't expose.
    virtual void SetNoteInbox(int inputSlot, NoteEventQueue* inbox, int cursor)
    {
-      if (inputSlot == 0)
-         SetNoteInbox(inbox, cursor);
+      (void)inputSlot;
+      SetNoteInbox(inbox, cursor);
    }
 };
