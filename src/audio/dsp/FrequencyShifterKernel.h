@@ -5,29 +5,11 @@
 #include <cmath>
 
 #include "IEffectKernel.h"
+#include "AnalogPrimitives.h"
 #include "audio/DspMath.h"
 #include "audio/ParamMailbox.h"
 
-// Frequency Shifter's kernel - a true single-sideband (SSB) frequency shifter:
-// moves every frequency component by a fixed Hz offset rather than multiplying
-// by a ratio (Pitch Shifter) or producing dual sum/difference sidebands (Ring Mod).
-//
-// Primary reference for the Hilbert transform allpass cascade:
-//   Olli Niemitalo, "Hilbert transformer using 2nd-order allpass filters",
-//   musicdsp.org archive. Two parallel cascades of four 2nd-order allpass
-//   sections with a 90-degree phase difference across the audio band.
-//
-// Single-sideband modulation:
-//   out(t) = x(t) * cos(2*pi*f*t) - x_hat(t) * sin(2*pi*f*t)
-// where x_hat is the Hilbert transform (quadrature phase) of x.
-// Signed f shifts up when positive and down when negative.
-//
-// Note on Path B: Path B includes a crucial 1-sample delay prior to/within its
-// allpass cascade so that Path A and Path B remain exactly 90 degrees apart.
-//
-// Feedback: Output is fed back into the input through a gain, capped at 0.95,
-// and soft-clipped via DspMath::FastTanh to produce the classic Bode / barber-pole
-// rising/falling spiral effect stably.
+// Frequency Shifter's kernel - a true single-sideband (SSB) frequency shifter with analog mode.
 class AudioEffectNode;
 
 struct Allpass2ndOrder
@@ -70,6 +52,8 @@ public:
    {
       mSampleRate = sampleRate;
       mMailbox.PrepareToPlay(sampleRate);
+      for (int ch = 0; ch < kMaxChannels; ch++)
+         mFbLp[ch].SetCutoff(6000.0f, sampleRate);
       Reset();
    }
 
@@ -85,20 +69,18 @@ public:
          mDelayB[ch] = 0.0f;
          mPhase[ch] = 0.0;
          mLastOut[ch] = 0.0f;
+         mFbLp[ch].Reset();
       }
+      mEnvFollower = 0.0f;
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
 
    void ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out) override;
 
-   // 1 sample discrete pipeline delay from Path B's structural unit-delay.
    int LatencySamples() const override { return 1; }
 
 private:
-   // Olli Niemitalo coefficient squares (a^2):
-   // Path A: 0.6923877778065, 0.9360654322959, 0.9882295226860, 0.9987488452737
-   // Path B: 0.4021921162426, 0.8561710882420, 0.9722909545651, 0.9952884791278
    static constexpr float kCoeffsASq[4] = {
       0.4794008343717222f,
       0.8762184935408794f,
@@ -115,10 +97,15 @@ private:
 
    ParamMailbox mMailbox;
    double mSampleRate = 44100.0;
+   std::atomic<int> mAnalog { 0 };
 
    Allpass2ndOrder mStagesA[kMaxChannels][4];
    Allpass2ndOrder mStagesB[kMaxChannels][4];
    float mDelayB[kMaxChannels] = { 0.0f };
    double mPhase[kMaxChannels] = { 0.0 };
    float mLastOut[kMaxChannels] = { 0.0f };
+
+   // Analog mode components
+   float mEnvFollower = 0.0f;
+   AnalogDsp::OnePoleLP mFbLp[kMaxChannels];
 };

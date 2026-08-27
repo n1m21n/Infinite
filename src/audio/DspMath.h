@@ -58,6 +58,14 @@ namespace DspMath
       rightGain = sinf(angle);
    }
 
+   // -------------------------------------------------------- FlushDenormal
+   // Flushes denormal / subnormal floating point numbers to zero to prevent
+   // CPU performance stalls in recursive filter & delay feedback loops.
+   inline float FlushDenormal(float x)
+   {
+      return std::fabs(x) < 1.0e-20f ? 0.0f : x;
+   }
+
    // ------------------------------------------------------------- Fast tanh
    // Pade-style rational approximation, x*(27+x*x)/(27+9*x*x), clamped
    // outside +/-3 where the rational form stops tracking tanh (saturates to

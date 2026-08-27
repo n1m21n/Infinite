@@ -186,6 +186,7 @@ namespace
          // `useSidechain ? sidechain : in` ternary is the entire
          // implementation; correct by inspection.
          def.params.push_back({ "sidechainExternal", 0.0f, 1.0f, 0.0f });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          // mix is AudioEffectNode's universal field, not a second param here.
 
          def.makeKernel = []() { return std::make_unique<DynamicsKernel>(); };
@@ -281,6 +282,7 @@ namespace
          def.params.push_back({ "tone", -1.0f, 1.0f, 0.0f, false, kShortPathPrereq });
          def.params.push_back({ "pan", -1.0f, 1.0f, 0.0f, false, kShortPathPrereq });
          def.params.push_back({ "ducking", 0.0f, 1.0f, 0.0f, false, kShortPathPrereq });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, kShortPathPrereq });
          // mix is AudioEffectNode's universal field (defaultMix above), not
          // a table row.
 
@@ -329,6 +331,7 @@ namespace
          // used before this param existed (see ReverbKernel.cpp), so adding
          // it doesn't change any existing patch's sound.
          def.params.push_back({ "width", 0.0f, 1.0f, 1.0f });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          // mix is AudioEffectNode's universal field (defaultMix above), not
          // a table row.
 
@@ -410,6 +413,7 @@ namespace
          def.visualizerId = EffectVisualizerId::kPitchShiftDisplay;
          def.params.push_back({ "pitch", -24.0f, 24.0f, 0.0f });
          def.params.push_back({ "grain", 10.0f, 250.0f, 80.0f });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, { { "pitch", 7.0f } } });
          def.makeKernel = []() { return std::make_unique<PitchShiftKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -441,6 +445,7 @@ namespace
          // window). `sync`/`rateDiv` stay confirmed (by hand) blind spots,
          // same as Delay's.
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.5f, false, { { "sync", 0.0f } } });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<ChorusKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -466,6 +471,7 @@ namespace
          def.params.push_back(
             { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.2f, false, { { "sync", 0.0f } } });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<FlangerKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -490,6 +496,7 @@ namespace
          def.params.push_back(
             { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.3f, false, { { "sync", 0.0f } } });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<PhaserKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -507,6 +514,7 @@ namespace
          def.visualizerId = EffectVisualizerId::kBitcrushWave;
          def.params.push_back({ "rate", 200.0f, 44100.0f, 6000.0f });
          def.params.push_back({ "bits", 1.0f, 16.0f, 8.0f });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<BitcrushKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -580,6 +588,7 @@ namespace
          def.visualizerId = EffectVisualizerId::kRingModWave;
          def.params.push_back({ "freq", 1.0f, 5000.0f, 220.0f });
          def.params.push_back({ "waveform", 0.0f, (float)DspMath::kWaveSquare, (float)DspMath::kWaveSine });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<RingModKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -599,6 +608,7 @@ namespace
          def.params.push_back({ "feedback", 0.0f, 0.95f, 0.0f });
          def.params.push_back({ "spread", 0.0f, 100.0f, 0.0f });
          def.params.push_back({ "range", 0.0f, 1.0f, 0.0f, true /* uiOnly */ });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, { { "shift", 200.0f } } });
          def.makeKernel = []() { return std::make_unique<FrequencyShifterKernel>(); };
          defs.push_back(std::move(def));
       }

@@ -6474,12 +6474,13 @@ namespace
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##samplerwavebody", ImVec2(w, h));
-      if (hasSample && ImGui::IsItemActivated())
+      if (hasSample && (ImGui::IsItemActivated() || ImGui::IsItemActive()))
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
          const float target = std::clamp(frac, n->start, n->end);
          n->position = target;
-         n->TriggerPreview(target);
+         if (ImGui::IsItemActivated())
+            n->TriggerPreview(target);
       }
 
       const bool isLight = IsThemeLight();
@@ -6513,23 +6514,17 @@ namespace
          if (endX < br.x)
             dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
 
-         // Primary position playhead: always visible in yellow/amber at `position`,
-         // showing the starting point for incoming/future voices.
+         // Primary yellow playhead: tracks live playback position across the sample when active,
+         // or parks at `position` as the starting anchor when idle.
+         const auto& snap = n->VisualSnapshot();
          const float posClamped = std::clamp(n->position, n->start, n->end);
-         const float posX = origin.x + w * posClamped;
+         const float activeFrac = (snap.selfActive && snap.selfPos >= 0.0f) ? snap.selfPos : posClamped;
+         const float posX = origin.x + w * std::clamp(activeFrac, 0.0f, 1.0f);
          const ImU32 yellowCol = isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 240);
          dl->AddLine(ImVec2(posX, origin.y), ImVec2(posX, br.y), yellowCol, 2.0f);
 
-         // Active voices in flight: drawn as white playheads whose opacity
-         // fades out in sync with each voice's envelope decay time.
-         const auto& snap = n->VisualSnapshot();
-         if (snap.selfActive && snap.selfPos >= 0.0f && snap.selfAmp >= 0.002f)
-         {
-            const float px = origin.x + w * std::clamp(snap.selfPos, 0.0f, 1.0f);
-            const int alpha = (int)(snap.selfAmp * 255.0f);
-            const ImU32 whiteCol = isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha);
-            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), whiteCol, 1.5f);
-         }
+         // Active note voices in flight: drawn as white playheads whose opacity
+         // fades out in sync with each voice's envelope decay time (only when notes are connected/played).
          for (int v = 0; v < snap.count; v++)
          {
             const auto& voice = snap.voices[v];
@@ -13028,8 +13023,10 @@ namespace
 
    void DrawDynamicsBody(GraphNode& gn, AudioEffectNode* n)
    {
-      char stat[80];
-      snprintf(stat, sizeof(stat), "compress %.0f:1 @ %.0f dB", n->Param("ratio"), n->Param("threshold"));
+      const bool analog = n->Param("analog") != 0.0f;
+      char stat[96];
+      snprintf(stat, sizeof(stat), "compress %.0f:1 @ %.0f dB%s", n->Param("ratio"), n->Param("threshold"),
+               analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawDynamicsVisualizer(n, n->Param("threshold"), n->Param("ratio"), n->Param("makeup"));
@@ -13066,6 +13063,13 @@ namespace
       {
          PushUndoCheckpoint();
          *n->ParamPtr("sidechainExternal") = external ? 1.0f : 0.0f;
+      }
+      ImGui::SameLine();
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##dynAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
       }
 
       EndAudioBody();
@@ -13225,15 +13229,16 @@ namespace
    {
       const bool sync = n->Param("sync") != 0.0f;
       const bool bounce = n->Param("bounce") != 0.0f;
+      const bool analog = n->Param("analog") != 0.0f;
 
-      char stat[96];
+      char stat[112];
       if (sync)
-         snprintf(stat, sizeof(stat), "%s - %.0f%% fb - %.0f%% wet",
+         snprintf(stat, sizeof(stat), "%s - %.0f%% fb - %.0f%% wet%s",
                   MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->Param("feedback"),
-                  n->mix * 100.0f);
+                  n->mix * 100.0f, analog ? " - analog" : "");
       else
-         snprintf(stat, sizeof(stat), "%.0f ms - %.0f%% fb - %.0f%% wet", n->Param("timeMs"), n->Param("feedback"),
-                  n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%.0f ms - %.0f%% fb - %.0f%% wet%s", n->Param("timeMs"), n->Param("feedback"),
+                  n->mix * 100.0f, analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawDelayVisualizer(n);
@@ -13283,6 +13288,13 @@ namespace
       {
          PushUndoCheckpoint();
          *n->ParamPtr("bounce") = bounceBool ? 1.0f : 0.0f;
+      }
+      ImGui::SameLine();
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##delayAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
       }
 
       EndAudioBody();
@@ -13362,8 +13374,10 @@ namespace
 
    void DrawReverbBody(GraphNode& gn, AudioEffectNode* n)
    {
-      char stat[80];
-      snprintf(stat, sizeof(stat), "%.1f s - %.0f%% wet", n->Param("decay"), n->mix * 100.0f);
+      const bool analog = n->Param("analog") != 0.0f;
+      char stat[96];
+      snprintf(stat, sizeof(stat), "%.1f s - %.0f%% wet%s", n->Param("decay"), n->mix * 100.0f,
+               analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawReverbVisualizer(n);
@@ -13388,6 +13402,13 @@ namespace
          row.Knob("width", n->ParamPtr("width"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
+      }
+
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##reverbAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
       }
 
       EndAudioBody();
@@ -13751,8 +13772,10 @@ namespace
 
    void DrawPitchShiftBody(GraphNode& gn, AudioEffectNode* n)
    {
-      char stat[80];
-      snprintf(stat, sizeof(stat), "%+.1f st - %.0f ms grain", n->Param("pitch"), n->Param("grain"));
+      const bool analog = n->Param("analog") != 0.0f;
+      char stat[96];
+      snprintf(stat, sizeof(stat), "%+.1f st - %.0f ms grain%s", n->Param("pitch"), n->Param("grain"),
+               analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawPitchShiftVisualizer(n);
@@ -13763,6 +13786,13 @@ namespace
       row.Knob("grain", n->ParamPtr("grain"), 10.0f, 250.0f, "%.0f ms", kKnobLarge);
       row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
       row.End();
+
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##pitchShiftAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+      }
 
       EndAudioBody();
    }
@@ -13867,13 +13897,15 @@ namespace
    void DrawChorusBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool sync = n->Param("sync") != 0.0f;
-      char stat[96];
+      const bool analog = n->Param("analog") != 0.0f;
+      char stat[112];
       if (sync)
-         snprintf(stat, sizeof(stat), "%.0f taps - %s - %.0f%% wet", n->Param("taps"),
-                  MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%.0f taps - %s - %.0f%% wet%s", n->Param("taps"),
+                  MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->mix * 100.0f,
+                  analog ? " - analog" : "");
       else
-         snprintf(stat, sizeof(stat), "%.0f taps - %.2f Hz - %.0f%% wet", n->Param("taps"), n->Param("rate"),
-                  n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%.0f taps - %.2f Hz - %.0f%% wet%s", n->Param("taps"), n->Param("rate"),
+                  n->mix * 100.0f, analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawChorusVisualizer(n);
@@ -13901,6 +13933,13 @@ namespace
       {
          PushUndoCheckpoint();
          *n->ParamPtr("taps") = taps3 ? 3.0f : 2.0f;
+      }
+      ImGui::SameLine();
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##chorusAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
       }
 
       EndAudioBody();
@@ -13981,14 +14020,15 @@ namespace
    void DrawFlangerBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool sync = n->Param("sync") != 0.0f;
-      char stat[96];
+      const bool analog = n->Param("analog") != 0.0f;
+      char stat[112];
       if (sync)
-         snprintf(stat, sizeof(stat), "%s - %.0f%% fb - %.0f%% wet",
+         snprintf(stat, sizeof(stat), "%s - %.0f%% fb - %.0f%% wet%s",
                   MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->Param("feedback") * 100.0f,
-                  n->mix * 100.0f);
+                  n->mix * 100.0f, analog ? " - analog" : "");
       else
-         snprintf(stat, sizeof(stat), "%.1f ms - %.0f%% fb - %.0f%% wet", n->Param("delay"),
-                  n->Param("feedback") * 100.0f, n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%.1f ms - %.0f%% fb - %.0f%% wet%s", n->Param("delay"),
+                  n->Param("feedback") * 100.0f, n->mix * 100.0f, analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFlangerVisualizer(n);
@@ -14009,6 +14049,13 @@ namespace
       }
 
       DrawSyncToggle(n, "sync to tempo##flangerSync");
+      ImGui::SameLine();
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##flangerAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+      }
 
       EndAudioBody();
    }
@@ -14094,13 +14141,15 @@ namespace
    void DrawPhaserBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool sync = n->Param("sync") != 0.0f;
-      char stat[96];
+      const bool analog = n->Param("analog") != 0.0f;
+      char stat[112];
       if (sync)
-         snprintf(stat, sizeof(stat), "%.0f-stage - %s - %.0f%% wet", n->Param("order"),
-                  MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%.0f-stage - %s - %.0f%% wet%s", n->Param("order"),
+                  MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->mix * 100.0f,
+                  analog ? " - analog" : "");
       else
-         snprintf(stat, sizeof(stat), "%.0f-stage - %.0f Hz - %.0f%% wet", n->Param("order"), n->Param("cutoff"),
-                  n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%.0f-stage - %.0f Hz - %.0f%% wet%s", n->Param("order"), n->Param("cutoff"),
+                  n->mix * 100.0f, analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawPhaserVisualizer(n);
@@ -14122,6 +14171,13 @@ namespace
       }
 
       DrawSyncToggle(n, "sync to tempo##phaserSync");
+      ImGui::SameLine();
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##phaserAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+      }
 
       EndAudioBody();
    }
@@ -14194,9 +14250,10 @@ namespace
 
    void DrawBitcrushBody(GraphNode& gn, AudioEffectNode* n)
    {
-      char stat[80];
-      snprintf(stat, sizeof(stat), "%.0f Hz - %.0f bit - %.0f%% wet", n->Param("rate"), n->Param("bits"),
-               n->mix * 100.0f);
+      const bool analog = n->Param("analog") != 0.0f;
+      char stat[96];
+      snprintf(stat, sizeof(stat), "%.0f Hz - %.0f bit - %.0f%% wet%s", n->Param("rate"), n->Param("bits"),
+               n->mix * 100.0f, analog ? " - analog" : "");
 
       const double sampleRate =
          AudioEngine::Instance().SampleRate() > 0.0 ? AudioEngine::Instance().SampleRate() : 44100.0;
@@ -14213,6 +14270,13 @@ namespace
       row.Knob("bits", n->ParamPtr("bits"), 1.0f, 16.0f, "%.0f", kKnobLarge);
       row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
       row.End();
+
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##bitcrushAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+      }
 
       EndAudioBody();
    }
@@ -14471,8 +14535,10 @@ namespace
 
    void DrawRingModBody(GraphNode& gn, AudioEffectNode* n)
    {
-      char stat[64];
-      snprintf(stat, sizeof(stat), "%.0f Hz - %.0f%% wet", n->Param("freq"), n->mix * 100.0f);
+      const bool analog = n->Param("analog") != 0.0f;
+      char stat[80];
+      snprintf(stat, sizeof(stat), "%.0f Hz - %.0f%% wet%s", n->Param("freq"), n->mix * 100.0f,
+               analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawRingModVisualizer(n);
@@ -14489,6 +14555,13 @@ namespace
          });
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
+      }
+
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##ringModAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
       }
 
       EndAudioBody();
@@ -14610,14 +14683,15 @@ namespace
 
    void DrawFrequencyShifterBody(GraphNode& gn, AudioEffectNode* n)
    {
-      char stat[64];
+      const bool analog = n->Param("analog") != 0.0f;
+      char stat[80];
       const float shiftVal = n->Param("shift");
       if (std::fabs(shiftVal) >= 1000.0f)
-         snprintf(stat, sizeof(stat), "%+.2f kHz - %.0f%% fb - %.0f%% wet",
-                  shiftVal / 1000.0f, n->Param("feedback") * 100.0f, n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%+.2f kHz - %.0f%% fb - %.0f%% wet%s",
+                  shiftVal / 1000.0f, n->Param("feedback") * 100.0f, n->mix * 100.0f, analog ? " - analog" : "");
       else
-         snprintf(stat, sizeof(stat), "%+.0f Hz - %.0f%% fb - %.0f%% wet",
-                  shiftVal, n->Param("feedback") * 100.0f, n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%+.0f Hz - %.0f%% fb - %.0f%% wet%s",
+                  shiftVal, n->Param("feedback") * 100.0f, n->mix * 100.0f, analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFrequencyShifterVisualizer(n);
@@ -14640,6 +14714,13 @@ namespace
          row.Knob("spread", n->ParamPtr("spread"), 0.0f, 100.0f, "%.1f Hz", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
+      }
+
+      bool analogBool = analog;
+      if (ImGui::Checkbox("analog##freqShiftAnalog", &analogBool))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
       }
 
       EndAudioBody();

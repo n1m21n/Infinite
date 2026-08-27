@@ -5,22 +5,14 @@
 #include <cmath>
 
 #include "IEffectKernel.h"
+#include "AnalogPrimitives.h"
 #include "audio/DspMath.h"
 #include "audio/MusicTime.h"
 #include "audio/ParamMailbox.h"
 
-// Phaser's kernel - a cascade of first-order allpass stages sharing one
-// LFO-modulated coefficient, per channel. Primary reference: Zolzer, "DAFX:
-// Digital Audio Effects", ch. 2.5 (the standard first-order allpass phaser:
-// a(n) = (tan(pi*fc/fs) - 1) / (tan(pi*fc/fs) + 1), y[n] = a*x[n] + x[n-1] -
-// a*y[n-1]). `order` (stage count) matches the KHS Audio Phaser module's
-// control set directly; `spread` offsets the right channel's LFO phase for
-// stereo width, the same construction Chorus/Flanger use.
+// Phaser's kernel - cascade of first-order allpass stages with digital and analog modes.
 class AudioEffectNode;
 
-// A single first-order allpass section (Zolzer DAFX ch. 2.5). Coefficient is
-// pushed in externally each sample so every stage in a cascade can share one
-// tan() call instead of paying for it per stage.
 struct AllpassStage
 {
    float x1 = 0.0f, y1 = 0.0f;
@@ -65,6 +57,7 @@ public:
          mStagesR[i].Reset();
       }
       mPhase = 0.0;
+      mDriftLfo.Reset();
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -87,8 +80,12 @@ private:
    std::atomic<int> mStageCount { 4 };
    std::atomic<int> mSync { 0 };
    std::atomic<int> mRateDiv { MusicTime::kQuarter };
+   std::atomic<int> mAnalog { 0 };
 
    AllpassStage mStagesL[kMaxStages];
    AllpassStage mStagesR[kMaxStages];
    double mPhase = 0.0;
+
+   // Analog mode components
+   AnalogDsp::DriftLfo mDriftLfo;
 };

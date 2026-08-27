@@ -245,7 +245,6 @@ public:
          mLastDecaySec = decaySec;
          const float decayMs = std::max(10.0f, decaySec * 1000.0f);
          mVoices.SetADSR(2.0f, decayMs, 0.0f, decayMs);
-         mSelfEnv.SetADSR(2.0f, decayMs, 0.0f, decayMs);
       }
 
       // The audition button's Stop always releases the self voice, whoever
@@ -281,6 +280,12 @@ public:
       }
       mTransportWasPlaying = transportPlaying;
 
+      if (!noteDriven && mWasNoteDriven && transportPlaying && !mSelfEnv.IsActive())
+      {
+         TriggerSelfVoice(-1.0f, SelfOwner::Transport);
+      }
+      mWasNoteDriven = noteDriven;
+
       NoteEvent evts[64];
       int numEvts = 0;
       int evtIdx = 0;
@@ -294,6 +299,17 @@ public:
       const float previewFrac = mPreviewFrac.exchange(-1.0f, std::memory_order_acq_rel);
       if (previewFrac >= 0.0f)
          TriggerSelfVoice(previewFrac, SelfOwner::User);
+
+      // Detect manual position scrub/change (slider drag or param modulation)
+      const float curStartFrac = mStart.load(std::memory_order_relaxed);
+      const float curEndFrac = std::max(curStartFrac + 0.001f, mEnd.load(std::memory_order_relaxed));
+      const float currentPosParam = std::clamp(mPosition.load(std::memory_order_relaxed), curStartFrac, curEndFrac);
+      if (mLastPosParam >= 0.0f && fabsf(currentPosParam - mLastPosParam) > 1e-4f)
+      {
+         if (mActiveBuffer != nullptr)
+            mSelfPos = (double)currentPosParam * mActiveBuffer->numFrames;
+      }
+      mLastPosParam = currentPosParam;
 
       for (int i = 0; i < buffer.numFrames; i++)
       {
@@ -525,6 +541,7 @@ private:
       }
 
       mSelfPos = mActiveBuffer != nullptr ? (double)frac * mActiveBuffer->numFrames : 0.0;
+      mLastPosParam = frac;
       mSelfEnv.NoteOn();
       mSelfOwner = owner;
    }
@@ -550,6 +567,8 @@ private:
    int mSelfDir = 1;
    SelfOwner mSelfOwner = SelfOwner::None;
    bool mTransportWasPlaying = false;
+   bool mWasNoteDriven = false;
+   float mLastPosParam = -1.0f;
    std::atomic<bool> mSelfOwnedByUserPublished { false };
 
    std::atomic<float> mPreviewFrac { -1.0f };

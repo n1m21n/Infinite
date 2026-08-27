@@ -32,6 +32,13 @@ public:
    {
       mSampleRate = sampleRate;
       mMailbox.PrepareToPlay(sampleRate);
+      for (int i = 0; i < 2; i++)
+      {
+         mPreFilterL[i].SetSampleRate(sampleRate);
+         mPreFilterL[i].SetCutoff(11000.0f, 0.707f);
+         mPreFilterR[i].SetSampleRate(sampleRate);
+         mPreFilterR[i].SetCutoff(11000.0f, 0.707f);
+      }
       Reset();
    }
 
@@ -39,6 +46,11 @@ public:
    {
       mPhase = 0.0f;
       mHoldL = mHoldR = 0.0f;
+      for (int i = 0; i < 2; i++)
+      {
+         mPreFilterL[i].Reset();
+         mPreFilterR[i].Reset();
+      }
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -50,7 +62,12 @@ public:
 private:
    ParamMailbox mMailbox;
    double mSampleRate = 44100.0;
+   std::atomic<int> mAnalog { 0 };
 
    float mPhase = 0.0f;
    float mHoldL = 0.0f, mHoldR = 0.0f;
+
+   // Analog mode: 11kHz reconstruction pre-filter stages
+   DspMath::TptSvf mPreFilterL[2];
+   DspMath::TptSvf mPreFilterR[2];
 };

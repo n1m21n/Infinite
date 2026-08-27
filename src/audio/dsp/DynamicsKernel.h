@@ -5,34 +5,24 @@
 #include <cmath>
 
 #include "IEffectKernel.h"
+#include "AnalogPrimitives.h"
 #include "audio/DspMath.h"
 #include "audio/ParamMailbox.h"
 
 // Dynamics' kernel - cut down to KHS Audio Compressor's control surface
 // (Threshold, Ratio, Attack, Release, Makeup, a Peak/RMS detector switch, a
-// Sidechain on/off switch, a meter - 5 knobs + 2 switches, one processing
-// mode) per .claude/skills/new-audio-node/SKILL.md's minimalism rule. An
-// earlier version had 4 selectable modes (compress/limit/gate/expand) and 17
-// params (knee, lookahead, hold, range, stereo link, auto release, sidechain
-// HP/audition, ...); all of that is gone, not hidden - this is a compressor,
-// full stop.
+// Sidechain on/off switch, an Analog mode toggle, a meter) per
+// .claude/skills/new-audio-node/SKILL.md's minimalism rule.
 //
 // Primary reference: Giannoulis, Massberg & Reiss, "Digital Dynamic Range
 // Compressor Design - A Tutorial and Analysis" (JAES 2012) - the soft-knee
 // gain computer (their eq. 4) and the branching/decoupled peak-detector
 // smoothing topology (their §III) both come directly from it. Knee width is
-// a fixed internal constant (6 dB), not a control - it shapes the transition
-// band around threshold, audible but not worth a knob at this size.
+// a fixed internal constant (6 dB).
 namespace DynamicsDsp
 {
    static constexpr float kKneeDb = 6.0f;
 
-   // Static gain-computer characteristic, in dB: given an instantaneous
-   // input level xG (dBFS), returns the gain-computer's target output level
-   // yG (dBFS) - Giannoulis eq. 4. A pure function of its arguments, shared
-   // by the kernel's own per-sample path and the DSP fixture's "measured vs
-   // analytic" assertion, so there is exactly one definition of "the
-   // analytic curve" to compare against.
    inline float GainComputerDb(float xG, float thresholdDb, float ratio)
    {
       const float R = std::max(1.0f, ratio);
@@ -47,13 +37,11 @@ namespace DynamicsDsp
    }
 }
 
-// AudioEffectNode's kernel for the Dynamics node. See IEffectKernel.h for
-// the PushParams/ProcessBlock split this obeys.
 class DynamicsKernel : public IEffectKernel
 {
 public:
    static constexpr int kMaxChannels = 8;
-   static constexpr float kRmsWindowMs = 20.0f; // fixed internal constant, not a control
+   static constexpr float kRmsWindowMs = 20.0f;
 
    enum ParamSlot
    {
@@ -69,6 +57,8 @@ public:
    {
       mSampleRate = sampleRate;
       mMailbox.PrepareToPlay(sampleRate);
+      for (int ch = 0; ch < kMaxChannels; ch++)
+         mWarmLp[ch].SetCutoff(20000.0f, sampleRate);
       Reset();
    }
 
@@ -77,6 +67,9 @@ public:
       mRmsMeanSq = 0.0f;
       mSmoothedReductionDb = 0.0f;
       mLastInputDb = -100.0f;
+      mOptoMemoryDb = 0.0f;
+      for (int ch = 0; ch < kMaxChannels; ch++)
+         mWarmLp[ch].Reset();
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -86,6 +79,7 @@ public:
       const int numChannels = std::min(in.numChannels, std::min(out.numChannels, kMaxChannels));
       const bool useRms = mDetectorRms.load(std::memory_order_relaxed) != 0;
       const bool useSidechain = sidechain != nullptr && mSidechainExternal.load(std::memory_order_relaxed) != 0;
+      const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
 
       const float rmsCoeff = expf(-1.0f / (kRmsWindowMs * 0.001f * (float)mSampleRate));
 
@@ -99,15 +93,11 @@ public:
          const float attackCoeff = expf(-1.0f / (attackMs * 0.001f * (float)mSampleRate));
          const float releaseCoeff = expf(-1.0f / (releaseMs * 0.001f * (float)mSampleRate));
 
-         // Detection signal: the external sidechain if wired and enabled,
-         // else the main input, always fully stereo-linked (max across
-         // channels) - the simplest, most predictable behavior for a
-         // single-knob-per-thing compressor.
          float linkedLevel = 0.0f;
          for (int ch = 0; ch < numChannels; ch++)
          {
             const float s = useSidechain ? sidechain->channels[std::min(ch, sidechain->numChannels - 1)][i]
-                                          : in.channels[ch][i];
+                                         : in.channels[ch][i];
             linkedLevel = std::max(linkedLevel, std::fabs(s));
          }
 
@@ -123,25 +113,57 @@ public:
          const float yG = DynamicsDsp::GainComputerDb(xG, thresholdDb, ratio);
          const float targetReductionDb = std::max(0.0f, xG - yG);
 
-         // Branching/decoupled smoothing (Giannoulis §III): attack when the
-         // target calls for MORE reduction than currently applied, release
-         // when it calls for less. Fully linked (one shared reduction value
-         // for every channel), the simplest predictable stereo behavior.
-         const float coeff = (targetReductionDb > mSmoothedReductionDb) ? attackCoeff : releaseCoeff;
-         mSmoothedReductionDb = targetReductionDb + (mSmoothedReductionDb - targetReductionDb) * coeff;
+         if (analog)
+         {
+            if (targetReductionDb > mSmoothedReductionDb)
+            {
+               mSmoothedReductionDb = targetReductionDb + (mSmoothedReductionDb - targetReductionDb) * attackCoeff;
+               mOptoMemoryDb += (mSmoothedReductionDb - mOptoMemoryDb) * 0.005f;
+            }
+            else
+            {
+               // Program-dependent dual-stage release: fast transient release (40ms) + slow opto release (400-1500ms)
+               const float fastRelCoeff = expf(-1.0f / (0.040f * (float)mSampleRate));
+               const float slowRelMs = std::clamp(releaseMs * 1.5f, 400.0f, 1500.0f);
+               const float slowRelCoeff = expf(-1.0f / (slowRelMs * 0.001f * (float)mSampleRate));
+               const float optoWeight = std::clamp(mOptoMemoryDb / 12.0f, 0.2f, 0.85f);
+               const float effRelCoeff = fastRelCoeff * (1.0f - optoWeight) + slowRelCoeff * optoWeight;
+               mSmoothedReductionDb = targetReductionDb + (mSmoothedReductionDb - targetReductionDb) * effRelCoeff;
+               mOptoMemoryDb += (targetReductionDb - mOptoMemoryDb) * 0.0002f;
+            }
+            mOptoMemoryDb = DspMath::FlushDenormal(mOptoMemoryDb);
 
-         const float gr = DspMath::DbToLinear(-mSmoothedReductionDb) * makeupLin;
-         for (int ch = 0; ch < numChannels; ch++)
-            out.channels[ch][i] = in.channels[ch][i] * gr + 1.0e-20f; // tiny bias: denormal guard
+            const float gr = DspMath::DbToLinear(-mSmoothedReductionDb) * makeupLin;
+            const float warmFc = std::clamp(20000.0f - std::max(0.0f, mSmoothedReductionDb - 6.0f) * 800.0f, 8000.0f, 20000.0f);
+            const float warmCoeff = AnalogDsp::OnePoleLP::CalcCoeff(warmFc, mSampleRate);
+
+            for (int ch = 0; ch < numChannels; ch++)
+            {
+               float s = in.channels[ch][i];
+               s = AnalogDsp::AsymTanh(s, 0.08f); // Input transformer warmth
+               s = s * gr;
+               s = mWarmLp[ch].Process(s, warmCoeff);
+               s = AnalogDsp::AsymTanh(s, 0.05f); // Output transformer warmth
+               out.channels[ch][i] = s + 1.0e-20f;
+            }
+         }
+         else
+         {
+            // Digital exact path
+            const float coeff = (targetReductionDb > mSmoothedReductionDb) ? attackCoeff : releaseCoeff;
+            mSmoothedReductionDb = targetReductionDb + (mSmoothedReductionDb - targetReductionDb) * coeff;
+
+            const float gr = DspMath::DbToLinear(-mSmoothedReductionDb) * makeupLin;
+            for (int ch = 0; ch < numChannels; ch++)
+               out.channels[ch][i] = in.channels[ch][i] * gr + 1.0e-20f;
+         }
       }
 
-      // {last sample's detected input level in dB, gain reduction in dB} -
-      // the visualizer's operating-point dot and GR meter.
       const float payload[2] = { mLastInputDb, mSmoothedReductionDb };
       mGrMeter.Write(payload, 2);
    }
 
-   int LatencySamples() const override { return 0; } // no lookahead at this size
+   int LatencySamples() const override { return 0; }
    MeterRing* ExtraMeter() override { return &mGrMeter; }
 
 private:
@@ -150,10 +172,14 @@ private:
 
    std::atomic<int> mDetectorRms { 0 };
    std::atomic<int> mSidechainExternal { 0 };
+   std::atomic<int> mAnalog { 0 };
 
    float mRmsMeanSq = 0.0f;
    float mSmoothedReductionDb = 0.0f;
    float mLastInputDb = -100.0f;
+   float mOptoMemoryDb = 0.0f;
+
+   AnalogDsp::OnePoleLP mWarmLp[kMaxChannels];
 
    MeterRing mGrMeter;
 };

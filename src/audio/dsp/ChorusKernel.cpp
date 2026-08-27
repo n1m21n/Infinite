@@ -15,6 +15,7 @@ void ChorusKernel::PushParams(const AudioEffectNode& node, double sampleRate)
    mSync.store(node.Param("sync") != 0.0f ? 1 : 0, std::memory_order_relaxed);
    mRateDiv.store(std::clamp((int)(node.Param("rateDiv") + 0.5f), 0, MusicTime::kNumRateDivisions - 1),
                   std::memory_order_relaxed);
+   mAnalog.store(node.Param("analog") != 0.0f ? 1 : 0, std::memory_order_relaxed);
 }
 
 void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
@@ -23,6 +24,7 @@ void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
    const int taps = mTaps.load(std::memory_order_relaxed);
    const bool sync = mSync.load(std::memory_order_relaxed) != 0;
    const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
+   const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
    const float lineCapacityMs = kMaxDelayMs - 4.0f;
 
    for (int i = 0; i < out.numFrames; i++)
@@ -48,29 +50,59 @@ void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       const float inL = in.channels[0][i];
       const float inR = numChannels >= 2 ? in.channels[1][i] : inL;
 
-      // Read each voice's tap from the line as it stood before this
-      // sample's write (matches FlangerKernel's read-then-write ordering),
-      // so the feedback path below can feed the wet sum itself back in -
-      // without this, `feedback` would need a second line per voice to have
-      // anything meaningful to feed back into.
       float wetL = 0.0f, wetR = 0.0f;
-      for (int k = 0; k < taps; k++)
+      if (analog)
       {
-         const float voiceOffset = (float)k / (float)taps;
-         const float lPhase = (float)mPhase + voiceOffset;
-         const float rPhase = (float)mPhase + voiceOffset + spread * 0.5f;
+         const float lfoDrift = mDriftLfo.Advance(std::max(0.1f, rateHz), 0.15f, 0.04f, mSampleRate) * 0.1f;
 
-         const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * lPhase), 0.5f, lineCapacityMs);
-         const float rMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * rPhase), 0.5f, lineCapacityMs);
+         for (int k = 0; k < taps; k++)
+         {
+            const float voiceOffset = (float)k / (float)taps;
+            const float lPhase = (float)mPhase + voiceOffset + lfoDrift;
+            const float rPhase = (float)mPhase + voiceOffset + spread * 0.5f + lfoDrift;
 
-         wetL += mLineL.Read(lMs * 0.001f * (float)mSampleRate);
-         wetR += mLineR.Read(rMs * 0.001f * (float)mSampleRate);
+            const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * lPhase), 0.5f, lineCapacityMs);
+            const float rMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * rPhase), 0.5f, lineCapacityMs);
+
+            wetL += mLineL.Read(lMs * 0.001f * (float)mSampleRate);
+            wetR += mLineR.Read(rMs * 0.001f * (float)mSampleRate);
+         }
+         wetL /= (float)taps;
+         wetR /= (float)taps;
+
+         // BBD compander and bucket saturation
+         wetL = AnalogDsp::AsymTanh(wetL, 0.10f);
+         wetR = AnalogDsp::AsymTanh(wetR, 0.10f);
+
+         // 4th-order 7.5kHz lowpass reconstruction filter
+         wetL = mFilterL[1].Process(mFilterL[0].Process(wetL).low).low;
+         wetR = mFilterR[1].Process(mFilterR[0].Process(wetR).low).low;
+
+         const float writeL = AnalogDsp::AsymTanh(inL + wetL * feedback, 0.12f);
+         const float writeR = AnalogDsp::AsymTanh(inR + wetR * feedback, 0.12f);
+         mLineL.Write(writeL);
+         mLineR.Write(writeR);
       }
-      wetL /= (float)taps;
-      wetR /= (float)taps;
+      else
+      {
+         for (int k = 0; k < taps; k++)
+         {
+            const float voiceOffset = (float)k / (float)taps;
+            const float lPhase = (float)mPhase + voiceOffset;
+            const float rPhase = (float)mPhase + voiceOffset + spread * 0.5f;
 
-      mLineL.Write(inL + wetL * feedback);
-      mLineR.Write(inR + wetR * feedback);
+            const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * lPhase), 0.5f, lineCapacityMs);
+            const float rMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * rPhase), 0.5f, lineCapacityMs);
+
+            wetL += mLineL.Read(lMs * 0.001f * (float)mSampleRate);
+            wetR += mLineR.Read(rMs * 0.001f * (float)mSampleRate);
+         }
+         wetL /= (float)taps;
+         wetR /= (float)taps;
+
+         mLineL.Write(inL + wetL * feedback);
+         mLineR.Write(inR + wetR * feedback);
+      }
 
       out.channels[0][i] = wetL;
       if (numChannels >= 2)

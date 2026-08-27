@@ -2,9 +2,6 @@
 
 #include "nodes/AudioEffectNode.h"
 
-// Main thread only - four continuous params, all through the mailbox for
-// per-sample smoothing (no discrete selectors left now that the convolution
-// engine is gone; see ReverbKernel.h's class comment).
 void ReverbKernel::PushParams(const AudioEffectNode& node, double sampleRate)
 {
    mSampleRate = sampleRate;
@@ -13,6 +10,7 @@ void ReverbKernel::PushParams(const AudioEffectNode& node, double sampleRate)
    mMailbox.Push(kDamping, node.Param("damping"));
    mMailbox.Push(kPredelayMs, node.Param("predelay"));
    mMailbox.Push(kWidth, node.Param("width"));
+   mAnalog.store(node.Param("analog") != 0.0f ? 1 : 0, std::memory_order_relaxed);
 }
 
 void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
@@ -22,6 +20,10 @@ void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
    const int numChannels = std::min(in.numChannels, std::min(out.numChannels, 2));
    const float rateScale = (float)(mSampleRate / 44100.0);
    const float outScale = 0.35355339059f; // 1/sqrt(kNumLines), keeps the 8-way sum near unity
+   const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
+
+   // Prime-detuned LFO rates for analog tank modulation
+   static const float kLfoRates[kNumLines] = { 0.29f, 0.41f, 0.53f, 0.67f, 0.37f, 0.47f, 0.73f, 0.83f };
 
    float blockDryPeak = 0.0f, blockWetPeak = 0.0f;
 
@@ -35,9 +37,7 @@ void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
 
       const float inMono = numChannels >= 2 ? 0.5f * (in.channels[0][i] + in.channels[1][i]) : in.channels[0][i];
 
-      // Predelay: a plain integer-sample read/write, no interpolation - the
-      // gap it carves before the FDN's own tail begins is the whole point of
-      // the visualizer's "predelay gap" (see DrawReverbVisualizer).
+      // Predelay: a plain integer-sample read/write, no interpolation
       const int predelaySamples = std::clamp((int)std::lround(predelayMs * 0.001f * (float)mSampleRate), 0,
                                               mPredelayCapacity - 1);
       mPredelay[(size_t)mPredelayWrite] = inMono;
@@ -51,51 +51,76 @@ void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
          mPredelayWrite = 0;
 
       const float diffused = mDiffuser[1].Process(mDiffuser[0].Process(predelayed));
-
-      // `size` scales every line's active delay length between 15% and 100%
-      // of its allocated (size=1) capacity - see FdnLine::ReadAtDelay's
-      // comment for why shrinking the active length mid-stream is safe
-      // without a buffer clear or reallocation.
       const float scaleFactor = 0.15f + 0.85f * size;
 
       float delayedOut[kNumLines];
       int activeLen[kNumLines];
-      for (int line = 0; line < kNumLines; line++)
+
+      if (analog)
       {
-         activeLen[line] = std::clamp((int)std::lround(kBaseLengths44k[line] * rateScale * scaleFactor), 8,
-                                       mLines[line].capacity);
-         delayedOut[line] = mLines[line].ReadAtDelay(activeLen[line]);
+         const float diffusedIn = AnalogDsp::AsymTanh(diffused, 0.12f);
+         mInputEnv += (std::fabs(inMono) - mInputEnv) * 0.001f;
+         mInputEnv = DspMath::FlushDenormal(mInputEnv);
+
+         const float dynamicAir = std::clamp(mInputEnv * 4.0f, 0.0f, 1.0f);
+         const float cutoffHz = std::max(600.0f, (18000.0f - damping * 17200.0f) * (1.0f - 0.20f * (1.0f - dynamicAir)));
+         const float dampCoeff = 1.0f - std::exp(-2.0f * 3.14159265f * cutoffHz / (float)mSampleRate);
+
+         for (int line = 0; line < kNumLines; line++)
+         {
+            activeLen[line] = std::clamp((int)std::lround(kBaseLengths44k[line] * rateScale * scaleFactor), 8,
+                                          mLines[line].capacity - 32);
+            const float lfoVal = mLfo[line].Advance(kLfoRates[line], 0.25f, 0.08f, mSampleRate);
+            const float modDelay = std::clamp((float)activeLen[line] + lfoVal * 10.0f, 4.0f, (float)(mLines[line].capacity - 4));
+            delayedOut[line] = mLines[line].Read(modDelay);
+         }
+
+         float mixed[kNumLines];
+         HadamardMix8(delayedOut, mixed);
+
+         for (int line = 0; line < kNumLines; line++)
+         {
+            const float decayGain =
+               std::pow(10.0f, -3.0f * (float)activeLen[line] / ((float)mSampleRate * decaySeconds));
+            const float fb = mixed[line] * decayGain;
+
+            FdnLine& l = mLines[line];
+            l.dampState = FlushDenormal(l.dampState + dampCoeff * (fb - l.dampState));
+
+            const float inject = diffusedIn * (line < 4 ? 0.5f : -0.5f);
+            l.Write(FlushDenormal(inject + l.dampState));
+         }
+      }
+      else
+      {
+         for (int line = 0; line < kNumLines; line++)
+         {
+            activeLen[line] = std::clamp((int)std::lround(kBaseLengths44k[line] * rateScale * scaleFactor), 8,
+                                          mLines[line].capacity);
+            delayedOut[line] = mLines[line].ReadAtDelay(activeLen[line]);
+         }
+
+         float mixed[kNumLines];
+         HadamardMix8(delayedOut, mixed);
+
+         const float cutoffHz = 18000.0f - damping * 17200.0f;
+         const float dampCoeff = 1.0f - std::exp(-2.0f * 3.14159265f * cutoffHz / (float)mSampleRate);
+
+         for (int line = 0; line < kNumLines; line++)
+         {
+            const float decayGain =
+               std::pow(10.0f, -3.0f * (float)activeLen[line] / ((float)mSampleRate * decaySeconds));
+            const float fb = mixed[line] * decayGain;
+
+            FdnLine& l = mLines[line];
+            l.dampState = FlushDenormal(l.dampState + dampCoeff * (fb - l.dampState));
+
+            const float inject = diffused * (line < 4 ? 0.5f : -0.5f);
+            l.Write(FlushDenormal(inject + l.dampState));
+         }
       }
 
-      float mixed[kNumLines];
-      HadamardMix8(delayedOut, mixed);
-
-      // Damping cutoff: damping=0 leaves the feedback path essentially flat
-      // (18kHz, above audibility of the shelving itself), damping=1 pulls it
-      // down to 800Hz for an audibly darker, faster-decaying tail.
-      const float cutoffHz = 18000.0f - damping * 17200.0f;
-      const float dampCoeff = 1.0f - std::exp(-2.0f * 3.14159265f * cutoffHz / (float)mSampleRate);
-
-      for (int line = 0; line < kNumLines; line++)
-      {
-         // 10^(-3*L/(fs*RT60)): the per-line loop gain that brings this
-         // line's contribution to -60dB after `decaySeconds` (Jot & Chaigne)
-         // - see ReverbKernel.h's class comment for the derivation.
-         const float decayGain =
-            std::pow(10.0f, -3.0f * (float)activeLen[line] / ((float)mSampleRate * decaySeconds));
-         const float fb = mixed[line] * decayGain;
-
-         FdnLine& l = mLines[line];
-         l.dampState = FlushDenormal(l.dampState + dampCoeff * (fb - l.dampState));
-
-         const float inject = diffused * (line < 4 ? 0.5f : -0.5f);
-         l.Write(FlushDenormal(inject + l.dampState));
-      }
-
-      // Stereo spread: even lines biased left, odd lines biased right, with
-      // `width` controlling how much of the opposite side's sum bleeds
-      // across. width=1 keeps the original fixed 0.6 cross-mix (full
-      // stereo); width=0 sums both sides equally into mono.
+      // Stereo spread
       float sumEven = 0.0f, sumOdd = 0.0f;
       for (int line = 0; line < kNumLines; line++)
       {

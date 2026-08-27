@@ -13,6 +13,7 @@ void FlangerKernel::PushParams(const AudioEffectNode& node, double sampleRate)
    mSync.store(node.Param("sync") != 0.0f ? 1 : 0, std::memory_order_relaxed);
    mRateDiv.store(std::clamp((int)(node.Param("rateDiv") + 0.5f), 0, MusicTime::kNumRateDivisions - 1),
                   std::memory_order_relaxed);
+   mAnalog.store(node.Param("analog") != 0.0f ? 1 : 0, std::memory_order_relaxed);
 }
 
 void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
@@ -21,6 +22,7 @@ void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
    const float lineCapacityMs = kMaxDelayMs - 2.0f;
    const bool sync = mSync.load(std::memory_order_relaxed) != 0;
    const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
+   const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
 
    for (int i = 0; i < out.numFrames; i++)
    {
@@ -40,22 +42,49 @@ void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
       if (mPhase >= 1.0)
          mPhase -= floor(mPhase);
 
-      const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * (float)mPhase), 0.2f, lineCapacityMs);
-      const float rMs = std::clamp(
-         delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + 0.25f)), 0.2f, lineCapacityMs);
-
       const float inL = in.channels[0][i];
       const float inR = numChannels >= 2 ? in.channels[1][i] : inL;
 
-      const float delayedL = mLineL.Read(lMs * 0.001f * (float)mSampleRate);
-      const float delayedR = mLineR.Read(rMs * 0.001f * (float)mSampleRate);
+      if (analog)
+      {
+         const float lfoDrift = mDriftLfo.Advance(std::max(0.1f, rateHz), 0.15f, 0.05f, mSampleRate) * 0.05f;
+         const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + lfoDrift)), 0.2f, lineCapacityMs);
+         const float rMs = std::clamp(
+            delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + 0.25f + lfoDrift)), 0.2f, lineCapacityMs);
 
-      mLineL.Write(inL + delayedL * feedback);
-      mLineR.Write(inR + delayedR * feedback);
+         float delayedL = mLineL.Read(lMs * 0.001f * (float)mSampleRate);
+         float delayedR = mLineR.Read(rMs * 0.001f * (float)mSampleRate);
 
-      out.channels[0][i] = delayedL;
-      if (numChannels >= 2)
-         out.channels[1][i] = delayedR;
+         const float fbL = AnalogDsp::AsymTanh(delayedL * feedback, 0.15f);
+         const float fbR = AnalogDsp::AsymTanh(delayedR * feedback, 0.15f);
+         mLineL.Write(inL + fbL);
+         mLineR.Write(inR + fbR);
+
+         // 4th-order 9kHz lowpass reconstruction filter
+         delayedL = mFilterL[1].Process(mFilterL[0].Process(delayedL).low).low;
+         delayedR = mFilterR[1].Process(mFilterR[0].Process(delayedR).low).low;
+
+         out.channels[0][i] = delayedL;
+         if (numChannels >= 2)
+            out.channels[1][i] = delayedR;
+      }
+      else
+      {
+         const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * (float)mPhase), 0.2f, lineCapacityMs);
+         const float rMs = std::clamp(
+            delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + 0.25f)), 0.2f, lineCapacityMs);
+
+         const float delayedL = mLineL.Read(lMs * 0.001f * (float)mSampleRate);
+         const float delayedR = mLineR.Read(rMs * 0.001f * (float)mSampleRate);
+
+         mLineL.Write(inL + delayedL * feedback);
+         mLineR.Write(inR + delayedR * feedback);
+
+         out.channels[0][i] = delayedL;
+         if (numChannels >= 2)
+            out.channels[1][i] = delayedR;
+      }
+
       for (int ch = 2; ch < out.numChannels; ch++)
          out.channels[ch][i] = 0.0f;
    }

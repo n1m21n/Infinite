@@ -52,7 +52,9 @@ A fresh session cannot infer them, and each has already cost real time here.
    not the norm, which is exactly why KHS's are the reference and not, say,
    a Waves channel strip). A dropdown that switches between more than two
    processing modes is itself a smell — collapse it to a toggle or cut the
-   modes that aren't the obviously-primary one. Before writing `DrawXxxBody`,
+   modes that aren't the obviously-primary one (a single binary `analog`
+   character toggle per effect node, switching between pure digital and vintage
+   hardware modeling, is an approved two-state control). Before writing `DrawXxxBody`,
    count the controls on the card; more than ~8 (excluding the visualizer and
    the mix knob) means cut until it's at or under that, not build a bigger
    card to fit them. When a design doc (`docs/plans/audio/README.md` §3 or

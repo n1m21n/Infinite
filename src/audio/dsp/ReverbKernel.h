@@ -6,49 +6,20 @@
 #include <vector>
 
 #include "IEffectKernel.h"
+#include "AnalogPrimitives.h"
 #include "audio/ParamMailbox.h"
 
-// Reverb's kernel - algorithmic only, per
-// .claude/skills/new-audio-node/SKILL.md's minimalism rule. The design doc
-// (docs/plans/audio/P3c-P3a2-design.md §1.4) specifies an `engine` dropdown
-// (algorithmic / convolution) plus a Tier 2 table (diffusion, mod rate/depth,
-// early/late balance, low/high cut, low/high decay multipliers, width,
-// freeze, and an entire convolution IR-file sub-panel); none of that ships
-// here. Convolution reverb is a second engine with its own file-loading,
-// worker-thread IR swap and FFT-partition kernel - the kind of "more capable,
-// closer to the spec doc" addition §0.5 explicitly calls out as not a reason
-// to build it. Tier 1 only: size, decay, damping, predelay, width, mix - 6
-// controls, one processing mode, matching the KHS Audio Delay/Compressor
-// control-surface bar's two rows of three.
-//
-// Kernel: 8-line FDN with a Hadamard mixing matrix (lossless, so the overall
-// output RT60 tracks the per-line target gain formula below), mutually-
-// incommensurate delay lengths, per-line one-pole damping in the feedback
-// path, and a short Schroeder allpass diffusion chain ahead of the network.
-// Primary reference: Jot & Chaigne, "Digital Delay Networks for Designing
-// Artificial Reverberators" (AES 1991) - the per-line decay-gain formula
-// g_i = 10^(-3 * L_i / (fs * RT60)) so every line decays to -60dB at the same
-// RT60 comes straight from that paper's feedback-matrix-gain derivation.
+// Reverb's kernel - algorithmic FDN with pure digital and vintage modulated analog modes.
 class AudioEffectNode;
 
 namespace ReverbDsp
 {
    constexpr int kNumLines = 8;
 
-   // Delay lengths in samples at a 44.1kHz reference rate, chosen distinct
-   // and free of small common factors so the 8 lines don't beat together
-   // into audible resonances - scaled by sampleRate/44100 and then by the
-   // `size` param at PrepareToPlay/ProcessBlock time.
    constexpr int kBaseLengths44k[kNumLines] = { 1051, 1163, 1279, 1381, 1499, 1607, 1733, 1867 };
 
-   // Sylvester-construction Hadamard 8x8, entries +-1, normalized by
-   // 1/sqrt(8) so the matrix is orthogonal (energy-preserving) - required
-   // for the per-line RT60 gain formula above to hold for the network as a
-   // whole, not just for one isolated line.
    inline void HadamardMix8(const float in[kNumLines], float out[kNumLines])
    {
-      // H4 blocks, built from H2 = [[1,1],[1,-1]] via the standard
-      // recursive doubling, then folded into H8 = [[H4,H4],[H4,-H4]].
       float h4a[4], h4b[4];
       {
          const float a = in[0], b = in[1], c = in[2], d = in[3];
@@ -72,13 +43,8 @@ namespace ReverbDsp
       }
    }
 
-   inline float FlushDenormal(float x) { return std::fabs(x) < 1.0e-20f ? 0.0f : x; }
+   inline float FlushDenormal(float x) { return DspMath::FlushDenormal(x); }
 
-   // One FDN line: a plain circular buffer sized for the largest delay this
-   // sample rate will ever need (size=1), read at an exact integer offset
-   // that may be smaller than the buffer's capacity - shrinking `activeLen`
-   // just means the unread tail of the physical buffer sits idle, which is
-   // harmless (see ReverbKernel.cpp's ProcessBlock comment).
    struct FdnLine
    {
       std::vector<float> buf;
@@ -101,6 +67,15 @@ namespace ReverbDsp
          dampState = 0.0f;
       }
 
+      float SampleAtDelay(int k) const
+      {
+         int p = writePos - 1 - k;
+         p %= capacity;
+         if (p < 0)
+            p += capacity;
+         return buf[(size_t)p];
+      }
+
       float ReadAtDelay(int activeLen) const
       {
          const int len = std::clamp(activeLen, 1, capacity);
@@ -109,6 +84,22 @@ namespace ReverbDsp
          if (p < 0)
             p += capacity;
          return buf[(size_t)p];
+      }
+
+      // 4-point Hermite cubic fractional read for analog tank modulation
+      float Read(float delaySamples) const
+      {
+         const int iDelay = (int)delaySamples;
+         const float frac = delaySamples - (float)iDelay;
+         const float xm1 = SampleAtDelay(iDelay - 1);
+         const float x0  = SampleAtDelay(iDelay);
+         const float x1  = SampleAtDelay(iDelay + 1);
+         const float x2  = SampleAtDelay(iDelay + 2);
+         const float c0 = x0;
+         const float c1 = 0.5f * (x1 - xm1);
+         const float c2 = xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
+         const float c3 = 0.5f * (x2 - xm1) + 1.5f * (x0 - x1);
+         return ((c3 * frac + c2) * frac + c1) * frac + c0;
       }
 
       void Write(float v)
@@ -120,9 +111,6 @@ namespace ReverbDsp
       }
    };
 
-   // Fixed-length Schroeder allpass: y[n] = -g*x[n] + w[n-D]; w[n] = x[n] +
-   // g*y[n]. Standard diffusion building block, series-chained ahead of the
-   // FDN to smear the input transient before it hits the network.
    struct AllpassDiffuser
    {
       std::vector<float> buf;
@@ -178,16 +166,14 @@ public:
 
       for (int i = 0; i < ReverbDsp::kNumLines; i++)
       {
-         const int cap = (int)std::ceil(ReverbDsp::kBaseLengths44k[i] * rateScale) + 8;
+         const int cap = (int)std::ceil(ReverbDsp::kBaseLengths44k[i] * rateScale) + 64;
          mLines[i].Prepare(cap);
       }
 
-      // Two short allpasses, primes well below the FDN's own line lengths so
-      // they diffuse the transient without themselves ringing audibly.
       mDiffuser[0].Prepare((int)std::ceil(347 * rateScale), 0.7f);
       mDiffuser[1].Prepare((int)std::ceil(113 * rateScale), 0.7f);
 
-      const int maxPredelaySamples = (int)std::ceil(0.5 * sampleRate) + 8; // 500ms Tier 1 cap
+      const int maxPredelaySamples = (int)std::ceil(0.5 * sampleRate) + 8;
       mPredelay.assign((size_t)std::max(8, maxPredelaySamples), 0.0f);
       mPredelayCapacity = (int)mPredelay.size();
 
@@ -198,10 +184,13 @@ public:
    {
       for (auto& line : mLines)
          line.Reset();
+      for (auto& lfo : mLfo)
+         lfo.Reset();
       mDiffuser[0].Reset();
       mDiffuser[1].Reset();
       std::fill(mPredelay.begin(), mPredelay.end(), 0.0f);
       mPredelayWrite = 0;
+      mInputEnv = 0.0f;
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -209,14 +198,17 @@ public:
    void ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out) override;
 
    int LatencySamples() const override { return 0; }
-   MeterRing* ExtraMeter() override { return &mLevelMeter; } // {dry peak, wet peak} for the visualizer's level pair
+   MeterRing* ExtraMeter() override { return &mLevelMeter; }
 
 private:
    ParamMailbox mMailbox;
    double mSampleRate = 44100.0;
+   std::atomic<int> mAnalog { 0 };
 
    ReverbDsp::FdnLine mLines[ReverbDsp::kNumLines];
    ReverbDsp::AllpassDiffuser mDiffuser[2];
+   AnalogDsp::DriftLfo mLfo[ReverbDsp::kNumLines];
+   float mInputEnv = 0.0f;
 
    std::vector<float> mPredelay;
    int mPredelayCapacity = 1;

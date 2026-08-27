@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "IEffectKernel.h"
+#include "AnalogPrimitives.h"
 #include "audio/DspMath.h"
 #include "audio/MusicTime.h"
 #include "audio/ParamMailbox.h"
@@ -140,6 +141,14 @@ public:
       mLineB.Prepare(maxSamples);
       mDelaySmoother.SetTimeConstant(0.02f, sampleRate); // slower than the mailbox's ~5ms so a time change sweeps, not zippers
       mDelaySmootherInit = false;
+      mDelaySmootherAnalog.SetTimeConstant(0.05f, sampleRate); // 50ms tape motor inertia
+      mDelaySmootherAnalogInit = false;
+      mAnalogLp.SetCutoff(4500.0f, sampleRate);
+      mAnalogHp.SetCutoff(80.0f, sampleRate);
+      mAnalogLpA.SetCutoff(4500.0f, sampleRate);
+      mAnalogHpA.SetCutoff(80.0f, sampleRate);
+      mAnalogLpB.SetCutoff(4500.0f, sampleRate);
+      mAnalogHpB.SetCutoff(80.0f, sampleRate);
       Reset();
    }
 
@@ -153,6 +162,14 @@ public:
       mFilterB.Reset();
       mDryEnv = 0.0f;
       mDelaySmootherInit = false;
+      mDelaySmootherAnalogInit = false;
+      mWowFlutter.Reset();
+      mAnalogLp.Reset();
+      mAnalogHp.Reset();
+      mAnalogLpA.Reset();
+      mAnalogHpA.Reset();
+      mAnalogLpB.Reset();
+      mAnalogHpB.Reset();
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -169,6 +186,7 @@ private:
    std::atomic<int> mBounce { 0 };
    std::atomic<int> mSync { 1 };
    std::atomic<int> mRateDiv { MusicTime::kEighth };
+   std::atomic<int> mAnalog { 0 };
 
    // Bounce off: one mono tap, panned to the stereo field by `pan`.
    DelayLine mLine;
@@ -180,6 +198,15 @@ private:
 
    DspMath::OnePole mDelaySmoother;
    bool mDelaySmootherInit = false;
+
+   // Analog mode components
+   DspMath::OnePole mDelaySmootherAnalog;
+   bool mDelaySmootherAnalogInit = false;
+   AnalogDsp::DriftLfo mWowFlutter;
+   AnalogDsp::OnePoleLP mAnalogLp;
+   AnalogDsp::OnePoleHP mAnalogHp;
+   AnalogDsp::OnePoleLP mAnalogLpA, mAnalogLpB;
+   AnalogDsp::OnePoleHP mAnalogHpA, mAnalogHpB;
 
    float mDryEnv = 0.0f; // mono duck envelope, off the downmixed dry input
 
