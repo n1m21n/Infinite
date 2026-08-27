@@ -1079,6 +1079,17 @@ namespace
    // none, and emitting a link to an undeclared pin makes the editor treat the
    // link as dead and delete it - which silently dropped the modulation.
    std::set<int> gDrawnParamPins;
+   // Set while a collapsed node runs its parameter dispatch purely to
+   // re-register its params (see the params block in the node loop). Every
+   // Mod* widget still assigns its ordinal and registers its ParamRef, then
+   // returns immediately: no pin, no widget, no drawing. A modulator writes
+   // through the pointer RegisterParam hands out, so a param that never
+   // registers is a param nothing can drive - which is why closing a node's
+   // eye used to silently freeze every modulator patched into it. The pins a
+   // collapsed node needs are declared separately by CollapsedBindingPins,
+   // so the widgets must NOT declare them again here: ed::BeginPin twice on
+   // one id in a frame is undefined.
+   bool gParamRegisterOnly = false;
    // Nodes to select next frame; they do not exist in the editor until they
    // have been drawn once, so selection has to wait a frame.
    std::vector<int> gPendingSelect;
@@ -1310,6 +1321,8 @@ namespace
       ref.step = step;
       ref.name = label;
       Modulation::Instance().RegisterParam(ref);
+      if (gParamRegisterOnly)
+         return false; // registered, deliberately not drawn - see gParamRegisterOnly
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex;
       const bool modulated = Modulation::Instance().IsModulated(nodeIndex, paramIndex);
@@ -2111,6 +2124,8 @@ namespace
       ref.step = step;
       ref.name = label;
       Modulation::Instance().RegisterParam(ref);
+      if (gParamRegisterOnly)
+         return false; // registered, deliberately not drawn - see gParamRegisterOnly
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex;
       const bool modulated = Modulation::Instance().IsModulated(nodeIndex, paramIndex);
@@ -2364,6 +2379,8 @@ namespace
       ref.value = col;
       ref.name = label;
       PaletteBinding::Instance().RegisterColor(ref);
+      if (gParamRegisterOnly)
+         return; // registered, deliberately not drawn - see gParamRegisterOnly
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kColorBase + colorIndex;
       const PaletteBinding::Source bound =
@@ -30822,6 +30839,7 @@ int main(int argc, char** argv)
             gn.hasModulatedParams = false;
             gn.hasBipolarParams = false;
             gn.hasPaletteColors = false;
+            gn.hasExpressionParams = false;
          }
          for (const auto& link : modulation.Links())
          {
@@ -30836,6 +30854,11 @@ int main(int argc, char** argv)
          {
             if (GraphNode* target = FindNodeByIndex(link.first.first))
                target->hasPaletteColors = true;
+         }
+         for (const auto& expr : modulation.Expressions())
+         {
+            if (GraphNode* target = FindNodeByIndex(expr.first.first))
+               target->hasExpressionParams = true;
          }
       }
 
@@ -37958,7 +37981,35 @@ int main(int argc, char** argv)
 
          // BeginNodeParams(gn.index) already ran above, ahead of the preview/
          // body dispatch - see the comment at that call site.
-         if (!isAudioBody && gn.showParams)
+         // A parameter only exists, as far as modulation is concerned, for the
+         // frames it draws in: ModSlider/ModKnob hand the apply pass a raw
+         // float* through RegisterParam, and the pass writes through exactly
+         // the pointers registered this frame. So closing a node's eye used to
+         // silently freeze every modulator and expression patched into it -
+         // the cable stayed, the binding stayed, the matrix still listed it,
+         // and nothing moved.
+         //
+         // Fix: a collapsed node that actually has something driving it still
+         // runs this whole dispatch, with the UI suppressed three ways -
+         // gParamRegisterOnly makes every Mod* widget register its ParamRef
+         // and return before it draws or declares a pin (the pins a collapsed
+         // node needs come from CollapsedBindingPins instead), SkipItems makes
+         // every plain ImGui widget a no-op so the node's size and layout are
+         // untouched, and an empty clip rect swallows any raw draw-list work
+         // the params body does around them. Gated on there being a binding at
+         // all so the common collapsed node costs exactly what it did before.
+         const bool registerOnlyParams = !isAudioBody && !gn.showParams &&
+                                         (gn.hasModulatedParams || gn.hasPaletteColors ||
+                                          gn.hasExpressionParams);
+         ImGuiWindow* paramsWindow = ImGui::GetCurrentWindow();
+         const bool savedSkipItems = paramsWindow->SkipItems;
+         if (registerOnlyParams)
+         {
+            gParamRegisterOnly = true;
+            paramsWindow->SkipItems = true;
+            ImGui::GetWindowDrawList()->PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(0.0f, 0.0f), false);
+         }
+         if (!isAudioBody && (gn.showParams || registerOnlyParams))
          {
             if (auto* n = dynamic_cast<ImageSourceNode*>(gn.node.get()))
                DrawImageSourceParams(n);
@@ -38312,6 +38363,12 @@ int main(int argc, char** argv)
             }
             else if (auto* n = dynamic_cast<SyphonOutNode*>(gn.node.get()))
                DrawSyphonOutParams(n);
+         }
+         if (registerOnlyParams)
+         {
+            ImGui::GetWindowDrawList()->PopClipRect();
+            paramsWindow->SkipItems = savedSkipItems;
+            gParamRegisterOnly = false;
          }
 
          ImGui::EndGroup();
@@ -41389,6 +41446,20 @@ int main(int argc, char** argv)
             printf("cable while hidden: %d %s\n", drawn,
                    drawn > 0 ? "DRAWN OK" : "MISSING - BUG");
          }
+         if (frameId == 6)
+         {
+            // Stamp a sentinel well outside the binding's range while the node
+            // is collapsed. If the apply pass is still writing this param, the
+            // next frame puts it back inside "size x"'s own range; if collapsing
+            // froze the modulation (the bug), the sentinel just sits there.
+            static_cast<ShapeNode*>(gNodes[0].node.get())->sizeX = -999.0f;
+         }
+         if (frameId == 8)
+         {
+            const float sizeX = static_cast<ShapeNode*>(gNodes[0].node.get())->sizeX;
+            printf("driven while hidden: size x = %.4f %s\n", sizeX,
+                   (sizeX >= 0.01f && sizeX <= 1.0f) ? "APPLIED OK" : "FROZEN - BUG");
+         }
          if (frameId == 9)
          {
             gNodes[0].showParams = true; // reopen
@@ -41654,16 +41725,21 @@ int main(int argc, char** argv)
          }
          if (frameId == 5)
          {
-            // Test 2: KnownParam is sticky - it must still resolve the
-            // destination's name/range even though this collapsed node
-            // registered nothing in FrameParams this frame.
+            // Test 2: the matrix can still resolve a collapsed destination's
+            // name/range. Two things have to hold at once: a collapsed node
+            // that something is patched into keeps re-registering its params
+            // (otherwise the apply pass has no pointer to write through and
+            // the modulation silently freezes - see gParamRegisterOnly), and
+            // KnownParam stays sticky for the cases that genuinely register
+            // nothing (a docked matrix panel drawing before the canvas has,
+            // a param behind a mode switch).
             bool registeredThisFrame = false;
             for (const ParamRef& ref : mod.FrameParams())
                if (ref.nodeIndex == gNodes[0].index && ref.paramIndex == sidesParam)
                   registeredThisFrame = true;
             const ParamRef* known = mod.KnownParam(gNodes[0].index, sidesParam);
-            test2Ok = !registeredThisFrame && known != nullptr && known->name == "sides";
-            printf("test2 (sticky KnownParam while collapsed) registered=%d known=%p name=%s  %s\n",
+            test2Ok = registeredThisFrame && known != nullptr && known->name == "sides";
+            printf("test2 (collapsed node still registers, KnownParam sticky) registered=%d known=%p name=%s  %s\n",
                    registeredThisFrame, (const void*)known, known ? known->name.c_str() : "(null)",
                    test2Ok ? "OK" : "- BUG");
             gNodes[0].showParams = true; // reopen

@@ -56,6 +56,11 @@ struct GraphNode
    bool hasModulatedParams = false; // recomputed each frame, drives the collapsed "mod" tag
    bool hasBipolarParams = false;   // ditto: true if any binding on this node is bipolar - "mod±"
    bool hasPaletteColors = false;   // ditto, for the collapsed "pal" tag
+   // ditto: true if any param on this node carries a typed expression. Not a
+   // tag of its own - it exists so a collapsed node with a live expression
+   // still runs the register-only params pass that keeps it evaluating (see
+   // gParamRegisterOnly in main.cpp).
+   bool hasExpressionParams = false;
 
    // Where to place the node the first frame it appears (canvas coords).
    float spawnX = 0.0f;
