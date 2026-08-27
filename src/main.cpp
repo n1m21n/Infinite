@@ -18,6 +18,7 @@
 // before a same-frame keystroke is processed, so typed-param entry sets the
 // cursor/selection state explicitly once the field is confirmed active.
 #include "imgui_internal.h"
+#include "TablerIcons.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -331,6 +332,8 @@ namespace
       // spawn menu, node header, help popup - but the registered type key
       // (gn.typeName, NodeFactory's lookup, every saved patch's node-type
       // string) stays "Dynamics" so existing patches keep loading.
+      if (name == "AudioEffects")
+         return "audio effects";
       if (name == "Dynamics")
          return "compressor";
       // Registered type key stays "Sampler" (patches/undo/copy-paste key off
@@ -970,15 +973,12 @@ namespace
          const ImVec2 bmin = ImGui::GetItemRectMin();
          const ImVec2 bmax = ImGui::GetItemRectMax();
          const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-         const float h = (bmax.y - bmin.y) * 0.22f;
-         const float w = h * 0.95f;
-         const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(255, 255, 255, 255) : IM_COL32(215, 218, 228, 255);
+         const float iconSize = (bmax.y - bmin.y) * 0.75f;
+         const ImU32 col = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
          if (state.descending)
-            dl->AddTriangleFilled(ImVec2(center.x - w, center.y - h * 0.5f), ImVec2(center.x + w, center.y - h * 0.5f),
-                                   ImVec2(center.x, center.y + h * 0.7f), col);
+            Tabler::DrawChevronDown(dl, center, iconSize, col);
          else
-            dl->AddTriangleFilled(ImVec2(center.x - w, center.y + h * 0.5f), ImVec2(center.x + w, center.y + h * 0.5f),
-                                   ImVec2(center.x, center.y - h * 0.7f), col);
+            Tabler::DrawChevronUp(dl, center, iconSize, col);
       }
       if (dirClicked)
          state.descending = !state.descending;
@@ -10164,28 +10164,26 @@ namespace
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float r = (bmax.y - bmin.y) * 0.28f;
-            const ImU32 col = ImGui::IsItemHovered() || scanning ? IM_COL32(255, 255, 255, 255) : IM_COL32(215, 218, 228, 255);
-            const float aMin = -2.35f, aMax = 2.0f; // ~250 degree sweep, gap at lower-left
-            dl->PathArcTo(center, r, aMin, aMax, 16);
-            dl->PathStroke(col, 0, 1.6f);
-            const ImVec2 tip(center.x + r * cosf(aMax), center.y + r * sinf(aMax));
-            const ImVec2 tangent(-sinf(aMax), cosf(aMax));
-            const ImVec2 normal(-tangent.y, tangent.x);
-            const float headLen = r * 0.9f;
-            dl->AddTriangleFilled(
-               ImVec2(tip.x + normal.x * headLen * 0.55f, tip.y + normal.y * headLen * 0.55f),
-               ImVec2(tip.x - normal.x * headLen * 0.55f, tip.y - normal.y * headLen * 0.55f),
-               ImVec2(tip.x + tangent.x * headLen * 0.7f, tip.y + tangent.y * headLen * 0.7f),
-               col);
+            const float iconSize = (bmax.y - bmin.y) * 0.72f;
+            const ImU32 col = ImGui::IsItemHovered() || scanning ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+            Tabler::DrawRefresh(dl, center, iconSize, col);
          }
          if (refreshClicked)
             folderToScan = folder;
          if (scanning)
             ImGui::EndDisabled();
          ImGui::SameLine(panelW - btnW);
-         if (ImGui::Button("x", ImVec2(btnW, 0)))
+         if (ImGui::Button("##removefolder", ImVec2(btnW, 0)))
             folderToRemove = folder;
+         {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            const float iconSize = (bmax.y - bmin.y) * 0.65f;
+            const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+            Tabler::DrawX(dl, center, iconSize, col);
+         }
          ImGui::PopID();
       }
       if (!folderToRemove.empty())
@@ -10331,24 +10329,12 @@ namespace
                const ImVec2 bmin = ImGui::GetItemRectMin();
                const ImVec2 bmax = ImGui::GetItemRectMax();
                const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-               const ImU32 iconCol = ImGui::IsItemHovered() ? IM_COL32(255, 255, 255, 255) : IM_COL32(215, 218, 228, 255);
+               const ImU32 iconCol = (ImGui::IsItemHovered() || isPlaying) ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+               const float iconSize = btnH * 0.85f;
                if (isPlaying)
-               {
-                  const float barW = btnH * 0.13f;
-                  const float barH = btnH * 0.38f;
-                  const float gapX = btnH * 0.09f;
-                  dl->AddRectFilled(ImVec2(center.x - gapX - barW, center.y - barH * 0.5f),
-                                     ImVec2(center.x - gapX, center.y + barH * 0.5f), iconCol, 1.0f);
-                  dl->AddRectFilled(ImVec2(center.x + gapX, center.y - barH * 0.5f),
-                                     ImVec2(center.x + gapX + barW, center.y + barH * 0.5f), iconCol, 1.0f);
-               }
+                  Tabler::DrawPlayerPause(dl, center, iconSize, iconCol);
                else
-               {
-                  const float h = btnH * 0.36f;
-                  dl->AddTriangleFilled(ImVec2(center.x - h * 0.5f, center.y - h),
-                                          ImVec2(center.x - h * 0.5f, center.y + h),
-                                          ImVec2(center.x + h * 0.85f, center.y), iconCol);
-               }
+                  Tabler::DrawPlayerPlay(dl, center, iconSize, iconCol, true);
             }
             if (clicked)
             {
@@ -21475,6 +21461,9 @@ namespace
          glfwMakeContextCurrent(mainWindow);
          return;
       }
+#if defined(_WIN32)
+      Platform::SetWindowIconFromResource(projWindow);
+#endif
 
       // Offset from the main window rather than wherever the OS happens to
       // drop it, so opening several in a row doesn't stack them exactly on
@@ -28381,6 +28370,9 @@ int main(int argc, char** argv)
       glfwTerminate();
       return 1;
    }
+#if defined(_WIN32)
+   Platform::SetWindowIconFromResource(window);
+#endif
 
    glfwMakeContextCurrent(window);
 #if !defined(__APPLE__)
@@ -31257,15 +31249,44 @@ int main(int argc, char** argv)
          ImGui::Separator();
 
          Transport& transport = Transport::Instance();
-         ImGui::PushStyleColor(ImGuiCol_Button, transport.IsPlaying()
-                                                   ? ImVec4(0.16f, 0.52f, 0.28f, 1.0f)
-                                                   : ImVec4(0.30f, 0.30f, 0.34f, 1.0f));
-         if (ImGui::Button(transport.IsPlaying() ? "Pause" : "Play", ImVec2(64, 0)))
+         const bool isTransportPlaying = transport.IsPlaying();
+         if (isTransportPlaying)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.52f, 0.28f, 1.0f));
+         if (ImGui::Button("##transportplay", ImVec2(36, 0)))
             transport.TogglePlay();
-         ImGui::PopStyleColor();
+         {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            const float iconSize = (bmax.y - bmin.y) * 0.72f;
+            const ImU32 col = isTransportPlaying
+                                  ? IM_COL32(255, 255, 255, 255)
+                                  : ImGui::GetColorU32(ImGuiCol_Text);
+            if (isTransportPlaying)
+               Tabler::DrawPlayerPause(dl, center, iconSize, col);
+            else
+               Tabler::DrawPlayerPlay(dl, center, iconSize, col, true);
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s (Space)", isTransportPlaying ? "Pause" : "Play");
+         if (isTransportPlaying)
+            ImGui::PopStyleColor();
 
-         if (ImGui::Button("Rewind"))
+         ImGui::SameLine();
+         if (ImGui::Button("##transportrewind", ImVec2(36, 0)))
             transport.Rewind();
+         {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            const float iconSize = (bmax.y - bmin.y) * 0.70f;
+            const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+            Tabler::DrawPlayerRewind(dl, center, iconSize, col);
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Rewind (Return)");
 
          ImGui::Separator();
 
@@ -31711,6 +31732,15 @@ int main(int argc, char** argv)
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
+         SamplerNode* dropTargetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasPos);
+         PaulStretchNode* dropTargetPaul = FindNodeUnderCanvasPoint<PaulStretchNode>(canvasPos);
+         GranularNode* dropTargetGran = FindNodeUnderCanvasPoint<GranularNode>(canvasPos);
+         MolderNode* dropTargetMolder = FindNodeUnderCanvasPoint<MolderNode>(canvasPos);
+         AudioFileNode* dropTargetAudioFile = FindNodeUnderCanvasPoint<AudioFileNode>(canvasPos);
+         AudioPluginNode* dropTargetPlugin = FindNodeUnderCanvasPoint<AudioPluginNode>(canvasPos);
+         ModelSourceNode* dropTargetModel = FindNodeUnderCanvasPoint<ModelSourceNode>(canvasPos);
+         VideoSourceNode* dropTargetVideo = FindNodeUnderCanvasPoint<VideoSourceNode>(canvasPos);
+         ImageSourceNode* dropTargetImage = FindNodeUnderCanvasPoint<ImageSourceNode>(canvasPos);
          float offset = 0.0f;
          bool droppedCheckpointPushed = false;
          auto ensureDroppedCheckpoint = [&]()
@@ -31733,12 +31763,64 @@ int main(int argc, char** argv)
                continue;
             }
 
-            if (dropTargetDrum != nullptr && HasExtension(path, kAudioExt))
+            if (HasExtension(path, kAudioExt))
             {
-               ensureDroppedCheckpoint();
-               dropTargetDrum->LoadFileToLane(dropTargetLane, path);
-               dropTargetLane = (dropTargetLane + 1) % DrumSequencerNode::kNumLanes;
-               gPatchDirty = true;
+               if (dropTargetDrum != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetDrum->LoadFileToLane(dropTargetLane, path);
+                  dropTargetLane = (dropTargetLane + 1) % DrumSequencerNode::kNumLanes;
+                  gPatchDirty = true;
+                  continue;
+               }
+               if (dropTargetSampler != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetSampler->LoadFile(path);
+                  dropTargetSampler = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
+               if (dropTargetPaul != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetPaul->LoadFile(path);
+                  dropTargetPaul = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
+               if (dropTargetGran != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetGran->LoadFile(path);
+                  dropTargetGran = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
+               if (dropTargetMolder != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetMolder->LoadFile(path);
+                  dropTargetMolder = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
+               if (dropTargetAudioFile != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetAudioFile->Open(path);
+                  dropTargetAudioFile = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
+
+               GraphNode* spawned = SpawnNode("Audio File", "Modulators", canvasPos.x + offset, canvasPos.y);
+               if (spawned != nullptr)
+               {
+                  static_cast<AudioFileNode*>(spawned->node.get())->Open(path);
+                  spawned->showParams = true;
+               }
+               offset += 240.0f;
                continue;
             }
 
@@ -31776,10 +31858,11 @@ int main(int argc, char** argv)
                      desc.path = origPath;
                }
 
-               if (AudioPluginNode* target = FindNodeUnderCanvasPoint<AudioPluginNode>(canvasPos))
+               if (dropTargetPlugin != nullptr)
                {
                   ensureDroppedCheckpoint();
-                  target->LoadPlugin(desc);
+                  dropTargetPlugin->LoadPlugin(desc);
+                  dropTargetPlugin = nullptr;
                   gPatchDirty = true;
                   continue;
                }
@@ -31787,26 +31870,44 @@ int main(int argc, char** argv)
                if (spawned != nullptr)
                   static_cast<AudioPluginNode*>(spawned->node.get())->LoadPlugin(desc);
             }
-            else if (HasExtension(path, kAudioExt))
-            {
-               spawned = SpawnNode("Audio File", "Modulators", canvasPos.x + offset, canvasPos.y);
-               if (spawned != nullptr)
-                  static_cast<AudioFileNode*>(spawned->node.get())->Open(path);
-            }
             else if (HasExtension(path, kModelExt))
             {
+               if (dropTargetModel != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetModel->Load(path);
+                  dropTargetModel = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
                spawned = SpawnNode("Model 3D", "3D", canvasPos.x + offset, canvasPos.y);
                if (spawned != nullptr)
                   static_cast<ModelSourceNode*>(spawned->node.get())->Load(path);
             }
             else if (HasExtension(path, kVideoExt))
             {
+               if (dropTargetVideo != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetVideo->Open(path);
+                  dropTargetVideo = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
                spawned = SpawnNode("Video", "Source", canvasPos.x + offset, canvasPos.y);
                if (spawned != nullptr)
                   static_cast<VideoSourceNode*>(spawned->node.get())->Open(path);
             }
             else
             {
+               if (dropTargetImage != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetImage->Load(path);
+                  dropTargetImage = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
                spawned = SpawnNode("Image Source", "Source", canvasPos.x + offset, canvasPos.y);
                if (spawned != nullptr)
                   static_cast<ImageSourceNode*>(spawned->node.get())->Load(path);
@@ -39953,6 +40054,13 @@ int main(int argc, char** argv)
                   targetMolder->LoadFile(gSampleDragPath);
                   gPatchDirty = true;
                }
+               else if (AudioFileNode* targetAudioFile = FindNodeUnderCanvasPoint<AudioFileNode>(canvasMouse))
+               {
+                  // Dropped onto an existing Audio File: swap its file.
+                  PushUndoCheckpoint();
+                  targetAudioFile->Open(gSampleDragPath);
+                  gPatchDirty = true;
+               }
                else if (overCanvas)
                {
                   // No Sampler under the cursor but still over the canvas:
@@ -40216,28 +40324,38 @@ int main(int argc, char** argv)
                for (const auto& t : gLinkDragSuggestions)
                {
                   ++shown;
-                  if (ImGui::Selectable(DisplayName(t.first).c_str()))
+                  if (ImGui::MenuItem(DisplayName(t.first).c_str()))
                   {
                      spawnName = t.first;
                      spawnCategory = t.second;
                   }
                }
+               ImGui::Separator();
             }
 
-            // no query yet: browse by category
-            for (const std::string& category : NodeFactory::Instance().GetCategories())
+            // no query yet: browse by category submenu
+            std::vector<std::string> cats = NodeFactory::Instance().GetCategories();
+            std::stable_sort(cats.begin(), cats.end(), [](const std::string& a, const std::string& b) {
+               return CategoryColors::SemanticRank(a) < CategoryColors::SemanticRank(b);
+            });
+
+            for (const std::string& category : cats)
             {
-               ImGui::SeparatorText(DisplayName(category).c_str());
-               for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+               ImGui::SetNextWindowSizeConstraints(ImVec2(180, 0), ImVec2(320, 440));
+               if (ImGui::BeginMenu(DisplayName(category).c_str()))
                {
-                  if (!IsUserSpawnable(name))
-                     continue;
-                  ++shown;
-                  if (ImGui::Selectable(DisplayName(name).c_str()))
+                  for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                   {
-                     spawnName = name;
-                     spawnCategory = category;
+                     if (!IsUserSpawnable(name))
+                        continue;
+                     ++shown;
+                     if (ImGui::MenuItem(DisplayName(name).c_str()))
+                     {
+                        spawnName = name;
+                        spawnCategory = category;
+                     }
                   }
+                  ImGui::EndMenu();
                }
             }
          }

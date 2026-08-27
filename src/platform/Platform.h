@@ -823,6 +823,7 @@ namespace Platform
 #if defined(_WIN32)
    void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost, bool hideCursor);
    void ReassertOutputWindowTopmost(GLFWwindow* window);
+   void SetWindowIconFromResource(GLFWwindow* window);
 #endif
 }
 

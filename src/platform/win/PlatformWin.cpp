@@ -814,7 +814,12 @@ namespace Platform
 
    // ---- Finder document opening ------------------------------------------
 
-   void InitDocumentHandlingPreGlfw() {}
+   void InitDocumentHandlingPreGlfw()
+   {
+      // Explicit AppUserModelID ensures Windows Taskbar groups windows under
+      // the Infinite application and displays the correct pinned taskbar icon.
+      SetCurrentProcessExplicitAppUserModelID(L"Infinite.Synthesizer");
+   }
    void InitDocumentHandlingPostGlfw() {}
 
    bool PollPendingOpenFile(std::string&)
@@ -986,5 +991,26 @@ namespace Platform
 
       SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+   }
+
+   void SetWindowIconFromResource(GLFWwindow* window)
+   {
+      HWND hwnd = glfwGetWin32Window(window);
+      if (hwnd == nullptr)
+         return;
+
+      HINSTANCE hInstance = GetModuleHandleW(nullptr);
+      HICON hIconBig = (HICON)LoadImageW(hInstance, L"GLFW_ICON", IMAGE_ICON,
+                                         GetSystemMetrics(SM_CXICON),
+                                         GetSystemMetrics(SM_CYICON),
+                                         LR_SHARED);
+      HICON hIconSmall = (HICON)LoadImageW(hInstance, L"GLFW_ICON", IMAGE_ICON,
+                                           GetSystemMetrics(SM_CXSMICON),
+                                           GetSystemMetrics(SM_CYSMICON),
+                                           LR_SHARED);
+      if (hIconBig != nullptr)
+         SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
+      if (hIconSmall != nullptr)
+         SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
    }
 }

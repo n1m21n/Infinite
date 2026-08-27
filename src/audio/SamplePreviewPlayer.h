@@ -51,11 +51,16 @@ public:
    void Play(Platform::SampleBuffer* decoded)
    {
       mStopRequested.store(false, std::memory_order_relaxed);
+      mPlayingPublished.store(true, std::memory_order_release);
       mSlot.Push(decoded);
    }
 
    // Main thread.
-   void Stop() { mStopRequested.store(true, std::memory_order_release); }
+   void Stop()
+   {
+      mStopRequested.store(true, std::memory_order_release);
+      mPlayingPublished.store(false, std::memory_order_release);
+   }
 
    bool IsPlaying() const { return mPlayingPublished.load(std::memory_order_relaxed); }
    float PositionSeconds() const { return mPositionSecondsPublished.load(std::memory_order_relaxed); }
