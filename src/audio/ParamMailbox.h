@@ -20,7 +20,7 @@
 class ParamMailbox
 {
 public:
-   static constexpr int kMaxParams = 64;
+   static constexpr int kMaxParams = 128;
 
    void PrepareToPlay(double sampleRate);
 

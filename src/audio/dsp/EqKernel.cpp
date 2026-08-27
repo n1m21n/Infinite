@@ -29,18 +29,24 @@ void EqKernel::PushParams(const AudioEffectNode& node, double sampleRate)
       const float q = node.Param(kQNames[b]);
       const float gainDb = node.Param(kGainNames[b]);
       const bool on = node.Param(kOnNames[b]) >= 0.5f;
+      const int activeStages = on ? EqDsp::StageCount(type) : 0;
 
-      DspMath::Biquad bq;
+      DspMath::Biquad activeBq;
       if (on)
-         EqDsp::ConfigureBiquad(bq, type, freq, q, gainDb, sampleRate);
-      else
-         EqDsp::ConfigureBypass(bq);
+         EqDsp::ConfigureBiquad(activeBq, type, freq, q, gainDb, sampleRate);
+      DspMath::Biquad bypassBq;
+      EqDsp::ConfigureBypass(bypassBq);
 
-      mMailbox.Push(b * kCoeffsPerBand + 0, bq.b0);
-      mMailbox.Push(b * kCoeffsPerBand + 1, bq.b1);
-      mMailbox.Push(b * kCoeffsPerBand + 2, bq.b2);
-      mMailbox.Push(b * kCoeffsPerBand + 3, bq.a1);
-      mMailbox.Push(b * kCoeffsPerBand + 4, bq.a2);
+      for (int st = 0; st < kMaxStagesPerBand; st++)
+      {
+         const DspMath::Biquad& bq = (st < activeStages) ? activeBq : bypassBq;
+         const int slot = (b * kMaxStagesPerBand + st) * kCoeffsPerStage;
+         mMailbox.Push(slot + 0, bq.b0);
+         mMailbox.Push(slot + 1, bq.b1);
+         mMailbox.Push(slot + 2, bq.b2);
+         mMailbox.Push(slot + 3, bq.a1);
+         mMailbox.Push(slot + 4, bq.a2);
+      }
    }
 
    mMailbox.Push(kOutputGainSlot, node.Param("outputGainDb"));

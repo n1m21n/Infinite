@@ -602,6 +602,13 @@ namespace
    // rather than the menu reaching into the editor from outside it.
    bool gRequestGroup = false;
    bool gRequestUngroup = false;
+   bool gRequestCopy = false;
+   bool gRequestPaste = false;
+   bool gRequestDuplicate = false;
+   bool gRequestDelete = false;
+   bool gRequestSelectAll = false;
+   bool gRequestAddNode = false;
+   bool gRequestAddComment = false;
    int gContextMenuNodeIndex = -1; // node the right-click context menu is open for
    int gHelpPopupNodeIndex = -1; // node the per-node "Help" popup is open for
    bool gOpenNodeHelpPopup = false; // set for one frame to open it (can't OpenPopup from inside another popup's Begin/End and have it show the same frame)
@@ -784,6 +791,7 @@ namespace
    bool gFormulaEditorOpen = false;
    bool gGlobalsOpen = false;
    bool gHelpOpen = false;
+   bool gShortcutsOpen = false;
    bool gShowUpdateCheckModal = false;
 
    // Files dropped on the window, consumed on the next frame so the spawn can
@@ -11552,65 +11560,199 @@ namespace
 
    void DrawNoteSequencerBody(GraphNode& gn, NoteSequencerNode* n)
    {
-      char stat[64];
       const int cur = n->CurrentStep();
-      snprintf(stat, sizeof(stat), "step %d/%d", cur < 0 ? 0 : cur + 1, n->steps);
+      const int steps = std::clamp(n->steps, 1, NoteSequencerNode::kMaxSteps);
+      char stat[80];
+      if (cur >= 0 && cur < steps)
+      {
+         int playNote = n->stepNote[cur];
+         if (n->useGlobalScale)
+            playNote = MusicTime::SnapToScale(playNote, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
+         playNote = std::clamp(playNote, 0, 127);
+         snprintf(stat, sizeof(stat), "step %d/%d - %s%d (%+dst)%s",
+                  cur + 1, steps,
+                  NoteNameList()[playNote % 12].c_str(), playNote / 12 - 1,
+                  playNote - 60,
+                  n->stepEnabled[cur] ? "" : " [muted]");
+      }
+      else
+      {
+         snprintf(stat, sizeof(stat), "step 0/%d", steps);
+      }
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       {
-         const int steps = std::clamp(n->steps, 1, NoteSequencerNode::kMaxSteps);
          const float w = gAudioBodyW;
-         const float pitchH = 70.0f;
-         const float velH = 16.0f;
-         const float gap = 2.0f;
+         const float pitchH = 186.0f;
+         const float tagH = 18.0f;
+         const float velH = 20.0f;
+         const float gap = 3.0f;
          const float barW = (w - gap * (float)(steps - 1)) / (float)steps;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         const int kLow = 48, kHigh = 84; // C3..C6 drag window
+         ImFont* font = ImGui::GetFont();
+         const float fontCapSz = 10.5f;
+         const float fontTagSz = 10.5f;
+         const float fontVelSz = 10.0f;
 
+         const int kLow = 36, kHigh = 84; // C2..C6 (-24..+24 st, 49 notes)
+         const int numNotes = kHigh - kLow + 1;
+         const float noteH = pitchH / (float)numNotes;
+
+         auto DrawTextCentered = [&](const ImVec2& minP, const ImVec2& maxP, ImU32 col, const char* text, float fSz) {
+            const ImVec2 sz = font->CalcTextSizeA(fSz, FLT_MAX, 0.0f, text);
+            const float tx = minP.x + std::max(0.0f, (maxP.x - minP.x - sz.x) * 0.5f);
+            const float ty = minP.y + std::max(0.0f, (maxP.y - minP.y - sz.y) * 0.5f);
+            dl->AddText(font, fSz, ImVec2(tx, ty), col, text);
+         };
+
+         // ---- 1) Clean background ----
+         dl->AddRectFilled(ImVec2(origin.x, origin.y), ImVec2(origin.x + w, origin.y + pitchH),
+                           IM_COL32(18, 20, 26, 255), 3.0f);
+
+         // ---- 2) Step columns: pitch bars, semitone badges, velocity & mute ----
          for (int i = 0; i < steps; i++)
          {
             const float x0 = origin.x + (float)i * (barW + gap);
+            const float x1 = x0 + barW;
+            const bool isCurrent = (i == cur);
             ImGui::PushID(i);
 
+            // Pitch drag / click area
             ImGui::SetCursorScreenPos(ImVec2(x0, origin.y));
             ImGui::InvisibleButton("pitch", ImVec2(barW, pitchH));
-            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
+            const bool pitchHovered = ImGui::IsItemHovered();
+            const bool pitchActive = ImGui::IsItemActive();
+
+            if (pitchActive && (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsItemClicked(ImGuiMouseButton_Left)))
             {
                const float my = ImGui::GetIO().MousePos.y;
                const float t = 1.0f - std::clamp((my - origin.y) / pitchH, 0.0f, 1.0f);
-               n->stepNote[i] = kLow + (int)(t * (float)(kHigh - kLow) + 0.5f);
+               n->stepNote[i] = std::clamp(kLow + (int)std::floor(t * (float)numNotes), kLow, kHigh);
             }
-            const bool isCurrent = (i == cur);
-            const float t = std::clamp((float)(n->stepNote[i] - kLow) / (float)(kHigh - kLow), 0.0f, 1.0f);
-            const float barTop = origin.y + (1.0f - t) * pitchH;
-            const ImU32 col = n->stepEnabled[i]
-               ? (isCurrent ? IM_COL32(255, 200, 100, 255) : IM_COL32(120, 200, 255, 255))
-               : IM_COL32(50, 53, 64, 255);
-            dl->AddRectFilled(ImVec2(x0 + 1.0f, origin.y), ImVec2(x0 + barW - 1.0f, origin.y + pitchH),
-                              IM_COL32(20, 21, 26, 255), 2.0f);
-            dl->AddRectFilled(ImVec2(x0 + 1.0f, barTop), ImVec2(x0 + barW - 1.0f, origin.y + pitchH), col, 2.0f);
 
-            const float vy0 = origin.y + pitchH + 2.0f;
-            ImGui::SetCursorScreenPos(ImVec2(x0, vy0));
-            if (ImGui::InvisibleButton("en", ImVec2(barW, velH)))
+            // Calculate display note
+            const int rawNote = n->stepNote[i];
+            int dispNote = rawNote;
+            if (n->useGlobalScale)
+               dispNote = MusicTime::SnapToScale(rawNote, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
+            dispNote = std::clamp(dispNote, kLow, kHigh);
+            const int dispPc = ((dispNote % 12) + 12) % 12;
+            const int dispOct = dispNote / 12 - 1;
+            const int stFromC4 = dispNote - 60;
+
+            const float noteTopY = origin.y + (float)(kHigh - dispNote) * noteH;
+            const float capH = std::max(16.0f, noteH + 3.0f);
+            const float capTop = std::clamp(noteTopY - (capH - noteH) * 0.5f, origin.y, origin.y + pitchH - capH);
+            const float capBot = capTop + capH;
+
+            // Step column hover / playhead background highlight
+            if (isCurrent)
+               dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, origin.y + pitchH),
+                                 IM_COL32(255, 210, 80, 30), 2.0f);
+            else if (pitchHovered)
+               dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, origin.y + pitchH),
+                                 IM_COL32(255, 255, 255, 12), 2.0f);
+
+            // Pitch bar stem (from cap to bottom of pitch area)
+            if (capBot < origin.y + pitchH)
+            {
+               const ImU32 stemCol = n->stepEnabled[i]
+                  ? (isCurrent ? IM_COL32(220, 160, 45, 140) : IM_COL32(50, 120, 195, 130))
+                  : IM_COL32(35, 38, 48, 100);
+               dl->AddRectFilled(ImVec2(x0 + 1.0f, capBot), ImVec2(x1 - 1.0f, origin.y + pitchH),
+                                 stemCol, 2.0f);
+            }
+
+            // Note head cap (solid prominent block)
+            const ImU32 capCol = n->stepEnabled[i]
+               ? (isCurrent ? IM_COL32(255, 220, 95, 255) : (pitchActive ? IM_COL32(140, 215, 255, 255) : IM_COL32(95, 185, 255, 255)))
+               : IM_COL32(55, 60, 75, 220);
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capCol, 3.0f);
+            dl->AddRect(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot),
+                        isCurrent ? IM_COL32(255, 245, 180, 255) : IM_COL32(180, 230, 255, 160), 3.0f);
+
+            // Note text inside head cap with reduced font size
+            char noteStr[16];
+            snprintf(noteStr, sizeof(noteStr), "%s%d", NoteNameList()[dispPc].c_str(), dispOct);
+            const ImU32 txtCol = n->stepEnabled[i] ? IM_COL32(10, 20, 35, 255) : IM_COL32(140, 145, 160, 220);
+            DrawTextCentered(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), txtCol, noteStr, fontCapSz);
+
+            // ---- Semitone tag / button (click to toggle step enable) ----
+            const float ty0 = origin.y + pitchH + 4.0f;
+            ImGui::SetCursorScreenPos(ImVec2(x0, ty0));
+            if (ImGui::InvisibleButton("tag", ImVec2(barW, tagH)))
                n->stepEnabled[i] = !n->stepEnabled[i];
-            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+            const bool tagHovered = ImGui::IsItemHovered();
+
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, ty0), ImVec2(x1 - 1.0f, ty0 + tagH),
+                              tagHovered ? IM_COL32(32, 36, 48, 255) : IM_COL32(18, 20, 26, 255), 2.0f);
+
+            char stStr[16];
+            if (barW >= 36.0f)
+               snprintf(stStr, sizeof(stStr), "%+d st", stFromC4);
+            else
+               snprintf(stStr, sizeof(stStr), "%+d", stFromC4);
+
+            const ImU32 stCol = n->stepEnabled[i]
+               ? (isCurrent ? IM_COL32(255, 215, 100, 255) : IM_COL32(150, 205, 255, 230))
+               : IM_COL32(90, 95, 110, 180);
+            DrawTextCentered(ImVec2(x0 + 1.0f, ty0), ImVec2(x1 - 1.0f, ty0 + tagH), stCol, stStr, fontTagSz);
+
+            // ---- Velocity strip ----
+            const float vy0 = ty0 + tagH + 3.0f;
+            ImGui::SetCursorScreenPos(ImVec2(x0, vy0));
+            ImGui::InvisibleButton("vel", ImVec2(barW, velH));
+            const bool velHovered = ImGui::IsItemHovered();
+            const bool velActive = ImGui::IsItemActive();
+
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            {
+               n->stepEnabled[i] = !n->stepEnabled[i];
+            }
+            else if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !n->stepEnabled[i])
+            {
+               n->stepEnabled[i] = true;
+            }
+            if (velActive && (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsItemClicked(ImGuiMouseButton_Left)))
             {
                const float my = ImGui::GetIO().MousePos.y;
                const float vt = 1.0f - std::clamp((my - vy0) / velH, 0.0f, 1.0f);
                n->stepVelocity[i] = std::clamp(vt, 0.0f, 1.0f);
+               n->stepEnabled[i] = true;
             }
-            dl->AddRectFilled(ImVec2(x0 + 1.0f, vy0), ImVec2(x0 + barW - 1.0f, vy0 + velH),
-                              IM_COL32(20, 21, 26, 255), 2.0f);
-            const float vFillTop = vy0 + (1.0f - n->stepVelocity[i]) * velH;
-            dl->AddRectFilled(ImVec2(x0 + 1.0f, vFillTop), ImVec2(x0 + barW - 1.0f, vy0 + velH),
-                              n->stepEnabled[i] ? IM_COL32(90, 170, 120, 255) : IM_COL32(50, 53, 64, 255), 2.0f);
+
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy0 + velH),
+                              IM_COL32(16, 18, 24, 255), 2.0f);
+
+            if (n->stepEnabled[i])
+            {
+               const float vFillTop = vy0 + (1.0f - n->stepVelocity[i]) * velH;
+               const ImU32 vCol = isCurrent ? IM_COL32(255, 205, 90, 255) : IM_COL32(75, 195, 130, 255);
+               dl->AddRectFilled(ImVec2(x0 + 1.0f, vFillTop), ImVec2(x1 - 1.0f, vy0 + velH), vCol, 2.0f);
+               char vStr[16];
+               snprintf(vStr, sizeof(vStr), "%.0f", n->stepVelocity[i] * 100.0f);
+               DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy0 + velH), IM_COL32(10, 25, 15, 230), vStr, fontVelSz);
+            }
+            else
+            {
+               DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy0 + velH), IM_COL32(85, 90, 105, 180), "OFF", fontVelSz);
+            }
+
+            // Playhead indicator border & top pip
+            if (isCurrent)
+            {
+               dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, vy0 + velH),
+                           IM_COL32(255, 210, 80, 220), 3.0f, 0, 1.5f);
+               dl->AddRectFilled(ImVec2(x0 + 2.0f, origin.y - 3.0f), ImVec2(x1 - 2.0f, origin.y),
+                                 IM_COL32(255, 225, 110, 255), 1.5f);
+            }
 
             ImGui::PopID();
          }
-         ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + pitchH + velH + 6.0f));
+
+         ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + pitchH + tagH + velH + 10.0f));
          ImGui::Dummy(ImVec2(w, 1.0f));
       }
 
@@ -18950,6 +19092,129 @@ namespace
       return CategoryHelpText(gn.category);
    }
 
+   void DrawShortcutsWindow(bool* open)
+   {
+      ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
+      if (!ImGui::Begin("All Shortcuts", open))
+      {
+         ImGui::End();
+         return;
+      }
+
+      static char filterBuf[128] = "";
+      ImGui::SetNextItemWidth(250);
+      ImGui::InputTextWithHint("##filter", "Filter shortcuts...", filterBuf, sizeof(filterBuf));
+      ImGui::SameLine();
+      if (filterBuf[0] != '\0' && ImGui::SmallButton("Clear"))
+         filterBuf[0] = '\0';
+
+      std::string filter = filterBuf;
+      for (char& c : filter)
+         c = (char)tolower((unsigned char)c);
+
+      struct ShortcutEntry {
+         const char* category;
+         const char* action;
+         const char* key;
+         const char* description;
+      };
+
+      static const ShortcutEntry kShortcuts[] = {
+         // Patch & File
+         { "File & Patch", "New Patch", "Cmd+N", "Create a new empty patch" },
+         { "File & Patch", "Open Patch", "Cmd+O", "Open an existing .inf patch file" },
+         { "File & Patch", "Save", "Cmd+S", "Save current patch" },
+         { "File & Patch", "Save As...", "Cmd+Shift+S", "Save patch to a new file" },
+
+         // Edit & Canvas
+         { "Edit & Canvas", "Undo", "Cmd+Z", "Undo last graph action" },
+         { "Edit & Canvas", "Redo", "Cmd+Shift+Z / Ctrl+Y", "Redo last undone action" },
+         { "Edit & Canvas", "Cut / Copy", "Cmd+C", "Copy selected nodes and internal connections" },
+         { "Edit & Canvas", "Paste", "Cmd+V", "Paste copied nodes with automatic offset" },
+         { "Edit & Canvas", "Duplicate", "Cmd+D / Shift+D", "Duplicate selected nodes in-place" },
+         { "Edit & Canvas", "Delete", "Delete / Backspace / Shift+X", "Delete selected nodes, groups, or links" },
+         { "Edit & Canvas", "Delete Cable", "X", "Delete selected cable/link only" },
+         { "Edit & Canvas", "Select All", "Shift+A", "Select all nodes on the canvas" },
+         { "Edit & Canvas", "Group Selection", "Cmd+G", "Wrap selected nodes in a group box" },
+         { "Edit & Canvas", "Ungroup", "Cmd+Shift+G", "Dissolve group without deleting nodes" },
+         { "Edit & Canvas", "Add Node", "Shift+N", "Open quick type-to-filter node picker" },
+         { "Edit & Canvas", "Add Note / Comment", "/", "Drop a comment note under mouse pointer" },
+
+         // Canvas & View
+         { "Canvas & View", "Pan Canvas", "Drag Canvas", "Pan graph view" },
+         { "Canvas & View", "Zoom", "Scroll Wheel", "Zoom in and out" },
+         { "Canvas & View", "Rubber-band Select", "Shift + Drag", "Select multiple nodes in box" },
+         { "Canvas & View", "Toggle Params", "Shift+H", "Show / hide parameter knobs & sliders" },
+         { "Canvas & View", "Viewport Panel", "Shift+V", "Dock selected node in viewport panel" },
+         { "Canvas & View", "Modulation Matrix", "Shift+M", "Toggle docked modulation matrix" },
+
+         // Transport & Audio
+         { "Transport & Audio", "Play / Pause", "Space", "Start / pause timeline and animations" },
+         { "Transport & Audio", "Toggle Audio Engine", "Shift+K", "Start / stop audio device" },
+      };
+
+      const char* lastCat = nullptr;
+      bool inTable = false;
+
+      for (const auto& s : kShortcuts)
+      {
+         if (!filter.empty())
+         {
+            std::string text = std::string(s.category) + " " + s.action + " " + s.key + " " + s.description;
+            for (char& c : text)
+               c = (char)tolower((unsigned char)c);
+            if (text.find(filter) == std::string::npos)
+               continue;
+         }
+
+         if (lastCat == nullptr || strcmp(lastCat, s.category) != 0)
+         {
+            if (inTable)
+            {
+               ImGui::EndTable();
+               ImGui::Spacing();
+               inTable = false;
+            }
+            lastCat = s.category;
+            ImGui::SeparatorText(s.category);
+         }
+
+         if (!inTable)
+         {
+            char tableId[64];
+            snprintf(tableId, sizeof(tableId), "tbl_%s", s.category);
+            if (ImGui::BeginTable(tableId, 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+            {
+               ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+               ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+               ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch);
+               ImGui::TableHeadersRow();
+               inTable = true;
+            }
+         }
+
+         if (inTable)
+         {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted(s.action);
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.82f, 1.0f, 1.0f));
+            ImGui::TextUnformatted(s.key);
+            ImGui::PopStyleColor();
+
+            ImGui::TableSetColumnIndex(2);
+            ImGui::TextUnformatted(s.description);
+         }
+      }
+
+      if (inTable)
+         ImGui::EndTable();
+
+      ImGui::End();
+   }
+
    void DrawHelpWindow(bool* open)
    {
       ImGui::SetNextWindowSize(ImVec2(720, 620), ImGuiCond_FirstUseEver);
@@ -24863,13 +25128,17 @@ namespace EqTest
       const int skip = std::min(settleSamples, totalSamples - 16);
       const double phaseInc = 2.0 * M_PI * (double)evalHz / sampleRate;
 
-      DspMath::Biquad bq;
-      EqDsp::ConfigureBiquad(bq, type, freqHz, q, gainDb, sampleRate);
+      const int stages = EqDsp::StageCount(type);
+      DspMath::Biquad bq[3];
+      for (int s = 0; s < stages; s++)
+         EqDsp::ConfigureBiquad(bq[s], type, freqHz, q, gainDb, sampleRate);
       double sumInSq = 0.0, sumOutSq = 0.0, phase = 0.0;
       for (int i = 0; i < totalSamples; i++)
       {
          const float x = (float)sin(phase);
-         const float y = bq.Process(x);
+         float y = x;
+         for (int s = 0; s < stages; s++)
+            y = bq[s].Process(y);
          if (i >= skip)
          {
             sumInSq += (double)x * (double)x;
@@ -24925,9 +25194,9 @@ static bool RunEqFixture()
    bool all = true;
    const double sampleRate = 44100.0;
 
-   // 1) Closed form vs measurement: EqDsp::BiquadMagnitudeDb must agree with
-   //    a settled-sine render of the same scratch Biquad, for each of the
-   //    5 band types, at a spread of freq/Q/gain/eval points - the check
+   // 1) Closed form vs measurement: EqDsp::BandMagnitudeDb must agree with
+   //    a settled-sine render of the same scratch Biquads, for each of the
+   //    12 band types, at a spread of freq/Q/gain/eval points - the check
    //    that makes the whole interactive curve trustworthy.
    {
       struct Case { int type; float freq, q, gainDb, evalHz; };
@@ -24940,15 +25209,23 @@ static bool RunEqFixture()
          { EqDsp::kHighShelf, 10000.0f, 0.707f, 5.0f, 200.0f },
          { EqDsp::kHp12, 200.0f, 0.707f, 0.0f, 50.0f },
          { EqDsp::kHp12, 200.0f, 0.707f, 0.0f, 4000.0f },
+         { EqDsp::kHp24, 200.0f, 0.707f, 0.0f, 50.0f },
+         { EqDsp::kHp36, 200.0f, 0.707f, 0.0f, 50.0f },
          { EqDsp::kLp12, 500.0f, 0.707f, 0.0f, 4000.0f },
          { EqDsp::kLp12, 500.0f, 0.707f, 0.0f, 100.0f },
+         { EqDsp::kLp24, 500.0f, 0.707f, 0.0f, 4000.0f },
+         { EqDsp::kLp36, 500.0f, 0.707f, 0.0f, 4000.0f },
+         { EqDsp::kBP, 1000.0f, 2.0f, 0.0f, 1000.0f },
+         { EqDsp::kBP, 1000.0f, 2.0f, 0.0f, 200.0f },
+         { EqDsp::kNotch, 1000.0f, 2.0f, 0.0f, 100.0f },
+         { EqDsp::kNotch, 1000.0f, 2.0f, 0.0f, 10000.0f },
+         { EqDsp::kAllpass, 1000.0f, 1.0f, 0.0f, 500.0f },
+         { EqDsp::kAllpass, 1000.0f, 1.0f, 0.0f, 2000.0f },
       };
       float maxErr = 0.0f;
       for (const Case& c : cases)
       {
-         DspMath::Biquad bq;
-         EqDsp::ConfigureBiquad(bq, c.type, c.freq, c.q, c.gainDb, sampleRate);
-         const float closedForm = EqDsp::BiquadMagnitudeDb(bq, c.evalHz, sampleRate);
+         const float closedForm = EqDsp::BandMagnitudeDb(c.type, c.freq, c.q, c.gainDb, true, c.evalHz, sampleRate);
          const float measured = MeasureMagnitudeDb(c.type, c.freq, c.q, c.gainDb, c.evalHz, sampleRate);
          maxErr = std::max(maxErr, std::fabs(closedForm - measured));
       }
@@ -29809,6 +30086,7 @@ int main(int argc, char** argv)
 
    char searchBuf[128] = "";
    bool searchJustOpened = false;
+   bool searchPopupCentered = false;
    // Shift+N is a toggle, so the keyboard block (which runs before the popup is
    // drawn) needs to know whether the picker is already up. ImGui::IsPopupOpen
    // can't be trusted from there - the other OpenPopup("search") call sites sit
@@ -30558,83 +30836,114 @@ int main(int argc, char** argv)
             if (ImGui::MenuItem("Redo", "Cmd+Shift+Z", false, !gRedoStack.empty()))
                Redo();
             ImGui::Separator();
+            if (ImGui::MenuItem("Cut / Copy", "Cmd+C"))
+               gRequestCopy = true;
+            if (ImGui::MenuItem("Paste", "Cmd+V"))
+               gRequestPaste = true;
+            if (ImGui::MenuItem("Duplicate", "Cmd+D"))
+               gRequestDuplicate = true;
+            if (ImGui::MenuItem("Delete", "Backspace"))
+               gRequestDelete = true;
+            ImGui::Separator();
+            if (ImGui::MenuItem("Select All", "Shift+A"))
+               gRequestSelectAll = true;
+            ImGui::Separator();
             if (ImGui::MenuItem("Group selection", "Cmd+G"))
                gRequestGroup = true;
             if (ImGui::MenuItem("Ungroup", "Cmd+Shift+G"))
                gRequestUngroup = true;
+            ImGui::Separator();
+            if (ImGui::MenuItem("Add Node...", "Shift+N"))
+               gRequestAddNode = true;
+            if (ImGui::MenuItem("Add Note", "/"))
+               gRequestAddComment = true;
             ImGui::EndMenu();
          }
 
          if (ImGui::BeginMenu("Menu"))
          {
-            ImGui::SeparatorText("Canvas");
-            ImGui::Checkbox("Snap to grid", &gSnapToGrid);
-            ImGui::SetNextItemWidth(170);
-            ImGui::SliderFloat("Grid size", &gGridSnap, 5.0f, 100.0f, "%.0f px");
-            ImGui::SetNextItemWidth(170);
-            ImGui::SliderFloat("Zoom speed", &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
-            if (ImGui::MenuItem("Fit view to content"))
-               gRequestFitView = true;
-
-            ImGui::SeparatorText("Minimap");
-            ImGui::Checkbox("Show minimap", &gMinimapEnabled);
-            if (gMinimapEnabled)
+            if (ImGui::BeginMenu("Canvas"))
             {
-               static const char* kCorners[] = {
-                  "Top left", "Top right", "Bottom left", "Bottom right"
-               };
-               ImGui::SetNextItemWidth(170);
-               if (ImGui::BeginCombo("Position", kCorners[gMinimapCorner]))
+               ImGui::Checkbox("Snap to grid", &gSnapToGrid);
+               ImGui::SetNextItemWidth(150);
+               ImGui::SliderFloat("Grid size", &gGridSnap, 5.0f, 100.0f, "%.0f px");
+               ImGui::SetNextItemWidth(150);
+               ImGui::SliderFloat("Zoom speed", &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
+               ImGui::Separator();
+               if (ImGui::MenuItem("Fit view to content"))
+                  gRequestFitView = true;
+               ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Minimap"))
+            {
+               ImGui::Checkbox("Show minimap", &gMinimapEnabled);
+               if (gMinimapEnabled)
                {
-                  for (int i = 0; i < 4; i++)
-                     if (ImGui::Selectable(kCorners[i], i == gMinimapCorner))
-                        gMinimapCorner = i;
-                  ImGui::EndCombo();
+                  static const char* kCorners[] = {
+                     "Top left", "Top right", "Bottom left", "Bottom right"
+                  };
+                  ImGui::SetNextItemWidth(150);
+                  if (ImGui::BeginCombo("Position", kCorners[gMinimapCorner]))
+                  {
+                     for (int i = 0; i < 4; i++)
+                        if (ImGui::Selectable(kCorners[i], i == gMinimapCorner))
+                           gMinimapCorner = i;
+                     ImGui::EndCombo();
+                  }
+                  ImGui::SetNextItemWidth(150);
+                  ImGui::SliderFloat("Size", &gMinimapSize, 120.0f, 360.0f, "%.0f px");
+                  ImGui::SetNextItemWidth(150);
+                  ImGui::SliderFloat("Opacity", &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
                }
-               ImGui::SetNextItemWidth(170);
-               ImGui::SliderFloat("Size", &gMinimapSize, 120.0f, 360.0f, "%.0f px");
-               ImGui::SetNextItemWidth(170);
-               ImGui::SliderFloat("Opacity", &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
+               ImGui::EndMenu();
             }
 
             // The whole section only exists once something is open - with
             // nothing open there is nothing here to configure.
             if (!gViewportPanelNodes.empty())
             {
-               ImGui::SeparatorText("Viewport panel");
-               ImGui::SetNextItemWidth(170);
-               ViewportPanelDockCombo();
-               ImGui::SetNextItemWidth(170);
-               // Only the axis the current dock actually reserves - the other
-               // one has no effect from here, and a dead slider reads as broken.
-               if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
-                  ImGui::SliderFloat("Width", &gViewportPanelWidth,
-                                     kViewportPanelMinWidth, 900.0f, "%.0f px");
-               else
-                  ImGui::SliderFloat("Height", &gViewportPanelHeight,
-                                     kViewportPanelMinHeight, 800.0f, "%.0f px");
-               if (ImGui::MenuItem("Close viewport panel"))
-                  gViewportPanelNodes.clear();
+               if (ImGui::BeginMenu("Viewport panel"))
+               {
+                  ImGui::SetNextItemWidth(150);
+                  ViewportPanelDockCombo();
+                  ImGui::SetNextItemWidth(150);
+                  // Only the axis the current dock actually reserves - the other
+                  // one has no effect from here, and a dead slider reads as broken.
+                  if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
+                     ImGui::SliderFloat("Width", &gViewportPanelWidth,
+                                        kViewportPanelMinWidth, 900.0f, "%.0f px");
+                  else
+                     ImGui::SliderFloat("Height", &gViewportPanelHeight,
+                                        kViewportPanelMinHeight, 800.0f, "%.0f px");
+                  ImGui::Separator();
+                  if (ImGui::MenuItem("Close viewport panel"))
+                     gViewportPanelNodes.clear();
+                  ImGui::EndMenu();
+               }
             }
 
-            ImGui::SeparatorText("Modulation matrix");
-            ImGui::Checkbox("Show modulation matrix", &gModMatrixOpen);
-            if (gModMatrixOpen)
+            if (ImGui::BeginMenu("Modulation matrix"))
             {
-               ImGui::SetNextItemWidth(170);
-               ModMatrixDockCombo();
-               ImGui::SetNextItemWidth(170);
-               // Only the axis the current dock actually reserves - see the
-               // identical comment on the viewport panel's own sliders above.
-               if (gModMatrixDock == 1 || gModMatrixDock == 2)
-                  ImGui::SliderFloat("Width", &gModMatrixWidth,
-                                     kModMatrixMinWidth, 900.0f, "%.0f px");
-               else
-                  ImGui::SliderFloat("Height", &gModMatrixHeight,
-                                     kModMatrixMinHeight, 800.0f, "%.0f px");
+               ImGui::Checkbox("Show modulation matrix", &gModMatrixOpen);
+               if (gModMatrixOpen)
+               {
+                  ImGui::SetNextItemWidth(150);
+                  ModMatrixDockCombo();
+                  ImGui::SetNextItemWidth(150);
+                  // Only the axis the current dock actually reserves - see the
+                  // identical comment on the viewport panel's own sliders above.
+                  if (gModMatrixDock == 1 || gModMatrixDock == 2)
+                     ImGui::SliderFloat("Width", &gModMatrixWidth,
+                                        kModMatrixMinWidth, 900.0f, "%.0f px");
+                  else
+                     ImGui::SliderFloat("Height", &gModMatrixHeight,
+                                        kModMatrixMinHeight, 800.0f, "%.0f px");
+               }
+               ImGui::EndMenu();
             }
 
-            ImGui::SeparatorText("Performance");
+            if (ImGui::BeginMenu("Performance"))
             {
                // A cap is useful in both directions: it stops a light patch
                // spinning the GPU at 400fps for no reason, and it gives a
@@ -30646,7 +30955,7 @@ int main(int argc, char** argv)
                   if (kFpsValues[i] == gTargetFps)
                      current = i;
 
-               ImGui::SetNextItemWidth(170);
+               ImGui::SetNextItemWidth(150);
                if (ImGui::BeginCombo("Target FPS", kFpsLabels[current]))
                {
                   for (int i = 0; i < 4; i++)
@@ -30659,38 +30968,38 @@ int main(int argc, char** argv)
 
                if (ImGui::Checkbox("Vsync", &gVsync))
                   glfwSwapInterval(gVsync ? 1 : 0);
+               ImGui::EndMenu();
             }
 
-            ImGui::SeparatorText("Theme");
+            if (ImGui::BeginMenu("Theme"))
             {
                const std::vector<std::string>& presets = CategoryColors::PresetNames();
                const int current = CategoryColors::CurrentPreset();
-               ImGui::SetNextItemWidth(170);
-               if (ImGui::BeginCombo("Theme", presets[current].c_str()))
+               for (int i = 0; i < (int)presets.size(); i++)
                {
-                  for (int i = 0; i < (int)presets.size(); i++)
-                     if (ImGui::Selectable(presets[i].c_str(), current == i))
-                     {
-                        CategoryColors::SetPreset(i);
-                        ApplyTheme();
-                     }
-                  ImGui::EndCombo();
+                  if (ImGui::MenuItem(presets[i].c_str(), nullptr, current == i))
+                  {
+                     CategoryColors::SetPreset(i);
+                     ApplyTheme();
+                  }
                }
+               ImGui::EndMenu();
             }
 
-            ImGui::SeparatorText("Autosave");
+            if (ImGui::BeginMenu("Autosave"))
             {
                if (ImGui::Checkbox("Autosave enabled", &gAutosaveEnabled))
                   SaveAutosaveSettings();
-               ImGui::SetNextItemWidth(170);
+               ImGui::SetNextItemWidth(150);
                int seconds = gAutosaveSeconds;
                if (ImGui::SliderInt("Interval", &seconds, 15, 300, "%d sec"))
                   gAutosaveSeconds = seconds;
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveAutosaveSettings();
+               ImGui::EndMenu();
             }
 
-            ImGui::SeparatorText("Audio");
+            if (ImGui::BeginMenu("Audio"))
             {
                const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
                const bool audioRunning = AudioEngine::Instance().SampleRate() > 0.0;
@@ -30699,7 +31008,7 @@ int main(int argc, char** argv)
                for (const Platform::AudioDeviceInfo& d : devices)
                   if (d.isOutput && d.deviceId == gAudioOutputDeviceId)
                      outputLabel = d.name;
-               ImGui::SetNextItemWidth(220);
+               ImGui::SetNextItemWidth(200);
                if (ImGui::BeginCombo("Output device", outputLabel.c_str()))
                {
                   if (ImGui::Selectable("System default", gAudioOutputDeviceId == 0))
@@ -30723,7 +31032,7 @@ int main(int argc, char** argv)
                for (const Platform::AudioDeviceInfo& d : devices)
                   if (d.isInput && d.deviceId == gAudioInputDeviceId)
                      inputLabel = d.name;
-               ImGui::SetNextItemWidth(220);
+               ImGui::SetNextItemWidth(200);
                if (ImGui::BeginCombo("Input device", inputLabel.c_str()))
                {
                   if (ImGui::Selectable("System default", gAudioInputDeviceId == 0))
@@ -30745,7 +31054,7 @@ int main(int argc, char** argv)
                   snprintf(buf, sizeof(buf), "%.0f Hz", gAudioSampleRate);
                   rateLabel = buf;
                }
-               ImGui::SetNextItemWidth(220);
+               ImGui::SetNextItemWidth(200);
                if (ImGui::BeginCombo("Sample rate", rateLabel.c_str()))
                {
                   if (ImGui::Selectable("Device default", gAudioSampleRate == 0.0))
@@ -30763,7 +31072,7 @@ int main(int argc, char** argv)
                static const int kBufferSizes[] = { 64, 128, 256, 512, 1024, 2048 };
                char bufferLabel[16];
                snprintf(bufferLabel, sizeof(bufferLabel), "%d", gAudioBufferFrames);
-               ImGui::SetNextItemWidth(220);
+               ImGui::SetNextItemWidth(200);
                if (ImGui::BeginCombo("Buffer size", bufferLabel))
                {
                   for (int frames : kBufferSizes)
@@ -30781,7 +31090,7 @@ int main(int argc, char** argv)
                for (int i = 0; i < 3; i++)
                   if (kOversampleValues[i] == gAudioOversample)
                      oversampleIdx = i;
-               ImGui::SetNextItemWidth(220);
+               ImGui::SetNextItemWidth(200);
                if (ImGui::BeginCombo("Oversampling", kOversampleLabels[oversampleIdx]))
                {
                   for (int i = 0; i < 3; i++)
@@ -30796,6 +31105,7 @@ int main(int argc, char** argv)
                                       actualBufferFrames);
                }
 
+               ImGui::Separator();
                if (ImGui::MenuItem("Apply audio settings"))
                {
                   const bool wasRunning = AudioEngine::Instance().SampleRate() > 0.0;
@@ -30818,21 +31128,27 @@ int main(int argc, char** argv)
                         fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
                   }
                }
+               ImGui::EndMenu();
             }
 
-            ImGui::SeparatorText("Nodes");
-            if (ImGui::MenuItem("Show all params"))
+            if (ImGui::BeginMenu("Nodes"))
             {
-               for (GraphNode& gn : gNodes)
-                  gn.showParams = true;
-            }
-            if (ImGui::MenuItem("Hide all params"))
-            {
-               for (GraphNode& gn : gNodes)
-                  gn.showParams = false;
+               if (ImGui::MenuItem("Show all params"))
+               {
+                  for (GraphNode& gn : gNodes)
+                     gn.showParams = true;
+               }
+               if (ImGui::MenuItem("Hide all params"))
+               {
+                  for (GraphNode& gn : gNodes)
+                     gn.showParams = false;
+               }
+               ImGui::EndMenu();
             }
 
             ImGui::Separator();
+            if (ImGui::MenuItem("All shortcuts..."))
+               gShortcutsOpen = true;
             if (ImGui::MenuItem("Expression globals..."))
                gGlobalsOpen = true;
             if (ImGui::MenuItem("Help / module reference"))
@@ -38349,7 +38665,9 @@ int main(int argc, char** argv)
          Redo();
 
       // Shift+A selects every node on the canvas.
-      if (!typing && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false))
+      const bool doSelectAll = gRequestSelectAll || (!typing && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false));
+      gRequestSelectAll = false;
+      if (doSelectAll)
       {
          ed::ClearSelection();
          for (GraphNode& gn : gNodes)
@@ -38360,8 +38678,10 @@ int main(int argc, char** argv)
       // it, so annotating a patch is one keystroke and then typing. Not gated on
       // Shift, so "?" does not leave a stray comment behind, and not on a
       // modifier, so Cmd-/ stays free for a binding later.
-      if (!typing && !cmdOrCtrl && !io.KeyShift &&
-          ImGui::IsKeyPressed(ImGuiKey_Slash, false))
+      const bool doAddComment = gRequestAddComment || (!typing && !cmdOrCtrl && !io.KeyShift &&
+                                                      ImGui::IsKeyPressed(ImGuiKey_Slash, false));
+      gRequestAddComment = false;
+      if (doAddComment)
       {
          // The pointer is only meaningful over the canvas; anywhere else (the
          // node panel, off the window entirely) the middle of the view is the
@@ -38456,8 +38776,10 @@ int main(int argc, char** argv)
       // the picker's own text field owns the keyboard the whole time it's up.
       // Safe to claim: the picker lowercases both query and candidate names,
       // so a capital letter is never needed to find a node.
-      if (!cmdOrCtrl && io.KeyShift && (!typing || searchPopupOpen) &&
-          ImGui::IsKeyPressed(ImGuiKey_N, false))
+      const bool doAddNode = gRequestAddNode ||
+         (!cmdOrCtrl && io.KeyShift && (!typing || searchPopupOpen) && ImGui::IsKeyPressed(ImGuiKey_N, false));
+      gRequestAddNode = false;
+      if (doAddNode)
       {
          if (searchPopupOpen)
          {
@@ -38465,19 +38787,13 @@ int main(int argc, char** argv)
          }
          else
          {
-            // The pointer is only meaningful over the canvas; anywhere else the
-            // middle of the view is the only sensible spawn point - same rule
-            // the "/" comment shortcut above uses.
-            const ImVec2 mouse = ImGui::GetMousePos();
-            const bool overGraph = mouse.x >= gGraphScreenTL.x &&
-                                   mouse.y >= gGraphScreenTL.y &&
-                                   mouse.x <= gGraphScreenTL.x + gGraphScreenSize.x &&
-                                   mouse.y <= gGraphScreenTL.y + gGraphScreenSize.y;
-            gSpawnPos = overGraph ? ed::ScreenToCanvas(mouse) : gViewCenterCanvas;
+            // Spawn node and search panel in the middle of the view/screen
+            gSpawnPos = gViewCenterCanvas;
             gLinkDragSourcePin = -1;
             gLinkDragSuggestions.clear();
             searchBuf[0] = '\0';
             searchJustOpened = true;
+            searchPopupCentered = true;
             ImGui::OpenPopup("search");
          }
          // The 'N' is already queued as a character for this frame; without
@@ -38575,9 +38891,12 @@ int main(int argc, char** argv)
          }
       }
 
-      if (!typing && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
+      const bool doDelete = gRequestDelete ||
+         (!typing && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
                       ImGui::IsKeyPressed(ImGuiKey_Backspace, false) ||
-                      (shiftOnly && ImGui::IsKeyPressed(ImGuiKey_X, false))))
+                      (shiftOnly && ImGui::IsKeyPressed(ImGuiKey_X, false))));
+      gRequestDelete = false;
+      if (doDelete)
       {
          int count = ed::GetSelectedObjectCount();
          if (count > 0)
@@ -38631,7 +38950,10 @@ int main(int argc, char** argv)
 
       // Shift+D (or Cmd/Ctrl+D) duplicates whatever is selected without
       // touching the clipboard.
-      if (!typing && (io.KeyShift || cmdOrCtrl) && ImGui::IsKeyPressed(ImGuiKey_D, false))
+      const bool doDuplicate = gRequestDuplicate ||
+         (!typing && (io.KeyShift || cmdOrCtrl) && ImGui::IsKeyPressed(ImGuiKey_D, false));
+      gRequestDuplicate = false;
+      if (doDuplicate)
       {
          const int count = ed::GetSelectedObjectCount();
          if (count > 0)
@@ -38834,30 +39156,34 @@ int main(int argc, char** argv)
 
             if (any)
             {
-               // Space for the label row above the box - AutoFitGroupToMembers
-               // corrects both this and the size from the real measured header
-               // on the group's first drawn frame, so it only has to be close.
-               const float headerAllowance = 34.0f;
-               if (GraphNode* gn = SpawnNode("Group", "Compositing",
-                                             bmin.x - kGroupPadding,
-                                             bmin.y - kGroupPadding - headerAllowance))
+               const float kPad = 32.0f;
+               const float kHeader = 24.0f;
+               const float gx = bmin.x - kPad;
+               const float gy = bmin.y - kPad - kHeader;
+               const float gw = (bmax.x - bmin.x) + kPad * 2.0f;
+               const float gh = (bmax.y - bmin.y) + kPad * 2.0f + kHeader;
+
+               PushUndoCheckpoint();
+               gSuppressUndoCheckpoints = true;
+               if (GraphNode* ggn = SpawnNode("Group", "Compositing", gx, gy))
                {
-                  auto* g = static_cast<GroupNode*>(gn->node.get());
-                  g->width = (bmax.x - bmin.x) + kGroupPadding * 2.0f;
-                  g->height = (bmax.y - bmin.y) + kGroupPadding * 2.0f;
-                  // Claim the selection explicitly rather than leaving it to
-                  // the geometric adoption pass: these are the nodes the user
-                  // pointed at, whether or not the initial box happens to
-                  // cover every one of them exactly.
-                  gGroupMembers[g] = picked;
+                  if (auto* grp = dynamic_cast<GroupNode*>(ggn->node.get()))
+                  {
+                     grp->width = gw;
+                     grp->height = gh;
+                     gGroupMembers[grp] = picked;
+                  }
                   ed::ClearSelection();
-                  gPendingSelect.push_back(gn->NodeId());
+                  gPendingSelect.push_back(ggn->NodeId());
                }
+               gSuppressUndoCheckpoints = false;
             }
          }
       }
 
-      if (!typing && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false))
+      const bool doCopy = gRequestCopy || (!typing && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false));
+      gRequestCopy = false;
+      if (doCopy)
       {
          clipboard.clear();
          clipboardSources.clear();
@@ -38903,7 +39229,9 @@ int main(int argc, char** argv)
          }
       }
 
-      if (!typing && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false) && !clipboard.empty())
+      const bool doPaste = (gRequestPaste || (!typing && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false))) && !clipboard.empty();
+      gRequestPaste = false;
+      if (doPaste)
       {
          // Recomputed fresh against the canvas as it stands right now, so a
          // second Cmd+V (which already sees the first paste sitting on the
@@ -38938,11 +39266,11 @@ int main(int argc, char** argv)
          if (!items.empty())
             PushUndoCheckpoint();
          gSuppressUndoCheckpoints = true;
+         ed::ClearSelection();
          std::map<int, GraphNode*> newByOrig;
          for (const PasteItem& item : items)
          {
-            GraphNode* copy = SpawnNode(item.type, item.category, item.pos.x, item.pos.y);
-            if (copy != nullptr)
+            if (GraphNode* copy = SpawnNode(item.type, item.category, item.pos.x, item.pos.y))
             {
                CopyParams(copy->node.get(), item.src);
                if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
@@ -39753,8 +40081,15 @@ int main(int argc, char** argv)
       }
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(300, 0), ImVec2(400, 440));
+      if (searchPopupCentered)
+      {
+         const ImVec2 center = ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f,
+                                      gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
+         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      }
       if (ImGui::BeginPopup("search"))
       {
+         searchPopupCentered = false;
          searchPopupOpen = true;
          // Shift+N pressed again while the picker was up - see searchRequestClose.
          if (searchRequestClose)
@@ -40408,6 +40743,9 @@ int main(int argc, char** argv)
 
       if (gHelpOpen)
          DrawHelpWindow(&gHelpOpen);
+
+      if (gShortcutsOpen)
+         DrawShortcutsWindow(&gShortcutsOpen);
 
       if (gShowUnsavedChangesModal)
       {
