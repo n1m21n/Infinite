@@ -38,6 +38,15 @@
 #include <io.h>
 #endif
 
+// Displayed shortcut labels: the modifier key shown in menus and the
+// shortcuts reference differs by platform (Cmd doesn't exist on Windows),
+// while the underlying handling already accepts Ctrl on both (see cmdOrCtrl).
+#if defined(_WIN32)
+   #define MODKEY "Ctrl"
+#else
+   #define MODKEY "Cmd"
+#endif
+
 namespace
 {
    // Test fixtures live in the OS temp directory; /tmp was hardcoded before
@@ -18790,7 +18799,7 @@ namespace
          { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
          { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
          { "Comment", "A free-floating note on the canvas - has no image input or output, just text. Double-click to edit." },
-         { "Group", "Created with Cmd+G on a selection, not spawned from the palette. Sizes itself automatically to fit its members - drag a node in to grow the box, drag one out to shrink it. Drag anywhere inside the box to move the whole group; right-click > Ungroup (or Cmd+Shift+G) dissolves it, leaving members in place (or ungroup one member from its own context menu)." },
+         { "Group", "Created with " MODKEY "+G on a selection, not spawned from the palette. Sizes itself automatically to fit its members - drag a node in to grow the box, drag one out to shrink it. Drag anywhere inside the box to move the whole group; right-click > Ungroup (or " MODKEY "+Shift+G) dissolves it, leaving members in place (or ungroup one member from its own context menu)." },
          { "Null", "A pass-through node: its output is exactly its input, unchanged. Useful as a stable junction point to branch a cable to several destinations, or as a placeholder while rewiring." },
          { "Viewport", "Shows its input at actual pixel size in its own resizable window, separate from the small node preview - useful for judging detail without zooming the whole canvas." },
 
@@ -19121,22 +19130,22 @@ namespace
 
       static const ShortcutEntry kShortcuts[] = {
          // Patch & File
-         { "File & Patch", "New Patch", "Cmd+N", "Create a new empty patch" },
-         { "File & Patch", "Open Patch", "Cmd+O", "Open an existing .inf patch file" },
-         { "File & Patch", "Save", "Cmd+S", "Save current patch" },
-         { "File & Patch", "Save As...", "Cmd+Shift+S", "Save patch to a new file" },
+         { "File & Patch", "New Patch", MODKEY "+N", "Create a new empty patch" },
+         { "File & Patch", "Open Patch", MODKEY "+O", "Open an existing .inf patch file" },
+         { "File & Patch", "Save", MODKEY "+S", "Save current patch" },
+         { "File & Patch", "Save As...", MODKEY "+Shift+S", "Save patch to a new file" },
 
          // Edit & Canvas
-         { "Edit & Canvas", "Undo", "Cmd+Z", "Undo last graph action" },
-         { "Edit & Canvas", "Redo", "Cmd+Shift+Z / Ctrl+Y", "Redo last undone action" },
-         { "Edit & Canvas", "Cut / Copy", "Cmd+C", "Copy selected nodes and internal connections" },
-         { "Edit & Canvas", "Paste", "Cmd+V", "Paste copied nodes with automatic offset" },
-         { "Edit & Canvas", "Duplicate", "Cmd+D / Shift+D", "Duplicate selected nodes in-place" },
+         { "Edit & Canvas", "Undo", MODKEY "+Z", "Undo last graph action" },
+         { "Edit & Canvas", "Redo", MODKEY "+Shift+Z / Ctrl+Y", "Redo last undone action" },
+         { "Edit & Canvas", "Cut / Copy", MODKEY "+C", "Copy selected nodes and internal connections" },
+         { "Edit & Canvas", "Paste", MODKEY "+V", "Paste copied nodes with automatic offset" },
+         { "Edit & Canvas", "Duplicate", MODKEY "+D / Shift+D", "Duplicate selected nodes in-place" },
          { "Edit & Canvas", "Delete", "Delete / Backspace / Shift+X", "Delete selected nodes, groups, or links" },
          { "Edit & Canvas", "Delete Cable", "X", "Delete selected cable/link only" },
          { "Edit & Canvas", "Select All", "Shift+A", "Select all nodes on the canvas" },
-         { "Edit & Canvas", "Group Selection", "Cmd+G", "Wrap selected nodes in a group box" },
-         { "Edit & Canvas", "Ungroup", "Cmd+Shift+G", "Dissolve group without deleting nodes" },
+         { "Edit & Canvas", "Group Selection", MODKEY "+G", "Wrap selected nodes in a group box" },
+         { "Edit & Canvas", "Ungroup", MODKEY "+Shift+G", "Dissolve group without deleting nodes" },
          { "Edit & Canvas", "Add Node", "Shift+N", "Open quick type-to-filter node picker" },
          { "Edit & Canvas", "Add Note / Comment", "/", "Drop a comment note under mouse pointer" },
 
@@ -19256,7 +19265,7 @@ namespace
                { "Type an exact value", "Double-click a slider" },
                { "Pan the canvas", "Drag empty canvas" },
                { "Rubber-band select", "Shift + drag" },
-               { "Duplicate", "Cmd+C / Cmd+V, or Shift+D / Cmd+D to duplicate in place" },
+               { "Duplicate", MODKEY "+C / " MODKEY "+V, or Shift+D / " MODKEY "+D to duplicate in place" },
                { "Select several", "Shift + drag a box around them, or Shift-click (or Ctrl-click) each one to add it. Then move, duplicate or delete as a group." },
                { "Delete", "Select, then Delete, Backspace or Shift+X" },
                { "Delete a cable", "Click the cable, then press X" },
@@ -30780,9 +30789,9 @@ int main(int argc, char** argv)
       {
          if (ImGui::BeginMenu("File"))
          {
-            if (ImGui::MenuItem("New", "Cmd+N"))
+            if (ImGui::MenuItem("New", MODKEY "+N"))
                GuardUnsavedChanges([]() { NewPatch(); });
-            if (ImGui::MenuItem("Open...", "Cmd+O"))
+            if (ImGui::MenuItem("Open...", MODKEY "+O"))
             {
                const std::string path = Platform::OpenPatchDialog();
                if (!path.empty())
@@ -30808,9 +30817,9 @@ int main(int argc, char** argv)
             }
 
             ImGui::Separator();
-            if (ImGui::MenuItem("Save", "Cmd+S"))
+            if (ImGui::MenuItem("Save", MODKEY "+S"))
                SavePatchInteractive(false);
-            if (ImGui::MenuItem("Save As...", "Cmd+Shift+S"))
+            if (ImGui::MenuItem("Save As...", MODKEY "+Shift+S"))
                SavePatchInteractive(true);
 
             if (!gPatchPath.empty() || !gPatchStatus.empty())
@@ -30831,16 +30840,16 @@ int main(int argc, char** argv)
 
          if (ImGui::BeginMenu("Edit"))
          {
-            if (ImGui::MenuItem("Undo", "Cmd+Z", false, !gUndoStack.empty()))
+            if (ImGui::MenuItem("Undo", MODKEY "+Z", false, !gUndoStack.empty()))
                Undo();
-            if (ImGui::MenuItem("Redo", "Cmd+Shift+Z", false, !gRedoStack.empty()))
+            if (ImGui::MenuItem("Redo", MODKEY "+Shift+Z", false, !gRedoStack.empty()))
                Redo();
             ImGui::Separator();
-            if (ImGui::MenuItem("Cut / Copy", "Cmd+C"))
+            if (ImGui::MenuItem("Cut / Copy", MODKEY "+C"))
                gRequestCopy = true;
-            if (ImGui::MenuItem("Paste", "Cmd+V"))
+            if (ImGui::MenuItem("Paste", MODKEY "+V"))
                gRequestPaste = true;
-            if (ImGui::MenuItem("Duplicate", "Cmd+D"))
+            if (ImGui::MenuItem("Duplicate", MODKEY "+D"))
                gRequestDuplicate = true;
             if (ImGui::MenuItem("Delete", "Backspace"))
                gRequestDelete = true;
@@ -30848,9 +30857,9 @@ int main(int argc, char** argv)
             if (ImGui::MenuItem("Select All", "Shift+A"))
                gRequestSelectAll = true;
             ImGui::Separator();
-            if (ImGui::MenuItem("Group selection", "Cmd+G"))
+            if (ImGui::MenuItem("Group selection", MODKEY "+G"))
                gRequestGroup = true;
-            if (ImGui::MenuItem("Ungroup", "Cmd+Shift+G"))
+            if (ImGui::MenuItem("Ungroup", MODKEY "+Shift+G"))
                gRequestUngroup = true;
             ImGui::Separator();
             if (ImGui::MenuItem("Add Node...", "Shift+N"))
@@ -41828,10 +41837,12 @@ int main(int argc, char** argv)
 
       ++frameId;
 
-      // Patch shortcuts. Handled outside the node editor so its own Cmd-key
+      // Patch shortcuts. Handled outside the node editor so its own Cmd/Ctrl-key
       // bindings do not swallow them, and gated on no text field having focus
-      // so typing an 'S' into a Text node does not save the patch.
-      if (!ImGui::GetIO().WantTextInput && ImGui::GetIO().KeySuper)
+      // so typing an 'S' into a Text node does not save the patch. KeySuper
+      // alone would miss Windows, where Cmd doesn't exist and Ctrl reports as
+      // KeyCtrl, not KeySuper (that's the Windows key there).
+      if (!ImGui::GetIO().WantTextInput && (ImGui::GetIO().KeySuper || ImGui::GetIO().KeyCtrl))
       {
          if (ImGui::IsKeyPressed(ImGuiKey_S, false))
             SavePatchInteractive(ImGui::GetIO().KeyShift);
