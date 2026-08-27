@@ -88,6 +88,27 @@ step_nodediff() {
 # skipped with a warning (not a hard failure - the website deploy is the
 # part `commit`/`push` still cover) if it isn't.
 step_release() {
+    echo "==> release: checking INFINITE_VERSION in CMakeLists.txt against the target tag"
+    local cmake_version
+    cmake_version=$(sed -n 's/^set(INFINITE_VERSION "\([0-9.]*\)")$/\1/p' CMakeLists.txt | head -1)
+    local target_tag
+    target_tag=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
+    if [ -n "$target_tag" ] && [ "v$cmake_version" != "$target_tag" ] && [ "$cmake_version" != "$target_tag" ]; then
+        echo "    !! CMakeLists.txt INFINITE_VERSION is \"$cmake_version\" but the latest GitHub"
+        echo "    !! Release tag is \"$target_tag\" - the build's baked-in version (bundle version,"
+        echo "    !! Windows .rc VERSIONINFO, and the in-app update checker's self-identification)"
+        echo "    !! would not match what you're shipping, and the update checker will nag users"
+        echo "    !! who are already current. Bump INFINITE_VERSION (and INFINITE_VERSION_RC right"
+        echo "    !! below it) in CMakeLists.txt to match, commit, then re-run release."
+        echo "    !! Set SHIP_INFINITE_SKIP_VERSION_CHECK=1 to override and build anyway."
+        if [ "${SHIP_INFINITE_SKIP_VERSION_CHECK:-}" != "1" ]; then
+            return 1
+        fi
+        echo "    SHIP_INFINITE_SKIP_VERSION_CHECK=1 set - proceeding anyway"
+    else
+        echo "    INFINITE_VERSION ($cmake_version) matches target tag ($target_tag) - ok"
+    fi
+
     echo "==> release: package.sh (build + DMG + copy into website/assets)"
     ./package.sh
 

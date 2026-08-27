@@ -232,3 +232,19 @@ the tagline in `README.md`'s first paragraph and `website/index.html`'s
   a successful run for `HEAD` yet and will skip the Windows upload with a
   warning rather than wait for one. Re-run `release-windows <tag>` once
   the `windows` job on `main` is green — see [Release (Windows)](#release-windows).
+- **`CMakeLists.txt`'s `INFINITE_VERSION` is the single source of truth for
+  the version baked into the built app** (macOS bundle version, Windows
+  `.rc` VERSIONINFO, and the string the in-app update checker compares
+  itself against). The GitHub Release *tag* is a separate, independently-set
+  string — nothing keeps them in sync automatically. If you cut a new
+  versioned release (e.g. `v0.2.2`) without also bumping `INFINITE_VERSION`
+  (and `INFINITE_VERSION_RC` right below it) first, the shipped build still
+  self-identifies as the old version, and every user who installs it
+  immediately sees a false "update available" badge pointing at the release
+  they just downloaded. `release` now checks this and refuses to build
+  (`step_release`'s version-check guard) if the tag and `INFINITE_VERSION`
+  disagree — but that check only fires if the target tag already exists
+  *before* you run `release`. When cutting a genuinely new tag by hand (the
+  "One release, not one per version" exception above), bump
+  `INFINITE_VERSION`/`INFINITE_VERSION_RC` and commit that **before**
+  running `gh release create`, not after.
