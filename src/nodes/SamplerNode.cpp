@@ -752,7 +752,10 @@ void SamplerNode::ReloadFromPath()
       LoadFile(mFilePath);
       start = savedStart;
       end = savedEnd;
-      position = std::clamp(savedPos, start, end);
+      // Restored verbatim, like start/end above - CookIfNeeded clamps position
+      // into [start, end] every frame anyway, and clamping here instead made
+      // copy/paste (CopyParams -> ReloadDerivedState) drop the saved value.
+      position = savedPos;
       decay = savedDecay;
    }
 }
