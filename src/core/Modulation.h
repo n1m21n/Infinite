@@ -162,9 +162,12 @@ public:
 
    // Sticky per-parameter metadata, accumulated from RegisterParam and never
    // cleared per-frame. The matrix panel needs a destination's name/min/max/
-   // step even on frames where that param didn't draw - a collapsed node
-   // (showParams == false) registers nothing, and a top/left-docked panel
-   // draws before the canvas has registered anything at all this frame.
+   // step even on frames where that param didn't draw - a top/left-docked
+   // panel draws before the canvas has registered anything at all this frame,
+   // and a param hidden behind a mode switch never draws at all. (A collapsed
+   // node used to be on this list too; it now keeps registering its params
+   // without drawing them - see gParamRegisterOnly in main.cpp - because
+   // registering is what lets a modulator keep writing into it.)
    // Cleared only by Clear(). The `value` pointer is deliberately nulled in
    // the stored copy: the raw float* is only valid within the frame that
    // registered it - never store or dereference it from here.
