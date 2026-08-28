@@ -641,6 +641,29 @@ body {
   margin-top: 16px;
 }
 
+.howto-video-showcase {
+  max-width: 900px;
+  margin: 0 auto 28px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.howto-video-embed-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 widescreen */
+  height: 0;
+  background: #000;
+}
+
+.howto-video-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
 .recipe-num {
   font-family: var(--font-cursive);
   font-size: 1.2rem;
