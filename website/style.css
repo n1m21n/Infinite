@@ -1,6 +1,6 @@
 /* ==========================================================================
    Infinite — Clean Visual Notebook Stylesheet
-   Typography: Helvetica/Inter + Caveat (Single Cursive Accent)
+   Typography: Geist (Precision Sans) + Caveat (Sketch Cursive) + Geist Mono
    Strict 3-Size Global Typographic Scale
    ========================================================================== */
 
@@ -10,10 +10,10 @@
   --font-size-medium: clamp(0.98rem, 1.2vw, 1.08rem);  /* Body text, Subheadings & Step Titles */
   --font-size-small: clamp(0.8rem, 0.9vw, 0.88rem);    /* Pills, Labels, Badges, Button Subtext, Cap Titles */
 
-  /* Fonts */
-  --font-sans: 'Inter', -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  /* Fonts: Modern Tech Geist paired with Caveat sketch cursive */
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-cursive: 'Caveat', cursive, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Monaco, monospace;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, Menlo, Monaco, monospace;
 
   /* Line Heights */
   --lh-tight: 1.15;

@@ -203,7 +203,7 @@ function resizeBranchCanvas() {
     const isMobile = targetW < 620 * dpr;
     const fontSize = (isMobile ? 12 : 14.5) * dpr;
     if (natureCtx) {
-      natureCtx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`;
+      natureCtx.font = `600 ${fontSize}px Geist, -apple-system, BlinkMacSystemFont, sans-serif`;
     }
     networkNodes.forEach(node => {
       node.x *= scaleX;
@@ -230,7 +230,7 @@ function buildNetworkStructure() {
   const fontSize = (isMobile ? 12 : 14.5) * dpr;
 
   if (natureCtx) {
-    natureCtx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`;
+    natureCtx.font = `600 ${fontSize}px Geist, -apple-system, BlinkMacSystemFont, sans-serif`;
   }
 
   networkNodes = NETWORK_ITEMS.map((item, idx) => {
@@ -573,7 +573,7 @@ function animateNatureBranches(timestamp) {
 
   // 4. Draw Nodes with Clean Protected Badge Clearance
   const fontSize = (isMobile ? 12 : 14.5) * dpr;
-  natureCtx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`;
+  natureCtx.font = `600 ${fontSize}px Geist, -apple-system, BlinkMacSystemFont, sans-serif`;
   natureCtx.textBaseline = 'middle';
 
   networkNodes.forEach(node => {
