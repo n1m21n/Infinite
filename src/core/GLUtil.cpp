@@ -1,8 +1,11 @@
 #include "GLUtil.h"
 
 #include "gl3.h"
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 #include <cstdio>
 #include <cstdlib>
+#include <unordered_map>
 
 namespace GLUtil
 {
@@ -16,13 +19,15 @@ namespace GLUtil
       "   gl_Position = vec4(aPos, 0.0, 1.0);\n"
       "}\n";
 
-   static unsigned int sQuadVao = 0;
+   static std::unordered_map<GLFWwindow*, unsigned int> sQuadVaos;
    static unsigned int sQuadVbo = 0;
 
-   static void EnsureQuad()
+   static unsigned int EnsureQuad()
    {
-      if (sQuadVao != 0)
-         return;
+      GLFWwindow* context = glfwGetCurrentContext();
+      auto found = sQuadVaos.find(context);
+      if (found != sQuadVaos.end())
+         return found->second;
 
       // clip-space pos.xy, uv.xy - a single GL_TRIANGLE_STRIP covering the viewport
       float verts[] = {
@@ -32,24 +37,41 @@ namespace GLUtil
          1.0f, 1.0f, 1.0f, 1.0f
       };
 
-      glGenVertexArrays(1, &sQuadVao);
-      glGenBuffers(1, &sQuadVbo);
-      glBindVertexArray(sQuadVao);
+      unsigned int vao = 0;
+      glGenVertexArrays(1, &vao);
+      if (sQuadVbo == 0)
+      {
+         glGenBuffers(1, &sQuadVbo);
+         glBindBuffer(GL_ARRAY_BUFFER, sQuadVbo);
+         glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+      }
+      glBindVertexArray(vao);
       glBindBuffer(GL_ARRAY_BUFFER, sQuadVbo);
-      glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
       glEnableVertexAttribArray(0);
       glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
       glEnableVertexAttribArray(1);
       glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
       glBindVertexArray(0);
+      sQuadVaos[context] = vao;
+      return vao;
    }
 
    static void DrawQuad()
    {
-      EnsureQuad();
-      glBindVertexArray(sQuadVao);
+      const unsigned int vao = EnsureQuad();
+      glBindVertexArray(vao);
       glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
       glBindVertexArray(0);
+   }
+
+   void ForgetCurrentContextObjects()
+   {
+      GLFWwindow* context = glfwGetCurrentContext();
+      auto found = sQuadVaos.find(context);
+      if (found == sQuadVaos.end())
+         return;
+      glDeleteVertexArrays(1, &found->second);
+      sQuadVaos.erase(found);
    }
 
    bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat)

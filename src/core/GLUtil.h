@@ -49,6 +49,11 @@ namespace GLUtil
    void DrawTextureToScreen(unsigned int tex, int windowW, int windowH,
                              int texW = 0, int texH = 0, bool checkerBg = false);
 
+   // VAOs are context-local even when GLFW contexts share textures, programs
+   // and buffers. Auxiliary output windows must release their own fullscreen
+   // quad VAO while their context is still current.
+   void ForgetCurrentContextObjects();
+
    // Reads an existing GPU texture's pixels back to the CPU as RGBA floats,
    // for nodes that need to sample a texture per-vertex rather than per-pixel
    // (e.g. displacing a mesh). `scratchFbo` is a caller-owned, lazily-created

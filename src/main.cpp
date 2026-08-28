@@ -21194,12 +21194,18 @@ namespace
    {
       if (i >= gProjectorWindows.size())
          return;
-      // Drop this node's solo-render FBO too, if it had one (geometry nodes
-      // only - see gProjectorViewports). Safe to erase immediately: unlike
-      // gRetiredViewports, nothing queues this texture into an ImGui draw
-      // list, it's only ever read by our own immediate GL blit this frame.
-      gProjectorViewports.erase(gProjectorWindows[i].nodeIndex);
-      glfwDestroyWindow(gProjectorWindows[i].window);
+      ProjectorWindow victim = gProjectorWindows[i];
+      GLFWwindow* previous = glfwGetCurrentContext();
+      glfwMakeContextCurrent(victim.window);
+      // Geometry preview FBOs and the fullscreen-quad VAO belong to this
+      // auxiliary context. Release them before the GLFW window destroys it.
+      gProjectorViewports.erase(victim.nodeIndex);
+      GLUtil::ForgetCurrentContextObjects();
+      if (previous != victim.window)
+         glfwMakeContextCurrent(previous);
+      else
+         glfwMakeContextCurrent(nullptr);
+      glfwDestroyWindow(victim.window);
       gProjectorWindows.erase(gProjectorWindows.begin() + (ptrdiff_t)i);
    }
 
@@ -21216,10 +21222,8 @@ namespace
 
    void CloseAllProjectorWindows()
    {
-      for (ProjectorWindow& pw : gProjectorWindows)
-         glfwDestroyWindow(pw.window);
-      gProjectorWindows.clear();
-      gProjectorViewports.clear();
+      while (!gProjectorWindows.empty())
+         CloseProjectorWindow(gProjectorWindows.size() - 1);
    }
 
    // Finds the open projector window (if any) showing this node index.
