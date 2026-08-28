@@ -1271,6 +1271,18 @@ body {
   color: var(--text-muted);
 }
 
+@media (max-width: 960px) {
+  .nav-links {
+    gap: 15px;
+  }
+}
+
+@media (max-width: 860px) {
+  .nav-links {
+    display: none;
+  }
+}
+
 /* --------------------------------------------------------------------------
    Mobile Optimization (Proper Padding, 2x2 Capabilities Grid)
    -------------------------------------------------------------------------- */
@@ -1282,6 +1294,7 @@ body {
   }
 
   .nav-links { display: none; }
+  .nav-btn-discord { display: none; }
   .hero-section { padding: 30px 0 18px; }
   .nature-canvas-wrapper { height: 340px; }
 
@@ -1411,5 +1424,14 @@ body {
   .download-actions .btn-lg {
     width: 100%;
     max-width: 320px;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-btn-github {
+    display: none;
+  }
+  .nav-container {
+    padding: 0 14px;
   }
 }
