@@ -48,6 +48,14 @@ public:
    int LastRecordedFrames() const { return mLastFrames; }
    int LastDroppedFrames() const { return mLastDropped; }
 
+   // Pure arithmetic half of the A/V pacing below, exposed so it can be
+   // asserted directly (INFINITE_RECSYNCTEST) without a GL context, a device
+   // or a movie file - which is what makes it checkable on Windows CI too.
+   // Returns how many video frames to write for the frame just captured so
+   // that emitted/fps tracks audioFrames/rate.
+   static int PacedRepeat(long long audioFrames, double rate, int fps,
+                          long long emitted, bool finalDrain);
+
    int recordFps = 30;
    bool includeAudio = false;
    int imageFormat = 0; // 0 = .png, 1 = .jpg
@@ -69,6 +77,12 @@ private:
    bool EnsureShader();
    void CaptureFrame();
    void DrainAudioCapture();
+   // How many video frames to emit for the frame just rendered, so the video
+   // track lands on the audio track's timeline: 0 when the app is rendering
+   // faster than recordFps (decimate), >1 when it is rendering slower (pad
+   // with a repeat). Always 1 when this take isn't audio-paced.
+   int PacedRepeatCount(bool finalDrain);
+
 
    // Triple-buffered PBO readback: CaptureFrame issues an async glReadPixels
    // into the write slot and fences it, then separately checks whether the
@@ -89,9 +103,43 @@ private:
    Platform::RecorderHandle* mRecorder = nullptr;
    int mRecordW = 0;
    int mRecordH = 0;
+   // Latched for the whole take alongside the dimensions above, and for the
+   // same reason. The recorder fixes its video PTS denominator at
+   // RecorderStart and never re-reads it, so pacing against a `recordFps` the
+   // user can still drag mid-take would have the pacer and the muxer working
+   // off two different frame rates - dragging 30 -> 60 would emit frames twice
+   // as fast as the encoder stamps them, stretching the video to double length
+   // against real audio. The UI disables the slider while recording too; this
+   // is the half that doesn't depend on the UI getting it right.
+   int mRecordFps = 30;
    std::string mRecordStatus;
    int mLastFrames = 0;
    int mLastDropped = 0;
+
+   // --- A/V sync ---
+   // A live-audio take has two independent clocks. The video track's PTS is a
+   // plain frame counter over recordFps (frameIndex/fps on macOS,
+   // FrameNumberToHns(frameCount, fps) on Windows), while live audio is
+   // stamped from the real sample count actually captured. Emitting one video
+   // frame per *rendered* frame therefore gives the movie a video duration of
+   // renderedFrames/recordFps against an audio duration of real elapsed time -
+   // so unless the render loop happens to hold exactly recordFps, the two
+   // drift linearly apart across the take. That is invisible while monitoring
+   // (playback is real-time either way) and shows up only in the written file.
+   //
+   // Pacing the video against the same sample count the muxer stamps the audio
+   // with locks them together by construction, and does it without trusting a
+   // wall clock - the audio device clock drifts from the system clock, which
+   // over a long take is its own source of desync.
+   //
+   // Only live audio needs this. With an audio *file* source the platform
+   // recorders slave the audio to the video's synthetic clock instead
+   // (AppendAudioUpTo / WriteFileAudioTrack), so that path is already in sync
+   // by construction and must keep every rendered frame.
+   bool mPaceToAudio = false;
+   double mAudioSampleRate = 0.0;
+   long long mAudioFramesAppended = 0; // audio frames handed to the recorder
+   long long mFramesEmitted = 0;       // video frames handed to the recorder
 
    static constexpr int kPboCount = 3;
    struct PboSlot

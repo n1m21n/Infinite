@@ -76,6 +76,20 @@ check_verdict() {
 
 check_verdict INFINITE_AUDIOPDCTEST "AUDIOPDCTEST OK"
 
+# Exported-movie A/V sync: pure arithmetic over the same pacing both
+# recorders' PTS depend on, so it runs headless here as well as on macOS -
+# and the recorders it guards are two separate implementations
+# (AVAssetWriter / Media Foundation) with the same frame-counter video clock.
+check_verdict INFINITE_RECSYNCTEST "REC SYNC OK"
+
+# The end-to-end half of the same property: writes a real movie through the
+# platform recorder with simultaneous tone/flash markers, reopens it with the
+# app's own decoders and measures how far apart the two tracks landed. This is
+# the only machine evidence anywhere that Media Foundation's muxing keeps
+# audio and video together - the macOS AVFoundation path is a separate
+# implementation of the same contract.
+check_verdict INFINITE_RECEXPORTTEST "REC EXPORT OK"
+
 # RemoveBgNode's background-removal backend (Vision on macOS, ONNX Runtime +
 # DirectML on Windows). SKIP is an accepted, non-failing verdict here (see
 # RunRemoveBgTest in src/main.cpp) - it just means Platform::SubjectMask

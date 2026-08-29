@@ -31215,6 +31215,393 @@ static int RunDspTest()
    return all ? 0 : 1;
 }
 
+
+// ===================================================== INFINITE_RECSYNCTEST
+// Guards the exported-movie A/V sync property. The video track's PTS is a
+// plain frame counter over recordFps on both platforms, while live audio is
+// stamped from the real captured sample count - so emitting one video frame
+// per *rendered* frame makes the file's video duration renderedFrames/fps
+// against an audio duration of real elapsed time, and the two walk apart
+// linearly across the take. That is invisible while monitoring and shows up
+// only in the written file, which is exactly how it shipped.
+//
+// OutputNode::PacedRepeat is the arithmetic that keeps them locked. This
+// simulates whole takes at render rates above, below and equal to the target
+// and asserts the invariant that actually matters: at every point in the
+// take, the video timeline (emitted/fps) tracks the audio timeline
+// (audioFrames/rate) to within a frame.
+static void RunRecSyncTest()
+{
+   printf("[REC SYNC TEST] pacing exported video against the audio clock\n");
+
+   const double kRate = 48000.0;
+   const int kFps = 30;
+   int failures = 0;
+
+   struct Case { const char* name; double renderFps; double seconds; };
+   const Case cases[] = {
+      { "render slower than target (20fps -> 30fps)",  20.0, 30.0 },
+      { "render faster than target (60fps -> 30fps)",  60.0, 30.0 },
+      { "render exactly at target  (30fps -> 30fps)",  30.0, 30.0 },
+      { "render wildly slow        ( 7fps -> 30fps)",   7.0, 30.0 },
+      // vsync off on a light patch: most frames are decimated away.
+      { "render uncapped          (240fps -> 30fps)", 240.0, 30.0 },
+   };
+
+   for (const Case& c : cases)
+   {
+      long long emitted = 0;
+      long long audioFrames = 0;
+      double worstDriftFrames = 0.0;
+
+      const long long renderCalls = (long long)(c.renderFps * c.seconds);
+      const long long audioPerCall = (long long)(kRate / c.renderFps);
+
+      for (long long i = 0; i < renderCalls; i++)
+      {
+         // One render frame: the audio thread produced its block, then the
+         // capture path decides what the frame is worth.
+         audioFrames += audioPerCall;
+         emitted += OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, false);
+
+         const double videoSeconds = (double)emitted / (double)kFps;
+         const double audioSeconds = (double)audioFrames / kRate;
+         const double drift = std::fabs(videoSeconds - audioSeconds) * (double)kFps;
+         if (drift > worstDriftFrames)
+            worstDriftFrames = drift;
+      }
+
+      // The final drain pads the tail out to the audio's full length.
+      emitted += OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, true);
+
+      const double videoSeconds = (double)emitted / (double)kFps;
+      const double audioSeconds = (double)audioFrames / kRate;
+      const double endDriftFrames = std::fabs(videoSeconds - audioSeconds) * (double)kFps;
+
+      // Two frames of slack: one for the rounding in PacedRepeat, one for a
+      // render call landing between audio blocks. Anything beyond that is
+      // the drift this test exists to catch.
+      const bool ok = worstDriftFrames <= 2.0 && endDriftFrames <= 1.0;
+      if (!ok)
+         failures++;
+      printf("  [%s] %s: %lld frames for %.2fs audio (video %.3fs) worst drift %.2f frames, end drift %.2f frames\n",
+             ok ? "pass" : "FAIL", c.name, emitted, audioSeconds, videoSeconds,
+             worstDriftFrames, endDriftFrames);
+   }
+
+   // A transient collapse in render rate - the interesting case, since it is
+   // what a heavy patch actually does. Render holds 30fps, freezes dead for
+   // two seconds mid-take while audio keeps flowing, then recovers. Sync must
+   // survive it, and the recovery must not be silently deferred to the end.
+   {
+      long long emitted = 0;
+      long long audioFrames = 0;
+      double worstDriftFrames = 0.0;
+      double driftAfterRecoveryFrames = 0.0;
+      const long long stallStart = 300;   // 10s in at 30fps
+      const long long recoverBy = 300 + 15; // half a second of render calls
+
+      for (long long i = 0; i < 900; i++)
+      {
+         // The stall costs render calls, never audio: the device keeps
+         // delivering blocks the whole time it is frozen.
+         audioFrames += (i == stallStart) ? (long long)(kRate * 2.0) + 1600 : 1600;
+         emitted += OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, false);
+
+         const double drift =
+            std::fabs((double)emitted / (double)kFps - (double)audioFrames / kRate) * (double)kFps;
+         // The stall itself is a legitimate gap - measure recovery from after
+         // it, which is the property at issue.
+         if (i > stallStart && drift > worstDriftFrames)
+            worstDriftFrames = drift;
+         if (i == recoverBy)
+            driftAfterRecoveryFrames = drift;
+      }
+      emitted += OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, true);
+      const double endDrift =
+         std::fabs((double)emitted / (double)kFps - (double)audioFrames / kRate) * (double)kFps;
+
+      const bool ok = driftAfterRecoveryFrames <= 1.0 && endDrift <= 1.0;
+      if (!ok)
+         failures++;
+      printf("  [%s] 2s render freeze mid-take: caught up within %lld frames (drift %.2f), end drift %.2f frames\n",
+             ok ? "pass" : "FAIL", recoverBy - stallStart, driftAfterRecoveryFrames, endDrift);
+   }
+
+   // A take with no live audio at all (engine stopped, or an audio *file*
+   // source, where the platform recorders slave audio to the video clock
+   // instead) must keep every rendered frame rather than stalling on an
+   // audio stream that never arrives.
+   const bool passthrough = OutputNode::PacedRepeat(0, kRate, kFps, 0, false) == 1 &&
+                            OutputNode::PacedRepeat(1000, 0.0, kFps, 0, false) == 1;
+   if (!passthrough)
+      failures++;
+   printf("  [%s] no live audio passes frames through unpaced\n", passthrough ? "pass" : "FAIL");
+
+   // A stall must not be handed to the encoder as one enormous burst, and
+   // must not be silently dropped either - the catch-up spreads across the
+   // frames that follow.
+   const int burst = OutputNode::PacedRepeat((long long)(kRate * 10.0), kRate, kFps, 0, false);
+   const bool capped = burst > 0 && burst <= kFps;
+   if (!capped)
+      failures++;
+   printf("  [%s] a 10s stall caps at %d frames per call instead of bursting 300\n",
+          capped ? "pass" : "FAIL", burst);
+
+   printf("REC SYNC %s\n", failures == 0 ? "OK" : "FAIL");
+}
+
+
+// ===================================================== INFINITE_RECEXPORTTEST
+// End-to-end A/V sync measurement on a real written movie, as opposed to
+// RECSYNCTEST above, which only exercises the pacing arithmetic in isolation.
+//
+// Marks the take with five simultaneous audio/video events - a tone burst and
+// a white flash decided by the same boolean, so they are aligned at the source
+// by construction - then writes the file through the real platform recorder,
+// reopens it with the app's own decoders, and measures how far apart the two
+// landed. Anything the muxer does to the relationship between the tracks shows
+// up here: PTS assignment, repeatCount expansion, AAC encoder priming delay,
+// container edit lists.
+//
+// Deliberately renders at a rate that does NOT match the target, since a
+// render loop that happens to hold the target rate hides the entire bug class
+// this exists for.
+//
+// Two separate verdicts, because they fail for different reasons and one is
+// far more serious than the other:
+//   - DRIFT: does the offset grow across the take? This is the bug that
+//     shipped. Tight tolerance.
+//   - OFFSET: is there a constant lead/lag on every marker? A fixed offset is
+//     an encoder-priming or capture-tap-point question, not drift. Looser
+//     tolerance, because video onsets can only be resolved to a frame.
+//
+// Headless: feeds the recorder pixel buffers directly rather than going
+// through the GL readback, so it runs on the Windows CI runner - the only
+// place the Media Foundation half of this can be executed by machine at all.
+static void RunRecExportTest()
+{
+   printf("[REC EXPORT TEST] measuring A/V sync on a real exported movie\n");
+
+   constexpr int kW = 320;
+   constexpr int kH = 240;
+   constexpr int kFps = 30;         // target/muxed frame rate
+   constexpr double kRenderFps = 20.0; // deliberately mismatched
+   constexpr double kRate = 48000.0;
+   constexpr double kTakeSeconds = 6.0;
+   constexpr double kMarkerSeconds = 0.1;
+   constexpr double kToneHz = 1000.0;
+   const double kMarkerAt[] = { 1.0, 2.0, 3.0, 4.0, 5.0 };
+   const int kMarkerCount = (int)(sizeof(kMarkerAt) / sizeof(kMarkerAt[0]));
+
+   const std::string path = TmpPath("infinite_recexporttest.mp4");
+   std::remove(path.c_str());
+
+   auto inMarker = [&](double t)
+   {
+      for (int m = 0; m < kMarkerCount; m++)
+      {
+         if (t >= kMarkerAt[m] && t < kMarkerAt[m] + kMarkerSeconds)
+            return true;
+      }
+      return false;
+   };
+
+   std::string error;
+   Platform::RecorderHandle* rec =
+      Platform::RecorderStart(path, kW, kH, kFps, error, std::string(), true, kRate, 2);
+   if (rec == nullptr)
+   {
+      printf("  [FAIL] could not start recorder: %s\n", error.c_str());
+      printf("REC EXPORT FAIL\n");
+      return;
+   }
+
+   const int blockFrames = (int)(kRate / kRenderFps);
+   const long long renderSteps = (long long)(kRenderFps * kTakeSeconds);
+   std::vector<float> block((size_t)blockFrames * 2);
+   long long audioFrames = 0;
+   long long emitted = 0;
+   double tonePhase = 0.0;
+
+   for (long long step = 0; step < renderSteps; step++)
+   {
+      const double t = (double)step / kRenderFps;
+      const bool marker = inMarker(t);
+
+      // One audio block for this render step. The tone runs continuously in
+      // phase so the burst has no click at its edges for the encoder to smear.
+      for (int i = 0; i < blockFrames; i++)
+      {
+         const float v = marker ? (float)(0.8 * std::sin(tonePhase)) : 0.0f;
+         tonePhase += 2.0 * M_PI * kToneHz / kRate;
+         if (tonePhase > 2.0 * M_PI)
+            tonePhase -= 2.0 * M_PI;
+         block[(size_t)i * 2 + 0] = v;
+         block[(size_t)i * 2 + 1] = v;
+      }
+      if (Platform::RecorderAppendAudio(rec, block.data(), blockFrames))
+         audioFrames += blockFrames;
+
+      // ...and however many video frames the pacing says that block is worth.
+      const int repeat = OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, false);
+      if (repeat > 0)
+      {
+         // The real render loop is paced by the display and never outruns the
+         // encoder; this one runs flat out, so without backpressure it would
+         // just overflow the queue and measure a movie made of dropped frames.
+         // Wait for a slot rather than sleeping, so the test stays as fast as
+         // the encoder is.
+         for (int spin = 0; spin < 20000 && Platform::RecorderPendingFrameCount(rec) >= 3; spin++)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+         std::vector<unsigned char> px = Platform::RecorderAcquireFrameBuffer(rec);
+         px.assign((size_t)kW * kH * 4, marker ? (unsigned char)255 : (unsigned char)0);
+         for (size_t i = 3; i < px.size(); i += 4)
+            px[i] = 255; // opaque
+         if (Platform::RecorderAppend(rec, std::move(px), repeat))
+            emitted += repeat;
+      }
+   }
+
+   int wrote = 0;
+   int dropped = 0;
+   const bool stopped = Platform::RecorderStop(rec, error, &wrote, &dropped);
+   if (!stopped)
+   {
+      printf("  [FAIL] recorder stop failed: %s\n", error.c_str());
+      printf("REC EXPORT FAIL\n");
+      std::remove(path.c_str());
+      return;
+   }
+   printf("  wrote %d frames (%d dropped) for %.2fs of audio, rendering at %.0ffps into a %dfps movie\n",
+          wrote, dropped, (double)audioFrames / kRate, kRenderFps, kFps);
+
+   int failures = 0;
+
+   // ---- where the tone bursts actually landed ----
+   Platform::SampleBuffer audio;
+   std::string audioErr;
+   std::vector<double> audioOnsets;
+   if (!Platform::DecodeVideoAudioTrackToBuffer(path, audio, audioErr) || audio.numFrames <= 0)
+   {
+      printf("  [FAIL] could not decode the movie's audio track: %s\n", audioErr.c_str());
+      failures++;
+   }
+   else
+   {
+      // Envelope over a 5ms window, then a rising edge through half amplitude.
+      const int win = (int)(audio.sampleRate * 0.005);
+      bool loud = false;
+      for (int i = 0; i + win < audio.numFrames; i += win)
+      {
+         float peak = 0.0f;
+         for (int k = 0; k < win; k++)
+            peak = std::max(peak, std::fabs(audio.channelData[(size_t)(i + k)]));
+         const bool nowLoud = peak > 0.4f;
+         if (nowLoud && !loud)
+            audioOnsets.push_back((double)i / audio.sampleRate);
+         loud = nowLoud;
+      }
+      printf("  audio track: %d frames @ %.0fHz, %d tone onsets\n",
+             audio.numFrames, audio.sampleRate, (int)audioOnsets.size());
+   }
+
+   // ---- where the flashes actually landed ----
+   std::vector<double> videoOnsets;
+   std::string videoErr;
+   Platform::VideoHandle* vid = Platform::VideoOpen(path, videoErr);
+   if (vid == nullptr)
+   {
+      printf("  [FAIL] could not open the movie for decoding: %s\n", videoErr.c_str());
+      failures++;
+   }
+   else
+   {
+      const int vw = Platform::VideoWidth(vid);
+      const int vh = Platform::VideoHeight(vid);
+      std::vector<unsigned char> px;
+      bool bright = false;
+      const double stepSeconds = 1.0 / ((double)kFps * 4.0);
+      for (double t = 0.0; t < kTakeSeconds; t += stepSeconds)
+      {
+         if (!Platform::VideoFrameAt(vid, t, px) && px.empty())
+            continue;
+         if ((int)px.size() < vw * vh * 4)
+            continue;
+         // Average the centre quarter, away from any edge artefacts.
+         double sum = 0.0;
+         int count = 0;
+         for (int y = vh / 4; y < vh * 3 / 4; y += 4)
+         {
+            for (int x = vw / 4; x < vw * 3 / 4; x += 4)
+            {
+               sum += px[((size_t)y * vw + x) * 4];
+               count++;
+            }
+         }
+         const double lum = count > 0 ? sum / count / 255.0 : 0.0;
+         const bool nowBright = lum > 0.5;
+         if (nowBright && !bright)
+            videoOnsets.push_back(t);
+         bright = nowBright;
+      }
+      printf("  video track: %dx%d, %.2fs, %d flash onsets\n",
+             vw, vh, Platform::VideoDuration(vid), (int)videoOnsets.size());
+      Platform::VideoClose(vid);
+   }
+
+   // ---- correlate ----
+   if ((int)audioOnsets.size() != kMarkerCount || (int)videoOnsets.size() != kMarkerCount)
+   {
+      printf("  [FAIL] expected %d markers on each track, found %d audio / %d video"
+             " - the markers did not survive the round trip\n",
+             kMarkerCount, (int)audioOnsets.size(), (int)videoOnsets.size());
+      failures++;
+   }
+   else
+   {
+      double first = 0.0;
+      double last = 0.0;
+      double worstAbs = 0.0;
+      for (int m = 0; m < kMarkerCount; m++)
+      {
+         const double delta = videoOnsets[m] - audioOnsets[m];
+         if (m == 0)
+            first = delta;
+         if (m == kMarkerCount - 1)
+            last = delta;
+         worstAbs = std::max(worstAbs, std::fabs(delta));
+         printf("    marker %d: audio %.3fs  video %.3fs  video-minus-audio %+.0fms\n",
+                m + 1, audioOnsets[m], videoOnsets[m], delta * 1000.0);
+      }
+
+      // The bug that shipped: the offset grows across the take. One video
+      // frame of slack, since a flash onset can only be resolved to the frame
+      // it starts on.
+      const double driftMs = std::fabs(last - first) * 1000.0;
+      const double kDriftToleranceMs = 1000.0 / kFps + 1.0;
+      const bool driftOk = driftMs <= kDriftToleranceMs;
+      if (!driftOk)
+         failures++;
+      printf("  [%s] DRIFT: offset moved %.0fms from first marker to last (tolerance %.0fms)\n",
+             driftOk ? "pass" : "FAIL", driftMs, kDriftToleranceMs);
+
+      // A constant lead/lag is a different question - encoder priming, or the
+      // point in the chain the audio is tapped. Not drift, but still audible
+      // past roughly a couple of frames, so it is worth a verdict of its own.
+      const double kOffsetToleranceMs = 2.0 * 1000.0 / kFps;
+      const bool offsetOk = worstAbs * 1000.0 <= kOffsetToleranceMs;
+      if (!offsetOk)
+         failures++;
+      printf("  [%s] OFFSET: worst constant offset %.0fms (tolerance %.0fms)\n",
+             offsetOk ? "pass" : "FAIL", worstAbs * 1000.0, kOffsetToleranceMs);
+   }
+
+   std::remove(path.c_str());
+   printf("REC EXPORT %s\n", failures == 0 ? "OK" : "FAIL");
+}
+
 // ===================================================== INFINITE_AUDIOPDCTEST
 //
 // Headless, numeric verification of plugin/effect delay compensation (PDC) -
@@ -33472,6 +33859,18 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_GRAINMOLDERTEST") != nullptr)
       return RunGrainMolderFixture() ? 0 : 1;
+
+   if (getenv("INFINITE_RECEXPORTTEST") != nullptr)
+   {
+      RunRecExportTest();
+      return 0; // verdict is the printf line, not $?
+   }
+
+   if (getenv("INFINITE_RECSYNCTEST") != nullptr)
+   {
+      RunRecSyncTest();
+      return 0; // verdict is the printf line, not $? - see AUDIOPDCTEST below
+   }
 
    if (getenv("INFINITE_AUDIOPDCTEST") != nullptr)
    {
@@ -43761,10 +44160,20 @@ int main(int argc, char** argv)
                   ImGui::PopStyleColor();
                ImGui::EndDisabled();
 
+               // Both of these are read once, at StartRecording, and latched
+               // for the take - the recorder fixes its frame rate and its
+               // audio track up front and cannot change either mid-stream.
+               // Leaving them live meant dragging fps during a take silently
+               // did nothing; now it also has to not desync the pacing that
+               // reads it, so say plainly that the take owns them.
+               ImGui::BeginDisabled(n->IsRecording());
                ImGui::SetNextItemWidth(kParamWidth);
                ImGui::SliderInt("fps", &n->recordFps, 1, 60);
 
                ImGui::Checkbox("include audio", &n->includeAudio);
+               ImGui::EndDisabled();
+               if (n->IsRecording() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                  ImGui::SetTooltip("locked for the current take");
                if (n->includeAudio && n->AudioInput().IsConnected())
                {
                   INode* src = n->AudioInput().GetSource();

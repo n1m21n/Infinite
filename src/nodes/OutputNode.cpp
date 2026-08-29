@@ -6,6 +6,7 @@
 
 #include "audio/AudioEngine.h"
 
+#include <cstdint>
 #include <cstring>
 
 namespace
@@ -52,6 +53,7 @@ bool OutputNode::StartRecording(const std::string& path)
    // mid-recording resolution change can't corrupt the stream.
    mRecordW = mOut.w & ~1;
    mRecordH = mOut.h & ~1;
+   mRecordFps = recordFps > 0 ? recordFps : 30;
 
    std::string audioPath;
    bool audioLoop = true;
@@ -74,15 +76,21 @@ bool OutputNode::StartRecording(const std::string& path)
             liveAudioSampleRate = 44100.0;
          mCaptureRing.overflowCount.store(0, std::memory_order_relaxed);
          mCaptureRing.enabled.store(true, std::memory_order_relaxed);
+         mPaceToAudio = true;
+         mAudioSampleRate = liveAudioSampleRate;
       }
    }
 
+   mAudioFramesAppended = 0;
+   mFramesEmitted = 0;
+
    std::string error;
-   mRecorder = Platform::RecorderStart(path, mRecordW, mRecordH, recordFps, error,
+   mRecorder = Platform::RecorderStart(path, mRecordW, mRecordH, mRecordFps, error,
                                        audioPath, audioLoop, liveAudioSampleRate, 2);
    if (mRecorder == nullptr)
    {
       mCaptureRing.enabled.store(false, std::memory_order_relaxed);
+      mPaceToAudio = false;
       mRecordStatus = error.empty() ? "could not start recording" : error;
       return false;
    }
@@ -120,11 +128,21 @@ void OutputNode::StopRecording()
    mLastFrames = frames;
    mLastDropped = dropped;
 
+   // Audio the ring had to throw away is a sync problem, not just a glitch:
+   // the samples are gone, so everything after the gap sits earlier in the
+   // file than it was played. Surface it rather than shipping a quietly
+   // shortened audio track.
+   const uint64_t audioDropped =
+      mPaceToAudio ? mCaptureRing.overflowCount.exchange(0, std::memory_order_relaxed) : 0;
+   mPaceToAudio = false;
+
    if (ok)
    {
       mRecordStatus = "saved " + std::to_string(frames) + " frames";
       if (dropped > 0)
          mRecordStatus += " (" + std::to_string(dropped) + " dropped)";
+      if (audioDropped > 0)
+         mRecordStatus += " (audio gap: " + std::to_string(audioDropped / 2) + " frames lost)";
    }
    else
       mRecordStatus = error;
@@ -139,7 +157,9 @@ void OutputNode::DrainAudioCapture()
    int n;
    while ((n = mCaptureRing.Read(scratch, 4096)) > 0)
    {
-      Platform::RecorderAppendAudio(mRecorder, scratch, n / 2);
+      const int frames = n / 2;
+      if (Platform::RecorderAppendAudio(mRecorder, scratch, frames))
+         mAudioFramesAppended += frames;
    }
 }
 
@@ -186,6 +206,42 @@ void OutputNode::ReleaseReadbackBuffers()
    }
 }
 
+int OutputNode::PacedRepeat(long long audioFrames, double rate, int fps,
+                            long long emitted, bool finalDrain)
+{
+   // No live audio has reached the recorder yet - the engine may be stopped
+   // or silent for this whole take. Pass frames straight through rather than
+   // stalling the video on an audio stream that may never arrive.
+   if (rate <= 0.0 || audioFrames <= 0)
+      return 1;
+   if (fps <= 0)
+      fps = 30;
+
+   const double audioSeconds = (double)audioFrames / rate;
+   const long long want = (long long)(audioSeconds * (double)fps + 0.5);
+   long long n = want - emitted;
+   if (n <= 0)
+      return 0; // rendering faster than recordFps: decimate
+
+   // A long stall (a modal dialog, a device change) shouldn't turn into one
+   // enormous burst of duplicated frames handed to the encoder in a single
+   // call - that just overflows its queue and gets counted as drops. Cap the
+   // catch-up per frame and let the following frames finish it; `want` keeps
+   // growing off the audio clock either way, so the cap spreads the catch-up
+   // out instead of losing it. The final drain has no following frames, so it
+   // takes the whole remainder and pads the tail out to the audio's length.
+   if (!finalDrain && n > fps)
+      n = fps;
+   return (int)n;
+}
+
+int OutputNode::PacedRepeatCount(bool finalDrain)
+{
+   if (!mPaceToAudio)
+      return 1;
+   return PacedRepeat(mAudioFramesAppended, mAudioSampleRate, mRecordFps, mFramesEmitted, finalDrain);
+}
+
 void OutputNode::FlushReadbacks()
 {
    if (mRecorder == nullptr)
@@ -198,6 +254,16 @@ void OutputNode::FlushReadbacks()
    // A generous but finite bound rather than a literal indefinite wait - if
    // the driver never signals, StopRecording should still return.
    const GLuint64 kFlushTimeoutNs = 5000000000ull; // 5s
+
+   // Which iteration will append the last frame of the take - the slot that
+   // has to pad the tail out to the audio track's full length. Not simply the
+   // last iteration: slots that were never filled are skipped below.
+   int lastPending = -1;
+   for (int i = 0; i < kPboCount; i++)
+   {
+      if (mPbo[(mPboReadIndex + i) % kPboCount].pending)
+         lastPending = i;
+   }
 
    for (int i = 0; i < kPboCount; i++)
    {
@@ -213,11 +279,18 @@ void OutputNode::FlushReadbacks()
          const void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, (GLsizeiptr)bytes, GL_MAP_READ_BIT);
          if (mapped != nullptr)
          {
-            std::vector<unsigned char> buf = Platform::RecorderAcquireFrameBuffer(mRecorder);
-            buf.resize(bytes);
-            memcpy(buf.data(), mapped, bytes);
+            // Last slot in the pipeline pads the tail out to the audio track's
+            // full length; earlier ones pace like any other frame.
+            const int repeat = PacedRepeatCount(i == lastPending);
+            if (repeat > 0)
+            {
+               std::vector<unsigned char> buf = Platform::RecorderAcquireFrameBuffer(mRecorder);
+               buf.resize(bytes);
+               memcpy(buf.data(), mapped, bytes);
+               if (Platform::RecorderAppend(mRecorder, std::move(buf), repeat))
+                  mFramesEmitted += repeat;
+            }
             glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
-            Platform::RecorderAppend(mRecorder, std::move(buf));
          }
       }
 
@@ -248,8 +321,25 @@ void OutputNode::CaptureFrame()
       // waiting to be consumed by the read side below - glReadPixels into a
       // bound PBO returns immediately (a GPU-to-GPU copy), so this never
       // stalls the render thread.
+      // With vsync off (or a light patch on a fast GPU) the render loop can
+      // run many times the target rate, and every one of those frames would
+      // otherwise cost a full-resolution glReadPixels whose result the pacing
+      // below just discards. Count what the pipeline already holds and skip
+      // issuing a readback we are certain to decimate - if that guess leaves
+      // us short later, the padding path covers it, so this can only cost a
+      // slightly staler frame, never sync.
+      int inFlight = 0;
+      for (int i = 0; i < kPboCount; i++)
+      {
+         if (mPbo[i].pending)
+            inFlight++;
+      }
+      const bool alreadyAhead =
+         mPaceToAudio && PacedRepeat(mAudioFramesAppended, mAudioSampleRate, mRecordFps,
+                                     mFramesEmitted + inFlight, false) == 0;
+
       PboSlot& writeSlot = mPbo[mPboWriteIndex];
-      if (!writeSlot.pending)
+      if (!writeSlot.pending && !alreadyAhead)
       {
          GLint prevFbo = 0;
          glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
@@ -274,9 +364,14 @@ void OutputNode::CaptureFrame()
       // The graph resolution shrank mid-take: the locked-size region no
       // longer fits, so feed the encoder a black frame of the take's size
       // rather than reading out of bounds or leaving the movie short.
-      std::vector<unsigned char> blank = Platform::RecorderAcquireFrameBuffer(mRecorder);
-      blank.assign((size_t)w * h * 4, 0);
-      Platform::RecorderAppend(mRecorder, std::move(blank));
+      const int repeat = PacedRepeatCount(false);
+      if (repeat > 0)
+      {
+         std::vector<unsigned char> blank = Platform::RecorderAcquireFrameBuffer(mRecorder);
+         blank.assign((size_t)w * h * 4, 0);
+         if (Platform::RecorderAppend(mRecorder, std::move(blank), repeat))
+            mFramesEmitted += repeat;
+      }
    }
 
    // Separately, check whether the read slot - up to kPboCount-1 frames
@@ -288,16 +383,25 @@ void OutputNode::CaptureFrame()
       const GLenum waitResult = glClientWaitSync(readSlot.fence, 0, 0);
       if (waitResult == GL_ALREADY_SIGNALED || waitResult == GL_CONDITION_SATISFIED)
       {
-         glBindBuffer(GL_PIXEL_PACK_BUFFER, readSlot.pbo);
-         const size_t bytes = (size_t)w * h * 4;
-         const void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, (GLsizeiptr)bytes, GL_MAP_READ_BIT);
-         if (mapped != nullptr)
+         // Decide how many video frames this readback is worth *before*
+         // paying for the map and the copy: at repeat 0 the frame is being
+         // decimated away and none of that work is needed. The slot still has
+         // to be retired below either way, or the readback pipeline stalls.
+         const int repeat = PacedRepeatCount(false);
+         if (repeat > 0)
          {
-            std::vector<unsigned char> buf = Platform::RecorderAcquireFrameBuffer(mRecorder);
-            buf.resize(bytes);
-            memcpy(buf.data(), mapped, bytes);
-            glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
-            Platform::RecorderAppend(mRecorder, std::move(buf));
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, readSlot.pbo);
+            const size_t bytes = (size_t)w * h * 4;
+            const void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, (GLsizeiptr)bytes, GL_MAP_READ_BIT);
+            if (mapped != nullptr)
+            {
+               std::vector<unsigned char> buf = Platform::RecorderAcquireFrameBuffer(mRecorder);
+               buf.resize(bytes);
+               memcpy(buf.data(), mapped, bytes);
+               glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+               if (Platform::RecorderAppend(mRecorder, std::move(buf), repeat))
+                  mFramesEmitted += repeat;
+            }
          }
          glDeleteSync(readSlot.fence);
          readSlot.fence = nullptr;
