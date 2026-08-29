@@ -31422,6 +31422,8 @@ static void RunRecExportTest()
    std::vector<float> block((size_t)blockFrames * 2);
    long long audioFrames = 0;
    long long emitted = 0;
+   long long audioRejected = 0;
+   long long videoRejected = 0;
    double tonePhase = 0.0;
 
    for (long long step = 0; step < renderSteps; step++)
@@ -31442,6 +31444,8 @@ static void RunRecExportTest()
       }
       if (Platform::RecorderAppendAudio(rec, block.data(), blockFrames))
          audioFrames += blockFrames;
+      else
+         audioRejected++;
 
       // ...and however many video frames the pacing says that block is worth.
       const int repeat = OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, false);
@@ -31461,6 +31465,8 @@ static void RunRecExportTest()
             px[i] = 255; // opaque
          if (Platform::RecorderAppend(rec, std::move(px), repeat))
             emitted += repeat;
+         else
+            videoRejected += repeat;
       }
    }
 
@@ -31476,8 +31482,23 @@ static void RunRecExportTest()
    }
    printf("  wrote %d frames (%d dropped) for %.2fs of audio, rendering at %.0ffps into a %dfps movie\n",
           wrote, dropped, (double)audioFrames / kRate, kRenderFps, kFps);
+   printf("  paced: emitted=%lld audioAccepted=%lld audioRejected=%lld videoRejected=%lld\n",
+          emitted, audioFrames, audioRejected, videoRejected);
 
    int failures = 0;
+
+   // A frame the recorder accepted has to reach the file. This is separate
+   // from the sync verdicts below because it fails differently: the encoder
+   // used to abandon padded frames without counting them, so the movie came
+   // out short while both the caller and droppedCount said everything was
+   // fine. Checking the invariant directly names that as an encoder fault
+   // instead of leaving it to show up as unexplained drift.
+   if ((long long)wrote + dropped != emitted)
+   {
+      printf("  [FAIL] ACCEPTED: recorder took %lld frames but accounted for %d written + %d dropped\n",
+             emitted, wrote, dropped);
+      failures++;
+   }
 
    // ---- where the tone bursts actually landed ----
    Platform::SampleBuffer audio;
