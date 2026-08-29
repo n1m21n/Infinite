@@ -1,8 +1,16 @@
 #include "GLUtil.h"
 
 #include "gl3.h"
+
+// GLFW_INCLUDE_NONE: glfw3.h pulls in the legacy <GL/gl.h> unless told not to,
+// and gl3.h above has already provided the 3.x core header (glad on non-Apple).
+// Only used here for glfwGetCurrentContext() - see sQuadVaos below.
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 
 namespace GLUtil
 {
@@ -16,40 +24,87 @@ namespace GLUtil
       "   gl_Position = vec4(aPos, 0.0, 1.0);\n"
       "}\n";
 
-   static unsigned int sQuadVao = 0;
+   // The fullscreen quad's GPU state, split by what an OpenGL share group
+   // actually shares.
+   //
+   // A projector/output window (main.cpp's OpenProjectorWindow) creates its
+   // context with the editor window as the share context, and then blits
+   // through DrawTextureToScreen with ITS context current. Share groups share
+   // *object* state - textures, buffers, shaders, programs - but explicitly
+   // NOT container objects: VAOs, FBOs, program pipelines and transform
+   // feedback objects are per-context (GL 3.3 core, Appendix D "Shared
+   // Objects and Multiple Contexts"). Apple's implementation shares VAOs
+   // anyway, as a documented non-conformance, which is why a single global
+   // VAO worked on macOS and drew nothing on Windows: glBindVertexArray with
+   // a name from another context raises GL_INVALID_OPERATION, leaves no
+   // vertex array bound, and in a core profile glDrawArrays with no bound
+   // VAO draws nothing at all - a uniformly dark-grey projector window.
+   //
+   // So: one VAO per context, keyed on the GLFW context that created it, and
+   // one shared VBO holding the actual vertices. The attribute pointers live
+   // in the VAO, not the buffer, so every per-context VAO has to redo the
+   // bind/glVertexAttribPointer/glEnableVertexAttribArray setup against that
+   // same shared buffer.
+   //
+   // Main-thread-only, like every other GL call site in this codebase.
    static unsigned int sQuadVbo = 0;
+   static std::map<GLFWwindow*, unsigned int> sQuadVaos;
 
-   static void EnsureQuad()
+   static unsigned int EnsureQuad()
    {
-      if (sQuadVao != 0)
-         return;
+      GLFWwindow* context = glfwGetCurrentContext();
+      auto it = sQuadVaos.find(context);
+      if (it != sQuadVaos.end() && it->second != 0)
+         return it->second;
 
-      // clip-space pos.xy, uv.xy - a single GL_TRIANGLE_STRIP covering the viewport
-      float verts[] = {
-         -1.0f, -1.0f, 0.0f, 0.0f,
-         1.0f, -1.0f, 1.0f, 0.0f,
-         -1.0f, 1.0f, 0.0f, 1.0f,
-         1.0f, 1.0f, 1.0f, 1.0f
-      };
+      if (sQuadVbo == 0)
+      {
+         // clip-space pos.xy, uv.xy - a single GL_TRIANGLE_STRIP covering the viewport
+         float verts[] = {
+            -1.0f, -1.0f, 0.0f, 0.0f,
+            1.0f, -1.0f, 1.0f, 0.0f,
+            -1.0f, 1.0f, 0.0f, 1.0f,
+            1.0f, 1.0f, 1.0f, 1.0f
+         };
+         glGenBuffers(1, &sQuadVbo);
+         glBindBuffer(GL_ARRAY_BUFFER, sQuadVbo);
+         glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+      }
 
-      glGenVertexArrays(1, &sQuadVao);
-      glGenBuffers(1, &sQuadVbo);
-      glBindVertexArray(sQuadVao);
+      unsigned int vao = 0;
+      glGenVertexArrays(1, &vao);
+      glBindVertexArray(vao);
       glBindBuffer(GL_ARRAY_BUFFER, sQuadVbo);
-      glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
       glEnableVertexAttribArray(0);
       glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
       glEnableVertexAttribArray(1);
       glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
       glBindVertexArray(0);
+      glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+      sQuadVaos[context] = vao;
+      return vao;
    }
 
    static void DrawQuad()
    {
-      EnsureQuad();
-      glBindVertexArray(sQuadVao);
+      const unsigned int vao = EnsureQuad();
+      if (vao == 0)
+         return;
+      glBindVertexArray(vao);
       glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
       glBindVertexArray(0);
+   }
+
+   void ReleaseCurrentContextResources()
+   {
+      GLFWwindow* context = glfwGetCurrentContext();
+      auto it = sQuadVaos.find(context);
+      if (it == sQuadVaos.end())
+         return;
+      if (it->second != 0)
+         glDeleteVertexArrays(1, &it->second);
+      sQuadVaos.erase(it);
    }
 
    bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat)

@@ -50,6 +50,7 @@
 #include "pluginterfaces/base/smartpointer.h"
 #include "pluginterfaces/base/ustring.h"
 #include "pluginterfaces/gui/iplugview.h"
+#include "pluginterfaces/gui/iplugviewcontentscalesupport.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
@@ -1883,6 +1884,100 @@ namespace Platform
 
 namespace
 {
+   // WM_DPICHANGED is gated on WINVER >= 0x0603 in <winuser.h>; this target
+   // does not raise WINVER, and the message is delivered regardless of which
+   // headers we compiled against, so define it if the SDK hid it.
+#ifndef WM_DPICHANGED
+   #define WM_DPICHANGED 0x02E0
+#endif
+
+   // ---- per-monitor DPI ----------------------------------------------------
+   //
+   // GLFW marks the process Per-Monitor-V2 DPI aware at glfwInit(), so a
+   // window on a 150% display really is 144 dpi and Windows does NOT scale
+   // anything for us. Two consequences this file has to honour:
+   //
+   //  * AdjustWindowRectEx assumes the system dpi (96) and so under-reports
+   //    the non-client margins on a high-dpi monitor, making the editor
+   //    window's client area too small for the view the plugin was told to
+   //    fill - the classic "partially blank editor". AdjustWindowRectExForDpi
+   //    is the per-monitor-aware form.
+   //  * The plugin itself has to be told the scale, via
+   //    IPlugViewContentScaleSupport::setContentScaleFactor. On Windows that
+   //    is the HOST's obligation (VST3 spec) - a plugin that supports it
+   //    draws at 1x until told otherwise, which is the "editor is tiny in
+   //    the corner" report. Cocoa derives backing scale itself, which is
+   //    why macOS needs no equivalent in PluginVST3.mm.
+   //
+   // Both entry points are Windows 10 1607+ and live in user32, so they are
+   // resolved dynamically - the shipped binary still launches on older
+   // Windows, it just falls back to the 96-dpi behaviour there.
+   using GetDpiForWindowProc = UINT(WINAPI*)(HWND);
+   using AdjustWindowRectExForDpiProc = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
+
+   HMODULE User32Module()
+   {
+      static const HMODULE module = GetModuleHandleW(L"user32.dll");
+      return module;
+   }
+
+   UINT EditorDpiForWindow(HWND hwnd)
+   {
+      static const GetDpiForWindowProc fn =
+         User32Module() != nullptr
+            ? (GetDpiForWindowProc)GetProcAddress(User32Module(), "GetDpiForWindow")
+            : nullptr;
+      if (fn != nullptr && hwnd != nullptr)
+      {
+         const UINT dpi = fn(hwnd);
+         if (dpi != 0)
+            return dpi;
+      }
+      return 96;
+   }
+
+   void AdjustEditorWindowRect(RECT& rect, DWORD style, DWORD exStyle, UINT dpi)
+   {
+      static const AdjustWindowRectExForDpiProc fn =
+         User32Module() != nullptr
+            ? (AdjustWindowRectExForDpiProc)GetProcAddress(User32Module(), "AdjustWindowRectExForDpi")
+            : nullptr;
+      if (fn != nullptr)
+      {
+         if (fn(&rect, style, FALSE, exStyle, dpi))
+            return;
+      }
+      AdjustWindowRectEx(&rect, style, FALSE, exStyle);
+   }
+
+   // Tells the plugin what scale to draw its editor at, if it implements the
+   // optional interface. Guarded like every other plugin call in this file -
+   // this runs inside third-party code and a fault here must not take the
+   // app down. Safe to call repeatedly (before attached(), and again on
+   // WM_DPICHANGED); plugins that don't implement it return kNotImplemented
+   // from queryInterface and this quietly does nothing.
+   void ApplyEditorContentScale(Platform::PluginHandle* h, HWND hwnd)
+   {
+      if (h == nullptr || h->vst3 == nullptr || !h->vst3->plugView || hwnd == nullptr)
+         return;
+      Platform::PluginVST3State* v = h->vst3;
+
+      const float scale = (float)EditorDpiForWindow(hwnd) / 96.0f;
+      if (!(scale > 0.0f))
+         return;
+
+      Platform::RunPluginCallGuarded("setContentScaleFactor", h, [&] {
+         Steinberg::IPlugViewContentScaleSupport* scaleSupport = nullptr;
+         if (v->plugView->queryInterface(Steinberg::IPlugViewContentScaleSupport::iid,
+                                         (void**)&scaleSupport) == Steinberg::kResultOk &&
+             scaleSupport != nullptr)
+         {
+            scaleSupport->setContentScaleFactor(scale);
+            scaleSupport->release();
+         }
+      });
+   }
+
    void HostComponentHandler::RecordTouch(Steinberg::Vst::ParamID id)
    {
       if (mHandle == nullptr || mHandle->vst3 == nullptr)
@@ -1912,7 +2007,7 @@ namespace
       RECT rect = { 0, 0, width, height };
       const DWORD style = (DWORD)GetWindowLongPtrW(v->editorHwnd, GWL_STYLE);
       const DWORD exStyle = (DWORD)GetWindowLongPtrW(v->editorHwnd, GWL_EXSTYLE);
-      AdjustWindowRectEx(&rect, style, FALSE, exStyle);
+      AdjustEditorWindowRect(rect, style, exStyle, EditorDpiForWindow(v->editorHwnd));
 
       v->resizingFromPlugin = true;
       SetWindowPos(v->editorHwnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top,
@@ -2127,6 +2222,46 @@ namespace
          return 0;
       }
 
+      // The window was dragged to a monitor with a different scale factor (or
+      // that monitor's scale changed under it). Per-Monitor-V2 means Windows
+      // hands us the correctly-scaled rect and expects us to honour it; then
+      // the plugin has to be told the new scale and given the new client size.
+      if (msg == WM_DPICHANGED)
+      {
+         Platform::PluginVST3State* v =
+            (h != nullptr && h->vst3 != nullptr && h->vst3->plugView) ? h->vst3 : nullptr;
+
+         // SetWindowPos dispatches WM_SIZE synchronously, so the suppression
+         // flag has to be raised BEFORE the move, not after - otherwise
+         // onSize() lands twice for one logical resize. Same flag the
+         // plugin-driven path in HostPlugFrame::resizeView uses.
+         const bool wasResizing = (v != nullptr) && v->resizingFromPlugin;
+         if (v != nullptr)
+            v->resizingFromPlugin = true;
+
+         const RECT* suggested = reinterpret_cast<const RECT*>(lParam);
+         if (suggested != nullptr)
+         {
+            SetWindowPos(hwnd, nullptr, suggested->left, suggested->top,
+                         suggested->right - suggested->left, suggested->bottom - suggested->top,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+         }
+
+         if (v != nullptr)
+         {
+            ApplyEditorContentScale(h, hwnd);
+
+            RECT client = {};
+            GetClientRect(hwnd, &client);
+            Steinberg::ViewRect newSize(0, 0, client.right - client.left, client.bottom - client.top);
+            if (!Platform::RunPluginCallGuarded("onSize", h, [&] { v->plugView->onSize(&newSize); }))
+               v->editorUnstable.store(true, std::memory_order_relaxed);
+
+            v->resizingFromPlugin = wasResizing;
+         }
+         return 0;
+      }
+
       if (msg == WM_SIZE)
       {
          if (h != nullptr && h->vst3 != nullptr && h->vst3->plugView && !h->vst3->resizingFromPlugin &&
@@ -2158,6 +2293,14 @@ namespace
          // Infinite target) - spell out the wide resource ID explicitly
          // instead of relying on that macro.
          wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
+         // Without a background brush, WM_ERASEBKGND is a no-op and any part
+         // of the client area the plugin's own child HWND does not cover
+         // shows whatever was in that video memory - the "editor is
+         // half-garbage" report. A plugin whose view is smaller than the
+         // window (or which is mid-resize) now gets a defined backdrop
+         // instead. COLOR_BTNFACE + 1 is the standard system-themed choice
+         // and needs no DeleteObject: system brushes are process-owned.
+         wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
          wc.lpszClassName = kEditorWindowClassName;
          return RegisterClassExW(&wc);
       }();
@@ -3016,8 +3159,12 @@ namespace Platform
       if (!canResize)
          style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
 
+      // Created at the system dpi first, then re-fitted below once the window
+      // exists and we can ask which monitor it actually landed on -
+      // AdjustWindowRectExForDpi needs a dpi, and there is no window to read
+      // one from until CreateWindowExW has returned.
       RECT wr = { 0, 0, width, height };
-      AdjustWindowRectEx(&wr, style, FALSE, 0);
+      AdjustEditorWindowRect(wr, style, 0, 96);
 
       HWND hwnd = CreateWindowExW(0, kEditorWindowClassName, WinCommon::Utf8ToWide(h->desc.name).c_str(),
                                   style, CW_USEDEFAULT, CW_USEDEFAULT, wr.right - wr.left, wr.bottom - wr.top,
@@ -3026,6 +3173,18 @@ namespace Platform
       {
          outError = "failed to create editor window";
          return false;
+      }
+
+      // Now that the window has a monitor, redo the frame maths at that
+      // monitor's real dpi so the client area is exactly the size the plugin
+      // asked for. At 96 dpi this is a no-op.
+      const UINT editorDpi = EditorDpiForWindow(hwnd);
+      if (editorDpi != 96)
+      {
+         RECT fit = { 0, 0, width, height };
+         AdjustEditorWindowRect(fit, style, 0, editorDpi);
+         SetWindowPos(hwnd, nullptr, 0, 0, fit.right - fit.left, fit.bottom - fit.top,
+                      SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
       }
 
       // Spec requires setFrame() before attached() - it is how a plugin with
@@ -3040,6 +3199,11 @@ namespace Platform
          DestroyWindow(hwnd);
          return false;
       }
+
+      // Spec: on Windows the HOST owns content scaling, and the plugin must
+      // be told before attached() so it builds its GUI at the right size in
+      // the first place rather than laying out at 1x and being rescaled.
+      ApplyEditorContentScale(h, hwnd);
 
       if (!RunPluginCallGuarded("attached", h, [&] { v->plugView->attached((void*)hwnd, Steinberg::kPlatformTypeHWND); }))
       {

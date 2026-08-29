@@ -2,6 +2,15 @@
 
 #include "../../core/gl3.h"
 
+// GLFW_INCLUDE_NONE matters more here than anywhere else: this TU exists
+// precisely so glad and the legacy Microsoft <GL/gl.h> never share a
+// translation unit (see SpoutGLBridge.h), and glfw3.h includes <GL/gl.h> by
+// default. Only glfwGetCurrentContext() is used, for the per-context VAO map.
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+
+#include <map>
+
 namespace SpoutGLBridge
 {
    namespace
@@ -26,32 +35,54 @@ namespace SpoutGLBridge
          "uniform sampler2D uTex;\n"
          "void main() { oColor = texture(uTex, vUv); }\n";
 
-      unsigned int sQuadVao = 0;
+      // Same split as GLUtil.cpp's quad, and for the same reason: an OpenGL
+      // share group shares buffers/shaders/programs/textures but NOT
+      // container objects, so a VAO name generated in one context is invalid
+      // in another (GL_INVALID_OPERATION on bind, nothing bound, and a core
+      // profile draws nothing). Apple shares VAOs as a non-conformance;
+      // Windows - the only platform that compiles this file at all - does
+      // not. Today every caller runs on the editor's main context, so a
+      // single static VAO would happen to work; keying it on the context
+      // means the day someone blits a Spout send from a projector/output
+      // window's context it keeps working instead of silently going black.
+      // The VBO stays shared - buffers really are share-group objects.
       unsigned int sQuadVbo = 0;
+      std::map<GLFWwindow*, unsigned int> sQuadVaos;
       unsigned int sProgram = 0;
 
-      void EnsureQuad()
+      unsigned int EnsureQuad()
       {
-         if (sQuadVao != 0)
-            return;
+         GLFWwindow* context = glfwGetCurrentContext();
+         auto it = sQuadVaos.find(context);
+         if (it != sQuadVaos.end() && it->second != 0)
+            return it->second;
 
-         float verts[] = {
-            -1.0f, -1.0f, 0.0f, 0.0f,
-            1.0f, -1.0f, 1.0f, 0.0f,
-            -1.0f, 1.0f, 0.0f, 1.0f,
-            1.0f, 1.0f, 1.0f, 1.0f
-         };
+         if (sQuadVbo == 0)
+         {
+            float verts[] = {
+               -1.0f, -1.0f, 0.0f, 0.0f,
+               1.0f, -1.0f, 1.0f, 0.0f,
+               -1.0f, 1.0f, 0.0f, 1.0f,
+               1.0f, 1.0f, 1.0f, 1.0f
+            };
+            glGenBuffers(1, &sQuadVbo);
+            glBindBuffer(GL_ARRAY_BUFFER, sQuadVbo);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+         }
 
-         glGenVertexArrays(1, &sQuadVao);
-         glGenBuffers(1, &sQuadVbo);
-         glBindVertexArray(sQuadVao);
+         unsigned int vao = 0;
+         glGenVertexArrays(1, &vao);
+         glBindVertexArray(vao);
          glBindBuffer(GL_ARRAY_BUFFER, sQuadVbo);
-         glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
          glEnableVertexAttribArray(0);
          glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
          glEnableVertexAttribArray(1);
          glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
          glBindVertexArray(0);
+         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+         sQuadVaos[context] = vao;
+         return vao;
       }
 
       unsigned int CompileShader(GLenum type, const char* src)
@@ -172,7 +203,9 @@ namespace SpoutGLBridge
       if (dstFbo == 0 || srcTex2D == 0 || !EnsureProgram())
          return false;
 
-      EnsureQuad();
+      const unsigned int quadVao = EnsureQuad();
+      if (quadVao == 0)
+         return false;
 
       GLint prevFbo = 0;
       glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
@@ -188,7 +221,7 @@ namespace SpoutGLBridge
       glBindTexture(GL_TEXTURE_2D, srcTex2D);
       glUniform1i(glGetUniformLocation(sProgram, "uTex"), 0);
 
-      glBindVertexArray(sQuadVao);
+      glBindVertexArray(quadVao);
       glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
       glBindVertexArray(0);
 

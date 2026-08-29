@@ -821,7 +821,20 @@ namespace Platform
    // exclusive fullscreen. SWP_NOACTIVATE means the editor keeps keyboard
    // focus while the output stays visible on the other display.
 #if defined(_WIN32)
-   void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost, bool hideCursor);
+   // Applies the borderless/topmost/cursor policy above. When w/h are both
+   // > 0 the window is also moved and resized to exactly that virtual-screen
+   // rect in the SAME SetWindowPos that applies the style change; otherwise
+   // position and size are left alone.
+   //
+   // That combined call is not a convenience - it is the fix for a real
+   // Windows-only defect. glfwSetWindowSize sets the CLIENT area, so sizing a
+   // still-decorated window to the monitor's full video mode and only then
+   // stripping the frame leaves a borderless window bigger than the monitor,
+   // overhanging bottom-right. macOS has no equivalent problem: its
+   // GLFW_DECORATED path keeps the content rect fixed when the frame goes
+   // away, so main.cpp's non-Windows branch deliberately still sizes first.
+   void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost, bool hideCursor,
+                              int x = 0, int y = 0, int w = 0, int h = 0);
    void ReassertOutputWindowTopmost(GLFWwindow* window);
    void SetWindowIconFromResource(GLFWwindow* window);
 #endif
