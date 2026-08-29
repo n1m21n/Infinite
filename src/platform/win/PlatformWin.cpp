@@ -394,13 +394,21 @@ namespace Platform
       const MAT2 mat2 = { fxIdentity, fxZero, fxZero, fxIdentity };
       float capHeight = 0.0f;
       {
+         // GGO_GLYPH_INDEX makes GDI read uChar as a GLYPH INDEX rather than a
+         // character, so `L'H'` (0x48) used to measure whichever glyph sat at
+         // index 72 in the font - font-dependent, in practice usually a
+         // lowercase letter, i.e. roughly the x-height. Since every emitted
+         // point is scaled by 1/capHeight, a capHeight ~30% low made ALL text
+         // in the app render substantially too large on Windows, by a factor
+         // that varied per font. The second pass below already measures real
+         // characters with plain GGO_NATIVE; these two calls now agree with it.
          GLYPHMETRICS metrics {};
-         const DWORD size = GetGlyphOutlineW(hdc, L'H', GGO_NATIVE | GGO_GLYPH_INDEX,
+         const DWORD size = GetGlyphOutlineW(hdc, L'H', GGO_NATIVE,
                                              &metrics, 0, nullptr, &mat2);
          if (size > 0 && size != GDI_ERROR)
          {
             std::vector<char> buf(size);
-            if (GetGlyphOutlineW(hdc, L'H', GGO_NATIVE | GGO_GLYPH_INDEX, &metrics,
+            if (GetGlyphOutlineW(hdc, L'H', GGO_NATIVE, &metrics,
                                  size, buf.data(), &mat2) != GDI_ERROR)
             {
                // Walk just for max-y.
@@ -498,9 +506,13 @@ namespace Platform
                         std::sqrt((cx - curX) * (cx - curX) + (cy - curY) * (cy - curY)) +
                         std::sqrt((ex - cx) * (ex - cx) + (ey - cy) * (ey - cy));
                      const int steps = std::clamp((int)(polyLen * 0.25f * scale), 2, 24);
+                     // t must reach exactly 1.0 at s == steps, otherwise every
+                     // sub-segment stops short of its own on-curve endpoint and
+                     // jumps to the next segment's first sample, leaving a small
+                     // notch at every on-curve point of every quadratic outline.
                      for (int s = 1; s <= steps; s++)
                      {
-                        const float t = (float)s / (float)(steps + 1);
+                        const float t = (float)s / (float)steps;
                         const float mt = 1.0f - t;
                         outContours.back().points.push_back(
                            (mt * mt * curX + 2.0f * mt * t * cx + t * t * ex) * scale);
@@ -522,7 +534,11 @@ namespace Platform
             ptr += header->cb;
          }
 
-         penX += (float)(metrics.gmCellIncX) + letterSpacing * (float)kEm;
+         // Advance is scaled by 1/capHeight downstream, so a spacing term added
+         // in em units came out as letterSpacing * (kEm / capHeight) - roughly a
+         // 1.4x overshoot versus the macOS path. Contribute it in cap-height
+         // units so it survives that division as letterSpacing * 1.0.
+         penX += (float)(metrics.gmCellIncX) + letterSpacing * capHeight;
       }
 
       SelectObject(hdc, old);

@@ -209,7 +209,16 @@ int gCurrent = 0;
 std::string ThemePath()
 {
    std::string dir = AppPaths::AppSupportDir();
-   return dir.empty() ? std::string() : dir + "/Infinite.theme";
+   if (dir.empty())
+      return std::string();
+   const std::string path = dir + "/Infinite.theme";
+   // Pre-AppSupportDir installs kept this one directory higher up, as a flat
+   // ~/Library/Application Support/Infinite.theme. Carry it across once so an
+   // upgrading macOS user doesn't silently lose their category colours.
+   const std::string home = AppPaths::HomeDir();
+   if (!home.empty())
+      AppPaths::MigrateLegacyFile(home + "/Library/Application Support/Infinite.theme", path);
+   return path;
 }
 }
 

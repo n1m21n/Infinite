@@ -1165,27 +1165,60 @@ namespace
          prevFlux = prevFlux * 0.7f + flux * 0.3f;
          std::memcpy(prevMagnitude, spectrum, sizeof(prevMagnitude));
 
-         // Log-spaced band energies, ~20 Hz..16 kHz.
+         // Band and summary energies.
+         //
+         // Every formula below is deliberately transcribed from
+         // Platform.mm's ProcessInto() rather than tuned independently:
+         // both paths run the same 1024-point FFT with the same
+         // norm = 2/kFftSize, so identical formulas over identical bin
+         // magnitudes are identical outputs by construction. Four separate
+         // divergences used to live here, none of which crashed or logged,
+         // and all of which silently made a Windows user's audio-reactive
+         // patch respond differently to the same sound:
+         //
+         //   1. low/mid/high came from fixed band INDICES, resolving to
+         //      ~20-106 / ~106-373 / ~1982-4571 Hz. The "mid" band was bass,
+         //      missing the whole vocal range, and "high" had no cymbals or
+         //      air. The low weights also summed to 1.5, not 1.0, scaling it
+         //      up by half again on top.
+         //   2. bands[] used a linear clamp(v * 4) where macOS uses the
+         //      compressive shape() below. They cross at v = 0.75 and diverge
+         //      badly everywhere real signals live - at v = 0.01 macOS reads
+         //      0.35 and Windows read 0.04.
+         //   3. the band ladder stopped at min(16000, nyquist) where macOS
+         //      runs to nyquist, so at 48 kHz every band boundary sat at a
+         //      different frequency on the two platforms.
+         //   4. low/mid/high/rms/peak were left raw - AudioRead()'s
+         //      smoothing loop only ever touched bands[] - so on Windows they
+         //      jittered where macOS glides. That half is fixed in AudioRead.
          const double nyquist = sampleRate * 0.5;
-         const double fMin = 20.0, fMax = std::min(16000.0, nyquist);
+
+         // Mean bin magnitude across a frequency span. Matches Platform.mm's
+         // rangeEnergy lambda exactly, inclusive `hi` and all.
+         auto rangeEnergy = [&](double fromHz, double toHz) {
+            const int lo = std::max(1, (int)(fromHz / nyquist * kBins));
+            const int hi = std::min(kBins - 1, (int)(toHz / nyquist * kBins));
+            float sum = 0.0f; int count = 0;
+            for (int i = lo; i <= hi; i++) { sum += spectrum[i]; count++; }
+            return count > 0 ? sum / (float)count : 0.0f;
+         };
+
+         // Magnitudes are tiny; a compressive curve maps them into a usable
+         // 0..1. Same curve as Platform.mm.
+         auto shape = [](float v) { return std::min(1.0f, std::sqrt(v * 12.0f)); };
+
          Platform::AudioLevels next;
-         next.rms = rms;
-         next.peak = peak;
+         next.rms = std::min(1.0f, rms * 3.0f);
+         next.peak = std::min(1.0f, peak);
          for (int b = 0; b < Platform::kAudioBands; b++)
          {
-            const double lo = fMin * std::pow(fMax / fMin, (double)b / Platform::kAudioBands);
-            const double hi = fMin * std::pow(fMax / fMin, (double)(b + 1) / Platform::kAudioBands);
-            int klo = std::clamp((int)(lo / nyquist * kBins), 1, kBins - 1);
-            int khi = std::clamp((int)(hi / nyquist * kBins), klo + 1, kBins);
-            float energy = 0.0f;
-            for (int k = klo; k < khi; k++)
-               energy += spectrum[k];
-            energy /= (float)std::max(1, khi - klo);
-            next.bands[b] = std::clamp(energy * 4.0f, 0.0f, 1.0f);
+            const double loHz = 20.0 * std::pow(nyquist / 20.0, (double)b / Platform::kAudioBands);
+            const double hiHz = 20.0 * std::pow(nyquist / 20.0, (double)(b + 1) / Platform::kAudioBands);
+            next.bands[b] = shape(rangeEnergy(loHz, hiHz));
          }
-         next.low = 0.5f * (next.bands[0] + next.bands[1]) + 0.25f * next.bands[2] + 0.25f * next.bands[3];
-         next.mid = 0.25f * next.bands[4] + 0.5f * next.bands[5] + 0.25f * next.bands[6];
-         next.high = 0.5f * next.bands[11] + 0.5f * next.bands[12];
+         next.low = shape(rangeEnergy(20.0, 250.0));
+         next.mid = shape(rangeEnergy(250.0, 2000.0));
+         next.high = shape(rangeEnergy(2000.0, 16000.0));
          next.onset = onset;
 
          std::lock_guard<std::mutex> lock(levelsMutex);
@@ -1274,16 +1307,28 @@ namespace Platform
       gAnalyser.levels.onset = false; // consumed on read, like macOS
 
       // Smoothing applied on read against the freshly sampled snapshot.
+      //
+      // macOS smooths rms, peak, low, mid, high AND bands[] (Platform.mm's
+      // ProcessInto, via Analyser::Smooth). This loop used to touch bands[]
+      // only, so the five summary outputs - the ones most patches actually
+      // cable up - jittered on Windows where they glide on macOS. Same
+      // attack/release coefficients, applied to the same set of fields.
       const float a = gAnalyser.attack.load(std::memory_order_relaxed);
       const float r = gAnalyser.release.load(std::memory_order_relaxed);
+      auto smooth = [a, r](float& prev, float target) {
+         prev += (target - prev) * (target > prev ? a : r);
+         return prev;
+      };
       static float sPrev[kAudioBands] = {};
+      static float sPrevRms = 0.0f, sPrevPeak = 0.0f;
+      static float sPrevLow = 0.0f, sPrevMid = 0.0f, sPrevHigh = 0.0f;
       for (int b = 0; b < kAudioBands; b++)
-      {
-         const float target = out.bands[b];
-         const float coeff = target > sPrev[b] ? a : r;
-         sPrev[b] += (target - sPrev[b]) * coeff;
-         out.bands[b] = sPrev[b];
-      }
+         out.bands[b] = smooth(sPrev[b], out.bands[b]);
+      out.rms = smooth(sPrevRms, out.rms);
+      out.peak = smooth(sPrevPeak, out.peak);
+      out.low = smooth(sPrevLow, out.low);
+      out.mid = smooth(sPrevMid, out.mid);
+      out.high = smooth(sPrevHigh, out.high);
       return true;
    }
 

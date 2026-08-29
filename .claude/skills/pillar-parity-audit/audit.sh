@@ -79,7 +79,12 @@ fi
 
 PASS=0; FAIL=0; SKIP=0
 FAILED=()
-FAIL_MARK='FAIL|BUG$'
+# Kept in sync with run-infinite-hygiene/driver.sh: the harness names its
+# failure branches inconsistently (FAIL, "... - BUG", and 56 places that print
+# a bare SUSPECT/MISMATCH), and its pass branches end in OK, PASS or SKIP.
+# Matching only FAIL|BUG let a failing fixture read as green in both gates.
+FAIL_MARK='FAIL|BUG$|MISMATCH|SUSPECT|DID NOT MOVE|TONE MISSING'
+PASS_MARK='OK$|OK[[:space:]]*$|PASS$|SKIP$|CLEAN$'
 
 run_fixture() {
    local name="$1"
@@ -91,7 +96,7 @@ run_fixture() {
    # Headless, exit-code-gated fixtures (DSPTEST, PERFMATRIXTEST) report through
    # $?; the GL ones always return 0 and speak only in printf. A non-zero exit
    # with no verdict line at all is the crash case.
-   if [ "$rc" -ne 0 ] && ! grep -qE 'OK$' "$log"; then
+   if [ "$rc" -ne 0 ] && ! grep -qE "$PASS_MARK" "$log"; then
       printf '    [CRASH]  %-26s (exit %d)  %s\n' "$name" "$rc" "$log"
       tail -3 "$log" | sed 's/^/            /'
       FAIL=$((FAIL+1)); FAILED+=("$name"); return
@@ -100,11 +105,11 @@ run_fixture() {
       printf '    [FAIL]  %-26s %s\n' "$name" "$log"
       grep -E "$FAIL_MARK" "$log" | head -3 | sed 's/^/            /'
       FAIL=$((FAIL+1)); FAILED+=("$name")
-   elif grep -qE 'OK$|OK[[:space:]]*$' "$log"; then
+   elif grep -qE "$PASS_MARK" "$log"; then
       printf '    [pass]  %-26s\n' "$name"
       PASS=$((PASS+1))
    else
-      printf '    [no verdict] %-21s %s  (fixture printed no OK/FAIL line at %s frames)\n' \
+      printf '    [no verdict] %-21s %s  (fixture printed no verdict line at %s frames)\n' \
              "$name" "$log" "$frames"
       SKIP=$((SKIP+1))
    fi
