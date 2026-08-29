@@ -31287,6 +31287,45 @@ static void RunRecSyncTest()
              worstDriftFrames, endDriftFrames);
    }
 
+   // A transient collapse in render rate - the interesting case, since it is
+   // what a heavy patch actually does. Render holds 30fps, freezes dead for
+   // two seconds mid-take while audio keeps flowing, then recovers. Sync must
+   // survive it, and the recovery must not be silently deferred to the end.
+   {
+      long long emitted = 0;
+      long long audioFrames = 0;
+      double worstDriftFrames = 0.0;
+      double driftAfterRecoveryFrames = 0.0;
+      const long long stallStart = 300;   // 10s in at 30fps
+      const long long recoverBy = 300 + 15; // half a second of render calls
+
+      for (long long i = 0; i < 900; i++)
+      {
+         // The stall costs render calls, never audio: the device keeps
+         // delivering blocks the whole time it is frozen.
+         audioFrames += (i == stallStart) ? (long long)(kRate * 2.0) + 1600 : 1600;
+         emitted += OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, false);
+
+         const double drift =
+            std::fabs((double)emitted / (double)kFps - (double)audioFrames / kRate) * (double)kFps;
+         // The stall itself is a legitimate gap - measure recovery from after
+         // it, which is the property at issue.
+         if (i > stallStart && drift > worstDriftFrames)
+            worstDriftFrames = drift;
+         if (i == recoverBy)
+            driftAfterRecoveryFrames = drift;
+      }
+      emitted += OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, true);
+      const double endDrift =
+         std::fabs((double)emitted / (double)kFps - (double)audioFrames / kRate) * (double)kFps;
+
+      const bool ok = driftAfterRecoveryFrames <= 1.0 && endDrift <= 1.0;
+      if (!ok)
+         failures++;
+      printf("  [%s] 2s render freeze mid-take: caught up within %lld frames (drift %.2f), end drift %.2f frames\n",
+             ok ? "pass" : "FAIL", recoverBy - stallStart, driftAfterRecoveryFrames, endDrift);
+   }
+
    // A take with no live audio at all (engine stopped, or an audio *file*
    // source, where the platform recorders slave audio to the video clock
    // instead) must keep every rendered frame rather than stalling on an
