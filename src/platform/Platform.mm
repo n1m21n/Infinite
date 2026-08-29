@@ -1196,15 +1196,25 @@ namespace Platform
                while (!h->input.isReadyForMoreMediaData && h->writer.status == AVAssetWriterStatusWriting && spins++ < 1000)
                   [NSThread sleepForTimeInterval:0.001];
 
+               // Both abandon paths below used to return without counting
+               // anything, so a movie could come out short of the frames the
+               // caller was told had been accepted, with droppedCount still
+               // reading zero. Padding made that worse - one hiccup abandons
+               // every remaining repeat at once, not a single frame - and
+               // nothing anywhere reported it.
                if (h->writer.status != AVAssetWriterStatusWriting || !h->input.isReadyForMoreMediaData)
                {
-                  h->pendingCount.fetch_sub(frame.repeatCount - i, std::memory_order_relaxed);
+                  const int lost = frame.repeatCount - i;
+                  h->pendingCount.fetch_sub(lost, std::memory_order_relaxed);
+                  h->droppedCount.fetch_add(lost, std::memory_order_relaxed);
                   break;
                }
 
                if (!AppendPixelsToWriter(h, frame.pixels))
                {
-                  h->pendingCount.fetch_sub(frame.repeatCount - i, std::memory_order_relaxed);
+                  const int lost = frame.repeatCount - i;
+                  h->pendingCount.fetch_sub(lost, std::memory_order_relaxed);
+                  h->droppedCount.fetch_add(lost, std::memory_order_relaxed);
                   break;
                }
                h->pendingCount.fetch_sub(1, std::memory_order_relaxed);
@@ -1385,8 +1395,23 @@ namespace Platform
       {
          @autoreleasepool
          {
+            // The adaptor's pixel buffer pool is finite and only recycles as
+            // the encoder drains it, so a burst of frames - which is exactly
+            // what constant-frame-rate padding produces - can exhaust it
+            // transiently. Wait for a buffer instead of reporting a failure:
+            // the caller's only response to false is to abandon the frame,
+            // which silently shortens the movie and skews everything after it.
             CVPixelBufferRef buffer = NULL;
-            CVReturn status = CVPixelBufferPoolCreatePixelBuffer(NULL, h->adaptor.pixelBufferPool, &buffer);
+            CVReturn status = kCVReturnError;
+            for (int attempt = 0; attempt < 500; attempt++)
+            {
+               status = CVPixelBufferPoolCreatePixelBuffer(NULL, h->adaptor.pixelBufferPool, &buffer);
+               if (status == kCVReturnSuccess && buffer != NULL)
+                  break;
+               if (h->writer.status != AVAssetWriterStatusWriting)
+                  return false;
+               [NSThread sleepForTimeInterval:0.001];
+            }
             if (status != kCVReturnSuccess || buffer == NULL)
                return false;
 
