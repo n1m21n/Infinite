@@ -31351,6 +31351,257 @@ static void RunRecSyncTest()
    printf("REC SYNC %s\n", failures == 0 ? "OK" : "FAIL");
 }
 
+
+// ===================================================== INFINITE_RECEXPORTTEST
+// End-to-end A/V sync measurement on a real written movie, as opposed to
+// RECSYNCTEST above, which only exercises the pacing arithmetic in isolation.
+//
+// Marks the take with five simultaneous audio/video events - a tone burst and
+// a white flash decided by the same boolean, so they are aligned at the source
+// by construction - then writes the file through the real platform recorder,
+// reopens it with the app's own decoders, and measures how far apart the two
+// landed. Anything the muxer does to the relationship between the tracks shows
+// up here: PTS assignment, repeatCount expansion, AAC encoder priming delay,
+// container edit lists.
+//
+// Deliberately renders at a rate that does NOT match the target, since a
+// render loop that happens to hold the target rate hides the entire bug class
+// this exists for.
+//
+// Two separate verdicts, because they fail for different reasons and one is
+// far more serious than the other:
+//   - DRIFT: does the offset grow across the take? This is the bug that
+//     shipped. Tight tolerance.
+//   - OFFSET: is there a constant lead/lag on every marker? A fixed offset is
+//     an encoder-priming or capture-tap-point question, not drift. Looser
+//     tolerance, because video onsets can only be resolved to a frame.
+//
+// Headless: feeds the recorder pixel buffers directly rather than going
+// through the GL readback, so it runs on the Windows CI runner - the only
+// place the Media Foundation half of this can be executed by machine at all.
+static void RunRecExportTest()
+{
+   printf("[REC EXPORT TEST] measuring A/V sync on a real exported movie\n");
+
+   constexpr int kW = 320;
+   constexpr int kH = 240;
+   constexpr int kFps = 30;         // target/muxed frame rate
+   constexpr double kRenderFps = 20.0; // deliberately mismatched
+   constexpr double kRate = 48000.0;
+   constexpr double kTakeSeconds = 6.0;
+   constexpr double kMarkerSeconds = 0.1;
+   constexpr double kToneHz = 1000.0;
+   const double kMarkerAt[] = { 1.0, 2.0, 3.0, 4.0, 5.0 };
+   const int kMarkerCount = (int)(sizeof(kMarkerAt) / sizeof(kMarkerAt[0]));
+
+   const std::string path = TmpPath("infinite_recexporttest.mp4");
+   std::remove(path.c_str());
+
+   auto inMarker = [&](double t)
+   {
+      for (int m = 0; m < kMarkerCount; m++)
+      {
+         if (t >= kMarkerAt[m] && t < kMarkerAt[m] + kMarkerSeconds)
+            return true;
+      }
+      return false;
+   };
+
+   std::string error;
+   Platform::RecorderHandle* rec =
+      Platform::RecorderStart(path, kW, kH, kFps, error, std::string(), true, kRate, 2);
+   if (rec == nullptr)
+   {
+      printf("  [FAIL] could not start recorder: %s\n", error.c_str());
+      printf("REC EXPORT FAIL\n");
+      return;
+   }
+
+   const int blockFrames = (int)(kRate / kRenderFps);
+   const long long renderSteps = (long long)(kRenderFps * kTakeSeconds);
+   std::vector<float> block((size_t)blockFrames * 2);
+   long long audioFrames = 0;
+   long long emitted = 0;
+   double tonePhase = 0.0;
+
+   for (long long step = 0; step < renderSteps; step++)
+   {
+      const double t = (double)step / kRenderFps;
+      const bool marker = inMarker(t);
+
+      // One audio block for this render step. The tone runs continuously in
+      // phase so the burst has no click at its edges for the encoder to smear.
+      for (int i = 0; i < blockFrames; i++)
+      {
+         const float v = marker ? (float)(0.8 * std::sin(tonePhase)) : 0.0f;
+         tonePhase += 2.0 * M_PI * kToneHz / kRate;
+         if (tonePhase > 2.0 * M_PI)
+            tonePhase -= 2.0 * M_PI;
+         block[(size_t)i * 2 + 0] = v;
+         block[(size_t)i * 2 + 1] = v;
+      }
+      if (Platform::RecorderAppendAudio(rec, block.data(), blockFrames))
+         audioFrames += blockFrames;
+
+      // ...and however many video frames the pacing says that block is worth.
+      const int repeat = OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, false);
+      if (repeat > 0)
+      {
+         // The real render loop is paced by the display and never outruns the
+         // encoder; this one runs flat out, so without backpressure it would
+         // just overflow the queue and measure a movie made of dropped frames.
+         // Wait for a slot rather than sleeping, so the test stays as fast as
+         // the encoder is.
+         for (int spin = 0; spin < 20000 && Platform::RecorderPendingFrameCount(rec) >= 3; spin++)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+         std::vector<unsigned char> px = Platform::RecorderAcquireFrameBuffer(rec);
+         px.assign((size_t)kW * kH * 4, marker ? (unsigned char)255 : (unsigned char)0);
+         for (size_t i = 3; i < px.size(); i += 4)
+            px[i] = 255; // opaque
+         if (Platform::RecorderAppend(rec, std::move(px), repeat))
+            emitted += repeat;
+      }
+   }
+
+   int wrote = 0;
+   int dropped = 0;
+   const bool stopped = Platform::RecorderStop(rec, error, &wrote, &dropped);
+   if (!stopped)
+   {
+      printf("  [FAIL] recorder stop failed: %s\n", error.c_str());
+      printf("REC EXPORT FAIL\n");
+      std::remove(path.c_str());
+      return;
+   }
+   printf("  wrote %d frames (%d dropped) for %.2fs of audio, rendering at %.0ffps into a %dfps movie\n",
+          wrote, dropped, (double)audioFrames / kRate, kRenderFps, kFps);
+
+   int failures = 0;
+
+   // ---- where the tone bursts actually landed ----
+   Platform::SampleBuffer audio;
+   std::string audioErr;
+   std::vector<double> audioOnsets;
+   if (!Platform::DecodeVideoAudioTrackToBuffer(path, audio, audioErr) || audio.numFrames <= 0)
+   {
+      printf("  [FAIL] could not decode the movie's audio track: %s\n", audioErr.c_str());
+      failures++;
+   }
+   else
+   {
+      // Envelope over a 5ms window, then a rising edge through half amplitude.
+      const int win = (int)(audio.sampleRate * 0.005);
+      bool loud = false;
+      for (int i = 0; i + win < audio.numFrames; i += win)
+      {
+         float peak = 0.0f;
+         for (int k = 0; k < win; k++)
+            peak = std::max(peak, std::fabs(audio.channelData[(size_t)(i + k)]));
+         const bool nowLoud = peak > 0.4f;
+         if (nowLoud && !loud)
+            audioOnsets.push_back((double)i / audio.sampleRate);
+         loud = nowLoud;
+      }
+      printf("  audio track: %d frames @ %.0fHz, %d tone onsets\n",
+             audio.numFrames, audio.sampleRate, (int)audioOnsets.size());
+   }
+
+   // ---- where the flashes actually landed ----
+   std::vector<double> videoOnsets;
+   std::string videoErr;
+   Platform::VideoHandle* vid = Platform::VideoOpen(path, videoErr);
+   if (vid == nullptr)
+   {
+      printf("  [FAIL] could not open the movie for decoding: %s\n", videoErr.c_str());
+      failures++;
+   }
+   else
+   {
+      const int vw = Platform::VideoWidth(vid);
+      const int vh = Platform::VideoHeight(vid);
+      std::vector<unsigned char> px;
+      bool bright = false;
+      const double stepSeconds = 1.0 / ((double)kFps * 4.0);
+      for (double t = 0.0; t < kTakeSeconds; t += stepSeconds)
+      {
+         if (!Platform::VideoFrameAt(vid, t, px) && px.empty())
+            continue;
+         if ((int)px.size() < vw * vh * 4)
+            continue;
+         // Average the centre quarter, away from any edge artefacts.
+         double sum = 0.0;
+         int count = 0;
+         for (int y = vh / 4; y < vh * 3 / 4; y += 4)
+         {
+            for (int x = vw / 4; x < vw * 3 / 4; x += 4)
+            {
+               sum += px[((size_t)y * vw + x) * 4];
+               count++;
+            }
+         }
+         const double lum = count > 0 ? sum / count / 255.0 : 0.0;
+         const bool nowBright = lum > 0.5;
+         if (nowBright && !bright)
+            videoOnsets.push_back(t);
+         bright = nowBright;
+      }
+      printf("  video track: %dx%d, %.2fs, %d flash onsets\n",
+             vw, vh, Platform::VideoDuration(vid), (int)videoOnsets.size());
+      Platform::VideoClose(vid);
+   }
+
+   // ---- correlate ----
+   if ((int)audioOnsets.size() != kMarkerCount || (int)videoOnsets.size() != kMarkerCount)
+   {
+      printf("  [FAIL] expected %d markers on each track, found %d audio / %d video"
+             " - the markers did not survive the round trip\n",
+             kMarkerCount, (int)audioOnsets.size(), (int)videoOnsets.size());
+      failures++;
+   }
+   else
+   {
+      double first = 0.0;
+      double last = 0.0;
+      double worstAbs = 0.0;
+      for (int m = 0; m < kMarkerCount; m++)
+      {
+         const double delta = videoOnsets[m] - audioOnsets[m];
+         if (m == 0)
+            first = delta;
+         if (m == kMarkerCount - 1)
+            last = delta;
+         worstAbs = std::max(worstAbs, std::fabs(delta));
+         printf("    marker %d: audio %.3fs  video %.3fs  video-minus-audio %+.0fms\n",
+                m + 1, audioOnsets[m], videoOnsets[m], delta * 1000.0);
+      }
+
+      // The bug that shipped: the offset grows across the take. One video
+      // frame of slack, since a flash onset can only be resolved to the frame
+      // it starts on.
+      const double driftMs = std::fabs(last - first) * 1000.0;
+      const double kDriftToleranceMs = 1000.0 / kFps + 1.0;
+      const bool driftOk = driftMs <= kDriftToleranceMs;
+      if (!driftOk)
+         failures++;
+      printf("  [%s] DRIFT: offset moved %.0fms from first marker to last (tolerance %.0fms)\n",
+             driftOk ? "pass" : "FAIL", driftMs, kDriftToleranceMs);
+
+      // A constant lead/lag is a different question - encoder priming, or the
+      // point in the chain the audio is tapped. Not drift, but still audible
+      // past roughly a couple of frames, so it is worth a verdict of its own.
+      const double kOffsetToleranceMs = 2.0 * 1000.0 / kFps;
+      const bool offsetOk = worstAbs * 1000.0 <= kOffsetToleranceMs;
+      if (!offsetOk)
+         failures++;
+      printf("  [%s] OFFSET: worst constant offset %.0fms (tolerance %.0fms)\n",
+             offsetOk ? "pass" : "FAIL", worstAbs * 1000.0, kOffsetToleranceMs);
+   }
+
+   std::remove(path.c_str());
+   printf("REC EXPORT %s\n", failures == 0 ? "OK" : "FAIL");
+}
+
 // ===================================================== INFINITE_AUDIOPDCTEST
 //
 // Headless, numeric verification of plugin/effect delay compensation (PDC) -
@@ -33608,6 +33859,12 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_GRAINMOLDERTEST") != nullptr)
       return RunGrainMolderFixture() ? 0 : 1;
+
+   if (getenv("INFINITE_RECEXPORTTEST") != nullptr)
+   {
+      RunRecExportTest();
+      return 0; // verdict is the printf line, not $?
+   }
 
    if (getenv("INFINITE_RECSYNCTEST") != nullptr)
    {

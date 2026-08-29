@@ -1112,6 +1112,12 @@ namespace Platform
       AVAudioPCMBuffer* audioScratch = nil; // reused read buffer
       double audioSampleRate = 44100.0;
       int64_t audioFramesWritten = 0;
+      // Live audio the encoder was not ready to accept yet, interleaved,
+      // waiting for the next attempt. RecorderAppendAudio runs on the render
+      // thread, so it cannot spin waiting for readiness the way the encoder
+      // worker does for video - it parks the samples here instead and retries.
+      std::vector<float> audioBacklog;
+      static constexpr size_t kMaxAudioBacklogFrames = 48000 * 30; // ~30s
       bool audioLoop = true;
       bool audioExhausted = false; // file ended and looping is off
 
@@ -1314,6 +1320,61 @@ namespace Platform
                CFRelease(sb);
             }
             h->audioFramesWritten += h->audioScratch.frameLength;
+         }
+      }
+
+      // Writes whatever live audio is waiting in h->audioBacklog, if the
+      // encoder will currently take it. Caller holds writerMutex.
+      //
+      // -[AVAssetWriterInput appendSampleBuffer:] raises an ObjC exception
+      // when readyForMoreMediaData is NO - it does not return NO - so calling
+      // it unchecked terminates the app. The video path spin-waits on the
+      // encoder queue and the file-audio path above returns to retry on the
+      // next frame; live audio had neither, which made a stalled AAC encoder
+      // a hard crash that loses the whole take.
+      void FlushPendingAudioLocked(RecorderHandle* h)
+      {
+         if (h->audioInput == nil || h->audioBacklog.empty())
+            return;
+         if (h->writer.status != AVAssetWriterStatusWriting)
+            return;
+         if (!h->audioInput.isReadyForMoreMediaData)
+            return; // try again on the next drain
+
+         @autoreleasepool
+         {
+            const int numFrames = (int)(h->audioBacklog.size() / 2);
+            if (numFrames <= 0)
+            {
+               h->audioBacklog.clear();
+               return;
+            }
+
+            if (h->audioScratch == nil || h->audioScratch.frameCapacity < (AVAudioFrameCount)numFrames)
+            {
+               h->audioScratch = [[AVAudioPCMBuffer alloc] initWithPCMFormat:h->audioFormat
+                                                              frameCapacity:(AVAudioFrameCount)std::max(4096, numFrames)];
+            }
+
+            h->audioScratch.frameLength = (AVAudioFrameCount)numFrames;
+            float* left = h->audioScratch.floatChannelData[0];
+            float* right = h->audioFormat.channelCount > 1 ? h->audioScratch.floatChannelData[1] : nullptr;
+            for (int i = 0; i < numFrames; i++)
+            {
+               left[i] = h->audioBacklog[(size_t)i * 2 + 0];
+               if (right != nullptr)
+                  right[i] = h->audioBacklog[(size_t)i * 2 + 1];
+            }
+
+            CMTime pts = CMTimeMake(h->audioFramesWritten, (int32_t)h->audioSampleRate);
+            CMSampleBufferRef sb = PCMBufferToSampleBuffer(h->audioScratch, pts);
+            if (sb != NULL)
+            {
+               [h->audioInput appendSampleBuffer:sb];
+               CFRelease(sb);
+               h->audioFramesWritten += numFrames;
+               h->audioBacklog.clear();
+            }
          }
       }
 
@@ -1563,42 +1624,23 @@ namespace Platform
       if (h->writer.status != AVAssetWriterStatusWriting)
          return false;
 
-      @autoreleasepool
+      h->audioBacklog.insert(h->audioBacklog.end(), interleavedSamples,
+                             interleavedSamples + (size_t)numFrames * 2);
+
+      // A backlog this deep means the encoder has been stalled for half a
+      // minute; the take is already lost at that point, but dropping the
+      // oldest audio is still better than growing without bound.
+      const size_t cap = RecorderHandle::kMaxAudioBacklogFrames * 2;
+      if (h->audioBacklog.size() > cap)
       {
-         if (h->audioScratch == nil || h->audioScratch.frameCapacity < (AVAudioFrameCount)numFrames)
-         {
-            h->audioScratch = [[AVAudioPCMBuffer alloc] initWithPCMFormat:h->audioFormat
-                                                           frameCapacity:(AVAudioFrameCount)std::max(4096, numFrames)];
-         }
-
-         h->audioScratch.frameLength = (AVAudioFrameCount)numFrames;
-         float* left = h->audioScratch.floatChannelData[0];
-         float* right = h->audioFormat.channelCount > 1 ? h->audioScratch.floatChannelData[1] : nullptr;
-
-         if (right != nullptr)
-         {
-            for (int i = 0; i < numFrames; i++)
-            {
-               left[i] = interleavedSamples[i * 2 + 0];
-               right[i] = interleavedSamples[i * 2 + 1];
-            }
-         }
-         else
-         {
-            for (int i = 0; i < numFrames; i++)
-               left[i] = interleavedSamples[i * 2 + 0];
-         }
-
-         CMTime pts = CMTimeMake(h->audioFramesWritten, (int32_t)h->audioSampleRate);
-         CMSampleBufferRef sb = PCMBufferToSampleBuffer(h->audioScratch, pts);
-         if (sb != NULL)
-         {
-            [h->audioInput appendSampleBuffer:sb];
-            CFRelease(sb);
-         }
-         h->audioFramesWritten += numFrames;
-         return true;
+         const size_t excess = h->audioBacklog.size() - cap;
+         h->audioBacklog.erase(h->audioBacklog.begin(),
+                               h->audioBacklog.begin() + (ptrdiff_t)excess);
+         fprintf(stderr, "recorder: audio encoder backlog overflowed, dropped %zu frames\n", excess / 2);
       }
+
+      FlushPendingAudioLocked(h);
+      return true;
    }
 
    std::vector<unsigned char> RecorderAcquireFrameBuffer(RecorderHandle* handle)
@@ -1665,6 +1707,23 @@ namespace Platform
       // Let the worker drain whatever is still queued and call markAsFinished
       // itself once it does - see RecorderWorkerLoop. A stop is allowed to
       // take a few milliseconds; the alternative is a truncated movie.
+      // Live audio still parked in the backlog has to reach the writer before
+      // the worker calls markAsFinished on the audio input, or the movie ends
+      // up short of audio at the tail. Bounded: a stop may take a moment, but
+      // it must not hang on an encoder that never becomes ready again.
+      for (int i = 0; i < 200; i++)
+      {
+         {
+            std::lock_guard<std::mutex> lock(handle->writerMutex);
+            if (handle->audioBacklog.empty())
+               break;
+            FlushPendingAudioLocked(handle);
+            if (handle->audioBacklog.empty())
+               break;
+         }
+         [NSThread sleepForTimeInterval:0.005];
+      }
+
       {
          std::lock_guard<std::mutex> lock(handle->queueMutex);
          handle->stopRequested = true;
