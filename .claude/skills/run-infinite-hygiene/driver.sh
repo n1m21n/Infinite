@@ -103,7 +103,7 @@ TESTS=(
   "VIDEOAUDIOTEST:70"
   "VIDEOSPEEDTEST:186"
   "DRAGTEST:35"
-  "WTDRAGTEST:35"
+  "WTDRAGTEST:80"
   # Spawns every registered node type with both param sections forced open and
   # asserts no node hands two of its controls the same pin id - which used to
   # hang the app outright (circular pin list in imgui-node-editor). Needs the

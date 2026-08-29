@@ -1145,6 +1145,13 @@ namespace Platform
       std::atomic<int> pendingCount { 0 };
       std::atomic<int> droppedCount { 0 };
 
+      // The frame the pump is part-way through. requestMediaDataWhenReady's
+      // block has to be able to return between repeats of one padded frame
+      // and pick up where it left off, so this can't live on its stack.
+      QueuedFrame current;
+      int currentRemaining = 0;
+      bool workerFinished = false;
+
       std::mutex writerMutex;
       dispatch_queue_t encodeQueue = nil;
       dispatch_semaphore_t workerDone = nil;
@@ -1158,76 +1165,13 @@ namespace Platform
       // now only ever called from the encoder queue.
       bool AppendPixelsToWriter(RecorderHandle* h, const std::vector<unsigned char>& pixels);
 
-      // Runs for the lifetime of the recording on `encodeQueue`. Blocks on
-      // `queueCv` between frames rather than using
-      // requestMediaDataWhenReadyOnQueue: that API only re-invokes its block
-      // on a not-ready -> ready transition of the writer input, so if the
-      // queue drains while the input happens to still be ready, a frame
-      // pushed after that point would never be picked up. A dedicated queue
-      // that blocks itself waiting for work sidesteps that and still keeps
-      // every AVAssetWriter call serialized on one queue, which is the part
-      // AVFoundation actually requires.
-      void RecorderWorkerLoop(RecorderHandle* h)
+      // Marks the inputs finished and releases RecorderStop. Idempotent: the
+      // pump below can reach it from more than one exit.
+      void FinishWorker(RecorderHandle* h)
       {
-         for (;;)
-         {
-            RecorderHandle::QueuedFrame frame;
-            {
-               std::unique_lock<std::mutex> lock(h->queueMutex);
-               h->queueCv.wait(lock, [h] { return !h->frameQueue.empty() || h->stopRequested; });
-               if (h->frameQueue.empty())
-                  break; // stopRequested and fully drained
-               frame = std::move(h->frameQueue.front());
-               h->frameQueue.pop_front();
-            }
-
-            if (h->writer.status != AVAssetWriterStatusWriting)
-            {
-               h->pendingCount.fetch_sub(frame.repeatCount, std::memory_order_relaxed);
-               break;
-            }
-
-            for (int i = 0; i < frame.repeatCount; i++)
-            {
-               // The writer input's readiness can lag by a frame or two even
-               // though expectsMediaDataInRealTime is NO; this queue is ours
-               // alone, so a short spin-wait here costs nothing else.
-               int spins = 0;
-               while (!h->input.isReadyForMoreMediaData && h->writer.status == AVAssetWriterStatusWriting && spins++ < 1000)
-                  [NSThread sleepForTimeInterval:0.001];
-
-               // Both abandon paths below used to return without counting
-               // anything, so a movie could come out short of the frames the
-               // caller was told had been accepted, with droppedCount still
-               // reading zero. Padding made that worse - one hiccup abandons
-               // every remaining repeat at once, not a single frame - and
-               // nothing anywhere reported it.
-               if (h->writer.status != AVAssetWriterStatusWriting || !h->input.isReadyForMoreMediaData)
-               {
-                  const int lost = frame.repeatCount - i;
-                  h->pendingCount.fetch_sub(lost, std::memory_order_relaxed);
-                  h->droppedCount.fetch_add(lost, std::memory_order_relaxed);
-                  break;
-               }
-
-               if (!AppendPixelsToWriter(h, frame.pixels))
-               {
-                  const int lost = frame.repeatCount - i;
-                  h->pendingCount.fetch_sub(lost, std::memory_order_relaxed);
-                  h->droppedCount.fetch_add(lost, std::memory_order_relaxed);
-                  break;
-               }
-               h->pendingCount.fetch_sub(1, std::memory_order_relaxed);
-            }
-
-            std::lock_guard<std::mutex> poolLock(h->poolMutex);
-            if (h->bufferPool.size() < RecorderHandle::kMaxPoolSize)
-               h->bufferPool.push_back(std::move(frame.pixels));
-
-            if (h->writer.status != AVAssetWriterStatusWriting)
-               break;
-         }
-
+         if (h->workerFinished)
+            return;
+         h->workerFinished = true;
          if (h->writer.status == AVAssetWriterStatusWriting)
          {
             [h->input markAsFinished];
@@ -1235,6 +1179,75 @@ namespace Platform
                [h->audioInput markAsFinished];
          }
          dispatch_semaphore_signal(h->workerDone);
+      }
+
+      // Runs on `encodeQueue`, driven by requestMediaDataWhenReadyOnQueue:.
+      //
+      // This used to be a plain dispatch_async loop that spin-waited whenever
+      // the input reported not-ready, on the reasoning that
+      // requestMediaDataWhenReady: only re-invokes its block on a
+      // not-ready -> ready transition, so a frame arriving while the input was
+      // still ready would never be picked up. That reasoning was right about
+      // the API and wrong about the fix: with expectsMediaDataInRealTime = NO
+      // nothing else re-arms the input, so under CPU pressure it stayed
+      // not-ready for tens of seconds at a stretch and the spin-wait gave up
+      // and abandoned frames - which is permanent A/V desync in the finished
+      // movie, and exactly what INFINITE_RECEXPORTTEST caught on a loaded CI
+      // runner. Appending anyway is not an option; AVFoundation raises.
+      //
+      // So: use the pull API, and keep the blocking-queue behaviour inside the
+      // block. While the input is ready this waits on queueCv for work exactly
+      // as before, which is what closes the hole the old comment described.
+      // When the input goes not-ready it returns, and AVFoundation re-invokes
+      // it on the transition back - no spinning, no deadline, no lost frames.
+      void RecorderPump(RecorderHandle* h)
+      {
+         while (h->input.isReadyForMoreMediaData)
+         {
+            if (h->writer.status != AVAssetWriterStatusWriting)
+            {
+               h->pendingCount.fetch_sub(h->currentRemaining, std::memory_order_relaxed);
+               h->currentRemaining = 0;
+               FinishWorker(h);
+               return;
+            }
+
+            if (h->currentRemaining <= 0)
+            {
+               std::unique_lock<std::mutex> lock(h->queueMutex);
+               h->queueCv.wait(lock, [h] { return !h->frameQueue.empty() || h->stopRequested; });
+               if (h->frameQueue.empty())
+               {
+                  lock.unlock();
+                  FinishWorker(h); // stopRequested and fully drained
+                  return;
+               }
+               h->current = std::move(h->frameQueue.front());
+               h->frameQueue.pop_front();
+               h->currentRemaining = h->current.repeatCount;
+            }
+
+            if (!AppendPixelsToWriter(h, h->current.pixels))
+            {
+               // Only a real writer failure reaches here now, and it is
+               // counted rather than silently shortening the movie.
+               h->pendingCount.fetch_sub(h->currentRemaining, std::memory_order_relaxed);
+               h->droppedCount.fetch_add(h->currentRemaining, std::memory_order_relaxed);
+               h->currentRemaining = 0;
+            }
+            else
+            {
+               h->pendingCount.fetch_sub(1, std::memory_order_relaxed);
+               h->currentRemaining--;
+            }
+
+            if (h->currentRemaining <= 0)
+            {
+               std::lock_guard<std::mutex> poolLock(h->poolMutex);
+               if (h->bufferPool.size() < RecorderHandle::kMaxPoolSize)
+                  h->bufferPool.push_back(std::move(h->current.pixels));
+            }
+         }
       }
    }
 
@@ -1403,7 +1416,7 @@ namespace Platform
             // which silently shortens the movie and skews everything after it.
             CVPixelBufferRef buffer = NULL;
             CVReturn status = kCVReturnError;
-            for (int attempt = 0; attempt < 500; attempt++)
+            for (int attempt = 0; attempt < 5000; attempt++)
             {
                status = CVPixelBufferPoolCreatePixelBuffer(NULL, h->adaptor.pixelBufferPool, &buffer);
                if (status == kCVReturnSuccess && buffer != NULL)
@@ -1413,7 +1426,9 @@ namespace Platform
                [NSThread sleepForTimeInterval:0.001];
             }
             if (status != kCVReturnSuccess || buffer == NULL)
+            {
                return false;
+            }
 
             CVPixelBufferLockBaseAddress(buffer, 0);
             unsigned char* dst = (unsigned char*)CVPixelBufferGetBaseAddress(buffer);
@@ -1442,7 +1457,20 @@ namespace Platform
             {
                std::lock_guard<std::mutex> lock(h->writerMutex);
                if (h->writer.status == AVAssetWriterStatusWriting)
-                  ok = [h->adaptor appendPixelBuffer:buffer withPresentationTime:when];
+               {
+                  // AVFoundation raises rather than returning NO if the input
+                  // is not ready. The pump only calls in while it is, but the
+                  // writer can change state underneath us, and an uncaught
+                  // ObjC exception here would take the whole app down mid-take.
+                  @try
+                  {
+                     ok = [h->adaptor appendPixelBuffer:buffer withPresentationTime:when];
+                  }
+                  @catch (NSException* e)
+                  {
+                     ok = NO;
+                  }
+               }
             }
             CVPixelBufferRelease(buffer);
             if (ok)
@@ -1634,7 +1662,7 @@ namespace Platform
 
          h->encodeQueue = dispatch_queue_create("com.infinite.recorder.encode", DISPATCH_QUEUE_SERIAL);
          h->workerDone = dispatch_semaphore_create(0);
-         dispatch_async(h->encodeQueue, ^{ RecorderWorkerLoop(h); });
+         [h->input requestMediaDataWhenReadyOnQueue:h->encodeQueue usingBlock:^{ RecorderPump(h); }];
 
          return h;
       }
@@ -1754,7 +1782,28 @@ namespace Platform
          handle->stopRequested = true;
       }
       handle->queueCv.notify_one();
-      dispatch_semaphore_wait(handle->workerDone, DISPATCH_TIME_FOREVER);
+
+      // Bounded, unlike the old dispatch_async worker's wait. The pump only
+      // runs when AVFoundation says the input is ready, so if the writer has
+      // wedged, nothing will ever re-invoke it to notice stopRequested and
+      // signal. Waiting forever there would hang the app on stop; finishing
+      // the inputs here instead costs at worst the tail of a broken take.
+      if (dispatch_semaphore_wait(handle->workerDone,
+                                  dispatch_time(DISPATCH_TIME_NOW, (int64_t)60 * NSEC_PER_SEC)) != 0)
+      {
+         std::lock_guard<std::mutex> lock(handle->writerMutex);
+         if (handle->writer.status == AVAssetWriterStatusWriting)
+         {
+            [handle->input markAsFinished];
+            if (handle->audioInput != nil)
+               [handle->audioInput markAsFinished];
+         }
+         // markAsFinished stops AVFoundation re-invoking the pump, but a block
+         // already in flight has to finish before the handle can be deleted.
+         // It cannot be parked in queueCv.wait: stopRequested is set above, so
+         // the predicate is satisfied and this barrier cannot deadlock.
+         dispatch_sync(handle->encodeQueue, ^{});
+      }
 
       // Read after the drain above, not before - the worker's last few
       // writes land between the caller's pre-stop snapshot and here.

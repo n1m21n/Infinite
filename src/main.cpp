@@ -6882,6 +6882,7 @@ namespace
       //
       // BeginGroup sets DC.GroupOffset/DC.Indent to the current cursor x, so
       // wrapping *and* Indent are both relative to the column from here on.
+      ImGui::PushID(index);
       ImGui::BeginGroup();
    }
 
@@ -6891,6 +6892,7 @@ namespace
       // ItemSize, which moves it.
       gAudioColumn.maxBottom = std::max(gAudioColumn.maxBottom, ImGui::GetCursorScreenPos().y);
       ImGui::EndGroup();
+      ImGui::PopID();
       gAudioBodyX = gAudioColumn.bodyX;
       gAudioBodyW = gAudioColumn.bodyW;
       gAudioContentX = gAudioColumn.contentX;
@@ -31456,7 +31458,14 @@ static void RunRecExportTest()
          // just overflow the queue and measure a movie made of dropped frames.
          // Wait for a slot rather than sleeping, so the test stays as fast as
          // the encoder is.
-         for (int spin = 0; spin < 20000 && Platform::RecorderPendingFrameCount(rec) >= 3; spin++)
+         //
+         // The ceiling is deliberately generous. A refused append is not lost
+         // footage - the pacer re-issues the count on the next frame - but the
+         // pixels it re-issues are the *next* step's, so refusing during a
+         // 100ms marker moves that marker's onset and this test reads it as an
+         // offset. That is queue policy, not sync, and measuring it here would
+         // make the verdict depend on how busy the machine is.
+         for (int spin = 0; spin < 120000 && Platform::RecorderPendingFrameCount(rec) >= 3; spin++)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
          std::vector<unsigned char> px = Platform::RecorderAcquireFrameBuffer(rec);
@@ -31493,10 +31502,18 @@ static void RunRecExportTest()
    // out short while both the caller and droppedCount said everything was
    // fine. Checking the invariant directly names that as an encoder fault
    // instead of leaving it to show up as unexplained drift.
-   if ((long long)wrote + dropped != emitted)
+   // Every frame the recorder accepted has to reach the file. A refused
+   // append is a different thing and not a failure: it never enters
+   // `emitted`, and the pacer simply asks for it again on the next frame,
+   // so the movie still comes out whole. What used to happen instead is
+   // that accepted frames were abandoned inside the encoder without being
+   // counted anywhere, so the movie came out short while both the caller
+   // and droppedCount said everything was fine.
+   if ((long long)wrote != emitted)
    {
-      printf("  [FAIL] ACCEPTED: recorder took %lld frames but accounted for %d written + %d dropped\n",
-             emitted, wrote, dropped);
+      printf("  [FAIL] ACCEPTED: recorder took %lld frames but only %d reached the file "
+             "(%d reported dropped, %lld appends refused)\n",
+             emitted, wrote, dropped, videoRejected);
       failures++;
    }
 
@@ -34834,12 +34851,27 @@ int main(int argc, char** argv)
       }
       else if (getenv("INFINITE_AUDIORECTEST") != nullptr)
       {
+         std::string audioPath = getenv("INFINITE_AUDIORECTEST");
+         if (audioPath == "1" || !std::filesystem::exists(audioPath))
+         {
+            audioPath = TmpPath("infinite_audiorectest_tone.wav");
+            constexpr double kToneHz = 440.0;
+            constexpr double kToneSampleRate = 48000.0;
+            constexpr double kToneSeconds = 3.0;
+            constexpr float kToneAmplitude = 0.5f;
+            const int toneFrames = (int)(kToneSampleRate * kToneSeconds);
+            std::vector<float> tone(toneFrames);
+            for (int i = 0; i < toneFrames; i++)
+               tone[i] = kToneAmplitude * std::sin(2.0 * M_PI * kToneHz * (double)i / kToneSampleRate);
+            AudioRecordings::WriteWav(audioPath, tone.data(), toneFrames, kToneSampleRate, 1);
+         }
+
          SpawnNode("Shape", "Source", 40.0f, 40.0f);       // 0
          SpawnNode("Output", "Utility", 320.0f, 40.0f);     // 1
          SpawnNode("Audio File", "Modulators", 40.0f, 400.0f); // 2
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          auto* audio = static_cast<AudioFileNode*>(gNodes[2].node.get());
-         audio->Open(getenv("INFINITE_AUDIORECTEST"));
+         audio->Open(audioPath);
          audio->monitor = false; // silent while the test runs
          auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
          out->includeAudio = true;
@@ -36054,8 +36086,6 @@ int main(int argc, char** argv)
          auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
          auto* wt = static_cast<WavetableNode*>(gNodes[0].node.get());
 
-         // gWtTestRects is (frames, amp, pitch, filter) per engine, in column
-         // order - so engine A's table picture is [0] and its amp curve [1].
          const ImVec4 framesA = gWtTestScreen[0];
          const ImVec4 ampA = gWtTestScreen[1];
          const ImVec4 filtB = gWtTestScreen[7]; // engine B's filter envelope
@@ -36081,26 +36111,26 @@ int main(int argc, char** argv)
          switch (frameId)
          {
             // --- phase 1: scrub engine A's table position ---
-            case 4: gTestMouse = Aim(framesA.x + fw * 0.15f, framesCy); break;
-            case 5: btn(true); break;
-            case 6: gTestMouse = Aim(framesA.x + fw * 0.50f, framesCy); break;
-            case 7: gTestMouse = Aim(framesA.x + fw * 0.80f, framesCy); break;
-            case 8: btn(false); break;
+            case 54: gTestMouse = Aim(framesA.x + fw * 0.15f, framesCy); break;
+            case 55: btn(true); break;
+            case 56: gTestMouse = Aim(framesA.x + fw * 0.50f, framesCy); break;
+            case 57: gTestMouse = Aim(framesA.x + fw * 0.80f, framesCy); break;
+            case 58: btn(false); break;
             // --- phase 2: drag engine A's amp sustain handle upward ---
-            case 12: gTestMouse = Aim(susX, susY); break;
-            case 13: btn(true); break;
-            case 14: gTestMouse = Aim(susX, susY - ampSpan * 0.25f); break;
-            case 15: gTestMouse = Aim(susX, susY - ampSpan * 0.45f); break;
-            case 16: btn(false); break;
+            case 62: gTestMouse = Aim(susX, susY); break;
+            case 63: btn(true); break;
+            case 64: gTestMouse = Aim(susX, susY - ampSpan * 0.25f); break;
+            case 65: gTestMouse = Aim(susX, susY - ampSpan * 0.45f); break;
+            case 66: btn(false); break;
             // --- phase 3: drag engine B's *filter* envelope attack sideways ---
-            case 20: gTestMouse = Aim(fbAttackX, fbTopY); break;
-            case 21: btn(true); break;
-            case 22: gTestMouse = Aim(fbAttackX + 30.0f, fbTopY); break;
-            case 23: gTestMouse = Aim(fbAttackX + 60.0f, fbTopY); break;
-            case 24: btn(false); break;
+            case 70: gTestMouse = Aim(fbAttackX, fbTopY); break;
+            case 71: btn(true); break;
+            case 72: gTestMouse = Aim(fbAttackX + 30.0f, fbTopY); break;
+            case 73: gTestMouse = Aim(fbAttackX + 60.0f, fbTopY); break;
+            case 74: btn(false); break;
             default: break;
          }
-         if (frameId >= 4)
+         if (frameId >= 54)
          {
             tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
             glfwSetCursorPos(window, (double)gTestMouse.x, (double)gTestMouse.y);
@@ -43295,7 +43325,7 @@ int main(int argc, char** argv)
          static float sPosA = 0.0f, sPosB = 0.0f, sSusA = 0.0f, sSusB = 0.0f;
          static float sFiltA = 0.0f, sFiltB = 0.0f;
          auto* wt = static_cast<WavetableNode*>(gNodes[0].node.get());
-         if (frameId == 3)
+         if (frameId == 53)
          {
             sPosA = wt->engines[0].position;
             sPosB = wt->engines[1].position;
@@ -43306,7 +43336,7 @@ int main(int argc, char** argv)
             printf("WTDRAG start: rects=%zu  A.pos=%.3f B.pos=%.3f A.sus=%.3f B.sus=%.3f\n",
                    gWtTestRects.size(), sPosA, sPosB, sSusA, sSusB);
          }
-         if (frameId == 10)
+         if (frameId == 60)
          {
             // The drag ended at 80% across the picture, so engine A's position
             // must land near there - and engine B's must not have moved at all.
@@ -43317,7 +43347,7 @@ int main(int argc, char** argv)
                    sPosB, posB, ok ? "OK" : "FAIL");
             gWtDragOk &= ok;
          }
-         if (frameId == 18)
+         if (frameId == 68)
          {
             const float susA = wt->engines[0].ampSustain;
             const float susB = wt->engines[1].ampSustain;
@@ -43326,7 +43356,7 @@ int main(int argc, char** argv)
                    sSusB, susB, ok ? "OK" : "FAIL");
             gWtDragOk &= ok;
          }
-         if (frameId == 26)
+         if (frameId == 76)
          {
             const float fa = wt->engines[0].filterAttack;
             const float fb = wt->engines[1].filterAttack;
@@ -48407,6 +48437,8 @@ int main(int argc, char** argv)
    AudioEngine::Instance().Stop();
    UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
    gNodes.clear();
+   if (getenv("INFINITE_RECTEARDOWNTEST") != nullptr && std::string(getenv("INFINITE_RECTEARDOWNTEST")) == "quit")
+      printf("quit-mid-record: survived  OK\n");
    ed::DestroyEditor(gEditor);
    ImGui_ImplOpenGL3_Shutdown();
    ImGui_ImplGlfw_Shutdown();
