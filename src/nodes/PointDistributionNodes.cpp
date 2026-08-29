@@ -5,6 +5,9 @@
 
 namespace
 {
+   const Mesh kEmptyMesh;
+   const std::vector<Particle> kEmptyPoints;
+
    // Same shape as MeshOps::Select's SelectHash / GeometryOpNodes' Rand01,
    // with a channel argument so a single grid cell can draw independent x/y
    // jitter without the two correlating. Same seed + same (index, channel)
@@ -88,24 +91,32 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
 
 const Mesh& DistributePointsOnFacesNode::GetMesh()
 {
+   if (bypassed)
+      return input ? input->GetMesh() : kEmptyMesh;
    RebuildIfNeeded();
    return mCache;
 }
 
 unsigned long long DistributePointsOnFacesNode::MeshRevision()
 {
+   if (bypassed)
+      return input ? input->MeshRevision() : 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }
 
 const std::vector<Particle>& DistributePointsOnFacesNode::GetPoints()
 {
+   if (bypassed)
+      return kEmptyPoints;
    RebuildIfNeeded();
    return mPoints;
 }
 
 unsigned long long DistributePointsOnFacesNode::PointRevision()
 {
+   if (bypassed)
+      return 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }
@@ -208,12 +219,16 @@ void PointsToVerticesNode::RebuildIfNeeded()
 
 const Mesh& PointsToVerticesNode::GetMesh()
 {
+   if (bypassed)
+      return input ? input->GetMesh() : kEmptyMesh;
    RebuildIfNeeded();
    return mCache;
 }
 
 unsigned long long PointsToVerticesNode::MeshRevision()
 {
+   if (bypassed)
+      return input ? input->MeshRevision() : 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }
@@ -317,24 +332,32 @@ void DistributePointsInGridNode::RebuildIfNeeded()
 
 const Mesh& DistributePointsInGridNode::GetMesh()
 {
+   if (bypassed)
+      return kEmptyMesh;
    RebuildIfNeeded();
    return mCache;
 }
 
 unsigned long long DistributePointsInGridNode::MeshRevision()
 {
+   if (bypassed)
+      return 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }
 
 const std::vector<Particle>& DistributePointsInGridNode::GetPoints()
 {
+   if (bypassed)
+      return kEmptyPoints;
    RebuildIfNeeded();
    return mPoints;
 }
 
 unsigned long long DistributePointsInGridNode::PointRevision()
 {
+   if (bypassed)
+      return 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }
@@ -382,12 +405,16 @@ void MergeByDistanceNode::RebuildIfNeeded()
 
 const Mesh& MergeByDistanceNode::GetMesh()
 {
+   if (bypassed)
+      return input ? input->GetMesh() : kEmptyMesh;
    RebuildIfNeeded();
    return mCache;
 }
 
 unsigned long long MergeByDistanceNode::MeshRevision()
 {
+   if (bypassed)
+      return input ? input->MeshRevision() : 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }

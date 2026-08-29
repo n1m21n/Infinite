@@ -51,6 +51,9 @@ size_t MaterialNode::TriangleCount() const
 
 Material MaterialNode::GetMaterial() const
 {
+   if (bypassed)
+      return input ? input->GetMaterial() : Material();
+
    Material m;
    m.color[0] = color[0]; m.color[1] = color[1]; m.color[2] = color[2];
    m.metallic = metallic;
@@ -247,24 +250,50 @@ void JoinGeometryNode::RebuildIfNeeded()
 
 const Mesh& JoinGeometryNode::GetMesh()
 {
+   if (bypassed)
+   {
+      for (int i = 0; i < kSlots; i++)
+         if (inputs[i] != nullptr)
+            return inputs[i]->GetMesh();
+      return mCache;
+   }
    RebuildIfNeeded();
    return mCache;
 }
 
 unsigned long long JoinGeometryNode::MeshRevision()
 {
+   if (bypassed)
+   {
+      for (int i = 0; i < kSlots; i++)
+         if (inputs[i] != nullptr)
+            return inputs[i]->MeshRevision();
+      return 0;
+   }
    RebuildIfNeeded();
    return mMeshRevision;
 }
 
 Mat4 JoinGeometryNode::GetModelMatrix() const
 {
+   if (bypassed)
+   {
+      for (int i = 0; i < kSlots; i++)
+         if (inputs[i] != nullptr)
+            return inputs[i]->GetModelMatrix();
+   }
    Mat4 m = Mat4::Scale(uniformScale, uniformScale, uniformScale);
    return Mat4::Multiply(Mat4::Translation(posX, posY, posZ), m);
 }
 
 Material JoinGeometryNode::GetMaterial() const
 {
+   if (bypassed)
+   {
+      for (int i = 0; i < kSlots; i++)
+         if (inputs[i] != nullptr)
+            return inputs[i]->GetMaterial();
+   }
    if (inheritMaterial)
    {
       const int pick = std::max(0, std::min(materialFrom, kSlots - 1));
@@ -417,24 +446,33 @@ void MeshToPointsNode::RebuildIfNeeded()
 
 const Mesh& MeshToPointsNode::GetMesh()
 {
+   if (bypassed)
+      return input ? input->GetMesh() : kEmptyMesh;
    RebuildIfNeeded();
    return mCache;
 }
 
 unsigned long long MeshToPointsNode::MeshRevision()
 {
+   if (bypassed)
+      return input ? input->MeshRevision() : 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }
 
 const std::vector<Particle>& MeshToPointsNode::GetPoints()
 {
+   static const std::vector<Particle> kEmptyPoints;
+   if (bypassed)
+      return kEmptyPoints;
    RebuildIfNeeded();
    return mPoints;
 }
 
 unsigned long long MeshToPointsNode::PointRevision()
 {
+   if (bypassed)
+      return 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }
@@ -557,12 +595,16 @@ void MetaBallNode::RebuildIfNeeded()
 
 const Mesh& MetaBallNode::GetMesh()
 {
+   if (bypassed)
+      return kEmptyMesh;
    RebuildIfNeeded();
    return mCache;
 }
 
 unsigned long long MetaBallNode::MeshRevision()
 {
+   if (bypassed)
+      return 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }

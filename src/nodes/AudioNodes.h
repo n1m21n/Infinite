@@ -38,6 +38,7 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
 
+   INode* BypassSource() override { return input.GetSource(); }
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    // Otherwise a bare unlabelled dot - see audio-node-ui-system.md §6a.
@@ -76,6 +77,13 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
 
+   INode* BypassSource() override
+   {
+      for (int i = 0; i < kSlots; i++)
+         if (inputs[i].IsConnected())
+            return inputs[i].GetSource();
+      return nullptr;
+   }
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override
    {
@@ -128,6 +136,10 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
 
+   INode* BypassSource() override
+   {
+      return inputA.IsConnected() ? inputA.GetSource() : inputB.GetSource();
+   }
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override
    {
@@ -174,6 +186,7 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
+   INode* BypassSource() override { return input.GetSource(); }
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "audio" : nullptr; }

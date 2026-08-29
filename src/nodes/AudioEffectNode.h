@@ -45,6 +45,7 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
 
+   INode* BypassSource() override { return input.GetSource(); }
    AudioNode* GetAudioNode() override;
    // Slot 1 (sidechain) only exists for an EffectDef with hasSidechain set
    // (Dynamics) - every other effect's contiguous-slot count stops at 1, the

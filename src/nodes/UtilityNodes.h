@@ -450,6 +450,14 @@ public:
    unsigned long long SurfaceTextureRevision() const override;
    MappingTransform GetMappingTransform() const override;
 
+   INode* BypassSource() override
+   {
+      for (int i = 0; i < kSlots; i++)
+         if (inputs[i] != nullptr)
+            return dynamic_cast<INode*>(inputs[i]);
+      return nullptr;
+   }
+
    IGeometrySource* inputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
    IGeometrySource** GeometryInputSlot(int slot) override
    {

@@ -45,8 +45,13 @@ public:
 
    const std::vector<Particle>& GetPoints() { return mParticles; }
    unsigned long long PointRevision() { return mRevision; }
-   const std::vector<Particle>* GetPointCloud() override { return &mParticles; }
-   unsigned long long PointCloudRevision() override { return mRevision; }
+   const std::vector<Particle>* GetPointCloud() override
+   {
+      if (bypassed)
+         return nullptr;
+      return &mParticles;
+   }
+   unsigned long long PointCloudRevision() override { return bypassed ? 0 : mRevision; }
 
    size_t AliveCount() const { return mAliveCount; }
    void Reset();
@@ -130,8 +135,16 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
-   const Mesh& GetMesh() override { return mMesh; }
-   unsigned long long MeshRevision() override { return mRevision; }
+   const Mesh& GetMesh() override
+   {
+      if (bypassed)
+      {
+         static const Mesh kEmptyMesh;
+         return input ? input->GetMesh() : kEmptyMesh;
+      }
+      return mMesh;
+   }
+   unsigned long long MeshRevision() override { return bypassed ? (input ? input->MeshRevision() : 0) : mRevision; }
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;

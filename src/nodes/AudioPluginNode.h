@@ -74,6 +74,7 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
 
+   INode* BypassSource() override { return input.GetSource(); }
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    // Slot 1, not a second audio slot - notes and audio share one pin-index

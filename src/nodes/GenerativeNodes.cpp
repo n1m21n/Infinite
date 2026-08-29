@@ -394,12 +394,19 @@ void ImageToPointsNode::RebuildMeshIfNeeded()
 
 const Mesh& ImageToPointsNode::GetMesh()
 {
+   if (bypassed)
+   {
+      static const Mesh kEmptyMesh;
+      return kEmptyMesh;
+   }
    RebuildMeshIfNeeded();
    return mCookedMesh;
 }
 
 unsigned long long ImageToPointsNode::MeshRevision()
 {
+   if (bypassed)
+      return 0;
    RebuildMeshIfNeeded();
    return mCookedMeshRevision;
 }

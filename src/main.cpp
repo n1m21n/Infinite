@@ -639,6 +639,7 @@ namespace
    // rather than the menu reaching into the editor from outside it.
    bool gRequestGroup = false;
    bool gRequestUngroup = false;
+   bool gRequestBypass = false;
    bool gRequestCopy = false;
    bool gRequestPaste = false;
    bool gRequestDuplicate = false;
@@ -3122,6 +3123,46 @@ namespace
          dl->AddRect(tl, br, col, 1.5f, 0, 1.4f);
       dl->AddLine(ImVec2(c.x, br.y), ImVec2(c.x, br.y + 2.5f), col, 1.4f);
       dl->AddLine(ImVec2(c.x - 3.5f, br.y + 2.5f), ImVec2(c.x + 3.5f, br.y + 2.5f), col, 1.4f);
+
+      return pressed;
+   }
+
+   // Small power / bypass toggle for a node. Hand-drawn procedural vector glyph
+   // rendering an IEC 60417-5009 power symbol.
+   bool BypassToggle(bool bypassed)
+   {
+      const float w = 22.0f;
+      const float h = 18.0f;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      const bool pressed = ImGui::InvisibleButton("##bypass", ImVec2(w, h));
+      const bool hovered = ImGui::IsItemHovered();
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
+      ImU32 col = hovered ? IM_COL32(235, 240, 255, 255)
+                          : (bypassed ? IM_COL32(245, 140, 60, 255) : IM_COL32(120, 124, 140, 255));
+
+      // IEC 60417-5009 Power symbol: an open arc (from 45 deg to 315 deg) plus a vertical line
+      const float r = 5.0f;
+      const float startAngle = 0.785398f; // ~45 deg
+      const float endAngle = 5.497787f;   // ~315 deg
+      dl->PathClear();
+      const int arcSegments = 16;
+      for (int i = 0; i <= arcSegments; i++)
+      {
+         float t = (float)i / (float)arcSegments;
+         float angle = startAngle + (endAngle - startAngle) * t;
+         dl->PathLineTo(ImVec2(c.x + sinf(angle) * r, c.y - cosf(angle) * r));
+      }
+      dl->PathStroke(col, 0, 1.6f);
+      // Vertical power stroke at top center
+      dl->AddLine(ImVec2(c.x, c.y - r - 2.0f), ImVec2(c.x, c.y + 0.5f), col, 1.6f);
+
+      if (bypassed)
+      {
+         // Diagonal strike through
+         dl->AddLine(ImVec2(c.x - r - 1.0f, c.y + r + 1.0f), ImVec2(c.x + r + 1.0f, c.y - r - 1.0f), IM_COL32(245, 100, 50, 255), 1.5f);
+      }
 
       return pressed;
    }
@@ -5716,6 +5757,11 @@ namespace
       ImGui::PushID(902);
       ImGui::InvisibleButton("##macrotriggerbtn", ImVec2(contentH, contentH));
       n->pressed = ImGui::IsItemActive();
+      if (ImGui::IsItemActivated())
+      {
+         n->justTriggered = true;
+         n->flash = 1.0f;
+      }
       const bool hovered = ImGui::IsItemHovered();
       ImGui::PopID();
 
@@ -21335,28 +21381,36 @@ namespace
 
          static std::map<size_t, float> sBangFlash;
 
-         // A trigger wired to a multi-state selector advances one step per
+         // A trigger wired to a multi-state selector or toggle advances one step per
          // press and wraps, instead of slamming the param to its maximum and
-         // back. On a bool or an 0..1 param there is no "next state" to walk
-         // to, so those keep the momentary 1 / 0 behaviour.
-         auto stepSpan = [&](int dstIndex, int dstParam) -> int {
-            if (dstIndex < 0 || dstParam < 0)
+         // back. A plain 0..1 continuous float keeps the momentary 1 / 0 behaviour.
+         auto stepSpan = [&](int dstIndex, int dstParam, const std::string& boolName) -> int {
+            if (dstIndex < 0)
+               return 0;
+            if (!boolName.empty())
+               return 1;
+            if (dstParam < 0)
                return 0;
             const ParamRef* kp = Modulation::Instance().KnownParam(dstIndex, dstParam);
-            if (kp == nullptr || kp->isBool)
+            if (kp == nullptr)
                return 0;
             const int span = (int)std::lround(kp->maxValue - kp->minValue);
-            // Any enum walks, two-state ones included - a mode with exactly
-            // two choices should still alternate per press rather than snap
-            // to the second one only while the pad is held. Integer params
-            // (ModSliderInt) walk too once there is more than one step to
-            // walk; a plain 0..1 float stays momentary, which is what a bang
-            // into a gain or a trigger-in wants.
+            if (kp->isBool || (kp->step == 1.0f && span == 1))
+               return 1;
             if (kp->isEnum)
                return span >= 1 ? span : 0;
             return (kp->step == 1.0f && span >= 2) ? span : 0;
          };
-         auto advance = [&](int dstIndex, int dstParam) {
+         auto advance = [&](int dstIndex, int dstParam, const std::string& boolName) {
+            if (!boolName.empty())
+            {
+               if (GraphNode* gn = FindNodeByIndex(dstIndex))
+               {
+                  bool curB = ReadNodeBool(gn, boolName, dstParam);
+                  WriteNodeBool(gn, boolName, !curB, dstParam);
+               }
+               return;
+            }
             auto [cur, kp] = getParamRef(dstIndex, dstParam, 0.0f);
             const int span = (int)std::lround(kp.maxValue - kp.minValue);
             if (span < 1)
@@ -21364,18 +21418,17 @@ namespace
             const int idx = std::clamp((int)std::lround(cur - kp.minValue), 0, span);
             gPerfPendingWrites[{ dstIndex, dstParam }] = kp.minValue + (float)((idx + 1) % (span + 1));
          };
-         const bool stepping = elem.boolName.empty() && stepSpan(elem.dstIndex, elem.dstParam) > 0;
+         const bool stepping = stepSpan(elem.dstIndex, elem.dstParam, elem.boolName) > 0;
 
          if (stepping)
          {
             if (ImGui::IsItemActivated())
             {
                sBangFlash[elemIdx] = 1.0f;
-               advance(elem.dstIndex, elem.dstParam);
+               advance(elem.dstIndex, elem.dstParam, elem.boolName);
                for (const auto& t : elem.targets)
-                  if (t.dstIndex >= 0 && t.dstParam >= 0 && t.boolName.empty() &&
-                      stepSpan(t.dstIndex, t.dstParam) > 0)
-                     advance(t.dstIndex, t.dstParam);
+                  if (t.dstIndex >= 0 && stepSpan(t.dstIndex, t.dstParam, t.boolName) > 0)
+                     advance(t.dstIndex, t.dstParam, t.boolName);
                   else if (t.dstIndex >= 0 && t.dstParam >= 0)
                      gPerfPendingWrites[{ t.dstIndex, t.dstParam }] = 1.0f;
             }
@@ -22989,6 +23042,16 @@ namespace
       return (it != bufferIndexOf.end()) ? it->second : -1;
    }
 
+   INode* ResolvedAudioSource(INode* source)
+   {
+      INode* node = source;
+      for (int hops = 0; node != nullptr && node->bypassed && hops < 64; hops++)
+      {
+         node = node->BypassSource();
+      }
+      return (node != nullptr && node->bypassed) ? nullptr : node;
+   }
+
    // Walks backward from `node` through its own audio inputs before adding
    // an entry for `node` itself, so sources land before their consumers -
    // AudioEngine::RunTopology walks `outOrder` front-to-back, so that order
@@ -23025,8 +23088,12 @@ namespace
          entry.numInputs = slot + 1;
          if (cable->IsConnected())
          {
-            CollectAudioChain(cable->GetSource(), visited, outOrder, bufferIndexOf);
-            entry.inputBufferIndices[slot] = AudioBufferIndexOf(cable->GetSource(), bufferIndexOf);
+            INode* resolved = ResolvedAudioSource(cable->GetSource());
+            if (resolved != nullptr)
+            {
+               CollectAudioChain(resolved, visited, outOrder, bufferIndexOf);
+               entry.inputBufferIndices[slot] = AudioBufferIndexOf(resolved, bufferIndexOf);
+            }
          }
       }
 
@@ -23038,15 +23105,22 @@ namespace
       {
          NoteCable* cable = node->NoteInputSlot(slot);
          if (cable != nullptr && cable->IsConnected())
-            CollectAudioChain(cable->GetSource(), visited, outOrder, bufferIndexOf);
+         {
+            INode* resolved = ResolvedAudioSource(cable->GetSource());
+            if (resolved != nullptr)
+               CollectAudioChain(resolved, visited, outOrder, bufferIndexOf);
+         }
       }
 
       if (AudioNode* audioNode = AudioNodeOfAny(node))
       {
-         entry.node = audioNode;
-         entry.outputBufferIndex = (int)outOrder.size();
-         bufferIndexOf[audioNode] = entry.outputBufferIndex;
-         outOrder.push_back(entry);
+         if (!node->bypassed)
+         {
+            entry.node = audioNode;
+            entry.outputBufferIndex = (int)outOrder.size();
+            bufferIndexOf[audioNode] = entry.outputBufferIndex;
+            outOrder.push_back(entry);
+         }
       }
    }
 
@@ -23082,13 +23156,17 @@ namespace
             AudioCable* cable = gn.node->AudioInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            CollectAudioChain(cable->GetSource(), visited, order, bufferIndexOf);
-            const int idx = AudioBufferIndexOf(cable->GetSource(), bufferIndexOf);
-            if (idx >= 0)
+            INode* resolved = ResolvedAudioSource(cable->GetSource());
+            if (resolved != nullptr)
             {
-               // Capture is set unconditionally, gated at write-time on the
-               // ring's own `enabled` flag - see AudioTerminal's comment.
-               terminals.push_back({ idx, ring });
+               CollectAudioChain(resolved, visited, order, bufferIndexOf);
+               const int idx = AudioBufferIndexOf(resolved, bufferIndexOf);
+               if (idx >= 0)
+               {
+                  // Capture is set unconditionally, gated at write-time on the
+                  // ring's own `enabled` flag - see AudioTerminal's comment.
+                  terminals.push_back({ idx, ring });
+               }
             }
          }
       }
@@ -23106,7 +23184,11 @@ namespace
          {
             NoteCable* cable = gn.node->NoteInputSlot(slot);
             if (cable != nullptr && cable->IsConnected())
-               CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf);
+            {
+               INode* resolved = ResolvedAudioSource(cable->GetSource());
+               if (resolved != nullptr)
+                  CollectAudioChain(resolved, visited, order, bufferIndexOf);
+            }
          }
       }
 
@@ -23149,7 +23231,8 @@ namespace
                NoteCable* cable = gn.node->NoteInputSlot(slot);
                if (cable == nullptr || !cable->IsConnected())
                   continue;
-               if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+               INode* resolved = ResolvedAudioSource(cable->GetSource());
+               if (AudioNode* producer = AudioNodeOfAny(resolved))
                {
                   if (NoteEventQueue* outbox = producer->NoteOutbox(cable->GetOutputSlot()))
                   {
@@ -23180,7 +23263,8 @@ namespace
             int cursor = -1;
             if (cable->IsConnected())
             {
-               if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
+               INode* resolved = ResolvedAudioSource(cable->GetSource());
+               if (AudioNode* producer = AudioNodeOfAny(resolved))
                {
                   inbox = producer->NoteOutbox(cable->GetOutputSlot());
                   if (inbox != nullptr)
@@ -35990,6 +36074,8 @@ int main(int argc, char** argv)
             ImGui::Separator();
             if (ImGui::MenuItem("Select All", "Shift+A"))
                gRequestSelectAll = true;
+            if (ImGui::MenuItem("Bypass selection", "B"))
+               gRequestBypass = true;
             ImGui::Separator();
             if (ImGui::MenuItem("Group selection", MODKEY "+G"))
                gRequestGroup = true;
@@ -43073,17 +43159,12 @@ int main(int argc, char** argv)
          // already shows every param, Tier 1 and Tier 2 alike, unconditionally
          // - see docs/plans/audio/audio-node-ui-system.md §1.
          const bool isAudioBody = IsAudioBodyNode(gn.node.get());
-         // The bypass (power) toggle used to live here; removed because it was
-         // confusing and unreliable. The underlying bypassed flag, its cable-walk
-         // logic, and patch serialization are untouched, so patches saved with a
-         // bypassed node still load and dim correctly - there just isn't a UI
-         // control to set it anymore.
          const bool isComment = dynamic_cast<CommentNode*>(gn.node.get()) != nullptr;
          // Audio nodes have nothing this row would add: Tier 1 is never
          // collapsed (so the "mod"/"pal" collapsed-tag affordance has
          // nothing to stand in for), and there is no mesh for the viewport
          // toggle - see the comment above isAudioBody.
-         if (!isAudioBody)
+         if (!isAudioBody && !isComment)
          {
             const bool isWide = (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr ||
                                  dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr);
@@ -43095,6 +43176,17 @@ int main(int argc, char** argv)
             }
             if (EyeToggle(gn.showParams))
                gn.showParams = !gn.showParams;
+            ImGui::SameLine();
+            if (BypassToggle(gn.node->bypassed))
+            {
+               PushUndoCheckpoint();
+               gn.node->bypassed = !gn.node->bypassed;
+               if (dynamic_cast<IAudioSource*>(gn.node.get()) != nullptr ||
+                   dynamic_cast<INoteSource*>(gn.node.get()) != nullptr)
+               {
+                  RebuildAudioTopology();
+               }
+            }
             // Mini viewport toggle, only for nodes that actually have a mesh to
             // show - excludes CameraNode/LightNode, which appear in the stat-box
             // branch above but implement no geometry interface, and
@@ -43134,6 +43226,15 @@ int main(int argc, char** argv)
                CollapsedBindingPins(gn.index, modTagMin, modTagMax, false);
             if (palTag)
                CollapsedBindingPins(gn.index, palTagMin, palTagMax, true);
+         }
+         else if (isAudioBody && !isComment)
+         {
+            if (BypassToggle(gn.node->bypassed))
+            {
+               PushUndoCheckpoint();
+               gn.node->bypassed = !gn.node->bypassed;
+               RebuildAudioTopology();
+            }
          }
 
          // BeginNodeParams(gn.index) already ran above, ahead of the preview/
@@ -44667,6 +44768,40 @@ int main(int argc, char** argv)
          }
       }
 
+      const bool doBypass =
+         gRequestBypass ||
+         (!typing && !cmdOrCtrl && !io.KeyShift && !io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_B, false));
+      gRequestBypass = false;
+
+      if (doBypass)
+      {
+         const int count = ed::GetSelectedObjectCount();
+         if (count > 0)
+         {
+            std::vector<ed::NodeId> selNodes(count);
+            const int nodeCount = ed::GetSelectedNodes(selNodes.data(), count);
+            if (nodeCount > 0)
+            {
+               PushUndoCheckpoint();
+               bool needsAudioRebuild = false;
+               for (int i = 0; i < nodeCount; i++)
+               {
+                  GraphNode* sel = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+                  if (sel == nullptr || sel->node == nullptr)
+                     continue;
+                  sel->node->bypassed = !sel->node->bypassed;
+                  if (dynamic_cast<IAudioSource*>(sel->node.get()) != nullptr ||
+                      dynamic_cast<INoteSource*>(sel->node.get()) != nullptr)
+                  {
+                     needsAudioRebuild = true;
+                  }
+               }
+               if (needsAudioRebuild)
+                  RebuildAudioTopology();
+            }
+         }
+      }
+
       const bool doCopy = gRequestCopy || (!typing && !gPerfMatrixFocused && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false));
       gRequestCopy = false;
       if (doCopy)
@@ -44899,6 +45034,18 @@ int main(int argc, char** argv)
          }
          else
          {
+            const char* bypassLabel = gn->node->bypassed ? "Enable Node" : "Bypass Node";
+            if (ImGui::MenuItem(bypassLabel, "B"))
+            {
+               PushUndoCheckpoint();
+               gn->node->bypassed = !gn->node->bypassed;
+               if (dynamic_cast<IAudioSource*>(gn->node.get()) != nullptr ||
+                   dynamic_cast<INoteSource*>(gn->node.get()) != nullptr)
+               {
+                  RebuildAudioTopology();
+               }
+            }
+
             // Audio nodes have no hide-able params state at all any more -
             // every param is always visible (horizontal-layout redesign,
             // docs/plans/audio/audio-node-ui-system.md §1/§4), so they skip
@@ -45847,36 +45994,33 @@ int main(int argc, char** argv)
       if (gPerfAssigningElemIdx >= 0 && gPerfAssigningElemIdx < (int)gPerfElements.size())
       {
          const auto& assignElem = gPerfElements[gPerfAssigningElemIdx];
-         const ImVec2 mp = ImGui::GetMousePos();
+         const ImVec2 mp = ImGui::GetMousePos(); // Canvas coordinates inside ed::Begin
+         const ImVec2 screenMouse = ImGui::GetIO().MousePos;
          int hoveredPinIdx = -1;
-         float pulse = 0.55f + 0.45f * sinf((float)ImGui::GetTime() * 8.0f);
-         ImU32 assignTint = IM_COL32(0, 220, 255, (int)(pulse * 255.0f));
 
-         ImDrawList* fgDl = ImGui::GetForegroundDrawList();
+         const ImVec2 graphBR(gGraphScreenTL.x + gGraphScreenSize.x, gGraphScreenTL.y + gGraphScreenSize.y);
+         const bool mouseOverGraph = (screenMouse.x >= gGraphScreenTL.x && screenMouse.x <= graphBR.x &&
+                                      screenMouse.y >= gGraphScreenTL.y && screenMouse.y <= graphBR.y);
 
-         for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
+         if (mouseOverGraph)
          {
-            const auto& pInfo = gParamPinScreenList[pi];
-            bool inBounds = (mp.x >= pInfo.rowMin.x && mp.x <= pInfo.rowMax.x &&
-                             mp.y >= pInfo.rowMin.y && mp.y <= pInfo.rowMax.y);
-            float dx = mp.x - pInfo.screenPos.x;
-            float dy = mp.y - pInfo.screenPos.y;
-            if (inBounds || (dx * dx + dy * dy < 20.0f * 20.0f))
+            for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
             {
-               hoveredPinIdx = (int)pi;
+               const auto& pInfo = gParamPinScreenList[pi];
+               bool inBounds = (mp.x >= pInfo.rowMin.x && mp.x <= pInfo.rowMax.x &&
+                                mp.y >= pInfo.rowMin.y && mp.y <= pInfo.rowMax.y);
+               float dx = mp.x - pInfo.screenPos.x;
+               float dy = mp.y - pInfo.screenPos.y;
+               if (inBounds || (dx * dx + dy * dy < 20.0f * 20.0f))
+               {
+                  hoveredPinIdx = (int)pi;
+               }
             }
-            // Draw glowing highlight around every assignable param row & pin
-            fgDl->AddRectFilled(pInfo.rowMin, pInfo.rowMax, IM_COL32(0, 200, 255, 35), 4.0f);
-            fgDl->AddRect(pInfo.rowMin, pInfo.rowMax, assignTint, 4.0f, 0, 1.5f);
-            fgDl->AddCircleFilled(pInfo.screenPos, 5.5f, assignTint);
          }
 
          if (hoveredPinIdx >= 0)
          {
             const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
-            fgDl->AddRectFilled(pInfo.rowMin, pInfo.rowMax, IM_COL32(0, 240, 255, 80), 4.0f);
-            fgDl->AddRect(pInfo.rowMin, pInfo.rowMax, IM_COL32(255, 220, 50, 255), 4.0f, 0, 2.2f);
-            fgDl->AddCircleFilled(pInfo.screenPos, 7.5f, IM_COL32(255, 220, 50, 255));
             ed::Suspend();
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
             ImGui::SetTooltip("Assign to '%s' (%s) -> %s: %s",
@@ -45895,7 +46039,7 @@ int main(int argc, char** argv)
                   el.dstParam = pInfo.paramIndex;
                   el.targets.clear();
                   el.targets.push_back({ pInfo.nodeIndex, pInfo.paramIndex, "" });
-                  if (el.label.empty() || el.label == "Knob" || el.label == "Fader" || el.label == "Slider" || el.label == "Toggle" || el.label == "XY Pad")
+                  if (el.label.empty() || el.label == "Knob" || el.label == "Fader" || el.label == "Slider" || el.label == "Toggle" || el.label == "XY Pad" || el.label == "Trigger" || el.label == "NumBox" || el.label == "Selector" || el.label == "Pan/Detent" || el.label == "Step Gate")
                      el.label = pInfo.paramName;
                }
                else if (gPerfAssigningAxis == 1)
@@ -46614,6 +46758,8 @@ int main(int argc, char** argv)
                GraphNode* modNode = FindNodeByIndex(src.nodeIndex);
                if (modNode == nullptr)
                   continue;
+               if (modNode->node != nullptr && modNode->node->bypassed && modNode->node->BypassSource() == nullptr)
+                  continue;
                auto* modulator = ModulatorForOutput(modNode->node.get(), src.outputIndex);
                if (modulator == nullptr)
                   continue;
@@ -46636,6 +46782,27 @@ int main(int argc, char** argv)
                {
                   *ref.value = ShapeToParam(ref, numBox->value);
                   continue;
+               }
+               if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(modNode->node.get()))
+               {
+                  const int span = (int)std::lround(ref.maxValue - ref.minValue);
+                  const bool isStepping = ref.isEnum || ref.isBool || (ref.step == 1.0f && span >= 1);
+                  if (isStepping)
+                  {
+                     if (trigNode->justTriggered)
+                     {
+                        if (ref.isBool || span == 1)
+                        {
+                           *ref.value = (*ref.value > ref.minValue + 0.5f) ? ref.minValue : ref.maxValue;
+                        }
+                        else if (span >= 1)
+                        {
+                           const int curIdx = std::clamp((int)std::lround(*ref.value - ref.minValue), 0, span);
+                           *ref.value = ref.minValue + (float)((curIdx + 1) % (span + 1));
+                        }
+                     }
+                     continue;
+                  }
                }
                const float v01 = std::clamp(modulator->Value01(), 0.0f, 1.0f);
                *ref.value = ShapeToParam(ref, src.lo + (src.hi - src.lo) * v01);
@@ -46676,6 +46843,12 @@ int main(int argc, char** argv)
                modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, error);
             }
          }
+      }
+
+      for (GraphNode& gn : gNodes)
+      {
+         if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(gn.node.get()))
+            trigNode->justTriggered = false;
       }
 
       // A Palette is not an Output, so nothing downstream pulls it, and both its

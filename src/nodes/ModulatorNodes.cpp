@@ -331,6 +331,9 @@ float EnvelopeNode::Value01()
 
 float CVToPitchNode::Value01()
 {
+   if (bypassed)
+      return input ? input->Value01() : constantIn;
+
    const float v01 = std::clamp(input ? input->Value01() : constantIn, 0.0f, 1.0f);
 
    const int low = std::min(rangeLow, rangeHigh);
@@ -370,6 +373,8 @@ float CVToPitchNode::Value01()
 
 float InvertNode::Value01()
 {
+   if (bypassed)
+      return input ? input->Value01() : constantIn;
    const float v = input ? input->Value01() : constantIn;
    return low + high - v;
 }
@@ -378,6 +383,8 @@ float InvertNode::Value01()
 
 float ModCurveNode::Value01()
 {
+   if (bypassed)
+      return input ? input->Value01() : constantIn;
    const float in = input ? input->Value01() : constantIn;
    const float x = std::clamp(in, 0.0f, 1.0f); // clamp for lookup only; the curve is only defined on 0..1
    const float y = curve.Evaluate(x);

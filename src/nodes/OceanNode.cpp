@@ -34,12 +34,19 @@ void OceanNode::RebuildIfNeeded()
 
 const Mesh& OceanNode::GetMesh()
 {
+   if (bypassed)
+   {
+      static const Mesh kEmptyMesh;
+      return kEmptyMesh;
+   }
    RebuildIfNeeded();
    return mMesh;
 }
 
 unsigned long long OceanNode::MeshRevision()
 {
+   if (bypassed)
+      return 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }

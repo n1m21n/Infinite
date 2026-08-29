@@ -193,8 +193,16 @@ public:
    float Value01() override { return pressed ? 1.0f : 0.0f; }
 
    bool pressed = false;
+   bool justTriggered = false;
    float flash = 0.0f;
    std::string label = "Trigger";
+
+   void Trigger()
+   {
+      pressed = true;
+      justTriggered = true;
+      flash = 1.0f;
+   }
 
    void VisitParams(ParamVisitor& v) override
    {

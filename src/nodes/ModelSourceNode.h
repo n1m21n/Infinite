@@ -24,8 +24,16 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
-   const Mesh& GetMesh() override { return mMesh; }
-   unsigned long long MeshRevision() override { return mMeshRevision; }
+   const Mesh& GetMesh() override
+   {
+      if (bypassed)
+      {
+         static const Mesh kEmptyMesh;
+         return kEmptyMesh;
+      }
+      return mMesh;
+   }
+   unsigned long long MeshRevision() override { return bypassed ? 0 : mMeshRevision; }
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;

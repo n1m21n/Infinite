@@ -9,10 +9,11 @@
 // save/load and link drawing). The actual real-time audio graph is the
 // flattened AudioNode* list AudioEngine::SetTopology is given, built by
 // walking these cables on the main thread (see docs/plans/audio/README.md,
-// P2's "AudioEngine::SetTopology integration" step). Deliberately does not
-// walk past bypassed nodes the way ImageCable::Resolved() does - none of the
-// P2 audio node types override BypassSource() yet, so that semantic doesn't
-// exist for audio cables yet either.
+// P2's "AudioEngine::SetTopology integration" step). This cable itself does
+// not walk past bypassed nodes - that resolution happens once, on the main
+// thread, via ResolvedAudioSource() in main.cpp (the audio-graph analogue of
+// ImageCable::Resolved()), which every CollectAudioChain call site in
+// RebuildAudioTopology goes through before reading GetSource().
 class AudioCable
 {
 public:

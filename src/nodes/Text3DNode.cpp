@@ -51,12 +51,19 @@ void Text3DNode::RebuildIfNeeded()
 
 const Mesh& Text3DNode::GetMesh()
 {
+   if (bypassed)
+   {
+      static const Mesh kEmptyMesh;
+      return kEmptyMesh;
+   }
    RebuildIfNeeded();
    return mMesh;
 }
 
 unsigned long long Text3DNode::MeshRevision()
 {
+   if (bypassed)
+      return 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }

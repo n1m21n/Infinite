@@ -146,6 +146,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    // MusicTime::ScaleType; kChromatic (every pitch class in the table) makes
@@ -199,6 +200,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    int semitones = 0; // -48..48
@@ -243,6 +245,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    static constexpr float kRange = 2.0f; // +/-2 st, the standard wheel range
@@ -272,6 +275,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    float curve = 1.0f; // 0.25..4, exponent; 1 = linear/unchanged
@@ -304,6 +308,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    float holdMs = 0.0f; // 0..3000, 0 = passthrough note-off
@@ -330,6 +335,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    float timingMs = 0.0f; // 0..100, random jitter on note-on timing
@@ -358,6 +364,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    int div = 0; // 0 = off, else index into kQuantizeDivisions (see .cpp)
@@ -387,6 +394,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    float glideMs = 0.0f; // 0..2000
@@ -449,6 +457,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    // rateMode defaults to free (1), matching every patch saved before this
@@ -496,6 +505,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    // Four distinct note outputs - see GraphNode::kOutputBase/OutputPinId.
@@ -534,6 +544,13 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
 
+   INode* BypassSource() override
+   {
+      for (int i = 0; i < kSlots; i++)
+         if (noteInputs[i].IsConnected())
+            return noteInputs[i].GetSource();
+      return nullptr;
+   }
    NoteCable* NoteInputSlot(int slot) override
    {
       return (slot >= 0 && slot < kSlots) ? &noteInputs[slot] : nullptr;
@@ -749,6 +766,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    int  semitones[kVoices] = { 12, 7, 5, 3, -3, -5, -7, -12 };
@@ -781,6 +799,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    float strumMs = 25.0f; // 0..200 ms
@@ -819,6 +838,7 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
    bool loop = true;

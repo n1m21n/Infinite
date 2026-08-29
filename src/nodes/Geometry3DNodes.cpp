@@ -28,6 +28,7 @@ namespace
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
+   const Mesh kEmptyMesh;
    const std::vector<std::string> kSpriteSizeModeNames = { "World", "Screen" };
    const int kShadowSizes[] = { 1024, 2048, 4096 };
 
@@ -837,12 +838,16 @@ void GeometryNode::RebuildIfNeeded()
 
 const Mesh& GeometryNode::GetMesh()
 {
+   if (bypassed)
+      return kEmptyMesh;
    RebuildIfNeeded();
    return mMesh;
 }
 
 unsigned long long GeometryNode::MeshRevision()
 {
+   if (bypassed)
+      return 0;
    RebuildIfNeeded();
    return mMeshRevision;
 }

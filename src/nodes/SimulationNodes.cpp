@@ -205,6 +205,12 @@ void ParticleSystemNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
 
+   // Bypassed: GetPointCloud() reports nothing, so stepping the emitter would
+   // just burn CPU on particles nobody reads. mLastBeats is left frozen; the
+   // dt clamp below already bounds the catch-up jump on resume.
+   if (bypassed)
+      return;
+
    const double beats = Transport::Instance().Beats();
    const float bpm = std::max(1.0f, Transport::Instance().Tempo());
 
@@ -511,12 +517,16 @@ void ClothNode::Step(float dt, float elapsed)
 
 Mat4 ClothNode::GetModelMatrix() const
 {
+   if (bypassed)
+      return input ? input->GetModelMatrix() : Mat4::Identity();
    Mat4 m = Mat4::Scale(uniformScale, uniformScale, uniformScale);
    return Mat4::Multiply(Mat4::Translation(posX, posY, posZ), m);
 }
 
 Material ClothNode::GetMaterial() const
 {
+   if (bypassed)
+      return input ? input->GetMaterial() : Material();
    if (inheritMaterial && input != nullptr)
       return input->GetMaterial();
 
@@ -557,6 +567,13 @@ void ClothNode::CookIfNeeded(int frameId)
 
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
+
+   // Bypassed: forward the upstream mesh untouched (see GetMesh()) and do not
+   // step the solver - no point spending the CPU on a simulation nothing is
+   // reading, and kMaxCatchUp already bounds the dt jump on resume the same
+   // way a long-paused transport does.
+   if (bypassed)
+      return;
 
    // The rest state is rebuilt when the incoming *topology* changes: a
    // different vertex/index count invalidates every constraint index. A mesh

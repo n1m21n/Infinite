@@ -44,8 +44,19 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
-   const Mesh& GetMesh() override { return mMesh; }
-   unsigned long long MeshRevision() override { return mRevision; }
+   const Mesh& GetMesh() override
+   {
+      if (bypassed)
+      {
+         static const Mesh kEmptyMesh;
+         return input ? input->GetMesh() : kEmptyMesh;
+      }
+      return mMesh;
+   }
+   unsigned long long MeshRevision() override
+   {
+      return bypassed ? (input ? input->MeshRevision() : 0) : mRevision;
+   }
    // Mutating a mesh does not relocate it, the same reasoning the geometry
    // operators use for forwarding their input's placement.
    Mat4 GetModelMatrix() const override
@@ -143,8 +154,13 @@ public:
 
    const std::vector<Particle>& GetPoints() { return mPoints; }
    unsigned long long PointRevision() { return mRevision; }
-   const std::vector<Particle>* GetPointCloud() override { return &mPoints; }
-   unsigned long long PointCloudRevision() override { return mRevision; }
+   const std::vector<Particle>* GetPointCloud() override
+   {
+      if (bypassed)
+         return nullptr;
+      return &mPoints;
+   }
+   unsigned long long PointCloudRevision() override { return bypassed ? 0 : mRevision; }
    // Mirrors RebuildMeshIfNeeded()'s baseHalf (GenerativeNodes.cpp) so
    // Render3D's sprite draw and this node's own mini-viewport agree on what
    // p.scale = 1.0 actually measures.
