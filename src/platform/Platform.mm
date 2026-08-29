@@ -55,6 +55,26 @@ namespace Platform
                             reason:@"continuous node-graph rendering"];
    }
 
+   // No-op on macOS: the crashreporter daemon writes a `.ips` report for any
+   // unhandled exception without app-side setup, so there is nothing for
+   // this process to install.
+   void InstallCrashHandler()
+   {
+   }
+
+   // No-op on macOS: stderr from an app launched from a terminal reaches that
+   // terminal, and Console.app captures the rest - there is no GUI-subsystem
+   // gap to work around here the way there is on Windows.
+   void AppendLogLine(const std::string& line)
+   {
+      (void)line;
+   }
+
+   void ShowFatalError(const std::string& title, const std::string& message)
+   {
+      fprintf(stderr, "%s: %s\n", title.c_str(), message.c_str());
+   }
+
    std::string OpenImageDialog()
    {
       @autoreleasepool
@@ -2447,6 +2467,17 @@ namespace Platform
       if (AudioObjectGetPropertyData(target, &bufferAddr, 0, nullptr, &size, &frames) != noErr)
          return 0;
       return (uint32_t)frames;
+   }
+
+   bool AudioPcmConversionSelfTest()
+   {
+      // Nothing to test here: CoreAudio's AVAudioEngine render path only ever
+      // hands the engine planar float, so the WASAPI-only PCM<->float
+      // conversion this checks (src/platform/win/AudioDeviceWin.cpp) has no
+      // macOS counterpart. Trivially true so main.cpp's env-var dispatch
+      // stays a single cross-platform call site.
+      printf("AUDIOPCMTEST OK\n");
+      return true;
    }
 
    // ------------------------------------------- input capture (Audio In node)

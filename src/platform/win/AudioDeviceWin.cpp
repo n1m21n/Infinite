@@ -37,6 +37,8 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <mutex>
 #include <thread>
@@ -230,6 +232,78 @@ namespace
       return false;
    }
 
+   // Some shared-mode endpoints negotiate a PCM mix format instead of float
+   // (docs/plans/windows-render/FIX_BRIEF.md addendum A1) - WASAPI shared mode
+   // won't let us demand float, so the render/capture paths must convert
+   // rather than refuse. Only container sizes of 16 and 32 bits are accepted:
+   // 16-bit PCM, plain 32-bit PCM, and 24-bit-in-32-container PCM (the driver
+   // reports wBitsPerSample == 32 for the last two either way; both left-
+   // justify their significant bits in the 32-bit word, so they convert
+   // identically as full-range int32 - there is nothing container-size 24
+   // (tightly packed, 3 bytes/sample) to worry about here, and this codebase
+   // has never seen a driver report one).
+   bool IsSupportedPcmFormat(const WAVEFORMATEX* fmt)
+   {
+      if (fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+      {
+         const WAVEFORMATEXTENSIBLE* ext = reinterpret_cast<const WAVEFORMATEXTENSIBLE*>(fmt);
+         if (!IsEqualGUID(ext->SubFormat, KSDATAFORMAT_SUBTYPE_PCM))
+            return false;
+      }
+      else if (fmt->wFormatTag != WAVE_FORMAT_PCM)
+         return false;
+      return fmt->wBitsPerSample == 16 || fmt->wBitsPerSample == 32;
+   }
+
+   // planar float (engine's internal contract) -> interleaved PCM bytes for
+   // the WASAPI render buffer. `bits` is the negotiated container size (16 or
+   // 32; see IsSupportedPcmFormat for why 32 covers both int32 and 24-in-32).
+   void PlanarFloatToInterleavedPcm(const float* const* planar, int channels, int frames,
+                                    WORD bits, BYTE* dest)
+   {
+      if (bits == 16)
+      {
+         int16_t* out = reinterpret_cast<int16_t*>(dest);
+         for (int i = 0; i < frames; i++)
+            for (int ch = 0; ch < channels; ch++)
+            {
+               const float v = std::clamp(planar[ch][i], -1.0f, 1.0f);
+               out[(size_t)i * channels + ch] = (int16_t)std::lround(v * 32767.0f);
+            }
+      }
+      else
+      {
+         int32_t* out = reinterpret_cast<int32_t*>(dest);
+         for (int i = 0; i < frames; i++)
+            for (int ch = 0; ch < channels; ch++)
+            {
+               const float v = std::clamp(planar[ch][i], -1.0f, 1.0f);
+               out[(size_t)i * channels + ch] = (int32_t)std::lround((double)v * 2147483647.0);
+            }
+      }
+   }
+
+   // Inverse of the above: interleaved WASAPI PCM bytes -> interleaved float,
+   // for the capture path (CaptureEngineBase::OnFrames still receives float).
+   void InterleavedPcmToFloat(const BYTE* src, int channels, int frames, WORD bits,
+                              std::vector<float>& outInterleaved)
+   {
+      outInterleaved.resize((size_t)frames * channels);
+      const size_t count = (size_t)frames * channels;
+      if (bits == 16)
+      {
+         const int16_t* in = reinterpret_cast<const int16_t*>(src);
+         for (size_t i = 0; i < count; i++)
+            outInterleaved[i] = in[i] / 32768.0f;
+      }
+      else
+      {
+         const int32_t* in = reinterpret_cast<const int32_t*>(src);
+         for (size_t i = 0; i < count; i++)
+            outInterleaved[i] = (float)(in[i] / 2147483648.0);
+      }
+   }
+
    // ---- render device ------------------------------------------------------
 
    struct RenderState
@@ -242,6 +316,7 @@ namespace
       double sampleRate = 0.0;
       int channels = 0;
       UINT32 bufferFrames = 0;
+      WORD pcmBits = 0;    // 0 = float mix format; 16/32 = PCM, see IsSupportedPcmFormat
 
       // Thread machinery
       std::thread thread;
@@ -339,7 +414,9 @@ namespace
                hr = gRender.client->GetMixFormat(&mixFormat);
                if (SUCCEEDED(hr) && mixFormat != nullptr)
                {
-                  if (IsFloatFormat(mixFormat) && mixFormat->nChannels <= kMaxChannels)
+                  const bool isFloat = IsFloatFormat(mixFormat);
+                  const bool isPcm = !isFloat && IsSupportedPcmFormat(mixFormat);
+                  if ((isFloat || isPcm) && mixFormat->nChannels <= kMaxChannels)
                   {
                      REFERENCE_TIME period = 0;
                      gRender.client->GetDevicePeriod(nullptr, &period);
@@ -351,6 +428,7 @@ namespace
                      {
                         gRender.sampleRate = (double)mixFormat->nSamplesPerSec;
                         gRender.channels = (int)mixFormat->nChannels;
+                        gRender.pcmBits = isPcm ? mixFormat->wBitsPerSample : 0;
 
                         UINT32 bufferSize = 0;
                         gRender.client->GetBufferSize(&bufferSize);
@@ -421,11 +499,18 @@ namespace
 
          gRender.callback(planar, gRender.channels, frames, gRender.userData);
 
-         float* out = reinterpret_cast<float*>(dest);
          const int chs = gRender.channels;
-         for (int i = 0; i < frames; i++)
-            for (int ch = 0; ch < chs; ch++)
-               out[(size_t)i * chs + ch] = planar[ch][i];
+         if (gRender.pcmBits != 0)
+         {
+            PlanarFloatToInterleavedPcm(planar, chs, frames, gRender.pcmBits, dest);
+         }
+         else
+         {
+            float* out = reinterpret_cast<float*>(dest);
+            for (int i = 0; i < frames; i++)
+               for (int ch = 0; ch < chs; ch++)
+                  out[(size_t)i * chs + ch] = planar[ch][i];
+         }
 
          gRender.renderer->ReleaseBuffer(frames, 0);
       }
@@ -551,8 +636,13 @@ namespace Platform
          return false;
       }
 
-      // Shared mode runs at the engine's mix rate; requested rates/sizes are
-      // clamped by the OS rather than rejected (same contract as CoreAudio).
+      // Shared mode structurally cannot honour a requested rate/buffer size -
+      // it always runs at the device's own mix format and period, unlike
+      // CoreAudio which actually applies these. Deliberately discarded, not
+      // a TODO: the audio-settings UI (main.cpp) disables both controls on
+      // Windows rather than let them sit live and silently do nothing - see
+      // docs/plans/windows-render/FIX_BRIEF.md addendum A2 for the tradeoff
+      // against AUDCLNT_SHAREMODE_EXCLUSIVE, which was not taken.
       (void)requestedSampleRate;
       (void)requestedBufferFrames;
       outSampleRate = gRender.sampleRate;
@@ -616,6 +706,51 @@ namespace Platform
       }
       enumerator->Release();
       return result;
+   }
+
+   // Headless round-trip check for the PCM<->float helpers above (FIX_BRIEF.md
+   // addendum A1). No device needed, so unlike the rest of this file this is
+   // actually CI-reachable - wired into main.cpp's env-var test dispatch as
+   // INFINITE_AUDIOPCMTEST alongside the other INFINITE_*TEST fixtures.
+   bool AudioPcmConversionSelfTest()
+   {
+      constexpr int kFrames = 8;
+      constexpr int kChannels = 2;
+      const float src[kChannels][kFrames] = {
+         { -1.0f, -0.5f, -0.1f, 0.0f, 0.1f, 0.3f, 0.75f, 1.0f },
+         { 0.9f, -0.9f, 0.42f, -0.42f, 0.0f, 1.0f, -1.0f, 0.05f },
+      };
+      const float* planar[kChannels] = { src[0], src[1] };
+
+      bool ok = true;
+      for (const WORD bits : { (WORD)16, (WORD)32 })
+      {
+         const size_t bytesPerSample = bits / 8;
+         std::vector<BYTE> interleaved(bytesPerSample * kChannels * kFrames);
+         PlanarFloatToInterleavedPcm(planar, kChannels, kFrames, bits, interleaved.data());
+
+         std::vector<float> roundTrip;
+         InterleavedPcmToFloat(interleaved.data(), kChannels, kFrames, bits, roundTrip);
+
+         // Quantization tolerance: one LSB of the negotiated container size.
+         const float tolerance = bits == 16 ? (1.0f / 32768.0f) * 1.5f : (1.0f / 2147483648.0f) * 2.0f;
+         for (int i = 0; i < kFrames && ok; i++)
+         {
+            for (int ch = 0; ch < kChannels; ch++)
+            {
+               const float expected = src[ch][i];
+               const float got = roundTrip[(size_t)i * kChannels + ch];
+               if (std::fabs(got - expected) > tolerance)
+               {
+                  ok = false;
+                  break;
+               }
+            }
+         }
+      }
+
+      printf("%s\n", ok ? "AUDIOPCMTEST OK" : "AUDIOPCMTEST FAIL");
+      return ok;
    }
 
    bool AudioDeviceConfigDidChange()
@@ -708,6 +843,7 @@ namespace
       double sampleRate = 0.0;
       int channels = 0;
       std::string error;
+      WORD pcmBits = 0;    // 0 = float mix format; 16/32 = PCM, see IsSupportedPcmFormat
 
       virtual ~CaptureEngineBase() = default;
       virtual void OnFormat(double rate, int chs) = 0;
@@ -836,15 +972,20 @@ namespace
             return;
          }
 
-         // Analysis/capture both want plain float; anything else is refused
-         // rather than half-supported.
-         if (!IsFloatFormat(fmt) || fmt->nChannels > kMaxChannels)
+         // Analysis/capture both want interleaved float delivered to
+         // OnFrames; PCM mix formats are converted on the fly below rather
+         // than refused (FIX_BRIEF.md addendum A1). nChannels > kMaxChannels
+         // is still a genuine limit.
+         const bool isFloat = IsFloatFormat(fmt);
+         const bool isPcm = !isFloat && IsSupportedPcmFormat(fmt);
+         if ((!isFloat && !isPcm) || fmt->nChannels > kMaxChannels)
          {
             error = "input device format unsupported";
             running.store(false, std::memory_order_release);
             cleanup();
             return;
          }
+         pcmBits = isPcm ? fmt->wBitsPerSample : 0;
 
          REFERENCE_TIME period = 0;
          client->GetDevicePeriod(nullptr, &period);
@@ -890,7 +1031,19 @@ namespace
                      break;
 
                   if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) == 0 && data != nullptr)
-                     OnFrames(reinterpret_cast<const float*>(data), (int)packetFrames);
+                  {
+                     if (pcmBits != 0)
+                     {
+                        static std::vector<float> converted;
+                        InterleavedPcmToFloat(data, fmt->nChannels, (int)packetFrames, pcmBits,
+                                             converted);
+                        OnFrames(converted.data(), (int)packetFrames);
+                     }
+                     else
+                     {
+                        OnFrames(reinterpret_cast<const float*>(data), (int)packetFrames);
+                     }
+                  }
                   else
                   {
                      // Silence packet still advances the analysis clock.

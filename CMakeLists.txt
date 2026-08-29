@@ -409,6 +409,7 @@ set(WIN32_SOURCES
     # exe shows Explorer's generic application icon everywhere.
     ${CMAKE_CURRENT_BINARY_DIR}/generated/Infinite.rc
     src/platform/win/PlatformWin.cpp
+    src/platform/win/CrashHandlerWin.cpp
     # GL-only half of the Spout bridge (glad), kept out of PlatformWin.cpp's
     # TU since that file also includes SpoutGL's headers, which drag in the
     # legacy <GL/gl.h> - see SpoutGLBridge.h for why the two can't mix.
@@ -526,6 +527,9 @@ if(WIN32)
         # (SpoutDirectX.cpp); dxgi also has its own #pragma comment(lib) but
         # MinGW-style toolchains don't process those, same reasoning as above.
         d3d11 dxgi
+        # dbghelp backs Platform::InstallCrashHandler's MiniDumpWriteDump call
+        # (CrashHandlerWin.cpp).
+        dbghelp
     )
     target_include_directories(Infinite PRIVATE "${ONNXRUNTIME_INCLUDE_DIR}")
     # onnxruntime.dll, DirectML.dll (its own runtime dependency - see the

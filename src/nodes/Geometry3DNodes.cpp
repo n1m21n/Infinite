@@ -1830,6 +1830,39 @@ void Render3DNode::CookIfNeeded(int frameId)
          // matrix, so only a uniform-ish scale - the length of the model's
          // own X basis vector - survives a Scale node upstream.
          const float scaleX = std::sqrt(model.m[0]*model.m[0] + model.m[1]*model.m[1] + model.m[2]*model.m[2]);
+         // p.scale is a relative multiplier (see IGeometrySource::PointBaseSize),
+         // not a world-space size - without this, Image to Points' default
+         // p.scale=1.0 draws a sprite ~100x too large next to its own
+         // mini-viewport, and at higher density/pointSize can push the total
+         // shaded fill far enough to trip Windows' GPU watchdog (TDR).
+         const float baseSize = cloud->PointBaseSize();
+
+         // Defensive backstop, independent of the units fix above: estimate
+         // total shaded fragments this cloud will cost (instance count x
+         // screen-space sprite area x MSAA samples) and, if it blows past a
+         // budget, shrink the sprite radius rather than dropping instances -
+         // a visibly-small cloud beats a cloud that silently has fewer points
+         // than it actually contains. Windows has no equivalent of macOS's
+         // soft stall here: its GPU watchdog (TDR) hard-resets the driver
+         // (and the process with it) after ~2s of an unresponsive frame.
+         const float kDeg2Rad = 3.14159265358979323846f / 180.0f;
+         const float visibleHeight = 2.0f * camDistance * std::tan(fov * 0.5f * kDeg2Rad);
+         const float pixelsPerUnit = visibleHeight > 1e-6f ? (float)mHeight / visibleHeight : 0.0f;
+         static const double kSampleMultiplier[4] = { 1.0, 2.0, 4.0, 8.0 };
+         const double sampleMult = kSampleMultiplier[std::max(0, std::min(3, samples))];
+         const float spriteRadiusPixels = baseSize * scaleX * pixelsPerUnit;
+         const double perSpriteArea = 4.0 * (double)spriteRadiusPixels * (double)spriteRadiusPixels;
+         const double estimatedFill = (double)points.size() * perSpriteArea * sampleMult;
+         const double kFillBudget = 5.0e8; // shaded samples/frame; the TDR-triggering case in the brief was ~2.5e10
+         float clampScale = 1.0f;
+         if (estimatedFill > kFillBudget && perSpriteArea > 0.0)
+         {
+            clampScale = (float)std::sqrt(kFillBudget / estimatedFill);
+            fprintf(stderr,
+                    "Render3D: point cloud sprite fill ~%.3g px/frame (budget %.3g) - "
+                    "clamping sprite radius by %.4fx to stay under it\n",
+                    estimatedFill, kFillBudget, clampScale);
+         }
 
          std::vector<Mat4> xforms;
          std::vector<float> colors;
@@ -1842,7 +1875,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             const float wx = model.m[0]*p.px + model.m[4]*p.py + model.m[8]*p.pz + model.m[12];
             const float wy = model.m[1]*p.px + model.m[5]*p.py + model.m[9]*p.pz + model.m[13];
             const float wz = model.m[2]*p.px + model.m[6]*p.py + model.m[10]*p.pz + model.m[14];
-            const float s = p.scale * scaleX;
+            const float s = p.scale * baseSize * scaleX * clampScale;
             xforms.push_back(Mat4::Multiply(Mat4::Translation(wx, wy, wz), Mat4::Scale(s, s, s)));
             colors.push_back(p.r); colors.push_back(p.g); colors.push_back(p.b);
          }
@@ -2240,7 +2273,12 @@ void Render3DNode::CookIfNeeded(int frameId)
          // added faces) - draw as points instead of the empty triangle list
          // Empty() used to reject outright. Not handled for the instanced
          // case; instancing a point cloud already has its own path via
-         // InstanceOnPointsNode/drawCloudSlot.
+         // InstanceOnPointsNode/drawCloudSlot. This shader never writes
+         // gl_PointSize, so gl_PointSize is only well-defined (as 1px, via
+         // glPointSize's default) while GL_PROGRAM_POINT_SIZE is off - force
+         // that explicitly rather than relying on no earlier draw in the
+         // frame having left it enabled.
+         glDisable(GL_PROGRAM_POINT_SIZE);
          glDrawArrays(GL_POINTS, 0, gpu.vertexCount);
       }
       else if (instanced)

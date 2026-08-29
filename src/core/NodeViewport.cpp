@@ -824,7 +824,15 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          mInstanceAttribsOn = false;
       }
       if (mIndexCount == 0)
+      {
+         // This shader (unlike the usePointCloud path above, which sets
+         // uPointSize and enables GL_PROGRAM_POINT_SIZE deliberately) never
+         // writes gl_PointSize, so force the state off rather than leaving
+         // gl_PointSize implicitly undefined if some earlier draw this frame
+         // left it enabled.
+         glDisable(GL_PROGRAM_POINT_SIZE);
          glDrawArrays(GL_POINTS, 0, mVertexCount);
+      }
       else
          glDrawElements(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, nullptr);
    }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -144,6 +145,15 @@ public:
    unsigned long long PointRevision() { return mRevision; }
    const std::vector<Particle>* GetPointCloud() override { return &mPoints; }
    unsigned long long PointCloudRevision() override { return mRevision; }
+   // Mirrors RebuildMeshIfNeeded()'s baseHalf (GenerativeNodes.cpp) so
+   // Render3D's sprite draw and this node's own mini-viewport agree on what
+   // p.scale = 1.0 actually measures.
+   float PointBaseSize() const override
+   {
+      const int n = std::max(2, std::min(density, 512));
+      const float cell = std::min(width, height) / (float)n;
+      return cell * 0.45f;
+   }
 
    // IGeometrySource: a swatch quad per point, each sampling its own texel of
    // the downsampled source image rather than the whole image tiled per-quad

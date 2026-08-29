@@ -43,6 +43,37 @@ namespace Platform
    bool LoadImageFloatRGB(const std::string& path, std::vector<float>& outPixels,
                           int& outWidth, int& outHeight, std::string& outError);
 
+   // ---- startup / crash diagnostics ---------------------------------------
+   // Windows links the app with WIN32_EXECUTABLE (CMakeLists.txt) - a GUI
+   // subsystem process with no console, so fprintf(stderr, ...) goes nowhere
+   // and an unhandled exception unwinds silently: the window just vanishes.
+   // macOS gets a `.ips` crash report and a visible terminal for free from
+   // the OS, so both of these are real work on Windows and a no-op on macOS.
+
+   // Installs a process-wide unhandled-exception handler that writes a
+   // minidump plus a short text log to AppPaths::AppSupportDir() + "/crash/"
+   // before the process dies, so a Windows crash leaves something to attach
+   // to a report. Call once, early in main(), after argv-only setup. No-op
+   // on macOS.
+   void InstallCrashHandler();
+
+   // Appends one line (a trailing newline is added) to a rolling
+   // AppPaths::AppSupportDir() + "/log.txt", so a user who hits a startup
+   // failure they can't see (see above) has something to attach to a report.
+   // Best-effort: never throws, silently does nothing if the file can't be
+   // opened. No-op on macOS - stderr already reaches a visible terminal or
+   // Console.app there.
+   void AppendLogLine(const std::string& line);
+
+   // Reports a fatal startup failure through every channel a user might
+   // actually see: stderr (unconditionally, matches prior behavior) and,
+   // on Windows only, a MessageBoxW plus AppendLogLine. macOS relies on the
+   // stderr print alone, since it reaches a visible terminal/Console.app.
+   // Intended for failures before the main window exists (glfwInit,
+   // glfwCreateWindow, GL context/loader setup) - call this instead of a
+   // bare fprintf(stderr, ...) at any of those sites.
+   void ShowFatalError(const std::string& title, const std::string& message);
+
    // ---- 3D model loading --------------------------------------------------
    // Goes through ModelIO for the same reason image decoding goes through
    // ImageIO: the OS already reads OBJ, PLY, STL, USD and USDZ, and a bundled
@@ -224,6 +255,16 @@ namespace Platform
    // queries the hardware directly - lets the UI show what was really
    // negotiated after a requestedBufferFrames the device may have clamped.
    uint32_t AudioDeviceBufferFrames(uint32_t deviceId = 0);
+
+   // Headless round-trip check for the WASAPI PCM<->float conversion helpers
+   // (docs/plans/windows-render/FIX_BRIEF.md addendum A1: WASAPI shared mode
+   // can hand back a non-float mix format, and the render/capture paths must
+   // convert rather than refuse). Prints "AUDIOPCMTEST OK"/"AUDIOPCMTEST
+   // FAIL" and returns the same verdict as a bool - this is the one piece of
+   // A1 that's actually CI-reachable (no device needed), so it's wired into
+   // main.cpp's env-var test dispatch next to the other INFINITE_*TEST
+   // fixtures. Trivially true on macOS, which never negotiates PCM here.
+   bool AudioPcmConversionSelfTest();
 
    // ---- audio device recovery (config-change / sleep-wake) ----
    // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md.

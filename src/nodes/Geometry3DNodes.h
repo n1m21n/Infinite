@@ -188,6 +188,13 @@ public:
    // geometry-ish source shared one interface.
    virtual const std::vector<Particle>* GetPointCloud() { return nullptr; }
    virtual unsigned long long PointCloudRevision() { return 0; }
+   // World-space half-extent that Particle::scale (a relative multiplier, see
+   // Mesh.h) is relative to for this source's points. Render3D's sprite draw
+   // multiplies p.scale by this to get an actual world size - a source whose
+   // p.scale is already absolute (ParticleSystemNode, Distribute*, Mesh to
+   // Points) returns 1.0f; a source that documents p.scale as a 0-1-ish
+   // multiplier of its own cell size (Image to Points) returns that cell size.
+   virtual float PointBaseSize() const { return 1.0f; }
    virtual const Polyline* GetCurve() { return nullptr; }
    virtual unsigned long long CurveStamp() { return 0; }
 };

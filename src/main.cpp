@@ -25075,7 +25075,15 @@ namespace
       h = std::max(180, (int)(h * scale));
 
       glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+      // 3.3, not 3.2: glad (non-Apple loader, see below) only populates a
+      // version block's function pointers when glGetString(GL_VERSION)
+      // reports it was actually granted, and glVertexAttribDivisor - used by
+      // every instanced draw in the app - is a 3.3 entry point. A driver that
+      // honours a literal 3.2 request (Mesa-on-D3D12, some Intel iGPU/RDP/VM
+      // stacks) leaves it null, so any instanced draw is an access violation
+      // there today. All 56 shaders in the tree are #version 150 and stay
+      // valid unchanged under a 3.3 context.
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
       glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
       glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
@@ -33192,6 +33200,13 @@ static bool RunPerfPanelSelfTest()
 
 int main(int argc, char** argv)
 {
+   // No-op on macOS (which gets a `.ips` report for free); on Windows this is
+   // the only thing standing between a crash and a completely silent exit,
+   // since main.cpp links WIN32_EXECUTABLE (no console, stderr goes nowhere).
+   // Installed before any of the INFINITE_*TEST branches below too, so a
+   // crash in a headless CI fixture leaves a dump/log the same as a real run.
+   Platform::InstallCrashHandler();
+
    // Old spelling kept as an alias: the panel was renamed to the performance
    // matrix, but a shell history full of INFINITE_PERFPANELTEST is not worth
    // breaking over it.
@@ -33255,6 +33270,9 @@ int main(int argc, char** argv)
       return 0;
    }
 
+   if (getenv("INFINITE_AUDIOPCMTEST") != nullptr)
+      return Platform::AudioPcmConversionSelfTest() ? 0 : 1;
+
    // Out-of-process half of the plugin scan: describe ONE bundle and exit. The
    // parent (Platform::EnumerateVST3Plugins) re-execs us once per bundle so
    // that a plugin which cannot be loaded - damaged code pages earn an
@@ -33308,20 +33326,27 @@ int main(int argc, char** argv)
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
    {
-      fprintf(stderr, "glfwInit failed\n");
+      Platform::ShowFatalError("Infinite failed to start", "glfwInit failed.");
       return 1;
    }
    Platform::InitDocumentHandlingPostGlfw();
 
    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+   // 3.3, not 3.2 - see the matching hint block in OpenProjectorWindow() for
+   // why: glad only loads glVertexAttribDivisor (used by every instanced
+   // draw) when the context actually reports 3.3, and some drivers honour a
+   // literal 3.2 request instead of over-granting like NVIDIA/AMD desktop
+   // drivers do.
+   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
    GLFWwindow* window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
    if (!window)
    {
-      fprintf(stderr, "glfwCreateWindow failed\n");
+      Platform::ShowFatalError("Infinite failed to start",
+                               "glfwCreateWindow failed. This usually means the graphics "
+                               "driver doesn't support the OpenGL version Infinite needs.");
       glfwTerminate();
       return 1;
    }
@@ -33334,9 +33359,19 @@ int main(int argc, char** argv)
    // On Windows core/gl3.h resolves to the glad2 loader; every GL entry point
    // is a function pointer until it's populated. All other windows share this
    // context, so one load here covers the app.
-   if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress))
+   //
+   // gladLoadGL's return value is the version it *found*, not a bool against
+   // what was requested - a driver that honours a literal 3.2 hint above
+   // returns a non-zero "3.2" here, which is a success as far as this call is
+   // concerned even though glVertexAttribDivisor and the rest of GL 3.3
+   // still come back null. GLAD_GL_VERSION_3_3 is the actual gate.
+   const int gladVersion = gladLoadGL((GLADloadfunc)glfwGetProcAddress);
+   if (!gladVersion || !GLAD_GL_VERSION_3_3)
    {
-      fprintf(stderr, "gladLoadGL failed (no OpenGL 3.3+ driver?)\n");
+      Platform::ShowFatalError(
+         "Infinite failed to start",
+         "This graphics driver does not support OpenGL 3.3, which Infinite requires. "
+         "Please update your graphics driver and try again.");
       glfwTerminate();
       return 1;
    }
@@ -36144,6 +36179,17 @@ int main(int argc, char** argv)
                   snprintf(buf, sizeof(buf), "%.0f Hz", gAudioSampleRate);
                   rateLabel = buf;
                }
+#if defined(_WIN32)
+               // WASAPI shared mode (AudioDeviceWin.cpp's RenderThreadMain)
+               // always negotiates the device's own mix format - requested
+               // rate/buffer are explicitly discarded there, `(void)
+               // requestedSampleRate; (void) requestedBufferFrames;` - so
+               // these two controls have never done anything on Windows.
+               // Disabling them (rather than leaving them live and inert)
+               // is the documented decision in
+               // docs/plans/windows-render/FIX_BRIEF.md addendum A2.
+               ImGui::BeginDisabled();
+#endif
                ImGui::SetNextItemWidth(200);
                if (ImGui::BeginCombo("Sample rate", rateLabel.c_str()))
                {
@@ -36158,10 +36204,21 @@ int main(int argc, char** argv)
                   }
                   ImGui::EndCombo();
                }
+#if defined(_WIN32)
+               ImGui::EndDisabled();
+               // BeginDisabled swallows hover, so ask the rect directly -
+               // same workaround DrawModulationBindingMenu's caller uses.
+               if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
+                  ImGui::SetTooltip("Windows shared-mode audio always runs at the format set in "
+                                    "Sound settings. Change the sample rate there.");
+#endif
 
                static const int kBufferSizes[] = { 64, 128, 256, 512, 1024, 2048 };
                char bufferLabel[16];
                snprintf(bufferLabel, sizeof(bufferLabel), "%d", gAudioBufferFrames);
+#if defined(_WIN32)
+               ImGui::BeginDisabled();
+#endif
                ImGui::SetNextItemWidth(200);
                if (ImGui::BeginCombo("Buffer size", bufferLabel))
                {
@@ -36174,6 +36231,12 @@ int main(int argc, char** argv)
                   }
                   ImGui::EndCombo();
                }
+#if defined(_WIN32)
+               ImGui::EndDisabled();
+               if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
+                  ImGui::SetTooltip("Windows shared-mode audio always runs at the device's own "
+                                    "period. Change it in Sound settings.");
+#endif
                static const float kOversampleValues[] = { 1.0f, 2.0f, 4.0f };
                static const char* kOversampleLabels[] = { "1x", "2x", "4x" };
                int oversampleIdx = 0;
