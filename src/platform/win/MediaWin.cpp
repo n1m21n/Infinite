@@ -660,7 +660,8 @@ namespace Platform
       // Picks the best native type and asks the reader for it converted to
       // RGB32. Returns false with outError if nothing usable exists.
       bool ConfigureCameraFormat(IMFSourceReader* reader, CameraResolution res,
-                                 UINT32& outWidth, UINT32& outHeight, std::string& outError)
+                                 UINT32& outWidth, UINT32& outHeight, LONG& outStride,
+                                 std::string& outError)
       {
          const int targetHeight = TargetHeightForResolution(res);
          long bestScore = LONG_MAX;
@@ -718,13 +719,25 @@ namespace Platform
 
          IMFMediaType* actual = nullptr;
          UINT64 size64 = 0;
+         UINT32 strideU32 = 0;
+         bool haveStride = false;
          if (SUCCEEDED(reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM,
                                                    &actual)))
          {
             actual->GetUINT64(MF_MT_FRAME_SIZE, &size64);
+            // Same rule as the file-decode path above: MF's video processor and
+            // hardware decoders routinely pad each row out to an alignment
+            // boundary, so the real stride is whatever MF_MT_DEFAULT_STRIDE
+            // says, not width * 4. Assuming the packed value read every row
+            // from a slightly wrong offset, with the error accumulating down
+            // the image - the classic progressively-sheared frame. Widths that
+            // happen to be well aligned (1920, 1280) looked fine, which is
+            // exactly why this survived casual testing; 854x480 did not.
+            haveStride = SUCCEEDED(actual->GetUINT32(MF_MT_DEFAULT_STRIDE, &strideU32));
             SafeRelease(&actual);
          }
          UnpackFrameSize(size64, outWidth, outHeight);
+         outStride = haveStride ? (LONG)strideU32 : (LONG)outWidth * 4;
          return true;
       }
 
@@ -817,8 +830,9 @@ namespace Platform
          }
 
          UINT32 w = 0, h = 0;
+         LONG stride = 0;
          CameraResolution applied = cam->resolution;
-         if (!ConfigureCameraFormat(reader, cam->resolution, w, h, cam->error))
+         if (!ConfigureCameraFormat(reader, cam->resolution, w, h, stride, cam->error))
          {
             cam->running.store(false, std::memory_order_release);
             SafeRelease(&reader);
@@ -837,10 +851,12 @@ namespace Platform
             if (wanted >= 0 && wanted != (int)applied && wanted < (int)CameraResolution::Count)
             {
                UINT32 nw = 0, nh = 0;
+               LONG nstride = 0;
                std::string err;
-               if (ConfigureCameraFormat(reader, (CameraResolution)wanted, nw, nh, err))
+               if (ConfigureCameraFormat(reader, (CameraResolution)wanted, nw, nh, nstride, err))
                {
                   applied = (CameraResolution)wanted;
+                  stride = nstride;
                   std::lock_guard<std::mutex> lock(cam->frameMutex);
                   cam->width = (int)nw;
                   cam->height = (int)nh;
@@ -866,9 +882,11 @@ namespace Platform
                BYTE* data = nullptr;
                if (SUCCEEDED(buffer->Lock(&data, nullptr, nullptr)))
                {
-                  // Contiguous buffers are tightly packed: stride is one row.
+                  // Negotiated stride, never an assumed width * 4. A negative
+                  // value means bottom-up, which is RGB32's default and what
+                  // the "Flipped" in this helper already handles.
                   std::vector<unsigned char> rgba;
-                  Rgb32ToRgbaFlipped(data, (LONG)(w * 4), (int)w, (int)h,
+                  Rgb32ToRgbaFlipped(data, stride != 0 ? stride : (LONG)(w * 4), (int)w, (int)h,
                                      cam->mirrorX.load(std::memory_order_relaxed), rgba);
                   buffer->Unlock();
 
@@ -882,15 +900,22 @@ namespace Platform
             }
             SafeRelease(&sample);
 
-            // Re-read the negotiated size if a resolution change landed.
+            // Re-read the negotiated size if a resolution change landed. The
+            // stride has to be re-read with it: a new frame size renegotiates
+            // the row padding too, and a stale stride shears every frame after
+            // the switch.
             IMFMediaType* actual = nullptr;
             UINT64 size64 = 0;
             if (SUCCEEDED(reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM,
                                                       &actual)))
             {
                actual->GetUINT64(MF_MT_FRAME_SIZE, &size64);
+               UINT32 strideU32 = 0;
+               const bool haveStride =
+                  SUCCEEDED(actual->GetUINT32(MF_MT_DEFAULT_STRIDE, &strideU32));
                SafeRelease(&actual);
                UnpackFrameSize(size64, w, h);
+               stride = haveStride ? (LONG)strideU32 : (LONG)w * 4;
             }
          }
 

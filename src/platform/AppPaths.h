@@ -1,14 +1,24 @@
 #pragma once
 
+#include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <string>
+
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #if defined(_WIN32)
    #include <direct.h>
    #define APPPATHS_MKDIR(p) _mkdir(p)
+   #define APPPATHS_STAT_T struct _stat
+   #define APPPATHS_STAT(p, sb) _stat(p, sb)
+   #define APPPATHS_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
 #else
-   #include <sys/stat.h>
    #define APPPATHS_MKDIR(p) mkdir(p, 0755)
+   #define APPPATHS_STAT_T struct stat
+   #define APPPATHS_STAT(p, sb) stat(p, sb)
+   #define APPPATHS_ISDIR(m) S_ISDIR(m)
 #endif
 
 // Portable replacements for the getenv("HOME")-based paths the macOS build
@@ -32,14 +42,34 @@ namespace AppPaths
       return {};
    }
 
+   // True when `path` exists and is a directory.
+   inline bool DirExists(const std::string& path)
+   {
+      if (path.empty())
+         return false;
+      APPPATHS_STAT_T sb {};
+      return APPPATHS_STAT(path.c_str(), &sb) == 0 && APPPATHS_ISDIR(sb.st_mode);
+   }
+
    // Creates a directory (no-op if it already exists). Returns true when the
    // directory exists afterwards.
+   //
+   // The mkdir RESULT is deliberately not what's returned: it fails with
+   // EEXIST on the overwhelmingly common already-there path. Only the state
+   // afterwards is meaningful. This used to `return true` unconditionally,
+   // which made the doc comment above a lie and, worse, made an unwritable
+   // settings directory invisible - AppSupportDir() handed back a path that
+   // could not be written, so autosave silently no-opped for a whole session
+   // and the user found out only after a crash, when there was nothing to
+   // recover.
    inline bool EnsureDir(const std::string& path)
    {
       if (path.empty())
          return false;
+      if (DirExists(path))
+         return true;
       APPPATHS_MKDIR(path.c_str());
-      return true;
+      return DirExists(path);
    }
 
    // The app's per-user settings directory, created if missing. Callers that
@@ -65,8 +95,55 @@ namespace AppPaths
          return {};
       std::string dir = home + "/Library/Application Support/Infinite";
 #endif
-      EnsureDir(dir);
+      // An unusable settings directory returns empty rather than a path that
+      // silently swallows every write. Every caller already handles the empty
+      // case (they all guard with `dir.empty()`), so this turns a silent
+      // data-loss mode into the no-settings-available path they already have.
+      if (!EnsureDir(dir))
+         return {};
       return dir;
+   }
+
+   // One-shot migration for state that predates the AppSupportDir() layout.
+   //
+   // Routing every settings path through AppSupportDir() relocated two files
+   // that already existed on every macOS install:
+   //     ~/Library/Application Support/Infinite.theme
+   //     ~/Library/Application Support/Infinite.recents
+   // which moved into the new per-app subdirectory. The new layout is better,
+   // so this migrates rather than reverts: if the new path is absent and the
+   // old one is present, move it across once. Rename first (atomic, and free
+   // within a filesystem), copy+unlink as a fallback for the cross-device
+   // case. On Windows there is no old path, so this is a no-op there.
+   //
+   // Safe to call on every load: it does nothing once the new file exists.
+   inline void MigrateLegacyFile(const std::string& oldPath, const std::string& newPath)
+   {
+      if (oldPath.empty() || newPath.empty())
+         return;
+
+      APPPATHS_STAT_T sb {};
+      if (APPPATHS_STAT(newPath.c_str(), &sb) == 0)
+         return; // already migrated, or the user has newer state - leave it
+      if (APPPATHS_STAT(oldPath.c_str(), &sb) != 0)
+         return; // nothing to migrate
+
+      if (std::rename(oldPath.c_str(), newPath.c_str()) == 0)
+         return;
+
+      std::ifstream in(oldPath, std::ios::binary);
+      if (!in)
+         return;
+      std::ofstream out(newPath, std::ios::binary);
+      if (!out)
+         return;
+      out << in.rdbuf();
+      if (out.good())
+      {
+         out.close();
+         in.close();
+         std::remove(oldPath.c_str());
+      }
    }
 
    // A writable scratch directory for test fixtures. POSIX builds kept using

@@ -86,6 +86,21 @@ namespace
       std::vector<std::string> deviceNames;
 
       // Note ring - written on WinMM callback threads, read anywhere.
+      //
+      // MidiStart() opens EVERY installed device with CALLBACK_FUNCTION, and
+      // WinMM delivers each open device's messages on its own thread. So this
+      // is multi-producer, not the single-producer ring its load/store pair
+      // was written for: two controllers could claim the same idx, write the
+      // same slot, and lose one increment - dropped and torn notes exactly
+      // when a performer has more than one controller plugged in.
+      //
+      // Producers are serialised on ringMutex rather than made lock-free:
+      // note traffic is a few hundred messages a second at worst, and keeping
+      // the single release-store on ringWrite preserves the publish barrier
+      // the (single-consumer, lock-free) reader below already relies on.
+      // This is deliberately NOT gState.mutex - the 0x80 Note Off path calls
+      // PublishNote while already holding that one.
+      std::mutex ringMutex;
       NoteRingSlot ring[kNoteRingCapacity];
       std::atomic<uint64_t> ringWrite{ 0 };
    };
@@ -167,6 +182,7 @@ namespace
 
    void PublishNote(unsigned int deviceIdPlusOne, int channel, int note, float velocity01, bool isNoteOn)
    {
+      std::lock_guard<std::mutex> lock(gState.ringMutex);
       const uint64_t idx = gState.ringWrite.load(std::memory_order_relaxed);
       NoteRingSlot& slot = gState.ring[idx % kNoteRingCapacity];
       slot.msg.device = deviceIdPlusOne;
@@ -182,6 +198,32 @@ namespace
    {
       const unsigned int dev = (unsigned int)deviceId + 1;
       const BYTE status = (BYTE)(param & 0xFF);
+
+      // System Real-Time (0xF8..0xFF) and System Common (0xF0..0xF7) are NOT
+      // channel messages: their low nibble is part of the message identity,
+      // not a channel number. Masking with 0xF0 first can only ever yield
+      // 0x80/0x90/0xA0/0xB0/0xC0/0xD0/0xE0/0xF0, so a switch on the masked
+      // value can never reach 0xF8/0xFA/0xFC and every clock case below was
+      // dead code - MidiClockIsPresent() was permanently false on Windows
+      // while macOS (Platform.mm, which tests the raw status first) synced
+      // fine. Dispatch on the full status byte before masking.
+      if (status >= 0xF0)
+      {
+         switch (status)
+         {
+            case 0xF8: // Timing clock
+               gClock.Pulse();
+               break;
+            case 0xFA: // Start
+            case 0xFC: // Stop
+               gClock.Reset();
+               break;
+            default:
+               break;
+         }
+         return;
+      }
+
       const BYTE type = status & 0xF0;
       const int channel = status & 0x0F;
       const BYTE d1 = (BYTE)((param >> 8) & 0xFF);
@@ -238,13 +280,6 @@ namespace
             gState.lastTouchedPending = true;
             break;
          }
-         case 0xF8: // Timing clock
-            gClock.Pulse();
-            break;
-         case 0xFA: // Start
-         case 0xFC: // Stop
-            gClock.Reset();
-            break;
          default:
             break;
       }

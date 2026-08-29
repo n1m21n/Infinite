@@ -25,6 +25,17 @@ cleanly is not evidence of anything here.
 
 ## Part 1 — Known defects
 
+> **Status, 2026-08-29.** 1.2 through 1.9 and 1.11 are now fixed in the tree;
+> each block below is kept for the mechanism and the reproduction, which stay
+> the reference for anyone touching that code again. What remains open is the
+> *verification* side, not the code: every Windows fix here was written and
+> reviewed on macOS and is still unfalsified on Windows hardware. 1.4 in
+> particular has no fixture on either platform (pillar P14 is still grade D) -
+> the `INFINITE_GLYPHMETRICSTEST` in the pillar-parity-audit backlog is what
+> would close it. Treat Part 2's manual pass as required before trusting any
+> of them.
+
+
 Each block is written to be pasted into a fresh Claude Code session as-is: it
 names the file, the mechanism, the fix direction, and the check that proves it.
 
@@ -33,13 +44,13 @@ Severity, briefly:
 | # | Defect | Effect |
 |---|---|---|
 | 1.1 | `PortableFft::Inverse` is not the inverse of `Forward` | PaulStretch emits reversed, corrupted audio |
-| 1.2 | Audio device open failure leaves a joinable `std::thread` | `std::terminate()` — hard crash, no dialog |
-| 1.3 | MIDI clock cases are unreachable | external clock/BPM sync silently never works |
-| 1.4 | Cap height measured from the wrong glyph | all text renders at the wrong size |
-| 1.5 | Settings paths moved | existing macOS users lose theme + recents |
-| 1.6 | Analyser `low`/`mid`/`high` from wrong bands | Audio Analyze drives visuals wrongly |
-| 1.7 | Media Foundation stride assumed to be `width*4` | skewed video/camera at some frame widths |
-| 1.8 | MIDI note ring has N producers, not 1 | dropped/torn notes with 2+ controllers |
+| 1.2 | Audio device open failure leaves a joinable `std::thread` | `std::terminate()` — hard crash, no dialog (fixed) |
+| 1.3 | MIDI clock cases are unreachable | external clock/BPM sync silently never works (fixed) |
+| 1.4 | Cap height measured from the wrong glyph | all text renders at the wrong size (fixed) |
+| 1.5 | Settings paths moved | existing macOS users lose theme + recents (fixed, migrates on load) |
+| 1.6 | Analyser `low`/`mid`/`high` from wrong bands | Audio Analyze drives visuals wrongly (fixed) |
+| 1.7 | Media Foundation stride assumed to be `width*4` | skewed video/camera at some frame widths (fixed) |
+| 1.8 | MIDI note ring has N producers, not 1 | dropped/torn notes with 2+ controllers (fixed) |
 | 1.9 | Capture-thread races | data race, and a use-after-free on the audio thread (fixed) |
 | 1.10 | Assorted smaller items | see the block |
 | 1.11 | Exe imported the VC++ redist CRT | wouldn't launch on a clean Windows install (fixed) |
@@ -90,7 +101,7 @@ corrupted audio. AnalyzeNodes.cpp uses Forward() only, so the spectrum
 display is unaffected.
 ```
 
-### 1.2 A failed audio-device open makes the app call `std::terminate()` (blocker)
+### 1.2 A failed audio-device open makes the app call `std::terminate()` (fixed)
 
 ```
 src/platform/win/AudioDeviceWin.cpp - RenderState::Stop() decides whether to
@@ -143,7 +154,7 @@ format is not IEEE float, or start something that grabs the default output in
 exclusive mode (many ASIO drivers, some players), then switch devices.
 ```
 
-### 1.3 MIDI clock handling is unreachable code (blocker for clock sync)
+### 1.3 MIDI clock handling is unreachable code (fixed)
 
 ```
 src/platform/win/MidiWin.cpp, HandleShortMessage(). The function computes
@@ -174,7 +185,7 @@ test that does not have a clock master attached, so it needs the note in the
 handoff rather than a fixture.
 ```
 
-### 1.4 Text cap height is measured from the wrong glyph (blocker for visual parity)
+### 1.4 Text cap height is measured from the wrong glyph (fixed)
 
 ```
 src/platform/win/PlatformWin.cpp, GetTextOutlines(). The first pass measures
@@ -227,7 +238,7 @@ fails on Windows today. The existing INFINITE_TEXTFIT fixture cannot serve
 here: it runs at frame 4, well after glfwInit().
 ```
 
-### 1.5 Settings paths moved, losing existing macOS users' state
+### 1.5 Settings paths moved, losing existing macOS users' state (fixed)
 
 ```
 PR #8 routed every settings path through AppPaths::AppSupportDir(), which
@@ -253,7 +264,7 @@ explains why nothing may be written next to the executable on macOS - keep
 that property.
 ```
 
-### 1.6 The input analyser's low/mid/high bands do not match macOS
+### 1.6 The input analyser's low/mid/high bands do not match macOS (fixed)
 
 ```
 src/platform/win/AudioDeviceWin.cpp, AnalyserEngine::RunAnalysis() derives
@@ -294,7 +305,7 @@ Platform.mm's rangeEnergy/shape/Smooth so the two paths agree by
 construction rather than by tuning.
 ```
 
-### 1.7 Media Foundation stride is assumed to equal `width * 4`
+### 1.7 Media Foundation stride is assumed to equal `width * 4` (fixed)
 
 ```
 src/platform/win/MediaWin.cpp hardcodes the row stride at two places:
@@ -323,7 +334,7 @@ consistent. Prefer IMF2DBuffer2/IMF2DBuffer::Lock2D where available, since it
 reports the stride directly.
 ```
 
-### 1.8 The MIDI note ring is single-producer but has N producers
+### 1.8 The MIDI note ring is single-producer but has N producers (fixed)
 
 ```
 src/platform/win/MidiWin.cpp. MidiStart() opens EVERY installed midiIn

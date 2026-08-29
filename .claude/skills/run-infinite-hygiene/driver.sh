@@ -5,9 +5,10 @@
 # (src/main.cpp, search `getenv("INFINITE_`) through the real compiled
 # .app binary — real ImGui frames, real GL draws, real node graph, not a
 # mock. Each test spawns a small fixture graph, runs it for N frames, and
-# printf's a verdict line ending in "OK", containing "FAIL", or ending in
-# "BUG". This script greps for the failure markers and reports pass/fail
-# per check.
+# printf's a verdict line ending in "OK"/"PASS"/"SKIP", containing "FAIL", or
+# naming a failure ("... - BUG", "SUSPECT", "MISMATCH"). This script greps for
+# the failure markers, requires a positive verdict to be present at all, and
+# reports pass/fail per check.
 #
 # Usage:
 #   .claude/skills/run-infinite-hygiene/driver.sh              # full suite
@@ -37,7 +38,16 @@ for arg in "$@"; do
   esac
 done
 
-FAIL_MARK='FAIL|BUG$'
+# Fixture verdicts are not uniform: the failure branch of a ternary is
+# sometimes "FAIL", sometimes "... - BUG", and in 56 places in main.cpp it is
+# a bare word like "SUSPECT" or "MISMATCH". Grepping only for FAIL|BUG meant
+# every one of those failed silently and the gate stayed green - MACROTEST
+# printed MISMATCH for as long as its expectation had been stale and this
+# script called it a pass. Match every negative form the harness actually
+# emits, and separately require a positive verdict (below), so a fixture that
+# dies before printing anything can no longer masquerade as a pass either.
+FAIL_MARK='FAIL|BUG$|MISMATCH|SUSPECT|DID NOT MOVE|TONE MISSING'
+PASS_MARK=' OK$|OK$|PASS$|SKIP$|CLEAN$'
 PASS=0
 FAIL=0
 FAILED_NAMES=()
@@ -235,8 +245,13 @@ for spec in "${TESTS[@]}"; do
     echo "  [FAIL]  $name — see $out"
     grep -E "$FAIL_MARK" "$out" | sed 's/^/          /'
     FAIL=$((FAIL+1)); FAILED_NAMES+=("$name")
+  elif ! grep -qE "$PASS_MARK" "$out"; then
+    # No failure marker AND no verdict at all: the fixture never reached its
+    # assertion. Silence is not a pass.
+    echo "  [FAIL]  $name — no verdict printed, see $out"
+    FAIL=$((FAIL+1)); FAILED_NAMES+=("$name (no verdict)")
   else
-    verdict=$(grep -E ' OK$' "$out" | tail -1)
+    verdict=$(grep -E "$PASS_MARK" "$out" | tail -1)
     echo "  [pass]  $name  ${verdict:+— $verdict}"
     PASS=$((PASS+1))
   fi

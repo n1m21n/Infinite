@@ -23,7 +23,16 @@ namespace
    std::string RecentsPath()
    {
       std::string dir = AppPaths::AppSupportDir();
-      return dir.empty() ? std::string() : dir + "/Infinite.recents";
+      if (dir.empty())
+         return std::string();
+      const std::string path = dir + "/Infinite.recents";
+      // See ThemePath() in CategoryColors.cpp: same one-shot migration from the
+      // flat pre-AppSupportDir location, so the recent-patch list survives the
+      // upgrade instead of resetting on first launch.
+      const std::string home = AppPaths::HomeDir();
+      if (!home.empty())
+         AppPaths::MigrateLegacyFile(home + "/Library/Application Support/Infinite.recents", path);
+      return path;
    }
 
    // Written with %.9g so a float survives the round trip exactly rather than

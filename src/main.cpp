@@ -23603,6 +23603,16 @@ namespace
    // ---- autosave / crash recovery ----
    bool gAutosaveEnabled = true;
    int gAutosaveSeconds = 60;
+
+   // Set when a periodic autosave write fails (unwritable settings directory,
+   // full disk, revoked permissions). PollAutosave() used to discard
+   // WriteAutosaveNow()'s result entirely, so autosave could no-op on every
+   // frame for an entire session and the user found out only after a crash,
+   // when the recovery prompt had nothing to offer. Surfaced in the Autosave
+   // menu and logged once, so the failure is visible while there is still a
+   // session left to save by hand.
+   bool gAutosaveFailed = false;
+   bool gAutosaveFailureLogged = false;
    double gLastAutosaveTime = 0.0;
 
    // Set once at startup (CheckAutosaveRecovery) when the previous run's
@@ -23899,7 +23909,19 @@ namespace
       if (gLastAutosaveTime > 0.0 && now - gLastAutosaveTime < (double)gAutosaveSeconds)
          return;
       gLastAutosaveTime = now;
-      WriteAutosaveNow();
+      const bool wrote = WriteAutosaveNow();
+      gAutosaveFailed = !wrote;
+      if (!wrote && !gAutosaveFailureLogged)
+      {
+         gAutosaveFailureLogged = true;
+         const std::string path = AutosavePath();
+         Platform::AppendLogLine(
+            "autosave write failed" +
+            (path.empty() ? std::string(" (no writable settings directory)")
+                          : std::string(" (") + path + ")"));
+      }
+      if (wrote)
+         gAutosaveFailureLogged = false;
    }
 
    // Called once at startup, after the graph and GL are initialised but
@@ -36389,6 +36411,19 @@ int main(int argc, char** argv)
 
             if (ImGui::BeginMenu("Autosave"))
             {
+               if (gAutosaveFailed)
+               {
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.35f, 1.0f));
+                  ImGui::TextUnformatted("Autosave is FAILING - save manually");
+                  ImGui::PopStyleColor();
+                  if (ImGui::IsItemHovered())
+                  {
+                     const std::string path = AutosavePath();
+                     ImGui::SetTooltip("Could not write %s.\nCheck permissions and free disk space.",
+                                       path.empty() ? "the settings directory" : path.c_str());
+                  }
+                  ImGui::Separator();
+               }
                if (ImGui::Checkbox("Autosave enabled", &gAutosaveEnabled))
                   SaveAutosaveSettings();
                ImGui::SetNextItemWidth(150);
@@ -42427,14 +42462,34 @@ int main(int argc, char** argv)
          printf("frame %d: instances=%zu  arrayTris=%zu  rendered=%zu tris in %zu draw calls, %zu uploads, %.2f ms/frame\n",
                 frameId, inst->InstanceCount(), op->TriangleCount(),
                 r->LastTriangleCount(), r->LastDrawCalls(), r->LastUploads(), gLastFrameMs);
+         static size_t sUploadsAtFrame4 = 0;
          if (frameId == 4)
+         {
+            sUploadsAtFrame4 = r->LastUploads();
             printf("%s\n", (inst->InstanceCount() > 100 && op->TriangleCount() > 100 &&
                              r->LastDrawCalls() <= 2) ? "INSTANCING + OPS OK" : "SUSPECT");
+         }
          else
-            // Nothing in this fixture animates, so a steady frame must re-upload
-            // nothing at all; any upload here means the mesh stamps are churning.
-            printf("%s\n", r->LastUploads() == 0 ? "MESH UPLOAD CACHING OK"
-                                                 : "SUSPECT - re-uploading a static mesh");
+         {
+            // Nothing in this fixture animates, so no upload may happen BETWEEN
+            // the two sample frames; any increase means the mesh stamps are
+            // churning.
+            //
+            // The invariant is the DELTA, not "== 0". mLastUploads is reset at
+            // the top of Render3DNode's draw and counts uploads within that one
+            // pass - so when the cache works perfectly the node skips the whole
+            // pass, the reset never runs, and the counter still reads whatever
+            // the last real render uploaded (3, at startup). Asserting == 0 here
+            // could not tell "never re-rendered", which is the ideal outcome,
+            // apart from "re-rendered and uploaded 3", which is the bug. It read
+            // SUSPECT on a perfectly-behaving cache, and the old hygiene gate
+            // matched only FAIL|BUG so nobody saw it say so.
+            const size_t delta = r->LastUploads() - std::min(r->LastUploads(), sUploadsAtFrame4);
+            printf("uploads frame4=%zu frame10=%zu delta=%zu\n",
+                   sUploadsAtFrame4, r->LastUploads(), delta);
+            printf("%s\n", delta == 0 ? "MESH UPLOAD CACHING OK"
+                                       : "SUSPECT - re-uploading a static mesh");
+         }
       }
 
       if (getenv("INFINITE_DISPLACETEST") != nullptr && frameId == 6)
@@ -47095,14 +47150,17 @@ int main(int argc, char** argv)
          }
          if (frameId == 5)
          {
-            printf("padX=%.2f -> size=%.4f (expect %.4f)\n", xy->padX, sh->sizeX, 0.01f + 0.49f * 0.25f);
+            // "size x" is a ModSlider over 0.01f..1.0f (see DrawShapeBody);
+            // the expectation must be derived from that same span, not from a
+            // hardcoded max that silently goes stale when the slider widens.
+            printf("padX=%.2f -> size=%.4f (expect %.4f)\n", xy->padX, sh->sizeX, 0.01f + 0.99f * 0.25f);
             printf("padY=%.2f -> rotation=%.4f (expect %.4f)\n", xy->padY, sh->rotation, -180.0f + 360.0f * 0.75f);
             xy->padX = 0.9f; xy->padY = 0.1f;
          }
          if (frameId == 8)
          {
             printf("after move: size=%.4f rotation=%.4f  %s\n", sh->sizeX, sh->rotation,
-                   (std::fabs(sh->sizeX - (0.01f + 0.49f * 0.9f)) < 0.01f &&
+                   (std::fabs(sh->sizeX - (0.01f + 0.99f * 0.9f)) < 0.01f &&
                     std::fabs(sh->rotation - (-180.0f + 360.0f * 0.1f)) < 3.0f)
                       ? "INDEPENDENT OUTPUTS OK" : "MISMATCH");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
