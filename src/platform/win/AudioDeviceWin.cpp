@@ -844,6 +844,15 @@ namespace
       int channels = 0;
       std::string error;
       WORD pcmBits = 0;    // 0 = float mix format; 16/32 = PCM, see IsSupportedPcmFormat
+      // Scratch for ThreadMain's PCM conversion and silence fill. Per-instance,
+      // NOT function-local statics: gAnalyser and gTap are two separate
+      // CaptureEngineBase objects, each with its own ThreadMain thread, and
+      // they can be live at the same time (an Audio In node while audio-
+      // reactive analysis runs). A shared static would have both threads
+      // resize/write the same vector, which is a data race and, on a
+      // reallocation, a use-after-free in whichever thread is mid-read.
+      std::vector<float> pcmScratch;
+      std::vector<float> silenceScratch;
 
       virtual ~CaptureEngineBase() = default;
       virtual void OnFormat(double rate, int chs) = 0;
@@ -1034,10 +1043,9 @@ namespace
                   {
                      if (pcmBits != 0)
                      {
-                        static std::vector<float> converted;
                         InterleavedPcmToFloat(data, fmt->nChannels, (int)packetFrames, pcmBits,
-                                             converted);
-                        OnFrames(converted.data(), (int)packetFrames);
+                                              pcmScratch);
+                        OnFrames(pcmScratch.data(), (int)packetFrames);
                      }
                      else
                      {
@@ -1047,9 +1055,8 @@ namespace
                   else
                   {
                      // Silence packet still advances the analysis clock.
-                     static std::vector<float> silence;
-                     silence.resize((size_t)packetFrames * fmt->nChannels, 0.0f);
-                     OnFrames(silence.data(), (int)packetFrames);
+                     silenceScratch.assign((size_t)packetFrames * fmt->nChannels, 0.0f);
+                     OnFrames(silenceScratch.data(), (int)packetFrames);
                   }
 
                   capture->ReleaseBuffer(packetFrames);

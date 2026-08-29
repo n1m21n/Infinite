@@ -239,10 +239,15 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "glob " << g.name << " " << EscapeLine(g.expr) << "\n";
    if (data.perfLayout.cellSize != 76 || data.perfLayout.pageCount > 1 || !data.perfLayout.pageNames.empty())
    {
-      file << "perfui " << data.perfLayout.cellSize << " " << data.perfLayout.pageCount;
-      for (const auto& name : data.perfLayout.pageNames)
-         file << " " << EscapeLine(name);
-      file << "\n";
+      // Names go on their own `perfname` lines, one per page, rather than as
+      // trailing tokens here. EscapeLine escapes backslashes and newlines but
+      // NOT spaces, and every default page name has one ("Page 1", "Master
+      // FX", "<name> Copy"), so the old trailing-token form split a single
+      // name into several on reload. Free-form text has to be last on its own
+      // line - the same rule the rest of this format already follows.
+      file << "perfui " << data.perfLayout.cellSize << " " << data.perfLayout.pageCount << "\n";
+      for (size_t i = 0; i < data.perfLayout.pageNames.size(); i++)
+         file << "perfname " << i << " " << EscapeLine(data.perfLayout.pageNames[i]) << "\n";
    }
    for (size_t i = 0; i < data.performance.size(); i++)
    {
@@ -445,10 +450,25 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       else if (tag == "perfui")
       {
          in >> outData.perfLayout.cellSize >> outData.perfLayout.pageCount;
+         // Legacy (pre-`perfname`) form: names as trailing whitespace-
+         // separated tokens. Still read so older patches keep whatever names
+         // survived that encoding; anything written since is a perfname line.
          std::string nameToken;
          while (in >> nameToken)
-         {
             outData.perfLayout.pageNames.push_back(UnescapeLine(nameToken));
+      }
+      else if (tag == "perfname")
+      {
+         int page = -1;
+         if (in >> page && page >= 0 && page < 1024)
+         {
+            std::string raw;
+            std::getline(in, raw);
+            if (!raw.empty() && raw[0] == ' ')
+               raw.erase(0, 1);
+            if ((int)outData.perfLayout.pageNames.size() <= page)
+               outData.perfLayout.pageNames.resize(page + 1);
+            outData.perfLayout.pageNames[page] = UnescapeLine(raw);
          }
       }
       else if (tag == "perf")

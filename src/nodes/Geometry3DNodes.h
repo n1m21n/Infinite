@@ -689,6 +689,12 @@ private:
    Mat4 mLightViewProj;
    GpuMesh mGpu[kSlots];
    int mLastCookFrame = -1;
+   // Last sprite-fill clamp factor this node reported (1 = not clamping).
+   // The clamp is evaluated on every instance-buffer rebuild, which for an
+   // animating cloud is every frame, so the warning is only printed when the
+   // factor actually moves - on Windows stderr is the rolling log file
+   // (CrashHandlerWin.cpp), and a per-frame line would bury everything else.
+   float mLastFillClamp = 1.0f;
    size_t mLastTriangles = 0;
    size_t mLastDrawCalls = 0;
    size_t mLastUploads = 0;

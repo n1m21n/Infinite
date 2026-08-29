@@ -38,7 +38,14 @@ namespace
             createMode = CREATE_ALWAYS;
       }
 
-      HANDLE h = CreateFileW(path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
+      // FILE_SHARE_WRITE matters: InstallCrashHandler reopens this same file as
+      // the process's stderr via _wfreopen, and the CRT opens it deny-none.
+      // Asking for FILE_SHARE_READ alone denies writers, which conflicts with
+      // that live handle and fails with ERROR_SHARING_VIOLATION - i.e. every
+      // AppendLogLine and the crash handler's own log line would silently
+      // write nothing, which is exactly the diagnostic this file exists for.
+      HANDLE h = CreateFileW(path.c_str(), FILE_APPEND_DATA,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
                              createMode, FILE_ATTRIBUTE_NORMAL, nullptr);
       if (h == INVALID_HANDLE_VALUE)
          return;
@@ -61,13 +68,19 @@ namespace
    // text log to AppPaths::AppSupportDir() + "/crash/", then lets the default
    // handler run (EXCEPTION_EXECUTE_HANDLER) so the process still terminates -
    // this is a "leave something behind" hook, not a recovery mechanism.
+   // Resolved once in InstallCrashHandler, on a healthy heap. The handler runs
+   // after something has already gone wrong - often a corrupted heap, where
+   // AppPaths::AppSupportDir()'s std::string work can deadlock or fault before
+   // it ever reaches MiniDumpWriteDump - so the crash path only reads these.
+   std::string gCrashDir;
+   std::string gLogPath;
+
    LONG WINAPI WriteCrashReport(EXCEPTION_POINTERS* info)
    {
-      const std::string appDir = AppPaths::AppSupportDir();
-      if (appDir.empty())
+      if (gCrashDir.empty())
          return EXCEPTION_EXECUTE_HANDLER;
 
-      const std::string crashDir = appDir + "/crash";
+      const std::string& crashDir = gCrashDir;
       AppPaths::EnsureDir(crashDir);
 
       SYSTEMTIME st;
@@ -102,7 +115,7 @@ namespace
                (unsigned long)code, addr,
                dumpWritten ? "dump written: " : "dump FAILED to write: ", dumpName.c_str());
       const std::string logLine = TimestampPrefix() + "[CRASH] " + msg + "\r\n";
-      AppendToFileW(WinCommon::Utf8ToWide(appDir + "/log.txt"), logLine);
+      AppendToFileW(WinCommon::Utf8ToWide(gLogPath), logLine);
 
       return EXCEPTION_EXECUTE_HANDLER;
    }
@@ -112,6 +125,15 @@ namespace Platform
 {
    void InstallCrashHandler()
    {
+      // Resolve the report paths before arming the filter - see gCrashDir.
+      {
+         const std::string dir = AppPaths::AppSupportDir();
+         if (!dir.empty())
+         {
+            gCrashDir = dir + "/crash";
+            gLogPath = dir + "/log.txt";
+         }
+      }
       SetUnhandledExceptionFilter(WriteCrashReport);
 
       // Redirects the process's actual stderr stream into the rolling log,
@@ -139,10 +161,17 @@ namespace Platform
 
    void AppendLogLine(const std::string& line)
    {
-      const std::string appDir = AppPaths::AppSupportDir();
-      if (appDir.empty())
-         return;
-      AppendToFileW(WinCommon::Utf8ToWide(appDir + "/log.txt"), TimestampPrefix() + line + "\r\n");
+      std::string logPath = gLogPath;
+      if (logPath.empty())
+      {
+         // Called before InstallCrashHandler (or with no app-support dir at
+         // all) - resolve on the spot rather than dropping the line.
+         const std::string appDir = AppPaths::AppSupportDir();
+         if (appDir.empty())
+            return;
+         logPath = appDir + "/log.txt";
+      }
+      AppendToFileW(WinCommon::Utf8ToWide(logPath), TimestampPrefix() + line + "\r\n");
    }
 
    void ShowFatalError(const std::string& title, const std::string& message)

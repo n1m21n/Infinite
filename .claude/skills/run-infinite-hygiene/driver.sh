@@ -94,6 +94,11 @@ TESTS=(
   "VIDEOSPEEDTEST:186"
   "DRAGTEST:35"
   "WTDRAGTEST:35"
+  # Spawns every registered node type with both param sections forced open and
+  # asserts no node hands two of its controls the same pin id - which used to
+  # hang the app outright (circular pin list in imgui-node-editor). Needs the
+  # bodies open, so ROUNDTRIPTEST's collapsed pass does not cover it.
+  "PINDUPTEST:10"
   "AUDIOPARAMSWEEPTEST:1"
   "AUDIOTEARDOWNSWEEPTEST:10"
   # Headless (exits before glfwInit), like AUDIOPARAMSWEEPTEST above.

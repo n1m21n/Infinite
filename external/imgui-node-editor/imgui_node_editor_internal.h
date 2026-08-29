@@ -308,6 +308,13 @@ struct Pin final: Object
     bool    m_SnapLinkToDir;
     bool    m_HasConnection;
     bool    m_HadConnection;
+    // --- Infinite local change ---
+    // ImGui frame this pin was last emitted in, so NodeBuilder::BeginPin can
+    // tell "first emission this frame" from "this id was already emitted this
+    // frame" - see the duplicate-id guard there. m_IsLive can't answer that:
+    // Object's constructor sets it to true, so a pin's very first emission
+    // would read as a duplicate.
+    int     m_LastEmittedFrame;
 
     Pin(EditorContext* editor, PinId id, PinKind kind)
         : Object(editor)
@@ -316,6 +323,7 @@ struct Pin final: Object
         , m_Node(nullptr)
         , m_Bounds()
         , m_PreviousPin(nullptr)
+        , m_LastEmittedFrame(-1)
         , m_Color(IM_COL32_WHITE)
         , m_BorderColor(IM_COL32_BLACK)
         , m_BorderWidth(0)

@@ -39,11 +39,11 @@ with an unambiguous machine-checkable verdict — and greps for the failure
 markers. See `ARCHITECTURE.md`'s "Dev/Test Harness" section for where this
 code lives.
 
-The 46 were picked to cover, category by category:
+The checks were picked to cover, category by category:
 
 | Area | Checks |
 |---|---|
-| Core engine (undo, patch format) | UNDOTEST, PATCHTEST, ROUNDTRIPTEST (167 node types, copy/paste + save/load) |
+| Core engine (undo, patch format) | UNDOTEST, PATCHTEST, ROUNDTRIPTEST (all registered node types, copy/paste + save/load), PINDUPTEST (every node type drawn expanded, no duplicate pin ids) |
 | Editor UI | GROUPTEST, COMMENTTEST, HIDETEST, SELECTTEST, DRAGTEST |
 | Per-node mini viewport | MINIVIEWPORTTEST (NodeViewport solo-renders a Select node's own mesh + selection overlay, independent of a plain untouched sibling) |
 | Params / modulation / color | COLORTEST, MACROTEST, PALETTETEST, BYPASSTEST |

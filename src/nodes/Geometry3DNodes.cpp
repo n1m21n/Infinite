@@ -1863,11 +1863,15 @@ void Render3DNode::CookIfNeeded(int frameId)
          if (estimatedFill > kFillBudget && perSpriteArea > 0.0)
          {
             clampScale = (float)std::sqrt(kFillBudget / estimatedFill);
-            fprintf(stderr,
-                    "Render3D: point cloud sprite fill ~%.3g px/frame (budget %.3g) - "
-                    "clamping sprite radius by %.4fx to stay under it\n",
-                    estimatedFill, kFillBudget, clampScale);
+            if (std::fabs(clampScale - mLastFillClamp) > 0.01f * std::max(clampScale, 1e-3f))
+            {
+               fprintf(stderr,
+                       "Render3D: point cloud sprite fill ~%.3g px/frame (budget %.3g) - "
+                       "clamping sprite radius by %.4fx to stay under it\n",
+                       estimatedFill, kFillBudget, clampScale);
+            }
          }
+         mLastFillClamp = clampScale;
 
          std::vector<Mat4> xforms;
          std::vector<float> colors;

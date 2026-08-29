@@ -1134,8 +1134,41 @@ namespace
    std::map<std::pair<int, std::string>, int> gDiscreteSlotByLabel;
    std::map<std::pair<int, int>, std::string> gDiscreteLabelBySlot;
 
-   int DiscreteParamSlot(int nodeIndex, const std::string& label)
+   // Set while a node draws a repeated sub-panel (a Wavetable engine column,
+   // and anything else that draws the same set of controls more than once in
+   // one node). Discrete params take their ordinal from a hash of their label
+   // alone, so two sub-panels drawing the same label collapse onto one slot -
+   // one pin id emitted twice in one frame. imgui-node-editor links a node's
+   // pins into a list as they are emitted, so the second emission makes the
+   // list circular and the next hit-test pass spins forever: a hard hang, on
+   // any patch containing that node, as soon as the cursor is over the canvas.
+   // (BeginPin also guards against this now - see the duplicate-id block in
+   // imgui_node_editor.cpp - but that guard costs the second control its pin,
+   // so the ids still have to be distinct here.)
+   //
+   // ImGui::PushID() does not help: it scopes widget ids, not these ordinals.
+   //
+   // The first sub-panel deliberately keeps the empty scope, so its slots hash
+   // exactly as they did before this existed and every binding in an already-
+   // saved patch still resolves to the same control.
+   std::string gDiscreteSlotScope;
+
+   struct DiscreteSlotScope
    {
+      std::string saved;
+      explicit DiscreteSlotScope(int subPanelIndex)
+         : saved(gDiscreteSlotScope)
+      {
+         if (subPanelIndex > 0)
+            gDiscreteSlotScope = saved + "#" + std::to_string(subPanelIndex);
+      }
+      ~DiscreteSlotScope() { gDiscreteSlotScope = saved; }
+   };
+
+   int DiscreteParamSlot(int nodeIndex, const std::string& rawLabel)
+   {
+      const std::string label = gDiscreteSlotScope.empty() ? rawLabel
+                                                           : rawLabel + gDiscreteSlotScope;
       const std::pair<int, std::string> key(nodeIndex, label);
       const auto cached = gDiscreteSlotByLabel.find(key);
       if (cached != gDiscreteSlotByLabel.end())
@@ -8570,6 +8603,12 @@ namespace
    void DrawWavetableEngineColumn(WavetableNode* n, int e)
    {
       WavetableEngine& eng = n->engines[e];
+
+      // Engine B's dropdowns and checkboxes carry the same labels as engine
+      // A's ("wtTable", "wtOct", "wtSemi", "wtFilter", "wtWarp", "##wtOn"),
+      // which without this puts both engines' copy of each on one discrete
+      // slot and one pin id - see DiscreteSlotScope.
+      DiscreteSlotScope discreteScope(e);
 
       // Every widget below exists twice on this node, once per engine, and
       // ImGui identifies widgets by their label. Without this the two columns'
@@ -22649,6 +22688,7 @@ namespace
          { "Edit & Canvas", "Delete", "Delete / Backspace / Shift+X", "Delete selected nodes, groups, or links" },
          { "Edit & Canvas", "Delete Cable", "X", "Delete selected cable/link only" },
          { "Edit & Canvas", "Select All", "Shift+A", "Select all nodes on the canvas" },
+         { "Edit & Canvas", "Bypass Selection", "B", "Toggle bypass (power off) on the selected nodes" },
          { "Edit & Canvas", "Group Selection", MODKEY "+G", "Wrap selected nodes in a group box" },
          { "Edit & Canvas", "Ungroup", MODKEY "+Shift+G", "Dissolve group without deleting nodes" },
          { "Edit & Canvas", "Add Node", "Shift+N", "Open quick type-to-filter node picker" },
@@ -23185,9 +23225,16 @@ namespace
             NoteCable* cable = gn.node->NoteInputSlot(slot);
             if (cable != nullptr && cable->IsConnected())
             {
-               INode* resolved = ResolvedAudioSource(cable->GetSource());
-               if (resolved != nullptr)
-                  CollectAudioChain(resolved, visited, order, bufferIndexOf);
+               // Seed with the CONSUMER, not with cable->GetSource(): the
+               // consumer is the node this loop exists to reach (an Envelope
+               // driving a visual param has no audio cable anywhere, so the
+               // Audio Out walk above never finds it), and CollectAudioChain
+               // already walks its inputs first. Seeding with the source
+               // instead would collect the producer and silently drop the
+               // consumer's own entry. Bypass needs no handling here -
+               // CollectAudioChain resolves each input through
+               // ResolvedAudioSource and skips adding a bypassed node itself.
+               CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf);
             }
          }
       }
@@ -33484,6 +33531,24 @@ int main(int argc, char** argv)
    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
+   // Dev/test harness runs (INFINITE_EXITAFTER) create the window off-screen:
+   // a hidden window still has a real GL context and still produces real ImGui
+   // frames and GL draws, but it never steals focus from whatever the person
+   // running the suite is actually doing, and - because WindowServer isn't
+   // waiting on it - a slow frame no longer trips the 10-second unresponsive
+   // watchdog that writes a "hang" spindump to the Desktop.
+   //
+   // Screenshot mode is the one exception: it glReadPixels the default
+   // framebuffer, which needs a real on-screen drawable.
+   const bool gHeadlessTestWindow = getenv("INFINITE_EXITAFTER") != nullptr &&
+                                    getenv("IMAGERESYNTH_SCREENSHOT") == nullptr;
+   if (gHeadlessTestWindow)
+   {
+      glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+      glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
+      glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
+   }
+
    GLFWwindow* window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
    if (!window)
    {
@@ -33982,6 +34047,63 @@ int main(int argc, char** argv)
 
          gMediaScanner.AddFolder(TmpPath("infinite_mediadrag"));
          gMediaScanner.StartScan();
+      }
+      else if (getenv("INFINITE_PINDUPTEST") != nullptr)
+      {
+         // Duplicate-pin-id regression fixture.
+         //
+         // A node that hands two of its own controls the same pin id used to
+         // hang the whole app: imgui-node-editor links a node's pins into a
+         // list as they are emitted, so emitting one id twice in a frame made
+         // that list circular and every later walk of it (the hit-test pass,
+         // the bounds pass, the drag scan) spun forever inside one frame -
+         // 100% CPU, no crash, no visual artefact, reported by users only as
+         // a system "hang". That is how the Wavetable node's two engine
+         // columns shipped: both engines' "wtTable"/"wtOct"/"wtSemi"/
+         // "wtFilter"/"wtWarp"/"##wtOn" hashed to one discrete slot.
+         //
+         // BeginPin now refuses the second link and counts it instead, so the
+         // failure mode is a warning - and this fixture is what reads that
+         // counter, because a warning nobody checks is a warning nobody sees.
+         //
+         // Deliberately spawns EVERY registered type with both param sections
+         // forced open: the ids are only allocated by the code that draws the
+         // controls, so a collapsed node proves nothing. ROUNDTRIPTEST covers
+         // every type too but draws them collapsed, which is exactly why it
+         // never saw this.
+         float x = 40.0f, y = 40.0f;
+         for (const std::string& category : NodeFactory::Instance().GetCategories())
+            for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+            {
+               GraphNode* gn = SpawnNode(name, category, x, y);
+               if (gn == nullptr)
+                  continue;
+               gn->showParams = true;
+               gn->showAdvancedParams = true;
+               x += 320.0f;
+               if (x > 320.0f * 24)
+               {
+                  x = 40.0f;
+                  y += 700.0f;
+               }
+            }
+      }
+      else if (const char* stressN = getenv("INFINITE_EDPERFTEST"))
+      {
+         // Editor-scalability fixture: N nodes laid out in a grid, so the
+         // per-frame cost of imgui-node-editor's hit-testing pass (ed::End()
+         // -> BuildControl, which walks every live node and every live pin
+         // once per frame) can be measured against node count instead of
+         // guessed at. Paired with the [edperf] timing line printed around
+         // ed::End() below.
+         const int count = std::max(1, atoi(stressN));
+         for (int i = 0; i < count; ++i)
+         {
+            const int col = i % 24, row = i / 24;
+            SpawnNode(getenv("INFINITE_EDPERF_TYPE") ? getenv("INFINITE_EDPERF_TYPE") : "Gain",
+                      getenv("INFINITE_EDPERF_CAT") ? getenv("INFINITE_EDPERF_CAT") : "Utility",
+                      40.0f + col * 260.0f, 40.0f + row * 200.0f);
+         }
       }
       else if (getenv("INFINITE_BYPASSTEST") != nullptr)
       {
@@ -35541,6 +35663,15 @@ int main(int argc, char** argv)
             tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
             glfwSetCursorPos(window, (double)gTestMouse.x, (double)gTestMouse.y);
          }
+      }
+
+      // BuildControl early-outs the moment the cursor isn't over the canvas,
+      // so an unattended run measures the cheap path and reports a healthy
+      // number that means nothing. Park the cursor mid-canvas.
+      if (getenv("INFINITE_EDPERFTEST") != nullptr)
+      {
+         ImGuiIO& tio = ImGui::GetIO();
+         tio.AddMousePosEvent(800.0f, 500.0f);
       }
 
       // Drags EQ's own handles and checks each gesture moves only the param
@@ -44768,9 +44899,13 @@ int main(int argc, char** argv)
          }
       }
 
+      // !gPerfMatrixFocused for the same reason Copy/Paste check it: while the
+      // performance matrix owns the keyboard, a bare letter belongs to that
+      // panel, not to the canvas selection behind it.
       const bool doBypass =
          gRequestBypass ||
-         (!typing && !cmdOrCtrl && !io.KeyShift && !io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_B, false));
+         (!typing && !gPerfMatrixFocused && !cmdOrCtrl && !io.KeyShift && !io.KeyAlt &&
+          ImGui::IsKeyPressed(ImGuiKey_B, false));
       gRequestBypass = false;
 
       if (doBypass)
@@ -46058,8 +46193,36 @@ int main(int argc, char** argv)
          }
       }
 
+      // [edperf] BuildControl's per-frame hit-test walk is the one part of the
+      // editor whose cost scales with patch size; a spindump that lands here
+      // is indistinguishable from a freeze, so keep it measurable.
+      static const bool kEdPerf = getenv("INFINITE_EDPERF") != nullptr ||
+                                  getenv("INFINITE_EDPERFTEST") != nullptr;
+      const auto edEndStart = kEdPerf ? std::chrono::steady_clock::now()
+                                      : std::chrono::steady_clock::time_point{};
       ed::End();
+      if (kEdPerf)
+      {
+         const double ms = std::chrono::duration<double, std::milli>(
+                              std::chrono::steady_clock::now() - edEndStart).count();
+         printf("[edperf] frame=%d nodes=%zu ed::End=%.2fms\n", frameId, gNodes.size(), ms);
+      }
       ed::SetCurrentEditor(nullptr);
+
+      if (getenv("INFINITE_PINDUPTEST") != nullptr && frameId == 6)
+      {
+         // Counted inside NodeBuilder::BeginPin (imgui_node_editor.cpp) - see
+         // the fixture above for what a non-zero value means and why it used
+         // to be a hang rather than a warning. Every offending id is already
+         // on stderr by the time this runs.
+         extern int g_InfiniteDuplicatePinIds;
+         if (g_InfiniteDuplicatePinIds == 0)
+            printf("PINDUPTEST %zu nodes, 0 duplicate pin ids  OK\n", gNodes.size());
+         else
+            printf("PINDUPTEST FAIL: %d node(s) emitted a pin id twice in one frame "
+                   "- see the [node editor] lines above for which\n",
+                   g_InfiniteDuplicatePinIds);
+      }
 
       // Node drawing is done. Everything below (docked panels, dialogs) must
       // not be mistaken for the last-drawn node's param block - see

@@ -14,6 +14,17 @@
 # include <string>
 # include <fstream>
 # include <bitset>
+# include <set>
+
+// --- Infinite local change ---
+// Distinct pin ids caught being emitted twice in one frame, ever, this run.
+// Each one is a node handing two different controls the same pin id, which
+// before the guard below made the node's pin list circular and hung the app.
+// Exported (not static) so Infinite's INFINITE_PINDUPTEST fixture can assert
+// it stays at zero across every registered node type - a duplicate is now a
+// warning rather than a freeze, and a warning nobody checks is a warning
+// nobody sees.
+int g_InfiniteDuplicatePinIds = 0;
 # include <climits>
 # include <algorithm>
 # include <sstream>
@@ -2388,7 +2399,15 @@ ed::Control ed::EditorContext::BuildControl(bool allowOffscreen)
     extraFlags |= ImGuiButtonFlags_MouseButtonRight;
     extraFlags |= ImGuiButtonFlags_MouseButtonMiddle;
 
-    static auto invisibleButtonEx = [](const char* str_id, const ImVec2& size_arg, ImGuiButtonFlags extraFlags) -> int
+    // --- Infinite local change: take a pre-computed ImGuiID ---
+    // Upstream passes a "%p"-formatted string and re-hashes it here. That
+    // snprintf runs once per live pin and once per live node, every frame,
+    // and Apple's vsnprintf takes a lock and touches the allocator on each
+    // call - on a large patch it dominates this whole hit-test pass. The
+    // caller now hashes the object pointer directly (ImGuiWindow::GetID's
+    // const void* overload), which is the same kind of per-window-unique id
+    // with none of the formatting.
+    static auto invisibleButtonEx = [](ImGuiID id, const ImVec2& size_arg, ImGuiButtonFlags extraFlags) -> int
     {
         using namespace ImGui;
 
@@ -2399,7 +2418,6 @@ ed::Control ed::EditorContext::BuildControl(bool allowOffscreen)
         if (size_arg.x == 0.0f || size_arg.y == 0.0f)
             return false;
 
-        const ImGuiID id = window->GetID(str_id);
         ImVec2 size = CalcItemSize(size_arg, 0.0f, 0.0f);
         const ImRect bb(window->DC.CursorPos, window->DC.CursorPos + size);
         ItemSize(size);
@@ -2417,14 +2435,10 @@ ed::Control ed::EditorContext::BuildControl(bool allowOffscreen)
     // Emits invisible button and returns true if it is clicked.
     auto emitInteractiveAreaEx = [&activeId](ObjectId id, const ImRect& rect, ImGuiButtonFlags extraFlags) -> int
     {
-        char idString[33] = { 0 }; // itoa can output 33 bytes maximum
-        snprintf(idString, 32, "%p", id.AsPointer());
+        const ImGuiID imId = ImGui::GetCurrentWindow()->GetID(id.AsPointer());
         ImGui::SetCursorScreenPos(rect.Min);
 
-        // debug
-        //if (id < 0) return ImGui::Button(idString, to_imvec(rect.size));
-
-        auto buttonIndex = invisibleButtonEx(idString, rect.GetSize(), extraFlags);
+        auto buttonIndex = invisibleButtonEx(imId, rect.GetSize(), extraFlags);
 
         // #debug
         //ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(0, 255, 0, 64));
@@ -5397,6 +5411,24 @@ void ed::NodeBuilder::BeginPin(PinId pinId, PinKind kind)
     m_CurrentPin = Editor->GetPin(pinId, kind);
     m_CurrentPin->m_Node = m_CurrentNode;
 
+    // --- Infinite local change: survive a duplicate pin id ---
+    // GetPin() returns the SAME Pin object for a repeated id, and the linking
+    // below is `pin->m_PreviousPin = node->m_LastPin; node->m_LastPin = pin`.
+    // Emit one id twice in a frame and the second pass makes the pin its own
+    // predecessor - a one-element cycle. Every walk of that list
+    // (BuildControl's hit-test pass, EndNode's bounds pass, the drag action's
+    // pin scan) is a plain `for (p = last; p; p = p->m_PreviousPin)`, so the
+    // app doesn't crash, glitch or draw wrong: it spins at 100% CPU inside
+    // one frame, forever, and the only artefact the user gets is a system
+    // "hang" report.
+    //
+    // Stamped with the ImGui frame index rather than tested against m_IsLive:
+    // Object's constructor sets m_IsLive to true, so a pin's first-ever
+    // emission would otherwise read as a duplicate and never get linked in.
+    const int thisFrame = ImGui::GetFrameCount();
+    const bool duplicateThisFrame = (m_CurrentPin->m_LastEmittedFrame == thisFrame);
+    m_CurrentPin->m_LastEmittedFrame = thisFrame;
+
     m_CurrentPin->m_IsLive      = true;
     m_CurrentPin->m_Color       = Editor->GetColor(StyleColor_PinRect);
     m_CurrentPin->m_BorderColor = Editor->GetColor(StyleColor_PinRectBorder);
@@ -5410,8 +5442,26 @@ void ed::NodeBuilder::BeginPin(PinId pinId, PinKind kind)
     m_CurrentPin->m_Strength    = editorStyle.LinkStrength;
     m_CurrentPin->m_SnapLinkToDir = editorStyle.SnapLinkToPinDir != 0.0f;
 
-    m_CurrentPin->m_PreviousPin = m_CurrentNode->m_LastPin;
-    m_CurrentNode->m_LastPin    = m_CurrentPin;
+    if (!duplicateThisFrame)
+    {
+        m_CurrentPin->m_PreviousPin = m_CurrentNode->m_LastPin;
+        m_CurrentNode->m_LastPin    = m_CurrentPin;
+    }
+    else
+    {
+        // Loud but once per id: a duplicate is always a bug in the node's own
+        // pin-id allocation, and it silently costs that pin its second slot.
+        static std::set<uintptr_t> reported;
+        const uintptr_t key = reinterpret_cast<uintptr_t>(pinId.AsPointer());
+        if (reported.insert(key).second)
+        {
+            ++g_InfiniteDuplicatePinIds;
+            fprintf(stderr, "[node editor] duplicate pin id %llu (node %llu) emitted twice in one frame "
+                            "- ignoring the second (would otherwise hang the frame)\n",
+                    (unsigned long long)key,
+                    (unsigned long long)reinterpret_cast<uintptr_t>(m_CurrentNode->m_ID.AsPointer()));
+        }
+    }
 
     m_PivotAlignment          = editorStyle.PivotAlignment;
     m_PivotSize               = editorStyle.PivotSize;

@@ -46,8 +46,10 @@ class INode;
 //   pal <dstIndex> <dstColor> <srcIndex> <srcSwatch>
 //   expr <dstIndex> <dstParam> <expression text to end of line>
 //   glob <name> <expression text to end of line>
-//   perfui <cellSize> <pageCount> [pageNames...]
-//   perf <kind> <dstIndex> <dstParam> <dstParam2> <cellX> <cellY> <page> <colorR> <colorG> <colorB> <boolName> <label to end of line>
+//   perfui <cellSize> <pageCount>
+//   perfname <pageIndex> <page name to end of line>
+//   perf <kind> <dstIndex> <dstParam> <dstParam2> <cellX> <cellY> <page> <colorR> <colorG> <colorB> <value> <value2> <boolName> <label to end of line>
+//   perftarget <perfIndex> <dstIndex> <dstParam> <axis> <boolName>
 //
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
