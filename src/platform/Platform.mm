@@ -1413,10 +1413,23 @@ namespace Platform
             return nullptr;
          }
 
+         // Same quality ladder as the Windows path (MediaWin.cpp): ~0.30 bits
+         // per pixel per frame. AVFoundation's default for a bare H.264
+         // videoSettings dictionary is far lower, which mushes exactly the
+         // material this app produces - hard-edged pixel art, flat colour
+         // fields, dithering, fine generative detail.
+         const double bpp = 0.30;
+         const NSInteger avgBitRate = (NSInteger)std::min(
+            80000000.0, std::max(2000000.0, (double)width * height * (fps > 0 ? fps : 30) * bpp));
          NSDictionary* videoSettings = @{
             AVVideoCodecKey  : AVVideoCodecTypeH264,
             AVVideoWidthKey  : @(width),
-            AVVideoHeightKey : @(height)
+            AVVideoHeightKey : @(height),
+            AVVideoCompressionPropertiesKey : @{
+               AVVideoAverageBitRateKey : @(avgBitRate),
+               AVVideoProfileLevelKey   : AVVideoProfileLevelH264HighAutoLevel,
+               AVVideoAllowFrameReorderingKey : @YES
+            }
          };
          AVAssetWriterInput* input = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeVideo
                                                                        outputSettings:videoSettings];

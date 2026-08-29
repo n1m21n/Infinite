@@ -27,6 +27,7 @@
 
 #include "WinCommon.h"
 
+#include <codecapi.h> // eAVEncH264VProfile_High
 #include <mfapi.h>
 #include <mferror.h>
 #include <mfidl.h>
@@ -1135,12 +1136,26 @@ namespace Platform
             hr = outType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264);
          if (SUCCEEDED(hr))
          {
-            // Rough quality ladder: ~0.08 bits per pixel per frame, clamped
-            // to a sane range. The encoder clamps further if needed.
+            // Quality ladder: ~0.30 bits per pixel per frame, clamped to a
+            // sane range. This is deliberately generous - Media Foundation's
+            // H.264 encoder is noticeably weaker than VideoToolbox at the
+            // same bitrate, and the material here (hard-edged pixel art, flat
+            // colour fields, dithering, high-frequency generative detail) is
+            // the worst case for a deblocking-heavy encoder. The old 0.08
+            // gave 1080p30 barely 5 Mbps, which visibly mushed pixel art.
+            // The encoder clamps further if it has to.
             const UINT32 bitrate = (UINT32)std::min(
-               20000000.0, std::max(1000000.0,
-                                    (double)rec->width * rec->height * rec->fps * 0.08));
+               80000000.0, std::max(2000000.0,
+                                    (double)rec->width * rec->height * rec->fps * 0.30));
             hr = outType->SetUINT32(MF_MT_AVG_BITRATE, bitrate);
+         }
+         if (SUCCEEDED(hr))
+         {
+            // High profile enables 8x8 transform and CABAC. Baseline (the
+            // default some MFTs pick) has neither, and costs real quality at
+            // any bitrate. Not fatal if the encoder refuses it, so the result
+            // is deliberately not folded into `hr`.
+            outType->SetUINT32(MF_MT_MPEG2_PROFILE, (UINT32)eAVEncH264VProfile_High);
          }
          if (SUCCEEDED(hr))
             hr = outType->SetUINT64(MF_MT_FRAME_SIZE,
@@ -1171,6 +1186,17 @@ namespace Platform
                                    (UINT32)MFVideoInterlace_Progressive);
          if (SUCCEEDED(hr))
             hr = inType->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
+         if (SUCCEEDED(hr))
+         {
+            // MUST be set, and MUST be positive. RGB32's *default* orientation
+            // in Media Foundation is bottom-up (negative stride, the GDI
+            // BITMAPINFOHEADER convention), so with this attribute absent the
+            // sink writer reads our top-down buffer upside down and the whole
+            // movie comes out vertically mirrored. RgbaBottomUpToBgraTopDown
+            // already flips GL's bottom-up readback into top-down rows, so the
+            // stride we hand over is a positive, tightly-packed width * 4.
+            hr = inType->SetUINT32(MF_MT_DEFAULT_STRIDE, (UINT32)(rec->width * 4));
+         }
          if (SUCCEEDED(hr))
             hr = rec->writer->SetInputMediaType(rec->videoStreamId, inType, nullptr);
 
