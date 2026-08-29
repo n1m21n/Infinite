@@ -925,8 +925,15 @@ namespace
          IAudioClient* client = nullptr;
          IAudioCaptureClient* capture = nullptr;
          WAVEFORMATEX* fmt = nullptr;
+         // Declared out here, not in the SUCCEEDED(Initialize) block below,
+         // so cleanup() can close it. As a local in that block it was leaked
+         // on every path out - one event handle per capture start/stop cycle,
+         // and PollAudioRecovery restarts the engine on every device change.
+         HANDLE bufferEvent = nullptr;
 
          auto cleanup = [&]() {
+            if (bufferEvent != nullptr)
+               CloseHandle(bufferEvent);
             if (fmt != nullptr)
                CoTaskMemFree(fmt);
             if (capture != nullptr)
@@ -1002,7 +1009,7 @@ namespace
                                  period, 0, fmt, nullptr);
          if (SUCCEEDED(hr))
          {
-            HANDLE bufferEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+            bufferEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
             hr = client->SetEventHandle(bufferEvent);
             if (SUCCEEDED(hr))
                hr = client->GetService(__uuidof(IAudioCaptureClient),
@@ -1194,12 +1201,27 @@ namespace
    {
       LatestRing ring;
       std::atomic<bool> wanted{ false };
+      // Allocate first, publish last. AudioInputCaptureRead runs on the AUDIO
+      // RENDER THREAD and used to be gated on `running && sampleRate > 0.0`,
+      // with OnFormat writing sampleRate BEFORE ring.Init() - so between those
+      // two statements the render thread could pass the gate and index
+      // ring.buffers while assign() was reallocating it. A use-after-free on
+      // the audio thread, and the window reopens on every input-engine
+      // restart, which PollAudioRecovery triggers on any device change.
+      //
+      // `running` alone is not enough either: Start() sets it before the
+      // thread has negotiated a format at all. This flag is the single thing
+      // the read path gates on, and it is only ever set true once the ring
+      // behind it is fully allocated.
+      std::atomic<bool> ready{ false };
 
       void OnFormat(double rate, int chs) override
       {
-         sampleRate = rate;
+         ready.store(false, std::memory_order_release);
          channels = std::clamp(chs, 1, kMaxChannels);
          ring.Init(channels);
+         sampleRate = rate;
+         ready.store(true, std::memory_order_release);
       }
 
       void OnFrames(const float* interleaved, int frames) override
@@ -1304,7 +1326,11 @@ namespace Platform
 
    bool AudioInputCaptureIsRunning()
    {
-      return gTap.running.load(std::memory_order_acquire) && gTap.sampleRate > 0.0;
+      // gTap.ready, not gTap.sampleRate: sampleRate is a plain double written
+      // by the capture thread, and it used to open this gate before the ring
+      // behind it existed - see CaptureTapEngine::ready.
+      return gTap.running.load(std::memory_order_acquire) &&
+             gTap.ready.load(std::memory_order_acquire);
    }
 
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels)

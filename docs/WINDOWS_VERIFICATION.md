@@ -40,7 +40,7 @@ Severity, briefly:
 | 1.6 | Analyser `low`/`mid`/`high` from wrong bands | Audio Analyze drives visuals wrongly |
 | 1.7 | Media Foundation stride assumed to be `width*4` | skewed video/camera at some frame widths |
 | 1.8 | MIDI note ring has N producers, not 1 | dropped/torn notes with 2+ controllers |
-| 1.9 | Capture-thread races | data race, and a use-after-free on the audio thread |
+| 1.9 | Capture-thread races | data race, and a use-after-free on the audio thread (fixed) |
 | 1.10 | Assorted smaller items | see the block |
 | 1.11 | Exe imported the VC++ redist CRT | wouldn't launch on a clean Windows install (fixed) |
 
@@ -355,7 +355,16 @@ slot. The ring is read from the audio thread, so do not "fix" this with a
 mutex around PublishNote.
 ```
 
-### 1.9 Two races in the capture engines
+### 1.9 Two races in the capture engines (fixed)
+
+**Fixed in v0.2.4.** (a) `silence`/`converted` are now per-instance
+`silenceScratch`/`pcmScratch` members of `CaptureEngineBase`, so the two
+engines no longer share one vector. (b) `CaptureTapEngine` gained an
+`std::atomic<bool> ready` that is cleared on entry to `OnFormat`, set only
+after `ring.Init()` has finished allocating, and is now the single thing
+`AudioInputCaptureIsRunning()` gates on — `sampleRate` no longer opens the
+gate. The leaked `bufferEvent` is now declared alongside the other
+`ThreadMain` locals and closed by `cleanup()`. Original report below.
 
 ```
 src/platform/win/AudioDeviceWin.cpp. Both derive from CaptureEngineBase, and
