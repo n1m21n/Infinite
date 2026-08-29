@@ -959,7 +959,8 @@ namespace Platform
    // fakes one with a borderless, always-on-top window instead of exclusive
    // GLFW fullscreen (which would auto-iconify / drop behind the editor the
    // moment focus moves to the other display).
-   void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost, bool hideCursor)
+   void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost, bool hideCursor,
+                              int x, int y, int w, int h)
    {
       HWND hwnd = glfwGetWin32Window(window);
       if (hwnd == nullptr)
@@ -972,8 +973,19 @@ namespace Platform
          style = (style & ~WS_POPUP) | WS_OVERLAPPEDWINDOW;
       SetWindowLongPtrW(hwnd, GWL_STYLE, style);
 
-      SetWindowPos(hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
-         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+      // With a target rect, the style change and the final geometry land in
+      // one SetWindowPos - the window is never briefly a decorated window
+      // holding a monitor-sized client area, which is what left a fullscreen
+      // projector overhanging the bottom-right of the display. WS_POPUP has
+      // no frame, so the requested rect IS the client rect; no
+      // AdjustWindowRect is wanted or needed here.
+      const bool haveRect = (w > 0 && h > 0);
+      UINT flags = SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW;
+      if (!haveRect)
+         flags |= SWP_NOMOVE | SWP_NOSIZE;
+
+      SetWindowPos(hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST,
+         haveRect ? x : 0, haveRect ? y : 0, haveRect ? w : 0, haveRect ? h : 0, flags);
 
       glfwSetInputMode(window, GLFW_CURSOR, hideCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL);
    }

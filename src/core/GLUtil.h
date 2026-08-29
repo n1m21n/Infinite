@@ -58,4 +58,13 @@ namespace GLUtil
    // would serialise the whole pipeline instead of one readback per rebuild.
    bool ReadTexturePixels(unsigned int& scratchFbo, unsigned int srcTex, int w, int h,
                           std::vector<float>& outRGBA);
+
+   // Deletes the per-context GL objects this namespace lazily created for the
+   // context that is current RIGHT NOW (today: the fullscreen-quad VAO).
+   // Call it with a secondary context current, immediately before that
+   // context is destroyed - otherwise its map entry lives on for a context
+   // that no longer exists and the map grows once per projector-window
+   // open/close cycle. The shared VBO and the blit programs are share-group
+   // objects owned by the main context and are deliberately NOT touched.
+   void ReleaseCurrentContextResources();
 }
