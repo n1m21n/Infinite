@@ -99,6 +99,11 @@ TESTS=(
   # hang the app outright (circular pin list in imgui-node-editor). Needs the
   # bodies open, so ROUNDTRIPTEST's collapsed pass does not cover it.
   "PINDUPTEST:10"
+  # Headless (exits before glfwInit) and exit-code gated, so the frame budget
+  # is irrelevant - a non-zero exit is reported as a crash above, which is the
+  # right verdict for it. Covers the performance matrix's patch round trip,
+  # including multi-target elements and page names.
+  "PERFMATRIXTEST:1"
   "AUDIOPARAMSWEEPTEST:1"
   "AUDIOTEARDOWNSWEEPTEST:10"
   # Headless (exits before glfwInit), like AUDIOPARAMSWEEPTEST above.

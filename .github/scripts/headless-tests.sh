@@ -42,6 +42,17 @@ else
    status=1
 fi
 
+# Same shape as DSPTEST: returns RunPerfPanelSelfTest()'s exit code. Headless,
+# so this is one of the few pieces of the performance matrix that CI can
+# actually exercise on Windows.
+echo "== INFINITE_PERFMATRIXTEST"
+if INFINITE_PERFMATRIXTEST=1 "$BIN"; then
+   echo "   pass"
+else
+   echo "   FAIL (exit $?)"
+   status=1
+fi
+
 # --- verdict-line gated ----------------------------------------------------
 # Each of these always exits 0, so grep the printf line instead.
 
