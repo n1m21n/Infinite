@@ -76,6 +76,12 @@ check_verdict() {
 
 check_verdict INFINITE_AUDIOPDCTEST "AUDIOPDCTEST OK"
 
+# Exported-movie A/V sync: pure arithmetic over the same pacing both
+# recorders' PTS depend on, so it runs headless here as well as on macOS -
+# and the recorders it guards are two separate implementations
+# (AVAssetWriter / Media Foundation) with the same frame-counter video clock.
+check_verdict INFINITE_RECSYNCTEST "REC SYNC OK"
+
 # RemoveBgNode's background-removal backend (Vision on macOS, ONNX Runtime +
 # DirectML on Windows). SKIP is an accepted, non-failing verdict here (see
 # RunRemoveBgTest in src/main.cpp) - it just means Platform::SubjectMask

@@ -31215,6 +31215,101 @@ static int RunDspTest()
    return all ? 0 : 1;
 }
 
+
+// ===================================================== INFINITE_RECSYNCTEST
+// Guards the exported-movie A/V sync property. The video track's PTS is a
+// plain frame counter over recordFps on both platforms, while live audio is
+// stamped from the real captured sample count - so emitting one video frame
+// per *rendered* frame makes the file's video duration renderedFrames/fps
+// against an audio duration of real elapsed time, and the two walk apart
+// linearly across the take. That is invisible while monitoring and shows up
+// only in the written file, which is exactly how it shipped.
+//
+// OutputNode::PacedRepeat is the arithmetic that keeps them locked. This
+// simulates whole takes at render rates above, below and equal to the target
+// and asserts the invariant that actually matters: at every point in the
+// take, the video timeline (emitted/fps) tracks the audio timeline
+// (audioFrames/rate) to within a frame.
+static void RunRecSyncTest()
+{
+   printf("[REC SYNC TEST] pacing exported video against the audio clock\n");
+
+   const double kRate = 48000.0;
+   const int kFps = 30;
+   int failures = 0;
+
+   struct Case { const char* name; double renderFps; double seconds; };
+   const Case cases[] = {
+      { "render slower than target (20fps -> 30fps)",  20.0, 30.0 },
+      { "render faster than target (60fps -> 30fps)",  60.0, 30.0 },
+      { "render exactly at target  (30fps -> 30fps)",  30.0, 30.0 },
+      { "render wildly slow        ( 7fps -> 30fps)",   7.0, 30.0 },
+   };
+
+   for (const Case& c : cases)
+   {
+      long long emitted = 0;
+      long long audioFrames = 0;
+      double worstDriftFrames = 0.0;
+
+      const long long renderCalls = (long long)(c.renderFps * c.seconds);
+      const long long audioPerCall = (long long)(kRate / c.renderFps);
+
+      for (long long i = 0; i < renderCalls; i++)
+      {
+         // One render frame: the audio thread produced its block, then the
+         // capture path decides what the frame is worth.
+         audioFrames += audioPerCall;
+         emitted += OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, false);
+
+         const double videoSeconds = (double)emitted / (double)kFps;
+         const double audioSeconds = (double)audioFrames / kRate;
+         const double drift = std::fabs(videoSeconds - audioSeconds) * (double)kFps;
+         if (drift > worstDriftFrames)
+            worstDriftFrames = drift;
+      }
+
+      // The final drain pads the tail out to the audio's full length.
+      emitted += OutputNode::PacedRepeat(audioFrames, kRate, kFps, emitted, true);
+
+      const double videoSeconds = (double)emitted / (double)kFps;
+      const double audioSeconds = (double)audioFrames / kRate;
+      const double endDriftFrames = std::fabs(videoSeconds - audioSeconds) * (double)kFps;
+
+      // Two frames of slack: one for the rounding in PacedRepeat, one for a
+      // render call landing between audio blocks. Anything beyond that is
+      // the drift this test exists to catch.
+      const bool ok = worstDriftFrames <= 2.0 && endDriftFrames <= 1.0;
+      if (!ok)
+         failures++;
+      printf("  [%s] %s: %lld frames for %.2fs audio (video %.3fs) worst drift %.2f frames, end drift %.2f frames\n",
+             ok ? "pass" : "FAIL", c.name, emitted, audioSeconds, videoSeconds,
+             worstDriftFrames, endDriftFrames);
+   }
+
+   // A take with no live audio at all (engine stopped, or an audio *file*
+   // source, where the platform recorders slave audio to the video clock
+   // instead) must keep every rendered frame rather than stalling on an
+   // audio stream that never arrives.
+   const bool passthrough = OutputNode::PacedRepeat(0, kRate, kFps, 0, false) == 1 &&
+                            OutputNode::PacedRepeat(1000, 0.0, kFps, 0, false) == 1;
+   if (!passthrough)
+      failures++;
+   printf("  [%s] no live audio passes frames through unpaced\n", passthrough ? "pass" : "FAIL");
+
+   // A stall must not be handed to the encoder as one enormous burst, and
+   // must not be silently dropped either - the catch-up spreads across the
+   // frames that follow.
+   const int burst = OutputNode::PacedRepeat((long long)(kRate * 10.0), kRate, kFps, 0, false);
+   const bool capped = burst > 0 && burst <= kFps;
+   if (!capped)
+      failures++;
+   printf("  [%s] a 10s stall caps at %d frames per call instead of bursting 300\n",
+          capped ? "pass" : "FAIL", burst);
+
+   printf("REC SYNC %s\n", failures == 0 ? "OK" : "FAIL");
+}
+
 // ===================================================== INFINITE_AUDIOPDCTEST
 //
 // Headless, numeric verification of plugin/effect delay compensation (PDC) -
@@ -33472,6 +33567,12 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_GRAINMOLDERTEST") != nullptr)
       return RunGrainMolderFixture() ? 0 : 1;
+
+   if (getenv("INFINITE_RECSYNCTEST") != nullptr)
+   {
+      RunRecSyncTest();
+      return 0; // verdict is the printf line, not $? - see AUDIOPDCTEST below
+   }
 
    if (getenv("INFINITE_AUDIOPDCTEST") != nullptr)
    {
