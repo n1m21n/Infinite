@@ -189,6 +189,47 @@ The hard constraints. Violations here are crashes and dropouts, not opinions.
   every param drag; a large blur kernel written as nested samples instead of
   separable passes will feel laggy even though it's "just a filter."
 
+**Editor identity — two controls must never share one id:**
+
+A node allocates three independent kinds of id, and they are computed
+*differently*. Getting two controls onto one id is not a cosmetic clash; each
+kind fails in its own way, and two of the three fail silently.
+
+- **ImGui widget ids** come from the label, scoped by the ID stack. Two
+  controls with the same label in one window are literally the same widget:
+  hovering or dragging one activates the other. `ImGui::PushID(i)` fixes it.
+- **Discrete param slots** (`DiscreteParamSlot`, bool/enum params) come from
+  an FNV-1a hash of the **label alone** — deliberately, so a control that is
+  hidden this frame keeps its address across saves. `PushID` does **not**
+  scope them. A repeated sub-panel therefore needs `DiscreteSlotScope`, and
+  the first sub-panel must stay unscoped or every saved binding to it moves.
+- **Float param slots** come from draw order (`gParamCounter`), so a control
+  drawn conditionally shifts every slot after it — a different bug with the
+  same cause, and the reason discrete params are hashed instead.
+
+The failure that matters: two controls on one **pin id** used to hang the
+whole app. imgui-node-editor links a node's pins into a singly-linked list as
+they are emitted, so emitting one id twice in a frame made the list circular,
+and every walk of it (`BuildControl`'s hit test, `EndNode`'s bounds pass, the
+drag scan) is a plain `for (p = last; p; p = p->m_PreviousPin)`. No crash, no
+glitch, nothing drawn wrong — 100% CPU inside one frame, forever, the moment
+the cursor entered the canvas. Users could only report it as a system "hang".
+`BeginPin` now refuses the second link and warns, so the residual cost of a
+collision is that the second control silently loses its pin and its
+modulation slot — which is how the Wavetable node's two engines shared one
+filter/table/octave binding for a release.
+
+So, when reviewing anything that draws the same controls more than once in
+one node (per-engine columns, per-voice rows, per-slot repeats):
+
+- Does each repeat get `ImGui::PushID`? (widget identity)
+- Does each repeat past the first get `DiscreteSlotScope`? (slot identity)
+- Does the first repeat stay *unscoped*? (backward compatibility)
+- Run `INFINITE_PINDUPTEST` — it draws every registered node type with both
+  param sections forced open and asserts zero duplicate pin ids. Confirm it
+  ran; `ROUNDTRIPTEST` covers every type too but draws them **collapsed**,
+  which is precisely why it never caught this.
+
 **General C++:**
 - Allocation in a per-frame path; `std::string` built per frame for an ImGui
   label; a `std::map` lookup where an index would do; an O(n²) over mesh
