@@ -67,18 +67,25 @@ namespace Tabler
                         ImVec2(center.x + half, center.y + half), col, rounding);
    }
 
-   // Tabler: player-track-prev / rewind
+   // Tabler: player-track-prev / rewind (smooth rounded vertical bar and filled triangle)
    inline void DrawPlayerRewind(ImDrawList* dl, ImVec2 center, float size, ImU32 col)
    {
       if (!dl) return;
       const float s = size / 24.0f;
       const float stroke = ImMax(1.2f, 1.8f * s);
-      // Vertical bar
-      dl->AddLine(Point24(center, size, 5.5f, 6.0f), Point24(center, size, 5.5f, 18.0f), col, stroke);
-      // Triangle pointing left
-      const ImVec2 p0 = Point24(center, size, 18.5f, 5.5f);
-      const ImVec2 p1 = Point24(center, size, 18.5f, 18.5f);
-      const ImVec2 p2 = Point24(center, size, 8.5f, 12.0f);
+
+      // Vertical rounded pill bar matching Pause style
+      const float barW = 2.4f * s;
+      const float barH = 13.0f * s;
+      const float barRounding = barW * 0.45f;
+      const ImVec2 barMin = Point24(center, size, 4.8f, 5.5f);
+      const ImVec2 barMax(barMin.x + barW, barMin.y + barH);
+      dl->AddRectFilled(barMin, barMax, col, barRounding);
+
+      // Triangle pointing left, optically balanced and matching Play height
+      const ImVec2 p0 = Point24(center, size, 18.2f, 5.5f);
+      const ImVec2 p1 = Point24(center, size, 18.2f, 18.5f);
+      const ImVec2 p2 = Point24(center, size, 8.6f, 12.0f);
       dl->AddTriangleFilled(p0, p1, p2, col);
       const ImVec2 pts[3] = { p0, p1, p2 };
       dl->AddPolyline(pts, 3, col, ImDrawFlags_Closed, stroke);

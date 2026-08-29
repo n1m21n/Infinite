@@ -145,10 +145,42 @@ Modulation::Source Modulation::ModulatorFor(int nodeIndex, int paramIndex) const
 
 void Modulation::RegisterParam(const ParamRef& ref)
 {
-   mFrameParams.push_back(ref);
-   ParamRef known = ref;
-   known.value = nullptr;
-   mKnownParams[Key(ref.nodeIndex, ref.paramIndex)] = known;
+   // Both stores used to take a full copy of the ParamRef every frame,
+   // enumOptions included. That was free while only floats registered (their
+   // option list is always empty), but a dropdown carries its whole option
+   // list - a rate-division or note-name list is dozens of std::strings - so
+   // registering dropdowns turned every frame into hundreds of string
+   // allocations per modulatable selector, which is what made dragging a
+   // macro into a mode feel sticky next to dragging it into a knob. The
+   // frame list never reads enumOptions (only the apply loop uses it, and
+   // only for min/max/step), and the sticky store only needs them re-copied
+   // when the list actually changes.
+   ParamRef& frame = mFrameParams.emplace_back();
+   frame.nodeIndex = ref.nodeIndex;
+   frame.paramIndex = ref.paramIndex;
+   frame.value = ref.value;
+   frame.minValue = ref.minValue;
+   frame.maxValue = ref.maxValue;
+   frame.step = ref.step;
+   frame.name = ref.name;
+   frame.isEnum = ref.isEnum;
+   frame.isBool = ref.isBool;
+
+   ParamRef& known = mKnownParams[Key(ref.nodeIndex, ref.paramIndex)];
+   known.nodeIndex = ref.nodeIndex;
+   known.paramIndex = ref.paramIndex;
+   known.value = nullptr; // never valid outside the frame that registered it
+   known.minValue = ref.minValue;
+   known.maxValue = ref.maxValue;
+   known.step = ref.step;
+   known.isEnum = ref.isEnum;
+   known.isBool = ref.isBool;
+   if (known.name != ref.name)
+      known.name = ref.name;
+   // An empty incoming list means "unchanged" (the caller skipped the copy),
+   // not "this param lost its options".
+   if (!ref.enumOptions.empty() && known.enumOptions != ref.enumOptions)
+      known.enumOptions = ref.enumOptions;
 }
 
 const ParamRef* Modulation::KnownParam(int nodeIndex, int paramIndex) const

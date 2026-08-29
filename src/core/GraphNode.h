@@ -61,6 +61,9 @@ struct GraphNode
    // still runs the register-only params pass that keeps it evaluating (see
    // gParamRegisterOnly in main.cpp).
    bool hasExpressionParams = false;
+   // ditto: true if any param on this node is bound to the performance matrix.
+   // Keeps collapsed nodes evaluating and registering into FrameParams().
+   bool hasPerfPanelParams = false;
 
    // Where to place the node the first frame it appears (canvas coords).
    float spawnX = 0.0f;

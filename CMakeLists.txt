@@ -251,6 +251,9 @@ set(COMMON_SOURCES
     src/audio/dsp/FormantFilterKernel.cpp
     src/audio/dsp/WavetableShaperKernel.cpp
     src/audio/dsp/LimiterKernel.cpp
+    src/audio/dsp/ResonatorBankKernel.cpp
+    src/audio/dsp/CycleShaperKernel.cpp
+    src/audio/dsp/SpecBlurKernel.cpp
     src/nodes/ImageSourceNode.cpp
     src/nodes/ShapeNode.cpp
     src/nodes/FormulaNode.cpp
@@ -308,12 +311,14 @@ set(COMMON_SOURCES
     src/nodes/AudioColorRampNode.cpp
     src/audio/dsp/SpectralAdditiveSynth.cpp
     src/audio/dsp/MolderDsp.cpp
+    src/audio/dsp/GrainMolderDsp.cpp
     src/nodes/OscillatorNode.cpp
     src/nodes/MetallicNode.cpp
     src/nodes/AudioEffectNode.cpp
     src/nodes/SamplerNode.cpp
     src/nodes/PaulStretchNode.cpp
     src/nodes/MolderNode.cpp
+    src/nodes/GrainMolderNode.cpp
     src/nodes/GranularNode.cpp
     src/nodes/DrumSequencerNode.cpp
     src/nodes/AudioPluginNode.cpp

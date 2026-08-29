@@ -34,6 +34,9 @@ struct ParamRef
    // ShapeToParam in main.cpp's modulation apply loop.
    float step = 0.0f;
    std::string name;
+   bool isEnum = false;
+   bool isBool = false;
+   std::vector<std::string> enumOptions;
 };
 
 // Which modulator drives which parameter. Keyed by (nodeIndex, paramIndex) so the
@@ -172,6 +175,7 @@ public:
    // the stored copy: the raw float* is only valid within the frame that
    // registered it - never store or dereference it from here.
    const ParamRef* KnownParam(int nodeIndex, int paramIndex) const;
+   const std::map<Key, ParamRef>& AllKnownParams() const { return mKnownParams; }
 
 private:
    std::map<Key, Source> mLinks;

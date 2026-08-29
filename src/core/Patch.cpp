@@ -237,6 +237,33 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "expr " << e.dstIndex << " " << e.dstParam << " " << EscapeLine(e.text) << "\n";
    for (const GlobalRecord& g : data.globals)
       file << "glob " << g.name << " " << EscapeLine(g.expr) << "\n";
+   if (data.perfLayout.cellSize != 76 || data.perfLayout.pageCount > 1 || !data.perfLayout.pageNames.empty())
+   {
+      file << "perfui " << data.perfLayout.cellSize << " " << data.perfLayout.pageCount;
+      for (const auto& name : data.perfLayout.pageNames)
+         file << " " << EscapeLine(name);
+      file << "\n";
+   }
+   for (size_t i = 0; i < data.performance.size(); i++)
+   {
+      const PerfRecord& p = data.performance[i];
+      std::string boolToken = p.boolName.empty() ? "-" : p.boolName;
+      file << "perf " << p.kind << " " << p.dstIndex << " " << p.dstParam << " " << p.dstParam2 << " "
+           << p.cellX << " " << p.cellY << " " << p.page << " "
+           << FloatToString(p.colorR) << " " << FloatToString(p.colorG) << " " << FloatToString(p.colorB) << " "
+           << FloatToString(p.value) << " " << FloatToString(p.value2) << " "
+           << boolToken << " " << EscapeLine(p.label) << "\n";
+      for (const auto& t : p.targets)
+      {
+         std::string bTok = t.boolName.empty() ? "-" : t.boolName;
+         file << "perftarget " << i << " " << t.dstIndex << " " << t.dstParam << " 0 " << bTok << "\n";
+      }
+      for (const auto& t : p.targetsY)
+      {
+         std::string bTok = t.boolName.empty() ? "-" : t.boolName;
+         file << "perftarget " << i << " " << t.dstIndex << " " << t.dstParam << " 1 " << bTok << "\n";
+      }
+   }
 
    if (!file.good())
    {
@@ -415,7 +442,98 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          if (!g.name.empty())
             outData.globals.push_back(g);
       }
+      else if (tag == "perfui")
+      {
+         in >> outData.perfLayout.cellSize >> outData.perfLayout.pageCount;
+         std::string nameToken;
+         while (in >> nameToken)
+         {
+            outData.perfLayout.pageNames.push_back(UnescapeLine(nameToken));
+         }
+      }
+      else if (tag == "perf")
+      {
+         PerfRecord p;
+         in >> p.kind >> p.dstIndex >> p.dstParam >> p.dstParam2
+            >> p.cellX >> p.cellY >> p.page
+            >> p.colorR >> p.colorG >> p.colorB;
+         std::string tok1;
+         if (in >> tok1)
+         {
+            char* endP = nullptr;
+            float val1 = std::strtof(tok1.c_str(), &endP);
+            if (endP != tok1.c_str() && *endP == '\0')
+            {
+               p.value = val1;
+               std::string tok2;
+               if (in >> tok2)
+               {
+                  float val2 = std::strtof(tok2.c_str(), &endP);
+                  if (endP != tok2.c_str() && *endP == '\0')
+                  {
+                     p.value2 = val2;
+                     in >> p.boolName;
+                  }
+                  else
+                  {
+                     p.boolName = tok2;
+                  }
+               }
+            }
+            else
+            {
+               p.boolName = tok1;
+            }
+         }
+         if (p.boolName == "-")
+            p.boolName.clear();
+         std::string raw;
+         std::getline(in, raw);
+         if (!raw.empty() && raw[0] == ' ')
+            raw.erase(0, 1);
+         p.label = UnescapeLine(raw);
+         outData.performance.push_back(p);
+      }
+      else if (tag == "perftarget")
+      {
+         int elemIdx = 0, dstIdx = -1, dstP = -1, axis = 0;
+         std::string bTok;
+         if (in >> elemIdx >> dstIdx >> dstP >> axis >> bTok)
+         {
+            if (elemIdx >= 0 && elemIdx < (int)outData.performance.size())
+            {
+               PerfTarget pt;
+               pt.dstIndex = dstIdx;
+               pt.dstParam = dstP;
+               if (bTok != "-") pt.boolName = bTok;
+               if (axis == 1)
+                  outData.performance[elemIdx].targetsY.push_back(pt);
+               else
+                  outData.performance[elemIdx].targets.push_back(pt);
+            }
+         }
+      }
       // Anything else is from a newer version and is deliberately ignored.
+   }
+
+   // Ensure primary destination is in targets list if targets is empty
+   for (auto& p : outData.performance)
+   {
+      if (p.targets.empty() && p.dstIndex >= 0 && p.dstParam >= 0)
+      {
+         PerfTarget pt;
+         pt.dstIndex = p.dstIndex;
+         pt.dstParam = p.dstParam;
+         pt.boolName = p.boolName;
+         p.targets.push_back(pt);
+      }
+      if (p.targetsY.empty() && p.dstIndex >= 0 && p.dstParam2 >= 0)
+      {
+         PerfTarget pt;
+         pt.dstIndex = p.dstIndex;
+         pt.dstParam = p.dstParam2;
+         p.targetsY.push_back(pt);
+      }
    }
 
    if (outData.nodes.empty())

@@ -62,6 +62,42 @@ namespace PatchJson
       for (const Patch::GlobalRecord& g : data.globals)
          out["globals"].push_back({ {"name", g.name}, {"expr", g.expr} });
 
+      out["perfLayout"] = {
+         {"cellSize", data.perfLayout.cellSize},
+         {"pageCount", data.perfLayout.pageCount},
+         {"pageNames", data.perfLayout.pageNames}
+      };
+
+      out["performance"] = json::array();
+      for (const Patch::PerfRecord& p : data.performance)
+      {
+         json tgts = json::array();
+         for (const auto& t : p.targets)
+            tgts.push_back({ {"dstIndex", t.dstIndex}, {"dstParam", t.dstParam}, {"boolName", t.boolName} });
+         json tgtsY = json::array();
+         for (const auto& t : p.targetsY)
+            tgtsY.push_back({ {"dstIndex", t.dstIndex}, {"dstParam", t.dstParam}, {"boolName", t.boolName} });
+
+         out["performance"].push_back({
+            {"kind", p.kind},
+            {"dstIndex", p.dstIndex},
+            {"dstParam", p.dstParam},
+            {"dstParam2", p.dstParam2},
+            {"cellX", p.cellX},
+            {"cellY", p.cellY},
+            {"page", p.page},
+            {"colorR", p.colorR},
+            {"colorG", p.colorG},
+            {"colorB", p.colorB},
+            {"value", p.value},
+            {"value2", p.value2},
+            {"boolName", p.boolName},
+            {"label", p.label},
+            {"targets", tgts},
+            {"targetsY", tgtsY}
+         });
+      }
+
       return out;
    }
 }

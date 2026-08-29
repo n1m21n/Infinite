@@ -46,6 +46,8 @@ class INode;
 //   pal <dstIndex> <dstColor> <srcIndex> <srcSwatch>
 //   expr <dstIndex> <dstParam> <expression text to end of line>
 //   glob <name> <expression text to end of line>
+//   perfui <cellSize> <pageCount> [pageNames...]
+//   perf <kind> <dstIndex> <dstParam> <dstParam2> <cellX> <cellY> <page> <colorR> <colorG> <colorB> <boolName> <label to end of line>
 //
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
@@ -129,6 +131,41 @@ namespace Patch
       std::string expr;
    };
 
+   // One control on the performance matrix. `kind` is 0=Knob, 1=VFader, 2=HSlider,
+   // 3=Toggle, 4=XYPad.
+   // dstIndex/dstParam address a destination node parameter (-1 if unbound macro).
+   // dstParam2 is used by the XY pad for its Y axis.
+   struct PerfTarget
+   {
+      int dstIndex = -1;
+      int dstParam = -1;
+      std::string boolName;
+   };
+
+   struct PerfRecord
+   {
+      int   kind      = 0;
+      int   dstIndex  = -1;
+      int   dstParam  = -1;
+      int   dstParam2 = -1;
+      int   cellX = 0, cellY = 0;
+      int   page  = 0;
+      float colorR = 0.0f, colorG = 0.0f, colorB = 0.0f;
+      float value = 0.0f;
+      float value2 = 0.0f;
+      std::string boolName;   // toggle only
+      std::string label;      // empty = inherit the source param's own name
+      std::vector<PerfTarget> targets;
+      std::vector<PerfTarget> targetsY;
+   };
+
+   struct PerfLayoutRecord
+   {
+      int cellSize = 76;
+      int pageCount = 1;
+      std::vector<std::string> pageNames;
+   };
+
    struct Data
    {
       std::vector<NodeRecord> nodes;
@@ -140,6 +177,8 @@ namespace Patch
       std::vector<PaletteRecord> palette;
       std::vector<ExprRecord> expressions;
       std::vector<GlobalRecord> globals;
+      std::vector<PerfRecord> performance;
+      PerfLayoutRecord perfLayout;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

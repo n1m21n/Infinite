@@ -154,3 +154,17 @@ float MacroXYNode::Value01()
 {
    return std::min(1.0f, std::max(0.0f, padX));
 }
+
+float MacroStepGateNode::Value01()
+{
+   if (Transport::Instance().IsPlaying())
+   {
+      const double beats = Transport::Instance().Beats();
+      const float rate = rateBeats > 0.001f ? rateBeats : 0.25f;
+      long long step = (long long)std::floor(beats / (double)rate);
+      mCurrentStep = (int)(((step % 8) + 8) % 8);
+   }
+   bool active = (pattern & (1 << mCurrentStep)) != 0;
+   return active ? 1.0f : 0.0f;
+}
+

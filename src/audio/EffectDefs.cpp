@@ -22,6 +22,9 @@
 #include "dsp/TremoloKernel.h"
 #include "dsp/FormantFilterKernel.h"
 #include "dsp/WavetableShaperKernel.h"
+#include "dsp/ResonatorBankKernel.h"
+#include "dsp/CycleShaperKernel.h"
+#include "dsp/SpecBlurKernel.h"
 #include "MusicTime.h"
 
 namespace
@@ -680,6 +683,59 @@ namespace
          def.params.push_back({ "smooth", 0.0f, 1.0f, 0.0f, false, kSmoothPrereq });
          def.params.push_back({ "output", -24.0f, 12.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<WavetableShaperKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // -------------------------------------------------------- Resonator Bank
+      // A bank of up to 16 parallel bandpass resonators (DspMath::TptSvf).
+      {
+         EffectDef def;
+         def.name = "Resonator Bank";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kResonatorBankSpectrum;
+         def.defaultMix = 0.5f;   // parallel resonance, not a full replacement
+         def.params.push_back({ "rootFreq",  20.0f, 2000.0f, 110.0f });
+         def.params.push_back({ "structure",  0.0f,    3.0f,   0.0f });
+         def.params.push_back({ "poles",      1.0f,   16.0f,   8.0f });
+         def.params.push_back({ "decay",      0.05f,  10.0f,   2.5f });
+         def.params.push_back({ "scatter",    0.0f,    1.0f,   0.0f });
+         def.params.push_back({ "spread",     0.0f,    1.0f,   0.7f });
+         def.params.push_back({ "analog",     0.0f,    1.0f,   0.0f });
+         def.makeKernel = []() { return std::make_unique<ResonatorBankKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ---------------------------------------------------------- Cycle Shaper
+      {
+         EffectDef def;
+         def.name = "Cycle Shaper";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kCycleShaperWave;
+         def.defaultMix = 1.0f;
+         def.params.push_back({ "waveform",   0.0f,   2.0f,   0.0f });
+         def.params.push_back({ "threshold", -60.0f,   0.0f, -36.0f, false, {}, { 0.0f, -3.0f, -6.0f, -60.0f } });
+         def.params.push_back({ "smooth",     0.0f,  32.0f,   8.0f });
+         def.params.push_back({ "analog",     0.0f,   1.0f,   0.0f });
+         def.makeKernel = []() { return std::make_unique<CycleShaperKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // -------------------------------------------------------------- Spec Blur
+      {
+         EffectDef def;
+         def.name = "Spec Blur";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kSpecBlurSpectrum;
+         def.defaultMix = 1.0f;
+         def.params.push_back({ "blurTime", 10.0f, 5000.0f, 300.0f });
+         def.params.push_back({ "tilt", -1.0f, 1.0f, 0.0f, false, { { "blurTime", 1000.0f } } });
+         def.params.push_back({ "diffusion", 0.0f, 1.0f, 0.25f });
+         def.params.push_back({ "freeze", 0.0f, 1.0f, 0.0f });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
+         def.makeKernel = []() { return std::make_unique<SpecBlurKernel>(); };
          defs.push_back(std::move(def));
       }
 
