@@ -31244,6 +31244,8 @@ static void RunRecSyncTest()
       { "render faster than target (60fps -> 30fps)",  60.0, 30.0 },
       { "render exactly at target  (30fps -> 30fps)",  30.0, 30.0 },
       { "render wildly slow        ( 7fps -> 30fps)",   7.0, 30.0 },
+      // vsync off on a light patch: most frames are decimated away.
+      { "render uncapped          (240fps -> 30fps)", 240.0, 30.0 },
    };
 
    for (const Case& c : cases)
@@ -43901,10 +43903,20 @@ int main(int argc, char** argv)
                   ImGui::PopStyleColor();
                ImGui::EndDisabled();
 
+               // Both of these are read once, at StartRecording, and latched
+               // for the take - the recorder fixes its frame rate and its
+               // audio track up front and cannot change either mid-stream.
+               // Leaving them live meant dragging fps during a take silently
+               // did nothing; now it also has to not desync the pacing that
+               // reads it, so say plainly that the take owns them.
+               ImGui::BeginDisabled(n->IsRecording());
                ImGui::SetNextItemWidth(kParamWidth);
                ImGui::SliderInt("fps", &n->recordFps, 1, 60);
 
                ImGui::Checkbox("include audio", &n->includeAudio);
+               ImGui::EndDisabled();
+               if (n->IsRecording() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                  ImGui::SetTooltip("locked for the current take");
                if (n->includeAudio && n->AudioInput().IsConnected())
                {
                   INode* src = n->AudioInput().GetSource();

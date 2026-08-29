@@ -53,6 +53,7 @@ bool OutputNode::StartRecording(const std::string& path)
    // mid-recording resolution change can't corrupt the stream.
    mRecordW = mOut.w & ~1;
    mRecordH = mOut.h & ~1;
+   mRecordFps = recordFps > 0 ? recordFps : 30;
 
    std::string audioPath;
    bool audioLoop = true;
@@ -84,7 +85,7 @@ bool OutputNode::StartRecording(const std::string& path)
    mFramesEmitted = 0;
 
    std::string error;
-   mRecorder = Platform::RecorderStart(path, mRecordW, mRecordH, recordFps, error,
+   mRecorder = Platform::RecorderStart(path, mRecordW, mRecordH, mRecordFps, error,
                                        audioPath, audioLoop, liveAudioSampleRate, 2);
    if (mRecorder == nullptr)
    {
@@ -238,7 +239,7 @@ int OutputNode::PacedRepeatCount(bool finalDrain)
 {
    if (!mPaceToAudio)
       return 1;
-   return PacedRepeat(mAudioFramesAppended, mAudioSampleRate, recordFps, mFramesEmitted, finalDrain);
+   return PacedRepeat(mAudioFramesAppended, mAudioSampleRate, mRecordFps, mFramesEmitted, finalDrain);
 }
 
 void OutputNode::FlushReadbacks()
@@ -320,8 +321,25 @@ void OutputNode::CaptureFrame()
       // waiting to be consumed by the read side below - glReadPixels into a
       // bound PBO returns immediately (a GPU-to-GPU copy), so this never
       // stalls the render thread.
+      // With vsync off (or a light patch on a fast GPU) the render loop can
+      // run many times the target rate, and every one of those frames would
+      // otherwise cost a full-resolution glReadPixels whose result the pacing
+      // below just discards. Count what the pipeline already holds and skip
+      // issuing a readback we are certain to decimate - if that guess leaves
+      // us short later, the padding path covers it, so this can only cost a
+      // slightly staler frame, never sync.
+      int inFlight = 0;
+      for (int i = 0; i < kPboCount; i++)
+      {
+         if (mPbo[i].pending)
+            inFlight++;
+      }
+      const bool alreadyAhead =
+         mPaceToAudio && PacedRepeat(mAudioFramesAppended, mAudioSampleRate, mRecordFps,
+                                     mFramesEmitted + inFlight, false) == 0;
+
       PboSlot& writeSlot = mPbo[mPboWriteIndex];
-      if (!writeSlot.pending)
+      if (!writeSlot.pending && !alreadyAhead)
       {
          GLint prevFbo = 0;
          glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);

@@ -103,6 +103,15 @@ private:
    Platform::RecorderHandle* mRecorder = nullptr;
    int mRecordW = 0;
    int mRecordH = 0;
+   // Latched for the whole take alongside the dimensions above, and for the
+   // same reason. The recorder fixes its video PTS denominator at
+   // RecorderStart and never re-reads it, so pacing against a `recordFps` the
+   // user can still drag mid-take would have the pacer and the muxer working
+   // off two different frame rates - dragging 30 -> 60 would emit frames twice
+   // as fast as the encoder stamps them, stretching the video to double length
+   // against real audio. The UI disables the slider while recording too; this
+   // is the half that doesn't depend on the UI getting it right.
+   int mRecordFps = 30;
    std::string mRecordStatus;
    int mLastFrames = 0;
    int mLastDropped = 0;
