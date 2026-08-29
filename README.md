@@ -200,6 +200,24 @@ src/
 
 ---
 
+## Contributing
+
+Contributions from the community are warmly welcome! Whether you are reporting bugs, improving documentation, designing new nodes, or submitting performance optimizations, here is how you can get started:
+
+### Ways to Contribute
+1. **Report Issues & Bugs**: [Open an issue on GitHub](https://github.com/n1m21n/Infinite/issues) describing the bug with clear reproduction steps, platform info (macOS / Windows), and patch files if applicable.
+2. **Feature Ideas & Discussions**: Share concepts, share node creations, or discuss architecture ideas in our [Discord Community](https://discord.gg/wpKdexvhn).
+3. **Submit Code & Nodes**:
+   - **Fork the repository** and create a descriptive feature branch (`git checkout -b feature/my-new-node`).
+   - **Review Standards**: Familiarize yourself with [docs/CODE_STANDARDS.md](docs/CODE_STANDARDS.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
+   - **Clean-room Discipline**: Infinite is MIT-licensed; never copy GPL source code.
+   - **Validate & Test**:
+     - On macOS: Build via `cmake --build build` and test the UI/audio playback.
+     - On Windows: Run verification builds and tests (`$env:INFINITE_DSPTEST = "1"; .\build\Release\Infinite.exe`).
+   - **Open a Pull Request**: Submit your PR with a clear summary of changes, rationale, and testing steps.
+
+---
+
 ## License
 
 Infinite's own source is licensed under the **MIT License** — see [LICENSE](LICENSE). Because VST3 hosting is included by default and links the GPLv3-licensed Steinberg VST3 SDK, the distributed binary of a default build is GPLv3; build with `-DINFINITE_ENABLE_VST3=OFF` for a plain-MIT binary.
@@ -210,4 +228,5 @@ Infinite's own source is licensed under the **MIT License** — see [LICENSE](LI
 - [stb](https://github.com/nothings/stb) (Public Domain)
 - [GLFW](https://github.com/glfw/glfw) (zlib)
 - [Steinberg VST3 SDK](https://github.com/steinbergmedia/vst3sdk) (GPLv3, or proprietary Steinberg license)
+
 
