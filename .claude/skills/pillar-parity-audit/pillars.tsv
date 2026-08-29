@@ -1,0 +1,29 @@
+# Infinite's functional pillars, and the evidence that each one works.
+#
+# id | name | macOS fixtures (NAME:frames) | Windows lane | grade
+#
+# Grades:
+#   A  executed on both platforms by machine
+#   B  executed on macOS; the Windows half is asserted statically (static-checks.sh)
+#   C  executed on macOS only; Windows rests on review + the Parallels pass
+#   D  no execution anywhere - manual protocol or static guard only
+#
+# Fixtures listed here are the ones NOT already covered by
+# run-infinite-hygiene/driver.sh, plus the driver's own for context. audit.sh
+# runs the whole column; --new-only runs just what the hygiene gate skips.
+#
+P1|Nodes construct, save, and die cleanly|ROUNDTRIPTEST:35!,PINDUPTEST:10!,DELETECRASHTEST:8!,INSTANCESWEEPTEST:40,AUDIOTEARDOWNSWEEPTEST:10!|AUDIOPARAMSWEEPTEST crash-check (exercises node registration)|C
+P2|Keyboard shortcuts|-|-|D
+P3|Settings, indexes, and per-user state|-|-|D
+P4|Rendering (3D, shading, materials, caches)|3DTEST:35!,SHADOWTEST:35!,MATFRAMETEST:35!,MAPTEST:35!,ENVTEST:14!,RENDER3DLIVETEST:40,RENDER3DCACHESWEEPTEST:40|none - CI runners have no GPU|C
+P5|Panels and browsers|BROWSERSORTTEST:40,MODMATRIXTEST:25!,PERFMATRIXTEST:1!|PERFMATRIXTEST (exit-code gated, headless)|C
+P6|Modulation|MODMATRIXTEST:25!,MODBOUNDSTEST:30!,MACROTEST:30!,NOTEFANOUTTEST:40|PERFMATRIXTEST|C
+P7|Audio / video / compositing / geometry basics|AUDIOGRAPHTEST:8!,AUDIOPCMTEST:40,DSPTEST:40,CYCLESHAPERTEST:40,VIDEOAUDIOTEST:70!,GEOTEST:30!,MESHOPTEST:30!,PARTICLETEST:40,UTILTEST:40|DSPTEST,AUDIOPDCTEST,REMOVEBGTEST|A
+P8|Input / output (devices, files, drag-drop, net)|SAMPLERDRAGTEST:600!,MEDIADRAGTEST:600!,PLUGINDRAGTEST:600!,RECTEARDOWNTEST:40|none|C
+P9|Performance and frame pacing|FPSTEST:70,TRANSPORTCLOCKTEST:40|none|C
+P10|Save, autosave, recovery, crash diagnostics|PATCHTEST:30!,AUTOSAVETEST:8!,AUTOSAVEMARKERTEST:1!|-|C
+P11|Platform-layer contract|-|static-checks.sh (symbol + build parity)|B
+P12|Build and distribution integrity|-|build.yml: static-CRT import scan, both arches|B
+P13|Dual-path numeric equivalence (__APPLE__ vs portable)|DSPTEST:40|DSPTEST on the real Windows runner|B
+P14|Text and typography (glyph metrics, outlines)|-|none - defect 1.4 is open|D
+P15|UI/UX conformance|MINIVIEWPORTTEST:12!,COLORTEST:13!,PALETTETEST:30!|none|C
