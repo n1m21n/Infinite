@@ -567,9 +567,10 @@ namespace Platform
       return slash == std::string::npos ? std::string() : exe.substr(0, slash + 1) + "infinite-vst3-scanner.exe";
    }
 
-   void SuppressAppUIForScanChild()
+   void SuppressAppUIForHeadlessProcess()
    {
-      // macOS-only Dock-icon dance; the Windows scan child is a console-less
+      // macOS-only Dock-icon dance; a hidden GLFW window already has no
+      // taskbar presence on Windows, and the scan child is a console-less
       // process with no window station presence of its own.
    }
 

@@ -19,8 +19,12 @@ exits non-zero if anything failed. Full raw output per check is saved to
 `/tmp/infinite_test_<NAME>.log` so a failure can be read in full.
 
 Flags:
+- `--fast` — Tier 1: pre-commit smoke (~8s, 11 critical checks for graph integrity, round-trip, undo, pins)
+- `--auto` — Tier 1 + auto-detected subsystem groups based on `git diff`
+- `--group <audio,3d,...>` — Tier 2: run specific subsystem groups (`audio`, `3d`/`geometry`, `ui`/`editor`, `modulation`, `video`/`export`, `media`/`browser`, `compositing`/`misc`)
+- `--full` — Tier 3: full 60+ check matrix + screenshot smoke (default when no tier flag is passed)
 - `--skip-build` — reuse the existing `build/` tree (fast iteration once you've built once)
-- `--shot-only` — just build + screenshot, skip the 32-check suite (quick visual spot-check)
+- `--shot-only` — just build + screenshot, skip the test suite (quick visual spot-check)
 
 Read the screenshot it writes (`/tmp/infinite_hygiene_shot.png`) with the
 Read tool to eyeball that node previews, chrome, and text are actually

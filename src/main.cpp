@@ -34143,7 +34143,7 @@ int main(int argc, char** argv)
       // Must happen before DescribeVST3Bundle touches any plugin code - see
       // the function's doc comment for why a scanned plugin can otherwise
       // make this child process pop up as a spurious extra Infinite window.
-      Platform::SuppressAppUIForScanChild();
+      Platform::SuppressAppUIForHeadlessProcess();
 
 #if defined(_WIN32)
       // stdout defaults to text mode, which translates '\n' to '\r\n' and
@@ -34178,6 +34178,33 @@ int main(int argc, char** argv)
       return 0;
    }
 
+   // Dev/test harness runs (INFINITE_EXITAFTER) and screenshot mode
+   // (IMAGERESYNTH_SCREENSHOT) create the window off-screen: a hidden window
+   // still has a real GL context and still produces real ImGui frames, real GL
+   // draws, and a real backbuffer glReadPixels can read from - verified
+   // directly, a hidden-window screenshot is pixel-identical to a visible-
+   // window one. Hiding it means the hygiene suite's visual smoke test no
+   // longer flashes an app window on screen, never steals focus from whatever
+   // the person running the suite is actually doing, and - because
+   // WindowServer isn't waiting on it - a slow frame no longer trips the
+   // 10-second unresponsive watchdog that writes a "hang" spindump to the
+   // Desktop.
+   const bool gHeadlessTestWindow = getenv("INFINITE_EXITAFTER") != nullptr ||
+                                    getenv("IMAGERESYNTH_SCREENSHOT") != nullptr;
+   // The Dock icon comes from NSApplication's activation policy, not window
+   // visibility, so GLFW_VISIBLE=false alone still leaves a headless test run
+   // bouncing in the Dock. Must claim the shared-application singleton before
+   // glfwInit() does (see the function's doc comment) - and glfwInit() itself
+   // unconditionally resets the policy back to Regular unless the
+   // GLFW_COCOA_MENUBAR init hint is off first (cocoa_init.m: "in case we are
+   // unbundled, make us a proper UI application"), so both are needed or the
+   // Prohibited policy above gets clobbered a few lines later.
+   if (gHeadlessTestWindow)
+   {
+      Platform::SuppressAppUIForHeadlessProcess();
+      glfwInitHint(GLFW_COCOA_MENUBAR, GLFW_FALSE);
+   }
+
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
    {
@@ -34196,17 +34223,6 @@ int main(int argc, char** argv)
    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
-   // Dev/test harness runs (INFINITE_EXITAFTER) create the window off-screen:
-   // a hidden window still has a real GL context and still produces real ImGui
-   // frames and GL draws, but it never steals focus from whatever the person
-   // running the suite is actually doing, and - because WindowServer isn't
-   // waiting on it - a slow frame no longer trips the 10-second unresponsive
-   // watchdog that writes a "hang" spindump to the Desktop.
-   //
-   // Screenshot mode is the one exception: it glReadPixels the default
-   // framebuffer, which needs a real on-screen drawable.
-   const bool gHeadlessTestWindow = getenv("INFINITE_EXITAFTER") != nullptr &&
-                                    getenv("IMAGERESYNTH_SCREENSHOT") == nullptr;
    if (gHeadlessTestWindow)
    {
       glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
@@ -34261,7 +34277,10 @@ int main(int argc, char** argv)
       return ok ? 0 : 1;
    }
 
-   glfwSwapInterval(1);
+   if (gHeadlessTestWindow)
+      glfwSwapInterval(0);
+   else
+      glfwSwapInterval(1);
    Platform::PreventAppNap();
 
    // Covers both the red close button and Cmd+Q: GLFW's Cocoa backend routes
@@ -34392,6 +34411,8 @@ int main(int argc, char** argv)
    // Embedded local control server (see docs/plans - RemoteControl) - lets an
    // external tool (the Infinite MCP server) drive this running instance.
    // Loopback-only; port overridable for running more than one instance.
+   // Skipped in headless/test modes so self-test runs do not bind/unbind port 7777.
+   if (getenv("INFINITE_EXITAFTER") == nullptr && getenv("IMAGERESYNTH_SCREENSHOT") == nullptr)
    {
       int controlPort = 7777;
       if (const char* portEnv = getenv("INFINITE_CONTROL_PORT"))
@@ -34685,7 +34706,8 @@ int main(int argc, char** argv)
          SpawnNode("Plugin", "AudioEffects", 900.0f, 60.0f); // 0
          gNodePanelOpen = true;
          gSearchPanelMode = 3;
-         gPluginScanner.StartScan();
+         AppPaths::EnsureDir(TmpPath("infinite_plugindrag"));
+         gPluginScanner.StartScan(TmpPath("infinite_plugindrag"));
       }
       else if (getenv("INFINITE_MEDIADRAGTEST") != nullptr)
       {

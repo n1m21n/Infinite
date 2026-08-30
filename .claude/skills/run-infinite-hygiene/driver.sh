@@ -11,9 +11,12 @@
 # reports pass/fail per check.
 #
 # Usage:
-#   .claude/skills/run-infinite-hygiene/driver.sh              # full suite
-#   .claude/skills/run-infinite-hygiene/driver.sh --skip-build  # reuse existing build/
-#   .claude/skills/run-infinite-hygiene/driver.sh --shot-only   # just render + screenshot, no test suite
+#   .claude/skills/run-infinite-hygiene/driver.sh --fast              # Tier 1: pre-commit smoke (~8s)
+#   .claude/skills/run-infinite-hygiene/driver.sh --auto              # Tier 1 + auto-detected groups from git diff
+#   .claude/skills/run-infinite-hygiene/driver.sh --group audio,3d    # Tier 2: specific subsystem groups
+#   .claude/skills/run-infinite-hygiene/driver.sh --full              # Tier 3: full suite + screenshot smoke (default)
+#   .claude/skills/run-infinite-hygiene/driver.sh --skip-build        # reuse existing build/
+#   .claude/skills/run-infinite-hygiene/driver.sh --shot-only         # just render + screenshot, no test suite
 #
 # Exit code: 0 if the build succeeded and every check passed, 1 otherwise.
 
@@ -30,11 +33,27 @@ BUILD_DIR="build"
 BIN="$BUILD_DIR/Infinite.app/Contents/MacOS/Infinite"
 SKIP_BUILD=0
 SHOT_ONLY=0
-for arg in "$@"; do
-  case "$arg" in
-    --skip-build) SKIP_BUILD=1 ;;
-    --shot-only) SHOT_ONLY=1 ;;
-    *) echo "unknown arg: $arg" >&2; exit 2 ;;
+TIER="full"
+EXPLICIT_GROUPS=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-build) SKIP_BUILD=1; shift ;;
+    --shot-only) SHOT_ONLY=1; shift ;;
+    --fast) TIER="fast"; shift ;;
+    --auto) TIER="auto"; shift ;;
+    --full) TIER="full"; shift ;;
+    --group)
+      TIER="group"
+      EXPLICIT_GROUPS="$2"
+      shift 2
+      ;;
+    --group=*)
+      TIER="group"
+      EXPLICIT_GROUPS="${1#*=}"
+      shift
+      ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
@@ -53,10 +72,103 @@ FAIL=0
 FAILED_NAMES=()
 EXPECTED_FILE="$(dirname "${BASH_SOURCE[0]}")/audio-param-sweep-expected.txt"
 
-# name:exitAfter — chosen empirically (each verified in-session to print its
-# full verdict by that frame; padded a few frames for safety). Grouped by
-# what they exercise; see SKILL.md for the map.
-TESTS=(
+# ---------------------------------------------------------------------------
+# Tier definitions per docs/plans/test-tiering.md
+# ---------------------------------------------------------------------------
+
+TIER1_CHECKS=(
+  "UNDOTEST:10"
+  "PATCHTEST:30"
+  "ROUNDTRIPTEST:35"
+  "PINDUPTEST:10"
+  "BYPASSTEST:30"
+  "DELETECRASHTEST:8"
+  "DSPTEST:1"
+  "PERFMATRIXTEST:1"
+  "AUDIOPDCTEST:1"
+  "RECSYNCTEST:1"
+  "AUTOSAVEMARKERTEST:1"
+)
+
+GROUP_AUDIO=(
+  "AUDIOPARAMSWEEPTEST:1"
+  "AUDIOTEARDOWNSWEEPTEST:10"
+  "AUDIOGRAPHTEST:8"
+  "AUDIOLIFECYCLETEST:8"
+  "AUDIORECOVERYTEST:8"
+  "AUDIOPDCTEST:1"
+  "RECSYNCTEST:1"
+  "RECEXPORTTEST:1"
+)
+
+GROUP_3D=(
+  "GEOTEST:30"
+  "MESHOPTEST:30"
+  "TEXT3DTEST:30"
+  "PATHOCEANTEST:35"
+  "SHADOWTEST:35"
+  "MATFRAMETEST:35"
+  "MAPTEST:35"
+  "PADPATHTEST:35"
+  "3DTEST:35"
+  "TRANSFORMSWEEPTEST:10"
+  "MAPPINGSWEEPTEST:10"
+  "REVISIONSWEEPTEST:10"
+  "ENVTEST:14"
+  "WRAPTEST:35"
+)
+
+GROUP_UI=(
+  "GROUPTEST:30"
+  "COMMENTTEST:15"
+  "HIDETEST:35"
+  "SELECTTEST:35"
+  "DISTRIBUTETEST:10"
+  "INSTANCESELECTTEST:10"
+  "MINIVIEWPORTTEST:12"
+  "COLORTEST:13"
+  "PALETTETEST:30"
+  "DRAGTEST:35"
+  "WTDRAGTEST:80"
+)
+
+GROUP_MODULATION=(
+  "MACROTEST:30"
+  "MODBOUNDSTEST:30"
+  "MODMATRIXTEST:25"
+  "PERFMATRIXTEST:1"
+)
+
+GROUP_VIDEO=(
+  "VIDEOAUDIOTEST:70"
+  "VIDEOSPEEDTEST:186"
+  "RECEXPORTTEST:1"
+  "RECSYNCTEST:1"
+)
+
+GROUP_MEDIA=(
+  "SAMPLERDRAGTEST:600"
+  "MEDIADRAGTEST:600"
+  "PLUGINDRAGTEST:600"
+  "PLUGINSCANTEST:1"
+  "BROWSERSORTTEST:1"
+)
+
+GROUP_COMPOSITING=(
+  "PHASEATEST:35"
+  "PHASECTEST:35"
+  "PHASEDTEST:35"
+  "PHASEETEST:35"
+  "PHASEFTEST:35"
+  "PHASE1TEST:35"
+  "PHASE4TEST:10"
+  "BUGTEST:35"
+  "FIXTEST:35"
+  "LIVETEST:35"
+  "REMOVEBGTEST:1"
+)
+
+FULL_TESTS=(
   "UNDOTEST:10"
   "UNDOPERFTEST:10"
   "PATCHTEST:30"
@@ -105,19 +217,10 @@ TESTS=(
   "VIDEOSPEEDTEST:186"
   "DRAGTEST:35"
   "WTDRAGTEST:80"
-  # Spawns every registered node type with both param sections forced open and
-  # asserts no node hands two of its controls the same pin id - which used to
-  # hang the app outright (circular pin list in imgui-node-editor). Needs the
-  # bodies open, so ROUNDTRIPTEST's collapsed pass does not cover it.
   "PINDUPTEST:10"
-  # Headless (exits before glfwInit) and exit-code gated, so the frame budget
-  # is irrelevant - a non-zero exit is reported as a crash above, which is the
-  # right verdict for it. Covers the performance matrix's patch round trip,
-  # including multi-target elements and page names.
   "PERFMATRIXTEST:1"
   "AUDIOPARAMSWEEPTEST:1"
   "AUDIOTEARDOWNSWEEPTEST:10"
-  # Headless (exits before glfwInit), like AUDIOPARAMSWEEPTEST above.
   "AUDIOPDCTEST:1"
   "RECSYNCTEST:1"
   "RECEXPORTTEST:1"
@@ -126,16 +229,104 @@ TESTS=(
   "SAMPLERDRAGTEST:600"
   "MEDIADRAGTEST:600"
   "PLUGINDRAGTEST:600"
-  # Headless (exits before glfwInit), so the frame budget is irrelevant to it -
-  # it polls a real asynchronous AU instantiation on its own bounded timer.
   "PLUGINSCANTEST:1"
   "AUTOSAVEMARKERTEST:1"
-  # Headless (exits before glfwInit), like PLUGINSCANTEST above. Prints
-  # "REMOVEBGTEST SKIP" rather than OK/FAIL on a platform/OS with no
-  # SubjectMask backend yet - that's an expected state, not a failure, so it
-  # is intentionally not treated as one below.
   "REMOVEBGTEST:1"
 )
+
+# Helper to add checks uniquely to an array
+declare -a SELECTED_TESTS=()
+add_checks() {
+  for item in "$@"; do
+    local exists=0
+    for existing in "${SELECTED_TESTS[@]}"; do
+      if [[ "$existing" == "$item" ]]; then
+        exists=1; break
+      fi
+    done
+    if [[ $exists -eq 0 ]]; then
+      SELECTED_TESTS+=("$item")
+    fi
+  done
+}
+
+add_group() {
+  local grp="$1"
+  case "$grp" in
+    audio) add_checks "${GROUP_AUDIO[@]}" ;;
+    3d|geometry) add_checks "${GROUP_3D[@]}" ;;
+    ui|editor) add_checks "${GROUP_UI[@]}" ;;
+    modulation) add_checks "${GROUP_MODULATION[@]}" ;;
+    video|export) add_checks "${GROUP_VIDEO[@]}" ;;
+    media|browser) add_checks "${GROUP_MEDIA[@]}" ;;
+    compositing|misc) add_checks "${GROUP_COMPOSITING[@]}" ;;
+    *) echo "Warning: unknown group '$grp' ignored" >&2 ;;
+  esac
+}
+
+RUN_SHOT=0
+
+if [[ "$TIER" == "fast" ]]; then
+  echo "Tier 1: Pre-commit smoke (${#TIER1_CHECKS[@]} checks)"
+  add_checks "${TIER1_CHECKS[@]}"
+elif [[ "$TIER" == "group" ]]; then
+  echo "Tier 2: Explicit groups [$EXPLICIT_GROUPS]"
+  IFS=',' read -ra GRP_ARRAY <<< "$EXPLICIT_GROUPS"
+  for g in "${GRP_ARRAY[@]}"; do
+    add_group "$g"
+  done
+elif [[ "$TIER" == "auto" ]]; then
+  DIFF_FILES=$(git diff --name-only HEAD 2>/dev/null || true)
+  STAGED_FILES=$(git diff --cached --name-only 2>/dev/null || true)
+  UNTRACKED_FILES=$(git status --porcelain 2>/dev/null | awk '{print $2}' || true)
+  ALL_DIFF=$(printf "%s\n%s\n%s" "$DIFF_FILES" "$STAGED_FILES" "$UNTRACKED_FILES" | sort -u | grep -v '^$' || true)
+
+  if echo "$ALL_DIFF" | grep -qE 'src/core/Patch\.cpp|NodeFactory|INode\.h'; then
+    echo "Tier auto: Cross-cutting change detected in diff -> escalating to Tier 3 (Full suite)"
+    TIER="full"
+    SELECTED_TESTS=("${FULL_TESTS[@]}")
+    RUN_SHOT=1
+  elif [[ -z "$ALL_DIFF" ]]; then
+    echo "Tier auto: No local diff detected -> running Tier 1 smoke"
+    add_checks "${TIER1_CHECKS[@]}"
+  else
+    add_checks "${TIER1_CHECKS[@]}"
+    SELECTED_GROUPS=()
+    if echo "$ALL_DIFF" | grep -qE 'src/audio/|src/nodes/Audio|Sequencer|Resonator'; then
+      SELECTED_GROUPS+=("audio"); add_group "audio"
+    fi
+    if echo "$ALL_DIFF" | grep -qE 'src/nodes/Geometry|Mesh|src/core/Mesh\.|3D|Ocean|Path'; then
+      SELECTED_GROUPS+=("3d"); add_group "3d"
+    fi
+    if echo "$ALL_DIFF" | grep -qE 'src/main\.cpp|src/core/NodeViewport\.|imgui'; then
+      SELECTED_GROUPS+=("ui"); add_group "ui"
+    fi
+    if echo "$ALL_DIFF" | grep -qE 'src/core/Modulation\.|Macro|PerfMatrix'; then
+      SELECTED_GROUPS+=("modulation"); add_group "modulation"
+    fi
+    if echo "$ALL_DIFF" | grep -qE 'OutputNode|Recorder|Muxer|Decoder|Platform.*Video'; then
+      SELECTED_GROUPS+=("video"); add_group "video"
+    fi
+    if echo "$ALL_DIFF" | grep -qE 'Scanner|Browser|SampleFolders|MediaFolders'; then
+      SELECTED_GROUPS+=("media"); add_group "media"
+    fi
+    if echo "$ALL_DIFF" | grep -qE 'src/nodes/Blend|Curves|Feedback|Filter'; then
+      SELECTED_GROUPS+=("compositing"); add_group "compositing"
+    fi
+
+    if [[ ${#SELECTED_GROUPS[@]} -gt 0 ]]; then
+      echo "Tier auto: Selected Tier 1 + groups [${SELECTED_GROUPS[*]}] (${#SELECTED_TESTS[@]} checks total)"
+    else
+      echo "Tier auto: No specific subsystem diff detected -> running Tier 1 smoke (${#SELECTED_TESTS[@]} checks)"
+    fi
+  fi
+fi
+
+if [[ "$TIER" == "full" ]]; then
+  echo "Tier 3: Full gate (${#FULL_TESTS[@]} checks + screenshot smoke)"
+  SELECTED_TESTS=("${FULL_TESTS[@]}")
+  RUN_SHOT=1
+fi
 
 step() { printf '\n== %s ==\n' "$1"; }
 
@@ -166,27 +357,29 @@ if [ ! -x "$BIN" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-step "Visual smoke (screenshot)"
-SHOT="/tmp/infinite_hygiene_shot.png"
-rm -f "$SHOT"
-IMAGERESYNTH_SCREENSHOT="$SHOT" INFINITE_SHOWCASE=1 "$BIN" >/tmp/infinite_shot.log 2>&1
-if [ -f "$SHOT" ]; then
-  echo "wrote $SHOT — Read it to eyeball rendering (nodes, previews, chrome all draw correctly)"
-else
-  echo "SCREENSHOT FAILED — see /tmp/infinite_shot.log"
-  FAIL=$((FAIL+1))
-  FAILED_NAMES+=("SCREENSHOT")
-fi
+if [ "$RUN_SHOT" -eq 1 ] || [ "$SHOT_ONLY" -eq 1 ]; then
+  step "Visual smoke (screenshot)"
+  SHOT="/tmp/infinite_hygiene_shot.png"
+  rm -f "$SHOT"
+  IMAGERESYNTH_SCREENSHOT="$SHOT" INFINITE_SHOWCASE=1 "$BIN" >/tmp/infinite_shot.log 2>&1
+  if [ -f "$SHOT" ]; then
+    echo "wrote $SHOT — Read it to eyeball rendering (nodes, previews, chrome all draw correctly)"
+  else
+    echo "SCREENSHOT FAILED — see /tmp/infinite_shot.log"
+    FAIL=$((FAIL+1))
+    FAILED_NAMES+=("SCREENSHOT")
+  fi
 
-if [ "$SHOT_ONLY" -eq 1 ]; then
-  echo
-  echo "shot-only run — skipping test suite"
-  exit 0
+  if [ "$SHOT_ONLY" -eq 1 ]; then
+    echo
+    echo "shot-only run — skipping test suite"
+    exit 0
+  fi
 fi
 
 # ---------------------------------------------------------------------------
-step "Self-test suite (${#TESTS[@]} checks)"
-for spec in "${TESTS[@]}"; do
+step "Self-test suite (${#SELECTED_TESTS[@]} checks)"
+for spec in "${SELECTED_TESTS[@]}"; do
   name="${spec%%:*}"
   frames="${spec##*:}"
   out="/tmp/infinite_test_${name}.log"

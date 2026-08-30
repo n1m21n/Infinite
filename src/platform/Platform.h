@@ -422,18 +422,27 @@ namespace Platform
    std::string ExecutablePath();
    std::string ScannerExecutablePath();
 
-   // Must be called first thing in the "--vst3-scan-bundle" child process,
-   // before any plugin code runs. The child is a re-exec of this same app
-   // binary, so it shares our bundle identity - if a scanned plugin's Cocoa
-   // UI classes touch [NSApplication sharedApplication] during their static
-   // init/factory instantiation (common for VST3 bundles with a Cocoa
-   // editor), AppKit lazily creates a default-policy shared application for
-   // *this* process and it shows up as its own Dock icon/window, i.e. a
-   // spurious extra "Infinite" instance. Creating the shared application
-   // ourselves first and setting it to the Prohibited activation policy
-   // claims that singleton before the plugin can, so nothing the plugin does
-   // afterward can make the child visible.
-   void SuppressAppUIForScanChild();
+   // Claims the shared NSApplication singleton with the Prohibited activation
+   // policy before anything else can - the Dock icon comes from activation
+   // policy, not window visibility, so a hidden GLFW window (GLFW_VISIBLE =
+   // false) still shows up in the Dock unless this runs first. Two callers:
+   //
+   //  - First thing in the "--vst3-scan-bundle" child process, before any
+   //    plugin code runs. The child is a re-exec of this same app binary, so
+   //    it shares our bundle identity - if a scanned plugin's Cocoa UI classes
+   //    touch [NSApplication sharedApplication] during their static
+   //    init/factory instantiation (common for VST3 bundles with a Cocoa
+   //    editor), AppKit lazily creates a default-policy shared application for
+   //    *this* process and it shows up as its own Dock icon/window, i.e. a
+   //    spurious extra "Infinite" instance.
+   //  - Before glfwInit() on a headless test/screenshot run (INFINITE_EXITAFTER
+   //    / IMAGERESYNTH_SCREENSHOT), so the hygiene suite's fixtures don't flash
+   //    an icon into the Dock even though their window is never shown.
+   //
+   // Creating the shared application ourselves first and setting it to
+   // Prohibited claims that singleton before anything else can, so nothing
+   // afterward - plugin or GLFW - can make the process visible.
+   void SuppressAppUIForHeadlessProcess();
 
    // Resolves a dropped .vst3 bundle back to the plugin description(s) it contains.
    bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out);

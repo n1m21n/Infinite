@@ -4129,7 +4129,7 @@ namespace Platform
       return std::string();
    }
 
-   void SuppressAppUIForScanChild()
+   void SuppressAppUIForHeadlessProcess()
    {
       @autoreleasepool
       {
