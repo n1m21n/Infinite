@@ -3377,7 +3377,6 @@ namespace
       REGISTER_NODE(RandomNode, Random, "Modulators");
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
       REGISTER_NODE(MathNode, Math, "Modulators");
-      REGISTER_NODE(ModMixerNode, Mod Mixer, "Modulators");
       REGISTER_NODE(CompareNode, Compare, "Modulators");
       REGISTER_NODE(RangeToRangeNode, Range to Range, "Modulators");
       REGISTER_NODE(SmoothNode, Smoothing, "Modulators");
@@ -5340,31 +5339,6 @@ namespace
          ImGui::TextDisabled("B: patched");
       ModSlider("gain", &n->gain, -4.0f, 4.0f);
       ModSlider("offset", &n->offset, -1.0f, 1.0f);
-      ModCheckbox("clamp to 0..1", &n->clampOutput);
-   }
-
-   void DrawModMixerParams(ModMixerNode* n)
-   {
-      DropdownButton("mode", ModMixerNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
-
-      ModCheckbox("mute 1", &n->mutes[0]);
-      ModSlider("weight 1", &n->weights[0], -2.0f, 2.0f);
-      ModSlider("fallback 1", &n->constantIn[0], 0.0f, 1.0f);
-
-      ModCheckbox("mute 2", &n->mutes[1]);
-      ModSlider("weight 2", &n->weights[1], -2.0f, 2.0f);
-      ModSlider("fallback 2", &n->constantIn[1], 0.0f, 1.0f);
-
-      ModCheckbox("mute 3", &n->mutes[2]);
-      ModSlider("weight 3", &n->weights[2], -2.0f, 2.0f);
-      ModSlider("fallback 3", &n->constantIn[2], 0.0f, 1.0f);
-
-      ModCheckbox("mute 4", &n->mutes[3]);
-      ModSlider("weight 4", &n->weights[3], -2.0f, 2.0f);
-      ModSlider("fallback 4", &n->constantIn[3], 0.0f, 1.0f);
-
-      ModSlider("gain", &n->masterGain, -4.0f, 4.0f);
-      ModSlider("offset", &n->masterOffset, -1.0f, 1.0f);
       ModCheckbox("clamp to 0..1", &n->clampOutput);
    }
 
@@ -44430,8 +44404,6 @@ int main(int argc, char** argv)
                DrawPatternParams(n);
             else if (auto* n = dynamic_cast<MathNode*>(gn.node.get()))
                DrawMathParams(n);
-            else if (auto* n = dynamic_cast<ModMixerNode*>(gn.node.get()))
-               DrawModMixerParams(n);
             else if (auto* n = dynamic_cast<CompareNode*>(gn.node.get()))
                DrawCompareParams(n);
             else if (auto* n = dynamic_cast<RangeToRangeNode*>(gn.node.get()))
