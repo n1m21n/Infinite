@@ -35405,6 +35405,41 @@ int main(int argc, char** argv)
          out->includeAudio = false;
          out->recordFps = 30;
       }
+      else if (getenv("INFINITE_OFFLINERENDERTEST") != nullptr)
+      {
+         // Offline Render's whole point is that it drives the graph and audio
+         // engine in lockstep, independent of wall-clock time - so unlike
+         // every other recording test above, the audio source here is a live
+         // synth (Oscillator) rather than an AudioFileNode. That matters
+         // because StartOfflineRender special-cases AudioFileNode sources
+         // (baking the file straight into the muxer) and only exercises the
+         // AudioEngine::ProcessOffline + capture-ring path - the actually new
+         // code - for everything else.
+         SpawnNode("Shape", "Source", 40.0f, 40.0f);       // 0
+         SpawnNode("Output", "Utility", 320.0f, 40.0f);    // 1
+         SpawnNode("Oscillator", "Synths", 40.0f, 400.0f); // 2
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         auto* osc = static_cast<OscillatorNode*>(gNodes[2].node.get());
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         out->includeAudio = true;
+         out->AudioInput().Connect(osc);
+         out->recordVideoPath = TmpPath("infinite_offlinerender.mov");
+         out->offlineFps = 10;
+         out->offlineDurationSeconds = 1;
+         out->offlinePrerollFrames = 2;
+         RebuildAudioTopology();
+      }
+      else if (getenv("INFINITE_OFFLINERENDERREFUSETEST") != nullptr)
+      {
+         // A hardware-driven source (Video In) anywhere in the patch must
+         // make StartOfflineRenderSession refuse up front - there is no
+         // camera feed to replay deterministically outside wall-clock time.
+         SpawnNode("Video In", "Source", 40.0f, 40.0f);    // 0
+         SpawnNode("Output", "Utility", 320.0f, 40.0f);    // 1
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         out->recordVideoPath = TmpPath("infinite_offlinerenderrefuse.mov");
+      }
       else if (getenv("INFINITE_PATCHTEST") != nullptr)
       {
          // A patch touching every kind of connection: image cables, a geometry
@@ -42028,6 +42063,54 @@ int main(int argc, char** argv)
             (void)reverseUpdates;
             printf("%s\n", (reverseOk && forwardOk) ? "VIDEOSPEEDTEST OK" : "VIDEOSPEEDTEST FAIL - BUG");
          }
+      }
+
+      if (getenv("INFINITE_OFFLINERENDERTEST") != nullptr)
+      {
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         if (frameId == 2)
+         {
+            StartOfflineRenderSession(out);
+            printf("start: active=%d status=%s\n", (int)gOfflineRender.active, out->RecordStatus().c_str());
+         }
+         static bool sOfflineDone = false;
+         static int sOfflineDoneFrame = -1;
+         // The offline pump can finish the whole take (all 10 frames, plus
+         // preroll) within a single outer loop iteration - it's bounded by a
+         // wall-clock budget, not a frame count - so completion is polled by
+         // state rather than assumed to land on any particular frameId.
+         if (!sOfflineDone && frameId >= 3 && !gOfflineRender.active && !out->IsOfflineFinalizing())
+         {
+            sOfflineDone = true;
+            sOfflineDoneFrame = frameId;
+            printf("finalize done at frameId=%d: frames=%d status=%s\n",
+                   frameId, out->LastRecordedFrames(), out->RecordStatus().c_str());
+         }
+         // AVFoundation's asset metadata for a file this same process just
+         // finished writing can lag the on-disk bytes by a beat or two (the
+         // same reason INFINITE_AUDIORECTEST checks its movie ~2s/60 frames
+         // after StopRecording rather than the instant it returns) - so the
+         // actual inspection is deferred a further margin past finalize
+         // rather than run in the very frame completion is first observed.
+         if (sOfflineDone && sOfflineDoneFrame >= 0 && frameId == sOfflineDoneFrame + 60)
+         {
+            const Platform::MovieInfo info = Platform::InspectMovie(out->recordVideoPath);
+            printf("offline render movie(video=%d audio=%d duration=%.2fs, frames=%d)\n",
+                   info.hasVideo, info.hasAudio, info.duration, out->LastRecordedFrames());
+            const bool ok = out->LastRecordedFrames() == 10 && info.hasVideo && info.hasAudio &&
+                            info.duration > 0.5;
+            printf("%s\n", ok ? "OFFLINERENDERTEST OK" : "OFFLINERENDERTEST FAIL - SUSPECT");
+         }
+      }
+
+      if (getenv("INFINITE_OFFLINERENDERREFUSETEST") != nullptr && frameId == 2)
+      {
+         auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         StartOfflineRenderSession(out);
+         printf("start: active=%d status=%s\n", (int)gOfflineRender.active, out->RecordStatus().c_str());
+         const bool refused = !gOfflineRender.active &&
+                               out->RecordStatus().find("refused") != std::string::npos;
+         printf("%s\n", refused ? "OFFLINERENDERREFUSETEST OK" : "OFFLINERENDERREFUSETEST FAIL - SUSPECT");
       }
 
       if (getenv("INFINITE_PATCHTEST") != nullptr && frameId == 4)
