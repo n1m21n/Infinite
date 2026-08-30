@@ -1986,6 +1986,61 @@ namespace Platform
       return true;
    }
 
+   bool RecorderQueueHasRoom(RecorderHandle* handle, size_t bytes)
+   {
+      if (handle == nullptr)
+         return false;
+      std::lock_guard<std::mutex> lock(handle->queueMutex);
+      // Mirrors RecorderAppend's own admission test, including its
+      // empty-queue escape hatch - a single frame larger than the whole
+      // budget is admitted rather than deadlocking a caller that waits.
+      return handle->frameQueue.empty() ||
+             handle->queuedBytes + bytes <= handle->queueByteBudget;
+   }
+
+   void RecorderCancel(RecorderHandle* handle)
+   {
+      if (handle == nullptr)
+         return;
+
+      // Drop everything still queued before touching the writer. A cancelled
+      // take has no use for frames that were never encoded, and draining
+      // them is exactly what made Cancel cost as much as the render itself.
+      {
+         std::lock_guard<std::mutex> lock(handle->queueMutex);
+         int discarded = 0;
+         for (const auto& f : handle->frameQueue)
+            discarded += f.repeatCount;
+         handle->frameQueue.clear();
+         handle->queuedBytes = 0;
+         handle->pendingCount.fetch_sub(discarded, std::memory_order_relaxed);
+         handle->stopRequested = true;
+      }
+      handle->queueCv.notify_one();
+
+      {
+         std::lock_guard<std::mutex> lock(handle->writerMutex);
+         handle->audioBacklog.clear();
+      }
+
+      // The pump is either parked on queueCv - woken by the notify above,
+      // finds the queue empty, and exits through FinishWorker - or not
+      // running at all because the input went not-ready, in which case this
+      // barrier returns immediately. Either way it costs at most the one
+      // frame already in flight, and it guarantees no block is inside the
+      // writer when cancelWriting lands.
+      dispatch_sync(handle->encodeQueue, ^{});
+
+      @autoreleasepool
+      {
+         std::lock_guard<std::mutex> lock(handle->writerMutex);
+         if (handle->writer.status == AVAssetWriterStatusWriting)
+            [handle->writer cancelWriting]; // synchronous, and deletes the output file
+      }
+
+      delete handle;
+   }
+
    int RecorderFrameCount(RecorderHandle* handle)
    {
       return handle ? (int)handle->frameIndex.load(std::memory_order_relaxed) : 0;
@@ -1999,9 +2054,14 @@ namespace Platform
          NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
          AVURLAsset* asset = [AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:nsPath] options:nil];
          NSArray<AVAssetTrack*>* videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
+         NSArray<AVAssetTrack*>* audioTracks = [asset tracksWithMediaType:AVMediaTypeAudio];
          info.hasVideo = videoTracks.count > 0;
-         info.hasAudio = [asset tracksWithMediaType:AVMediaTypeAudio].count > 0;
+         info.hasAudio = audioTracks.count > 0;
          info.duration = CMTimeGetSeconds(asset.duration);
+         if (info.hasVideo)
+            info.videoDuration = CMTimeGetSeconds(videoTracks.firstObject.timeRange.duration);
+         if (info.hasAudio)
+            info.audioDuration = CMTimeGetSeconds(audioTracks.firstObject.timeRange.duration);
 
          if (info.hasVideo)
          {

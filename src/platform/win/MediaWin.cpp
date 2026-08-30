@@ -1106,6 +1106,7 @@ namespace Platform
          // duration is known (looped or truncated to match). Written on the
          // encoder thread too, from WriteFileAudioTrack at Stop.
          std::string audioPath;
+         std::string outputPath; // kept so a cancelled take can delete its partial file
          bool loopAudio = true;
          SampleBuffer fileAudio;
 
@@ -1513,6 +1514,7 @@ namespace Platform
       rec->height = height & ~1;
       rec->fps = fps > 0 ? (double)fps : 30.0;
       rec->audioPath = audioPath;
+      rec->outputPath = path;
       rec->loopAudio = loopAudio;
 
       HRESULT hr = MFCreateSinkWriterFromURL(WinCommon::Utf8ToWide(path).c_str(), nullptr,
@@ -1661,6 +1663,53 @@ namespace Platform
          return false;
       return WriteInterleavedFloatAudio(rec, interleavedSamples, numFrames, rec->liveRate,
                                         rec->liveChannels);
+   }
+
+   bool RecorderQueueHasRoom(RecorderHandle* handle, size_t bytes)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      if (rec == nullptr)
+         return false;
+      std::lock_guard<std::mutex> lock(rec->queueMutex);
+      // Mirrors RecorderAppend's own admission test, empty-queue escape
+      // hatch included - see the macOS twin.
+      return rec->frameQueue.empty() ||
+             rec->queuedBytes + bytes <= rec->queueByteBudget;
+   }
+
+   void RecorderCancel(RecorderHandle* handle)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      if (rec == nullptr)
+         return;
+      ComScope com;
+
+      // Drop everything still queued before joining: a cancelled take has no
+      // use for frames that were never encoded, and encoding them is exactly
+      // what made Cancel cost as much as the render itself. The worker's loop
+      // exits as soon as it finds the queue empty with stopRequested set.
+      {
+         std::lock_guard<std::mutex> lock(rec->queueMutex);
+         int discarded = 0;
+         for (const auto& f : rec->frameQueue)
+            discarded += f.repeatCount;
+         rec->frameQueue.clear();
+         rec->queuedBytes = 0;
+         rec->pendingCount.fetch_sub(discarded, std::memory_order_relaxed);
+         rec->stopRequested = true;
+      }
+      rec->queueCv.notify_one();
+      if (rec->worker.joinable())
+         rec->worker.join();
+
+      // No Flush, no Finalize: an MP4 the sink writer never finalized has no
+      // moov atom and is not a playable file, which is what cancelling means.
+      // Deleting it is the counterpart to AVAssetWriter's cancelWriting on
+      // the macOS side, which removes its own output file.
+      const std::wstring widePath = WinCommon::Utf8ToWide(rec->outputPath);
+      delete rec; // releases the writer (and pairs RecorderStart's MFStartup)
+      if (!widePath.empty())
+         DeleteFileW(widePath.c_str());
    }
 
    bool RecorderStop(RecorderHandle* handle, std::string& outError,
