@@ -775,6 +775,24 @@ namespace Platform
    // RecorderFrameCount() beforehand can race the worker's last few writes.
    bool RecorderStop(RecorderHandle* handle, std::string& outError,
                      int* outFrameCount = nullptr, int* outDroppedCount = nullptr);
+
+   // Aborts a take instead of finishing it: discards every frame still queued
+   // for the encoder, skips the flush/finalize entirely, and deletes the
+   // partial output file. Returns as fast as the encoder can be unblocked -
+   // at worst one in-flight frame - where RecorderStop's cost scales with
+   // however deep the queue happens to be. That difference is the whole
+   // point: an offline render can queue frames far faster than the encoder
+   // drains them, so routing Cancel through RecorderStop made cancelling a
+   // long take take about as long as finishing it. The handle is destroyed
+   // either way; nothing usable is left behind on disk.
+   void RecorderCancel(RecorderHandle* handle);
+
+   // Whether an append of `bytes` would be admitted right now, or dropped by
+   // the encoder queue's byte-budget ceiling. The live path has no use for
+   // this - it cannot stall a real-time take, so it accepts the drop - but an
+   // offline render must never drop a frame it has already advanced the
+   // transport and the audio clock for, so it asks first and waits instead.
+   bool RecorderQueueHasRoom(RecorderHandle* handle, size_t bytes);
    int RecorderFrameCount(RecorderHandle* handle);
 
    // Inspects a finished recording. Used by the audio-mux self-test, and handy
@@ -786,6 +804,13 @@ namespace Platform
       bool hasAudio = false;
       double duration = 0.0;
       int frameCount = 0;
+      // Per-track durations, not just the asset's overall one (which is the
+      // longer of the two). An export that wrote all its video but lost part
+      // of its audio - or the reverse - has a perfectly plausible overall
+      // duration and two tracks that disagree; this is the only way to see
+      // that from outside the process.
+      double videoDuration = 0.0;
+      double audioDuration = 0.0;
    };
    MovieInfo InspectMovie(const std::string& path);
 

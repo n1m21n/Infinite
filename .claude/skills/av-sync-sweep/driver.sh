@@ -43,6 +43,12 @@ ASSERT=(
   # --- offline render (non-realtime export) ---
   "OFFLINERENDERTEST:300"
   "OFFLINERENDERREFUSETEST:6"
+  # A take long enough for the encoder queue's byte budget to matter: 1800
+  # frames used to have 579 of them silently rejected by the queue, leaving a
+  # 20s video track against a 30s audio track - the "audio is sped up" report.
+  "OFFLINERENDERTEST,OFFLINERENDER_FPS=60,OFFLINERENDER_SECONDS=30:2200"
+  # Cancel on that same deep queue must abandon the file rather than drain it.
+  "OFFLINERENDERTEST,OFFLINERENDER_FPS=60,OFFLINERENDER_SECONDS=30,OFFLINERENDER_CANCEL=300:600"
 )
 
 OBSERVE=()

@@ -23899,7 +23899,11 @@ namespace
       const int done = std::min(n->OfflineFramesDone(), total);
       const float frac = (float)done / (float)total;
 
-      if (n->IsOfflineFinalizing())
+      if (n->IsOfflineCancelling())
+      {
+         ImGui::Text("Cancelling...");
+      }
+      else if (n->IsOfflineFinalizing())
       {
          ImGui::Text("Finalizing...");
       }
@@ -23911,7 +23915,13 @@ namespace
       {
          ImGui::Text("Rendering... %d/%d", done, total);
       }
-      ImGui::ProgressBar(frac, ImVec2(280, 0));
+      // A cancelled take's progress bar is meaningless - it would sit frozen
+      // at whatever fraction the render reached, which is precisely what
+      // made a slow cancel look like a hang.
+      if (n->IsOfflineCancelling())
+         ImGui::ProgressBar(-1.0f * (float)ImGui::GetTime(), ImVec2(280, 0), "");
+      else
+         ImGui::ProgressBar(frac, ImVec2(280, 0));
 
       ImGui::BeginDisabled(n->IsOfflineFinalizing());
       if (ImGui::Button("Cancel", ImVec2(120, 0)))
@@ -35457,7 +35467,25 @@ int main(int argc, char** argv)
          auto* osc = static_cast<OscillatorNode*>(gNodes[2].node.get());
          auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
          out->includeAudio = true;
-         out->AudioInput().Connect(osc);
+
+         // INFINITE_OFFLINERENDER_MIXER puts a Mixer between the synth and
+         // the Output's audio pin, which is how a real patch is wired (the
+         // Output reports "from: mixer") and NOT what a direct oscillator
+         // connection exercises: the terminal the capture ring is attached
+         // to is then the mixer's buffer, one node further down a chain
+         // whose blocks this take drives by hand.
+         if (getenv("INFINITE_OFFLINERENDER_MIXER") != nullptr)
+         {
+            SpawnNode("Mixer", "Utility", 180.0f, 400.0f); // 3
+            INode* mixer = gNodes[3].node.get();
+            if (AudioCable* c = mixer->AudioInputSlot(0))
+               c->Connect(osc);
+            out->AudioInput().Connect(mixer);
+         }
+         else
+         {
+            out->AudioInput().Connect(osc);
+         }
          out->recordVideoPath = TmpPath("infinite_offlinerender.mov");
          // fps/duration are overridable so the same fixture can sweep rates
          // that don't divide the sample rate evenly (24fps @ 44100 =
@@ -36537,6 +36565,19 @@ int main(int argc, char** argv)
             const double budgetStart = glfwGetTime();
             while (on->IsOfflineRendering() && on->OfflineFramesDone() < on->OfflineFramesTotal())
             {
+               // Backpressure, checked before anything else in the step: the
+               // pump can hand the encoder frames far faster than it drains
+               // them (that is the whole point of rendering offline), and
+               // RecorderAppend's live-path answer to a full queue is to drop
+               // the frame. Dropping is right for a live take, which cannot
+               // stall, and wrong for this one, which can - a dropped frame
+               // leaves the video track permanently short against a
+               // full-length audio track. So yield the batch instead and try
+               // again next outer iteration, with the progress window and
+               // Cancel button still live in between.
+               if (!on->OfflineEncoderHasRoom())
+                  break;
+
                ++frameId;
                Transport::Instance().Tick(1.0f / (float)std::max(1, on->offlineFps));
 
@@ -42155,6 +42196,42 @@ int main(int argc, char** argv)
          }
          static bool sOfflineDone = false;
          static int sOfflineDoneFrame = -1;
+
+         // INFINITE_OFFLINERENDER_CANCEL=<frames>: cancel the take once it
+         // has rendered that many frames, and measure how long the cancel
+         // takes in main-loop frames. Cancel used to route through the same
+         // drain-everything finalize as a completed take, so on a deep queue
+         // it sat at "Finalizing..." for as long as finishing would have
+         // taken - which reads as a hang, because the user has already said
+         // they want it to stop.
+         static int sCancelRequestedFrame = -1;
+         if (const char* cancelEnv = getenv("INFINITE_OFFLINERENDER_CANCEL"))
+         {
+            const int cancelAt = std::max(1, atoi(cancelEnv));
+            if (sCancelRequestedFrame < 0 && gOfflineRender.active &&
+                out->OfflineFramesDone() >= cancelAt)
+            {
+               sCancelRequestedFrame = frameId;
+               out->RequestFinishOfflineRender(true);
+               printf("cancel requested at frameId=%d after %d rendered frames\n",
+                      frameId, out->OfflineFramesDone());
+            }
+            if (sCancelRequestedFrame >= 0 && !gOfflineRender.active &&
+                !out->IsOfflineFinalizing() && sOfflineDoneFrame < 0)
+            {
+               const int cost = frameId - sCancelRequestedFrame;
+               const bool fileGone = !std::filesystem::exists(out->recordVideoPath);
+               // 10 main-loop frames is a generous ceiling for "instant" -
+               // the old drain path took hundreds on a backed-up queue.
+               const bool ok = cost <= 10 && fileGone;
+               printf("cancel took %d main-loop frames, partial file removed=%d, status=%s\n",
+                      cost, (int)fileGone, out->RecordStatus().c_str());
+               printf("%s\n", ok ? "OFFLINERENDERCANCELTEST OK"
+                                  : "OFFLINERENDERCANCELTEST FAIL - BUG");
+               sOfflineDoneFrame = frameId; // stop this block from reporting again
+               sOfflineDone = true;
+            }
+         }
          // The offline pump can finish the whole take (all 10 frames, plus
          // preroll) within a single outer loop iteration - it's bounded by a
          // wall-clock budget, not a frame count - so completion is polled by
@@ -42172,7 +42249,12 @@ int main(int argc, char** argv)
          // after StopRecording rather than the instant it returns) - so the
          // actual inspection is deferred a further margin past finalize
          // rather than run in the very frame completion is first observed.
-         if (sOfflineDone && sOfflineDoneFrame >= 0 && frameId == sOfflineDoneFrame + 60)
+         // A cancelled take has no file to inspect (that is the point of
+         // cancel), so the completion assertion below belongs only to a take
+         // that was allowed to finish - the cancel branch above is that
+         // variant's whole verdict.
+         if (sOfflineDone && sOfflineDoneFrame >= 0 && frameId == sOfflineDoneFrame + 60 &&
+             getenv("INFINITE_OFFLINERENDER_CANCEL") == nullptr)
          {
             const Platform::MovieInfo info = Platform::InspectMovie(out->recordVideoPath);
             // The take's own budget: 10 frames at 10fps is exactly 1 second
@@ -42195,13 +42277,29 @@ int main(int argc, char** argv)
             const bool audioExact = sr > 0.0 && std::llabs(gotAudio - expectedAudio) <= 64;
             const bool durationOk = info.duration > takeSeconds - 0.1 &&
                                      info.duration < takeSeconds + 0.15;
-            printf("offline render %dfps x %ds movie(video=%d audio=%d duration=%.2fs, frames=%d) "
+            // What landed in the FILE, not what was handed to the recorder:
+            // frames can be dropped by the encoder queue's byte budget and
+            // audio can be dropped by the writer's bounded flush at stop,
+            // and both are invisible to the append-side counters above.
+            // Two tracks that disagree in length IS the "audio is sped up"
+            // symptom, so it is asserted directly.
+            const bool tracksAgree = info.hasAudio && info.hasVideo &&
+                                      std::fabs(info.audioDuration - info.videoDuration) < 0.1;
+            printf("offline render %dfps x %ds movie(video=%d audio=%d duration=%.2fs "
+                   "videoTrack=%.2fs audioTrack=%.2fs, frames=%d) "
                    "audio frames=%lld expected=%lld (%+lld) @%.0fHz\n",
                    out->offlineFps, out->offlineDurationSeconds,
-                   info.hasVideo, info.hasAudio, info.duration, out->LastRecordedFrames(),
+                   info.hasVideo, info.hasAudio, info.duration,
+                   info.videoDuration, info.audioDuration, out->LastRecordedFrames(),
                    gotAudio, expectedAudio, gotAudio - expectedAudio, sr);
+            if (!tracksAgree)
+               printf("  A/V MISMATCH: video track %.2fs vs audio track %.2fs (%.1f%% off)\n",
+                      info.videoDuration, info.audioDuration,
+                      info.videoDuration > 0.0
+                         ? 100.0 * (info.audioDuration - info.videoDuration) / info.videoDuration
+                         : 0.0);
             const bool ok = out->LastRecordedFrames() == expectedFrames && info.hasVideo &&
-                            info.hasAudio && durationOk && audioExact;
+                            info.hasAudio && durationOk && audioExact && tracksAgree;
             printf("%s\n", ok ? "OFFLINERENDERTEST OK" : "OFFLINERENDERTEST FAIL - SUSPECT");
          }
       }

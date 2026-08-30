@@ -135,6 +135,10 @@ public:
    // Cancel button/main.cpp's progress dialog so clicking Cancel never blocks
    // the main thread waiting on Platform::RecorderStop.
    bool IsOfflineFinalizing() const { return mOfflineFinalizeThread.joinable(); }
+   // True while that finalize is an abort rather than a completion, so the
+   // progress window can say "Cancelling..." instead of "Finalizing..." -
+   // which read as a hang when cancel was the slow path.
+   bool IsOfflineCancelling() const { return mOfflineCancelled && IsOfflineFinalizing(); }
    int OfflineFramesDone() const { return mOfflineFramesDone; }
    int OfflineFramesTotal() const { return mOfflineTotalFrames; }
    bool IsPrerolling() const { return mOfflinePrerollRemaining > 0; }
@@ -147,6 +151,15 @@ public:
    // this frame's readback to hide latency behind; the whole point of this
    // path is that it's allowed to take as long as it takes.
    void CaptureOfflineFrame();
+   // False while the encoder queue is too full to take another frame of this
+   // take's size. The offline pump must check this BEFORE ticking the
+   // transport or generating the frame's audio, and simply not run that step
+   // yet: an offline take has no real-time deadline, so waiting for the
+   // encoder costs wall-clock time, while appending anyway costs a dropped
+   // frame - and a dropped frame is permanent A/V desync, since the video
+   // track then runs short against a full-length audio track. A 30s 60fps
+   // take at 1920x1920 lost a third of its frames this way.
+   bool OfflineEncoderHasRoom() const;
    // Async, mirrors StopRecordingAsync(): hands Platform::RecorderStop to a
    // background thread and returns immediately, so a mid-render Cancel click
    // never blocks the UI thread. Also the path taken when OfflineFramesDone()
@@ -345,6 +358,7 @@ private:
    int mOfflineRecordH = 0;
    int mOfflineRecordFps = 30;
    bool mOfflineIncludeAudio = false;
+   bool mOfflineCancelled = false;
    double mOfflineAudioSampleRate = 0.0;
    long long mOfflineAudioFramesGenerated = 0;
    long long mOfflineAudioFramesAppended = 0;

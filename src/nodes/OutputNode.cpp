@@ -339,6 +339,14 @@ int OutputNode::OfflineAudioFramesOwed() const
    return owed > 0 ? (int)owed : 0;
 }
 
+bool OutputNode::OfflineEncoderHasRoom() const
+{
+   if (mOfflineRecorder == nullptr)
+      return true;
+   const size_t frameBytes = (size_t)mOfflineRecordW * (size_t)mOfflineRecordH * 4;
+   return Platform::RecorderQueueHasRoom(mOfflineRecorder, frameBytes);
+}
+
 void OutputNode::CaptureOfflineFrame()
 {
    if (mOfflineRecorder == nullptr)
@@ -393,14 +401,30 @@ void OutputNode::RequestFinishOfflineRender(bool cancelled)
    Platform::RecorderHandle* handle = mOfflineRecorder;
    mOfflineRecorder = nullptr;
 
+   mOfflineCancelled = cancelled;
    mRecordStatus = cancelled ? "cancelling..." : "finalizing...";
    mOfflineFinalizeDone.store(false, std::memory_order_relaxed);
    mOfflineFinalizeThread = std::thread([this, handle, audioDropped, cancelled]()
    {
-      FinalizeResult r = FinishRecorder(handle, audioDropped);
-      if (cancelled && r.ok)
+      if (cancelled)
+      {
+         // Abort rather than finalize: Platform::RecorderCancel throws away
+         // whatever is still queued and deletes the partial file instead of
+         // encoding a take the user has already given up on. Still on the
+         // background thread (it can block for the one frame in flight), but
+         // it no longer scales with queue depth - which is what made Cancel
+         // sit at "Finalizing..." for as long as the render would have taken.
+         Platform::RecorderCancel(handle);
+         FinalizeResult r;
+         r.ok = false;
          r.error = "cancelled";
-      mOfflineFinalizeResult = std::move(r);
+         r.audioDropped = audioDropped;
+         mOfflineFinalizeResult = std::move(r);
+      }
+      else
+      {
+         mOfflineFinalizeResult = FinishRecorder(handle, audioDropped);
+      }
       mOfflineFinalizeDone.store(true, std::memory_order_release);
    });
 }
@@ -413,12 +437,13 @@ void OutputNode::PollOfflineFinalize()
    const FinalizeResult& r = mOfflineFinalizeResult;
    mLastFrames = r.frames;
    mLastDropped = r.dropped;
-   if (r.ok && r.error != "cancelled")
+   if (r.error == "cancelled")
+      mRecordStatus = "cancelled - partial file discarded";
+   else if (r.ok)
       mRecordStatus = "rendered " + std::to_string(r.frames) + " frames";
-   else if (r.error == "cancelled")
-      mRecordStatus = "cancelled (" + std::to_string(r.frames) + " frames kept)";
    else
       mRecordStatus = r.error;
+   mOfflineCancelled = false;
 }
 
 void OutputNode::WaitForOfflineFinalize()
