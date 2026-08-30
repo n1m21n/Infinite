@@ -130,13 +130,25 @@ namespace
       }
    }
 
-   // Copies caller-supplied bottom-up RGBA8 pixels into a top-down BGRA8
-   // staging row layout for the sink writer's input type.
-   void RgbaBottomUpToBgraTopDown(const unsigned char* src, int width, int height,
-                                  std::vector<unsigned char>& out)
+   // Copies caller-supplied bottom-up pixels into a top-down BGRA8 staging
+   // row layout for the sink writer's input type. `isBgra` selects between
+   // the native path (the caller's glReadPixels already came back BGRA8, so
+   // this is a pure row-reverse copy) and the fallback where it's RGBA8 and
+   // still needs a per-pixel channel swizzle alongside the flip.
+   void BgraBottomUpToTopDown(const unsigned char* src, int width, int height,
+                              bool isBgra, std::vector<unsigned char>& out)
    {
       out.resize((size_t)width * height * 4);
       const size_t rowBytes = (size_t)width * 4;
+      if (isBgra)
+      {
+         for (int y = 0; y < height; y++)
+         {
+            const unsigned char* srcRow = src + (size_t)(height - 1 - y) * rowBytes;
+            memcpy(out.data() + (size_t)y * rowBytes, srcRow, rowBytes);
+         }
+         return;
+      }
       for (int y = 0; y < height; y++)
       {
          const unsigned char* srcRow = src + (size_t)(height - 1 - y) * rowBytes;
@@ -1078,6 +1090,13 @@ namespace Platform
          double fps = 30.0;
          std::atomic<long long> frameCount { 0 }; // written only on the encoder thread
 
+         // Whether frames handed to RecorderAppend are BGRA8 (the default,
+         // matching a native glReadPixels) or RGBA8 (the caller's fallback).
+         // Set once, before the first RecorderAppend of the take, by
+         // RecorderSetInputIsBgra - never touched after that, so a plain read
+         // on `worker` is safe.
+         bool inputIsBgra = true;
+
          // Live-audio streaming mode (RecorderAppendAudio).
          double liveRate = 0.0;
          int liveChannels = 0;
@@ -1097,8 +1116,14 @@ namespace Platform
          // The render thread (OutputNode) only ever touches queueMutex/
          // poolMutex and the atomics below; WriteSample and the RGBA->BGRA
          // swizzle run entirely on `worker`.
-         static constexpr size_t kMaxQueueDepth = 4;
-         static constexpr size_t kMaxPoolSize = 8;
+         // A frame-count cap is resolution-blind: 4 frames of slack was 33MB
+         // at 1080p but only ~2MB at 320x240. A byte budget scales with
+         // resolution instead. 256MB is a starting value, not a measured
+         // one - it buys ~32 frames of elasticity at 1080p RGBA.
+         static constexpr size_t kMaxQueueBytes = 256ull * 1024 * 1024;
+         // Overridable per-instance for RecorderSetTestQueueByteBudget - see
+         // the matching macOS comment in Platform.mm.
+         size_t queueByteBudget = kMaxQueueBytes;
 
          struct QueuedFrame
          {
@@ -1109,10 +1134,12 @@ namespace Platform
          std::mutex queueMutex;
          std::condition_variable queueCv;
          std::deque<QueuedFrame> frameQueue;
+         size_t queuedBytes = 0; // guarded by queueMutex
          bool stopRequested = false;
 
          std::mutex poolMutex;
          std::vector<std::vector<unsigned char>> bufferPool;
+         size_t poolBytes = 0; // guarded by poolMutex
 
          std::atomic<int> pendingCount { 0 };
          std::atomic<int> droppedCount { 0 };
@@ -1386,6 +1413,13 @@ namespace Platform
 
          std::vector<unsigned char> bgraScratch((size_t)rec->width * rec->height * 4);
 
+         // The most recently *processed* frame's converted bytes (not
+         // necessarily the most recently written one - see the padding
+         // comment below). Local to this thread: it is the only one that
+         // ever touches the encoder's frame queue output.
+         std::vector<unsigned char> prevBgra;
+         bool hasPrevBgra = false;
+
          for (;;)
          {
             RecorderHandleMf::QueuedFrame frame;
@@ -1396,13 +1430,28 @@ namespace Platform
                   break; // stopRequested and fully drained
                frame = std::move(rec->frameQueue.front());
                rec->frameQueue.pop_front();
+               rec->queuedBytes -= frame.pixels.size();
             }
+
+            // Convert once per queued frame, not once per repeat - padding a
+            // constant-frame-rate take used to re-pay this conversion for
+            // byte-identical pixels on every one of its repeats.
+            BgraBottomUpToTopDown(frame.pixels.data(), rec->width, rec->height,
+                                 rec->inputIsBgra, bgraScratch);
 
             for (int i = 0; i < frame.repeatCount; i++)
             {
-               RgbaBottomUpToBgraTopDown(frame.pixels.data(), rec->width, rec->height, bgraScratch);
+               // Padding fills the earlier repeats with the *previous*
+               // frame's content and only the final repeat with this frame's
+               // own - so a padded repeat never stamps new pixels at a PTS
+               // earlier than when they were actually rendered. The first
+               // frame of a take has no previous frame to pad with, so every
+               // one of its repeats uses its own content.
+               const bool isFinalRepeat = (i == frame.repeatCount - 1);
+               const bool useNewFrame = isFinalRepeat || !hasPrevBgra;
+               const std::vector<unsigned char>& toWrite = useNewFrame ? bgraScratch : prevBgra;
 
-               IMFMediaBuffer* buffer = BufferFromMemory((BYTE*)bgraScratch.data(), (DWORD)bgraScratch.size());
+               IMFMediaBuffer* buffer = BufferFromMemory((BYTE*)toWrite.data(), (DWORD)toWrite.size());
                if (buffer != nullptr)
                {
                   IMFSample* sample = nullptr;
@@ -1429,9 +1478,19 @@ namespace Platform
                rec->pendingCount.fetch_sub(1, std::memory_order_relaxed);
             }
 
+            // This frame becomes "the previous frame" for whatever comes
+            // next, regardless of whether every repeat above actually made
+            // it to the writer.
+            prevBgra.swap(bgraScratch);
+            hasPrevBgra = true;
+
             std::lock_guard<std::mutex> poolLock(rec->poolMutex);
-            if (rec->bufferPool.size() < RecorderHandleMf::kMaxPoolSize)
+            const size_t bytes = frame.pixels.size();
+            if (rec->poolBytes + bytes <= rec->queueByteBudget)
+            {
+               rec->poolBytes += bytes;
                rec->bufferPool.push_back(std::move(frame.pixels));
+            }
          }
       }
    }
@@ -1513,6 +1572,7 @@ namespace Platform
       {
          std::vector<unsigned char> buf = std::move(rec->bufferPool.back());
          rec->bufferPool.pop_back();
+         rec->poolBytes -= buf.size();
          buf.resize(bytes);
          return buf;
       }
@@ -1530,16 +1590,25 @@ namespace Platform
          repeatCount = 1;
 
       std::lock_guard<std::mutex> lock(rec->queueMutex);
-      if (rec->frameQueue.size() >= RecorderHandleMf::kMaxQueueDepth)
+      // Byte-budgeted rather than frame-count-capped so elasticity scales
+      // with resolution. The frameQueue.empty() escape hatch guarantees a
+      // single frame larger than the whole budget is still admitted rather
+      // than permanently rejected.
+      if (rec->queuedBytes + pixels.size() > rec->queueByteBudget &&
+          !rec->frameQueue.empty())
       {
          rec->droppedCount.fetch_add(1, std::memory_order_relaxed);
          std::lock_guard<std::mutex> poolLock(rec->poolMutex);
-         if (rec->bufferPool.size() < RecorderHandleMf::kMaxPoolSize)
+         if (rec->poolBytes + pixels.size() <= rec->queueByteBudget)
+         {
+            rec->poolBytes += pixels.size();
             rec->bufferPool.push_back(std::move(pixels));
+         }
          return false;
       }
 
       rec->pendingCount.fetch_add(repeatCount, std::memory_order_relaxed);
+      rec->queuedBytes += pixels.size();
       rec->frameQueue.push_back({ std::move(pixels), repeatCount });
       rec->queueCv.notify_one();
       return true;
@@ -1551,10 +1620,26 @@ namespace Platform
       return RecorderAppend(handle, std::move(copy), 1);
    }
 
+   void RecorderSetInputIsBgra(RecorderHandle* handle, bool isBgra)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      if (rec != nullptr)
+         rec->inputIsBgra = isBgra;
+   }
+
    int RecorderPendingFrameCount(RecorderHandle* handle)
    {
       auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
       return rec ? rec->pendingCount.load(std::memory_order_relaxed) : 0;
+   }
+
+   void RecorderSetTestQueueByteBudget(RecorderHandle* handle, size_t bytes)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      if (rec == nullptr)
+         return;
+      std::lock_guard<std::mutex> lock(rec->queueMutex);
+      rec->queueByteBudget = bytes;
    }
 
    int RecorderDroppedFrameCount(RecorderHandle* handle)

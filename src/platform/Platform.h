@@ -730,8 +730,19 @@ namespace Platform
                                  bool loopAudio = true,
                                  double liveAudioSampleRate = 0.0,
                                  int liveAudioChannels = 2);
-   // `pixels` is RGBA8 bottom-up, exactly as glReadPixels returns it.
+   // `pixels` is BGRA8 bottom-up by default - the GPU's native glReadPixels
+   // format (GL_BGRA/GL_UNSIGNED_INT_8_8_8_8_REV) on essentially all desktop
+   // GPUs, which turns the readback into a straight blit instead of a
+   // driver-side conversion. See RecorderSetInputIsBgra below for the RGBA
+   // fallback path.
    bool RecorderAppend(RecorderHandle* handle, const std::vector<unsigned char>& pixels);
+
+   // Tells the recorder whether pixels handed to RecorderAppend for the rest
+   // of this take are BGRA8 (the default assumed at RecorderStart) or RGBA8 -
+   // the fallback a caller uses when its GPU driver rejects a native BGRA
+   // glReadPixels. Call before the first RecorderAppend of the take; the
+   // format is fixed for the take's whole duration once appends begin.
+   void RecorderSetInputIsBgra(RecorderHandle* handle, bool isBgra);
 
    // Hands the caller a buffer from the recorder's own pool, already sized
    // width*height*4. Recycling these is what lets the render thread hand off
@@ -747,6 +758,13 @@ namespace Platform
    int RecorderPendingFrameCount(RecorderHandle* handle);
    // Frames the encoder could not accept and discarded, for the whole take.
    int RecorderDroppedFrameCount(RecorderHandle* handle);
+
+   // Test-only: overrides the queue's byte-budget admission ceiling (normally
+   // a fixed 256MB) for this handle. Real hardware encoders drain fast enough
+   // that reproducing a genuine over-budget rejection in a self-test needs an
+   // artificially small ceiling rather than an artificially slow consumer -
+   // see RunRecExportTest's `starved` variant in main.cpp.
+   void RecorderSetTestQueueByteBudget(RecorderHandle* handle, size_t bytes);
 
    // Appends interleaved float audio frames to the movie's audio track.
    bool RecorderAppendAudio(RecorderHandle* handle, const float* interleavedSamples, int numFrames);

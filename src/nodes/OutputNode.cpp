@@ -83,6 +83,8 @@ bool OutputNode::StartRecording(const std::string& path)
 
    mAudioFramesAppended = 0;
    mFramesEmitted = 0;
+   mReadbackFormatDecided = false;
+   mReadbackIsBgra = true;
 
    std::string error;
    mRecorder = Platform::RecorderStart(path, mRecordW, mRecordH, mRecordFps, error,
@@ -105,6 +107,7 @@ bool OutputNode::StartRecording(const std::string& path)
 
 void OutputNode::StopRecording()
 {
+   mStopRequested = false;
    if (mRecorder == nullptr)
       return;
 
@@ -350,7 +353,28 @@ void OutputNode::CaptureFrame()
          glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
          glBindBuffer(GL_PIXEL_PACK_BUFFER, writeSlot.pbo);
-         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+         if (!mReadbackFormatDecided)
+         {
+            // GL_BGRA/GL_UNSIGNED_INT_8_8_8_8_REV is the implementation-preferred
+            // readback format on Apple GL and on essentially all desktop GPUs -
+            // glReadPixels becomes a straight blit instead of a driver-side
+            // conversion. Both tokens are legal GL 3.3 core arguments, but confirm
+            // the driver actually accepted them before committing the whole take
+            // to that assumption: glGetError reports an enum-validation failure
+            // synchronously even though the readback itself completes async.
+            glGetError();
+            glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, nullptr);
+            const GLenum err = glGetError();
+            mReadbackIsBgra = (err != GL_INVALID_ENUM && err != GL_INVALID_OPERATION);
+            if (!mReadbackIsBgra)
+               glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            Platform::RecorderSetInputIsBgra(mRecorder, mReadbackIsBgra);
+            mReadbackFormatDecided = true;
+         }
+         else if (mReadbackIsBgra)
+            glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, nullptr);
+         else
+            glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
          writeSlot.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
          writeSlot.pending = true;
          mPboWriteIndex = (mPboWriteIndex + 1) % kPboCount;

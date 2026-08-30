@@ -1105,6 +1105,13 @@ namespace Platform
       int fps = 30;
       std::atomic<long long> frameIndex { 0 }; // written only on encodeQueue; read from any thread
 
+      // Whether frames handed to RecorderAppend are BGRA8 (the default,
+      // matching a native glReadPixels) or RGBA8 (the caller's fallback when
+      // its driver refused native BGRA readback). Set once, before the first
+      // RecorderAppend of the take, by RecorderSetInputIsBgra - never
+      // touched after that, so plain reads on encodeQueue are safe.
+      bool inputIsBgra = true;
+
       // Audio, all optional - nil/zero when the recording is video-only.
       AVAssetWriterInput* audioInput = nil;
       AVAudioFile* audioFile = nil;
@@ -1125,8 +1132,20 @@ namespace Platform
       // The render thread (OutputNode) only ever touches queueMutex/poolMutex
       // and the atomics below; everything past that point - appendPixelBuffer,
       // the CVPixelBuffer copy, the audio catch-up - runs on encodeQueue.
-      static constexpr size_t kMaxQueueDepth = 4;
-      static constexpr size_t kMaxPoolSize = 8;
+      //
+      // A frame-count cap is resolution-blind: 4 frames of slack was 33MB at
+      // 1080p but only ~2MB at 320x240, so the same constant left almost no
+      // elasticity at recording resolutions users actually export at. A byte
+      // budget scales with resolution instead. 256MB is a starting value, not
+      // a measured one - it buys ~32 frames of elasticity at 1080p RGBA,
+      // enough to absorb a transient encoder stall instead of dropping into
+      // it immediately.
+      static constexpr size_t kMaxQueueBytes = 256ull * 1024 * 1024;
+      // Overridable per-instance for RecorderSetTestQueueByteBudget - real
+      // hardware encoders drain far faster than any self-test can outrun, so
+      // exercising the rejection path deterministically needs a shrinkable
+      // ceiling rather than a slower consumer.
+      size_t queueByteBudget = kMaxQueueBytes;
 
       struct QueuedFrame
       {
@@ -1137,10 +1156,12 @@ namespace Platform
       std::mutex queueMutex;
       std::condition_variable queueCv;
       std::deque<QueuedFrame> frameQueue;
+      size_t queuedBytes = 0; // guarded by queueMutex; sum of frameQueue[*].pixels.size()
       bool stopRequested = false;
 
       std::mutex poolMutex;
       std::vector<std::vector<unsigned char>> bufferPool;
+      size_t poolBytes = 0; // guarded by poolMutex; sum of bufferPool[*].size()
 
       std::atomic<int> pendingCount { 0 };
       std::atomic<int> droppedCount { 0 };
@@ -1152,6 +1173,25 @@ namespace Platform
       int currentRemaining = 0;
       bool workerFinished = false;
 
+      // The current frame's pixels, flipped top-down (and channel-swizzled if
+      // not native BGRA) into this scratch buffer once, the moment it's
+      // popped off the queue - not once per repeat. Each repeat still stamps
+      // a fresh CVPixelBuffer from the adaptor's pool (re-appending one
+      // CVPixelBuffer object across repeats wedges AVAssetWriterInputPixelBufferAdaptor -
+      // confirmed by RECEXPORTTEST hanging when tried), but stamping is a
+      // flat memcpy now instead of a per-pixel swizzle, which is what
+      // actually breaks the feedback loop under padding.
+      std::vector<unsigned char> currentFlipped;
+
+      // The most recently *processed* frame's flipped bytes (not necessarily
+      // the most recently written one - see RecorderPump). A repeatCount > 1
+      // pads slots 0..N-2 with this instead of the new frame, so padding
+      // never stamps content at a PTS earlier than when it was rendered.
+      // Empty/unset (hasPrevFlipped == false) only for the first frame of a
+      // take, which has nothing earlier to pad with.
+      std::vector<unsigned char> prevFlipped;
+      bool hasPrevFlipped = false;
+
       std::mutex writerMutex;
       dispatch_queue_t encodeQueue = nil;
       dispatch_semaphore_t workerDone = nil;
@@ -1159,11 +1199,24 @@ namespace Platform
 
    namespace
    {
-      // Copies `pixels` (RGBA8 bottom-up) into a fresh CVPixelBuffer and
-      // appends it to the writer, then catches audio up to the new frame
-      // boundary. This is the body of the old synchronous RecorderAppend -
-      // now only ever called from the encoder queue.
-      bool AppendPixelsToWriter(RecorderHandle* h, const std::vector<unsigned char>& pixels);
+      // Flips `pixels` (BGRA8 or RGBA8 bottom-up, per h->inputIsBgra) into
+      // `out`, top-down and tightly packed (width*4 stride), swizzling
+      // channels too if not native BGRA. Pure CPU byte-shuffling, no pool
+      // involvement - this is the expensive half of a frame's conversion,
+      // and doing it once per queued frame rather than once per repeat is
+      // what breaks the padding-burst feedback loop.
+      void FlipPixelsTopDown(RecorderHandle* h, const std::vector<unsigned char>& pixels,
+                             std::vector<unsigned char>& out);
+
+      // Stamps `flipped` into a fresh CVPixelBuffer from the adaptor's pool
+      // and appends it at the current frameIndex, then catches audio up to
+      // the new frame boundary. A fresh buffer every call, even across
+      // repeats of the same padded frame - re-appending one CVPixelBuffer
+      // object at successive PTS values wedges
+      // AVAssetWriterInputPixelBufferAdaptor in practice, though Apple's own
+      // docs describe it as a supported pattern. Only ever called from the
+      // encoder queue.
+      bool AppendFlippedToWriter(RecorderHandle* h, const std::vector<unsigned char>& flipped);
 
       // Marks the inputs finished and releases RecorderStop. Idempotent: the
       // pump below can reach it from more than one exit.
@@ -1224,10 +1277,30 @@ namespace Platform
                }
                h->current = std::move(h->frameQueue.front());
                h->frameQueue.pop_front();
+               h->queuedBytes -= h->current.pixels.size();
                h->currentRemaining = h->current.repeatCount;
+
+               // Flip once per queued frame, not once per repeat - this is
+               // the fix for the feedback loop where a padding burst re-paid
+               // the full conversion cost for byte-identical pixels on every
+               // one of its repeats. Each repeat below still stamps a fresh
+               // pool buffer, but from these already-flipped bytes, so it's a
+               // flat memcpy rather than a per-pixel swizzle.
+               FlipPixelsTopDown(h, h->current.pixels, h->currentFlipped);
             }
 
-            if (!AppendPixelsToWriter(h, h->current.pixels))
+            // Padding fills the earlier slots (0..N-2 of this frame's N
+            // repeats) with the *previous* frame's content and only the
+            // final slot with this frame's own - so a padded repeat never
+            // stamps new pixels at a PTS earlier than when they were
+            // actually rendered. The very first frame of a take has no
+            // previous frame to pad with, so every one of its slots uses its
+            // own content; there is no better answer for slot zero.
+            const bool isFinalRepeat = (h->currentRemaining == 1);
+            const bool useNewFrame = isFinalRepeat || !h->hasPrevFlipped;
+            const std::vector<unsigned char>& toAppend = useNewFrame ? h->currentFlipped : h->prevFlipped;
+
+            if (!AppendFlippedToWriter(h, toAppend))
             {
                // Only a real writer failure reaches here now, and it is
                // counted rather than silently shortening the movie.
@@ -1243,9 +1316,19 @@ namespace Platform
 
             if (h->currentRemaining <= 0)
             {
+               // This frame becomes "the previous frame" for whatever comes
+               // next, whether or not every one of its repeats actually made
+               // it to the writer.
+               h->prevFlipped.swap(h->currentFlipped);
+               h->hasPrevFlipped = true;
+
                std::lock_guard<std::mutex> poolLock(h->poolMutex);
-               if (h->bufferPool.size() < RecorderHandle::kMaxPoolSize)
+               const size_t bytes = h->current.pixels.size();
+               if (h->poolBytes + bytes <= h->queueByteBudget)
+               {
+                  h->poolBytes += bytes;
                   h->bufferPool.push_back(std::move(h->current.pixels));
+               }
             }
          }
       }
@@ -1401,10 +1484,55 @@ namespace Platform
          }
       }
 
-      // Body of the encoder worker's per-frame work: copy into a CVPixelBuffer,
-      // append it, catch audio up to the new frame boundary. Only ever called
-      // from encodeQueue - see RecorderWorkerLoop's comment for why.
-      bool AppendPixelsToWriter(RecorderHandle* h, const std::vector<unsigned char>& pixels)
+      // Flips `pixels` top-down into `out`, tightly packed (width*4 stride),
+      // swizzling channels too if not native BGRA. Pure CPU work, no pool
+      // involvement, so this always succeeds. Only ever called from
+      // encodeQueue.
+      void FlipPixelsTopDown(RecorderHandle* h, const std::vector<unsigned char>& pixels,
+                            std::vector<unsigned char>& out)
+      {
+         const int w = h->width;
+         const int height = h->height;
+         const size_t rowBytes = (size_t)w * 4;
+         out.resize(rowBytes * (size_t)height);
+
+         if (h->inputIsBgra)
+         {
+            // Native path: incoming is BGRA8 bottom-up straight out of
+            // glReadPixels(GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV), which on
+            // essentially every desktop GPU is byte-for-byte the CVPixelBuffer's
+            // 32BGRA layout already - no channel swizzle needed, just the
+            // vertical flip glReadPixels always requires.
+            for (int y = 0; y < height; y++)
+            {
+               const unsigned char* srcRow = pixels.data() + (size_t)(height - 1 - y) * rowBytes;
+               memcpy(out.data() + (size_t)y * rowBytes, srcRow, rowBytes);
+            }
+         }
+         else
+         {
+            // Fallback: the caller's driver refused native BGRA readback, so
+            // this is RGBA8 bottom-up and still needs a per-pixel swizzle.
+            for (int y = 0; y < height; y++)
+            {
+               const unsigned char* srcRow = pixels.data() + (size_t)(height - 1 - y) * rowBytes;
+               unsigned char* dstRow = out.data() + (size_t)y * rowBytes;
+               for (int x = 0; x < w; x++)
+               {
+                  dstRow[x * 4 + 0] = srcRow[x * 4 + 2];
+                  dstRow[x * 4 + 1] = srcRow[x * 4 + 1];
+                  dstRow[x * 4 + 2] = srcRow[x * 4 + 0];
+                  dstRow[x * 4 + 3] = 255;
+               }
+            }
+         }
+      }
+
+      // Stamps `flipped` into a fresh CVPixelBuffer from the adaptor's pool,
+      // appends it, catches audio up to the new frame boundary. Only ever
+      // called from encodeQueue - see RecorderPump's comment for why a fresh
+      // buffer every call, even across repeats of one padded frame.
+      bool AppendFlippedToWriter(RecorderHandle* h, const std::vector<unsigned char>& flipped)
       {
          @autoreleasepool
          {
@@ -1426,28 +1554,21 @@ namespace Platform
                [NSThread sleepForTimeInterval:0.001];
             }
             if (status != kCVReturnSuccess || buffer == NULL)
-            {
                return false;
-            }
 
             CVPixelBufferLockBaseAddress(buffer, 0);
             unsigned char* dst = (unsigned char*)CVPixelBufferGetBaseAddress(buffer);
             const size_t dstStride = CVPixelBufferGetBytesPerRow(buffer);
-            const int w = h->width;
+            const size_t rowBytes = (size_t)h->width * 4;
             const int height = h->height;
-
-            // incoming is RGBA bottom-up from glReadPixels; the writer wants BGRA top-down
-            for (int y = 0; y < height; y++)
+            if (dstStride == rowBytes)
             {
-               const unsigned char* srcRow = pixels.data() + (size_t)(height - 1 - y) * w * 4;
-               unsigned char* dstRow = dst + (size_t)y * dstStride;
-               for (int x = 0; x < w; x++)
-               {
-                  dstRow[x * 4 + 0] = srcRow[x * 4 + 2];
-                  dstRow[x * 4 + 1] = srcRow[x * 4 + 1];
-                  dstRow[x * 4 + 2] = srcRow[x * 4 + 0];
-                  dstRow[x * 4 + 3] = 255;
-               }
+               memcpy(dst, flipped.data(), rowBytes * (size_t)height);
+            }
+            else
+            {
+               for (int y = 0; y < height; y++)
+                  memcpy(dst + (size_t)y * dstStride, flipped.data() + (size_t)y * rowBytes, rowBytes);
             }
             CVPixelBufferUnlockBaseAddress(buffer, 0);
 
@@ -1472,7 +1593,6 @@ namespace Platform
                   }
                }
             }
-            CVPixelBufferRelease(buffer);
             if (ok)
                h->frameIndex.fetch_add(1, std::memory_order_relaxed);
 
@@ -1484,6 +1604,13 @@ namespace Platform
                                                        (double)h->fps * h->audioSampleRate);
                AppendAudioUpTo(h, targetFrames);
             }
+            // CVPixelBufferPoolCreatePixelBuffer follows the create rule - this
+            // call owns a +1 ref regardless of append's outcome. appendPixelBuffer:
+            // takes its own reference for the async encode, so releasing ours
+            // here (rather than holding it across repeats, which is what wedged
+            // the encoder before) is what lets the pool see the buffer as free
+            // again once AVFoundation is done with it.
+            CVPixelBufferRelease(buffer);
             return ok == YES;
          }
       }
@@ -1706,6 +1833,7 @@ namespace Platform
       {
          std::vector<unsigned char> buf = std::move(handle->bufferPool.back());
          handle->bufferPool.pop_back();
+         handle->poolBytes -= buf.size();
          buf.resize(bytes);
          return buf;
       }
@@ -1720,16 +1848,26 @@ namespace Platform
          repeatCount = 1;
 
       std::lock_guard<std::mutex> lock(handle->queueMutex);
-      if (handle->frameQueue.size() >= RecorderHandle::kMaxQueueDepth)
+      // Byte-budgeted rather than frame-count-capped so the encoder's
+      // elasticity scales with resolution instead of being 33MB at 1080p and
+      // 2MB at 320x240 for the same constant. The frameQueue.empty() escape
+      // hatch guarantees a single frame larger than the whole budget is
+      // still admitted rather than permanently rejected.
+      if (handle->queuedBytes + pixels.size() > handle->queueByteBudget &&
+          !handle->frameQueue.empty())
       {
          handle->droppedCount.fetch_add(1, std::memory_order_relaxed);
          std::lock_guard<std::mutex> poolLock(handle->poolMutex);
-         if (handle->bufferPool.size() < RecorderHandle::kMaxPoolSize)
+         if (handle->poolBytes + pixels.size() <= handle->queueByteBudget)
+         {
+            handle->poolBytes += pixels.size();
             handle->bufferPool.push_back(std::move(pixels));
+         }
          return false;
       }
 
       handle->pendingCount.fetch_add(repeatCount, std::memory_order_relaxed);
+      handle->queuedBytes += pixels.size();
       handle->frameQueue.push_back({ std::move(pixels), repeatCount });
       handle->queueCv.notify_one();
       return true;
@@ -1741,9 +1879,23 @@ namespace Platform
       return RecorderAppend(handle, std::move(copy), 1);
    }
 
+   void RecorderSetInputIsBgra(RecorderHandle* handle, bool isBgra)
+   {
+      if (handle != nullptr)
+         handle->inputIsBgra = isBgra;
+   }
+
    int RecorderPendingFrameCount(RecorderHandle* handle)
    {
       return handle ? handle->pendingCount.load(std::memory_order_relaxed) : 0;
+   }
+
+   void RecorderSetTestQueueByteBudget(RecorderHandle* handle, size_t bytes)
+   {
+      if (handle == nullptr)
+         return;
+      std::lock_guard<std::mutex> lock(handle->queueMutex);
+      handle->queueByteBudget = bytes;
    }
 
    int RecorderDroppedFrameCount(RecorderHandle* handle)

@@ -31556,12 +31556,24 @@ static void RunRecSyncTest()
 // Headless: feeds the recorder pixel buffers directly rather than going
 // through the GL readback, so it runs on the Windows CI runner - the only
 // place the Media Foundation half of this can be executed by machine at all.
-static void RunRecExportTest()
+// width/height: recording resolution - 320x240 (the historical default), at
+// only ~54MB of lifetime video bytes for the whole take, cannot cross the
+// 256MB queue budget even with zero draining, so it can never exercise the
+// drop path; 1280x720 can. starved: when true, shrinks the queue's byte
+// budget for this take (a real hardware encoder drains far faster than this
+// test can produce, so forcing it to actually reject frames needs a smaller
+// ceiling, not a slower consumer) so RecorderAppend/RecorderPump's admission
+// rejection engages for real, under the same safe backpressure every variant
+// uses - exercising the case the non-starved variant deliberately excludes.
+// label: short tag folded into this run's printf lines, so a log is
+// self-identifying when more than one variant's output ends up read side by
+// side.
+static void RunRecExportTest(int width, int height, bool starved, const char* label)
 {
-   printf("[REC EXPORT TEST] measuring A/V sync on a real exported movie\n");
+   printf("[REC EXPORT TEST %s] measuring A/V sync on a real exported movie\n", label);
 
-   constexpr int kW = 320;
-   constexpr int kH = 240;
+   const int kW = width;
+   const int kH = height;
    constexpr int kFps = 30;         // target/muxed frame rate
    constexpr double kRenderFps = 20.0; // deliberately mismatched
    constexpr double kRate = 48000.0;
@@ -31594,6 +31606,17 @@ static void RunRecExportTest()
       return;
    }
 
+   if (starved)
+   {
+      // A real hardware encoder drains far faster than this test can ever
+      // produce, so forcing a genuine over-budget rejection needs a smaller
+      // ceiling, not a slower consumer - a handful of 720p frames' worth is
+      // enough to make the byte-budget check in RecorderAppend/RecorderPump
+      // engage for real under the same safe backpressure spin every other
+      // variant uses, without letting the whole take collapse.
+      Platform::RecorderSetTestQueueByteBudget(rec, 10ull * 1024 * 1024);
+   }
+
    const int blockFrames = (int)(kRate / kRenderFps);
    const long long renderSteps = (long long)(kRenderFps * kTakeSeconds);
    std::vector<float> block((size_t)blockFrames * 2);
@@ -31610,8 +31633,12 @@ static void RunRecExportTest()
    // so every remaining render step would burn its own fresh 120s cap and the
    // test would hang for hours instead of failing. Track wall-clock spent
    // waiting across the *whole* loop and bail with a verdict well before that.
+   // A larger frame takes the software encoder longer per frame, so the
+   // budget scales with it rather than staying fixed and flaking on the
+   // slower resolution - two tiers, not a literal per-pixel scale, since this
+   // is a safety bail-out and not itself something worth tuning finely.
    const auto waitBudgetStart = std::chrono::steady_clock::now();
-   constexpr auto kMaxTotalWait = std::chrono::seconds(45);
+   const auto kMaxTotalWait = std::chrono::seconds(kW * kH > 320 * 240 ? 90 : 45);
    bool encoderWedged = false;
 
    for (long long step = 0; step < renderSteps; step++)
@@ -31641,16 +31668,27 @@ static void RunRecExportTest()
       {
          // The real render loop is paced by the display and never outruns the
          // encoder; this one runs flat out, so without backpressure it would
-         // just overflow the queue and measure a movie made of dropped frames.
-         // Wait for a slot rather than sleeping, so the test stays as fast as
-         // the encoder is.
+         // just overflow the queue and measure a movie made of dropped
+         // frames. Wait for a slot rather than sleeping, so the test stays as
+         // fast as the encoder is. This spin stays active even in `starved`
+         // mode - real hardware encoders drain so much faster than this test
+         // can produce that removing it entirely doesn't make production
+         // outrun consumption, it starves the encoder's dispatch queue of a
+         // chance to run at all (this test thread never yields otherwise),
+         // which rejects nearly everything and wipes out marker windows
+         // outright rather than exercising the bounded, recoverable drops the
+         // byte budget is meant to produce. `starved` instead shrinks the
+         // budget itself (see RecorderSetTestQueueByteBudget below) so real,
+         // moderate admission rejections happen under this same safe pacing.
          //
          // The ceiling is deliberately generous. A refused append is not lost
-         // footage - the pacer re-issues the count on the next frame - but the
-         // pixels it re-issues are the *next* step's, so refusing during a
-         // 100ms marker moves that marker's onset and this test reads it as an
-         // offset. That is queue policy, not sync, and measuring it here would
-         // make the verdict depend on how busy the machine is.
+         // footage - the pacer re-issues the count on the next frame - and
+         // since item 2, the pixels it re-issues pad with the *previous*
+         // frame rather than stamping the next step's content early, so a
+         // drop here no longer moves a marker's onset backwards in time. That
+         // reclassification is exactly what the `starved` variant checks via
+         // the LEAD assertion below, instead of avoiding the case as the
+         // pre-item-2 comment here used to.
          for (int spin = 0; spin < 120000 && Platform::RecorderPendingFrameCount(rec) >= 3; spin++)
          {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -31808,6 +31846,7 @@ static void RunRecExportTest()
       double first = 0.0;
       double last = 0.0;
       double worstAbs = 0.0;
+      double worstLeadMs = 0.0; // most-negative video-minus-audio seen, in ms
       for (int m = 0; m < kMarkerCount; m++)
       {
          const double delta = videoOnsets[m] - audioOnsets[m];
@@ -31816,6 +31855,7 @@ static void RunRecExportTest()
          if (m == kMarkerCount - 1)
             last = delta;
          worstAbs = std::max(worstAbs, std::fabs(delta));
+         worstLeadMs = std::min(worstLeadMs, delta * 1000.0);
          printf("    marker %d: audio %.3fs  video %.3fs  video-minus-audio %+.0fms\n",
                 m + 1, audioOnsets[m], videoOnsets[m], delta * 1000.0);
       }
@@ -31840,6 +31880,20 @@ static void RunRecExportTest()
          failures++;
       printf("  [%s] OFFSET: worst constant offset %.0fms (tolerance %.0fms)\n",
              offsetOk ? "pass" : "FAIL", worstAbs * 1000.0, kOffsetToleranceMs);
+
+      // The bug this catches: a dropped frame used to get padded by stamping
+      // the *new* frame into the repeat slots that cover the past, pulling
+      // video's onset earlier than the audio it's supposed to follow. One
+      // video frame of quantization slack, same reasoning as DRIFT/OFFSET
+      // above - this is one-sided because lagging is already covered by
+      // OFFSET/DRIFT above and is far less objectionable than leading.
+      const double kLeadToleranceMs = 1000.0 / kFps + 1.0;
+      const double leadMagnitudeMs = std::max(0.0, -worstLeadMs);
+      const bool leadOk = leadMagnitudeMs <= kLeadToleranceMs;
+      if (!leadOk)
+         failures++;
+      printf("  [%s] LEAD: video must not precede its audio onset - worst lead %.0fms (tolerance %.0fms)\n",
+             leadOk ? "pass" : "FAIL", leadMagnitudeMs, kLeadToleranceMs);
    }
 
    std::remove(path.c_str());
@@ -34104,9 +34158,22 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_GRAINMOLDERTEST") != nullptr)
       return RunGrainMolderFixture() ? 0 : 1;
 
-   if (getenv("INFINITE_RECEXPORTTEST") != nullptr)
+   if (const char* recExportVariant = getenv("INFINITE_RECEXPORTTEST"))
    {
-      RunRecExportTest();
+      // default/320x240 can never overrun the queue even at its old 4-frame
+      // depth, so it can't exercise the drop path on its own - and at this
+      // whole take's lifetime byte total (180 frames * ~300KB =~ 54MB) it is
+      // structurally incapable of crossing the 256MB budget even with zero
+      // draining, so "starved" runs at 720p instead (~648MB lifetime, well
+      // over budget) to force real drops when combined with the removed
+      // backpressure spin below. "720p" alone (spin still on) checks that
+      // resolution still syncs cleanly under normal backpressure.
+      if (std::strcmp(recExportVariant, "starved") == 0)
+         RunRecExportTest(1280, 720, true, "starved");
+      else if (std::strcmp(recExportVariant, "720p") == 0)
+         RunRecExportTest(1280, 720, false, "720p");
+      else
+         RunRecExportTest(320, 240, false, "default");
       return 0; // verdict is the printf line, not $?
    }
 
@@ -36149,6 +36216,22 @@ int main(int argc, char** argv)
    {
       gFrameStart = glfwGetTime();
       glfwPollEvents();
+
+      // A recording Stop click sets StopRequested() rather than calling the
+      // blocking OutputNode::StopRecording() directly, so that frame gets to
+      // finish drawing and present its "finalizing..." state before the
+      // block happens. This is the earliest point in the *next* frame - the
+      // one right after that "finalizing" frame's glfwSwapBuffers - where
+      // it's safe to actually run the block: the user has already seen the
+      // app acknowledge the click instead of appearing to hang mid-click.
+      for (GraphNode& gn : gNodes)
+      {
+         if (auto* on = dynamic_cast<OutputNode*>(gn.node.get()))
+         {
+            if (on->StopRequested())
+               on->StopRecording();
+         }
+      }
 
       // Same dev-harness carve-out as the startup check above.
       if (getenv("INFINITE_EXITAFTER") == nullptr)
@@ -44590,11 +44673,25 @@ int main(int argc, char** argv)
                   ImGui::TextDisabled("from: %s", srcName.c_str());
                }
 
-               if (n->IsRecording())
+               if (n->StopRequested())
+               {
+                  // The actual (blocking) StopRecording() runs at the top of
+                  // next frame, once this "finalizing" state has had a
+                  // chance to reach the screen - see the pump next to
+                  // glfwPollEvents(). Recording can't be (re)started from
+                  // here; the handle is mid-teardown.
+                  ImGui::BeginDisabled();
+                  ImGui::Button("Finalizing...", ImVec2(kPreviewSize, 0));
+                  ImGui::EndDisabled();
+                  const int pending = n->PendingFrames();
+                  if (pending > 0)
+                     ImGui::TextDisabled("finishing up, %d frames left", pending);
+               }
+               else if (n->IsRecording())
                {
                   ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
                   if (ImGui::Button("Stop recording", ImVec2(kPreviewSize, 0)))
-                     n->StopRecording();
+                     n->RequestStopRecording();
                   ImGui::PopStyleColor();
                   ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), "REC  %d frames", n->RecordedFrames());
                   const int pending = n->PendingFrames();
