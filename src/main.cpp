@@ -724,6 +724,16 @@ namespace
       ImVec2 screenPos;
       ImVec2 rowMin;
       ImVec2 rowMax;
+      // Round controls (ModKnob's Knob/KnobDb/KnobFreq styles) hit-test and
+      // draw the same rowMin/rowMax box as everything else, but that box also
+      // covers the caption text and pin dot below the cap - highlighting it
+      // whole reads as "the entire cell", not "this knob". These let the
+      // assign-mode hover highlight trace the actual knob circle instead.
+      // Left at their defaults (false/zero) for every non-round pin, which is
+      // why the other two push sites don't need to set them.
+      bool isCircle = false;
+      ImVec2 shapeCenter = ImVec2(0.0f, 0.0f);
+      float shapeRadius = 0.0f;
    };
    std::vector<ParamPinScreenInfo> gParamPinScreenList;
    int   gPerfRenamingElementIdx = -1;
@@ -1591,8 +1601,12 @@ namespace
       ed::EndPin();
 
       GraphNode* curGn = FindNodeByIndex(h.nodeIndex);
+      // rowMin starts after the pin box + its SameLine gap, not at the pin
+      // itself - the assign-mode highlight traces the actual widget, and
+      // starting it at the pin left the highlight overhanging past the
+      // widget's real left edge by the pin's own width.
       gParamPinScreenList.push_back({ h.nodeIndex, h.paramIndex, curGn ? curGn->typeName : "",
-                                      StripParamLabel(label), c, p,
+                                      StripParamLabel(label), c, ImVec2(p.x + box + 4.0f, p.y),
                                       ImVec2(p.x + width, p.y + box + 4.0f) });
       ImGui::SameLine(0.0f, 4.0f);
    }
@@ -1764,8 +1778,10 @@ namespace
       dl->AddCircle(c, 4.0f, isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255), 0, 1.0f);
       ed::EndPin();
       GraphNode* curGn = FindNodeByIndex(nodeIndex);
+      // rowMin starts after the pin box + its SameLine gap, not at the pin
+      // itself - see the matching comment on DrawDiscreteParamPin's push.
       gParamPinScreenList.push_back({ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
-                                      p, ImVec2(p.x + width, p.y + box + 4.0f) });
+                                      ImVec2(p.x + box + 4.0f, p.y), ImVec2(p.x + width, p.y + box + 4.0f) });
       ImGui::SameLine(0.0f, 4.0f);
 
       // Double-clicking swaps the slider for a text field so an exact value
@@ -2866,8 +2882,17 @@ namespace
             dl->AddCircleFilled(c, 2.0f, pinColor);
          ed::EndPin();
          GraphNode* curGn = FindNodeByIndex(nodeIndex);
-         gParamPinScreenList.push_back({ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
-                                         cellOrigin, ImVec2(cellOrigin.x + cell, cellOrigin.y + diameter + 16.0f) });
+         ParamPinScreenInfo pinInfo{ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
+                                      cellOrigin, ImVec2(cellOrigin.x + cell, cellOrigin.y + diameter + 16.0f) };
+         const bool roundWidget = (style == AudioWidgetStyle::Knob || style == AudioWidgetStyle::KnobDb ||
+                                    style == AudioWidgetStyle::KnobFreq);
+         if (roundWidget)
+         {
+            pinInfo.isCircle = true;
+            pinInfo.shapeCenter = ImVec2(cellOrigin.x + cell * 0.5f, cellOrigin.y + diameter * 0.5f);
+            pinInfo.shapeRadius = diameter * 0.5f + 2.0f;
+         }
+         gParamPinScreenList.push_back(pinInfo);
          ImGui::SetCursorScreenPos(cursorAfter);
       }
 
@@ -46996,13 +47021,24 @@ int main(int argc, char** argv)
       if (gPerfAssigningElemIdx >= 0 && gPerfAssigningElemIdx < (int)gPerfElements.size())
       {
          const auto& assignElem = gPerfElements[gPerfAssigningElemIdx];
-         const ImVec2 mp = ImGui::GetMousePos(); // Canvas coordinates inside ed::Begin
-         const ImVec2 screenMouse = ImGui::GetIO().MousePos;
+         // imgui-node-editor remaps io.MousePos into its own local/zoomed
+         // canvas space for the duration of ed::Begin()/ed::End() (see
+         // ImGuiEx::Canvas::EnterLocalSpace), so both GetMousePos() and
+         // GetIO().MousePos are canvas-space here, not real screen pixels.
+         // gGraphScreenTL/gGraphScreenSize were captured before ed::Begin(),
+         // in real screen space, so they have to be converted with
+         // ed::ScreenToCanvas before comparing against the mouse - comparing
+         // them directly (as this used to) left mouseOverGraph false at any
+         // pan/zoom other than the coincidental default, which silently
+         // broke every canvas-click parameter assignment.
+         const ImVec2 mp = ImGui::GetMousePos();
          int hoveredPinIdx = -1;
 
-         const ImVec2 graphBR(gGraphScreenTL.x + gGraphScreenSize.x, gGraphScreenTL.y + gGraphScreenSize.y);
-         const bool mouseOverGraph = (screenMouse.x >= gGraphScreenTL.x && screenMouse.x <= graphBR.x &&
-                                      screenMouse.y >= gGraphScreenTL.y && screenMouse.y <= graphBR.y);
+         const ImVec2 graphTL = ed::ScreenToCanvas(gGraphScreenTL);
+         const ImVec2 graphBR = ed::ScreenToCanvas(
+            ImVec2(gGraphScreenTL.x + gGraphScreenSize.x, gGraphScreenTL.y + gGraphScreenSize.y));
+         const bool mouseOverGraph = (mp.x >= graphTL.x && mp.x <= graphBR.x &&
+                                      mp.y >= graphTL.y && mp.y <= graphBR.y);
 
          if (mouseOverGraph)
          {
@@ -47023,6 +47059,26 @@ int main(int argc, char** argv)
          if (hoveredPinIdx >= 0)
          {
             const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
+            // Glowing box + ring around the hovered control, drawn while still
+            // inside ed::Begin/End so it rides the same local-space vertex
+            // transform as the row rect it's outlining - drawing it after
+            // ed::Suspend() below would place it in real screen space and it
+            // would land in the wrong spot at any pan/zoom.
+            {
+               ImDrawList* hoverDl = ImGui::GetWindowDrawList();
+               const ImU32 glowCol = IM_COL32(0, 230, 255, 28);
+               const ImU32 ringCol = IM_COL32(0, 230, 255, 160);
+               if (pInfo.isCircle)
+               {
+                  hoverDl->AddCircleFilled(pInfo.shapeCenter, pInfo.shapeRadius, glowCol, 24);
+                  hoverDl->AddCircle(pInfo.shapeCenter, pInfo.shapeRadius, ringCol, 24, 1.0f);
+               }
+               else
+               {
+                  hoverDl->AddRectFilled(pInfo.rowMin, pInfo.rowMax, glowCol, 4.0f);
+                  hoverDl->AddRect(pInfo.rowMin, pInfo.rowMax, ringCol, 4.0f, 0, 1.0f);
+               }
+            }
             ed::Suspend();
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
             ImGui::SetTooltip("Assign to '%s' (%s) -> %s: %s",
