@@ -29,6 +29,9 @@ OutputNode::~OutputNode()
    // its thread captures `this` by pointer, so teardown must not proceed
    // (and free the object out from under it) until that thread is done.
    WaitForFinalize();
+   if (mOfflineActive)
+      RequestFinishOfflineRender(true);
+   WaitForOfflineFinalize();
    GLUtil::DestroyFbo(mOut);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
@@ -220,6 +223,170 @@ void OutputNode::WaitForFinalize()
    {
       mFinalizeThread.join();
       ApplyFinalizeResult(mFinalizeResult);
+   }
+}
+
+bool OutputNode::StartOfflineRender(const std::string& path)
+{
+   if (mRecorder != nullptr || IsFinalizing() || mOfflineActive || IsOfflineFinalizing())
+      return false;
+   if (mOut.w <= 1 || mOut.h <= 1)
+   {
+      mRecordStatus = "nothing connected to record";
+      return false;
+   }
+
+   mOfflineRecordW = mOut.w & ~1;
+   mOfflineRecordH = mOut.h & ~1;
+   mOfflineRecordFps = offlineFps > 0 ? offlineFps : 30;
+   mOfflineTotalFrames = mOfflineRecordFps * (offlineDurationSeconds > 0 ? offlineDurationSeconds : 1);
+   mOfflinePrerollRemaining = offlinePrerollFrames > 0 ? offlinePrerollFrames : 0;
+   mOfflineFramesDone = 0;
+
+   std::string audioPath;
+   bool audioLoop = true;
+   double liveAudioSampleRate = 0.0;
+   mOfflineIncludeAudio = includeAudio && mAudioInput.IsConnected();
+
+   if (mOfflineIncludeAudio)
+   {
+      if (auto* file = dynamic_cast<AudioFileNode*>(mAudioInput.GetSource()))
+      {
+         if (file->IsLoaded())
+         {
+            audioPath = file->FilePath();
+            audioLoop = file->loop;
+         }
+      }
+      else
+      {
+         // Non-file audio (synthesized in the graph) is rendered block by
+         // block via AudioEngine::ProcessOffline, one block per video frame -
+         // see main.cpp's RunOfflineRenderStep. That makes the mCaptureRing
+         // the audio path for this whole take, same as a live take's, just
+         // fed synchronously instead of from the real device callback.
+         liveAudioSampleRate = 44100.0;
+         mCaptureRing.overflowCount.store(0, std::memory_order_relaxed);
+         mCaptureRing.enabled.store(true, std::memory_order_relaxed);
+      }
+   }
+
+   std::string error;
+   mOfflineRecorder = Platform::RecorderStart(path, mOfflineRecordW, mOfflineRecordH, mOfflineRecordFps, error,
+                                              audioPath, audioLoop, liveAudioSampleRate, 2);
+   if (mOfflineRecorder == nullptr)
+   {
+      mCaptureRing.enabled.store(false, std::memory_order_relaxed);
+      mOfflineIncludeAudio = false;
+      mRecordStatus = error.empty() ? "could not start offline render" : error;
+      return false;
+   }
+
+   Platform::RecorderSetInputIsBgra(mOfflineRecorder, false);
+   mOfflineActive = true;
+   mRecordStatus = "rendering...";
+   return true;
+}
+
+void OutputNode::DrainOfflineAudioCapture()
+{
+   if (mOfflineRecorder == nullptr)
+      return;
+
+   float scratch[4096];
+   int n;
+   while ((n = mCaptureRing.Read(scratch, 4096)) > 0)
+      Platform::RecorderAppendAudio(mOfflineRecorder, scratch, n / 2);
+}
+
+void OutputNode::CaptureOfflineFrame()
+{
+   if (mOfflineRecorder == nullptr)
+      return;
+
+   const int w = mOfflineRecordW;
+   const int h = mOfflineRecordH;
+
+   std::vector<unsigned char> buf = Platform::RecorderAcquireFrameBuffer(mOfflineRecorder);
+   buf.resize((size_t)w * h * 4);
+
+   if (mOut.w >= w && mOut.h >= h)
+   {
+      GLint prevFbo = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, mOut.fbo);
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, buf.data());
+      glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+   }
+   else
+   {
+      // The graph resolution shrank mid-take: feed a black frame of the
+      // take's locked size rather than reading out of bounds.
+      memset(buf.data(), 0, buf.size());
+   }
+
+   // Always counted, even if the append itself is dropped by the encoder -
+   // this is a fixed frame budget (mOfflineTotalFrames), not a live pace, so
+   // the only way the take can ever end is by counting down regardless.
+   Platform::RecorderAppend(mOfflineRecorder, std::move(buf), 1);
+   mOfflineFramesDone++;
+
+   if (mOfflineIncludeAudio)
+      DrainOfflineAudioCapture();
+}
+
+void OutputNode::RequestFinishOfflineRender(bool cancelled)
+{
+   if (!mOfflineActive || IsOfflineFinalizing())
+      return;
+
+   mOfflineActive = false;
+   mCaptureRing.enabled.store(false, std::memory_order_relaxed);
+   if (mOfflineIncludeAudio)
+      DrainOfflineAudioCapture();
+   mOfflineIncludeAudio = false;
+
+   const uint64_t audioDropped = mCaptureRing.overflowCount.exchange(0, std::memory_order_relaxed);
+
+   Platform::RecorderHandle* handle = mOfflineRecorder;
+   mOfflineRecorder = nullptr;
+
+   mRecordStatus = cancelled ? "cancelling..." : "finalizing...";
+   mOfflineFinalizeDone.store(false, std::memory_order_relaxed);
+   mOfflineFinalizeThread = std::thread([this, handle, audioDropped, cancelled]()
+   {
+      FinalizeResult r = FinishRecorder(handle, audioDropped);
+      if (cancelled && r.ok)
+         r.error = "cancelled";
+      mOfflineFinalizeResult = std::move(r);
+      mOfflineFinalizeDone.store(true, std::memory_order_release);
+   });
+}
+
+void OutputNode::PollOfflineFinalize()
+{
+   if (!mOfflineFinalizeThread.joinable() || !mOfflineFinalizeDone.load(std::memory_order_acquire))
+      return;
+   mOfflineFinalizeThread.join();
+   const FinalizeResult& r = mOfflineFinalizeResult;
+   mLastFrames = r.frames;
+   mLastDropped = r.dropped;
+   if (r.ok && r.error != "cancelled")
+      mRecordStatus = "rendered " + std::to_string(r.frames) + " frames";
+   else if (r.error == "cancelled")
+      mRecordStatus = "cancelled (" + std::to_string(r.frames) + " frames kept)";
+   else
+      mRecordStatus = r.error;
+}
+
+void OutputNode::WaitForOfflineFinalize()
+{
+   if (mOfflineFinalizeThread.joinable())
+   {
+      mOfflineFinalizeThread.join();
+      mLastFrames = mOfflineFinalizeResult.frames;
+      mLastDropped = mOfflineFinalizeResult.dropped;
    }
 }
 

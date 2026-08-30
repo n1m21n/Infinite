@@ -22,6 +22,7 @@ public:
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
+   bool IsHardwareDriven() const override { return true; }
 
    float Value01() override { return mValue; }
 
@@ -78,6 +79,7 @@ public:
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
+   bool IsHardwareDriven() const override { return true; }
 
    float Value01() override { return mEnvelope; }
 

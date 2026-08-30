@@ -78,6 +78,11 @@ public:
    void PollFinalize();
    int RecordedFrames() const;
    const std::string& RecordStatus() const { return mRecordStatus; }
+   // For callers outside this class that need to surface a status string
+   // before/without ever calling Start(Offline)Recording - e.g. main.cpp's
+   // up-front hardware-driven-node refusal, which has to reject a take
+   // before OutputNode itself is involved at all.
+   void SetRecordStatus(const std::string& s) { mRecordStatus = s; }
    // Both read the live handle, so both are 0 while IsFinalizing() - the
    // handle has already been handed off to the background thread by then,
    // and touching it from this thread while RecorderStop() may be mid-delete
@@ -105,6 +110,51 @@ public:
    std::string exportImagePath;
    std::string recordVideoPath;
 
+   // --- offline render (non-realtime export) ---
+   // A second, fully separate capture path from the live recorder above: the
+   // caller (main.cpp) drives the graph and AudioEngine::ProcessOffline in
+   // lockstep, one fixed-size step per frame, completely divorced from wall
+   // time - so a patch that only manages 10fps live can still export a
+   // perfectly smooth, perfectly A/V-synced 60fps file, the same model as
+   // TouchDesigner/After Effects/Final Cut's non-realtime export. Because
+   // both video and audio for a frame are produced by the same synchronous
+   // step (see CaptureOfflineFrame), there is no drift to correct for and
+   // this path needs none of the live path's PacedRepeat pacing.
+   bool StartOfflineRender(const std::string& path);
+   bool IsOfflineRendering() const { return mOfflineActive; }
+   // True from the moment CancelOfflineRender()/the frame-count target hands
+   // the handle to the background finalize thread until PollOfflineFinalize()
+   // has picked up its result - mirrors IsFinalizing() above. Checked by the
+   // Cancel button/main.cpp's progress dialog so clicking Cancel never blocks
+   // the main thread waiting on Platform::RecorderStop.
+   bool IsOfflineFinalizing() const { return mOfflineFinalizeThread.joinable(); }
+   int OfflineFramesDone() const { return mOfflineFramesDone; }
+   int OfflineFramesTotal() const { return mOfflineTotalFrames; }
+   bool IsPrerolling() const { return mOfflinePrerollRemaining > 0; }
+   int PrerollFramesRemaining() const { return mOfflinePrerollRemaining; }
+   void DecrementPreroll() { if (mOfflinePrerollRemaining > 0) mOfflinePrerollRemaining--; }
+   // Called once per offline step, after the graph has cooked this frame and
+   // (if includeAudio) AudioEngine::ProcessOffline has just written this
+   // frame's audio into mCaptureRing. Synchronous glReadPixels straight into
+   // client memory - no PBO pipeline, since nothing downstream is waiting on
+   // this frame's readback to hide latency behind; the whole point of this
+   // path is that it's allowed to take as long as it takes.
+   void CaptureOfflineFrame();
+   // Async, mirrors StopRecordingAsync(): hands Platform::RecorderStop to a
+   // background thread and returns immediately, so a mid-render Cancel click
+   // never blocks the UI thread. Also the path taken when OfflineFramesDone()
+   // reaches OfflineFramesTotal() - see main.cpp's RunOfflineRenderStep.
+   void RequestFinishOfflineRender(bool cancelled);
+   // Call once a frame (see the pump next to glfwPollEvents() in main.cpp).
+   // No-op unless a RequestFinishOfflineRender() finalize has completed, in
+   // which case it joins the background thread, clears IsOfflineRendering(),
+   // and copies its results into RecordStatus().
+   void PollOfflineFinalize();
+
+   int offlineFps = 30;
+   int offlineDurationSeconds = 10;
+   int offlinePrerollFrames = 0;
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("recordFps", recordFps);
@@ -113,12 +163,21 @@ public:
       v.Int("videoFormat", videoFormat);
       v.Text("exportImagePath", exportImagePath);
       v.Text("recordVideoPath", recordVideoPath);
+      v.Int("offlineFps", offlineFps);
+      v.Int("offlineDurationSeconds", offlineDurationSeconds);
+      v.Int("offlinePrerollFrames", offlinePrerollFrames);
    }
 
 private:
    bool EnsureShader();
    void CaptureFrame();
    void DrainAudioCapture();
+   // Offline-render counterpart of DrainAudioCapture(): drains mCaptureRing
+   // into mOfflineRecorder instead of mRecorder. A separate function rather
+   // than a parameterized one so the live path's mAudioFramesAppended pacing
+   // counter (meaningless for the offline path, which is never paced) can't
+   // accidentally get mixed up with it.
+   void DrainOfflineAudioCapture();
    // How many video frames to emit for the frame just rendered, so the video
    // track lands on the audio track's timeline: 0 when the app is rendering
    // faster than recordFps (decimate), >1 when it is rendering slower (pad
@@ -156,6 +215,12 @@ private:
    // reassigned while still joinable (std::thread::operator= on a joinable
    // thread calls std::terminate).
    void WaitForFinalize();
+
+   // Blocks until any in-flight offline finalize completes and joins the
+   // thread; a no-op if none is in flight. Called by the destructor for the
+   // same reason WaitForFinalize() is - the background thread's lambda
+   // captures `this`.
+   void WaitForOfflineFinalize();
 
    ImageCable mInput;
    AudioCable mAudioInput;
@@ -240,4 +305,19 @@ private:
    // result so the encoder converts the bytes correctly either way.
    bool mReadbackFormatDecided = false;
    bool mReadbackIsBgra = true;
+
+   // --- offline render (non-realtime export) ---
+   Platform::RecorderHandle* mOfflineRecorder = nullptr;
+   bool mOfflineActive = false;
+   int mOfflineTotalFrames = 0;
+   int mOfflineFramesDone = 0;
+   int mOfflinePrerollRemaining = 0;
+   int mOfflineRecordW = 0;
+   int mOfflineRecordH = 0;
+   int mOfflineRecordFps = 30;
+   bool mOfflineIncludeAudio = false;
+
+   std::thread mOfflineFinalizeThread;
+   std::atomic<bool> mOfflineFinalizeDone{ false };
+   FinalizeResult mOfflineFinalizeResult;
 };

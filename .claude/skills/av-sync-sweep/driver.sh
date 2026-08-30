@@ -39,6 +39,10 @@ ASSERT=(
   "RECTEARDOWNTEST:14"        # delete the Output node mid-take
   "RECTEARDOWNTEST=quit:14"   # quit mid-take: destructor path, StopRecording
                               # never called explicitly
+
+  # --- offline render (non-realtime export) ---
+  "OFFLINERENDERTEST:300"
+  "OFFLINERENDERREFUSETEST:6"
 )
 
 OBSERVE=()

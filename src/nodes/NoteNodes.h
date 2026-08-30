@@ -62,6 +62,7 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
+   bool IsHardwareDriven() const override { return true; }
 
    AudioNode* GetAudioNode() override;
 
