@@ -32209,17 +32209,19 @@ static void RunRecExportTest(int width, int height, bool starved, const char* la
       const double stepSeconds = 1.0 / ((double)kFps * 4.0);
       for (double t = 0.0; t < kTakeSeconds; t += stepSeconds)
       {
-         // Platform::VideoFrameAt is asynchronous on Windows (a decode thread
-         // fills a queue the caller picks from), so "nothing decoded yet" is a
-         // normal answer at t = 0. Wait a bounded moment for the very first
-         // frame; after that a false return just means "reuse the last one",
-         // which is what this stepper wants anyway - and is what macOS returns
-         // for three out of every four steps here, since it steps at 4x the
-         // clip's frame rate.
+         // This stepper runs as fast as the CPU allows, which on Windows is far
+         // faster than the decode thread - so it has to wait for the decoder
+         // rather than sample one early frame 720 times and report no flashes.
+         // VideoDecodeIsCatchingUp is what distinguishes "not decoded yet" from
+         // "there is nothing more"; it is constant false on macOS, where
+         // VideoFrameAt already decoded synchronously, so this loop never
+         // executes there and macOS timing is unchanged.
          bool gotFrame = Platform::VideoFrameAt(vid, t, px);
-         for (int waitedMs = 0; !gotFrame && px.empty() && waitedMs < 2000; waitedMs += 5)
+         for (int waitedMs = 0;
+              !gotFrame && waitedMs < 2000 && Platform::VideoDecodeIsCatchingUp(vid);
+              waitedMs++)
          {
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             gotFrame = Platform::VideoFrameAt(vid, t, px);
          }
          if (!gotFrame && px.empty())

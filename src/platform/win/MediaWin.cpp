@@ -298,6 +298,11 @@ namespace
       // Render thread -> decode thread.
       std::atomic<long long> targetHns{ 0 };
 
+      // Newest timestamp pulled from the reader since the last seek, or -1.
+      // Decode thread only, except that VideoDecodeIsCatchingUp reads it to
+      // answer "has the decoder got as far as the caller is asking for".
+      std::atomic<long long> decodeHeadHns{ -1 };
+
       // Decode thread -> render thread.
       std::mutex mutex;
       std::condition_variable cv;
@@ -312,6 +317,10 @@ namespace
       std::atomic<bool> stop{ false };
       std::atomic<bool> running{ false };
       std::atomic<bool> threadDone{ false };
+      // Set when the reader has no more frames for the current position, and
+      // cleared by a seek. Read by VideoDecodeIsCatchingUp so an offline
+      // stepper can tell "not decoded yet" from "there is nothing more".
+      std::atomic<bool> endOfStream{ false };
       // Written by the decode thread before threadDone's release store.
       std::string error;
 
@@ -501,8 +510,6 @@ namespace
 
       video->running.store(true, std::memory_order_release);
 
-      LONGLONG decodeHeadHns = -1; // newest timestamp pulled from the reader since the last seek
-      bool endOfStream = false;
 
       while (!video->stop.load(std::memory_order_acquire))
       {
@@ -512,8 +519,10 @@ namespace
          // A jump far enough forward that decoding every intervening frame
          // would take longer than seeking to the nearest keyframe. Small gaps
          // stay on the sequential path, which is both exact and cheaper.
+         const LONGLONG decodeHead =
+            (LONGLONG)video->decodeHeadHns.load(std::memory_order_acquire);
          const bool jumpedForward =
-            decodeHeadHns >= 0 && target > decodeHeadHns + kVideoForwardSeekHns;
+            decodeHead >= 0 && target > decodeHead + kVideoForwardSeekHns;
 
          bool needSeek = false;
          size_t queued = 0;
@@ -551,11 +560,12 @@ namespace
             seek.hVal.QuadPart = target;
             if (FAILED(video->reader->SetCurrentPosition(GUID_NULL, seek)))
                break;
-            decodeHeadHns = -1;
-            endOfStream = false;
+            video->decodeHeadHns.store(-1, std::memory_order_release);
+            video->endOfStream.store(false, std::memory_order_release);
          }
 
-         if (endOfStream || queued >= kVideoReadaheadFrames)
+         if (video->endOfStream.load(std::memory_order_acquire) ||
+             queued >= kVideoReadaheadFrames)
          {
             // Caught up (or out of file): sleep until the render thread moves
             // the target or drains a frame. The timeout keeps a missed
@@ -585,7 +595,7 @@ namespace
             // Clean end of stream, or a decode error mid-stream: stop pulling
             // and keep serving whatever is queued, so the picture holds rather
             // than going black. A later backwards seek clears this.
-            endOfStream = true;
+            video->endOfStream.store(true, std::memory_order_release);
             std::lock_guard<std::mutex> lock(video->mutex);
             video->recycle.push_back(std::move(frame));
             continue;
@@ -593,13 +603,13 @@ namespace
 
          // Guard against non-monotonic timestamps from sloppy containers: the
          // queue has to stay ascending for the render thread's pick to work.
-         if (decodeHeadHns >= 0 && timeHns < decodeHeadHns)
+         if (decodeHead >= 0 && timeHns < decodeHead)
          {
             std::lock_guard<std::mutex> lock(video->mutex);
             video->recycle.push_back(std::move(frame));
             continue;
          }
-         decodeHeadHns = timeHns;
+         video->decodeHeadHns.store((long long)timeHns, std::memory_order_release);
          frame.timeHns = timeHns;
 
          std::lock_guard<std::mutex> lock(video->mutex);
@@ -732,6 +742,23 @@ namespace Platform
       // decode thread has work to do.
       video->cv.notify_one();
       return produced;
+   }
+
+   bool VideoDecodeIsCatchingUp(VideoHandle* handle)
+   {
+      auto* video = reinterpret_cast<VideoHandleMf*>(handle);
+      if (video == nullptr || !video->running.load(std::memory_order_acquire))
+         return false; // no decode thread to wait for
+      // End of stream means no further frame is coming for this position, so a
+      // caller that waited would wait forever. A backwards seek clears it.
+      if (video->endOfStream.load(std::memory_order_acquire))
+         return false;
+      // Once the decoder has read past the requested position, the answer to
+      // "is there a frame at or before it" is settled - a further wait would
+      // never change it. This is the common case for a stepper running at a
+      // finer grain than the clip's own frame rate.
+      return video->decodeHeadHns.load(std::memory_order_acquire) <
+             video->targetHns.load(std::memory_order_acquire);
    }
 
    // Decodes a video container's audio track in full, up front, into a
