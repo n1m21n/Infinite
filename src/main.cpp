@@ -13113,19 +13113,19 @@ namespace
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
+      int hoverStep = -1;
       {
          const float w = gAudioBodyW;
-         const float pitchH = 186.0f;
-         const float tagH = 18.0f;
-         const float velH = 20.0f;
-         const float gap = 3.0f;
+         const float pitchH = 170.0f;
+         const float velH = 22.0f;
+         const float totalGridH = pitchH + velH;
+         const float gap = 2.0f;
          const float barW = (w - gap * (float)(steps - 1)) / (float)steps;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
+         const ImVec2 br(origin.x + w, origin.y + totalGridH);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          ImFont* font = ImGui::GetFont();
-         const float fontCapSz = 10.5f;
-         const float fontTagSz = 10.5f;
-         const float fontVelSz = 10.0f;
+         const bool isLight = IsThemeLight();
 
          const int kLow = 36, kHigh = 84; // C2..C6 (-24..+24 st, 49 notes)
          const int numNotes = kHigh - kLow + 1;
@@ -13138,25 +13138,60 @@ namespace
             dl->AddText(font, fSz, ImVec2(tx, ty), col, text);
          };
 
-         // ---- 1) Clean background ----
-         dl->AddRectFilled(ImVec2(origin.x, origin.y), ImVec2(origin.x + w, origin.y + pitchH),
-                           IM_COL32(18, 20, 26, 255), 3.0f);
+         // ---- 1) Container chassis ----
+         dl->AddRectFilled(origin, br, isLight ? IM_COL32(236, 240, 248, 255) : IM_COL32(16, 16, 22, 255), 4.0f);
 
-         // ---- 2) Step columns: pitch bars, semitone badges, velocity & mute ----
+         // ---- 2) Octave guide lines across pitch area ----
+         const int octaveNotes[] = { 48, 60, 72 }; // C3, C4, C5
+         for (int octNote : octaveNotes)
+         {
+            const float lineY = origin.y + (float)(kHigh - octNote) * noteH;
+            const bool isMiddleC = (octNote == 60);
+            const ImU32 lineCol = isMiddleC
+               ? (isLight ? IM_COL32(175, 182, 198, 220) : IM_COL32(65, 70, 88, 220))
+               : (isLight ? IM_COL32(210, 215, 226, 150) : IM_COL32(32, 35, 46, 150));
+            dl->AddLine(ImVec2(origin.x + 2.0f, lineY), ImVec2(br.x - 2.0f, lineY), lineCol, isMiddleC ? 1.5f : 1.0f);
+         }
+
+         // Divider line between pitch matrix and velocity lane
+         dl->AddLine(ImVec2(origin.x, origin.y + pitchH), ImVec2(br.x, origin.y + pitchH),
+                     isLight ? IM_COL32(200, 206, 218, 255) : IM_COL32(40, 44, 56, 255), 1.0f);
+
+         // ---- 3) Step Columns ----
          for (int i = 0; i < steps; i++)
          {
             const float x0 = origin.x + (float)i * (barW + gap);
             const float x1 = x0 + barW;
             const bool isCurrent = (i == cur);
+            const bool isGroupStart = (i % 4) == 0;
             ImGui::PushID(i);
 
-            // Pitch drag / click area
+            // Column track background
+            const ImU32 trackCol = isLight
+               ? (isGroupStart ? IM_COL32(214, 220, 232, 255) : IM_COL32(226, 230, 240, 255))
+               : (isGroupStart ? IM_COL32(32, 35, 46, 255) : IM_COL32(22, 24, 32, 255));
+            dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, origin.y + pitchH), trackCol, 2.0f);
+
+            // ---- Pitch interactive area ----
             ImGui::SetCursorScreenPos(ImVec2(x0, origin.y));
             ImGui::InvisibleButton("pitch", ImVec2(barW, pitchH));
             const bool pitchHovered = ImGui::IsItemHovered();
             const bool pitchActive = ImGui::IsItemActive();
+            if (pitchHovered)
+               hoverStep = i;
 
-            if (pitchActive && (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsItemClicked(ImGuiMouseButton_Left)))
+            // Double click or right click to toggle gate / mute
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            {
+               PushUndoCheckpoint();
+               n->stepEnabled[i] = !n->stepEnabled[i];
+            }
+            else if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            {
+               PushUndoCheckpoint();
+               n->stepEnabled[i] = !n->stepEnabled[i];
+            }
+            else if (pitchActive && (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsItemClicked(ImGuiMouseButton_Left)))
             {
                const float my = ImGui::GetIO().MousePos.y;
                const float t = 1.0f - std::clamp((my - origin.y) / pitchH, 0.0f, 1.0f);
@@ -13171,82 +13206,93 @@ namespace
             dispNote = std::clamp(dispNote, kLow, kHigh);
             const int dispPc = ((dispNote % 12) + 12) % 12;
             const int dispOct = dispNote / 12 - 1;
-            const int stFromC4 = dispNote - 60;
 
             const float noteTopY = origin.y + (float)(kHigh - dispNote) * noteH;
-            const float capH = std::max(16.0f, noteH + 3.0f);
+            const float capH = std::max(15.0f, noteH + 2.5f);
             const float capTop = std::clamp(noteTopY - (capH - noteH) * 0.5f, origin.y, origin.y + pitchH - capH);
             const float capBot = capTop + capH;
 
-            // Step column hover / playhead background highlight
+            // Playhead column wash or hover highlight
             if (isCurrent)
+            {
                dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, origin.y + pitchH),
-                                 IM_COL32(255, 210, 80, 30), 2.0f);
+                                 isLight ? IM_COL32(255, 200, 80, 50) : IM_COL32(255, 190, 80, 35), 2.0f);
+            }
             else if (pitchHovered)
+            {
                dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, origin.y + pitchH),
-                                 IM_COL32(255, 255, 255, 12), 2.0f);
+                                 isLight ? IM_COL32(0, 0, 0, 10) : IM_COL32(255, 255, 255, 12), 2.0f);
+            }
 
             // Pitch bar stem (from cap to bottom of pitch area)
             if (capBot < origin.y + pitchH)
             {
                const ImU32 stemCol = n->stepEnabled[i]
-                  ? (isCurrent ? IM_COL32(220, 160, 45, 140) : IM_COL32(50, 120, 195, 130))
-                  : IM_COL32(35, 38, 48, 100);
+                  ? (isCurrent
+                        ? (isLight ? IM_COL32(235, 145, 30, 160) : IM_COL32(225, 170, 50, 150))
+                        : (isLight ? IM_COL32(45, 125, 230, 150) : IM_COL32(60, 140, 235, 140)))
+                  : (isLight ? IM_COL32(195, 200, 210, 90) : IM_COL32(38, 42, 54, 90));
                dl->AddRectFilled(ImVec2(x0 + 1.0f, capBot), ImVec2(x1 - 1.0f, origin.y + pitchH),
                                  stemCol, 2.0f);
             }
 
-            // Note head cap (solid prominent block)
-            const ImU32 capCol = n->stepEnabled[i]
-               ? (isCurrent ? IM_COL32(255, 220, 95, 255) : (pitchActive ? IM_COL32(140, 215, 255, 255) : IM_COL32(95, 185, 255, 255)))
-               : IM_COL32(55, 60, 75, 220);
-            dl->AddRectFilled(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capCol, 3.0f);
-            dl->AddRect(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot),
-                        isCurrent ? IM_COL32(255, 245, 180, 255) : IM_COL32(180, 230, 255, 160), 3.0f);
+            // Note pill cap
+            const float fontCapSz = steps <= 8 ? 10.5f : (steps <= 12 ? 9.5f : 8.5f);
+            if (n->stepEnabled[i])
+            {
+               const ImU32 capCol = isCurrent
+                  ? (isLight ? IM_COL32(245, 155, 25, 255) : IM_COL32(255, 200, 80, 255))
+                  : (pitchActive
+                        ? (isLight ? IM_COL32(20, 105, 220, 255) : IM_COL32(120, 195, 255, 255))
+                        : (isLight ? IM_COL32(35, 120, 235, 255) : IM_COL32(80, 170, 255, 255)));
+               const ImU32 capBorder = isCurrent
+                  ? (isLight ? IM_COL32(255, 230, 140, 255) : IM_COL32(255, 245, 180, 255))
+                  : (isLight ? IM_COL32(160, 205, 255, 200) : IM_COL32(180, 230, 255, 180));
 
-            // Note text inside head cap with reduced font size
-            char noteStr[16];
-            snprintf(noteStr, sizeof(noteStr), "%s%d", NoteNameList()[dispPc].c_str(), dispOct);
-            const ImU32 txtCol = n->stepEnabled[i] ? IM_COL32(10, 20, 35, 255) : IM_COL32(140, 145, 160, 220);
-            DrawTextCentered(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), txtCol, noteStr, fontCapSz);
+               dl->AddRectFilled(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capCol, 3.0f);
+               dl->AddRect(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capBorder, 3.0f);
 
-            // ---- Semitone tag / button (click to toggle step enable) ----
-            const float ty0 = origin.y + pitchH + 4.0f;
-            ImGui::SetCursorScreenPos(ImVec2(x0, ty0));
-            if (ImGui::InvisibleButton("tag", ImVec2(barW, tagH)))
-               n->stepEnabled[i] = !n->stepEnabled[i];
-            const bool tagHovered = ImGui::IsItemHovered();
-
-            dl->AddRectFilled(ImVec2(x0 + 1.0f, ty0), ImVec2(x1 - 1.0f, ty0 + tagH),
-                              tagHovered ? IM_COL32(32, 36, 48, 255) : IM_COL32(18, 20, 26, 255), 2.0f);
-
-            char stStr[16];
-            if (barW >= 36.0f)
-               snprintf(stStr, sizeof(stStr), "%+d st", stFromC4);
+               char noteStr[16];
+               snprintf(noteStr, sizeof(noteStr), "%s%d", NoteNameList()[dispPc].c_str(), dispOct);
+               const ImU32 txtCol = isCurrent
+                  ? IM_COL32(20, 15, 5, 255)
+                  : (isLight ? IM_COL32(255, 255, 255, 255) : IM_COL32(10, 20, 35, 255));
+               DrawTextCentered(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), txtCol, noteStr, fontCapSz);
+            }
             else
-               snprintf(stStr, sizeof(stStr), "%+d", stFromC4);
+            {
+               const ImU32 capCol = isLight ? IM_COL32(208, 213, 224, 200) : IM_COL32(40, 44, 56, 200);
+               const ImU32 capBorder = isLight ? IM_COL32(175, 182, 196, 180) : IM_COL32(65, 70, 85, 180);
+               dl->AddRectFilled(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capCol, 3.0f);
+               dl->AddRect(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capBorder, 3.0f);
 
-            const ImU32 stCol = n->stepEnabled[i]
-               ? (isCurrent ? IM_COL32(255, 215, 100, 255) : IM_COL32(150, 205, 255, 230))
-               : IM_COL32(90, 95, 110, 180);
-            DrawTextCentered(ImVec2(x0 + 1.0f, ty0), ImVec2(x1 - 1.0f, ty0 + tagH), stCol, stStr, fontTagSz);
+               char noteStr[16];
+               snprintf(noteStr, sizeof(noteStr), "%s%d", NoteNameList()[dispPc].c_str(), dispOct);
+               const ImU32 txtCol = isLight ? IM_COL32(130, 136, 152, 200) : IM_COL32(105, 110, 125, 180);
+               DrawTextCentered(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), txtCol, noteStr, fontCapSz);
+            }
 
-            // ---- Velocity strip ----
-            const float vy0 = ty0 + tagH + 3.0f;
+            // ---- Velocity lane ----
+            const float vy0 = origin.y + pitchH;
+            const float vy1 = vy0 + velH;
             ImGui::SetCursorScreenPos(ImVec2(x0, vy0));
             ImGui::InvisibleButton("vel", ImVec2(barW, velH));
             const bool velHovered = ImGui::IsItemHovered();
             const bool velActive = ImGui::IsItemActive();
+            if (velHovered)
+               hoverStep = i;
 
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             {
+               PushUndoCheckpoint();
                n->stepEnabled[i] = !n->stepEnabled[i];
             }
-            else if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !n->stepEnabled[i])
+            else if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
             {
-               n->stepEnabled[i] = true;
+               PushUndoCheckpoint();
+               n->stepEnabled[i] = !n->stepEnabled[i];
             }
-            if (velActive && (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsItemClicked(ImGuiMouseButton_Left)))
+            else if (velActive && (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsItemClicked(ImGuiMouseButton_Left)))
             {
                const float my = ImGui::GetIO().MousePos.y;
                const float vt = 1.0f - std::clamp((my - vy0) / velH, 0.0f, 1.0f);
@@ -13254,37 +13300,80 @@ namespace
                n->stepEnabled[i] = true;
             }
 
-            dl->AddRectFilled(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy0 + velH),
-                              IM_COL32(16, 18, 24, 255), 2.0f);
+            // Velocity track background
+            const ImU32 velTrackCol = isLight ? IM_COL32(220, 225, 236, 255) : IM_COL32(18, 20, 26, 255);
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, vy0 + 1.0f), ImVec2(x1 - 1.0f, vy1 - 1.0f), velTrackCol, 2.0f);
 
+            const float fontVelSz = steps <= 8 ? 9.5f : 8.5f;
             if (n->stepEnabled[i])
             {
-               const float vFillTop = vy0 + (1.0f - n->stepVelocity[i]) * velH;
-               const ImU32 vCol = isCurrent ? IM_COL32(255, 205, 90, 255) : IM_COL32(75, 195, 130, 255);
-               dl->AddRectFilled(ImVec2(x0 + 1.0f, vFillTop), ImVec2(x1 - 1.0f, vy0 + velH), vCol, 2.0f);
+               const float vFillTop = vy1 - n->stepVelocity[i] * (velH - 2.0f) - 1.0f;
+               const ImU32 vCol = isCurrent
+                  ? (isLight ? IM_COL32(235, 145, 30, 240) : IM_COL32(255, 205, 90, 255))
+                  : (isLight ? IM_COL32(40, 165, 100, 230) : IM_COL32(65, 205, 135, 240));
+               dl->AddRectFilled(ImVec2(x0 + 1.0f, vFillTop), ImVec2(x1 - 1.0f, vy1 - 1.0f), vCol, 2.0f);
+
                char vStr[16];
                snprintf(vStr, sizeof(vStr), "%.0f", n->stepVelocity[i] * 100.0f);
-               DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy0 + velH), IM_COL32(10, 25, 15, 230), vStr, fontVelSz);
+               const ImU32 txtVCol = isLight ? IM_COL32(10, 25, 15, 230) : IM_COL32(10, 25, 15, 230);
+               DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy1), txtVCol, vStr, fontVelSz);
             }
             else
             {
-               DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy0 + velH), IM_COL32(85, 90, 105, 180), "OFF", fontVelSz);
+               DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy1),
+                                isLight ? IM_COL32(140, 145, 160, 180) : IM_COL32(85, 90, 105, 180), "OFF", fontVelSz);
             }
 
-            // Playhead indicator border & top pip
+            // Playhead column outline
             if (isCurrent)
             {
-               dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, vy0 + velH),
-                           IM_COL32(255, 210, 80, 220), 3.0f, 0, 1.5f);
-               dl->AddRectFilled(ImVec2(x0 + 2.0f, origin.y - 3.0f), ImVec2(x1 - 2.0f, origin.y),
-                                 IM_COL32(255, 225, 110, 255), 1.5f);
+               dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, vy1),
+                           isLight ? IM_COL32(225, 130, 20, 240) : IM_COL32(255, 210, 80, 230), 2.0f, 0, 1.5f);
             }
+
+            // ---- Step number label below each column (Pattern-style) ----
+            char label[8];
+            snprintf(label, sizeof(label), "%d", i + 1);
+            const float labelFontSize = steps <= 8 ? ImGui::GetFontSize() : std::max(8.0f, barW * 0.95f);
+            const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
+            const ImU32 stepNumCol = isCurrent
+               ? (isLight ? IM_COL32(225, 130, 20, 255) : IM_COL32(255, 200, 80, 255))
+               : (isLight
+                     ? (isGroupStart ? IM_COL32(40, 48, 65, 255) : IM_COL32(110, 116, 132, 255))
+                     : (isGroupStart ? IM_COL32(190, 194, 210, 255) : IM_COL32(110, 114, 130, 255)));
+            dl->AddText(font, labelFontSize, ImVec2(x0 + (barW - textSize.x) * 0.5f, br.y + 3.0f),
+                        stepNumCol, label);
 
             ImGui::PopID();
          }
 
-         ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + pitchH + tagH + velH + 10.0f));
-         ImGui::Dummy(ImVec2(w, 1.0f));
+         // Grid outer border
+         dl->AddRect(origin, br, isLight ? IM_COL32(185, 192, 208, 255) : IM_COL32(65, 70, 85, 255), 4.0f);
+
+         const float labelRowH = ImGui::GetFontSize() + 5.0f;
+         ImGui::SetCursorScreenPos(ImVec2(origin.x, br.y + labelRowH));
+         if (hoverStep >= 0)
+         {
+            const int rawNote = n->stepNote[hoverStep];
+            int dispNote = rawNote;
+            if (n->useGlobalScale)
+               dispNote = MusicTime::SnapToScale(rawNote, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
+            dispNote = std::clamp(dispNote, kLow, kHigh);
+            const int dispPc = ((dispNote % 12) + 12) % 12;
+            const int dispOct = dispNote / 12 - 1;
+            const int stFromC4 = dispNote - 60;
+            if (n->stepEnabled[hoverStep])
+               ImGui::TextDisabled("step %d: %s%d (%+dst) | vel %.0f%% (dbl-click to mute)",
+                                   hoverStep + 1, NoteNameList()[dispPc].c_str(), dispOct, stFromC4,
+                                   n->stepVelocity[hoverStep] * 100.0f);
+            else
+               ImGui::TextDisabled("step %d: %s%d (%+dst) [MUTED] (dbl-click to unmute)",
+                                   hoverStep + 1, NoteNameList()[dispPc].c_str(), dispOct, stFromC4);
+         }
+         else
+         {
+            ImGui::TextDisabled("%d steps, looped", steps);
+         }
       }
 
       {
