@@ -138,6 +138,19 @@ namespace Platform
    // Seeking backwards restarts the reader, which is how looping works.
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels);
 
+   // True while the decoder has not yet read as far as the position last asked
+   // for through VideoFrameAt - i.e. a false return from VideoFrameAt means
+   // "not yet", not "never". Once it goes false the answer is settled and
+   // waiting longer cannot change it, so it is safe to loop on.
+   //
+   // Always false on macOS, where VideoFrameAt decodes synchronously and has
+   // therefore always caught up by the time it returns. On Windows decoding
+   // runs on its own thread, so a caller stepping faster than real time (a
+   // self-test or an offline analysis pass, never the render thread) has to
+   // wait for the decoder instead of racing past it. The render thread must
+   // NOT wait on this - holding the previous frame is the whole point.
+   bool VideoDecodeIsCatchingUp(VideoHandle* handle);
+
    // Decodes a video container's audio track into the same planar-float
    // SampleBuffer (defined below) the audio-file path already produces.
    // Returns false with a reason in outError when the file has no audio

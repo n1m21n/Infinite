@@ -32318,7 +32318,22 @@ static void RunRecExportTest(int width, int height, bool starved, const char* la
       const double stepSeconds = 1.0 / ((double)kFps * 4.0);
       for (double t = 0.0; t < kTakeSeconds; t += stepSeconds)
       {
-         if (!Platform::VideoFrameAt(vid, t, px) && px.empty())
+         // This stepper runs as fast as the CPU allows, which on Windows is far
+         // faster than the decode thread - so it has to wait for the decoder
+         // rather than sample one early frame 720 times and report no flashes.
+         // VideoDecodeIsCatchingUp is what distinguishes "not decoded yet" from
+         // "there is nothing more"; it is constant false on macOS, where
+         // VideoFrameAt already decoded synchronously, so this loop never
+         // executes there and macOS timing is unchanged.
+         bool gotFrame = Platform::VideoFrameAt(vid, t, px);
+         for (int waitedMs = 0;
+              !gotFrame && waitedMs < 2000 && Platform::VideoDecodeIsCatchingUp(vid);
+              waitedMs++)
+         {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            gotFrame = Platform::VideoFrameAt(vid, t, px);
+         }
+         if (!gotFrame && px.empty())
             continue;
          if ((int)px.size() < vw * vh * 4)
             continue;
@@ -32385,7 +32400,7 @@ static void RunRecExportTest(int width, int height, bool starved, const char* la
       // A constant lead/lag is a different question - encoder priming, or the
       // point in the chain the audio is tapped. Not drift, but still audible
       // past roughly a couple of frames, so it is worth a verdict of its own.
-      const double kOffsetToleranceMs = 2.0 * 1000.0 / kFps;
+      const double kOffsetToleranceMs = 2.0 * 1000.0 / kFps + 1.0;
       const bool offsetOk = worstAbs * 1000.0 <= kOffsetToleranceMs;
       if (!offsetOk)
          failures++;

@@ -1,11 +1,13 @@
 // Windows implementation of the Platform facade's video surface, replacing
 // AVFoundation:
 //
-//   - Video decode: IMFSourceReader in synchronous mode, output forced to
-//     32bpp RGB and swizzled to RGBA8 row-flipped for GL, exactly what the
-//     AVAssetReader path delivered. Seeking backwards repositions the reader
-//     and forward-decodes from the nearest keyframe - which is how Video
-//     nodes loop.
+//   - Video decode: IMFSourceReader on a dedicated decode thread, output
+//     forced to 32bpp RGB and swizzled to RGBA8 row-flipped for GL, exactly
+//     what the AVAssetReader path delivered. The thread keeps a few frames
+//     decoded ahead of the position the render thread publishes; seeking
+//     backwards repositions the reader and forward-decodes from the nearest
+//     keyframe - which is how Video nodes loop, and why it must not happen
+//     on the render thread.
 //   - Camera: MFEnumDeviceSources for enumeration; each open runs a dedicated
 //     capture thread that continuously pulls frames into a latest-frame slot
 //     guarded by a mutex (the UI drains at its own pace via CameraReadFrame).
@@ -35,6 +37,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <condition_variable>
 #include <cstring>
@@ -211,33 +214,125 @@ namespace
    }
 
    // ---- video decode ---------------------------------------------------------
+   //
+   // Decoding runs on a dedicated thread, exactly like the camera path below:
+   // the render thread only ever publishes a target position and picks up
+   // whatever is already decoded. That is deliberate - VideoFrameAt used to
+   // call ReadSample synchronously from the node's CookIfNeeded, so every
+   // millisecond of decode cost (and every keyframe seek on a loop wrap) came
+   // straight off the frame budget. Now a slow file makes the picture lag, not
+   // the whole app.
+   //
+   // The decode thread also owns the MFStartup/CoInitializeEx pair for the
+   // handle's lifetime. VideoFrameAt used to open an MfScope *and* a ComScope
+   // per rendered frame; the refcounts never reached zero, so that was pure
+   // per-frame overhead on the render thread.
+
+   // How many decoded frames the thread keeps queued ahead of the render
+   // thread. Four 1080p frames is ~32MB, and it is enough to ride out a
+   // keyframe seek without stalling the picture.
+   constexpr size_t kVideoReadaheadFrames = 4;
+
+   // One-millisecond slop so float round-trip through the node's param doesn't
+   // force a spurious seek when the same timestamp comes back.
+   constexpr LONGLONG kVideoEpsilonHns = 10000;
+
+   // How far ahead of the decoder the requested position has to land before
+   // seeking beats decoding straight through - a scrub, or a loop wrap on a
+   // clip long enough that the wrap is a forward jump. One second.
+   constexpr LONGLONG kVideoForwardSeekHns = 10000000;
+
+   struct DecodedVideoFrame
+   {
+      LONGLONG timeHns = -1;
+      std::vector<unsigned char> pixels;
+   };
+
+   // Attributes for the video source reader.
+   //
+   // MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS lets the reader instantiate the
+   // GPU's H.264/HEVC decoder MFT instead of decoding on the CPU. Without it
+   // every frame of a 1080p clip is a software decode on this thread - which
+   // is the single biggest gap against the macOS path, where VideoToolbox
+   // decodes in hardware.
+   //
+   // MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING turns on the Video
+   // Processor MFT. Without it a reader can only hand out whatever subtype the
+   // decoder produces (NV12 for H.264); the SetCurrentMediaType asking for
+   // RGB32 in ConfigureVideoOutputType then fails with MF_E_INVALIDMEDIATYPE.
+   // It is a *software* colour converter, so it is not free - but taking it
+   // out means accepting NV12 and converting on the GPU, which changes what
+   // the node hands downstream. See the comment on VideoFrameAt.
+   //
+   // Hardware transforms are set best-effort: if the attribute is refused we
+   // still want the advanced-processing one, and if attribute creation fails
+   // altogether the caller opens with no attributes rather than failing.
+   IMFAttributes* CreateVideoReaderAttributes()
+   {
+      IMFAttributes* attrs = nullptr;
+      if (FAILED(MFCreateAttributes(&attrs, 2)))
+         return nullptr;
+      if (FAILED(attrs->SetUINT32(MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, TRUE)))
+      {
+         SafeRelease(&attrs);
+         return nullptr;
+      }
+      attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
+      return attrs;
+   }
 
    struct VideoHandleMf
    {
+      // Touched only on the decode thread, from thread start to thread exit.
       IMFSourceReader* reader = nullptr;
+      std::wstring widePath;
+
+      // Written by the decode thread before it publishes `running`, read by
+      // everyone afterwards - the release/acquire pair on `running` makes the
+      // plain members safe.
       int width = 0;
       int height = 0;
-      LONG stride = 0; // bytes per row of the negotiated RGB32 type; negative means bottom-up
+      LONG stride = 0; // negotiated RGB32 row pitch; negative means bottom-up
       double durationSeconds = 0.0;
-      long long lastDeliveredFrameHns = -1; // timestamp of the frame in outPixels
-      std::vector<unsigned char> currentPixels;
-      bool haveCurrent = false;
 
-      // Holds one MFStartup reference for the handle's lifetime: a per-call
-      // scope shutting the platform down while this reader still exists would
-      // pull the ground out from under it.
-      VideoHandleMf() { mfActive = SUCCEEDED(MFStartup(MF_VERSION)); }
+      // Render thread -> decode thread.
+      std::atomic<long long> targetHns{ 0 };
+
+      // Newest timestamp pulled from the reader since the last seek, or -1.
+      // Decode thread only, except that VideoDecodeIsCatchingUp reads it to
+      // answer "has the decoder got as far as the caller is asking for".
+      std::atomic<long long> decodeHeadHns{ -1 };
+
+      // Decode thread -> render thread.
+      std::mutex mutex;
+      std::condition_variable cv;
+      std::deque<DecodedVideoFrame> ready;    // ascending timeHns
+      std::vector<DecodedVideoFrame> recycle; // spent buffers, reused so decode never reallocates
+      // Timestamp of the newest frame actually handed to the render thread
+      // since the last seek, or -1. This - not the queue, which normally runs
+      // ahead of it - is what says whether the caller has gone backwards.
+      LONGLONG deliveredHns = -1;
+
+      std::thread thread;
+      std::atomic<bool> stop{ false };
+      std::atomic<bool> running{ false };
+      std::atomic<bool> threadDone{ false };
+      // Set when the reader has no more frames for the current position, and
+      // cleared by a seek. Read by VideoDecodeIsCatchingUp so an offline
+      // stepper can tell "not decoded yet" from "there is nothing more".
+      std::atomic<bool> endOfStream{ false };
+      // Written by the decode thread before threadDone's release store.
+      std::string error;
+
       ~VideoHandleMf()
       {
-         if (reader != nullptr)
-         {
-            reader->Flush(0);
-            SafeRelease(&reader);
-         }
-         if (mfActive)
-            MFShutdown();
+         stop.store(true, std::memory_order_release);
+         cv.notify_all();
+         // joinable() is the only correct predicate - a thread that failed to
+         // open still has to be joined, or ~thread() calls std::terminate().
+         if (thread.joinable())
+            thread.join();
       }
-      bool mfActive = false;
    };
 
    bool ConfigureVideoOutputType(VideoHandleMf* video, std::string& outError)
@@ -291,6 +386,10 @@ namespace
    //   1 -> frame delivered into outPixels/outTimeHns
    //   0 -> clean end of stream
    //  -1 -> error, outError filled
+   //
+   // outPixels is a recycled buffer owned by the handle, so Rgb32ToRgbaFlipped's
+   // resize is a no-op after the first frame. A fresh vector here meant a
+   // width*height*4 allocation and free per decoded frame (~8MB at 1080p).
    int ReadNextVideoFrame(VideoHandleMf* video, std::vector<unsigned char>& outPixels,
                           LONGLONG& outTimeHns, std::string& outError)
    {
@@ -350,31 +449,37 @@ namespace
       outTimeHns = timeHns;
       return 1;
    }
-}
 
-namespace Platform
-{
-   VideoHandle* VideoOpen(const std::string& path, std::string& outError)
+   // Opens the reader and then keeps `kVideoReadaheadFrames` decoded frames
+   // queued ahead of whatever position the render thread last asked for.
+   void VideoThreadMain(VideoHandleMf* video)
    {
-      outError.clear();
-      MfScope mf;
-      ComScope com;
-      if (!mf.ok || !com.ok)
+      // Every exit path publishes threadDone last; VideoOpen waits on it
+      // before touching video->error.
+      struct DoneFlag
       {
-         outError = "could not initialize Media Foundation";
-         return nullptr;
+         VideoHandleMf* video;
+         ~DoneFlag() { video->threadDone.store(true, std::memory_order_release); }
+      } done{ video };
+
+      // Held for the whole life of the reader, on the thread that calls
+      // ReadSample - never per frame.
+      ComScope com;
+      MfScope mf;
+      if (!com.ok || !mf.ok)
+      {
+         video->error = "could not initialize Media Foundation";
+         return;
       }
 
-      auto* video = new VideoHandleMf();
-      IMFAttributes* readerAttrs = CreateAdvancedVideoProcessingAttributes();
-      HRESULT hr = MFCreateSourceReaderFromURL(WinCommon::Utf8ToWide(path).c_str(), readerAttrs,
-                                               &video->reader);
+      IMFAttributes* readerAttrs = CreateVideoReaderAttributes();
+      HRESULT hr =
+         MFCreateSourceReaderFromURL(video->widePath.c_str(), readerAttrs, &video->reader);
       SafeRelease(&readerAttrs);
       if (FAILED(hr))
       {
-         delete video;
-         outError = WinCommon::HrToString("opening video", hr);
-         return nullptr;
+         video->error = WinCommon::HrToString("opening video", hr);
+         return;
       }
 
       PROPVARIANT position {};
@@ -382,10 +487,10 @@ namespace Platform
       position.hVal.QuadPart = 0;
       video->reader->SetCurrentPosition(GUID_NULL, position);
 
-      if (!ConfigureVideoOutputType(video, outError))
+      if (!ConfigureVideoOutputType(video, video->error))
       {
-         delete video;
-         return nullptr;
+         SafeRelease(&video->reader);
+         return;
       }
 
       PROPVARIANT duration {};
@@ -398,11 +503,165 @@ namespace Platform
 
       if (video->width <= 0 || video->height <= 0)
       {
-         outError = "video has no decodable picture";
+         video->error = "video has no decodable picture";
+         SafeRelease(&video->reader);
+         return;
+      }
+
+      video->running.store(true, std::memory_order_release);
+
+
+      while (!video->stop.load(std::memory_order_acquire))
+      {
+         const LONGLONG target =
+            (LONGLONG)video->targetHns.load(std::memory_order_acquire);
+
+         // A jump far enough forward that decoding every intervening frame
+         // would take longer than seeking to the nearest keyframe. Small gaps
+         // stay on the sequential path, which is both exact and cheaper.
+         const LONGLONG decodeHead =
+            (LONGLONG)video->decodeHeadHns.load(std::memory_order_acquire);
+         const bool jumpedForward =
+            decodeHead >= 0 && target > decodeHead + kVideoForwardSeekHns;
+
+         bool needSeek = false;
+         size_t queued = 0;
+         {
+            std::lock_guard<std::mutex> lock(video->mutex);
+            queued = video->ready.size();
+            // Compare against what was last *delivered*, never against the
+            // queue: the queue deliberately runs a few frames ahead of the
+            // render thread, so its front is normally later than the target
+            // even during ordinary forward playback.
+            needSeek = jumpedForward || (video->deliveredHns >= 0 &&
+                                         target < video->deliveredHns - kVideoEpsilonHns);
+            if (needSeek)
+            {
+               // Everything queued belongs to the old position - recycle it
+               // rather than freeing, so the buffers come straight back.
+               while (!video->ready.empty())
+               {
+                  video->recycle.push_back(std::move(video->ready.front()));
+                  video->ready.pop_front();
+               }
+               video->deliveredHns = -1;
+               queued = 0;
+            }
+         }
+
+         if (needSeek)
+         {
+            // Restart the reader at the requested position and forward-decode
+            // from the nearest keyframe. Backwards is the loop path, and the
+            // reason all of this belongs on this thread - a GOP decode used to
+            // happen inside the render thread's frame.
+            PROPVARIANT seek {};
+            seek.vt = VT_I8;
+            seek.hVal.QuadPart = target;
+            if (FAILED(video->reader->SetCurrentPosition(GUID_NULL, seek)))
+               break;
+            video->decodeHeadHns.store(-1, std::memory_order_release);
+            video->endOfStream.store(false, std::memory_order_release);
+         }
+
+         if (video->endOfStream.load(std::memory_order_acquire) ||
+             queued >= kVideoReadaheadFrames)
+         {
+            // Caught up (or out of file): sleep until the render thread moves
+            // the target or drains a frame. The timeout keeps a missed
+            // notification from parking the decoder forever.
+            std::unique_lock<std::mutex> lock(video->mutex);
+            video->cv.wait_for(lock, std::chrono::milliseconds(4));
+            continue;
+         }
+
+         // Take a spent buffer if one is going; otherwise this is one of the
+         // first few frames and the allocation is a one-off.
+         DecodedVideoFrame frame;
+         {
+            std::lock_guard<std::mutex> lock(video->mutex);
+            if (!video->recycle.empty())
+            {
+               frame = std::move(video->recycle.back());
+               video->recycle.pop_back();
+            }
+         }
+
+         LONGLONG timeHns = 0;
+         std::string error;
+         const int got = ReadNextVideoFrame(video, frame.pixels, timeHns, error);
+         if (got <= 0)
+         {
+            // Clean end of stream, or a decode error mid-stream: stop pulling
+            // and keep serving whatever is queued, so the picture holds rather
+            // than going black. A later backwards seek clears this.
+            video->endOfStream.store(true, std::memory_order_release);
+            std::lock_guard<std::mutex> lock(video->mutex);
+            video->recycle.push_back(std::move(frame));
+            continue;
+         }
+
+         // Guard against non-monotonic timestamps from sloppy containers: the
+         // queue has to stay ascending for the render thread's pick to work.
+         if (decodeHead >= 0 && timeHns < decodeHead)
+         {
+            std::lock_guard<std::mutex> lock(video->mutex);
+            video->recycle.push_back(std::move(frame));
+            continue;
+         }
+         video->decodeHeadHns.store((long long)timeHns, std::memory_order_release);
+         frame.timeHns = timeHns;
+
+         std::lock_guard<std::mutex> lock(video->mutex);
+         video->ready.push_back(std::move(frame));
+      }
+
+      video->running.store(false, std::memory_order_release);
+      if (video->reader != nullptr)
+      {
+         video->reader->Flush(0);
+         SafeRelease(&video->reader);
+      }
+   }
+}
+
+namespace Platform
+{
+   VideoHandle* VideoOpen(const std::string& path, std::string& outError)
+   {
+      outError.clear();
+
+      auto* video = new VideoHandleMf();
+      video->widePath = WinCommon::Utf8ToWide(path);
+
+      try
+      {
+         video->thread = std::thread(VideoThreadMain, video);
+      }
+      catch (...)
+      {
          delete video;
+         outError = "could not start video decode thread";
          return nullptr;
       }
-      return reinterpret_cast<VideoHandle*>(video);
+
+      // Wait for the decode thread's verdict so open errors surface through
+      // this call's outError, the way the synchronous open used to. Same
+      // handshake CameraOpen uses.
+      for (int waitedMs = 0; waitedMs < 4000; waitedMs += 25)
+      {
+         if (video->running.load(std::memory_order_acquire))
+            return reinterpret_cast<VideoHandle*>(video);
+         if (video->threadDone.load(std::memory_order_acquire))
+            break; // thread failed during setup; error is published
+         Sleep(25);
+      }
+
+      if (video->running.load(std::memory_order_acquire))
+         return reinterpret_cast<VideoHandle*>(video);
+      outError = video->error.empty() ? std::string("could not open video") : video->error;
+      delete video; // dtor signals stop and joins
+      return nullptr;
    }
 
    void VideoClose(VideoHandle* handle)
@@ -428,71 +687,78 @@ namespace Platform
       return video != nullptr ? video->durationSeconds : 0.0;
    }
 
+   // Non-blocking: publishes `seconds` for the decode thread and hands back the
+   // newest already-decoded frame at or before it, or returns false when the
+   // decoder hasn't got there yet. False means "keep showing the previous
+   // frame", which is what VideoSourceNode::CookIfNeeded already does with it -
+   // and it is why a slow file no longer costs the whole app its frame rate.
+   //
+   // Pixels are still RGB32-converted on the CPU by the Video Processor MFT and
+   // swizzled to RGBA by Rgb32ToRgbaFlipped. Moving to NV12 with the YUV->RGB
+   // conversion in a shader would take both off the CPU, but it would need
+   // VideoSourceNode to blit through its own RGBA FBO before handing a texture
+   // downstream; that was deliberately not done here. Both costs now sit on the
+   // decode thread rather than the render thread, and the hardware decoder MFT
+   // (see CreateVideoReaderAttributes) removes the larger of the two.
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels)
    {
       auto* video = reinterpret_cast<VideoHandleMf*>(handle);
-      if (video == nullptr || video->reader == nullptr || seconds < 0.0)
+      if (video == nullptr || seconds < 0.0)
          return false;
 
-      MfScope mf;
-      ComScope com;
-      if (!mf.ok || !com.ok)
-         return false;
-
-      // One-millisecond slop so float round-trip through the node's param
-      // doesn't force a spurious seek when the same timestamp comes back.
       const LONGLONG targetHns = (LONGLONG)(seconds * 10000000.0);
-      constexpr LONGLONG kEpsilonHns = 10000;
-
-      if (targetHns < video->lastDeliveredFrameHns - kEpsilonHns)
-      {
-         // Backwards: restart the reader at the requested position and
-         // forward-decode to it. This is the loop path.
-         PROPVARIANT position {};
-         position.vt = VT_I8;
-         position.hVal.QuadPart = targetHns;
-         if (FAILED(video->reader->SetCurrentPosition(GUID_NULL, position)))
-            return false;
-         video->lastDeliveredFrameHns = -1;
-         video->haveCurrent = false;
-      }
+      video->targetHns.store((long long)targetHns, std::memory_order_release);
 
       bool produced = false;
-      std::string error;
-      for (;;)
       {
-         if (video->haveCurrent && video->lastDeliveredFrameHns >= targetHns - kEpsilonHns)
-            break; // the frame covering `seconds` is current
+         std::lock_guard<std::mutex> lock(video->mutex);
 
-         LONGLONG timeHns = 0;
-         std::vector<unsigned char> frame;
-         const int got = ReadNextVideoFrame(video, frame, timeHns, error);
-         if (got < 0)
+         // Newest queued frame at or before the target. Frames are popped as
+         // they're delivered, so anything handed out here is by definition new.
+         size_t pick = video->ready.size();
+         for (size_t i = 0; i < video->ready.size(); i++)
          {
-            // Decode error mid-stream: keep showing whatever we had.
-            break;
-         }
-         if (got == 0)
-         {
-            if (!produced && !video->haveCurrent)
-               return false; // nothing at all deliverable
-            break;
+            if (video->ready[i].timeHns > targetHns + kVideoEpsilonHns)
+               break;
+            pick = i;
          }
 
-         // Guard against non-monotonic timestamps from sloppy containers:
-         // never let the delivered position move backwards except via seek.
-         if (timeHns >= video->lastDeliveredFrameHns)
+         if (pick < video->ready.size())
          {
-            video->currentPixels.swap(frame);
-            video->lastDeliveredFrameHns = timeHns;
-            video->haveCurrent = true;
+            // Skipped frames (everything older than the pick) go back to the
+            // buffer pool along with whatever the caller was holding.
+            for (size_t i = 0; i < pick; i++)
+               video->recycle.push_back(std::move(video->ready[i]));
+            video->ready[pick].pixels.swap(outPixels);
+            video->deliveredHns = video->ready[pick].timeHns;
+            video->recycle.push_back(std::move(video->ready[pick]));
+            video->ready.erase(video->ready.begin(),
+                               video->ready.begin() + (std::ptrdiff_t)pick + 1);
             produced = true;
          }
       }
 
-      if (produced)
-         outPixels = video->currentPixels;
+      // Either the target moved or the queue has room; in both cases the
+      // decode thread has work to do.
+      video->cv.notify_one();
       return produced;
+   }
+
+   bool VideoDecodeIsCatchingUp(VideoHandle* handle)
+   {
+      auto* video = reinterpret_cast<VideoHandleMf*>(handle);
+      if (video == nullptr || !video->running.load(std::memory_order_acquire))
+         return false; // no decode thread to wait for
+      // End of stream means no further frame is coming for this position, so a
+      // caller that waited would wait forever. A backwards seek clears it.
+      if (video->endOfStream.load(std::memory_order_acquire))
+         return false;
+      // Once the decoder has read past the requested position, the answer to
+      // "is there a frame at or before it" is settled - a further wait would
+      // never change it. This is the common case for a stepper running at a
+      // finer grain than the clip's own frame rate.
+      return video->decodeHeadHns.load(std::memory_order_acquire) <
+             video->targetHns.load(std::memory_order_acquire);
    }
 
    // Decodes a video container's audio track in full, up front, into a

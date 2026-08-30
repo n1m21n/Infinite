@@ -1022,6 +1022,10 @@ namespace Platform
    int VideoHeight(VideoHandle* handle) { return handle ? handle->height : 0; }
    double VideoDuration(VideoHandle* handle) { return handle ? handle->duration : 0.0; }
 
+   // Decoding here is synchronous: when VideoFrameAt returns, it has already
+   // done whatever work the requested position needed. Nothing to wait for.
+   bool VideoDecodeIsCatchingUp(VideoHandle*) { return false; }
+
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels)
    {
       if (handle == nullptr || seconds < 0.0)
