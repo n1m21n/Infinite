@@ -222,6 +222,7 @@ set(COMMON_SOURCES
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
     src/core/UpdateCheck.cpp
+    src/core/AudioDecodeCache.cpp
     src/audio/AudioEngine.cpp
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp

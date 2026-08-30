@@ -63,6 +63,7 @@ namespace
 #include <fstream>
 #include <map>
 #include <unordered_map>
+#include <deque>
 #include <set>
 #include <memory>
 #include <string>
@@ -4468,6 +4469,14 @@ namespace
    // them. Both patch load and copy/paste restore a node from bare settings,
    // so both call this afterwards rather than duplicating the same dynamic
    // casts in two places.
+   //
+   // Every undo/redo and multi-node delete respawns nodes from scratch and
+   // routes through here, so the file-backed ReloadFromPath() calls below
+   // (image/environment/model/audio) are what pays for re-decoding a source
+   // file on every such respawn. See docs/plans/undo-delete-perf-prompt.md
+   // Part B - AssetCache.h now sits behind those loaders so a respawn that
+   // points at a file already decoded this session skips the decode, not
+   // this dispatch.
    void ReloadDerivedState(INode* node)
    {
       if (auto* img = dynamic_cast<ImageSourceNode*>(node))
@@ -23283,8 +23292,48 @@ namespace
    // AudioOutputNode and OutputNode contribute no AudioNode of their own to
    // `order`, but each connected audio input's source buffer becomes a
    // terminal entry wired into that node's capture ring.
+   //
+   // Set around a loop that would otherwise call this once per node for what
+   // is conceptually a single edit (e.g. deleting a multi-node selection), so
+   // the caller can do exactly one rebuild after the loop. Declared here
+   // rather than next to gSuppressUndoCheckpoints because it must be visible
+   // to the early-out below, which runs long before that declaration.
+   bool gDeferAudioRebuild = false;
+
+   // Timing for the undo/delete performance work in
+   // docs/plans/undo-delete-perf-prompt.md - off unless INFINITE_PERFTIMING
+   // is set, matching every other getenv("INFINITE_...") harness in this
+   // file. Declared here (this function's own definition is the earliest of
+   // the three it instruments) so it's visible everywhere it's used below.
+   // Checked once per construction rather than cached, so toggling the env
+   // var takes effect on the next call without a restart.
+   struct ScopedPerfTimer
+   {
+      const char* label;
+      std::chrono::steady_clock::time_point start;
+      bool enabled;
+      explicit ScopedPerfTimer(const char* l)
+         : label(l), enabled(getenv("INFINITE_PERFTIMING") != nullptr)
+      {
+         if (enabled)
+            start = std::chrono::steady_clock::now();
+      }
+      ~ScopedPerfTimer()
+      {
+         if (enabled)
+         {
+            double ms = std::chrono::duration<double, std::milli>(
+               std::chrono::steady_clock::now() - start).count();
+            fprintf(stderr, "[perf] %s: %.3f ms\n", label, ms);
+         }
+      }
+   };
+
    void RebuildAudioTopology()
    {
+      if (gDeferAudioRebuild)
+         return;
+      ScopedPerfTimer perfTimer("RebuildAudioTopology");
       std::vector<AudioTopologyEntry> order;
       std::set<INode*> visited;
       std::unordered_map<AudioNode*, int> bufferIndexOf;
@@ -23741,7 +23790,42 @@ namespace
    // than round-tripping through disk.
    Patch::Data BuildPatchData()
    {
+      ScopedPerfTimer perfTimer("BuildPatchData");
       Patch::Data data;
+
+      // Reverse-lookup tables built once (a single O(N) pass, one dynamic_cast
+      // per node per interface) so every per-cable scan below is a map lookup
+      // instead of an O(N) linear search - this function used to be O(N^2)
+      // with dynamic_cast in the inner loop. See
+      // docs/plans/undo-delete-perf-prompt.md.
+      std::unordered_map<const void*, int> addrToIndex;
+      addrToIndex.reserve(gNodes.size() * 2);
+      for (GraphNode& gn : gNodes)
+      {
+         addrToIndex[(const void*)gn.node.get()] = gn.index;
+         // IGeometrySource*/IPaletteSource* are different addresses into the
+         // same object under multiple inheritance, so each cast that this
+         // function compares against needs its own entry.
+         if (auto* asGeo = dynamic_cast<IGeometrySource*>(gn.node.get()))
+            addrToIndex[(const void*)asGeo] = gn.index;
+         if (auto* asPal = dynamic_cast<IPaletteSource*>(gn.node.get()))
+            addrToIndex[(const void*)asPal] = gn.index;
+      }
+      // Modulator addresses are keyed to the specific output index they came
+      // from, unlike the plain addresses above - mirrors ModulatorForOutput's
+      // two cases. Built in gNodes/output order with first-write-wins
+      // (unordered_map::emplace no-ops on an existing key), matching the
+      // original nested scan's "first match wins" semantics exactly.
+      struct ModSource { int index; int output; };
+      std::unordered_map<const void*, ModSource> modAddrToSource;
+      for (GraphNode& src : gNodes)
+      {
+         int outputs = std::max(1, src.node->OutputCount());
+         for (int o = 0; o < outputs; o++)
+            if (IModulator* mod = ModulatorForOutput(src.node.get(), o))
+               modAddrToSource.emplace((const void*)mod, ModSource{ src.index, o });
+      }
+
       for (GraphNode& gn : gNodes)
       {
          Patch::NodeRecord rec;
@@ -23766,14 +23850,9 @@ namespace
             {
                if (!cable->IsConnected())
                   continue;
-               for (GraphNode& src : gNodes)
-               {
-                  if (src.node.get() == cable->GetSource())
-                  {
-                     data.cables.push_back({ gn.index, slot, src.index });
-                     break;
-                  }
-               }
+               auto it = addrToIndex.find((const void*)cable->GetSource());
+               if (it != addrToIndex.end())
+                  data.cables.push_back({ gn.index, slot, it->second });
             }
          }
          // Audio/note cables are typed like image cables (a plain
@@ -23785,51 +23864,32 @@ namespace
             AudioCable* cable = gn.node->AudioInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == cable->GetSource())
-               {
-                  data.audio.push_back({ gn.index, slot, src.index, cable->GetOutputSlot() });
-                  break;
-               }
-            }
+            auto it = addrToIndex.find((const void*)cable->GetSource());
+            if (it != addrToIndex.end())
+               data.audio.push_back({ gn.index, slot, it->second, cable->GetOutputSlot() });
          }
          for (int slot = 0; slot < kMaxNoteSlots; slot++)
          {
             NoteCable* cable = gn.node->NoteInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == cable->GetSource())
-               {
-                  data.notes.push_back({ gn.index, slot, src.index, cable->GetOutputSlot() });
-                  break;
-               }
-            }
+            auto it = addrToIndex.find((const void*)cable->GetSource());
+            if (it != addrToIndex.end())
+               data.notes.push_back({ gn.index, slot, it->second, cable->GetOutputSlot() });
          }
       }
 
       // Geometry, camera, light, audio and modulator-input pins, found by
-      // comparing against each candidate source rather than stored by index.
+      // looking up each candidate source's address rather than scanning for it.
       for (GraphNode& gn : gNodes)
       {
          auto record = [&](const void* wanted, int slot)
          {
             if (wanted == nullptr)
                return;
-            for (GraphNode& src : gNodes)
-            {
-               // Compared against IGeometrySource* separately from INode*:
-               // with multiple inheritance they are different addresses into
-               // the same object, so one comparison is not enough.
-               const void* asGeo = dynamic_cast<IGeometrySource*>(src.node.get());
-               if (asGeo == wanted || (const void*)src.node.get() == wanted)
-               {
-                  data.geometry.push_back({ gn.index, slot, src.index });
-                  return;
-               }
-            }
+            auto it = addrToIndex.find(wanted);
+            if (it != addrToIndex.end())
+               data.geometry.push_back({ gn.index, slot, it->second });
          };
 
          // Render3DNode's geometry slots are found generically below via
@@ -23849,16 +23909,7 @@ namespace
             // paletteInput is an IPaletteSource*, not an IGeometrySource*, so
             // it needs its own comparison the same way camera/light do above.
             if (setColor->paletteInput != nullptr)
-            {
-               for (GraphNode& src : gNodes)
-               {
-                  if (dynamic_cast<IPaletteSource*>(src.node.get()) == setColor->paletteInput)
-                  {
-                     data.geometry.push_back({ gn.index, 2, src.index });
-                     break;
-                  }
-               }
-            }
+               record(setColor->paletteInput, 2);
          }
          if (int count = gn.node->ModulatorInputCount())
          {
@@ -23867,22 +23918,13 @@ namespace
                IModulator* wanted = *gn.node->ModulatorInputSlot(slot);
                if (wanted == nullptr)
                   continue;
-               for (GraphNode& src : gNodes)
-               {
-                  bool found = false;
-                  for (int o = 0; o < std::max(1, src.node->OutputCount()) && !found; o++)
-                     if (ModulatorForOutput(src.node.get(), o) == wanted)
-                     {
-                        // The output index matters here in a way it doesn't for
-                        // geometry/camera/light pins: a modulator source can
-                        // expose several outputs, and dropping `o` re-attached
-                        // every restored cable to output 0.
-                        data.geometry.push_back({ gn.index, slot, src.index, o });
-                        found = true;
-                     }
-                  if (found)
-                     break;
-               }
+               auto it = modAddrToSource.find((const void*)wanted);
+               if (it != modAddrToSource.end())
+                  // The output index matters here in a way it doesn't for
+                  // geometry/camera/light pins: a modulator source can
+                  // expose several outputs, and dropping it re-attached every
+                  // restored cable to output 0.
+                  data.geometry.push_back({ gn.index, slot, it->second.index, it->second.output });
             }
          }
       }
@@ -24118,8 +24160,12 @@ namespace
    // checkpoints - that would corrupt the very stack an undo/redo is reading
    // from, and turn opening a 50-node patch into 50 checkpoints.
    bool gSuppressUndoCheckpoints = false;
-   std::vector<Patch::Data> gUndoStack;
-   std::vector<Patch::Data> gRedoStack;
+   // deque, not vector: erase(begin()) at the depth cap below shifts every
+   // remaining element, and each element is a full Patch::Data (two
+   // heap-allocated strings per param per node) - expensive to shift at a
+   // 200-deep cap on a large patch. pop_front() is O(1) on a deque.
+   std::deque<Patch::Data> gUndoStack;
+   std::deque<Patch::Data> gRedoStack;
    const size_t kMaxUndoDepth = 200;
 
    void NewPatch()
@@ -24170,6 +24216,7 @@ namespace
    // a new document boundary, an undo is not.
    void ApplyPatchData(const Patch::Data& data)
    {
+      ScopedPerfTimer perfTimer("ApplyPatchData");
       gSuppressUndoCheckpoints = true;
       NewPatch();
 
@@ -24385,7 +24432,7 @@ namespace
          return;
       gUndoStack.push_back(std::move(snapshot));
       if (gUndoStack.size() > kMaxUndoDepth)
-         gUndoStack.erase(gUndoStack.begin());
+         gUndoStack.pop_front();
       // A fresh action invalidates whatever redo history pointed at a future
       // that no longer follows from the graph's current state.
       gRedoStack.clear();
@@ -24415,7 +24462,7 @@ namespace
       if (gUndoStack.empty())
          return;
       gRedoStack.push_back(BuildPatchData());
-      Patch::Data prev = gUndoStack.back();
+      Patch::Data prev = std::move(gUndoStack.back());
       gUndoStack.pop_back();
       ApplyPatchData(prev);
       gPatchDirty = true;
@@ -24427,7 +24474,7 @@ namespace
       if (gRedoStack.empty())
          return;
       gUndoStack.push_back(BuildPatchData());
-      Patch::Data next = gRedoStack.back();
+      Patch::Data next = std::move(gRedoStack.back());
       gRedoStack.pop_back();
       ApplyPatchData(next);
       gPatchDirty = true;
@@ -38924,6 +38971,72 @@ int main(int argc, char** argv)
          printf("%s\n", ok ? "UNDO REDO OK" : "SUSPECT");
       }
 
+      // Regression guard for the BuildPatchData() perf fix in
+      // docs/plans/undo-delete-perf-prompt.md: it used to be O(N^2) with
+      // dynamic_cast in the inner loop, which is what actually caused the
+      // per-click stutter and the multi-second undo hang on a large patch.
+      // The ceiling is deliberately generous - the fixed version should run
+      // in low single-digit milliseconds even at this node count, so this is
+      // here to catch a return to O(N^2) (or worse), not to chase a specific
+      // number.
+      if (getenv("INFINITE_UNDOPERFTEST") != nullptr && frameId == 4)
+      {
+         NewPatch();
+         const int kNodeCount = 300;
+         for (int i = 0; i < kNodeCount; i++)
+            SpawnNode("Cube", "3D", (float)(i % 20) * 150.0f, (float)(i / 20) * 150.0f);
+         const bool spawnedAll = (int)gNodes.size() == kNodeCount;
+
+         const auto t0 = std::chrono::steady_clock::now();
+         Patch::Data snap = BuildPatchData();
+         const double ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - t0).count();
+
+         const double kCeilingMs = 50.0;
+         const bool fastEnough = ms < kCeilingMs;
+         const bool snapshotComplete = snap.nodes.size() == (size_t)kNodeCount;
+         printf("BuildPatchData on %d nodes: %.3f ms (ceiling %.1f ms)  %s\n",
+                kNodeCount, ms, kCeilingMs,
+                (spawnedAll && fastEnough && snapshotComplete) ? "OK" : "FAIL");
+
+         // Measurement step from docs/plans/undo-delete-perf-prompt.md: time
+         // the five real end-user operations on the same 300-node patch, not
+         // just BuildPatchData in isolation. Printed unconditionally (no
+         // pass/fail ceiling) - these are for the commit message, not a gate.
+         auto timeIt = [](auto&& fn) {
+            const auto s = std::chrono::steady_clock::now();
+            fn();
+            return std::chrono::duration<double, std::milli>(
+               std::chrono::steady_clock::now() - s).count();
+         };
+
+         const double clickMs = timeIt([&]() { PushUndoCheckpoint(); });
+
+         const int deleteIndex = gNodes.back().index;
+         const double deleteMs = timeIt([&]() { RemoveNodeByIndex(deleteIndex); });
+
+         std::vector<int> groupIndices;
+         for (int i = 0; i < 50 && i < (int)gNodes.size(); i++)
+            groupIndices.push_back(gNodes[gNodes.size() - 1 - i].index);
+         const double groupDeleteMs = timeIt([&]() {
+            gSuppressUndoCheckpoints = true;
+            gDeferAudioRebuild = true;
+            for (int idx : groupIndices)
+               RemoveNodeByIndex(idx);
+            gDeferAudioRebuild = false;
+            RebuildAudioTopology();
+            gSuppressUndoCheckpoints = false;
+         });
+
+         const double undoMs = timeIt([&]() { Undo(); });
+         const double redoMs = timeIt([&]() { Redo(); });
+
+         printf("UNDOPERFTEST timings (nodes=%d): click=%.3fms delete=%.3fms "
+                "groupDelete(%zu)=%.3fms undo=%.3fms redo=%.3fms\n",
+                (int)gNodes.size(), clickMs, deleteMs, groupIndices.size(),
+                groupDeleteMs, undoMs, redoMs);
+      }
+
       // Bring the comment into view for the screenshot check. Frame 2 rather
       // than frame 0 only so the node has settled at its spawn position and
       // measured its own size first; the fit itself runs at the end of this
@@ -45359,6 +45472,12 @@ int main(int argc, char** argv)
             if (linkCount > 0 || !toDelete.empty())
                PushUndoCheckpoint();
             gSuppressUndoCheckpoints = true;
+            // One topology rebuild for the whole batch too - RemoveNodeByIndex
+            // rebuilds on every call by default, which turned deleting an
+            // N-node group into N full audio-graph rebuilds (each re-preparing
+            // every audio node in the order, resetting reverb tails/delay
+            // lines along the way).
+            gDeferAudioRebuild = true;
 
             for (int i = 0; i < linkCount; i++)
             {
@@ -45371,6 +45490,12 @@ int main(int argc, char** argv)
                RemoveNodeByIndex(index);
             }
 
+            // After the loop, not before: RemoveNodeByIndex's own ordering
+            // rule (rebuild only after the victim is erased from gNodes)
+            // still has to hold for every victim, and deferring the rebuild
+            // to here preserves that - every victim is already erased by now.
+            gDeferAudioRebuild = false;
+            RebuildAudioTopology();
             gSuppressUndoCheckpoints = false;
             ed::ClearSelection();
          }
@@ -45783,11 +45908,28 @@ int main(int argc, char** argv)
       ed::EndDelete();
 
       // ---- undo checkpoint for node drags ----
+      // Only worth capturing a snapshot (BuildPatchData() walks every node
+      // and cable) when this click could actually turn into a node drag -
+      // not on every click anywhere, including knobs, buttons, menus and
+      // empty canvas, which used to pay this cost on every single click.
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
       {
-         gDragStartSnapshot = BuildPatchData();
-         gDragSnapshotValid = true;
-         gDragSnapshotPushed = false;
+         bool couldStartNodeDrag = (bool)ed::GetHoveredNode();
+         if (!couldStartNodeDrag)
+         {
+            const int selCount = ed::GetSelectedObjectCount();
+            if (selCount > 0)
+            {
+               std::vector<ed::NodeId> selNodes(selCount);
+               couldStartNodeDrag = ed::GetSelectedNodes(selNodes.data(), selCount) > 0;
+            }
+         }
+         if (couldStartNodeDrag)
+         {
+            gDragStartSnapshot = BuildPatchData();
+            gDragSnapshotValid = true;
+            gDragSnapshotPushed = false;
+         }
       }
       if (gDragSnapshotValid && !gDragSnapshotPushed &&
           ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
@@ -45805,7 +45947,7 @@ int main(int argc, char** argv)
          }
          if (moved)
          {
-            PushUndoSnapshot(gDragStartSnapshot);
+            PushUndoSnapshot(std::move(gDragStartSnapshot));
             gDragSnapshotPushed = true;
          }
       }

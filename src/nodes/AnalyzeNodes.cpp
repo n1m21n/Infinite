@@ -13,6 +13,7 @@
 
 #include "GLUtil.h"
 #include "Transport.h"
+#include "core/AudioDecodeCache.h"
 #include "core/Expression.h"
 #include "core/AudioTopologyRequest.h"
 #include "audio/AudioBuffer.h"
@@ -1133,7 +1134,7 @@ bool AudioFileNode::Open(const std::string& path)
 {
    auto* decoded = new Platform::SampleBuffer();
    std::string error;
-   if (!Platform::DecodeAudioFileToBuffer(path, *decoded, error))
+   if (!AudioDecodeCache::DecodeCached(path, *decoded, error))
    {
       delete decoded;
       mStatus = error.empty() ? "failed to load" : error;
