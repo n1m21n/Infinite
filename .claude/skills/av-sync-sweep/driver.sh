@@ -5,6 +5,16 @@ SWEEP_ARGS=("$@")
 
 ASSERT=(
   # --- headless, no GL / device / movie file: the arithmetic half ---
+  # AudioCaptureRing stereo-pair integrity under a forced mid-call overflow
+  # and an odd-sized Read(). The ring used to drop/return samples one at a
+  # time, so an overflow (or an odd maxCount) could commit/return an odd
+  # number of trailing floats from a call that always hands it whole L/R
+  # pairs - permanently swapping every pair written after that point. That
+  # doesn't shorten the file (the duration/sample-count checks below don't
+  # catch it) and decodes as intermittent noise rather than silence - a much
+  # better fit for a take reported as "sped up, then breaks" than a pure
+  # sample-count shortfall.
+  "AUDIORINGTEST:1"
   # OutputNode::PacedRepeat directly - decimate when rendering fast, pad when
   # rendering slow, pass through unpaced with no live audio, and cap a stall
   # instead of bursting 300 frames at once.
@@ -55,6 +65,13 @@ ASSERT=(
   "OFFLINERENDERTEST,OFFLINERENDER_FPS=60,OFFLINERENDER_SECONDS=15,OFFLINERENDER_QUEUEBYTES=8000000:2000"
   # Cancel on that same deep queue must abandon the file rather than drain it.
   "OFFLINERENDERTEST,OFFLINERENDER_FPS=60,OFFLINERENDER_SECONDS=30,OFFLINERENDER_CANCEL=300:600"
+  # A shape closer to the real patch that first reported this bug: 1080p,
+  # a Mixer between the synth and Output, a constrained encoder queue AND a
+  # simulated heavy per-frame GPU cook (COOKDELAYMS) so video frames arrive
+  # far slower than the encoder can drain them - the opposite backpressure
+  # direction from the tiny-queue case above, and the one that changes
+  # whether the encoder is ever really the bottleneck.
+  "OFFLINERENDERTEST,OFFLINERENDER_FPS=60,OFFLINERENDER_SECONDS=30,OFFLINERENDER_RES=1920x1080,OFFLINERENDER_MIXER=1,OFFLINERENDER_QUEUEBYTES=8000000,OFFLINERENDER_COOKDELAYMS=15:8000"
 )
 
 OBSERVE=()
