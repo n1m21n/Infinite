@@ -120,7 +120,14 @@ public:
    // both video and audio for a frame are produced by the same synchronous
    // step (see CaptureOfflineFrame), there is no drift to correct for and
    // this path needs none of the live path's PacedRepeat pacing.
-   bool StartOfflineRender(const std::string& path);
+   // audioSampleRate: the live device's rate, read by the caller BEFORE it
+   // detaches the device (this call happens after the detach, so it can't
+   // read AudioEngine::SampleRate() itself - and must not, since the graph's
+   // AudioNodes stay prepared at the detached device's rate). 0 falls back to
+   // 44100. Everything downstream - the per-frame sample budget and the
+   // muxer's declared audio rate - is derived from this one number; a
+   // mismatch here is heard directly as the take playing back off-speed.
+   bool StartOfflineRender(const std::string& path, double audioSampleRate);
    bool IsOfflineRendering() const { return mOfflineActive; }
    // True from the moment CancelOfflineRender()/the frame-count target hands
    // the handle to the background finalize thread until PollOfflineFinalize()
@@ -150,6 +157,28 @@ public:
    // which case it joins the background thread, clears IsOfflineRendering(),
    // and copies its results into RecordStatus().
    void PollOfflineFinalize();
+
+   // True only for the graph-synthesized-audio case (a synth/sampler chain,
+   // not an AudioFileNode - that one is baked in muxer-side and needs no
+   // per-frame work). Gates the caller's AudioEngine::ProcessOffline pump.
+   bool OfflineNeedsGraphAudio() const { return mOfflineIncludeAudio && mOfflineAudioSampleRate > 0.0; }
+   // The device sample rate this take was started at - captured before
+   // main.cpp detaches the audio device, since the graph's AudioNodes were
+   // PrepareToPlay'd at that rate and will keep generating as if it still
+   // applies. Everything downstream (per-frame sample budget, the muxer's
+   // declared audio rate) must use THIS, never a hardcoded 44100: a 48kHz
+   // device rendered as 44.1kHz plays back at the wrong speed.
+   double OfflineAudioSampleRate() const { return mOfflineAudioSampleRate; }
+   // How many audio frames the take still owes for the video frame about to
+   // be captured, from a running cumulative target rather than a fixed
+   // per-frame quota - so an fps that doesn't divide the sample rate evenly
+   // (24fps @ 44100 = 1837.5) can't drift over a long take. May exceed
+   // kAudioMaxBlockFrames; the caller generates it in chunks.
+   int OfflineAudioFramesOwed() const;
+   void NoteOfflineAudioGenerated(int frames) { mOfflineAudioFramesGenerated += frames; }
+   // Audio frames actually handed to the muxer this take (self-test hook:
+   // this should equal round(totalFrames * sampleRate / fps)).
+   long long OfflineAudioFramesAppended() const { return mOfflineAudioFramesAppended; }
 
    int offlineFps = 30;
    int offlineDurationSeconds = 10;
@@ -316,6 +345,9 @@ private:
    int mOfflineRecordH = 0;
    int mOfflineRecordFps = 30;
    bool mOfflineIncludeAudio = false;
+   double mOfflineAudioSampleRate = 0.0;
+   long long mOfflineAudioFramesGenerated = 0;
+   long long mOfflineAudioFramesAppended = 0;
 
    std::thread mOfflineFinalizeThread;
    std::atomic<bool> mOfflineFinalizeDone{ false };

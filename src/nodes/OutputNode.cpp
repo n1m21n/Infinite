@@ -6,6 +6,7 @@
 
 #include "audio/AudioEngine.h"
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -226,7 +227,7 @@ void OutputNode::WaitForFinalize()
    }
 }
 
-bool OutputNode::StartOfflineRender(const std::string& path)
+bool OutputNode::StartOfflineRender(const std::string& path, double audioSampleRate)
 {
    if (mRecorder != nullptr || IsFinalizing() || mOfflineActive || IsOfflineFinalizing())
       return false;
@@ -242,6 +243,9 @@ bool OutputNode::StartOfflineRender(const std::string& path)
    mOfflineTotalFrames = mOfflineRecordFps * (offlineDurationSeconds > 0 ? offlineDurationSeconds : 1);
    mOfflinePrerollRemaining = offlinePrerollFrames > 0 ? offlinePrerollFrames : 0;
    mOfflineFramesDone = 0;
+   mOfflineAudioSampleRate = 0.0;
+   mOfflineAudioFramesGenerated = 0;
+   mOfflineAudioFramesAppended = 0;
 
    std::string audioPath;
    bool audioLoop = true;
@@ -265,7 +269,26 @@ bool OutputNode::StartOfflineRender(const std::string& path)
          // see main.cpp's RunOfflineRenderStep. That makes the mCaptureRing
          // the audio path for this whole take, same as a live take's, just
          // fed synchronously instead of from the real device callback.
-         liveAudioSampleRate = 44100.0;
+         // The graph's AudioNodes were PrepareToPlay'd at the live device's
+         // rate and keep generating as if it still applies, even after
+         // main.cpp detaches the device for the take - so the take must be
+         // budgeted and muxed at THAT rate. Hardcoding 44100 here against a
+         // 48kHz device is exactly what makes rendered audio play back at the
+         // wrong speed.
+         liveAudioSampleRate = audioSampleRate > 0.0 ? audioSampleRate : 44100.0;
+         mOfflineAudioSampleRate = liveAudioSampleRate;
+
+         // Drop anything already sitting in the ring before arming it. The
+         // device is detached by the time this runs, but its last callbacks
+         // may have landed samples in here on the way out - and those belong
+         // to real time, not to this take. Left in, they ride at the head of
+         // the take's audio track and push everything after them out of sync
+         // with the picture.
+         {
+            float discard[4096];
+            while (mCaptureRing.Read(discard, 4096) > 0)
+               ;
+         }
          mCaptureRing.overflowCount.store(0, std::memory_order_relaxed);
          mCaptureRing.enabled.store(true, std::memory_order_relaxed);
       }
@@ -278,6 +301,7 @@ bool OutputNode::StartOfflineRender(const std::string& path)
    {
       mCaptureRing.enabled.store(false, std::memory_order_relaxed);
       mOfflineIncludeAudio = false;
+      mOfflineAudioSampleRate = 0.0;
       mRecordStatus = error.empty() ? "could not start offline render" : error;
       return false;
    }
@@ -296,7 +320,23 @@ void OutputNode::DrainOfflineAudioCapture()
    float scratch[4096];
    int n;
    while ((n = mCaptureRing.Read(scratch, 4096)) > 0)
+   {
       Platform::RecorderAppendAudio(mOfflineRecorder, scratch, n / 2);
+      mOfflineAudioFramesAppended += n / 2;
+   }
+}
+
+int OutputNode::OfflineAudioFramesOwed() const
+{
+   if (!OfflineNeedsGraphAudio())
+      return 0;
+   const int fps = mOfflineRecordFps > 0 ? mOfflineRecordFps : 30;
+   // (framesDone + 1): the budget for the video frame that is about to be
+   // captured, not the one just finished.
+   const long long target = (long long)std::llround(
+      (double)(mOfflineFramesDone + 1) * mOfflineAudioSampleRate / (double)fps);
+   const long long owed = target - mOfflineAudioFramesGenerated;
+   return owed > 0 ? (int)owed : 0;
 }
 
 void OutputNode::CaptureOfflineFrame()
@@ -346,6 +386,7 @@ void OutputNode::RequestFinishOfflineRender(bool cancelled)
    if (mOfflineIncludeAudio)
       DrainOfflineAudioCapture();
    mOfflineIncludeAudio = false;
+   mOfflineAudioSampleRate = 0.0;
 
    const uint64_t audioDropped = mCaptureRing.overflowCount.exchange(0, std::memory_order_relaxed);
 
