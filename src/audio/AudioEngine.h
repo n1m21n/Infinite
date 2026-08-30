@@ -19,7 +19,7 @@
 // device callback - generous enough that no real block size/channel count
 // should ever exceed them. A block that somehow does gets truncated to the
 // cap rather than overrunning a pooled buffer - see AudioEngine::RunTopology.
-constexpr int kAudioMaxNodeInputs = 8;
+constexpr int kAudioMaxNodeInputs = 12;
 constexpr int kAudioMaxBlockFrames = 4096;
 constexpr int kAudioMaxChannels = 8;
 
@@ -30,7 +30,7 @@ constexpr int kAudioMaxChannels = 8;
 struct AudioTopologyEntry
 {
    AudioNode* node = nullptr;
-   int inputBufferIndices[kAudioMaxNodeInputs] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+   int inputBufferIndices[kAudioMaxNodeInputs] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
    int numInputs = 0;
    int outputBufferIndex = -1;
 

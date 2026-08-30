@@ -95,21 +95,32 @@ public:
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
       mMailbox.PrepareToPlay(sampleRate);
-      for (int s = 0; s < MixerNode::kSlots; s++)
+      for (int s = 0; s < MixerNode::kMaxSlots; s++)
          mMailbox.SetImmediate(s, mGainDb[s].load(std::memory_order_relaxed));
    }
 
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
    {
-      const int slots = std::min(numInputs, (int)MixerNode::kSlots);
+      const int activeChannels = std::clamp(mNumChannels.load(std::memory_order_relaxed), 0, (int)MixerNode::kMaxSlots);
+      const int slots = std::min(numInputs, activeChannels);
 
-      // Pan and mute are read once per block, not smoothed per sample. Mute is
-      // a state, not a level - smoothing it would make it a fade with no
-      // control over its length - and pan moves are gestural, not audio-rate.
-      float panL[MixerNode::kSlots], panR[MixerNode::kSlots];
-      for (int s = 0; s < MixerNode::kSlots; s++)
+      bool anySolo = false;
+      for (int s = 0; s < activeChannels; s++)
       {
-         if (mMute[s].load(std::memory_order_relaxed) != 0)
+         if (mSolo[s].load(std::memory_order_relaxed) != 0)
+         {
+            anySolo = true;
+            break;
+         }
+      }
+
+      // Pan, mute and solo are read once per block, not smoothed per sample.
+      float panL[MixerNode::kMaxSlots] = {}, panR[MixerNode::kMaxSlots] = {};
+      for (int s = 0; s < activeChannels; s++)
+      {
+         const bool isMuted = mMute[s].load(std::memory_order_relaxed) != 0;
+         const bool isSolo = mSolo[s].load(std::memory_order_relaxed) != 0;
+         if (isMuted || (anySolo && !isSolo))
          {
             panL[s] = panR[s] = 0.0f;
             continue;
@@ -122,12 +133,12 @@ public:
          panR[s] *= (float)M_SQRT2;
       }
 
-      float channelPeak[MixerNode::kSlots] = {};
+      float channelPeak[MixerNode::kMaxSlots] = {};
       float peak = 0.0f;
       for (int i = 0; i < output.numFrames; i++)
       {
-         float linear[MixerNode::kSlots];
-         for (int s = 0; s < MixerNode::kSlots; s++)
+         float linear[MixerNode::kMaxSlots];
+         for (int s = 0; s < activeChannels; s++)
             linear[s] = DspMath::DbToLinear(mMailbox.SmoothedValue(s));
 
          for (int ch = 0; ch < output.numChannels; ch++)
@@ -151,19 +162,21 @@ public:
       }
 
       mMeter.Write(&peak, 1);
-      for (int s = 0; s < MixerNode::kSlots; s++)
-         mChannelPeak[s].store(channelPeak[s], std::memory_order_relaxed);
+      for (int s = 0; s < MixerNode::kMaxSlots; s++)
+         mChannelPeak[s].store(s < activeChannels ? channelPeak[s] : 0.0f, std::memory_order_relaxed);
    }
 
    // Main thread only.
    void PushParams(const MixerNode& n)
    {
-      for (int s = 0; s < MixerNode::kSlots; s++)
+      mNumChannels.store(n.numChannels, std::memory_order_relaxed);
+      for (int s = 0; s < MixerNode::kMaxSlots; s++)
       {
          mGainDb[s].store(n.gainDb[s], std::memory_order_relaxed);
          mMailbox.Push(s, n.gainDb[s]);
          mPan[s].store(n.pan[s], std::memory_order_relaxed);
          mMute[s].store(n.mute[s] ? 1 : 0, std::memory_order_relaxed);
+         mSolo[s].store(n.solo[s] ? 1 : 0, std::memory_order_relaxed);
       }
    }
 
@@ -173,10 +186,12 @@ public:
 private:
    ParamMailbox mMailbox;
    MeterRing mMeter;
-   std::atomic<float> mGainDb[MixerNode::kSlots] {};
-   std::atomic<float> mPan[MixerNode::kSlots] {};
-   std::atomic<int> mMute[MixerNode::kSlots] {};
-   std::atomic<float> mChannelPeak[MixerNode::kSlots] {};
+   std::atomic<int> mNumChannels { 8 };
+   std::atomic<float> mGainDb[MixerNode::kMaxSlots] {};
+   std::atomic<float> mPan[MixerNode::kMaxSlots] {};
+   std::atomic<int> mMute[MixerNode::kMaxSlots] {};
+   std::atomic<int> mSolo[MixerNode::kMaxSlots] {};
+   std::atomic<float> mChannelPeak[MixerNode::kMaxSlots] {};
 };
 
 MixerNode::MixerNode() = default;
@@ -194,26 +209,35 @@ void MixerNode::CookIfNeeded(int frameId)
    float peak = 0.0f;
    if (mAudioNode->Meter().ReadLatest(peak))
       mLevel = peak;
-   for (int s = 0; s < kSlots; s++)
+   for (int s = 0; s < kMaxSlots; s++)
       mChannelLevel[s] = mAudioNode->ChannelPeak(s);
 }
 
 void MixerNode::VisitParams(ParamVisitor& v)
 {
-   static const char* kGainNames[kSlots] = {
-      "gain0", "gain1", "gain2", "gain3", "gain4", "gain5", "gain6", "gain7"
+   v.Int("channels", numChannels);
+   static const char* kGainNames[kMaxSlots] = {
+      "gain0", "gain1", "gain2", "gain3", "gain4", "gain5",
+      "gain6", "gain7", "gain8", "gain9", "gain10", "gain11"
    };
-   static const char* kPanNames[kSlots] = {
-      "pan0", "pan1", "pan2", "pan3", "pan4", "pan5", "pan6", "pan7"
+   static const char* kPanNames[kMaxSlots] = {
+      "pan0", "pan1", "pan2", "pan3", "pan4", "pan5",
+      "pan6", "pan7", "pan8", "pan9", "pan10", "pan11"
    };
-   static const char* kMuteNames[kSlots] = {
-      "mute0", "mute1", "mute2", "mute3", "mute4", "mute5", "mute6", "mute7"
+   static const char* kMuteNames[kMaxSlots] = {
+      "mute0", "mute1", "mute2", "mute3", "mute4", "mute5",
+      "mute6", "mute7", "mute8", "mute9", "mute10", "mute11"
    };
-   for (int i = 0; i < kSlots; i++)
+   static const char* kSoloNames[kMaxSlots] = {
+      "solo0", "solo1", "solo2", "solo3", "solo4", "solo5",
+      "solo6", "solo7", "solo8", "solo9", "solo10", "solo11"
+   };
+   for (int i = 0; i < kMaxSlots; i++)
    {
       v.Float(kGainNames[i], gainDb[i]);
       v.Float(kPanNames[i], pan[i]);
       v.Bool(kMuteNames[i], mute[i]);
+      v.Bool(kSoloNames[i], solo[i]);
    }
 }
 

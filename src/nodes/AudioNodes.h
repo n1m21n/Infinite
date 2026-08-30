@@ -65,7 +65,8 @@ private:
 class MixerNode : public INode, public IAudioSource
 {
 public:
-   static constexpr int kSlots = 8;
+   static constexpr int kMaxSlots = 12;
+   static constexpr int kSlots = 12;
 
    static INode* Create() { return new MixerNode(); }
    MixerNode();
@@ -79,7 +80,7 @@ public:
 
    INode* BypassSource() override
    {
-      for (int i = 0; i < kSlots; i++)
+      for (int i = 0; i < numChannels; i++)
          if (inputs[i].IsConnected())
             return inputs[i].GetSource();
       return nullptr;
@@ -87,12 +88,14 @@ public:
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override
    {
-      return (slot >= 0 && slot < kSlots) ? &inputs[slot] : nullptr;
+      return (slot >= 0 && slot < numChannels) ? &inputs[slot] : nullptr;
    }
    const char* InputLabel(int slot) const override
    {
-      static const char* kLabels[kSlots] = { "1", "2", "3", "4", "5", "6", "7", "8" };
-      return (slot >= 0 && slot < kSlots) ? kLabels[slot] : nullptr;
+      static const char* kLabels[kMaxSlots] = {
+         "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"
+      };
+      return (slot >= 0 && slot < numChannels) ? kLabels[slot] : nullptr;
    }
 
    // Current summed output level (0..1, post-gain), for the inline meter.
@@ -101,22 +104,24 @@ public:
    // cache CookIfNeeded fills - never from the audio node directly.
    float ChannelLevel(int slot) const
    {
-      return (slot >= 0 && slot < kSlots) ? mChannelLevel[slot] : 0.0f;
+      return (slot >= 0 && slot < numChannels) ? mChannelLevel[slot] : 0.0f;
    }
 
-   float gainDb[kSlots] = {};
+   int numChannels = 8;
+   float gainDb[kMaxSlots] = {};
    // -1 hard left .. +1 hard right. A mixer without pan can only ever build a
    // mono sum, which is most of why the previous knob-grid version read as a
    // gain array rather than as a mixer.
-   float pan[kSlots] = {};
-   bool mute[kSlots] = {};
-   AudioCable inputs[kSlots];
+   float pan[kMaxSlots] = {};
+   bool mute[kMaxSlots] = {};
+   bool solo[kMaxSlots] = {};
+   AudioCable inputs[kMaxSlots];
 
 private:
    std::unique_ptr<AudioMixerNode> mAudioNode;
    int mLastCookFrame = -1;
    float mLevel = 0.0f;
-   float mChannelLevel[kSlots] = {};
+   float mChannelLevel[kMaxSlots] = {};
 };
 
 // A two-input crossfader: blend=0 is input A only, 1 is input B only, 0.5 is

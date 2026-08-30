@@ -3824,8 +3824,8 @@ namespace
    const int kMaxGeometrySlots = 4;
 
    // Upper bound on how many audio/note-input slots any single node exposes.
-   // The widest today is Mixer, at MixerNode::kSlots (8).
-   const int kMaxAudioSlots = 8;
+   // The widest today is Mixer, at MixerNode::kMaxSlots (12).
+   const int kMaxAudioSlots = 12;
    // Every note-consuming node before AudioPluginNode carried its one note
    // pin at unified slot 0 (Sampler, Envelope, ...), which is why this was 1
    // and the topology builder's wiring pass (RebuildAudioTopology) used to
@@ -7321,6 +7321,34 @@ namespace
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
              dynamic_cast<VibratoNode*>(node) != nullptr || dynamic_cast<EnvelopeNode*>(node) != nullptr;
+   }
+
+   float AudioNodeWidth(INode* node)
+   {
+      if (auto* mixer = dynamic_cast<MixerNode*>(node))
+         return std::max(280.0f, (float)mixer->numChannels * 80.0f);
+      if (dynamic_cast<WavetableNode*>(node) != nullptr ||
+          dynamic_cast<DrumSequencerNode*>(node) != nullptr)
+         return kAudioWideWidth;
+      if (dynamic_cast<GainNode*>(node) != nullptr ||
+          dynamic_cast<BlendAudioNode*>(node) != nullptr ||
+          dynamic_cast<AudioInputNode*>(node) != nullptr ||
+          dynamic_cast<SplitterNode*>(node) != nullptr ||
+          dynamic_cast<NoteTransposeNode*>(node) != nullptr ||
+          dynamic_cast<PitchBendNode*>(node) != nullptr ||
+          dynamic_cast<GateNode*>(node) != nullptr ||
+          dynamic_cast<GlideNode*>(node) != nullptr ||
+          dynamic_cast<VibratoNode*>(node) != nullptr ||
+          dynamic_cast<VelocityCurveNode*>(node) != nullptr ||
+          dynamic_cast<HumanizerNode*>(node) != nullptr ||
+          dynamic_cast<QuantizerNode*>(node) != nullptr ||
+          dynamic_cast<NoteEchoNode*>(node) != nullptr ||
+          dynamic_cast<NoteMergeNode*>(node) != nullptr ||
+          dynamic_cast<NoteRouterNode*>(node) != nullptr ||
+          dynamic_cast<NoteStrumNode*>(node) != nullptr ||
+          dynamic_cast<AudioToCVNode*>(node) != nullptr)
+         return kAudioNarrowWidth;
+      return kAudioNodeWidth;
    }
 
    // Drains WavetableNode's MeterRing into a small cache on the node itself
@@ -12142,73 +12170,126 @@ namespace
    // identical dials with eight identical captions, which is precisely the
    // "no hierarchy, reads as a spreadsheet" failure §5 warns about. The wide
    // horizontal sum meter that briefly sat above the strips is gone too: every
-   // channel already carries its own meter, so it was a duplicate reading of
-   // the same signal drawn across the strips' own space.
+   // channel already carries its own meter, so it was the same signal drawn across the strips' own space.
    void DrawMixerBody(GraphNode& gn, MixerNode* n)
    {
+      const int count = std::clamp(n->numChannels, 0, (int)MixerNode::kMaxSlots);
+      const float bodyW = std::max(280.0f, (float)count * 80.0f);
       char stat[64];
-      snprintf(stat, sizeof(stat), "8 in -> 1 out   sum %+.1f dB",
-               DspMath::LinearToDb(std::max(n->Level(), 1e-5f)));
-      BeginAudioBody(gn.index, gn.category, kAudioMixerWidth, stat);
+      if (count > 0)
+         snprintf(stat, sizeof(stat), "%d in -> 1 out   sum %+.1f dB",
+                  count, DspMath::LinearToDb(std::max(n->Level(), 1e-5f)));
+      else
+         snprintf(stat, sizeof(stat), "0 in -> 0 out (idle)");
+
+      BeginAudioBody(gn.index, gn.category, bodyW, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      const float cellW = gAudioContentW / (float)MixerNode::kSlots;
-      const float faderH = 138.0f;
-      const float stripTop = ImGui::GetCursorScreenPos().y;
-
-      // Meters first, drawn straight to the draw list so they cost no layout
-      // and sit inside each fader's own cell.
-      for (int i = 0; i < MixerNode::kSlots; i++)
+      // Channels param control
       {
-         const float cx = gAudioContentX + ((float)i + 0.5f) * cellW;
-         DrawStripMeter(cx + 14.0f, stripTop + 6.0f, 8.0f, faderH - 12.0f, n->ChannelLevel(i));
-      }
-
-      {
-         // See DrawGainBody: the row's maxDiameter has to be the fader height.
-         AudioKnobRow row(MixerNode::kSlots, faderH);
-         for (int i = 0; i < MixerNode::kSlots; i++)
+         ImGui::PushItemWidth(140.0f);
+         int ch = n->numChannels;
+         if (ImGui::SliderInt("channels", &ch, 0, MixerNode::kMaxSlots))
          {
-            char label[8];
-            snprintf(label, sizeof(label), "%d", i + 1);
-            row.Fader(label, &n->gainDb[i], -60.0f, 12.0f, "%.1f dB", faderH, /*dbTaper=*/true);
+            PushUndoCheckpoint();
+            n->numChannels = std::clamp(ch, 0, (int)MixerNode::kMaxSlots);
+            RebuildAudioTopology();
          }
-         row.End();
+         ImGui::PopItemWidth();
+         ImGui::Dummy(ImVec2(0.0f, 4.0f));
       }
 
-      // Mute row, aligned to the same cells. A mute that isn't directly under
-      // its own fader belongs to no channel in particular.
+      if (count > 0)
       {
-         const float btnW = std::min(cellW - 6.0f, 34.0f);
-         const float rowY = ImGui::GetCursorScreenPos().y;
-         for (int i = 0; i < MixerNode::kSlots; i++)
+         const float cellW = gAudioContentW / (float)count;
+         const float faderH = 138.0f;
+         const float stripTop = ImGui::GetCursorScreenPos().y;
+
+         // Meters first, drawn straight to the draw list so they cost no layout
+         // and sit inside each fader's own cell.
+         for (int i = 0; i < count; i++)
          {
             const float cx = gAudioContentX + ((float)i + 0.5f) * cellW;
-            ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, rowY));
-            ImGui::PushID(9200 + i);
-            ImGui::PushStyleColor(ImGuiCol_Button, n->mute[i] ? ImVec4(0.52f, 0.16f, 0.16f, 1.0f)
-                                                              : ImVec4(0.13f, 0.14f, 0.18f, 1.0f));
-            if (ImGui::Button("M", ImVec2(btnW, 0.0f)))
-            {
-               PushUndoCheckpoint();
-               n->mute[i] = !n->mute[i];
-            }
-            ImGui::PopStyleColor();
-            ImGui::PopID();
+            DrawStripMeter(cx + 14.0f, stripTop + 6.0f, 8.0f, faderH - 12.0f, n->ChannelLevel(i));
          }
-         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
-         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight() + 4.0f));
-      }
 
-      {
-         AudioKnobRow row(MixerNode::kSlots, kKnobStd);
-         for (int i = 0; i < MixerNode::kSlots; i++)
          {
-            char label[8];
-            snprintf(label, sizeof(label), "pan %d", i + 1);
-            row.Knob(label, &n->pan[i], -1.0f, 1.0f, "%.2f", kKnobStd);
+            AudioKnobRow row(count, faderH);
+            for (int i = 0; i < count; i++)
+            {
+               char label[8];
+               snprintf(label, sizeof(label), "%d", i + 1);
+               row.Fader(label, &n->gainDb[i], -60.0f, 12.0f, "%.1f dB", faderH, /*dbTaper=*/true);
+            }
+            row.End();
          }
-         row.End();
+
+         // Solo (S) and Mute (M) row
+         {
+            const float btnW = std::min((cellW - 8.0f) * 0.5f, 26.0f);
+            const float rowY = ImGui::GetCursorScreenPos().y;
+            for (int i = 0; i < count; i++)
+            {
+               const float cx = gAudioContentX + ((float)i + 0.5f) * cellW;
+               const float sX = cx - btnW - 2.0f;
+               const float mX = cx + 2.0f;
+
+               // Solo (S) button
+               ImGui::SetCursorScreenPos(ImVec2(sX, rowY));
+               ImGui::PushID(9100 + i);
+               if (n->solo[i])
+               {
+                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.65f, 0.15f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+               }
+               else
+               {
+                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.13f, 0.14f, 0.18f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.85f, 1.0f));
+               }
+               if (ImGui::Button("S", ImVec2(btnW, 0.0f)))
+               {
+                  PushUndoCheckpoint();
+                  n->solo[i] = !n->solo[i];
+               }
+               ImGui::PopStyleColor(2);
+               ImGui::PopID();
+
+               // Mute (M) button
+               ImGui::SetCursorScreenPos(ImVec2(mX, rowY));
+               ImGui::PushID(9200 + i);
+               if (n->mute[i])
+               {
+                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.16f, 0.16f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+               }
+               else
+               {
+                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.13f, 0.14f, 0.18f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.85f, 1.0f));
+               }
+               if (ImGui::Button("M", ImVec2(btnW, 0.0f)))
+               {
+                  PushUndoCheckpoint();
+                  n->mute[i] = !n->mute[i];
+               }
+               ImGui::PopStyleColor(2);
+               ImGui::PopID();
+            }
+            ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
+            ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight() + 4.0f));
+         }
+
+         {
+            AudioKnobRow row(count, kKnobStd);
+            for (int i = 0; i < count; i++)
+            {
+               char label[8];
+               snprintf(label, sizeof(label), "pan %d", i + 1);
+               row.Knob(label, &n->pan[i], -1.0f, 1.0f, "%.2f", kKnobStd);
+            }
+            row.End();
+         }
       }
 
       EndAudioBody();
@@ -20554,8 +20635,10 @@ namespace
       if (boolName == "bypassed") return gn->node->bypassed;
       if (auto* mixer = dynamic_cast<MixerNode*>(gn->node.get()))
       {
-         if (boolName == "mute" && channelIdx >= 0 && channelIdx < MixerNode::kSlots)
+         if (boolName == "mute" && channelIdx >= 0 && channelIdx < MixerNode::kMaxSlots)
             return mixer->mute[channelIdx];
+         if (boolName == "solo" && channelIdx >= 0 && channelIdx < MixerNode::kMaxSlots)
+            return mixer->solo[channelIdx];
       }
       struct BoolFinder : public ParamVisitor
       {
@@ -20580,9 +20663,14 @@ namespace
       if (boolName == "bypassed") { gn->node->bypassed = newVal; return; }
       if (auto* mixer = dynamic_cast<MixerNode*>(gn->node.get()))
       {
-         if (boolName == "mute" && channelIdx >= 0 && channelIdx < MixerNode::kSlots)
+         if (boolName == "mute" && channelIdx >= 0 && channelIdx < MixerNode::kMaxSlots)
          {
             mixer->mute[channelIdx] = newVal;
+            return;
+         }
+         if (boolName == "solo" && channelIdx >= 0 && channelIdx < MixerNode::kMaxSlots)
+         {
+            mixer->solo[channelIdx] = newVal;
             return;
          }
       }
@@ -43577,22 +43665,69 @@ int main(int argc, char** argv)
          if (dimmed)
             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.55f);
 
+         const bool isAudioBody = IsAudioBodyNode(gn.node.get());
+         const bool isComment = dynamic_cast<CommentNode*>(gn.node.get()) != nullptr;
+         auto* mixerNode = dynamic_cast<MixerNode*>(gn.node.get());
+
          // --- inputs spread along the top edge ---
+         const ImVec2 topRowPos = ImGui::GetCursorPos();
          int inputs = InputCountFor(gn);
-         const float pinSpacing = (inputs > 4) ? 8.0f : 12.0f;
-         for (int slot = 0; slot < inputs; slot++)
+         float maxInputY = topRowPos.y;
+
+         if (mixerNode != nullptr && mixerNode->numChannels > 0)
          {
-            char label[24];
-            if (const char* named = gn.node->InputLabel(slot))
-               snprintf(label, sizeof(label), "%s", named);
-            else if (inputs == 1)
-               label[0] = '\0';
-            else
-               snprintf(label, sizeof(label), "%c", 'A' + slot);
-            DrawPin(gn.InputPinId(slot), ed::PinKind::Input, label);
-            if (slot + 1 < inputs)
-               ImGui::SameLine(0.0f, pinSpacing);
+            const float expectedW = AudioNodeWidth(gn.node.get());
+            const float cellW = expectedW / (float)mixerNode->numChannels;
+            for (int slot = 0; slot < inputs; slot++)
+            {
+               char label[24];
+               if (const char* named = gn.node->InputLabel(slot))
+                  snprintf(label, sizeof(label), "%s", named);
+               else
+                  snprintf(label, sizeof(label), "%d", slot + 1);
+
+               const float pinW = kPinHit + 4.0f + ImGui::CalcTextSize(label).x;
+               const float pinX = topRowPos.x + ((float)slot + 0.5f) * cellW - pinW * 0.5f;
+               ImGui::SetCursorPos(ImVec2(pinX, topRowPos.y));
+               DrawPin(gn.InputPinId(slot), ed::PinKind::Input, label);
+            }
+            maxInputY = std::max(maxInputY, ImGui::GetCursorPosY());
          }
+         else
+         {
+            const float pinSpacing = (inputs > 4) ? 8.0f : 12.0f;
+            for (int slot = 0; slot < inputs; slot++)
+            {
+               char label[24];
+               if (const char* named = gn.node->InputLabel(slot))
+                  snprintf(label, sizeof(label), "%s", named);
+               else if (inputs == 1)
+                  label[0] = '\0';
+               else
+                  snprintf(label, sizeof(label), "%c", 'A' + slot);
+               DrawPin(gn.InputPinId(slot), ed::PinKind::Input, label);
+               if (slot + 1 < inputs)
+                  ImGui::SameLine(0.0f, pinSpacing);
+            }
+            if (inputs > 0)
+               maxInputY = std::max(maxInputY, ImGui::GetCursorPosY());
+         }
+
+         if (isAudioBody && !isComment)
+         {
+            const float expectedW = AudioNodeWidth(gn.node.get());
+            ImGui::SetCursorPos(ImVec2(topRowPos.x + expectedW - 22.0f, topRowPos.y));
+            if (BypassToggle(gn.node->bypassed))
+            {
+               PushUndoCheckpoint();
+               gn.node->bypassed = !gn.node->bypassed;
+               RebuildAudioTopology();
+            }
+            maxInputY = std::max(maxInputY, topRowPos.y + 18.0f);
+         }
+
+         if (inputs > 0 || (isAudioBody && !isComment))
+            ImGui::SetCursorPos(ImVec2(topRowPos.x, maxInputY + 4.0f));
 
          // Group the body so its measured width can right-align the out pin.
          // ed::GetNodeSize() is scaled by the current zoom, so feeding it back
@@ -43628,7 +43763,6 @@ int main(int argc, char** argv)
             dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<MacroXYNode*>(gn.node.get()) != nullptr;
          IGeometrySource* geoSourceForViewport = dynamic_cast<IGeometrySource*>(gn.node.get());
-         const bool isAudioBodyNode = IsAudioBodyNode(gn.node.get());
          if (multiOutModulator)
             ; // these draw their own meters in the params panel
          else if (auto* macroKnob = dynamic_cast<MacroKnobNode*>(gn.node.get()))
@@ -43647,7 +43781,7 @@ int main(int argc, char** argv)
             DrawMacroRadioSelectorBody(macroRadio);
          else if (auto* macroStepGate = dynamic_cast<MacroStepGateNode*>(gn.node.get()))
             DrawMacroStepGateBody(macroStepGate);
-         else if (!isAudioBodyNode && dynamic_cast<IModulator*>(gn.node.get()) != nullptr)
+         else if (!isAudioBody && dynamic_cast<IModulator*>(gn.node.get()) != nullptr)
          {
             // Audio/note nodes are excluded here even when they implement
             // IModulator: EnvelopeNode does (its output is a modulator
@@ -43785,7 +43919,7 @@ int main(int argc, char** argv)
             DrawPalettePreview(palette);
          else if (auto* proj = dynamic_cast<ProjectionNode*>(gn.node.get()))
             DrawProjectionPreview(proj);
-         else if (isAudioBodyNode)
+         else if (isAudioBody)
             DrawAudioNodeBody(gn);
          else
             DrawPreview(gn.node.get());
@@ -43794,8 +43928,6 @@ int main(int argc, char** argv)
          // Audio nodes skip the eye toggle entirely: DrawAudioNodeBody above
          // already shows every param, Tier 1 and Tier 2 alike, unconditionally
          // - see docs/plans/audio/audio-node-ui-system.md §1.
-         const bool isAudioBody = IsAudioBodyNode(gn.node.get());
-         const bool isComment = dynamic_cast<CommentNode*>(gn.node.get()) != nullptr;
          // Audio nodes have nothing this row would add: Tier 1 is never
          // collapsed (so the "mod"/"pal" collapsed-tag affordance has
          // nothing to stand in for), and there is no mesh for the viewport
@@ -43862,15 +43994,6 @@ int main(int argc, char** argv)
                CollapsedBindingPins(gn.index, modTagMin, modTagMax, false);
             if (palTag)
                CollapsedBindingPins(gn.index, palTagMin, palTagMax, true);
-         }
-         else if (isAudioBody && !isComment)
-         {
-            if (BypassToggle(gn.node->bypassed))
-            {
-               PushUndoCheckpoint();
-               gn.node->bypassed = !gn.node->bypassed;
-               RebuildAudioTopology();
-            }
          }
 
          // BeginNodeParams(gn.index) already ran above, ahead of the preview/
