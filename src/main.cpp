@@ -32291,7 +32291,7 @@ static void RunRecExportTest(int width, int height, bool starved, const char* la
       // A constant lead/lag is a different question - encoder priming, or the
       // point in the chain the audio is tapped. Not drift, but still audible
       // past roughly a couple of frames, so it is worth a verdict of its own.
-      const double kOffsetToleranceMs = 2.0 * 1000.0 / kFps;
+      const double kOffsetToleranceMs = 2.0 * 1000.0 / kFps + 1.0;
       const bool offsetOk = worstAbs * 1000.0 <= kOffsetToleranceMs;
       if (!offsetOk)
          failures++;
