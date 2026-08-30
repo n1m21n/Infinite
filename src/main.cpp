@@ -19517,14 +19517,31 @@ namespace
    // setup, not something casual node-viewport orbiting should ever move.
    std::map<int, SharedViewportCamera> gNodeCameras;
 
-   // Nodes/viewports retired by RemoveNodeByIndex this frame, held until the
-   // start of the next frame - see RemoveNodeByIndex for why teardown can't
-   // happen synchronously. NodeViewport has a user-declared destructor (which
-   // suppresses its implicit move ctor), so it can't live in a
-   // vector<NodeViewport> without a copy that would double-free its GL
-   // texture; map::node_type from extract() moves the whole tree node instead
-   // of the mapped value, sidestepping that.
-   std::vector<std::unique_ptr<INode>> gRetiredNodes;
+   // Nodes/viewports retired by RemoveNodeByIndex/NewPatch, held past the GL
+   // texture hazard (their own draw calls can't happen synchronously - see
+   // RemoveNodeByIndex) AND past the audio hazard: a retired node's AudioNode
+   // may still be reachable through AudioEngine's currently-published topology
+   // for a little while after it leaves gNodes (RebuildAudioTopology hasn't
+   // republished yet, or the audio thread hasn't finished a block against the
+   // last topology that included it). safeAfterGeneration records
+   // AudioEngine::CurrentGeneration() at the moment of retirement - "the last
+   // topology generation that can still reach this node" - and the node is
+   // only actually destroyed once AudioEngine::CompletedGeneration() confirms
+   // the audio thread has moved past it. A plain one-video-frame delay isn't
+   // enough here: nothing ties a video frame's length to the audio thread's
+   // own progress (see the crash this replaced - Cmd+Z destroying a node
+   // whose AudioNode the audio thread was still mid-ProcessBlock on).
+   // NodeViewport has a user-declared destructor (which suppresses its
+   // implicit move ctor), so it can't live in a vector<NodeViewport> without a
+   // copy that would double-free its GL texture; map::node_type from
+   // extract() moves the whole tree node instead of the mapped value,
+   // sidestepping that.
+   struct RetiredNode
+   {
+      std::unique_ptr<INode> node;
+      uint64_t safeAfterGeneration = 0;
+   };
+   std::vector<RetiredNode> gRetiredNodes;
    std::vector<std::map<int, NodeViewport>::node_type> gRetiredViewports;
 
    // A geometry-producing node's own solo render, independent of whatever a
@@ -23579,13 +23596,15 @@ namespace
       // ImGui_ImplOpenGL3_RenderDrawData() actually submits the draw list at
       // the end of the frame, frees a GL name that the pending draw commands
       // still reference - producing a one-frame flash of garbage/reused-texture
-      // content. Retire ownership instead; actual teardown happens at the top
-      // of the next frame's loop, once this frame is fully rendered and
-      // presented (see gRetiredNodes/gRetiredViewports drain next to
-      // glfwPollEvents()).
+      // content. Retire ownership instead; actual teardown is gated on both
+      // the next frame's presentation AND the audio thread confirming it's
+      // done with this node - see gRetiredNodes' declaration and its drain
+      // next to glfwPollEvents().
       if (auto vp = gNodeViewports.extract(index); !vp.empty())
          gRetiredViewports.push_back(std::move(vp));
-      gRetiredNodes.push_back(std::move(victim->node));
+      // Read before RebuildAudioTopology() below republishes: this is "the
+      // last topology generation that can still reach victim's AudioNode".
+      gRetiredNodes.push_back({ std::move(victim->node), AudioEngine::Instance().CurrentGeneration() });
 
       gNodes.erase(std::remove_if(gNodes.begin(), gNodes.end(),
                                   [index](const GraphNode& g) { return g.index == index; }),
@@ -24024,10 +24043,16 @@ namespace
       // synchronously here - same hazard RemoveNodeByIndex guards against -
       // would free a GL name pending draw commands still reference, flashing
       // garbage/reused-texture content for one frame right before the node
-      // disappears. Actual teardown happens next frame (see
-      // gRetiredNodes/gRetiredViewports drain next to glfwPollEvents()).
+      // disappears. Actual teardown is gated on both the next frame AND the
+      // audio thread confirming it's done with these nodes (see gRetiredNodes'
+      // declaration and its drain next to glfwPollEvents()). Every node here
+      // shares the same "last generation that can still reach it" - whatever
+      // is current right now - since none of them can appear in any topology
+      // RebuildAudioTopology builds after this point (gNodes is about to be
+      // cleared).
+      const uint64_t safeAfterGeneration = AudioEngine::Instance().CurrentGeneration();
       for (GraphNode& gn : gNodes)
-         gRetiredNodes.push_back(std::move(gn.node));
+         gRetiredNodes.push_back({ std::move(gn.node), safeAfterGeneration });
       while (!gNodeViewports.empty())
          gRetiredViewports.push_back(gNodeViewports.extract(gNodeViewports.begin()));
       gNodes.clear();
@@ -35958,10 +35983,26 @@ int main(int argc, char** argv)
          if (glfwWindowShouldClose(gProjectorWindows[i].window))
             CloseProjectorWindow(i);
 
-      // Actually tear down anything retired by RemoveNodeByIndex last frame.
-      // Safe here: the frame that queued draw commands referencing these
-      // textures has already been submitted and presented.
-      gRetiredNodes.clear();
+      // Actually tear down anything retired by RemoveNodeByIndex/NewPatch.
+      // The GL-texture hazard is already clear here (the frame that queued
+      // draw commands referencing these textures has been submitted and
+      // presented), but a node can also own audio state the real-time audio
+      // thread may still be mid-ProcessBlock on against an older topology -
+      // only drop entries the audio thread has actually confirmed it's past
+      // (or that no audio thread is currently running to race with at all).
+      // See gRetiredNodes' declaration for why a frame boundary alone isn't
+      // sufficient for that half of the hazard.
+      {
+         const bool audioRaceable = AudioEngine::Instance().SampleRate() > 0.0 && AudioEngine::Instance().IsAlive();
+         const uint64_t completedGeneration = AudioEngine::Instance().CompletedGeneration();
+         gRetiredNodes.erase(
+            std::remove_if(gRetiredNodes.begin(), gRetiredNodes.end(),
+                            [&](RetiredNode& retired)
+                            {
+                               return !audioRaceable || completedGeneration > retired.safeAfterGeneration;
+                            }),
+            gRetiredNodes.end());
+      }
       gRetiredViewports.clear();
 
       // dev-only: drive copy/paste/delete with synthetic key events so the

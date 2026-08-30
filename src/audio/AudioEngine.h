@@ -151,6 +151,25 @@ public:
    // mixing it in after RunTopology.
    SamplePreviewPlayer& Preview() { return mPreviewPlayer; }
 
+   // Main thread only. The generation number that will be attached to the
+   // NEXT SetTopology() call - i.e. the generation of whatever topology is
+   // mCurrent right now. A node being retired from the graph (main.cpp's
+   // gRetiredNodes) can still be referenced by mCurrent up until the
+   // following RebuildAudioTopology()/SetTopology() publishes a topology that
+   // excludes it, so callers must read this BEFORE that publish and treat the
+   // result as "the last generation that might still reach this node".
+   uint64_t CurrentGeneration() const { return mPublishedGeneration.load(std::memory_order_relaxed); }
+
+   // Main thread only. The generation number of the last topology the audio
+   // thread has fully finished a RunTopology() pass over. A retired node
+   // recorded against generation G is only safe to actually destroy once this
+   // returns > G - that's the audio thread's own confirmation that it has
+   // moved on to a topology built after the node was removed from gNodes, not
+   // a guess based on how much wall-clock time has passed. See gRetiredNodes'
+   // drain in main.cpp for why a one-video-frame heuristic isn't enough here
+   // (unlike the GL-texture retirement it shares a mechanism with).
+   uint64_t CompletedGeneration() const { return mCompletedGeneration.load(std::memory_order_relaxed); }
+
 private:
    AudioEngine() = default;
 
@@ -188,9 +207,18 @@ private:
    {
       AudioTopology topology;
       std::vector<PooledBuffer> buffers;
+      uint64_t generation = 0;
    };
    std::atomic<ProcessList*> mCurrent { nullptr };
    ProcessList* mRetiring = nullptr; // freed on the NEXT SetTopology call
+
+   // Bumped once per SetTopology() call (main thread only) - see
+   // CurrentGeneration(). Started at 0 so the first published topology is
+   // generation 1 and 0 can mean "before anything was ever published".
+   std::atomic<uint64_t> mPublishedGeneration { 0 };
+   // Written by Process() (real audio thread only) right after it finishes
+   // RunTopology() over `list` - see CompletedGeneration().
+   std::atomic<uint64_t> mCompletedGeneration { 0 };
 
    // Shared by Process() (real device callback) and ProcessOffline() (tests):
    // walks `list`'s topology in order, handing each node its declared input

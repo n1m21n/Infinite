@@ -93,6 +93,7 @@ void AudioEngine::SetTopology(AudioTopology topology)
    fresh->buffers.resize(fresh->topology.numBuffers);
    for (PooledBuffer& b : fresh->buffers) // main thread only - never inside Process()
       b.Allocate();
+   fresh->generation = mPublishedGeneration.fetch_add(1, std::memory_order_relaxed) + 1;
 
    ProcessList* old = mCurrent.exchange(fresh, std::memory_order_acq_rel);
 
@@ -329,6 +330,12 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    const double topologyStartMs = NowMs();
    ProcessList* list = mCurrent.load(std::memory_order_acquire);
    RunTopology(list, buffer);
+   // Published after RunTopology fully returns, so a main-thread reader never
+   // observes this generation as "completed" while entry.node->ProcessBlock
+   // calls against `list`'s (possibly about-to-be-retired) nodes are still
+   // in flight - see CompletedGeneration()'s doc comment.
+   if (list != nullptr)
+      mCompletedGeneration.store(list->generation, std::memory_order_release);
    // Deliberately after RunTopology, not part of it: the preview is not in
    // the node topology at all, so it stays audible (and unaffected by
    // bypass/the transport) across a topology swap, and even with nothing
