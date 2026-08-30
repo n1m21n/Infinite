@@ -23827,17 +23827,52 @@ namespace
          return;
       }
 
-      if (!n->StartOfflineRender(n->recordVideoPath))
+      // The graph's AudioNodes are only PrepareToPlay'd once the engine has
+      // opened a device at least once this session (RebuildAudioTopology
+      // skips the PrepareToPlay loop while SampleRate() is 0), and
+      // StartOfflineRender reads that same rate to budget/mux the take - so
+      // for a synth-audio take with the device currently off, start it
+      // briefly here first. If it can't start, the take still goes ahead as
+      // video-only rather than being refused outright: an unprepared graph
+      // would only write silence anyway.
+      const bool deviceWasRunningBefore = AudioEngine::Instance().SampleRate() > 0.0;
+      const bool wantsGraphAudio =
+         n->includeAudio && n->AudioInput().IsConnected() &&
+         dynamic_cast<AudioFileNode*>(n->AudioInput().GetSource()) == nullptr;
+      if (wantsGraphAudio && AudioEngine::Instance().SampleRate() <= 0.0)
+      {
+         if (!StartAudioEngine(gAudioStartError))
+            n->SetRecordStatus("no audio device (" + gAudioStartError + ") - rendering video only");
+      }
+
+      // Detach the device BEFORE arming the take, not after. While the
+      // device is open its real-time callback keeps writing into the same
+      // capture ring the take reads from, and Platform::AudioDeviceClose is
+      // not instant (hundreds of ms of AVAudioEngine teardown) - arming
+      // first captured that whole live tail into the head of the take's
+      // audio track, so the file came out with more audio than picture and
+      // everything after the tail sat out of sync.
+      const double takeSampleRate = AudioEngine::Instance().SampleRate();
+      if (takeSampleRate > 0.0)
+         AudioEngine::Instance().Stop();
+
+      if (!n->StartOfflineRender(n->recordVideoPath, takeSampleRate))
+      {
+         // Put the device back exactly as it was - the take never started.
+         if (deviceWasRunningBefore)
+            StartAudioEngine(gAudioStartError);
          return; // n->RecordStatus() already carries the reason
+      }
 
       gOfflineRender.active = true;
       gOfflineRender.node = n;
-      gOfflineRender.includeAudio = n->includeAudio && n->AudioInput().IsConnected();
-      gOfflineRender.deviceWasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+      gOfflineRender.includeAudio = n->OfflineNeedsGraphAudio();
+      // Deliberately the state from BEFORE the warmup start above, so a
+      // device this function itself opened is left closed afterwards rather
+      // than silently switching the user's audio on.
+      gOfflineRender.deviceWasRunning = deviceWasRunningBefore;
       gOfflineRender.wasPlaying = Transport::Instance().IsPlaying();
 
-      if (gOfflineRender.deviceWasRunning)
-         AudioEngine::Instance().Stop();
       Transport::Instance().SetPlaying(true);
    }
 
@@ -36487,7 +36522,7 @@ int main(int argc, char** argv)
                   on->DecrementPreroll();
                else
                {
-                  if (gOfflineRender.includeAudio)
+                  if (on->OfflineNeedsGraphAudio())
                   {
                      // Fixed-capacity scratch, same discipline as
                      // AudioEngine::RunTopology's own thread_local scratch -
@@ -36496,13 +36531,28 @@ int main(int argc, char** argv)
                      static float sOfflineAudioL[kAudioMaxBlockFrames];
                      static float sOfflineAudioR[kAudioMaxBlockFrames];
                      static float* sOfflineAudioChannels[2] = { sOfflineAudioL, sOfflineAudioR };
-                     const int blockFrames = std::min(kAudioMaxBlockFrames,
-                        std::max(1, (int)std::lround(44100.0 / (double)std::max(1, on->offlineFps))));
-                     AudioBuffer offlineBuf;
-                     offlineBuf.channels = sOfflineAudioChannels;
-                     offlineBuf.numChannels = 2;
-                     offlineBuf.numFrames = blockFrames;
-                     AudioEngine::Instance().ProcessOffline(offlineBuf);
+
+                     // The frame's sample budget comes from OutputNode's
+                     // running cumulative target at the take's REAL device
+                     // sample rate (see OfflineAudioFramesOwed) - so an fps
+                     // that doesn't divide the rate evenly can't drift, and a
+                     // budget larger than one block (any fps below ~12 at
+                     // 48kHz) is generated in several blocks instead of being
+                     // silently truncated to kAudioMaxBlockFrames, which
+                     // would have made the audio track short - i.e. played
+                     // back sped up against the video.
+                     int owed = on->OfflineAudioFramesOwed();
+                     while (owed > 0)
+                     {
+                        const int blockFrames = std::min(owed, kAudioMaxBlockFrames);
+                        AudioBuffer offlineBuf;
+                        offlineBuf.channels = sOfflineAudioChannels;
+                        offlineBuf.numChannels = 2;
+                        offlineBuf.numFrames = blockFrames;
+                        AudioEngine::Instance().ProcessOffline(offlineBuf);
+                        on->NoteOfflineAudioGenerated(blockFrames);
+                        owed -= blockFrames;
+                     }
                   }
                   on->CaptureOfflineFrame();
                }
@@ -42068,10 +42118,15 @@ int main(int argc, char** argv)
       if (getenv("INFINITE_OFFLINERENDERTEST") != nullptr)
       {
          auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
+         static double sOfflineAudioSampleRate = 0.0;
          if (frameId == 2)
          {
             StartOfflineRenderSession(out);
-            printf("start: active=%d status=%s\n", (int)gOfflineRender.active, out->RecordStatus().c_str());
+            // Latched here: StartOfflineRenderSession detaches the device, so
+            // AudioEngine::SampleRate() reads 0 for the rest of the take.
+            sOfflineAudioSampleRate = out->OfflineAudioSampleRate();
+            printf("start: active=%d rate=%.0fHz status=%s\n", (int)gOfflineRender.active,
+                   sOfflineAudioSampleRate, out->RecordStatus().c_str());
          }
          static bool sOfflineDone = false;
          static int sOfflineDoneFrame = -1;
@@ -42095,10 +42150,24 @@ int main(int argc, char** argv)
          if (sOfflineDone && sOfflineDoneFrame >= 0 && frameId == sOfflineDoneFrame + 60)
          {
             const Platform::MovieInfo info = Platform::InspectMovie(out->recordVideoPath);
-            printf("offline render movie(video=%d audio=%d duration=%.2fs, frames=%d)\n",
-                   info.hasVideo, info.hasAudio, info.duration, out->LastRecordedFrames());
+            // The take's own budget: 10 frames at 10fps is exactly 1 second
+            // of video, so the audio track must be exactly 1 second of the
+            // take's real device sample rate. Asserting the appended sample
+            // count against that (rather than just "an audio track exists")
+            // is what catches an audio track written at the wrong rate or
+            // truncated per frame - either of which plays back off-speed
+            // against the picture while still passing hasAudio.
+            const double sr = sOfflineAudioSampleRate;
+            const long long expectedAudio = (long long)std::llround(10.0 * sr / 10.0);
+            const long long gotAudio = out->OfflineAudioFramesAppended();
+            const bool audioExact = sr > 0.0 && std::llabs(gotAudio - expectedAudio) <= 64;
+            const bool durationOk = info.duration > 0.9 && info.duration < 1.15;
+            printf("offline render movie(video=%d audio=%d duration=%.2fs, frames=%d) "
+                   "audio frames=%lld expected=%lld @%.0fHz\n",
+                   info.hasVideo, info.hasAudio, info.duration, out->LastRecordedFrames(),
+                   gotAudio, expectedAudio, sr);
             const bool ok = out->LastRecordedFrames() == 10 && info.hasVideo && info.hasAudio &&
-                            info.duration > 0.5;
+                            durationOk && audioExact;
             printf("%s\n", ok ? "OFFLINERENDERTEST OK" : "OFFLINERENDERTEST FAIL - SUSPECT");
          }
       }
@@ -45088,12 +45157,37 @@ int main(int argc, char** argv)
 
                ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || gOfflineRender.active);
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::SliderInt("render fps", &n->offlineFps, 1, 60);
+               ImGui::InputInt("render fps", &n->offlineFps);
+               n->offlineFps = std::clamp(n->offlineFps, 1, 240);
+
+               // Duration is typed, not dragged: a render queue's length is a
+               // number the user knows ("give me 45 seconds"), and hitting an
+               // exact value on a 1..600 slider is fiddly. The presets are
+               // the common takes; the field takes anything up to an hour.
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::SliderInt("duration (s)", &n->offlineDurationSeconds, 1, 600);
+               ImGui::InputInt("duration (s)", &n->offlineDurationSeconds);
+               n->offlineDurationSeconds = std::clamp(n->offlineDurationSeconds, 1, 3600);
+               for (int preset : { 15, 30, 45, 60 })
+               {
+                  ImGui::PushID(preset);
+                  const bool selected = n->offlineDurationSeconds == preset;
+                  if (selected)
+                     ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                  if (ImGui::Button((std::to_string(preset) + "s").c_str(), ImVec2(kParamWidth * 0.22f, 0)))
+                     n->offlineDurationSeconds = preset;
+                  if (selected)
+                     ImGui::PopStyleColor();
+                  ImGui::PopID();
+                  if (preset != 60)
+                     ImGui::SameLine();
+               }
+
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::SliderInt("preroll frames", &n->offlinePrerollFrames, 0, 600);
+               ImGui::InputInt("preroll frames", &n->offlinePrerollFrames);
+               n->offlinePrerollFrames = std::clamp(n->offlinePrerollFrames, 0, 600);
                ImGui::EndDisabled();
+
+               ImGui::TextDisabled("%d frames @ %dfps", n->offlineDurationSeconds * n->offlineFps, n->offlineFps);
 
                if (thisNodeRendering)
                {
