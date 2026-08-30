@@ -870,12 +870,18 @@ public:
    void RequestRestart() { mRestartRequested.store(true, std::memory_order_release); }
    bool IsPlaying() const { return mPlaying.load(std::memory_order_relaxed); }
 
-   // Main thread. mFramePos is only ever written by the audio thread and
-   // read here - a 64-bit atomic is lock-free on every platform this ships
-   // on, so this never blocks the audio thread.
+   // Main thread. mFramePos and mActiveFileSampleRate are only ever written
+   // by the audio thread and read here - 64-bit/double atomics are
+   // lock-free on every platform this ships on, so this never blocks the
+   // audio thread. mFramePos counts frames at the decoded file's own rate
+   // (see ProcessBlock's mPos/mPlaybackRate), not the engine's mSampleRate,
+   // so it must be divided by that same file rate to get real elapsed
+   // seconds - using mSampleRate here would be wrong whenever the file's
+   // rate differs from the engine's (e.g. a 44.1kHz file on a 48kHz engine).
    double PositionSeconds() const
    {
-      return mSampleRate > 0.0 ? (double)mFramePos.load(std::memory_order_relaxed) / mSampleRate : 0.0;
+      const double rate = mActiveFileSampleRate.load(std::memory_order_relaxed);
+      return rate > 0.0 ? (double)mFramePos.load(std::memory_order_relaxed) / rate : 0.0;
    }
 
    // Main thread. Latest published analysis snapshot - lock-free-safe to
@@ -895,6 +901,10 @@ public:
          mPos = 0.0;
          mFramePos.store(0, std::memory_order_relaxed);
          mAnalyser.Reset();
+         const double fileRate = (mActiveBuffer != nullptr && mActiveBuffer->sampleRate > 0.0)
+            ? mActiveBuffer->sampleRate : mSampleRate;
+         mPlaybackRate = (fileRate > 0.0 && mSampleRate > 0.0) ? fileRate / mSampleRate : 1.0;
+         mActiveFileSampleRate.store(fileRate, std::memory_order_relaxed);
       }
 
       for (int ch = 0; ch < buffer.numChannels; ch++)
@@ -919,7 +929,7 @@ public:
          if (hasBuffer && mPlaying.load(std::memory_order_relaxed))
          {
             raw = ReadSample(*mActiveBuffer, mPos);
-            mPos += 1.0;
+            mPos += mPlaybackRate;
             if (mPos >= mActiveBuffer->numFrames)
             {
                if (loop)
@@ -948,16 +958,25 @@ public:
 private:
    static float ReadSample(const Platform::SampleBuffer& buf, double pos)
    {
-      // Rate is always exactly 1.0 (no pitch/speed on this node), so pos is
-      // always integral - a direct bounds-checked index is enough, no
-      // interpolation needed. Channel 0 only, same simplification
-      // SamplerNode's ReadSample makes for a multi-channel file.
-      const int i = (int)pos;
-      return (i >= 0 && i < buf.numFrames) ? buf.channelData[i] : 0.0f;
+      // The file's decoded sample rate can differ from the engine's running
+      // rate (e.g. a 44.1kHz file with a 48kHz engine), so pos is generally
+      // non-integral - linearly interpolate between the two nearest frames.
+      // Channel 0 only, same simplification SamplerNode's ReadSample makes
+      // for a multi-channel file.
+      const int i0 = (int)std::floor(pos);
+      if (i0 < 0 || i0 >= buf.numFrames)
+         return 0.0f;
+      const int i1 = i0 + 1;
+      const float s0 = buf.channelData[i0];
+      const float s1 = (i1 < buf.numFrames) ? buf.channelData[i1] : s0;
+      const float frac = (float)(pos - i0);
+      return s0 + (s1 - s0) * frac;
    }
 
 
    double mSampleRate = 44100.0;
+   double mPlaybackRate = 1.0; // decoded file's sampleRate / engine's mSampleRate
+   std::atomic<double> mActiveFileSampleRate { 44100.0 }; // for PositionSeconds() - see its comment
    ParamMailbox mMailbox;
 
    std::atomic<float> mVolume { 0.8f };
