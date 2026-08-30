@@ -573,3 +573,61 @@ private:
    std::unique_ptr<AudioAudioToCVNode> mAudioNode;
    int mLastCookFrame = -1;
 };
+
+// Combines up to four modulator inputs into a single output with independent
+// depth/weights, fallback constants, channel mutes, and selectable combination
+// modes (Sum/Additive, Weighted Average/Blend, Multiply/VCA, Max, Min).
+class ModMixerNode : public INode, public IModulator
+{
+public:
+   static const int kChannels = 4;
+
+   static INode* Create() { return new ModMixerNode(); }
+   static const std::vector<std::string>& ModeNames();
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   const char* InputLabel(int slot) const override
+   {
+      static const char* kLabels[kChannels] = { "in 1", "in 2", "in 3", "in 4" };
+      return (slot >= 0 && slot < kChannels) ? kLabels[slot] : nullptr;
+   }
+
+   IModulator* inputs[kChannels] = { nullptr, nullptr, nullptr, nullptr };
+   IModulator** ModulatorInputSlot(int slot) override
+   {
+      return (slot >= 0 && slot < kChannels) ? &inputs[slot] : nullptr;
+   }
+   int ModulatorInputCount() const override { return kChannels; }
+
+   float Value01() override;
+
+   int mode = 0; // 0: Sum, 1: Average, 2: Multiply, 3: Max, 4: Min
+   float weights[kChannels] = { 1.0f, 1.0f, 1.0f, 1.0f };
+   float constantIn[kChannels] = { 0.5f, 0.5f, 0.5f, 0.5f };
+   bool mutes[kChannels] = { false, false, false, false };
+
+   float masterGain = 1.0f;
+   float masterOffset = 0.0f;
+   bool clampOutput = true;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("mode", mode);
+      static const char* kWeightKeys[kChannels] = { "weight0", "weight1", "weight2", "weight3" };
+      static const char* kConstKeys[kChannels] = { "const0", "const1", "const2", "const3" };
+      static const char* kMuteKeys[kChannels] = { "mute0", "mute1", "mute2", "mute3" };
+      for (int i = 0; i < kChannels; i++)
+      {
+         v.Float(kWeightKeys[i], weights[i]);
+         v.Float(kConstKeys[i], constantIn[i]);
+         v.Bool(kMuteKeys[i], mutes[i]);
+      }
+      v.Float("masterGain", masterGain);
+      v.Float("masterOffset", masterOffset);
+      v.Bool("clampOutput", clampOutput);
+   }
+};
