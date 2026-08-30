@@ -23961,6 +23961,11 @@ namespace
          data.globals.push_back({ g.name, g.expr });
       data.performance = gPerfElements;
       data.perfLayout = gPerfLayout;
+      data.transport.bpm = Transport::Instance().Tempo();
+      data.transport.timeSigNum = Transport::Instance().TimeSigNumerator();
+      data.transport.timeSigDen = Transport::Instance().TimeSigDenominator();
+      data.transport.key = Transport::Instance().Key();
+      data.transport.scale = Transport::Instance().Scale();
       return data;
    }
 
@@ -24222,6 +24227,14 @@ namespace
       {
          gUndoStack.clear();
          gRedoStack.clear();
+         // A genuine "start a fresh document" also resets the global
+         // transport - a loaded patch restores its own bpm/time signature/
+         // key/scale right after this call (see ApplyPatchData), so this
+         // would otherwise just be clobbered a moment later.
+         Transport::Instance().SetTempo(120.0f);
+         Transport::Instance().SetTimeSignature(4, 4);
+         Transport::Instance().SetKey(0);
+         Transport::Instance().SetScale(0);
       }
    }
 
@@ -24403,6 +24416,11 @@ namespace
       // replayed in file order, not source-before-destination order) isn't
       // guaranteed.
       RebuildAudioTopology();
+
+      Transport::Instance().SetTempo(data.transport.bpm);
+      Transport::Instance().SetTimeSignature(data.transport.timeSigNum, data.transport.timeSigDen);
+      Transport::Instance().SetKey(data.transport.key);
+      Transport::Instance().SetScale(data.transport.scale);
 
       gSuppressUndoCheckpoints = false;
    }

@@ -50,6 +50,7 @@ class INode;
 //   perfname <pageIndex> <page name to end of line>
 //   perf <kind> <dstIndex> <dstParam> <dstParam2> <cellX> <cellY> <page> <colorR> <colorG> <colorB> <value> <value2> <boolName> <label to end of line>
 //   perftarget <perfIndex> <dstIndex> <dstParam> <axis> <boolName>
+//   transport <bpm> <tsNum> <tsDen> <key> <scale>
 //
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
@@ -168,6 +169,21 @@ namespace Patch
       std::vector<std::string> pageNames;
    };
 
+   // Global transport state (docs/plans/audio/P3c-P3a2-design.md §0.2/§0.3) -
+   // BPM, time signature, and key/scale all live on Transport rather than any
+   // node, so without this record they silently reset to their defaults on
+   // every load. Defaults here match Transport's own field initialisers, so
+   // a patch saved before this record existed (or a `transport` line missing
+   // some tokens, via >>'s failed-extraction behaviour) reads back unchanged.
+   struct TransportRecord
+   {
+      float bpm = 120.0f;
+      int timeSigNum = 4;
+      int timeSigDen = 4;
+      int key = 0;
+      int scale = 0;
+   };
+
    struct Data
    {
       std::vector<NodeRecord> nodes;
@@ -181,6 +197,7 @@ namespace Patch
       std::vector<GlobalRecord> globals;
       std::vector<PerfRecord> performance;
       PerfLayoutRecord perfLayout;
+      TransportRecord transport;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);
