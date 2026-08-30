@@ -16,10 +16,20 @@ name: Build
 # .claude/skills/run-infinite-hygiene/driver.sh - still has to run on a real
 # desktop. See docs/WINDOWS_VERIFICATION.md for that half.
 
+# Website/docs-only pushes can't break the build, so they don't pay for one.
+# Keep this list in sync with the paths the Pages workflow deploys from.
 on:
   push:
     branches: [main, 'feature/**', 'bugfix/**']
+    paths-ignore:
+      - 'website/**'
+      - 'docs/**'
+      - '**/*.md'
   pull_request:
+    paths-ignore:
+      - 'website/**'
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
 
 # A force-push mid-run should cancel the superseded run, not queue behind it.
