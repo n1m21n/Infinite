@@ -1,6 +1,9 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "INode.h"
@@ -36,20 +39,51 @@ public:
 
    // --- recording ---
    bool StartRecording(const std::string& path);
+   // Fully synchronous: blocks until the encoder is joined and the movie is
+   // finalized on disk. Used by the destructor (teardown must not outlive a
+   // thread touching `this`, see ~OutputNode) and by the dev/test harnesses
+   // in main.cpp, which need the file to be complete the instant this
+   // returns. The interactive Stop button does NOT call this directly - see
+   // StopRecordingAsync below - because on a long or backlogged take this can
+   // block for tens of seconds (audio backlog flush, PBO drain, encoder join,
+   // AVAssetWriter's finishWriting spin), which would freeze the whole app
+   // with no repaint.
    void StopRecording();
+   // The interactive path: does the GL-bound work (audio drain, PBO flush)
+   // on this thread since it needs the render thread's GL context, then hands
+   // the recorder handle to a background thread for the part that can take a
+   // long time (Platform::RecorderStop - encoder join + finishWriting) and
+   // returns immediately. IsRecording() is already false by the time this
+   // returns; IsFinalizing() is true until the background thread completes.
+   // Call PollFinalize() once a frame to pick up completion.
+   void StopRecordingAsync();
    // Marks a stop as wanted without blocking: the caller (the ImGui button)
    // sets this and returns, so its "finalizing" state gets one frame to
-   // reach the screen before the driver's per-frame pump actually calls the
-   // blocking StopRecording() - see the pump next to glfwPollEvents() in
+   // reach the screen before the driver's per-frame pump actually calls
+   // StopRecordingAsync() - see the pump next to glfwPollEvents() in
    // main.cpp. Recording is still considered active (IsRecording() is still
-   // true) until that call completes.
+   // true) until that call runs.
    void RequestStopRecording() { mStopRequested = true; }
    bool StopRequested() const { return mStopRequested; }
    bool IsRecording() const { return mRecorder != nullptr; }
+   // True from the moment StopRecordingAsync() hands the handle to the
+   // background thread until PollFinalize() has picked up its result and
+   // joined it. Mutually exclusive with IsRecording().
+   bool IsFinalizing() const { return mFinalizeThread.joinable(); }
+   // Call once a frame (see the pump next to glfwPollEvents() in main.cpp).
+   // No-op unless a StopRecordingAsync() finalize has completed, in which
+   // case it joins the background thread and copies its results into
+   // RecordStatus()/LastRecordedFrames()/LastDroppedFrames() - the same
+   // fields StopRecording() itself populates synchronously.
+   void PollFinalize();
    int RecordedFrames() const;
    const std::string& RecordStatus() const { return mRecordStatus; }
-   int PendingFrames() const { return Platform::RecorderPendingFrameCount(mRecorder); }
-   int DroppedFrames() const { return Platform::RecorderDroppedFrameCount(mRecorder); }
+   // Both read the live handle, so both are 0 while IsFinalizing() - the
+   // handle has already been handed off to the background thread by then,
+   // and touching it from this thread while RecorderStop() may be mid-delete
+   // on the other would be a data race.
+   int PendingFrames() const { return IsFinalizing() ? 0 : Platform::RecorderPendingFrameCount(mRecorder); }
+   int DroppedFrames() const { return IsFinalizing() ? 0 : Platform::RecorderDroppedFrameCount(mRecorder); }
    // Final totals from the take that just ended, once StopRecording has
    // drained the queue and joined the encoder - unlike DroppedFrames()
    // above, still valid after mRecorder is gone.
@@ -100,6 +134,29 @@ private:
    void ReleaseReadbackBuffers();
    void FlushReadbacks(); // blocking drain, used on StopRecording/teardown
 
+   // Common tail of StopRecording()/StopRecordingAsync(): everything up to
+   // and including handing the drained handle off to Platform::RecorderStop.
+   // Runs synchronously on whichever thread calls it - the render thread for
+   // StopRecording(), the background finalize thread for StopRecordingAsync().
+   struct FinalizeResult
+   {
+      bool ok = false;
+      int frames = 0;
+      int dropped = 0;
+      uint64_t audioDropped = 0;
+      std::string error;
+   };
+   FinalizeResult FinishRecorder(Platform::RecorderHandle* handle, uint64_t audioDropped);
+   void ApplyFinalizeResult(const FinalizeResult& r);
+   // Blocks until any in-flight StopRecordingAsync() finalize has actually
+   // completed and joins the thread. A no-op if none is in flight. Called by
+   // the destructor (a dangling `this` in the background thread's lambda
+   // would otherwise outlive the node) and defensively at the top of
+   // StartRecording()/StopRecordingAsync(), so mFinalizeThread is never
+   // reassigned while still joinable (std::thread::operator= on a joinable
+   // thread calls std::terminate).
+   void WaitForFinalize();
+
    ImageCable mInput;
    AudioCable mAudioInput;
    AudioCaptureRing mCaptureRing;
@@ -124,6 +181,19 @@ private:
    std::string mRecordStatus;
    int mLastFrames = 0;
    int mLastDropped = 0;
+
+   // --- async finalize (StopRecordingAsync) ---
+   std::thread mFinalizeThread;
+   // Set by the finalize thread right before it returns; PollFinalize() polls
+   // this rather than blocking on the thread, so the render thread never
+   // waits on it. Only meaningful while mFinalizeThread.joinable().
+   std::atomic<bool> mFinalizeDone{ false };
+   // Staged result, written once by the finalize thread before it sets
+   // mFinalizeDone (release) and read once by PollFinalize() after it
+   // observes mFinalizeDone (acquire) - that pair is the only synchronization
+   // these need, since nothing else touches them while a finalize is in
+   // flight.
+   FinalizeResult mFinalizeResult;
 
    // --- A/V sync ---
    // A live-audio take has two independent clocks. The video track's PTS is a

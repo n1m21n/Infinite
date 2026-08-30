@@ -36260,19 +36260,25 @@ int main(int argc, char** argv)
       gFrameStart = glfwGetTime();
       glfwPollEvents();
 
-      // A recording Stop click sets StopRequested() rather than calling the
-      // blocking OutputNode::StopRecording() directly, so that frame gets to
-      // finish drawing and present its "finalizing..." state before the
-      // block happens. This is the earliest point in the *next* frame - the
-      // one right after that "finalizing" frame's glfwSwapBuffers - where
-      // it's safe to actually run the block: the user has already seen the
-      // app acknowledge the click instead of appearing to hang mid-click.
+      // A recording Stop click sets StopRequested() rather than calling
+      // OutputNode::StopRecordingAsync() directly, so that frame gets to
+      // finish drawing and present its "finalizing..." state before the call
+      // happens. This is the earliest point in the *next* frame - the one
+      // right after that "finalizing" frame's glfwSwapBuffers - where it's
+      // safe to actually run it: the user has already seen the app
+      // acknowledge the click instead of appearing to hang mid-click.
+      // StopRecordingAsync() itself only blocks briefly (GL-bound PBO/audio
+      // drain); the potentially long part - encoder join + AVAssetWriter's
+      // finishWriting - runs on a background thread and is picked up by
+      // PollFinalize() below once it completes, so a long or heavily
+      // backlogged take no longer freezes the app on Stop.
       for (GraphNode& gn : gNodes)
       {
          if (auto* on = dynamic_cast<OutputNode*>(gn.node.get()))
          {
             if (on->StopRequested())
-               on->StopRecording();
+               on->StopRecordingAsync();
+            on->PollFinalize();
          }
       }
 
@@ -44716,17 +44722,24 @@ int main(int argc, char** argv)
                   ImGui::TextDisabled("from: %s", srcName.c_str());
                }
 
-               if (n->StopRequested())
+               if (n->StopRequested() || n->IsFinalizing())
                {
-                  // The actual (blocking) StopRecording() runs at the top of
-                  // next frame, once this "finalizing" state has had a
-                  // chance to reach the screen - see the pump next to
-                  // glfwPollEvents(). Recording can't be (re)started from
-                  // here; the handle is mid-teardown.
+                  // StopRequested(): the actual StopRecordingAsync() call
+                  // runs at the top of next frame, once this "finalizing"
+                  // state has had a chance to reach the screen - see the
+                  // pump next to glfwPollEvents(). IsFinalizing(): the
+                  // encoder join + movie finalize is running on a background
+                  // thread and can take a while on a long/backlogged take,
+                  // but doesn't block this UI - a new take can't be started
+                  // here (the button stays disabled) since StartRecording()
+                  // would otherwise briefly block on WaitForFinalize().
                   ImGui::BeginDisabled();
                   ImGui::Button("Finalizing...", ImVec2(kPreviewSize, 0));
                   ImGui::EndDisabled();
-                  const int pending = n->PendingFrames();
+                  // PendingFrames() reads the live handle, which has already
+                  // been handed off to the background thread once
+                  // IsFinalizing() is true - nothing left here to report.
+                  const int pending = n->StopRequested() ? n->PendingFrames() : 0;
                   if (pending > 0)
                      ImGui::TextDisabled("finishing up, %d frames left", pending);
                }

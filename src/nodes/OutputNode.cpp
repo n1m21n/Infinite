@@ -25,6 +25,10 @@ OutputNode::~OutputNode()
    // in the PBO pipeline, and must not leak the PBOs themselves.
    if (mRecorder != nullptr)
       StopRecording();
+   // A StopRecordingAsync() finalize may still be running in the background;
+   // its thread captures `this` by pointer, so teardown must not proceed
+   // (and free the object out from under it) until that thread is done.
+   WaitForFinalize();
    GLUtil::DestroyFbo(mOut);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
@@ -107,6 +111,7 @@ bool OutputNode::StartRecording(const std::string& path)
 
 void OutputNode::StopRecording()
 {
+   WaitForFinalize(); // see its doc comment - guards mFinalizeThread reuse below
    mStopRequested = false;
    if (mRecorder == nullptr)
       return;
@@ -119,17 +124,9 @@ void OutputNode::StopRecording()
    // out short by exactly the number of buffers in the pipeline.
    FlushReadbacks();
 
-   // Final counts come out of RecorderStop itself, after it has joined the
-   // encoder worker - reading them beforehand can race the worker's last
-   // few writes and under-report what actually landed in the file.
-   int frames = 0;
-   int dropped = 0;
-   std::string error;
-   const bool ok = Platform::RecorderStop(mRecorder, error, &frames, &dropped);
+   Platform::RecorderHandle* handle = mRecorder;
    mRecorder = nullptr;
    ReleaseReadbackBuffers();
-   mLastFrames = frames;
-   mLastDropped = dropped;
 
    // Audio the ring had to throw away is a sync problem, not just a glitch:
    // the samples are gone, so everything after the gap sits earlier in the
@@ -139,16 +136,91 @@ void OutputNode::StopRecording()
       mPaceToAudio ? mCaptureRing.overflowCount.exchange(0, std::memory_order_relaxed) : 0;
    mPaceToAudio = false;
 
-   if (ok)
+   ApplyFinalizeResult(FinishRecorder(handle, audioDropped));
+}
+
+void OutputNode::StopRecordingAsync()
+{
+   WaitForFinalize(); // must not reassign a still-joinable mFinalizeThread below
+   mStopRequested = false;
+   if (mRecorder == nullptr)
+      return;
+
+   // Same GL-bound work as StopRecording() - this has to run on the render
+   // thread (the only thread with the GL context) and is normally fast: the
+   // PBOs it's draining were issued a frame or two ago, so glClientWaitSync
+   // returns almost immediately. Only Platform::RecorderStop below - the
+   // encoder join and AVAssetWriter's finishWriting - is the part that can
+   // take tens of seconds under a big backlog, so that's the part that moves
+   // to a background thread.
+   mCaptureRing.enabled.store(false, std::memory_order_relaxed);
+   DrainAudioCapture();
+   FlushReadbacks();
+
+   Platform::RecorderHandle* handle = mRecorder;
+   mRecorder = nullptr;
+   ReleaseReadbackBuffers();
+
+   const uint64_t audioDropped =
+      mPaceToAudio ? mCaptureRing.overflowCount.exchange(0, std::memory_order_relaxed) : 0;
+   mPaceToAudio = false;
+
+   mRecordStatus = "finalizing...";
+   mFinalizeDone.store(false, std::memory_order_relaxed);
+   // Ownership of `handle` moves entirely into the thread: nothing else on
+   // OutputNode touches it again (PendingFrames/DroppedFrames both check
+   // IsFinalizing() first - see their doc comments in OutputNode.h).
+   mFinalizeThread = std::thread([this, handle, audioDropped]()
    {
-      mRecordStatus = "saved " + std::to_string(frames) + " frames";
-      if (dropped > 0)
-         mRecordStatus += " (" + std::to_string(dropped) + " dropped)";
-      if (audioDropped > 0)
-         mRecordStatus += " (audio gap: " + std::to_string(audioDropped / 2) + " frames lost)";
+      FinalizeResult r = FinishRecorder(handle, audioDropped);
+      mFinalizeResult = std::move(r);
+      mFinalizeDone.store(true, std::memory_order_release);
+   });
+}
+
+OutputNode::FinalizeResult OutputNode::FinishRecorder(Platform::RecorderHandle* handle, uint64_t audioDropped)
+{
+   FinalizeResult r;
+   r.audioDropped = audioDropped;
+
+   // Final counts come out of RecorderStop itself, after it has joined the
+   // encoder worker - reading them beforehand can race the worker's last
+   // few writes and under-report what actually landed in the file.
+   r.ok = Platform::RecorderStop(handle, r.error, &r.frames, &r.dropped);
+   return r;
+}
+
+void OutputNode::ApplyFinalizeResult(const FinalizeResult& r)
+{
+   mLastFrames = r.frames;
+   mLastDropped = r.dropped;
+   if (r.ok)
+   {
+      mRecordStatus = "saved " + std::to_string(r.frames) + " frames";
+      if (r.dropped > 0)
+         mRecordStatus += " (" + std::to_string(r.dropped) + " dropped)";
+      if (r.audioDropped > 0)
+         mRecordStatus += " (audio gap: " + std::to_string(r.audioDropped / 2) + " frames lost)";
    }
    else
-      mRecordStatus = error;
+      mRecordStatus = r.error;
+}
+
+void OutputNode::PollFinalize()
+{
+   if (!mFinalizeThread.joinable() || !mFinalizeDone.load(std::memory_order_acquire))
+      return;
+   mFinalizeThread.join();
+   ApplyFinalizeResult(mFinalizeResult);
+}
+
+void OutputNode::WaitForFinalize()
+{
+   if (mFinalizeThread.joinable())
+   {
+      mFinalizeThread.join();
+      ApplyFinalizeResult(mFinalizeResult);
+   }
 }
 
 void OutputNode::DrainAudioCapture()
