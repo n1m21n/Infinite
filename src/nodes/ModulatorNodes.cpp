@@ -533,3 +533,103 @@ float AudioToCVNode::RawEnvelope() const
 {
    return mAudioNode ? mAudioNode->RawEnvelope() : 0.0f;
 }
+
+// ---------------------------------------------------------------- ModMixer
+
+namespace
+{
+   const std::vector<std::string> kModMixerModes = {
+      "Sum (Add)", "Average (Blend)", "Multiply (VCA)", "Maximum", "Minimum"
+   };
+}
+
+const std::vector<std::string>& ModMixerNode::ModeNames()
+{
+   return kModMixerModes;
+}
+
+float ModMixerNode::Value01()
+{
+   float activeValues[kChannels];
+   float activeWeights[kChannels];
+   int activeCount = 0;
+
+   for (int i = 0; i < kChannels; i++)
+   {
+      if (!mutes[i])
+      {
+         const float raw = inputs[i] ? inputs[i]->Value01() : constantIn[i];
+         activeValues[activeCount] = raw;
+         activeWeights[activeCount] = weights[i];
+         activeCount++;
+      }
+   }
+
+   if (activeCount == 0)
+   {
+      const float zeroRes = masterOffset;
+      return clampOutput ? std::min(1.0f, std::max(0.0f, zeroRes)) : zeroRes;
+   }
+
+   float r = 0.0f;
+   switch (mode)
+   {
+      case 0: // Sum (Add)
+      {
+         for (int i = 0; i < activeCount; i++)
+            r += activeValues[i] * activeWeights[i];
+         break;
+      }
+      case 1: // Average (Blend)
+      {
+         float totalWeight = 0.0f;
+         for (int i = 0; i < activeCount; i++)
+         {
+            r += activeValues[i] * activeWeights[i];
+            totalWeight += std::fabs(activeWeights[i]);
+         }
+         if (totalWeight > 1e-5f)
+            r /= totalWeight;
+         break;
+      }
+      case 2: // Multiply (VCA)
+      {
+         r = 1.0f;
+         for (int i = 0; i < activeCount; i++)
+         {
+            const float w = activeWeights[i];
+            const float stage = (1.0f - w) + w * activeValues[i];
+            r *= stage;
+         }
+         break;
+      }
+      case 3: // Maximum
+      {
+         r = activeValues[0] * activeWeights[0];
+         for (int i = 1; i < activeCount; i++)
+         {
+            const float val = activeValues[i] * activeWeights[i];
+            if (val > r)
+               r = val;
+         }
+         break;
+      }
+      case 4: // Minimum
+      {
+         r = activeValues[0] * activeWeights[0];
+         for (int i = 1; i < activeCount; i++)
+         {
+            const float val = activeValues[i] * activeWeights[i];
+            if (val < r)
+               r = val;
+         }
+         break;
+      }
+      default:
+         r = activeValues[0] * activeWeights[0];
+         break;
+   }
+
+   r = r * masterGain + masterOffset;
+   return clampOutput ? std::min(1.0f, std::max(0.0f, r)) : r;
+}
