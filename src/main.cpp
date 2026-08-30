@@ -442,6 +442,14 @@ namespace
    void PushUndoCheckpoint();
    GraphNode* FindNodeByIndex(int index);
 
+   // Offline Render (non-realtime export) - defined near RebuildAudioTopology/
+   // StartAudioEngine below, forward-declared here since the node-params UI
+   // (among the first drawing code in the file) and the main loop's pump
+   // (near the very end) both need to call into it.
+   INode* FindHardwareDrivenNode();
+   void StartOfflineRenderSession(OutputNode* n);
+   void DrawOfflineRenderProgressWindow();
+
    std::vector<GraphNode> gNodes;
 
    // Which node indices each Group considers its own, once-in-always-in. Kept
@@ -599,6 +607,21 @@ namespace
    // settings" fails, so the toggle button can surface why on hover instead
    // of just silently staying off. Cleared on a successful Start().
    std::string gAudioStartError;
+
+   // ---- Offline Render (non-realtime export) state ----
+   // One take at a time, across the whole patch (not per-OutputNode) - the
+   // graph and AudioEngine are only ever driven by one clock at once, so two
+   // Output nodes each trying to run their own offline session concurrently
+   // would just race each other over the same Transport/AudioEngine calls.
+   struct OfflineRenderState
+   {
+      bool active = false;         // a take is either rendering or finalizing
+      OutputNode* node = nullptr;  // which OutputNode owns this take
+      bool includeAudio = false;   // latched at start, mirrors node->includeAudio
+      bool deviceWasRunning = false; // AudioEngine::Instance().SampleRate() > 0 before this take
+      bool wasPlaying = true;        // Transport::Instance().IsPlaying() before this take
+   };
+   OfflineRenderState gOfflineRender;
 
    // ---- device-change / sleep-wake recovery state (PollAudioRecovery) ----
    // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md.
@@ -23766,6 +23789,103 @@ namespace
          fprintf(stderr, "audio device recovery: %s\n", gAudioStartError.c_str());
    }
 
+   // Whole-graph scan for a node whose output comes from outside the process
+   // entirely (see INode::IsHardwareDriven's doc comment) - Offline Render
+   // must refuse up front rather than silently rendering black/frozen frames
+   // where a live camera, MIDI controller, or Syphon/Spout receiver would
+   // have been, since none of those can be pre-synthesized for a take that
+   // isn't running in real time.
+   INode* FindHardwareDrivenNode()
+   {
+      for (GraphNode& gn : gNodes)
+      {
+         if (gn.node && gn.node->IsHardwareDriven())
+            return gn.node.get();
+      }
+      return nullptr;
+   }
+
+   // Entry point for the "Render" button in an OutputNode's params (see the
+   // node-params drawing code below). Refuses up front if the patch has a
+   // hardware-driven source or another take (on this or any other OutputNode)
+   // is already in progress; otherwise stops the live audio device (so its
+   // real callback can't race this take's synchronous ProcessOffline calls -
+   // see the main-loop pump next to glfwPollEvents()) and forces Transport
+   // to play, restoring both once the take finishes or is cancelled.
+   void StartOfflineRenderSession(OutputNode* n)
+   {
+      if (gOfflineRender.active || n == nullptr)
+         return;
+      if (n->IsRecording() || n->IsFinalizing())
+         return;
+
+      if (INode* hw = FindHardwareDrivenNode())
+      {
+         (void)hw;
+         n->SetRecordStatus("refused: patch has a live source (camera/MIDI/Syphon In) "
+                             "that can't be pre-synthesized for an offline take");
+         return;
+      }
+
+      if (!n->StartOfflineRender(n->recordVideoPath))
+         return; // n->RecordStatus() already carries the reason
+
+      gOfflineRender.active = true;
+      gOfflineRender.node = n;
+      gOfflineRender.includeAudio = n->includeAudio && n->AudioInput().IsConnected();
+      gOfflineRender.deviceWasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+      gOfflineRender.wasPlaying = Transport::Instance().IsPlaying();
+
+      if (gOfflineRender.deviceWasRunning)
+         AudioEngine::Instance().Stop();
+      Transport::Instance().SetPlaying(true);
+   }
+
+   // Small floating progress dialog, drawn once a frame (right before
+   // ImGui::Render()) for the whole duration of a take - matches the
+   // TouchDesigner/After Effects "rendering..." modal rather than living
+   // inline in the OutputNode's own params panel, since the node stays
+   // wherever it is on the canvas but the take applies to the whole patch.
+   void DrawOfflineRenderProgressWindow()
+   {
+      OutputNode* n = gOfflineRender.node;
+      if (n == nullptr)
+         return;
+
+      ImGuiIO& io = ImGui::GetIO();
+      ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
+                               ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+      ImGui::SetNextWindowBgAlpha(0.95f);
+      ImGui::Begin("Offline Render", nullptr,
+                    ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
+                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
+
+      const int total = std::max(1, n->OfflineFramesTotal());
+      const int done = std::min(n->OfflineFramesDone(), total);
+      const float frac = (float)done / (float)total;
+
+      if (n->IsOfflineFinalizing())
+      {
+         ImGui::Text("Finalizing...");
+      }
+      else if (n->IsPrerolling())
+      {
+         ImGui::Text("Warming up... (%d frames left)", n->PrerollFramesRemaining());
+      }
+      else
+      {
+         ImGui::Text("Rendering... %d/%d", done, total);
+      }
+      ImGui::ProgressBar(frac, ImVec2(280, 0));
+
+      ImGui::BeginDisabled(n->IsOfflineFinalizing());
+      if (ImGui::Button("Cancel", ImVec2(120, 0)))
+         n->RequestFinishOfflineRender(true);
+      ImGui::EndDisabled();
+
+      ImGui::End();
+   }
+
    void RemoveNodeByIndex(int index)
    {
       GraphNode* victim = FindNodeByIndex(index);
@@ -36301,6 +36421,78 @@ int main(int argc, char** argv)
             if (on->StopRequested())
                on->StopRecordingAsync();
             on->PollFinalize();
+            on->PollOfflineFinalize();
+         }
+      }
+
+      // Offline Render pump: drives the graph and (if the take includes
+      // audio) AudioEngine::ProcessOffline in lockstep, a fixed step per
+      // frame, completely independent of wall-clock time or vsync - the
+      // TouchDesigner/After Effects/Final Cut non-realtime export model, see
+      // OutputNode::CaptureOfflineFrame's doc comment. Bounded to a small
+      // wall-clock budget per outer loop iteration (rather than looping until
+      // the whole take is done) so glfwPollEvents/ImGui still run often
+      // enough for the progress window to repaint and the Cancel button to
+      // stay clickable during a long render.
+      if (gOfflineRender.active)
+      {
+         OutputNode* on = gOfflineRender.node;
+         if (on->IsOfflineRendering())
+         {
+            const double budgetStart = glfwGetTime();
+            while (on->IsOfflineRendering() && on->OfflineFramesDone() < on->OfflineFramesTotal())
+            {
+               ++frameId;
+               Transport::Instance().Tick(1.0f / (float)std::max(1, on->offlineFps));
+
+               for (GraphNode& gn : gNodes)
+                  gn.node->CookIfNeeded(frameId);
+
+               if (on->IsPrerolling())
+                  on->DecrementPreroll();
+               else
+               {
+                  if (gOfflineRender.includeAudio)
+                  {
+                     // Fixed-capacity scratch, same discipline as
+                     // AudioEngine::RunTopology's own thread_local scratch -
+                     // allocated once, reused every step. Not thread_local:
+                     // this only ever runs on the main thread.
+                     static float sOfflineAudioL[kAudioMaxBlockFrames];
+                     static float sOfflineAudioR[kAudioMaxBlockFrames];
+                     static float* sOfflineAudioChannels[2] = { sOfflineAudioL, sOfflineAudioR };
+                     const int blockFrames = std::min(kAudioMaxBlockFrames,
+                        std::max(1, (int)std::lround(44100.0 / (double)std::max(1, on->offlineFps))));
+                     AudioBuffer offlineBuf;
+                     offlineBuf.channels = sOfflineAudioChannels;
+                     offlineBuf.numChannels = 2;
+                     offlineBuf.numFrames = blockFrames;
+                     AudioEngine::Instance().ProcessOffline(offlineBuf);
+                  }
+                  on->CaptureOfflineFrame();
+               }
+
+               // ~50Hz: keeps the progress window and Cancel button live even
+               // mid-render, without giving up much throughput to redraws.
+               if (glfwGetTime() - budgetStart > 0.02)
+                  break;
+            }
+
+            if (on->OfflineFramesDone() >= on->OfflineFramesTotal())
+               on->RequestFinishOfflineRender(false);
+         }
+         else if (!on->IsOfflineFinalizing())
+         {
+            // PollOfflineFinalize() above just picked up the completed
+            // finalize - whether from reaching the frame count or from a
+            // Cancel click - so it's safe to hand the app's audio device and
+            // transport play-state back to whatever they were before this
+            // take started.
+            if (gOfflineRender.deviceWasRunning)
+               StartAudioEngine(gAudioStartError);
+            Transport::Instance().SetPlaying(gOfflineRender.wasPlaying);
+            gOfflineRender.active = false;
+            gOfflineRender.node = nullptr;
          }
       }
 
@@ -44798,6 +44990,44 @@ int main(int argc, char** argv)
                   ImGui::TextDisabled("%s", n->RecordStatus().c_str());
                   ImGui::PopTextWrapPos();
                }
+
+               ImGui::Dummy(ImVec2(0, 8));
+               ImGui::Separator();
+               ImGui::TextDisabled("Offline Render");
+
+               // A take drives the whole patch's Transport/AudioEngine, not
+               // just this node - only one can ever be in flight regardless
+               // of which OutputNode started it, and it can't overlap this
+               // node's own live recording either (both would fight over the
+               // same recordVideoPath/EnsureFbo-sized mOut).
+               const bool thisNodeRendering = gOfflineRender.node == n;
+               const bool otherSessionActive = gOfflineRender.active && !thisNodeRendering;
+
+               ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || gOfflineRender.active);
+               ImGui::SetNextItemWidth(kParamWidth);
+               ImGui::SliderInt("render fps", &n->offlineFps, 1, 60);
+               ImGui::SetNextItemWidth(kParamWidth);
+               ImGui::SliderInt("duration (s)", &n->offlineDurationSeconds, 1, 600);
+               ImGui::SetNextItemWidth(kParamWidth);
+               ImGui::SliderInt("preroll frames", &n->offlinePrerollFrames, 0, 600);
+               ImGui::EndDisabled();
+
+               if (thisNodeRendering)
+               {
+                  // The floating DrawOfflineRenderProgressWindow carries the
+                  // live progress/Cancel button; this is just a disabled
+                  // placeholder so the button doesn't visually disappear.
+                  ImGui::BeginDisabled();
+                  ImGui::Button("Rendering...", ImVec2(kPreviewSize, 0));
+                  ImGui::EndDisabled();
+               }
+               else
+               {
+                  ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || otherSessionActive);
+                  if (ImGui::Button("Render", ImVec2(kPreviewSize, 0)))
+                     StartOfflineRenderSession(n);
+                  ImGui::EndDisabled();
+               }
             }
             else if (auto* n = dynamic_cast<SyphonOutNode*>(gn.node.get()))
                DrawSyphonOutParams(n);
@@ -48804,7 +49034,8 @@ int main(int argc, char** argv)
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
-
+      if (gOfflineRender.active)
+         DrawOfflineRenderProgressWindow();
 
       ImGui::Render();
       int fbW, fbH;
