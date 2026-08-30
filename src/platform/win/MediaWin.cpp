@@ -1405,6 +1405,13 @@ namespace Platform
 
          std::vector<unsigned char> bgraScratch((size_t)rec->width * rec->height * 4);
 
+         // The most recently *processed* frame's converted bytes (not
+         // necessarily the most recently written one - see the padding
+         // comment below). Local to this thread: it is the only one that
+         // ever touches the encoder's frame queue output.
+         std::vector<unsigned char> prevBgra;
+         bool hasPrevBgra = false;
+
          for (;;)
          {
             RecorderHandleMf::QueuedFrame frame;
@@ -1425,7 +1432,17 @@ namespace Platform
 
             for (int i = 0; i < frame.repeatCount; i++)
             {
-               IMFMediaBuffer* buffer = BufferFromMemory((BYTE*)bgraScratch.data(), (DWORD)bgraScratch.size());
+               // Padding fills the earlier repeats with the *previous*
+               // frame's content and only the final repeat with this frame's
+               // own - so a padded repeat never stamps new pixels at a PTS
+               // earlier than when they were actually rendered. The first
+               // frame of a take has no previous frame to pad with, so every
+               // one of its repeats uses its own content.
+               const bool isFinalRepeat = (i == frame.repeatCount - 1);
+               const bool useNewFrame = isFinalRepeat || !hasPrevBgra;
+               const std::vector<unsigned char>& toWrite = useNewFrame ? bgraScratch : prevBgra;
+
+               IMFMediaBuffer* buffer = BufferFromMemory((BYTE*)toWrite.data(), (DWORD)toWrite.size());
                if (buffer != nullptr)
                {
                   IMFSample* sample = nullptr;
@@ -1451,6 +1468,12 @@ namespace Platform
                }
                rec->pendingCount.fetch_sub(1, std::memory_order_relaxed);
             }
+
+            // This frame becomes "the previous frame" for whatever comes
+            // next, regardless of whether every repeat above actually made
+            // it to the writer.
+            prevBgra.swap(bgraScratch);
+            hasPrevBgra = true;
 
             std::lock_guard<std::mutex> poolLock(rec->poolMutex);
             if (rec->bufferPool.size() < RecorderHandleMf::kMaxPoolSize)

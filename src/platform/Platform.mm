@@ -1169,6 +1169,15 @@ namespace Platform
       // actually breaks the feedback loop under padding.
       std::vector<unsigned char> currentFlipped;
 
+      // The most recently *processed* frame's flipped bytes (not necessarily
+      // the most recently written one - see RecorderPump). A repeatCount > 1
+      // pads slots 0..N-2 with this instead of the new frame, so padding
+      // never stamps content at a PTS earlier than when it was rendered.
+      // Empty/unset (hasPrevFlipped == false) only for the first frame of a
+      // take, which has nothing earlier to pad with.
+      std::vector<unsigned char> prevFlipped;
+      bool hasPrevFlipped = false;
+
       std::mutex writerMutex;
       dispatch_queue_t encodeQueue = nil;
       dispatch_semaphore_t workerDone = nil;
@@ -1265,7 +1274,18 @@ namespace Platform
                FlipPixelsTopDown(h, h->current.pixels, h->currentFlipped);
             }
 
-            if (!AppendFlippedToWriter(h, h->currentFlipped))
+            // Padding fills the earlier slots (0..N-2 of this frame's N
+            // repeats) with the *previous* frame's content and only the
+            // final slot with this frame's own - so a padded repeat never
+            // stamps new pixels at a PTS earlier than when they were
+            // actually rendered. The very first frame of a take has no
+            // previous frame to pad with, so every one of its slots uses its
+            // own content; there is no better answer for slot zero.
+            const bool isFinalRepeat = (h->currentRemaining == 1);
+            const bool useNewFrame = isFinalRepeat || !h->hasPrevFlipped;
+            const std::vector<unsigned char>& toAppend = useNewFrame ? h->currentFlipped : h->prevFlipped;
+
+            if (!AppendFlippedToWriter(h, toAppend))
             {
                // Only a real writer failure reaches here now, and it is
                // counted rather than silently shortening the movie.
@@ -1281,6 +1301,12 @@ namespace Platform
 
             if (h->currentRemaining <= 0)
             {
+               // This frame becomes "the previous frame" for whatever comes
+               // next, whether or not every one of its repeats actually made
+               // it to the writer.
+               h->prevFlipped.swap(h->currentFlipped);
+               h->hasPrevFlipped = true;
+
                std::lock_guard<std::mutex> poolLock(h->poolMutex);
                if (h->bufferPool.size() < RecorderHandle::kMaxPoolSize)
                   h->bufferPool.push_back(std::move(h->current.pixels));
