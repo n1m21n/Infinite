@@ -8,6 +8,20 @@ Transport& Transport::Instance()
 
 double Transport::Seconds() const
 {
+   if (mOfflineActive.load(std::memory_order_relaxed))
+   {
+      if (mOfflineInAudioBlock.load(std::memory_order_relaxed))
+      {
+         const double sr = mAudioSampleRate.load(std::memory_order_relaxed);
+         if (sr > 0.0)
+         {
+            return mAudioSecondsOffset.load(std::memory_order_relaxed) +
+                   (double)mAudioSampleCounter.load(std::memory_order_relaxed) / sr;
+         }
+      }
+      return mOfflineVideoSeconds.load(std::memory_order_relaxed);
+   }
+
    const double sr = mAudioSampleRate.load(std::memory_order_relaxed);
    if (sr > 0.0)
    {
@@ -20,7 +34,7 @@ double Transport::Seconds() const
 double Transport::Beats() const
 {
    const double sr = mAudioSampleRate.load(std::memory_order_relaxed);
-   if (sr <= 0.0)
+   if (sr <= 0.0 && !mOfflineActive.load(std::memory_order_relaxed))
       return mBeats;
    const double secOffset = mAudioSecondsOffset.load(std::memory_order_relaxed);
    return mAudioBeatsOffset.load(std::memory_order_relaxed) +
@@ -32,6 +46,9 @@ void Transport::Tick(float deltaSeconds)
    // clamp so a stalled frame (window drag, file dialog) doesn't jump the clock
    if (deltaSeconds > 0.25f)
       deltaSeconds = 0.25f;
+
+   if (mOfflineActive.load(std::memory_order_relaxed))
+      return; // offline mode: video frame time is driven explicitly by SetOfflineVideoTime
 
    if (mAudioSampleRate.load(std::memory_order_relaxed) > 0.0)
       return; // audio-driven: Beats()/Seconds() compute live, nothing to accumulate here
@@ -62,4 +79,40 @@ void Transport::AdvanceAudioClock(int numFrames)
 {
    if (mPlaying.load(std::memory_order_relaxed))
       mAudioSampleCounter.fetch_add((uint64_t)numFrames, std::memory_order_relaxed);
+}
+
+void Transport::SetOfflineMode(bool active, double sampleRate)
+{
+   if (active)
+   {
+      mAudioSecondsOffset.store(mSeconds, std::memory_order_relaxed);
+      mAudioBeatsOffset.store(mBeats, std::memory_order_relaxed);
+      mAudioSampleCounter.store(0, std::memory_order_relaxed);
+      mAudioSampleRate.store(sampleRate, std::memory_order_relaxed);
+      mOfflineVideoSeconds.store(mSeconds, std::memory_order_relaxed);
+      mOfflineInAudioBlock.store(false, std::memory_order_relaxed);
+      mOfflineActive.store(true, std::memory_order_relaxed);
+   }
+   else
+   {
+      mOfflineActive.store(false, std::memory_order_relaxed);
+      mOfflineInAudioBlock.store(false, std::memory_order_relaxed);
+   }
+}
+
+void Transport::SetOfflineVideoTime(double seconds)
+{
+   mOfflineVideoSeconds.store(seconds, std::memory_order_relaxed);
+}
+
+void Transport::BeginOfflineAudioBlock(int numFrames)
+{
+   if (mPlaying.load(std::memory_order_relaxed))
+      mAudioSampleCounter.fetch_add((uint64_t)numFrames, std::memory_order_relaxed);
+   mOfflineInAudioBlock.store(true, std::memory_order_relaxed);
+}
+
+void Transport::EndOfflineAudioBlock()
+{
+   mOfflineInAudioBlock.store(false, std::memory_order_relaxed);
 }

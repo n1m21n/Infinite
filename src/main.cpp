@@ -622,6 +622,7 @@ namespace
       bool wasPlaying = true;        // Transport::Instance().IsPlaying() before this take
       bool vsyncWasOn = true;        // gVsync before this take; restored when it ends
       double startTime = 0.0;        // glfwGetTime() when the take was armed
+      double startSeconds = 0.0;     // Transport::Instance().Seconds() when take was armed
       // Set by the pump whenever it yields because the encoder queue is full
       // rather than because it ran out of time budget. The two look identical
       // from outside - the frame counter stops either way - so the progress
@@ -24039,6 +24040,8 @@ namespace
       gOfflineRender.vsyncWasOn = gVsync;
       glfwSwapInterval(0);
 
+      gOfflineRender.startSeconds = Transport::Instance().Seconds();
+      Transport::Instance().SetOfflineMode(true, takeSampleRate);
       Transport::Instance().SetPlaying(true);
    }
 
@@ -34621,6 +34624,204 @@ static bool RunPerfPanelSelfTest()
    return true;
 }
 
+void ApplyModulationAndPalette(int frameId)
+{
+   Modulation& modulation = Modulation::Instance();
+   // Apply deferred writes from the performance matrix before snapshot and modulators
+   for (const ParamRef& ref : modulation.FrameParams())
+   {
+      if (ref.value == nullptr) continue;
+      auto it = gPerfPendingWrites.find({ref.nodeIndex, ref.paramIndex});
+      if (it != gPerfPendingWrites.end())
+         *ref.value = ShapeToParam(ref, it->second);
+   }
+   gPerfPendingWrites.clear();
+
+   // Snapshot every registered parameter's current value, keyed by node,
+   // before any of this frame's writes land. This is what lets an
+   // expression reference a sibling parameter by name ("width * 0.5")
+   // without depending on the order params happened to draw in - and it
+   // means a cycle between two expressions just settles a frame late
+   // rather than reading half-updated state mid-pass.
+   std::map<int, std::map<std::string, float>> paramSnapshot;
+   for (const ParamRef& ref : modulation.FrameParams())
+      if (ref.value != nullptr)
+         paramSnapshot[ref.nodeIndex][ref.name] = *ref.value;
+
+   // Fixture only: put one envelope field into the expression state, so
+   // the UI fixture also covers the fx badge and the clear button - the
+   // layout that spilled out of the panel and over the next column.
+   // Parameter indices are positional and only exist once the node has
+   // drawn, so this has to run here, where FrameParams is populated,
+   // rather than beside the node's spawn.
+   if (getenv("INFINITE_AUDIOUITEST") != nullptr && frameId == 2 && gNodes.size() > 1)
+   {
+      int found = 0, foundDecay = 0;
+      for (const ParamRef& ref : modulation.FrameParams())
+      {
+         if (ref.nodeIndex != gNodes[1].index)
+            continue;
+         if (ref.name == "release" && ++found == 3) // engine A's filter release
+            modulation.SetExpression(ref.nodeIndex, ref.paramIndex, "lerp(lo, hi, 0.5)");
+         // ...and, under INFINITE_AUDIOUITEST_TYPING, leave engine A's
+         // filter decay open in formula-entry mode - the other layout
+         // that spilled, since the typed field used to draw its caption
+         // outside the box to the right. Behind its own flag because a
+         // fixture that opens with a focused text field swallows the
+         // keyboard until you click away.
+         if (ref.name == "decay" && ++foundDecay == 3 &&
+             getenv("INFINITE_AUDIOUITEST_TYPING") != nullptr)
+         {
+            const std::pair<int, int> key(ref.nodeIndex, ref.paramIndex);
+            gTypedParamText[key] = "=lerp(lo, hi, 0.25)";
+            gTypedParam.insert(key);
+            gTypedParamJustOpened = key;
+         }
+      }
+   }
+
+   const double t = Transport::Instance().Seconds();
+   // Patch-wide named values, evaluated once before any parameter reads
+   // them so every expression in the frame sees the same globals - see
+   // core/ExprGlobals.h.
+   ExprGlobals::EvaluateAll(t);
+   const std::map<std::string, float>& globals = ExprGlobals::Values();
+   for (const ParamRef& ref : modulation.FrameParams())
+   {
+      if (ref.value == nullptr)
+         continue;
+      const Modulation::Source src = modulation.ResolvedSourceFor(ref);
+      if (src.nodeIndex >= 0)
+      {
+         if (!src.enabled)
+            continue;   // binding intact, just not written this frame
+         // A wired modulator always wins over a typed expression - see
+         // Modulation::SetExpression.
+         GraphNode* modNode = FindNodeByIndex(src.nodeIndex);
+         if (modNode == nullptr)
+            continue;
+         if (modNode->node != nullptr && modNode->node->bypassed && modNode->node->BypassSource() == nullptr)
+            continue;
+         auto* modulator = ModulatorForOutput(modNode->node.get(), src.outputIndex);
+         if (modulator == nullptr)
+            continue;
+         // Value01() is documented to return 0..1, but InvertNode and
+         // RangeToRangeNode (clampOutput=false) deliberately violate
+         // that on purpose as a signal-shaping tool - see
+         // docs/plans/modulators/00-modulation-polarity.md §4. That's
+         // fine as long as it stays a signal between modulator nodes:
+         // clamping v01 here means it can no longer reach past
+         // src.lo/src.hi into a destination param, which is a hard
+         // contract (see ShapeToParam).
+         // A macro number box is the one modulator that speaks in the
+         // destination's own units rather than 0..1: the point of
+         // typing "440" into it is that the destination becomes 440,
+         // with each destination clamping to its own declared range on
+         // the way in. Normalising it would have forced the box to
+         // carry a min/max of its own, which is exactly the pair of
+         // params that made it fiddly.
+         if (auto* numBox = dynamic_cast<MacroNumBoxNode*>(modNode->node.get()))
+         {
+            *ref.value = ShapeToParam(ref, numBox->value);
+            continue;
+         }
+         if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(modNode->node.get()))
+         {
+            const int span = (int)std::lround(ref.maxValue - ref.minValue);
+            const bool isStepping = ref.isEnum || ref.isBool || (ref.step == 1.0f && span >= 1);
+            if (isStepping)
+            {
+               if (trigNode->justTriggered)
+               {
+                  if (ref.isBool || span == 1)
+                  {
+                     *ref.value = (*ref.value > ref.minValue + 0.5f) ? ref.minValue : ref.maxValue;
+                  }
+                  else if (span >= 1)
+                  {
+                     const int curIdx = std::clamp((int)std::lround(*ref.value - ref.minValue), 0, span);
+                     *ref.value = ref.minValue + (float)((curIdx + 1) % (span + 1));
+                  }
+               }
+               continue;
+            }
+         }
+         const float v01 = std::clamp(modulator->Value01(), 0.0f, 1.0f);
+         *ref.value = ShapeToParam(ref, src.lo + (src.hi - src.lo) * v01);
+         continue;
+      }
+      const std::string* expr = modulation.ExpressionFor(ref.nodeIndex, ref.paramIndex);
+      if (expr == nullptr)
+         continue;
+      float result = 0.0f;
+      std::string error;
+      // `lo`/`hi` bind this param's own range, so an expression can be
+      // written in normalised terms the way a wired modulator already
+      // works: `=lerp(lo, hi, sin(t) * 0.5 + 0.5)` sweeps the full range,
+      // where the bare `=sin(t)` people reach for first lands in raw
+      // units and clamps to nothing on a param measured in milliseconds.
+      // Both spellings stay available - raw units are what you want for
+      // `=250` or `=width * 0.5`.
+      std::map<std::string, float>& siblings = paramSnapshot[ref.nodeIndex];
+      const auto savedLo = siblings.find("lo");
+      const auto savedHi = siblings.find("hi");
+      const bool hadLo = savedLo != siblings.end(), hadHi = savedHi != siblings.end();
+      const float prevLo = hadLo ? savedLo->second : 0.0f;
+      const float prevHi = hadHi ? savedHi->second : 0.0f;
+      siblings["lo"] = ref.minValue;
+      siblings["hi"] = ref.maxValue;
+      const bool evaluated = Expression::Evaluate(*expr, t, &siblings, &globals, result, error);
+      if (hadLo) siblings["lo"] = prevLo; else siblings.erase("lo");
+      if (hadHi) siblings["hi"] = prevHi; else siblings.erase("hi");
+      if (evaluated)
+      {
+         *ref.value = ShapeToParam(ref, result);
+         modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, std::string());
+      }
+      else
+      {
+         // Leave the last good value in place rather than snapping to 0 -
+         // a typo mid-edit should not blank out the render.
+         modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, error);
+      }
+   }
+
+   for (GraphNode& gn : gNodes)
+   {
+      if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(gn.node.get()))
+         trigNode->justTriggered = false;
+   }
+
+   // A Palette is not an Output, so nothing downstream pulls it, and both its
+   // preview and its bindings need this frame's swatches. Cooking here - after
+   // modulation has been applied - is what lets a modulator drive the shaping
+   // controls and have it land the same frame.
+   for (GraphNode& gn : gNodes)
+   {
+      if (dynamic_cast<IPaletteSource*>(gn.node.get()) != nullptr)
+         gn.node->CookIfNeeded(frameId);
+   }
+
+   // Colours, the same way and for the same reason: the registry was rebuilt
+   // while the nodes drew, so every pointer here belongs to a node that
+   // still exists. A palette has to cook before it can be read, and it is
+   // not an Output so nothing else would pull it.
+   PaletteBinding& palette = PaletteBinding::Instance();
+   for (const ColorRef& ref : palette.FrameColors())
+   {
+      const PaletteBinding::Source src = palette.SourceFor(ref.nodeIndex, ref.colorIndex);
+      if (src.nodeIndex < 0 || ref.value == nullptr)
+         continue;
+      GraphNode* palNode = FindNodeByIndex(src.nodeIndex);
+      if (palNode == nullptr)
+         continue;
+      auto* source = dynamic_cast<IPaletteSource*>(palNode->node.get());
+      if (source == nullptr)
+         continue;
+      source->GetSwatch(src.swatchIndex, ref.value);
+   }
+}
+
 int main(int argc, char** argv)
 {
    // No-op on macOS (which gets a `.ips` report for free); on Windows this is
@@ -36952,7 +37153,10 @@ int main(int argc, char** argv)
                gOfflineRender.waitingOnEncoder = false;
 
                ++frameId;
-               Transport::Instance().Tick(1.0f / (float)std::max(1, on->offlineFps));
+               const double videoSec = gOfflineRender.startSeconds +
+                  (double)on->OfflineFramesDone() / (double)std::max(1, on->offlineFps);
+               Transport::Instance().SetOfflineVideoTime(videoSec);
+               ApplyModulationAndPalette(frameId);
 
                for (GraphNode& gn : gNodes)
                   gn.node->CookIfNeeded(frameId);
@@ -37010,8 +37214,11 @@ int main(int argc, char** argv)
             // Cancel click - so it's safe to hand the app's audio device and
             // transport play-state back to whatever they were before this
             // take started.
+            Transport::Instance().SetOfflineMode(false);
             if (gOfflineRender.deviceWasRunning)
                StartAudioEngine(gAudioStartError);
+            else
+               Transport::Instance().NotifyAudioEngineStopped();
             Transport::Instance().SetPlaying(gOfflineRender.wasPlaying);
             glfwSwapInterval(gOfflineRender.vsyncWasOn ? 1 : 0);
             gOfflineRender.active = false;
@@ -48870,204 +49077,7 @@ int main(int argc, char** argv)
       // while nodes draw, so every pointer here belongs to a node that still
       // exists. Cooking before the UI would mean writing through last frame's
       // pointers, which dangle the moment a node is deleted.
-      {
-         Modulation& modulation = Modulation::Instance();
-         // Apply deferred writes from the performance matrix before snapshot and modulators
-         for (const ParamRef& ref : modulation.FrameParams())
-         {
-            if (ref.value == nullptr) continue;
-            auto it = gPerfPendingWrites.find({ref.nodeIndex, ref.paramIndex});
-            if (it != gPerfPendingWrites.end())
-               *ref.value = ShapeToParam(ref, it->second);
-         }
-         gPerfPendingWrites.clear();
-
-         // Snapshot every registered parameter's current value, keyed by node,
-         // before any of this frame's writes land. This is what lets an
-         // expression reference a sibling parameter by name ("width * 0.5")
-         // without depending on the order params happened to draw in - and it
-         // means a cycle between two expressions just settles a frame late
-         // rather than reading half-updated state mid-pass.
-         std::map<int, std::map<std::string, float>> paramSnapshot;
-         for (const ParamRef& ref : modulation.FrameParams())
-            if (ref.value != nullptr)
-               paramSnapshot[ref.nodeIndex][ref.name] = *ref.value;
-
-         // Fixture only: put one envelope field into the expression state, so
-         // the UI fixture also covers the fx badge and the clear button - the
-         // layout that spilled out of the panel and over the next column.
-         // Parameter indices are positional and only exist once the node has
-         // drawn, so this has to run here, where FrameParams is populated,
-         // rather than beside the node's spawn.
-         if (getenv("INFINITE_AUDIOUITEST") != nullptr && frameId == 2 && gNodes.size() > 1)
-         {
-            int found = 0, foundDecay = 0;
-            for (const ParamRef& ref : modulation.FrameParams())
-            {
-               if (ref.nodeIndex != gNodes[1].index)
-                  continue;
-               if (ref.name == "release" && ++found == 3) // engine A's filter release
-                  modulation.SetExpression(ref.nodeIndex, ref.paramIndex, "lerp(lo, hi, 0.5)");
-               // ...and, under INFINITE_AUDIOUITEST_TYPING, leave engine A's
-               // filter decay open in formula-entry mode - the other layout
-               // that spilled, since the typed field used to draw its caption
-               // outside the box to the right. Behind its own flag because a
-               // fixture that opens with a focused text field swallows the
-               // keyboard until you click away.
-               if (ref.name == "decay" && ++foundDecay == 3 &&
-                   getenv("INFINITE_AUDIOUITEST_TYPING") != nullptr)
-               {
-                  const std::pair<int, int> key(ref.nodeIndex, ref.paramIndex);
-                  gTypedParamText[key] = "=lerp(lo, hi, 0.25)";
-                  gTypedParam.insert(key);
-                  gTypedParamJustOpened = key;
-               }
-            }
-         }
-
-         const double t = Transport::Instance().Seconds();
-         // Patch-wide named values, evaluated once before any parameter reads
-         // them so every expression in the frame sees the same globals - see
-         // core/ExprGlobals.h.
-         ExprGlobals::EvaluateAll(t);
-         const std::map<std::string, float>& globals = ExprGlobals::Values();
-         for (const ParamRef& ref : modulation.FrameParams())
-         {
-            if (ref.value == nullptr)
-               continue;
-            const Modulation::Source src = modulation.ResolvedSourceFor(ref);
-            if (src.nodeIndex >= 0)
-            {
-               if (!src.enabled)
-                  continue;   // binding intact, just not written this frame
-               // A wired modulator always wins over a typed expression - see
-               // Modulation::SetExpression.
-               GraphNode* modNode = FindNodeByIndex(src.nodeIndex);
-               if (modNode == nullptr)
-                  continue;
-               if (modNode->node != nullptr && modNode->node->bypassed && modNode->node->BypassSource() == nullptr)
-                  continue;
-               auto* modulator = ModulatorForOutput(modNode->node.get(), src.outputIndex);
-               if (modulator == nullptr)
-                  continue;
-               // Value01() is documented to return 0..1, but InvertNode and
-               // RangeToRangeNode (clampOutput=false) deliberately violate
-               // that on purpose as a signal-shaping tool - see
-               // docs/plans/modulators/00-modulation-polarity.md §4. That's
-               // fine as long as it stays a signal between modulator nodes:
-               // clamping v01 here means it can no longer reach past
-               // src.lo/src.hi into a destination param, which is a hard
-               // contract (see ShapeToParam).
-               // A macro number box is the one modulator that speaks in the
-               // destination's own units rather than 0..1: the point of
-               // typing "440" into it is that the destination becomes 440,
-               // with each destination clamping to its own declared range on
-               // the way in. Normalising it would have forced the box to
-               // carry a min/max of its own, which is exactly the pair of
-               // params that made it fiddly.
-               if (auto* numBox = dynamic_cast<MacroNumBoxNode*>(modNode->node.get()))
-               {
-                  *ref.value = ShapeToParam(ref, numBox->value);
-                  continue;
-               }
-               if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(modNode->node.get()))
-               {
-                  const int span = (int)std::lround(ref.maxValue - ref.minValue);
-                  const bool isStepping = ref.isEnum || ref.isBool || (ref.step == 1.0f && span >= 1);
-                  if (isStepping)
-                  {
-                     if (trigNode->justTriggered)
-                     {
-                        if (ref.isBool || span == 1)
-                        {
-                           *ref.value = (*ref.value > ref.minValue + 0.5f) ? ref.minValue : ref.maxValue;
-                        }
-                        else if (span >= 1)
-                        {
-                           const int curIdx = std::clamp((int)std::lround(*ref.value - ref.minValue), 0, span);
-                           *ref.value = ref.minValue + (float)((curIdx + 1) % (span + 1));
-                        }
-                     }
-                     continue;
-                  }
-               }
-               const float v01 = std::clamp(modulator->Value01(), 0.0f, 1.0f);
-               *ref.value = ShapeToParam(ref, src.lo + (src.hi - src.lo) * v01);
-               continue;
-            }
-            const std::string* expr = modulation.ExpressionFor(ref.nodeIndex, ref.paramIndex);
-            if (expr == nullptr)
-               continue;
-            float result = 0.0f;
-            std::string error;
-            // `lo`/`hi` bind this param's own range, so an expression can be
-            // written in normalised terms the way a wired modulator already
-            // works: `=lerp(lo, hi, sin(t) * 0.5 + 0.5)` sweeps the full range,
-            // where the bare `=sin(t)` people reach for first lands in raw
-            // units and clamps to nothing on a param measured in milliseconds.
-            // Both spellings stay available - raw units are what you want for
-            // `=250` or `=width * 0.5`.
-            std::map<std::string, float>& siblings = paramSnapshot[ref.nodeIndex];
-            const auto savedLo = siblings.find("lo");
-            const auto savedHi = siblings.find("hi");
-            const bool hadLo = savedLo != siblings.end(), hadHi = savedHi != siblings.end();
-            const float prevLo = hadLo ? savedLo->second : 0.0f;
-            const float prevHi = hadHi ? savedHi->second : 0.0f;
-            siblings["lo"] = ref.minValue;
-            siblings["hi"] = ref.maxValue;
-            const bool evaluated = Expression::Evaluate(*expr, t, &siblings, &globals, result, error);
-            if (hadLo) siblings["lo"] = prevLo; else siblings.erase("lo");
-            if (hadHi) siblings["hi"] = prevHi; else siblings.erase("hi");
-            if (evaluated)
-            {
-               *ref.value = ShapeToParam(ref, result);
-               modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, std::string());
-            }
-            else
-            {
-               // Leave the last good value in place rather than snapping to 0 -
-               // a typo mid-edit should not blank out the render.
-               modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, error);
-            }
-         }
-      }
-
-      for (GraphNode& gn : gNodes)
-      {
-         if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(gn.node.get()))
-            trigNode->justTriggered = false;
-      }
-
-      // A Palette is not an Output, so nothing downstream pulls it, and both its
-      // preview and its bindings need this frame's swatches. Cooking here - after
-      // modulation has been applied - is what lets a modulator drive the shaping
-      // controls and have it land the same frame.
-      for (GraphNode& gn : gNodes)
-      {
-         if (dynamic_cast<IPaletteSource*>(gn.node.get()) != nullptr)
-            gn.node->CookIfNeeded(frameId);
-      }
-
-      // Colours, the same way and for the same reason: the registry was rebuilt
-      // while the nodes drew, so every pointer here belongs to a node that
-      // still exists. A palette has to cook before it can be read, and it is
-      // not an Output so nothing else would pull it.
-      {
-         PaletteBinding& palette = PaletteBinding::Instance();
-         for (const ColorRef& ref : palette.FrameColors())
-         {
-            const PaletteBinding::Source src = palette.SourceFor(ref.nodeIndex, ref.colorIndex);
-            if (src.nodeIndex < 0 || ref.value == nullptr)
-               continue;
-            GraphNode* palNode = FindNodeByIndex(src.nodeIndex);
-            if (palNode == nullptr)
-               continue;
-            auto* source = dynamic_cast<IPaletteSource*>(palNode->node.get());
-            if (source == nullptr)
-               continue;
-            source->GetSwatch(src.swatchIndex, ref.value);
-         }
-      }
+      ApplyModulationAndPalette(frameId);
 
       for (GraphNode& gn : gNodes)
       {

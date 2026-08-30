@@ -67,6 +67,16 @@ public:
    // frame-driven one.
    void AdvanceAudioClock(int numFrames);
 
+   // Offline render clock decoupling: keeps visual cooking locked to frame k's
+   // exact timestamp (k / fps) while audio synthesis advances along its own
+   // sample clock (numFrames / sampleRate), even when lookahead renders audio
+   // blocks ahead of the current video frame.
+   void SetOfflineMode(bool active, double sampleRate = 0.0);
+   bool IsOfflineMode() const { return mOfflineActive.load(std::memory_order_relaxed); }
+   void SetOfflineVideoTime(double seconds);
+   void BeginOfflineAudioBlock(int numFrames);
+   void EndOfflineAudioBlock();
+
    // ---- time signature (docs/plans/audio/P3c-P3a2-design.md §0.2) --------
    // Transport had BPM and beats but no bar concept, so nothing could express
    // "1 bar" or "reset every bar". numerator 1-16, denominator restricted to
@@ -131,4 +141,8 @@ private:
    std::atomic<int> mTimeSigDen { 4 };
    std::atomic<int> mKey { 0 };   // 0 = C
    std::atomic<int> mScale { 0 }; // MusicTime::kMajor
+
+   std::atomic<bool> mOfflineActive { false };
+   std::atomic<bool> mOfflineInAudioBlock { false };
+   std::atomic<double> mOfflineVideoSeconds { 0.0 };
 };

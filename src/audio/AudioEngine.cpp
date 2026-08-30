@@ -162,8 +162,10 @@ void AudioEngine::PumpMainThread()
 
 void AudioEngine::ProcessOffline(AudioBuffer& buffer)
 {
+   Transport::Instance().BeginOfflineAudioBlock(buffer.numFrames);
    ProcessList* list = mCurrent.load(std::memory_order_acquire);
    RunTopology(list, buffer);
+   Transport::Instance().EndOfflineAudioBlock();
 }
 
 void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
