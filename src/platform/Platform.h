@@ -750,6 +750,13 @@ namespace Platform
    // Frames the encoder could not accept and discarded, for the whole take.
    int RecorderDroppedFrameCount(RecorderHandle* handle);
 
+   // Test-only: overrides the queue's byte-budget admission ceiling (normally
+   // a fixed 256MB) for this handle. Real hardware encoders drain fast enough
+   // that reproducing a genuine over-budget rejection in a self-test needs an
+   // artificially small ceiling rather than an artificially slow consumer -
+   // see RunRecExportTest's `starved` variant in main.cpp.
+   void RecorderSetTestQueueByteBudget(RecorderHandle* handle, size_t bytes);
+
    // Appends interleaved float audio frames to the movie's audio track.
    bool RecorderAppendAudio(RecorderHandle* handle, const float* interleavedSamples, int numFrames);
 

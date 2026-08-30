@@ -1121,6 +1121,9 @@ namespace Platform
          // resolution instead. 256MB is a starting value, not a measured
          // one - it buys ~32 frames of elasticity at 1080p RGBA.
          static constexpr size_t kMaxQueueBytes = 256ull * 1024 * 1024;
+         // Overridable per-instance for RecorderSetTestQueueByteBudget - see
+         // the matching macOS comment in Platform.mm.
+         size_t queueByteBudget = kMaxQueueBytes;
 
          struct QueuedFrame
          {
@@ -1483,7 +1486,7 @@ namespace Platform
 
             std::lock_guard<std::mutex> poolLock(rec->poolMutex);
             const size_t bytes = frame.pixels.size();
-            if (rec->poolBytes + bytes <= RecorderHandleMf::kMaxQueueBytes)
+            if (rec->poolBytes + bytes <= rec->queueByteBudget)
             {
                rec->poolBytes += bytes;
                rec->bufferPool.push_back(std::move(frame.pixels));
@@ -1591,12 +1594,12 @@ namespace Platform
       // with resolution. The frameQueue.empty() escape hatch guarantees a
       // single frame larger than the whole budget is still admitted rather
       // than permanently rejected.
-      if (rec->queuedBytes + pixels.size() > RecorderHandleMf::kMaxQueueBytes &&
+      if (rec->queuedBytes + pixels.size() > rec->queueByteBudget &&
           !rec->frameQueue.empty())
       {
          rec->droppedCount.fetch_add(1, std::memory_order_relaxed);
          std::lock_guard<std::mutex> poolLock(rec->poolMutex);
-         if (rec->poolBytes + pixels.size() <= RecorderHandleMf::kMaxQueueBytes)
+         if (rec->poolBytes + pixels.size() <= rec->queueByteBudget)
          {
             rec->poolBytes += pixels.size();
             rec->bufferPool.push_back(std::move(pixels));
@@ -1628,6 +1631,15 @@ namespace Platform
    {
       auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
       return rec ? rec->pendingCount.load(std::memory_order_relaxed) : 0;
+   }
+
+   void RecorderSetTestQueueByteBudget(RecorderHandle* handle, size_t bytes)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      if (rec == nullptr)
+         return;
+      std::lock_guard<std::mutex> lock(rec->queueMutex);
+      rec->queueByteBudget = bytes;
    }
 
    int RecorderDroppedFrameCount(RecorderHandle* handle)

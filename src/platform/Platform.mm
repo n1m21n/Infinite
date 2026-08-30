@@ -1141,6 +1141,11 @@ namespace Platform
       // enough to absorb a transient encoder stall instead of dropping into
       // it immediately.
       static constexpr size_t kMaxQueueBytes = 256ull * 1024 * 1024;
+      // Overridable per-instance for RecorderSetTestQueueByteBudget - real
+      // hardware encoders drain far faster than any self-test can outrun, so
+      // exercising the rejection path deterministically needs a shrinkable
+      // ceiling rather than a slower consumer.
+      size_t queueByteBudget = kMaxQueueBytes;
 
       struct QueuedFrame
       {
@@ -1319,7 +1324,7 @@ namespace Platform
 
                std::lock_guard<std::mutex> poolLock(h->poolMutex);
                const size_t bytes = h->current.pixels.size();
-               if (h->poolBytes + bytes <= RecorderHandle::kMaxQueueBytes)
+               if (h->poolBytes + bytes <= h->queueByteBudget)
                {
                   h->poolBytes += bytes;
                   h->bufferPool.push_back(std::move(h->current.pixels));
@@ -1848,12 +1853,12 @@ namespace Platform
       // 2MB at 320x240 for the same constant. The frameQueue.empty() escape
       // hatch guarantees a single frame larger than the whole budget is
       // still admitted rather than permanently rejected.
-      if (handle->queuedBytes + pixels.size() > RecorderHandle::kMaxQueueBytes &&
+      if (handle->queuedBytes + pixels.size() > handle->queueByteBudget &&
           !handle->frameQueue.empty())
       {
          handle->droppedCount.fetch_add(1, std::memory_order_relaxed);
          std::lock_guard<std::mutex> poolLock(handle->poolMutex);
-         if (handle->poolBytes + pixels.size() <= RecorderHandle::kMaxQueueBytes)
+         if (handle->poolBytes + pixels.size() <= handle->queueByteBudget)
          {
             handle->poolBytes += pixels.size();
             handle->bufferPool.push_back(std::move(pixels));
@@ -1883,6 +1888,14 @@ namespace Platform
    int RecorderPendingFrameCount(RecorderHandle* handle)
    {
       return handle ? handle->pendingCount.load(std::memory_order_relaxed) : 0;
+   }
+
+   void RecorderSetTestQueueByteBudget(RecorderHandle* handle, size_t bytes)
+   {
+      if (handle == nullptr)
+         return;
+      std::lock_guard<std::mutex> lock(handle->queueMutex);
+      handle->queueByteBudget = bytes;
    }
 
    int RecorderDroppedFrameCount(RecorderHandle* handle)
