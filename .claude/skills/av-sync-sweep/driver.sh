@@ -47,6 +47,12 @@ ASSERT=(
   # frames used to have 579 of them silently rejected by the queue, leaving a
   # 20s video track against a 30s audio track - the "audio is sped up" report.
   "OFFLINERENDERTEST,OFFLINERENDER_FPS=60,OFFLINERENDER_SECONDS=30:2200"
+  # The same take against a deliberately tiny encoder-queue budget, so the
+  # pump spends most of it waiting for room. That wait used to deadlock: the
+  # writer holds video not-ready until the audio track leads it, and a pump
+  # that has stopped rendering has also stopped producing audio. Stalled at
+  # frame ~73 of 900 before the fix.
+  "OFFLINERENDERTEST,OFFLINERENDER_FPS=60,OFFLINERENDER_SECONDS=15,OFFLINERENDER_QUEUEBYTES=8000000:2000"
   # Cancel on that same deep queue must abandon the file rather than drain it.
   "OFFLINERENDERTEST,OFFLINERENDER_FPS=60,OFFLINERENDER_SECONDS=30,OFFLINERENDER_CANCEL=300:600"
 )

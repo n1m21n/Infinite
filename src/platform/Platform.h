@@ -793,6 +793,54 @@ namespace Platform
    // offline render must never drop a frame it has already advanced the
    // transport and the audio clock for, so it asks first and waits instead.
    bool RecorderQueueHasRoom(RecorderHandle* handle, size_t bytes);
+
+   // Pushes whatever live audio is parked in the recorder's own backlog into
+   // the writer, if the writer will take it now. RecorderAppendAudio already
+   // tries this on every append, so a take that keeps appending never needs
+   // to call it - but a caller that has STOPPED appending (an offline render
+   // waiting for the video queue to drain) does: on macOS the writer holds
+   // the video input not-ready until the audio track catches up, and the only
+   // thing that ever flushed parked audio was the next append. Waiting for
+   // the encoder while the encoder waits for audio nobody will hand it is a
+   // deadlock, and this is what breaks it. No-op where the platform's writer
+   // takes audio synchronously (Windows).
+   void RecorderFlushPendingAudio(RecorderHandle* handle);
+
+   // One-line snapshot of the recorder's internal state - writer status, both
+   // inputs' readiness, queue depth, audio backlog. Diagnostic only: the
+   // difference between "the encoder is slow" and "the encoder is wedged" is
+   // invisible from outside, and a stalled offline render is exactly when it
+   // matters.
+   // Asks the encoder to drain whatever is queued, right now, without waiting
+   // for the writer to hand out a readiness callback.
+   //
+   // The macOS encoder runs off AVAssetWriterInput's pull API
+   // (requestMediaDataWhenReadyOnQueue:), whose contract is that the block is
+   // re-invoked when an input that went not-ready becomes ready again. In an
+   // offline render that re-invocation has been observed never to arrive: the
+   // video input reports not-ready with the writer still in
+   // AVAssetWriterStatusWriting, its audio track fully written and ahead of
+   // the picture, one frame queued, and every encoder thread idle. Nothing
+   // else in the process is waiting on anything - the take simply stops.
+   //
+   // A live take rides through it (its next append re-arms the queue, and it
+   // drops frames rather than waiting); an offline take cannot, because it
+   // stops appending precisely while it waits for room. So the waiting side
+   // kicks the encoder itself rather than trusting the callback to come.
+   // Cheap and idempotent: a kick with nothing to drain returns immediately.
+   void RecorderKickEncoder(RecorderHandle* handle);
+
+   // Marks the take's audio track complete without finishing the video track
+   // or the file. Only meaningful for an offline render, whose audio is
+   // generated on a fixed budget and therefore finishes before the picture
+   // does: the writer will not take more video while it is still expecting
+   // audio for that stretch of the timeline, so the last frames of a take
+   // whose audio has run out cannot be written until the audio input is
+   // told there is no more coming. Idempotent, and appending audio after it
+   // is a no-op rather than an error.
+   void RecorderFinishAudioInput(RecorderHandle* handle);
+
+   std::string RecorderDebugState(RecorderHandle* handle);
    int RecorderFrameCount(RecorderHandle* handle);
 
    // Inspects a finished recording. Used by the audio-mux self-test, and handy

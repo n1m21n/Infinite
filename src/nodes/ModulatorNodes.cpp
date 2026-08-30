@@ -108,12 +108,7 @@ float RandomNode::Value01()
 
 int PatternNode::EffectiveLength() const
 {
-   if (fitToBar)
-   {
-      const int stepsPerBar = Transport::Instance().TimeSigNumerator() * std::max(1, fitDivision);
-      return std::max(1, std::min(stepsPerBar, kSteps));
-   }
-   return std::max(1, std::min(length, kSteps));
+   return std::clamp(length, 1, kSteps);
 }
 
 float PatternNode::Value01()

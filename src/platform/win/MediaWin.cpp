@@ -1677,6 +1677,46 @@ namespace Platform
              rec->queuedBytes + bytes <= rec->queueByteBudget;
    }
 
+   void RecorderFlushPendingAudio(RecorderHandle* handle)
+   {
+      // Nothing to do here: WriteInterleavedFloatAudio hands samples straight
+      // to the sink writer, which buffers them itself, so this platform has
+      // no backlog of its own to park audio in and no readiness gate that a
+      // caller could deadlock against. Declared for both platforms so the
+      // offline pump stays one code path.
+      (void)handle;
+   }
+
+   void RecorderFinishAudioInput(RecorderHandle* handle)
+   {
+      // The Media Foundation sink writer has no per-stream readiness gate to
+      // release - it accepts video whether or not more audio is coming - so
+      // there is nothing to mark here. Declared on both platforms so the
+      // offline pump stays one code path.
+      (void)handle;
+   }
+
+   void RecorderKickEncoder(RecorderHandle* handle)
+   {
+      // The Windows encoder is a plain worker thread on a condition variable,
+      // not a callback the OS owes us, so there is no readiness handshake to
+      // miss and nothing to kick. Declared on both platforms so the offline
+      // pump stays one code path.
+      (void)handle;
+   }
+
+   std::string RecorderDebugState(RecorderHandle* handle)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      if (rec == nullptr)
+         return "no recorder";
+      std::lock_guard<std::mutex> lock(rec->queueMutex);
+      char buf[128];
+      snprintf(buf, sizeof(buf), "queued=%zu (%zuKB)", rec->frameQueue.size(),
+               rec->queuedBytes / 1024);
+      return std::string(buf);
+   }
+
    void RecorderCancel(RecorderHandle* handle)
    {
       auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);

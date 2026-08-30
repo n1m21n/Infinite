@@ -160,6 +160,17 @@ public:
    // track then runs short against a full-length audio track. A 30s 60fps
    // take at 1920x1920 lost a third of its frames this way.
    bool OfflineEncoderHasRoom() const;
+   // Drains whatever graph audio has been generated into the muxer and asks
+   // the encoder to make progress. Called both after each rendered frame and
+   // while the pump is waiting for encoder room - see the wait's comment in
+   // main.cpp for why the audio has to keep moving even when the picture
+   // cannot.
+   void FlushOfflineEncoderAudio();
+   // Test hook only: lets a fixture shrink the encoder queue's byte budget
+   // for the take in flight, so the backpressure path can be exercised at a
+   // fixture's resolution instead of needing a real 1080p patch to fill
+   // 256MB. Null except while an offline take is rendering.
+   Platform::RecorderHandle* OfflineRecorderForTest() const { return mOfflineRecorder; }
    // Async, mirrors StopRecordingAsync(): hands Platform::RecorderStop to a
    // background thread and returns immediately, so a mid-render Cancel click
    // never blocks the UI thread. Also the path taken when OfflineFramesDone()
@@ -187,7 +198,13 @@ public:
    // per-frame quota - so an fps that doesn't divide the sample rate evenly
    // (24fps @ 44100 = 1837.5) can't drift over a long take. May exceed
    // kAudioMaxBlockFrames; the caller generates it in chunks.
-   int OfflineAudioFramesOwed() const;
+   //
+   // lookaheadFrames lets the caller run the audio ahead of the picture,
+   // capped at the take's own total: the writer will not accept more video
+   // until its audio track has run past the same point, so a pump that has
+   // stopped rendering (waiting for encoder room) must keep the audio moving
+   // or the two sides wait on each other forever.
+   int OfflineAudioFramesOwed(int lookaheadFrames = 0) const;
    void NoteOfflineAudioGenerated(int frames) { mOfflineAudioFramesGenerated += frames; }
    // Audio frames actually handed to the muxer this take (self-test hook:
    // this should equal round(totalFrames * sampleRate / fps)).

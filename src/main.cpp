@@ -620,6 +620,16 @@ namespace
       bool includeAudio = false;   // latched at start, mirrors node->includeAudio
       bool deviceWasRunning = false; // AudioEngine::Instance().SampleRate() > 0 before this take
       bool wasPlaying = true;        // Transport::Instance().IsPlaying() before this take
+      bool vsyncWasOn = true;        // gVsync before this take; restored when it ends
+      double startTime = 0.0;        // glfwGetTime() when the take was armed
+      // Set by the pump whenever it yields because the encoder queue is full
+      // rather than because it ran out of time budget. The two look identical
+      // from outside - the frame counter stops either way - so the progress
+      // window says which one is happening instead of leaving the user to
+      // guess whether a render is slow or wedged.
+      bool waitingOnEncoder = false;
+      double lastProgressTime = 0.0; // when OfflineFramesDone last changed
+      int lastFramesDone = -1;
    };
    OfflineRenderState gOfflineRender;
 
@@ -5168,8 +5178,7 @@ namespace
    // Drag/paint state for the pattern step grid. A horizontal paint gesture
    // spans many frames and, unlike a click-to-toggle grid, needs to remember
    // which bar the mouse was over last frame - otherwise a fast drag leaves
-   // gaps between samples instead of a continuous paint. Mirrors
-   // gDrumGridDrag's reasoning (see DrawDrumSequencerBody).
+   // gaps between samples instead of a continuous paint.
    struct PatternGridDragState
    {
       PatternNode* node = nullptr;
@@ -5177,26 +5186,20 @@ namespace
    };
    PatternGridDragState gPatternGridDrag;
 
-   // One vertical bar per live step, filling the node body's width. Click-
-   // drag sets a bar's value; dragging horizontally paints every bar the
-   // mouse crosses. Shift-drag is a fine (relative) adjustment instead of the
-   // usual absolute mouse-y mapping. Right-click resets a bar to centre.
-   // steps[] always stores 0..1 - `bipolar` only changes how this draws and
-   // reads back (see 00-modulation-polarity.md for why the swing-around-
-   // centre convention matters once a binding is bipolar).
    void DrawPatternStepGrid(PatternNode* n)
    {
-      const int count = std::max(1, n->EffectiveLength());
+      const int count = std::clamp(n->EffectiveLength(), 1, PatternNode::kSteps);
       const int curStep = n->CurrentStep();
-      const int groupSize = n->fitToBar ? std::max(1, n->fitDivision) : 4;
+      const int groupSize = 4;
       const float size = kPreviewSize;
-      const float height = 110.0f;
+      const float height = 115.0f;
       const float gap = 2.0f;
-      const float cellW = (size - gap * (float)(count - 1)) / (float)count;
+      const float cellW = count > 1 ? (size - gap * (float)(count - 1)) / (float)count : size;
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImVec2 br(origin.x + size, origin.y + height);
       ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImFont* font = ImGui::GetFont();
 
       ImGui::InvisibleButton("##patterngrid", ImVec2(size, height));
       const bool hovered = ImGui::IsItemHovered();
@@ -5204,7 +5207,9 @@ namespace
       const ImVec2 mouse = ImGui::GetIO().MousePos;
 
       auto stepAt = [&](float mx) {
-         int s = (int)((mx - origin.x) / (cellW + gap));
+         const float stepSpan = cellW + gap;
+         if (stepSpan <= 0.0f) return 0;
+         int s = (int)((mx - origin.x) / stepSpan);
          return std::clamp(s, 0, count - 1);
       };
 
@@ -5216,23 +5221,38 @@ namespace
       }
 
       int hoverStep = -1;
-      if (itemActive && gPatternGridDrag.node == n)
+      if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+      {
+         PushUndoCheckpoint();
+         const int s = stepAt(mouse.x);
+         if (s >= 0 && s < PatternNode::kSteps)
+         {
+            n->steps[s] = (n->steps[s] > 0.05f) ? 0.0f : 1.0f;
+            hoverStep = s;
+            gPatternGridDrag.lastStep = s;
+         }
+      }
+      else if (itemActive && gPatternGridDrag.node == n)
       {
          const int s = stepAt(mouse.x);
-         if (ImGui::GetIO().KeyShift)
+         if (s >= 0 && s < PatternNode::kSteps)
          {
-            n->steps[s] = std::clamp(n->steps[s] - ImGui::GetIO().MouseDelta.y / height * 0.25f, 0.0f, 1.0f);
+            if (ImGui::GetIO().KeyShift)
+            {
+               n->steps[s] = std::clamp(n->steps[s] - ImGui::GetIO().MouseDelta.y / height * 0.25f, 0.0f, 1.0f);
+            }
+            else
+            {
+               const float t = 1.0f - std::clamp((mouse.y - origin.y) / height, 0.0f, 1.0f);
+               const int lo = std::clamp(gPatternGridDrag.lastStep >= 0 ? std::min(gPatternGridDrag.lastStep, s) : s, 0, count - 1);
+               const int hi = std::clamp(gPatternGridDrag.lastStep >= 0 ? std::max(gPatternGridDrag.lastStep, s) : s, 0, count - 1);
+               for (int i = lo; i <= hi; i++)
+                  if (i >= 0 && i < PatternNode::kSteps)
+                     n->steps[i] = t;
+            }
+            gPatternGridDrag.lastStep = s;
+            hoverStep = s;
          }
-         else
-         {
-            const float t = 1.0f - std::clamp((mouse.y - origin.y) / height, 0.0f, 1.0f);
-            const int lo = gPatternGridDrag.lastStep >= 0 ? std::min(gPatternGridDrag.lastStep, s) : s;
-            const int hi = gPatternGridDrag.lastStep >= 0 ? std::max(gPatternGridDrag.lastStep, s) : s;
-            for (int i = lo; i <= hi; i++)
-               n->steps[i] = t;
-         }
-         gPatternGridDrag.lastStep = s;
-         hoverStep = s;
       }
       else if (gPatternGridDrag.node == n)
       {
@@ -5243,108 +5263,151 @@ namespace
       if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
       {
          PushUndoCheckpoint();
-         n->steps[stepAt(mouse.x)] = 0.5f;
+         const int s = stepAt(mouse.x);
+         if (s >= 0 && s < PatternNode::kSteps)
+         {
+            n->steps[s] = 0.0f;
+            hoverStep = s;
+         }
       }
       if (hoverStep < 0 && hovered)
          hoverStep = stepAt(mouse.x);
 
       const bool isLight = IsThemeLight();
+
+      // ---- 1) Container chassis background ----
       dl->AddRectFilled(origin, br, isLight ? IM_COL32(236, 240, 248, 255) : IM_COL32(16, 16, 22, 255), 4.0f);
 
-      const float centerY = origin.y + height * 0.5f;
-      if (n->bipolar)
-         dl->AddLine(ImVec2(origin.x, centerY), ImVec2(br.x, centerY), isLight ? IM_COL32(180, 186, 202, 255) : IM_COL32(80, 84, 100, 255));
+      // ---- 2) Subtle horizontal guide lines (25%, 50%, 75%) ----
+      const float y25 = origin.y + height * 0.25f;
+      const float y50 = origin.y + height * 0.50f;
+      const float y75 = origin.y + height * 0.75f;
+      const ImU32 subGuideCol = isLight ? IM_COL32(218, 223, 234, 150) : IM_COL32(32, 35, 46, 150);
+      dl->AddLine(ImVec2(origin.x + 2.0f, y25), ImVec2(br.x - 2.0f, y25), subGuideCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x + 2.0f, y50), ImVec2(br.x - 2.0f, y50), subGuideCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x + 2.0f, y75), ImVec2(br.x - 2.0f, y75), subGuideCol, 1.0f);
 
+      auto DrawTextCentered = [&](const ImVec2& minP, const ImVec2& maxP, ImU32 col, const char* text, float fSz) {
+         const ImVec2 sz = font->CalcTextSizeA(fSz, FLT_MAX, 0.0f, text);
+         const float tx = minP.x + std::max(0.0f, (maxP.x - minP.x - sz.x) * 0.5f);
+         const float ty = minP.y + std::max(0.0f, (maxP.y - minP.y - sz.y) * 0.5f);
+         dl->AddText(font, fSz, ImVec2(tx, ty), col, text);
+      };
+
+      // ---- 3) Step columns ----
       for (int i = 0; i < count; i++)
       {
          const float x0 = origin.x + (float)i * (cellW + gap);
          const float x1 = x0 + cellW;
+         const bool isCurrent = (i == curStep) && curStep < count;
          const bool isGroupStart = (i % groupSize) == 0;
+         const bool isHoveredCol = (hoverStep == i);
+
+         // Track lane background
          const ImU32 gridCol = isLight
-            ? (isGroupStart ? IM_COL32(210, 216, 228, 255) : IM_COL32(224, 228, 238, 255))
-            : (isGroupStart ? IM_COL32(64, 68, 84, 255) : IM_COL32(38, 40, 50, 255));
+            ? (isGroupStart ? IM_COL32(212, 218, 230, 255) : IM_COL32(224, 228, 238, 255))
+            : (isGroupStart ? IM_COL32(32, 35, 46, 255) : IM_COL32(22, 24, 32, 255));
          dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y), gridCol, 2.0f);
 
-         const float v = n->steps[i];
-         float fillTop, fillBottom;
-         if (n->bipolar)
+         // Column hover or playhead background wash
+         if (isCurrent)
          {
-            if (v >= 0.5f)
-            {
-               fillTop = centerY - (v - 0.5f) * 2.0f * (height * 0.5f);
-               fillBottom = centerY;
-            }
-            else
-            {
-               fillTop = centerY;
-               fillBottom = centerY + (0.5f - v) * 2.0f * (height * 0.5f);
-            }
+            dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
+                              isLight ? IM_COL32(255, 200, 80, 50) : IM_COL32(255, 190, 80, 35), 2.0f);
          }
-         else
+         else if (isHoveredCol)
          {
-            fillTop = br.y - v * height;
-            fillBottom = br.y;
+            dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
+                              isLight ? IM_COL32(0, 0, 0, 10) : IM_COL32(255, 255, 255, 12), 2.0f);
          }
-         const bool isPlayhead = (i == curStep) && curStep < count;
-         const ImU32 fillCol = isPlayhead
-            ? (isLight ? IM_COL32(225, 130, 20, 255) : IM_COL32(255, 190, 90, 255))
-            : (isLight ? IM_COL32(35, 115, 235, 230) : IM_COL32(120, 190, 255, 220));
-         dl->AddRectFilled(ImVec2(x0, fillTop), ImVec2(x1, fillBottom), fillCol, 2.0f);
-         if (isPlayhead)
-            dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, br.y), isLight ? IM_COL32(0, 0, 0, 80) : IM_COL32(255, 255, 255, 130), 2.0f);
 
+         const float v = std::clamp(n->steps[i], 0.0f, 1.0f);
+         const float fillTop = br.y - v * height;
+         const float fillBottom = br.y;
+
+         // Bar stem fill
+         const ImU32 fillCol = isCurrent
+            ? (isLight ? IM_COL32(235, 145, 30, 240) : IM_COL32(255, 190, 80, 240))
+            : (isLight ? IM_COL32(35, 120, 235, 230) : IM_COL32(75, 165, 255, 220));
+
+         if (std::fabs(fillBottom - fillTop) > 1.0f)
+         {
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, fillTop), ImVec2(x1 - 1.0f, fillBottom), fillCol, 2.0f);
+         }
+
+         // Value Cap Pill at the level mark
+         const float capH = 14.0f;
+         const float capY = std::clamp(fillTop, origin.y, br.y - capH);
+
+         const ImU32 capCol = isCurrent
+            ? (isLight ? IM_COL32(245, 155, 25, 255) : IM_COL32(255, 200, 80, 255))
+            : (isLight ? IM_COL32(40, 130, 240, 255) : IM_COL32(95, 185, 255, 255));
+         const ImU32 capBorder = isCurrent
+            ? (isLight ? IM_COL32(255, 230, 140, 255) : IM_COL32(255, 245, 180, 255))
+            : (isLight ? IM_COL32(160, 205, 255, 200) : IM_COL32(180, 230, 255, 180));
+
+         dl->AddRectFilled(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capCol, 2.5f);
+         dl->AddRect(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capBorder, 2.5f);
+
+         // Display value inside cap if column is wide enough
+         if (cellW >= 18.0f)
+         {
+            char valStr[16];
+            if (cellW >= 30.0f)
+               snprintf(valStr, sizeof(valStr), "%.2f", v);
+            else
+               snprintf(valStr, sizeof(valStr), "%.1f", v);
+
+            const float fontValSz = count <= 8 ? 9.5f : 8.5f;
+            const ImU32 txtCol = isCurrent ? IM_COL32(20, 15, 5, 255) : IM_COL32(10, 20, 35, 255);
+            DrawTextCentered(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), txtCol, valStr, fontValSz);
+         }
+
+         // Playhead outline
+         if (isCurrent)
+         {
+            dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, br.y),
+                        isLight ? IM_COL32(225, 130, 20, 240) : IM_COL32(255, 210, 80, 230), 2.0f, 0, 1.5f);
+         }
+
+         // Step number label below column
          char label[8];
          snprintf(label, sizeof(label), "%d", i + 1);
-         // The default font stops fitting two-digit labels once more than
-         // eight bars share the row (16 steps at kPreviewSize leaves under
-         // 12px per cell) - shrink to fit rather than letting neighbours
-         // overlap into unreadable clutter.
          const float labelFontSize = count <= 8 ? ImGui::GetFontSize() : std::max(8.0f, cellW * 0.95f);
-         const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
-         const ImU32 stepNumCol = isLight
-            ? (isGroupStart ? IM_COL32(40, 48, 65, 255) : IM_COL32(110, 116, 132, 255))
-            : (isGroupStart ? IM_COL32(190, 194, 210, 255) : IM_COL32(110, 114, 130, 255));
-         dl->AddText(ImGui::GetFont(), labelFontSize, ImVec2(x0 + (cellW - textSize.x) * 0.5f, br.y + 3.0f),
+         const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
+         const ImU32 stepNumCol = isCurrent
+            ? (isLight ? IM_COL32(225, 130, 20, 255) : IM_COL32(255, 200, 80, 255))
+            : (isLight
+                  ? (isGroupStart ? IM_COL32(40, 48, 65, 255) : IM_COL32(110, 116, 132, 255))
+                  : (isGroupStart ? IM_COL32(190, 194, 210, 255) : IM_COL32(110, 114, 130, 255)));
+         dl->AddText(font, labelFontSize, ImVec2(x0 + (cellW - textSize.x) * 0.5f, br.y + 3.0f),
                      stepNumCol, label);
       }
-      dl->AddRect(origin, br, isLight ? IM_COL32(185, 192, 208, 255) : IM_COL32(70, 74, 90, 255), 4.0f);
 
-      const float labelRowH = ImGui::GetFontSize() + 6.0f;
+      // Outer border
+      dl->AddRect(origin, br, isLight ? IM_COL32(185, 192, 208, 255) : IM_COL32(65, 70, 85, 255), 4.0f);
+
+      const float labelRowH = ImGui::GetFontSize() + 5.0f;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, br.y + labelRowH));
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + size);
       if (hoverStep >= 0)
       {
-         const float display = n->bipolar ? (n->steps[hoverStep] - 0.5f) * 2.0f : n->steps[hoverStep];
-         ImGui::TextDisabled("step %d: %.2f", hoverStep + 1, display);
+         ImGui::TextDisabled("step %d: %.2f", hoverStep + 1, n->steps[hoverStep]);
       }
       else
       {
          ImGui::TextDisabled("%d steps, looped", count);
       }
+      ImGui::PopTextWrapPos();
    }
 
    void DrawPatternParams(PatternNode* n)
    {
       DrawPatternStepGrid(n);
 
-      static const std::vector<std::string> kFitDivisionNames = { "1 / beat", "2 / beat", "4 / beat" };
-      static const int kFitDivisionValues[3] = { 1, 2, 4 };
-
-      ModCheckbox("fit to bar", &n->fitToBar);
-      if (n->fitToBar)
-      {
-         int cur = 0;
-         for (int i = 0; i < 3; i++)
-            if (kFitDivisionValues[i] == n->fitDivision)
-               cur = i;
-         DropdownButton("steps/beat", kFitDivisionNames, cur, [n](int i) { n->fitDivision = kFitDivisionValues[i]; });
-      }
-      else
-      {
-         ModSliderInt("length", &n->length, 1, PatternNode::kSteps);
-      }
+      ModSliderInt("length", &n->length, 1, PatternNode::kSteps);
       ModSlider("beats / step", &n->stepBeats, 0.05f, 8.0f);
       ModCheckbox("glide between steps", &n->smoothSteps);
-      ModCheckbox("bipolar", &n->bipolar);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
    }
@@ -23961,6 +24024,20 @@ namespace
       // than silently switching the user's audio on.
       gOfflineRender.deviceWasRunning = deviceWasRunningBefore;
       gOfflineRender.wasPlaying = Transport::Instance().IsPlaying();
+      gOfflineRender.startTime = glfwGetTime();
+      gOfflineRender.lastProgressTime = gOfflineRender.startTime;
+      gOfflineRender.lastFramesDone = -1;
+      gOfflineRender.waitingOnEncoder = false;
+
+      // An offline render is meant to run as fast as the hardware allows, and
+      // with vsync on it cannot: the main loop blocks in glfwSwapBuffers for
+      // the rest of every display refresh, so the pump gets a little over
+      // half of each 16.7ms whatever budget it is given. Dropping the swap
+      // interval for the duration of the take is the difference between "as
+      // fast as it can go" and "a bit faster than realtime" on a heavy patch,
+      // which is what makes a long render look like it has stalled.
+      gOfflineRender.vsyncWasOn = gVsync;
+      glfwSwapInterval(0);
 
       Transport::Instance().SetPlaying(true);
    }
@@ -24003,6 +24080,29 @@ namespace
       else
       {
          ImGui::Text("Rendering... %d/%d", done, total);
+
+         // Rate and ETA, and - when the pump is yielding because the encoder
+         // queue is full rather than because it is out of time - which side
+         // the take is waiting on. A long render with no rate readout is
+         // indistinguishable from a wedged one, and that ambiguity is the
+         // whole reason a slow render gets reported as a hang.
+         const double elapsed = ImGui::GetTime() > 0.0 ? glfwGetTime() - gOfflineRender.startTime : 0.0;
+         const double rate = elapsed > 0.5 ? (double)done / elapsed : 0.0;
+         if (rate > 0.01)
+         {
+            const double remain = (double)(total - done) / rate;
+            ImGui::TextDisabled("%.1f fps - about %d:%02d left", rate,
+                                 (int)(remain / 60.0), (int)remain % 60);
+         }
+         else
+         {
+            ImGui::TextDisabled("estimating...");
+         }
+         const double sinceProgress = glfwGetTime() - gOfflineRender.lastProgressTime;
+         if (gOfflineRender.waitingOnEncoder)
+            ImGui::TextDisabled("waiting for the encoder to catch up");
+         else if (sinceProgress > 5.0)
+            ImGui::TextDisabled("no new frame for %.0fs", sinceProgress);
       }
       // A cancelled take's progress bar is meaningless - it would sit frozen
       // at whatever fraction the render reached, which is precisely what
@@ -35555,7 +35655,10 @@ int main(int argc, char** argv)
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          auto* osc = static_cast<OscillatorNode*>(gNodes[2].node.get());
          auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
-         out->includeAudio = true;
+         // INFINITE_OFFLINERENDER_NOAUDIO renders the same take video-only,
+         // to tell a stall that involves the writer's audio input apart from
+         // one in the video path alone.
+         out->includeAudio = getenv("INFINITE_OFFLINERENDER_NOAUDIO") == nullptr;
 
          // INFINITE_OFFLINERENDER_MIXER puts a Mixer between the synth and
          // the Output's audio pin, which is how a real patch is wired (the
@@ -35574,6 +35677,20 @@ int main(int argc, char** argv)
          else
          {
             out->AudioInput().Connect(osc);
+         }
+         // INFINITE_OFFLINERENDER_RES=WxH sizes the source, and with it the
+         // take: frame bytes are what decide whether the encoder queue's byte
+         // budget is ever reached, so a stall that only shows up at 1080p is
+         // invisible at the Shape node's 1024x1024 default.
+         if (const char* resEnv = getenv("INFINITE_OFFLINERENDER_RES"))
+         {
+            int rw = 0, rh = 0;
+            if (sscanf(resEnv, "%dx%d", &rw, &rh) == 2 && rw > 0 && rh > 0)
+            {
+               auto* shape = static_cast<ShapeNode*>(gNodes[0].node.get());
+               shape->width = (float)rw;
+               shape->height = (float)rh;
+            }
          }
          out->recordVideoPath = TmpPath("infinite_offlinerender.mov");
          // fps/duration are overridable so the same fixture can sweep rates
@@ -36652,6 +36769,38 @@ int main(int argc, char** argv)
          if (on->IsOfflineRendering())
          {
             const double budgetStart = glfwGetTime();
+
+            // Generates graph audio up to the take's running cumulative
+            // target, optionally `lookahead` video frames past the frame
+            // about to be captured. Shared by the per-frame path below and
+            // by the backpressure wait, which needs it for a different
+            // reason - see the wait's own comment.
+            auto pumpOfflineAudio = [on](int lookahead)
+            {
+               if (!on->OfflineNeedsGraphAudio())
+                  return;
+               // Fixed-capacity scratch, same discipline as
+               // AudioEngine::RunTopology's own thread_local scratch -
+               // allocated once, reused every step. Not thread_local: this
+               // only ever runs on the main thread.
+               static float sOfflineAudioL[kAudioMaxBlockFrames];
+               static float sOfflineAudioR[kAudioMaxBlockFrames];
+               static float* sOfflineAudioChannels[2] = { sOfflineAudioL, sOfflineAudioR };
+
+               int owed = on->OfflineAudioFramesOwed(lookahead);
+               while (owed > 0)
+               {
+                  const int blockFrames = std::min(owed, kAudioMaxBlockFrames);
+                  AudioBuffer offlineBuf;
+                  offlineBuf.channels = sOfflineAudioChannels;
+                  offlineBuf.numChannels = 2;
+                  offlineBuf.numFrames = blockFrames;
+                  AudioEngine::Instance().ProcessOffline(offlineBuf);
+                  on->NoteOfflineAudioGenerated(blockFrames);
+                  owed -= blockFrames;
+               }
+               on->FlushOfflineEncoderAudio();
+            };
             while (on->IsOfflineRendering() && on->OfflineFramesDone() < on->OfflineFramesTotal())
             {
                // Backpressure, checked before anything else in the step: the
@@ -36665,7 +36814,29 @@ int main(int argc, char** argv)
                // again next outer iteration, with the progress window and
                // Cancel button still live in between.
                if (!on->OfflineEncoderHasRoom())
+               {
+                  // Keep the audio moving even though the picture cannot.
+                  //
+                  // AVAssetWriter will not take more video until the take's
+                  // audio track has run past the same point - so a pump that
+                  // stops rendering because the encoder queue is full also
+                  // stops the audio the encoder is waiting for, and the two
+                  // sides wait on each other forever. Measured, not guessed:
+                  // with the queue full the writer sat at videoReady=0,
+                  // audioReady=1, every encoder thread idle, one frame
+                  // queued, permanently. The same take renders to completion
+                  // video-only. INFINITE_OFFLINERENDER_QUEUEBYTES reproduces
+                  // it in seconds.
+                  //
+                  // A second of lookahead is enough to clear the writer's
+                  // interleaving window, and OfflineAudioFramesOwed caps the
+                  // audio at the take's own frame total regardless, so this
+                  // can never make the audio track longer than the picture.
+                  pumpOfflineAudio(on->offlineFps);
+                  gOfflineRender.waitingOnEncoder = true;
                   break;
+               }
+               gOfflineRender.waitingOnEncoder = false;
 
                ++frameId;
                Transport::Instance().Tick(1.0f / (float)std::max(1, on->offlineFps));
@@ -36677,45 +36848,24 @@ int main(int argc, char** argv)
                   on->DecrementPreroll();
                else
                {
-                  if (on->OfflineNeedsGraphAudio())
-                  {
-                     // Fixed-capacity scratch, same discipline as
-                     // AudioEngine::RunTopology's own thread_local scratch -
-                     // allocated once, reused every step. Not thread_local:
-                     // this only ever runs on the main thread.
-                     static float sOfflineAudioL[kAudioMaxBlockFrames];
-                     static float sOfflineAudioR[kAudioMaxBlockFrames];
-                     static float* sOfflineAudioChannels[2] = { sOfflineAudioL, sOfflineAudioR };
-
-                     // The frame's sample budget comes from OutputNode's
-                     // running cumulative target at the take's REAL device
-                     // sample rate (see OfflineAudioFramesOwed) - so an fps
-                     // that doesn't divide the rate evenly can't drift, and a
-                     // budget larger than one block (any fps below ~12 at
-                     // 48kHz) is generated in several blocks instead of being
-                     // silently truncated to kAudioMaxBlockFrames, which
-                     // would have made the audio track short - i.e. played
-                     // back sped up against the video.
-                     int owed = on->OfflineAudioFramesOwed();
-                     while (owed > 0)
-                     {
-                        const int blockFrames = std::min(owed, kAudioMaxBlockFrames);
-                        AudioBuffer offlineBuf;
-                        offlineBuf.channels = sOfflineAudioChannels;
-                        offlineBuf.numChannels = 2;
-                        offlineBuf.numFrames = blockFrames;
-                        AudioEngine::Instance().ProcessOffline(offlineBuf);
-                        on->NoteOfflineAudioGenerated(blockFrames);
-                        owed -= blockFrames;
-                     }
-                  }
+                  pumpOfflineAudio(0);
                   on->CaptureOfflineFrame();
                }
 
-               // ~50Hz: keeps the progress window and Cancel button live even
-               // mid-render, without giving up much throughput to redraws.
-               if (glfwGetTime() - budgetStart > 0.02)
+               // ~10Hz: with vsync off for the take (see
+               // StartOfflineRenderSession) the only cost of a longer batch
+               // is progress-window latency, and a 20ms batch against a
+               // ~16.7ms redraw spent nearly half the take drawing UI. 100ms
+               // still repaints and services the Cancel button ten times a
+               // second, which is as responsive as a click needs.
+               if (glfwGetTime() - budgetStart > 0.1)
                   break;
+            }
+
+            if (on->OfflineFramesDone() != gOfflineRender.lastFramesDone)
+            {
+               gOfflineRender.lastFramesDone = on->OfflineFramesDone();
+               gOfflineRender.lastProgressTime = glfwGetTime();
             }
 
             if (on->OfflineFramesDone() >= on->OfflineFramesTotal())
@@ -36731,6 +36881,7 @@ int main(int argc, char** argv)
             if (gOfflineRender.deviceWasRunning)
                StartAudioEngine(gAudioStartError);
             Transport::Instance().SetPlaying(gOfflineRender.wasPlaying);
+            glfwSwapInterval(gOfflineRender.vsyncWasOn ? 1 : 0);
             gOfflineRender.active = false;
             gOfflineRender.node = nullptr;
          }
@@ -42280,11 +42431,29 @@ int main(int argc, char** argv)
             // Latched here: StartOfflineRenderSession detaches the device, so
             // AudioEngine::SampleRate() reads 0 for the rest of the take.
             sOfflineAudioSampleRate = out->OfflineAudioSampleRate();
+            // INFINITE_OFFLINERENDER_QUEUEBYTES shrinks the encoder queue's
+            // byte budget for this take, so the pump hits backpressure at a
+            // fixture's resolution rather than only on a real 1080p patch -
+            // and with it the deadlock that backpressure exposed: yielding
+            // with audio still parked in the writer's backlog, where nothing
+            // but another render step would ever flush it.
+            if (const char* qb = getenv("INFINITE_OFFLINERENDER_QUEUEBYTES"))
+               Platform::RecorderSetTestQueueByteBudget(out->OfflineRecorderForTest(),
+                                                        (size_t)atoll(qb));
             printf("start: active=%d rate=%.0fHz status=%s\n", (int)gOfflineRender.active,
                    sOfflineAudioSampleRate, out->RecordStatus().c_str());
          }
          static bool sOfflineDone = false;
          static int sOfflineDoneFrame = -1;
+
+         // Progress trace: a take that stops advancing is indistinguishable
+         // from a slow one in the final verdict, so the fixture prints where
+         // it got to as it goes.
+         if (getenv("INFINITE_OFFLINERENDER_TRACE") != nullptr && frameId % 200 == 0)
+            printf("trace frameId=%d rendered=%d/%d room=%d %s\n", frameId,
+                   out->OfflineFramesDone(), out->OfflineFramesTotal(),
+                   (int)out->OfflineEncoderHasRoom(),
+                   Platform::RecorderDebugState(out->OfflineRecorderForTest()).c_str());
 
          // INFINITE_OFFLINERENDER_CANCEL=<frames>: cancel the take once it
          // has rendered that many frames, and measure how long the cancel
