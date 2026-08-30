@@ -16936,13 +16936,28 @@ namespace
             // apart, and so ModSlider's own ImGui id is unique per row.
             char label[96];
             snprintf(label, sizeof(label), "%s##map%d", m.displayName.c_str(), i);
-            ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW, /*audioStyle=*/true);
-            // Right-click an assigned row to unmap it. The row itself stays -
-            // it just goes back to showing "unassigned".
-            if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            if (n->Configuring())
             {
-               PushUndoCheckpoint();
-               n->UnmapSlot(i);
+               const float unmapBtnW = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f + 2.0f;
+               ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW - unmapBtnW - 4.0f, /*audioStyle=*/true);
+               ImGui::SameLine(0.0f, 2.0f);
+               ImGui::PushID(i + 40000);
+               ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
+               if (ImGui::SmallButton("x"))
+               {
+                  PushUndoCheckpoint();
+                  Modulation::Instance().Unbind(gn.index, i);
+                  Modulation::Instance().ClearExpression(gn.index, i);
+                  n->UnmapSlot(i);
+               }
+               ImGui::PopStyleColor(3);
+               ImGui::PopID();
+            }
+            else
+            {
+               ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW, /*audioStyle=*/true);
             }
          }
          else
