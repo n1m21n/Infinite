@@ -11,7 +11,7 @@ A unified node-based audiovisual modular workstation for **macOS** and **Windows
 
 ---
 
-## 📺 Video Tutorial
+## Video Tutorial
 
 > **New to Infinite?** Watch the full walkthrough and workflow tutorial on YouTube:  
 > 🔗 **[Infinite Video Walkthrough & Tutorial](https://www.youtube.com/watch?v=vXRjrDhSq24&t=1421s)**
