@@ -278,6 +278,9 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
          file << "perftarget " << i << " " << t.dstIndex << " " << t.dstParam << " 1 " << bTok << "\n";
       }
    }
+   file << "transport " << FloatToString(data.transport.bpm) << " "
+        << data.transport.timeSigNum << " " << data.transport.timeSigDen << " "
+        << data.transport.key << " " << data.transport.scale << "\n";
 
    if (!file.good())
    {
@@ -479,6 +482,16 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
                outData.perfLayout.pageNames.resize(page + 1);
             outData.perfLayout.pageNames[page] = UnescapeLine(raw);
          }
+      }
+      else if (tag == "transport")
+      {
+         // Any missing trailing token (an older patch saved before this line
+         // existed at all won't have the tag; a patch saved between adding
+         // bpm/timesig and adding key/scale would be missing just those)
+         // leaves the field at TransportRecord's own default via >>'s
+         // failed-extraction behaviour, same precedent as "flags"/"mod" above.
+         in >> outData.transport.bpm >> outData.transport.timeSigNum >> outData.transport.timeSigDen
+            >> outData.transport.key >> outData.transport.scale;
       }
       else if (tag == "perf")
       {
