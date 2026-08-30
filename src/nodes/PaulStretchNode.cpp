@@ -167,6 +167,7 @@ public:
       mOutputBuffers[1].Clear();
       mHopAccumulator = 0.0f;
       mSamplePlayPosition = 0.0;
+      mLastPosParam = -1.0f;
 
       if (mRecordBuffer.empty())
          mRecordBuffer.resize((size_t)kMaxRecordSeconds * kMaxRecordSampleRate);
@@ -177,6 +178,7 @@ public:
       mOutputBuffers[0].Clear();
       mOutputBuffers[1].Clear();
       mHopAccumulator = 0.0f;
+      mLastPosParam = -1.0f;
    }
 
    SampleSlot& GetSampleSlot() { return mSampleSlot; }
@@ -195,6 +197,12 @@ public:
    void StopPreview()
    {
       mAuditionStopPending.store(true, std::memory_order_release);
+   }
+
+   void Seek(float frac)
+   {
+      mSeekPos.store(frac, std::memory_order_release);
+      mSeekPending.store(true, std::memory_order_release);
    }
 
    void StartRecording()
@@ -239,6 +247,7 @@ public:
    std::atomic<float> mVolume { 0.8f };
    std::atomic<float> mStart { 0.0f };
    std::atomic<float> mEnd { 1.0f };
+   std::atomic<float> mPosition { 0.0f };
    std::atomic<bool> mLoop { true };
 
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
@@ -277,7 +286,7 @@ public:
       Platform::SampleBuffer* activeSample = mSampleSlot.Active();
       const bool hasSample = (activeSample != nullptr && activeSample->numFrames > 0 && activeSample->channels > 0);
 
-      // 3. Handle audition commands
+      // 3. Handle audition and seek commands
       if (mAuditionTriggerPending.exchange(false, std::memory_order_acq_rel))
       {
          const float frac = mAuditionTriggerFrac.load(std::memory_order_relaxed);
@@ -285,8 +294,18 @@ public:
          {
             mSamplePlayPosition = (double)std::clamp(frac, 0.0f, 1.0f) * (double)activeSample->numFrames;
          }
+         mLastPosParam = (hasSample && activeSample->numFrames > 0) ? (float)(mSamplePlayPosition / (double)activeSample->numFrames) : frac;
          mAuditionActive = true;
          mSelfEnv.NoteOn();
+      }
+      if (mSeekPending.exchange(false, std::memory_order_acq_rel))
+      {
+         const float sPos = mSeekPos.load(std::memory_order_relaxed);
+         if (hasSample)
+         {
+            mSamplePlayPosition = (double)std::clamp(sPos, 0.0f, 1.0f) * (double)activeSample->numFrames;
+         }
+         mLastPosParam = (hasSample && activeSample->numFrames > 0) ? (float)(mSamplePlayPosition / (double)activeSample->numFrames) : sPos;
       }
       if (mAuditionStopPending.exchange(false, std::memory_order_acq_rel))
       {
@@ -331,6 +350,16 @@ public:
       double loopEnd = (double)sampleFrames * std::max((double)startFrac, (double)endFrac);
       if (loopEnd <= loopStart + 1.0)
          loopEnd = std::min((double)sampleFrames, loopStart + (double)currentFFTSize);
+
+      // Handle position scrub or parameter modulation
+      const float curStartFrac = (float)(loopStart / (double)std::max(1, sampleFrames));
+      const float curEndFrac = (float)(loopEnd / (double)std::max(1, sampleFrames));
+      const float currentPosParam = std::clamp(mPosition.load(std::memory_order_relaxed), curStartFrac, curEndFrac);
+      if (mLastPosParam >= 0.0f && std::abs(currentPosParam - mLastPosParam) > 1e-4f)
+      {
+         mSamplePlayPosition = (double)currentPosParam * (double)sampleFrames;
+      }
+      mLastPosParam = currentPosParam;
 
       if (mSamplePlayPosition < loopStart || mSamplePlayPosition >= loopEnd)
          mSamplePlayPosition = loopStart;
@@ -570,6 +599,10 @@ private:
    std::atomic<float> mAuditionTriggerFrac { 0.0f };
    std::atomic<bool> mAuditionStopPending { false };
 
+   std::atomic<bool> mSeekPending { false };
+   std::atomic<float> mSeekPos { 0.0f };
+   float mLastPosParam = -1.0f;
+
    std::atomic<bool> mRecordingActive { false };
    std::atomic<int> mRecordWritePos { 0 };
    std::atomic<bool> mRecordOverflowed { false };
@@ -606,6 +639,8 @@ void PaulStretchNode::CookIfNeeded(int frameId)
    mAudioNode->mVolume.store(volume, std::memory_order_relaxed);
    mAudioNode->mStart.store(start, std::memory_order_relaxed);
    mAudioNode->mEnd.store(end, std::memory_order_relaxed);
+   position = std::clamp(position, std::min(start, end), std::max(start, end));
+   mAudioNode->mPosition.store(position, std::memory_order_relaxed);
    mAudioNode->mLoop.store(loop, std::memory_order_relaxed);
 
    float ph = 0.0f;
@@ -631,6 +666,7 @@ void PaulStretchNode::VisitParams(ParamVisitor& v)
    v.Float("volume", volume);
    v.Float("start", start);
    v.Float("end", end);
+   v.Float("position", position);
    v.Bool("loop", loop);
 }
 
@@ -643,9 +679,10 @@ AudioNode* PaulStretchNode::GetAudioNode()
 
 void PaulStretchNode::TriggerPreview(float frac)
 {
+   position = std::clamp(frac, 0.0f, 1.0f);
    if (mAudioNode == nullptr)
       mAudioNode = std::make_unique<AudioPaulStretchNode>();
-   mAudioNode->TriggerPreview(frac);
+   mAudioNode->TriggerPreview(position);
    mSelfOwnedByUser = true;
 }
 
@@ -654,6 +691,14 @@ void PaulStretchNode::StopPreview()
    if (mAudioNode != nullptr)
       mAudioNode->StopPreview();
    mSelfOwnedByUser = false;
+}
+
+void PaulStretchNode::Seek(float frac)
+{
+   position = std::clamp(frac, std::min(start, end), std::max(start, end));
+   if (mAudioNode == nullptr)
+      mAudioNode = std::make_unique<AudioPaulStretchNode>();
+   mAudioNode->Seek(position);
 }
 
 void PaulStretchNode::StartRecording()
@@ -722,9 +767,11 @@ void PaulStretchNode::ReloadFromPath()
    {
       float savedStart = start;
       float savedEnd = end;
+      float savedPos = position;
       LoadFile(mFilePath);
       start = savedStart;
       end = savedEnd;
+      position = savedPos;
    }
 }
 

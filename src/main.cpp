@@ -7722,11 +7722,14 @@ namespace
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##paulstretchwavebody", ImVec2(w, h));
-      if (hasSample && ImGui::IsItemActivated())
+      if (hasSample && (ImGui::IsItemActivated() || (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))))
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
          const float target = (frac < n->start || frac > n->end) ? n->start : frac;
-         n->TriggerPreview(target);
+         n->position = target;
+         n->Seek(target);
+         if (!n->IsPlaying())
+            n->TriggerPreview(target);
       }
 
       const bool isLight = IsThemeLight();
@@ -7798,7 +7801,10 @@ namespace
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
+         {
             n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
+            n->position = std::clamp(n->position, n->start, n->end);
+         }
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
@@ -7807,7 +7813,10 @@ namespace
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
+         {
             n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
+            n->position = std::clamp(n->position, n->start, n->end);
+         }
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
       }
@@ -10351,11 +10360,23 @@ namespace
 
       AudioSlider("detune", &n->detune, 0.0f, 100.0f, "%.1f c", AudioHalfWidth());
       ImGui::SameLine();
-      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+      if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
+         n->position = std::clamp(n->position, std::min(n->start, n->end), std::max(n->start, n->end));
+         n->Seek(n->position);
+      }
+
+      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
          n->start = std::min(n->start, n->end - 0.01f);
+         n->position = std::clamp(n->position, n->start, n->end);
+      }
       ImGui::SameLine();
-      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
          n->end = std::max(n->end, n->start + 0.01f);
+         n->position = std::clamp(n->position, n->start, n->end);
+      }
 
       EndAudioBody();
    }
@@ -27906,11 +27927,12 @@ static bool RunPaulStretchFixture()
             else
             {
                PaulStretchNode reloaded;
+               recNode.position = 0.42f;
                std::vector<std::pair<std::string, std::string>> params;
                Patch::SaveParams(&recNode, params);
                Patch::LoadParams(&reloaded, params);
                reloaded.ReloadFromPath();
-               if (reloaded.waveformCacheCount <= 0 || reloaded.FilePath().empty())
+               if (reloaded.waveformCacheCount <= 0 || reloaded.FilePath().empty() || std::abs(reloaded.position - 0.42f) > 1e-4f)
                {
                   printf("PAULSTRETCHTEST record patch reload failed FAIL\n");
                   ok = false;
