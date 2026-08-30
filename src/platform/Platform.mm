@@ -1127,6 +1127,12 @@ namespace Platform
       static constexpr size_t kMaxAudioBacklogFrames = 48000 * 30; // ~30s
       bool audioLoop = true;
       bool audioExhausted = false; // file ended and looping is off
+      // Set once the audio track has been marked complete - either by
+      // RecorderFinishAudioInput mid-take (an offline render whose audio
+      // budget ran out before its last frames were written) or by the
+      // worker's own finish. markAsFinished twice raises, so every site that
+      // marks the audio input checks this first.
+      bool audioFinished = false;
 
       // ---- encoder worker -------------------------------------------------
       // The render thread (OutputNode) only ever touches queueMutex/poolMutex
@@ -1228,8 +1234,11 @@ namespace Platform
          if (h->writer.status == AVAssetWriterStatusWriting)
          {
             [h->input markAsFinished];
-            if (h->audioInput != nil)
+            if (h->audioInput != nil && !h->audioFinished)
+            {
                [h->audioInput markAsFinished];
+               h->audioFinished = true;
+            }
          }
          dispatch_semaphore_signal(h->workerDone);
       }
@@ -1253,7 +1262,13 @@ namespace Platform
       // as before, which is what closes the hole the old comment described.
       // When the input goes not-ready it returns, and AVFoundation re-invokes
       // it on the transition back - no spinning, no deadline, no lost frames.
-      void RecorderPump(RecorderHandle* h)
+      // blockOnEmpty: AVFoundation's own invocation parks on queueCv waiting
+      // for the next frame (that is what keeps a frame handed over while the
+      // input was already ready from sitting until the next readiness
+      // transition). A kick from RecorderKickEncoder must NOT park - it exists
+      // to drain what is already queued and get out of the way - so it passes
+      // false and returns the moment the queue is empty.
+      void RecorderPump(RecorderHandle* h, bool blockOnEmpty = true)
       {
          while (h->input.isReadyForMoreMediaData)
          {
@@ -1268,7 +1283,10 @@ namespace Platform
             if (h->currentRemaining <= 0)
             {
                std::unique_lock<std::mutex> lock(h->queueMutex);
-               h->queueCv.wait(lock, [h] { return !h->frameQueue.empty() || h->stopRequested; });
+               if (blockOnEmpty)
+                  h->queueCv.wait(lock, [h] { return !h->frameQueue.empty() || h->stopRequested; });
+               if (h->frameQueue.empty() && !blockOnEmpty)
+                  return; // a kick with nothing left to drain
                if (h->frameQueue.empty())
                {
                   lock.unlock();
@@ -1440,7 +1458,7 @@ namespace Platform
       // a hard crash that loses the whole take.
       void FlushPendingAudioLocked(RecorderHandle* h)
       {
-         if (h->audioInput == nil || h->audioBacklog.empty())
+         if (h->audioInput == nil || h->audioBacklog.empty() || h->audioFinished)
             return;
          if (h->writer.status != AVAssetWriterStatusWriting)
             return;
@@ -1801,7 +1819,7 @@ namespace Platform
          return false;
 
       std::lock_guard<std::mutex> lock(h->writerMutex);
-      if (h->writer.status != AVAssetWriterStatusWriting)
+      if (h->writer.status != AVAssetWriterStatusWriting || h->audioFinished)
          return false;
 
       h->audioBacklog.insert(h->audioBacklog.end(), interleavedSamples,
@@ -1947,8 +1965,11 @@ namespace Platform
          if (handle->writer.status == AVAssetWriterStatusWriting)
          {
             [handle->input markAsFinished];
-            if (handle->audioInput != nil)
+            if (handle->audioInput != nil && !handle->audioFinished)
+            {
                [handle->audioInput markAsFinished];
+               handle->audioFinished = true;
+            }
          }
          // markAsFinished stops AVFoundation re-invoking the pump, but a block
          // already in flight has to finish before the handle can be deleted.
@@ -1996,6 +2017,66 @@ namespace Platform
       // budget is admitted rather than deadlocking a caller that waits.
       return handle->frameQueue.empty() ||
              handle->queuedBytes + bytes <= handle->queueByteBudget;
+   }
+
+   void RecorderFlushPendingAudio(RecorderHandle* handle)
+   {
+      if (handle == nullptr || handle->audioInput == nil)
+         return;
+      std::lock_guard<std::mutex> lock(handle->writerMutex);
+      FlushPendingAudioLocked(handle);
+   }
+
+   void RecorderFinishAudioInput(RecorderHandle* handle)
+   {
+      if (handle == nullptr || handle->audioInput == nil)
+         return;
+      std::lock_guard<std::mutex> lock(handle->writerMutex);
+      if (handle->audioFinished || handle->writer.status != AVAssetWriterStatusWriting)
+         return;
+      FlushPendingAudioLocked(handle);
+      if (!handle->audioBacklog.empty())
+         return; // still owed a flush; try again on the next call
+      [handle->audioInput markAsFinished];
+      handle->audioFinished = true;
+   }
+
+   void RecorderKickEncoder(RecorderHandle* handle)
+   {
+      if (handle == nullptr || handle->encodeQueue == nil)
+         return;
+      RecorderHandle* h = handle;
+      dispatch_async(h->encodeQueue, ^{ RecorderPump(h, /*blockOnEmpty=*/false); });
+   }
+
+   std::string RecorderDebugState(RecorderHandle* handle)
+   {
+      if (handle == nullptr)
+         return "no recorder";
+      size_t queued = 0, queuedBytes = 0, backlog = 0;
+      {
+         std::lock_guard<std::mutex> lock(handle->queueMutex);
+         queued = handle->frameQueue.size();
+         queuedBytes = handle->queuedBytes;
+      }
+      bool videoReady = false, audioReady = false;
+      long long audioWritten = 0;
+      int status = 0;
+      {
+         std::lock_guard<std::mutex> lock(handle->writerMutex);
+         status = (int)handle->writer.status;
+         videoReady = handle->input.isReadyForMoreMediaData ? true : false;
+         audioReady = handle->audioInput != nil && handle->audioInput.isReadyForMoreMediaData;
+         backlog = handle->audioBacklog.size() / 2;
+         audioWritten = handle->audioFramesWritten;
+      }
+      char buf[256];
+      snprintf(buf, sizeof(buf),
+               "writer=%d videoReady=%d audioReady=%d queued=%zu (%zuKB) frameIdx=%lld "
+               "audioBacklog=%zu audioWritten=%lld",
+               status, (int)videoReady, (int)audioReady, queued, queuedBytes / 1024,
+               (long long)handle->frameIndex.load(std::memory_order_relaxed), backlog, audioWritten);
+      return std::string(buf);
    }
 
    void RecorderCancel(RecorderHandle* handle)

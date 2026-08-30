@@ -6,6 +6,7 @@
 
 #include "audio/AudioEngine.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -326,15 +327,20 @@ void OutputNode::DrainOfflineAudioCapture()
    }
 }
 
-int OutputNode::OfflineAudioFramesOwed() const
+int OutputNode::OfflineAudioFramesOwed(int lookaheadFrames) const
 {
    if (!OfflineNeedsGraphAudio())
       return 0;
    const int fps = mOfflineRecordFps > 0 ? mOfflineRecordFps : 30;
    // (framesDone + 1): the budget for the video frame that is about to be
-   // captured, not the one just finished.
+   // captured, not the one just finished. Never past the take's own frame
+   // total, whatever lookahead is asked for - the audio track's length is
+   // fixed by the frame count, and running past it would make the take
+   // longer than the picture it belongs to.
+   const long long ahead = std::min((long long)mOfflineFramesDone + 1 + std::max(0, lookaheadFrames),
+                                     (long long)mOfflineTotalFrames);
    const long long target = (long long)std::llround(
-      (double)(mOfflineFramesDone + 1) * mOfflineAudioSampleRate / (double)fps);
+      (double)ahead * mOfflineAudioSampleRate / (double)fps);
    const long long owed = target - mOfflineAudioFramesGenerated;
    return owed > 0 ? (int)owed : 0;
 }
@@ -345,6 +351,26 @@ bool OutputNode::OfflineEncoderHasRoom() const
       return true;
    const size_t frameBytes = (size_t)mOfflineRecordW * (size_t)mOfflineRecordH * 4;
    return Platform::RecorderQueueHasRoom(mOfflineRecorder, frameBytes);
+}
+
+void OutputNode::FlushOfflineEncoderAudio()
+{
+   if (mOfflineRecorder == nullptr)
+      return;
+   if (mOfflineIncludeAudio)
+   {
+      DrainOfflineAudioCapture();
+      // The take's audio is generated on a fixed budget (fps x duration) and
+      // so runs out before the last video frames have been written. The
+      // writer holds the video input not-ready while it is still expecting
+      // audio for that stretch, so those last frames can only land once the
+      // audio track is explicitly closed - without it a take stalls a few
+      // dozen frames short of its own total.
+      if (mOfflineAudioFramesGenerated > 0 && OfflineAudioFramesOwed(mOfflineTotalFrames) == 0)
+         Platform::RecorderFinishAudioInput(mOfflineRecorder);
+   }
+   Platform::RecorderFlushPendingAudio(mOfflineRecorder);
+   Platform::RecorderKickEncoder(mOfflineRecorder);
 }
 
 void OutputNode::CaptureOfflineFrame()
