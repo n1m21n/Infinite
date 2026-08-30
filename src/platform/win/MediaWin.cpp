@@ -1116,8 +1116,11 @@ namespace Platform
          // The render thread (OutputNode) only ever touches queueMutex/
          // poolMutex and the atomics below; WriteSample and the RGBA->BGRA
          // swizzle run entirely on `worker`.
-         static constexpr size_t kMaxQueueDepth = 4;
-         static constexpr size_t kMaxPoolSize = 8;
+         // A frame-count cap is resolution-blind: 4 frames of slack was 33MB
+         // at 1080p but only ~2MB at 320x240. A byte budget scales with
+         // resolution instead. 256MB is a starting value, not a measured
+         // one - it buys ~32 frames of elasticity at 1080p RGBA.
+         static constexpr size_t kMaxQueueBytes = 256ull * 1024 * 1024;
 
          struct QueuedFrame
          {
@@ -1128,10 +1131,12 @@ namespace Platform
          std::mutex queueMutex;
          std::condition_variable queueCv;
          std::deque<QueuedFrame> frameQueue;
+         size_t queuedBytes = 0; // guarded by queueMutex
          bool stopRequested = false;
 
          std::mutex poolMutex;
          std::vector<std::vector<unsigned char>> bufferPool;
+         size_t poolBytes = 0; // guarded by poolMutex
 
          std::atomic<int> pendingCount { 0 };
          std::atomic<int> droppedCount { 0 };
@@ -1422,6 +1427,7 @@ namespace Platform
                   break; // stopRequested and fully drained
                frame = std::move(rec->frameQueue.front());
                rec->frameQueue.pop_front();
+               rec->queuedBytes -= frame.pixels.size();
             }
 
             // Convert once per queued frame, not once per repeat - padding a
@@ -1476,8 +1482,12 @@ namespace Platform
             hasPrevBgra = true;
 
             std::lock_guard<std::mutex> poolLock(rec->poolMutex);
-            if (rec->bufferPool.size() < RecorderHandleMf::kMaxPoolSize)
+            const size_t bytes = frame.pixels.size();
+            if (rec->poolBytes + bytes <= RecorderHandleMf::kMaxQueueBytes)
+            {
+               rec->poolBytes += bytes;
                rec->bufferPool.push_back(std::move(frame.pixels));
+            }
          }
       }
    }
@@ -1559,6 +1569,7 @@ namespace Platform
       {
          std::vector<unsigned char> buf = std::move(rec->bufferPool.back());
          rec->bufferPool.pop_back();
+         rec->poolBytes -= buf.size();
          buf.resize(bytes);
          return buf;
       }
@@ -1576,16 +1587,25 @@ namespace Platform
          repeatCount = 1;
 
       std::lock_guard<std::mutex> lock(rec->queueMutex);
-      if (rec->frameQueue.size() >= RecorderHandleMf::kMaxQueueDepth)
+      // Byte-budgeted rather than frame-count-capped so elasticity scales
+      // with resolution. The frameQueue.empty() escape hatch guarantees a
+      // single frame larger than the whole budget is still admitted rather
+      // than permanently rejected.
+      if (rec->queuedBytes + pixels.size() > RecorderHandleMf::kMaxQueueBytes &&
+          !rec->frameQueue.empty())
       {
          rec->droppedCount.fetch_add(1, std::memory_order_relaxed);
          std::lock_guard<std::mutex> poolLock(rec->poolMutex);
-         if (rec->bufferPool.size() < RecorderHandleMf::kMaxPoolSize)
+         if (rec->poolBytes + pixels.size() <= RecorderHandleMf::kMaxQueueBytes)
+         {
+            rec->poolBytes += pixels.size();
             rec->bufferPool.push_back(std::move(pixels));
+         }
          return false;
       }
 
       rec->pendingCount.fetch_add(repeatCount, std::memory_order_relaxed);
+      rec->queuedBytes += pixels.size();
       rec->frameQueue.push_back({ std::move(pixels), repeatCount });
       rec->queueCv.notify_one();
       return true;

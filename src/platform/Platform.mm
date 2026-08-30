@@ -1132,8 +1132,15 @@ namespace Platform
       // The render thread (OutputNode) only ever touches queueMutex/poolMutex
       // and the atomics below; everything past that point - appendPixelBuffer,
       // the CVPixelBuffer copy, the audio catch-up - runs on encodeQueue.
-      static constexpr size_t kMaxQueueDepth = 4;
-      static constexpr size_t kMaxPoolSize = 8;
+      //
+      // A frame-count cap is resolution-blind: 4 frames of slack was 33MB at
+      // 1080p but only ~2MB at 320x240, so the same constant left almost no
+      // elasticity at recording resolutions users actually export at. A byte
+      // budget scales with resolution instead. 256MB is a starting value, not
+      // a measured one - it buys ~32 frames of elasticity at 1080p RGBA,
+      // enough to absorb a transient encoder stall instead of dropping into
+      // it immediately.
+      static constexpr size_t kMaxQueueBytes = 256ull * 1024 * 1024;
 
       struct QueuedFrame
       {
@@ -1144,10 +1151,12 @@ namespace Platform
       std::mutex queueMutex;
       std::condition_variable queueCv;
       std::deque<QueuedFrame> frameQueue;
+      size_t queuedBytes = 0; // guarded by queueMutex; sum of frameQueue[*].pixels.size()
       bool stopRequested = false;
 
       std::mutex poolMutex;
       std::vector<std::vector<unsigned char>> bufferPool;
+      size_t poolBytes = 0; // guarded by poolMutex; sum of bufferPool[*].size()
 
       std::atomic<int> pendingCount { 0 };
       std::atomic<int> droppedCount { 0 };
@@ -1263,6 +1272,7 @@ namespace Platform
                }
                h->current = std::move(h->frameQueue.front());
                h->frameQueue.pop_front();
+               h->queuedBytes -= h->current.pixels.size();
                h->currentRemaining = h->current.repeatCount;
 
                // Flip once per queued frame, not once per repeat - this is
@@ -1308,8 +1318,12 @@ namespace Platform
                h->hasPrevFlipped = true;
 
                std::lock_guard<std::mutex> poolLock(h->poolMutex);
-               if (h->bufferPool.size() < RecorderHandle::kMaxPoolSize)
+               const size_t bytes = h->current.pixels.size();
+               if (h->poolBytes + bytes <= RecorderHandle::kMaxQueueBytes)
+               {
+                  h->poolBytes += bytes;
                   h->bufferPool.push_back(std::move(h->current.pixels));
+               }
             }
          }
       }
@@ -1814,6 +1828,7 @@ namespace Platform
       {
          std::vector<unsigned char> buf = std::move(handle->bufferPool.back());
          handle->bufferPool.pop_back();
+         handle->poolBytes -= buf.size();
          buf.resize(bytes);
          return buf;
       }
@@ -1828,16 +1843,26 @@ namespace Platform
          repeatCount = 1;
 
       std::lock_guard<std::mutex> lock(handle->queueMutex);
-      if (handle->frameQueue.size() >= RecorderHandle::kMaxQueueDepth)
+      // Byte-budgeted rather than frame-count-capped so the encoder's
+      // elasticity scales with resolution instead of being 33MB at 1080p and
+      // 2MB at 320x240 for the same constant. The frameQueue.empty() escape
+      // hatch guarantees a single frame larger than the whole budget is
+      // still admitted rather than permanently rejected.
+      if (handle->queuedBytes + pixels.size() > RecorderHandle::kMaxQueueBytes &&
+          !handle->frameQueue.empty())
       {
          handle->droppedCount.fetch_add(1, std::memory_order_relaxed);
          std::lock_guard<std::mutex> poolLock(handle->poolMutex);
-         if (handle->bufferPool.size() < RecorderHandle::kMaxPoolSize)
+         if (handle->poolBytes + pixels.size() <= RecorderHandle::kMaxQueueBytes)
+         {
+            handle->poolBytes += pixels.size();
             handle->bufferPool.push_back(std::move(pixels));
+         }
          return false;
       }
 
       handle->pendingCount.fetch_add(repeatCount, std::memory_order_relaxed);
+      handle->queuedBytes += pixels.size();
       handle->frameQueue.push_back({ std::move(pixels), repeatCount });
       handle->queueCv.notify_one();
       return true;
