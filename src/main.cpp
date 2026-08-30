@@ -31541,6 +31541,17 @@ static void RunRecExportTest()
    long long videoRejected = 0;
    double tonePhase = 0.0;
 
+   // The per-step cap below is generous by design (see its own comment), but
+   // that's fine only as long as the encoder is making progress overall. A
+   // wedged encoder - observed on GitHub's shared macOS runners, which don't
+   // reliably have hardware VideoToolbox access - never drops pendingCount,
+   // so every remaining render step would burn its own fresh 120s cap and the
+   // test would hang for hours instead of failing. Track wall-clock spent
+   // waiting across the *whole* loop and bail with a verdict well before that.
+   const auto waitBudgetStart = std::chrono::steady_clock::now();
+   constexpr auto kMaxTotalWait = std::chrono::seconds(45);
+   bool encoderWedged = false;
+
    for (long long step = 0; step < renderSteps; step++)
    {
       const double t = (double)step / kRenderFps;
@@ -31579,7 +31590,16 @@ static void RunRecExportTest()
          // offset. That is queue policy, not sync, and measuring it here would
          // make the verdict depend on how busy the machine is.
          for (int spin = 0; spin < 120000 && Platform::RecorderPendingFrameCount(rec) >= 3; spin++)
+         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            if (std::chrono::steady_clock::now() - waitBudgetStart > kMaxTotalWait)
+            {
+               encoderWedged = true;
+               break;
+            }
+         }
+         if (encoderWedged)
+            break;
 
          std::vector<unsigned char> px = Platform::RecorderAcquireFrameBuffer(rec);
          px.assign((size_t)kW * kH * 4, marker ? (unsigned char)255 : (unsigned char)0);
@@ -31590,6 +31610,17 @@ static void RunRecExportTest()
          else
             videoRejected += repeat;
       }
+   }
+
+   if (encoderWedged)
+   {
+      printf("  [FAIL] encoder appears wedged: pending frame count never dropped below 3 for "
+             "%lldms (RecorderPump never got re-armed by AVFoundation)\n",
+             (long long)std::chrono::duration_cast<std::chrono::milliseconds>(kMaxTotalWait).count());
+      printf("REC EXPORT FAIL\n");
+      Platform::RecorderStop(rec, error, nullptr, nullptr);
+      std::remove(path.c_str());
+      return;
    }
 
    int wrote = 0;
