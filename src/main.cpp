@@ -31931,6 +31931,115 @@ static void RunRecSyncTest()
 }
 
 
+// ===================================================== INFINITE_AUDIORINGTEST
+// AudioCaptureRing carries interleaved stereo (L,R,L,R,..) from the audio
+// thread to whatever drains it (a live WAV capture, or Offline Render's
+// DrainOfflineAudioCapture). Write() used to drop samples one at a time on
+// overflow, which could commit an odd number of trailing samples from a call
+// that always hands it an even (frame-aligned) count - splitting a stereo
+// pair right down the middle. Nothing downstream ever re-anchors that phase,
+// so every pair after the drop is silently channel-swapped from then on: not
+// a shorter file (the sample-count/duration assertions elsewhere don't catch
+// it), but every future pair decoded as noise instead of the real signal
+// until another odd-offset event happens to restore parity by chance. A
+// reported take that plays sped-up and then alternates silence and "weird
+// noise" for the rest of its length is a much better fit for this than for a
+// pure sample-count shortfall. Read() had the same class of bug from the
+// consumer side (a maxCount that happens to land on an odd boundary).
+//
+// This drives the ring directly - no audio device, no GL, no movie file -
+// and checks the one property that matters: every sample that comes back out
+// of Read() belongs to a whole, correctly-paired L/R frame from what went in,
+// even when a Write() call is forced to overflow mid-call.
+static void RunAudioRingTest()
+{
+   printf("[AUDIO RING TEST] stereo-pair integrity under overflow\n");
+   int failures = 0;
+
+   AudioCaptureRing ring;
+   const size_t usable = AudioCaptureRing::kCapacity - 1; // one slot always kept empty
+
+   // Fill the ring to within 3 samples of full - an odd number of free
+   // slots, which is exactly the condition that let the old code commit a
+   // lone unpaired sample. Filler content is irrelevant, so use pairs of 0.
+   {
+      std::vector<float> filler(usable - 3, 0.0f);
+      ring.Write(filler.data(), (int)filler.size());
+   }
+
+   // Two marker pairs, in one call, against only 3 free slots: only the
+   // first pair (111,222) fits; the second (333,444) cannot, since it would
+   // need to consume the ring's last free slot AND the head. A correct
+   // implementation drops the second pair whole; the old implementation
+   // wrote 111,222,333 and dropped only 444, leaving 333 unpaired.
+   const float markers[4] = { 111.0f, 222.0f, 333.0f, 444.0f };
+   ring.Write(markers, 4);
+
+   std::vector<float> out(usable + 8, -1.0f);
+   const int n = ring.Read(out.data(), (int)out.size());
+
+   const bool evenCount = (n % 2) == 0;
+   if (!evenCount)
+      failures++;
+   printf("  [%s] Read() returned an even sample count (%d)\n", evenCount ? "pass" : "FAIL", n);
+
+   // Every pair the filler wrote was (0,0), so the first sample that isn't
+   // zero is where the markers begin. It must be exactly {111,222} (the
+   // second marker pair correctly dropped whole), never {111,222,333,...}
+   // with 333 stranded as the start of a corrupted pair, and never a lone
+   // 333 or 444 appearing without its correct partner.
+   int markerStart = -1;
+   for (int i = 0; i + 1 < n; i += 2)
+   {
+      if (out[i] != 0.0f || out[i + 1] != 0.0f)
+      {
+         markerStart = i;
+         break;
+      }
+   }
+   const bool foundMarkers = markerStart >= 0;
+   const bool pairIntact = foundMarkers && out[markerStart] == 111.0f && out[markerStart + 1] == 222.0f;
+   // The second pair must be either fully present (444 right after 222, if
+   // capacity allowed it) or fully absent (nothing after 222 at all) -
+   // never 333 appearing alone or paired with something that isn't 444.
+   const bool secondPairWholeOrAbsent =
+      (markerStart + 3 >= n) ||
+      (out[markerStart + 2] == 333.0f && out[markerStart + 3] == 444.0f) ||
+      (out[markerStart + 2] == 0.0f); // ring had room for nothing more after 222
+   if (!(foundMarkers && pairIntact && secondPairWholeOrAbsent))
+      failures++;
+   printf("  [%s] overflow dropped whole pairs only (found=%d intact=%d secondOk=%d, "
+          "markerStart=%d n=%d)\n",
+          (foundMarkers && pairIntact && secondPairWholeOrAbsent) ? "pass" : "FAIL",
+          (int)foundMarkers, (int)pairIntact, (int)secondPairWholeOrAbsent, markerStart, n);
+
+   // Repeat with an odd Read() maxCount, which used to let the consumer side
+   // strand a lone sample of a pair in `out` while leaving its partner
+   // behind in the ring for the next call - the same corruption from the
+   // other direction.
+   {
+      AudioCaptureRing ring2;
+      const float pairs[6] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f };
+      ring2.Write(pairs, 6);
+      float small[3] = { -1, -1, -1 };
+      const int n1 = ring2.Read(small, 3); // odd maxCount
+      const bool n1Even = (n1 % 2) == 0;
+      float rest[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+      const int n2 = ring2.Read(rest, 8);
+      const bool allPairsAccountedFor = (n1 + n2) == 6;
+      // Whatever came back in the first read must be whole pairs from the
+      // start of the stream (1,2[,3,4]), not a lone 1 or a 1,2,3 split.
+      const bool firstReadOk = n1 >= 0 && n1 <= 2 &&
+                               (n1 == 0 || (small[0] == 1.0f && small[1] == 2.0f));
+      if (!(n1Even && allPairsAccountedFor && firstReadOk))
+         failures++;
+      printf("  [%s] odd Read() maxCount never splits a pair (n1=%d n2=%d total=%d)\n",
+             (n1Even && allPairsAccountedFor && firstReadOk) ? "pass" : "FAIL", n1, n2, n1 + n2);
+   }
+
+   printf("AUDIO RING %s\n", failures == 0 ? "OK" : "FAIL");
+}
+
 // ===================================================== INFINITE_RECEXPORTTEST
 // End-to-end A/V sync measurement on a real written movie, as opposed to
 // RECSYNCTEST above, which only exercises the pacing arithmetic in isolation.
@@ -34585,6 +34694,12 @@ int main(int argc, char** argv)
       return 0; // verdict is the printf line, not $? - see AUDIOPDCTEST below
    }
 
+   if (getenv("INFINITE_AUDIORINGTEST") != nullptr)
+   {
+      RunAudioRingTest();
+      return 0; // verdict is the printf line, not $?
+   }
+
    if (getenv("INFINITE_AUDIOPDCTEST") != nullptr)
    {
       RunAudioPdcTest();
@@ -36826,6 +36941,25 @@ int main(int argc, char** argv)
 
                for (GraphNode& gn : gNodes)
                   gn.node->CookIfNeeded(frameId);
+
+               // INFINITE_OFFLINERENDER_COOKDELAYMS simulates a heavy
+               // per-frame GPU cook (the user's real patch, not this
+               // fixture's Shape+Oscillator) by burning wall-clock time here,
+               // after the graph is cooked but before audio is pumped or the
+               // frame captured - the same place a genuinely slow shader
+               // would cost time. This changes backpressure dynamics: a slow
+               // cook means video frames arrive far slower than the encoder
+               // can drain them, so OfflineEncoderHasRoom() may never trip at
+               // all, which points any audio-loss bug away from the
+               // backpressure/lookahead path (§3.1/§3.3 in the offline-render
+               // brief) and toward something that misbehaves independent of
+               // encoder pressure.
+               if (const char* cookDelayEnv = getenv("INFINITE_OFFLINERENDER_COOKDELAYMS"))
+               {
+                  static const int sCookDelayMs = std::max(0, atoi(cookDelayEnv));
+                  if (sCookDelayMs > 0)
+                     std::this_thread::sleep_for(std::chrono::milliseconds(sCookDelayMs));
+               }
 
                if (on->IsPrerolling())
                   on->DecrementPreroll();
