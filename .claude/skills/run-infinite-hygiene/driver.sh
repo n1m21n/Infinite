@@ -48,6 +48,7 @@ EXPECTED_FILE="$(dirname "${BASH_SOURCE[0]}")/audio-param-sweep-expected.txt"
 # what they exercise; see SKILL.md for the map.
 TESTS=(
   "UNDOTEST:10"
+  "UNDOPERFTEST:10"
   "PATCHTEST:30"
   "ROUNDTRIPTEST:35"
   "GROUPTEST:30"
