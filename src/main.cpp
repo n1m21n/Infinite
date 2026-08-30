@@ -36128,6 +36128,22 @@ int main(int argc, char** argv)
       gFrameStart = glfwGetTime();
       glfwPollEvents();
 
+      // A recording Stop click sets StopRequested() rather than calling the
+      // blocking OutputNode::StopRecording() directly, so that frame gets to
+      // finish drawing and present its "finalizing..." state before the
+      // block happens. This is the earliest point in the *next* frame - the
+      // one right after that "finalizing" frame's glfwSwapBuffers - where
+      // it's safe to actually run the block: the user has already seen the
+      // app acknowledge the click instead of appearing to hang mid-click.
+      for (GraphNode& gn : gNodes)
+      {
+         if (auto* on = dynamic_cast<OutputNode*>(gn.node.get()))
+         {
+            if (on->StopRequested())
+               on->StopRecording();
+         }
+      }
+
       // Same dev-harness carve-out as the startup check above.
       if (getenv("INFINITE_EXITAFTER") == nullptr)
          PollAutosave();
@@ -44568,11 +44584,25 @@ int main(int argc, char** argv)
                   ImGui::TextDisabled("from: %s", srcName.c_str());
                }
 
-               if (n->IsRecording())
+               if (n->StopRequested())
+               {
+                  // The actual (blocking) StopRecording() runs at the top of
+                  // next frame, once this "finalizing" state has had a
+                  // chance to reach the screen - see the pump next to
+                  // glfwPollEvents(). Recording can't be (re)started from
+                  // here; the handle is mid-teardown.
+                  ImGui::BeginDisabled();
+                  ImGui::Button("Finalizing...", ImVec2(kPreviewSize, 0));
+                  ImGui::EndDisabled();
+                  const int pending = n->PendingFrames();
+                  if (pending > 0)
+                     ImGui::TextDisabled("finishing up, %d frames left", pending);
+               }
+               else if (n->IsRecording())
                {
                   ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
                   if (ImGui::Button("Stop recording", ImVec2(kPreviewSize, 0)))
-                     n->StopRecording();
+                     n->RequestStopRecording();
                   ImGui::PopStyleColor();
                   ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), "REC  %d frames", n->RecordedFrames());
                   const int pending = n->PendingFrames();

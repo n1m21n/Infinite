@@ -107,6 +107,7 @@ bool OutputNode::StartRecording(const std::string& path)
 
 void OutputNode::StopRecording()
 {
+   mStopRequested = false;
    if (mRecorder == nullptr)
       return;
 
