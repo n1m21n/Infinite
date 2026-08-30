@@ -24079,30 +24079,13 @@ namespace
       }
       else
       {
+         // Frame counter and bar only. A rate/ETA readout and an
+         // encoder-wait notice lived here briefly; they were diagnostics for
+         // a specific stall wearing a UI's clothes, and they read as noise
+         // once the stall was fixed. gOfflineRender still tracks the timing
+         // they came from - see its startTime/lastProgressTime - so a future
+         // diagnostic can print rather than draw.
          ImGui::Text("Rendering... %d/%d", done, total);
-
-         // Rate and ETA, and - when the pump is yielding because the encoder
-         // queue is full rather than because it is out of time - which side
-         // the take is waiting on. A long render with no rate readout is
-         // indistinguishable from a wedged one, and that ambiguity is the
-         // whole reason a slow render gets reported as a hang.
-         const double elapsed = ImGui::GetTime() > 0.0 ? glfwGetTime() - gOfflineRender.startTime : 0.0;
-         const double rate = elapsed > 0.5 ? (double)done / elapsed : 0.0;
-         if (rate > 0.01)
-         {
-            const double remain = (double)(total - done) / rate;
-            ImGui::TextDisabled("%.1f fps - about %d:%02d left", rate,
-                                 (int)(remain / 60.0), (int)remain % 60);
-         }
-         else
-         {
-            ImGui::TextDisabled("estimating...");
-         }
-         const double sinceProgress = glfwGetTime() - gOfflineRender.lastProgressTime;
-         if (gOfflineRender.waitingOnEncoder)
-            ImGui::TextDisabled("waiting for the encoder to catch up");
-         else if (sinceProgress > 5.0)
-            ImGui::TextDisabled("no new frame for %.0fs", sinceProgress);
       }
       // A cancelled take's progress bar is meaningless - it would sit frozen
       // at whatever fraction the render reached, which is precisely what
