@@ -23,6 +23,8 @@ set -uo pipefail
 # Headless/CI: never let UpdateCheck::Start() make a network call.
 export INFINITE_NO_UPDATE_CHECK=1
 
+UNAME_S="$(uname -s 2>/dev/null || echo unknown)"
+
 BIN="${1:?usage: headless-tests.sh <path-to-infinite-binary>}"
 
 if [ ! -x "$BIN" ]; then
@@ -88,7 +90,25 @@ check_verdict INFINITE_RECSYNCTEST "REC SYNC OK"
 # the only machine evidence anywhere that Media Foundation's muxing keeps
 # audio and video together - the macOS AVFoundation path is a separate
 # implementation of the same contract.
-check_verdict INFINITE_RECEXPORTTEST "REC EXPORT OK"
+#
+# ...except GitHub's macOS runners don't reliably have hardware VideoToolbox
+# encode access (confirmed via "IOServiceMatchingfailed for:
+# AppleM2ScalerCSCDriver" in the runner's own log), so
+# AVAssetWriterInput.isReadyForMoreMediaData can get permanently stuck
+# not-ready and the test fails every run there - a runner limitation, not a
+# regression, and not something a retry fixes. src/main.cpp's
+# RunRecExportTest bails after a bounded 45s wait instead of hanging (it used
+# to wedge this job for 3+ hours - see runs 33284955189, 33292843911,
+# 33294497903), but the encoder still never catches up, so skip the gate on
+# macOS specifically. The Windows runner's Media Foundation path has real
+# hardware encode access and keeps gating on it; a real Mac (see
+# run-infinite-hygiene) does too.
+if [ "$UNAME_S" = "Darwin" ]; then
+   echo "== INFINITE_RECEXPORTTEST"
+   echo "   SKIP (GitHub's macOS runners lack hardware video encode access - see this script's comment)"
+else
+   check_verdict INFINITE_RECEXPORTTEST "REC EXPORT OK"
+fi
 
 # RemoveBgNode's background-removal backend (Vision on macOS, ONNX Runtime +
 # DirectML on Windows). SKIP is an accepted, non-failing verdict here (see
