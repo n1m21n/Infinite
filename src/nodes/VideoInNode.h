@@ -19,6 +19,7 @@ public:
    int GetOutputHeight() const override { return mHeight; }
    unsigned long long TextureRevision() const override { return mRevision; }
    void CookIfNeeded(int frameId) override;
+   bool IsHardwareDriven() const override { return true; }
 
    bool active = true;
    std::string deviceId;

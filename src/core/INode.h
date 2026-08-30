@@ -198,6 +198,17 @@ public:
    // can't do work that only happens inside ProcessBlock (like recording).
    virtual bool RequiresAudioProcessing() const { return false; }
 
+   // True for a node whose output comes from outside the process entirely -
+   // a live camera, MIDI controller, or Syphon/Spout receiver - and so can't
+   // be pre-synthesized for an Offline Render take (main.cpp's
+   // FindHardwareDrivenNode). Distinct from IAudioSource::IsHardwareDriven
+   // above (which exists for the headless audio-param sweep and predates
+   // this one): this virtual lives on INode itself so non-audio hardware
+   // sources (camera, MIDI, Syphon In) can answer it too, without pulling in
+   // IAudioSource. A node satisfying both (Audio In) overrides this one
+   // function to answer both, since the signatures match exactly.
+   virtual bool IsHardwareDriven() const { return false; }
+
    // A param whose audible effect only shows up when another param sits at a
    // specific value (unison-spread params like "detune"/"stereoWidth" are a
    // no-op while "unison" == 1) needs that other param set first, or a sweep

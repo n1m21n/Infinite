@@ -25,6 +25,7 @@ public:
    int GetOutputHeight() const override;
    void CookIfNeeded(int frameId) override;
    unsigned long long TextureRevision() const override { return mRevision; }
+   bool IsHardwareDriven() const override { return true; }
 
    // Server discovery & connection
    void RefreshServers();
