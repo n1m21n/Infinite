@@ -151,4 +151,14 @@ private:
    PboSlot mPbo[kPboCount];
    int mPboWriteIndex = 0;
    int mPboReadIndex = 0;
+
+   // Decided once, on the first readback of a take: prefer the GPU's native
+   // GL_BGRA/GL_UNSIGNED_INT_8_8_8_8_REV format so glReadPixels is a straight
+   // blit instead of a driver-side conversion, falling back to GL_RGBA if the
+   // driver rejects it (checked via glGetError right after the first call,
+   // which reports enum-validation errors synchronously even though the
+   // readback itself is async). Platform::RecorderSetInputIsBgra is told the
+   // result so the encoder converts the bytes correctly either way.
+   bool mReadbackFormatDecided = false;
+   bool mReadbackIsBgra = true;
 };

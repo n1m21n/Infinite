@@ -130,13 +130,25 @@ namespace
       }
    }
 
-   // Copies caller-supplied bottom-up RGBA8 pixels into a top-down BGRA8
-   // staging row layout for the sink writer's input type.
-   void RgbaBottomUpToBgraTopDown(const unsigned char* src, int width, int height,
-                                  std::vector<unsigned char>& out)
+   // Copies caller-supplied bottom-up pixels into a top-down BGRA8 staging
+   // row layout for the sink writer's input type. `isBgra` selects between
+   // the native path (the caller's glReadPixels already came back BGRA8, so
+   // this is a pure row-reverse copy) and the fallback where it's RGBA8 and
+   // still needs a per-pixel channel swizzle alongside the flip.
+   void BgraBottomUpToTopDown(const unsigned char* src, int width, int height,
+                              bool isBgra, std::vector<unsigned char>& out)
    {
       out.resize((size_t)width * height * 4);
       const size_t rowBytes = (size_t)width * 4;
+      if (isBgra)
+      {
+         for (int y = 0; y < height; y++)
+         {
+            const unsigned char* srcRow = src + (size_t)(height - 1 - y) * rowBytes;
+            memcpy(out.data() + (size_t)y * rowBytes, srcRow, rowBytes);
+         }
+         return;
+      }
       for (int y = 0; y < height; y++)
       {
          const unsigned char* srcRow = src + (size_t)(height - 1 - y) * rowBytes;
@@ -1078,6 +1090,13 @@ namespace Platform
          double fps = 30.0;
          std::atomic<long long> frameCount { 0 }; // written only on the encoder thread
 
+         // Whether frames handed to RecorderAppend are BGRA8 (the default,
+         // matching a native glReadPixels) or RGBA8 (the caller's fallback).
+         // Set once, before the first RecorderAppend of the take, by
+         // RecorderSetInputIsBgra - never touched after that, so a plain read
+         // on `worker` is safe.
+         bool inputIsBgra = true;
+
          // Live-audio streaming mode (RecorderAppendAudio).
          double liveRate = 0.0;
          int liveChannels = 0;
@@ -1398,10 +1417,14 @@ namespace Platform
                rec->frameQueue.pop_front();
             }
 
+            // Convert once per queued frame, not once per repeat - padding a
+            // constant-frame-rate take used to re-pay this conversion for
+            // byte-identical pixels on every one of its repeats.
+            BgraBottomUpToTopDown(frame.pixels.data(), rec->width, rec->height,
+                                 rec->inputIsBgra, bgraScratch);
+
             for (int i = 0; i < frame.repeatCount; i++)
             {
-               RgbaBottomUpToBgraTopDown(frame.pixels.data(), rec->width, rec->height, bgraScratch);
-
                IMFMediaBuffer* buffer = BufferFromMemory((BYTE*)bgraScratch.data(), (DWORD)bgraScratch.size());
                if (buffer != nullptr)
                {
@@ -1549,6 +1572,13 @@ namespace Platform
    {
       std::vector<unsigned char> copy = pixels;
       return RecorderAppend(handle, std::move(copy), 1);
+   }
+
+   void RecorderSetInputIsBgra(RecorderHandle* handle, bool isBgra)
+   {
+      auto* rec = reinterpret_cast<RecorderHandleMf*>(handle);
+      if (rec != nullptr)
+         rec->inputIsBgra = isBgra;
    }
 
    int RecorderPendingFrameCount(RecorderHandle* handle)
