@@ -35459,9 +35459,34 @@ int main(int argc, char** argv)
          out->includeAudio = true;
          out->AudioInput().Connect(osc);
          out->recordVideoPath = TmpPath("infinite_offlinerender.mov");
-         out->offlineFps = 10;
-         out->offlineDurationSeconds = 1;
+         // fps/duration are overridable so the same fixture can sweep rates
+         // that don't divide the sample rate evenly (24fps @ 44100 =
+         // 1837.5 samples/frame) and rates whose per-frame audio budget
+         // exceeds one kAudioMaxBlockFrames block (anything below ~12fps) -
+         // the two ways a per-frame audio quota goes wrong at some fps but
+         // not others. Default 10fps/1s is the low-fps multi-block case.
+         const char* fpsEnv = getenv("INFINITE_OFFLINERENDER_FPS");
+         const char* secEnv = getenv("INFINITE_OFFLINERENDER_SECONDS");
+         out->offlineFps = fpsEnv ? std::max(1, atoi(fpsEnv)) : 10;
+         out->offlineDurationSeconds = secEnv ? std::max(1, atoi(secEnv)) : 1;
          out->offlinePrerollFrames = 2;
+
+         // Re-open the device at a requested rate/buffer size, exactly as
+         // the Audio settings menu's "Apply audio settings" does, so the
+         // sweep can prove a take is budgeted and muxed at whatever the
+         // device actually negotiates rather than at one hardcoded rate -
+         // the defect this fixture exists to catch.
+         if (const char* rateEnv = getenv("INFINITE_OFFLINERENDER_RATE"))
+         {
+            const char* bufEnv = getenv("INFINITE_OFFLINERENDER_BUFFER");
+            AudioEngine::Instance().Stop();
+            AudioEngine::Instance().SetRequestedSampleRate(atof(rateEnv));
+            if (bufEnv != nullptr)
+               AudioEngine::Instance().SetRequestedBufferFrames(atoi(bufEnv));
+            std::string rateErr;
+            if (!StartAudioEngine(rateErr))
+               fprintf(stderr, "offline render test: could not reopen device: %s\n", rateErr.c_str());
+         }
          RebuildAudioTopology();
       }
       else if (getenv("INFINITE_OFFLINERENDERREFUSETEST") != nullptr)
@@ -42158,16 +42183,25 @@ int main(int argc, char** argv)
             // truncated per frame - either of which plays back off-speed
             // against the picture while still passing hasAudio.
             const double sr = sOfflineAudioSampleRate;
-            const long long expectedAudio = (long long)std::llround(10.0 * sr / 10.0);
+            const int expectedFrames = out->offlineFps * out->offlineDurationSeconds;
+            const double takeSeconds = (double)expectedFrames / (double)out->offlineFps;
+            const long long expectedAudio =
+               (long long)std::llround((double)expectedFrames * sr / (double)out->offlineFps);
             const long long gotAudio = out->OfflineAudioFramesAppended();
+            // 64 frames = 1.5ms at 44.1kHz: room for one block's rounding on
+            // an fps that doesn't divide the rate, and nothing more. A
+            // per-frame quota that drifts, truncates, or is budgeted at the
+            // wrong rate misses this by orders of magnitude.
             const bool audioExact = sr > 0.0 && std::llabs(gotAudio - expectedAudio) <= 64;
-            const bool durationOk = info.duration > 0.9 && info.duration < 1.15;
-            printf("offline render movie(video=%d audio=%d duration=%.2fs, frames=%d) "
-                   "audio frames=%lld expected=%lld @%.0fHz\n",
+            const bool durationOk = info.duration > takeSeconds - 0.1 &&
+                                     info.duration < takeSeconds + 0.15;
+            printf("offline render %dfps x %ds movie(video=%d audio=%d duration=%.2fs, frames=%d) "
+                   "audio frames=%lld expected=%lld (%+lld) @%.0fHz\n",
+                   out->offlineFps, out->offlineDurationSeconds,
                    info.hasVideo, info.hasAudio, info.duration, out->LastRecordedFrames(),
-                   gotAudio, expectedAudio, sr);
-            const bool ok = out->LastRecordedFrames() == 10 && info.hasVideo && info.hasAudio &&
-                            durationOk && audioExact;
+                   gotAudio, expectedAudio, gotAudio - expectedAudio, sr);
+            const bool ok = out->LastRecordedFrames() == expectedFrames && info.hasVideo &&
+                            info.hasAudio && durationOk && audioExact;
             printf("%s\n", ok ? "OFFLINERENDERTEST OK" : "OFFLINERENDERTEST FAIL - SUSPECT");
          }
       }
