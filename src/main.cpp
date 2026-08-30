@@ -32209,7 +32209,20 @@ static void RunRecExportTest(int width, int height, bool starved, const char* la
       const double stepSeconds = 1.0 / ((double)kFps * 4.0);
       for (double t = 0.0; t < kTakeSeconds; t += stepSeconds)
       {
-         if (!Platform::VideoFrameAt(vid, t, px) && px.empty())
+         // Platform::VideoFrameAt is asynchronous on Windows (a decode thread
+         // fills a queue the caller picks from), so "nothing decoded yet" is a
+         // normal answer at t = 0. Wait a bounded moment for the very first
+         // frame; after that a false return just means "reuse the last one",
+         // which is what this stepper wants anyway - and is what macOS returns
+         // for three out of every four steps here, since it steps at 4x the
+         // clip's frame rate.
+         bool gotFrame = Platform::VideoFrameAt(vid, t, px);
+         for (int waitedMs = 0; !gotFrame && px.empty() && waitedMs < 2000; waitedMs += 5)
+         {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            gotFrame = Platform::VideoFrameAt(vid, t, px);
+         }
+         if (!gotFrame && px.empty())
             continue;
          if ((int)px.size() < vw * vh * 4)
             continue;
