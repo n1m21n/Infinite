@@ -14,6 +14,7 @@
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
 #include "core/Transport.h"
+#include "core/AudioDecodeCache.h"
 #include "platform/Platform.h"
 
 namespace
@@ -673,7 +674,7 @@ bool DrumSequencerNode::LoadFileToLane(int lane, const std::string& path)
    lane = Clamp(lane);
    auto* decoded = new Platform::SampleBuffer();
    std::string error;
-   if (!Platform::DecodeAudioFileToBuffer(path, *decoded, error))
+   if (!AudioDecodeCache::DecodeCached(path, *decoded, error))
    {
       delete decoded;
       laneStatus[lane] = error.empty() ? "failed to load" : error;

@@ -4,8 +4,28 @@
 #include <algorithm>
 #include <cmath>
 
+#include "AssetCache.h"
 #include "Platform.h"
 #include "Transport.h"
+
+namespace
+{
+   struct RawModelData
+   {
+      std::vector<Platform::ModelVertex> vertices;
+      std::vector<unsigned int> indices;
+   };
+
+   // Shared across every ModelSourceNode respawn in the process - see
+   // AssetCache.h. Caches the raw decoded vertex/index buffers, before
+   // per-node Normalize() runs, so two nodes pointed at the same file (or
+   // one node respawned by undo/redo) don't re-run Platform::LoadModel.
+   AssetCache<RawModelData>& GetModelDecodeCache()
+   {
+      static AssetCache<RawModelData> cache(512ull * 1024 * 1024);
+      return cache;
+   }
+}
 
 ModelSourceNode::~ModelSourceNode()
 {
@@ -14,20 +34,31 @@ ModelSourceNode::~ModelSourceNode()
 
 bool ModelSourceNode::Load(const std::string& path)
 {
-   std::vector<Platform::ModelVertex> vertices;
-   std::vector<unsigned int> indices;
-   std::string error;
-
-   if (!Platform::LoadModel(path, vertices, indices, error))
+   auto& cache = GetModelDecodeCache();
+   const RawModelData* cached = nullptr;
+   RawModelData decoded;
+   if (const RawModelData* hit = cache.Get(path))
    {
-      mStatus = error.empty() ? "could not load model" : error;
-      return false;
+      cached = hit;
+   }
+   else
+   {
+      std::string error;
+      if (!Platform::LoadModel(path, decoded.vertices, decoded.indices, error))
+      {
+         mStatus = error.empty() ? "could not load model" : error;
+         return false;
+      }
+      const size_t bytes = decoded.vertices.size() * sizeof(Platform::ModelVertex) +
+                            decoded.indices.size() * sizeof(unsigned int);
+      cache.Put(path, decoded, bytes);
+      cached = &decoded;
    }
 
    mMesh.vertices.clear();
-   mMesh.indices = indices;
-   mMesh.vertices.reserve(vertices.size());
-   for (const Platform::ModelVertex& src : vertices)
+   mMesh.indices = cached->indices;
+   mMesh.vertices.reserve(cached->vertices.size());
+   for (const Platform::ModelVertex& src : cached->vertices)
    {
       Vertex v;
       v.px = src.px; v.py = src.py; v.pz = src.pz;

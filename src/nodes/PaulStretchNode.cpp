@@ -18,6 +18,7 @@
 #include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
+#include "core/AudioDecodeCache.h"
 #include "platform/Platform.h"
 #include "Transport.h"
 #include "core/AudioTopologyRequest.h"
@@ -702,7 +703,7 @@ bool PaulStretchNode::LoadFile(const std::string& path)
 
    auto* decoded = new Platform::SampleBuffer();
    std::string error;
-   if (!Platform::DecodeAudioFileToBuffer(path, *decoded, error))
+   if (!AudioDecodeCache::DecodeCached(path, *decoded, error))
    {
       delete decoded;
       mStatus = error.empty() ? "failed to load" : error;

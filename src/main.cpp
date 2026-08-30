@@ -4395,6 +4395,14 @@ namespace
    // them. Both patch load and copy/paste restore a node from bare settings,
    // so both call this afterwards rather than duplicating the same dynamic
    // casts in two places.
+   //
+   // Every undo/redo and multi-node delete respawns nodes from scratch and
+   // routes through here, so the file-backed ReloadFromPath() calls below
+   // (image/environment/model/audio) are what pays for re-decoding a source
+   // file on every such respawn. See docs/plans/undo-delete-perf-prompt.md
+   // Part B - AssetCache.h now sits behind those loaders so a respawn that
+   // points at a file already decoded this session skips the decode, not
+   // this dispatch.
    void ReloadDerivedState(INode* node)
    {
       if (auto* img = dynamic_cast<ImageSourceNode*>(node))

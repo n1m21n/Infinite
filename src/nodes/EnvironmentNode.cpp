@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 
+#include "AssetCache.h"
 #include "Platform.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -34,6 +35,22 @@ namespace
       const size_t read = fread(out.data(), 1, (size_t)size, f);
       fclose(f);
       return read == (size_t)size;
+   }
+
+   struct DecodedEnv
+   {
+      std::vector<float> pixels; // RGB, width*height*3
+      int width = 0;
+      int height = 0;
+   };
+
+   // Shared across every EnvironmentNode respawn in the process - see
+   // AssetCache.h. Both the .hdr and .exr decode paths normalize into this
+   // same RGB-float shape so one cache covers both.
+   AssetCache<DecodedEnv>& GetEnvDecodeCache()
+   {
+      static AssetCache<DecodedEnv> cache(512ull * 1024 * 1024);
+      return cache;
    }
 }
 
@@ -153,48 +170,59 @@ bool EnvironmentNode::Load(const std::string& path)
    for (char& c : ext)
       c = (char)tolower((unsigned char)c);
 
-   if (ext == "hdr")
+   auto& cache = GetEnvDecodeCache();
+   const DecodedEnv* cached = cache.Get(path);
+   DecodedEnv decoded;
+
+   if (cached == nullptr)
    {
-      // Radiance HDR: ImageIO does not read this format, so it goes through
-      // stb_image's own decoder instead.
-      std::vector<unsigned char> file;
-      if (!ReadWholeFile(path, file))
+      if (ext == "hdr")
       {
-         mLastError = "could not read file";
+         // Radiance HDR: ImageIO does not read this format, so it goes through
+         // stb_image's own decoder instead.
+         std::vector<unsigned char> file;
+         if (!ReadWholeFile(path, file))
+         {
+            mLastError = "could not read file";
+            return false;
+         }
+
+         int w = 0, h = 0, channels = 0;
+         float* pixels = stbi_loadf_from_memory(file.data(), (int)file.size(), &w, &h, &channels, 3);
+         if (pixels == nullptr)
+         {
+            mLastError = stbi_failure_reason() ? stbi_failure_reason() : "could not decode HDR image";
+            return false;
+         }
+         decoded.pixels.assign(pixels, pixels + (size_t)w * (size_t)h * 3);
+         decoded.width = w;
+         decoded.height = h;
+         stbi_image_free(pixels);
+      }
+      else if (ext == "exr")
+      {
+         // EXR: the OS decodes this natively (Ventura+), including values above
+         // 1.0, as long as the bitmap context is told to keep float precision
+         // and stay in an extended-range colour space rather than clamping to
+         // 8-bit sRGB the way ImageSourceNode's loader does.
+         std::string error;
+         if (!Platform::LoadImageFloatRGB(path, decoded.pixels, decoded.width, decoded.height, error))
+         {
+            mLastError = error;
+            return false;
+         }
+      }
+      else
+      {
+         mLastError = "expected a .hdr or .exr equirectangular image";
          return false;
       }
 
-      int w = 0, h = 0, channels = 0;
-      float* pixels = stbi_loadf_from_memory(file.data(), (int)file.size(), &w, &h, &channels, 3);
-      if (pixels == nullptr)
-      {
-         mLastError = stbi_failure_reason() ? stbi_failure_reason() : "could not decode HDR image";
-         return false;
-      }
-      Upload(pixels, w, h);
-      stbi_image_free(pixels);
+      cache.Put(path, decoded, decoded.pixels.size() * sizeof(float));
+      cached = &decoded;
    }
-   else if (ext == "exr")
-   {
-      // EXR: the OS decodes this natively (Ventura+), including values above
-      // 1.0, as long as the bitmap context is told to keep float precision
-      // and stay in an extended-range colour space rather than clamping to
-      // 8-bit sRGB the way ImageSourceNode's loader does.
-      std::vector<float> pixels;
-      int w = 0, h = 0;
-      std::string error;
-      if (!Platform::LoadImageFloatRGB(path, pixels, w, h, error))
-      {
-         mLastError = error;
-         return false;
-      }
-      Upload(pixels.data(), w, h);
-   }
-   else
-   {
-      mLastError = "expected a .hdr or .exr equirectangular image";
-      return false;
-   }
+
+   Upload(cached->pixels.data(), cached->width, cached->height);
 
    mLoadedPath = path;
    pathInput = path;
