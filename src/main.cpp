@@ -7386,26 +7386,72 @@ namespace
    // and adds a real border stroke - a guaranteed-visible backstop the way
    // the waveform box and slider fields already draw their own explicit
    // AddRect borders instead of trusting a themed background.
-   bool AudioToggleButton(const char* label, bool* value, float width = 44.0f)
+   bool AudioToggleButtonEx(const char* label, bool* value, const ImVec2& size,
+                            ImU32 activeBgLight, ImU32 activeBgDark,
+                            ImU32 activeHoverLight, ImU32 activeHoverDark,
+                            ImU32 activeHitLight, ImU32 activeHitDark,
+                            ImU32 activeTextLight, ImU32 activeTextDark)
    {
       const bool isLight = IsThemeLight();
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
       ImGui::PushStyleColor(ImGuiCol_Border, isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(130, 138, 160, 200));
-      ImGui::PushStyleColor(ImGuiCol_Button, *value ? (isLight ? IM_COL32(55, 115, 235, 255) : IM_COL32(90, 115, 205, 255))
-                                                    : (isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(58, 64, 82, 255)));
+      ImGui::PushStyleColor(ImGuiCol_Button, *value ? (isLight ? activeBgLight : activeBgDark)
+                                                    : (isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(33, 36, 46, 255)));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                            *value ? (isLight ? IM_COL32(75, 135, 245, 255) : IM_COL32(108, 132, 220, 255))
-                                   : (isLight ? IM_COL32(208, 214, 225, 255) : IM_COL32(76, 83, 104, 255)));
+                            *value ? (isLight ? activeHoverLight : activeHoverDark)
+                                   : (isLight ? IM_COL32(208, 214, 225, 255) : IM_COL32(51, 56, 71, 255)));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                            *value ? (isLight ? IM_COL32(40, 95, 215, 255) : IM_COL32(120, 144, 230, 255))
-                                   : (isLight ? IM_COL32(195, 202, 215, 255) : IM_COL32(88, 96, 118, 255)));
-      ImGui::PushStyleColor(ImGuiCol_Text, *value ? IM_COL32(255, 255, 255, 255)
+                            *value ? (isLight ? activeHitLight : activeHitDark)
+                                   : (isLight ? IM_COL32(195, 202, 215, 255) : IM_COL32(64, 70, 89, 255)));
+      ImGui::PushStyleColor(ImGuiCol_Text, *value ? (isLight ? activeTextLight : activeTextDark)
                                                   : (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255)));
-      const bool clicked = ImGui::Button(label, ImVec2(width, 0));
+      const bool clicked = ImGui::Button(label, size);
       ImGui::PopStyleColor(5);
       ImGui::PopStyleVar();
       if (clicked)
          *value = !*value;
+      return clicked;
+   }
+
+   bool AudioToggleButton(const char* label, bool* value, float width = 44.0f, float height = 0.0f)
+   {
+      return AudioToggleButtonEx(label, value, ImVec2(width, height),
+                                 IM_COL32(55, 115, 235, 255), IM_COL32(90, 115, 205, 255),
+                                 IM_COL32(75, 135, 245, 255), IM_COL32(108, 132, 220, 255),
+                                 IM_COL32(40, 95, 215, 255), IM_COL32(120, 144, 230, 255),
+                                 IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
+   }
+
+   bool AudioSoloButton(const char* label, bool* value, float width = 26.0f, float height = 0.0f)
+   {
+      return AudioToggleButtonEx(label, value, ImVec2(width, height),
+                                 IM_COL32(215, 160, 25, 255), IM_COL32(217, 166, 38, 255),
+                                 IM_COL32(235, 180, 45, 255), IM_COL32(235, 184, 56, 255),
+                                 IM_COL32(195, 140, 15, 255), IM_COL32(199, 148, 26, 255),
+                                 IM_COL32(25, 25, 30, 255), IM_COL32(25, 25, 30, 255));
+   }
+
+   bool AudioMuteButton(const char* label, bool* value, float width = 26.0f, float height = 0.0f)
+   {
+      return AudioToggleButtonEx(label, value, ImVec2(width, height),
+                                 IM_COL32(200, 45, 45, 255), IM_COL32(166, 41, 41, 255),
+                                 IM_COL32(220, 65, 65, 255), IM_COL32(191, 56, 56, 255),
+                                 IM_COL32(175, 35, 35, 255), IM_COL32(140, 31, 31, 255),
+                                 IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
+   }
+
+   bool AudioSmallButton(const char* label, float width = 26.0f, float height = 0.0f)
+   {
+      const bool isLight = IsThemeLight();
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(130, 138, 160, 200));
+      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(33, 36, 46, 255));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? IM_COL32(208, 214, 225, 255) : IM_COL32(51, 56, 71, 255));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? IM_COL32(195, 202, 215, 255) : IM_COL32(64, 70, 89, 255));
+      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255));
+      const bool clicked = ImGui::Button(label, ImVec2(width, height));
+      ImGui::PopStyleColor(5);
+      ImGui::PopStyleVar();
       return clicked;
    }
 
@@ -8804,11 +8850,10 @@ namespace
          const float w = gAudioContentW;
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
-         const float boxW = 20.0f;
-         const float stepBtnW = 16.0f;
+         const float onW = 14.0f + 4.0f + ImGui::GetFrameHeight();
          const float gap = ImGui::GetStyle().ItemSpacing.x;
          const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
-         const float tableW = std::max(60.0f, w - boxW - (stepBtnW * 2.0f + 4.0f) - octW - semiW - fineW - gap * 4.0f);
+         const float tableW = std::max(60.0f, w - onW - octW - semiW - fineW - gap * 4.0f);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          bool on = eng.on;
@@ -8820,43 +8865,13 @@ namespace
          if (ImGui::IsItemHovered())
             SetAudioReadout(e == 0 ? "engine a" : "engine b", eng.on ? "on" : "off");
 
-         float curX = x0 + boxW + gap;
-         ImGui::SetCursorScreenPos(ImVec2(curX, y));
-         char prevId[32], nextId[32];
-         snprintf(prevId, sizeof(prevId), "<##wtPrev%d", e);
-         snprintf(nextId, sizeof(nextId), ">##wtNext%d", e);
-         if (ImGui::Button(prevId, ImVec2(stepBtnW, 0)))
-         {
-            PushUndoCheckpoint();
-            eng.table = (eng.table - 1 + Wavetable::NumTables()) % Wavetable::NumTables();
-         }
-         if (ImGui::IsItemHovered())
-            SetAudioReadout("wavetable", "previous table");
-
-         curX += stepBtnW + 2.0f;
-         ImGui::SetCursorScreenPos(ImVec2(curX, y));
+         ImGui::SetCursorScreenPos(ImVec2(x0 + onW + gap, y));
          AudioBareDropdown("wtTable", WavetableNames(), eng.table,
-                           [&eng](int i) { PushUndoCheckpoint(); eng.table = i; }, tableW,
-                           WavetableCategories());
+                           [&eng](int i) { PushUndoCheckpoint(); eng.table = i; }, tableW);
          if (ImGui::IsItemHovered())
-         {
-            char buf[64];
-            snprintf(buf, sizeof(buf), "[%s] %s", Wavetable::TableCategoryName(eng.table),
-                     Wavetable::TableName(eng.table));
-            SetAudioReadout("wavetable", buf);
-         }
+            SetAudioReadout("wavetable", Wavetable::TableName(eng.table));
 
-         curX += tableW + 2.0f;
-         ImGui::SetCursorScreenPos(ImVec2(curX, y));
-         if (ImGui::Button(nextId, ImVec2(stepBtnW, 0)))
-         {
-            PushUndoCheckpoint();
-            eng.table = (eng.table + 1) % Wavetable::NumTables();
-         }
-         if (ImGui::IsItemHovered())
-            SetAudioReadout("wavetable", "next table");
-
-         ImGui::SetCursorScreenPos(ImVec2(x0 + boxW + gap + (stepBtnW * 2.0f + 4.0f) + tableW + gap, y));
+         ImGui::SetCursorScreenPos(ImVec2(x0 + onW + gap + tableW + gap, y));
          AudioSlider("fine", &eng.fine, -50.0f, 50.0f, "%.1f c", fineW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
@@ -11403,12 +11418,13 @@ namespace
       // ---- step grid: the visualizer, and the primary editable control ----
       {
          const int steps = std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps);
-         const float gutterW = 54.0f; // R | M | S
-         const float toggleW = 15.0f;
+         const float toggleW = 20.0f;
+         const float gutterW = toggleW * 3.0f + 2.0f * 2.0f + 6.0f; // R | M | S (70px)
+         const float rightGutterW = 32.0f; // Output pin gutter on the right
          const float rowH = 28.0f;
          const float rowGap = 2.0f;
          const float cellGap = 1.0f;
-         const float stepsW = gAudioBodyW - gutterW;
+         const float stepsW = gAudioBodyW - gutterW - rightGutterW;
          const float cellW = (stepsW - cellGap * (float)(steps - 1)) / (float)steps;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          n->gridCanvasTopY = origin.y;
@@ -11426,21 +11442,21 @@ namespace
 
             // ---- gutter: randomise, mute, solo ------------------------
             ImGui::SetCursorScreenPos(ImVec2(origin.x, y0));
-            if (ImGui::Button("R##randlane", ImVec2(toggleW, rowH)))
+            if (AudioSmallButton("R##randlane", toggleW, rowH))
             {
                PushUndoCheckpoint();
                n->RandomizeLane(lane);
             }
             ImGui::SameLine(0.0f, 2.0f);
             bool muteBool = n->laneMute[lane];
-            if (AudioToggleButton("M##mute", &muteBool, toggleW))
+            if (AudioMuteButton("M##mute", &muteBool, toggleW, rowH))
             {
                PushUndoCheckpoint();
                n->laneMute[lane] = muteBool;
             }
             ImGui::SameLine(0.0f, 2.0f);
             bool soloBool = n->laneSolo[lane];
-            if (AudioToggleButton("S##solo", &soloBool, toggleW))
+            if (AudioSoloButton("S##solo", &soloBool, toggleW, rowH))
             {
                PushUndoCheckpoint();
                n->laneSolo[lane] = soloBool;
@@ -11489,7 +11505,7 @@ namespace
                {
                   const float fillTop = y0 + (1.0f - vel) * rowH;
                   const ImU32 fillCol = (s == curStep && n->run) ? IM_COL32(255, 200, 100, 255)
-                                                                  : IM_COL32(120, 200, 255, 220);
+                                                                 : IM_COL32(120, 200, 255, 220);
                   dl->AddRectFilled(ImVec2(x0, fillTop), ImVec2(x0 + cellW - cellGap, y0 + rowH), fillCol, 2.0f);
                }
                if (s == curStep)
@@ -11498,6 +11514,23 @@ namespace
 
                ImGui::PopID();
             }
+
+            // ---- lane output pin: right gutter ----------------------------
+            const float pinX = origin.x + gutterW + stepsW + rightGutterW * 0.5f;
+            const float pinY = y0 + rowH * 0.5f;
+            const int pinId = gn.OutputPinId(1 + lane);
+
+            ed::BeginPin(pinId, ed::PinKind::Output);
+            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            const ImVec2 pinCenter(pinX, pinY);
+            const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
+            const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
+            ed::PinRect(pinMin, pinMax);
+
+            const bool isLight = IsThemeLight();
+            dl->AddCircleFilled(pinCenter, kPinRadius, isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255));
+            dl->AddCircle(pinCenter, kPinRadius, isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255), 0, 1.5f);
+            ed::EndPin();
 
             ImGui::PopID();
          }
@@ -12399,43 +12432,23 @@ namespace
                // Solo (S) button
                ImGui::SetCursorScreenPos(ImVec2(sX, rowY));
                ImGui::PushID(9100 + i);
-               if (n->solo[i])
-               {
-                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.65f, 0.15f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-               }
-               else
-               {
-                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.13f, 0.14f, 0.18f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.85f, 1.0f));
-               }
-               if (ImGui::Button("S", ImVec2(btnW, 0.0f)))
+               bool soloVal = n->solo[i];
+               if (AudioSoloButton("S", &soloVal, btnW))
                {
                   PushUndoCheckpoint();
-                  n->solo[i] = !n->solo[i];
+                  n->solo[i] = soloVal;
                }
-               ImGui::PopStyleColor(2);
                ImGui::PopID();
 
                // Mute (M) button
                ImGui::SetCursorScreenPos(ImVec2(mX, rowY));
                ImGui::PushID(9200 + i);
-               if (n->mute[i])
-               {
-                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.16f, 0.16f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-               }
-               else
-               {
-                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.13f, 0.14f, 0.18f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.85f, 1.0f));
-               }
-               if (ImGui::Button("M", ImVec2(btnW, 0.0f)))
+               bool muteVal = n->mute[i];
+               if (AudioMuteButton("M", &muteVal, btnW))
                {
                   PushUndoCheckpoint();
-                  n->mute[i] = !n->mute[i];
+                  n->mute[i] = muteVal;
                }
-               ImGui::PopStyleColor(2);
                ImGui::PopID();
             }
             ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
@@ -23968,20 +23981,32 @@ namespace
       return node->AudioNodeForNotePorts();
    }
 
-   int AudioBufferIndexOf(INode* node, const std::unordered_map<AudioNode*, int>& bufferIndexOf)
+   int AudioBufferIndexOf(INode* node, int pinOutputSlot, const std::unordered_map<AudioNode*, int>& bufferIndexOf)
    {
       AudioNode* an = AudioNodeOfAny(node);
       if (an == nullptr)
          return -1;
       auto it = bufferIndexOf.find(an);
-      return (it != bufferIndexOf.end()) ? it->second : -1;
+      if (it == bufferIndexOf.end())
+         return -1;
+      int baseIdx = it->second;
+      int audioSlot = 0;
+      if (auto* asrc = dynamic_cast<IAudioSource*>(node))
+         audioSlot = asrc->AudioOutputSlotForPin(pinOutputSlot);
+      if (audioSlot < 0 || audioSlot >= an->AudioOutputCount())
+         audioSlot = 0;
+      return baseIdx + audioSlot;
    }
 
-   INode* ResolvedAudioSource(INode* source)
+   INode* ResolvedAudioSource(INode* source, bool* didHop = nullptr)
    {
+      if (didHop)
+         *didHop = false;
       INode* node = source;
       for (int hops = 0; node != nullptr && node->bypassed && hops < 64; hops++)
       {
+         if (didHop)
+            *didHop = true;
          node = node->BypassSource();
       }
       return (node != nullptr && node->bypassed) ? nullptr : node;
@@ -24000,7 +24025,8 @@ namespace
    // in case a cycle ever slips through.
    void CollectAudioChain(INode* node, std::set<INode*>& visited,
                            std::vector<AudioTopologyEntry>& outOrder,
-                           std::unordered_map<AudioNode*, int>& bufferIndexOf)
+                           std::unordered_map<AudioNode*, int>& bufferIndexOf,
+                           int& nextBufferIndex)
    {
       if (node == nullptr || visited.count(node) != 0)
          return;
@@ -24023,11 +24049,13 @@ namespace
          entry.numInputs = slot + 1;
          if (cable->IsConnected())
          {
-            INode* resolved = ResolvedAudioSource(cable->GetSource());
+            bool hopped = false;
+            INode* resolved = ResolvedAudioSource(cable->GetSource(), &hopped);
             if (resolved != nullptr)
             {
-               CollectAudioChain(resolved, visited, outOrder, bufferIndexOf);
-               entry.inputBufferIndices[slot] = AudioBufferIndexOf(resolved, bufferIndexOf);
+               CollectAudioChain(resolved, visited, outOrder, bufferIndexOf, nextBufferIndex);
+               const int outputSlot = hopped ? 0 : cable->GetOutputSlot();
+               entry.inputBufferIndices[slot] = AudioBufferIndexOf(resolved, outputSlot, bufferIndexOf);
             }
          }
       }
@@ -24043,7 +24071,7 @@ namespace
          {
             INode* resolved = ResolvedAudioSource(cable->GetSource());
             if (resolved != nullptr)
-               CollectAudioChain(resolved, visited, outOrder, bufferIndexOf);
+               CollectAudioChain(resolved, visited, outOrder, bufferIndexOf, nextBufferIndex);
          }
       }
 
@@ -24052,8 +24080,13 @@ namespace
          if (!node->bypassed)
          {
             entry.node = audioNode;
-            entry.outputBufferIndex = (int)outOrder.size();
-            bufferIndexOf[audioNode] = entry.outputBufferIndex;
+            const int numOuts = std::clamp(audioNode->AudioOutputCount(), 1, kAudioMaxNodeOutputs);
+            entry.numOutputs = numOuts;
+            entry.outputBufferIndex = nextBufferIndex;
+            for (int o = 0; o < numOuts; o++)
+               entry.outputBufferIndices[o] = nextBufferIndex + o;
+            bufferIndexOf[audioNode] = nextBufferIndex;
+            nextBufferIndex += numOuts;
             outOrder.push_back(entry);
          }
       }
@@ -24117,6 +24150,7 @@ namespace
       std::set<INode*> visited;
       std::unordered_map<AudioNode*, int> bufferIndexOf;
       std::vector<AudioTerminal> terminals;
+      int nextBufferIndex = 0;
 
       for (GraphNode& gn : gNodes)
       {
@@ -24131,11 +24165,13 @@ namespace
             AudioCable* cable = gn.node->AudioInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            INode* resolved = ResolvedAudioSource(cable->GetSource());
+            bool hopped = false;
+            INode* resolved = ResolvedAudioSource(cable->GetSource(), &hopped);
             if (resolved != nullptr)
             {
-               CollectAudioChain(resolved, visited, order, bufferIndexOf);
-               const int idx = AudioBufferIndexOf(resolved, bufferIndexOf);
+               CollectAudioChain(resolved, visited, order, bufferIndexOf, nextBufferIndex);
+               const int outputSlot = hopped ? 0 : cable->GetOutputSlot();
+               const int idx = AudioBufferIndexOf(resolved, outputSlot, bufferIndexOf);
                if (idx >= 0)
                {
                   // Capture is set unconditionally, gated at write-time on the
@@ -24169,7 +24205,7 @@ namespace
                // consumer's own entry. Bypass needs no handling here -
                // CollectAudioChain resolves each input through
                // ResolvedAudioSource and skips adding a bypassed node itself.
-               CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf);
+               CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf, nextBufferIndex);
             }
          }
       }
@@ -24181,7 +24217,7 @@ namespace
       for (GraphNode& gn : gNodes)
       {
          if (gn.node->RequiresAudioProcessing())
-            CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf);
+            CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf, nextBufferIndex);
       }
 
       // Wire each note-consuming node's inbox to its producer's outbox, now
@@ -24274,9 +24310,8 @@ namespace
       //
       // `order` is topologically sorted (CollectAudioChain only appends a
       // node after every source it reads from) and each entry's
-      // outputBufferIndex is exactly its own position in `order` (set at
-      // push_back time above) - so a single forward pass can compute every
-      // entry's cumulative latency by looking up its already-computed
+      // outputBufferIndices are assigned - so a single forward pass can compute
+      // every entry's cumulative latency by looking up its already-computed
       // inputs' cumulative latency by buffer index, with no separate
       // topological sort needed.
       //
@@ -24286,7 +24321,7 @@ namespace
       // any DAW's PDC uses. Note-only inputs carry no cumulative latency of
       // their own (MIDI events aren't delayed by this pass at all) and
       // aren't represented in inputBufferIndices, so they don't factor in.
-      std::vector<int> cumulativeLatency(order.size(), 0);
+      std::vector<int> cumulativeLatencyByBuffer(nextBufferIndex, 0);
       for (size_t k = 0; k < order.size(); k++)
       {
          AudioTopologyEntry& entry = order[k];
@@ -24294,10 +24329,16 @@ namespace
          for (int i = 0; i < entry.numInputs; i++)
          {
             const int idx = entry.inputBufferIndices[i];
-            if (idx >= 0)
-               maxUpstream = std::max(maxUpstream, cumulativeLatency[(size_t)idx]);
+            if (idx >= 0 && idx < (int)cumulativeLatencyByBuffer.size())
+               maxUpstream = std::max(maxUpstream, cumulativeLatencyByBuffer[(size_t)idx]);
          }
-         cumulativeLatency[k] = entry.node->LatencySamples() + maxUpstream;
+         const int entryLatency = entry.node->LatencySamples() + maxUpstream;
+         for (int o = 0; o < entry.numOutputs; o++)
+         {
+            const int outIdx = entry.outputBufferIndices[o];
+            if (outIdx >= 0 && outIdx < (int)cumulativeLatencyByBuffer.size())
+               cumulativeLatencyByBuffer[(size_t)outIdx] = entryLatency;
+         }
       }
 
       // At every merge point - a node with more than one connected input
@@ -24317,15 +24358,15 @@ namespace
          for (int i = 0; i < entry.numInputs; i++)
          {
             const int idx = entry.inputBufferIndices[i];
-            if (idx >= 0)
-               maxAmongConnected = std::max(maxAmongConnected, cumulativeLatency[(size_t)idx]);
+            if (idx >= 0 && idx < (int)cumulativeLatencyByBuffer.size())
+               maxAmongConnected = std::max(maxAmongConnected, cumulativeLatencyByBuffer[(size_t)idx]);
          }
          for (int i = 0; i < entry.numInputs; i++)
          {
             const int idx = entry.inputBufferIndices[i];
-            if (idx < 0)
+            if (idx < 0 || idx >= (int)cumulativeLatencyByBuffer.size())
                continue;
-            const int delay = maxAmongConnected - cumulativeLatency[(size_t)idx];
+            const int delay = maxAmongConnected - cumulativeLatencyByBuffer[(size_t)idx];
             if (delay > 0)
                entry.inputCompensation[i].Prepare(delay, kAudioMaxChannels);
          }
@@ -24336,13 +24377,13 @@ namespace
       {
          int maxAmongTerminals = 0;
          for (const AudioTerminal& terminal : terminals)
-            if (terminal.bufferIndex >= 0)
-               maxAmongTerminals = std::max(maxAmongTerminals, cumulativeLatency[(size_t)terminal.bufferIndex]);
+            if (terminal.bufferIndex >= 0 && terminal.bufferIndex < (int)cumulativeLatencyByBuffer.size())
+               maxAmongTerminals = std::max(maxAmongTerminals, cumulativeLatencyByBuffer[(size_t)terminal.bufferIndex]);
          for (AudioTerminal& terminal : terminals)
          {
-            if (terminal.bufferIndex < 0)
+            if (terminal.bufferIndex < 0 || terminal.bufferIndex >= (int)cumulativeLatencyByBuffer.size())
                continue;
-            const int delay = maxAmongTerminals - cumulativeLatency[(size_t)terminal.bufferIndex];
+            const int delay = maxAmongTerminals - cumulativeLatencyByBuffer[(size_t)terminal.bufferIndex];
             if (delay > 0)
                terminal.compensation.Prepare(delay, kAudioMaxChannels);
          }
@@ -24351,7 +24392,7 @@ namespace
       AudioTopology topology;
       topology.order = std::move(order);
       topology.terminalBufferIndices = std::move(terminals);
-      topology.numBuffers = (int)topology.order.size();
+      topology.numBuffers = nextBufferIndex;
       AudioEngine::Instance().SetTopology(std::move(topology));
    }
 
@@ -31582,6 +31623,78 @@ static bool RunDrumSequencerFixture()
       }
       printf("DRUMSEQTEST lane resolver %s\n", resolverOk ? "OK" : "FAIL");
       ok &= resolverOk;
+   }
+
+   // ---- multi-output discrete lane routing test --------------------------
+   {
+      resetTransport();
+      DrumSequencerNode node;
+      node.rate = MusicTime::kSixteenth;
+      node.numSteps = 1;
+      bool pinsOk = (node.OutputCount() == 9);
+      if (pinsOk)
+      {
+         pinsOk &= (strcmp(node.OutputLabel(0), "out") == 0);
+         pinsOk &= (strcmp(node.OutputLabel(1), "1") == 0);
+         pinsOk &= (strcmp(node.OutputLabel(8), "8") == 0);
+         pinsOk &= (node.AudioOutputSlotForPin(0) == 0);
+         pinsOk &= (node.AudioOutputSlotForPin(3) == 3);
+      }
+      AudioNode* an = node.GetAudioNode();
+      bool audioOutOk = (an != nullptr && an->AudioOutputCount() == 9);
+
+      bool routingOk = pinsOk && audioOutOk;
+      if (routingOk)
+      {
+         node.LoadFileToLane(1, shortClickPath); // Load click into lane 2 (index 1)
+         node.stepVel[1][0] = 0.8f; // Program hit on lane 2 only
+         node.CookIfNeeded(1);
+         an->PrepareToPlay((double)sampleRate, blockSize);
+         node.CookIfNeeded(2);
+
+         constexpr int kBlock = 256;
+         float masterEnergy = 0.0f;
+         float lane1Energy = 0.0f;
+         float lane2Energy = 0.0f;
+         float lane3Energy = 0.0f;
+
+         for (int b = 0; b < 16; b++)
+         {
+            float outBufs[9][2][kBlock] = {};
+            float* outChanPtrs[9][2];
+            AudioBuffer outAudioBufs[9];
+            AudioBuffer* outPtrs[9];
+            for (int o = 0; o < 9; o++)
+            {
+               outChanPtrs[o][0] = outBufs[o][0];
+               outChanPtrs[o][1] = outBufs[o][1];
+               outAudioBufs[o].channels = outChanPtrs[o];
+               outAudioBufs[o].numChannels = 2;
+               outAudioBufs[o].numFrames = kBlock;
+               outPtrs[o] = &outAudioBufs[o];
+            }
+
+            transport.AdvanceAudioClock(kBlock);
+            an->ProcessBlockMulti(nullptr, 0, outPtrs, 9);
+
+            for (int i = 0; i < kBlock; i++)
+            {
+               masterEnergy += std::abs(outBufs[0][0][i]);
+               lane1Energy += std::abs(outBufs[1][0][i]);
+               lane2Energy += std::abs(outBufs[2][0][i]); // index 2 is lane 2 (pin 2)
+               lane3Energy += std::abs(outBufs[3][0][i]);
+            }
+         }
+
+         if (masterEnergy <= 1e-4f || lane2Energy <= 1e-4f || lane1Energy > 1e-6f || lane3Energy > 1e-6f)
+         {
+            printf("DRUMSEQTEST multi-output FAIL (master=%.4f lane2=%.4f lane1=%.4f lane3=%.4f)\n",
+                   masterEnergy, lane2Energy, lane1Energy, lane3Energy);
+            routingOk = false;
+         }
+      }
+      printf("DRUMSEQTEST multi-output lane routing %s\n", routingOk ? "OK" : "FAIL");
+      ok &= routingOk;
    }
 
    remove(shortClickPath.c_str());
@@ -46932,7 +47045,8 @@ int main(int argc, char** argv)
             // Drawing the same pin id through ed::BeginPin() twice in one
             // frame is not something imgui-node-editor supports.
             auto* geoTable = dynamic_cast<GeometryTableNode*>(gn.node.get());
-            const int outputs = geoTable != nullptr ? 4 : std::max(1, gn.node->OutputCount());
+            auto* drumSeq = dynamic_cast<DrumSequencerNode*>(gn.node.get());
+            const int outputs = geoTable != nullptr ? 4 : (drumSeq != nullptr ? 1 : std::max(1, gn.node->OutputCount()));
             std::vector<float> pinW(outputs);
             float itemW = 0.0f;
             for (int o = 0; o < outputs; o++)

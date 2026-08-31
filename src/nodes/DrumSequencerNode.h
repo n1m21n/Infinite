@@ -43,8 +43,16 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
-
    AudioNode* GetAudioNode() override;
+   int OutputCount() const override { return 1 + kNumLanes; }
+   const char* OutputLabel(int index) const override
+   {
+      static const char* kLabels[1 + kNumLanes] = {
+         "out", "1", "2", "3", "4", "5", "6", "7", "8"
+      };
+      return (index >= 0 && index < 1 + kNumLanes) ? kLabels[index] : nullptr;
+   }
+   int AudioOutputSlotForPin(int pinIndex) const override { return pinIndex; }
 
    // Opens the native audio dialog (mirrors SamplerNode::LoadFile) and loads
    // the result into `lane` (clamped 0..kNumLanes-1). Returns false, leaving

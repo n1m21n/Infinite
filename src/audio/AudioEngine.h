@@ -20,6 +20,7 @@
 // should ever exceed them. A block that somehow does gets truncated to the
 // cap rather than overrunning a pooled buffer - see AudioEngine::RunTopology.
 constexpr int kAudioMaxNodeInputs = 12;
+constexpr int kAudioMaxNodeOutputs = 12;
 constexpr int kAudioMaxBlockFrames = 4096;
 constexpr int kAudioMaxChannels = 8;
 
@@ -32,7 +33,9 @@ struct AudioTopologyEntry
    AudioNode* node = nullptr;
    int inputBufferIndices[kAudioMaxNodeInputs] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
    int numInputs = 0;
-   int outputBufferIndex = -1;
+   int outputBufferIndices[kAudioMaxNodeOutputs] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+   int numOutputs = 1;
+   int outputBufferIndex = -1; // primary output buffer (mirrors outputBufferIndices[0] for backwards compatibility)
 
    // Plugin/effect delay compensation (PDC): per input pin, the
    // CompensationDelay that pin's source branch needs so every pin merging

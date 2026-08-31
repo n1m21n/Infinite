@@ -237,8 +237,25 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
             inputPtrs[i] = &inputViews[i];
          }
       }
-      AudioBuffer output = list->buffers[entry.outputBufferIndex].View(numFrames, numChannels);
-      entry.node->ProcessBlock(inputPtrs, entry.numInputs, output);
+      const int numOuts = std::clamp(entry.numOutputs, 1, kAudioMaxNodeOutputs);
+      AudioBuffer outputViews[kAudioMaxNodeOutputs];
+      AudioBuffer* outputPtrs[kAudioMaxNodeOutputs];
+      for (int o = 0; o < numOuts; o++)
+      {
+         int outIdx = entry.outputBufferIndices[o];
+         if (outIdx < 0 && o == 0 && entry.outputBufferIndex >= 0)
+            outIdx = entry.outputBufferIndex;
+         if (outIdx >= 0 && outIdx < list->topology.numBuffers)
+         {
+            outputViews[o] = list->buffers[outIdx].View(numFrames, numChannels);
+            outputPtrs[o] = &outputViews[o];
+         }
+         else
+         {
+            outputPtrs[o] = nullptr;
+         }
+      }
+      entry.node->ProcessBlockMulti(inputPtrs, entry.numInputs, outputPtrs, numOuts);
    }
 
    // Scratch interleave buffer for capture rings - thread_local so it's

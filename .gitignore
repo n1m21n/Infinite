@@ -25,3 +25,4 @@ local-prompts/
 # never swept into this repo's history by git add -A. See
 # .claude/skills/repo-privacy-split.
 mcp-server/
+.worktrees/

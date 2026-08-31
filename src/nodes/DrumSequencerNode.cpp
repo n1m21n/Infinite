@@ -137,14 +137,32 @@ public:
    void PushBuffer(int lane, Platform::SampleBuffer* buf) { mSampleSlots[lane].Push(buf); }
    void DrainRetired() { for (auto& slot : mSampleSlots) slot.DrainRetired(); }
 
-   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int numInputs, AudioBuffer& buffer) override
+   int AudioOutputCount() const override { return 1 + kNumLanes; }
+
+   void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& buffer) override
    {
-      (void)numInputs;
+      AudioBuffer* outPtrs[1] = { &buffer };
+      ProcessBlockMulti(inputs, numInputs, outPtrs, 1);
+   }
+
+   void ProcessBlockMulti(const AudioBuffer* const* /*inputs*/, int /*numInputs*/,
+                          AudioBuffer* const* outputs, int numOutputs) override
+   {
       for (auto& slot : mSampleSlots)
          slot.SwapIn();
 
-      for (int ch = 0; ch < buffer.numChannels; ch++)
-         std::fill(buffer.channels[ch], buffer.channels[ch] + buffer.numFrames, 0.0f);
+      for (int o = 0; o < numOutputs; o++)
+      {
+         if (outputs[o] == nullptr)
+            continue;
+         for (int ch = 0; ch < outputs[o]->numChannels; ch++)
+            std::fill(outputs[o]->channels[ch], outputs[o]->channels[ch] + outputs[o]->numFrames, 0.0f);
+      }
+
+      if (numOutputs == 0 || outputs[0] == nullptr)
+         return;
+
+      const int numFrames = outputs[0]->numFrames;
 
       // ---- schedule this block's step boundaries -------------------------
       // Sample-accurate: derived every block from Transport's own position,
@@ -194,7 +212,7 @@ public:
                   {
                      const double frac = span > 1e-9 ? (landmark - mPrevRawPos) / span : 0.0;
                      const int frameOffset =
-                        std::clamp((int)(frac * buffer.numFrames), 0, std::max(0, buffer.numFrames - 1));
+                        std::clamp((int)(frac * numFrames), 0, std::max(0, numFrames - 1));
                      stepEvts[numStepEvts++] = { lane, frameOffset, v };
                   }
                }
@@ -224,7 +242,7 @@ public:
       }
 
       int stepIdx = 0;
-      for (int i = 0; i < buffer.numFrames; i++)
+      for (int i = 0; i < numFrames; i++)
       {
          // Advance every lane's smoothed continuous params exactly once per
          // sample (ParamMailbox has one smoother per id - calling
@@ -251,6 +269,9 @@ public:
             stepIdx++;
 
          float sampleL = 0.0f, sampleR = 0.0f;
+         float laneL[kNumLanes] = {};
+         float laneR[kNumLanes] = {};
+
          for (int v = 0; v < kNumVoices; v++)
          {
             Voice& voice = mVoices[v];
@@ -276,18 +297,38 @@ public:
 
             const float totalAmp = ampAttack * voice.boostEnv * voice.decayAmp * voice.velocity;
             const float s = ReadSample(*voice.buffer, voice.readPos) * totalAmp;
-            sampleL += s * voice.panL;
-            sampleR += s * voice.panR;
+            const float vL = s * voice.panL;
+            const float vR = s * voice.panR;
+
+            sampleL += vL;
+            sampleR += vR;
+            laneL[lane] += vL;
+            laneR[lane] += vR;
 
             voice.readPos += voice.rate;
             if (voice.readPos >= voice.endFrame - 1 || (voice.decayCoeff < 1.0f && totalAmp < 1e-4f))
                voice.active = false;
          }
 
-         if (buffer.numChannels > 0)
-            buffer.channels[0][i] = sampleL * masterVolNow;
-         if (buffer.numChannels > 1)
-            buffer.channels[1][i] = sampleR * masterVolNow;
+         if (outputs[0] != nullptr)
+         {
+            if (outputs[0]->numChannels > 0)
+               outputs[0]->channels[0][i] = sampleL * masterVolNow;
+            if (outputs[0]->numChannels > 1)
+               outputs[0]->channels[1][i] = sampleR * masterVolNow;
+         }
+
+         for (int lane = 0; lane < kNumLanes; lane++)
+         {
+            const int outIdx = 1 + lane;
+            if (outIdx < numOutputs && outputs[outIdx] != nullptr)
+            {
+               if (outputs[outIdx]->numChannels > 0)
+                  outputs[outIdx]->channels[0][i] = laneL[lane];
+               if (outputs[outIdx]->numChannels > 1)
+                  outputs[outIdx]->channels[1][i] = laneR[lane];
+            }
+         }
       }
    }
 
