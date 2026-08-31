@@ -69,17 +69,23 @@ namespace
       }
    };
 
-   // COM init for the calling thread; matches AudioDeviceWin's pattern.
+   // COM init for the calling thread; matches AudioDeviceWin's pattern,
+   // including tolerating a thread the JUCE plugin backend already put in STA
+   // (RPC_E_CHANGED_MODE): Media Foundation works in either apartment, so use
+   // the existing one and only CoUninitialize an init that was ours.
    struct ComScope
    {
       bool ok = false;
+      bool owned = false;
       ComScope()
       {
-         ok = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+         const HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+         if (SUCCEEDED(hr)) { ok = true; owned = true; }
+         else if (hr == RPC_E_CHANGED_MODE) { ok = true; owned = false; }
       }
       ~ComScope()
       {
-         if (ok)
+         if (owned)
             CoUninitialize();
       }
    };
@@ -321,6 +327,12 @@ namespace
       // cleared by a seek. Read by VideoDecodeIsCatchingUp so an offline
       // stepper can tell "not decoded yet" from "there is nothing more".
       std::atomic<bool> endOfStream{ false };
+      // Furthest frame timestamp ever decoded, never reset by a seek. Once
+      // endOfStream is set this is the clip's true last-frame time, which is
+      // how VideoObservedEndSeconds recovers a duration for containers whose
+      // header declares none (VideoDuration would return 0 for those). -1
+      // until the first frame decodes.
+      std::atomic<long long> maxDecodedHns{ -1 };
       // Written by the decode thread before threadDone's release store.
       std::string error;
 
@@ -610,6 +622,8 @@ namespace
             continue;
          }
          video->decodeHeadHns.store((long long)timeHns, std::memory_order_release);
+         if (timeHns > video->maxDecodedHns.load(std::memory_order_relaxed))
+            video->maxDecodedHns.store((long long)timeHns, std::memory_order_release);
          frame.timeHns = timeHns;
 
          std::lock_guard<std::mutex> lock(video->mutex);
@@ -627,12 +641,118 @@ namespace
 
 namespace Platform
 {
-   VideoHandle* VideoOpen(const std::string& path, std::string& outError)
+   // ---- ffmpeg fallback for formats Media Foundation can't open -----------
+   //
+   // MF only decodes what Windows has a codec for (mp4/H.264/HEVC, wmv, ...).
+   // For anything else (webm/vp9, mkv, ProRes, many mov variants) we transcode
+   // once, with ffmpeg, into a temp H.264 mp4 that MF *can* read, cache it, and
+   // open THAT through the normal MF path below - so loop, seek, scrub, trim,
+   // duration and the audio-track decode all keep working with no second decode
+   // engine. ffmpeg.exe is looked up next to the app, then on PATH; if it isn't
+   // present the original MF error is what surfaces. See VideoTranscodeCachePath
+   // (reused by the audio-track decoder) for the cache key.
+
+   static std::wstring VideoAppDirW()
+   {
+      std::wstring path(32768, L'\0');
+      const DWORD n = GetModuleFileNameW(nullptr, path.data(), (DWORD)path.size());
+      path.resize(n);
+      const size_t slash = path.find_last_of(L"/\\");
+      return slash == std::wstring::npos ? std::wstring() : path.substr(0, slash + 1);
+   }
+
+   static bool VideoFileExistsW(const std::wstring& p)
+   {
+      const DWORD attr = GetFileAttributesW(p.c_str());
+      return attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+   }
+
+   static std::wstring VideoFfmpegExeW()
+   {
+      const std::wstring beside = VideoAppDirW() + L"ffmpeg.exe";
+      if (VideoFileExistsW(beside))
+         return beside;
+      return L"ffmpeg.exe"; // rely on PATH
+   }
+
+   // %TEMP%\infinite_transcode\<hash>.mp4, hash of path + size + mtime so a
+   // changed source re-transcodes and reopening the same file reuses the temp.
+   std::wstring VideoTranscodeCachePath(const std::wstring& srcW)
+   {
+      unsigned long long tag = 1469598103934665603ULL; // FNV-1a offset basis
+      auto mix = [&tag](const void* p, size_t len)
+      {
+         const unsigned char* b = static_cast<const unsigned char*>(p);
+         for (size_t i = 0; i < len; i++) { tag ^= b[i]; tag *= 1099511628211ULL; }
+      };
+      mix(srcW.data(), srcW.size() * sizeof(wchar_t));
+      WIN32_FILE_ATTRIBUTE_DATA fad{};
+      if (GetFileAttributesExW(srcW.c_str(), GetFileExInfoStandard, &fad))
+      {
+         mix(&fad.nFileSizeLow, sizeof(fad.nFileSizeLow));
+         mix(&fad.nFileSizeHigh, sizeof(fad.nFileSizeHigh));
+         mix(&fad.ftLastWriteTime, sizeof(fad.ftLastWriteTime));
+      }
+
+      wchar_t tmp[MAX_PATH];
+      const DWORD n = GetTempPathW(MAX_PATH, tmp);
+      std::wstring dir = (n > 0 && n < MAX_PATH) ? std::wstring(tmp, n) : std::wstring(L".\\");
+      dir += L"infinite_transcode\\";
+      CreateDirectoryW(dir.c_str(), nullptr);
+
+      static const wchar_t* kHex = L"0123456789abcdef";
+      std::wstring hex(16, L'0');
+      for (int i = 15; i >= 0; i--) { hex[i] = kHex[tag & 0xF]; tag >>= 4; }
+      return dir + hex + L".mp4";
+   }
+
+   // Blocking transcode. Returns true if outW exists afterwards. Runs ffmpeg
+   // hidden; ultrafast keeps first-open latency down, H.264/yuv420p/AAC is the
+   // most MF-friendly result, +faststart makes MF's seeking clean.
+   static bool VideoRunFfmpegTranscode(const std::wstring& inW, const std::wstring& outW,
+                                       std::string& outError)
+   {
+      const std::wstring ff = VideoFfmpegExeW();
+      std::wstring cmd = L"\"" + ff + L"\" -y -hide_banner -loglevel error -i \"" + inW +
+                         L"\" -map 0:v:0 -c:v libx264 -preset ultrafast -pix_fmt yuv420p " +
+                         L"-map 0:a:0? -c:a aac -movflags +faststart \"" + outW + L"\"";
+
+      std::vector<wchar_t> mutableCmd(cmd.begin(), cmd.end());
+      mutableCmd.push_back(L'\0');
+
+      STARTUPINFOW si{};
+      si.cb = sizeof(si);
+      si.dwFlags = STARTF_USESHOWWINDOW;
+      si.wShowWindow = SW_HIDE;
+      PROCESS_INFORMATION pi{};
+      const BOOL ok = CreateProcessW(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE,
+                                     CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+      if (!ok)
+      {
+         outError = "ffmpeg.exe not found (put it next to Infinite.exe or on PATH)";
+         return false;
+      }
+      WaitForSingleObject(pi.hProcess, INFINITE);
+      DWORD exitCode = 1;
+      GetExitCodeProcess(pi.hProcess, &exitCode);
+      CloseHandle(pi.hProcess);
+      CloseHandle(pi.hThread);
+      if (exitCode != 0 || !VideoFileExistsW(outW))
+      {
+         outError = "ffmpeg could not transcode this file";
+         return false;
+      }
+      return true;
+   }
+
+   // The original synchronous MF open, now taking a wide path so the ffmpeg
+   // fallback can reopen the transcoded temp through the exact same path.
+   static VideoHandleMf* OpenMfReader(const std::wstring& widePath, std::string& outError)
    {
       outError.clear();
 
       auto* video = new VideoHandleMf();
-      video->widePath = WinCommon::Utf8ToWide(path);
+      video->widePath = widePath;
 
       try
       {
@@ -651,16 +771,51 @@ namespace Platform
       for (int waitedMs = 0; waitedMs < 4000; waitedMs += 25)
       {
          if (video->running.load(std::memory_order_acquire))
-            return reinterpret_cast<VideoHandle*>(video);
+            return video;
          if (video->threadDone.load(std::memory_order_acquire))
             break; // thread failed during setup; error is published
          Sleep(25);
       }
 
       if (video->running.load(std::memory_order_acquire))
-         return reinterpret_cast<VideoHandle*>(video);
+         return video;
       outError = video->error.empty() ? std::string("could not open video") : video->error;
       delete video; // dtor signals stop and joins
+      return nullptr;
+   }
+
+#if !defined(INFINITE_WIN_VIDEO_FFMPEG)
+   // The video-picture playback functions (VideoOpen..VideoDecodeIsCatchingUp).
+   // These are the ONLY functions the FFMPEG/OpenCV backend replaces; when it
+   // is selected they come from MediaFfmpegWin.cpp instead and this block is
+   // compiled out. Camera capture, the recorder, and DecodeVideoAudioTrackToBuffer
+   // (below) always stay on Media Foundation regardless of the video backend.
+   VideoHandle* VideoOpen(const std::string& path, std::string& outError)
+   {
+      outError.clear();
+      const std::wstring srcW = WinCommon::Utf8ToWide(path);
+
+      // Fast path: let Media Foundation open it directly.
+      std::string mfError;
+      if (VideoHandleMf* mf = OpenMfReader(srcW, mfError))
+         return reinterpret_cast<VideoHandle*>(mf);
+
+      // MF can't - transcode once (cached) and open the temp through MF.
+      const std::wstring cacheW = VideoTranscodeCachePath(srcW);
+      if (!VideoFileExistsW(cacheW))
+      {
+         std::string ffErr;
+         if (!VideoRunFfmpegTranscode(srcW, cacheW, ffErr))
+         {
+            outError = mfError.empty() ? ffErr : (mfError + " | ffmpeg fallback: " + ffErr);
+            return nullptr;
+         }
+      }
+
+      std::string tempErr;
+      if (VideoHandleMf* mf = OpenMfReader(cacheW, tempErr))
+         return reinterpret_cast<VideoHandle*>(mf);
+      outError = "ffmpeg-transcoded temp still unreadable: " + tempErr;
       return nullptr;
    }
 
@@ -685,6 +840,21 @@ namespace Platform
    {
       auto* video = reinterpret_cast<VideoHandleMf*>(handle);
       return video != nullptr ? video->durationSeconds : 0.0;
+   }
+
+   bool VideoAtEnd(VideoHandle* handle)
+   {
+      auto* video = reinterpret_cast<VideoHandleMf*>(handle);
+      return video != nullptr && video->endOfStream.load(std::memory_order_acquire);
+   }
+
+   double VideoObservedEndSeconds(VideoHandle* handle)
+   {
+      auto* video = reinterpret_cast<VideoHandleMf*>(handle);
+      if (video == nullptr || !video->endOfStream.load(std::memory_order_acquire))
+         return -1.0;
+      const long long hns = video->maxDecodedHns.load(std::memory_order_acquire);
+      return hns >= 0 ? (double)hns / 10000000.0 : -1.0;
    }
 
    // Non-blocking: publishes `seconds` for the decode thread and hands back the
@@ -760,6 +930,7 @@ namespace Platform
       return video->decodeHeadHns.load(std::memory_order_acquire) <
              video->targetHns.load(std::memory_order_acquire);
    }
+#endif // !INFINITE_WIN_VIDEO_FFMPEG
 
    // Decodes a video container's audio track in full, up front, into a
    // planar-float SampleBuffer - the same shape DecodeAudioFileToBuffer
@@ -781,11 +952,21 @@ namespace Platform
       }
 
       IMFSourceReader* reader = nullptr;
-      HRESULT hr = MFCreateSourceReaderFromURL(WinCommon::Utf8ToWide(path).c_str(), nullptr, &reader);
+      const std::wstring srcW = WinCommon::Utf8ToWide(path);
+      HRESULT hr = MFCreateSourceReaderFromURL(srcW.c_str(), nullptr, &reader);
       if (FAILED(hr))
       {
-         outError = WinCommon::HrToString("opening file", hr);
-         return false;
+         // MF can't open the source. If VideoOpen already transcoded this exact
+         // file to a temp mp4 (same cache key), pull the audio from that so an
+         // exotic-format clip's sound plays too, not just its picture.
+         const std::wstring cacheW = VideoTranscodeCachePath(srcW);
+         if (VideoFileExistsW(cacheW))
+            hr = MFCreateSourceReaderFromURL(cacheW.c_str(), nullptr, &reader);
+         if (FAILED(hr))
+         {
+            outError = WinCommon::HrToString("opening file", hr);
+            return false;
+         }
       }
 
       // Selecting the audio stream fails when the container has none - that

@@ -1,0 +1,17 @@
+--- a/CMakeLists.txt	2026-08-31 05:20:06.256834349 +0000
++++ b/CMakeLists.txt	2026-08-31 05:19:28.758471859 +0000
+@@ -542,6 +542,14 @@
+ endif()
+ 
+ if(WIN32)
++    # PluginHostWin.cpp is the generic Plugin* API that forwards to the raw
++    # PluginVST3* backend. The JUCE backend (PluginJuceWin.cpp) provides those
++    # same Plugin* functions itself, so compiling both would be a duplicate
++    # symbol - and PluginHostWin's PluginVST3* calls would be unresolved without
++    # the raw backend. So drop it from the source list when JUCE is selected.
++    if(INFINITE_WIN_PLUGIN_BACKEND STREQUAL "JUCE")
++        list(REMOVE_ITEM WIN32_SOURCES src/platform/win/PluginHostWin.cpp)
++    endif()
+     target_sources(Infinite PRIVATE ${WIN32_SOURCES})
+ 
+     # Video backend selection. FFMPEG (OpenCV) swaps in the picture-playback

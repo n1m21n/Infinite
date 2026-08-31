@@ -88,10 +88,17 @@ void PluginScanner::StartScan(const std::string& folder)
    else
    {
 #if defined(_WIN32)
-      // Steinberg's system-wide VST3 location; the per-user %LOCALAPPDATA%
-      // one only exists if the user or an installer created it.
+      // The two locations the VST3 spec defines on Windows. The system-wide one
+      // under %COMMONPROGRAMFILES% is where most installers drop plugins; the
+      // per-user %LOCALAPPDATA%\Programs\Common\VST3 one only exists if an
+      // installer (or the user) created it, but plenty of vendors now default
+      // to it, so scanning only the first is what made a machine full of VST3s
+      // still come up empty. Both are walked; a missing folder is a harmless
+      // no-op in the directory walk.
       if (const char* common = getenv("COMMONPROGRAMFILES"))
          vst3Folders.push_back(std::string(common) + "\\VST3");
+      if (const char* localAppData = getenv("LOCALAPPDATA"))
+         vst3Folders.push_back(std::string(localAppData) + "\\Programs\\Common\\VST3");
 #else
       vst3Folders.push_back("/Library/Audio/Plug-Ins/VST3");
       const char* home = getenv("HOME");

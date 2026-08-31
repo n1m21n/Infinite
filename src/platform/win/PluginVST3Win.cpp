@@ -729,8 +729,19 @@ namespace
          return;
       }
 
+      // Hard bound on the retry loop below. Each non-clean pass is guaranteed
+      // to remove at least one bundle (see the forward-progress block), so the
+      // loop already terminates in <= N passes; this is a belt-and-suspenders
+      // cap so a pathological case can never leave the scan spinning forever
+      // (the "hit Rescan and it stays scanning and never stops" symptom).
+      const size_t maxIterations = bundlesToScan.size() * 2 + 8;
+      size_t iterationGuard = 0;
+
       while (!bundlesToScan.empty())
       {
+         if (++iterationGuard > maxIterations)
+            break; // give up on the rest, publish whatever was described
+
          auto it = bundlesToScan.begin();
          while (it != bundlesToScan.end())
          {
@@ -759,6 +770,10 @@ namespace
             break;
 
          std::vector<Platform::PluginDesc> parsed = ParseProbeOutput(output);
+         std::vector<std::string> describedPaths;
+         for (const Platform::PluginDesc& d : parsed)
+            if (!d.path.empty())
+               describedPaths.push_back(d.path);
          for (Platform::PluginDesc& d : parsed)
             out.push_back(std::move(d));
 
@@ -775,6 +790,38 @@ namespace
          // identifies and blocklists the offender on the next launch, same
          // as the single-probe path.
          EnsureSentinelCheckedOnce();
+
+         // Forward-progress guarantee. First drop every bundle this pass
+         // already described, so the next pass neither re-lists them nor
+         // re-crashes the child on its way back to the offender.
+         for (const std::string& described : describedPaths)
+         {
+            auto jt = bundlesToScan.begin();
+            while (jt != bundlesToScan.end())
+            {
+               if (*jt == described)
+                  jt = bundlesToScan.erase(jt);
+               else
+                  ++jt;
+            }
+         }
+
+         // If the pass described nothing at all, the batch child died on the
+         // very first bundle (it probes in list order), and the sentinel may
+         // not have persisted the blocklist entry on this machine - so blocklist
+         // that front bundle ourselves and move on. This is what turns an
+         // un-attributed crasher from an infinite "scanning..." into "one bad
+         // plugin skipped, the rest listed".
+         if (describedPaths.empty() && !bundlesToScan.empty())
+         {
+            const std::string offender = bundlesToScan.front();
+            {
+               std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+               AddToBlocklistLocked(offender);
+            }
+            RecordScanFailure(offender);
+            bundlesToScan.erase(bundlesToScan.begin());
+         }
       }
    }
 }

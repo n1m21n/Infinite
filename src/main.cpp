@@ -4882,6 +4882,49 @@ namespace
       ModCheckbox("loop", &n->loop);
       ModSlider("speed", &n->speed, -2.0f, 4.0f);
 
+      // Transport extras. Raw ImGui (not Mod*) on purpose: adding modulation
+      // param pins here would renumber the audio params below them and break
+      // saved modulation bindings, so these stay plain controls.
+      ImGui::Checkbox("reverse", &n->reverse);
+
+      const double dur = n->Duration();
+      if (dur > 0.0)
+      {
+         // While not scrubbing, keep the scrub handle tracking the live
+         // playhead so flipping scrub on grabs the current frame, not 0.
+         if (!n->scrub)
+            n->scrubSeconds = (float)n->Position();
+
+         bool scrubBool = n->scrub;
+         if (ImGui::Checkbox("scrub", &scrubBool))
+         {
+            n->scrub = scrubBool;
+            if (scrubBool)
+               n->scrubSeconds = (float)n->Position();
+         }
+         if (n->scrub)
+         {
+            ImGui::SetNextItemWidth(kPreviewSize);
+            ImGui::SliderFloat("##scrubpos", &n->scrubSeconds, 0.0f, (float)dur, "%.2fs");
+         }
+
+         float inS = n->trimIn;
+         float outS = (n->trimOut > 0.0f) ? n->trimOut : (float)dur;
+         ImGui::SetNextItemWidth(kPreviewSize);
+         if (ImGui::SliderFloat("trim in", &inS, 0.0f, (float)dur, "%.2fs"))
+            n->trimIn = std::clamp(inS, 0.0f, std::max(0.0f, outS - 0.05f));
+         ImGui::SetNextItemWidth(kPreviewSize);
+         if (ImGui::SliderFloat("trim out", &outS, 0.0f, (float)dur, "%.2fs"))
+         {
+            const float clamped = std::clamp(outS, n->trimIn + 0.05f, (float)dur);
+            n->trimOut = (clamped >= (float)dur - 1e-3f) ? 0.0f : clamped; // 0 == to end
+         }
+      }
+      else
+      {
+         ImGui::TextDisabled("scrub/trim: play once to detect length");
+      }
+
       NodeSeparator();
       if (n->HasAudio())
       {
@@ -6396,6 +6439,7 @@ namespace
 
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       ImGui::TextDisabled("%s", n->Status().c_str());
+      ImGui::TextDisabled("engine: %s", Platform::MattingBackend().c_str());
       ImGui::PopTextWrapPos();
 
       ModSlider("feather", &n->feather, 0.0f, 4.0f);
@@ -6407,7 +6451,7 @@ namespace
       ModCheckbox("auto refresh (video)", &n->autoRefresh);
       if (n->autoRefresh)
       {
-         ModSlider("every beats", &n->refreshBeats, 0.1f, 8.0f);
+         ModSlider("every N frames", &n->refreshFrames, 1.0f, 120.0f, "%.0f");
       }
    }
 
@@ -48633,6 +48677,13 @@ int main(int argc, char** argv)
                   }
                   if (matches.empty())
                      continue;
+                  // Alphabetical within each category (by the visible display
+                  // name), so the grouped Modules list is easy to scan instead
+                  // of following registration order.
+                  std::stable_sort(matches.begin(), matches.end(),
+                                   [](const std::string& a, const std::string& b) {
+                     return ILess(DisplayName(a), DisplayName(b));
+                  });
                   if (gModulesFilter.descending)
                      std::reverse(matches.begin(), matches.end());
 
@@ -49586,7 +49637,7 @@ int main(int argc, char** argv)
       // unserviced - see local-prompts/02-plugin-editor-lag.md. Pump it here
       // so a hosted plugin's editor window (the app's only real NSWindow)
       // doesn't sit starved for the length of a heavy cook.
-      if (Platform::AnyPluginEditorOpen())
+      if (Platform::AnyPluginEditorOpen() || Platform::PluginHostNeedsPump())
          Platform::PumpPluginEditorEvents();
 
       // Top-level idle gate: NodeWorkCounter() only advances when some node
@@ -49772,7 +49823,7 @@ int main(int argc, char** argv)
 
       // glfwSwapBuffers blocks on vsync - dead time for AppKit to service a
       // hosted plugin's editor window. See local-prompts/02-plugin-editor-lag.md.
-      if (Platform::AnyPluginEditorOpen())
+      if (Platform::AnyPluginEditorOpen() || Platform::PluginHostNeedsPump())
          Platform::PumpPluginEditorEvents();
 
       // Projector output: blit this frame's cooked result of each open
@@ -49875,7 +49926,7 @@ int main(int argc, char** argv)
       {
          const double budget = 1.0 / (double)gTargetFps;
          const double deadline = gFrameStart + budget;
-         if (Platform::AnyPluginEditorOpen())
+         if (Platform::AnyPluginEditorOpen() || Platform::PluginHostNeedsPump())
          {
             // Spend the idle slack servicing the editor's run loop instead of
             // sleeping through it - see local-prompts/02-plugin-editor-lag.md.

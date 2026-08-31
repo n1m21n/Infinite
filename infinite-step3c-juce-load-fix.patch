@@ -1,0 +1,47 @@
+--- a/src/platform/win/PluginJuceWin.cpp	2026-08-31 05:20:32.814470989 +0000
++++ b/src/platform/win/PluginJuceWin.cpp	2026-08-31 05:47:02.581666572 +0000
+@@ -55,7 +55,10 @@
+       // v1/v2 were populated while scans launched the full Infinite app as the
+       // child process. v3 belongs to the dedicated minimal scanner helper, so
+       // every bundle gets one clean retry under the corrected architecture.
+-      fs::path BlocklistPath() { return fs::u8path(AppPaths::AppSupportDir()) / "PluginVST3Blocklist-v3.txt"; }
++      // v4: the in-process JUCE backend no longer auto-blocklists on a failed
++      // describe (that wrongly hid working plugins), so start from a clean file
++      // and drop any stale v3 entries a working plugin got stuck in.
++      fs::path BlocklistPath() { return fs::u8path(AppPaths::AppSupportDir()) / "PluginVST3Blocklist-v4.txt"; }
+ 
+       void VstLog(const std::string& message)
+       {
+@@ -326,11 +329,15 @@
+             for (auto& d : descs)
+                out.push_back(std::move(d));
+          }
+-         catch (...) { AddToBlocklist(path); VstLog("scan threw for " + path); }
++         catch (...) { VstLog("scan threw for " + path); }
+          if (described)
+             VstLog("scan success: " + path);
+          else
+          {
++            // Record as a failure the panel surfaces, but do NOT auto-blocklist:
++            // a describe that throws or comes up empty shouldn't permanently
++            // hide a plugin (that is what made a working plugin vanish after one
++            // bad pass). The blocklist stays a manual/explicit tool.
+             gScanFailures.push_back(path);
+             VstLog("scan failed: " + path);
+          }
+@@ -357,6 +364,15 @@
+ 
+    void SetVST3SearchFolders(const std::vector<std::string>& folders)
+    {
++      // Pin JUCE's GUI MessageManager to the MAIN thread. This runs at startup
++      // from PluginScanner::LoadFromDisk (main thread), before any Rescan can
++      // spin up the background scan thread. Without this, the in-process scan
++      // would be the first to touch JUCE and would create the MessageManager on
++      // the background thread - and then createPluginInstanceAsync's completion
++      // (posted to that thread) would never run against the pump we do on the
++      // main thread in PluginPoll, so a plugin would sit "loading" forever.
++      EnsureJuceInitialised();
++
+       std::lock_guard<std::mutex> lock(gPathMutex);
+       gSearchFolders = folders;
+    }

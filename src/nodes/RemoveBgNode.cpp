@@ -9,7 +9,16 @@
 
 namespace
 {
+   // The macOS Vision request types (subject lifting vs. person segmentation)
+   // don't exist on Windows, where a single salient-object model (u2netp) runs
+   // through ONNX Runtime + DirectML and the mode is ignored entirely - so
+   // showing the macOS-only labels there was misleading. Each platform gets the
+   // options it can actually honour.
+#if defined(_WIN32)
+   const std::vector<std::string> kModeNames = { "Salient subject (GPU)" };
+#else
    const std::vector<std::string> kModeNames = { "Subject (macOS 14+)", "Person (macOS 12+)" };
+#endif
    const std::vector<std::string> kOutputModeNames = { "Cutout", "Mask only", "Background only" };
 
    const char* kFragSrc =
@@ -240,17 +249,18 @@ void RemoveBgNode::CookIfNeeded(int frameId)
 
    PollMaskResult();
 
-   // Auto-refresh is rate-limited by the transport, not the frame rate:
-   // segmentation is far too expensive to run every frame. With the worker
-   // in place, a request that arrives while nothing is in flight is honoured
-   // immediately rather than waiting for the next beat boundary.
+   // Auto-refresh is rate-limited by the render frame counter, not the musical
+   // transport: segmentation is far too expensive to run every frame, and for
+   // video the natural cadence is "every N frames" (tied to fps), not "every N
+   // beats" (tied to BPM). With the worker in place, a request that arrives
+   // while nothing is in flight is honoured immediately.
    if (autoRefresh)
    {
-      const double beat = Transport::Instance().Beats();
-      if (beat < mLastMaskBeat || beat - mLastMaskBeat >= std::max(0.1f, refreshBeats))
+      const int interval = std::max(1, (int)(refreshFrames + 0.5f));
+      if (frameId < mLastMaskFrame || frameId - mLastMaskFrame >= interval)
       {
          mNeedsMask = true;
-         mLastMaskBeat = beat;
+         mLastMaskFrame = frameId;
       }
    }
 

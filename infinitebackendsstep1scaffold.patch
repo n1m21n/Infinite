@@ -1,0 +1,48 @@
+--- a/CMakeLists.txt	2026-08-31 01:11:43.604558210 +0000
++++ b/CMakeLists.txt	2026-08-31 01:46:52.860683591 +0000
+@@ -174,6 +174,45 @@
+ # sign-off - it's a licensing decision, not a technical one.
+ option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" ON)
+ 
++# ---- Windows engine backends (see docs/WINDOWS_BACKENDS proposal) -----------
++#
++# Each OS-specific capability can be backed by more than one library. CMake
++# picks exactly ONE backend per capability; every backend of a capability
++# implements the same Platform.h functions, so only one .cpp is ever compiled
++# and there is never a duplicate symbol - and no #if leaks into common code.
++#
++# Defaults reproduce today's build exactly, and every backend lives entirely
++# under if(WIN32) or in Windows-only .cpp files. The macOS target compiles
++# APPLE_SOURCES + COMMON_SOURCES only and never sees any of this, so no backend
++# choice here can affect the mac build.
++#
++# This first commit is scaffolding only: it declares the option surface and
++# fails fast on a not-yet-implemented choice. The FFMPEG and JUCE backends land
++# in later self-contained commits that add their own sources and dependencies,
++# each guarded by these options.
++set(INFINITE_WIN_VIDEO_BACKEND  "MF"      CACHE STRING "Windows video/media backend: MF | FFMPEG")
++set(INFINITE_WIN_PLUGIN_BACKEND "VST3RAW" CACHE STRING "Windows plugin host backend: VST3RAW | JUCE")
++set_property(CACHE INFINITE_WIN_VIDEO_BACKEND  PROPERTY STRINGS "MF" "FFMPEG")
++set_property(CACHE INFINITE_WIN_PLUGIN_BACKEND PROPERTY STRINGS "VST3RAW" "JUCE")
++
++# One flag to select the heavier, more capable engines together.
++option(INFINITE_WIN_PROFILE_PERFORMANCE "Windows: use the FFMPEG + JUCE backends" OFF)
++if(INFINITE_WIN_PROFILE_PERFORMANCE)
++    set(INFINITE_WIN_VIDEO_BACKEND  "FFMPEG")
++    set(INFINITE_WIN_PLUGIN_BACKEND "JUCE")
++endif()
++
++if(WIN32)
++    if(NOT INFINITE_WIN_VIDEO_BACKEND STREQUAL "MF")
++        message(FATAL_ERROR "INFINITE_WIN_VIDEO_BACKEND=${INFINITE_WIN_VIDEO_BACKEND} is not implemented yet "
++                            "(only MF is wired up so far). The FFMPEG backend arrives in a later commit.")
++    endif()
++    if(NOT INFINITE_WIN_PLUGIN_BACKEND STREQUAL "VST3RAW")
++        message(FATAL_ERROR "INFINITE_WIN_PLUGIN_BACKEND=${INFINITE_WIN_PLUGIN_BACKEND} is not implemented yet "
++                            "(only VST3RAW is wired up so far). The JUCE backend arrives in a later commit.")
++    endif()
++endif()
++
+ set(IMGUI_DIR external/imgui)
+ set(NODE_EDITOR_DIR external/imgui-node-editor)
+ set(STB_DIR external/stb)

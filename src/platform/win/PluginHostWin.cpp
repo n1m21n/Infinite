@@ -274,6 +274,11 @@ namespace Platform
       return PluginVST3PumpEditorEvents();
    }
 
+   // The raw VST3 host drives editor events off its own HWND pump, gated on an
+   // open editor like mac - it has no separate message loop to starve, so no
+   // always-on pump is needed. JUCE is the backend that does; see its override.
+   bool PluginHostNeedsPump() { return false; }
+
    bool PluginSaveState(PluginHandle* handle, std::string& outBase64)
    {
       outBase64.clear();
@@ -453,6 +458,8 @@ namespace Platform
    {
       return false;
    }
+
+   bool PluginHostNeedsPump() { return false; }
 
    bool PluginSaveState(PluginHandle* handle, std::string& outBase64)
    {

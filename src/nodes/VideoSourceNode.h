@@ -60,10 +60,30 @@ public:
    bool audioEnabled = true;
    float volume = 1.0f;
 
+   // Playback direction. Kept separate from a negative `speed` so the speed
+   // slider can stay a positive magnitude and reverse is a plain toggle; the
+   // two combine into the signed rate used to advance the position.
+   bool reverse = false;
+
+   // Trim points, in seconds. Playback (and the loop wrap) is confined to
+   // [trimIn, trimOut). trimOut <= 0 means "until the end of the clip", so a
+   // freshly loaded clip with both at their defaults plays in full.
+   float trimIn = 0.0f;
+   float trimOut = 0.0f;
+
+   // Scrub: when on, the transport no longer drives the position - it is set
+   // directly from scrubSeconds, so the user can drag to any frame. scrubSeconds
+   // is clamped into the active trim range.
+   bool scrub = false;
+   float scrubSeconds = 0.0f;
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Text("path", mLoadedPath);
       v.Bool("loop", loop); v.Float("speed", speed);
+      v.Bool("reverse", reverse);
+      v.Float("trimIn", trimIn); v.Float("trimOut", trimOut);
+      v.Bool("scrub", scrub); v.Float("scrubSeconds", scrubSeconds);
       v.Bool("audioEnabled", audioEnabled); v.Float("volume", volume);
    }
 

@@ -1,0 +1,62 @@
+--- a/src/platform/win/AudioDeviceWin.cpp	2026-08-31 05:20:32.074512234 +0000
++++ b/src/platform/win/AudioDeviceWin.cpp	2026-08-31 06:00:17.385655779 +0000
+@@ -121,12 +121,28 @@
+    struct ComScope
+    {
+       bool ok = false;
++      bool owned = false; // did WE initialize COM (so must balance CoUninitialize)?
+       explicit ComScope()
+       {
+          const HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+-         ok = SUCCEEDED(hr); // S_FALSE (already initialized) counts as success
++         if (SUCCEEDED(hr))
++         {
++            // S_OK or S_FALSE (already MTA): we now hold a COM reference to
++            // release on scope exit.
++            ok = true;
++            owned = true;
++         }
++         else if (hr == RPC_E_CHANGED_MODE)
++         {
++            // COM is already initialized on this thread in a DIFFERENT apartment
++            // (STA) - this happens once the JUCE plugin backend puts the main
++            // thread into STA at startup. MMDevice/WASAPI works fine in STA, so
++            // use the existing apartment; do NOT CoUninitialize (it isn't ours).
++            ok = true;
++            owned = false;
++         }
+       }
+-      ~ComScope() { if (ok) CoUninitialize(); }
++      ~ComScope() { if (owned) CoUninitialize(); }
+    };
+ 
+    // Opts the render thread into the Multimedia Class Scheduler Service for
+--- a/src/platform/win/MediaWin.cpp	2026-08-31 05:20:32.797674592 +0000
++++ b/src/platform/win/MediaWin.cpp	2026-08-31 06:00:54.361655277 +0000
+@@ -69,17 +69,23 @@
+       }
+    };
+ 
+-   // COM init for the calling thread; matches AudioDeviceWin's pattern.
++   // COM init for the calling thread; matches AudioDeviceWin's pattern,
++   // including tolerating a thread the JUCE plugin backend already put in STA
++   // (RPC_E_CHANGED_MODE): Media Foundation works in either apartment, so use
++   // the existing one and only CoUninitialize an init that was ours.
+    struct ComScope
+    {
+       bool ok = false;
++      bool owned = false;
+       ComScope()
+       {
+-         ok = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
++         const HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
++         if (SUCCEEDED(hr)) { ok = true; owned = true; }
++         else if (hr == RPC_E_CHANGED_MODE) { ok = true; owned = false; }
+       }
+       ~ComScope()
+       {
+-         if (ok)
++         if (owned)
+             CoUninitialize();
+       }
+    };
