@@ -39789,6 +39789,18 @@ int main(int argc, char** argv)
                 poisson.size(), (int)minDistanceHeld, (int)saturates, poissonSaturated.size(),
                 (minDistanceHeld && saturates) ? "OK" : "FAIL");
 
+         // A saturated Poisson scatter is the case that used to tank the
+         // frame rate (30x the requested count in wasted candidate draws,
+         // each walking an unordered_map neighbour grid). It must now finish
+         // in single-digit milliseconds so running it once a frame is cheap.
+         const auto poissonTimingStart = std::chrono::steady_clock::now();
+         const std::vector<MeshPoint> poissonTiming =
+            MeshOps::DistributeOnFaces(sphere, 300.0f, 3.0f, MeshOps::kDistributePoisson, 0.1f);
+         const double poissonTimingMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - poissonTimingStart).count();
+         printf("poisson disk timing: %zu points in %.3f ms  %s\n",
+                poissonTiming.size(), poissonTimingMs, poissonTimingMs < 10.0 ? "OK" : "FAIL");
+
          // Merge by Distance: zero threshold is a no-op; a large one collapses
          // a subdivided cube's duplicated seam vertices.
          const Mesh cube = Primitives::Cube(1);
@@ -39890,7 +39902,8 @@ int main(int argc, char** argv)
                 distFacesScaleNode.pointSize * 0.5f, facesScaleOk ? "OK" : "FAIL");
 
          const bool ok = uniformCoverage && sameSeedIdentical && diffSeedDiffers &&
-                         minDistanceHeld && saturates && mergeNoOp && mergeCollapses &&
+                         minDistanceHeld && saturates && poissonTimingMs < 10.0 &&
+                         mergeNoOp && mergeCollapses &&
                          p2vOk && gridOrderOk && gridScaleOk && facesScaleOk;
          printf("%s\n", ok ? "DISTRIBUTE OK" : "SUSPECT");
       }

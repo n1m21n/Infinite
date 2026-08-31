@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <map>
 #include <set>
 #include <unordered_map>
@@ -2537,20 +2538,50 @@ namespace MeshOps
       // reject any candidate within minDistance of an already-accepted point.
       // A spatial hash grid (cell size == minDistance) keeps the rejection
       // check O(1) per candidate rather than O(n) against every prior point.
+      //
+      // The grid is a flat open-addressed table: `gridKeys`/`gridHead` map a
+      // cell hash to the most recently accepted point in that cell, and
+      // `cellNext` chains earlier points in the same cell by index. This
+      // replaces a std::unordered_map<long long, std::vector<int>>, which
+      // cost a heap allocation per newly-seen cell and a hash + pointer chase
+      // per neighbour lookup - the dominant cost of a saturated scatter.
+      // Both arrays are sized off `cap` (the accepted-point budget), not the
+      // candidate budget, since only accepted points are ever inserted.
       const float cell = std::max(minDistance, 1e-5f);
-      std::unordered_map<long long, std::vector<int>> grid;
       auto cellCoord = [&](float v) { return (long long)std::floor(v / cell); };
       auto cellHash = [](long long cx, long long cy, long long cz) {
          return (cx * 73856093LL) ^ (cy * 19349663LL) ^ (cz * 83492791LL);
       };
 
+      const long long kEmptyGridKey = std::numeric_limits<long long>::min();
+      size_t gridCapacity = 64;
+      while (gridCapacity < (size_t)cap * 2 + 16)
+         gridCapacity <<= 1;
+      std::vector<long long> gridKeys(gridCapacity, kEmptyGridKey);
+      std::vector<int> gridHead(gridCapacity, -1);
+      std::vector<int> cellNext((size_t)cap, -1);
+
+      auto gridSlot = [&](long long key, bool insert) -> size_t {
+         size_t h = (size_t)(key * 0x9E3779B97F4A7C15ULL);
+         h ^= h >> 32;
+         size_t idx = h & (gridCapacity - 1);
+         while (gridKeys[idx] != kEmptyGridKey && gridKeys[idx] != key)
+            idx = (idx + 1) & (gridCapacity - 1);
+         if (insert && gridKeys[idx] == kEmptyGridKey)
+            gridKeys[idx] = key;
+         return idx;
+      };
+
       const float minDistSq = minDistance * minDistance;
       // A generous candidate budget: Poisson rejection needs far more draws
-      // than accepted points once packing tightens. `saturationLimit`
-      // consecutive rejects (spacing has nowhere left to add a point) stops
-      // early instead of burning the whole budget on a saturated surface.
+      // than accepted points once packing tightens. `saturationLimit` is a
+      // fixed number of consecutive rejects (spacing has nowhere left to add
+      // a point), not scaled by `cap` - scaling it by the requested count is
+      // what let a high-density scatter burn tens of millions of wasted
+      // candidate draws before this fix. `maxCandidates` never drops below
+      // 4000, so saturationLimit stays a hard backstop below it.
       const int maxCandidates = std::min(std::max(cap * 40, 4000), 2000000);
-      const int saturationLimit = std::max(2000, cap * 30);
+      const int saturationLimit = 1500;
       int consecutiveRejects = 0;
 
       for (int i = 0; i < maxCandidates && (int)points.size() < cap; i++)
@@ -2565,25 +2596,23 @@ namespace MeshOps
          for (long long dy = -1; dy <= 1 && ok; dy++)
          for (long long dx = -1; dx <= 1 && ok; dx++)
          {
-            auto it = grid.find(cellHash(cx+dx, cy+dy, cz+dz));
-            if (it == grid.end())
-               continue;
-            for (int idx : it->second)
+            const size_t slot = gridSlot(cellHash(cx+dx, cy+dy, cz+dz), false);
+            for (int idx = gridHead[slot]; idx != -1 && ok; idx = cellNext[(size_t)idx])
             {
                const MeshPoint& q = points[(size_t)idx];
                const float ddx = q.px-p.px, ddy = q.py-p.py, ddz = q.pz-p.pz;
                if (ddx*ddx + ddy*ddy + ddz*ddz < minDistSq)
-               {
                   ok = false;
-                  break;
-               }
             }
          }
 
          if (ok)
          {
             points.push_back(p);
-            grid[cellHash(cx, cy, cz)].push_back((int)points.size() - 1);
+            const int newIdx = (int)points.size() - 1;
+            const size_t slot = gridSlot(cellHash(cx, cy, cz), true);
+            cellNext[(size_t)newIdx] = gridHead[slot];
+            gridHead[slot] = newIdx;
             consecutiveRejects = 0;
          }
          else if (++consecutiveRejects > saturationLimit)

@@ -82,15 +82,22 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
       const int n = std::min((int)xforms.size(), 256);
       const bool isGroupIdent = (groupMatrix == Mat4::Identity());
 
+      // Scatter once on the source mesh in local space and transform the
+      // result into each instance's space, rather than re-running the full
+      // distribution (Poisson disk especially) up to 256 times for what is
+      // the same surface. Every instance now shares one local-space scatter;
+      // this changes the on-screen pattern relative to before (each instance
+      // previously got its own seed offset) but the pattern was never a
+      // documented invariant, only a side effect of paying the cost per
+      // instance.
+      const std::vector<MeshPoint> points =
+         MeshOps::DistributeOnFaces(src, density, seed, method, minDistance);
+
       for (int i = 0; i < n; i++)
       {
          const Mat4 m = isGroupIdent ? xforms[i] : Mat4::Multiply(groupMatrix, xforms[i]);
          float nMat[9];
          m.NormalMatrix(nMat);
-
-         const float instSeed = seed + (float)i * 17.13f;
-         const std::vector<MeshPoint> points =
-            MeshOps::DistributeOnFaces(src, density, instSeed, method, minDistance);
 
          float instTint[3] = { tint[0], tint[1], tint[2] };
          if ((size_t)i * 3 + 2 < instColors.size())
