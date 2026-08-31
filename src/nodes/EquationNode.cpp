@@ -279,6 +279,11 @@ public:
          float frameSumL = 0.0f;
          float frameSumR = 0.0f;
 
+         const bool glideActive = glide > 0.001f;
+         const float glideCoef = glideActive
+            ? expf(-1.0f / (float)(mSampleRate * glide))
+            : 0.0f;
+
          if (!isNoteDriven)
          {
             Voice& v = mVoices[0];
@@ -309,9 +314,8 @@ public:
                   continue;
                }
 
-               if (glide > 0.001f)
+               if (glideActive)
                {
-                  const float glideCoef = expf(-1.0f / (float)(mSampleRate * glide));
                   v.currentFreq = v.targetFreq + glideCoef * (v.currentFreq - v.targetFreq);
                }
                else
