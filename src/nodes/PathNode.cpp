@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "Transport.h"
+#include "GeometryOpNodes.h"
 
 namespace
 {
@@ -19,23 +20,21 @@ namespace
 {
    const std::vector<std::string> kFollowModeNames = { "Boundary", "Slice" };
 }
+
 const std::vector<std::string>& PathNode::FollowModeNames() { return kFollowModeNames; }
 
 void PathNode::RebuildFollowIfNeeded()
 {
-   // A curve is already a polyline, so following one is free; a mesh has to be
-   // reduced to one, which is not, hence the cache.
-   const Polyline* curve = curveSource ? curveSource->GetCurve() : nullptr;
-   if (curve != nullptr)
+   if (curveSource != nullptr)
    {
-      const unsigned long long revision = curveSource->CurveStamp();
-      if (mBuiltCurve != (const void*)curveSource || mBuiltRevision != revision)
-      {
-         mFollow = *curve;
-         mBuiltCurve = curveSource;
-         mBuiltGeometry = nullptr;
-         mBuiltRevision = revision;
-      }
+      const unsigned long long stamp = curveSource->CurveStamp();
+      if (mBuiltCurve == (const void*)curveSource && mBuiltRevision == stamp)
+         return;
+      const Polyline* p = curveSource->GetCurve();
+      mFollow = p ? *p : Polyline();
+      mBuiltCurve = curveSource;
+      mBuiltGeometry = nullptr;
+      mBuiltRevision = stamp;
       return;
    }
 
@@ -48,7 +47,11 @@ void PathNode::RebuildFollowIfNeeded()
       return;
    }
 
-   const unsigned long long revision = geometrySource->MeshRevision();
+   InstanceOnPointsNode* instancer = FindInstancer(geometrySource);
+   unsigned long long revision = geometrySource->MeshRevision();
+   if (instancer != nullptr)
+      revision += instancer->InstanceRevision() + (unsigned long long)instancer->InstanceCount();
+
    const Mat4 geometryModel = geometrySource->GetModelMatrix();
    if (mBuiltGeometry == (const void*)geometrySource && mBuiltRevision == revision &&
        mBuiltFollowMode == followMode && mBuiltSliceAxis == sliceAxis &&
@@ -59,7 +62,18 @@ void PathNode::RebuildFollowIfNeeded()
    // Moving/rotating/scaling the source has to move the followed contour with
    // it, since the path is meant to trace where the mesh actually sits in the
    // scene, not where it sat in its own local space.
-   const Mesh mesh = MeshOps::Transform(geometrySource->GetMesh(), geometryModel);
+   Mesh mesh;
+   if (instancer != nullptr)
+   {
+      const std::vector<Mat4>& xforms = ResolveInstanceTransforms(geometrySource, instancer);
+      mesh = MeshOps::RealizeInstances(geometrySource->GetMesh(), xforms, geometrySource->GetInstanceGroupMatrix(), &instancer->InstanceColors(), 256);
+      if (geometryModel != Mat4::Identity())
+         mesh = MeshOps::Transform(mesh, geometryModel);
+   }
+   else
+   {
+      mesh = MeshOps::Transform(geometrySource->GetMesh(), geometryModel);
+   }
    std::vector<Polyline> loops;
    if (followMode == kFollowBoundary)
    {

@@ -65,6 +65,23 @@ public:
    {
       return input ? input->GetMappingTransform() : MappingTransform();
    }
+   IGeometrySource* PassthroughSource() const override { return input; }
+   Mat4 GetInstanceGroupMatrix() const override
+   {
+      return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
+   const std::vector<unsigned char>* InstanceSelection() const override
+   {
+      return input ? input->InstanceSelection() : nullptr;
+   }
+   unsigned long long InstanceSelectionRevision() const override
+   {
+      return input ? input->InstanceSelectionRevision() : 0;
+   }
+   const std::vector<Mat4>* InstanceTransformOverride() const override
+   {
+      return input ? input->InstanceTransformOverride() : nullptr;
+   }
 
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }

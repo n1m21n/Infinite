@@ -88,6 +88,7 @@ struct Mat4
             return false;
       return true;
    }
+   bool operator!=(const Mat4& o) const { return !(*this == o); }
 
    static Mat4 Multiply(const Mat4& a, const Mat4& b)
    {
@@ -433,6 +434,13 @@ namespace MeshOps
    // inverse of SplitBySelection, used to stitch an operator's selected-only
    // result back together with the unselected part it didn't touch.
    void AppendMesh(Mesh& a, const Mesh& b);
+   // Realizes an instanced scatter: bakes each instance transform (composed with
+   // groupMatrix) into a copy of `stamp` and concatenates them into a single mesh.
+   Mesh RealizeInstances(const Mesh& stamp,
+                         const std::vector<Mat4>& xforms,
+                         const Mat4& groupMatrix,
+                         const std::vector<float>* instanceColors = nullptr,
+                         int maxInstances = 256);
    // A copy of `in` with faceMask cleared, so a selection-aware operator can
    // be told to ignore whatever mask arrived on its input - the
    // `selectionOnly == false` half of every operator this phase touches.

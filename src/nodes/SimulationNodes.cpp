@@ -6,6 +6,7 @@
 #include <set>
 
 #include "Transport.h"
+#include "GeometryOpNodes.h"
 
 namespace
 {
@@ -280,7 +281,15 @@ void ClothNode::RebuildFromInput()
 
    if (input == nullptr)
       return;
-   const Mesh& srcLocal = input->GetMesh();
+   Mesh srcLocal;
+   if (InstanceOnPointsNode* instancer = FindInstancer(input))
+   {
+      srcLocal = MeshOps::RealizeInstances(input->GetMesh(), ResolveInstanceTransforms(input, instancer), input->GetInstanceGroupMatrix(), &instancer->InstanceColors(), 256);
+   }
+   else
+   {
+      srcLocal = input->GetMesh();
+   }
    if (srcLocal.Empty())
       return;
 
@@ -584,7 +593,16 @@ void ClothNode::CookIfNeeded(int frameId)
    const unsigned long long upstreamRevision = input ? input->MeshRevision() : 0;
    const Mat4 inputModel = input ? input->GetModelMatrix() : Mat4::Identity();
    size_t vertexCount = 0, indexCount = 0;
-   if (input != nullptr)
+   InstanceOnPointsNode* instancer = input ? FindInstancer(input) : nullptr;
+   if (instancer != nullptr)
+   {
+      const std::vector<Mat4>& xforms = ResolveInstanceTransforms(input, instancer);
+      const size_t instCount = std::min((size_t)256, xforms.size());
+      const Mesh& peek = input->GetMesh();
+      vertexCount = peek.vertices.size() * instCount;
+      indexCount = peek.indices.size() * instCount;
+   }
+   else if (input != nullptr)
    {
       const Mesh& peek = input->GetMesh();
       vertexCount = peek.vertices.size();

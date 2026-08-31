@@ -6,6 +6,16 @@
 #include "Geometry3DNodes.h"
 #include "Palette.h"
 
+class InstanceOnPointsNode;
+
+// Instancing traversal helpers: walk the PassthroughSource() chain to locate an
+// upstream InstanceOnPointsNode, its effective transforms (accounting for
+// overrides), and its selection mask.
+InstanceOnPointsNode* FindInstancer(IGeometrySource* source);
+bool WrapsInstancer(IGeometrySource* source);
+const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, InstanceOnPointsNode* instancer);
+const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source);
+
 // One class for every mesh -> mesh operator, chosen by a dropdown - the same
 // table-driven approach FilterNode uses for image effects, so adding an
 // operator is a case in a switch rather than a new node type.
@@ -952,6 +962,7 @@ private:
       // InstanceOnPointsNode::CookIfNeeded.
       Mat4 sourceModel;
       Mat4 targetModel;
+      Mat4 targetGroup;
       bool operator==(const Signature& o) const
       {
          return mode == o.mode && axis == o.axis && radiusOverride == o.radiusOverride &&
@@ -959,7 +970,8 @@ private:
                 offset == o.offset && blend == o.blend && flat == o.flat && flip == o.flip &&
                 source == o.source && target == o.target &&
                 sourceRevision == o.sourceRevision && targetRevision == o.targetRevision &&
-                sourceModel == o.sourceModel && targetModel == o.targetModel;
+                sourceModel == o.sourceModel && targetModel == o.targetModel &&
+                targetGroup == o.targetGroup;
       }
    };
 

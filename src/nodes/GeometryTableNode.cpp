@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdio>
 
+#include "GeometryOpNodes.h"
+
 namespace
 {
    const std::vector<std::string> kSampleModeNames = { "Vertex", "Scatter", "Contour" };
@@ -52,6 +54,11 @@ void GeometryTableNode::Rebuild()
    unsigned long long revision = geometrySource->MeshRevision();
    const std::vector<Particle>* cloudForRevision =
       (sampleMode != kContour) ? geometrySource->GetPointCloud() : nullptr;
+   InstanceOnPointsNode* instancer = (cloudForRevision == nullptr && sampleMode != kContour)
+                                    ? FindInstancer(geometrySource) : nullptr;
+   if (instancer != nullptr)
+      revision += instancer->InstanceRevision() + (unsigned long long)instancer->InstanceCount();
+
    if (cloudForRevision != nullptr && !cloudForRevision->empty())
       revision = geometrySource->PointCloudRevision();
    else if (sampleMode == kContour && geometrySource->GetCurve() != nullptr)
@@ -89,7 +96,18 @@ void GeometryTableNode::Rebuild()
       }
       else
       {
-         const Mesh mesh = MeshOps::Transform(geometrySource->GetMesh(), model);
+         Mesh mesh;
+         if (instancer != nullptr)
+         {
+            const std::vector<Mat4>& xforms = ResolveInstanceTransforms(geometrySource, instancer);
+            mesh = MeshOps::RealizeInstances(geometrySource->GetMesh(), xforms, geometrySource->GetInstanceGroupMatrix(), &instancer->InstanceColors(), 256);
+            if (model != Mat4::Identity())
+               mesh = MeshOps::Transform(mesh, model);
+         }
+         else
+         {
+            mesh = MeshOps::Transform(geometrySource->GetMesh(), model);
+         }
          if (sampleMode == kVertex)
          {
             // ToPoints welds by default, which is what's wanted here: a Cube
@@ -165,7 +183,18 @@ void GeometryTableNode::Rebuild()
       }
       else
       {
-         const Mesh mesh = MeshOps::Transform(geometrySource->GetMesh(), model);
+         Mesh mesh;
+         if (instancer != nullptr)
+         {
+            const std::vector<Mat4>& xforms = ResolveInstanceTransforms(geometrySource, instancer);
+            mesh = MeshOps::RealizeInstances(geometrySource->GetMesh(), xforms, geometrySource->GetInstanceGroupMatrix(), &instancer->InstanceColors(), 256);
+            if (model != Mat4::Identity())
+               mesh = MeshOps::Transform(mesh, model);
+         }
+         else
+         {
+            mesh = MeshOps::Transform(geometrySource->GetMesh(), model);
+         }
          // A closed mesh has no boundary at all, so fall back to a slice -
          // same reduction and same fallback order as PathNode's follow mode.
          std::vector<Polyline> loops = MeshOps::BoundaryLoops(mesh);

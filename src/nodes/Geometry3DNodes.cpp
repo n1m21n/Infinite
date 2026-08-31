@@ -49,49 +49,6 @@ namespace
       }
    };
 
-   // Finds the InstanceOnPoints feeding a geometry source, even if it's
-   // wrapped in one or more mesh-transforming nodes (Transform, Subdivide, ...
-   // - see IGeometrySource::PassthroughSource). Without this, patching a
-   // Transform node between InstanceOnPoints and Render 3D silently dropped
-   // every instance but the first, since the direct dynamic_cast only ever
-   // saw the wrapping node.
-   InstanceOnPointsNode* FindInstancer(IGeometrySource* source)
-   {
-      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
-      {
-         if (auto* instancer = dynamic_cast<InstanceOnPointsNode*>(s))
-            return instancer;
-      }
-      return nullptr;
-   }
-
-   // Walks the same chain looking for the first non-null
-   // InstanceTransformOverride() - a selectionOnly Delete/Transform downstream
-   // of the instancer replacing its raw placements (see
-   // GeometryOpNode::InstanceTransformOverride). Falls back to the
-   // instancer's own InstanceTransforms() when nothing overrides.
-   const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, InstanceOnPointsNode* instancer)
-   {
-      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
-      {
-         if (const std::vector<Mat4>* override_ = s->InstanceTransformOverride())
-            return *override_;
-      }
-      return instancer->InstanceTransforms();
-   }
-
-   // Same chain-walk for the instance selection mask, used by the overlay -
-   // see IGeometrySource::InstanceSelection.
-   const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source)
-   {
-      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
-      {
-         if (const std::vector<unsigned char>* mask = s->InstanceSelection())
-            return mask;
-      }
-      return nullptr;
-   }
-
    // Depth-only pass from the light's point of view. Shares the instancing
    // attribute layout with the main shader so an instanced source casts shadows
    // from all its copies rather than just the base mesh.

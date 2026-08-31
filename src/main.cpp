@@ -929,6 +929,7 @@ namespace
    bool gGlobalsOpen = false;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
+   bool gSettingsOpen = false;
    bool gShowUpdateCheckModal = false;
 
    // Files dropped on the window, consumed on the next frame so the spawn can
@@ -3614,6 +3615,8 @@ namespace
       edStyle.Colors[ed::StyleColor_Grid] = vec(t.border, isLight ? 0.50f : 0.35f);
       edStyle.Colors[ed::StyleColor_NodeBg] = vec(t.panelBg, isLight ? 0.95f : 0.80f);
       edStyle.Colors[ed::StyleColor_NodeBorder] = vec(t.border, isLight ? 0.70f : 0.40f);
+      edStyle.NodeRounding = CategoryColors::GetNodeRounding();
+      edStyle.GroupRounding = CategoryColors::GetNodeRounding() * 0.5f;
       edStyle.GridSpacing = gGridSnap;
       ed::SetCurrentEditor(prevEditor);
    }
@@ -22998,6 +23001,8 @@ namespace
       return CategoryHelpText(gn.category);
    }
 
+   void DrawSettingsWindow(bool* open);
+
    void DrawShortcutsWindow(bool* open)
    {
       ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
@@ -23027,6 +23032,7 @@ namespace
 
       static const ShortcutEntry kShortcuts[] = {
          // Patch & File
+         { "File & Patch", "Settings...", MODKEY "+0", "Open appearance, canvas, audio, and performance settings" },
          { "File & Patch", "New Patch", MODKEY "+N", "Create a new empty patch" },
          { "File & Patch", "Open Patch", MODKEY "+O", "Open an existing .inf patch file" },
          { "File & Patch", "Save", MODKEY "+S", "Save current patch" },
@@ -23246,16 +23252,14 @@ namespace
                { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
                { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
             } },
-            { "Effects", {
-               { "Blur family", "Gaussian, box, motion (angle + distance) and radial (with a centre point)." },
-               { "Bloom / Diffuse Glow", "Bloom isolates pixels above a threshold and blooms them outward. Diffuse Glow screens a blurred copy back over the image." },
-               { "Sharpen", "Unsharp mask - blurs a copy and adds back the difference." },
-               { "Distortion", "Twirl, pinch/punch, ripple, lens distortion (with chromatic aberration), displace and liquify. Position-dependent effects have Centre X/Y." },
-               { "Glitch family", "Five kinds: the original combined glitch, RGB shift, scanlines, blocks, wave and datamosh." },
-               { "Symmetry", "Symmetry (mirror about X, Y or both), Kaleidoscope (segment count, rotation, zoom) and Mirror Tile." },
-               { "Stylise", "Halftone (mono or CMY-style colour), Sobel edge detection and Edge Outline." },
-               { "Pixelate / Noise / Vignette", "Block pixelation, additive grain and a vignette with its own centre." },
-               { "Resynthesize", "Each generation reads the previous one, so the image drifts away from the source. The XY pad blends four named mutation effects assigned to its corners; Randomise re-rolls which four. The orb's path can be recorded, looped and replayed in time." },
+            { "3D", {
+               { "Render 3D", "Full rasterizer & raytracer pipeline with ambient occlusion, shadow mapping, HDR environment reflections, and depth-buffer compositing." },
+               { "Camera 3D & Light 3D", "Perspective and orthographic cameras with orbit and target controls; Directional, Point, and Spot lights with shadow casting." },
+               { "Primitives & Mesh", "Box, Sphere, Cylinder, Torus, Plane, Grid, Teapot, 3D Mesh loader (OBJ, PLY, STL), and Path/Curve generator." },
+               { "Procedural Operations", "Extrude, Lathe / Revolve, Loft, Sweep along path, Boolean 3D (Union, Difference, Intersect), Subdivide, Bevel, Displace 3D (Noise & Texture displacement), and Bend / Twist / Taper deformers." },
+               { "Point Distribution & Instancing", "Surface and volume point scatter, Grid distribution, and Instance on Points with scale and rotation noise variations." },
+               { "Audio Displacement", "Deforms 3D vertex geometries in real-time driven by live audio frequencies or RMS waveforms." },
+               { "Particle & Simulation", "3D particle emitter with gravity, turbulence vector fields, collision planes, and spring-mass dynamics." },
             } },
             { "Compositing", {
                { "Transform", "Translate, scale, rotate, flip horizontal and flip vertical." },
@@ -23277,6 +23281,17 @@ namespace
                { "Trails", "A pre-wired feedback loop: decaying accumulation with drift, zoom, rotation and hue rotation. Reach for this before wiring a loop by hand." },
                { "Reaction-Diffusion", "Gray-Scott chemical simulation, six presets. Needs no input; patch one in and its luminance varies the feed rate so the pattern grows differently through light and dark." },
             } },
+            { "Effects", {
+               { "Blur family", "Gaussian, box, motion (angle + distance) and radial (with a centre point)." },
+               { "Bloom / Diffuse Glow", "Bloom isolates pixels above a threshold and blooms them outward. Diffuse Glow screens a blurred copy back over the image." },
+               { "Sharpen", "Unsharp mask - blurs a copy and adds back the difference." },
+               { "Distortion", "Twirl, pinch/punch, ripple, lens distortion (with chromatic aberration), displace and liquify. Position-dependent effects have Centre X/Y." },
+               { "Glitch family", "Five kinds: the original combined glitch, RGB shift, scanlines, blocks, wave and datamosh." },
+               { "Symmetry", "Symmetry (mirror about X, Y or both), Kaleidoscope (segment count, rotation, zoom) and Mirror Tile." },
+               { "Stylise", "Halftone (mono or CMY-style colour), Sobel edge detection and Edge Outline." },
+               { "Pixelate / Noise / Vignette", "Block pixelation, additive grain and a vignette with its own centre." },
+               { "Resynthesize", "Each generation reads the previous one, so the image drifts away from the source. The XY pad blends four named mutation effects assigned to its corners; Randomise re-rolls which four. The orb's path can be recorded, looped and replayed in time." },
+            } },
             { "Modulators", {
                { "LFO", "Sine, triangle, saw up/down, square and sample-and-hold. Rate in beats, plus phase and an output range." },
                { "Random", "A new random value every N beats, with adjustable smoothing between steps. Deterministic, so rewinding replays the same sequence." },
@@ -23289,16 +23304,49 @@ namespace
                { "Invert", "Mirrors a modulator around a low/high pivot. Defaults to 0..1 for a classic 1-v flip; set low/high to match an unclamped source to mirror it correctly." },
                { "Mod Curve", "Remaps a modulator through a draggable transfer curve - an S-curve, staircase, or exponential response, all things a slider can't express." },
             } },
+            { "Macros", {
+               { "Macro Controls", "Macro Knob, Macro Slider, Macro Bipolar Knob, Macro XY, Macro Toggle, Macro Trigger, Macro NumBox, Macro Radio Selector, and Macro Step Gate - unified live performance controls surfaced in the Performance Matrix." },
+            } },
             { "Utility", {
                { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
-      #if defined(_WIN32)
-         { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other Windows applications in real-time via Spout, zero-copy GPU texture sharing." },
+#if defined(_WIN32)
+               { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other Windows applications in real-time via Spout, zero-copy GPU texture sharing." },
 #else
-         { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
+               { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
 #endif
                { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
                { "OSC Receive", "Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin." },
                { "OSC Send", "Sends its patched modulator input as an Open Sound Control message (address + float) to a host:port over UDP, on change (past an epsilon) or at least every interval - the one node in the patch with no output of its own." },
+               { "Gain, Mixer & Splitter", "Audio signal level adjustment with dB scaling, multi-channel audio mixer, and multi-channel signal splitter/router." },
+            } },
+            { "Notes", {
+               { "MIDI Notes", "Virtual MIDI keyboard, external hardware MIDI controller input, note record, and polyphonic voice dispatch." },
+               { "Arpeggiator", "Tempo-synced arpeggiation patterns (Up, Down, Up/Down, Random, Chord, As-Played), octave span, and gate length." },
+               { "Scale Notes & Quantizer", "Musical scale and mode snapping across the standard modes through Chromatic, with pitch quantizing." },
+               { "Bouncing Balls", "Physics-based gravity bounce note generator (up to 12 balls, with speed, size, and range controls) creating organic rhythmic polyrhythms as balls hit walls." },
+               { "Note Transpose, Pitch Bend, Velocity Curve", "Pitch shifting, interval offset, pitch wheel modulation, and non-linear velocity mapping curves." },
+               { "Gate, Humanizer, Glide", "Note gate length shaping, timing/velocity jitter humanization, and portamento glide." },
+               { "Note Stack", "Polyphonic chord generator, harmony generator, and interval stacking." },
+            } },
+            { "Synths", {
+               { "Wavetable Synth", "Multi-voice polyphonic wavetable oscillator (up to 8 voices) with two independent A/B wavetable engines crossfaded against each other, wavetable position morphing, detuned unison, and integrated stereo spread." },
+               { "Sampler", "High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback." },
+               { "Drum Sequencer", "8-lane pattern drum sequencer with individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, and decay envelopes." },
+               { "Equation Synth", "Real-time bytebeat and mathematical expression synthesis evaluating user formulas with dynamic variables (t, x, y, inputs)." },
+               { "Wave Terrain Synth", "2D terrain trajectory orbital synthesis - a moving point traces a path across a height-mapped surface to generate a waveform." },
+               { "Spectral Synth", "Additive harmonic-bank synthesis with overtone-series sculpting." },
+            } },
+            { "AudioEffects", {
+               { "Audio Filter", "Multi-mode state-variable & ladder filter (LP12/24/36, HP, BP, Notch, Peak) with drive and resonance control." },
+               { "Dynamics", "Peak and RMS compressor, limiter, and expander with adjustable attack, release, knee, ratio, and gain reduction metering." },
+               { "Delay & Reverb", "Tempo-synced ping-pong / stereo bounce delay, feedback filters, high-density Feedback Delay Network (FDN) reverberator with predelay and damping." },
+               { "Stutter & Glitch", "Beat-synced buffer repeater, freeze, reverse playback, and granular slice retriggering." },
+               { "Wavetable Shaper", "Non-linear transfer curve distortion, saturation drive, bias, and anti-aliased oversampled waveshaping." },
+               { "EQ", "4-band parametric equalizer with high/low shelving, peak filters, and interactive frequency response display." },
+               { "Resonator Bank", "Up to 16 parallel bandpass resonators forming a tuned modal filter bank, including a 'Metallic' tuning mode." },
+               { "Cycle Shaper", "Single-cycle waveform distortion and crossfade shaper." },
+               { "Spectral Blur & Frequency Shifter", "FFT spectral domain phase smearing, freeze, and frequency SSB modulation." },
+               { "Plugin", "Third-party AU (macOS) / VST3 (Windows) audio plugin hosting with full state save/restore and parameter automation via mapped modulation pins. The plugin editor opens in its own native window." },
             } },
          };
 
@@ -24622,6 +24670,456 @@ namespace
          Transport::Instance().SetKey(0);
          Transport::Instance().SetScale(0);
       }
+   }
+
+   void DrawSettingsWindow(bool* open)
+   {
+      ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
+      if (!ImGui::Begin("Settings", open, ImGuiWindowFlags_NoCollapse))
+      {
+         ImGui::End();
+         return;
+      }
+
+      if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None))
+      {
+         // 1. Appearance Tab
+         if (ImGui::BeginTabItem("Appearance"))
+         {
+            const bool isLight = CategoryColors::IsThemeLight();
+            ImGui::Spacing();
+            ImGui::SeparatorText("Theme Preset & Palette");
+
+            const std::vector<std::string>& presets = CategoryColors::PresetNames();
+            const int currentPreset = CategoryColors::CurrentPreset();
+            ImGui::SetNextItemWidth(220.0f);
+            if (ImGui::BeginCombo("##themepreset", presets[currentPreset].c_str()))
+            {
+               for (int i = 0; i < (int)presets.size(); i++)
+               {
+                  if (ImGui::Selectable(presets[i].c_str(), currentPreset == i))
+                  {
+                     CategoryColors::SetPreset(i);
+                     ApplyTheme();
+                  }
+               }
+               ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Reset to Defaults"))
+            {
+               CategoryColors::ResetAllAppearanceBoth();
+               ApplyTheme();
+            }
+            ImGui::Spacing();
+
+            // Node Module Category Colors
+            ImGui::SeparatorText("Node Module Category Colors");
+            const std::vector<std::string>& catNames = CategoryColors::CategoryNames();
+            if (ImGui::BeginTable("CatColorsTbl", 2, ImGuiTableFlags_None))
+            {
+               ImGui::TableSetupColumn("Col1", ImGuiTableColumnFlags_WidthStretch);
+               ImGui::TableSetupColumn("Col2", ImGuiTableColumnFlags_WidthStretch);
+               for (size_t i = 0; i < catNames.size(); i++)
+               {
+                  ImGui::TableNextColumn();
+                  const std::string& cat = catNames[i];
+                  const CategoryColors::Color& col = CategoryColors::ColorFor(cat);
+                  float c[3] = { col.r, col.g, col.b };
+                  char pickerId[64];
+                  snprintf(pickerId, sizeof(pickerId), "##catcol_%s", cat.c_str());
+                  ImGui::SetNextItemWidth(120.0f);
+                  if (ImGui::ColorEdit3(pickerId, c, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+                  {
+                     CategoryColors::SetCategoryColor(cat, { c[0], c[1], c[2] }, isLight, false);
+                  }
+                  if (ImGui::IsItemDeactivatedAfterEdit())
+                  {
+                     CategoryColors::SaveAppearanceOverrides();
+                  }
+                  ImGui::SameLine(0.0f, 6.0f);
+                  ImGui::TextUnformatted(cat.c_str());
+                  if (CategoryColors::HasCategoryColorOverride(cat, isLight))
+                  {
+                     ImGui::SameLine(0.0f, 8.0f);
+                     char resetId[64];
+                     snprintf(resetId, sizeof(resetId), "Reset##cat_%s", cat.c_str());
+                     if (ImGui::SmallButton(resetId))
+                        CategoryColors::ResetCategoryColor(cat, isLight);
+                  }
+               }
+               ImGui::EndTable();
+            }
+
+            ImGui::Spacing();
+            // Cable Category Colors
+            ImGui::SeparatorText("Cable Category Colors");
+            const std::vector<std::string>& cableNames = CategoryColors::CableTypeNames();
+            if (ImGui::BeginTable("CableColorsTbl", 2, ImGuiTableFlags_None))
+            {
+               ImGui::TableSetupColumn("Col1", ImGuiTableColumnFlags_WidthStretch);
+               ImGui::TableSetupColumn("Col2", ImGuiTableColumnFlags_WidthStretch);
+               for (int i = 0; i < (int)CategoryColors::CableType::Count; i++)
+               {
+                  ImGui::TableNextColumn();
+                  auto type = (CategoryColors::CableType)i;
+                  const CategoryColors::Color& col = CategoryColors::CableColorFor(type);
+                  float c[3] = { col.r, col.g, col.b };
+                  char pickerId[64];
+                  snprintf(pickerId, sizeof(pickerId), "##cablecol_%d", i);
+                  ImGui::SetNextItemWidth(120.0f);
+                  if (ImGui::ColorEdit3(pickerId, c, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+                  {
+                     CategoryColors::SetCableColor(type, { c[0], c[1], c[2] }, isLight, false);
+                  }
+                  if (ImGui::IsItemDeactivatedAfterEdit())
+                  {
+                     CategoryColors::SaveAppearanceOverrides();
+                  }
+                  ImGui::SameLine(0.0f, 6.0f);
+                  ImGui::TextUnformatted(cableNames[i].c_str());
+                  if (CategoryColors::HasCableColorOverride(type, isLight))
+                  {
+                     ImGui::SameLine(0.0f, 8.0f);
+                     char resetId[64];
+                     snprintf(resetId, sizeof(resetId), "Reset##cable_%d", i);
+                     if (ImGui::SmallButton(resetId))
+                        CategoryColors::ResetCableColor(type, isLight);
+                  }
+               }
+               ImGui::EndTable();
+            }
+
+            ImGui::Spacing();
+            // Node Card Styling
+            ImGui::SeparatorText("Node Card Styling");
+            float opacity = CategoryColors::GetNodeOpacity();
+            ImGui::SetNextItemWidth(200.0f);
+            if (ImGui::SliderFloat("Node Opacity", &opacity, 0.10f, 1.00f, "%.2f"))
+            {
+               CategoryColors::SetNodeOpacity(opacity, isLight, false);
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit())
+            {
+               CategoryColors::SaveAppearanceOverrides();
+            }
+            if (CategoryColors::HasNodeOpacityOverride(isLight))
+            {
+               ImGui::SameLine();
+               if (ImGui::SmallButton("Reset##opacity"))
+                  CategoryColors::SetNodeOpacity(-1.0f, isLight);
+            }
+
+            float rounding = CategoryColors::GetNodeRounding();
+            ImGui::SetNextItemWidth(200.0f);
+            if (ImGui::SliderFloat("Node Corner Radius", &rounding, 0.0f, 24.0f, "%.0f px"))
+            {
+               CategoryColors::SetNodeRounding(rounding, false);
+               ApplyTheme();
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit())
+            {
+               CategoryColors::SaveAppearanceOverrides();
+            }
+            if (CategoryColors::HasNodeRoundingOverride())
+            {
+               ImGui::SameLine();
+               if (ImGui::SmallButton("Reset##rounding"))
+               {
+                  CategoryColors::SetNodeRounding(-1.0f);
+                  ApplyTheme();
+               }
+            }
+
+            float tintWeight = CategoryColors::GetTintWeight();
+            ImGui::SetNextItemWidth(200.0f);
+            if (ImGui::SliderFloat("Tint", &tintWeight, 0.0f, 0.50f, "%.2f"))
+            {
+               CategoryColors::SetTintWeight(tintWeight, isLight, false);
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit())
+            {
+               CategoryColors::SaveAppearanceOverrides();
+            }
+            if (CategoryColors::HasTintWeightOverride(isLight))
+            {
+               ImGui::SameLine();
+               if (ImGui::SmallButton("Reset##tint"))
+                  CategoryColors::SetTintWeight(-1.0f, isLight);
+            }
+
+            ImGui::EndTabItem();
+         }
+
+         // 2. Canvas & Workspace Tab
+         if (ImGui::BeginTabItem("Canvas & Workspace"))
+         {
+            ImGui::Spacing();
+            ImGui::SeparatorText("Grid & Canvas");
+            ImGui::Checkbox("Snap to grid", &gSnapToGrid);
+            ImGui::SetNextItemWidth(180.0f);
+            ImGui::SliderFloat("Grid size", &gGridSnap, 5.0f, 100.0f, "%.0f px");
+            ImGui::SetNextItemWidth(180.0f);
+            ImGui::SliderFloat("Zoom sensitivity", &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
+
+            ImGui::Spacing();
+            ImGui::SeparatorText("Minimap");
+            ImGui::Checkbox("Show minimap", &gMinimapEnabled);
+            if (gMinimapEnabled)
+            {
+               static const char* kCorners[] = {
+                  "Top left", "Top right", "Bottom left", "Bottom right"
+               };
+               ImGui::SetNextItemWidth(180.0f);
+               if (ImGui::BeginCombo("Position", kCorners[gMinimapCorner]))
+               {
+                  for (int i = 0; i < 4; i++)
+                     if (ImGui::Selectable(kCorners[i], i == gMinimapCorner))
+                        gMinimapCorner = i;
+                  ImGui::EndCombo();
+               }
+               ImGui::SetNextItemWidth(180.0f);
+               ImGui::SliderFloat("Size", &gMinimapSize, 120.0f, 360.0f, "%.0f px");
+               ImGui::SetNextItemWidth(180.0f);
+               ImGui::SliderFloat("Opacity", &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
+            }
+
+            ImGui::Spacing();
+            ImGui::SeparatorText("Cable Visibility");
+            bool showMod = (gCableVisibilityMask & 0x4) != 0;
+            bool showAudNote = (gCableVisibilityMask & 0x2) != 0;
+            bool showImg = (gCableVisibilityMask & 0x1) != 0;
+
+            if (ImGui::Checkbox("Modulation cables", &showMod))
+               gCableVisibilityMask = (gCableVisibilityMask & ~0x4) | (showMod ? 0x4 : 0);
+            if (ImGui::Checkbox("Audio & note cables", &showAudNote))
+               gCableVisibilityMask = (gCableVisibilityMask & ~0x2) | (showAudNote ? 0x2 : 0);
+            if (ImGui::Checkbox("Image & geometry cables", &showImg))
+               gCableVisibilityMask = (gCableVisibilityMask & ~0x1) | (showImg ? 0x1 : 0);
+
+            ImGui::TextDisabled("Note: Image & geometry toggle also covers palette cables.");
+            ImGui::Spacing();
+            if (ImGui::Button("Show all cables"))
+               gCableVisibilityMask = 0x7;
+            ImGui::SameLine();
+            if (ImGui::Button("Hide all cables"))
+               gCableVisibilityMask = 0x0;
+
+            ImGui::EndTabItem();
+         }
+
+         // 3. Audio Tab
+         if (ImGui::BeginTabItem("Audio"))
+         {
+            ImGui::Spacing();
+            ImGui::SeparatorText("Audio Devices & Format");
+            const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
+            const bool audioRunning = AudioEngine::Instance().SampleRate() > 0.0;
+
+            std::string outputLabel = (gAudioOutputDeviceId == 0) ? "System default" : "Unknown device";
+            for (const Platform::AudioDeviceInfo& d : devices)
+               if (d.isOutput && d.deviceId == gAudioOutputDeviceId)
+                  outputLabel = d.name;
+            ImGui::SetNextItemWidth(240.0f);
+            if (ImGui::BeginCombo("Output device", outputLabel.c_str()))
+            {
+               if (ImGui::Selectable("System default", gAudioOutputDeviceId == 0))
+                  gAudioOutputDeviceId = 0;
+               for (const Platform::AudioDeviceInfo& d : devices)
+               {
+                  if (!d.isOutput)
+                     continue;
+                  if (ImGui::Selectable(d.name.c_str(), d.deviceId == gAudioOutputDeviceId))
+                     gAudioOutputDeviceId = d.deviceId;
+               }
+               ImGui::EndCombo();
+            }
+
+            std::string inputLabel = (gAudioInputDeviceId == 0) ? "System default" : "Unknown device";
+            for (const Platform::AudioDeviceInfo& d : devices)
+               if (d.isInput && d.deviceId == gAudioInputDeviceId)
+                  inputLabel = d.name;
+            ImGui::SetNextItemWidth(240.0f);
+            if (ImGui::BeginCombo("Input device", inputLabel.c_str()))
+            {
+               if (ImGui::Selectable("System default", gAudioInputDeviceId == 0))
+                  gAudioInputDeviceId = 0;
+               for (const Platform::AudioDeviceInfo& d : devices)
+               {
+                  if (!d.isInput)
+                     continue;
+                  if (ImGui::Selectable(d.name.c_str(), d.deviceId == gAudioInputDeviceId))
+                     gAudioInputDeviceId = d.deviceId;
+               }
+               ImGui::EndCombo();
+            }
+
+            static const double kSampleRates[] = { 44100.0, 48000.0, 88200.0, 96000.0 };
+            std::string rateLabel = (gAudioSampleRate == 0.0) ? "Device default" : "";
+            if (gAudioSampleRate != 0.0)
+            {
+               char buf[32];
+               snprintf(buf, sizeof(buf), "%.0f Hz", gAudioSampleRate);
+               rateLabel = buf;
+            }
+#if defined(_WIN32)
+            ImGui::BeginDisabled();
+#endif
+            ImGui::SetNextItemWidth(240.0f);
+            if (ImGui::BeginCombo("Sample rate", rateLabel.c_str()))
+            {
+               if (ImGui::Selectable("Device default", gAudioSampleRate == 0.0))
+                  gAudioSampleRate = 0.0;
+               for (double rate : kSampleRates)
+               {
+                  char label[32];
+                  snprintf(label, sizeof(label), "%.0f Hz", rate);
+                  if (ImGui::Selectable(label, gAudioSampleRate == rate))
+                     gAudioSampleRate = rate;
+               }
+               ImGui::EndCombo();
+            }
+#if defined(_WIN32)
+            ImGui::EndDisabled();
+            if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
+               ImGui::SetTooltip("Windows shared-mode audio always runs at the format set in "
+                                 "Sound settings. Change the sample rate there.");
+#endif
+
+            static const int kBufferSizes[] = { 64, 128, 256, 512, 1024, 2048 };
+            char bufferLabel[16];
+            snprintf(bufferLabel, sizeof(bufferLabel), "%d", gAudioBufferFrames);
+#if defined(_WIN32)
+            ImGui::BeginDisabled();
+#endif
+            ImGui::SetNextItemWidth(240.0f);
+            if (ImGui::BeginCombo("Buffer size", bufferLabel))
+            {
+               for (int frames : kBufferSizes)
+               {
+                  char label[16];
+                  snprintf(label, sizeof(label), "%d", frames);
+                  if (ImGui::Selectable(label, gAudioBufferFrames == frames))
+                     gAudioBufferFrames = frames;
+               }
+               ImGui::EndCombo();
+            }
+#if defined(_WIN32)
+            ImGui::EndDisabled();
+            if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
+               ImGui::SetTooltip("Windows shared-mode audio always runs at the device's own "
+                                 "period. Change it in Sound settings.");
+#endif
+
+            static const float kOversampleValues[] = { 1.0f, 2.0f, 4.0f };
+            static const char* kOversampleLabels[] = { "1x", "2x", "4x" };
+            int oversampleIdx = 0;
+            for (int i = 0; i < 3; i++)
+               if (kOversampleValues[i] == gAudioOversample)
+                  oversampleIdx = i;
+            ImGui::SetNextItemWidth(240.0f);
+            if (ImGui::BeginCombo("Oversampling", kOversampleLabels[oversampleIdx]))
+            {
+               for (int i = 0; i < 3; i++)
+                  if (ImGui::Selectable(kOversampleLabels[i], oversampleIdx == i))
+                     gAudioOversample = kOversampleValues[i];
+               ImGui::EndCombo();
+            }
+
+            if (audioRunning)
+            {
+               const uint32_t actualBufferFrames = Platform::AudioDeviceBufferFrames(gAudioOutputDeviceId);
+               ImGui::TextDisabled("Active: %.0f Hz, %u frames", AudioEngine::Instance().SampleRate(),
+                                   actualBufferFrames);
+            }
+
+            ImGui::Spacing();
+            if (ImGui::Button("Apply audio settings", ImVec2(180, 0)))
+            {
+               const bool wasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+               if (wasRunning)
+                  AudioEngine::Instance().Stop();
+
+               AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
+               AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
+               AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+
+               if (wasRunning)
+               {
+                  gAudioStartError.clear();
+                  if (!StartAudioEngine(gAudioStartError))
+                     fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
+               }
+            }
+
+            ImGui::EndTabItem();
+         }
+
+         // 4. General & Performance Tab
+         if (ImGui::BeginTabItem("General & Performance"))
+         {
+            ImGui::Spacing();
+            ImGui::SeparatorText("Autosave");
+            if (gAutosaveFailed)
+            {
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.35f, 1.0f));
+               ImGui::TextUnformatted("Autosave is FAILING - save manually");
+               ImGui::PopStyleColor();
+               if (ImGui::IsItemHovered())
+               {
+                  const std::string path = AutosavePath();
+                  ImGui::SetTooltip("Could not write %s.\nCheck permissions and free disk space.",
+                                    path.empty() ? "the settings directory" : path.c_str());
+               }
+            }
+            if (ImGui::Checkbox("Autosave enabled", &gAutosaveEnabled))
+               SaveAutosaveSettings();
+            ImGui::SetNextItemWidth(180.0f);
+            int seconds = gAutosaveSeconds;
+            if (ImGui::SliderInt("Autosave interval", &seconds, 15, 300, "%d sec"))
+               gAutosaveSeconds = seconds;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+               SaveAutosaveSettings();
+
+            ImGui::Spacing();
+            ImGui::SeparatorText("Performance & Rendering");
+            static const char* kFpsLabels[] = { "Unlimited", "30", "60", "120" };
+            static const int kFpsValues[] = { 0, 30, 60, 120 };
+            int current = 0;
+            for (int i = 0; i < 4; i++)
+               if (kFpsValues[i] == gTargetFps)
+                  current = i;
+
+            ImGui::SetNextItemWidth(180.0f);
+            if (ImGui::BeginCombo("Target FPS", kFpsLabels[current]))
+            {
+               for (int i = 0; i < 4; i++)
+               {
+                  if (ImGui::Selectable(kFpsLabels[i], current == i))
+                     gTargetFps = kFpsValues[i];
+               }
+               ImGui::EndCombo();
+            }
+
+            if (ImGui::Checkbox("Vsync", &gVsync))
+               glfwSwapInterval(gVsync ? 1 : 0);
+
+            ImGui::Spacing();
+            ImGui::SeparatorText("Application & Updates");
+            ImGui::Text("Version: %s", INFINITE_VERSION_STRING);
+            if (ImGui::Button("Check for updates..."))
+            {
+               UpdateCheck::Start();
+               gShowUpdateCheckModal = true;
+            }
+
+            ImGui::EndTabItem();
+         }
+
+         ImGui::EndTabBar();
+      }
+
+      ImGui::End();
    }
 
    // Rebuilds the live graph from a snapshot - shared by LoadPatchFrom (from
@@ -33659,6 +34157,101 @@ static bool RunBrowserSortTest()
    return ok;
 }
 
+static bool RunAppearanceSelfTest()
+{
+   bool ok = true;
+   auto check = [&ok](bool cond, const char* msg) {
+      if (!cond) {
+         printf("  FAIL: %s\n", msg);
+         ok = false;
+      }
+   };
+
+   // 1. Coverage - for all 9 presets x all 10 categories, ColorFor() returns a non-fallback color
+   const auto& presetNames = CategoryColors::PresetNames();
+   check(presetNames.size() == 9, "preset count is 9");
+   const auto& catNames = CategoryColors::CategoryNames();
+   check(catNames.size() == 10, "category count is 10");
+
+   for (int i = 0; i < (int)presetNames.size(); i++)
+   {
+      CategoryColors::SetPreset(i);
+      for (const std::string& cat : catNames)
+      {
+         const CategoryColors::Color& c = CategoryColors::ColorFor(cat);
+         const bool isFallback = (std::abs(c.r - 0.42f) < 1e-4f &&
+                                  std::abs(c.g - 0.44f) < 1e-4f &&
+                                  std::abs(c.b - 0.50f) < 1e-4f);
+         check(!isFallback, ("preset " + presetNames[i] + " category " + cat + " has distinct color").c_str());
+      }
+   }
+
+   // 2. Rank parity
+   for (const std::string& cat : catNames)
+   {
+      check(CategoryColors::SemanticRank(cat) < (int)catNames.size(),
+            ("category " + cat + " is in SemanticRank table").c_str());
+   }
+
+   // 3. Round trip persistence
+   CategoryColors::SetPreset(0); // Infinite (dark)
+   CategoryColors::ResetAllAppearanceBoth();
+
+   CategoryColors::SetCategoryColor("Source", { 0.111f, 0.222f, 0.333f }, false);
+   CategoryColors::SetCableColor(CategoryColors::CableType::Modulation, { 0.444f, 0.555f, 0.666f }, false);
+   CategoryColors::SetNodeOpacity(0.654f, false);
+   CategoryColors::SetTintWeight(0.234f, false);
+   CategoryColors::SetNodeRounding(18.0f);
+
+   check(std::abs(CategoryColors::ColorFor("Source").r - 0.111f) < 1e-3f, "category override getter r");
+   check(std::abs(CategoryColors::CableColorFor(CategoryColors::CableType::Modulation).r - 0.444f) < 1e-3f, "cable override getter r");
+   check(std::abs(CategoryColors::GetNodeOpacity() - 0.654f) < 1e-3f, "node opacity override getter");
+   check(std::abs(CategoryColors::GetTintWeight() - 0.234f) < 1e-3f, "tint weight override getter");
+   check(std::abs(CategoryColors::GetNodeRounding() - 18.0f) < 1e-3f, "node rounding override getter");
+
+   CategoryColors::LoadPreference();
+   check(std::abs(CategoryColors::ColorFor("Source").r - 0.111f) < 1e-3f, "reloaded category override");
+   check(std::abs(CategoryColors::CableColorFor(CategoryColors::CableType::Modulation).r - 0.444f) < 1e-3f, "reloaded cable override");
+   check(std::abs(CategoryColors::GetNodeOpacity() - 0.654f) < 1e-3f, "reloaded opacity override");
+   check(std::abs(CategoryColors::GetTintWeight() - 0.234f) < 1e-3f, "reloaded tint weight override");
+   check(std::abs(CategoryColors::GetNodeRounding() - 18.0f) < 1e-3f, "reloaded rounding override");
+
+   // 4. Polarity isolation
+   CategoryColors::SetPreset(6); // GitHub Light
+   check(CategoryColors::IsThemeLight(), "GitHub Light is light theme");
+   check(!CategoryColors::HasCategoryColorOverride("Source", true), "light Source has no override yet");
+   check(!CategoryColors::HasCableColorOverride(CategoryColors::CableType::Modulation, true), "light cable has no override");
+   check(!CategoryColors::HasNodeOpacityOverride(true), "light opacity has no override");
+   check(std::abs(CategoryColors::GetNodeOpacity() - CategoryColors::DefaultNodeOpacity(true)) < 1e-3f, "light opacity defaults to 0.95");
+
+   // 5. Reset
+   CategoryColors::SetPreset(0); // Dark Infinite
+   CategoryColors::ResetCategoryColor("Source", false);
+   check(!CategoryColors::HasCategoryColorOverride("Source", false), "Source reset clears override");
+   CategoryColors::ResetAllAppearanceBoth();
+   check(!CategoryColors::HasCableColorOverride(CategoryColors::CableType::Modulation, false), "ResetAll clears cable");
+   check(!CategoryColors::HasNodeOpacityOverride(false), "ResetAll clears opacity");
+   check(!CategoryColors::HasNodeRoundingOverride(), "ResetAll clears rounding");
+
+   // 6. Backwards compatibility values
+   check(std::abs(CategoryColors::DefaultNodeOpacity(false) - 0.784f) < 1e-3f, "dark opacity default is 0.784");
+   check(std::abs(CategoryColors::DefaultNodeOpacity(true) - 0.950f) < 1e-3f, "light opacity default is 0.95");
+   check(std::abs(CategoryColors::DefaultTintWeight(false) - 0.160f) < 1e-3f, "dark tint default is 0.16");
+   check(std::abs(CategoryColors::DefaultTintWeight(true) - 0.120f) < 1e-3f, "light tint default is 0.12");
+   check(std::abs(CategoryColors::DefaultNodeRounding() - 12.0f) < 1e-3f, "node rounding default is 12.0");
+
+   // 7. Cable classification
+   const int colorPin = 2 * GraphNode::kStride + GraphNode::kColorBase + 1;
+   const int paramPin = 2 * GraphNode::kStride + GraphNode::kParamBase + 1;
+   check(GraphNode::IsColorPin(colorPin), "color pin recognized");
+   check(!GraphNode::IsParamPin(colorPin), "color pin is not param pin");
+   check(GraphNode::IsParamPin(paramPin), "param pin recognized");
+   check(!GraphNode::IsColorPin(paramPin), "param pin is not color pin");
+
+   printf("%s\n", ok ? "APPEARANCE SELFTEST PASS" : "APPEARANCE SELFTEST FAIL");
+   return ok;
+}
+
 // Wire a note consumer's inbox the way the real topology builder does: through
 // the slot-aware SetNoteInbox(slot, ...) overload, at whichever slot the node
 // actually exposes its note pin on. Every fixture below must use this rather
@@ -34857,6 +35450,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_BROWSERSORTTEST") != nullptr)
       return RunBrowserSortTest() ? 0 : 1;
+
+   if (getenv("INFINITE_APPEARANCETEST") != nullptr)
+      return RunAppearanceSelfTest() ? 0 : 1;
 
    if (getenv("INFINITE_PLUGINSCANTEST") != nullptr)
       return RunPluginScanTest();
@@ -38014,42 +38610,10 @@ int main(int argc, char** argv)
 
          if (ImGui::BeginMenu("Menu"))
          {
-            if (ImGui::BeginMenu("Canvas"))
-            {
-               ImGui::Checkbox("Snap to grid", &gSnapToGrid);
-               ImGui::SetNextItemWidth(150);
-               ImGui::SliderFloat("Grid size", &gGridSnap, 5.0f, 100.0f, "%.0f px");
-               ImGui::SetNextItemWidth(150);
-               ImGui::SliderFloat("Zoom speed", &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
-               ImGui::Separator();
-               if (ImGui::MenuItem("Fit view to content"))
-                  gRequestFitView = true;
-               ImGui::EndMenu();
-            }
+            if (ImGui::MenuItem("Settings...", MODKEY "+0"))
+               gSettingsOpen = true;
 
-            if (ImGui::BeginMenu("Minimap"))
-            {
-               ImGui::Checkbox("Show minimap", &gMinimapEnabled);
-               if (gMinimapEnabled)
-               {
-                  static const char* kCorners[] = {
-                     "Top left", "Top right", "Bottom left", "Bottom right"
-                  };
-                  ImGui::SetNextItemWidth(150);
-                  if (ImGui::BeginCombo("Position", kCorners[gMinimapCorner]))
-                  {
-                     for (int i = 0; i < 4; i++)
-                        if (ImGui::Selectable(kCorners[i], i == gMinimapCorner))
-                           gMinimapCorner = i;
-                     ImGui::EndCombo();
-                  }
-                  ImGui::SetNextItemWidth(150);
-                  ImGui::SliderFloat("Size", &gMinimapSize, 120.0f, 360.0f, "%.0f px");
-                  ImGui::SetNextItemWidth(150);
-                  ImGui::SliderFloat("Opacity", &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
-               }
-               ImGui::EndMenu();
-            }
+            ImGui::Separator();
 
             if (ImGui::BeginMenu("Viewport panel"))
             {
@@ -38059,8 +38623,6 @@ int main(int argc, char** argv)
                   ImGui::SetNextItemWidth(150);
                   ViewportPanelDockCombo();
                   ImGui::SetNextItemWidth(150);
-                  // Only the axis the current dock actually reserves - the other
-                  // one has no effect from here, and a dead slider reads as broken.
                   if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
                      ImGui::SliderFloat("Width", &gViewportPanelWidth,
                                         kViewportPanelMinWidth, 900.0f, "%.0f px");
@@ -38084,8 +38646,6 @@ int main(int argc, char** argv)
                   ImGui::SetNextItemWidth(150);
                   ModMatrixDockCombo();
                   ImGui::SetNextItemWidth(150);
-                  // Only the axis the current dock actually reserves - see the
-                  // identical comment on the viewport panel's own sliders above.
                   if (gModMatrixDock == 1 || gModMatrixDock == 2)
                      ImGui::SliderFloat("Width", &gModMatrixWidth,
                                         kModMatrixMinWidth, 900.0f, "%.0f px");
@@ -38115,256 +38675,6 @@ int main(int argc, char** argv)
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu("Cable visibility"))
-            {
-               bool showMod = (gCableVisibilityMask & 0x4) != 0;
-               bool showAudNote = (gCableVisibilityMask & 0x2) != 0;
-               bool showImg = (gCableVisibilityMask & 0x1) != 0;
-
-               if (ImGui::Checkbox("Modulation cables", &showMod))
-                  gCableVisibilityMask = (gCableVisibilityMask & ~0x4) | (showMod ? 0x4 : 0);
-               if (ImGui::Checkbox("Audio & note cables", &showAudNote))
-                  gCableVisibilityMask = (gCableVisibilityMask & ~0x2) | (showAudNote ? 0x2 : 0);
-               if (ImGui::Checkbox("Image & geometry cables", &showImg))
-                  gCableVisibilityMask = (gCableVisibilityMask & ~0x1) | (showImg ? 0x1 : 0);
-
-               ImGui::Separator();
-               if (ImGui::MenuItem("Show all cables"))
-                  gCableVisibilityMask = 0x7;
-               if (ImGui::MenuItem("Hide all cables"))
-                  gCableVisibilityMask = 0x0;
-               ImGui::EndMenu();
-            }
-
-            if (ImGui::BeginMenu("Performance"))
-            {
-               // A cap is useful in both directions: it stops a light patch
-               // spinning the GPU at 400fps for no reason, and it gives a
-               // predictable frame budget to judge a heavy one against.
-               static const char* kFpsLabels[] = { "Unlimited", "30", "60", "120" };
-               static const int kFpsValues[] = { 0, 30, 60, 120 };
-               int current = 0;
-               for (int i = 0; i < 4; i++)
-                  if (kFpsValues[i] == gTargetFps)
-                     current = i;
-
-               ImGui::SetNextItemWidth(150);
-               if (ImGui::BeginCombo("Target FPS", kFpsLabels[current]))
-               {
-                  for (int i = 0; i < 4; i++)
-                  {
-                     if (ImGui::Selectable(kFpsLabels[i], current == i))
-                        gTargetFps = kFpsValues[i];
-                  }
-                  ImGui::EndCombo();
-               }
-
-               if (ImGui::Checkbox("Vsync", &gVsync))
-                  glfwSwapInterval(gVsync ? 1 : 0);
-               ImGui::EndMenu();
-            }
-
-            if (ImGui::BeginMenu("Theme"))
-            {
-               const std::vector<std::string>& presets = CategoryColors::PresetNames();
-               const int current = CategoryColors::CurrentPreset();
-               for (int i = 0; i < (int)presets.size(); i++)
-               {
-                  if (ImGui::MenuItem(presets[i].c_str(), nullptr, current == i))
-                  {
-                     CategoryColors::SetPreset(i);
-                     ApplyTheme();
-                  }
-               }
-               ImGui::EndMenu();
-            }
-
-            if (ImGui::BeginMenu("Autosave"))
-            {
-               if (gAutosaveFailed)
-               {
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.35f, 1.0f));
-                  ImGui::TextUnformatted("Autosave is FAILING - save manually");
-                  ImGui::PopStyleColor();
-                  if (ImGui::IsItemHovered())
-                  {
-                     const std::string path = AutosavePath();
-                     ImGui::SetTooltip("Could not write %s.\nCheck permissions and free disk space.",
-                                       path.empty() ? "the settings directory" : path.c_str());
-                  }
-                  ImGui::Separator();
-               }
-               if (ImGui::Checkbox("Autosave enabled", &gAutosaveEnabled))
-                  SaveAutosaveSettings();
-               ImGui::SetNextItemWidth(150);
-               int seconds = gAutosaveSeconds;
-               if (ImGui::SliderInt("Interval", &seconds, 15, 300, "%d sec"))
-                  gAutosaveSeconds = seconds;
-               if (ImGui::IsItemDeactivatedAfterEdit())
-                  SaveAutosaveSettings();
-               ImGui::EndMenu();
-            }
-
-            if (ImGui::BeginMenu("Audio"))
-            {
-               const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
-               const bool audioRunning = AudioEngine::Instance().SampleRate() > 0.0;
-
-               std::string outputLabel = (gAudioOutputDeviceId == 0) ? "System default" : "Unknown device";
-               for (const Platform::AudioDeviceInfo& d : devices)
-                  if (d.isOutput && d.deviceId == gAudioOutputDeviceId)
-                     outputLabel = d.name;
-               ImGui::SetNextItemWidth(200);
-               if (ImGui::BeginCombo("Output device", outputLabel.c_str()))
-               {
-                  if (ImGui::Selectable("System default", gAudioOutputDeviceId == 0))
-                     gAudioOutputDeviceId = 0;
-                  for (const Platform::AudioDeviceInfo& d : devices)
-                  {
-                     if (!d.isOutput)
-                        continue;
-                     if (ImGui::Selectable(d.name.c_str(), d.deviceId == gAudioOutputDeviceId))
-                        gAudioOutputDeviceId = d.deviceId;
-                  }
-                  ImGui::EndCombo();
-               }
-
-               // Wired through for a future audio-input node (P3) - the new
-               // synth engine has none yet, so this selection isn't consumed
-               // anywhere yet. The pre-existing mic level/FFT analyser
-               // (Platform::AudioStart, an unrelated older feature) stays on
-               // the system default input regardless of this setting.
-               std::string inputLabel = (gAudioInputDeviceId == 0) ? "System default" : "Unknown device";
-               for (const Platform::AudioDeviceInfo& d : devices)
-                  if (d.isInput && d.deviceId == gAudioInputDeviceId)
-                     inputLabel = d.name;
-               ImGui::SetNextItemWidth(200);
-               if (ImGui::BeginCombo("Input device", inputLabel.c_str()))
-               {
-                  if (ImGui::Selectable("System default", gAudioInputDeviceId == 0))
-                     gAudioInputDeviceId = 0;
-                  for (const Platform::AudioDeviceInfo& d : devices)
-                  {
-                     if (!d.isInput)
-                        continue;
-                     if (ImGui::Selectable(d.name.c_str(), d.deviceId == gAudioInputDeviceId))
-                        gAudioInputDeviceId = d.deviceId;
-                  }
-                  ImGui::EndCombo();
-               }
-               static const double kSampleRates[] = { 44100.0, 48000.0, 88200.0, 96000.0 };
-               std::string rateLabel = (gAudioSampleRate == 0.0) ? "Device default" : "";
-               if (gAudioSampleRate != 0.0)
-               {
-                  char buf[32];
-                  snprintf(buf, sizeof(buf), "%.0f Hz", gAudioSampleRate);
-                  rateLabel = buf;
-               }
-#if defined(_WIN32)
-               // WASAPI shared mode (AudioDeviceWin.cpp's RenderThreadMain)
-               // always negotiates the device's own mix format - requested
-               // rate/buffer are explicitly discarded there, `(void)
-               // requestedSampleRate; (void) requestedBufferFrames;` - so
-               // these two controls have never done anything on Windows.
-               // Disabling them (rather than leaving them live and inert)
-               // is the documented decision in
-               // docs/plans/windows-render/FIX_BRIEF.md addendum A2.
-               ImGui::BeginDisabled();
-#endif
-               ImGui::SetNextItemWidth(200);
-               if (ImGui::BeginCombo("Sample rate", rateLabel.c_str()))
-               {
-                  if (ImGui::Selectable("Device default", gAudioSampleRate == 0.0))
-                     gAudioSampleRate = 0.0;
-                  for (double rate : kSampleRates)
-                  {
-                     char label[32];
-                     snprintf(label, sizeof(label), "%.0f Hz", rate);
-                     if (ImGui::Selectable(label, gAudioSampleRate == rate))
-                        gAudioSampleRate = rate;
-                  }
-                  ImGui::EndCombo();
-               }
-#if defined(_WIN32)
-               ImGui::EndDisabled();
-               // BeginDisabled swallows hover, so ask the rect directly -
-               // same workaround DrawModulationBindingMenu's caller uses.
-               if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
-                  ImGui::SetTooltip("Windows shared-mode audio always runs at the format set in "
-                                    "Sound settings. Change the sample rate there.");
-#endif
-
-               static const int kBufferSizes[] = { 64, 128, 256, 512, 1024, 2048 };
-               char bufferLabel[16];
-               snprintf(bufferLabel, sizeof(bufferLabel), "%d", gAudioBufferFrames);
-#if defined(_WIN32)
-               ImGui::BeginDisabled();
-#endif
-               ImGui::SetNextItemWidth(200);
-               if (ImGui::BeginCombo("Buffer size", bufferLabel))
-               {
-                  for (int frames : kBufferSizes)
-                  {
-                     char label[16];
-                     snprintf(label, sizeof(label), "%d", frames);
-                     if (ImGui::Selectable(label, gAudioBufferFrames == frames))
-                        gAudioBufferFrames = frames;
-                  }
-                  ImGui::EndCombo();
-               }
-#if defined(_WIN32)
-               ImGui::EndDisabled();
-               if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
-                  ImGui::SetTooltip("Windows shared-mode audio always runs at the device's own "
-                                    "period. Change it in Sound settings.");
-#endif
-               static const float kOversampleValues[] = { 1.0f, 2.0f, 4.0f };
-               static const char* kOversampleLabels[] = { "1x", "2x", "4x" };
-               int oversampleIdx = 0;
-               for (int i = 0; i < 3; i++)
-                  if (kOversampleValues[i] == gAudioOversample)
-                     oversampleIdx = i;
-               ImGui::SetNextItemWidth(200);
-               if (ImGui::BeginCombo("Oversampling", kOversampleLabels[oversampleIdx]))
-               {
-                  for (int i = 0; i < 3; i++)
-                     if (ImGui::Selectable(kOversampleLabels[i], oversampleIdx == i))
-                        gAudioOversample = kOversampleValues[i];
-                  ImGui::EndCombo();
-               }
-               if (audioRunning)
-               {
-                  const uint32_t actualBufferFrames = Platform::AudioDeviceBufferFrames(gAudioOutputDeviceId);
-                  ImGui::TextDisabled("Active: %.0f Hz, %u frames", AudioEngine::Instance().SampleRate(),
-                                      actualBufferFrames);
-               }
-
-               ImGui::Separator();
-               if (ImGui::MenuItem("Apply audio settings"))
-               {
-                  const bool wasRunning = AudioEngine::Instance().SampleRate() > 0.0;
-                  if (wasRunning)
-                     AudioEngine::Instance().Stop();
-
-                  AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
-                  AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
-                  AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
-
-                  if (wasRunning)
-                  {
-                     gAudioStartError.clear();
-                     // StartAudioEngine, not a bare Start(): the new rate/
-                     // buffer size just applied above may not be what the
-                     // device actually negotiates, and every node's
-                     // ParamMailbox needs PrepareToPlay'd with whatever it
-                     // negotiates - see StartAudioEngine's comment (bugs 1/2).
-                     if (!StartAudioEngine(gAudioStartError))
-                        fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
-                  }
-               }
-               ImGui::EndMenu();
-            }
-
             if (ImGui::BeginMenu("Nodes"))
             {
                if (ImGui::MenuItem("Show all params"))
@@ -38381,6 +38691,8 @@ int main(int argc, char** argv)
             }
 
             ImGui::Separator();
+            if (ImGui::MenuItem("Fit view to content"))
+               gRequestFitView = true;
             if (ImGui::MenuItem("All shortcuts..."))
                gShortcutsOpen = true;
             if (ImGui::MenuItem("Expression globals..."))
@@ -38389,7 +38701,7 @@ int main(int argc, char** argv)
                gHelpOpen = true;
             if (ImGui::MenuItem("Check for updates"))
             {
-               UpdateCheck::Start(); // manual re-check for anyone who dismissed the badge
+               UpdateCheck::Start();
                gShowUpdateCheckModal = true;
             }
 
@@ -41960,11 +42272,15 @@ int main(int argc, char** argv)
          sw3Node.manualSlot = 0;
          checkPassthrough("Switcher3DNode", &sw3Node);
 
-         // Excluded on purpose: nodes that consume an instancer's *output*
-         // rather than passing its stamp through - MeshToPointsNode,
-         // JoinGeometryNode, ClothNode, the DistributePoints* family - build
-         // their own geometry from GetMesh(), so "the instancer is still
-         // upstream" is not a claim they make or should make.
+         MappingNode mappingNode; mappingNode.input = &groupXform;
+         checkPassthrough("MappingNode", &mappingNode);
+
+         MeshResynthNode resynthNode; resynthNode.input = &groupXform;
+         checkPassthrough("MeshResynthNode", &resynthNode);
+
+         AudioDisplacementNode audioDispNode; audioDispNode.input = &groupXform;
+         checkPassthrough("AudioDisplacementNode", &audioDispNode);
+
          bool allOk = true;
          for (const Result& r : results)
          {
@@ -41975,6 +42291,80 @@ int main(int argc, char** argv)
             if (!ok)
                allOk = false;
          }
+
+         // Consumer-side realization checks: assert that nodes that consume an
+         // instancer's output properly realize all instances across the scatter,
+         // track the 5/7/3 group translation, and reduce count on instance deletion.
+         auto checkConsumerRealization = [&](const char* name, bool ok, const char* detail)
+         {
+            printf("  [%s] %-24s %s\n", ok ? "pass" : "FAIL", name, ok ? "" : detail);
+            if (!ok) allOk = false;
+         };
+
+         // 1. DistributePointsOnFacesNode realization & group tracking
+         DistributePointsOnFacesNode distNode;
+         distNode.input = &groupXform;
+         cook(&distNode);
+         const auto& distPts = distNode.GetPoints();
+         float dMeanX = 0, dMeanY = 0, dMeanZ = 0;
+         for (const auto& p : distPts) { dMeanX += p.px; dMeanY += p.py; dMeanZ += p.pz; }
+         if (!distPts.empty()) { dMeanX /= distPts.size(); dMeanY /= distPts.size(); dMeanZ /= distPts.size(); }
+         const bool distOk = distPts.size() > 50 &&
+                             std::fabs(dMeanX - 5.0f) < 1.5f &&
+                             std::fabs(dMeanY - 7.0f) < 1.5f &&
+                             std::fabs(dMeanZ - 3.0f) < 1.5f;
+         checkConsumerRealization("DistributePoints(scatter)", distOk, "points not realized or group translation lost");
+
+         // 2. MeshToPointsNode realization & group tracking
+         MeshToPointsNode m2pNode;
+         m2pNode.input = &groupXform;
+         cook(&m2pNode);
+         const auto& m2pPts = m2pNode.GetPoints();
+         float mMeanX = 0, mMeanY = 0, mMeanZ = 0;
+         for (const auto& p : m2pPts) { mMeanX += p.px; mMeanY += p.py; mMeanZ += p.pz; }
+         if (!m2pPts.empty()) { mMeanX /= m2pPts.size(); mMeanY /= m2pPts.size(); mMeanZ /= m2pPts.size(); }
+         const bool m2pOk = m2pPts.size() > 50 &&
+                            std::fabs(mMeanX - 5.0f) < 1.5f &&
+                            std::fabs(mMeanY - 7.0f) < 1.5f &&
+                            std::fabs(mMeanZ - 3.0f) < 1.5f;
+         checkConsumerRealization("MeshToPoints(scatter)", m2pOk, "points not realized or group translation lost");
+
+         // 3. PointsToVerticesNode realization
+         PointsToVerticesNode p2vNode;
+         p2vNode.input = &groupXform;
+         cook(&p2vNode);
+         const size_t p2vCount = p2vNode.GetMesh().vertices.size();
+         const bool p2vOk = p2vCount > 50;
+         checkConsumerRealization("PointsToVertices(scatter)", p2vOk, "vertices not realized across instances");
+
+         // 4. JoinGeometryNode realization
+         JoinGeometryNode joinNode;
+         joinNode.inputs[0] = &groupXform;
+         cook(&joinNode);
+         const size_t joinCount = joinNode.GetMesh().vertices.size();
+         const bool joinOk = joinCount > 50;
+         checkConsumerRealization("JoinGeometry(scatter)", joinOk, "instances not realized in join");
+
+         // 5. Upstream deletion propagation to DistributePoints
+         GeometryOpNode selNode;
+         selNode.op = GeometryOpNode::kSelect;
+         selNode.selectMode = MeshOps::kSelectRandom;
+         selNode.selectA = 0.5f;
+         selNode.input = &inst;
+
+         GeometryOpNode delNode;
+         delNode.op = GeometryOpNode::kDelete;
+         delNode.selectionOnly = true;
+         delNode.keepSelected = false;
+         delNode.input = &selNode;
+
+         DistributePointsOnFacesNode distAfterDel;
+         distAfterDel.input = &delNode;
+         cook(&distAfterDel);
+         const size_t distAfterDelCount = distAfterDel.GetPoints().size();
+         const bool delOk = distAfterDelCount > 0 && distAfterDelCount < distPts.size();
+         checkConsumerRealization("Delete->DistributePoints", delOk, "deletion did not reduce realized points");
+
          printf("%s\n", allOk ? "INSTANCE SWEEP OK" : "INSTANCE SWEEP FAIL");
       }
 
@@ -45098,13 +45488,14 @@ int main(int argc, char** argv)
          // a node still reads as "the same kind of card", just tinted.
          const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
          const CategoryColors::Color& catColor = CategoryColors::ColorFor(gn.category);
-         const bool isLight = (0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
-         const float kTintWeight = isLight ? 0.12f : 0.16f;
+         const bool isLight = CategoryColors::IsThemeLight();
+         const float kTintWeight = CategoryColors::GetTintWeight();
+         const float nodeAlpha = CategoryColors::GetNodeOpacity();
          ed::PushStyleColor(ed::StyleColor_NodeBg,
                             ImColor(t.panelBg.r * (1.0f - kTintWeight) + catColor.r * kTintWeight,
                                     t.panelBg.g * (1.0f - kTintWeight) + catColor.g * kTintWeight,
                                     t.panelBg.b * (1.0f - kTintWeight) + catColor.b * kTintWeight,
-                                    isLight ? 0.95f : 0.784f));
+                                    nodeAlpha));
          ed::PushStyleColor(ed::StyleColor_NodeBorder,
                             ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
 
@@ -46182,17 +46573,30 @@ int main(int argc, char** argv)
       // it. The link is approximated as a straight line between the two nodes'
       // facing edges rather than the bezier actually drawn: close enough to feel
       // right, and it avoids reaching into the editor's internal curve geometry.
-      const bool isLight = IsThemeLight();
       for (const LinkInfo& link : gLinks)
       {
          const bool isMod = GraphNode::IsParamPin(link.dstPin);
          if (isMod)
          {
             if (gCableVisibilityMask & 0x4)
-               ed::Link(link.id, link.srcPin, link.dstPin,
-                        isLight ? ImColor(215, 120, 10) : ImColor(255, 190, 90), 2.0f);
+            {
+               const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Modulation);
+               ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+            }
             continue;
          }
+
+         const bool isColor = GraphNode::IsColorPin(link.dstPin);
+         if (isColor)
+         {
+            if (gCableVisibilityMask & 0x1)
+            {
+               const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Palette);
+               ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+            }
+            continue;
+         }
+
          // Audio = blue, Note = green (docs/plans/audio/README.md's colour
          // scheme). Only ordinary input pins can be audio/note - param/colour
          // pins are already handled above.
@@ -46206,15 +46610,19 @@ int main(int argc, char** argv)
                if (dst->node->AudioInputSlot(slot) != nullptr)
                {
                   if (gCableVisibilityMask & 0x2)
-                     ed::Link(link.id, link.srcPin, link.dstPin,
-                              isLight ? ImColor(30, 100, 230) : ImColor(90, 150, 255), 2.0f);
+                  {
+                     const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Audio);
+                     ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+                  }
                   tinted = true;
                }
                else if (dst->node->NoteInputSlot(slot) != nullptr)
                {
                   if (gCableVisibilityMask & 0x2)
-                     ed::Link(link.id, link.srcPin, link.dstPin,
-                              isLight ? ImColor(20, 150, 60) : ImColor(90, 220, 130), 2.0f);
+                  {
+                     const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Note);
+                     ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+                  }
                   tinted = true;
                }
             }
@@ -46222,13 +46630,16 @@ int main(int argc, char** argv)
          if (!tinted)
          {
             if (gCableVisibilityMask & 0x1)
-               ed::Link(link.id, link.srcPin, link.dstPin,
-                        isLight ? ImColor(55, 62, 78) : ImColor(230, 235, 245), 2.0f);
+            {
+               const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Stream);
+               ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+            }
          }
       }
 
       // ---- handle new connections ----
-      if (ed::BeginCreate(isLight ? ImColor(55, 62, 78) : ImColor(255, 255, 255), 2.0f))
+      const CategoryColors::Color& defStreamCol = CategoryColors::CableColorFor(CategoryColors::CableType::Stream);
+      if (ed::BeginCreate(ImColor(defStreamCol.r, defStreamCol.g, defStreamCol.b, 1.0f), 2.0f))
       {
          ed::PinId startPin, endPin;
          if (ed::QueryNewLink(&startPin, &endPin))
@@ -47670,7 +48081,7 @@ int main(int argc, char** argv)
                         gModRangeTypedPendingInit = true;
                         gModRangeTypedNoAutoSelect = false;
                      }
-                     else if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
+                     else if (ImGui::IsItemHovered() && !ImGui::IsItemActive() && !io.KeyCtrl && !io.KeySuper)
                      {
                         std::string seed;
                         for (int k = 0; k < 10; k++)
@@ -48891,6 +49302,9 @@ int main(int argc, char** argv)
       if (gShortcutsOpen)
          DrawShortcutsWindow(&gShortcutsOpen);
 
+      if (gSettingsOpen)
+         DrawSettingsWindow(&gSettingsOpen);
+
       if (gShowUnsavedChangesModal)
       {
          ImGui::OpenPopup("Unsaved Changes");
@@ -49856,7 +50270,9 @@ int main(int argc, char** argv)
       // KeyCtrl, not KeySuper (that's the Windows key there).
       if (!ImGui::GetIO().WantTextInput && (ImGui::GetIO().KeySuper || ImGui::GetIO().KeyCtrl))
       {
-         if (ImGui::IsKeyPressed(ImGuiKey_S, false))
+         if (ImGui::IsKeyPressed(ImGuiKey_0, false))
+            gSettingsOpen = true;
+         else if (ImGui::IsKeyPressed(ImGuiKey_S, false))
             SavePatchInteractive(ImGui::GetIO().KeyShift);
          else if (ImGui::IsKeyPressed(ImGuiKey_O, false))
          {

@@ -469,6 +469,71 @@ namespace MeshOps
       return out;
    }
 
+   Mesh RealizeInstances(const Mesh& stamp,
+                         const std::vector<Mat4>& xforms,
+                         const Mat4& groupMatrix,
+                         const std::vector<float>* instanceColors,
+                         int maxInstances)
+   {
+      Mesh out;
+      if (stamp.vertices.empty() || xforms.empty())
+         return out;
+
+      const int n = std::max(0, std::min((int)xforms.size(), maxInstances));
+      if (n == 0)
+         return out;
+
+      out.vertices.reserve(stamp.vertices.size() * (size_t)n);
+      out.indices.reserve(stamp.indices.size() * (size_t)n);
+      if (!stamp.faceMask.empty())
+         out.faceMask.reserve(stamp.faceMask.size() * (size_t)n);
+
+      const bool isGroupIdent = groupMatrix == Mat4::Identity();
+      for (int i = 0; i < n; i++)
+      {
+         const Mat4 m = isGroupIdent ? xforms[i] : Mat4::Multiply(groupMatrix, xforms[i]);
+         Mesh copy = Transform(stamp, m);
+
+         if (instanceColors && (size_t)i * 3 + 2 < instanceColors->size())
+         {
+            const float cr = (*instanceColors)[(size_t)i * 3 + 0];
+            const float cg = (*instanceColors)[(size_t)i * 3 + 1];
+            const float cb = (*instanceColors)[(size_t)i * 3 + 2];
+            if (copy.vertexColor.empty())
+            {
+               copy.vertexColor.reserve(copy.vertices.size() * 3);
+               for (size_t v = 0; v < copy.vertices.size(); v++)
+               {
+                  copy.vertexColor.push_back(cr);
+                  copy.vertexColor.push_back(cg);
+                  copy.vertexColor.push_back(cb);
+               }
+            }
+            else
+            {
+               for (size_t v = 0; v < copy.vertices.size(); v++)
+               {
+                  copy.vertexColor[v * 3 + 0] *= cr;
+                  copy.vertexColor[v * 3 + 1] *= cg;
+                  copy.vertexColor[v * 3 + 2] *= cb;
+               }
+            }
+         }
+
+         const unsigned int base = (unsigned int)out.vertices.size();
+         out.vertices.insert(out.vertices.end(), copy.vertices.begin(), copy.vertices.end());
+         for (unsigned int idx : copy.indices)
+            out.indices.push_back(base + idx);
+         if (!copy.vertexColor.empty())
+            out.vertexColor.insert(out.vertexColor.end(),
+                                   copy.vertexColor.begin(), copy.vertexColor.end());
+         if (!copy.faceMask.empty())
+            out.faceMask.insert(out.faceMask.end(),
+                                copy.faceMask.begin(), copy.faceMask.end());
+      }
+      return out;
+   }
+
    // Primitives here duplicate vertices wherever UVs or normals split - the
    // sphere's date line, every edge of a flat-shaded cube. Any operator that
    // reasons about connectivity has to weld those back together first or it

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "Geometry3DNodes.h"
+#include "GeometryOpNodes.h"
 
 // Phase 6: real point distribution. Four small, unrelated node types that
 // happen to all live in the point/vertex domain - kept in their own file
@@ -41,7 +41,12 @@ public:
    const std::vector<Particle>& GetPoints();
    unsigned long long PointRevision();
 
-   Mat4 GetModelMatrix() const override { return input ? input->GetModelMatrix() : Mat4::Identity(); }
+   Mat4 GetModelMatrix() const override
+   {
+      if (input == nullptr) return Mat4::Identity();
+      if (FindInstancer(input) != nullptr) return Mat4::Identity();
+      return input->GetModelMatrix();
+   }
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override { return input ? input->GetSurfaceTexture() : 0; }
    unsigned int GetMaterialTexture(int map) override
@@ -110,9 +115,15 @@ private:
    std::vector<Particle> mPoints;
    const void* mBuiltInput = nullptr;
    unsigned long long mBuiltUpstream = 0;
+   const void* mBuiltInstancer = nullptr;
+   unsigned long long mBuiltInstRevision = 0;
+   Mat4 mBuiltGroupMatrix;
+   size_t mBuiltInstanceCount = 0;
    float mBuiltDensity = -1.0f;
    int mBuiltMethod = -1;
    float mBuiltMinDistance = -1.0f, mBuiltPointSize = -1.0f, mBuiltSeed = 0.0f;
+   bool mBuiltInherit = true;
+   float mBuiltColor[3] = { -1.0f, -1.0f, -1.0f };
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
 };
@@ -137,7 +148,12 @@ public:
 
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
-   Mat4 GetModelMatrix() const override { return input ? input->GetModelMatrix() : Mat4::Identity(); }
+   Mat4 GetModelMatrix() const override
+   {
+      if (input == nullptr) return Mat4::Identity();
+      if (FindInstancer(input) != nullptr) return Mat4::Identity();
+      return input->GetModelMatrix();
+   }
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override { return input ? input->GetSurfaceTexture() : 0; }
    unsigned int GetMaterialTexture(int map) override
@@ -199,6 +215,10 @@ private:
    Mesh mCache;
    const void* mBuiltInput = nullptr;
    unsigned long long mBuiltUpstream = 0;
+   const void* mBuiltInstancer = nullptr;
+   unsigned long long mBuiltInstRevision = 0;
+   Mat4 mBuiltGroupMatrix;
+   size_t mBuiltInstanceCount = 0;
    bool mBuiltAliveOnly = true;
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;

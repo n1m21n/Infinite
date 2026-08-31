@@ -48,26 +48,6 @@ namespace
       return h;
    }
 
-   // Walks the same PassthroughSource() chain as WrapsInstancer below, but
-   // returns the instancer itself so a caller can also read its instance
-   // count - see GeometryOpNode::UpstreamInstanceCount.
-   InstanceOnPointsNode* FindInstancer(IGeometrySource* s)
-   {
-      for (; s != nullptr; s = s->PassthroughSource())
-      {
-         if (auto* instancer = dynamic_cast<InstanceOnPointsNode*>(s))
-            return instancer;
-      }
-      return nullptr;
-   }
-
-   // Whether a source is, or sits behind a chain of mesh-transforming wrapper
-   // nodes on top of, an InstanceOnPoints - see IGeometrySource::PassthroughSource.
-   bool WrapsInstancer(IGeometrySource* s)
-   {
-      return FindInstancer(s) != nullptr;
-   }
-
    // Same hash MeshOps::Select uses internally (Mesh.cpp's anonymous-namespace
    // SelectHash) - kept identical so kSelectRandom means the same threshold in
    // the instance domain as it does on faces.
@@ -76,6 +56,41 @@ namespace
       const float x = std::sin((seed + 1.0f) * (float)(index + 1) * 12.9898f) * 43758.5453f;
       return x - std::floor(x);
    }
+}
+
+InstanceOnPointsNode* FindInstancer(IGeometrySource* s)
+{
+   for (; s != nullptr; s = s->PassthroughSource())
+   {
+      if (auto* instancer = dynamic_cast<InstanceOnPointsNode*>(s))
+         return instancer;
+   }
+   return nullptr;
+}
+
+bool WrapsInstancer(IGeometrySource* s)
+{
+   return FindInstancer(s) != nullptr;
+}
+
+const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, InstanceOnPointsNode* instancer)
+{
+   for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
+   {
+      if (const std::vector<Mat4>* override_ = s->InstanceTransformOverride())
+         return *override_;
+   }
+   return instancer->InstanceTransforms();
+}
+
+const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source)
+{
+   for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
+   {
+      if (const std::vector<unsigned char>* mask = s->InstanceSelection())
+         return mask;
+   }
+   return nullptr;
 }
 
 const std::vector<std::string>& GeometryOpNode::OpNames() { return kOpNames; }
@@ -872,8 +887,11 @@ WrapNode::Signature WrapNode::CurrentSignature() const
    s.target = targetInput;
    s.sourceRevision = sourceInput ? sourceInput->MeshRevision() : 0;
    s.targetRevision = targetInput ? targetInput->MeshRevision() : 0;
+   if (InstanceOnPointsNode* targetInstancer = targetInput ? FindInstancer(targetInput) : nullptr)
+      s.targetRevision += targetInstancer->InstanceRevision() + (unsigned long long)targetInstancer->InstanceCount();
    s.sourceModel = sourceInput ? sourceInput->GetModelMatrix() : Mat4::Identity();
    s.targetModel = targetInput ? targetInput->GetModelMatrix() : Mat4::Identity();
+   s.targetGroup = targetInput ? targetInput->GetInstanceGroupMatrix() : Mat4::Identity();
    return s;
 }
 
@@ -881,8 +899,16 @@ float WrapNode::ResolvedRadius() const
 {
    if (targetInput == nullptr)
       return radiusOverride;
-   return MeshOps::WrapRadius(targetInput->GetMesh(), targetInput->GetModelMatrix(), axis) *
-          radiusScale;
+   Mesh tgt;
+   if (InstanceOnPointsNode* targetInstancer = FindInstancer(targetInput))
+   {
+      tgt = MeshOps::RealizeInstances(targetInput->GetMesh(), ResolveInstanceTransforms(targetInput, targetInstancer), targetInput->GetInstanceGroupMatrix(), &targetInstancer->InstanceColors(), 256);
+   }
+   else
+   {
+      tgt = targetInput->GetMesh();
+   }
+   return MeshOps::WrapRadius(tgt, targetInput->GetModelMatrix(), axis) * radiusScale;
 }
 
 const Mesh& WrapNode::GetMesh()
@@ -901,7 +927,18 @@ const Mesh& WrapNode::GetMesh()
    // The target is optional in the bend modes - a radius override alone is
    // enough to bend around nothing - so an empty target is passed straight
    // through to Wrap, which decides whether it can proceed.
-   const Mesh& tgt = targetInput ? targetInput->GetMesh() : kEmptyMesh;
+   Mesh tgt;
+   if (targetInput != nullptr)
+   {
+      if (InstanceOnPointsNode* targetInstancer = FindInstancer(targetInput))
+      {
+         tgt = MeshOps::RealizeInstances(targetInput->GetMesh(), ResolveInstanceTransforms(targetInput, targetInstancer), targetInput->GetInstanceGroupMatrix(), &targetInstancer->InstanceColors(), 256);
+      }
+      else
+      {
+         tgt = targetInput->GetMesh();
+      }
+   }
    const Mat4 tgtModel = targetInput ? targetInput->GetModelMatrix() : Mat4::Identity();
    mCache = MeshOps::Wrap(src, srcModel, tgt, tgtModel, mode, offset, blend,
                           radiusOverride, radiusScale, axis, fitAround, flatShade, flipNormals);

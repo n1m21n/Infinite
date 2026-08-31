@@ -44,15 +44,22 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
    }
 
    const unsigned long long upstream = input->MeshRevision();
-   if (mBuiltInput == input && mBuiltUpstream == upstream && mBuiltDensity == density &&
-       mBuiltMethod == method && mBuiltMinDistance == minDistance &&
-       mBuiltPointSize == pointSize && mBuiltSeed == seed)
+   InstanceOnPointsNode* instancer = FindInstancer(input);
+   const unsigned long long instRev = instancer ? instancer->InstanceRevision() : 0;
+   const Mat4 groupMatrix = instancer ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   const std::vector<Mat4>* xformsPtr = instancer ? &ResolveInstanceTransforms(input, instancer) : nullptr;
+   const size_t instCount = xformsPtr ? xformsPtr->size() : 0;
+
+   const bool sameColor = (mBuiltColor[0] == color[0] && mBuiltColor[1] == color[1] && mBuiltColor[2] == color[2]);
+   if (mBuiltInput == input && mBuiltUpstream == upstream &&
+       mBuiltInstancer == (const void*)instancer && mBuiltInstRevision == instRev &&
+       mBuiltGroupMatrix == groupMatrix && mBuiltInstanceCount == instCount &&
+       mBuiltDensity == density && mBuiltMethod == method &&
+       mBuiltMinDistance == minDistance && mBuiltPointSize == pointSize &&
+       mBuiltSeed == seed && mBuiltInherit == inheritMaterial && sameColor)
       return;
 
    const Mesh& src = input->GetMesh();
-   const std::vector<MeshPoint> points =
-      MeshOps::DistributeOnFaces(src, density, seed, method, minDistance);
-   mCache = MeshOps::PointsToFaces(points, pointSize);
 
    float tint[3];
    if (inheritMaterial)
@@ -66,26 +73,91 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
    }
 
    mPoints.clear();
-   mPoints.reserve(points.size());
-   for (const MeshPoint& p : points)
+   std::vector<MeshPoint> allPoints;
+
+   if (instancer != nullptr && xformsPtr != nullptr && !xformsPtr->empty())
    {
-      Particle particle;
-      particle.px = p.px; particle.py = p.py; particle.pz = p.pz;
-      particle.nx = p.nx; particle.ny = p.ny; particle.nz = p.nz;
-      // Half-extent pointSize * 0.5 * p.scale, matching the quad
-      // MeshOps::PointsToFaces just baked into mCache (h = size * 0.5).
-      particle.scale = pointSize * 0.5f * p.scale;
-      particle.r = tint[0] * p.r; particle.g = tint[1] * p.g; particle.b = tint[2] * p.b;
-      mPoints.push_back(particle);
+      const std::vector<Mat4>& xforms = *xformsPtr;
+      const std::vector<float>& instColors = instancer->InstanceColors();
+      const int n = std::min((int)xforms.size(), 256);
+      const bool isGroupIdent = (groupMatrix == Mat4::Identity());
+
+      for (int i = 0; i < n; i++)
+      {
+         const Mat4 m = isGroupIdent ? xforms[i] : Mat4::Multiply(groupMatrix, xforms[i]);
+         float nMat[9];
+         m.NormalMatrix(nMat);
+
+         const float instSeed = seed + (float)i * 17.13f;
+         const std::vector<MeshPoint> points =
+            MeshOps::DistributeOnFaces(src, density, instSeed, method, minDistance);
+
+         float instTint[3] = { tint[0], tint[1], tint[2] };
+         if ((size_t)i * 3 + 2 < instColors.size())
+         {
+            instTint[0] *= instColors[(size_t)i * 3 + 0];
+            instTint[1] *= instColors[(size_t)i * 3 + 1];
+            instTint[2] *= instColors[(size_t)i * 3 + 2];
+         }
+
+         for (const MeshPoint& p : points)
+         {
+            MeshPoint wp;
+            wp.px = m.m[0]*p.px + m.m[4]*p.py + m.m[8]*p.pz + m.m[12];
+            wp.py = m.m[1]*p.px + m.m[5]*p.py + m.m[9]*p.pz + m.m[13];
+            wp.pz = m.m[2]*p.px + m.m[6]*p.py + m.m[10]*p.pz + m.m[14];
+
+            float nx = nMat[0]*p.nx + nMat[3]*p.ny + nMat[6]*p.nz;
+            float ny = nMat[1]*p.nx + nMat[4]*p.ny + nMat[7]*p.nz;
+            float nz = nMat[2]*p.nx + nMat[5]*p.ny + nMat[8]*p.nz;
+            const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
+            if (len > 1e-6f) { nx /= len; ny /= len; nz /= len; }
+            wp.nx = nx; wp.ny = ny; wp.nz = nz;
+            wp.scale = p.scale;
+            wp.r = p.r; wp.g = p.g; wp.b = p.b;
+            allPoints.push_back(wp);
+
+            Particle particle;
+            particle.px = wp.px; particle.py = wp.py; particle.pz = wp.pz;
+            particle.nx = wp.nx; particle.ny = wp.ny; particle.nz = wp.nz;
+            particle.scale = pointSize * 0.5f * p.scale;
+            particle.r = instTint[0] * p.r; particle.g = instTint[1] * p.g; particle.b = instTint[2] * p.b;
+            mPoints.push_back(particle);
+         }
+      }
+      mCache = MeshOps::PointsToFaces(allPoints, pointSize);
+   }
+   else
+   {
+      const std::vector<MeshPoint> points =
+         MeshOps::DistributeOnFaces(src, density, seed, method, minDistance);
+      mCache = MeshOps::PointsToFaces(points, pointSize);
+
+      mPoints.reserve(points.size());
+      for (const MeshPoint& p : points)
+      {
+         Particle particle;
+         particle.px = p.px; particle.py = p.py; particle.pz = p.pz;
+         particle.nx = p.nx; particle.ny = p.ny; particle.nz = p.nz;
+         particle.scale = pointSize * 0.5f * p.scale;
+         particle.r = tint[0] * p.r; particle.g = tint[1] * p.g; particle.b = tint[2] * p.b;
+         mPoints.push_back(particle);
+      }
    }
 
    mBuiltInput = input;
    mBuiltUpstream = upstream;
+   mBuiltInstancer = instancer;
+   mBuiltInstRevision = instRev;
+   mBuiltGroupMatrix = groupMatrix;
+   mBuiltInstanceCount = instCount;
    mBuiltDensity = density;
    mBuiltMethod = method;
    mBuiltMinDistance = minDistance;
    mBuiltPointSize = pointSize;
    mBuiltSeed = seed;
+   mBuiltInherit = inheritMaterial;
+   mBuiltColor[0] = color[0]; mBuiltColor[1] = color[1]; mBuiltColor[2] = color[2];
    mMeshRevision = NextMeshRevision();
 }
 
@@ -179,7 +251,16 @@ void PointsToVerticesNode::RebuildIfNeeded()
    // "cloud is the more specific instruction" rule InstanceOnPointsNode uses.
    const std::vector<Particle>* cloud = input->GetPointCloud();
    const unsigned long long upstream = cloud ? input->PointCloudRevision() : input->MeshRevision();
-   if (mBuiltInput == input && mBuiltUpstream == upstream && mBuiltAliveOnly == aliveOnly)
+   InstanceOnPointsNode* instancer = cloud ? nullptr : FindInstancer(input);
+   const unsigned long long instRev = instancer ? instancer->InstanceRevision() : 0;
+   const Mat4 groupMatrix = instancer ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   const std::vector<Mat4>* xformsPtr = instancer ? &ResolveInstanceTransforms(input, instancer) : nullptr;
+   const size_t instCount = xformsPtr ? xformsPtr->size() : 0;
+
+   if (mBuiltInput == input && mBuiltUpstream == upstream &&
+       mBuiltInstancer == (const void*)instancer && mBuiltInstRevision == instRev &&
+       mBuiltGroupMatrix == groupMatrix && mBuiltInstanceCount == instCount &&
+       mBuiltAliveOnly == aliveOnly)
       return;
 
    Mesh out;
@@ -200,6 +281,12 @@ void PointsToVerticesNode::RebuildIfNeeded()
          out.vertexColor.push_back(p.b);
       }
    }
+   else if (instancer != nullptr && xformsPtr != nullptr && !xformsPtr->empty())
+   {
+      const Mesh realized = MeshOps::RealizeInstances(input->GetMesh(), *xformsPtr, groupMatrix, &instancer->InstanceColors(), 256);
+      out.vertices = realized.vertices;
+      out.vertexColor = realized.vertexColor;
+   }
    else
    {
       // No cloud upstream - fall back to the mesh's own vertices, so wiring a
@@ -213,6 +300,10 @@ void PointsToVerticesNode::RebuildIfNeeded()
    mCache = out;
    mBuiltInput = input;
    mBuiltUpstream = upstream;
+   mBuiltInstancer = instancer;
+   mBuiltInstRevision = instRev;
+   mBuiltGroupMatrix = groupMatrix;
+   mBuiltInstanceCount = instCount;
    mBuiltAliveOnly = aliveOnly;
    mMeshRevision = NextMeshRevision();
 }

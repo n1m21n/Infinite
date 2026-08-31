@@ -17,45 +17,6 @@ namespace
    // the object the same apparent size while reading closer to orthographic.
    constexpr float kFovDegrees = 28.0f;
 
-   // Same chain-walk as Render3DNode's FindInstancer (Geometry3DNodes.cpp): an
-   // InstanceOnPoints wrapped in Transform/Subdivide/etc. is still an instancer
-   // as far as the preview is concerned, so the thumbnail shows every instance
-   // rather than just the one stamp mesh those wrappers actually operate on.
-   InstanceOnPointsNode* FindInstancer(IGeometrySource* source)
-   {
-      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
-      {
-         if (auto* instancer = dynamic_cast<InstanceOnPointsNode*>(s))
-            return instancer;
-      }
-      return nullptr;
-   }
-
-   // Same chain-walk, for the first non-null InstanceTransformOverride() (a
-   // selectionOnly Delete/Transform downstream of the instancer) - see
-   // GeometryOpNode::InstanceTransformOverride. Falls back to the instancer's
-   // own placements when nothing overrides.
-   const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, InstanceOnPointsNode* instancer)
-   {
-      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
-      {
-         if (const std::vector<Mat4>* override_ = s->InstanceTransformOverride())
-            return *override_;
-      }
-      return instancer->InstanceTransforms();
-   }
-
-   // Same chain-walk for the instance selection mask, used by the selection
-   // overlay's instance-domain fallback (whole instances tinted, not faces).
-   const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source)
-   {
-      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
-      {
-         if (const std::vector<unsigned char>* mask = s->InstanceSelection())
-            return mask;
-      }
-      return nullptr;
-   }
    // Position + normal + UV, no instancing. Cheapest lit look that still
    // reads as a solid: ambient + one fixed directional light + a small
    // specular kick so curvature is visible on a flat-lit preview. UV is

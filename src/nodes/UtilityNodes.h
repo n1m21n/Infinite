@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "Geometry3DNodes.h"
+#include "GeometryOpNodes.h"
+#include "Mesh.h"
 
 // --- Comment --------------------------------------------------------------
 // A free-floating annotation. Not part of the signal graph at all - no
@@ -381,6 +383,24 @@ public:
    }
    MappingTransform GetMappingTransform() const override;
 
+   IGeometrySource* PassthroughSource() const override { return input; }
+   Mat4 GetInstanceGroupMatrix() const override
+   {
+      return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
+   }
+   const std::vector<unsigned char>* InstanceSelection() const override
+   {
+      return input ? input->InstanceSelection() : nullptr;
+   }
+   unsigned long long InstanceSelectionRevision() const override
+   {
+      return input ? input->InstanceSelectionRevision() : 0;
+   }
+   const std::vector<Mat4>* InstanceTransformOverride() const override
+   {
+      return input ? input->InstanceTransformOverride() : nullptr;
+   }
+
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
@@ -534,6 +554,10 @@ private:
    unsigned long long mMeshRevision = 0;
    const void* mBuiltInputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
    unsigned long long mBuiltRevisions[kSlots] = { 0, 0, 0, 0 };
+   const void* mBuiltInstancers[kSlots] = { nullptr, nullptr, nullptr, nullptr };
+   unsigned long long mBuiltInstRevisions[kSlots] = { 0, 0, 0, 0 };
+   Mat4 mBuiltGroupMatrices[kSlots];
+   size_t mBuiltInstanceCounts[kSlots] = { 0, 0, 0, 0 };
    int mBuiltMode = -1;
    // The transforms are baked into the merged vertices, so a change to one has
    // to trigger a rebuild exactly like a change to a mesh would. Keying only on
@@ -687,7 +711,9 @@ public:
    // a mesh does not relocate it.
    Mat4 GetModelMatrix() const override
    {
-      return input ? input->GetModelMatrix() : Mat4::Identity();
+      if (input == nullptr) return Mat4::Identity();
+      if (FindInstancer(input) != nullptr) return Mat4::Identity();
+      return input->GetModelMatrix();
    }
    Material GetMaterial() const override;
    unsigned int GetSurfaceTexture() override;
@@ -777,9 +803,15 @@ private:
 
    const void* mBuiltInput = nullptr;
    unsigned long long mBuiltUpstream = 0;
+   const void* mBuiltInstancer = nullptr;
+   unsigned long long mBuiltInstRevision = 0;
+   Mat4 mBuiltGroupMatrix;
+   size_t mBuiltInstanceCount = 0;
    int mBuiltMode = -1, mBuiltMax = -1;
    float mBuiltSize = -1.0f;
    bool mBuiltWeld = true;
    float mBuiltDissolve = -1.0f;
+   bool mBuiltInherit = true;
+   float mBuiltColor[3] = { -1.0f, -1.0f, -1.0f };
    int mLastCookFrame = -1;
 };
