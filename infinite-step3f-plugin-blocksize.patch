@@ -1,0 +1,80 @@
+--- a/src/nodes/AudioPluginNode.cpp	2026-08-31 07:10:40.520345886 +0000
++++ b/src/nodes/AudioPluginNode.cpp	2026-08-31 07:10:40.520541345 +0000
+@@ -24,6 +24,37 @@
+       Platform::PluginScheduleMIDIEvent(handle, 0, allNotesOff, 3);
+       Platform::PluginScheduleMIDIEvent(handle, 0, allSoundOff, 3);
+    }
++
++   // Block size to prepare a hosted plugin at. This MUST match the block size
++   // the engine will actually feed processBlock, not the pool's 4096 ceiling:
++   // preparing at 4096 while the device delivers ~448-frame callbacks is a
++   // prepared-vs-actual mismatch that spec-loose plugins choke on - a streaming
++   // sampler (DecentSampler) comes out glitched and a block-size-sensitive host
++   // (Cardinal / VCV Rack) can hang. The mac AU path never hit this because the
++   // original prepared at 4096 there too and AUs tolerate it; the Windows JUCE
++   // VST3 backend does not, and the working fork prepared at the real device
++   // block for exactly this reason.
++   //
++   // AudioDeviceBufferFrames() returns the running WASAPI buffer size (the exact
++   // capacity the render loop caps each callback to - see AudioDeviceWin.cpp),
++   // so a callback can never exceed it: preparing here is always >= what
++   // PluginRender is later handed, so its "numFrames > maxFrames -> silence"
++   // guard can never trip from this. 512 is the fallback when no device is open
++   // yet (headless prepare); the clamp keeps it in the pool's legal range.
++   int PluginPrepareBlockFrames()
++   {
++#if defined(__APPLE__)
++      // mac AU path is unchanged on purpose: it has always prepared at the pool
++      // ceiling and AUs tolerate it, so the working mac build stays byte-for-byte
++      // as it was. Only the Windows JUCE VST3 backend needs the real block.
++      return kAudioMaxBlockFrames;
++#else
++      int block = (int)Platform::AudioDeviceBufferFrames();
++      if (block <= 0)
++         block = 512;
++      return std::clamp(block, 64, kAudioMaxBlockFrames);
++#endif
++   }
+ }
+ 
+ // ---------------------------------------------------------------- audio half
+@@ -432,7 +463,7 @@
+    mStatus = "loading " + desc.name + "...";
+ 
+    const double rate = AudioEngine::Instance().SampleRate();
+-   mHandle = Platform::PluginCreate(desc, rate, kAudioMaxBlockFrames);
++   mHandle = Platform::PluginCreate(desc, rate, PluginPrepareBlockFrames());
+ }
+ 
+ void AudioPluginNode::ReloadFromIdentity()
+@@ -648,7 +679,12 @@
+    double rate = AudioEngine::Instance().SampleRate();
+    if (rate <= 0.0)
+       rate = mAudioNode->SampleRate();
+-   if (rate > 0.0 && (rate != mPreparedRate || mPreparedBlock != kAudioMaxBlockFrames))
++   // Only queried when the engine is actually running: AudioDeviceBufferFrames()
++   // is a cheap field read then (returns the live gRender.bufferFrames), but a
++   // COM device probe while stopped - and CookIfNeeded runs every frame. When
++   // rate is 0 we keep mPreparedBlock so the condition below stays false.
++   const int block = (rate > 0.0) ? PluginPrepareBlockFrames() : mPreparedBlock;
++   if (rate > 0.0 && (rate != mPreparedRate || mPreparedBlock != block))
+    {
+       // A note held across this unpublish window would otherwise sustain
+       // forever - the re-prepare below tears down and rebuilds the plugin's
+@@ -656,14 +692,14 @@
+       FlushPluginNotes(mHandle);
+       mAudioNode->SetHandle(nullptr);
+       std::string error;
+-      if (!Platform::PluginPrepare(mHandle, rate, kAudioMaxBlockFrames, error))
++      if (!Platform::PluginPrepare(mHandle, rate, block, error))
+       {
+          mLoadFailed = true;
+          mStatus = error.empty() ? std::string("prepare failed") : error;
+          return;
+       }
+       mPreparedRate = rate;
+-      mPreparedBlock = kAudioMaxBlockFrames;
++      mPreparedBlock = block;
+ 
+       // 3. A restored patch's plugin state is applied here, once, after the
+       //    plugin is fully prepared - fullState invalidates render resources,

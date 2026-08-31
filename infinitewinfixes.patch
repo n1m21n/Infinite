@@ -1,0 +1,452 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d6917f9..242d8f8 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,5 +1,15 @@
+ cmake_minimum_required(VERSION 3.16)
+ 
++# CMP0135 (CMake 3.24+): make FetchContent URL downloads use the extraction
++# time as the file timestamp instead of the archive's own, so a changed URL
++# actually rebuilds. Silences the two author warnings the onnxruntime_dml /
++# directml_redist FetchContent_Declare calls emit under CMake 3.24+. Guarded
++# so older CMake (which lacks the policy) still configures.
++if(POLICY CMP0135)
++    cmake_policy(SET CMP0135 NEW)
++    set(CMAKE_POLICY_DEFAULT_CMP0135 NEW)
++endif()
++
+ # Universal + a floor of macOS 11: UTType (file dialogs) and the modern
+ # AVAssetWriter APIs need 11.0, and shipping both slices means the DMG runs on
+ # Intel Macs as well as Apple Silicon. Must be set before project().
+diff --git a/src/audio/PluginScanner.cpp b/src/audio/PluginScanner.cpp
+index 6f7d3da..56250ff 100644
+--- a/src/audio/PluginScanner.cpp
++++ b/src/audio/PluginScanner.cpp
+@@ -88,10 +88,17 @@ void PluginScanner::StartScan(const std::string& folder)
+    else
+    {
+ #if defined(_WIN32)
+-      // Steinberg's system-wide VST3 location; the per-user %LOCALAPPDATA%
+-      // one only exists if the user or an installer created it.
++      // The two locations the VST3 spec defines on Windows. The system-wide one
++      // under %COMMONPROGRAMFILES% is where most installers drop plugins; the
++      // per-user %LOCALAPPDATA%\Programs\Common\VST3 one only exists if an
++      // installer (or the user) created it, but plenty of vendors now default
++      // to it, so scanning only the first is what made a machine full of VST3s
++      // still come up empty. Both are walked; a missing folder is a harmless
++      // no-op in the directory walk.
+       if (const char* common = getenv("COMMONPROGRAMFILES"))
+          vst3Folders.push_back(std::string(common) + "\\VST3");
++      if (const char* localAppData = getenv("LOCALAPPDATA"))
++         vst3Folders.push_back(std::string(localAppData) + "\\Programs\\Common\\VST3");
+ #else
+       vst3Folders.push_back("/Library/Audio/Plug-Ins/VST3");
+       const char* home = getenv("HOME");
+diff --git a/src/main.cpp b/src/main.cpp
+index d04be11..f8980ef 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -4882,6 +4882,49 @@ namespace
+       ModCheckbox("loop", &n->loop);
+       ModSlider("speed", &n->speed, -2.0f, 4.0f);
+ 
++      // Transport extras. Raw ImGui (not Mod*) on purpose: adding modulation
++      // param pins here would renumber the audio params below them and break
++      // saved modulation bindings, so these stay plain controls.
++      ImGui::Checkbox("reverse", &n->reverse);
++
++      const double dur = n->Duration();
++      if (dur > 0.0)
++      {
++         // While not scrubbing, keep the scrub handle tracking the live
++         // playhead so flipping scrub on grabs the current frame, not 0.
++         if (!n->scrub)
++            n->scrubSeconds = (float)n->Position();
++
++         bool scrubBool = n->scrub;
++         if (ImGui::Checkbox("scrub", &scrubBool))
++         {
++            n->scrub = scrubBool;
++            if (scrubBool)
++               n->scrubSeconds = (float)n->Position();
++         }
++         if (n->scrub)
++         {
++            ImGui::SetNextItemWidth(kPreviewSize);
++            ImGui::SliderFloat("##scrubpos", &n->scrubSeconds, 0.0f, (float)dur, "%.2fs");
++         }
++
++         float inS = n->trimIn;
++         float outS = (n->trimOut > 0.0f) ? n->trimOut : (float)dur;
++         ImGui::SetNextItemWidth(kPreviewSize);
++         if (ImGui::SliderFloat("trim in", &inS, 0.0f, (float)dur, "%.2fs"))
++            n->trimIn = std::clamp(inS, 0.0f, std::max(0.0f, outS - 0.05f));
++         ImGui::SetNextItemWidth(kPreviewSize);
++         if (ImGui::SliderFloat("trim out", &outS, 0.0f, (float)dur, "%.2fs"))
++         {
++            const float clamped = std::clamp(outS, n->trimIn + 0.05f, (float)dur);
++            n->trimOut = (clamped >= (float)dur - 1e-3f) ? 0.0f : clamped; // 0 == to end
++         }
++      }
++      else
++      {
++         ImGui::TextDisabled("scrub/trim: play once to detect length");
++      }
++
+       NodeSeparator();
+       if (n->HasAudio())
+       {
+@@ -6396,6 +6439,7 @@ namespace
+ 
+       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+       ImGui::TextDisabled("%s", n->Status().c_str());
++      ImGui::TextDisabled("engine: %s", Platform::MattingBackend().c_str());
+       ImGui::PopTextWrapPos();
+ 
+       ModSlider("feather", &n->feather, 0.0f, 4.0f);
+diff --git a/src/nodes/RemoveBgNode.cpp b/src/nodes/RemoveBgNode.cpp
+index c554dd4..a1f3523 100644
+--- a/src/nodes/RemoveBgNode.cpp
++++ b/src/nodes/RemoveBgNode.cpp
+@@ -9,7 +9,16 @@
+ 
+ namespace
+ {
++   // The macOS Vision request types (subject lifting vs. person segmentation)
++   // don't exist on Windows, where a single salient-object model (u2netp) runs
++   // through ONNX Runtime + DirectML and the mode is ignored entirely - so
++   // showing the macOS-only labels there was misleading. Each platform gets the
++   // options it can actually honour.
++#if defined(_WIN32)
++   const std::vector<std::string> kModeNames = { "Salient subject (GPU)" };
++#else
+    const std::vector<std::string> kModeNames = { "Subject (macOS 14+)", "Person (macOS 12+)" };
++#endif
+    const std::vector<std::string> kOutputModeNames = { "Cutout", "Mask only", "Background only" };
+ 
+    const char* kFragSrc =
+diff --git a/src/nodes/VideoSourceNode.cpp b/src/nodes/VideoSourceNode.cpp
+index a71c792..afe8314 100644
+--- a/src/nodes/VideoSourceNode.cpp
++++ b/src/nodes/VideoSourceNode.cpp
+@@ -275,15 +275,42 @@ void VideoSourceNode::CookIfNeeded(int frameId)
+ 
+    EnsurePlaceholder();
+ 
++   // Reverse folds into a signed rate the audio half reads too, so its own
++   // read cursor runs backwards in step with the picture.
++   const float effectiveSpeed = speed * (reverse ? -1.0f : 1.0f);
+    if (mAudioNode)
+    {
+-      mAudioNode->PushParams(audioEnabled, volume, speed, loop);
++      mAudioNode->PushParams(audioEnabled, volume, effectiveSpeed, loop);
+       mAudioNode->DrainRetired();
+    }
+ 
+    if (mVideo == nullptr)
+       return;
+ 
++   // Learn the true duration for containers whose header declares none (on
++   // Windows MF_PD_DURATION comes back empty for some files, which used to
++   // leave mDuration at 0 - and a 0 duration silently disabled both the loop
++   // wrap and the total-time readout). VideoObservedEndSeconds fills in once
++   // the clip has been decoded through to its end at least once.
++   if (mDuration <= 0.0)
++   {
++      const double observed = Platform::VideoObservedEndSeconds(mVideo);
++      if (observed > 0.0)
++         mDuration = observed;
++   }
++
++   // Active playback window from the trim points. trimOut <= 0 means "to the
++   // end"; when the end is not yet known (unknown duration) outSec stays 0 and
++   // the wrap below falls back to the decoder's end-of-stream signal.
++   const double inSec = std::max(0.0, (double)trimIn);
++   double outSec = 0.0;
++   if (trimOut > 0.0f && (double)trimOut > inSec)
++      outSec = (double)trimOut;
++   else if (mDuration > 0.0)
++      outSec = mDuration;
++   if (outSec > 0.0 && mDuration > 0.0)
++      outSec = std::min(outSec, mDuration);
++
+    // Advance by the transport's own delta so pausing holds the frame and the
+    // speed control retimes playback without touching wall time.
+    const double now = Transport::Instance().Seconds();
+@@ -291,25 +318,46 @@ void VideoSourceNode::CookIfNeeded(int frameId)
+    if (delta < 0.0)
+       delta = 0.0;
+    mLastTransportSeconds = now;
+-   mPosition += delta * (double)speed;
+ 
+-   if (mDuration > 0.0)
++   if (scrub)
+    {
+-      if (loop)
++      // Manual positioning: the transport is ignored and the frame follows the
++      // scrub control directly.
++      const double hi = (outSec > inSec) ? outSec
++                                         : (mDuration > 0.0 ? mDuration : (double)scrubSeconds);
++      mPosition = std::clamp((double)scrubSeconds, inSec, std::max(inSec, hi));
++   }
++   else
++   {
++      mPosition += delta * (double)effectiveSpeed;
++
++      if (outSec > inSec)
+       {
+-         mPosition = std::fmod(mPosition, mDuration);
+-         if (mPosition < 0.0)
+-            mPosition += mDuration; // fmod keeps the sign of the dividend
++         const double span = outSec - inSec;
++         if (loop)
++         {
++            double rel = std::fmod(mPosition - inSec, span);
++            if (rel < 0.0)
++               rel += span; // fmod keeps the sign of the dividend
++            mPosition = inSec + rel;
++         }
++         else
++         {
++            mPosition = std::clamp(mPosition, inSec, outSec);
++         }
+       }
+       else
+       {
+-         mPosition = std::clamp(mPosition, 0.0, mDuration);
++         // End not yet known: hold the floor at trimIn, and wrap on the
++         // decoder's real end-of-stream when looping forward. Reverse-looping
++         // with an unknown end has nothing to wrap to, so it just holds at in.
++         if (mPosition < inSec)
++            mPosition = inSec;
++         if (loop && effectiveSpeed >= 0.0f && Platform::VideoAtEnd(mVideo))
++            mPosition = inSec;
++         mPosition = std::max(mPosition, 0.0);
+       }
+    }
+-   else
+-   {
+-      mPosition = std::max(mPosition, 0.0);
+-   }
+ 
+    // Published for the audio half to read - see VideoAudioNode's class
+    // comment. Written every cook, whether or not this node currently has an
+diff --git a/src/nodes/VideoSourceNode.h b/src/nodes/VideoSourceNode.h
+index b9fc631..1080bfd 100644
+--- a/src/nodes/VideoSourceNode.h
++++ b/src/nodes/VideoSourceNode.h
+@@ -60,10 +60,30 @@ public:
+    bool audioEnabled = true;
+    float volume = 1.0f;
+ 
++   // Playback direction. Kept separate from a negative `speed` so the speed
++   // slider can stay a positive magnitude and reverse is a plain toggle; the
++   // two combine into the signed rate used to advance the position.
++   bool reverse = false;
++
++   // Trim points, in seconds. Playback (and the loop wrap) is confined to
++   // [trimIn, trimOut). trimOut <= 0 means "until the end of the clip", so a
++   // freshly loaded clip with both at their defaults plays in full.
++   float trimIn = 0.0f;
++   float trimOut = 0.0f;
++
++   // Scrub: when on, the transport no longer drives the position - it is set
++   // directly from scrubSeconds, so the user can drag to any frame. scrubSeconds
++   // is clamped into the active trim range.
++   bool scrub = false;
++   float scrubSeconds = 0.0f;
++
+    void VisitParams(ParamVisitor& v) override
+    {
+       v.Text("path", mLoadedPath);
+       v.Bool("loop", loop); v.Float("speed", speed);
++      v.Bool("reverse", reverse);
++      v.Float("trimIn", trimIn); v.Float("trimOut", trimOut);
++      v.Bool("scrub", scrub); v.Float("scrubSeconds", scrubSeconds);
+       v.Bool("audioEnabled", audioEnabled); v.Float("volume", volume);
+    }
+ 
+diff --git a/src/platform/Platform.h b/src/platform/Platform.h
+index b050c20..3fefb67 100644
+--- a/src/platform/Platform.h
++++ b/src/platform/Platform.h
+@@ -151,6 +151,21 @@ namespace Platform
+    // NOT wait on this - holding the previous frame is the whole point.
+    bool VideoDecodeIsCatchingUp(VideoHandle* handle);
+ 
++   // True once the decoder has hit end-of-stream for the position last asked
++   // for and has no further frame to give. A backwards seek (VideoFrameAt with
++   // an earlier position) clears it. This lets a looping player wrap on the
++   // real last frame even for containers whose header carries no duration -
++   // where VideoDuration returns 0 and a time-based wrap has nothing to wrap
++   // against. Always false on macOS (VideoFrameAt is synchronous there).
++   bool VideoAtEnd(VideoHandle* handle);
++
++   // The timestamp (seconds) of the furthest frame decoded so far, but only
++   // once end-of-stream has actually been reached - i.e. the clip's true
++   // duration, learned by playing/scrubbing to the end. Returns a negative
++   // value until then. A reliable fallback for files where VideoDuration()
++   // (the container's declared duration) is 0. Always negative on macOS.
++   double VideoObservedEndSeconds(VideoHandle* handle);
++
+    // Decodes a video container's audio track into the same planar-float
+    // SampleBuffer (defined below) the audio-file path already produces.
+    // Returns false with a reason in outError when the file has no audio
+@@ -193,6 +208,14 @@ namespace Platform
+                     MattingMode mode, std::vector<unsigned char>& outMask,
+                     std::string& outError);
+ 
++   // Human-readable name of the compute path the background remover uses, for
++   // the node UI - "Apple Vision (on-device)" on macOS, and on Windows either
++   // "DirectML GPU (DX12)" or "CPU (DirectML unavailable)" depending on whether
++   // the DirectML execution provider registered. Cheap to call every frame: it
++   // does NOT construct the ONNX session, it only reports what the last (or
++   // pending) SubjectMask call resolved to.
++   std::string MattingBackend();
++
+    // ---- audio input ----
+    // Taps the default input device and keeps a running spectrum. Everything is
+    // computed on the audio thread and read lock-free-ish by the render thread;
+diff --git a/src/platform/Platform.mm b/src/platform/Platform.mm
+index d45c9f5..4669161 100644
+--- a/src/platform/Platform.mm
++++ b/src/platform/Platform.mm
+@@ -1026,6 +1026,12 @@ namespace Platform
+    // done whatever work the requested position needed. Nothing to wait for.
+    bool VideoDecodeIsCatchingUp(VideoHandle*) { return false; }
+ 
++   // macOS reads a reliable duration from AVAsset, so the time-based loop wrap
++   // always has something to wrap against and the end-of-stream fallback the
++   // Windows player needs is never exercised here.
++   bool VideoAtEnd(VideoHandle*) { return false; }
++   double VideoObservedEndSeconds(VideoHandle*) { return -1.0; }
++
+    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels)
+    {
+       if (handle == nullptr || seconds < 0.0)
+@@ -2191,6 +2197,8 @@ namespace Platform
+ 
+ namespace Platform
+ {
++   std::string MattingBackend() { return "Apple Vision (on-device)"; }
++
+    bool SubjectMask(const std::vector<unsigned char>& rgbaPixels, int width, int height,
+                     MattingMode mode, std::vector<unsigned char>& outMask,
+                     std::string& outError)
+diff --git a/src/platform/win/MediaWin.cpp b/src/platform/win/MediaWin.cpp
+index aef96ab..35b6988 100644
+--- a/src/platform/win/MediaWin.cpp
++++ b/src/platform/win/MediaWin.cpp
+@@ -321,6 +321,12 @@ namespace
+       // cleared by a seek. Read by VideoDecodeIsCatchingUp so an offline
+       // stepper can tell "not decoded yet" from "there is nothing more".
+       std::atomic<bool> endOfStream{ false };
++      // Furthest frame timestamp ever decoded, never reset by a seek. Once
++      // endOfStream is set this is the clip's true last-frame time, which is
++      // how VideoObservedEndSeconds recovers a duration for containers whose
++      // header declares none (VideoDuration would return 0 for those). -1
++      // until the first frame decodes.
++      std::atomic<long long> maxDecodedHns{ -1 };
+       // Written by the decode thread before threadDone's release store.
+       std::string error;
+ 
+@@ -610,6 +616,8 @@ namespace
+             continue;
+          }
+          video->decodeHeadHns.store((long long)timeHns, std::memory_order_release);
++         if (timeHns > video->maxDecodedHns.load(std::memory_order_relaxed))
++            video->maxDecodedHns.store((long long)timeHns, std::memory_order_release);
+          frame.timeHns = timeHns;
+ 
+          std::lock_guard<std::mutex> lock(video->mutex);
+@@ -687,6 +695,21 @@ namespace Platform
+       return video != nullptr ? video->durationSeconds : 0.0;
+    }
+ 
++   bool VideoAtEnd(VideoHandle* handle)
++   {
++      auto* video = reinterpret_cast<VideoHandleMf*>(handle);
++      return video != nullptr && video->endOfStream.load(std::memory_order_acquire);
++   }
++
++   double VideoObservedEndSeconds(VideoHandle* handle)
++   {
++      auto* video = reinterpret_cast<VideoHandleMf*>(handle);
++      if (video == nullptr || !video->endOfStream.load(std::memory_order_acquire))
++         return -1.0;
++      const long long hns = video->maxDecodedHns.load(std::memory_order_acquire);
++      return hns >= 0 ? (double)hns / 10000000.0 : -1.0;
++   }
++
+    // Non-blocking: publishes `seconds` for the decode thread and hands back the
+    // newest already-decoded frame at or before it, or returns false when the
+    // decoder hasn't got there yet. False means "keep showing the previous
+diff --git a/src/platform/win/PlatformWin.cpp b/src/platform/win/PlatformWin.cpp
+index 4b05c59..6aef2af 100644
+--- a/src/platform/win/PlatformWin.cpp
++++ b/src/platform/win/PlatformWin.cpp
+@@ -28,6 +28,7 @@
+ #include <algorithm>
+ #include <cmath>
+ #include <cstddef>
++#include <atomic>
+ #include <map>
+ #include <memory>
+ #include <mutex>
+@@ -598,9 +599,15 @@ namespace Platform
+       std::string outputName;
+       int inputW = 320;
+       int inputH = 320;
++      bool usedDml = false; // true if the DirectML EP registered (GPU path)
+       std::string error; // non-empty if construction failed; session stays null
+    };
+ 
++   // Which compute path the matting session resolved to, for MattingBackend()'s
++   // UI readout. 0 = not built yet, 1 = DirectML GPU, 2 = CPU fallback,
++   // 3 = unavailable (model failed to load). Set once inside EnsureOrtSession.
++   std::atomic<int> gMattingBackendKind{ 0 };
++
+    OrtMattingSession& EnsureOrtSession()
+    {
+       static OrtMattingSession* holder = nullptr;
+@@ -632,10 +639,12 @@ namespace Platform
+                options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+                options.DisableMemPattern();
+                Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(options, 0));
++               holder->usedDml = true;
+             }
+             catch (const Ort::Exception&)
+             {
+                // Fall through and run on CPU.
++               holder->usedDml = false;
+             }
+ 
+             holder->session = std::make_unique<Ort::Session>(holder->env, modelPath.c_str(), options);
+@@ -660,6 +669,9 @@ namespace Platform
+             holder->session.reset();
+             holder->error = std::string("could not load background removal model: ") + e.what();
+          }
++
++         gMattingBackendKind.store(
++            holder->session ? (holder->usedDml ? 1 : 2) : 3, std::memory_order_release);
+       });
+       return *holder;
+    }
+@@ -792,6 +804,17 @@ namespace Platform
+       }
+    }
+ 
++   std::string MattingBackend()
++   {
++      switch (gMattingBackendKind.load(std::memory_order_acquire))
++      {
++         case 1: return "DirectML GPU (DX12)";
++         case 2: return "CPU (DirectML unavailable)";
++         case 3: return "unavailable";
++         default: return "DirectML GPU (DX12) - confirmed on first run";
++      }
++   }
++
+    // ---- audio synthesis spike (throwaway feasibility probe) ---------------
+ 
+    bool AudioSpikeStart(std::string&)

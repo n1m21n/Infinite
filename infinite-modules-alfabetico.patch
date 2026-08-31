@@ -1,0 +1,16 @@
+--- a/src/main.cpp	2026-08-31 02:54:14.781253842 +0000
++++ b/src/main.cpp	2026-08-31 03:15:12.513375002 +0000
+@@ -48677,6 +48677,13 @@
+                   }
+                   if (matches.empty())
+                      continue;
++                  // Alphabetical within each category (by the visible display
++                  // name), so the grouped Modules list is easy to scan instead
++                  // of following registration order.
++                  std::stable_sort(matches.begin(), matches.end(),
++                                   [](const std::string& a, const std::string& b) {
++                     return ILess(DisplayName(a), DisplayName(b));
++                  });
+                   if (gModulesFilter.descending)
+                      std::reverse(matches.begin(), matches.end());
+ 

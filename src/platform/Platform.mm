@@ -1026,6 +1026,12 @@ namespace Platform
    // done whatever work the requested position needed. Nothing to wait for.
    bool VideoDecodeIsCatchingUp(VideoHandle*) { return false; }
 
+   // macOS reads a reliable duration from AVAsset, so the time-based loop wrap
+   // always has something to wrap against and the end-of-stream fallback the
+   // Windows player needs is never exercised here.
+   bool VideoAtEnd(VideoHandle*) { return false; }
+   double VideoObservedEndSeconds(VideoHandle*) { return -1.0; }
+
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels)
    {
       if (handle == nullptr || seconds < 0.0)
@@ -2191,6 +2197,8 @@ namespace Platform
 
 namespace Platform
 {
+   std::string MattingBackend() { return "Apple Vision (on-device)"; }
+
    bool SubjectMask(const std::vector<unsigned char>& rgbaPixels, int width, int height,
                     MattingMode mode, std::vector<unsigned char>& outMask,
                     std::string& outError)
@@ -5384,6 +5392,14 @@ namespace Platform
          return CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.0, true) == kCFRunLoopRunHandledSource;
       }
    }
+
+   // mac AU/VST hosting rides the app's own Cocoa run loop, which the OS pumps
+   // continuously whether or not a plugin editor is open - so there is no
+   // separate message loop that could starve, and the existing editor-open gate
+   // is all mac ever needs. Windows/JUCE is the only backend that overrides this
+   // to true (see PluginJuceWin.cpp). Keeping mac at false leaves the mac frame
+   // loop byte-for-byte as it was.
+   bool PluginHostNeedsPump() { return false; }
 
    bool PluginSaveState(PluginHandle* h, std::string& outBase64)
    {

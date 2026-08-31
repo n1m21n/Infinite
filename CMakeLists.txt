@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.16)
 
+# CMP0135 (CMake 3.24+): make FetchContent URL downloads use the extraction
+# time as the file timestamp instead of the archive's own, so a changed URL
+# actually rebuilds. Silences the two author warnings the onnxruntime_dml /
+# directml_redist FetchContent_Declare calls emit under CMake 3.24+. Guarded
+# so older CMake (which lacks the policy) still configures.
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0135 NEW)
+endif()
+
 # Universal + a floor of macOS 11: UTType (file dialogs) and the modern
 # AVAssetWriter APIs need 11.0, and shipping both slices means the DMG runs on
 # Intel Macs as well as Apple Silicon. Must be set before project().
@@ -164,6 +174,45 @@ endif()
 # sign-off - it's a licensing decision, not a technical one.
 option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" ON)
 
+# ---- Windows engine backends (see docs/WINDOWS_BACKENDS proposal) -----------
+#
+# Each OS-specific capability can be backed by more than one library. CMake
+# picks exactly ONE backend per capability; every backend of a capability
+# implements the same Platform.h functions, so only one .cpp is ever compiled
+# and there is never a duplicate symbol - and no #if leaks into common code.
+#
+# Defaults reproduce today's build exactly, and every backend lives entirely
+# under if(WIN32) or in Windows-only .cpp files. The macOS target compiles
+# APPLE_SOURCES + COMMON_SOURCES only and never sees any of this, so no backend
+# choice here can affect the mac build.
+#
+# This first commit is scaffolding only: it declares the option surface and
+# fails fast on a not-yet-implemented choice. The FFMPEG and JUCE backends land
+# in later self-contained commits that add their own sources and dependencies,
+# each guarded by these options.
+set(INFINITE_WIN_VIDEO_BACKEND  "MF"      CACHE STRING "Windows video/media backend: MF | FFMPEG")
+set(INFINITE_WIN_PLUGIN_BACKEND "VST3RAW" CACHE STRING "Windows plugin host backend: VST3RAW | JUCE")
+set_property(CACHE INFINITE_WIN_VIDEO_BACKEND  PROPERTY STRINGS "MF" "FFMPEG")
+set_property(CACHE INFINITE_WIN_PLUGIN_BACKEND PROPERTY STRINGS "VST3RAW" "JUCE")
+
+# One flag to select the heavier, more capable engines together.
+option(INFINITE_WIN_PROFILE_PERFORMANCE "Windows: use the FFMPEG + JUCE backends" OFF)
+if(INFINITE_WIN_PROFILE_PERFORMANCE)
+    set(INFINITE_WIN_VIDEO_BACKEND  "FFMPEG")
+    set(INFINITE_WIN_PLUGIN_BACKEND "JUCE")
+endif()
+
+if(WIN32)
+    if(NOT INFINITE_WIN_VIDEO_BACKEND MATCHES "^(MF|FFMPEG)$")
+        message(FATAL_ERROR "INFINITE_WIN_VIDEO_BACKEND must be MF or FFMPEG, got "
+                            "'${INFINITE_WIN_VIDEO_BACKEND}'.")
+    endif()
+    if(NOT INFINITE_WIN_PLUGIN_BACKEND MATCHES "^(VST3RAW|JUCE)$")
+        message(FATAL_ERROR "INFINITE_WIN_PLUGIN_BACKEND must be VST3RAW or JUCE, got "
+                            "'${INFINITE_WIN_PLUGIN_BACKEND}'.")
+    endif()
+endif()
+
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)
 set(STB_DIR external/stb)
@@ -181,7 +230,10 @@ if(INFINITE_ENABLE_VST3 AND NOT APPLE AND NOT WIN32)
                         "this platform's layer reports plugin hosting as unavailable.")
 endif()
 
-if(INFINITE_ENABLE_VST3)
+# The Steinberg VST3 SDK is only needed by the raw VST3RAW Windows backend and
+# by macOS. The Windows JUCE backend brings its own VST3 hosting, so it must
+# NOT require the SDK submodule.
+if(INFINITE_ENABLE_VST3 AND NOT (WIN32 AND INFINITE_WIN_PLUGIN_BACKEND STREQUAL "JUCE"))
     set(VST3_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/vst3sdk")
     if(NOT EXISTS "${VST3_SDK_DIR}/pluginterfaces/vst/ivstaudioprocessor.h")
         message(FATAL_ERROR "INFINITE_ENABLE_VST3 is ON, but Steinberg VST3 SDK was not found in external/vst3sdk.\n"
@@ -189,6 +241,19 @@ if(INFINITE_ENABLE_VST3)
                             "  git submodule update --init --recursive external/vst3sdk\n"
                             "or clone the VST3 SDK into external/vst3sdk.")
     endif()
+endif()
+
+# The Windows JUCE plugin backend pulls JUCE in as a build dependency (only when
+# selected). Big first-time clone; nothing else in the tree is affected.
+if(WIN32 AND INFINITE_WIN_PLUGIN_BACKEND STREQUAL "JUCE")
+    include(FetchContent)
+    FetchContent_Declare(
+        juce
+        GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+        GIT_TAG 8.0.15
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(juce)
 endif()
 
 # ---- per-platform sources ---------------------------------------------------
@@ -477,7 +542,33 @@ if(APPLE)
 endif()
 
 if(WIN32)
+    # PluginHostWin.cpp is the generic Plugin* API that forwards to the raw
+    # PluginVST3* backend. The JUCE backend (PluginJuceWin.cpp) provides those
+    # same Plugin* functions itself, so compiling both would be a duplicate
+    # symbol - and PluginHostWin's PluginVST3* calls would be unresolved without
+    # the raw backend. So drop it from the source list when JUCE is selected.
+    if(INFINITE_WIN_PLUGIN_BACKEND STREQUAL "JUCE")
+        list(REMOVE_ITEM WIN32_SOURCES src/platform/win/PluginHostWin.cpp)
+    endif()
     target_sources(Infinite PRIVATE ${WIN32_SOURCES})
+
+    # Video backend selection. FFMPEG (OpenCV) swaps in the picture-playback
+    # functions from MediaFfmpegWin.cpp and compiles the Media Foundation ones
+    # out of MediaWin.cpp via INFINITE_WIN_VIDEO_FFMPEG. MediaWin/MediaDecodeWin
+    # stay compiled either way for camera capture, the recorder, the clip's
+    # audio track and image/EXR decode. Default (MF) adds nothing here.
+    if(INFINITE_WIN_VIDEO_BACKEND STREQUAL "FFMPEG")
+        find_package(OpenCV REQUIRED COMPONENTS core imgproc videoio)
+        target_sources(Infinite PRIVATE src/platform/win/MediaFfmpegWin.cpp)
+        target_compile_definitions(Infinite PRIVATE INFINITE_WIN_VIDEO_FFMPEG=1)
+        target_include_directories(Infinite PRIVATE ${OpenCV_INCLUDE_DIRS})
+        target_link_libraries(Infinite PRIVATE ${OpenCV_LIBS})
+        # OpenCV's runtime DLLs (including the videoio FFmpeg plugin,
+        # opencv_videoio_ffmpeg*.dll) must sit next to Infinite.exe. A vcpkg
+        # toolchain deploys them automatically (applocal), which is how the
+        # reference build does it; a manual OpenCV install needs them copied
+        # next to the exe or placed on PATH.
+    endif()
 endif()
 
 target_include_directories(Infinite PRIVATE
@@ -570,6 +661,29 @@ if(WIN32)
         # mirroring macOS. No codesign step is needed here, since Windows has
         # no equivalent requirement.
         target_compile_definitions(Infinite PRIVATE INFINITE_ENABLE_VST3=1)
+      if(INFINITE_WIN_PLUGIN_BACKEND STREQUAL "JUCE")
+        # ---- JUCE VST3 host backend: in-process scan, no Steinberg SDK, no
+        # scanner helper. JUCE hosts and describes the bundles directly, and is
+        # far more robust loading third-party plugins than the raw SDK path. ----
+        target_compile_definitions(Infinite PRIVATE
+            INFINITE_WIN_PLUGIN_JUCE=1
+            JUCE_MODAL_LOOPS_PERMITTED=1
+            JUCE_PLUGINHOST_VST3=1
+            JUCE_PLUGINHOST_AU=0
+            JUCE_USE_CURL=0
+            JUCE_WEB_BROWSER=0)
+        target_sources(Infinite PRIVATE src/platform/win/PluginJuceWin.cpp)
+        target_link_libraries(Infinite PRIVATE
+            juce::juce_audio_basics
+            juce::juce_audio_processors
+            juce::juce_core
+            juce::juce_data_structures
+            juce::juce_events
+            juce::juce_graphics
+            juce::juce_gui_basics
+            juce::juce_gui_extra
+            ole32 shell32 shlwapi version winmm ws2_32 strmiids)
+      else()
         target_include_directories(Infinite PRIVATE
             ${VST3_SDK_DIR}
             ${VST3_SDK_DIR}/pluginterfaces
@@ -627,6 +741,7 @@ if(WIN32)
                     "$<TARGET_FILE:infinite-vst3-scanner>"
                     "$<TARGET_FILE_DIR:Infinite>/infinite-vst3-scanner.exe"
             COMMENT "Copying scanner helper next to Infinite.exe")
+      endif() # INFINITE_WIN_PLUGIN_BACKEND JUCE / VST3RAW
     endif()
     target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
 elseif(APPLE)

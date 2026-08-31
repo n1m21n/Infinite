@@ -151,6 +151,21 @@ namespace Platform
    // NOT wait on this - holding the previous frame is the whole point.
    bool VideoDecodeIsCatchingUp(VideoHandle* handle);
 
+   // True once the decoder has hit end-of-stream for the position last asked
+   // for and has no further frame to give. A backwards seek (VideoFrameAt with
+   // an earlier position) clears it. This lets a looping player wrap on the
+   // real last frame even for containers whose header carries no duration -
+   // where VideoDuration returns 0 and a time-based wrap has nothing to wrap
+   // against. Always false on macOS (VideoFrameAt is synchronous there).
+   bool VideoAtEnd(VideoHandle* handle);
+
+   // The timestamp (seconds) of the furthest frame decoded so far, but only
+   // once end-of-stream has actually been reached - i.e. the clip's true
+   // duration, learned by playing/scrubbing to the end. Returns a negative
+   // value until then. A reliable fallback for files where VideoDuration()
+   // (the container's declared duration) is 0. Always negative on macOS.
+   double VideoObservedEndSeconds(VideoHandle* handle);
+
    // Decodes a video container's audio track into the same planar-float
    // SampleBuffer (defined below) the audio-file path already produces.
    // Returns false with a reason in outError when the file has no audio
@@ -192,6 +207,14 @@ namespace Platform
    bool SubjectMask(const std::vector<unsigned char>& rgbaPixels, int width, int height,
                     MattingMode mode, std::vector<unsigned char>& outMask,
                     std::string& outError);
+
+   // Human-readable name of the compute path the background remover uses, for
+   // the node UI - "Apple Vision (on-device)" on macOS, and on Windows either
+   // "DirectML GPU (DX12)" or "CPU (DirectML unavailable)" depending on whether
+   // the DirectML execution provider registered. Cheap to call every frame: it
+   // does NOT construct the ONNX session, it only reports what the last (or
+   // pending) SubjectMask call resolved to.
+   std::string MattingBackend();
 
    // ---- audio input ----
    // Taps the default input device and keeps a running spectrum. Everything is
@@ -617,6 +640,15 @@ namespace Platform
    // Main thread only. No-op if no editor window is open. Returns true if it
    // actually dispatched something.
    bool PumpPluginEditorEvents();
+
+   // True if the plugin backend needs PumpPluginEditorEvents() called from the
+   // main frame loop even with no editor window open. mac and the raw Windows
+   // VST3 host return false (their editor pump is only ever needed for an open
+   // editor window; the OS run loop services the plugin engine itself). The
+   // Windows JUCE backend returns true while any plugin is loaded, because JUCE
+   // runs its own MessageManager loop that would otherwise sit unserviced -
+   // starving streaming samplers and deadlocking heavy synths. Main thread only.
+   bool PluginHostNeedsPump();
 
    // AUAudioUnit.fullState, keyed-archived and base64'd so it round-trips
    // through Patch.cpp's Text param (one backslash-escaped line, no length

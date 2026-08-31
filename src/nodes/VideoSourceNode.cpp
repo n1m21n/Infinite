@@ -275,14 +275,41 @@ void VideoSourceNode::CookIfNeeded(int frameId)
 
    EnsurePlaceholder();
 
+   // Reverse folds into a signed rate the audio half reads too, so its own
+   // read cursor runs backwards in step with the picture.
+   const float effectiveSpeed = speed * (reverse ? -1.0f : 1.0f);
    if (mAudioNode)
    {
-      mAudioNode->PushParams(audioEnabled, volume, speed, loop);
+      mAudioNode->PushParams(audioEnabled, volume, effectiveSpeed, loop);
       mAudioNode->DrainRetired();
    }
 
    if (mVideo == nullptr)
       return;
+
+   // Learn the true duration for containers whose header declares none (on
+   // Windows MF_PD_DURATION comes back empty for some files, which used to
+   // leave mDuration at 0 - and a 0 duration silently disabled both the loop
+   // wrap and the total-time readout). VideoObservedEndSeconds fills in once
+   // the clip has been decoded through to its end at least once.
+   if (mDuration <= 0.0)
+   {
+      const double observed = Platform::VideoObservedEndSeconds(mVideo);
+      if (observed > 0.0)
+         mDuration = observed;
+   }
+
+   // Active playback window from the trim points. trimOut <= 0 means "to the
+   // end"; when the end is not yet known (unknown duration) outSec stays 0 and
+   // the wrap below falls back to the decoder's end-of-stream signal.
+   const double inSec = std::max(0.0, (double)trimIn);
+   double outSec = 0.0;
+   if (trimOut > 0.0f && (double)trimOut > inSec)
+      outSec = (double)trimOut;
+   else if (mDuration > 0.0)
+      outSec = mDuration;
+   if (outSec > 0.0 && mDuration > 0.0)
+      outSec = std::min(outSec, mDuration);
 
    // Advance by the transport's own delta so pausing holds the frame and the
    // speed control retimes playback without touching wall time.
@@ -291,24 +318,45 @@ void VideoSourceNode::CookIfNeeded(int frameId)
    if (delta < 0.0)
       delta = 0.0;
    mLastTransportSeconds = now;
-   mPosition += delta * (double)speed;
 
-   if (mDuration > 0.0)
+   if (scrub)
    {
-      if (loop)
-      {
-         mPosition = std::fmod(mPosition, mDuration);
-         if (mPosition < 0.0)
-            mPosition += mDuration; // fmod keeps the sign of the dividend
-      }
-      else
-      {
-         mPosition = std::clamp(mPosition, 0.0, mDuration);
-      }
+      // Manual positioning: the transport is ignored and the frame follows the
+      // scrub control directly.
+      const double hi = (outSec > inSec) ? outSec
+                                         : (mDuration > 0.0 ? mDuration : (double)scrubSeconds);
+      mPosition = std::clamp((double)scrubSeconds, inSec, std::max(inSec, hi));
    }
    else
    {
-      mPosition = std::max(mPosition, 0.0);
+      mPosition += delta * (double)effectiveSpeed;
+
+      if (outSec > inSec)
+      {
+         const double span = outSec - inSec;
+         if (loop)
+         {
+            double rel = std::fmod(mPosition - inSec, span);
+            if (rel < 0.0)
+               rel += span; // fmod keeps the sign of the dividend
+            mPosition = inSec + rel;
+         }
+         else
+         {
+            mPosition = std::clamp(mPosition, inSec, outSec);
+         }
+      }
+      else
+      {
+         // End not yet known: hold the floor at trimIn, and wrap on the
+         // decoder's real end-of-stream when looping forward. Reverse-looping
+         // with an unknown end has nothing to wrap to, so it just holds at in.
+         if (mPosition < inSec)
+            mPosition = inSec;
+         if (loop && effectiveSpeed >= 0.0f && Platform::VideoAtEnd(mVideo))
+            mPosition = inSec;
+         mPosition = std::max(mPosition, 0.0);
+      }
    }
 
    // Published for the audio half to read - see VideoAudioNode's class

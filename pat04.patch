@@ -1,0 +1,312 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d7df02a..0d21777 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -203,9 +203,9 @@ if(INFINITE_WIN_PROFILE_PERFORMANCE)
+ endif()
+ 
+ if(WIN32)
+-    if(NOT INFINITE_WIN_VIDEO_BACKEND STREQUAL "MF")
+-        message(FATAL_ERROR "INFINITE_WIN_VIDEO_BACKEND=${INFINITE_WIN_VIDEO_BACKEND} is not implemented yet "
+-                            "(only MF is wired up so far). The FFMPEG backend arrives in a later commit.")
++    if(NOT INFINITE_WIN_VIDEO_BACKEND MATCHES "^(MF|FFMPEG)$")
++        message(FATAL_ERROR "INFINITE_WIN_VIDEO_BACKEND must be MF or FFMPEG, got "
++                            "'${INFINITE_WIN_VIDEO_BACKEND}'.")
+     endif()
+     if(NOT INFINITE_WIN_PLUGIN_BACKEND STREQUAL "VST3RAW")
+         message(FATAL_ERROR "INFINITE_WIN_PLUGIN_BACKEND=${INFINITE_WIN_PLUGIN_BACKEND} is not implemented yet "
+@@ -527,6 +527,24 @@ endif()
+ 
+ if(WIN32)
+     target_sources(Infinite PRIVATE ${WIN32_SOURCES})
++
++    # Video backend selection. FFMPEG (OpenCV) swaps in the picture-playback
++    # functions from MediaFfmpegWin.cpp and compiles the Media Foundation ones
++    # out of MediaWin.cpp via INFINITE_WIN_VIDEO_FFMPEG. MediaWin/MediaDecodeWin
++    # stay compiled either way for camera capture, the recorder, the clip's
++    # audio track and image/EXR decode. Default (MF) adds nothing here.
++    if(INFINITE_WIN_VIDEO_BACKEND STREQUAL "FFMPEG")
++        find_package(OpenCV REQUIRED COMPONENTS core imgproc videoio)
++        target_sources(Infinite PRIVATE src/platform/win/MediaFfmpegWin.cpp)
++        target_compile_definitions(Infinite PRIVATE INFINITE_WIN_VIDEO_FFMPEG=1)
++        target_include_directories(Infinite PRIVATE ${OpenCV_INCLUDE_DIRS})
++        target_link_libraries(Infinite PRIVATE ${OpenCV_LIBS})
++        # OpenCV's runtime DLLs (including the videoio FFmpeg plugin,
++        # opencv_videoio_ffmpeg*.dll) must sit next to Infinite.exe. A vcpkg
++        # toolchain deploys them automatically (applocal), which is how the
++        # reference build does it; a manual OpenCV install needs them copied
++        # next to the exe or placed on PATH.
++    endif()
+ endif()
+ 
+ target_include_directories(Infinite PRIVATE
+diff --git a/src/platform/win/MediaFfmpegWin.cpp b/src/platform/win/MediaFfmpegWin.cpp
+new file mode 100644
+index 0000000..2c3918a
+--- /dev/null
++++ b/src/platform/win/MediaFfmpegWin.cpp
+@@ -0,0 +1,239 @@
++// Windows video-picture backend built on OpenCV's VideoCapture (FFmpeg
++// backend). Selected with -DINFINITE_WIN_VIDEO_BACKEND=FFMPEG (or the
++// performance profile); the CMake then compiles this file, defines
++// INFINITE_WIN_VIDEO_FFMPEG (which compiles the matching functions out of
++// MediaWin.cpp), and links OpenCV.
++//
++// Why this exists: Media Foundation only decodes formats Windows has a codec
++// for, and it decodes forward-only, so reverse/scrub stutter. OpenCV+FFmpeg
++// reads virtually any container and seeks by frame index, so reverse, scrub
++// and looping are all clean random-access operations.
++//
++// Scope: this file implements ONLY the picture side of playback. Camera
++// capture, the recorder, DecodeVideoAudioTrackToBuffer (the clip's audio
++// track) and image/EXR decode all stay on Media Foundation in MediaWin.cpp /
++// MediaDecodeWin.cpp and are compiled in alongside this file. So a clip's
++// audio still comes through MF; only its picture comes through OpenCV.
++//
++// The public contract matches Platform.h exactly, so nothing above the
++// platform seam (nodes, UI, VideoSourceNode's loop/reverse/scrub/trim logic)
++// changes. Handles are opaque; VideoHandleCv is our concrete type.
++
++#include "../Platform.h"
++
++#include <opencv2/core.hpp>
++#include <opencv2/imgproc.hpp>
++#include <opencv2/videoio.hpp>
++
++#include <algorithm>
++#include <atomic>
++#include <cmath>
++#include <condition_variable>
++#include <cstdint>
++#include <mutex>
++#include <thread>
++#include <vector>
++
++namespace
++{
++   struct VideoHandleCv
++   {
++      cv::VideoCapture capture;
++      std::atomic<int> width{ 0 };
++      std::atomic<int> height{ 0 };
++      double duration = 0.0; // seconds; 0 if the container reports no frame count
++      double fps = 30.0;
++
++      // Decoding runs on its own worker; the render thread only ever posts a
++      // target frame and consumes the newest finished RGBA buffer, never waits.
++      std::mutex frameMutex;
++      std::condition_variable frameReady;
++      std::thread decoder;
++      bool stopping = false;
++      bool requestPending = false;
++      long long requestedFrame = 0;
++      long long lastQueuedFrame = -1;
++      long long lastDecodedFrame = -1;
++      std::uint64_t requestSerial = 0;
++      std::uint64_t publishedSerial = 0;
++      std::uint64_t consumedSerial = 0;
++      std::vector<unsigned char> publishedPixels;
++      std::atomic<bool> atEnd{ false }; // last read hit end-of-stream; cleared on a seek
++
++      ~VideoHandleCv()
++      {
++         {
++            std::lock_guard<std::mutex> lock(frameMutex);
++            stopping = true;
++         }
++         frameReady.notify_one();
++         if (decoder.joinable())
++            decoder.join();
++      }
++   };
++}
++
++namespace Platform
++{
++   VideoHandle* VideoOpen(const std::string& path, std::string& outError)
++   {
++      outError.clear();
++      auto handle = std::make_unique<VideoHandleCv>();
++
++      // Prefer the FFmpeg backend explicitly; fall back to OpenCV's default
++      // (which may pick MSMF/DShow) if the FFmpeg one is unavailable.
++      if (!handle->capture.open(path, cv::CAP_FFMPEG))
++      {
++         if (!handle->capture.open(path))
++         {
++            outError = "OpenCV/FFmpeg could not open this video";
++            return nullptr;
++         }
++      }
++
++      handle->width.store((int)handle->capture.get(cv::CAP_PROP_FRAME_WIDTH), std::memory_order_relaxed);
++      handle->height.store((int)handle->capture.get(cv::CAP_PROP_FRAME_HEIGHT), std::memory_order_relaxed);
++      handle->fps = handle->capture.get(cv::CAP_PROP_FPS);
++      if (!(handle->fps > 0.0))
++         handle->fps = 30.0;
++      const double frames = handle->capture.get(cv::CAP_PROP_FRAME_COUNT);
++      handle->duration = frames > 0.0 ? frames / handle->fps : 0.0;
++
++      if (handle->width.load() <= 0 || handle->height.load() <= 0)
++      {
++         outError = "video has no decodable picture";
++         return nullptr;
++      }
++
++      VideoHandleCv* raw = handle.get();
++      raw->decoder = std::thread([raw]()
++      {
++         for (;;)
++         {
++            long long targetFrame = 0;
++            std::uint64_t serial = 0;
++            {
++               std::unique_lock<std::mutex> lock(raw->frameMutex);
++               raw->frameReady.wait(lock, [raw]() { return raw->stopping || raw->requestPending; });
++               if (raw->stopping)
++                  return;
++               targetFrame = raw->requestedFrame;
++               serial = raw->requestSerial;
++               raw->requestPending = false;
++            }
++
++            // Sequential playback reads the next frame; any other target is a
++            // seek. This is what makes reverse and scrub cheap: OpenCV/FFmpeg
++            // seeks to an arbitrary frame index instead of forward-decoding.
++            if (targetFrame != raw->lastDecodedFrame + 1)
++            {
++               raw->capture.set(cv::CAP_PROP_POS_FRAMES, (double)targetFrame);
++               raw->atEnd.store(false, std::memory_order_release);
++            }
++
++            cv::Mat bgr;
++            if (!raw->capture.read(bgr) || bgr.empty())
++            {
++               // End of stream (or a decode gap). Leave the last frame up and
++               // flag the end so a looping player can wrap on it. A later seek
++               // (target != last+1) clears the flag above.
++               raw->atEnd.store(true, std::memory_order_release);
++               continue;
++            }
++
++            cv::Mat rgba;
++            cv::cvtColor(bgr, rgba, cv::COLOR_BGR2RGBA);
++            cv::flip(rgba, rgba, 0); // GL expects bottom-up, same as the MF path
++            std::vector<unsigned char> pixels(rgba.datastart, rgba.dataend);
++            raw->lastDecodedFrame = targetFrame;
++
++            {
++               std::lock_guard<std::mutex> lock(raw->frameMutex);
++               raw->width.store(rgba.cols, std::memory_order_relaxed);
++               raw->height.store(rgba.rows, std::memory_order_relaxed);
++               raw->publishedPixels.swap(pixels);
++               raw->publishedSerial = serial;
++            }
++         }
++      });
++
++      return reinterpret_cast<VideoHandle*>(handle.release());
++   }
++
++   void VideoClose(VideoHandle* handle)
++   {
++      delete reinterpret_cast<VideoHandleCv*>(handle);
++   }
++
++   int VideoWidth(VideoHandle* handle)
++   {
++      auto* v = reinterpret_cast<VideoHandleCv*>(handle);
++      return v != nullptr ? v->width.load(std::memory_order_relaxed) : 0;
++   }
++
++   int VideoHeight(VideoHandle* handle)
++   {
++      auto* v = reinterpret_cast<VideoHandleCv*>(handle);
++      return v != nullptr ? v->height.load(std::memory_order_relaxed) : 0;
++   }
++
++   double VideoDuration(VideoHandle* handle)
++   {
++      auto* v = reinterpret_cast<VideoHandleCv*>(handle);
++      return v != nullptr ? v->duration : 0.0;
++   }
++
++   bool VideoAtEnd(VideoHandle* handle)
++   {
++      auto* v = reinterpret_cast<VideoHandleCv*>(handle);
++      return v != nullptr && v->atEnd.load(std::memory_order_acquire);
++   }
++
++   double VideoObservedEndSeconds(VideoHandle* handle)
++   {
++      // OpenCV reports the frame count up front, so VideoDuration is reliable
++      // and this fallback is not needed. Report the known end if we have it.
++      auto* v = reinterpret_cast<VideoHandleCv*>(handle);
++      return (v != nullptr && v->duration > 0.0) ? v->duration : -1.0;
++   }
++
++   bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels)
++   {
++      auto* v = reinterpret_cast<VideoHandleCv*>(handle);
++      if (v == nullptr || seconds < 0.0)
++         return false;
++
++      const long long targetFrame = std::max(0LL, (long long)std::floor(seconds * v->fps));
++      bool produced = false;
++      {
++         std::lock_guard<std::mutex> lock(v->frameMutex);
++         if (targetFrame != v->lastQueuedFrame)
++         {
++            v->requestedFrame = targetFrame;
++            v->lastQueuedFrame = targetFrame;
++            ++v->requestSerial;
++            v->requestPending = true;
++         }
++         if (v->publishedSerial != v->consumedSerial && !v->publishedPixels.empty())
++         {
++            outPixels = v->publishedPixels;
++            v->consumedSerial = v->publishedSerial;
++            produced = true;
++         }
++      }
++      v->frameReady.notify_one();
++      return produced;
++   }
++
++   bool VideoDecodeIsCatchingUp(VideoHandle* handle)
++   {
++      auto* v = reinterpret_cast<VideoHandleCv*>(handle);
++      if (v == nullptr)
++         return false;
++      if (v->atEnd.load(std::memory_order_acquire))
++         return false; // nothing more is coming for this position
++      std::lock_guard<std::mutex> lock(v->frameMutex);
++      // Still catching up while a requested frame has not yet been published.
++      return v->requestPending || v->publishedSerial < v->requestSerial;
++   }
++}
+diff --git a/src/platform/win/MediaWin.cpp b/src/platform/win/MediaWin.cpp
+index bc758b9..f58608f 100644
+--- a/src/platform/win/MediaWin.cpp
++++ b/src/platform/win/MediaWin.cpp
+@@ -778,6 +778,12 @@ namespace Platform
+       return nullptr;
+    }
+ 
++#if !defined(INFINITE_WIN_VIDEO_FFMPEG)
++   // The video-picture playback functions (VideoOpen..VideoDecodeIsCatchingUp).
++   // These are the ONLY functions the FFMPEG/OpenCV backend replaces; when it
++   // is selected they come from MediaFfmpegWin.cpp instead and this block is
++   // compiled out. Camera capture, the recorder, and DecodeVideoAudioTrackToBuffer
++   // (below) always stay on Media Foundation regardless of the video backend.
+    VideoHandle* VideoOpen(const std::string& path, std::string& outError)
+    {
+       outError.clear();
+@@ -918,6 +924,7 @@ namespace Platform
+       return video->decodeHeadHns.load(std::memory_order_acquire) <
+              video->targetHns.load(std::memory_order_acquire);
+    }
++#endif // !INFINITE_WIN_VIDEO_FFMPEG
+ 
+    // Decodes a video container's audio track in full, up front, into a
+    // planar-float SampleBuffer - the same shape DecodeAudioFileToBuffer

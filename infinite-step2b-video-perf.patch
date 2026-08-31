@@ -1,0 +1,43 @@
+--- a/src/platform/win/MediaFfmpegWin.cpp	2026-08-31 02:54:14.786976115 +0000
++++ b/src/platform/win/MediaFfmpegWin.cpp	2026-08-31 02:53:34.569286075 +0000
+@@ -80,14 +80,21 @@
+       outError.clear();
+       auto handle = std::make_unique<VideoHandleCv>();
+ 
+-      // Prefer the FFmpeg backend explicitly; fall back to OpenCV's default
+-      // (which may pick MSMF/DShow) if the FFmpeg one is unavailable.
+-      if (!handle->capture.open(path, cv::CAP_FFMPEG))
++      // Try hardware-accelerated decode first (D3D11VA/DXVA through FFmpeg),
++      // the big framerate win over software decode for HD/4K - this is what
++      // makes OpenCV match the Media Foundation path, which was GPU-decoding.
++      // Fall back to plain FFmpeg, then OpenCV's default backend.
++      const std::vector<int> hwParams = { cv::CAP_PROP_HW_ACCELERATION,
++                                          cv::VIDEO_ACCELERATION_ANY };
++      if (!handle->capture.open(path, cv::CAP_FFMPEG, hwParams))
+       {
+-         if (!handle->capture.open(path))
++         if (!handle->capture.open(path, cv::CAP_FFMPEG))
+          {
+-            outError = "OpenCV/FFmpeg could not open this video";
+-            return nullptr;
++            if (!handle->capture.open(path))
++            {
++               outError = "OpenCV/FFmpeg could not open this video";
++               return nullptr;
++            }
+          }
+       }
+ 
+@@ -216,7 +223,11 @@
+          }
+          if (v->publishedSerial != v->consumedSerial && !v->publishedPixels.empty())
+          {
+-            outPixels = v->publishedPixels;
++            // Swap instead of copy: the caller uploads this straight to a
++            // texture and never needs it again, so handing over the buffer
++            // avoids a full-frame memcpy on the render thread every frame
++            // (that copy is real cost at 4K).
++            outPixels.swap(v->publishedPixels);
+             v->consumedSerial = v->publishedSerial;
+             produced = true;
+          }

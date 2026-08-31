@@ -1,0 +1,339 @@
+--- a/src/nodes/RemoveBgNode.h	2026-08-31 01:11:43.227978302 +0000
++++ b/src/nodes/RemoveBgNode.h	2026-08-31 01:11:04.504555886 +0000
+@@ -54,7 +54,7 @@
+    float threshold = 0.5f;
+    float contrast = 1.0f;
+    bool autoRefresh = false;      // recompute periodically, for video
+-   float refreshBeats = 1.0f;
++   float refreshFrames = 30.0f;   // recompute every N rendered frames (fps-based, not BPM)
+    float bgColor[3] = { 0.0f, 0.0f, 0.0f };
+    float bgOpacity = 0.0f;
+ 
+@@ -63,7 +63,7 @@
+       v.Int("mode", mode); v.Int("outputMode", outputMode);
+       v.Float("feather", feather); v.Float("threshold", threshold);
+       v.Float("contrast", contrast);
+-      v.Bool("autoRefresh", autoRefresh); v.Float("refreshBeats", refreshBeats);
++      v.Bool("autoRefresh", autoRefresh); v.Float("refreshFrames", refreshFrames);
+       v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
+    }
+ 
+@@ -105,7 +105,7 @@
+    bool mShaderTried = false;
+    bool mNeedsMask = false;
+    int mLastCookFrame = -1;
+-   double mLastMaskBeat = -1000.0;
++   int mLastMaskFrame = -1000000;
+    std::string mStatus = "press Remove Background";
+ 
+    // Cross-thread ownership: the main thread owns this node and every GL
+--- a/src/nodes/RemoveBgNode.cpp	2026-08-31 01:11:43.608558210 +0000
++++ b/src/nodes/RemoveBgNode.cpp	2026-08-31 01:11:13.576556425 +0000
+@@ -249,17 +249,18 @@
+ 
+    PollMaskResult();
+ 
+-   // Auto-refresh is rate-limited by the transport, not the frame rate:
+-   // segmentation is far too expensive to run every frame. With the worker
+-   // in place, a request that arrives while nothing is in flight is honoured
+-   // immediately rather than waiting for the next beat boundary.
++   // Auto-refresh is rate-limited by the render frame counter, not the musical
++   // transport: segmentation is far too expensive to run every frame, and for
++   // video the natural cadence is "every N frames" (tied to fps), not "every N
++   // beats" (tied to BPM). With the worker in place, a request that arrives
++   // while nothing is in flight is honoured immediately.
+    if (autoRefresh)
+    {
+-      const double beat = Transport::Instance().Beats();
+-      if (beat < mLastMaskBeat || beat - mLastMaskBeat >= std::max(0.1f, refreshBeats))
++      const int interval = std::max(1, (int)(refreshFrames + 0.5f));
++      if (frameId < mLastMaskFrame || frameId - mLastMaskFrame >= interval)
+       {
+          mNeedsMask = true;
+-         mLastMaskBeat = beat;
++         mLastMaskFrame = frameId;
+       }
+    }
+ 
+--- a/src/main.cpp	2026-08-31 01:11:43.608375610 +0000
++++ b/src/main.cpp	2026-08-31 01:11:22.116556933 +0000
+@@ -6451,7 +6451,7 @@
+       ModCheckbox("auto refresh (video)", &n->autoRefresh);
+       if (n->autoRefresh)
+       {
+-         ModSlider("every beats", &n->refreshBeats, 0.1f, 8.0f);
++         ModSlider("every N frames", &n->refreshFrames, 1.0f, 120.0f, "%.0f");
+       }
+    }
+ 
+--- a/src/platform/win/MediaWin.cpp	2026-08-31 01:11:43.615449529 +0000
++++ b/src/platform/win/MediaWin.cpp	2026-08-31 01:22:39.084597174 +0000
+@@ -635,12 +635,118 @@
+ 
+ namespace Platform
+ {
+-   VideoHandle* VideoOpen(const std::string& path, std::string& outError)
++   // ---- ffmpeg fallback for formats Media Foundation can't open -----------
++   //
++   // MF only decodes what Windows has a codec for (mp4/H.264/HEVC, wmv, ...).
++   // For anything else (webm/vp9, mkv, ProRes, many mov variants) we transcode
++   // once, with ffmpeg, into a temp H.264 mp4 that MF *can* read, cache it, and
++   // open THAT through the normal MF path below - so loop, seek, scrub, trim,
++   // duration and the audio-track decode all keep working with no second decode
++   // engine. ffmpeg.exe is looked up next to the app, then on PATH; if it isn't
++   // present the original MF error is what surfaces. See VideoTranscodeCachePath
++   // (reused by the audio-track decoder) for the cache key.
++
++   static std::wstring VideoAppDirW()
++   {
++      std::wstring path(32768, L'\0');
++      const DWORD n = GetModuleFileNameW(nullptr, path.data(), (DWORD)path.size());
++      path.resize(n);
++      const size_t slash = path.find_last_of(L"/\\");
++      return slash == std::wstring::npos ? std::wstring() : path.substr(0, slash + 1);
++   }
++
++   static bool VideoFileExistsW(const std::wstring& p)
++   {
++      const DWORD attr = GetFileAttributesW(p.c_str());
++      return attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY);
++   }
++
++   static std::wstring VideoFfmpegExeW()
++   {
++      const std::wstring beside = VideoAppDirW() + L"ffmpeg.exe";
++      if (VideoFileExistsW(beside))
++         return beside;
++      return L"ffmpeg.exe"; // rely on PATH
++   }
++
++   // %TEMP%\infinite_transcode\<hash>.mp4, hash of path + size + mtime so a
++   // changed source re-transcodes and reopening the same file reuses the temp.
++   std::wstring VideoTranscodeCachePath(const std::wstring& srcW)
++   {
++      unsigned long long tag = 1469598103934665603ULL; // FNV-1a offset basis
++      auto mix = [&tag](const void* p, size_t len)
++      {
++         const unsigned char* b = static_cast<const unsigned char*>(p);
++         for (size_t i = 0; i < len; i++) { tag ^= b[i]; tag *= 1099511628211ULL; }
++      };
++      mix(srcW.data(), srcW.size() * sizeof(wchar_t));
++      WIN32_FILE_ATTRIBUTE_DATA fad{};
++      if (GetFileAttributesExW(srcW.c_str(), GetFileExInfoStandard, &fad))
++      {
++         mix(&fad.nFileSizeLow, sizeof(fad.nFileSizeLow));
++         mix(&fad.nFileSizeHigh, sizeof(fad.nFileSizeHigh));
++         mix(&fad.ftLastWriteTime, sizeof(fad.ftLastWriteTime));
++      }
++
++      wchar_t tmp[MAX_PATH];
++      const DWORD n = GetTempPathW(MAX_PATH, tmp);
++      std::wstring dir = (n > 0 && n < MAX_PATH) ? std::wstring(tmp, n) : std::wstring(L".\\");
++      dir += L"infinite_transcode\\";
++      CreateDirectoryW(dir.c_str(), nullptr);
++
++      static const wchar_t* kHex = L"0123456789abcdef";
++      std::wstring hex(16, L'0');
++      for (int i = 15; i >= 0; i--) { hex[i] = kHex[tag & 0xF]; tag >>= 4; }
++      return dir + hex + L".mp4";
++   }
++
++   // Blocking transcode. Returns true if outW exists afterwards. Runs ffmpeg
++   // hidden; ultrafast keeps first-open latency down, H.264/yuv420p/AAC is the
++   // most MF-friendly result, +faststart makes MF's seeking clean.
++   static bool VideoRunFfmpegTranscode(const std::wstring& inW, const std::wstring& outW,
++                                       std::string& outError)
++   {
++      const std::wstring ff = VideoFfmpegExeW();
++      std::wstring cmd = L"\"" + ff + L"\" -y -hide_banner -loglevel error -i \"" + inW +
++                         L"\" -map 0:v:0 -c:v libx264 -preset ultrafast -pix_fmt yuv420p " +
++                         L"-map 0:a:0? -c:a aac -movflags +faststart \"" + outW + L"\"";
++
++      std::vector<wchar_t> mutableCmd(cmd.begin(), cmd.end());
++      mutableCmd.push_back(L'\0');
++
++      STARTUPINFOW si{};
++      si.cb = sizeof(si);
++      si.dwFlags = STARTF_USESHOWWINDOW;
++      si.wShowWindow = SW_HIDE;
++      PROCESS_INFORMATION pi{};
++      const BOOL ok = CreateProcessW(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE,
++                                     CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
++      if (!ok)
++      {
++         outError = "ffmpeg.exe not found (put it next to Infinite.exe or on PATH)";
++         return false;
++      }
++      WaitForSingleObject(pi.hProcess, INFINITE);
++      DWORD exitCode = 1;
++      GetExitCodeProcess(pi.hProcess, &exitCode);
++      CloseHandle(pi.hProcess);
++      CloseHandle(pi.hThread);
++      if (exitCode != 0 || !VideoFileExistsW(outW))
++      {
++         outError = "ffmpeg could not transcode this file";
++         return false;
++      }
++      return true;
++   }
++
++   // The original synchronous MF open, now taking a wide path so the ffmpeg
++   // fallback can reopen the transcoded temp through the exact same path.
++   static VideoHandleMf* OpenMfReader(const std::wstring& widePath, std::string& outError)
+    {
+       outError.clear();
+ 
+       auto* video = new VideoHandleMf();
+-      video->widePath = WinCommon::Utf8ToWide(path);
++      video->widePath = widePath;
+ 
+       try
+       {
+@@ -659,19 +765,48 @@
+       for (int waitedMs = 0; waitedMs < 4000; waitedMs += 25)
+       {
+          if (video->running.load(std::memory_order_acquire))
+-            return reinterpret_cast<VideoHandle*>(video);
++            return video;
+          if (video->threadDone.load(std::memory_order_acquire))
+             break; // thread failed during setup; error is published
+          Sleep(25);
+       }
+ 
+       if (video->running.load(std::memory_order_acquire))
+-         return reinterpret_cast<VideoHandle*>(video);
++         return video;
+       outError = video->error.empty() ? std::string("could not open video") : video->error;
+       delete video; // dtor signals stop and joins
+       return nullptr;
+    }
+ 
++   VideoHandle* VideoOpen(const std::string& path, std::string& outError)
++   {
++      outError.clear();
++      const std::wstring srcW = WinCommon::Utf8ToWide(path);
++
++      // Fast path: let Media Foundation open it directly.
++      std::string mfError;
++      if (VideoHandleMf* mf = OpenMfReader(srcW, mfError))
++         return reinterpret_cast<VideoHandle*>(mf);
++
++      // MF can't - transcode once (cached) and open the temp through MF.
++      const std::wstring cacheW = VideoTranscodeCachePath(srcW);
++      if (!VideoFileExistsW(cacheW))
++      {
++         std::string ffErr;
++         if (!VideoRunFfmpegTranscode(srcW, cacheW, ffErr))
++         {
++            outError = mfError.empty() ? ffErr : (mfError + " | ffmpeg fallback: " + ffErr);
++            return nullptr;
++         }
++      }
++
++      std::string tempErr;
++      if (VideoHandleMf* mf = OpenMfReader(cacheW, tempErr))
++         return reinterpret_cast<VideoHandle*>(mf);
++      outError = "ffmpeg-transcoded temp still unreadable: " + tempErr;
++      return nullptr;
++   }
++
+    void VideoClose(VideoHandle* handle)
+    {
+       delete reinterpret_cast<VideoHandleMf*>(handle);
+@@ -804,11 +939,21 @@
+       }
+ 
+       IMFSourceReader* reader = nullptr;
+-      HRESULT hr = MFCreateSourceReaderFromURL(WinCommon::Utf8ToWide(path).c_str(), nullptr, &reader);
++      const std::wstring srcW = WinCommon::Utf8ToWide(path);
++      HRESULT hr = MFCreateSourceReaderFromURL(srcW.c_str(), nullptr, &reader);
+       if (FAILED(hr))
+       {
+-         outError = WinCommon::HrToString("opening file", hr);
+-         return false;
++         // MF can't open the source. If VideoOpen already transcoded this exact
++         // file to a temp mp4 (same cache key), pull the audio from that so an
++         // exotic-format clip's sound plays too, not just its picture.
++         const std::wstring cacheW = VideoTranscodeCachePath(srcW);
++         if (VideoFileExistsW(cacheW))
++            hr = MFCreateSourceReaderFromURL(cacheW.c_str(), nullptr, &reader);
++         if (FAILED(hr))
++         {
++            outError = WinCommon::HrToString("opening file", hr);
++            return false;
++         }
+       }
+ 
+       // Selecting the audio stream fails when the container has none - that
+--- a/src/platform/win/PluginVST3Win.cpp	2026-08-31 01:11:43.230658048 +0000
++++ b/src/platform/win/PluginVST3Win.cpp	2026-08-31 01:26:30.560610933 +0000
+@@ -729,8 +729,19 @@
+          return;
+       }
+ 
++      // Hard bound on the retry loop below. Each non-clean pass is guaranteed
++      // to remove at least one bundle (see the forward-progress block), so the
++      // loop already terminates in <= N passes; this is a belt-and-suspenders
++      // cap so a pathological case can never leave the scan spinning forever
++      // (the "hit Rescan and it stays scanning and never stops" symptom).
++      const size_t maxIterations = bundlesToScan.size() * 2 + 8;
++      size_t iterationGuard = 0;
++
+       while (!bundlesToScan.empty())
+       {
++         if (++iterationGuard > maxIterations)
++            break; // give up on the rest, publish whatever was described
++
+          auto it = bundlesToScan.begin();
+          while (it != bundlesToScan.end())
+          {
+@@ -759,6 +770,10 @@
+             break;
+ 
+          std::vector<Platform::PluginDesc> parsed = ParseProbeOutput(output);
++         std::vector<std::string> describedPaths;
++         for (const Platform::PluginDesc& d : parsed)
++            if (!d.path.empty())
++               describedPaths.push_back(d.path);
+          for (Platform::PluginDesc& d : parsed)
+             out.push_back(std::move(d));
+ 
+@@ -775,6 +790,38 @@
+          // identifies and blocklists the offender on the next launch, same
+          // as the single-probe path.
+          EnsureSentinelCheckedOnce();
++
++         // Forward-progress guarantee. First drop every bundle this pass
++         // already described, so the next pass neither re-lists them nor
++         // re-crashes the child on its way back to the offender.
++         for (const std::string& described : describedPaths)
++         {
++            auto jt = bundlesToScan.begin();
++            while (jt != bundlesToScan.end())
++            {
++               if (*jt == described)
++                  jt = bundlesToScan.erase(jt);
++               else
++                  ++jt;
++            }
++         }
++
++         // If the pass described nothing at all, the batch child died on the
++         // very first bundle (it probes in list order), and the sentinel may
++         // not have persisted the blocklist entry on this machine - so blocklist
++         // that front bundle ourselves and move on. This is what turns an
++         // un-attributed crasher from an infinite "scanning..." into "one bad
++         // plugin skipped, the rest listed".
++         if (describedPaths.empty() && !bundlesToScan.empty())
++         {
++            const std::string offender = bundlesToScan.front();
++            {
++               std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
++               AddToBlocklistLocked(offender);
++            }
++            RecordScanFailure(offender);
++            bundlesToScan.erase(bundlesToScan.begin());
++         }
+       }
+    }
+ }

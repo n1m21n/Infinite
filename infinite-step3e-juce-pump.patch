@@ -1,0 +1,130 @@
+--- a/src/platform/win/PluginJuceWin.cpp	2026-08-31 06:54:24.469139560 +0000
++++ b/src/platform/win/PluginJuceWin.cpp	2026-08-31 06:54:24.468820314 +0000
+@@ -50,6 +50,16 @@
+       std::vector<std::string> gBlocklist;
+       bool gBlocklistLoaded = false;
+       std::atomic<int> gOpenEditorCount { 0 };
++      // Number of live JUCE plugin instances (loaded and not yet destroyed).
++      // Drives PluginHostNeedsPump(): while any JUCE plugin exists we must keep
++      // servicing the JUCE MessageManager from the main thread every frame,
++      // even with no editor window open. Heavy/streaming plugins (Cardinal,
++      // DecentSampler) do timer/async/background work on the message thread; if
++      // it is never pumped their audio comes out wrong or the plugin deadlocks
++      // the whole app. Effects that live entirely in processBlock don't need
++      // this, which is why they sound fine either way. On mac the OS run loop
++      // pumps everything, so this counter is Windows/JUCE only.
++      std::atomic<int> gLiveInstanceCount { 0 };
+       std::mutex gVstLogMutex;
+ 
+       // v1/v2 were populated while scans launched the full Infinite app as the
+@@ -433,6 +443,7 @@
+                return;
+             }
+             handle->instance = std::move(instance);
++            gLiveInstanceCount.fetch_add(1, std::memory_order_acq_rel);
+             handle->instance->addListener(handle);
+             handle->instance->setNonRealtime(false);
+             handle->instance->setRateAndBufferSizeDetails(handle->sampleRate, handle->maxFrames);
+@@ -532,6 +543,7 @@
+       {
+          handle->instance->removeListener(handle);
+          handle->instance->releaseResources();
++         gLiveInstanceCount.fetch_sub(1, std::memory_order_acq_rel);
+       }
+       delete handle;
+    }
+@@ -713,6 +725,7 @@
+    }
+    bool PluginEditorIsOpen(PluginHandle* handle) { return handle && handle->editor != nullptr; }
+    bool AnyPluginEditorOpen() { return gOpenEditorCount.load() > 0; }
++   bool PluginHostNeedsPump() { return gLiveInstanceCount.load(std::memory_order_acquire) > 0; }
+    bool PumpPluginEditorEvents()
+    {
+       EnsureJuceInitialised();
+--- a/src/platform/win/PluginHostWin.cpp	2026-08-31 06:54:24.469577369 +0000
++++ b/src/platform/win/PluginHostWin.cpp	2026-08-31 06:54:24.469434527 +0000
+@@ -274,6 +274,11 @@
+       return PluginVST3PumpEditorEvents();
+    }
+ 
++   // The raw VST3 host drives editor events off its own HWND pump, gated on an
++   // open editor like mac - it has no separate message loop to starve, so no
++   // always-on pump is needed. JUCE is the backend that does; see its override.
++   bool PluginHostNeedsPump() { return false; }
++
+    bool PluginSaveState(PluginHandle* handle, std::string& outBase64)
+    {
+       outBase64.clear();
+@@ -454,6 +459,8 @@
+       return false;
+    }
+ 
++   bool PluginHostNeedsPump() { return false; }
++
+    bool PluginSaveState(PluginHandle* handle, std::string& outBase64)
+    {
+       (void)handle;
+--- a/src/platform/Platform.mm	2026-08-31 06:54:24.471114142 +0000
++++ b/src/platform/Platform.mm	2026-08-31 06:54:24.470702295 +0000
+@@ -5393,6 +5393,14 @@
+       }
+    }
+ 
++   // mac AU/VST hosting rides the app's own Cocoa run loop, which the OS pumps
++   // continuously whether or not a plugin editor is open - so there is no
++   // separate message loop that could starve, and the existing editor-open gate
++   // is all mac ever needs. Windows/JUCE is the only backend that overrides this
++   // to true (see PluginJuceWin.cpp). Keeping mac at false leaves the mac frame
++   // loop byte-for-byte as it was.
++   bool PluginHostNeedsPump() { return false; }
++
+    bool PluginSaveState(PluginHandle* h, std::string& outBase64)
+    {
+       outBase64.clear();
+--- a/src/platform/Platform.h	2026-08-31 06:54:24.472048340 +0000
++++ b/src/platform/Platform.h	2026-08-31 06:54:24.471753823 +0000
+@@ -641,6 +641,15 @@
+    // actually dispatched something.
+    bool PumpPluginEditorEvents();
+ 
++   // True if the plugin backend needs PumpPluginEditorEvents() called from the
++   // main frame loop even with no editor window open. mac and the raw Windows
++   // VST3 host return false (their editor pump is only ever needed for an open
++   // editor window; the OS run loop services the plugin engine itself). The
++   // Windows JUCE backend returns true while any plugin is loaded, because JUCE
++   // runs its own MessageManager loop that would otherwise sit unserviced -
++   // starving streaming samplers and deadlocking heavy synths. Main thread only.
++   bool PluginHostNeedsPump();
++
+    // AUAudioUnit.fullState, keyed-archived and base64'd so it round-trips
+    // through Patch.cpp's Text param (one backslash-escaped line, no length
+    // cap). Returns false if the plugin publishes no state.
+--- a/src/main.cpp	2026-08-31 06:54:24.507184311 +0000
++++ b/src/main.cpp	2026-08-31 06:54:24.487184311 +0000
+@@ -49637,7 +49637,7 @@
+       // unserviced - see local-prompts/02-plugin-editor-lag.md. Pump it here
+       // so a hosted plugin's editor window (the app's only real NSWindow)
+       // doesn't sit starved for the length of a heavy cook.
+-      if (Platform::AnyPluginEditorOpen())
++      if (Platform::AnyPluginEditorOpen() || Platform::PluginHostNeedsPump())
+          Platform::PumpPluginEditorEvents();
+ 
+       // Top-level idle gate: NodeWorkCounter() only advances when some node
+@@ -49823,7 +49823,7 @@
+ 
+       // glfwSwapBuffers blocks on vsync - dead time for AppKit to service a
+       // hosted plugin's editor window. See local-prompts/02-plugin-editor-lag.md.
+-      if (Platform::AnyPluginEditorOpen())
++      if (Platform::AnyPluginEditorOpen() || Platform::PluginHostNeedsPump())
+          Platform::PumpPluginEditorEvents();
+ 
+       // Projector output: blit this frame's cooked result of each open
+@@ -49926,7 +49926,7 @@
+       {
+          const double budget = 1.0 / (double)gTargetFps;
+          const double deadline = gFrameStart + budget;
+-         if (Platform::AnyPluginEditorOpen())
++         if (Platform::AnyPluginEditorOpen() || Platform::PluginHostNeedsPump())
+          {
+             // Spend the idle slack servicing the editor's run loop instead of
+             // sleeping through it - see local-prompts/02-plugin-editor-lag.md.
