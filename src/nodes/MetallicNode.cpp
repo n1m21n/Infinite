@@ -183,7 +183,11 @@ public:
                   for (int v = 0; v < kMaxVoices; v++)
                   {
                      if (mVoices[v].active && (mVoices[v].voiceId == event.voiceId || mVoices[v].midiNote == event.note))
-                        mVoices[v].Release(mSampleRate);
+                        // A struck metal bar doesn't stop ringing when the mallet
+                        // lifts - damp toward silence over (at least) the decay
+                        // knob's own time instead of the old fixed 0.4s, which
+                        // made every note-off collapse a long decay to ~0.3s.
+                        mVoices[v].Release(mSampleRate, std::max(0.4f, decayVal));
                   }
                }
             }
@@ -226,7 +230,9 @@ public:
                                          transientVal, decayVal, stiffnessVal,
                                          currentMaterial, widthVal, mSampleRate);
 
-               const float intervalSec = std::clamp(decayVal * 1.2f, 1.5f, 5.0f);
+               // Upper bound tracks the decay knob (was capped at 5s) so a
+               // long tail isn't cut off by the next free-running strike.
+               const float intervalSec = std::clamp(decayVal * 1.2f, 1.5f, 20.0f);
                mFreeRunTriggerTimer = (int)(intervalSec * (float)mSampleRate);
             }
 
