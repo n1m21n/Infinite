@@ -234,6 +234,15 @@ the tagline in `README.md`'s first paragraph and `website/index.html`'s
 
 ## Gotchas
 
+- `website/index.html` hardcodes the version string as plain text in the
+  download card (`<span class="spec-val">v0.2.X</span>`, in the specs-grid
+  next to the Version label) — nothing in `driver.sh` updates this, so it
+  silently goes stale every release unless you grep for the old version
+  and bump it by hand (`grep -rn "0\.2\.6" website/` before publishing, or
+  the pattern of the version you're leaving behind). The Windows download
+  button already points at `releases/latest/download/...`, which follows
+  whichever tag GitHub marks latest automatically — only the visible text
+  label needs a manual edit.
 - `driver.sh`'s `cleanup` uses `git rm`, which stages the deletion but
   doesn't commit — it composes with the `commit` subcommand rather than
   committing on its own, so a bad cleanup run is still just `git reset` away
