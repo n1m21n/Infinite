@@ -848,6 +848,7 @@ private:
 
       Voice& v = mVoices[slot];
       const bool fresh = !v.active || v.note != note;
+      const bool wasInactive = !v.active;
       v.active = true;
       v.held = true;
       v.note = note;
@@ -864,7 +865,12 @@ private:
          // ringing into a new attack is an audible thump.
          for (int e = 0; e < kEngines; e++)
             v.eng[e].Reset(mSampleRate);
-         v.glide.SetImmediate(NoteToHz((float)note));
+         // Only snap the glide smoother when the voice was silent. If the
+         // voice was already active (playing a different note), preserve the
+         // current frequency so the one-pole smoother glides from the old
+         // pitch to the new one over the glide time constant.
+         if (wasInactive)
+            v.glide.SetImmediate(NoteToHz((float)note));
       }
       for (int e = 0; e < kEngines; e++)
       {
