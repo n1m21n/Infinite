@@ -24,7 +24,22 @@ class AudioNode
 public:
    virtual ~AudioNode() {}
    virtual void PrepareToPlay(double sampleRate, int maxBlockSize) {}
+   virtual int AudioOutputCount() const { return 1; }
    virtual void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) = 0;
+   virtual void ProcessBlockMulti(const AudioBuffer* const* inputs, int numInputs,
+                                  AudioBuffer* const* outputs, int numOutputs)
+   {
+      if (numOutputs > 0 && outputs[0] != nullptr)
+         ProcessBlock(inputs, numInputs, *outputs[0]);
+      for (int i = 1; i < numOutputs; i++)
+      {
+         if (outputs[i] != nullptr)
+         {
+            for (int ch = 0; ch < outputs[i]->numChannels; ch++)
+               std::fill(outputs[i]->channels[ch], outputs[i]->channels[ch] + outputs[i]->numFrames, 0.0f);
+         }
+      }
+   }
    virtual void Reset() {}
 
    // Samples of latency this node's own processing adds (lookahead,

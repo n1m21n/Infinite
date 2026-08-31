@@ -45,6 +45,7 @@ public:
    // avoid treating the node's image output as an audio source too - see
    // main.cpp's `srcIsAudioNode` call sites.
    virtual bool IsAudioOutputIndex(int /*index*/) const { return true; }
+   virtual int AudioOutputSlotForPin(int /*pinIndex*/) const { return 0; }
 };
 
 // Mix-in for a node that produces or forwards note events (Note Sequencer;
