@@ -17,6 +17,13 @@ struct CurveShape
 
    std::vector<Point> points;
 
+   // Bumped by any edit that actually changes `points` (Reset, AddPoint,
+   // MovePoint when it moves, RemovePoint, Decode when the decoded points
+   // differ). Lets a consumer that caches a derived result (e.g. CurvesNode's
+   // LUT texture) detect a change without every mutation site having to
+   // remember to say so explicitly.
+   unsigned long long version = 0;
+
    CurveShape() { Reset(); }
 
    void Reset();

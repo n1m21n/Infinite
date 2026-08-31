@@ -6287,6 +6287,7 @@ namespace
 
       if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
       {
+         PushUndoCheckpoint();
          if (nearest >= 0)
          {
             sDragIndex = nearest;
@@ -6302,9 +6303,15 @@ namespace
       if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
       {
          if (nearest >= 0)
+         {
+            PushUndoCheckpoint();
             shape.RemovePoint(nearest);
+         }
          else if (resetOnEmptyRightClick)
+         {
+            PushUndoCheckpoint();
             shape.Reset();
+         }
       }
 
       if (active && sDragShape == &shape && sDragIndex >= 0)
@@ -36196,6 +36203,19 @@ int main(int argc, char** argv)
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[2], 0)->Connect(gNodes[1].node.get());
       }
+      else if (getenv("INFINITE_CURVESLUTTEST") != nullptr)
+      {
+         // Regression guard for the LUT-not-rebuilt-while-editing bug: the UI
+         // (DrawCurveEditor) mutates CurvesNode's CurveShape through the raw
+         // reference returned by Shape(channel), never through the
+         // AddPoint/MovePoint/RemovePoint wrappers or VisitParams. The
+         // fixture reproduces exactly that path.
+         SpawnNode("Shape", "Source", 40.0f, 40.0f);    // 0 white circle
+         SpawnNode("Curves", "Compositing", 320.0f, 40.0f); // 1
+         SpawnNode("Output", "Utility", 600.0f, 40.0f); // 2
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         CableFor(gNodes[2], 0)->Connect(gNodes[1].node.get());
+      }
       else if (getenv("INFINITE_MINIVIEWPORTTEST") != nullptr)
       {
          // Cube -> Select (the +Y side, by normal) -> Transform Selected. Slot B
@@ -39572,6 +39592,53 @@ int main(int argc, char** argv)
             sample(gNodes[2].node.get(), px);
             printf("invert bypassed: output=(%d,%d,%d) %s\n", px[0], px[1], px[2],
                    px[0] > 200 ? "PASSED THROUGH OK" : "STILL INVERTED - BUG");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      if (getenv("INFINITE_CURVESLUTTEST") != nullptr)
+      {
+         auto sample = [](INode* n, unsigned char* out)
+         {
+            GLuint fbo = 0;
+            glGenFramebuffers(1, &fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, n->GetOutputTexture(), 0);
+            glReadPixels(n->GetOutputWidth()/2, n->GetOutputHeight()/2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, out);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDeleteFramebuffers(1, &fbo);
+         };
+         static unsigned char sBaselinePx[4];
+         static int sRebuildsAfterEdit = -1;
+         auto* cv = static_cast<CurvesNode*>(gNodes[1].node.get());
+         unsigned char px[4];
+         if (frameId == 2)
+         {
+            sample(gNodes[2].node.get(), sBaselinePx);
+         }
+         if (frameId == 3)
+         {
+            // The raw-reference path DrawCurveEditor actually uses: no
+            // MarkDirty(), no VisitParams, no wrapper call.
+            cv->Shape(CurvesNode::kRGB).MovePoint(1, 1.0f, 0.0f);
+         }
+         if (frameId == 4)
+         {
+            sample(gNodes[2].node.get(), px);
+            const bool changed = px[0] != sBaselinePx[0] || px[1] != sBaselinePx[1] || px[2] != sBaselinePx[2];
+            printf("curves lut after raw-reference edit: baseline=(%d,%d,%d) now=(%d,%d,%d) %s\n",
+                   sBaselinePx[0], sBaselinePx[1], sBaselinePx[2], px[0], px[1], px[2],
+                   changed ? "UPDATED OK" : "STALE - BUG");
+            sRebuildsAfterEdit = cv->LutRebuildCount();
+         }
+         if (frameId == 6)
+         {
+            // No mutation happened between frame 4 and here - a correct
+            // implementation must not have rebuilt the LUT again.
+            const int rebuilds = cv->LutRebuildCount();
+            printf("curves lut rebuild count: after-edit=%d idle=%d %s\n",
+                   sRebuildsAfterEdit, rebuilds,
+                   rebuilds == sRebuildsAfterEdit ? "NO SPURIOUS REBUILD OK" : "REBUILT WITH NO EDIT - BUG");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }

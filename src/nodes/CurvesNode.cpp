@@ -56,16 +56,13 @@ void CurvesNode::ResetChannel(int channel)
    if (channel < 0 || channel >= kChannelCount)
       return;
    mShapes[channel].Reset();
-   mLutDirty = true;
 }
 
 int CurvesNode::AddPoint(int channel, float x, float y)
 {
    if (channel < 0 || channel >= kChannelCount)
       return -1;
-   int index = mShapes[channel].AddPoint(x, y);
-   mLutDirty = true;
-   return index;
+   return mShapes[channel].AddPoint(x, y);
 }
 
 void CurvesNode::MovePoint(int channel, int index, float x, float y)
@@ -73,7 +70,6 @@ void CurvesNode::MovePoint(int channel, int index, float x, float y)
    if (channel < 0 || channel >= kChannelCount)
       return;
    mShapes[channel].MovePoint(index, x, y);
-   mLutDirty = true;
 }
 
 void CurvesNode::RemovePoint(int channel, int index)
@@ -81,7 +77,6 @@ void CurvesNode::RemovePoint(int channel, int index)
    if (channel < 0 || channel >= kChannelCount)
       return;
    mShapes[channel].RemovePoint(index);
-   mLutDirty = true;
 }
 
 float CurvesNode::Evaluate(int channel, float x) const
@@ -117,7 +112,9 @@ void CurvesNode::RebuildLut()
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
    glBindTexture(GL_TEXTURE_2D, 0);
 
-   mLutDirty = false;
+   for (int c = 0; c < kChannelCount; c++)
+      mLutVersion[c] = mShapes[c].version;
+   mLutRebuildCount++;
 }
 
 bool CurvesNode::EnsureShader()
@@ -143,7 +140,10 @@ void CurvesNode::CookIfNeeded(int frameId)
    }
    if (!EnsureShader())
       return;
-   if (mLutDirty || mLutTex == 0)
+   bool lutStale = mLutTex == 0;
+   for (int c = 0; c < kChannelCount && !lutStale; c++)
+      lutStale = mLutVersion[c] != mShapes[c].version;
+   if (lutStale)
       RebuildLut();
    if (!GLUtil::EnsureFbo(mOut, mInput.Width(), mInput.Height()))
       return;

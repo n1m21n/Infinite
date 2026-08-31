@@ -9,6 +9,7 @@ void CurveShape::Reset()
    points.clear();
    points.push_back({ 0.0f, 0.0f });
    points.push_back({ 1.0f, 1.0f });
+   version++;
 }
 
 int CurveShape::AddPoint(float x, float y)
@@ -26,6 +27,7 @@ int CurveShape::AddPoint(float x, float y)
       }
    }
    points.insert(points.begin() + insertAt, { x, y });
+   version++;
    return (int)insertAt;
 }
 
@@ -48,8 +50,12 @@ void CurveShape::MovePoint(int index, float x, float y)
       x = std::min(hi, std::max(lo, x));
    }
 
+   if (points[index].x == x && points[index].y == y)
+      return; // no actual change - don't churn a cache keyed on version
+
    points[index].x = x;
    points[index].y = y;
+   version++;
 }
 
 void CurveShape::RemovePoint(int index)
@@ -57,6 +63,7 @@ void CurveShape::RemovePoint(int index)
    if (index <= 0 || index >= (int)points.size() - 1)
       return; // endpoints are permanent
    points.erase(points.begin() + index);
+   version++;
 }
 
 float CurveShape::Evaluate(float x) const
@@ -127,6 +134,12 @@ void CurveShape::Decode(const std::string& s)
          break;
       start = sep + 1;
    }
-   if (decoded.size() >= 2)
-      points = decoded;
+   if (decoded.size() < 2)
+      return;
+   if (decoded.size() == points.size() &&
+       std::equal(decoded.begin(), decoded.end(), points.begin(),
+                   [](const Point& a, const Point& b) { return a.x == b.x && a.y == b.y; }))
+      return; // identical to what's already loaded - don't invalidate a cache for nothing
+   points = decoded;
+   version++;
 }

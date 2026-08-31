@@ -50,7 +50,17 @@ public:
    // Curve value at x (0..1), used by both the shader LUT and the widget.
    float Evaluate(int channel, float x) const;
 
-   void MarkDirty() { mLutDirty = true; }
+   // Forces the next CookIfNeeded to rebuild the LUT regardless of whether
+   // any CurveShape::version changed - callers that mutate shapes through
+   // something other than the wrappers above (e.g. Decode on load) still
+   // bump version themselves, so this is only needed by call sites that want
+   // an unconditional rebuild.
+   void MarkDirty() { for (int c = 0; c < kChannelCount; c++) mLutVersion[c] = ~0ull; }
+
+   // For the CurvesLutTest self-test: how many times RebuildLut has actually
+   // re-uploaded the LUT texture, so a test can assert a no-op cook did not
+   // rebuild it.
+   int LutRebuildCount() const { return mLutRebuildCount; }
 
    int activeChannel = kRGB;
    float mix = 1.0f;
@@ -71,7 +81,6 @@ public:
          std::string encoded = mShapes[c].Encode();
          v.Text(kKeys[c], encoded);
          mShapes[c].Decode(encoded);
-         mLutDirty = true;
       }
    }
 
@@ -80,7 +89,13 @@ private:
    void RebuildLut();
 
    CurveShape mShapes[kChannelCount];
-   bool mLutDirty = true;
+   // Compared against mShapes[c].version in CookIfNeeded; a mismatch means
+   // the shape changed since the LUT was last built. Deliberately not reset
+   // to 0 in the initializer - CurveShape::version also starts at 0 (bumped
+   // once by the constructor's Reset()), so this array starts mismatched by
+   // construction and mLutTex == 0 forces the first build regardless.
+   unsigned long long mLutVersion[kChannelCount] = {};
+   int mLutRebuildCount = 0;
    unsigned int mLutTex = 0;
 
    ImageCable mInput;
