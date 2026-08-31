@@ -72,6 +72,12 @@ namespace WavetableSynthCore
       0.472136f, 0.090170f, 0.708204f, 0.326238f
    };
 
+   // Time constant of the polyphony-normalisation ramp. Deliberately fixed
+   // and not tied to the glide knob: this is a click fix, not a musical
+   // control. Short enough that a chord still lands as one event, long enough
+   // that the gain step it replaces is inaudible.
+   constexpr float kPolyNormSmoothSec = 0.015f;
+
    inline float Lerp(float a, float b, float t) { return a + (b - a) * t; }
 
    // Asymmetric phase bend. w > 0 compresses the first half of the cycle into
@@ -252,6 +258,10 @@ public:
          mMailbox.SetImmediate(i, mFloatAtomics[i].load(std::memory_order_relaxed));
 
       mFreeGlide.SetImmediate(mFloatAtomics[kFrequency].load(std::memory_order_relaxed));
+      // Unity, not zero: at 0 the very first note would fade in over the
+      // smoother's time constant instead of starting at full level.
+      mPolyNormSmooth.SetImmediate(1.0f);
+      mPolyNormSmooth.SetTimeConstant(kPolyNormSmoothSec, sampleRate);
       for (int e = 0; e < kEngines; e++)
          mFreeEngine[e].Reset(sampleRate);
       for (Voice& v : mVoices)
@@ -324,6 +334,9 @@ public:
          numEvts = mNoteInbox->Pop(mNoteCursor, evts, 64);
 
       int activeCount = 0;
+      // Fixed rate, so hoisted out of the sample loop (unlike glide, which
+      // tracks a smoothed param and has to be re-set per sample).
+      mPolyNormSmooth.SetTimeConstant(WavetableSynthCore::kPolyNormSmoothSec, mSampleRate);
 
       for (int i = 0; i < buffer.numFrames; i++)
       {
@@ -490,12 +503,18 @@ public:
             // Polyphony shouldn't make the patch louder as notes pile up, but
             // it shouldn't duck an existing note either - sqrt is the usual
             // compromise between "sums to clipping" and "held chord pumps".
-            if (active > 1)
-            {
-               const float norm = 1.0f / sqrtf((float)active);
-               outL *= norm;
-               outR *= norm;
-            }
+            //
+            // Ramped, not applied as a step: `active` is an integer recounted
+            // every sample, so a note-on that overlaps a sounding voice (a
+            // chord, or just the previous note's release tail) used to snap
+            // this gain 1.0 -> 0.7071 within one sample and click. The new
+            // note's attack can't mask that, because the discontinuity lands
+            // on the voice that was already sounding. Steady state is
+            // unchanged - the smoother settles on the same 1/sqrt(N).
+            const float normTarget = active > 1 ? 1.0f / sqrtf((float)active) : 1.0f;
+            const float norm = mPolyNormSmooth.Process(normTarget);
+            outL *= norm;
+            outR *= norm;
          }
 
          outL *= sm.volume;
@@ -848,6 +867,12 @@ private:
 
       Voice& v = mVoices[slot];
       const bool fresh = !v.active || v.note != note;
+      // Stolen: this slot was sounding a *different* note, so the phase and
+      // filter reset below happens under an amp envelope that is still at
+      // whatever level the old note had reached. Zeroing it first is what
+      // makes the new attack start from real silence instead of splicing a
+      // fresh waveform in at the old note's amplitude.
+      const bool stolen = v.active && v.note != note;
       v.active = true;
       v.held = true;
       v.note = note;
@@ -874,6 +899,8 @@ private:
          v.amp[e].SetADSR(eng[e].ampA, eng[e].ampD, eng[e].ampS, eng[e].ampR);
          v.pitch[e].SetADSR(eng[e].pitA, eng[e].pitD, eng[e].pitS, eng[e].pitR);
          v.filt[e].SetADSR(eng[e].fltA, eng[e].fltD, eng[e].fltS, eng[e].fltR);
+         if (stolen)
+            v.amp[e].ResetLevel();
          v.amp[e].NoteOn();
          v.pitch[e].NoteOn();
          v.filt[e].NoteOn();
@@ -923,6 +950,11 @@ private:
    // Free-running state (no note cable) - see ProcessBlock.
    DspMath::OnePole mFreeGlide;
    EngineState mFreeEngine[WavetableSynthCore::kEngines];
+
+   // Polyphony normalisation gain, smoothed across blocks - see ProcessBlock's
+   // note-driven branch. Persistent because the voice count changes mid-block
+   // and the ramp has to survive the block boundary.
+   DspMath::OnePole mPolyNormSmooth;
 
    std::atomic<int> mActiveVoices { 0 };
    std::atomic<int> mEngOn[WavetableSynthCore::kEngines] { { 1 }, { 0 } };

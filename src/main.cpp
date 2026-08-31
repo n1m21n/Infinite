@@ -27680,6 +27680,198 @@ static bool RunWavetableFixture()
       all &= filterOk;
    }
 
+
+   // 5. Polyphony normalisation must be continuous. `active` is an integer
+   //    recounted every sample, so applying 1/sqrt(active) directly made any
+   //    overlapping note-on step the gain on the *already sounding* voice
+   //    (1 -> 0.7071 = -3 dB in one sample). The new note's attack cannot mask
+   //    that, because the discontinuity is on the old voice - so the check is
+   //    a sample-to-sample delta scan across the second note's onset, compared
+   //    against the same waveform's own steady-state slew.
+   {
+      WavetableNode wt;
+      wt.volume = 1.0f;
+      wt.mix = 0.0f;
+      wt.glide = 0.0f;
+      wt.engines[0].on = true;
+      wt.engines[0].table = 0;
+      wt.engines[0].position = 0.0f; // sine end of "Basic Shapes"
+      wt.engines[0].unison = 1;
+      wt.engines[0].phaseRandomize = 0.0f;
+      wt.engines[0].warpMode = SynthModes::kWarpOff;
+      wt.engines[0].warpAmount = 0.0f;
+      wt.engines[0].filterType = SynthModes::kFilterOff;
+      wt.engines[0].ampAttack = 4.0f;
+      wt.engines[0].ampDecay = 1.0f;
+      wt.engines[0].ampSustain = 1.0f;
+      wt.engines[0].ampRelease = 4000.0f; // long enough that note 1's tail is
+                                          // still loud when note 2 arrives
+      wt.engines[1].on = false;
+
+      AudioNode* audio = wt.GetAudioNode();
+      // Cook first, then prepare: PrepareToPlay latches every mailbox value
+      // immediately, so nothing is still ramping when the first note lands.
+      wt.CookIfNeeded(1);
+      audio->PrepareToPlay(sampleRate, numFrames);
+
+      NoteEventQueue inbox;
+      audio->SetNoteInbox(&inbox, inbox.RegisterConsumer());
+
+      std::vector<float> chan0(numFrames), chan1(numFrames);
+      float* chans[2] = { chan0.data(), chan1.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = numFrames;
+
+      std::vector<float> stream;
+      auto RunBlocks = [&](int blocks) {
+         for (int b = 0; b < blocks; b++)
+         {
+            audio->ProcessBlock(nullptr, 0, buf);
+            stream.insert(stream.end(), chan0.begin(), chan0.end());
+         }
+      };
+
+      NoteEvent on1;
+      on1.note = 69; // A4
+      on1.velocity = 1.0f;
+      on1.isNoteOn = true;
+      on1.voiceId = 101;
+      inbox.Push(on1);
+      RunBlocks(38); // ~200 ms
+
+      NoteEvent off1 = on1;
+      off1.isNoteOn = false;
+      off1.velocity = 0.0f;
+      inbox.Push(off1);
+      RunBlocks(4); // into the (very long) release, tail still near full level
+
+      const int boundary = (int)stream.size();
+      NoteEvent on2 = on1;
+      on2.note = 64; // E4, a second voice - note 1's tail is still sounding
+      on2.voiceId = 102;
+      inbox.Push(on2);
+      RunBlocks(20);
+
+      // The delta of the delta, not the delta: a one-sample level step of s
+      // shows up in the first difference added to the waveform's own slew, so
+      // whether it reads as a spike at all depends on which way the waveform
+      // happened to be moving - a -3 dB step landing against a falling slope
+      // can measure *smaller* than the steady slew, which is exactly what this
+      // check saw before it was written this way. The second difference has no
+      // such cancellation: a band-limited waveform's is ~A*w^2, orders below
+      // its amplitude at these pitches, while any step survives it whole.
+      auto MaxStep = [&](int from, int to) {
+         float m = 0.0f;
+         for (int i = std::max(2, from); i < std::min(to, (int)stream.size()); i++)
+            m = std::max(m, std::fabs(stream[i] - 2.0f * stream[i - 1] + stream[i - 2]));
+         return m;
+      };
+
+      // Steady state of note 1 alone, sampled from its sustain.
+      const float steadyStep = MaxStep(4800, 9000);
+      // Only the first ~0.7 ms after the onset: far enough into the 4 ms
+      // attack that note 2 contributes almost nothing of its own curvature,
+      // so anything large here came from a step applied to note 1.
+      const float boundaryStep = MaxStep(boundary - 4, boundary + 32);
+      const bool continuousOk = steadyStep > 1e-7f && boundaryStep < steadyStep * 8.0f;
+      printf("DSPTEST wavetable poly-norm continuity: steady step=%.6f  note-on step=%.6f "
+             "(%.2fx)  %s\n",
+             steadyStep, boundaryStep, steadyStep > 0.0f ? boundaryStep / steadyStep : 0.0f,
+             continuousOk ? "OK" : "FAIL");
+      all &= continuousOk;
+   }
+
+   // 6. ...and smoothing it must not change steady-state loudness: a held
+   //    3-note chord has to measure exactly 1/sqrt(3) of the same three
+   //    voices summed unnormalised (which is what each note renders as on its
+   //    own, where active == 1 and no normalisation applies).
+   {
+      auto Configure = [](WavetableNode& wt) {
+         wt.volume = 1.0f;
+         wt.mix = 0.0f;
+         wt.glide = 0.0f;
+         wt.engines[0].on = true;
+         wt.engines[0].table = 0;
+         wt.engines[0].position = 0.0f;
+         wt.engines[0].unison = 1;
+         wt.engines[0].phaseRandomize = 0.0f;
+         wt.engines[0].warpMode = SynthModes::kWarpOff;
+         wt.engines[0].warpAmount = 0.0f;
+         wt.engines[0].filterType = SynthModes::kFilterOff;
+         wt.engines[0].ampAttack = 4.0f;
+         wt.engines[0].ampDecay = 1.0f;
+         wt.engines[0].ampSustain = 1.0f;
+         wt.engines[0].ampRelease = 260.0f;
+         wt.engines[1].on = false;
+      };
+
+      const int kChordBlocks = 200; // ~1.07 s
+      // Every note starts at frame 0 of block 0 with a reset phase, so a
+      // solo render and the same note inside the chord stay sample-aligned.
+      auto Render = [&](const std::vector<int>& notes, std::vector<float>& out) {
+         WavetableNode wt;
+         Configure(wt);
+         AudioNode* audio = wt.GetAudioNode();
+         wt.CookIfNeeded(1);
+         audio->PrepareToPlay(sampleRate, numFrames);
+
+         NoteEventQueue inbox;
+         audio->SetNoteInbox(&inbox, inbox.RegisterConsumer());
+         for (size_t n = 0; n < notes.size(); n++)
+         {
+            NoteEvent on;
+            on.note = notes[n];
+            on.velocity = 1.0f;
+            on.isNoteOn = true;
+            on.voiceId = 200 + (int)n;
+            inbox.Push(on);
+         }
+
+         std::vector<float> chan0(numFrames), chan1(numFrames);
+         float* chans[2] = { chan0.data(), chan1.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = numFrames;
+         out.clear();
+         for (int b = 0; b < kChordBlocks; b++)
+         {
+            audio->ProcessBlock(nullptr, 0, buf);
+            out.insert(out.end(), chan0.begin(), chan0.end());
+         }
+      };
+
+      const std::vector<int> chordNotes = { 60, 64, 67 };
+      std::vector<float> chord, solo[3];
+      Render(chordNotes, chord);
+      for (int n = 0; n < 3; n++)
+         Render({ chordNotes[n] }, solo[n]);
+
+      // Measured from 0.2 s in, well past both the 4 ms attack and the
+      // normalisation ramp, so this is purely a steady-state comparison.
+      const int from = (int)(sampleRate * 0.2);
+      const int to = (int)chord.size();
+      double chordSum = 0.0, expectSum = 0.0;
+      const double expectedNorm = 1.0 / sqrt(3.0);
+      for (int i = from; i < to; i++)
+      {
+         const double expect = ((double)solo[0][i] + solo[1][i] + solo[2][i]) * expectedNorm;
+         chordSum += (double)chord[i] * chord[i];
+         expectSum += expect * expect;
+      }
+      const double n = (double)(to - from);
+      const double chordRms = sqrt(chordSum / n);
+      const double expectRms = sqrt(expectSum / n);
+      const bool gainOk = expectRms > 0.01 && std::fabs(chordRms - expectRms) < expectRms * 0.01;
+      printf("DSPTEST wavetable poly-norm steady gain: chord RMS=%.5f  1/sqrt(3) of summed "
+             "voices=%.5f  %s\n",
+             chordRms, expectRms, gainOk ? "OK" : "FAIL");
+      all &= gainOk;
+   }
+
+
    return all;
 }
 

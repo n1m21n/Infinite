@@ -28,6 +28,16 @@ public:
       mStage = Stage::Attack;
    }
 
+   // Forces the level back to silence. Deliberately NOT folded into NoteOn():
+   // a retrigger that keeps mLevel is what makes legato and same-note replay
+   // click-free, so this is only for the caller that genuinely needs the new
+   // note to start from zero - a stolen voice, whose oscillator phase and
+   // filter state are about to be reset out from under a still-loud level.
+   void ResetLevel()
+   {
+      mLevel = 0.0f;
+   }
+
    void NoteOff()
    {
       if (mStage != Stage::Idle)
