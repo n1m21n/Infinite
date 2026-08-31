@@ -77,6 +77,8 @@ public:
       mFilterR2.Reset();
       mNextAge = 1;
       mFreeRunTriggerTimer = 0;
+      mLastNoteHz = 0.0f;
+      mHasLastNote = false;
    }
 
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
@@ -174,9 +176,12 @@ public:
                   const float noteHz = MidiNoteToHz(event.note, fineVal) * powf(2.0f, tuningSemis / 12.0f);
                   const int voiceIdx = AllocateVoice();
                   mVoices[voiceIdx].age = mNextAge++;
+                  const float startPitch = (mHasLastNote && glideSec > 0.001f) ? mLastNoteHz : noteHz;
                   mVoices[voiceIdx].Trigger(event.note, event.velocity, event.voiceId, noteHz,
                                             transientVal, decayVal, stiffnessVal,
-                                            currentMaterial, widthVal, mSampleRate);
+                                            currentMaterial, widthVal, mSampleRate, startPitch);
+                  mLastNoteHz = noteHz;
+                  mHasLastNote = true;
                }
                else
                {
@@ -198,9 +203,12 @@ public:
                const float noteHz = MidiNoteToHz(60, fineVal) * powf(2.0f, tuningSemis / 12.0f);
                const int voiceIdx = AllocateVoice();
                mVoices[voiceIdx].age = mNextAge++;
+               const float startPitch = (mHasLastNote && glideSec > 0.001f) ? mLastNoteHz : noteHz;
                mVoices[voiceIdx].Trigger(60, 0.85f, -1, noteHz,
                                          transientVal, decayVal, stiffnessVal,
-                                         currentMaterial, widthVal, mSampleRate);
+                                         currentMaterial, widthVal, mSampleRate, startPitch);
+               mLastNoteHz = noteHz;
+               mHasLastNote = true;
             }
 
             // Retune held voices at control rate. Transient is deliberately not
@@ -369,6 +377,8 @@ private:
    MetallicDsp::MetallicVoice mVoices[kMaxVoices];
    uint64_t mNextAge = 1;
    int mFreeRunTriggerTimer = 0;
+   float mLastNoteHz = 0.0f;
+   bool mHasLastNote = false;
 
    ParamMailbox mMailbox;
    NoteEventQueue* mNoteInbox = nullptr;

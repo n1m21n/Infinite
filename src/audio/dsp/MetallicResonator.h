@@ -535,7 +535,8 @@ namespace MetallicDsp
       }
 
       void Trigger(int note, float vel, int id, float freqHz, float transient, float decaySec,
-                   float stiffness, int materialPreset, float stereoSpread, double sampleRate)
+                   float stiffness, int materialPreset, float stereoSpread, double sampleRate,
+                   float startPitchHz = -1.0f)
       {
          // A stolen voice still holds 4096 samples of the previous note's
          // waveguide energy; re-reading that at a shorter delay length with
@@ -545,17 +546,18 @@ namespace MetallicDsp
          midiNote = note;
          velocity = vel;
          voiceId = id;
-         currentFreq = freqHz;
+         const float initPitch = (startPitchHz > 0.0f) ? startPitchHz : freqHz;
+         currentFreq = initPitch;
          active = true;
          voiceLevel = 1.0f;
          coefSlew = (sampleRate > 0.0) ? (1.0f - expf(-1.0f / (0.005f * (float)sampleRate))) : 0.02f;
-         pitchSmoother.SetImmediate(freqHz);
+         pitchSmoother.SetImmediate(initPitch);
 
          const MaterialProfile mat = GetMaterialProfile(materialPreset);
          const float effectiveHardness = std::clamp(transient * mat.strikeHardness, 0.1f, 2.5f);
 
-         exciter.Trigger(vel, effectiveHardness, freqHz, sampleRate);
-         UpdateAcoustics(freqHz, decaySec, stiffness, materialPreset, stereoSpread, sampleRate, true);
+         exciter.Trigger(vel, effectiveHardness, initPitch, sampleRate);
+         UpdateAcoustics(initPitch, decaySec, stiffness, materialPreset, stereoSpread, sampleRate, true);
          ampDecay = ComputeAmpDecay(decaySec, sampleRate);
       }
 
@@ -629,7 +631,8 @@ namespace MetallicDsp
             const float beat = 1.0f + (m % 2 == 1 ? mat.nonLinearBeating : -mat.nonLinearBeating) * (float)m;
             const float modeFreq = freqHz * mat.modeRatios[m] * inharm * beat;
 
-            const float modeLoss = expf(-mat.highFreqLoss * (float)m * 0.4f);
+            const float lossScale = 1.0f / (1.0f + 0.15f * effectiveDecay);
+            const float modeLoss = expf(-mat.highFreqLoss * (float)m * 0.4f * lossScale);
             const float modeDecay = effectiveDecay * modeLoss;
             const float amp = mat.modeAmplitudes[m] * (velocity > 0.0f ? velocity : 0.8f);
             const float modePan = (m == 0) ? 0.0f : ((m % 2 == 1 ? 1.0f : -1.0f) * stereoSpread * (0.3f + 0.7f * ((float)m / (float)kNumModes)));

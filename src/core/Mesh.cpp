@@ -2580,8 +2580,8 @@ namespace MeshOps
       // what let a high-density scatter burn tens of millions of wasted
       // candidate draws before this fix. `maxCandidates` never drops below
       // 4000, so saturationLimit stays a hard backstop below it.
-      const int maxCandidates = std::min(std::max(cap * 40, 4000), 2000000);
-      const int saturationLimit = 1500;
+      const int maxCandidates = std::min(std::max(cap * 15, 4000), 300000);
+      const int saturationLimit = 150;
       int consecutiveRejects = 0;
 
       for (int i = 0; i < maxCandidates && (int)points.size() < cap; i++)

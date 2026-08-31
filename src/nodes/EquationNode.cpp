@@ -116,6 +116,8 @@ public:
       mMailbox.PrepareToPlay(mSampleRate);
       for (int v = 0; v < kMaxVoices; v++)
          mVoices[v].Reset(mSampleRate);
+      mLastNoteHz = 0.0f;
+      mHasLastNote = false;
 
       const int allocSize = std::max(maxBlockSize, 4096);
       mMonoScope.resize(allocSize, 0.0f);
@@ -227,6 +229,7 @@ public:
             {
                const int voiceIdx = AllocateVoice();
                Voice& v = mVoices[voiceIdx];
+               const bool wasInactive = !v.active;
                v.active = true;
                v.held = true;
                v.note = event.note;
@@ -240,8 +243,21 @@ public:
 
                const float baseHz = MidiNoteToHz(event.note + octave * 12 + semi);
                v.targetFreq = baseHz;
-               if (v.currentFreq <= 0.0f)
-                  v.currentFreq = baseHz;
+               const float glide = mMailbox.SmoothedValue(kParamGlide);
+               if (wasInactive)
+               {
+                  if (mHasLastNote && glide > 0.001f)
+                     v.currentFreq = mLastNoteHz;
+                  else
+                     v.currentFreq = baseHz;
+               }
+               else
+               {
+                  if (glide <= 0.001f)
+                     v.currentFreq = baseHz;
+               }
+               mLastNoteHz = baseHz;
+               mHasLastNote = true;
             }
             else if (!event.isNoteOn && !event.bendUpdate)
             {
@@ -520,6 +536,8 @@ private:
 
    Voice mVoices[kMaxVoices];
    uint64_t mAgeCounter = 0;
+   float mLastNoteHz = 0.0f;
+   bool mHasLastNote = false;
    std::atomic<int> mActiveVoices{0};
 };
 

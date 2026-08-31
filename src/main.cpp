@@ -24966,15 +24966,18 @@ namespace
 
    // Mirrors CategoryColors::ThemePath()/LoadPreference(): one flat
    // preference file next to the app's other Application Support state.
-   std::string AutosaveSettingsPath()
+   // Covers everything on the General & Performance settings tab (autosave,
+   // target FPS, vsync) - kept as one file since the file predates the FPS/
+   // vsync fields and renaming it would strand existing users' autosave prefs.
+   std::string GeneralSettingsPath()
    {
       std::string dir = AppPaths::AppSupportDir();
       return dir.empty() ? std::string() : dir + "/Infinite.autosave-settings";
    }
 
-   void LoadAutosaveSettings()
+   void LoadGeneralSettings()
    {
-      const std::string path = AutosaveSettingsPath();
+      const std::string path = GeneralSettingsPath();
       if (path.empty())
          return;
       std::ifstream file(path);
@@ -24987,15 +24990,123 @@ namespace
          if (seconds > 0)
             gAutosaveSeconds = seconds;
       }
+      if (std::getline(file, line) && !line.empty())
+         gTargetFps = atoi(line.c_str());
+      if (std::getline(file, line) && !line.empty())
+         gVsync = (line != "0");
    }
 
-   void SaveAutosaveSettings()
+   void SaveGeneralSettings()
    {
-      const std::string path = AutosaveSettingsPath();
+      const std::string path = GeneralSettingsPath();
       if (path.empty())
          return;
       std::ofstream file(path);
-      file << (gAutosaveEnabled ? "1" : "0") << "\n" << gAutosaveSeconds << "\n";
+      file << (gAutosaveEnabled ? "1" : "0") << "\n" << gAutosaveSeconds << "\n"
+           << gTargetFps << "\n" << (gVsync ? "1" : "0") << "\n";
+   }
+
+   // One flat preference file for the Canvas & Workspace settings tab.
+   std::string WorkspaceSettingsPath()
+   {
+      std::string dir = AppPaths::AppSupportDir();
+      return dir.empty() ? std::string() : dir + "/Infinite.workspace-settings";
+   }
+
+   void LoadWorkspaceSettings()
+   {
+      const std::string path = WorkspaceSettingsPath();
+      if (path.empty())
+         return;
+      std::ifstream file(path);
+      std::string line;
+      while (std::getline(file, line))
+      {
+         const size_t eq = line.find('=');
+         if (eq == std::string::npos)
+            continue;
+         const std::string key = line.substr(0, eq);
+         const std::string val = line.substr(eq + 1);
+         if (key == "snapToGrid")
+            gSnapToGrid = (val != "0");
+         else if (key == "gridSnap")
+            gGridSnap = std::strtof(val.c_str(), nullptr);
+         else if (key == "zoomSensitivity")
+            gZoomSensitivity = std::strtof(val.c_str(), nullptr);
+         else if (key == "minimapEnabled")
+            gMinimapEnabled = (val != "0");
+         else if (key == "minimapCorner")
+            gMinimapCorner = atoi(val.c_str());
+         else if (key == "minimapSize")
+            gMinimapSize = std::strtof(val.c_str(), nullptr);
+         else if (key == "minimapOpacity")
+            gMinimapOpacity = std::strtof(val.c_str(), nullptr);
+         else if (key == "cableVisibilityMask")
+            gCableVisibilityMask = atoi(val.c_str());
+      }
+   }
+
+   void SaveWorkspaceSettings()
+   {
+      const std::string path = WorkspaceSettingsPath();
+      if (path.empty())
+         return;
+      std::ofstream file(path);
+      file << "snapToGrid=" << (gSnapToGrid ? 1 : 0) << "\n";
+      file << "gridSnap=" << gGridSnap << "\n";
+      file << "zoomSensitivity=" << gZoomSensitivity << "\n";
+      file << "minimapEnabled=" << (gMinimapEnabled ? 1 : 0) << "\n";
+      file << "minimapCorner=" << gMinimapCorner << "\n";
+      file << "minimapSize=" << gMinimapSize << "\n";
+      file << "minimapOpacity=" << gMinimapOpacity << "\n";
+      file << "cableVisibilityMask=" << gCableVisibilityMask << "\n";
+   }
+
+   // One flat preference file for the Audio settings tab.
+   std::string AudioSettingsPath()
+   {
+      std::string dir = AppPaths::AppSupportDir();
+      return dir.empty() ? std::string() : dir + "/Infinite.audio-settings";
+   }
+
+   void LoadAudioSettings()
+   {
+      const std::string path = AudioSettingsPath();
+      if (path.empty())
+         return;
+      std::ifstream file(path);
+      std::string line;
+      while (std::getline(file, line))
+      {
+         const size_t eq = line.find('=');
+         if (eq == std::string::npos)
+            continue;
+         const std::string key = line.substr(0, eq);
+         const std::string val = line.substr(eq + 1);
+         if (key == "outputDeviceId")
+            gAudioOutputDeviceId = (uint32_t)strtoul(val.c_str(), nullptr, 10);
+         else if (key == "inputDeviceId")
+            gAudioInputDeviceId = (uint32_t)strtoul(val.c_str(), nullptr, 10);
+         else if (key == "sampleRate")
+            gAudioSampleRate = strtod(val.c_str(), nullptr);
+         else if (key == "bufferFrames")
+            gAudioBufferFrames = atoi(val.c_str());
+         else if (key == "oversample")
+            gAudioOversample = std::strtof(val.c_str(), nullptr);
+      }
+   }
+
+   void SaveAudioSettings()
+   {
+      const std::string path = AudioSettingsPath();
+      if (path.empty())
+         return;
+      std::ofstream file(path);
+      file << "outputDeviceId=" << gAudioOutputDeviceId << "\n";
+      file << "inputDeviceId=" << gAudioInputDeviceId << "\n";
+      file << "sampleRate=" << gAudioSampleRate << "\n";
+      file << "bufferFrames=" << gAudioBufferFrames << "\n";
+      file << "oversample=" << gAudioOversample << "\n";
    }
 
    void DiscardAutosave()
@@ -25392,15 +25503,21 @@ namespace
          {
             ImGui::Spacing();
             ImGui::SeparatorText("Grid & Canvas");
-            ImGui::Checkbox("Snap to grid", &gSnapToGrid);
+            if (ImGui::Checkbox("Snap to grid", &gSnapToGrid))
+               SaveWorkspaceSettings();
             ImGui::SetNextItemWidth(180.0f);
             ImGui::SliderFloat("Grid size", &gGridSnap, 5.0f, 100.0f, "%.0f px");
+            if (ImGui::IsItemDeactivatedAfterEdit())
+               SaveWorkspaceSettings();
             ImGui::SetNextItemWidth(180.0f);
             ImGui::SliderFloat("Zoom sensitivity", &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
+            if (ImGui::IsItemDeactivatedAfterEdit())
+               SaveWorkspaceSettings();
 
             ImGui::Spacing();
             ImGui::SeparatorText("Minimap");
-            ImGui::Checkbox("Show minimap", &gMinimapEnabled);
+            if (ImGui::Checkbox("Show minimap", &gMinimapEnabled))
+               SaveWorkspaceSettings();
             if (gMinimapEnabled)
             {
                static const char* kCorners[] = {
@@ -25411,13 +25528,20 @@ namespace
                {
                   for (int i = 0; i < 4; i++)
                      if (ImGui::Selectable(kCorners[i], i == gMinimapCorner))
+                     {
                         gMinimapCorner = i;
+                        SaveWorkspaceSettings();
+                     }
                   ImGui::EndCombo();
                }
                ImGui::SetNextItemWidth(180.0f);
                ImGui::SliderFloat("Size", &gMinimapSize, 120.0f, 360.0f, "%.0f px");
+               if (ImGui::IsItemDeactivatedAfterEdit())
+                  SaveWorkspaceSettings();
                ImGui::SetNextItemWidth(180.0f);
                ImGui::SliderFloat("Opacity", &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
+               if (ImGui::IsItemDeactivatedAfterEdit())
+                  SaveWorkspaceSettings();
             }
 
             ImGui::Spacing();
@@ -25427,19 +25551,34 @@ namespace
             bool showImg = (gCableVisibilityMask & 0x1) != 0;
 
             if (ImGui::Checkbox("Modulation cables", &showMod))
+            {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x4) | (showMod ? 0x4 : 0);
+               SaveWorkspaceSettings();
+            }
             if (ImGui::Checkbox("Audio & note cables", &showAudNote))
+            {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x2) | (showAudNote ? 0x2 : 0);
+               SaveWorkspaceSettings();
+            }
             if (ImGui::Checkbox("Image & geometry cables", &showImg))
+            {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x1) | (showImg ? 0x1 : 0);
+               SaveWorkspaceSettings();
+            }
 
             ImGui::TextDisabled("Note: Image & geometry toggle also covers palette cables.");
             ImGui::Spacing();
             if (ImGui::Button("Show all cables"))
+            {
                gCableVisibilityMask = 0x7;
+               SaveWorkspaceSettings();
+            }
             ImGui::SameLine();
             if (ImGui::Button("Hide all cables"))
+            {
                gCableVisibilityMask = 0x0;
+               SaveWorkspaceSettings();
+            }
 
             ImGui::EndTabItem();
          }
@@ -25558,7 +25697,10 @@ namespace
             {
                for (int i = 0; i < 3; i++)
                   if (ImGui::Selectable(kOversampleLabels[i], oversampleIdx == i))
+                  {
                      gAudioOversample = kOversampleValues[i];
+                     SaveAudioSettings();
+                  }
                ImGui::EndCombo();
             }
 
@@ -25579,6 +25721,7 @@ namespace
                AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
                AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
                AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+               SaveAudioSettings();
 
                if (wasRunning)
                {
@@ -25609,13 +25752,13 @@ namespace
                }
             }
             if (ImGui::Checkbox("Autosave enabled", &gAutosaveEnabled))
-               SaveAutosaveSettings();
+               SaveGeneralSettings();
             ImGui::SetNextItemWidth(180.0f);
             int seconds = gAutosaveSeconds;
             if (ImGui::SliderInt("Autosave interval", &seconds, 15, 300, "%d sec"))
                gAutosaveSeconds = seconds;
             if (ImGui::IsItemDeactivatedAfterEdit())
-               SaveAutosaveSettings();
+               SaveGeneralSettings();
 
             ImGui::Spacing();
             ImGui::SeparatorText("Performance & Rendering");
@@ -25632,13 +25775,19 @@ namespace
                for (int i = 0; i < 4; i++)
                {
                   if (ImGui::Selectable(kFpsLabels[i], current == i))
+                  {
                      gTargetFps = kFpsValues[i];
+                     SaveGeneralSettings();
+                  }
                }
                ImGui::EndCombo();
             }
 
             if (ImGui::Checkbox("Vsync", &gVsync))
+            {
                glfwSwapInterval(gVsync ? 1 : 0);
+               SaveGeneralSettings();
+            }
 
             ImGui::Spacing();
             ImGui::SeparatorText("Application & Updates");
@@ -36782,7 +36931,21 @@ int main(int argc, char** argv)
    config.EnableSmoothZoom = true; // trackpad momentum made stepped zoom feel jumpy
    Patch::LoadRecents();
    CategoryColors::LoadPreference();
-   LoadAutosaveSettings();
+   LoadGeneralSettings();
+   LoadWorkspaceSettings();
+   LoadAudioSettings();
+   // Feed the loaded device/format prefs into the engine now, before the
+   // user ever presses "Start Audio", so a persisted non-default choice
+   // actually takes effect on the first Start rather than only after the
+   // Settings dialog's "Apply audio settings" button is clicked again.
+   AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
+   AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
+   AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+   // The window was just created with vsync hardcoded on (above); apply the
+   // persisted preference now that it's loaded. Headless test windows stay
+   // uncapped regardless - they don't want to be paced by the display.
+   if (!gHeadlessTestWindow)
+      glfwSwapInterval(gVsync ? 1 : 0);
    LoadBrowserFilterPrefs();
 
    gEditor = ed::CreateEditor(&config);

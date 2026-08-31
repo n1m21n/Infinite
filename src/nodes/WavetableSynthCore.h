@@ -266,6 +266,8 @@ public:
          mFreeEngine[e].Reset(sampleRate);
       for (Voice& v : mVoices)
          v.Reset(sampleRate);
+      mLastNotePitch = 60.0f;
+      mHasLastNote = false;
    }
 
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
@@ -439,8 +441,8 @@ public:
                   continue;
 
                v.glide.SetTimeConstant(sm.glide, mSampleRate);
-               const float targetHz = NoteToHz((float)v.note);
-               const float base = v.glide.Process(targetHz);
+               const float currentPitch = v.glide.Process((float)v.note);
+               const float base = NoteToHz(currentPitch);
                // Velocity always shapes level. It used to be a 0..1 "amount"
                // param, which is a control nobody reaches for: a synth that
                // ignores how hard you played is broken, and one that responds
@@ -881,6 +883,7 @@ private:
       v.velocity = velocity;
       v.bend = bendSemitones;
       v.age = mNextAge++;
+      const float targetHz = NoteToHz((float)note);
       if (fresh)
       {
          // A new note starts its phase where the engine's `phase` param says,
@@ -890,13 +893,23 @@ private:
          // ringing into a new attack is an audible thump.
          for (int e = 0; e < kEngines; e++)
             v.eng[e].Reset(mSampleRate);
-         // Only snap the glide smoother when the voice was silent. If the
-         // voice was already active (playing a different note), preserve the
-         // current frequency so the one-pole smoother glides from the old
-         // pitch to the new one over the glide time constant.
+         const float glide = mFloatAtomics[kGlide].load(std::memory_order_relaxed);
+         const float targetPitch = (float)note;
          if (wasInactive)
-            v.glide.SetImmediate(NoteToHz((float)note));
+         {
+            if (mHasLastNote && glide > 0.001f)
+               v.glide.SetImmediate(mLastNotePitch);
+            else
+               v.glide.SetImmediate(targetPitch);
+         }
+         else
+         {
+            if (glide <= 0.001f)
+               v.glide.SetImmediate(targetPitch);
+         }
       }
+      mLastNotePitch = (float)note;
+      mHasLastNote = true;
       for (int e = 0; e < kEngines; e++)
       {
          v.amp[e].SetSampleRate(mSampleRate);
@@ -952,6 +965,8 @@ private:
 
    Voice mVoices[WavetableSynthCore::kMaxVoices];
    uint64_t mNextAge = 1;
+   float mLastNotePitch = 60.0f;
+   bool mHasLastNote = false;
 
    // Free-running state (no note cable) - see ProcessBlock.
    DspMath::OnePole mFreeGlide;
