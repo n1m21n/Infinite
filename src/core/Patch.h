@@ -160,6 +160,16 @@ namespace Patch
       std::string label;      // empty = inherit the source param's own name
       std::vector<PerfTarget> targets;
       std::vector<PerfTarget> targetsY;
+
+      // MIDI mapping (0 = unbound device, channel 0-15, controller/note 0-127)
+      int  midiDevice     = 0;
+      int  midiChannel    = -1;
+      int  midiController = -1;
+      bool midiIsNote     = false;
+      int  midiDeviceY    = 0;
+      int  midiChannelY   = -1;
+      int  midiControllerY = -1;
+      bool midiIsNoteY    = false;
    };
 
    struct PerfLayoutRecord

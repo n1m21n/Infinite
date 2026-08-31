@@ -277,6 +277,10 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
          std::string bTok = t.boolName.empty() ? "-" : t.boolName;
          file << "perftarget " << i << " " << t.dstIndex << " " << t.dstParam << " 1 " << bTok << "\n";
       }
+      if (p.midiDevice != 0)
+         file << "perfmidi " << i << " 0 " << p.midiDevice << " " << p.midiChannel << " " << p.midiController << " " << (p.midiIsNote ? 1 : 0) << "\n";
+      if (p.midiDeviceY != 0)
+         file << "perfmidi " << i << " 1 " << p.midiDeviceY << " " << p.midiChannelY << " " << p.midiControllerY << " " << (p.midiIsNoteY ? 1 : 0) << "\n";
    }
    file << "transport " << FloatToString(data.transport.bpm) << " "
         << data.transport.timeSigNum << " " << data.transport.timeSigDen << " "
@@ -552,6 +556,30 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
                   outData.performance[elemIdx].targetsY.push_back(pt);
                else
                   outData.performance[elemIdx].targets.push_back(pt);
+            }
+         }
+      }
+      else if (tag == "perfmidi")
+      {
+         int elemIdx = 0, axis = 0, dev = 0, ch = -1, ctrl = -1, isNoteInt = 0;
+         if (in >> elemIdx >> axis >> dev >> ch >> ctrl >> isNoteInt)
+         {
+            if (elemIdx >= 0 && elemIdx < (int)outData.performance.size())
+            {
+               if (axis == 1)
+               {
+                  outData.performance[elemIdx].midiDeviceY = dev;
+                  outData.performance[elemIdx].midiChannelY = ch;
+                  outData.performance[elemIdx].midiControllerY = ctrl;
+                  outData.performance[elemIdx].midiIsNoteY = (isNoteInt != 0);
+               }
+               else
+               {
+                  outData.performance[elemIdx].midiDevice = dev;
+                  outData.performance[elemIdx].midiChannel = ch;
+                  outData.performance[elemIdx].midiController = ctrl;
+                  outData.performance[elemIdx].midiIsNote = (isNoteInt != 0);
+               }
             }
          }
       }

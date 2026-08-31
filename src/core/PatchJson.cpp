@@ -94,7 +94,15 @@ namespace PatchJson
             {"boolName", p.boolName},
             {"label", p.label},
             {"targets", tgts},
-            {"targetsY", tgtsY}
+            {"targetsY", tgtsY},
+            {"midiDevice", p.midiDevice},
+            {"midiChannel", p.midiChannel},
+            {"midiController", p.midiController},
+            {"midiIsNote", p.midiIsNote},
+            {"midiDeviceY", p.midiDeviceY},
+            {"midiChannelY", p.midiChannelY},
+            {"midiControllerY", p.midiControllerY},
+            {"midiIsNoteY", p.midiIsNoteY}
          });
       }
 

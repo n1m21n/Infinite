@@ -749,6 +749,16 @@ namespace
    char  gPerfRenamePageBuffer[64] = "";
    int   gPerfAssigningElemIdx = -1;
    int   gPerfAssigningAxis = 0; // 0 = X or primary, 1 = Y
+   int   gPerfMidiLearnIdx = -1;
+   int   gPerfMidiLearnAxis = 0; // 0 = X or primary, 1 = Y
+   struct PerfMidiRuntimeState
+   {
+      float lastVal = -1.0f;
+      float lastValY = -1.0f;
+      unsigned int lastHitSeq = 0;
+   };
+   std::map<size_t, PerfMidiRuntimeState> gPerfMidiRuntimeStates;
+   std::map<size_t, float> gPerfBangFlash;
    struct ParamPinScreenInfo
    {
       int nodeIndex;
@@ -21183,8 +21193,8 @@ namespace
 
       ImVec2 span = GetPerfElementCellSpan(elem.kind);
       const float gap = 8.0f;
-      ImVec2 cellPos(gridOrigin.x + elem.cellX * (cellSize + gap),
-                     gridOrigin.y + elem.cellY * (cellSize + gap));
+      ImVec2 cellPos(gridOrigin.x + elem.cellX * (cellSize + gap) + gap * 0.5f,
+                     gridOrigin.y + elem.cellY * (cellSize + gap) + gap * 0.5f);
       ImVec2 cardSize(span.x * cellSize + (span.x - 1.0f) * gap,
                       span.y * cellSize + (span.y - 1.0f) * gap);
 
@@ -21194,22 +21204,22 @@ namespace
       if (gPerfDragIdx == (int)elemIdx)
       {
          ImVec2 m = ImGui::GetIO().MousePos;
-         int rawSnapX = std::max(0, (int)std::round((m.x - gridOrigin.x - cardSize.x * 0.5f) / (cellSize + gap)));
-         int rawSnapY = std::max(0, (int)std::round((m.y - gridOrigin.y - 10.0f) / (cellSize + gap)));
+         int rawSnapX = std::max(0, (int)std::round((m.x - gridOrigin.x - gap * 0.5f - cardSize.x * 0.5f) / (cellSize + gap)));
+         int rawSnapY = std::max(0, (int)std::round((m.y - gridOrigin.y - gap * 0.5f - 10.0f) / (cellSize + gap)));
 
          auto [adjX, adjY] = FindAdjustedNonOverlappingCell(elem.page, (int)elemIdx, rawSnapX, rawSnapY, (int)span.x, (int)span.y);
          snapX = adjX;
          snapY = adjY;
 
          // Draw live snap grid highlight at the non-overlapping target cell
-         ImVec2 snapTL(gridOrigin.x + snapX * (cellSize + gap), gridOrigin.y + snapY * (cellSize + gap));
+         ImVec2 snapTL(gridOrigin.x + snapX * (cellSize + gap) + gap * 0.5f, gridOrigin.y + snapY * (cellSize + gap) + gap * 0.5f);
          ImVec2 snapBR(snapTL.x + cardSize.x, snapTL.y + cardSize.y);
          dl->AddRectFilled(snapTL, snapBR, IM_COL32(70, 140, 255, 45), 6.0f);
          dl->AddRect(snapTL, snapBR, IM_COL32(90, 180, 255, 220), 6.0f, 0, 2.0f);
 
          // Floating live card position
-         cellPos = ImVec2(gridOrigin.x + gPerfDragOriginCellX * (cellSize + gap) + (m.x - gPerfDragMouseStart.x),
-                          gridOrigin.y + gPerfDragOriginCellY * (cellSize + gap) + (m.y - gPerfDragMouseStart.y));
+         cellPos = ImVec2(gridOrigin.x + gPerfDragOriginCellX * (cellSize + gap) + gap * 0.5f + (m.x - gPerfDragMouseStart.x),
+                          gridOrigin.y + gPerfDragOriginCellY * (cellSize + gap) + gap * 0.5f + (m.y - gPerfDragMouseStart.y));
       }
 
       ImVec2 cardBR(cellPos.x + cardSize.x, cellPos.y + cardSize.y);
@@ -21226,7 +21236,13 @@ namespace
       dl->AddRectFilled(cellPos, cardBR, cardBg, 6.0f);
       if (gPerfEditMode)
          dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : (isLight ? IM_COL32(180, 190, 205, 200) : IM_COL32(65, 72, 88, 200)), 6.0f, 0, 1.2f);
-      if (gPerfEditMode && gPerfSelection.count(elemIdx) > 0)
+      if (gPerfMidiLearnIdx == (int)elemIdx)
+      {
+         float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 8.0f);
+         dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
+                     IM_COL32(255, (int)(160 + 50 * pulse), 30, 255), 7.0f, 0, 2.5f);
+      }
+      else if (gPerfEditMode && gPerfSelection.count(elemIdx) > 0)
          dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
                      isLight ? IM_COL32(30, 110, 220, 255) : IM_COL32(95, 165, 255, 255), 7.0f, 0, 2.0f);
       else
@@ -21313,21 +21329,14 @@ namespace
             gPerfDragIdx = -1;
          }
 
-         ImGui::SetNextWindowSizeConstraints(ImVec2(180.0f, 0.0f), ImVec2(230.0f, 450.0f));
+         ImGui::SetNextWindowSizeConstraints(ImVec2(180.0f, 0.0f), ImVec2(240.0f, 480.0f));
          if (ImGui::BeginPopupContextItem("##elemcontext", ImGuiPopupFlags_MouseButtonRight))
          {
-            ImGui::Text("Customize");
-            ImGui::Separator();
-            ImGui::SetNextItemWidth(120.0f);
-            char labelBuf[64];
-            snprintf(labelBuf, sizeof(labelBuf), "%s", elem.label.c_str());
-            if (ImGui::InputText("##elemlabelinput", labelBuf, sizeof(labelBuf)))
+            if (ImGui::MenuItem("Rename"))
             {
-               PushUndoCheckpoint();
-               elem.label = labelBuf;
+               gPerfRenamingElementIdx = (int)elemIdx;
+               snprintf(gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer), "%s", displayLabel.c_str());
             }
-            ImGui::SameLine();
-            ImGui::TextDisabled("Label");
 
             if (ImGui::BeginMenu("Type"))
             {
@@ -21385,6 +21394,70 @@ namespace
                   elem.targets.clear();
                   elem.targetsY.clear();
                }
+
+               ImGui::Separator();
+               // MIDI Learn for XY Pad (X Axis and Y Axis)
+               const bool isLearningX = (gPerfMidiLearnIdx == (int)elemIdx && gPerfMidiLearnAxis == 0);
+               const bool isLearningY = (gPerfMidiLearnIdx == (int)elemIdx && gPerfMidiLearnAxis == 1);
+               if (isLearningX)
+               {
+                  if (ImGui::MenuItem("Listening X... (Move MIDI CC)"))
+                     gPerfMidiLearnIdx = -1;
+               }
+               else
+               {
+                  std::string xLabel = (elem.midiDevice != 0) ? "Re-learn MIDI X Axis..." : "MIDI Learn X Axis...";
+                  if (ImGui::MenuItem(xLabel.c_str()))
+                  {
+                     std::string err;
+                     Platform::MidiStart(err);
+                     Platform::MidiCCValue flush;
+                     while (Platform::MidiPollLastTouched(flush)) {}
+                     gPerfMidiLearnIdx = (int)elemIdx;
+                     gPerfMidiLearnAxis = 0;
+                     ImGui::CloseCurrentPopup();
+                  }
+               }
+               if (elem.midiDevice != 0)
+               {
+                  std::string devName = Platform::MidiDeviceName((Platform::MidiDeviceId)elem.midiDevice);
+                  std::string bindStr = "MIDI X: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannel + 1) + " \xC2\xB7 " + (elem.midiIsNote ? "Note " : "CC ") + std::to_string(elem.midiController);
+                  ImGui::TextDisabled("%s", bindStr.c_str());
+               }
+
+               if (isLearningY)
+               {
+                  if (ImGui::MenuItem("Listening Y... (Move MIDI CC)"))
+                     gPerfMidiLearnIdx = -1;
+               }
+               else
+               {
+                  std::string yLabel = (elem.midiDeviceY != 0) ? "Re-learn MIDI Y Axis..." : "MIDI Learn Y Axis...";
+                  if (ImGui::MenuItem(yLabel.c_str()))
+                  {
+                     std::string err;
+                     Platform::MidiStart(err);
+                     Platform::MidiCCValue flush;
+                     while (Platform::MidiPollLastTouched(flush)) {}
+                     gPerfMidiLearnIdx = (int)elemIdx;
+                     gPerfMidiLearnAxis = 1;
+                     ImGui::CloseCurrentPopup();
+                  }
+               }
+               if (elem.midiDeviceY != 0)
+               {
+                  std::string devName = Platform::MidiDeviceName((Platform::MidiDeviceId)elem.midiDeviceY);
+                  std::string bindStr = "MIDI Y: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannelY + 1) + " \xC2\xB7 " + (elem.midiIsNoteY ? "Note " : "CC ") + std::to_string(elem.midiControllerY);
+                  ImGui::TextDisabled("%s", bindStr.c_str());
+               }
+
+               if ((elem.midiDevice != 0 || elem.midiDeviceY != 0) && ImGui::MenuItem("Clear MIDI Bindings"))
+               {
+                  PushUndoCheckpoint();
+                  elem.midiDevice = 0; elem.midiChannel = -1; elem.midiController = -1; elem.midiIsNote = false;
+                  elem.midiDeviceY = 0; elem.midiChannelY = -1; elem.midiControllerY = -1; elem.midiIsNoteY = false;
+                  if (gPerfMidiLearnIdx == (int)elemIdx) gPerfMidiLearnIdx = -1;
+               }
             }
             else // Regular single-axis control
             {
@@ -21409,6 +21482,53 @@ namespace
                   elem.dstParam = -1;
                   elem.boolName.clear();
                   elem.targets.clear();
+               }
+
+               if (elem.kind != 9) // Step Gate does not use MIDI Learn
+               {
+                  ImGui::Separator();
+                  const bool isLearning = (gPerfMidiLearnIdx == (int)elemIdx && gPerfMidiLearnAxis == 0);
+                  if (isLearning)
+                  {
+                     std::string learnPrompt = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7)
+                        ? "Listening... (Move CC or Hit Pad)"
+                        : "Listening... (Move MIDI CC)";
+                     if (ImGui::MenuItem(learnPrompt.c_str()))
+                        gPerfMidiLearnIdx = -1;
+                  }
+                  else
+                  {
+                     std::string midiLabel = (elem.midiDevice != 0) ? "Re-learn MIDI CC" : "MIDI CC Learn";
+                     if (elem.kind == 3 || elem.kind == 5 || elem.kind == 7)
+                        midiLabel = (elem.midiDevice != 0) ? "Re-learn MIDI (CC / Trigger)" : "MIDI Learn (CC / Trigger)";
+                     if (ImGui::MenuItem(midiLabel.c_str()))
+                     {
+                        std::string err;
+                        Platform::MidiStart(err);
+                        Platform::MidiCCValue flush;
+                        while (Platform::MidiPollLastTouched(flush)) {}
+                        gPerfMidiLearnIdx = (int)elemIdx;
+                        gPerfMidiLearnAxis = 0;
+                        ImGui::CloseCurrentPopup();
+                     }
+                  }
+
+                  if (elem.midiDevice != 0)
+                  {
+                     std::string devName = Platform::MidiDeviceName((Platform::MidiDeviceId)elem.midiDevice);
+                     std::string bindStr = "MIDI: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannel + 1) + " \xC2\xB7 " + (elem.midiIsNote ? "Note " : "CC ") + std::to_string(elem.midiController);
+                     ImGui::TextDisabled("%s", bindStr.c_str());
+
+                     if (ImGui::MenuItem("Clear MIDI Binding"))
+                     {
+                        PushUndoCheckpoint();
+                        elem.midiDevice = 0;
+                        elem.midiChannel = -1;
+                        elem.midiController = -1;
+                        elem.midiIsNote = false;
+                        if (gPerfMidiLearnIdx == (int)elemIdx) gPerfMidiLearnIdx = -1;
+                     }
+                  }
                }
             }
 
@@ -21780,9 +21900,6 @@ namespace
          ImGui::InvisibleButton("##bangbtn", ImVec2(padSize, padSize));
          const bool active = ImGui::IsItemActive();
          const bool hovered = ImGui::IsItemHovered();
-
-         static std::map<size_t, float> sBangFlash;
-
          // A trigger wired to a multi-state selector or toggle advances one step per
          // press and wraps, instead of slamming the param to its maximum and
          // back. A plain 0..1 continuous float keeps the momentary 1 / 0 behaviour.
@@ -21826,7 +21943,7 @@ namespace
          {
             if (ImGui::IsItemActivated())
             {
-               sBangFlash[elemIdx] = 1.0f;
+               gPerfBangFlash[elemIdx] = 1.0f;
                advance(elem.dstIndex, elem.dstParam, elem.boolName);
                for (const auto& t : elem.targets)
                   if (t.dstIndex >= 0 && stepSpan(t.dstIndex, t.dstParam, t.boolName) > 0)
@@ -21838,7 +21955,7 @@ namespace
          }
          else if (active)
          {
-            sBangFlash[elemIdx] = 1.0f;
+            gPerfBangFlash[elemIdx] = 1.0f;
             elem.value = 1.0f;
             if (dstNode != nullptr && !elem.boolName.empty())
                WriteNodeBool(dstNode, elem.boolName, true, elem.dstParam);
@@ -21877,12 +21994,12 @@ namespace
             }
          }
 
-         float flash = sBangFlash[elemIdx];
+         float flash = gPerfBangFlash[elemIdx];
          if (flash > 0.0f)
          {
             flash -= ImGui::GetIO().DeltaTime * 4.0f;
             if (flash < 0.0f) flash = 0.0f;
-            sBangFlash[elemIdx] = flash;
+            gPerfBangFlash[elemIdx] = flash;
          }
 
          float r = padSize * 0.44f;
@@ -22126,12 +22243,365 @@ namespace
       ImGui::PopID();
    }
 
+   void UpdatePerformanceMatrixMIDI()
+   {
+      // 1. Process MIDI Learn if active
+      if (gPerfMidiLearnIdx >= 0)
+      {
+         if (!Platform::MidiIsRunning())
+         {
+            std::string err;
+            Platform::MidiStart(err);
+         }
+         Platform::MidiCCValue last;
+         if (Platform::MidiPollLastTouched(last))
+         {
+            if (gPerfMidiLearnIdx < (int)gPerfElements.size())
+            {
+               PushUndoCheckpoint();
+               auto& elem = gPerfElements[gPerfMidiLearnIdx];
+               if (gPerfMidiLearnAxis == 1)
+               {
+                  elem.midiDeviceY = (int)last.device;
+                  elem.midiChannelY = last.channel;
+                  elem.midiControllerY = last.controller;
+                  elem.midiIsNoteY = last.isNote;
+               }
+               else
+               {
+                  elem.midiDevice = (int)last.device;
+                  elem.midiChannel = last.channel;
+                  elem.midiController = last.controller;
+                  elem.midiIsNote = last.isNote;
+               }
+               gPerfMidiRuntimeStates[gPerfMidiLearnIdx] = PerfMidiRuntimeState{};
+            }
+            gPerfMidiLearnIdx = -1;
+         }
+      }
+
+      // 2. Process all MIDI-bound elements
+      for (size_t i = 0; i < gPerfElements.size(); i++)
+      {
+         auto& elem = gPerfElements[i];
+         if (elem.midiDevice == 0 && elem.midiDeviceY == 0)
+            continue;
+
+         if (!Platform::MidiIsRunning())
+         {
+            std::string err;
+            Platform::MidiStart(err);
+         }
+
+         PerfMidiRuntimeState& st = gPerfMidiRuntimeStates[i];
+
+         // Handle primary / X axis
+         if (elem.midiDevice != 0)
+         {
+            if (elem.kind == 3) // Toggle
+            {
+               if (elem.midiIsNote)
+               {
+                  unsigned int hitSeq = Platform::MidiNoteHitCount(elem.midiDevice, elem.midiChannel, elem.midiController);
+                  if (st.lastHitSeq == 0) st.lastHitSeq = hitSeq;
+                  if (hitSeq > st.lastHitSeq)
+                  {
+                     st.lastHitSeq = hitSeq;
+                     bool curVal = elem.value > 0.5f;
+                     bool newVal = !curVal;
+                     elem.value = newVal ? 1.0f : 0.0f;
+                     if (elem.dstIndex >= 0 && !elem.boolName.empty())
+                     {
+                        if (GraphNode* gn = FindNodeByIndex(elem.dstIndex))
+                           WriteNodeBool(gn, elem.boolName, newVal, elem.dstParam);
+                     }
+                     else if (elem.dstIndex >= 0 && elem.dstParam >= 0)
+                        gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = elem.value;
+                     for (const auto& t : elem.targets)
+                     {
+                        if (t.dstIndex >= 0 && !t.boolName.empty())
+                        {
+                           if (GraphNode* gn = FindNodeByIndex(t.dstIndex))
+                              WriteNodeBool(gn, t.boolName, newVal, t.dstParam);
+                        }
+                        else if (t.dstIndex >= 0 && t.dstParam >= 0)
+                           gPerfPendingWrites[{t.dstIndex, t.dstParam}] = elem.value;
+                     }
+                  }
+               }
+               else // CC
+               {
+                  float rawVal = 0.0f;
+                  if (Platform::MidiRead(elem.midiDevice, elem.midiChannel, elem.midiController, false, rawVal))
+                  {
+                     if (st.lastVal < 0.0f || std::abs(rawVal - st.lastVal) > 0.001f)
+                     {
+                        st.lastVal = rawVal;
+                        bool newVal = rawVal > 0.5f;
+                        elem.value = newVal ? 1.0f : 0.0f;
+                        if (elem.dstIndex >= 0 && !elem.boolName.empty())
+                        {
+                           if (GraphNode* gn = FindNodeByIndex(elem.dstIndex))
+                              WriteNodeBool(gn, elem.boolName, newVal, elem.dstParam);
+                        }
+                        else if (elem.dstIndex >= 0 && elem.dstParam >= 0)
+                           gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = elem.value;
+                        for (const auto& t : elem.targets)
+                        {
+                           if (t.dstIndex >= 0 && !t.boolName.empty())
+                           {
+                              if (GraphNode* gn = FindNodeByIndex(t.dstIndex))
+                                 WriteNodeBool(gn, t.boolName, newVal, t.dstParam);
+                           }
+                           else if (t.dstIndex >= 0 && t.dstParam >= 0)
+                              gPerfPendingWrites[{t.dstIndex, t.dstParam}] = elem.value;
+                        }
+                     }
+                  }
+               }
+            }
+            else if (elem.kind == 5) // Momentary Trigger / Bang
+            {
+               auto stepSpan = [&](int dstIndex, int dstParam, const std::string& boolName) -> int {
+                  if (dstIndex < 0) return 0;
+                  if (!boolName.empty()) return 1;
+                  if (dstParam < 0) return 0;
+                  const ParamRef* kp = Modulation::Instance().KnownParam(dstIndex, dstParam);
+                  if (kp == nullptr) return 0;
+                  const int span = (int)std::lround(kp->maxValue - kp->minValue);
+                  if (kp->isBool || (kp->step == 1.0f && span == 1)) return 1;
+                  if (kp->isEnum) return span >= 1 ? span : 0;
+                  return (kp->step == 1.0f && span >= 2) ? span : 0;
+               };
+               auto advance = [&](int dstIndex, int dstParam, const std::string& boolName) {
+                  if (!boolName.empty())
+                  {
+                     if (GraphNode* gn = FindNodeByIndex(dstIndex))
+                     {
+                        bool curB = ReadNodeBool(gn, boolName, dstParam);
+                        WriteNodeBool(gn, boolName, !curB, dstParam);
+                     }
+                     return;
+                  }
+                  float cur = 0.0f;
+                  const ParamRef* pKp = Modulation::Instance().KnownParam(dstIndex, dstParam);
+                  if (!pKp) return;
+                  for (const ParamRef& ref : Modulation::Instance().FrameParams())
+                     if (ref.nodeIndex == dstIndex && ref.paramIndex == dstParam && ref.value) { cur = *ref.value; break; }
+                  const int span = (int)std::lround(pKp->maxValue - pKp->minValue);
+                  if (span < 1) return;
+                  const int idx = std::clamp((int)std::lround(cur - pKp->minValue), 0, span);
+                  gPerfPendingWrites[{ dstIndex, dstParam }] = pKp->minValue + (float)((idx + 1) % (span + 1));
+               };
+
+               const bool stepping = stepSpan(elem.dstIndex, elem.dstParam, elem.boolName) > 0;
+               if (elem.midiIsNote)
+               {
+                  float rawVal = 0.0f;
+                  Platform::MidiRead(elem.midiDevice, elem.midiChannel, elem.midiController, true, rawVal);
+                  unsigned int hitSeq = Platform::MidiNoteHitCount(elem.midiDevice, elem.midiChannel, elem.midiController);
+                  bool newHit = false;
+                  if (st.lastHitSeq == 0) st.lastHitSeq = hitSeq;
+                  if (hitSeq > st.lastHitSeq)
+                  {
+                     st.lastHitSeq = hitSeq;
+                     newHit = true;
+                  }
+                  if (newHit || rawVal > 0.0f)
+                  {
+                     elem.value = 1.0f;
+                     gPerfBangFlash[i] = 1.0f;
+                     if (newHit)
+                     {
+                        if (stepping)
+                        {
+                           advance(elem.dstIndex, elem.dstParam, elem.boolName);
+                           for (const auto& t : elem.targets)
+                              if (t.dstIndex >= 0 && stepSpan(t.dstIndex, t.dstParam, t.boolName) > 0)
+                                 advance(t.dstIndex, t.dstParam, t.boolName);
+                              else if (t.dstIndex >= 0 && t.dstParam >= 0)
+                                 gPerfPendingWrites[{ t.dstIndex, t.dstParam }] = 1.0f;
+                        }
+                        else
+                        {
+                           if (elem.dstIndex >= 0 && !elem.boolName.empty()) { if (GraphNode* gn = FindNodeByIndex(elem.dstIndex)) WriteNodeBool(gn, elem.boolName, true, elem.dstParam); }
+                           else if (elem.dstIndex >= 0 && elem.dstParam >= 0) gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = 1.0f;
+                           for (const auto& t : elem.targets) { if (t.dstIndex >= 0 && !t.boolName.empty()) { if (GraphNode* gn = FindNodeByIndex(t.dstIndex)) WriteNodeBool(gn, t.boolName, true, t.dstParam); } else if (t.dstIndex >= 0 && t.dstParam >= 0) gPerfPendingWrites[{t.dstIndex, t.dstParam}] = 1.0f; }
+                        }
+                     }
+                  }
+                  else if (!stepping && elem.value > 0.0f)
+                  {
+                     elem.value = 0.0f;
+                     if (elem.dstIndex >= 0 && !elem.boolName.empty()) { if (GraphNode* gn = FindNodeByIndex(elem.dstIndex)) WriteNodeBool(gn, elem.boolName, false, elem.dstParam); }
+                     else if (elem.dstIndex >= 0 && elem.dstParam >= 0) gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = 0.0f;
+                     for (const auto& t : elem.targets) { if (t.dstIndex >= 0 && !t.boolName.empty()) { if (GraphNode* gn = FindNodeByIndex(t.dstIndex)) WriteNodeBool(gn, t.boolName, false, t.dstParam); } else if (t.dstIndex >= 0 && t.dstParam >= 0) gPerfPendingWrites[{t.dstIndex, t.dstParam}] = 0.0f; }
+                  }
+               }
+               else // CC
+               {
+                  float rawVal = 0.0f;
+                  if (Platform::MidiRead(elem.midiDevice, elem.midiChannel, elem.midiController, false, rawVal))
+                  {
+                     if (st.lastVal < 0.0f || std::abs(rawVal - st.lastVal) > 0.001f)
+                     {
+                        bool wasOn = st.lastVal > 0.5f;
+                        bool isOn = rawVal > 0.5f;
+                        st.lastVal = rawVal;
+                        if (isOn && !wasOn)
+                        {
+                           elem.value = 1.0f;
+                           gPerfBangFlash[i] = 1.0f;
+                           if (stepping)
+                           {
+                              advance(elem.dstIndex, elem.dstParam, elem.boolName);
+                              for (const auto& t : elem.targets)
+                                 if (t.dstIndex >= 0 && stepSpan(t.dstIndex, t.dstParam, t.boolName) > 0)
+                                    advance(t.dstIndex, t.dstParam, t.boolName);
+                                 else if (t.dstIndex >= 0 && t.dstParam >= 0)
+                                    gPerfPendingWrites[{ t.dstIndex, t.dstParam }] = 1.0f;
+                           }
+                           else
+                           {
+                              if (elem.dstIndex >= 0 && !elem.boolName.empty()) { if (GraphNode* gn = FindNodeByIndex(elem.dstIndex)) WriteNodeBool(gn, elem.boolName, true, elem.dstParam); }
+                              else if (elem.dstIndex >= 0 && elem.dstParam >= 0) gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = 1.0f;
+                              for (const auto& t : elem.targets) { if (t.dstIndex >= 0 && !t.boolName.empty()) { if (GraphNode* gn = FindNodeByIndex(t.dstIndex)) WriteNodeBool(gn, t.boolName, true, t.dstParam); } else if (t.dstIndex >= 0 && t.dstParam >= 0) gPerfPendingWrites[{t.dstIndex, t.dstParam}] = 1.0f; }
+                           }
+                        }
+                        else if (!isOn && wasOn && !stepping)
+                        {
+                           elem.value = 0.0f;
+                           if (elem.dstIndex >= 0 && !elem.boolName.empty()) { if (GraphNode* gn = FindNodeByIndex(elem.dstIndex)) WriteNodeBool(gn, elem.boolName, false, elem.dstParam); }
+                           else if (elem.dstIndex >= 0 && elem.dstParam >= 0) gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = 0.0f;
+                           for (const auto& t : elem.targets) { if (t.dstIndex >= 0 && !t.boolName.empty()) { if (GraphNode* gn = FindNodeByIndex(t.dstIndex)) WriteNodeBool(gn, t.boolName, false, t.dstParam); } else if (t.dstIndex >= 0 && t.dstParam >= 0) gPerfPendingWrites[{t.dstIndex, t.dstParam}] = 0.0f; }
+                        }
+                     }
+                  }
+               }
+            }
+            else if (elem.kind == 8) // Bipolar Knob
+            {
+               float rawVal = 0.0f;
+               if (Platform::MidiRead(elem.midiDevice, elem.midiChannel, elem.midiController, elem.midiIsNote, rawVal))
+               {
+                  if (st.lastVal < 0.0f || std::abs(rawVal - st.lastVal) > 0.001f)
+                  {
+                     st.lastVal = rawVal;
+                     const ParamRef* pKp = (elem.dstIndex >= 0 && elem.dstParam >= 0) ? Modulation::Instance().KnownParam(elem.dstIndex, elem.dstParam) : nullptr;
+                     float minV = pKp ? pKp->minValue : -1.0f, maxV = pKp ? pKp->maxValue : 1.0f;
+                     if (minV >= maxV) { minV = -1.0f; maxV = 1.0f; }
+                     float midV = (minV + maxV) * 0.5f;
+                     float halfSpan = (maxV - minV) * 0.5f;
+                     float bipVal = -1.0f + 2.0f * rawVal;
+                     elem.value = bipVal;
+                     float actualVal = midV + bipVal * halfSpan;
+                     if (pKp && pKp->step == 1.0f) actualVal = std::round(actualVal);
+                     if (elem.dstIndex >= 0 && elem.dstParam >= 0) gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = actualVal;
+                     for (const auto& t : elem.targets) if (t.dstIndex >= 0 && t.dstParam >= 0) gPerfPendingWrites[{t.dstIndex, t.dstParam}] = actualVal;
+                  }
+               }
+            }
+            else if (elem.kind == 7) // Radio Selector
+            {
+               const ParamRef* pKp = (elem.dstIndex >= 0 && elem.dstParam >= 0) ? Modulation::Instance().KnownParam(elem.dstIndex, elem.dstParam) : nullptr;
+               float minV = pKp ? pKp->minValue : 0.0f, maxV = pKp ? pKp->maxValue : 1.0f;
+               if (minV >= maxV) { minV = 0.0f; maxV = 1.0f; }
+               int count = 8;
+               bool isDiscreteEnum = pKp && (pKp->isEnum || (pKp->step == 1.0f && (maxV - minV) <= 16.0f && (maxV - minV) >= 1.0f));
+               if (isDiscreteEnum) count = std::clamp((int)(maxV - minV + 1.0f), 2, 8);
+
+               if (elem.midiIsNote)
+               {
+                  unsigned int hitSeq = Platform::MidiNoteHitCount(elem.midiDevice, elem.midiChannel, elem.midiController);
+                  if (st.lastHitSeq == 0) st.lastHitSeq = hitSeq;
+                  if (hitSeq > st.lastHitSeq)
+                  {
+                     st.lastHitSeq = hitSeq;
+                     int curIndex = 0;
+                     if (isDiscreteEnum)
+                        curIndex = std::clamp((int)std::round(elem.value - minV), 0, count - 1);
+                     else
+                        curIndex = std::clamp((int)std::round((elem.value - minV) / (maxV - minV) * (float)(count - 1)), 0, count - 1);
+                     int nextIndex = (curIndex + 1) % count;
+                     float newVal = isDiscreteEnum ? (minV + (float)nextIndex) : (minV + (maxV - minV) * ((float)nextIndex / (float)(count - 1)));
+                     elem.value = newVal;
+                     if (elem.dstIndex >= 0 && elem.dstParam >= 0) gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = newVal;
+                     for (const auto& t : elem.targets) if (t.dstIndex >= 0 && t.dstParam >= 0) gPerfPendingWrites[{t.dstIndex, t.dstParam}] = newVal;
+                  }
+               }
+               else // CC
+               {
+                  float rawVal = 0.0f;
+                  if (Platform::MidiRead(elem.midiDevice, elem.midiChannel, elem.midiController, false, rawVal))
+                  {
+                     if (st.lastVal < 0.0f || std::abs(rawVal - st.lastVal) > 0.001f)
+                     {
+                        st.lastVal = rawVal;
+                        int b = std::clamp((int)std::floor(rawVal * (float)count), 0, count - 1);
+                        float newVal = isDiscreteEnum ? (minV + (float)b) : (minV + (maxV - minV) * ((float)b / (float)(count - 1)));
+                        elem.value = newVal;
+                        if (elem.dstIndex >= 0 && elem.dstParam >= 0) gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = newVal;
+                        for (const auto& t : elem.targets) if (t.dstIndex >= 0 && t.dstParam >= 0) gPerfPendingWrites[{t.dstIndex, t.dstParam}] = newVal;
+                     }
+                  }
+               }
+            }
+            else // Knob (0), VFader (1), HSlider (2), XY Pad X (4), NumBox (6), Step Gate (9)
+            {
+               float rawVal = 0.0f;
+               if (Platform::MidiRead(elem.midiDevice, elem.midiChannel, elem.midiController, elem.midiIsNote, rawVal))
+               {
+                  if (st.lastVal < 0.0f || std::abs(rawVal - st.lastVal) > 0.001f)
+                  {
+                     st.lastVal = rawVal;
+                     const ParamRef* pKp = (elem.dstIndex >= 0 && elem.dstParam >= 0) ? Modulation::Instance().KnownParam(elem.dstIndex, elem.dstParam) : nullptr;
+                     float minV = pKp ? pKp->minValue : 0.0f, maxV = pKp ? pKp->maxValue : 1.0f;
+                     if (minV >= maxV) { minV = 0.0f; maxV = 1.0f; }
+                     float newV = minV + (maxV - minV) * rawVal;
+                     if (pKp && pKp->step > 0.0f)
+                        newV = std::round((newV - minV) / pKp->step) * pKp->step + minV;
+                     elem.value = newV;
+                     if (elem.dstIndex >= 0 && elem.dstParam >= 0) gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = newV;
+                     for (const auto& t : elem.targets) if (t.dstIndex >= 0 && t.dstParam >= 0) gPerfPendingWrites[{t.dstIndex, t.dstParam}] = newV;
+                  }
+               }
+            }
+         }
+
+         // Handle XY Pad Y axis
+         if (elem.kind == 4 && elem.midiDeviceY != 0)
+         {
+            float rawValY = 0.0f;
+            if (Platform::MidiRead(elem.midiDeviceY, elem.midiChannelY, elem.midiControllerY, elem.midiIsNoteY, rawValY))
+            {
+               if (st.lastValY < 0.0f || std::abs(rawValY - st.lastValY) > 0.001f)
+               {
+                  st.lastValY = rawValY;
+                  int p2 = elem.dstParam2 >= 0 ? elem.dstParam2 : (elem.dstParam >= 0 ? elem.dstParam + 1 : -1);
+                  const ParamRef* pKpY = (elem.dstIndex >= 0 && p2 >= 0) ? Modulation::Instance().KnownParam(elem.dstIndex, p2) : nullptr;
+                  float minY = pKpY ? pKpY->minValue : 0.0f, maxY = pKpY ? pKpY->maxValue : 1.0f;
+                  if (minY >= maxY) { minY = 0.0f; maxY = 1.0f; }
+                  float newY = minY + (maxY - minY) * rawValY;
+                  if (pKpY && pKpY->step > 0.0f)
+                     newY = std::round((newY - minY) / pKpY->step) * pKpY->step + minY;
+                  elem.value2 = newY;
+                  if (elem.dstIndex >= 0 && p2 >= 0) gPerfPendingWrites[{elem.dstIndex, p2}] = newY;
+                  for (const auto& t : elem.targetsY) if (t.dstIndex >= 0 && t.dstParam >= 0) gPerfPendingWrites[{t.dstIndex, t.dstParam}] = newY;
+               }
+            }
+         }
+      }
+   }
+
    void DrawPerfPanelContent()
    {
       if (gPerfLayout.pageCount < 1) gPerfLayout.pageCount = 1;
       if (gPerfLayout.cellSize < 40) gPerfLayout.cellSize = 76;
       while ((int)gPerfLayout.pageNames.size() < gPerfLayout.pageCount)
          gPerfLayout.pageNames.push_back("Page " + std::to_string((int)gPerfLayout.pageNames.size() + 1));
+
+      if (gPerfMidiLearnIdx >= 0 && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+         gPerfMidiLearnIdx = -1;
 
       // Parameter Picking Mode Alert Banner
       if (gPerfAssigningElemIdx >= 0 && gPerfAssigningElemIdx < (int)gPerfElements.size())
@@ -22144,6 +22614,23 @@ namespace
          ImGui::SameLine();
          if (ImGui::SmallButton("Cancel"))
             gPerfAssigningElemIdx = -1;
+         ImGui::PopStyleColor();
+      }
+
+      // MIDI Learn Alert Banner
+      if (gPerfMidiLearnIdx >= 0 && gPerfMidiLearnIdx < (int)gPerfElements.size())
+      {
+         ImGui::Spacing();
+         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 185, 45, 255));
+         const auto& elem = gPerfElements[gPerfMidiLearnIdx];
+         std::string axisStr = (gPerfMidiLearnAxis == 1) ? " (Y Axis)" : (elem.kind == 4 ? " (X Axis)" : "");
+         std::string prompt = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7)
+            ? "MIDI Learn for '" + elem.label + "'" + axisStr + ": Move any CC knob/fader or hit a pad on your MIDI controller (Esc to cancel)..."
+            : "MIDI CC Learn for '" + elem.label + "'" + axisStr + ": Move any CC knob, fader, or wheel on your MIDI controller (Esc to cancel)...";
+         ImGui::Text("%s", prompt.c_str());
+         ImGui::SameLine();
+         if (ImGui::SmallButton("Cancel##cancelmidilearn"))
+            gPerfMidiLearnIdx = -1;
          ImGui::PopStyleColor();
       }
 
@@ -35063,6 +35550,14 @@ static bool RunPerfPanelSelfTest()
    multiRec.targets.push_back({ 10, 2, "" });
    multiRec.targetsY.push_back({ 10, 1, "" });
    multiRec.targetsY.push_back({ 10, 3, "" });
+   multiRec.midiDevice = 1;
+   multiRec.midiChannel = 2;
+   multiRec.midiController = 21;
+   multiRec.midiIsNote = false;
+   multiRec.midiDeviceY = 1;
+   multiRec.midiChannelY = 2;
+   multiRec.midiControllerY = 22;
+   multiRec.midiIsNoteY = false;
    multiRec.label = "DualXY";
    pData.performance.push_back(multiRec);
 
@@ -35074,11 +35569,14 @@ static bool RunPerfPanelSelfTest()
       if (Patch::Read(testPath, readData, readErr))
       {
          if (readData.performance.empty() || readData.performance[0].targets.size() != 2 ||
-             readData.performance[0].targetsY.size() != 2)
+             readData.performance[0].targetsY.size() != 2 ||
+             readData.performance[0].midiDevice != 1 || readData.performance[0].midiChannel != 2 ||
+             readData.performance[0].midiController != 21 || readData.performance[0].midiControllerY != 22)
          {
-            printf("[PERF MATRIX TEST FAIL] Multi-target read mismatch: targets=%zu targetsY=%zu\n",
+            printf("[PERF MATRIX TEST FAIL] Multi-target/MIDI read mismatch: targets=%zu targetsY=%zu midiDev=%d\n",
                    readData.performance.empty() ? 0 : readData.performance[0].targets.size(),
-                   readData.performance.empty() ? 0 : readData.performance[0].targetsY.size());
+                   readData.performance.empty() ? 0 : readData.performance[0].targetsY.size(),
+                   readData.performance.empty() ? 0 : readData.performance[0].midiDevice);
             std::filesystem::remove(testPath);
             return false;
          }
@@ -35226,6 +35724,8 @@ static bool RunPerfPanelSelfTest()
 
 void ApplyModulationAndPalette(int frameId)
 {
+   UpdatePerformanceMatrixMIDI();
+
    Modulation& modulation = Modulation::Instance();
    // Apply deferred writes from the performance matrix before snapshot and modulators
    for (const ParamRef& ref : modulation.FrameParams())
