@@ -6416,6 +6416,7 @@ namespace
 
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       ImGui::TextDisabled("%s", n->Status().c_str());
+      ImGui::TextDisabled("engine: %s", Platform::MattingBackend().c_str());
       ImGui::PopTextWrapPos();
 
       ModSlider("feather", &n->feather, 0.0f, 4.0f);
@@ -6427,7 +6428,7 @@ namespace
       ModCheckbox("auto refresh (video)", &n->autoRefresh);
       if (n->autoRefresh)
       {
-         ModSlider("every beats", &n->refreshBeats, 0.1f, 8.0f);
+         ModSlider("every N frames", &n->refreshFrames, 1.0f, 120.0f, "%.0f");
       }
    }
 

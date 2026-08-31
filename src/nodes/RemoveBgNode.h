@@ -54,7 +54,7 @@ public:
    float threshold = 0.5f;
    float contrast = 1.0f;
    bool autoRefresh = false;      // recompute periodically, for video
-   float refreshBeats = 1.0f;
+   float refreshFrames = 30.0f;   // recompute every N rendered frames (fps-based, not BPM)
    float bgColor[3] = { 0.0f, 0.0f, 0.0f };
    float bgOpacity = 0.0f;
 
@@ -63,7 +63,7 @@ public:
       v.Int("mode", mode); v.Int("outputMode", outputMode);
       v.Float("feather", feather); v.Float("threshold", threshold);
       v.Float("contrast", contrast);
-      v.Bool("autoRefresh", autoRefresh); v.Float("refreshBeats", refreshBeats);
+      v.Bool("autoRefresh", autoRefresh); v.Float("refreshFrames", refreshFrames);
       v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
    }
 
@@ -105,7 +105,7 @@ private:
    bool mShaderTried = false;
    bool mNeedsMask = false;
    int mLastCookFrame = -1;
-   double mLastMaskBeat = -1000.0;
+   int mLastMaskFrame = -1000000;
    std::string mStatus = "press Remove Background";
 
    // Cross-thread ownership: the main thread owns this node and every GL
