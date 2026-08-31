@@ -29521,6 +29521,185 @@ static bool RunResonatorFixture()
    return ok;
 }
 
+// ================================================= INFINITE_METALLICDECAYTEST
+// Regression fixture for bugfix/metallic-decay-time: the Metallic node's
+// `decay` knob (main.cpp, Physical Acoustics section, "%.2f s") did not
+// deliver the time it displayed - a hard pole ceiling capped every mode at
+// ~2.9s regardless of the knob, a second independent amp envelope shortened
+// the audible tail further, and the knob was silently rescaled per material.
+// Renders each of the 8 material presets at both 44.1kHz and 48kHz, at
+// decay knob values of 1s/4s/9s, and checks that the measured peak-to-(-60dB)
+// time on the summed output is within +/-20% of the knob, and that the voice
+// frees itself within 2x the knob value.
+static bool RunMetallicDecayFixture()
+{
+   using namespace MetallicDsp;
+   bool ok = true;
+
+   const double sampleRates[] = { 44100.0, 48000.0 };
+   const float decayValues[] = { 1.0f, 4.0f, 9.0f };
+
+   for (double sr : sampleRates)
+   {
+      for (int mat = 0; mat < (int)kNumMaterials; mat++)
+      {
+         for (float decayKnob : decayValues)
+         {
+            MetallicVoice voice;
+            voice.Trigger(60, 1.0f, 0, 220.0f, 1.0f, decayKnob, 0.5f, mat, 0.0f, sr);
+
+            // 1.2x the knob plus half a second of headroom is enough to hold
+            // both rate-measurement windows below, and to catch the 2x-knob
+            // free deadline within the same render.
+            const int totalSamples = (int)(decayKnob * 1.2 * sr) + (int)(0.5 * sr);
+            const int freeDeadline = (int)(decayKnob * 2.0 * sr);
+
+            std::vector<float> mono((size_t)totalSamples);
+            bool allFinite = true;
+            int freeAtSample = -1;
+
+            for (int i = 0; i < totalSamples; i++)
+            {
+               float outL = 0.0f, outR = 0.0f;
+               voice.Process(outL, outR);
+               if (!std::isfinite(outL) || !std::isfinite(outR))
+                  allFinite = false;
+               mono[(size_t)i] = 0.5f * (outL + outR);
+               if (freeAtSample < 0 && !voice.active)
+                  freeAtSample = i;
+            }
+
+            // Rate-extrapolated T60: a mallet strike's broadband click sums
+            // constructively across all 12 modes into a peak far louder
+            // than the settled ring, and the modes also beat against each
+            // other for the first stretch (non-monotonic local dB slope),
+            // so neither "time from peak" nor a naive two-point read is
+            // reliable - a linear regression of dB vs time over several
+            // points, taken after the beating settles and comfortably
+            // before the voice frees itself (energy runs out fastest on
+            // the shortest/brightest presets, well inside the 2x-knob
+            // deadline below), averages out the local wobble.
+            const int winSamples = std::max(64, (int)(0.02 * sr));
+            auto rmsAt = [&](int center) -> double {
+               int hi = std::min(totalSamples, center + winSamples / 2);
+               int lo = std::max(0, hi - winSamples);
+               double sumSq = 0.0;
+               for (int i = lo; i < hi; i++)
+                  sumSq += (double)mono[(size_t)i] * (double)mono[(size_t)i];
+               return sqrt(sumSq / std::max(1, hi - lo));
+            };
+
+            const double freeTimeSec = (freeAtSample >= 0) ? (freeAtSample / sr) : (decayKnob * 2.0);
+            const double regionStart = 0.30 * decayKnob;
+            const double regionEnd = std::max(regionStart + 0.05, std::min(0.75 * decayKnob, freeTimeSec * 0.85));
+
+            const int numPoints = 10;
+            double sumT = 0.0, sumDb = 0.0, sumTT = 0.0, sumTDb = 0.0;
+            int n = 0;
+            for (int p = 0; p < numPoints; p++)
+            {
+               const double t = regionStart + (regionEnd - regionStart) * ((double)p / (double)(numPoints - 1));
+               const int center = (int)(t * sr);
+               if (center < 0 || center >= totalSamples) continue;
+               const double rms = rmsAt(center);
+               if (rms <= 1e-9) continue;
+               const double db = 20.0 * log10(rms);
+               sumT += t; sumDb += db; sumTT += t * t; sumTDb += t * db;
+               n++;
+            }
+            // Least-squares slope (dB/sec) of the regression points, then
+            // extrapolate to the -60dB crossing to get T60.
+            const double denom = (double)n * sumTT - sumT * sumT;
+            const double slope = (n >= 2 && std::fabs(denom) > 1e-9)
+               ? ((double)n * sumTDb - sumT * sumDb) / denom
+               : 0.0;
+            const float measuredT60 = (slope < -0.01) ? (float)(-60.0 / slope) : 1e9f;
+
+            const float errFrac = std::fabs(measuredT60 - decayKnob) / decayKnob;
+            const bool freedInTime = freeAtSample >= 0 && freeAtSample <= freeDeadline;
+            const bool caseOk = allFinite && errFrac <= 0.20f && freedInTime;
+
+            if (!caseOk)
+            {
+               printf("METALLICDECAYTEST %s @ %.0fHz decay=%.1fs -> measured T60=%.2fs (err %.1f%%) "
+                      "finite=%d freedInTime=%d FAIL\n",
+                      MaterialName(mat), sr, decayKnob, measuredT60,
+                      errFrac * 100.0f, (int)allFinite, (int)freedInTime);
+               ok = false;
+            }
+            else
+            {
+               printf("METALLICDECAYTEST %s @ %.0fHz decay=%.1fs -> measured T60=%.2fs (err %.1f%%) OK\n",
+                      MaterialName(mat), sr, decayKnob, measuredT60, errFrac * 100.0f);
+            }
+         }
+      }
+   }
+
+   // Note-off should not collapse a long decay to a fixed short tail: with
+   // the decay knob at 9s, release the voice immediately after the strike
+   // and confirm the release-phase T60 still tracks the knob rather than the
+   // old fixed 0.4s (releaseSec = max(0.4, effectiveDecay), MetallicNode.cpp).
+   {
+      const double sr = 44100.0;
+      const float decayKnob = 9.0f;
+      MetallicVoice voice;
+      voice.Trigger(60, 1.0f, 0, 220.0f, 1.0f, decayKnob, 0.5f, kSteel, 0.0f, sr);
+      voice.Release(sr, std::max(0.4f, decayKnob));
+
+      const int totalSamples = (int)(decayKnob * 0.7 * sr);
+      std::vector<float> mono((size_t)totalSamples);
+      int freeAtSample = -1;
+      for (int i = 0; i < totalSamples; i++)
+      {
+         float outL = 0.0f, outR = 0.0f;
+         voice.Process(outL, outR);
+         mono[(size_t)i] = 0.5f * (outL + outR);
+         if (freeAtSample < 0 && !voice.active)
+            freeAtSample = i;
+      }
+
+      const int winSamples = std::max(64, (int)(0.02 * sr));
+      auto rmsAt = [&](int center) -> double {
+         int hi = std::min(totalSamples, center + winSamples / 2);
+         int lo = std::max(0, hi - winSamples);
+         double sumSq = 0.0;
+         for (int i = lo; i < hi; i++)
+            sumSq += (double)mono[(size_t)i] * (double)mono[(size_t)i];
+         return sqrt(sumSq / std::max(1, hi - lo));
+      };
+      const double freeTimeSec = (freeAtSample >= 0) ? (freeAtSample / sr) : (decayKnob * 0.7);
+      const int t0samp = (int)(0.25 * decayKnob * sr);
+      const int t1samp = (int)(std::min(0.6 * decayKnob, freeTimeSec * 0.85) * sr);
+      const double rms0 = rmsAt(t0samp);
+      const double rms1 = rmsAt(t1samp);
+      const double dbDrop = 20.0 * log10((rms1 + 1e-12) / (rms0 + 1e-12));
+      const double dt = (double)(t1samp - t0samp) / sr;
+      const float measuredT60 = (dbDrop < -0.01) ? (float)(-60.0 * dt / dbDrop) : 1e9f;
+
+      // The old behaviour hard-capped the released tail at ~0.3s regardless
+      // of the knob. releaseSec == effectiveDecay reuses ComputeAmpDecay()'s
+      // safety-net envelope, which contributes only a little extra loss on
+      // top of the modal decay - require the released tail to stay well
+      // above the old fixed cutoff and reasonably close to the knob.
+      const bool releaseOk = measuredT60 >= decayKnob * 0.7f;
+      if (!releaseOk)
+      {
+         printf("METALLICDECAYTEST note-off tail: decay=%.1fs released T60=%.2fs (want >= %.2fs) FAIL\n",
+                decayKnob, measuredT60, decayKnob * 0.7f);
+         ok = false;
+      }
+      else
+      {
+         printf("METALLICDECAYTEST note-off tail: decay=%.1fs released T60=%.2fs OK\n",
+                decayKnob, measuredT60);
+      }
+   }
+
+   printf("%s\n", ok ? "METALLICDECAYTEST OK" : "METALLICDECAYTEST FAIL");
+   return ok;
+}
+
 // ================================================= INFINITE_CYCLESHAPERTEST
 static bool RunCycleShaperFixture()
 {
@@ -35972,6 +36151,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_RESONATORTEST") != nullptr)
       return RunResonatorFixture() ? 0 : 1;
+
+   if (getenv("INFINITE_METALLICDECAYTEST") != nullptr)
+      return RunMetallicDecayFixture() ? 0 : 1;
 
    if (getenv("INFINITE_CYCLESHAPERTEST") != nullptr)
       return RunCycleShaperFixture() ? 0 : 1;

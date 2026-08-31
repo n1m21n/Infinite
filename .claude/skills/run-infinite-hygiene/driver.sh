@@ -99,6 +99,7 @@ GROUP_AUDIO=(
   "AUDIOPDCTEST:1"
   "RECSYNCTEST:1"
   "RECEXPORTTEST:1"
+  "METALLICDECAYTEST:1"
 )
 
 GROUP_3D=(
@@ -234,6 +235,7 @@ FULL_TESTS=(
   "AUTOSAVEMARKERTEST:1"
   "REMOVEBGTEST:1"
   "CURVESLUTTEST:10"
+  "METALLICDECAYTEST:1"
 )
 
 # Helper to add checks uniquely to an array
@@ -241,7 +243,7 @@ declare -a SELECTED_TESTS=()
 add_checks() {
   for item in "$@"; do
     local exists=0
-    for existing in "${SELECTED_TESTS[@]}"; do
+    for existing in "${SELECTED_TESTS[@]:-}"; do
       if [[ "$existing" == "$item" ]]; then
         exists=1; break
       fi
