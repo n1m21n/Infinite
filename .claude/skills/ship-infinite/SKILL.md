@@ -1,6 +1,6 @@
 ---
 name: ship-infinite
-description: Verify, review, commit, and push uncommitted Infinite changes, build the distributable macOS DMG, pull the CI-built Windows x64/ARM64 zips, and publish all of it via the GitHub Pages website (n1m21n.github.io/Infinite) and the latest GitHub Release — plus flag node-catalog changes that need the Node Reference Manual updated, and clean up junk/duplicate tracked files. Use when asked to "ship this", "release Infinite", "cut a release", "build and publish the DMG", "push and deploy", or "clean up the repo before release".
+description: Verify, review, commit, and push uncommitted Infinite changes, cut a versioned GitHub Release tag with curated "What's new" notes, build the distributable macOS DMG, pull the CI-built Windows x64/ARM64 zips, and publish all of it via the GitHub Pages website (n1m21n.github.io/Infinite) and that Release — plus flag node-catalog changes that need the Node Reference Manual updated, and clean up junk/duplicate tracked files. Use when asked to "ship this", "release Infinite", "cut a release", "build and publish the DMG", "push and deploy", or "clean up the repo before release".
 ---
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`), not
@@ -19,6 +19,9 @@ in order:
 .claude/skills/ship-infinite/driver.sh commit "<message>"   # git add -A && commit
 .claude/skills/ship-infinite/driver.sh push                 # git push
 .claude/skills/ship-infinite/driver.sh nodediff <base-ref>   # e.g. origin/main~1 — reports node-table changes
+# bump INFINITE_VERSION/INFINITE_VERSION_RC in CMakeLists.txt, commit, push (see gotchas)
+.claude/skills/ship-infinite/driver.sh whatsnew v0.2.7      # candidate release-notes bullets — curate by hand
+gh release create v0.2.7 --title v0.2.7 --notes-file notes.md --target main
 .claude/skills/ship-infinite/driver.sh release               # DMG (package.sh) + Windows zips (from CI) + Release upload
 # then commit + push again so the new DMG (and any doc/cleanup changes) deploy:
 .claude/skills/ship-infinite/driver.sh commit "Release: rebuild DMG"
@@ -74,21 +77,30 @@ nodes are expected to follow — see the `new-audio-node`/`new-effect-node`/
 `new-geometry-node` skills). A node type registered without a matching
 help-text entry won't be flagged by name, only by its `REGISTER_NODE` line.
 
-## One release, not one per version
+## One release per version
 
-This project keeps exactly **one** downloadable GitHub Release (whichever
-one GitHub marks "latest") — `release` never runs `gh release create`, it
-always uploads onto the existing latest release with `--clobber`. Older
-tagged releases (e.g. `v0.1`) predate this policy and are left alone as
-history, but new versions do not get their own tag/release; only the
-current DMG/zips are ever downloadable from the Releases page. If you
-genuinely want a new versioned release (a real major-version cut, not a
-routine rebuild), that's a deliberate `gh release create` run by hand —
-outside this skill.
+Every shipped version gets its own GitHub Release tag (`v0.2.6`, `v0.2.7`,
+...) — `release` uploads onto whichever tag GitHub currently marks
+"latest", so **cut the tag first**, by hand, before running `release`:
 
-Since assets are clobbered onto the same tag, the tag's release notes are
-the only place version history can live — see
-[Changelog](#changelog) below for how that's kept.
+```bash
+.claude/skills/ship-infinite/driver.sh whatsnew v0.2.7   # prints candidate bullets, see below
+# curate the bullets, then:
+gh release create v0.2.7 --title v0.2.7 --notes-file notes.md --target main
+.claude/skills/ship-infinite/driver.sh release             # DMG + Windows zips upload onto that tag
+```
+
+Bump `INFINITE_VERSION`/`INFINITE_VERSION_RC` in `CMakeLists.txt` and
+commit that *before* `gh release create` — see the version-check gotcha
+below. `release`'s DMG/Windows-zip uploads use `--clobber`, so re-running
+`release` (e.g. after Windows CI finishes) safely re-uploads onto the same
+tag without creating a duplicate.
+
+Older tags predate this policy and are left alone as history (`v0.1` was
+never re-cut, and `v0.2.1`–`v0.2.6` briefly shared one clobbered "latest"
+release before this policy). Going forward, every version is its own tag
+with its own notes page — see [What's new](#whats-new) below for the
+release-notes format.
 
 ## Release (DMG)
 
@@ -133,43 +145,55 @@ the x64 artifact present) all just print a warning and return — they never
 fail the overall `release` step, since the DMG and website deploy already
 went through by the time this runs.
 
-## Changelog
+## What's new
 
-Runs automatically as the last step of `release`, right after the Windows
-upload. Since this project only ever has one downloadable release (see
-above), the release notes are where version history has to accumulate —
-so this appends a dated, auto-generated entry rather than overwriting the
-hand-written description at the top of the notes:
+**Standard release-notes format**, effective v0.2.7: a single flat section,
+no dates, one bullet per user-facing change —
 
 ```
-## Changelog
+## What's new in v0.2.7
 
-### 2026-08-24
-- Add in-app update checker for macOS and Windows
-- Remove Group from the palette, disable resizing, drag from anywhere
+- Add a unified Settings panel (Cmd+0) with Appearance, Canvas & Workspace, ...
+- Fix cross-voice glide/portamento retriggering across Oscillator, Wavetable, ...
+- ...
 ```
 
-New entries are inserted newest-first, right under the `## Changelog`
-heading (created on first run if it doesn't exist yet). The commit list
-comes from `git log --no-merges <last-shipped-sha>..HEAD`, with commits
-whose subject starts with `Release: ` filtered out (those are DMG-rebuild
-mechanics, not user-facing changes).
+No `## Changelog` section, no `### YYYY-MM-DD` sub-headings, no
+accumulating history in one release's body — each version is its own tag
+(see [One release per version](#one-release-per-version) above), so each
+tag's notes only need to cover that version.
 
-"Last shipped" is tracked in a committed marker file,
-`.claude/skills/ship-infinite/last-release-sha.txt` — not the release's
-git tag, because the tag's commit never moves (assets are clobbered onto
-it without retagging), so the tag alone can't tell you what's new since
-last time. The marker file updates every `release` run and needs to be
-committed and pushed like any other change — it's part of what the
-follow-up `commit`/`push` after `release` should include. The very first
-time this runs (no marker file yet) it just records the current commit as
-a baseline and logs nothing, since there's no prior release to diff
-against.
-
-Can also be run standalone:
+`whatsnew` prints candidate bullets to stdout — it never writes to a
+release. It diffs the given tag against the most recent tag reachable from
+`HEAD` (or all of `HEAD`'s history if there is no previous tag), lists
+`git log --no-merges` commit subjects, and filters out `Release: ` and
+`Bump version to ` commits (mechanics, not user-facing):
 
 ```bash
-.claude/skills/ship-infinite/driver.sh changelog <tag>   # e.g. v0.2-preview
+.claude/skills/ship-infinite/driver.sh whatsnew v0.2.7
+```
+
+Curate the output before publishing — this is a human/Claude judgment call
+like `review` and `nodediff`, not something to publish verbatim:
+
+- Merge near-duplicate commits (an early fix and its same-day refinement
+  are usually one bullet, not two — e.g. two commits fixing the same glide
+  bug became one bullet for v0.2.7).
+- Drop internal/dev-tooling commits (a new Claude Code skill, CI config) —
+  they're real commits but not something a user of the app cares about.
+- Check large "save progress"-style commits by hand: `git show --stat` can
+  reveal a real fix or feature bundled into an otherwise-mechanical commit
+  message (this happened for v0.2.7 — a Distribute Points on Faces cache
+  bug fix was buried inside a commit titled "Save progress on core
+  codebase, nodes, and documentation").
+- Verify technical claims against the actual diff before publishing — see
+  the `release-notes-audit` skill.
+
+Then write the curated list to a file and publish/update the release:
+
+```bash
+gh release create v0.2.7 --title v0.2.7 --notes-file notes.md --target main   # new tag
+gh release edit v0.2.7 --notes-file notes.md                                   # revise an existing tag's notes
 ```
 
 ## Cleanup

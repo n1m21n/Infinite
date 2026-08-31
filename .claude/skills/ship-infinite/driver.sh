@@ -127,84 +127,57 @@ step_release() {
     echo "    uploaded website/assets/Infinite.dmg onto release $tag"
 
     step_release_windows "$tag"
-    step_changelog "$tag"
 }
 
-# -------------------------------------------------------------- changelog ---
-# This project keeps exactly ONE downloadable release (whatever GitHub marks
-# "latest") — asset uploads above always --clobber onto it rather than
-# tagging a new release per version. So the version history has to live in
-# that release's notes instead of in a list of separate releases. This
-# appends a dated "## Changelog" entry summarizing commits since the last
-# time this ran, rather than replacing the hand-written description above
-# the Downloads table.
+# -------------------------------------------------------------- whatsnew ---
+# Standard format: this project now cuts one GitHub Release tag per version
+# (v0.2.6, v0.2.7, ...) instead of clobbering assets onto a single perpetual
+# "latest" release. Since each version gets its own tag/notes page, there is
+# no cross-version accumulation to track and no dates needed in the notes —
+# each release's body is just:
 #
-# "Since last time" is tracked via a committed marker file (SHA_FILE) rather
-# than the release's git tag, because the tag's commit never moves (assets
-# are clobbered onto the same tag without retagging) — the tag alone can't
-# tell you what's new.
-step_changelog() {
-    local tag="${1:?tag required}"
-    echo "==> release: updating changelog on release $tag"
+#   ## What's new in <tag>
+#
+#   - <one bullet per user-facing change>
+#   - ...
+#
+# This prints CANDIDATE bullets (raw commit subjects since the previous tag,
+# with mechanical commits like version bumps and "Release: " DMG rebuilds
+# filtered out) to stdout — it does NOT write them to the release. Curate by
+# hand before publishing: merge near-duplicate commits (an early fix and its
+# later refinement are often one user-facing bullet), drop internal/skill-only
+# commits, and verify each claim against the actual diff (see the
+# release-notes-audit skill) before `gh release create`/`gh release edit`.
+step_whatsnew() {
+    local tag="${1:?tag required, e.g. v0.2.7}"
+    echo "==> whatsnew: candidate bullets for $tag"
 
-    local sha_file=".claude/skills/ship-infinite/last-release-sha.txt"
-    local head_sha
-    head_sha=$(git rev-parse HEAD)
-
-    if [ ! -f "$sha_file" ]; then
-        echo "    no $sha_file yet — recording current HEAD as the baseline, nothing to log this run"
-        echo "$head_sha" > "$sha_file"
-        return 0
-    fi
-    local last_sha
-    last_sha=$(cat "$sha_file")
-    if [ "$last_sha" = "$head_sha" ]; then
-        echo "    HEAD unchanged since last changelog update — skipping"
-        return 0
+    local prev_tag
+    prev_tag=$(git tag --sort=-creatordate --merged HEAD | grep -v "^${tag}\$" | head -1)
+    local range="HEAD"
+    if [ -n "$prev_tag" ]; then
+        range="$prev_tag..HEAD"
+        echo "    previous tag: $prev_tag (range: $range)"
+    else
+        echo "    no previous tag found - listing all of HEAD's history"
     fi
 
     local entries
-    entries=$(git log --no-merges --pretty=format:'%s' "$last_sha..$head_sha" \
-        | grep -vi '^Release: ' || true)
+    entries=$(git log --no-merges --pretty=format:'%s' "$range" \
+        | grep -vi '^Release: ' \
+        | grep -vi '^Bump version to ' \
+        || true)
     if [ -z "$entries" ]; then
-        echo "    no non-release commits since last changelog update — skipping"
-        echo "$head_sha" > "$sha_file"
-        return 0
+        echo "    no commits found in $range"
+        return 1
     fi
 
-    local today
-    today=$(date +%Y-%m-%d)
-    local new_section
-    new_section="### $today"$'\n'
+    echo
+    echo "## What's new in $tag"
+    echo
     while IFS= read -r line; do
-        new_section+="- $line"$'\n'
+        echo "- $line"
     done <<< "$entries"
-
-    local body tmp section_file
-    body=$(gh release view "$tag" --json body -q .body)
-    tmp=$(mktemp)
-    if echo "$body" | grep -q '^## Changelog$'; then
-        # Insert the new dated section right under the heading (newest first).
-        # `awk -v` can't hold a multi-line string on macOS's stock awk, so
-        # this goes through `sed ... r <file>` instead.
-        section_file=$(mktemp)
-        { echo ""; printf "%s" "$new_section"; } > "$section_file"
-        sed "/^## Changelog\$/r $section_file" <<< "$body" > "$tmp"
-        rm -f "$section_file"
-    else
-        {
-            echo "$body"
-            echo ""
-            echo "## Changelog"
-            echo ""
-            printf "%s" "$new_section"
-        } > "$tmp"
-    fi
-
-    gh release edit "$tag" --notes-file "$tmp"
-    rm -f "$tmp"
-    echo "$head_sha" > "$sha_file"
-    echo "    added changelog entry for $today ($(echo "$entries" | wc -l | tr -d ' ') commit(s))"
 }
 
 # --------------------------------------------------------- release-windows ---
@@ -320,7 +293,7 @@ case "$STEP" in
     nodediff) shift; step_nodediff "$@" ;;
     release) step_release ;;
     release-windows) shift; step_release_windows "$@" ;;
-    changelog) shift; step_changelog "$@" ;;
+    whatsnew) shift; step_whatsnew "$@" ;;
     cleanup) step_cleanup ;;
     all)
         echo "Use individual subcommands (verify/review/commit/push/nodediff/release/cleanup)."
