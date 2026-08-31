@@ -2191,6 +2191,8 @@ namespace Platform
 
 namespace Platform
 {
+   std::string MattingBackend() { return "Apple Vision (on-device)"; }
+
    bool SubjectMask(const std::vector<unsigned char>& rgbaPixels, int width, int height,
                     MattingMode mode, std::vector<unsigned char>& outMask,
                     std::string& outError)

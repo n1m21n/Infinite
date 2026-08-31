@@ -26,6 +26,7 @@
 #include <dml_provider_factory.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <map>
@@ -598,8 +599,14 @@ namespace Platform
       std::string outputName;
       int inputW = 320;
       int inputH = 320;
+      bool usedDml = false; // true if the DirectML EP registered (GPU path)
       std::string error; // non-empty if construction failed; session stays null
    };
+
+   // Which compute path the matting session resolved to, for MattingBackend()'s
+   // UI readout. 0 = not built yet, 1 = DirectML GPU, 2 = CPU fallback,
+   // 3 = unavailable (model failed to load). Set once inside EnsureOrtSession.
+   std::atomic<int> gMattingBackendKind{ 0 };
 
    OrtMattingSession& EnsureOrtSession()
    {
@@ -632,10 +639,12 @@ namespace Platform
                options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
                options.DisableMemPattern();
                Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(options, 0));
+               holder->usedDml = true;
             }
             catch (const Ort::Exception&)
             {
                // Fall through and run on CPU.
+               holder->usedDml = false;
             }
 
             holder->session = std::make_unique<Ort::Session>(holder->env, modelPath.c_str(), options);
@@ -660,6 +669,9 @@ namespace Platform
             holder->session.reset();
             holder->error = std::string("could not load background removal model: ") + e.what();
          }
+
+         gMattingBackendKind.store(
+            holder->session ? (holder->usedDml ? 1 : 2) : 3, std::memory_order_release);
       });
       return *holder;
    }
@@ -789,6 +801,17 @@ namespace Platform
          outMask.clear();
          outError = std::string("background removal failed: ") + e.what();
          return false;
+      }
+   }
+
+   std::string MattingBackend()
+   {
+      switch (gMattingBackendKind.load(std::memory_order_acquire))
+      {
+         case 1: return "DirectML GPU (DX12)";
+         case 2: return "CPU (DirectML unavailable)";
+         case 3: return "unavailable";
+         default: return "not yet determined";
       }
    }
 

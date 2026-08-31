@@ -121,12 +121,28 @@ namespace
    struct ComScope
    {
       bool ok = false;
+      bool owned = false; // did WE initialize COM (so must balance CoUninitialize)?
       explicit ComScope()
       {
          const HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-         ok = SUCCEEDED(hr); // S_FALSE (already initialized) counts as success
+         if (SUCCEEDED(hr))
+         {
+            // S_OK or S_FALSE (already MTA): we now hold a COM reference to
+            // release on scope exit.
+            ok = true;
+            owned = true;
+         }
+         else if (hr == RPC_E_CHANGED_MODE)
+         {
+            // COM is already initialized on this thread in a DIFFERENT apartment
+            // (STA) - this happens once the JUCE plugin backend puts the main
+            // thread into STA at startup. MMDevice/WASAPI works fine in STA, so
+            // use the existing apartment; do NOT CoUninitialize (it isn't ours).
+            ok = true;
+            owned = false;
+         }
       }
-      ~ComScope() { if (ok) CoUninitialize(); }
+      ~ComScope() { if (owned) CoUninitialize(); }
    };
 
    // Opts the render thread into the Multimedia Class Scheduler Service for

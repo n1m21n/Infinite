@@ -193,6 +193,14 @@ namespace Platform
                     MattingMode mode, std::vector<unsigned char>& outMask,
                     std::string& outError);
 
+   // Human-readable name of the compute path the background remover uses, for
+   // the node UI - "Apple Vision (on-device)" on macOS, and on Windows either
+   // "DirectML GPU (DX12)" or "CPU (DirectML unavailable)" depending on whether
+   // the DirectML execution provider registered. Cheap to call every frame: it
+   // does NOT construct the ONNX session, it only reports what the last (or
+   // pending) SubjectMask call resolved to.
+   std::string MattingBackend();
+
    // ---- audio input ----
    // Taps the default input device and keeps a running spectrum. Everything is
    // computed on the audio thread and read lock-free-ish by the render thread;

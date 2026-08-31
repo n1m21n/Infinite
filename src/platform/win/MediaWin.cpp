@@ -69,17 +69,23 @@ namespace
       }
    };
 
-   // COM init for the calling thread; matches AudioDeviceWin's pattern.
+   // COM init for the calling thread; matches AudioDeviceWin's pattern,
+   // including tolerating a thread the JUCE plugin backend already put in STA
+   // (RPC_E_CHANGED_MODE): Media Foundation works in either apartment, so use
+   // the existing one and only CoUninitialize an init that was ours.
    struct ComScope
    {
       bool ok = false;
+      bool owned = false;
       ComScope()
       {
-         ok = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+         const HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+         if (SUCCEEDED(hr)) { ok = true; owned = true; }
+         else if (hr == RPC_E_CHANGED_MODE) { ok = true; owned = false; }
       }
       ~ComScope()
       {
-         if (ok)
+         if (owned)
             CoUninitialize();
       }
    };
