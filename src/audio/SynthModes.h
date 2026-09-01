@@ -219,4 +219,50 @@ namespace SynthModes
          list.push_back(FilterName(t));
       return list;
    }
+
+   // -------------------------------------------------------------- waveform
+   // The same "same setting, different spelling per node" drift that
+   // motivated the filter table above also happened to the basic oscillator
+   // shapes: Wavetable capitalized them, Ring Mod and Tremolo lowercased
+   // them, and Cycle Shaper reordered them and then spelled its own dropdown
+   // differently from its own stat-line label. One canonical list here, in
+   // canonical order and canonical (lowercase) spelling, same as
+   // FilterNames() above.
+   //
+   // Every node keeps its own local index order - saved patches store that
+   // index as an int - and gets its canonical strings via WaveformTypeSubset,
+   // passing its own enum values in whatever order it already uses.
+   enum WaveformType
+   {
+      kWaveSine = 0,
+      kWaveTriangle,
+      kWaveSaw,
+      kWaveSquare,
+      kWaveRampDown,
+      kNumWaveformTypes
+   };
+
+   inline const char* const* WaveformNames()
+   {
+      static const char* const kNames[kNumWaveformTypes] = {
+         "sine", "triangle", "saw", "square", "ramp down"
+      };
+      return kNames;
+   }
+
+   inline const char* WaveformName(int type)
+   {
+      return (type >= 0 && type < kNumWaveformTypes) ? WaveformNames()[type] : WaveformNames()[0];
+   }
+
+   // Same contract as FilterTypeSubset: pass this node's own enum values in
+   // its own index order, get canonical spelling back, index order untouched.
+   inline std::vector<std::string> WaveformTypeSubset(std::initializer_list<WaveformType> types)
+   {
+      std::vector<std::string> list;
+      list.reserve(types.size());
+      for (WaveformType t : types)
+         list.push_back(WaveformName(t));
+      return list;
+   }
 }

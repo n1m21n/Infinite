@@ -9688,7 +9688,8 @@ namespace
          const float gap = 5.0f;
          const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
          const float waveW = std::max(70.0f, w - octW - semiW - fineW - gap * 3.0f);
-         static const std::vector<std::string> kOscWaveNames = { "Sine", "Triangle", "Saw", "Square" };
+         static const std::vector<std::string> kOscWaveNames = SynthModes::WaveformTypeSubset(
+            { SynthModes::kWaveSine, SynthModes::kWaveTriangle, SynthModes::kWaveSaw, SynthModes::kWaveSquare });
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          AudioBareDropdown("oscWave", kOscWaveNames, n->waveform,
@@ -16931,9 +16932,9 @@ namespace
          // line, and rate/time already live right next to the toggle that
          // picks which of the two is showing.
          AudioKnobRow row(3);
-         row.Dropdown("sync", { "Free", "Synced" }, sync ? 1 : 0, [n](int i) {
+         row.Dropdown("sync", { "Synced", "Free" }, sync ? 0 : 1, [n](int i) {
             PushUndoCheckpoint();
-            *n->ParamPtr("sync") = i != 0 ? 1.0f : 0.0f;
+            *n->ParamPtr("sync") = (i == 0) ? 1.0f : 0.0f;
          });
          if (sync)
          {
@@ -17016,7 +17017,8 @@ namespace
       {
          AudioKnobRow row(3);
          const int waveform = (int)(n->Param("waveform") + 0.5f);
-         static const std::vector<std::string> kWaveNames = { "sine", "triangle", "saw", "square" };
+         static const std::vector<std::string> kWaveNames = SynthModes::WaveformTypeSubset(
+            { SynthModes::kWaveSine, SynthModes::kWaveTriangle, SynthModes::kWaveSaw, SynthModes::kWaveSquare });
          row.Dropdown("wave", kWaveNames, waveform, [n](int i) {
             PushUndoCheckpoint();
             *n->ParamPtr("waveform") = (float)i;
@@ -17318,7 +17320,8 @@ namespace
          // still get the same ordinals (0, 1) they always have.
          AudioKnobRow row(3);
          const int shape = (int)(n->Param("shape") + 0.5f);
-         static const std::vector<std::string> kShapeNames = { "sine", "triangle", "square", "ramp down" };
+         static const std::vector<std::string> kShapeNames = SynthModes::WaveformTypeSubset(
+            { SynthModes::kWaveSine, SynthModes::kWaveTriangle, SynthModes::kWaveSquare, SynthModes::kWaveRampDown });
          row.Dropdown("shape", kShapeNames, shape, [n](int i) {
             PushUndoCheckpoint();
             *n->ParamPtr("shape") = (float)i;
@@ -17637,7 +17640,7 @@ namespace
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
-         static const char* kWaves[] = { "Sine", "Square", "Triangle" };
+         static const char* kWaves[] = { "sine", "square", "triangle" };
          char buf[64];
          snprintf(buf, sizeof(buf), "wave: %s - thresh: %.0fdB", kWaves[waveform], thresholdDb);
          SetAudioReadout("cycle shaper", buf);
@@ -17653,7 +17656,7 @@ namespace
       const int smooth = std::clamp((int)std::round(n->Param("smooth")), 0, 32);
       const bool analog = n->Param("analog") != 0.0f;
 
-      static const char* kWaves[] = { "Sine", "Square", "Triangle" };
+      static const char* kWaves[] = { "sine", "square", "triangle" };
       char stat[80];
       snprintf(stat, sizeof(stat), "%s - %.0fdB - %dsmp%s", kWaves[waveform], thresholdDb, smooth, analog ? " - analog" : "");
 
@@ -17663,7 +17666,8 @@ namespace
 
       {
          AudioKnobRow row(4);
-         static const std::vector<std::string> kWaveNames = { "sine", "square", "triangle" };
+         static const std::vector<std::string> kWaveNames = SynthModes::WaveformTypeSubset(
+            { SynthModes::kWaveSine, SynthModes::kWaveSquare, SynthModes::kWaveTriangle });
          row.Dropdown("shape", kWaveNames, waveform, [n](int i) {
             PushUndoCheckpoint();
             *n->ParamPtr("waveform") = (float)i;
