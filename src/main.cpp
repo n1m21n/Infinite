@@ -14557,19 +14557,34 @@ namespace
 
    // ---- Audio Filter -----------------------------------------------------
    // Cached per-node response curve: the underlying MagnitudeDb sweep is a
-   // settled-sine measurement (AudioFilterKernel.h), cheap per call but not
-   // free across ~150 points x up to 4 bands every single ImGui frame, so it
-   // is only recomputed when something that would actually change the curve
-   // has (per audio-node-ui-system.md §3f's "computed main-thread ... never
-   // by calling into the live AudioNode" - this recomputes from a *scratch*
-   // Biquad/TptSvf, same as the kernel's own PushParams, not the running one).
+   // settled-sine measurement (AudioFilterKernel.h) that runs an actual
+   // settle-then-measure simulation of the filter primitive per point (up to
+   // ~8000 simulated samples each) - cheap for a one-off recompute, but not
+   // free across 160 points every single ImGui frame while freq/Q/gain are
+   // being dragged (up to ~1.28M simulated samples/frame). Recomputed only
+   // when the signature (everything it depends on) actually changed (per
+   // audio-node-ui-system.md §3f's "computed main-thread ... never by
+   // calling into the live AudioNode" - this recomputes from a *scratch*
+   // Biquad/TptSvf, same as the kernel's own PushParams, not the running
+   // one) - AND, while a drag is actively changing the signature every
+   // frame, throttled to at most once per kFilterCurveThrottleSec so a drag
+   // doesn't force a full recompute at UI frame rate. The heuristic for "a
+   // drag is happening" is deliberately the same one the task that added
+   // this used: the signature changed on this exact frame AND the mouse
+   // button is currently held (a typed edit or a single modulation step
+   // changes the signature without the button held, and gets an immediate,
+   // un-throttled, full-resolution recompute - so the *final* curve after
+   // any change, drag or not, is always full 160-point resolution).
    struct FilterCurveCache
    {
       std::vector<float> curveDb; // one entry per x pixel column sampled
-      std::vector<float> signature;
+      std::vector<float> signature;    // signature that produced curveDb
+      std::vector<float> lastSeenSignature; // signature observed last frame
+      double lastRecomputeTime = -1.0;
       bool dragIsQ = false; // which handle the current drag (if any) is grabbing
    };
    std::map<int, FilterCurveCache> gFilterCurveCache;
+   const double kFilterCurveThrottleSec = 0.05; // ~20 Hz cap on the full recompute while dragging
 
    const float kFilterVizMinHz = 20.0f;
    const float kFilterVizMaxHz = 20000.0f;
@@ -14682,14 +14697,25 @@ namespace
       const float q = n->Param("q");
       const float gain = n->Param("gain");
 
-      // Recompute the curve only if the signature (everything it depends on)
-      // actually changed since last frame.
       std::vector<float> sig{ (float)sampleRate, type, freq, q, gain };
       FilterCurveCache& cache = gFilterCurveCache[gCurrentNodeIndex];
       const int kNumPoints = 160;
-      if (cache.signature != sig)
+
+      // Throttle the full recompute while a drag is actively changing the
+      // signature every frame - see the FilterCurveCache comment above for
+      // the full reasoning. `sigChanged` catches the drag case;
+      // `cache.signature != sig` is what actually needs a recompute (true
+      // the first frame after any change, drag or not).
+      const bool sigChanged = (cache.lastSeenSignature != sig);
+      cache.lastSeenSignature = sig;
+      const bool dragging = sigChanged && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+      const double now = ImGui::GetTime();
+      const bool throttled = dragging && cache.lastRecomputeTime >= 0.0 &&
+                             (now - cache.lastRecomputeTime) < kFilterCurveThrottleSec;
+      if (cache.signature != sig && !throttled)
       {
          cache.signature = sig;
+         cache.lastRecomputeTime = now;
          cache.curveDb.resize(kNumPoints);
          for (int i = 0; i < kNumPoints; i++)
          {
@@ -14699,10 +14725,29 @@ namespace
          }
       }
 
+      // Live LFO sweep animation (envAmount != 0): the cached curve above is
+      // always computed at the *base* freq (never at LFO-shifted freq, so
+      // the expensive MagnitudeDb recompute never has to run every frame
+      // just because the LFO is running) - octaves of cutoff shift instead
+      // just translate the whole curve at a constant offset along the log-
+      // frequency x-axis, since the response of these filter types depends
+      // only on the ratio of the eval frequency to the cutoff, not on the
+      // cutoff's absolute position. Free (no MagnitudeDb calls) and exact
+      // for SVF LP/HP/BP/notch; a very close approximation for the shelf/
+      // peak biquad types this close to Nyquist. `lfoOut` is read from the
+      // kernel's own audio-thread LFO (AudioFilterKernel::mLfoMeter) via the
+      // existing ExtraMeterValue MeterRing readback, same discipline as
+      // Dynamics' GR-bar dot - no new cross-thread mechanism.
+      const float envAmount = n->Param("envAmount");
+      const float lfoOut = envAmount != 0.0f ? std::clamp(n->ExtraMeterValue(0), -1.0f, 1.0f) : 0.0f;
+      const float totalOctaves = envAmount * lfoOut * 4.0f;
+      const float pixelsPerOctave = w * logf(2.0f) / (logf(kFilterVizMaxHz) - logf(kFilterVizMinHz));
+      const float deltaX = totalOctaves * pixelsPerOctave;
+
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
       {
-         const float x = origin.x + (float)i * (w / (float)(kNumPoints - 1));
+         const float x = origin.x + (float)i * (w / (float)(kNumPoints - 1)) + deltaX;
          const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
@@ -14750,9 +14795,14 @@ namespace
             *n->ParamPtr("gain") = FilterVizYToDb(m.y, origin.y, h);
       }
 
+      // Drawn (possibly LFO-shifted) handle position - drag hit-testing
+      // above stays against the *base* `hx`, so grabbing the handle is
+      // unaffected by where the sweep happens to have moved it visually.
+      const float hxDraw = hx + deltaX;
+
       const bool mainNear = isNear && !(active && cache.dragIsQ);
-      dl->AddCircleFilled(ImVec2(hx, hy), mainNear ? 5.0f : 3.6f, IM_COL32(235, 245, 255, 255), 12);
-      dl->AddCircle(ImVec2(hx, hy), mainNear ? 5.0f : 3.6f, IM_COL32(20, 24, 32, 220), 12, 1.5f);
+      dl->AddCircleFilled(ImVec2(hxDraw, hy), mainNear ? 5.0f : 3.6f, IM_COL32(235, 245, 255, 255), 12);
+      dl->AddCircle(ImVec2(hxDraw, hy), mainNear ? 5.0f : 3.6f, IM_COL32(20, 24, 32, 220), 12, 1.5f);
 
       // Diamond handle for Q, offset beside the main dot so both stay
       // visually distinct.
@@ -14777,6 +14827,17 @@ namespace
       // double-reserve it and leave a blank gap the height of the graph
       // between it and whatever's drawn next.
    }
+
+   // Forward declaration: the shared sync/rate-mode cell pair Chorus/
+   // Flanger/Phaser/Tremolo all use is defined further down (with the rest
+   // of their shared helpers), but Audio Filter's own body is defined here,
+   // earlier in the file, and now uses it too for its "env" LFO's rate.
+   // Default rateLo/rateHi live only on this first declaration - a default
+   // argument can only be specified once across all declarations seen by
+   // the translation unit, so the real definition below no longer repeats
+   // them.
+   void AddRateModeCells(AudioKnobRow& row, AudioEffectNode* n, const char* syncLabel,
+                         float rateLo = 0.02f, float rateHi = 5.0f);
 
    void DrawAudioFilterBody(GraphNode& gn, AudioEffectNode* n)
    {
@@ -14816,11 +14877,25 @@ namespace
 
       BeginAudioSection("output");
       {
-         AudioKnobRow row(4);
+         // 5 cells: selector column left (sync v, rate), knobs right
+         // (output gain, env, mix) - mix stays bottom-right (P4). `row.index`
+         // is set explicitly before each call so the *visual* cell a control
+         // lands in can differ from its *draw order* - output gain, mix and
+         // env are still called first, second, third, exactly as before the
+         // "mod" knob was removed and sync/rate were added, so their
+         // gParamCounter ordinals (and any existing patch's modulation
+         // bindings on them) don't move; only where they're drawn does, and
+         // the new `rate` param's ordinal lands after them, same reasoning
+         // DrawChorusBody uses for its near-identical layout problem.
+         AudioKnobRow row(5);
+         row.index = 2;
          row.Knob("output gain", n->ParamPtr("outputGainDb"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
+         row.index = 4;
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.index = 3;
          row.Knob("env", n->ParamPtr("envAmount"), -1.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("mod", n->ParamPtr("modAmount"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+         row.index = 0;
+         AddRateModeCells(row, n, "sync to tempo##filterSync");
          row.End();
       }
       EndAudioSection();
@@ -16252,7 +16327,7 @@ namespace
    // an accepted, documented consequence of the checkbox-to-dropdown
    // conversion; `depth`/`rate`/`mix` bindings are unaffected.
    void AddRateModeCells(AudioKnobRow& row, AudioEffectNode* n, const char* syncLabel,
-                         float rateLo = 0.02f, float rateHi = 5.0f)
+                         float rateLo, float rateHi)
    {
       static const std::vector<std::string> kSyncModes = { "Synced", "Free" };
       const bool sync = n->Param("sync") != 0.0f;
@@ -46028,105 +46103,11 @@ int main(int argc, char** argv)
          printf("%s\n", overallOk ? "NOTE FANOUT TEST OK" : "NOTE FANOUT TEST FAIL");
       }
 
-      // Audio Filter's "cutoff mod" sidechain input (slot 1), deleted
-      // mid-playback: the generic AUDIOTEARDOWNSWEEPTEST above only ever
-      // wires an upstream node into slot 0 (see its
-      // "upstreamGainIndex"/AudioInputSlot(0) comment) - a modulator wired
-      // specifically into a second/sidechain slot and then deleted is not
-      // exercised there, so this covers that gap directly (docs/plans/
-      // fm-and-note-fanout-fixes.md item 11 part C).
-      if (getenv("INFINITE_NOTEFANOUTTEST") != nullptr && frameId == 4)
-      {
-         auto SpawnIndex = [&](const std::string& name, const std::string& category, float x, float y) -> int
-         {
-            GraphNode* gn = SpawnNode(name, category, x, y);
-            return gn ? gn->index : -1;
-         };
-
-         const int modIdx = SpawnIndex("Oscillator", "Synths", 40.0f, 700.0f);
-         const int filterIdx = SpawnIndex("Audio Filter", "AudioEffects", 320.0f, 700.0f);
-         const int upstreamGainIdx = SpawnIndex("Gain", "Utility", 40.0f, 760.0f);
-         GraphNode* mod = FindNodeByIndex(modIdx);
-         GraphNode* filter = FindNodeByIndex(filterIdx);
-         GraphNode* upstreamGain = FindNodeByIndex(upstreamGainIdx);
-         bool wired = mod && filter && upstreamGain;
-         if (wired)
-         {
-            filter->node->AudioInputSlot(0)->Connect(upstreamGain->node.get()); // real signal to filter
-            filter->node->AudioInputSlot(1)->Connect(mod->node.get());          // oscillator -> cutoff mod
-            mod->node->CookIfNeeded(1);
-            filter->node->CookIfNeeded(1);
-            upstreamGain->node->CookIfNeeded(1);
-         }
-
-         RebuildAudioTopology();
-
-         const int numFrames = 256;
-         std::vector<float> fL(numFrames), fR(numFrames);
-         float* fChans[2] = { fL.data(), fR.data() };
-         AudioBuffer fBuf;
-         fBuf.channels = fChans;
-         fBuf.numChannels = 2;
-         fBuf.numFrames = numFrames;
-
-         bool ok = wired;
-         if (ok)
-         {
-            AudioNode* filterAudio = AudioNodeOfAny(filter->node.get());
-            AudioNode* modAudio = AudioNodeOfAny(mod->node.get());
-            AudioNode* gainAudio = AudioNodeOfAny(upstreamGain->node.get());
-
-            std::vector<float> mL(numFrames), mR(numFrames);
-            float* mChans[2] = { mL.data(), mR.data() };
-            AudioBuffer mBuf;
-            mBuf.channels = mChans;
-            mBuf.numChannels = 2;
-            mBuf.numFrames = numFrames;
-
-            std::vector<float> gL(numFrames), gR(numFrames);
-            float* gChans[2] = { gL.data(), gR.data() };
-            AudioBuffer gBuf;
-            gBuf.channels = gChans;
-            gBuf.numChannels = 2;
-            gBuf.numFrames = numFrames;
-            const AudioBuffer* gainInputs[1] = { &gBuf }; // Gain's own input is silence; fine, still exercises the filter
-
-            for (int b = 0; b < 4; b++)
-            {
-               modAudio->ProcessBlock(nullptr, 0, mBuf);
-               gainAudio->ProcessBlock(gainInputs, 1, gBuf);
-               const AudioBuffer* filterInputs[2] = { &gBuf, &mBuf };
-               filterAudio->ProcessBlock(filterInputs, 2, fBuf);
-            }
-
-            RemoveNodeByIndex(modIdx); // deletes the cutoff-mod source mid-playback
-
-            // gNodes.erase() shifts every element after the erased one down
-            // a slot, invalidating any GraphNode* taken before the call
-            // (same hazard AUDIOTEARDOWNSWEEPTEST's own comment on SpawnNode
-            // documents for push_back) - `filter` was resolved before the
-            // removal above, so it must be re-resolved by index rather than
-            // dereferenced directly, or this is exactly the same
-            // dangling-pointer bug DELETECRASHTEST exists to catch.
-            filter = FindNodeByIndex(filterIdx);
-
-            // Filter must keep processing post-delete - DisconnectAllTo
-            // clears its sidechain cable, so slot 1 reads back as
-            // nullptr/inactive rather than a dangling AudioNode*.
-            for (int b = 0; b < 4; b++)
-            {
-               gainAudio->ProcessBlock(gainInputs, 1, gBuf);
-               const AudioBuffer* filterInputs[2] = { &gBuf, nullptr };
-               filterAudio->ProcessBlock(filterInputs, 2, fBuf);
-            }
-            ok = filter != nullptr && filter->node->AudioInputSlot(1)->GetSource() == nullptr;
-         }
-         printf("%s\n", ok ? "FILTER CUTOFF MOD TEARDOWN OK" : "FILTER CUTOFF MOD TEARDOWN FAIL");
-
-         for (int idx : { filterIdx, upstreamGainIdx })
-            if (idx >= 0)
-               RemoveNodeByIndex(idx);
-      }
+      // Audio Filter's "cutoff mod" sidechain input (slot 1) was removed as
+      // part of the envAmount-becomes-internal-LFO redesign (EffectDefs.cpp,
+      // AudioFilterKernel.h) - the sidechain-teardown fixture that used to
+      // live here (spawn/wire/delete-mid-playback against that pin) went
+      // with it, since the pin no longer exists to test.
 
       if (getenv("INFINITE_AUDIOGRAPHTEST") != nullptr && frameId == 4)
       {

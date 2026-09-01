@@ -8,7 +8,10 @@
 
 #include "IEffectKernel.h"
 #include "audio/DspMath.h"
+#include "audio/MeterRing.h"
+#include "audio/MusicTime.h"
 #include "audio/ParamMailbox.h"
+#include "core/Transport.h"
 
 // Audio Filter's kernel: up to 4 bands in series, each one of 12 types.
 // docs/plans/audio/P3c-P3a2-design.md §1.1:
@@ -190,7 +193,10 @@ public:
    static constexpr int kQSlot = kFreqSlot + 1;
    static constexpr int kGainSlot = kQSlot + 1;
    static constexpr int kEnvAmountSlot = kGainSlot + 1;
-   static constexpr int kModAmountSlot = kEnvAmountSlot + 1;
+   // Free-Hz rate for the internal LFO (§"envAmount" above) - only read while
+   // `sync` is off, same free-Hz-vs-tempo-synced split as Chorus/Flanger/
+   // Phaser/Tremolo's own `rate` slot.
+   static constexpr int kRateSlot = kEnvAmountSlot + 1;
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
@@ -209,54 +215,51 @@ public:
             svf.Reset();
       for (auto& bq : mBiquad)
          bq.Reset();
-      mEnvFollower = 0.0f;
+      mLfoPhase = 0.0;
       mBiquadFreqSlew = 1000.0f;
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
 
-   void ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out) override
+   void ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out) override
    {
       const int numChannels = std::min({ in.numChannels, out.numChannels, kMaxChannels });
       const int type = mType.load(std::memory_order_relaxed);
-      // Summed to mono rather than reading channels[0] alone - a hard-panned
-      // or stereo-wide modulator should still modulate at full strength.
-      const AudioBuffer* modBuf = (sidechain != nullptr && sidechain->numChannels > 0) ? sidechain : nullptr;
-
-      // Envelope-follower time constants for the "env" knob's auto-wah style
-      // cutoff sweep - fast attack, slower release, the standard envelope
-      // filter shape. Computed once per block; mSampleRate is set in
-      // PrepareToPlay/PushParams and doesn't change mid-block.
-      const float attackCoef = expf(-1.0f / (float)(mSampleRate * 0.003));
-      const float releaseCoef = expf(-1.0f / (float)(mSampleRate * 0.080));
+      const bool sync = mSync.load(std::memory_order_relaxed) != 0;
+      const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
 
       for (int i = 0; i < out.numFrames; i++)
       {
          const float envAmount = mMailbox.SmoothedValue(kEnvAmountSlot);
          const bool envActive = std::fabs(envAmount) > 1.0e-4f;
-         // modAmount is smoothed like every other slot, so it's read once
-         // per sample here rather than once per block - and gates the fast
-         // path exactly like envAmount does: a connected-but-silent, or
-         // fully-turned-down, modulator shouldn't force the slow per-sample
-         // coefficient recompute below.
-         const float modAmount = mMailbox.SmoothedValue(kModAmountSlot);
-         const bool modActive = (modBuf != nullptr) && std::fabs(modAmount) > 1.0e-4f;
 
-         // Envelope follower runs on the input's peak magnitude across
-         // channels, once per sample, regardless of envActive - so the
-         // follower is already settled the moment the knob is turned up
-         // rather than starting cold.
-         float peak = 0.0f;
-         for (int ch = 0; ch < numChannels; ch++)
-            peak = std::max(peak, std::fabs(in.channels[ch][i]));
-         const float coef = peak > mEnvFollower ? attackCoef : releaseCoef;
-         mEnvFollower = peak + coef * (mEnvFollower - peak);
+         // The internal sweep LFO always advances, active or not, so
+         // re-engaging `env` later resumes from a live phase instead of a
+         // phase frozen at whatever it last was - same reasoning
+         // ProcessBlock already applies to mBiquadFreqSlew below. Rate mode
+         // mirrors Chorus/Flanger/Phaser/Tremolo's own sync/rateDiv/rate
+         // split exactly.
+         float rateHz;
+         if (sync)
+         {
+            const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+            rateHz = (float)MusicTime::HzForRateDivision((MusicTime::RateDivision)rateDiv, bpm);
+         }
+         else
+         {
+            rateHz = std::max(0.0f, mMailbox.SmoothedValue(kRateSlot));
+         }
+         mLfoPhase += (double)rateHz / mSampleRate;
+         if (mLfoPhase >= 1.0)
+            mLfoPhase -= floor(mLfoPhase);
+         const float lfoOut = sinf(2.0f * (float)M_PI * (float)mLfoPhase);
+         mLfoMeter.Write(&lfoOut, 1);
 
          float coeffs[kStages][kCoeffsPerStage];
-         if (!envActive && !modActive)
+         if (!envActive)
          {
             // Fast path: precomputed, smoothed coefficients from PushParams -
-            // unchanged behaviour for every patch that leaves env at 0 and mod unconnected.
+            // unchanged behaviour for every patch that leaves env at 0.
             for (int s = 0; s < kStages; s++)
                for (int c = 0; c < kCoeffsPerStage; c++)
                   coeffs[s][c] = mMailbox.SmoothedValue(s * kCoeffsPerStage + c);
@@ -268,25 +271,14 @@ public:
          }
          else
          {
-            // Recompute this sample's coefficients from the modulated
+            // Recompute this sample's coefficients from the LFO-modulated
             // cutoff - envAmount is in octaves of shift, scaled by the
-            // follower's 0-1 envelope, plus the audio-rate modulator scaled
-            // by modAmount (bipolar, so a negative setting inverts it -
-            // matching envAmount's shape).
+            // free-running sine LFO's bipolar -1..1 output (a negative
+            // envAmount inverts the sweep direction).
             const float freq = mMailbox.SmoothedValue(kFreqSlot);
             const float q = mMailbox.SmoothedValue(kQSlot);
             const float gainDb = mMailbox.SmoothedValue(kGainSlot);
-            float extModOctaves = 0.0f;
-            if (modActive)
-            {
-               const int modChans = std::min(modBuf->numChannels, 2);
-               float modValue = 0.0f;
-               for (int c = 0; c < modChans; c++)
-                  modValue += modBuf->channels[c][i];
-               modValue /= (float)modChans;
-               extModOctaves = modValue * 4.0f * modAmount;
-            }
-            const float totalOctaves = (envAmount * mEnvFollower * 4.0f) + extModOctaves;
+            const float totalOctaves = envAmount * lfoOut * 4.0f;
             // Clamped to a hard ceiling below Nyquist rather than a fixed
             // 20kHz - correct for sample rates above 44.1kHz, where the old
             // fixed bound left an env/mod sweep stopping well short of what
@@ -371,15 +363,27 @@ public:
 
    int LatencySamples() const override { return 0; } // no lookahead/oversampling/FFT window
 
+   // Kernel-published LFO output (-1..1), read by DrawAudioFilterVisualizer
+   // via AudioEffectNode::ExtraMeterValue(0) so the response curve can
+   // animate the live sweep in sync with the audio-thread LFO - same
+   // MeterRing discipline DynamicsKernel uses for its GR-bar readout, not a
+   // new cross-thread mechanism.
+   MeterRing* ExtraMeter() override { return &mLfoMeter; }
+
 private:
    ParamMailbox mMailbox;
    double mSampleRate = 44100.0;
 
    std::atomic<int> mType {};
+   std::atomic<int> mSync {};
+   std::atomic<int> mRateDiv { MusicTime::kQuarter };
 
    DspMath::TptSvf mSvf[kStages][kMaxChannels];
    DspMath::Biquad mBiquad[kMaxChannels];
-   float mEnvFollower = 0.0f;
+   // Free-running sweep LFO phase, 0..1 - see the `envAmount`/kRateSlot
+   // comments above.
+   double mLfoPhase = 0.0;
+   MeterRing mLfoMeter;
    // Slew-limits the cutoff feeding the biquad branch under modulation - see
    // ProcessBlock's comment at the biquad recompute for why.
    float mBiquadFreqSlew = 1000.0f;
