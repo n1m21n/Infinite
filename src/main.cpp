@@ -16996,13 +16996,18 @@ namespace
 
       {
          AudioKnobRow row(3);
-         row.Knob("freq", n->ParamPtr("freq"), 1.0f, 5000.0f, "%.0f Hz", kKnobLarge);
          const int waveform = (int)(n->Param("waveform") + 0.5f);
          static const std::vector<std::string> kWaveNames = { "sine", "triangle", "saw", "square" };
          row.Dropdown("wave", kWaveNames, waveform, [n](int i) {
             PushUndoCheckpoint();
             *n->ParamPtr("waveform") = (float)i;
          });
+         // Dropdown is a discrete param (RegisterDiscreteParam, keyed by
+         // label hash) and never touches gParamCounter, so moving it ahead of
+         // the two continuous knobs here does not renumber their ordinals -
+         // freq and mix are still assigned gParamCounter in the same relative
+         // order as before (see gParamCounter's comment above, ~line 1162).
+         row.Knob("freq", n->ParamPtr("freq"), 1.0f, 5000.0f, "%.0f Hz", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
