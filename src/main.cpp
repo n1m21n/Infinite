@@ -16346,25 +16346,41 @@ namespace
          row.End();
       }
       {
-         // 4 cells: selector column left (mode v, rate), knobs right
-         // (feedback, mix) - mix stays bottom-right (P4). `row.index` is set
-         // explicitly before each call so the *visual* cell a control lands
-         // in can differ from its *draw order* - feedback and mix are still
-         // called first and second, exactly as before, so their
-         // gParamCounter ordinals (and any existing patch's modulation
-         // bindings on them) don't move; only where they're drawn does.
-         AudioKnobRow row(4);
-         row.index = 2;
+         // 3 cells: rate | feedback | mix - mix stays bottom-right of the
+         // last knob row (P4). `row.index` is set explicitly before each
+         // call so the *visual* cell a control lands in can differ from
+         // its *draw order* - feedback and mix are still called first and
+         // second, exactly as before (see the old 4-cell row this
+         // replaces), so their gParamCounter ordinals (and any existing
+         // patch's modulation bindings on them) don't move; only where
+         // they're drawn, and where the sync dropdown moved to (its own
+         // row below), changes. AddSyncedRateCell is called last, exactly
+         // as it was before (via AddRateModeCells), so rate's ordinal is
+         // unaffected too.
+         AudioKnobRow row(3);
+         row.index = 1;
          row.Knob("feedback", n->ParamPtr("feedback"), 0.0f, 0.9f, "%.2f", kKnobLarge);
-         row.index = 3;
+         row.index = 2;
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.index = 0;
-         AddRateModeCells(row, n, "sync to tempo##chorusSync");
+         AddSyncedRateCell(row, n);
          row.End();
       }
 
       {
-         AudioKnobRow row(4);
+         // 3 cells, all used: sync dropdown left (P3), then the two
+         // checkboxes - a clean 3-3-3 grid (P6). The dropdown keeps the
+         // exact label id ("sync to tempo##chorusSync") the old
+         // AddRateModeCells call used here, matching the discrete-param
+         // hash-based addressing AddRateModeCells' own comment documents -
+         // any existing patch's modulation binding on the sync control
+         // still resolves to this control even though it moved rows.
+         AudioKnobRow row(3);
+         static const std::vector<std::string> kSyncModes = { "Synced", "Free" };
+         row.Dropdown("sync to tempo##chorusSync", kSyncModes, sync ? 0 : 1, [n](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr("sync") = (i == 0) ? 1.0f : 0.0f;
+         });
          bool taps3 = n->Param("taps") >= 2.5f;
          if (row.Checkbox("3 taps##chorusTaps", &taps3))
          {
@@ -16377,8 +16393,6 @@ namespace
             PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
-         row.Skip();
-         row.Skip();
          row.End();
       }
 
