@@ -508,6 +508,7 @@ namespace
             { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.2f, false, { { "sync", 0.0f } } });
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
+         def.params.push_back({ "spread", 0.0f, 1.0f, 0.5f });
          def.makeKernel = []() { return std::make_unique<FlangerKernel>(); };
          defs.push_back(std::move(def));
       }
