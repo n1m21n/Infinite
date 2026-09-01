@@ -13998,7 +13998,13 @@ namespace
             // ---- Step number label below each column (Pattern-style) ----
             char label[8];
             snprintf(label, sizeof(label), "%d", i + 1);
-            const float labelFontSize = steps <= 8 ? ImGui::GetFontSize() : std::max(8.0f, barW * 0.95f);
+            // Cap at the ambient UI font size and only shrink below it once a
+            // column gets too narrow to fit a number at that size - the old
+            // `steps > 8 ? barW * 0.95f` branch scaled font size UP with
+            // column width instead of down, so going from 8 to 9+ steps (still
+            // ~45px-wide columns at this node width) jumped the step numbers
+            // to ~3x the normal text size instead of shrinking them.
+            const float labelFontSize = std::min(ImGui::GetFontSize(), std::max(8.0f, barW * 0.95f));
             const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
             const ImU32 stepNumCol = isCurrent
                ? (isLight ? IM_COL32(225, 130, 20, 255) : IM_COL32(255, 200, 80, 255))
@@ -15672,7 +15678,10 @@ namespace
       }
 
       {
-         AudioKnobRow row(3);
+         // Tight checkbox-only row (maxDia 20 = checkbox frame height,
+         // hasCaptions=false) - same pattern as Dynamics/Pitch Shift/Ring
+         // Mod/SpecBlur's trailing checkbox rows.
+         AudioKnobRow row(3, 20.0f, 0.0f, false);
          bool syncBool = sync;
          if (row.Checkbox("sync to tempo##delaySync", &syncBool))
          {
@@ -15802,7 +15811,12 @@ namespace
       }
 
       {
-         AudioKnobRow row(3);
+         // Tight checkbox-only row (maxDia 20 = checkbox frame height,
+         // hasCaptions=false): same pattern as Pitch Shift/Ring Mod/Dynamics/
+         // SpecBlur/Switcher's trailing analog rows. The default
+         // AudioKnobRow(3) reserves a full knob-height-plus-caption strip
+         // that a checkbox never draws into, leaving dead space below it.
+         AudioKnobRow row(3, 20.0f, 0.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##reverbAnalog", &analogBool))
          {
