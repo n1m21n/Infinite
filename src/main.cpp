@@ -12993,7 +12993,11 @@ namespace
    // grid was its own: it is the single piece of feedback that tells you
    // whether the node is receiving anything at all, which is the first thing
    // you need to know when a patch is silent.
-   void DrawMidiKeyboard(const bool held[128], int lowNote, int octaves)
+   // `ringNote` (-1 = none) draws a coloured outline around one key on top
+   // of its lit/unlit fill - Note Filter's live last-note-passed/blocked
+   // marker (node-ui-pillars P9's "one live marker" requirement). MIDI Notes
+   // doesn't pass it, so its two call sites are unaffected by the default.
+   void DrawMidiKeyboard(const bool held[128], int lowNote, int octaves, int ringNote = -1, bool ringGood = true)
    {
       const float w = gAudioBodyW, h = 58.0f;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -13009,6 +13013,7 @@ namespace
 
       const int whiteCount = 7 * octaves;
       const float keyW = (w - 4.0f) / (float)whiteCount;
+      const ImU32 ringCol = ringGood ? IM_COL32(120, 200, 255, 255) : IM_COL32(255, 96, 86, 255);
 
       for (int o = 0; o < octaves; o++)
       {
@@ -13021,6 +13026,9 @@ namespace
                                       : (isLight ? IM_COL32(250, 250, 255, 255) : IM_COL32(206, 210, 222, 255));
             dl->AddRectFilled(ImVec2(x + 0.5f, origin.y + 3.0f), ImVec2(x + keyW - 0.5f, br.y - 3.0f),
                               whiteCol, 2.0f);
+            if (note == ringNote)
+               dl->AddRect(ImVec2(x + 1.0f, origin.y + 4.0f), ImVec2(x + keyW - 1.0f, br.y - 4.0f),
+                          ringCol, 2.0f, 0, 2.0f);
          }
       }
       for (int o = 0; o < octaves; o++)
@@ -13034,6 +13042,9 @@ namespace
                                       : (isLight ? IM_COL32(60, 65, 80, 255) : IM_COL32(26, 28, 36, 255));
             dl->AddRectFilled(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
                               blackCol, 2.0f);
+            if (note == ringNote)
+               dl->AddRect(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
+                          ringCol, 2.0f, 0, 2.0f);
          }
       }
 
@@ -13127,144 +13138,75 @@ namespace
       ModSlider("glide (ms)", &n->glideMs, 0.0f, 2000.0f);
    }
 
-   // A real C-anchored keyboard (the white/black layout is a property of C,
-   // never of the root - see node-ui-pillars P9) whose window scrolls/sizes
-   // to contain rangeLow..rangeHigh, coloured by what the gate would do to
-   // each pitch - computed purely from params (main thread only, redraws
-   // every frame like DrawADSRVisualizer), plus one live marker for the last
-   // note the audio thread actually saw: a ring around the key, coloured by
-   // whether it passed. That marker is the only thing read from the audio
-   // side, via the same two-atomic publish LastNote() uses.
-   //
-   // AudioNoteFilterNode::Process (NoteNodes.cpp) snaps an off-scale note to
-   // its nearest in-scale neighbour rather than rejecting it outright, then
-   // range-gates the snapped result - so the picture needs three states, not
-   // two: in-range-and-in-scale passes untouched (full bright); in-range-but-
-   // off-scale still passes, just moved (a distinct dimmer/tinted "snapped"
-   // state); out-of-range is dropped (dark).
+   // Effective scale/root - the values AudioNoteFilterNode::ProcessBlock
+   // (NoteNodes.cpp) actually gates against. When useGlobalScale is on, the
+   // node's own scale/root fields are disabled in the UI and ignored on the
+   // audio thread in favour of the transport's; the visualizer has to read
+   // the same source or it lies about what's being applied.
+   void NoteFilterEffectiveScale(NoteFilterNode* n, int& outScale, int& outRoot)
+   {
+      if (n->useGlobalScale)
+      {
+         outScale = Transport::Instance().Scale();
+         outRoot = Transport::Instance().Key();
+      }
+      else
+      {
+         outScale = n->scale;
+         outRoot = n->root;
+      }
+   }
+
+   // Reuses DrawMidiKeyboard's real black/white piano look (node-ui-pillars
+   // P9/P3 feedback: this used to be an all-blue-tinted-rectangle strip with
+   // clip-arrow clutter and a root tick that read as a stray mark). A key is
+   // lit iff a note there would actually pass the gate right now - in range
+   // and in the effective scale - exactly like DrawMidiKeyboard's "held"
+   // meaning, just computed from params instead of MIDI state. The one thing
+   // kept from the old visualizer is the live last-note ring - useful, not
+   // part of the complaint.
    void DrawNoteFilterVisualizer(NoteFilterNode* n)
    {
-      const float w = gAudioBodyW, h = 58.0f;
-      const ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 br(origin.x + w, origin.y + h);
-      const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
-
-      static const int kWhiteOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
-      static const int kBlackOffsets[5] = { 1, 3, 6, 8, 10 };
-      static const float kBlackSlot[5] = { 0.0f, 1.0f, 3.0f, 4.0f, 5.0f };
+      int scale, root;
+      NoteFilterEffectiveScale(n, scale, root);
 
       const int rangeLow = std::clamp(n->rangeLow, 0, 127);
       const int rangeHigh = std::clamp(n->rangeHigh, rangeLow, 127);
 
       // Size a 2-4 octave window to contain the whole range, centred on its
-      // midpoint, anchored to a C (defect 3) - never anchored to root
-      // (defect 1). Keyboard layout stays a real instrument regardless of
-      // what scale/root is selected; only which pitch classes light up
-      // changes with those.
+      // midpoint, anchored to a C (node-ui-pillars P9) - never anchored to
+      // root. Keyboard layout stays a real instrument regardless of what
+      // scale/root is selected; only which keys light up changes with those.
       const int octaves = std::clamp((rangeHigh - rangeLow) / 12 + 2, 2, 4);
       const int windowSemitones = octaves * 12;
       const int mid = (rangeLow + rangeHigh) / 2;
       const int maxLowNote = std::max(0, ((128 - windowSemitones) / 12) * 12);
       const int lowNote = std::clamp(((mid - windowSemitones / 2) / 12) * 12, 0, maxLowNote);
-      const bool clippedLeft = rangeLow < lowNote;
-      const bool clippedRight = rangeHigh > lowNote + windowSemitones - 1;
 
-      const int whiteCount = 7 * octaves;
-      const float keyW = (w - 4.0f) / (float)whiteCount;
-      const int lastIn = n->LastNoteIn();
-      const bool lastPassed = n->LastPassed();
-
-      enum class KeyState { OutOfRange, Snapped, Active };
-      auto NoteState = [n, rangeLow, rangeHigh](int note) -> KeyState {
-         if (note < rangeLow || note > rangeHigh)
-            return KeyState::OutOfRange;
-         const int pc = ((note - n->root) % 12 + 12) % 12;
-         return MusicTime::ScaleContainsPitchClass(n->scale, pc) ? KeyState::Active : KeyState::Snapped;
-      };
-
-      // Only two colors on screen, independent of white/black key shape:
-      // Active (in-scale) reads as a lit blue LED; everything else - both
-      // Snapped (in-range, off-scale) and OutOfRange - collapses into one
-      // greyed-out/disabled look. A key's own shape (white rectangle vs.
-      // black raised key) already tells the user which it is, so color now
-      // communicates scale membership only, not key identity. KeyState is
-      // kept as three values because NoteState/other logic still cares about
-      // the distinction; only the color mapping collapses it to two.
-      auto KeyColor = [isLight](KeyState state) -> ImU32 {
-         if (state == KeyState::Active)
-            return isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255);
-         return isLight ? IM_COL32(190, 193, 200, 255) : IM_COL32(58, 60, 68, 255);
-      };
-
-      // Root tick: a small bar at the bottom of every key whose pitch class
-      // is the root, so the root stays readable without moving the layout
-      // (the convention every DAW scale-highlight uses).
-      const ImU32 rootTickCol = isLight ? IM_COL32(30, 30, 40, 220) : IM_COL32(235, 235, 245, 220);
-
-      for (int o = 0; o < octaves; o++)
+      bool lit[128];
+      for (int note = 0; note < 128; note++)
       {
-         for (int k = 0; k < 7; k++)
-         {
-            const int note = lowNote + o * 12 + kWhiteOffsets[k];
-            const float x = origin.x + 2.0f + (float)(o * 7 + k) * keyW;
-            dl->AddRectFilled(ImVec2(x + 0.5f, origin.y + 3.0f), ImVec2(x + keyW - 0.5f, br.y - 3.0f),
-                              KeyColor(NoteState(note)), 2.0f);
-            if (((note - n->root) % 12 + 12) % 12 == 0)
-               dl->AddRectFilled(ImVec2(x + keyW * 0.35f, br.y - 6.0f), ImVec2(x + keyW * 0.65f, br.y - 4.0f),
-                                 rootTickCol, 1.0f);
-            if (note == lastIn)
-               dl->AddRect(ImVec2(x + 1.0f, origin.y + 4.0f), ImVec2(x + keyW - 1.0f, br.y - 4.0f),
-                          lastPassed ? IM_COL32(120, 200, 255, 255) : IM_COL32(255, 96, 86, 255), 2.0f, 0, 2.0f);
-         }
-      }
-      for (int o = 0; o < octaves; o++)
-      {
-         for (int k = 0; k < 5; k++)
-         {
-            const int note = lowNote + o * 12 + kBlackOffsets[k];
-            const float x = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[k] + 1.0f) * keyW - keyW * 0.3f;
-            dl->AddRectFilled(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
-                              KeyColor(NoteState(note)), 2.0f);
-            if (((note - n->root) % 12 + 12) % 12 == 0)
-               dl->AddRectFilled(ImVec2(x + keyW * 0.12f, origin.y + h * 0.62f - 3.0f), ImVec2(x + keyW * 0.48f, origin.y + h * 0.62f - 1.0f),
-                                 rootTickCol, 1.0f);
-            if (note == lastIn)
-               dl->AddRect(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
-                          lastPassed ? IM_COL32(120, 200, 255, 255) : IM_COL32(255, 96, 86, 255), 2.0f, 0, 2.0f);
-         }
+         const int pc = ((note - root) % 12 + 12) % 12;
+         lit[note] = note >= rangeLow && note <= rangeHigh && MusicTime::ScaleContainsPitchClass(scale, pc);
       }
 
-      // Off-window indicator: with the window sized to contain the whole
-      // range this should only fire when the range itself spans more than
-      // the 4-octave cap, but it must never again be possible for the strip
-      // to render fully dark with no explanation (defect 3).
-      const ImU32 clipCol = isLight ? IM_COL32(200, 60, 50, 230) : IM_COL32(255, 120, 100, 230);
-      if (clippedLeft)
-      {
-         const float cx = origin.x + 7.0f, cy = origin.y + h * 0.5f;
-         dl->AddTriangleFilled(ImVec2(cx, cy - 5.0f), ImVec2(cx, cy + 5.0f), ImVec2(cx - 6.0f, cy), clipCol);
-      }
-      if (clippedRight)
-      {
-         const float cx = br.x - 7.0f, cy = origin.y + h * 0.5f;
-         dl->AddTriangleFilled(ImVec2(cx, cy - 5.0f), ImVec2(cx, cy + 5.0f), ImVec2(cx + 6.0f, cy), clipCol);
-      }
-
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
-      ImGui::Dummy(ImVec2(w, h));
+      DrawMidiKeyboard(lit, lowNote, octaves, n->LastNoteIn(), n->LastPassed());
    }
 
    void DrawNoteFilterBody(GraphNode& gn, NoteFilterNode* n)
    {
       char stat[96];
       if (n->LastNoteIn() < 0)
+      {
+         // Truthful in both modes (node-ui-pillars P9): when useGlobalScale
+         // is on, n->scale is the disabled/greyed field, not what's actually
+         // gating - the status text has to name the effective scale instead.
+         int effScale, effRoot;
+         NoteFilterEffectiveScale(n, effScale, effRoot);
          snprintf(stat, sizeof(stat), "%s in %s%d..%s%d",
-                  MusicTime::ScaleTable(n->scale).name, NoteNameList()[n->rangeLow % 12].c_str(),
+                  MusicTime::ScaleTable(effScale).name, NoteNameList()[n->rangeLow % 12].c_str(),
                   n->rangeLow / 12 - 1, NoteNameList()[n->rangeHigh % 12].c_str(), n->rangeHigh / 12 - 1);
+      }
       else
          snprintf(stat, sizeof(stat), "last: %s%d - %s", NoteNameList()[n->LastNoteIn() % 12].c_str(),
                   n->LastNoteIn() / 12 - 1, n->LastPassed() ? "passed" : "blocked");
