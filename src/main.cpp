@@ -16165,11 +16165,13 @@ namespace
       EndAudioBody();
    }
 
-   // Shared rate control for Chorus/Flanger/Phaser - a rateDiv dropdown when
-   // synced, a free-Hz knob when not - added as the next cell of an
-   // already-open AudioKnobRow so it sits alongside the effect's other
-   // knobs instead of claiming a row of its own.
-   void AddSyncedRateCell(AudioKnobRow& row, AudioEffectNode* n)
+   // Shared rate control for Tremolo/Chorus/Flanger/Phaser - a rateDiv
+   // dropdown when synced, a free-Hz knob when not - added as the next cell
+   // of an already-open AudioKnobRow so it sits alongside the effect's other
+   // knobs instead of claiming a row of its own. `rateLo`/`rateHi` match
+   // each effect's own EffectDefs "rate" range (Tremolo's is 0.05-20 Hz;
+   // Chorus/Flanger/Phaser share 0.02-5 Hz, the default here).
+   void AddSyncedRateCell(AudioKnobRow& row, AudioEffectNode* n, float rateLo = 0.02f, float rateHi = 5.0f)
    {
       const bool sync = n->Param("sync") != 0.0f;
       if (sync)
@@ -16178,36 +16180,62 @@ namespace
             PushUndoCheckpoint();
             *n->ParamPtr("rateDiv") = (float)i;
          });
+         // The free-Hz knob isn't drawn while synced, but it still must
+         // consume a gParamCounter ordinal - same trick, same reason, as
+         // DrawRateModeControls' reserved-slot comment above: ordinals are
+         // assigned by draw order, and the dropdown just drawn is a
+         // *discrete* param (numbered from a hash of its label, see
+         // DiscreteParamSlot) that doesn't touch gParamCounter at all. Skipping
+         // the knob call here would leave this cell consuming zero ordinals
+         // while synced versus one while free, shifting every later
+         // gParamCounter-numbered control in the body (this effect's own
+         // "mix") down by one the instant sync flips, silently repointing
+         // whatever cable was patched into it.
+         ParamRef rateSlot;
+         rateSlot.nodeIndex = gCurrentNodeIndex;
+         rateSlot.paramIndex = gParamCounter++;
+         rateSlot.value = n->ParamPtr("rate");
+         rateSlot.minValue = rateLo;
+         rateSlot.maxValue = rateHi;
+         rateSlot.name = "rate";
+         Modulation::Instance().RegisterParam(rateSlot);
       }
       else
       {
-         row.Knob("rate", n->ParamPtr("rate"), 0.02f, 5.0f, "%.2f Hz", kKnobLarge);
+         row.Knob("rate", n->ParamPtr("rate"), rateLo, rateHi, "%.2f Hz", kKnobLarge);
       }
    }
 
-   // "sync to tempo" toggle, drawn below the knob rows.
-   void DrawSyncToggle(AudioEffectNode* n, const char* checkboxId)
+   // Shared [rate-mode v][rate] pair for the four AudioEffects with a
+   // tempo-sync toggle (Tremolo, Chorus, Flanger, Phaser) - the effect-side
+   // equivalent of the note generators' DrawRateModeControls. Cell 1 is a
+   // Synced/Free dropdown replacing the old free-floating/row "sync to
+   // tempo" checkbox (see node-ui-pillars P1/P3); cell 2 is
+   // AddSyncedRateCell's existing rate-division-dropdown-or-Hz-knob cell.
+   //
+   // `syncLabel` must be the exact label id the node's old sync checkbox
+   // used (e.g. "sync to tempo##chorusSync"). Discrete params are numbered
+   // from a hash of their label, not from draw order (DiscreteParamSlot), so
+   // reusing the old label keeps this dropdown on the same pin address the
+   // checkbox occupied - an already-saved patch's modulation binding on the
+   // sync toggle, if any, still resolves to this control rather than going
+   // permanently inactive. Note this does flip that binding's polarity: a
+   // cable driving the old checkbox toward 1.0 meant "synced"; driving this
+   // 2-option dropdown ("Synced" first, matching the note-generator
+   // convention this mirrors) toward 1.0 now selects "Free" instead. That
+   // narrow case - a cable bound specifically to the sync toggle itself - is
+   // an accepted, documented consequence of the checkbox-to-dropdown
+   // conversion; `depth`/`rate`/`mix` bindings are unaffected.
+   void AddRateModeCells(AudioKnobRow& row, AudioEffectNode* n, const char* syncLabel,
+                         float rateLo = 0.02f, float rateHi = 5.0f)
    {
-      bool sync = n->Param("sync") != 0.0f;
-      if (ModCheckbox(checkboxId, &sync))
-      {
+      static const std::vector<std::string> kSyncModes = { "Synced", "Free" };
+      const bool sync = n->Param("sync") != 0.0f;
+      row.Dropdown(syncLabel, kSyncModes, sync ? 0 : 1, [n](int i) {
          PushUndoCheckpoint();
-         *n->ParamPtr("sync") = sync ? 1.0f : 0.0f;
-      }
-   }
-
-   // Grid-aware overload for a toggle row already opened as an AudioKnobRow
-   // (P1) - takes the same cell it would have taken as a bare ModCheckbox,
-   // just via row.Checkbox so it shares the row's column edges and pin
-   // centring instead of floating on a SameLine strip.
-   void DrawSyncToggle(AudioKnobRow& row, AudioEffectNode* n, const char* checkboxId)
-   {
-      bool sync = n->Param("sync") != 0.0f;
-      if (row.Checkbox(checkboxId, &sync))
-      {
-         PushUndoCheckpoint();
-         *n->ParamPtr("sync") = sync ? 1.0f : 0.0f;
-      }
+         *n->ParamPtr("sync") = (i == 0) ? 1.0f : 0.0f;
+      });
+      AddSyncedRateCell(row, n, rateLo, rateHi);
    }
 
    // ---- Chorus -------------------------------------------------------------
@@ -16301,16 +16329,25 @@ namespace
          row.End();
       }
       {
-         AudioKnobRow row(3);
+         // 4 cells: selector column left (mode v, rate), knobs right
+         // (feedback, mix) - mix stays bottom-right (P4). `row.index` is set
+         // explicitly before each call so the *visual* cell a control lands
+         // in can differ from its *draw order* - feedback and mix are still
+         // called first and second, exactly as before, so their
+         // gParamCounter ordinals (and any existing patch's modulation
+         // bindings on them) don't move; only where they're drawn does.
+         AudioKnobRow row(4);
+         row.index = 2;
          row.Knob("feedback", n->ParamPtr("feedback"), 0.0f, 0.9f, "%.2f", kKnobLarge);
+         row.index = 3;
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
-         AddSyncedRateCell(row, n);
+         row.index = 0;
+         AddRateModeCells(row, n, "sync to tempo##chorusSync");
          row.End();
       }
 
       {
-         AudioKnobRow row(3);
-         DrawSyncToggle(row, n, "sync to tempo##chorusSync");
+         AudioKnobRow row(4);
          bool taps3 = n->Param("taps") >= 2.5f;
          if (row.Checkbox("3 taps##chorusTaps", &taps3))
          {
@@ -16323,6 +16360,8 @@ namespace
             PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
+         row.Skip();
+         row.Skip();
          row.End();
       }
 
@@ -16426,21 +16465,27 @@ namespace
          row.End();
       }
       {
-         AudioKnobRow row(2);
+         // Selector column left (mode v, rate), mix bottom-right (P4). mix
+         // is still called first so its ordinal doesn't move - see the
+         // matching comment in DrawChorusBody.
+         AudioKnobRow row(3);
+         row.index = 2;
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
-         AddSyncedRateCell(row, n);
+         row.index = 0;
+         AddRateModeCells(row, n, "sync to tempo##flangerSync");
          row.End();
       }
 
       {
-         AudioKnobRow row(2);
-         DrawSyncToggle(row, n, "sync to tempo##flangerSync");
+         AudioKnobRow row(3);
          bool analogBool = analog;
          if (row.Checkbox("analog##flangerAnalog", &analogBool))
          {
             PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
+         row.Skip();
+         row.Skip();
          row.End();
       }
 
@@ -16550,22 +16595,30 @@ namespace
          row.End();
       }
       {
-         AudioKnobRow row(3);
+         // 4 cells: selector column left (mode v, rate), knobs right
+         // (spread, mix) - mix stays bottom-right (P4). spread/mix are still
+         // called first and second, exactly as before, so their ordinals
+         // don't move - see the matching comment in DrawChorusBody.
+         AudioKnobRow row(4);
+         row.index = 2;
          row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.index = 3;
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
-         AddSyncedRateCell(row, n);
+         row.index = 0;
+         AddRateModeCells(row, n, "sync to tempo##phaserSync");
          row.End();
       }
 
       {
-         AudioKnobRow row(3);
-         DrawSyncToggle(row, n, "sync to tempo##phaserSync");
+         AudioKnobRow row(4);
          bool analogBool = analog;
          if (row.Checkbox("analog##phaserAnalog", &analogBool))
          {
             PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
+         row.Skip();
+         row.Skip();
          row.Skip();
          row.End();
       }
@@ -17234,40 +17287,29 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       {
+         // Selector column left (shape v), knobs right (depth, stereo).
+         // The dropdown is a discrete param (numbered from a hash of its
+         // label - DiscreteParamSlot) rather than a gParamCounter ordinal,
+         // so calling it first here costs "depth"/"stereo" nothing - they
+         // still get the same ordinals (0, 1) they always have.
          AudioKnobRow row(3);
-         row.Knob("depth", n->ParamPtr("depth"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          const int shape = (int)(n->Param("shape") + 0.5f);
          static const std::vector<std::string> kShapeNames = { "sine", "triangle", "square", "ramp down" };
          row.Dropdown("shape", kShapeNames, shape, [n](int i) {
             PushUndoCheckpoint();
             *n->ParamPtr("shape") = (float)i;
          });
+         row.Knob("depth", n->ParamPtr("depth"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("stereo", n->ParamPtr("stereoPhase"), 0.0f, 180.0f, "%.0f deg", kKnobLarge);
          row.End();
       }
       {
+         // Selector column left (mode v, rate), mix bottom-right (P4). Rate
+         // is still called before mix, exactly as before, so mix's ordinal
+         // doesn't move.
          AudioKnobRow row(3);
-         if (n->Param("sync") != 0.0f)
-         {
-            row.Dropdown("rate", MusicTime::RateDivisionList(), (int)(n->Param("rateDiv") + 0.5f), [n](int i) {
-               PushUndoCheckpoint();
-               *n->ParamPtr("rateDiv") = (float)i;
-            });
-         }
-         else
-         {
-            row.Knob("rate", n->ParamPtr("rate"), 0.05f, 20.0f, "%.2f Hz", kKnobLarge);
-         }
-         row.Skip();
+         AddRateModeCells(row, n, "sync to tempo##tremoloSync", 0.05f, 20.0f);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.End();
-      }
-
-      {
-         AudioKnobRow row(3);
-         DrawSyncToggle(row, n, "sync to tempo##tremoloSync");
-         row.Skip();
-         row.Skip();
          row.End();
       }
 
