@@ -13125,12 +13125,21 @@ namespace
       ModSlider("glide (ms)", &n->glideMs, 0.0f, 2000.0f);
    }
 
-   // Two-octave keyboard centred on the filter's root, coloured by what the
-   // gate would do to each pitch - computed purely from params (main thread
-   // only, redraws every frame like DrawADSRVisualizer), plus one live marker
-   // for the last note the audio thread actually saw: a ring around the key,
-   // coloured by whether it passed. That marker is the only thing read from
-   // the audio side, via the same two-atomic publish LastNote() uses.
+   // A real C-anchored keyboard (the white/black layout is a property of C,
+   // never of the root - see node-ui-pillars P9) whose window scrolls/sizes
+   // to contain rangeLow..rangeHigh, coloured by what the gate would do to
+   // each pitch - computed purely from params (main thread only, redraws
+   // every frame like DrawADSRVisualizer), plus one live marker for the last
+   // note the audio thread actually saw: a ring around the key, coloured by
+   // whether it passed. That marker is the only thing read from the audio
+   // side, via the same two-atomic publish LastNote() uses.
+   //
+   // AudioNoteFilterNode::Process (NoteNodes.cpp) snaps an off-scale note to
+   // its nearest in-scale neighbour rather than rejecting it outright, then
+   // range-gates the snapped result - so the picture needs three states, not
+   // two: in-range-and-in-scale passes untouched (full bright); in-range-but-
+   // off-scale still passes, just moved (a distinct dimmer/tinted "snapped"
+   // state); out-of-range is dropped (dark).
    void DrawNoteFilterVisualizer(NoteFilterNode* n)
    {
       const float w = gAudioBodyW, h = 58.0f;
@@ -13144,24 +13153,58 @@ namespace
       static const int kWhiteOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
       static const int kBlackOffsets[5] = { 1, 3, 6, 8, 10 };
       static const float kBlackSlot[5] = { 0.0f, 1.0f, 3.0f, 4.0f, 5.0f };
-      const int octaves = 2;
-      const int lowNote = std::clamp(48 + n->root, 0, 108); // one octave below/above middle C, centred on root
+
+      const int rangeLow = std::clamp(n->rangeLow, 0, 127);
+      const int rangeHigh = std::clamp(n->rangeHigh, rangeLow, 127);
+
+      // Size a 2-4 octave window to contain the whole range, centred on its
+      // midpoint, anchored to a C (defect 3) - never anchored to root
+      // (defect 1). Keyboard layout stays a real instrument regardless of
+      // what scale/root is selected; only which pitch classes light up
+      // changes with those.
+      const int octaves = std::clamp((rangeHigh - rangeLow) / 12 + 2, 2, 4);
+      const int windowSemitones = octaves * 12;
+      const int mid = (rangeLow + rangeHigh) / 2;
+      const int maxLowNote = std::max(0, ((128 - windowSemitones) / 12) * 12);
+      const int lowNote = std::clamp(((mid - windowSemitones / 2) / 12) * 12, 0, maxLowNote);
+      const bool clippedLeft = rangeLow < lowNote;
+      const bool clippedRight = rangeHigh > lowNote + windowSemitones - 1;
+
       const int whiteCount = 7 * octaves;
       const float keyW = (w - 4.0f) / (float)whiteCount;
       const int lastIn = n->LastNoteIn();
       const bool lastPassed = n->LastPassed();
 
-      auto KeyColor = [n, isLight](int note, bool isWhite) -> ImU32 {
-         const bool inRange = note >= n->rangeLow && note <= n->rangeHigh;
+      enum class KeyState { OutOfRange, Snapped, Active };
+      auto NoteState = [n, rangeLow, rangeHigh](int note) -> KeyState {
+         if (note < rangeLow || note > rangeHigh)
+            return KeyState::OutOfRange;
          const int pc = ((note - n->root) % 12 + 12) % 12;
-         const bool inScale = MusicTime::ScaleContainsPitchClass(n->scale, pc);
-         const bool active = inRange && inScale;
-         if (isWhite)
-            return active ? (isLight ? IM_COL32(250, 250, 255, 255) : IM_COL32(206, 210, 222, 255))
-                          : (isLight ? IM_COL32(200, 205, 218, 255) : IM_COL32(72, 76, 90, 255));
-         return active ? (isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255))
-                       : (isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(26, 28, 36, 255));
+         return MusicTime::ScaleContainsPitchClass(n->scale, pc) ? KeyState::Active : KeyState::Snapped;
       };
+
+      auto KeyColor = [isLight](KeyState state, bool isWhite) -> ImU32 {
+         if (isWhite)
+         {
+            switch (state)
+            {
+               case KeyState::Active:  return isLight ? IM_COL32(250, 250, 255, 255) : IM_COL32(206, 210, 222, 255);
+               case KeyState::Snapped: return isLight ? IM_COL32(255, 214, 150, 255) : IM_COL32(150, 122, 70, 255);
+               default:                return isLight ? IM_COL32(200, 205, 218, 255) : IM_COL32(72, 76, 90, 255);
+            }
+         }
+         switch (state)
+         {
+            case KeyState::Active:  return isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255);
+            case KeyState::Snapped: return isLight ? IM_COL32(205, 140, 40, 255) : IM_COL32(130, 95, 40, 255);
+            default:                return isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(26, 28, 36, 255);
+         }
+      };
+
+      // Root tick: a small bar at the bottom of every key whose pitch class
+      // is the root, so the root stays readable without moving the layout
+      // (the convention every DAW scale-highlight uses).
+      const ImU32 rootTickCol = isLight ? IM_COL32(30, 30, 40, 220) : IM_COL32(235, 235, 245, 220);
 
       for (int o = 0; o < octaves; o++)
       {
@@ -13170,7 +13213,10 @@ namespace
             const int note = lowNote + o * 12 + kWhiteOffsets[k];
             const float x = origin.x + 2.0f + (float)(o * 7 + k) * keyW;
             dl->AddRectFilled(ImVec2(x + 0.5f, origin.y + 3.0f), ImVec2(x + keyW - 0.5f, br.y - 3.0f),
-                              KeyColor(note, true), 2.0f);
+                              KeyColor(NoteState(note), true), 2.0f);
+            if (((note - n->root) % 12 + 12) % 12 == 0)
+               dl->AddRectFilled(ImVec2(x + keyW * 0.35f, br.y - 6.0f), ImVec2(x + keyW * 0.65f, br.y - 4.0f),
+                                 rootTickCol, 1.0f);
             if (note == lastIn)
                dl->AddRect(ImVec2(x + 1.0f, origin.y + 4.0f), ImVec2(x + keyW - 1.0f, br.y - 4.0f),
                           lastPassed ? IM_COL32(120, 200, 255, 255) : IM_COL32(255, 96, 86, 255), 2.0f, 0, 2.0f);
@@ -13183,11 +13229,30 @@ namespace
             const int note = lowNote + o * 12 + kBlackOffsets[k];
             const float x = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[k] + 1.0f) * keyW - keyW * 0.3f;
             dl->AddRectFilled(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
-                              KeyColor(note, false), 2.0f);
+                              KeyColor(NoteState(note), false), 2.0f);
+            if (((note - n->root) % 12 + 12) % 12 == 0)
+               dl->AddRectFilled(ImVec2(x + keyW * 0.12f, origin.y + h * 0.62f - 3.0f), ImVec2(x + keyW * 0.48f, origin.y + h * 0.62f - 1.0f),
+                                 rootTickCol, 1.0f);
             if (note == lastIn)
                dl->AddRect(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
                           lastPassed ? IM_COL32(120, 200, 255, 255) : IM_COL32(255, 96, 86, 255), 2.0f, 0, 2.0f);
          }
+      }
+
+      // Off-window indicator: with the window sized to contain the whole
+      // range this should only fire when the range itself spans more than
+      // the 4-octave cap, but it must never again be possible for the strip
+      // to render fully dark with no explanation (defect 3).
+      const ImU32 clipCol = isLight ? IM_COL32(200, 60, 50, 230) : IM_COL32(255, 120, 100, 230);
+      if (clippedLeft)
+      {
+         const float cx = origin.x + 7.0f, cy = origin.y + h * 0.5f;
+         dl->AddTriangleFilled(ImVec2(cx, cy - 5.0f), ImVec2(cx, cy + 5.0f), ImVec2(cx - 6.0f, cy), clipCol);
+      }
+      if (clippedRight)
+      {
+         const float cx = br.x - 7.0f, cy = origin.y + h * 0.5f;
+         dl->AddTriangleFilled(ImVec2(cx, cy - 5.0f), ImVec2(cx, cy + 5.0f), ImVec2(cx + 6.0f, cy), clipCol);
       }
 
       dl->PopClipRect();
@@ -13199,9 +13264,9 @@ namespace
    {
       char stat[96];
       if (n->LastNoteIn() < 0)
-         snprintf(stat, sizeof(stat), "%s in %s..%s",
+         snprintf(stat, sizeof(stat), "%s in %s%d..%s%d",
                   MusicTime::ScaleTable(n->scale).name, NoteNameList()[n->rangeLow % 12].c_str(),
-                  NoteNameList()[n->rangeHigh % 12].c_str());
+                  n->rangeLow / 12 - 1, NoteNameList()[n->rangeHigh % 12].c_str(), n->rangeHigh / 12 - 1);
       else
          snprintf(stat, sizeof(stat), "last: %s%d - %s", NoteNameList()[n->LastNoteIn() % 12].c_str(),
                   n->LastNoteIn() / 12 - 1, n->LastPassed() ? "passed" : "blocked");
