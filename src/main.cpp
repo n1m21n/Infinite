@@ -14574,7 +14574,19 @@ namespace
       bool dragIsQ = false; // which handle the current drag (if any) is grabbing
    };
    std::map<int, FilterCurveCache> gFilterCurveCache;
-   const double kFilterCurveThrottleSec = 0.05; // ~20 Hz cap on the full recompute while dragging
+   // Throttling *how often* the recompute fires (below) caps it at ~12.5Hz,
+   // but that alone isn't enough: a full 160-point AudioFilterDsp::MagnitudeDb
+   // sweep is a real settle-then-measure simulation per point (up to ~8000
+   // samples each, each involving a sin() call) and measures ~10-15ms on its
+   // own at Q=18/48kHz - comparable to or larger than an entire 60fps frame
+   // budget (16.6ms), so even a throttled recompute still stalls the frame it
+   // lands on. kFilterCurveDragPoints cuts the *cost* of each recompute by
+   // dropping the point count while a drag is live (measured ~3-5x cheaper at
+   // 48 points) - full kFilterCurveFullPoints resolution always returns the
+   // instant the drag ends.
+   const double kFilterCurveThrottleSec = 0.08; // ~12.5 Hz cap on the full recompute while dragging
+   const int kFilterCurveDragPoints = 48;
+   const int kFilterCurveFullPoints = 160;
 
    const float kFilterVizMinHz = 20.0f;
    const float kFilterVizMaxHz = 20000.0f;
@@ -14689,7 +14701,6 @@ namespace
 
       std::vector<float> sig{ (float)sampleRate, type, freq, q, gain };
       FilterCurveCache& cache = gFilterCurveCache[gCurrentNodeIndex];
-      const int kNumPoints = 160;
 
       // Throttle the full recompute while a drag is actively changing the
       // signature every frame - see the FilterCurveCache comment above for
@@ -14702,6 +14713,10 @@ namespace
       const double now = ImGui::GetTime();
       const bool throttled = dragging && cache.lastRecomputeTime >= 0.0 &&
                              (now - cache.lastRecomputeTime) < kFilterCurveThrottleSec;
+      // Coarser while a drag is live (see kFilterCurveDragPoints comment
+      // above); the mouse-up frame has dragging=false, so it always recomputes
+      // at full resolution the instant the drag ends.
+      const int kNumPoints = dragging ? kFilterCurveDragPoints : kFilterCurveFullPoints;
       if (cache.signature != sig && !throttled)
       {
          cache.signature = sig;
@@ -14715,16 +14730,34 @@ namespace
          }
       }
 
-      // Live LFO sweep animation (envAmount != 0): the cached curve above is
-      // always computed at the *base* freq (never at LFO-shifted freq, so
-      // the expensive MagnitudeDb recompute never has to run every frame
-      // just because the LFO is running) - octaves of cutoff shift instead
-      // just translate the whole curve at a constant offset along the log-
-      // frequency x-axis, since the response of these filter types depends
-      // only on the ratio of the eval frequency to the cutoff, not on the
-      // cutoff's absolute position. Free (no MagnitudeDb calls) and exact
-      // for SVF LP/HP/BP/notch; a very close approximation for the shelf/
-      // peak biquad types this close to Nyquist. `lfoOut` is read from the
+      // The base curve and its handles below always reflect the actual
+      // knob-set freq/Q/gain and never move on their own - a curve that
+      // silently shifts out from under a value the knobs still show is a P9
+      // truthfulness violation. `cache.curveDb.size()` (not `kNumPoints`,
+      // which reflects *this frame's* drag state and can be one frame stale
+      // relative to the cache on the exact mouse-release frame) is the
+      // source of truth for how many points are actually cached.
+      const int cachedPoints = (int)cache.curveDb.size();
+      dl->PathClear();
+      for (int i = 0; i < cachedPoints; i++)
+      {
+         const float x = origin.x + (float)i * (w / (float)(cachedPoints - 1));
+         const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
+         dl->PathLineTo(ImVec2(x, y));
+      }
+      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+
+      // Live LFO sweep indicator (envAmount != 0): a second curve, in yellow,
+      // overlaid on top of the static base curve above - it never replaces
+      // or moves the base curve/handles, purely an animated readout of where
+      // the internal LFO currently has the cutoff swept to. Reuses the same
+      // cached curveDb array (translated in x), so this costs nothing extra
+      // in MagnitudeDb calls - octaves of cutoff shift are a constant
+      // pixel-space offset along the log-frequency axis, since the response
+      // of these filter types depends only on the ratio of the eval
+      // frequency to the cutoff, not the cutoff's absolute position (exact
+      // for SVF LP/HP/BP/notch, a close approximation for the shelf/peak
+      // biquad types this close to Nyquist). `lfoOut` is read from the
       // kernel's own audio-thread LFO (AudioFilterKernel::mLfoMeter) via the
       // existing ExtraMeterValue MeterRing readback, same discipline as
       // Dynamics' GR-bar dot - no new cross-thread mechanism.
@@ -14733,15 +14766,17 @@ namespace
       const float totalOctaves = envAmount * lfoOut * 4.0f;
       const float pixelsPerOctave = w * logf(2.0f) / (logf(kFilterVizMaxHz) - logf(kFilterVizMinHz));
       const float deltaX = totalOctaves * pixelsPerOctave;
-
-      dl->PathClear();
-      for (int i = 0; i < kNumPoints; i++)
+      if (envAmount != 0.0f)
       {
-         const float x = origin.x + (float)i * (w / (float)(kNumPoints - 1)) + deltaX;
-         const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
-         dl->PathLineTo(ImVec2(x, y));
+         dl->PathClear();
+         for (int i = 0; i < cachedPoints; i++)
+         {
+            const float x = origin.x + (float)i * (w / (float)(cachedPoints - 1)) + deltaX;
+            const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
+            dl->PathLineTo(ImVec2(x, y));
+         }
+         dl->PathStroke(IM_COL32(255, 205, 60, 210), 0, 1.5f);
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       // Two handles sharing the single ##filterCurve button above - the
       // round one sets freq/gain, the diamond sets Q. Q used to ride the
@@ -14785,14 +14820,12 @@ namespace
             *n->ParamPtr("gain") = FilterVizYToDb(m.y, origin.y, h);
       }
 
-      // Drawn (possibly LFO-shifted) handle position - drag hit-testing
-      // above stays against the *base* `hx`, so grabbing the handle is
-      // unaffected by where the sweep happens to have moved it visually.
-      const float hxDraw = hx + deltaX;
-
+      // Handle stays at the real (non-LFO-shifted) freq/gain - it's the
+      // knob-set value, and only the yellow overlay above should visually
+      // sweep.
       const bool mainNear = isNear && !(active && cache.dragIsQ);
-      dl->AddCircleFilled(ImVec2(hxDraw, hy), mainNear ? 5.0f : 3.6f, IM_COL32(235, 245, 255, 255), 12);
-      dl->AddCircle(ImVec2(hxDraw, hy), mainNear ? 5.0f : 3.6f, IM_COL32(20, 24, 32, 220), 12, 1.5f);
+      dl->AddCircleFilled(ImVec2(hx, hy), mainNear ? 5.0f : 3.6f, IM_COL32(235, 245, 255, 255), 12);
+      dl->AddCircle(ImVec2(hx, hy), mainNear ? 5.0f : 3.6f, IM_COL32(20, 24, 32, 220), 12, 1.5f);
 
       // Diamond handle for Q, offset beside the main dot so both stay
       // visually distinct.
