@@ -10,6 +10,7 @@ void FlangerKernel::PushParams(const AudioEffectNode& node, double sampleRate)
    mMailbox.Push(kDepthMs, node.Param("depth"));
    mMailbox.Push(kRateHz, node.Param("rate"));
    mMailbox.Push(kFeedback, node.Param("feedback"));
+   mMailbox.Push(kSpread, node.Param("spread"));
    mSync.store(node.Param("sync") != 0.0f ? 1 : 0, std::memory_order_relaxed);
    mRateDiv.store(std::clamp((int)(node.Param("rateDiv") + 0.5f), 0, MusicTime::kNumRateDivisions - 1),
                   std::memory_order_relaxed);
@@ -37,6 +38,7 @@ void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
       else
          rateHz = std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
       const float feedback = std::clamp(mMailbox.SmoothedValue(kFeedback), -0.95f, 0.95f);
+      const float spread = std::clamp(mMailbox.SmoothedValue(kSpread), 0.0f, 1.0f);
 
       mPhase += rateHz / mSampleRate;
       if (mPhase >= 1.0)
@@ -50,7 +52,7 @@ void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
          const float lfoDrift = mDriftLfo.Advance(std::max(0.1f, rateHz), 0.15f, 0.05f, mSampleRate) * 0.05f;
          const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + lfoDrift)), 0.2f, lineCapacityMs);
          const float rMs = std::clamp(
-            delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + 0.25f + lfoDrift)), 0.2f, lineCapacityMs);
+            delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f + lfoDrift)), 0.2f, lineCapacityMs);
 
          float delayedL = mLineL.Read(lMs * 0.001f * (float)mSampleRate);
          float delayedR = mLineR.Read(rMs * 0.001f * (float)mSampleRate);
@@ -72,7 +74,7 @@ void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
       {
          const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * (float)mPhase), 0.2f, lineCapacityMs);
          const float rMs = std::clamp(
-            delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + 0.25f)), 0.2f, lineCapacityMs);
+            delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f)), 0.2f, lineCapacityMs);
 
          const float delayedL = mLineL.Read(lMs * 0.001f * (float)mSampleRate);
          const float delayedR = mLineR.Read(rMs * 0.001f * (float)mSampleRate);

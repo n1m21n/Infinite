@@ -16504,7 +16504,7 @@ namespace
          dl->PathStroke(isLight ? IM_COL32(30, 110, 230, alpha) : IM_COL32(150, 214, 255, alpha), 0, 1.4f + std::fabs(feedback) * 2.2f);
       };
       drawWet(0.0f, 235);
-      drawWet(0.25f, 120);
+      drawWet(n->Param("spread") * 0.5f, 120);
 
       char buf[24];
       snprintf(buf, sizeof(buf), "%.2f ms", delayMs);
@@ -16548,26 +16548,43 @@ namespace
          row.End();
       }
       {
-         // Selector column left (mode v, rate), mix bottom-right (P4). mix
-         // is still called first so its ordinal doesn't move - see the
-         // matching comment in DrawChorusBody.
+         // 3 cells: rate | spread | mix - mix stays bottom-right of the
+         // last knob row (P4). row.index is set explicitly before each
+         // call so the *visual* cell a control lands in can differ from
+         // its *draw order* - see the matching comment in DrawChorusBody.
+         // AddSyncedRateCell is called last, exactly as it was before (via
+         // AddRateModeCells), so rate's ordinal is unaffected.
          AudioKnobRow row(3);
+         row.index = 1;
+         row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.index = 2;
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.index = 0;
-         AddRateModeCells(row, n, "sync to tempo##flangerSync");
+         AddSyncedRateCell(row, n, 0.02f, 5.0f);
          row.End();
       }
 
       {
+         // 3 cells, all used: sync dropdown left (P3), then the analog
+         // checkbox, then a skip - matching Chorus/Phaser's row 3 (P6). The
+         // dropdown keeps the exact label id ("sync to tempo##flangerSync")
+         // the old AddRateModeCells call used here, matching the
+         // discrete-param hash-based addressing AddRateModeCells' own
+         // comment documents - any existing patch's modulation binding on
+         // the sync control still resolves to this control even though it
+         // moved rows.
          AudioKnobRow row(3, 20.0f, 8.0f, false);
+         static const std::vector<std::string> kSyncModes = { "Synced", "Free" };
+         row.Dropdown("sync to tempo##flangerSync", kSyncModes, sync ? 0 : 1, [n](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr("sync") = (i == 0) ? 1.0f : 0.0f;
+         });
          bool analogBool = analog;
          if (row.Checkbox("analog##flangerAnalog", &analogBool))
          {
             PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
-         row.Skip();
          row.Skip();
          row.End();
       }

@@ -25,6 +25,7 @@ public:
       kDepthMs,
       kRateHz,
       kFeedback,
+      kSpread,
       kNumSlots
    };
 
