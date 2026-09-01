@@ -14295,8 +14295,11 @@ namespace
       {
          // Same 4-cell grid as the Record/Play/Stop/Clear strip above, so
          // `loop` lands directly under Record instead of floating at the
-         // body's left edge under an unrelated cell count.
-         AudioKnobRow row(4);
+         // body's left edge under an unrelated cell count. Small explicit
+         // height (matches the Flanger/Phaser trailing-checkbox-row
+         // precedent) since a lone checkbox doesn't need full knob height
+         // plus a caption-line reservation.
+         AudioKnobRow row(4, 20.0f, 8.0f, false);
          row.Checkbox("loop##capturerLoop", &n->loop);
          row.Skip();
          row.Skip();
