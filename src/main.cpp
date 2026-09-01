@@ -4004,7 +4004,7 @@ namespace
       style.Colors[ImGuiCol_ChildBg] = vec(t.panelBg, 0.0f);
       style.Colors[ImGuiCol_PopupBg] = vec(t.panelBg, 0.98f);
       style.Colors[ImGuiCol_Border] = vec(t.border);
-      style.Colors[ImGuiCol_FrameBg] = vec(t.panelBg);
+      style.Colors[ImGuiCol_FrameBg] = shade(t.panelBg, 0.08f);
       style.Colors[ImGuiCol_FrameBgHovered] = shade(t.panelBg, 0.14f);
       style.Colors[ImGuiCol_FrameBgActive] = shade(t.panelBg, 0.24f);
       style.Colors[ImGuiCol_TitleBg] = vec(t.windowBg);
@@ -16427,7 +16427,7 @@ namespace
          // hash-based addressing AddRateModeCells' own comment documents -
          // any existing patch's modulation binding on the sync control
          // still resolves to this control even though it moved rows.
-         AudioKnobRow row(3);
+         AudioKnobRow row(3, 20.0f, 8.0f, false);
          static const std::vector<std::string> kSyncModes = { "Synced", "Free" };
          row.Dropdown("sync to tempo##chorusSync", kSyncModes, sync ? 0 : 1, [n](int i) {
             PushUndoCheckpoint();
@@ -16709,7 +16709,7 @@ namespace
          // hash-based addressing AddRateModeCells' own comment documents -
          // any existing patch's modulation binding on the sync control
          // still resolves to this control even though it moved rows.
-         AudioKnobRow row(3);
+         AudioKnobRow row(3, 20.0f, 8.0f, false);
          static const std::vector<std::string> kSyncModes = { "Synced", "Free" };
          row.Dropdown("sync to tempo##phaserSync", kSyncModes, sync ? 0 : 1, [n](int i) {
             PushUndoCheckpoint();
