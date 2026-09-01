@@ -160,7 +160,11 @@ void AudioEffectNode::CookIfNeeded(int frameId)
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioEffectRuntime>(mDef);
 
-   mAudioNode->PushMix(mix);
+   // EQ has no mix control on its body (the "output" section was removed
+   // entirely) - always push fully wet regardless of whatever value happens
+   // to be stored in `mix` (e.g. carried over from an older save), rather
+   // than leaving it silently blended with no UI to see or fix it.
+   mAudioNode->PushMix(mDef.forceFullyWet ? 1.0f : mix);
    // A kernel that derives run-time coefficients (Audio Filter's tan()) needs
    // the real device rate; falls back to a sane default when no device is
    // open yet so a patch built before pressing play still shows a sensible

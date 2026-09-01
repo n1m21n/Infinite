@@ -114,6 +114,16 @@ struct EffectDef
    // audio-rate cutoff input, so this is table-driven rather than a name
    // special-case in AudioEffectNode::InputLabel.
    const char* sidechainLabel = "sidechain";
+   // True if this effect has no wet/dry mix control on its body (EQ - its
+   // "output" section, output gain + mix, was removed entirely per user
+   // request) and must therefore always run fully wet regardless of
+   // whatever value happens to be sitting in the universal `mix` field
+   // (e.g. a value carried over from an older save). AudioEffectNode::
+   // CookIfNeeded pushes 1.0 to the runtime instead of `mix` when this is
+   // set, rather than clamping/ignoring `mix` itself, so a saved patch's
+   // stored value is left untouched (VisitParams still round-trips it) -
+   // only its audio-thread effect is suppressed.
+   bool forceFullyWet = false;
 };
 
 const std::vector<EffectDef>& GetEffectDefs();

@@ -169,7 +169,14 @@ public:
                for (int c = 0; c < kCoeffsPerStage; c++)
                   coeffs[b][s][c] = mMailbox.SmoothedValue((b * kMaxStagesPerBand + s) * kCoeffsPerStage + c);
 
-         const float outputGain = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputGainSlot));
+         // Output gain hardcoded to unity (0 dB) - the "output" section
+         // (output gain + mix) was removed from DrawEqBody entirely, so this
+         // no longer reads outputGainDb/kOutputGainSlot at all. Keeping the
+         // slot/constant declared (PushParams simply never writes it, so it
+         // stays at the mailbox's zero-initialized default) rather than
+         // deleting them is what makes this a pure DSP hardcode with no
+         // save/load risk - see EqKernel.cpp's PushParams comment.
+         const float outputGain = 1.0f;
 
          for (int ch = 0; ch < numChannels; ch++)
          {

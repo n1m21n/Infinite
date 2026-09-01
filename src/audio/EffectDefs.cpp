@@ -142,13 +142,25 @@ namespace
                                     { { bandGain, 12.0f }, { bandFreq, 1000.0f } } });
          }
 
-         def.params.push_back({ "outputGainDb", -24.0f, 12.0f, 0.0f });
+         // Kept declared (name-keyed save/load, so an old patch's stored
+         // value still round-trips harmlessly) but marked uiOnly: the
+         // "output" section (this knob + the universal `mix` field) was
+         // removed from DrawEqBody per user request, and EqKernel::
+         // ProcessBlock now hardcodes 0 dB output gain regardless of this
+         // value - see EffectDef::forceFullyWet below for the matching mix
+         // story. No audio-thread effect by design, same as selectedBand.
+         def.params.push_back({ "outputGainDb", -24.0f, 12.0f, 0.0f, true });
          // UI-only: which band the Tier 1 knob row currently follows. No
          // audio-thread effect by design - the sweep reports it pass-with-a-
          // note rather than FAIL (EffectParamDef::uiOnly's whole purpose).
          def.params.push_back({ "selectedBand", 0.0f, 4.0f, 0.0f, true });
 
          def.makeKernel = []() { return std::make_unique<EqKernel>(); };
+         // No mix knob on the body either (removed with the output
+         // section) - always run fully wet so a saved patch's stored `mix`
+         // can't silently blend in dry signal with no control to see or fix
+         // it. See EffectDef::forceFullyWet's comment.
+         def.forceFullyWet = true;
          defs.push_back(std::move(def));
       }
 
@@ -751,11 +763,18 @@ const std::vector<EffectDef>& GetEffectDefs()
 
 namespace
 {
-   // Sweep-only prerequisite/candidate declarations for nodes that are NOT
-   // AudioEffectNode instances (Note Filter, and any future note-only node) -
-   // kept out of BuildEffectDefs() because every entry there gets registered
-   // as a spawnable AudioEffectNode (see main.cpp's GetEffectDefs() loop),
-   // which these node types must never be.
+   // Sweep-only prerequisite/candidate/uiOnly declarations for a param name
+   // that FindEffectParamDef can't find inside any EffectDef::params list -
+   // either because the node type isn't an AudioEffectNode instance at all
+   // (Note Filter, and any future note-only node - kept out of
+   // BuildEffectDefs() because every entry there gets registered as a
+   // spawnable AudioEffectNode, see main.cpp's GetEffectDefs() loop, which
+   // these node types must never be), or because the param is one of
+   // AudioEffectNode's *universal* fields (declared once on the C++ class,
+   // not per-EffectDef - e.g. `mix`, AudioEffectNode.h) for an effect that
+   // needs to override that field's normally-generic sweep behavior - EQ's
+   // `mix` below, forced fully-wet in the kernel with no body knob to drive
+   // it, same reasoning as outputGainDb's uiOnly entry in BuildEffectDefs().
    const std::vector<std::pair<std::string, EffectParamDef>>& ExtraParamDefs()
    {
       static const std::vector<std::pair<std::string, EffectParamDef>> extra = {
@@ -768,6 +787,14 @@ namespace
          // note (69) - none of them push rangeLow above it, so the note
          // never actually gets blocked and no difference is ever observed.
          { "Note Filter", { "rangeLow", 0.0f, 127.0f, 0.0f, false, {}, { 90.0f } } },
+         // EQ's "output" section (output gain + mix) was removed from the
+         // body entirely - AudioEffectNode::CookIfNeeded now always pushes
+         // 1.0 to the runtime for EQ (EffectDef::forceFullyWet) regardless
+         // of whatever value the universal `mix` field holds, so it
+         // legitimately has no audio-thread effect for EQ specifically
+         // (every other effect's `mix` still does, and stays generically
+         // testable - this entry is scoped to "EQ" only).
+         { "EQ", { "mix", 0.0f, 1.0f, 1.0f, true } },
       };
       return extra;
    }
@@ -782,7 +809,12 @@ const EffectParamDef* FindEffectParamDef(const std::string& nodeName, const std:
       for (const EffectParamDef& p : def.params)
          if (p.name == paramName)
             return &p;
-      return nullptr;
+      // Found the def but not this param among its declared params - fall
+      // through to ExtraParamDefs, which also covers a universal field
+      // (`mix`) that a specific EffectDef needs to override for the sweep,
+      // not just params for non-AudioEffectNode node types (see
+      // ExtraParamDefs' comment).
+      break;
    }
    for (const auto& entry : ExtraParamDefs())
       if (entry.first == nodeName && entry.second.name == paramName)

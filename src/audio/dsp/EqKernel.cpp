@@ -49,5 +49,8 @@ void EqKernel::PushParams(const AudioEffectNode& node, double sampleRate)
       }
    }
 
-   mMailbox.Push(kOutputGainSlot, node.Param("outputGainDb"));
+   // EQ's "output" section (output gain + mix) was removed from the body
+   // entirely - ProcessBlock hardcodes 0 dB output gain now (see
+   // EqKernel.h), so outputGainDb's stored value (whatever a saved patch
+   // happens to carry) is deliberately never pushed to the mailbox here.
 }
