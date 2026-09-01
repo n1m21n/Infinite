@@ -52,16 +52,37 @@ namespace
          def.params.push_back({ "gain", -24.0f, 24.0f, 0.0f, false,
                                  { { "type", (float)AudioFilterDsp::kPeak } } });
          def.params.push_back({ "outputGainDb", -24.0f, 12.0f, 0.0f });
-         // Bipolar octaves of cutoff shift, scaled by an internal envelope
-         // follower on the input signal - the classic envelope-filter/
-         // auto-wah control. 0 = off, the kernel's unmodified fast path.
+         // Bipolar octaves of cutoff shift, driven by an internal free-
+         // running sine LFO (not an audio-rate sidechain input any more -
+         // see the removed "cutoff mod" pin below) - the classic auto-wah/
+         // filter-sweep control. 0 = off, the kernel's unmodified fast path.
          def.params.push_back({ "envAmount", -1.0f, 1.0f, 0.0f });
-         // Depth for the audio-rate "cutoff mod" sidechain input - bipolar
-         // like envAmount, so a negative setting inverts the modulator. 0 =
-         // off, matching envAmount's fast-path gating.
-         def.params.push_back({ "modAmount", -1.0f, 1.0f, 0.0f });
-         def.hasSidechain = true;
-         def.sidechainLabel = "cutoff mod";
+         // sync/rateDiv/rate: appended after the original six params rather
+         // than inserted among them, so an existing saved patch's indices
+         // for type/freq/q/gain/outputGainDb/envAmount are untouched -
+         // params are name-keyed (AudioEffectNode::VisitParams,
+         // ParamIndex(name)) so this is about draw-order/ordinal stability
+         // for modulation bindings, not save/load itself. Same sync/rateDiv/
+         // rate triplet Chorus/Flanger/Phaser/Tremolo already declare -
+         // rateDiv deliberately gets no {sync, 1.0f} prerequisite, matching
+         // their same known AUDIOPARAMSWEEPTEST blind spot (see
+         // audio-param-sweep-expected.txt).
+         // sync and rate only reach the output through the LFO's cutoff-shift
+         // path, which the kernel's fast path (ProcessBlock's `!envActive`
+         // check) skips entirely when envAmount is at its own default of 0 -
+         // same gated-by-sibling-default class as `gain` above, so both get
+         // an explicit prerequisite pinning envAmount away from 0 for the
+         // sweep to observe them in isolation.
+         def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f, false, { { "envAmount", 1.0f } } });
+         def.params.push_back(
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+         def.params.push_back(
+            { "rate", 0.02f, 5.0f, 0.5f, false, { { "sync", 0.0f }, { "envAmount", 1.0f } } });
+         // The "cutoff mod" audio-rate sidechain input (modAmount + a second
+         // audio pin) is removed per the redesign - envAmount now drives the
+         // internal LFO above instead of an external modulator or an
+         // envelope follower. An existing patch with a cable plugged into
+         // that pin silently loses it on load; no compat shim, by design.
          def.makeKernel = []() { return std::make_unique<AudioFilterKernel>(); };
          defs.push_back(std::move(def));
       }
