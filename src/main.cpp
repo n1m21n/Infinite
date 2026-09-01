@@ -1942,15 +1942,27 @@ namespace
    // pin - that list is what the performance matrix's "Assign Parameter" picker
    // hit-tests, so registering here is what makes a mode or a checkbox
    // assignable to a surface control. Leaves the cursor on the same line.
-   void DrawDiscreteParamPin(const DiscreteParamHandle& h, const char* label, float width)
+   // `controlHeight`, when non-zero, is the frame height of the control this
+   // pin belongs to (a checkbox, a dropdown button, ...). The pin is drawn
+   // vertically centred on that control instead of at the raw cursor Y -
+   // fixed once here so no call site has to remember to offset it (P2). The
+   // next widget still lands at the row's original, un-shifted Y: the cursor
+   // is restored explicitly at the end rather than left to ImGui's SameLine
+   // tracking, which would otherwise pick up the shifted line.
+   void DrawDiscreteParamPin(const DiscreteParamHandle& h, const char* label, float width,
+                             float controlHeight = 0.0f)
    {
       const int pinId = h.nodeIndex * GraphNode::kStride + GraphNode::kParamBase + h.paramIndex;
       gDrawnParamPins.insert(pinId);
 
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float box = 12.0f;
+      const ImVec2 p = controlHeight > 0.0f
+         ? ImVec2(origin.x, origin.y + (controlHeight - box) * 0.5f)
+         : origin;
+      ImGui::SetCursorScreenPos(p);
       ImGui::Dummy(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
@@ -1972,7 +1984,7 @@ namespace
       gParamPinScreenList.push_back({ h.nodeIndex, h.paramIndex, curGn ? curGn->typeName : "",
                                       StripParamLabel(label), c, ImVec2(p.x + box + 4.0f, p.y),
                                       ImVec2(p.x + width, p.y + box + 4.0f) });
-      ImGui::SameLine(0.0f, 4.0f);
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + box + 4.0f, origin.y));
    }
 
    void DropdownButton(const char* label, const std::vector<std::string>& options,
@@ -2001,7 +2013,7 @@ namespace
          }
          if (!h.draw)
             return; // registered so the modulator keeps writing; just not drawn
-         DrawDiscreteParamPin(h, label, width);
+         DrawDiscreteParamPin(h, label, width, ImGui::GetFrameHeight());
          width = std::max(24.0f, width - 18.0f); // the pin ate 14px + 4px of the row
       }
 
@@ -2085,7 +2097,7 @@ namespace
       if (!h.draw)
          return changed;
 
-      DrawDiscreteParamPin(h, label, kParamWidth);
+      DrawDiscreteParamPin(h, label, kParamWidth, ImGui::GetFrameHeight());
 
       PushCheckboxStyle();
       if (h.modulated)
@@ -2157,8 +2169,14 @@ namespace
 
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-      ImVec2 p = ImGui::GetCursorScreenPos();
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float box = 14.0f;
+      // Centred on the slider track's frame height, same fix and same
+      // restore-the-cursor-explicitly reasoning as DrawDiscreteParamPin - see
+      // the comment there. The track itself is drawn later at `origin`'s Y.
+      const float controlHeight = ImGui::GetFrameHeight();
+      const ImVec2 p = ImVec2(origin.x, origin.y + (controlHeight - box) * 0.5f);
+      ImGui::SetCursorScreenPos(p);
       ImGui::Dummy(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
@@ -2176,7 +2194,7 @@ namespace
       // itself - see the matching comment on DrawDiscreteParamPin's push.
       gParamPinScreenList.push_back({ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
                                       ImVec2(p.x + box + 4.0f, p.y), ImVec2(p.x + width, p.y + box + 4.0f) });
-      ImGui::SameLine(0.0f, 4.0f);
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + box + 4.0f, origin.y));
 
       // Double-clicking swaps the slider for a text field so an exact value
       // (or, prefixed with '=', an expression) can be typed. ImGui's built-in
@@ -9199,7 +9217,7 @@ namespace
          }
          if (!h.draw)
             return;
-         DrawDiscreteParamPin(h, id, width);
+         DrawDiscreteParamPin(h, id, width, ImGui::GetFrameHeight());
          width = std::max(24.0f, width - 18.0f);
       }
 
@@ -14235,7 +14253,15 @@ namespace
          n->ClearRecording();
 
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
-      ModCheckbox("loop##capturerLoop", &n->loop);
+      {
+         // No knob row sits above this - the Record/Play/Stop/Clear strip is
+         // its own full-width button row (P1's "deliberate full-width button
+         // strip" exception) - so a single full-width cell is what puts this
+         // trailing checkbox on the grid instead of floating.
+         AudioKnobRow row(1);
+         row.Checkbox("loop##capturerLoop", &n->loop);
+         row.End();
+      }
 
       EndAudioBody();
    }
@@ -15501,25 +15527,27 @@ namespace
          row.End();
       }
 
-      bool syncBool = sync;
-      if (ModCheckbox("sync to tempo##delaySync", &syncBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("sync") = syncBool ? 1.0f : 0.0f;
-      }
-      ImGui::SameLine();
-      bool bounceBool = bounce;
-      if (ModCheckbox("bounce##delayBounce", &bounceBool))
-      {
-         PushUndoCheckpoint();
-         *n->ParamPtr("bounce") = bounceBool ? 1.0f : 0.0f;
-      }
-      ImGui::SameLine();
-      bool analogBool = analog;
-      if (ModCheckbox("analog##delayAnalog", &analogBool))
-      {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(3);
+         bool syncBool = sync;
+         if (row.Checkbox("sync to tempo##delaySync", &syncBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("sync") = syncBool ? 1.0f : 0.0f;
+         }
+         bool bounceBool = bounce;
+         if (row.Checkbox("bounce##delayBounce", &bounceBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("bounce") = bounceBool ? 1.0f : 0.0f;
+         }
+         bool analogBool = analog;
+         if (row.Checkbox("analog##delayAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.End();
       }
 
       EndAudioBody();
@@ -15629,11 +15657,17 @@ namespace
          row.End();
       }
 
-      bool analogBool = analog;
-      if (ModCheckbox("analog##reverbAnalog", &analogBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(3);
+         bool analogBool = analog;
+         if (row.Checkbox("analog##reverbAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.Skip();
+         row.Skip();
+         row.End();
       }
 
       EndAudioBody();
@@ -16012,11 +16046,17 @@ namespace
       row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
       row.End();
 
-      bool analogBool = analog;
-      if (ModCheckbox("analog##pitchShiftAnalog", &analogBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(3);
+         bool analogBool = analog;
+         if (row.Checkbox("analog##pitchShiftAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.Skip();
+         row.Skip();
+         row.End();
       }
 
       EndAudioBody();
@@ -16047,6 +16087,20 @@ namespace
    {
       bool sync = n->Param("sync") != 0.0f;
       if (ModCheckbox(checkboxId, &sync))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("sync") = sync ? 1.0f : 0.0f;
+      }
+   }
+
+   // Grid-aware overload for a toggle row already opened as an AudioKnobRow
+   // (P1) - takes the same cell it would have taken as a bare ModCheckbox,
+   // just via row.Checkbox so it shares the row's column edges and pin
+   // centring instead of floating on a SameLine strip.
+   void DrawSyncToggle(AudioKnobRow& row, AudioEffectNode* n, const char* checkboxId)
+   {
+      bool sync = n->Param("sync") != 0.0f;
+      if (row.Checkbox(checkboxId, &sync))
       {
          PushUndoCheckpoint();
          *n->ParamPtr("sync") = sync ? 1.0f : 0.0f;
@@ -16151,20 +16205,22 @@ namespace
          row.End();
       }
 
-      DrawSyncToggle(n, "sync to tempo##chorusSync");
-      ImGui::SameLine();
-      bool taps3 = n->Param("taps") >= 2.5f;
-      if (ModCheckbox("3 taps##chorusTaps", &taps3))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("taps") = taps3 ? 3.0f : 2.0f;
-      }
-      ImGui::SameLine();
-      bool analogBool = analog;
-      if (ModCheckbox("analog##chorusAnalog", &analogBool))
-      {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(3);
+         DrawSyncToggle(row, n, "sync to tempo##chorusSync");
+         bool taps3 = n->Param("taps") >= 2.5f;
+         if (row.Checkbox("3 taps##chorusTaps", &taps3))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("taps") = taps3 ? 3.0f : 2.0f;
+         }
+         bool analogBool = analog;
+         if (row.Checkbox("analog##chorusAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.End();
       }
 
       EndAudioBody();
@@ -16273,13 +16329,16 @@ namespace
          row.End();
       }
 
-      DrawSyncToggle(n, "sync to tempo##flangerSync");
-      ImGui::SameLine();
-      bool analogBool = analog;
-      if (ModCheckbox("analog##flangerAnalog", &analogBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(2);
+         DrawSyncToggle(row, n, "sync to tempo##flangerSync");
+         bool analogBool = analog;
+         if (row.Checkbox("analog##flangerAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.End();
       }
 
       EndAudioBody();
@@ -16395,13 +16454,17 @@ namespace
          row.End();
       }
 
-      DrawSyncToggle(n, "sync to tempo##phaserSync");
-      ImGui::SameLine();
-      bool analogBool = analog;
-      if (ModCheckbox("analog##phaserAnalog", &analogBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(3);
+         DrawSyncToggle(row, n, "sync to tempo##phaserSync");
+         bool analogBool = analog;
+         if (row.Checkbox("analog##phaserAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.Skip();
+         row.End();
       }
 
       EndAudioBody();
@@ -16496,11 +16559,17 @@ namespace
       row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
       row.End();
 
-      bool analogBool = analog;
-      if (ModCheckbox("analog##bitcrushAnalog", &analogBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(3);
+         bool analogBool = analog;
+         if (row.Checkbox("analog##bitcrushAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.Skip();
+         row.Skip();
+         row.End();
       }
 
       EndAudioBody();
@@ -16782,11 +16851,17 @@ namespace
          row.End();
       }
 
-      bool analogBool = analog;
-      if (ModCheckbox("analog##ringModAnalog", &analogBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(3);
+         bool analogBool = analog;
+         if (row.Checkbox("analog##ringModAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.Skip();
+         row.Skip();
+         row.End();
       }
 
       EndAudioBody();
@@ -16941,11 +17016,18 @@ namespace
          row.End();
       }
 
-      bool analogBool = analog;
-      if (ModCheckbox("analog##freqShiftAnalog", &analogBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(4);
+         bool analogBool = analog;
+         if (row.Checkbox("analog##freqShiftAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.Skip();
+         row.Skip();
+         row.Skip();
+         row.End();
       }
 
       EndAudioBody();
@@ -17078,7 +17160,13 @@ namespace
          row.End();
       }
 
-      DrawSyncToggle(n, "sync to tempo##tremoloSync");
+      {
+         AudioKnobRow row(3);
+         DrawSyncToggle(row, n, "sync to tempo##tremoloSync");
+         row.Skip();
+         row.Skip();
+         row.End();
+      }
 
       EndAudioBody();
    }
@@ -17390,11 +17478,18 @@ namespace
          row.End();
       }
 
-      bool analogBool = analog;
-      if (ModCheckbox("analog##cycleShaperAnalog", &analogBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(4);
+         bool analogBool = analog;
+         if (row.Checkbox("analog##cycleShaperAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.Skip();
+         row.Skip();
+         row.Skip();
+         row.End();
       }
 
       EndAudioBody();
