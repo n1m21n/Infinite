@@ -3655,6 +3655,7 @@ namespace
       if (auto* n = dynamic_cast<ChorderNode*>(node)) return &n->useGlobalScale;
       if (auto* n = dynamic_cast<NoteStackNode*>(node)) return &n->useGlobalScale;
       if (auto* n = dynamic_cast<BouncingBallsNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<NoteCapturerNode*>(node)) return &n->useGlobalScale;
       return nullptr;
    }
 
@@ -14334,12 +14335,14 @@ namespace
 
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
       {
-         // No knob row sits above this - the Record/Play/Stop/Clear strip is
-         // its own full-width button row (P1's "deliberate full-width button
-         // strip" exception) - so a single full-width cell is what puts this
-         // trailing checkbox on the grid instead of floating.
-         AudioKnobRow row(1);
+         // Same 4-cell grid as the Record/Play/Stop/Clear strip above, so
+         // `loop` lands directly under Record instead of floating at the
+         // body's left edge under an unrelated cell count.
+         AudioKnobRow row(4);
          row.Checkbox("loop##capturerLoop", &n->loop);
+         row.Skip();
+         row.Skip();
+         row.Skip();
          row.End();
       }
 

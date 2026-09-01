@@ -3726,24 +3726,44 @@ public:
 
          if (mPlaying)
          {
+            const bool useGlobalScale = mUseGlobalScale.load(std::memory_order_relaxed);
             while (mPlayIndex < mRecordedCount && mRecorded[mPlayIndex].beat <= playhead)
             {
                const RecEvt& r = mRecorded[mPlayIndex];
                NoteEvent out;
-               out.note = r.note;
                out.velocity = r.velocity;
                out.isNoteOn = r.isNoteOn;
                out.frameOffset = 0;
                out.source = this;
                out.voiceId = r.voiceId;
+
+               // Snap on note-on only; remember the snapped pitch so the
+               // matching note-off releases the same pitch, even if the
+               // transport key/scale changes mid-playback (otherwise the
+               // note-off would target a different pitch than what's
+               // actually sounding and leave a hung note).
+               int note = r.note;
+               if (r.isNoteOn)
+               {
+                  if (useGlobalScale)
+                     note = MusicTime::SnapToScale(note, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
+                  note = std::clamp(note, 0, 127);
+               }
+               else
+               {
+                  const int* sounding = mSounding.Find(r.voiceId);
+                  if (sounding != nullptr)
+                     note = *sounding;
+               }
+               out.note = note;
                mOutbox.Push(out);
-               if (r.note >= 0 && r.note <= 127)
+               if (note >= 0 && note <= 127)
                {
                   if (r.isNoteOn)
-                     mSounding.GetOrInsert(r.voiceId) = r.note;
+                     mSounding.GetOrInsert(r.voiceId) = note;
                   else
                      mSounding.Erase(r.voiceId);
-                  SetKeyBit(mHeldBits, r.note, r.isNoteOn);
+                  SetKeyBit(mHeldBits, note, r.isNoteOn);
                }
                mPlayIndex++;
             }
@@ -3766,6 +3786,7 @@ public:
    {
       mLoop.store(n.loop, std::memory_order_relaxed);
       mQuantizeDiv.store(n.quantizeDiv, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
    }
    void SendCommand(Command c) { mCommand.store(c, std::memory_order_relaxed); }
 
@@ -3837,6 +3858,7 @@ private:
    std::atomic<int> mCommand { kNone };
    std::atomic<bool> mLoop { true };
    std::atomic<int> mQuantizeDiv { 0 };
+   std::atomic<bool> mUseGlobalScale { false };
    std::atomic<bool> mRecordingReadout { false };
    std::atomic<bool> mPlayingReadout { false };
    std::atomic<int> mRecordedCountReadout { 0 };
@@ -3864,6 +3886,7 @@ void NoteCapturerNode::VisitParams(ParamVisitor& v)
 {
    v.Bool("loop", loop);
    v.Int("quantizeDiv", quantizeDiv);
+   v.Bool("useGlobalScale", useGlobalScale);
 }
 
 AudioNode* NoteCapturerNode::GetAudioNode()
