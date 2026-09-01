@@ -16240,7 +16240,7 @@ namespace
          // the dead gap between this checkbox and the node's bottom border.
          // Same tight-row pattern already used by Dynamics/SpecBlur/Switcher's
          // trailing checkbox rows.
-         AudioKnobRow row(3, 20.0f, 0.0f, false);
+         AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##pitchShiftAnalog", &analogBool))
          {
@@ -16581,7 +16581,7 @@ namespace
       }
 
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##flangerAnalog", &analogBool))
          {
@@ -16714,7 +16714,7 @@ namespace
       }
 
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(4, 20.0f, 8.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##phaserAnalog", &analogBool))
          {
@@ -16820,7 +16820,7 @@ namespace
       row.End();
 
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##bitcrushAnalog", &analogBool))
          {
@@ -17123,7 +17123,7 @@ namespace
          // height) + hasCaptions=false, so the row doesn't reserve a full
          // knob-height-plus-caption-strip below a control whose label prints
          // inline rather than underneath it.
-         AudioKnobRow row(3, 20.0f, 0.0f, false);
+         AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##ringModAnalog", &analogBool))
          {
@@ -17288,7 +17288,7 @@ namespace
       }
 
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(4, 20.0f, 8.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##freqShiftAnalog", &analogBool))
          {
@@ -17654,7 +17654,7 @@ namespace
       }
 
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(4, 20.0f, 8.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##resonatorAnalog", &analogBool))
          {
@@ -17768,7 +17768,7 @@ namespace
       }
 
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(4, 20.0f, 8.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##cycleShaperAnalog", &analogBool))
          {
