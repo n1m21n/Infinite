@@ -16170,7 +16170,15 @@ namespace
       row.End();
 
       {
-         AudioKnobRow row(3);
+         // maxDia 20 (checkbox frame height) + hasCaptions=false: a
+         // checkbox-only row draws its label inline, never below the control
+         // the way a knob's caption does, so leaving this at the default
+         // AudioKnobRow(3) (maxDia kKnobSmall=40, hasCaptions=true) reserved a
+         // full knob-height-plus-caption-strip that nothing ever drew into -
+         // the dead gap between this checkbox and the node's bottom border.
+         // Same tight-row pattern already used by Dynamics/SpecBlur/Switcher's
+         // trailing checkbox rows.
+         AudioKnobRow row(3, 20.0f, 0.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##pitchShiftAnalog", &analogBool))
          {
@@ -17034,7 +17042,12 @@ namespace
       }
 
       {
-         AudioKnobRow row(3);
+         // Same tight checkbox-row pattern as Pitch Shift above and as
+         // Dynamics/SpecBlur/Switcher already use: maxDia 20 (checkbox frame
+         // height) + hasCaptions=false, so the row doesn't reserve a full
+         // knob-height-plus-caption-strip below a control whose label prints
+         // inline rather than underneath it.
+         AudioKnobRow row(3, 20.0f, 0.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##ringModAnalog", &analogBool))
          {
