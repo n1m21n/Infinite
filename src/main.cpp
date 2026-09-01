@@ -13185,20 +13185,26 @@ namespace
          return MusicTime::ScaleContainsPitchClass(n->scale, pc) ? KeyState::Active : KeyState::Snapped;
       };
 
+      // Active (in-scale) is the one state allowed to read as "lit up" -
+      // near-white / bright blue, unchanged from before. Snapped (in-range,
+      // off-scale) used to be a vivid gold/amber that read just as lively as
+      // Active, so the scale never visually popped. Snapped is now a muted
+      // grey-brown - clearly dimmer than Active, but a shade warmer/lighter
+      // than OutOfRange so the two remain distinguishable from each other.
       auto KeyColor = [isLight](KeyState state, bool isWhite) -> ImU32 {
          if (isWhite)
          {
             switch (state)
             {
                case KeyState::Active:  return isLight ? IM_COL32(250, 250, 255, 255) : IM_COL32(206, 210, 222, 255);
-               case KeyState::Snapped: return isLight ? IM_COL32(255, 214, 150, 255) : IM_COL32(150, 122, 70, 255);
+               case KeyState::Snapped: return isLight ? IM_COL32(208, 200, 190, 255) : IM_COL32(108, 100, 90, 255);
                default:                return isLight ? IM_COL32(200, 205, 218, 255) : IM_COL32(72, 76, 90, 255);
             }
          }
          switch (state)
          {
             case KeyState::Active:  return isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255);
-            case KeyState::Snapped: return isLight ? IM_COL32(205, 140, 40, 255) : IM_COL32(130, 95, 40, 255);
+            case KeyState::Snapped: return isLight ? IM_COL32(120, 108, 95, 255) : IM_COL32(55, 48, 42, 255);
             default:                return isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(26, 28, 36, 255);
          }
       };
