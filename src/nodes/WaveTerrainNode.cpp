@@ -33,9 +33,14 @@ namespace
       "Luminance", "Red", "Green", "Blue", "Alpha", "Edge Magnitude"
    };
 
-   const std::vector<std::string> kFilterNames = {
-      "Bypass", "Lowpass 12dB", "Lowpass 24dB", "Highpass 12dB", "Bandpass"
-   };
+   // Index order is fixed by filterType's serialization (0..4 == Off, LP12,
+   // LP24, HP12, BP) - see WaveTerrainNode.h. Only the strings come from the
+   // canonical list (SynthModes::FilterNames), and only via this subset call,
+   // so this can't drift from the app-wide spelling again.
+   const std::vector<std::string> kFilterNames = SynthModes::FilterTypeSubset({
+      SynthModes::kFilterOff, SynthModes::kFilterLP12, SynthModes::kFilterLP24,
+      SynthModes::kFilterHP12, SynthModes::kFilterBP12
+   });
 
    enum SmoothedParam
    {

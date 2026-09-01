@@ -7,6 +7,7 @@
 #include <string>
 
 #include "audio/DspMath.h"
+#include "audio/SynthModes.h"
 
 // Physical Modelling Metallic Synthesizer DSP Kernel.
 // Combines:
@@ -71,14 +72,20 @@ namespace MetallicDsp
       kNumFilterModes
    };
 
+   // Index order here is FilterMode's own enum order (LP12, LP24, HP12, BP,
+   // Off) - not the canonical list's order (Off first) - because filterType
+   // is serialized as this enum's int value directly (see
+   // MetallicNode.h::filterType) and reordering would silently rewrite every
+   // saved patch's filter mode. Only the spellings are migrated, one-to-one
+   // with SynthModes::FilterName, to the app-wide canonical strings.
    inline const char* const* FilterModeNames()
    {
       static const char* const kNames[kNumFilterModes] = {
-         "Lowpass 12",
-         "Lowpass 24",
-         "Highpass 12",
-         "Bandpass",
-         "Bypass"
+         SynthModes::FilterName(SynthModes::kFilterLP12),
+         SynthModes::FilterName(SynthModes::kFilterLP24),
+         SynthModes::FilterName(SynthModes::kFilterHP12),
+         SynthModes::FilterName(SynthModes::kFilterBP12),
+         SynthModes::FilterName(SynthModes::kFilterOff)
       };
       return kNames;
    }

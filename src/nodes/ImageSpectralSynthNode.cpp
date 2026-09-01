@@ -16,6 +16,7 @@
 #include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
+#include "audio/SynthModes.h"
 #include "audio/dsp/SpectralAdditiveSynth.h"
 #include "core/GLUtil.h"
 
@@ -43,9 +44,15 @@ namespace
       "64 Partials", "128 Partials", "256 Partials"
    };
 
-   const std::vector<std::string> kFilterNames = {
-      "Off", "LP 12dB", "LP 24dB", "HP 12dB", "BP 12dB"
-   };
+   // Index order is fixed by filterType's serialization (0..4 == Off, LP12,
+   // LP24, HP12, BP12, matching SpectralAdditiveDsp::FilterType) - see
+   // ImageSpectralSynthNode.h. Only the strings come from the canonical list
+   // (SynthModes::FilterNames), and only via this subset call, so this can't
+   // drift from the app-wide spelling again.
+   const std::vector<std::string> kFilterNames = SynthModes::FilterTypeSubset({
+      SynthModes::kFilterOff, SynthModes::kFilterLP12, SynthModes::kFilterLP24,
+      SynthModes::kFilterHP12, SynthModes::kFilterBP12
+   });
 
    inline float MidiNoteToHz(int midiNote)
    {

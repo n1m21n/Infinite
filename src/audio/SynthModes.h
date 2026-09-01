@@ -201,4 +201,22 @@ namespace SynthModes
             list.push_back(FilterNames()[i]);
       return list;
    }
+
+   // For nodes whose DSP only ever implements a subset of the canonical
+   // filter types: pass the enum values that subset actually uses, in the
+   // node's own index order (which must stay whatever it already is - the
+   // caller's saved patches store that index as an int), and get back the
+   // canonical spelling for each. This is the only place a node-local filter
+   // string is allowed to come from, so the four-different-spellings drift
+   // that motivated this function cannot recur - a node can misname its own
+   // subset only by passing the wrong enum value, which is reviewable at the
+   // call site, not by hand-typing a string that silently diverges later.
+   inline std::vector<std::string> FilterTypeSubset(std::initializer_list<FilterType> types)
+   {
+      std::vector<std::string> list;
+      list.reserve(types.size());
+      for (FilterType t : types)
+         list.push_back(FilterName(t));
+      return list;
+   }
 }
