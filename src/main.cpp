@@ -3576,6 +3576,18 @@ namespace
       return pressed;
    }
 
+   // GlobalScaleToggle runs per-node, inside ed::Begin()/ed::End(), nested in
+   // that node's own layout - not a safe place to call ed::Suspend()/Resume()
+   // (that pairing is only ever used once, after the whole node-draw loop
+   // finishes, for the popups/minimap/perf-matrix overlay block). Calling it
+   // here corrupted ImGui's window/ID state for the rest of the frame and
+   // made the app's top toolbar disappear while hovering the icon. So the
+   // hover just records intent here; the tooltip itself is drawn later, in
+   // that existing post-loop suspended block, where real screen-space
+   // tooltips are already known to be safe.
+   bool gGlobalScaleTooltipHovered = false;
+   bool gGlobalScaleTooltipEnabled = false;
+
    // Small toggle for Global Scale (snap to scale). Hand-drawn procedural vector glyph
    // rendering a high-precision beamed musical note (♫) symbol.
    bool GlobalScaleToggle(bool enabled)
@@ -3636,8 +3648,13 @@ namespace
 
       if (hovered)
       {
-         ImGui::SetItemTooltip("%s", enabled ? "Global Scale: ON (click to disable)"
-                                             : "Global Scale: OFF (click to enable)");
+         // Deferred: see the comment on gGlobalScaleTooltipHovered above.
+         // Drawing a real ed::Suspend()'d tooltip from here (mid per-node
+         // ed::Begin()/ed::End()) corrupted ImGui's state for the rest of
+         // the frame; the actual tooltip is drawn later from the post-loop
+         // suspended block instead.
+         gGlobalScaleTooltipHovered = true;
+         gGlobalScaleTooltipEnabled = enabled;
       }
 
       return pressed;
@@ -15679,9 +15696,11 @@ namespace
 
       {
          // Tight checkbox-only row (maxDia 20 = checkbox frame height,
-         // hasCaptions=false) - same pattern as Dynamics/Pitch Shift/Ring
-         // Mod/SpecBlur's trailing checkbox rows.
-         AudioKnobRow row(3, 20.0f, 0.0f, false);
+         // hasCaptions=false) with a small 8px headerRowH gap so it doesn't
+         // read as too compacted against the knob row above - same pattern
+         // as Pitch Shift/Ring Mod/Flanger/Phaser/Bitcrush/etc.'s trailing
+         // analog rows.
+         AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool syncBool = sync;
          if (row.Checkbox("sync to tempo##delaySync", &syncBool))
          {
@@ -15812,11 +15831,11 @@ namespace
 
       {
          // Tight checkbox-only row (maxDia 20 = checkbox frame height,
-         // hasCaptions=false): same pattern as Pitch Shift/Ring Mod/Dynamics/
-         // SpecBlur/Switcher's trailing analog rows. The default
-         // AudioKnobRow(3) reserves a full knob-height-plus-caption strip
-         // that a checkbox never draws into, leaving dead space below it.
-         AudioKnobRow row(3, 20.0f, 0.0f, false);
+         // hasCaptions=false) with a small 8px headerRowH gap so it doesn't
+         // read as too compacted against the knob row above - same pattern
+         // as Pitch Shift/Ring Mod/Flanger/Phaser/Bitcrush/etc.'s trailing
+         // analog rows.
+         AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool analogBool = analog;
          if (row.Checkbox("analog##reverbAnalog", &analogBool))
          {
@@ -41302,6 +41321,7 @@ int main(int argc, char** argv)
       ed::GetStyle().GridSpacing = gGridSnap;
       ed::Begin("graph", ImVec2(graphWidth, graphHeight));
       gParamPinScreenList.clear();
+      gGlobalScaleTooltipHovered = false;
 
       if (!gPendingSelect.empty())
       {
@@ -49819,6 +49839,19 @@ int main(int argc, char** argv)
       ed::Suspend();
 
       DrawMinimap();
+
+      // Deferred from GlobalScaleToggle() above - see comment on
+      // gGlobalScaleTooltipHovered. This is the first point after the
+      // per-node draw loop where an ed::Suspend()'d tooltip is safe to draw.
+      if (gGlobalScaleTooltipHovered)
+      {
+         ImGui::BeginTooltip();
+         ImGui::SetWindowFontScale(0.85f);
+         ImGui::TextUnformatted(gGlobalScaleTooltipEnabled ? "Global Scale: ON (click to disable)"
+                                                            : "Global Scale: OFF (click to enable)");
+         ImGui::SetWindowFontScale(1.0f);
+         ImGui::EndTooltip();
+      }
 
       // Right-click (two-finger click on a Mac trackpad) opens the same
       // type-to-filter picker as double-click, so the keyboard works either way.
