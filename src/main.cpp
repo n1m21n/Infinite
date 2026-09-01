@@ -1923,13 +1923,22 @@ namespace
    inline void PushDropdownStyle()
    {
       const bool isLight = IsThemeLight();
-      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.20f, 0.22f, 0.30f, 1.0f));
+      // Dark: the fill sits within ~0.06 luminance of the node body (a
+      // category-tinted mix of panelBg, see DrawNodes' NodeBg push) - a
+      // recess, not a chip. The border is dropped to a hairline no brighter
+      // than a row separator and the frame stroke is switched off entirely
+      // (FrameBorderSize 0 below) - the caption text is what carries the
+      // control's identity in dark, at near-full contrast, not the frame.
+      // Light is untouched: the panel there is bright enough that a recess
+      // still needs a real edge to read as a control at all. See P10 in
+      // .claude/skills/node-ui-pillars/SKILL.md.
+      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.28f, 0.31f, 0.42f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.35f, 0.39f, 0.52f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.90f, 0.93f, 0.98f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.72f, 0.76f, 0.85f, 1.0f) : ImVec4(0.30f, 0.34f, 0.46f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.72f, 0.76f, 0.85f, 1.0f) : ImVec4(0.22f, 0.235f, 0.278f, 1.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
    }
 
    inline void PopDropdownStyle()
@@ -2052,14 +2061,20 @@ namespace
    inline void PushCheckboxStyle()
    {
       const bool isLight = IsThemeLight();
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.18f, 0.20f, 0.28f, 1.0f));
+      // Same budget as PushDropdownStyle, and deliberately the same dark fill
+      // - both are recesses in the same body, so they should read as the
+      // same depth of chrome. CheckMark is the one element allowed full
+      // accent brightness (bumped here vs. the old value): once the frame
+      // stops competing with it, the checked state can and should be the
+      // loudest thing in an unchecked row of quiet frames. See P10.
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.25f, 0.28f, 0.38f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.32f, 0.36f, 0.48f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_CheckMark, isLight ? ImVec4(0.20f, 0.55f, 0.95f, 1.0f) : ImVec4(0.45f, 0.75f, 1.0f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.70f, 0.74f, 0.84f, 1.0f) : ImVec4(0.30f, 0.34f, 0.46f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_CheckMark, isLight ? ImVec4(0.20f, 0.55f, 0.95f, 1.0f) : ImVec4(0.55f, 0.82f, 1.0f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.70f, 0.74f, 0.84f, 1.0f) : ImVec4(0.22f, 0.235f, 0.278f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.88f, 0.92f, 0.98f, 1.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
    }
 
    inline void PopCheckboxStyle()

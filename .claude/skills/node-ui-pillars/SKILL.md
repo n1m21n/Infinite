@@ -167,17 +167,40 @@ parameter ends and the next begins.
 The budget, dark theme:
 
 - A checkbox frame or dropdown button fill sits **within ~0.06 luminance** of
-  the node body background. It is a recess, not a chip.
-- Its border is a hairline no brighter than the row-separator tone. If the
-  border is what makes it findable, it is too bright — raise the fill contrast
-  slightly instead and drop the border.
+  the node body background of the shipped default ("Infinite") theme. It is a
+  recess, not a chip. The node body itself is `panelBg` blended with a
+  per-category tint (`DrawNodes`' `ed::StyleColor_NodeBg` push, `src/main.cpp`
+  ~47347) — its luminance varies by category (roughly 0.15–0.22 across the 10
+  categories at the default tint weight), so treat the budget as "close to the
+  quietest, most common case," not an exact match against every category.
+  Some other theme presets (Nord in particular) have a brighter dark `panelBg`
+  than "Infinite" — the fixed dark fill below will then sit *more* recessed
+  than the 0.06 budget on those presets, which is the safe direction to miss
+  in (a control can be darker than intended without ever becoming a chip; the
+  defect this rule exists to prevent is the opposite).
+- Border is switched off in dark (`FrameBorderSize 0`) rather than merely
+  dimmed — at 1px even a hairline color reads as the thing that makes the
+  control findable, which is itself the failure mode. Light mode keeps
+  `FrameBorderSize 1`, because there the panel is bright enough that a recess
+  needs a real edge to read as a control. If a border color is still set for
+  the (now-invisible) dark border, keep its color no brighter than the
+  row-separator tone (`t.border`) so a future re-enable doesn't reintroduce a
+  chip.
 - The **check mark / active state** is the only element allowed full accent
-  brightness. An unchecked checkbox should be nearly invisible until scanned
-  for; a checked one should be obvious.
-- The dropdown's caption text carries the identity; the frame does not need to.
+  brightness — brighter than the frame ever gets. An unchecked checkbox should
+  be nearly invisible until scanned for; a checked one should be obvious.
+- The dropdown's caption text carries the identity, at near-full contrast; the
+  frame does not need to and should not compete with it.
+- Hover/active states are free — they cost nothing at rest, so they can jump
+  noticeably above the quiet resting fill to signal "interactive" without
+  fighting rule 1.
 - Vertical rhythm does the separating, not per-widget chrome: consistent row
   height and one gutter between the label column and the value column beat any
-  amount of framing.
+  amount of framing. Render 3D's `NodeSeparator` group headers (`output`,
+  `camera`, `raster`, `light`, `shadows`, `environment`, `points`) are the
+  highest-return separation tool already in the system — reach for zebra
+  banding or a hairline group separator only if grouping alone still isn't
+  enough, and keep it low-alpha (~2–3%) if you do.
 
 Both themes are defined in exactly two places —
 `PushCheckboxStyle()` / `PushDropdownStyle()` (`src/main.cpp` ~2040 and ~1960).
