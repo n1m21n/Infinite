@@ -13185,28 +13185,18 @@ namespace
          return MusicTime::ScaleContainsPitchClass(n->scale, pc) ? KeyState::Active : KeyState::Snapped;
       };
 
-      // Active (in-scale) is the one state allowed to read as "lit up" -
-      // near-white / bright blue, unchanged from before. Snapped (in-range,
-      // off-scale) used to be a vivid gold/amber that read just as lively as
-      // Active, so the scale never visually popped. Snapped is now a muted
-      // grey-brown - clearly dimmer than Active, but a shade warmer/lighter
-      // than OutOfRange so the two remain distinguishable from each other.
-      auto KeyColor = [isLight](KeyState state, bool isWhite) -> ImU32 {
-         if (isWhite)
-         {
-            switch (state)
-            {
-               case KeyState::Active:  return isLight ? IM_COL32(250, 250, 255, 255) : IM_COL32(206, 210, 222, 255);
-               case KeyState::Snapped: return isLight ? IM_COL32(208, 200, 190, 255) : IM_COL32(108, 100, 90, 255);
-               default:                return isLight ? IM_COL32(200, 205, 218, 255) : IM_COL32(72, 76, 90, 255);
-            }
-         }
-         switch (state)
-         {
-            case KeyState::Active:  return isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255);
-            case KeyState::Snapped: return isLight ? IM_COL32(120, 108, 95, 255) : IM_COL32(55, 48, 42, 255);
-            default:                return isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(26, 28, 36, 255);
-         }
+      // Only two colors on screen, independent of white/black key shape:
+      // Active (in-scale) reads as a lit blue LED; everything else - both
+      // Snapped (in-range, off-scale) and OutOfRange - collapses into one
+      // greyed-out/disabled look. A key's own shape (white rectangle vs.
+      // black raised key) already tells the user which it is, so color now
+      // communicates scale membership only, not key identity. KeyState is
+      // kept as three values because NoteState/other logic still cares about
+      // the distinction; only the color mapping collapses it to two.
+      auto KeyColor = [isLight](KeyState state) -> ImU32 {
+         if (state == KeyState::Active)
+            return isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255);
+         return isLight ? IM_COL32(190, 193, 200, 255) : IM_COL32(58, 60, 68, 255);
       };
 
       // Root tick: a small bar at the bottom of every key whose pitch class
@@ -13221,7 +13211,7 @@ namespace
             const int note = lowNote + o * 12 + kWhiteOffsets[k];
             const float x = origin.x + 2.0f + (float)(o * 7 + k) * keyW;
             dl->AddRectFilled(ImVec2(x + 0.5f, origin.y + 3.0f), ImVec2(x + keyW - 0.5f, br.y - 3.0f),
-                              KeyColor(NoteState(note), true), 2.0f);
+                              KeyColor(NoteState(note)), 2.0f);
             if (((note - n->root) % 12 + 12) % 12 == 0)
                dl->AddRectFilled(ImVec2(x + keyW * 0.35f, br.y - 6.0f), ImVec2(x + keyW * 0.65f, br.y - 4.0f),
                                  rootTickCol, 1.0f);
@@ -13237,7 +13227,7 @@ namespace
             const int note = lowNote + o * 12 + kBlackOffsets[k];
             const float x = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[k] + 1.0f) * keyW - keyW * 0.3f;
             dl->AddRectFilled(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
-                              KeyColor(NoteState(note), false), 2.0f);
+                              KeyColor(NoteState(note)), 2.0f);
             if (((note - n->root) % 12 + 12) % 12 == 0)
                dl->AddRectFilled(ImVec2(x + keyW * 0.12f, origin.y + h * 0.62f - 3.0f), ImVec2(x + keyW * 0.48f, origin.y + h * 0.62f - 1.0f),
                                  rootTickCol, 1.0f);
