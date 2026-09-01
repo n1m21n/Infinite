@@ -142,13 +142,25 @@ namespace
                                     { { bandGain, 12.0f }, { bandFreq, 1000.0f } } });
          }
 
-         def.params.push_back({ "outputGainDb", -24.0f, 12.0f, 0.0f });
+         // Kept declared (name-keyed save/load, so an old patch's stored
+         // value still round-trips harmlessly) but marked uiOnly: the
+         // "output" section (this knob + the universal `mix` field) was
+         // removed from DrawEqBody per user request, and EqKernel::
+         // ProcessBlock now hardcodes 0 dB output gain regardless of this
+         // value - see EffectDef::forceFullyWet below for the matching mix
+         // story. No audio-thread effect by design, same as selectedBand.
+         def.params.push_back({ "outputGainDb", -24.0f, 12.0f, 0.0f, true });
          // UI-only: which band the Tier 1 knob row currently follows. No
          // audio-thread effect by design - the sweep reports it pass-with-a-
          // note rather than FAIL (EffectParamDef::uiOnly's whole purpose).
          def.params.push_back({ "selectedBand", 0.0f, 4.0f, 0.0f, true });
 
          def.makeKernel = []() { return std::make_unique<EqKernel>(); };
+         // No mix knob on the body either (removed with the output
+         // section) - always run fully wet so a saved patch's stored `mix`
+         // can't silently blend in dry signal with no control to see or fix
+         // it. See EffectDef::forceFullyWet's comment.
+         def.forceFullyWet = true;
          defs.push_back(std::move(def));
       }
 

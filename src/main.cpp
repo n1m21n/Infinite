@@ -15282,15 +15282,6 @@ namespace
          row.End();
       }
 
-      BeginAudioSection("output");
-      {
-         AudioKnobRow row(2);
-         row.Knob("output gain", n->ParamPtr("outputGainDb"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.End();
-      }
-      EndAudioSection();
-
       EndAudioBody();
    }
 
