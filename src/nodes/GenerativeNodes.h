@@ -195,10 +195,13 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override;
-   // No texture at all when useImageColor is off, same condition that makes
-   // CookIfNeeded fall back to a flat p.r/g/b = tint per point - the swatch
-   // then shows GetMaterial()'s tint color instead of the raw image.
-   unsigned int GetSurfaceTexture() override { return useImageColor ? mSmall.tex : 0; }
+   // Never expose a surface texture here: CookIfNeeded (GenerativeNodes.cpp) already
+   // bakes this same downsampled source image into each point's own instance color
+   // (p.r/g/b) whenever useImageColor is on. Returning mSmall.tex here as well made
+   // Geometry3DNodes.cpp's point-cloud shader multiply that same image data in twice
+   // (once via vInstanceColor, again via the texture sample), crushing colored points
+   // toward black while the white-tint (useImageColor off) path stayed at full brightness.
+   unsigned int GetSurfaceTexture() override { return 0; }
    unsigned long long SurfaceTextureRevision() const override { return mRevision; }
 
    ImageCable& Input() { return mInput; }
