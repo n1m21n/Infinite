@@ -24,6 +24,7 @@ class AudioGlideNode;
 class AudioNoteEchoNode;
 class AudioNoteRouterNode;
 class AudioNoteMergeNode;
+class AudioNoteSwitcherNode;
 class AudioArpeggiatorNode;
 class AudioNoteSequencerNode;
 class AudioRandomNoteGeneratorNode;
@@ -563,6 +564,58 @@ public:
 
 private:
    std::unique_ptr<AudioNoteMergeNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
+// Cycles between up to four connected note inputs on a fixed interval
+// (beats or seconds) or manually - the note-cable counterpart of SwitcherNode
+// (2D) and Switcher3DNode (3D). When the active slot changes, new note-ons
+// come exclusively from the new slot, while notes held on the old slot have
+// their note-offs passed through when they naturally release.
+class NoteSwitcherNode : public INode, public INoteSource
+{
+public:
+   static constexpr int kSlots = 4;
+
+   static INode* Create() { return new NoteSwitcherNode(); }
+   NoteSwitcherNode();
+   ~NoteSwitcherNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   INode* BypassSource() override
+   {
+      const int active = ActiveSlot();
+      if (active >= 0 && active < kSlots && noteInputs[active].IsConnected())
+         return noteInputs[active].GetSource();
+      for (int i = 0; i < kSlots; i++)
+         if (noteInputs[i].IsConnected())
+            return noteInputs[i].GetSource();
+      return nullptr;
+   }
+   NoteCable* NoteInputSlot(int slot) override
+   {
+      return (slot >= 0 && slot < kSlots) ? &noteInputs[slot] : nullptr;
+   }
+   const char* InputLabel(int slot) const override;
+   AudioNode* GetAudioNode() override;
+
+   int ActiveSlot() const;
+
+   NoteCable noteInputs[kSlots];
+
+   int rateMode = 0;          // 0 = Synced, 1 = Free
+   float rateBeats = 4.0f;    // note division in beats when synced
+   float rateSeconds = 1.0f;  // interval in seconds when free
+   bool manual = false;
+   int manualSlot = 0;        // 0..kSlots-1
+
+private:
+   std::unique_ptr<AudioNoteSwitcherNode> mAudioNode;
    int mLastCookFrame = -1;
 };
 

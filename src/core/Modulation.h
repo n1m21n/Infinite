@@ -20,6 +20,9 @@ public:
    virtual float Value01() = 0;
 };
 
+using FaderPosToValueFn = float (*)(float pos01, float minV, float maxV);
+using FaderValueToPosFn = float (*)(float value, float minV, float maxV);
+
 // One modulatable parameter, re-registered every frame while its node draws.
 // The raw float* is only ever used within the frame that registered it.
 struct ParamRef
@@ -37,6 +40,8 @@ struct ParamRef
    bool isEnum = false;
    bool isBool = false;
    std::vector<std::string> enumOptions;
+   FaderPosToValueFn posToValue = nullptr;
+   FaderValueToPosFn valueToPos = nullptr;
 };
 
 // Which modulator drives which parameter. Keyed by (nodeIndex, paramIndex) so the

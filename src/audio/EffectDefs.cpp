@@ -327,7 +327,7 @@ namespace
          // predelay landing and the damping-shortens-decay effect directly
          // and passes for all three.
          def.params.push_back({ "decay", 0.1f, 20.0f, 2.0f });
-         def.params.push_back({ "damping", 0.0f, 1.0f, 0.4f });
+         def.params.push_back({ "damping", 0.0f, 1.0f, 0.155f });
          def.params.push_back({ "predelay", 0.0f, 500.0f, 20.0f });
          // Stereo width: blends the FDN's even/odd-line L/R split back toward
          // mono. Default 1.0 reproduces the fixed 0.6 cross-mix the kernel

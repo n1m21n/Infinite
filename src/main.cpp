@@ -1230,11 +1230,26 @@ namespace
       if (cached != gDiscreteSlotByLabel.end())
          return cached->second;
 
+      // Rename-compatibility shim: map renamed discrete parameter labels to their
+      // historical string so FNV-1a hash ordinal doesn't change and existing patches stay valid.
+      static const std::unordered_map<std::string, std::string> kRenameAliases = {
+         { "Global Scale##midiSnap", "Snap to Key##midiSnap" },
+         { "Global Scale##transposeSnap", "Snap to Key##transposeSnap" },
+         { "Global Scale##arpSnap", "Snap to Key##arpSnap" },
+         { "Global Scale##seqSnap", "Snap to Key##seqSnap" },
+         { "Global Scale##stackSnap", "Snap to Key##stackSnap" },
+      };
+
+      const std::string* hashStr = &label;
+      auto aliasIt = kRenameAliases.find(label);
+      if (aliasIt != kRenameAliases.end())
+         hashStr = &aliasIt->second;
+
       // FNV-1a, so the same label lands on the same slot in every run and a
       // saved patch's bindings still resolve after a reload. Probing only
       // happens on a real collision within one node.
       uint32_t h = 2166136261u;
-      for (const char c : label)
+      for (const char c : *hashStr)
       {
          h ^= (uint8_t)c;
          h *= 16777619u;
@@ -1430,6 +1445,259 @@ namespace
       gAudioReadout[gCurrentNodeIndex] = buf;
    }
 
+   // Widget styles for audio knobs and faders.
+   enum class AudioWidgetStyle
+   {
+      Knob,
+      VFader,
+      // Same widget as VFader, routed through ConsoleFaderTaper - unity at
+      // 75% of throw instead of a linear-in-dB mapping. Only meaningful for
+      // a -60..+12 dB range; see the taper's own comment.
+      VFaderDb,
+      // Same widget as Knob, routed through ConsoleFaderTaper.
+      KnobDb,
+      // Logarithmic taper matching human ear frequency/pitch perception and visualizer response curves.
+      KnobFreq,
+      KnobLog,
+      KnobSkewAttack100,
+      KnobSkewDecay300,
+      KnobSkewRelease400,
+      KnobSkewDelay250,
+      KnobSkewGlide150,
+      KnobSkewGlide100,
+      KnobSkewStrum30,
+      KnobSkewStrum20,
+      KnobSkewFreqShifter12,
+      KnobSkewStereoBass120,
+      KnobSkewBassMono = KnobSkewStereoBass120,
+      KnobSkewSpread100 = KnobSkewFreqShifter12
+   };
+
+   // Adaptive format helper: scales display precision at small values so
+   // tapered parameters do not display a static "0 ms" or dead string across the bottom sweep.
+   inline void FormatAudioParam(char* outBuf, size_t outSize, const char* fmt, float val)
+   {
+      if (!outBuf || outSize == 0)
+         return;
+      if (!fmt || fmt[0] == '\0')
+      {
+         outBuf[0] = '\0';
+         return;
+      }
+
+      if (strstr(fmt, "ms") != nullptr)
+      {
+         const float absV = std::fabs(val);
+         if (absV < 10.0f && (strstr(fmt, "%.0f") || strstr(fmt, "%.1f")))
+         {
+            snprintf(outBuf, outSize, "%.2f ms", val);
+            return;
+         }
+         if (absV < 100.0f && strstr(fmt, "%.0f"))
+         {
+            snprintf(outBuf, outSize, "%.1f ms", val);
+            return;
+         }
+      }
+      else if (strstr(fmt, "Hz") != nullptr)
+      {
+         const float absV = std::fabs(val);
+         if (absV < 10.0f && (strstr(fmt, "%.0f") || strstr(fmt, "%.1f")))
+         {
+            snprintf(outBuf, outSize, "%.2f Hz", val);
+            return;
+         }
+         if (absV < 100.0f && strstr(fmt, "%.0f"))
+         {
+            snprintf(outBuf, outSize, "%.1f Hz", val);
+            return;
+         }
+      }
+      else if (strstr(fmt, "s") != nullptr && strstr(fmt, "st") == nullptr && strstr(fmt, "step") == nullptr && strstr(fmt, "semi") == nullptr)
+      {
+         const float absV = std::fabs(val);
+         if (absV < 0.1f && (strstr(fmt, "%.2f") || strstr(fmt, "%.1f") || strstr(fmt, "%.0f")))
+         {
+            snprintf(outBuf, outSize, "%.3f s", val);
+            return;
+         }
+         if (absV < 1.0f && (strstr(fmt, "%.1f") || strstr(fmt, "%.0f")))
+         {
+            snprintf(outBuf, outSize, "%.2f s", val);
+            return;
+         }
+      }
+
+      snprintf(outBuf, outSize, fmt, val);
+   }
+
+   // Skew (power law) taper parameterized by target 12 o'clock centre value.
+   // Follows JUCE's NormalisableRange::setSkewForCentre idiom:
+   // k = ln((centre - minV) / (maxV - minV)) / ln(0.5)
+   // PosToValue(p) = minV + (maxV - minV) * p^k
+   // ValueToPos(v) = ((v - minV) / (maxV - minV))^(1/k)
+   namespace SkewTaperMath
+   {
+      inline float PosToValue(float pos01, float minV, float maxV, float centre)
+      {
+         if (maxV <= minV || centre <= minV || centre >= maxV)
+            return minV + (maxV - minV) * std::clamp(pos01, 0.0f, 1.0f);
+         const float k = logf((centre - minV) / (maxV - minV)) / logf(0.5f);
+         return minV + (maxV - minV) * powf(std::clamp(pos01, 0.0f, 1.0f), k);
+      }
+
+      inline float ValueToPos(float value, float minV, float maxV, float centre)
+      {
+         if (maxV <= minV || centre <= minV || centre >= maxV)
+            return (maxV > minV) ? std::clamp((value - minV) / (maxV - minV), 0.0f, 1.0f) : 0.0f;
+         const float k = logf((centre - minV) / (maxV - minV)) / logf(0.5f);
+         const float norm = std::clamp((value - minV) / (maxV - minV), 0.0f, 1.0f);
+         return std::clamp(powf(norm, 1.0f / k), 0.0f, 1.0f);
+      }
+   }
+
+   // True logarithmic taper for ranges with minV > 0.
+   // Maps 0..1 throw to an octave/ratio-linear scale between minV and maxV.
+   namespace LogTaper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV)
+      {
+         const float lo = std::max(1e-4f, minV);
+         const float hi = std::max(lo + 1e-4f, maxV);
+         return lo * powf(hi / lo, std::clamp(pos01, 0.0f, 1.0f));
+      }
+
+      inline float ValueToPos(float value, float minV, float maxV)
+      {
+         const float lo = std::max(1e-4f, minV);
+         const float hi = std::max(lo + 1e-4f, maxV);
+         const float clampedVal = std::clamp(value, lo, hi);
+         return std::clamp((logf(clampedVal) - logf(lo)) / (logf(hi) - logf(lo)), 0.0f, 1.0f);
+      }
+   }
+
+   namespace FrequencyTaper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return LogTaper::PosToValue(pos01, minV, maxV); }
+      inline float ValueToPos(float value, float minV, float maxV) { return LogTaper::ValueToPos(value, minV, maxV); }
+   }
+
+   namespace SkewAttack100Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 100.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 100.0f); }
+   }
+
+   namespace SkewDecay300Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 300.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 300.0f); }
+   }
+
+   namespace SkewRelease400Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 400.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 400.0f); }
+   }
+
+   namespace SkewDelay250Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 250.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 250.0f); }
+   }
+
+   namespace SkewGlide150Taper
+   {
+      inline float CentreForRange(float maxV) { return maxV <= 10.0f ? 0.15f : 150.0f; }
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, CentreForRange(maxV)); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, CentreForRange(maxV)); }
+   }
+
+   namespace SkewGlide100Taper
+   {
+      inline float CentreForRange(float maxV) { return maxV <= 10.0f ? 0.10f : 100.0f; }
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, CentreForRange(maxV)); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, CentreForRange(maxV)); }
+   }
+
+   namespace SkewStrum30Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 30.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 30.0f); }
+   }
+
+   namespace SkewStrum20Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 20.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 20.0f); }
+   }
+
+   namespace SkewFreqShifter12Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 12.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 12.0f); }
+   }
+
+   namespace SkewStereoBass120Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 120.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 120.0f); }
+   }
+
+   // Piecewise-linear -60..+12 dB console taper: unity sits at 75% of throw
+   // and the range below -30 dB (near-inaudible) is compressed, instead of
+   // giving 0 -> -12 dB (a large, obvious level change) and -60 -> -30 dB
+   // (barely audible) equal pixel budget the way a linear-in-dB fader does.
+   // Only valid for a -60..+12 dB range - callers with a different minV/maxV
+   // should not opt in.
+   namespace ConsoleFaderTaper
+   {
+      struct Point { float pos, db; };
+      const Point kPoints[] = {
+         { 0.00f, -60.0f }, { 0.15f, -45.0f }, { 0.30f, -30.0f }, { 0.45f, -20.0f },
+         { 0.60f, -10.0f }, { 0.75f,   0.0f }, { 1.00f,  12.0f },
+      };
+      constexpr int kCount = sizeof(kPoints) / sizeof(kPoints[0]);
+      // Detents drawn on a tapered fader, in dB - meaningless as even quarters
+      // of the throw once the taper is nonlinear.
+      const float kDetentsDb[] = { 0.0f, -10.0f, -20.0f, -30.0f, -60.0f };
+      constexpr int kNumDetents = sizeof(kDetentsDb) / sizeof(kDetentsDb[0]);
+
+      inline float PosToDb(float pos)
+      {
+         pos = std::clamp(pos, 0.0f, 1.0f);
+         for (int i = 0; i + 1 < kCount; i++)
+         {
+            if (pos <= kPoints[i + 1].pos)
+            {
+               const float t = (pos - kPoints[i].pos) / (kPoints[i + 1].pos - kPoints[i].pos);
+               return kPoints[i].db + (kPoints[i + 1].db - kPoints[i].db) * t;
+            }
+         }
+         return kPoints[kCount - 1].db;
+      }
+
+      inline float DbToPos(float db)
+      {
+         if (db <= kPoints[0].db)
+            return kPoints[0].pos;
+         if (db >= kPoints[kCount - 1].db)
+            return kPoints[kCount - 1].pos;
+         for (int i = 0; i + 1 < kCount; i++)
+         {
+            if (db <= kPoints[i + 1].db)
+            {
+               const float t = (db - kPoints[i].db) / (kPoints[i + 1].db - kPoints[i].db);
+               return kPoints[i].pos + (kPoints[i + 1].pos - kPoints[i].pos) * t;
+            }
+         }
+         return kPoints[kCount - 1].pos;
+      }
+
+      inline float PosToValue(float pos01, float /*minV*/, float /*maxV*/) { return PosToDb(pos01); }
+      inline float ValueToPos(float value, float /*minV*/, float /*maxV*/) { return DbToPos(value); }
+   }
+
    // ---- horizontal audio slider -------------------------------------------
    // Label left, value right, both *inside* the track; a low-alpha fill from
    // the left edge to the current value instead of a grab handle. This is
@@ -1444,7 +1712,8 @@ namespace
    // IsItemActivated/IsItemHovered surface ModSlider's surrounding logic
    // depends on) and only the pixels are ours.
    bool AudioSliderFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
-                         float width, ImU32 fillColor, bool readOnly)
+                         float width, ImU32 fillColor, bool readOnly,
+                         FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
    {
       const bool isLight = IsThemeLight();
       if (isLight)
@@ -1463,17 +1732,47 @@ namespace
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
 
+      auto ValueToPos01 = [&](float v) -> float
+      {
+         return valueToPos ? std::clamp(valueToPos(v, minV, maxV), 0.0f, 1.0f)
+                           : ((maxV > minV) ? std::clamp((v - minV) / (maxV - minV), 0.0f, 1.0f) : 0.0f);
+      };
+      auto Pos01ToValue = [&](float pos) -> float
+      {
+         return posToValue ? std::clamp(posToValue(pos, minV, maxV), minV, maxV)
+                           : std::clamp(minV + (maxV - minV) * pos, minV, maxV);
+      };
+
       std::string id = std::string("##as_") + label;
       ImGui::SetNextItemWidth(width);
-      const bool changed = ImGui::SliderFloat(id.c_str(), value, minV, maxV, "",
-                                              readOnly ? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None);
+      bool changed = false;
+      float pos01 = ValueToPos01(*value);
+      if (posToValue != nullptr)
+      {
+         if (ImGui::SliderFloat(id.c_str(), &pos01, 0.0f, 1.0f, "",
+                                readOnly ? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None))
+         {
+            const float next = Pos01ToValue(pos01);
+            if (next != *value)
+            {
+               *value = next;
+               changed = true;
+            }
+         }
+      }
+      else
+      {
+         changed = ImGui::SliderFloat(id.c_str(), value, minV, maxV, "",
+                                      readOnly ? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None);
+         pos01 = ValueToPos01(*value);
+      }
       ImGui::PopStyleVar();
       ImGui::PopStyleColor(5);
 
       const ImVec2 r0 = ImGui::GetItemRectMin();
       const ImVec2 r1 = ImGui::GetItemRectMax();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const float t = (maxV > minV) ? std::clamp((*value - minV) / (maxV - minV), 0.0f, 1.0f) : 0.0f;
+      const float t = pos01;
       const float fillX = r0.x + (r1.x - r0.x) * t;
       if (t > 0.0f)
       {
@@ -1490,7 +1789,7 @@ namespace
       if (hash != std::string::npos)
          name = name.substr(0, hash);
       char valBuf[48];
-      snprintf(valBuf, sizeof(valBuf), fmt, *value);
+      FormatAudioParam(valBuf, sizeof(valBuf), fmt, *value);
       const float textY = r0.y + (r1.y - r0.y - ImGui::GetTextLineHeight()) * 0.5f;
       const ImVec2 valSize = ImGui::CalcTextSize(valBuf);
       const float valX = r1.x - 7.0f - valSize.x;
@@ -1621,6 +1920,24 @@ namespace
       return h;
    }
 
+   inline void PushDropdownStyle()
+   {
+      const bool isLight = IsThemeLight();
+      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.20f, 0.22f, 0.30f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.28f, 0.31f, 0.42f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.35f, 0.39f, 0.52f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.90f, 0.93f, 0.98f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.72f, 0.76f, 0.85f, 1.0f) : ImVec4(0.30f, 0.34f, 0.46f, 1.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+   }
+
+   inline void PopDropdownStyle()
+   {
+      ImGui::PopStyleVar(2);
+      ImGui::PopStyleColor(5);
+   }
+
    // Same pin id scheme, colours and gParamPinScreenList entry as ModSlider's
    // pin - that list is what the performance matrix's "Assign Parameter" picker
    // hit-tests, so registering here is what makes a mode or a checkbox
@@ -1633,16 +1950,18 @@ namespace
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float box = 14.0f;
+      const float box = 12.0f;
       ImGui::Dummy(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();
       const ImU32 pinColor = h.modulated
          ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
-         : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
-      dl->AddCircleFilled(c, 4.0f, pinColor);
-      dl->AddCircle(c, 4.0f, isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255), 0, 1.0f);
+         : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(120, 128, 150, 255));
+      dl->AddCircleFilled(c, 4.0f, isLight ? IM_COL32(240, 243, 250, 255) : IM_COL32(18, 19, 25, 255));
+      dl->AddCircle(c, h.modulated ? 4.0f : 4.5f, pinColor, 12, 2.0f);
+      if (h.modulated)
+         dl->AddCircleFilled(c, 2.0f, pinColor);
       ed::EndPin();
 
       GraphNode* curGn = FindNodeByIndex(h.nodeIndex);
@@ -1687,6 +2006,7 @@ namespace
       }
 
       const std::string caption = options[safeCurrent] + "##" + label;
+      PushDropdownStyle();
       if (h.modulated)
       {
          // Read-only look, matching a modulated slider: the value still reads
@@ -1710,10 +2030,30 @@ namespace
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
       }
+      PopDropdownStyle();
       if (!showCaption)
          return;
       ImGui::SameLine();
       ImGui::TextDisabled("%s", StripParamLabel(label).c_str());
+   }
+
+   inline void PushCheckboxStyle()
+   {
+      const bool isLight = IsThemeLight();
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.18f, 0.20f, 0.28f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.25f, 0.28f, 0.38f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.32f, 0.36f, 0.48f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_CheckMark, isLight ? ImVec4(0.20f, 0.55f, 0.95f, 1.0f) : ImVec4(0.45f, 0.75f, 1.0f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.70f, 0.74f, 0.84f, 1.0f) : ImVec4(0.30f, 0.34f, 0.46f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.88f, 0.92f, 0.98f, 1.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+   }
+
+   inline void PopCheckboxStyle()
+   {
+      ImGui::PopStyleVar(2);
+      ImGui::PopStyleColor(6);
    }
 
    bool ModCheckbox(const char* label, bool* value)
@@ -1724,7 +2064,12 @@ namespace
       const DiscreteParamHandle h =
          RegisterDiscreteParam(label, *value ? 1.0f : 0.0f, 1.0f, /*isBool=*/true, nullptr);
       if (!h.registered)
-         return ImGui::Checkbox(label, value); // not a node param - plain checkbox
+      {
+         PushCheckboxStyle();
+         bool changed = ImGui::Checkbox(label, value);
+         PopCheckboxStyle();
+         return changed;
+      }
 
       // Reported as "changed" the frame a cable flips it, because a lot of
       // call sites are `bool tmp = node->Get(); if (ModCheckbox(.., &tmp))
@@ -1742,6 +2087,7 @@ namespace
 
       DrawDiscreteParamPin(h, label, kParamWidth);
 
+      PushCheckboxStyle();
       if (h.modulated)
       {
          bool shown = *value;
@@ -1760,16 +2106,17 @@ namespace
          changed = ImGui::Checkbox(label, value) || changed;
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
       }
+      PopCheckboxStyle();
       return changed;
    }
-
    // `audioStyle` swaps the widget in the middle of this function for
    // AudioSliderFloat above. Everything around it - the pin, the typed-edit
    // field, the expression/modulation branches, undo, hotkeys - is shared,
    // so an audio slider is modulatable and expression-drivable on exactly
-   // the same terms as every other param in the app.
+   // the same terms as every other param in the ap
    bool ModSlider(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
-                  float width = kParamWidth, bool audioStyle = false, float step = 0.0f)
+                  float width = kParamWidth, bool audioStyle = false, float step = 0.0f,
+                  FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
    {
       const int nodeIndex = gCurrentNodeIndex;
       const int paramIndex = gParamCounter++;
@@ -1782,6 +2129,8 @@ namespace
       ref.maxValue = maxV;
       ref.step = step;
       ref.name = label;
+      ref.posToValue = posToValue;
+      ref.valueToPos = valueToPos;
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
@@ -1818,9 +2167,9 @@ namespace
          ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
          : hasExpr && !exprErrored
             ? (isLight ? IM_COL32(130, 80, 230, 255) : IM_COL32(170, 130, 255, 255))
-            : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
+            : isLight ? IM_COL32(170, 175, 190, 255) : IM_COL32(70, 75, 90, 255);
       dl->AddCircleFilled(c, 4.0f, pinColor);
-      dl->AddCircle(c, 4.0f, isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255), 0, 1.0f);
+      dl->AddCircle(c, 4.0f, isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(30, 32, 40, 255), 16, 1.0f);
       ed::EndPin();
       GraphNode* curGn = FindNodeByIndex(nodeIndex);
       // rowMin starts after the pin box + its SameLine gap, not at the pin
@@ -1931,7 +2280,7 @@ namespace
          if (audioStyle)
          {
             AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
-                             IM_COL32(255, 190, 90, 255), /*readOnly=*/true);
+                             IM_COL32(255, 190, 90, 255), /*readOnly=*/true, posToValue, valueToPos);
          }
          else
          {
@@ -1967,7 +2316,7 @@ namespace
          if (audioStyle)
          {
             AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f - exprSuffixW,
-                             IM_COL32(170, 130, 255, 255), /*readOnly=*/true);
+                             IM_COL32(170, 130, 255, 255), /*readOnly=*/true, posToValue, valueToPos);
          }
          else
          {
@@ -2016,7 +2365,7 @@ namespace
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
-                                       IM_COL32(120, 200, 255, 235), /*readOnly=*/false);
+                                       IM_COL32(120, 200, 255, 235), /*readOnly=*/false, posToValue, valueToPos);
          }
          else
          {
@@ -2041,7 +2390,7 @@ namespace
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
-                                       IM_COL32(120, 200, 255, 235), /*readOnly=*/false);
+                                       IM_COL32(120, 200, 255, 235), /*readOnly=*/false, posToValue, valueToPos);
          }
          else
          {
@@ -2123,19 +2472,6 @@ namespace
    // exactly why every mixing desk ever built uses faders there and knobs
    // everywhere else. A row of 8 knobs cannot be read as a balance; a row of
    // 8 faders is read as one by shape alone.
-   enum class AudioWidgetStyle
-   {
-      Knob,
-      VFader,
-      // Same widget as VFader, routed through ConsoleFaderTaper - unity at
-      // 75% of throw instead of a linear-in-dB mapping. Only meaningful for
-      // a -60..+12 dB range; see the taper's own comment.
-      VFaderDb,
-      // Same widget as Knob, routed through ConsoleFaderTaper.
-      KnobDb,
-      // Logarithmic taper matching human ear frequency/pitch perception and visualizer response curves.
-      KnobFreq
-   };
 
    // Visual width the fader occupies inside its cell (track plus the cap's
    // overhang). The interactive rect matches, for the same reason KnobFloat's
@@ -2149,80 +2485,6 @@ namespace
    // not dB-specific plumbing hardcoded into the widget.
    using FaderPosToValueFn = float (*)(float pos01, float minV, float maxV);
    using FaderValueToPosFn = float (*)(float value, float minV, float maxV);
-
-   // Logarithmic frequency taper: maps 0..1 throw to an octave-linear scale between minV and maxV.
-   // Perceptually centres ~630 Hz on 20..20,000 Hz, matching human pitch perception and filter graphs.
-   namespace FrequencyTaper
-   {
-      inline float PosToValue(float pos01, float minV, float maxV)
-      {
-         const float lo = std::max(1.0f, minV);
-         const float hi = std::max(lo + 1.0f, maxV);
-         return lo * powf(hi / lo, std::clamp(pos01, 0.0f, 1.0f));
-      }
-
-      inline float ValueToPos(float value, float minV, float maxV)
-      {
-         const float lo = std::max(1.0f, minV);
-         const float hi = std::max(lo + 1.0f, maxV);
-         const float clampedVal = std::clamp(value, lo, hi);
-         return std::clamp((logf(clampedVal) - logf(lo)) / (logf(hi) - logf(lo)), 0.0f, 1.0f);
-      }
-   }
-
-   // Piecewise-linear -60..+12 dB console taper: unity sits at 75% of throw
-   // and the range below -30 dB (near-inaudible) is compressed, instead of
-   // giving 0 -> -12 dB (a large, obvious level change) and -60 -> -30 dB
-   // (barely audible) equal pixel budget the way a linear-in-dB fader does.
-   // Only valid for a -60..+12 dB range - callers with a different minV/maxV
-   // should not opt in.
-   namespace ConsoleFaderTaper
-   {
-      struct Point { float pos, db; };
-      const Point kPoints[] = {
-         { 0.00f, -60.0f }, { 0.15f, -45.0f }, { 0.30f, -30.0f }, { 0.45f, -20.0f },
-         { 0.60f, -10.0f }, { 0.75f,   0.0f }, { 1.00f,  12.0f },
-      };
-      constexpr int kCount = sizeof(kPoints) / sizeof(kPoints[0]);
-      // Detents drawn on a tapered fader, in dB - meaningless as even quarters
-      // of the throw once the taper is nonlinear.
-      const float kDetentsDb[] = { 0.0f, -10.0f, -20.0f, -30.0f, -60.0f };
-      constexpr int kNumDetents = sizeof(kDetentsDb) / sizeof(kDetentsDb[0]);
-
-      float PosToDb(float pos)
-      {
-         pos = std::clamp(pos, 0.0f, 1.0f);
-         for (int i = 0; i + 1 < kCount; i++)
-         {
-            if (pos <= kPoints[i + 1].pos)
-            {
-               const float t = (pos - kPoints[i].pos) / (kPoints[i + 1].pos - kPoints[i].pos);
-               return kPoints[i].db + (kPoints[i + 1].db - kPoints[i].db) * t;
-            }
-         }
-         return kPoints[kCount - 1].db;
-      }
-
-      float DbToPos(float db)
-      {
-         if (db <= kPoints[0].db)
-            return kPoints[0].pos;
-         if (db >= kPoints[kCount - 1].db)
-            return kPoints[kCount - 1].pos;
-         for (int i = 0; i + 1 < kCount; i++)
-         {
-            if (db <= kPoints[i + 1].db)
-            {
-               const float t = (db - kPoints[i].db) / (kPoints[i + 1].db - kPoints[i].db);
-               return kPoints[i].pos + (kPoints[i + 1].pos - kPoints[i].pos) * t;
-            }
-         }
-         return kPoints[kCount - 1].pos;
-      }
-
-      float PosToValue(float pos01, float /*minV*/, float /*maxV*/) { return PosToDb(pos01); }
-      float ValueToPos(float value, float /*minV*/, float /*maxV*/) { return DbToPos(value); }
-   }
 
    // Vertical fader with KnobFloat's exact contract - draws at the cursor,
    // reserves (cell, rowH), leaves IsItemHovered/IsItemActive queryable, fills
@@ -2258,14 +2520,11 @@ namespace
       {
          // Travel is the fader's own length, not a fixed 200px as on the
          // knob: a fader that doesn't track the cap under the cursor reads as
-         // broken in a way a knob never does, because the cap is visibly a
-         // position rather than an angle. Dragging moves position linearly
-         // (screen pixels are literally position), then position maps to
-         // value through whatever taper is active - linear when there isn't one.
+         // spongy, because the eye can compare the cap to the cursor in the
+         // same visual axis.
          const float speed = ImGui::GetIO().KeyShift ? 0.2f : 1.0f;
-         const float travel = std::max(1.0f, height - 12.0f);
          const float posNow = ValueToPos01(*value);
-         const float nextPos = std::clamp(posNow - ImGui::GetIO().MouseDelta.y * speed / travel, 0.0f, 1.0f);
+         const float nextPos = std::clamp(posNow - ImGui::GetIO().MouseDelta.y * speed / height, 0.0f, 1.0f);
          const float next = Pos01ToValue(nextPos);
          if (next != *value)
          {
@@ -2274,13 +2533,11 @@ namespace
          }
       }
 
-      const float t = ValueToPos01(*value);
       const float cx = p.x + cell * 0.5f;
-      const float top = p.y + 6.0f;
-      const float bottom = p.y + height - 6.0f;
+      const float top = p.y + 4.0f;
+      const float bottom = p.y + height - 4.0f;
+      const float t = ValueToPos01(*value);
       const float capY = bottom - t * (bottom - top);
-      // Modulation range band (item 6), same intent as KnobFloat's arc band
-      // above - only ever passed when read-only-modulated.
       const float capYLo = hasRange ? bottom - ValueToPos01(rangeLo) * (bottom - top) : 0.0f;
       const float capYHi = hasRange ? bottom - ValueToPos01(rangeHi) * (bottom - top) : 0.0f;
 
@@ -2289,12 +2546,12 @@ namespace
       if (isLight)
       {
          dl->AddRectFilled(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                           IM_COL32(215, 220, 230, 255), 3.0f);
+                           IM_COL32(215, 218, 228, 255), 3.0f);
          dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                     IM_COL32(180, 185, 200, 255), 3.0f);
+                     IM_COL32(190, 195, 208, 255), 3.0f);
          if (hasRange)
             dl->AddRectFilled(ImVec2(cx - 5.0f, std::min(capYLo, capYHi)), ImVec2(cx + 5.0f, std::max(capYLo, capYHi)),
-                              IM_COL32(255, 190, 90, 100));
+                              IM_COL32(255, 190, 90, 110));
          if (t > 0.0f)
             dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
 
@@ -2303,8 +2560,8 @@ namespace
             for (int i = 0; i <= 4; i++)
             {
                const float y = bottom - (float)i * 0.25f * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(0, 0, 0, 45), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(0, 0, 0, 45), 1.0f);
+               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(170, 175, 190, 255), 1.0f);
+               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(170, 175, 190, 255), 1.0f);
             }
          }
          else
@@ -2313,16 +2570,16 @@ namespace
             {
                const float dpos = std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f);
                const float y = bottom - dpos * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(0, 0, 0, 45), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(0, 0, 0, 45), 1.0f);
+               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(170, 175, 190, 255), 1.0f);
+               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(170, 175, 190, 255), 1.0f);
             }
          }
-         const ImU32 capCol = readOnly ? IM_COL32(180, 185, 198, 255) : IM_COL32(235, 238, 245, 255);
+         const ImU32 capCol = readOnly ? IM_COL32(200, 204, 214, 255) : IM_COL32(236, 240, 248, 255);
          dl->AddRectFilled(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f), capCol, 3.0f);
          dl->AddRect(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f),
-                     IM_COL32(150, 155, 170, 255), 3.0f);
+                     IM_COL32(180, 185, 200, 255), 3.0f);
          dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
-                     readOnly ? IM_COL32(120, 125, 140, 255) : IM_COL32(40, 45, 60, 255), 1.6f);
+                     readOnly ? IM_COL32(140, 145, 160, 255) : IM_COL32(40, 45, 60, 255), 1.6f);
          if (hovered && !readOnly)
             dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
                         IM_COL32(0, 0, 0, 30), 4.0f, 0, 2.0f);
@@ -2383,7 +2640,7 @@ namespace
       if (hovered || active)
       {
          char buf[48];
-         snprintf(buf, sizeof(buf), fmt, *value);
+         FormatAudioParam(buf, sizeof(buf), fmt, *value);
          SetAudioReadout(caption, buf);
       }
 
@@ -2532,7 +2789,7 @@ namespace
       if (hovered || active)
       {
          char buf[48];
-         snprintf(buf, sizeof(buf), fmt, *value);
+         FormatAudioParam(buf, sizeof(buf), fmt, *value);
          SetAudioReadout(caption, buf);
       }
 
@@ -2699,24 +2956,78 @@ namespace
    // all the pin placement below actually needs from it.
    bool ModKnob(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
                 float diameter = kKnobDiameter, float cellW = 0.0f,
-                AudioWidgetStyle style = AudioWidgetStyle::Knob, float step = 0.0f)
+                AudioWidgetStyle style = AudioWidgetStyle::Knob, float step = 0.0f,
+                FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
    {
+      FaderPosToValueFn p2v = posToValue;
+      FaderValueToPosFn v2p = valueToPos;
+      if (!p2v)
+      {
+         switch (style)
+         {
+         case AudioWidgetStyle::VFaderDb:
+         case AudioWidgetStyle::KnobDb:
+            p2v = ConsoleFaderTaper::PosToValue;
+            v2p = ConsoleFaderTaper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobFreq:
+         case AudioWidgetStyle::KnobLog:
+            p2v = FrequencyTaper::PosToValue;
+            v2p = FrequencyTaper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewAttack100:
+            p2v = SkewAttack100Taper::PosToValue;
+            v2p = SkewAttack100Taper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewDecay300:
+            p2v = SkewDecay300Taper::PosToValue;
+            v2p = SkewDecay300Taper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewRelease400:
+            p2v = SkewRelease400Taper::PosToValue;
+            v2p = SkewRelease400Taper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewDelay250:
+            p2v = SkewDelay250Taper::PosToValue;
+            v2p = SkewDelay250Taper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewGlide150:
+            p2v = SkewGlide150Taper::PosToValue;
+            v2p = SkewGlide150Taper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewGlide100:
+            p2v = SkewGlide100Taper::PosToValue;
+            v2p = SkewGlide100Taper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewStrum30:
+            p2v = SkewStrum30Taper::PosToValue;
+            v2p = SkewStrum30Taper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewStrum20:
+            p2v = SkewStrum20Taper::PosToValue;
+            v2p = SkewStrum20Taper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewFreqShifter12:
+            p2v = SkewFreqShifter12Taper::PosToValue;
+            v2p = SkewFreqShifter12Taper::ValueToPos;
+            break;
+         case AudioWidgetStyle::KnobSkewStereoBass120:
+            p2v = SkewStereoBass120Taper::PosToValue;
+            v2p = SkewStereoBass120Taper::ValueToPos;
+            break;
+         default:
+            break;
+         }
+      }
+
       auto DrawWidget = [&](float* v, ImU32 col, bool readOnly, bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f) -> bool
       {
-         if (style == AudioWidgetStyle::VFaderDb)
-            return VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                                ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos, hasRange, rangeLo, rangeHi);
-         if (style == AudioWidgetStyle::KnobDb)
-            return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                              ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos, hasRange, rangeLo, rangeHi);
-         if (style == AudioWidgetStyle::KnobFreq)
-            return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                              FrequencyTaper::PosToValue, FrequencyTaper::ValueToPos, hasRange, rangeLo, rangeHi);
-         return style == AudioWidgetStyle::VFader
+         const bool isVFader = (style == AudioWidgetStyle::VFader || style == AudioWidgetStyle::VFaderDb);
+         return isVFader
             ? VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                          nullptr, nullptr, hasRange, rangeLo, rangeHi)
+                          p2v, v2p, hasRange, rangeLo, rangeHi)
             : KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                       nullptr, nullptr, hasRange, rangeLo, rangeHi);
+                        p2v, v2p, hasRange, rangeLo, rangeHi);
       };
       const float widgetW = (style == AudioWidgetStyle::VFader || style == AudioWidgetStyle::VFaderDb)
                                ? kFaderWidth : diameter;
@@ -2732,6 +3043,8 @@ namespace
       ref.maxValue = maxV;
       ref.step = step;
       ref.name = label;
+      ref.posToValue = p2v;
+      ref.valueToPos = v2p;
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
@@ -2929,8 +3242,7 @@ namespace
          GraphNode* curGn = FindNodeByIndex(nodeIndex);
          ParamPinScreenInfo pinInfo{ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
                                       cellOrigin, ImVec2(cellOrigin.x + cell, cellOrigin.y + diameter + 16.0f) };
-         const bool roundWidget = (style == AudioWidgetStyle::Knob || style == AudioWidgetStyle::KnobDb ||
-                                    style == AudioWidgetStyle::KnobFreq);
+         const bool roundWidget = (style != AudioWidgetStyle::VFader && style != AudioWidgetStyle::VFaderDb);
          if (roundWidget)
          {
             pinInfo.isCircle = true;
@@ -3231,6 +3543,88 @@ namespace
       return pressed;
    }
 
+   // Small toggle for Global Scale (snap to scale). Hand-drawn procedural vector glyph
+   // rendering a high-precision beamed musical note (♫) symbol.
+   bool GlobalScaleToggle(bool enabled)
+   {
+      const float w = 22.0f;
+      const float h = 18.0f;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      const bool pressed = ImGui::InvisibleButton("##globalscale", ImVec2(w, h));
+      const bool hovered = ImGui::IsItemHovered();
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
+      ImU32 col = hovered ? IM_COL32(245, 248, 255, 255)
+                          : (enabled ? IM_COL32(185, 145, 255, 255) : IM_COL32(120, 124, 140, 255));
+
+      // Draw slanted note head helper with high segment count for smooth curves
+      auto DrawNoteHead = [&](ImVec2 center, float rx, float ry, float angleRad, bool filled)
+      {
+         const float cosA = cosf(angleRad);
+         const float sinA = sinf(angleRad);
+         const int kSegs = 24;
+         dl->PathClear();
+         for (int i = 0; i < kSegs; i++)
+         {
+            const float t = (float)i / (float)kSegs * 6.2831853f;
+            const float ex = rx * cosf(t);
+            const float ey = ry * sinf(t);
+            const float px = center.x + ex * cosA - ey * sinA;
+            const float py = center.y + ex * sinA + ey * cosA;
+            dl->PathLineTo(ImVec2(px, py));
+         }
+         if (filled)
+            dl->PathFillConvex(col);
+         else
+            dl->PathStroke(col, ImDrawFlags_Closed, 1.4f);
+      };
+
+      const float angle = -0.38f; // ~ -22 degrees slant
+      const ImVec2 head1(c.x - 3.8f, c.y + 3.0f);
+      const ImVec2 head2(c.x + 2.8f, c.y + 1.2f);
+      const float rx = 2.4f, ry = 1.7f;
+
+      DrawNoteHead(head1, rx, ry, angle, enabled);
+      DrawNoteHead(head2, rx, ry, angle, enabled);
+
+      const float stem1X = head1.x + 1.5f;
+      const float stem2X = head2.x + 1.5f;
+      const float top1Y = c.y - 4.5f;
+      const float top2Y = c.y - 6.3f;
+      const float stemThickness = 1.4f;
+
+      // Stems
+      dl->AddLine(ImVec2(stem1X, head1.y + 0.5f), ImVec2(stem1X, top1Y), col, stemThickness);
+      dl->AddLine(ImVec2(stem2X, head2.y + 0.5f), ImVec2(stem2X, top2Y), col, stemThickness);
+
+      // Connecting top beam
+      dl->AddLine(ImVec2(stem1X - 0.4f, top1Y + 0.3f), ImVec2(stem2X + 0.4f, top2Y + 0.3f), col, 2.2f);
+
+      if (hovered)
+      {
+         ImGui::SetItemTooltip("%s", enabled ? "Global Scale: ON (click to disable)"
+                                             : "Global Scale: OFF (click to enable)");
+      }
+
+      return pressed;
+   }
+
+   bool* GetNodeGlobalScaleFlag(INode* node)
+   {
+      if (node == nullptr) return nullptr;
+      if (auto* n = dynamic_cast<MidiNotesNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<NoteFilterNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<NoteTransposeNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<ArpeggiatorNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<NoteSequencerNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<RandomNoteGeneratorNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<ChorderNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<NoteStackNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<BouncingBallsNode*>(node)) return &n->useGlobalScale;
+      return nullptr;
+   }
+
    // Small power / bypass toggle for a node. Hand-drawn procedural vector glyph
    // rendering an IEC 60417-5009 power symbol.
    bool BypassToggle(bool bypassed)
@@ -3507,6 +3901,7 @@ namespace
       REGISTER_NODE(NoteEchoNode, Note Echo, "Notes");
       REGISTER_NODE(NoteRouterNode, Note Router, "Notes");
       REGISTER_NODE(NoteMergeNode, Note Merge, "Notes");
+      REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
       REGISTER_NODE(ArpeggiatorNode, Arpeggiator, "Notes");
       REGISTER_NODE(NoteSequencerNode, Note Sequencer, "Notes");
       REGISTER_NODE(RandomNoteGeneratorNode, Random Note Generator, "Notes");
@@ -7124,7 +7519,7 @@ namespace
       // still shares one baseline - the alternative, letting the dropdown
       // cells be taller, is exactly the ragged row the bottom-align exists to
       // prevent.
-      AudioKnobRow(int cellCount, float maxDiameter = kKnobLarge, float headerRowH = 0.0f, bool hasCaptions = true)
+      AudioKnobRow(int cellCount, float maxDiameter = kKnobSmall, float headerRowH = 0.0f, bool hasCaptions = true)
       {
          count = std::max(1, cellCount);
          maxDia = maxDiameter;
@@ -7142,15 +7537,30 @@ namespace
       }
 
       void Knob(const char* label, float* v, float lo, float hi, const char* fmt,
-                float dia = kKnobSmall, bool dbTaper = false, bool freqTaper = false)
+                float dia = kKnobSmall, bool dbTaper = false, bool freqTaper = false,
+                AudioWidgetStyle explicitStyle = AudioWidgetStyle::Knob,
+                FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
       {
          Place(dia);
-         AudioWidgetStyle style = AudioWidgetStyle::Knob;
-         if (dbTaper)
-            style = AudioWidgetStyle::KnobDb;
-         else if (freqTaper || (lo >= 1.0f && hi >= 1000.0f && (strstr(fmt, "Hz") != nullptr || strcmp(label, "freq") == 0 || strcmp(label, "cutoff") == 0)))
-            style = AudioWidgetStyle::KnobFreq;
-         ModKnob(label, v, lo, hi, fmt, dia, cellW, style);
+         AudioWidgetStyle style = explicitStyle;
+         if (style == AudioWidgetStyle::Knob && posToValue == nullptr)
+         {
+            if (dbTaper)
+            {
+               style = AudioWidgetStyle::KnobDb;
+            }
+            else if (freqTaper || (lo > 0.0f && (hi / lo >= 9.0f) &&
+                     (strstr(fmt, "Hz") != nullptr || strcmp(label, "freq") == 0 || strcmp(label, "cutoff") == 0 || strcmp(label, "filter") == 0)))
+            {
+               style = AudioWidgetStyle::KnobFreq;
+            }
+            else if (lo > 0.0f && (hi / lo >= 9.0f) &&
+                     (strstr(fmt, "ms") != nullptr || (strstr(fmt, "s") != nullptr && strstr(fmt, "st") == nullptr && strstr(fmt, "step") == nullptr && strstr(fmt, "semi") == nullptr)))
+            {
+               style = AudioWidgetStyle::KnobLog;
+            }
+         }
+         ModKnob(label, v, lo, hi, fmt, dia, cellW, style, 0.0f, posToValue, valueToPos);
          index++;
       }
 
@@ -7188,21 +7598,21 @@ namespace
             index++;
             return;
          }
-         float btnW = std::min(cellW - 8.0f, 118.0f);
+         const float cellX0 = x0 + (float)index * cellW;
          const float btnH = ImGui::GetFrameHeight();
-         const float cx = x0 + (float)index * cellW + cellW * 0.5f;
-         // Vertically centred in the knob-height cell, not bottom-aligned -
-         // bottom-aligning left a tall empty gap above the button and made
-         // it read as sitting low relative to the knobs sharing its row.
-         const float btnY = y0 + (maxDia - btnH) * 0.5f;
+         const float btnY = y0 + headerH + (maxDia - btnH) * 0.5f;
          const int lastIndex = (int)options.size() - 1;
          int safe = std::max(0, std::min(current, lastIndex));
 
-         // Same modulation path as the free DropdownButton: an audio node's
-         // mode selector is a param like any other, so it registers, takes a
-         // cable, and shows up in the perf panel's assign picker.
          const DiscreteParamHandle h =
             RegisterDiscreteParam(label, (float)safe, (float)lastIndex, /*isBool=*/false, &options);
+
+         const float knobW = (maxDia >= kKnobLarge) ? kKnobLarge : kKnobSmall;
+         const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
+         const float pinW = 16.0f;
+         float btnX = cellX0 + 4.0f;
+         float btnW = std::min(cellW - 8.0f, 118.0f);
+
          if (h.registered)
          {
             if (h.driven)
@@ -7217,19 +7627,17 @@ namespace
                index++;
                return; // registered so the modulator keeps writing; just not drawn
             }
-            const float pinW = 18.0f; // 14px pin + 4px gap
-            btnW = std::max(24.0f, btnW - pinW);
-            const float leftX = cx - (btnW + pinW) * 0.5f;
-            ImGui::SetCursorScreenPos(ImVec2(leftX, btnY + (btnH - 14.0f) * 0.5f));
-            DrawDiscreteParamPin(h, label, btnW + pinW);
-            ImGui::SetCursorScreenPos(ImVec2(leftX + pinW, btnY));
-         }
-         else
-         {
-            ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, btnY));
+            ImGui::SetCursorScreenPos(ImVec2(pinX, btnY + (btnH - 12.0f) * 0.5f));
+            DrawDiscreteParamPin(h, label, cellW - (pinX - cellX0) - pinW);
+            btnX = pinX + pinW;
+            const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
+            btnW = std::max(20.0f, std::min(btnRight - btnX, 118.0f));
          }
 
+         ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
+
          const std::string caption = options[safe] + "##" + label;
+         PushDropdownStyle();
          if (h.modulated)
          {
             ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
@@ -7255,10 +7663,8 @@ namespace
             if (h.registered)
                DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
          }
-         const bool isLight = IsThemeLight();
-         const ImVec2 sz = ImGui::CalcTextSize(label);
-         ImGui::GetWindowDrawList()->AddText(ImVec2(cx - sz.x * 0.5f, y0 + headerH + maxDia + 4.0f),
-                                             isLight ? IM_COL32(50, 55, 70, 255) : IM_COL32(176, 182, 198, 255), label);
+         PopDropdownStyle();
+
          index++;
       }
 
@@ -7277,8 +7683,7 @@ namespace
       {
          if (!options.empty())
          {
-            float btnW = std::min(cellW - 8.0f, 112.0f);
-            const float cx = x0 + (float)index * cellW + cellW * 0.5f;
+            const float cellX0 = x0 + (float)index * cellW;
             const float btnH = ImGui::GetFrameHeight();
             const int lastIndex = (int)options.size() - 1;
             int safe = std::max(0, std::min(current, lastIndex));
@@ -7300,20 +7705,25 @@ namespace
             }
             if (drawIt)
             {
+               const float knobW = dia;
+               const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
+               const float pinW = 16.0f;
+               float btnX = cellX0 + 4.0f;
+               float btnW = std::min(cellW - 8.0f, 112.0f);
+
                if (h.registered)
                {
-                  const float pinW = 18.0f;
-                  btnW = std::max(24.0f, btnW - pinW);
-                  const float leftX = cx - (btnW + pinW) * 0.5f;
-                  ImGui::SetCursorScreenPos(ImVec2(leftX, y0 + (btnH - 14.0f) * 0.5f));
-                  DrawDiscreteParamPin(h, dropId, btnW + pinW);
-                  ImGui::SetCursorScreenPos(ImVec2(leftX + pinW, y0));
+                  ImGui::SetCursorScreenPos(ImVec2(pinX, y0 + (btnH - 12.0f) * 0.5f));
+                  DrawDiscreteParamPin(h, dropId, cellW - (pinX - cellX0) - pinW);
+                  btnX = pinX + pinW;
+                  const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
+                  btnW = std::max(20.0f, std::min(btnRight - btnX, 112.0f));
                }
-               else
-               {
-                  ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, y0));
-               }
+
+               ImGui::SetCursorScreenPos(ImVec2(btnX, y0));
+
                const std::string caption = options[safe] + "##" + dropId;
+               PushDropdownStyle();
                if (h.modulated)
                {
                   ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
@@ -7338,18 +7748,82 @@ namespace
                   if (h.registered)
                      DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
                }
+               PopDropdownStyle();
             }
          }
          Place(dia);
          if (knobDisabled)
             ImGui::BeginDisabled();
          AudioWidgetStyle style = AudioWidgetStyle::Knob;
-         if (freqTaper || (lo >= 1.0f && hi >= 1000.0f && (strstr(fmt, "Hz") != nullptr || strcmp(knobLabel, "freq") == 0 || strcmp(knobLabel, "cutoff") == 0 || strcmp(knobLabel, "filter") == 0)))
+         if (freqTaper || (lo > 0.0f && (hi / lo >= 9.0f) && (strstr(fmt, "Hz") != nullptr || strcmp(knobLabel, "freq") == 0 || strcmp(knobLabel, "cutoff") == 0 || strcmp(knobLabel, "filter") == 0)))
             style = AudioWidgetStyle::KnobFreq;
          ModKnob(knobLabel, v, lo, hi, fmt, dia, cellW, style);
          if (knobDisabled)
             ImGui::EndDisabled();
          index++;
+      }
+
+      bool Checkbox(const char* label, bool* value)
+      {
+         if (value == nullptr)
+         {
+            index++;
+            return false;
+         }
+         const float cellX0 = x0 + (float)index * cellW;
+         const float knobW = (maxDia >= kKnobLarge) ? kKnobLarge : kKnobSmall;
+         const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
+         const float pinW = 16.0f;
+         const float checkY = y0 + headerH + (maxDia - ImGui::GetFrameHeight()) * 0.5f;
+
+         const DiscreteParamHandle h =
+            RegisterDiscreteParam(label, *value ? 1.0f : 0.0f, 1.0f, /*isBool=*/true, nullptr);
+
+         bool changed = false;
+         if (h.registered)
+         {
+            const bool incoming = *value;
+            if (h.driven)
+            {
+               *value = h.value >= 0.5f;
+               changed = (*value != incoming);
+            }
+            if (!h.draw)
+            {
+               index++;
+               return changed;
+            }
+            ImGui::SetCursorScreenPos(ImVec2(pinX, checkY + (ImGui::GetFrameHeight() - 12.0f) * 0.5f));
+            DrawDiscreteParamPin(h, label, cellW - (pinX - cellX0) - pinW);
+         }
+
+         const float checkX = pinX + (h.registered ? pinW : 0.0f);
+         ImGui::SetCursorScreenPos(ImVec2(checkX, checkY));
+
+         PushCheckboxStyle();
+         if (h.modulated)
+         {
+            bool shown = *value;
+            ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? ImVec4(0.84f, 0.49f, 0.08f, 1.0f)
+                                                                     : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+            ImGui::BeginDisabled();
+            ImGui::Checkbox(label, &shown);
+            ImGui::EndDisabled();
+            ImGui::PopStyleColor();
+            DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
+                                      ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
+                                                                 ImGui::GetItemRectMax()));
+         }
+         else
+         {
+            changed = ImGui::Checkbox(label, value) || changed;
+            if (h.registered)
+               DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
+         }
+         PopCheckboxStyle();
+
+         index++;
+         return changed;
       }
 
       void Skip() { index++; }
@@ -7366,9 +7840,10 @@ namespace
    float AudioFullWidth() { return gAudioContentW; }
    float AudioHalfWidth() { return (gAudioContentW - ImGui::GetStyle().ItemSpacing.x) * 0.5f; }
 
-   bool AudioSlider(const char* label, float* v, float lo, float hi, const char* fmt, float width)
+   bool AudioSlider(const char* label, float* v, float lo, float hi, const char* fmt, float width,
+                    FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
    {
-      return ModSlider(label, v, lo, hi, fmt, width, /*audioStyle=*/true);
+      return ModSlider(label, v, lo, hi, fmt, width, /*audioStyle=*/true, /*step=*/0.0f, posToValue, valueToPos);
    }
 
    bool AudioSliderInt(const char* label, int* v, int lo, int hi, float width)
@@ -7532,6 +8007,7 @@ namespace
           dynamic_cast<QuantizerNode*>(node) != nullptr ||
           dynamic_cast<NoteEchoNode*>(node) != nullptr ||
           dynamic_cast<NoteMergeNode*>(node) != nullptr ||
+          dynamic_cast<NoteSwitcherNode*>(node) != nullptr ||
           dynamic_cast<NoteRouterNode*>(node) != nullptr ||
           dynamic_cast<NoteStrumNode*>(node) != nullptr ||
           dynamic_cast<AudioToCVNode*>(node) != nullptr)
@@ -8806,14 +9282,14 @@ namespace
          y += rowH;
       }
       ImGui::SetCursorScreenPos(ImVec2(fieldsX, y));
-      AudioSlider("attack", attackMs, 0.0f, 4000.0f, "%.0f ms", halfW);
+      AudioSlider("attack", attackMs, 0.0f, 4000.0f, "%.0f ms", halfW, SkewAttack100Taper::PosToValue, SkewAttack100Taper::ValueToPos);
       ImGui::SameLine();
-      AudioSlider("decay", decayMs, 0.0f, 4000.0f, "%.0f ms", halfW);
+      AudioSlider("decay", decayMs, 0.0f, 4000.0f, "%.0f ms", halfW, SkewDecay300Taper::PosToValue, SkewDecay300Taper::ValueToPos);
       y += rowH;
       ImGui::SetCursorScreenPos(ImVec2(fieldsX, y));
       AudioSlider("sustain", sustain, 0.0f, 1.0f, "%.3f", halfW);
       ImGui::SameLine();
-      AudioSlider("release", releaseMs, 0.0f, 4000.0f, "%.0f ms", halfW);
+      AudioSlider("release", releaseMs, 0.0f, 4000.0f, "%.0f ms", halfW, SkewRelease400Taper::PosToValue, SkewRelease400Taper::ValueToPos);
 
       // Close the row at whichever side is taller, so EndAudioSection measures
       // the panel rather than just the field stack.
@@ -9016,7 +9492,7 @@ namespace
          row.Knob("freq", &n->frequency, 20.0f, 8000.0f, "%.0f Hz");
          if (noteDriven)
             ImGui::EndDisabled();
-         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s");
+         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
          // This knob is the manual/global bend - a Pitch Bend node wired
          // into the note chain upstream doesn't touch it at all, it rides
          // in on each note's own bendSemitones field instead (see
@@ -9037,11 +9513,6 @@ namespace
       EndAudioBody();
    }
 
-   const std::vector<std::string>& OscillatorWaveformNames()
-   {
-      static const std::vector<std::string> names = { "sine", "triangle", "saw", "square" };
-      return names;
-   }
 
    void DrawOscillatorWaveform(int waveform, float phase, float h, float width)
    {
@@ -9171,7 +9642,6 @@ namespace
          snprintf(stat, sizeof(stat), "%s  -  free run %.0f Hz",
                   waveName, n->frequency);
 
-      gWtTestRects.clear();
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       WavetableEngine& eng = n->engine;
@@ -9184,9 +9654,10 @@ namespace
          const float gap = 5.0f;
          const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
          const float waveW = std::max(70.0f, w - octW - semiW - fineW - gap * 3.0f);
+         static const std::vector<std::string> kOscWaveNames = { "Sine", "Triangle", "Saw", "Square" };
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         AudioBareDropdown("oscWave", OscillatorWaveformNames(), n->waveform,
+         AudioBareDropdown("oscWave", kOscWaveNames, n->waveform,
                            [n](int i) { PushUndoCheckpoint(); n->waveform = i; }, waveW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + waveW + gap, y));
@@ -9249,7 +9720,7 @@ namespace
          row.Knob("freq", &n->frequency, 20.0f, 8000.0f, "%.0f Hz");
          if (noteDriven)
             ImGui::EndDisabled();
-         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s");
+         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide150);
          row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
          // fmMode picks phase modulation vs linear through-zero FM - see the
          // Wavetable master row's identical control for why they're paired.
@@ -9368,7 +9839,7 @@ namespace
          row.Knob("freq", &n->frequency, 20.0f, 4000.0f, "%.0f Hz");
          if (noteDriven)
             ImGui::EndDisabled();
-         row.Knob("glide", &n->glide, 0.0f, 1.0f, "%.2f s");
+         row.Knob("glide", &n->glide, 0.0f, 1.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
          row.End();
       }
       EndAudioSection();
@@ -9606,7 +10077,7 @@ namespace
          row.Knob("freq", &n->frequency, 20.0f, 4000.0f, "%.0f Hz");
          if (noteDriven)
             ImGui::EndDisabled();
-         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s");
+         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
          row.End();
       }
       EndAudioSection();
@@ -9832,7 +10303,7 @@ namespace
                            "cutoff", &n->cutoff, 20.0f, 20000.0f, "%.0f Hz", filterOff);
          row2.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f");
          row2.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
-         row2.Knob("glide", &n->glide, 0.0f, 1.0f, "%.3f s");
+         row2.Knob("glide", &n->glide, 0.0f, 1.0f, "%.3f s", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide150);
          row2.End();
       }
       EndAudioSection();
@@ -10067,7 +10538,7 @@ namespace
          {
             row.Knob("speed", &n->scanSpeed, 0.05f, 10.0f, "%.2fx");
          }
-         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s");
+         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
          row.Knob("width", &n->stereoWidth, 0.0f, 2.0f, "%.2f");
          row.End();
       }
@@ -10386,7 +10857,7 @@ namespace
       if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->position = std::clamp(n->position, n->start, n->end);
       ImGui::SameLine();
-      AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth());
+      AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
       EndAudioBody();
    }
@@ -10992,7 +11463,7 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
       // Row 1: grain | amount
-      AudioSlider("grain", &n->grain, 10.0f, 500.0f, "%.0f ms", AudioHalfWidth());
+      AudioSlider("grain", &n->grain, 10.0f, 500.0f, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
       ImGui::SameLine();
       AudioSlider("amount", &n->amount, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
@@ -11053,7 +11524,7 @@ namespace
       // Row 5: pitch | decay
       AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
       ImGui::SameLine();
-      AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth());
+      AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
       EndAudioBody();
    }
@@ -11122,9 +11593,9 @@ namespace
       AudioSlider("scan", &n->scan, -4.0f, 4.0f, "%.2fx", AudioHalfWidth());
 
       // Row 2: Grain Size & Density
-      AudioSlider("size", &n->grainLength, 5.0f, 1000.0f, "%.0f ms", AudioHalfWidth());
+      AudioSlider("size", &n->grainLength, 5.0f, 1000.0f, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
       ImGui::SameLine();
-      AudioSlider("density", &n->density, 1.0f, 100.0f, "%.0f Hz", AudioHalfWidth());
+      AudioSlider("density", &n->density, 1.0f, 100.0f, "%.0f Hz", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
       // Row 3: Random Position (Spray) & Random Length
       AudioSlider("spray", &n->randomPos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
@@ -12560,7 +13031,7 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(3, kKnobLarge);
          // -1 is omni, so the knob's low end is a mode rather than a channel
          // number - spelled out in the readout format rather than hidden.
          row.KnobInt("channel", &n->channel, -1, 15, kKnobLarge);
@@ -12568,8 +13039,6 @@ namespace
          row.Knob("velocity", &n->velocityScale, 0.0f, 2.0f, "%.2f", kKnobLarge);
          row.End();
       }
-
-      ModCheckbox("Snap to Key##midiSnap", &n->useGlobalScale);
 
       BeginAudioSection("input");
       if (!Platform::MidiIsRunning())
@@ -12724,8 +13193,6 @@ namespace
          row.End();
       }
 
-      ModCheckbox("Global Scale##filterGlobal", &n->useGlobalScale);
-
       EndAudioBody();
    }
 
@@ -12795,12 +13262,12 @@ namespace
    // second row. Standardised so every one-knob note node looks like these
    // rather than each inventing its own compact layout.
    void DrawSingleKnobAudioBody(GraphNode& gn, const char* stat, const char* label, float* v, float lo, float hi,
-                                const char* fmt)
+                                const char* fmt, AudioWidgetStyle explicitStyle = AudioWidgetStyle::Knob,
+                                FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
    {
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
       AudioKnobRow row(1, kKnobLarge);
-      row.Knob(label, v, lo, hi, fmt, kKnobLarge);
+      row.Knob(label, v, lo, hi, fmt, kKnobLarge, false, false, explicitStyle, posToValue, valueToPos);
       row.End();
       EndAudioBody();
    }
@@ -12814,7 +13281,6 @@ namespace
    void DrawSingleKnobIntAudioBody(GraphNode& gn, const char* stat, const char* label, int* v, int lo, int hi)
    {
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
       AudioKnobRow row(1, kKnobLarge);
       row.KnobInt(label, v, lo, hi, kKnobLarge);
       row.End();
@@ -12825,15 +13291,7 @@ namespace
    {
       char stat[48];
       snprintf(stat, sizeof(stat), "%+d st", n->semitones);
-      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
-      {
-         AudioKnobRow row(1, kKnobLarge);
-         row.KnobInt("transpose", &n->semitones, -48, 48, kKnobLarge);
-         row.End();
-      }
-      ModCheckbox("Snap to Key##transposeSnap", &n->useGlobalScale);
-      EndAudioBody();
+      DrawSingleKnobIntAudioBody(gn, stat, "transpose", &n->semitones, -48, 48);
    }
 
    void DrawPitchBendBody(GraphNode& gn, PitchBendNode* n)
@@ -12855,7 +13313,7 @@ namespace
    {
       char stat[48];
       snprintf(stat, sizeof(stat), "%s", n->glideMs > 0.0f ? "gliding" : "off");
-      DrawSingleKnobAudioBody(gn, stat, "glide", &n->glideMs, 0.0f, 2000.0f, "%.0f ms");
+      DrawSingleKnobAudioBody(gn, stat, "glide", &n->glideMs, 0.0f, 2000.0f, "%.0f ms", AudioWidgetStyle::KnobSkewGlide150);
    }
 
    void DrawVibratoBody(GraphNode& gn, VibratoNode* n)
@@ -12942,12 +13400,39 @@ namespace
       snprintf(stat, sizeof(stat), "%s", kQuantizeLabels[std::clamp(n->div, 0, 4)].c_str());
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      AudioKnobRow row(1, kKnobLarge);
-      row.Dropdown("quantize", kQuantizeLabels, n->div, [n](int i) {
-         PushUndoCheckpoint();
-         n->div = i;
-      });
-      row.End();
+
+      const float totalW = gAudioBodyW;
+      const int count = (int)kQuantizeLabels.size();
+      const float spacing = 3.0f;
+      const float btnW = (totalW - spacing * (float)(count - 1)) / (float)count;
+      const float btnH = 22.0f;
+      const bool isLight = IsThemeLight();
+
+      for (int i = 0; i < count; i++)
+      {
+         if (i > 0)
+            ImGui::SameLine(0.0f, spacing);
+         const bool selected = (n->div == i);
+         if (selected)
+         {
+            ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.20f, 0.48f, 0.88f, 1.0f) : ImVec4(0.25f, 0.55f, 0.95f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+         }
+         else
+         {
+            ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.88f, 0.90f, 0.94f, 1.0f) : ImVec4(0.18f, 0.20f, 0.26f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.2f, 0.2f, 0.25f, 1.0f) : ImVec4(0.7f, 0.72f, 0.78f, 1.0f));
+         }
+         char btnId[32];
+         snprintf(btnId, sizeof(btnId), "%s##qdiv_%d", kQuantizeLabels[i].c_str(), i);
+         if (ImGui::Button(btnId, ImVec2(btnW, btnH)))
+         {
+            PushUndoCheckpoint();
+            n->div = i;
+         }
+         ImGui::PopStyleColor(2);
+      }
+
       EndAudioBody();
    }
 
@@ -12972,10 +13457,11 @@ namespace
       {
          AudioKnobRow row(2);
          row.KnobInt("transpose", &n->transposePerRepeat, -12, 12);
+         bool muteDryBool = n->muteDry;
+         if (row.Checkbox("Mute Dry##echoMuteDry", &muteDryBool))
+            n->muteDry = muteDryBool;
          row.End();
       }
-
-      ModCheckbox("Mute Dry##echoMuteDry", &n->muteDry);
 
       EndAudioBody();
    }
@@ -12987,28 +13473,72 @@ namespace
          if (n->noteInputs[i].IsConnected())
             active++;
 
-      char stat[32];
-      snprintf(stat, sizeof(stat), "%d active", active);
+      char stat[64];
+      if (active == 0)
+         snprintf(stat, sizeof(stat), "no active inputs");
+      else
+         snprintf(stat, sizeof(stat), "%d of %d inputs active", active, NoteMergeNode::kSlots);
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
-      // Four lit dots showing which inputs are currently connected - the
-      // same visual language as Note Router's output dots, mirrored to
-      // inputs since Merge is fan-in rather than fan-out.
+      ImGui::TextDisabled("merges all connected inputs");
+      ImGui::TextDisabled("to a single output stream");
+
+      EndAudioBody();
+   }
+
+   void DrawNoteSwitcherBody(GraphNode& gn, NoteSwitcherNode* n)
+   {
+      const int active = n->ActiveSlot();
+      char stat[64];
+      if (n->manual)
+         snprintf(stat, sizeof(stat), "manual  -  slot %d", active + 1);
+      else if (n->rateMode == 0)
+      {
+         int div = NearestRateDivision(n->rateBeats);
+         snprintf(stat, sizeof(stat), "every %s  -  slot %d", kRateDivisionLabels[std::clamp(div, 0, (int)kRateDivisionLabels.size() - 1)].c_str(), active + 1);
+      }
+      else
+         snprintf(stat, sizeof(stat), "every %.2fs  -  slot %d", n->rateSeconds, active + 1);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      // Four LED dots: active slot lit, connected dim, unconnected darkest
       {
          const float w = gAudioBodyW;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const float dia = 14.0f;
-         const float gap = (w - (float)NoteMergeNode::kSlots * dia) / (float)(NoteMergeNode::kSlots + 1);
-         for (int i = 0; i < NoteMergeNode::kSlots; i++)
+         const float gap = (w - (float)NoteSwitcherNode::kSlots * dia) / (float)(NoteSwitcherNode::kSlots + 1);
+         for (int i = 0; i < NoteSwitcherNode::kSlots; i++)
          {
             const float cx = origin.x + gap * (float)(i + 1) + dia * (float)i + dia * 0.5f;
-            const bool lit = n->noteInputs[i].IsConnected();
-            dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f,
-                                lit ? IM_COL32(120, 200, 255, 255) : IM_COL32(50, 53, 64, 255));
+            const bool isConnected = n->noteInputs[i].IsConnected();
+            const bool isActive = (i == active);
+            ImU32 col = IM_COL32(50, 53, 64, 255); // unconnected darkest
+            if (isActive)
+               col = IM_COL32(120, 200, 255, 255); // active lit
+            else if (isConnected)
+               col = IM_COL32(70, 120, 170, 255); // connected dim
+            dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f, col);
          }
          ImGui::Dummy(ImVec2(w, dia + 6.0f));
+      }
+
+      {
+         AudioKnobRow row(2);
+         DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
+         row.End();
+      }
+
+      {
+         AudioKnobRow row(2, 20.0f, 0.0f, false);
+         row.Checkbox("manual##switcherManual", &n->manual);
+         row.End();
+      }
+      if (n->manual)
+      {
+         ModSliderInt("slot", &n->manualSlot, 0, NoteSwitcherNode::kSlots - 1);
       }
 
       EndAudioBody();
@@ -13181,8 +13711,6 @@ namespace
          row.Knob("gate", &n->gatePercent, 1.0f, 100.0f, "%.0f%%", kKnobSmall);
          row.End();
       }
-
-      ModCheckbox("Snap to Key##arpSnap", &n->useGlobalScale);
 
       EndAudioBody();
    }
@@ -13482,8 +14010,6 @@ namespace
          row.End();
       }
 
-      ModCheckbox("Snap to Key##seqSnap", &n->useGlobalScale);
-
       EndAudioBody();
    }
 
@@ -13520,8 +14046,6 @@ namespace
          row.End();
       }
 
-      ModCheckbox("Global Scale##rngGlobal", &n->useGlobalScale);
-
       EndAudioBody();
    }
 
@@ -13549,14 +14073,12 @@ namespace
       }
       {
          AudioKnobRow row(4);
-         row.Knob("strum", &n->strumMs, 0.0f, 200.0f, "%.0fms", kKnobSmall);
+         row.Knob("strum", &n->strumMs, 0.0f, 200.0f, "%.0fms", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewStrum30);
          row.Knob("hu.time", &n->humanizeTimingMs, 0.0f, 100.0f, "%.0fms", kKnobSmall);
          row.Knob("hu.vel", &n->humanizeVelocity, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
          row.Knob("harmonics", &n->upperHarmonics, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
          row.End();
       }
-
-      ModCheckbox("Global Scale##chorderGlobal", &n->useGlobalScale);
 
       EndAudioBody();
    }
@@ -13650,8 +14172,6 @@ namespace
       ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, ImGui::GetCursorScreenPos().y + 5.0f));
       DrawNoteStackToggleRow(n, 4);
 
-      ModCheckbox("Snap to Key##stackSnap", &n->useGlobalScale);
-
       EndAudioBody();
    }
 
@@ -13677,7 +14197,7 @@ namespace
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawNoteCapturerVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, 5.0f));
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 3.0f) / 4.0f;
       if (recording)
@@ -13714,15 +14234,8 @@ namespace
       if (ImGui::Button("Clear", ImVec2(btnW, 0)))
          n->ClearRecording();
 
-      ModCheckbox("loop", &n->loop);
-      ImGui::SameLine();
-      {
-         // Applied once, on StopRecording - see NoteCapturerNode::quantizeDiv.
-         AudioKnobRow row(1);
-         row.Dropdown("quantize", kQuantizeLabels, n->quantizeDiv,
-                      [n](int i) { PushUndoCheckpoint(); n->quantizeDiv = i; });
-         row.End();
-      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ModCheckbox("loop##capturerLoop", &n->loop);
 
       EndAudioBody();
    }
@@ -13811,24 +14324,21 @@ namespace
          row.End();
       }
 
-      ModCheckbox("Global Scale##ballsGlobal", &n->useGlobalScale);
-
       EndAudioBody();
    }
 
+   // Single-macro bodies below: identical standard rhythm (narrow body, one
+   // centred large knob, no second row) as Note Transpose / Pitch Bend / Gate
+   // / Glide / Vibrato.
    void DrawStrumBody(GraphNode& gn, NoteStrumNode* n)
    {
-      char stat[64];
-      if (n->strumMs <= 0.0f)
-         snprintf(stat, sizeof(stat), "off");
-      else
-         snprintf(stat, sizeof(stat), "%.1f ms", n->strumMs);
-
+      char stat[48];
+      snprintf(stat, sizeof(stat), "%.1f ms", n->strumMs);
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
       {
-         AudioKnobRow row(1);
-         row.Knob("strum", &n->strumMs, 0.0f, 100.0f, "%.1f ms", kKnobLarge);
+         AudioKnobRow row(1, kKnobLarge);
+         row.Knob("strum", &n->strumMs, 0.0f, 100.0f, "%.1f ms", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewStrum20);
          row.End();
       }
 
@@ -13904,7 +14414,7 @@ namespace
       AudioKnobRow row(3);
       row.KnobInt("range lo", &n->rangeLow, 0, 126);
       row.KnobInt("range hi", &n->rangeHigh, 1, 127);
-      row.Knob("glide", &n->glideMs, 0.0f, 500.0f, "%.0f ms", kKnobLarge);
+      row.Knob("glide", &n->glideMs, 0.0f, 500.0f, "%.0f ms", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide100);
       row.End();
 
       EndAudioBody();
@@ -14751,39 +15261,40 @@ namespace
       // included) reads as one of the same row instead of mix living apart
       // in its own slider section.
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(3, kKnobLarge);
          row.Knob("threshold", n->ParamPtr("threshold"), -60.0f, 0.0f, "%.1f dB", kKnobLarge);
          row.Knob("ratio", n->ParamPtr("ratio"), 1.0f, 20.0f, "%.1f:1", kKnobLarge);
          row.Knob("attack", n->ParamPtr("attack"), 0.05f, 200.0f, "%.2f ms", kKnobLarge);
          row.End();
       }
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(3, kKnobLarge);
          row.Knob("release", n->ParamPtr("release"), 5.0f, 2000.0f, "%.0f ms", kKnobLarge);
          row.Knob("makeup", n->ParamPtr("makeup"), -12.0f, 24.0f, "%.1f dB", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
-
-      bool rms = n->Param("detectorRms") != 0.0f;
-      if (ModCheckbox("RMS detect##dynRms", &rms))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("detectorRms") = rms ? 1.0f : 0.0f;
-      }
-      ImGui::SameLine();
-      bool external = n->Param("sidechainExternal") != 0.0f;
-      if (ModCheckbox("sidechain##dynSidechain", &external))
-      {
-         PushUndoCheckpoint();
-         *n->ParamPtr("sidechainExternal") = external ? 1.0f : 0.0f;
-      }
-      ImGui::SameLine();
-      bool analogBool = analog;
-      if (ModCheckbox("analog##dynAnalog", &analogBool))
-      {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(3, 20.0f, 0.0f, false);
+         bool rms = n->Param("detectorRms") != 0.0f;
+         if (row.Checkbox("RMS##dynRms", &rms))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("detectorRms") = rms ? 1.0f : 0.0f;
+         }
+         bool external = n->Param("sidechainExternal") != 0.0f;
+         if (row.Checkbox("sidechain##dynSidechain", &external))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("sidechainExternal") = external ? 1.0f : 0.0f;
+         }
+         bool analogBool = analog;
+         if (row.Checkbox("analog##dynAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.End();
       }
 
       EndAudioBody();
@@ -15439,7 +15950,7 @@ namespace
       AudioKnobRow row(3);
       row.Knob("width", n->ParamPtr("width"), 0.0f, 2.0f, "%.2f", kKnobLarge);
       row.Knob("pan", n->ParamPtr("pan"), -1.0f, 1.0f, "%.2f", kKnobLarge);
-      row.Knob("bass mono", n->ParamPtr("bassMono"), 0.0f, 500.0f, "%.0f Hz", kKnobLarge);
+      row.Knob("bass mono", n->ParamPtr("bassMono"), 0.0f, 500.0f, "%.0f Hz", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewBassMono);
       row.End();
 
       EndAudioBody();
@@ -16425,7 +16936,7 @@ namespace
                           },
                           "shift", n->ParamPtr("shift"), -shiftLimit, shiftLimit, fmt, false, kKnobLarge);
          row.Knob("feedback", n->ParamPtr("feedback"), 0.0f, 0.95f, "%.2f", kKnobLarge);
-         row.Knob("spread", n->ParamPtr("spread"), 0.0f, 100.0f, "%.1f Hz", kKnobLarge);
+         row.Knob("spread", n->ParamPtr("spread"), 0.0f, 100.0f, "%.1f Hz", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewSpread100);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
@@ -16754,7 +17265,7 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(4, kKnobLarge);
          row.Knob("root", n->ParamPtr("rootFreq"), 20.0f, 2000.0f, "%.0f Hz", kKnobLarge);
          static const std::vector<std::string> kStructs = { "harmonic", "odd", "chord", "metallic" };
          row.Dropdown("struct", kStructs, structure, [n](int i) {
@@ -16767,18 +17278,17 @@ namespace
       }
 
       {
-         AudioKnobRow row(3);
-         row.Knob("scatter", n->ParamPtr("scatter"), 0.0f, 1.0f, "%.2f");
-         row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f");
+         AudioKnobRow row(4, kKnobLarge);
+         row.Knob("scatter", n->ParamPtr("scatter"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         bool analogBool = analog;
+         if (row.Checkbox("analog##resonatorAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
          row.End();
-      }
-
-      bool analogBool = analog;
-      if (ModCheckbox("analog##resonatorAnalog", &analogBool))
-      {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
       }
 
       EndAudioBody();
@@ -17018,7 +17528,7 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(4, kKnobLarge);
          row.Knob("blur", n->ParamPtr("blurTime"), 10.0f, 5000.0f, "%.0fms", kKnobLarge);
          row.Knob("tilt", n->ParamPtr("tilt"), -1.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("diffuse", n->ParamPtr("diffusion"), 0.0f, 1.0f, "%.2f", kKnobLarge);
@@ -17026,19 +17536,21 @@ namespace
          row.End();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
-      bool freezeBool = freeze;
-      if (ModCheckbox("freeze##specBlurFreeze", &freezeBool))
       {
-         PushUndoCheckpoint();
-         *n->ParamPtr("freeze") = freezeBool ? 1.0f : 0.0f;
-      }
-      ImGui::SameLine(0.0f, 20.0f);
-      bool analogBool = analog;
-      if (ModCheckbox("analog##specBlurAnalog", &analogBool))
-      {
-         PushUndoCheckpoint();
-         *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         AudioKnobRow row(4, 20.0f, 0.0f, false);
+         bool freezeBool = freeze;
+         if (row.Checkbox("freeze##specBlurFreeze", &freezeBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("freeze") = freezeBool ? 1.0f : 0.0f;
+         }
+         bool analogBool = analog;
+         if (row.Checkbox("analog##specBlurAnalog", &analogBool))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+         }
+         row.End();
       }
 
       EndAudioBody();
@@ -17436,6 +17948,8 @@ namespace
          DrawNoteRouterBody(gn, n);
       else if (auto* n = dynamic_cast<NoteMergeNode*>(gn.node.get()))
          DrawNoteMergeBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteSwitcherNode*>(gn.node.get()))
+         DrawNoteSwitcherBody(gn, n);
       else if (auto* n = dynamic_cast<ArpeggiatorNode*>(gn.node.get()))
          DrawArpeggiatorBody(gn, n);
       else if (auto* n = dynamic_cast<NoteSequencerNode*>(gn.node.get()))
@@ -21731,9 +22245,8 @@ namespace
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f) * 0.44f;
          ImGui::SetCursorScreenPos(ImVec2(centerX - diameter * 0.5f, centerY - diameter * 0.5f));
 
-         const bool isDb = (kp.minValue < 0.0f && kp.maxValue <= 12.0f && kp.name.find("dB") != std::string::npos);
-         FaderPosToValueFn p2v = isDb ? ConsoleFaderTaper::PosToValue : nullptr;
-         FaderValueToPosFn v2p = isDb ? ConsoleFaderTaper::ValueToPos : nullptr;
+         FaderPosToValueFn p2v = kp.posToValue;
+         FaderValueToPosFn v2p = kp.valueToPos;
          ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
 
          float v = dragSeed(val);
@@ -21758,9 +22271,9 @@ namespace
          float centerX = cellPos.x + cardSize.x * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(centerX - 16.0f, cellPos.y + 22.0f));
 
-         const bool isDb = (minV < 0.0f && maxV <= 12.0f);
-         FaderPosToValueFn p2v = isDb ? ConsoleFaderTaper::PosToValue : nullptr;
-         FaderValueToPosFn v2p = isDb ? ConsoleFaderTaper::ValueToPos : nullptr;
+         const bool isDb = (minV < 0.0f && maxV <= 12.0f && kp.posToValue == ConsoleFaderTaper::PosToValue);
+         FaderPosToValueFn p2v = kp.posToValue;
+         FaderValueToPosFn v2p = kp.valueToPos;
          ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
 
          float v = dragSeed(val);
@@ -21787,7 +22300,9 @@ namespace
 
          ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
          float v = dragSeed(val);
-         const bool sliderMoved = AudioSliderFloat("##hslider", &v, minV, maxV, "%.2f", sliderW, fillCol, isModulated);
+         FaderPosToValueFn p2v = kp.posToValue;
+         FaderValueToPosFn v2p = kp.valueToPos;
+         const bool sliderMoved = AudioSliderFloat("##hslider", &v, minV, maxV, "%.2f", sliderW, fillCol, isModulated, p2v, v2p);
          dragHold(v);
          if (sliderMoved)
          {
@@ -21873,8 +22388,8 @@ namespace
             ImVec2 m = ImGui::GetIO().MousePos;
             float normX = std::clamp((m.x - origin.x) / padSize, 0.0f, 1.0f);
             float normY = std::clamp(1.0f - (m.y - origin.y) / padSize, 0.0f, 1.0f);
-            float newX = minX + (maxX - minX) * normX;
-            float newY = minY + (maxY - minY) * normY;
+            float newX = kpX.posToValue ? kpX.posToValue(normX, minX, maxX) : (minX + (maxX - minX) * normX);
+            float newY = kpY.posToValue ? kpY.posToValue(normY, minY, maxY) : (minY + (maxY - minY) * normY);
             elem.value = newX;
             elem.value2 = newY;
             if (elem.dstIndex >= 0 && elem.dstParam >= 0)
@@ -21882,11 +22397,23 @@ namespace
             if (elem.dstIndex >= 0 && p2 >= 0)
                gPerfPendingWrites[{elem.dstIndex, p2}] = newY;
             for (const auto& t : elem.targets)
+            {
                if (t.dstIndex >= 0 && t.dstParam >= 0)
-                  gPerfPendingWrites[{t.dstIndex, t.dstParam}] = newX;
+               {
+                  auto [tVal, tKp] = getParamRef(t.dstIndex, t.dstParam, elem.value);
+                  float tNew = tKp.posToValue ? tKp.posToValue(normX, tKp.minValue, tKp.maxValue) : (tKp.minValue + (tKp.maxValue - tKp.minValue) * normX);
+                  gPerfPendingWrites[{t.dstIndex, t.dstParam}] = tNew;
+               }
+            }
             for (const auto& t : elem.targetsY)
+            {
                if (t.dstIndex >= 0 && t.dstParam >= 0)
-                  gPerfPendingWrites[{t.dstIndex, t.dstParam}] = newY;
+               {
+                  auto [tVal, tKp] = getParamRef(t.dstIndex, t.dstParam, elem.value2);
+                  float tNew = tKp.posToValue ? tKp.posToValue(normY, tKp.minValue, tKp.maxValue) : (tKp.minValue + (tKp.maxValue - tKp.minValue) * normY);
+                  gPerfPendingWrites[{t.dstIndex, t.dstParam}] = tNew;
+               }
+            }
             valX = newX;
             valY = newY;
          }
@@ -21896,8 +22423,8 @@ namespace
          dl->AddLine(ImVec2(origin.x, origin.y + padSize * 0.5f), ImVec2(padBR.x, origin.y + padSize * 0.5f), ScopeGridCol());
          dl->AddRect(origin, padBR, ScopeBorderCol(), 4.0f);
 
-         float normX = std::clamp((valX - minX) / (maxX - minX), 0.0f, 1.0f);
-         float normY = std::clamp((valY - minY) / (maxY - minY), 0.0f, 1.0f);
+         float normX = kpX.valueToPos ? kpX.valueToPos(valX, minX, maxX) : ((maxX > minX) ? std::clamp((valX - minX) / (maxX - minX), 0.0f, 1.0f) : 0.0f);
+         float normY = kpY.valueToPos ? kpY.valueToPos(valY, minY, maxY) : ((maxY > minY) ? std::clamp((valY - minY) / (maxY - minY), 0.0f, 1.0f) : 0.0f);
          ImVec2 orbPos(origin.x + normX * padSize, origin.y + (1.0f - normY) * padSize);
          dl->AddCircleFilled(orbPos, 6.0f, themeTint);
          dl->AddCircle(orbPos, 6.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 1.5f);
@@ -46787,6 +47314,17 @@ int main(int argc, char** argv)
          if (isAudioBody && !isComment)
          {
             const float expectedW = AudioNodeWidth(gn.node.get());
+            bool* globalScalePtr = GetNodeGlobalScaleFlag(gn.node.get());
+            if (globalScalePtr != nullptr)
+            {
+               ImGui::SetCursorPos(ImVec2(topRowPos.x + expectedW - 44.0f, topRowPos.y));
+               if (GlobalScaleToggle(*globalScalePtr))
+               {
+                  PushUndoCheckpoint();
+                  *globalScalePtr = !(*globalScalePtr);
+               }
+            }
+
             ImGui::SetCursorPos(ImVec2(topRowPos.x + expectedW - 22.0f, topRowPos.y));
             if (BypassToggle(gn.node->bypassed))
             {
@@ -49883,20 +50421,8 @@ int main(int argc, char** argv)
       ImGui::SetNextWindowSizeConstraints(ImVec2(220, 0), ImVec2(420, 480));
       if (ImGui::BeginPopup("##dropdown"))
       {
-         std::string lastCat = "";
          for (int i = 0; i < (int)gDropdown.options.size(); i++)
          {
-            if (i < (int)gDropdown.categories.size() && !gDropdown.categories[i].empty())
-            {
-               if (gDropdown.categories[i] != lastCat)
-               {
-                  lastCat = gDropdown.categories[i];
-                  if (i > 0)
-                     ImGui::Spacing();
-                  ImGui::TextColored(ImVec4(0.55f, 0.70f, 0.95f, 0.85f), "%s", lastCat.c_str());
-                  ImGui::Separator();
-               }
-            }
             bool selected = (i == gDropdown.current);
             if (ImGui::Selectable(gDropdown.options[i].c_str(), selected))
             {

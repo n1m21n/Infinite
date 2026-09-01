@@ -63,7 +63,8 @@ void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
          mInputEnv = DspMath::FlushDenormal(mInputEnv);
 
          const float dynamicAir = std::clamp(mInputEnv * 4.0f, 0.0f, 1.0f);
-         const float cutoffHz = std::max(600.0f, (18000.0f - damping * 17200.0f) * (1.0f - 0.20f * (1.0f - dynamicAir)));
+         const float baseCutoff = 18000.0f * std::pow(800.0f / 18000.0f, damping);
+         const float cutoffHz = std::max(600.0f, baseCutoff * (1.0f - 0.20f * (1.0f - dynamicAir)));
          const float dampCoeff = 1.0f - std::exp(-2.0f * 3.14159265f * cutoffHz / (float)mSampleRate);
 
          for (int line = 0; line < kNumLines; line++)
@@ -103,7 +104,7 @@ void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
          float mixed[kNumLines];
          HadamardMix8(delayedOut, mixed);
 
-         const float cutoffHz = 18000.0f - damping * 17200.0f;
+         const float cutoffHz = 18000.0f * std::pow(800.0f / 18000.0f, damping);
          const float dampCoeff = 1.0f - std::exp(-2.0f * 3.14159265f * cutoffHz / (float)mSampleRate);
 
          for (int line = 0; line < kNumLines; line++)

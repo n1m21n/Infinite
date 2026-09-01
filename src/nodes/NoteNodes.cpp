@@ -1938,6 +1938,220 @@ const char* NoteMergeNode::InputLabel(int slot) const
    return (slot >= 0 && slot < kSlots) ? kLabels[slot] : nullptr;
 }
 
+// ---------------------------------------------------------------- Switcher
+class AudioNoteSwitcherNode : public AudioNode
+{
+public:
+   static constexpr int kSlots = NoteSwitcherNode::kSlots;
+
+   struct VoiceInfo
+   {
+      uint8_t slot = 0;
+      int note = 0;
+   };
+
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
+   {
+      mSourceSlot.Clear();
+      mActiveSlotReadout.store(-1, std::memory_order_relaxed);
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      // 1. Compute active connected slot from clock or manualSlot
+      int connected[kSlots];
+      int count = 0;
+      for (int i = 0; i < kSlots; i++)
+      {
+         if (mInbox[i] != nullptr)
+            connected[count++] = i;
+      }
+
+      int activeSlot = -1;
+      if (count > 0)
+      {
+         const bool manual = mManual.load(std::memory_order_relaxed);
+         const int manualSlot = mManualSlot.load(std::memory_order_relaxed);
+         if (manual || count == 1)
+         {
+            const int pick = manual ? std::clamp(manualSlot, 0, kSlots - 1) : connected[0];
+            activeSlot = (mInbox[pick] != nullptr) ? pick : connected[0];
+         }
+         else
+         {
+            const int rateMode = mRateMode.load(std::memory_order_relaxed);
+            if (rateMode == 0)
+            {
+               const float rateBeats = std::max(0.01f, mRateBeats.load(std::memory_order_relaxed));
+               const double clock = Transport::Instance().Beats();
+               const double pos = clock / (double)rateBeats;
+               const long long index = (long long)std::floor(pos);
+               activeSlot = connected[(int)(((index % count) + count) % count)];
+            }
+            else
+            {
+               const float rateSeconds = std::max(0.01f, mRateSeconds.load(std::memory_order_relaxed));
+               const double clock = Transport::Instance().Seconds();
+               const double pos = clock / (double)rateSeconds;
+               const long long index = (long long)std::floor(pos);
+               activeSlot = connected[(int)(((index % count) + count) % count)];
+            }
+         }
+      }
+      mActiveSlotReadout.store(activeSlot, std::memory_order_relaxed);
+
+      // 2. Pop events from all 4 inboxes
+      struct TaggedEvent
+      {
+         NoteEvent event;
+         uint8_t slot;
+      };
+      TaggedEvent all[kSlots * 64];
+      int total = 0;
+
+      for (int s = 0; s < kSlots; s++)
+      {
+         if (mInbox[s] == nullptr)
+            continue;
+         NoteEvent evts[64];
+         const int n = mInbox[s]->Pop(mCursor[s], evts, 64);
+         for (int i = 0; i < n && total < kSlots * 64; i++)
+         {
+            all[total].event = evts[i];
+            all[total].slot = (uint8_t)s;
+            total++;
+         }
+      }
+
+      std::stable_sort(all, all + total, [](const TaggedEvent& a, const TaggedEvent& b)
+      {
+         return a.event.frameOffset < b.event.frameOffset;
+      });
+
+      // 3-5. Forward note-ons from active slot, note-offs/bends from registered voices
+      for (int i = 0; i < total; i++)
+      {
+         const NoteEvent& e = all[i].event;
+         const uint8_t slot = all[i].slot;
+
+         if (e.isNoteOn)
+         {
+            if ((int)slot == activeSlot)
+            {
+               mSourceSlot.GetOrInsert(e.voiceId) = { slot, e.note };
+               NoteEvent out = e;
+               out.source = this;
+               mOutbox.Push(out);
+            }
+         }
+         else
+         {
+            if (VoiceInfo* info = mSourceSlot.Find(e.voiceId))
+            {
+               NoteEvent out = e;
+               out.source = this;
+               mOutbox.Push(out);
+               if (!e.bendUpdate)
+                  mSourceSlot.Erase(e.voiceId);
+            }
+         }
+      }
+
+      // 6. Orphan flush: if slot for a sounding voice became disconnected, emit note-off and erase
+      mSourceSlot.ForEach([this](int voiceId, VoiceInfo& v) -> bool
+      {
+         if (v.slot >= kSlots || mInbox[v.slot] == nullptr)
+         {
+            NoteEvent off;
+            off.note = v.note;
+            off.velocity = 0.0f;
+            off.isNoteOn = false;
+            off.frameOffset = 0;
+            off.source = this;
+            off.voiceId = voiceId;
+            mOutbox.Push(off);
+            return true;
+         }
+         return false;
+      });
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+
+   void SetNoteInbox(int inputSlot, NoteEventQueue* inbox, int cursor) override
+   {
+      if (inputSlot >= 0 && inputSlot < kSlots)
+      {
+         mInbox[inputSlot] = inbox;
+         mCursor[inputSlot] = cursor;
+      }
+   }
+
+   void PushParams(int rateMode, float rateBeats, float rateSeconds, bool manual, int manualSlot)
+   {
+      mRateMode.store(rateMode, std::memory_order_relaxed);
+      mRateBeats.store(rateBeats, std::memory_order_relaxed);
+      mRateSeconds.store(rateSeconds, std::memory_order_relaxed);
+      mManual.store(manual, std::memory_order_relaxed);
+      mManualSlot.store(manualSlot, std::memory_order_relaxed);
+   }
+
+   int ActiveSlot() const { return mActiveSlotReadout.load(std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox[kSlots] = {};
+   int mCursor[kSlots] = { -1, -1, -1, -1 };
+   VoiceIdMap<VoiceInfo, 128> mSourceSlot;
+
+   std::atomic<int> mActiveSlotReadout { -1 };
+   std::atomic<int> mRateMode { 0 };
+   std::atomic<float> mRateBeats { 4.0f };
+   std::atomic<float> mRateSeconds { 1.0f };
+   std::atomic<bool> mManual { false };
+   std::atomic<int> mManualSlot { 0 };
+};
+
+NoteSwitcherNode::NoteSwitcherNode() = default;
+NoteSwitcherNode::~NoteSwitcherNode() = default;
+
+void NoteSwitcherNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteSwitcherNode>();
+   mAudioNode->PushParams(rateMode, rateBeats, rateSeconds, manual, manualSlot);
+}
+
+void NoteSwitcherNode::VisitParams(ParamVisitor& v)
+{
+   v.Int("rateMode", rateMode);
+   v.Float("rateBeats", rateBeats);
+   v.Float("rateSeconds", rateSeconds);
+   v.Bool("manual", manual);
+   v.Int("manualSlot", manualSlot);
+}
+
+AudioNode* NoteSwitcherNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteSwitcherNode>();
+   return mAudioNode.get();
+}
+
+const char* NoteSwitcherNode::InputLabel(int slot) const
+{
+   static const char* kLabels[kSlots] = { "1", "2", "3", "4" };
+   return (slot >= 0 && slot < kSlots) ? kLabels[slot] : nullptr;
+}
+
+int NoteSwitcherNode::ActiveSlot() const
+{
+   return mAudioNode ? mAudioNode->ActiveSlot() : -1;
+}
+
 // ---------------------------------------------------------------- Arpeggiator
 class AudioArpeggiatorNode : public AudioNode
 {
