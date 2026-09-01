@@ -14117,17 +14117,29 @@ namespace
       char stat[64];
       const int last = n->LastNote();
       if (last < 0)
-         snprintf(stat, sizeof(stat), "%s in %s..%s", MusicTime::ScaleTable(n->scale).name,
-                  NoteNameList()[n->rangeLow % 12].c_str(), NoteNameList()[n->rangeHigh % 12].c_str());
+      {
+         if (n->groove > 0.001f)
+            snprintf(stat, sizeof(stat), "%s in %s..%s - %.0f%% groove", MusicTime::ScaleTable(n->scale).name,
+                     NoteNameList()[n->rangeLow % 12].c_str(), NoteNameList()[n->rangeHigh % 12].c_str(),
+                     n->groove * 100.0f);
+         else
+            snprintf(stat, sizeof(stat), "%s in %s..%s", MusicTime::ScaleTable(n->scale).name,
+                     NoteNameList()[n->rangeLow % 12].c_str(), NoteNameList()[n->rangeHigh % 12].c_str());
+      }
       else
-         snprintf(stat, sizeof(stat), "last: %s%d", NoteNameList()[last % 12].c_str(), last / 12 - 1);
+      {
+         if (n->groove > 0.001f)
+            snprintf(stat, sizeof(stat), "last: %s%d - %.0f%% groove", NoteNameList()[last % 12].c_str(),
+                     last / 12 - 1, n->groove * 100.0f);
+         else
+            snprintf(stat, sizeof(stat), "last: %s%d", NoteNameList()[last % 12].c_str(), last / 12 - 1);
+      }
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
+      // Row 1 (4): selector column left (scale, root), knobs right (lo, hi).
       {
          AudioKnobRow row(4);
-         row.KnobInt("lo", &n->rangeLow, 0, 127, kKnobSmall);
-         row.KnobInt("hi", &n->rangeHigh, 0, 127, kKnobSmall);
          if (n->useGlobalScale)
             ImGui::BeginDisabled();
          row.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
@@ -14136,12 +14148,19 @@ namespace
                       [n](int i) { PushUndoCheckpoint(); n->root = i; });
          if (n->useGlobalScale)
             ImGui::EndDisabled();
+         row.KnobInt("lo", &n->rangeLow, 0, 127, kKnobSmall);
+         row.KnobInt("hi", &n->rangeHigh, 0, 127, kKnobSmall);
          row.End();
       }
+      // Row 2 (4): same grid - mode/rate selector column left, knobs right.
+      // DrawRateModeControls emits the mode dropdown + rate cell as two cells
+      // with stable ordinals (see its header comment), so cell indices never
+      // move when rate mode flips between Synced and Free.
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(4);
          DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
          row.KnobInt("wander", &n->maxStep, 1, 12);
+         row.Knob("groove", &n->groove, 0.0f, 1.0f, "%.2f", kKnobSmall);
          row.End();
       }
 
@@ -14167,7 +14186,7 @@ namespace
          if (n->useGlobalScale)
             ImGui::EndDisabled();
          row.KnobInt("chord", &n->chordSize, 2, 6);
-         row.Knob("groove", &n->rateBeats, 0.0625f, 4.0f, "%.3f beats", kKnobSmall);
+         row.Knob("rate", &n->rateBeats, 0.0625f, 4.0f, "%.3f beats", kKnobSmall);
          row.End();
       }
       {

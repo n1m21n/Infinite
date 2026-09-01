@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 
@@ -2874,6 +2875,7 @@ public:
       const float rateBeatsP = std::max(0.015625f, mRateBeats.load(std::memory_order_relaxed));
       const float rateSecondsP = std::max(0.01f, mRateSeconds.load(std::memory_order_relaxed));
       const int maxStep = std::max(1, mMaxStep.load(std::memory_order_relaxed));
+      const float groove = std::clamp(mGroove.load(std::memory_order_relaxed), 0.0f, 1.0f);
       const double bpm = (double)Transport::Instance().Tempo();
       const double rateBeats = std::max(0.001, rateMode == 1 ? (double)rateSecondsP * bpm / 60.0 : (double)rateBeatsP);
 
@@ -2919,20 +2921,40 @@ public:
             mPendingOffActive = false;
          }
 
+         // Swing: every odd-numbered step is delayed by groove * 0.5 * rateBeats
+         // (standard MPC-style swing). groove == 0 => swingSamples == 0 => bit-
+         // identical to the pre-groove behaviour. groove is clamped to 1.0 and
+         // the scale factor is 0.5 * rateBeats, so a swung note-on can never
+         // reach (let alone cross) the next step's boundary at rateBeats.
+         const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
+         const double stepSamples = rateBeats * samplesPerBeat;
+         const bool isOddStep = (step & 1) != 0;
+         const double swingSamplesD = isOddStep ? (double)groove * 0.5 * rateBeats * samplesPerBeat : 0.0;
+         assert(swingSamplesD < stepSamples); // never allowed to cross the next step boundary
+         // The audio thread only detects the step boundary once per block (at
+         // frameOffset 0), so the swing delay is expressed as this note-on's
+         // frameOffset within the current block rather than as new pending
+         // state - sample-accurate up to one block, and adds no new state.
+         const int swingFrame = std::clamp((int)std::lround(swingSamplesD), 0, numFrames - 1);
+
          NoteEvent on;
          on.note = note;
          on.velocity = 0.6f + (mRng.Next() * 0.5f + 0.5f) * 0.3f;
          on.isNoteOn = true;
-         on.frameOffset = 0;
+         on.frameOffset = swingFrame;
          on.source = this;
          on.voiceId = NextVoiceId();
          mOutbox.Push(on);
          mCurrentOutNote = note;
          mCurrentOutVoiceId = on.voiceId;
 
-         const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
-         const double stepSamples = rateBeats * samplesPerBeat;
-         mPendingOffSample = mSamplePos + (uint64_t)(stepSamples * 0.7); // fixed 70% gate
+         // The note-off must swing with its note-on, or a swung note either
+         // overlaps the next step's note-on or overshoots past it. Gate it at
+         // 70% of whatever time remains *after* the swung onset, not 70% of
+         // the full step - that keeps the off strictly before the next
+         // boundary for any groove in [0, 1].
+         const double availableSamples = stepSamples - swingSamplesD;
+         mPendingOffSample = mSamplePos + (uint64_t)std::llround(swingSamplesD) + (uint64_t)(availableSamples * 0.7);
          mPendingOffActive = true;
       }
 
@@ -2953,6 +2975,7 @@ public:
       mRateSeconds.store(n.rateSeconds, std::memory_order_relaxed);
       mMaxStep.store(n.maxStep, std::memory_order_relaxed);
       mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
+      mGroove.store(n.groove, std::memory_order_relaxed);
    }
 
    int LastNote() const { return mLastNoteReadout.load(std::memory_order_relaxed); }
@@ -2979,6 +3002,7 @@ private:
    std::atomic<float> mRateSeconds { 0.2f };
    std::atomic<int> mMaxStep { 4 };
    std::atomic<bool> mUseGlobalScale { true };
+   std::atomic<float> mGroove { 0.0f };
    std::atomic<int> mLastNoteReadout { -1 };
 };
 
@@ -3006,6 +3030,7 @@ void RandomNoteGeneratorNode::VisitParams(ParamVisitor& v)
    v.Float("rateSeconds", rateSeconds);
    v.Int("maxStep", maxStep);
    v.Bool("useGlobalScale", useGlobalScale);
+   v.Float("groove", groove); // appended after existing params - save-compat
 }
 
 AudioNode* RandomNoteGeneratorNode::GetAudioNode()
