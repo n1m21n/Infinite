@@ -17388,6 +17388,7 @@ namespace
       const int numPoles = std::clamp((int)std::round(n->Param("poles")), 1, 16);
       const float decay = std::clamp(n->Param("decay"), 0.05f, 10.0f);
       const float spread = std::clamp(n->Param("spread"), 0.0f, 1.0f);
+      const float damp = std::clamp(n->Param("damp"), 0.0f, 1.0f);
 
       for (int i = 0; i < numPoles; i++)
       {
@@ -17410,16 +17411,26 @@ namespace
             continue;
 
          const float x = freqToX(f_i);
-         const float q_i = std::clamp(0.4547f * f_i * decay, 0.5f, 500.0f);
+         // Mirrors ResonatorBankKernel::PushParams' decay_i - see the comment
+         // there for the formula and why damp == 0 is a no-op.
+         const float freqRatio = std::min(rootFreq / f_i, 1.0f);
+         const float decay_i = std::clamp(decay * powf(freqRatio, damp), 0.05f, decay);
+         const float q_i = std::clamp(0.4547f * f_i * decay_i, 0.5f, 500.0f);
          const float normH = std::clamp(log10f(q_i) / log10f(500.0f), 0.1f, 0.9f);
          const float peakY = br.y - 14.0f - normH * (h - 22.0f);
+         // Damped partials fade as well as shrink, so raising damp visibly
+         // tilts the whole spectrum down and out to the right.
+         const float alphaScale = std::clamp(decay_i / std::max(decay, 0.0001f), 0.25f, 1.0f);
 
          const float pos = (numPoles > 1) ? ((float)i / (float)(numPoles - 1) - 0.5f) * spread + 0.5f : 0.5f;
-         const ImU32 stemCol = (pos < 0.45f)
+         const ImU32 baseCol = (pos < 0.45f)
             ? (isLight ? IM_COL32(30, 110, 230, 220) : IM_COL32(110, 200, 255, 220))
             : ((pos > 0.55f)
                ? (isLight ? IM_COL32(230, 90, 40, 220) : IM_COL32(255, 140, 90, 220))
                : (isLight ? IM_COL32(40, 180, 110, 220) : IM_COL32(110, 230, 160, 220)));
+         const unsigned baseAlpha = (baseCol >> IM_COL32_A_SHIFT) & 0xFF;
+         const ImU32 stemCol = (baseCol & ~IM_COL32_A_MASK) |
+            (((unsigned)(baseAlpha * alphaScale)) << IM_COL32_A_SHIFT);
 
          dl->AddLine(ImVec2(x, br.y - 14.0f), ImVec2(x, peakY), stemCol, 2.0f);
          dl->AddCircleFilled(ImVec2(x, peakY), 3.0f, stemCol);
@@ -17431,8 +17442,11 @@ namespace
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          static const char* kStructNames[] = { "Harmonic", "Odd", "Chord", "Metallic" };
-         char buf[64];
-         snprintf(buf, sizeof(buf), "root %.0f Hz - %s - %d poles", rootFreq, kStructNames[structure], numPoles);
+         char buf[80];
+         if (damp > 0.001f)
+            snprintf(buf, sizeof(buf), "root %.0f Hz - %s - %d poles - %.0f%% damp", rootFreq, kStructNames[structure], numPoles, damp * 100.0f);
+         else
+            snprintf(buf, sizeof(buf), "root %.0f Hz - %s - %d poles", rootFreq, kStructNames[structure], numPoles);
          SetAudioReadout("resonator bank", buf);
       }
 
@@ -17446,10 +17460,14 @@ namespace
       const int poles = std::clamp((int)std::round(n->Param("poles")), 1, 16);
       const float decay = n->Param("decay");
       const bool analog = n->Param("analog") != 0.0f;
+      const float damp = std::clamp(n->Param("damp"), 0.0f, 1.0f);
 
       static const char* kStructNames[] = { "Harmonic", "Odd", "Chord", "Metallic" };
-      char stat[80];
-      snprintf(stat, sizeof(stat), "%.0f Hz - %s - %d poles%s", rootFreq, kStructNames[structure], poles, analog ? " - analog" : "");
+      char stat[96];
+      if (damp > 0.001f)
+         snprintf(stat, sizeof(stat), "%.0f Hz - %s - %d poles - %.0f%% damp%s", rootFreq, kStructNames[structure], poles, damp * 100.0f, analog ? " - analog" : "");
+      else
+         snprintf(stat, sizeof(stat), "%.0f Hz - %s - %d poles%s", rootFreq, kStructNames[structure], poles, analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawResonatorBankVisualizer(n);
@@ -17457,12 +17475,12 @@ namespace
 
       {
          AudioKnobRow row(4, kKnobLarge);
-         row.Knob("root", n->ParamPtr("rootFreq"), 20.0f, 2000.0f, "%.0f Hz", kKnobLarge);
          static const std::vector<std::string> kStructs = { "harmonic", "odd", "chord", "metallic" };
          row.Dropdown("struct", kStructs, structure, [n](int i) {
             PushUndoCheckpoint();
             *n->ParamPtr("structure") = (float)i;
          });
+         row.Knob("root", n->ParamPtr("rootFreq"), 20.0f, 2000.0f, "%.0f Hz", kKnobLarge);
          row.Knob("poles", n->ParamPtr("poles"), 1.0f, 16.0f, "%.0f", kKnobLarge);
          row.Knob("decay", n->ParamPtr("decay"), 0.05f, 10.0f, "%.2fs", kKnobLarge);
          row.End();
@@ -17472,13 +17490,22 @@ namespace
          AudioKnobRow row(4, kKnobLarge);
          row.Knob("scatter", n->ParamPtr("scatter"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("damp", n->ParamPtr("damp"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      {
+         AudioKnobRow row(4);
          bool analogBool = analog;
          if (row.Checkbox("analog##resonatorAnalog", &analogBool))
          {
             PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
+         row.Skip();
+         row.Skip();
+         row.Skip();
          row.End();
       }
 

@@ -707,6 +707,9 @@ namespace
          def.params.push_back({ "scatter",    0.0f,    1.0f,   0.0f });
          def.params.push_back({ "spread",     0.0f,    1.0f,   0.7f });
          def.params.push_back({ "analog",     0.0f,    1.0f,   0.0f });
+         // Appended after the existing params - never inserted, or every saved
+         // patch's param indices for this node would silently shift.
+         def.params.push_back({ "damp",       0.0f,    1.0f,   0.0f });
          def.makeKernel = []() { return std::make_unique<ResonatorBankKernel>(); };
          defs.push_back(std::move(def));
       }

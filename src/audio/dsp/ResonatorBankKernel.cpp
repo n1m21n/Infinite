@@ -41,6 +41,7 @@ void ResonatorBankKernel::PushParams(const AudioEffectNode& node, double sampleR
    const float scatter = std::clamp(node.Param("scatter"), 0.0f, 1.0f);
    const float spread = std::clamp(node.Param("spread"), 0.0f, 1.0f);
    const bool analog = node.Param("analog") > 0.5f;
+   const float damp = std::clamp(node.Param("damp"), 0.0f, 1.0f);
 
    // If pole count increased, mark newly activated poles for audio-thread reset
    if (numPolesRequested > mLastPoles)
@@ -80,7 +81,24 @@ void ResonatorBankKernel::PushParams(const AudioEffectNode& node, double sampleR
       f_i *= 1.0f + scatter * mScatterOffsets[i] * 0.05f;
       f_i = std::clamp(f_i, 20.0f, (float)(0.45 * sampleRate));
 
-      const float q_i = std::clamp(0.4547f * f_i * decay, 0.5f, 500.0f);
+      // damp: scale this partial's decay time down the further above the
+      // root it sits, so a struck object's ring darkens as it dies out
+      // instead of every partial ringing the same length. decay_i = decay *
+      // (f_root/f_i)^damp - a partial at exactly f_root always keeps the
+      // full decay (ratio == 1, exponent irrelevant), and every partial
+      // above it decays faster as damp climbs toward 1, at a rate that
+      // scales with how many octaves above root it sits rather than a fixed
+      // per-partial-index amount, so it keys off the actual frequency ratio
+      // (works the same for the Harmonic/Odd/Chord/Metallic structures,
+      // whose partials aren't evenly spaced in index). At damp == 0 the
+      // exponent is 0 so the ratio term is always 1 and decay_i == decay
+      // exactly - bit-identical to before this param existed. Clamped to the
+      // node's existing decay floor so high damp + many poles can't produce
+      // a zero-length/unstable tail on the highest partials.
+      const float freqRatio = std::min(rootFreq / f_i, 1.0f);
+      const float decay_i = std::clamp(decay * powf(freqRatio, damp), 0.05f, decay);
+
+      const float q_i = std::clamp(0.4547f * f_i * decay_i, 0.5f, 500.0f);
 
       const float pos = (numPolesRequested > 1)
          ? ((float)i / (float)(numPolesRequested - 1) - 0.5f) * spread + 0.5f
