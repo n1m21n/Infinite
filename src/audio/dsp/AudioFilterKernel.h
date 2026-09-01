@@ -227,6 +227,7 @@ public:
       const int type = mType.load(std::memory_order_relaxed);
       const bool sync = mSync.load(std::memory_order_relaxed) != 0;
       const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
+      float lastLfoOut = 0.0f;
 
       for (int i = 0; i < out.numFrames; i++)
       {
@@ -253,7 +254,7 @@ public:
          if (mLfoPhase >= 1.0)
             mLfoPhase -= floor(mLfoPhase);
          const float lfoOut = sinf(2.0f * (float)M_PI * (float)mLfoPhase);
-         mLfoMeter.Write(&lfoOut, 1);
+         lastLfoOut = lfoOut;
 
          float coeffs[kStages][kCoeffsPerStage];
          if (!envActive)
@@ -359,6 +360,22 @@ public:
             out.channels[ch][i] = s * outputGain;
          }
       }
+
+      // Publish once per block, not once per sample: mLfoMeter previously
+      // wrote every sample (44.1k+/sec), which fills the 4096-entry
+      // MeterRing in well under a second while DrawAudioFilterVisualizer's
+      // ExtraMeterValue readback only drains up to kMaxExtraMeterValues (4)
+      // entries per UI frame (~240/sec at 60fps). Once full, MeterRing::Write
+      // silently drops samples until the reader makes room, so the initial
+      // ~4096-sample backlog - itself only ~93ms of real audio time - took
+      // the UI ~17 seconds of frames to page through, during which
+      // consecutive entries were microseconds apart and the yellow sweep
+      // overlay read as frozen. That read as "doesn't animate until I nudge
+      // a knob," but a knob nudge did nothing to it directly; the backlog
+      // was just still draining. Writing once per block (same discipline
+      // DynamicsKernel's mGrMeter already uses for its GR-bar dot) keeps the
+      // ring shallow so the UI reads a near-current value every frame.
+      mLfoMeter.Write(&lastLfoOut, 1);
    }
 
    int LatencySamples() const override { return 0; } // no lookahead/oversampling/FFT window
