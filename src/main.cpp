@@ -14845,22 +14845,23 @@ namespace
 
       BeginAudioSection("output");
       {
-         // 5 cells: selector column left (sync v, rate), knobs right
-         // (output gain, env, mix) - mix stays bottom-right (P4). `row.index`
-         // is set explicitly before each call so the *visual* cell a control
-         // lands in can differ from its *draw order* - output gain, mix and
-         // env are still called first, second, third, exactly as before the
-         // "mod" knob was removed and sync/rate were added, so their
-         // gParamCounter ordinals (and any existing patch's modulation
-         // bindings on them) don't move; only where they're drawn does, and
-         // the new `rate` param's ordinal lands after them, same reasoning
-         // DrawChorusBody uses for its near-identical layout problem.
-         AudioKnobRow row(5);
-         row.index = 2;
-         row.Knob("output gain", n->ParamPtr("outputGainDb"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
-         row.index = 4;
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         // 4 cells: selector column left (sync v, rate), knobs right
+         // (env, mix) - mix stays bottom-right (P4). `row.index` is set
+         // explicitly before each call so the *visual* cell a control lands
+         // in can differ from its *draw order* - mix and env are still
+         // called first and second, exactly as before "output gain" was
+         // removed (it's redundant with the filter's own `gain` knob above),
+         // so their gParamCounter ordinals stay in the same relative order
+         // to each other and to sync/rate. Deleting "output gain"'s knob
+         // outright (not just repositioning it) does still shift every
+         // later-drawn param's ordinal down by one relative to old patches -
+         // unavoidable when removing a param's control entirely, same
+         // reasoning DrawChorusBody uses for its near-identical layout
+         // problem.
+         AudioKnobRow row(4);
          row.index = 3;
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.index = 2;
          row.Knob("env", n->ParamPtr("envAmount"), -1.0f, 1.0f, "%.2f", kKnobLarge);
          row.index = 0;
          AddRateModeCells(row, n, "sync to tempo##filterSync");
