@@ -15885,19 +15885,31 @@ namespace
       const float driveDb = n->Param("drive");
       const float bias = n->Param("bias");
       const float smooth = n->Param("smooth");
+      const float stereo = std::clamp(n->Param("stereo"), 0.0f, 1.0f);
+      const float positionL = position - stereo * 0.5f;
+      const float positionR = position + stereo * 0.5f;
 
-      dl->PathClear();
+      // At stereo=0 positionL==positionR==position, so the two traces below
+      // draw on top of each other and it looks exactly like the single-curve
+      // original - same alpha-layering technique as DrawChorusVisualizer's
+      // taps, not a second visualizer mode.
       const int kNumPoints = 96;
-      for (int i = 0; i < kNumPoints; i++)
+      for (int pass = 0; pass < (stereo > 0.0f ? 2 : 1); pass++)
       {
-         const float xIn = -1.0f + 2.0f * (float)i / (float)(kNumPoints - 1);
-         const float yOut =
-            std::clamp(WavetableShaperDsp::Shape(xIn, table, position, driveDb, bias, smooth), -1.0f, 1.0f);
-         const float x = origin.x + (0.5f + 0.5f * xIn) * w;
-         const float y = origin.y + (0.5f - 0.5f * yOut) * h;
-         dl->PathLineTo(ImVec2(x, y));
+         const float tracePosition = (pass == 1) ? positionR : positionL;
+         const int alpha = (stereo > 0.0f) ? (pass == 0 ? 200 : 150) : 255;
+         dl->PathClear();
+         for (int i = 0; i < kNumPoints; i++)
+         {
+            const float xIn = -1.0f + 2.0f * (float)i / (float)(kNumPoints - 1);
+            const float yOut =
+               std::clamp(WavetableShaperDsp::Shape(xIn, table, tracePosition, driveDb, bias, smooth), -1.0f, 1.0f);
+            const float x = origin.x + (0.5f + 0.5f * xIn) * w;
+            const float y = origin.y + (0.5f - 0.5f * yOut) * h;
+            dl->PathLineTo(ImVec2(x, y));
+         }
+         dl->PathStroke(isLight ? IM_COL32(30, 110, 230, alpha) : IM_COL32(150, 214, 255, alpha), 0, 1.8f);
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
       // Live operating-point dot at the kernel's last input sample.
       const float lastIn = std::clamp(n->ExtraMeterValue(0), -1.0f, 1.0f);
@@ -15922,22 +15934,29 @@ namespace
 
    void DrawWavetableShaperBody(GraphNode& gn, AudioEffectNode* n)
    {
-      char stat[96];
-      snprintf(stat, sizeof(stat), "%s - %.1f dB drive - %.0f%% wet",
-               Wavetable::TableName((int)(n->Param("table") + 0.5f)), n->Param("drive"), n->mix * 100.0f);
+      const float stereo = n->Param("stereo");
+      char stat[112];
+      if (stereo > 0.0f)
+         snprintf(stat, sizeof(stat), "%s - %.1f dB drive - %.0f%% stereo - %.0f%% wet",
+                  Wavetable::TableName((int)(n->Param("table") + 0.5f)), n->Param("drive"), stereo * 100.0f,
+                  n->mix * 100.0f);
+      else
+         snprintf(stat, sizeof(stat), "%s - %.1f dB drive - %.0f%% wet",
+                  Wavetable::TableName((int)(n->Param("table") + 0.5f)), n->Param("drive"), n->mix * 100.0f);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawWavetableShaperVisualizer(n);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      // Tier 1 only: table, position, drive, bias, smooth, output, mix - one
-      // processing mode. `table` is the curve's identity (a dropdown, same
-      // carve-out as Audio Filter's `type`/Ring Mod's `waveform`), not a
-      // second mode selector. Row 1 is table/position/drive; row 2 is
-      // bias/smooth/output/mix so mix still lands in the standard
+      // Tier 1 only: table, position, drive, stereo, bias, smooth, output,
+      // mix - one processing mode. `table` is the curve's identity (a
+      // dropdown, same carve-out as Audio Filter's `type`/Ring Mod's
+      // `waveform`), not a second mode selector. Both rows are 4 cells so
+      // they share column edges (P1); row 1 is table/position/drive/stereo,
+      // row 2 is bias/smooth/output/mix so mix still lands in the standard
       // bottom-right spot every AudioEffects node's grammar puts it in.
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(4);
          const int table = (int)(n->Param("table") + 0.5f);
          row.Dropdown("table", WavetableNames(), table, [n](int i) {
             PushUndoCheckpoint();
@@ -15945,6 +15964,7 @@ namespace
          }, WavetableCategories());
          row.Knob("position", n->ParamPtr("position"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("drive", n->ParamPtr("drive"), 0.0f, 24.0f, "%.1f dB", kKnobLarge);
+         row.Knob("stereo", n->ParamPtr("stereo"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
       {

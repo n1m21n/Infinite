@@ -682,6 +682,11 @@ namespace
          static const std::vector<EffectParamPrereq> kSmoothPrereq = { { "position", 0.5f } };
          def.params.push_back({ "smooth", 0.0f, 1.0f, 0.0f, false, kSmoothPrereq });
          def.params.push_back({ "output", -24.0f, 12.0f, 0.0f });
+         // Appended after the existing params, never inserted - see
+         // WavetableShaperKernel.h's class comment. At the default 0.0 both
+         // channels read the same frame, so this is a no-op for every patch
+         // saved before it existed.
+         def.params.push_back({ "stereo", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<WavetableShaperKernel>(); };
          defs.push_back(std::move(def));
       }
