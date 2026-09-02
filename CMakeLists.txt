@@ -216,6 +216,12 @@ set(COMMON_SOURCES
     src/core/Transport.cpp
     src/core/Modulation.cpp
     src/core/Expression.cpp
+    src/core/field/FieldLex.cpp
+    src/core/field/FieldParse.cpp
+    src/core/field/FieldIR.cpp
+    src/core/field/FieldBytecode.cpp
+    src/core/field/FieldVM.cpp
+    src/core/field/FieldProgramCache.cpp
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp

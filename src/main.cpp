@@ -80,6 +80,9 @@ namespace
 #include "core/AudioTopologyRequest.h"
 #include "core/Modulation.h"
 #include "core/Expression.h"
+#include "core/field/FieldLex.h"
+#include "core/field/FieldParse.h"
+#include "core/field/FieldIR.h"
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
@@ -34589,15 +34592,97 @@ static int RunFieldTest()
 
    // Section B: Lexer Maximal Munch & Token Checks
    bool secBOk = true;
-   printf("SECTION B (Lexer): OK\n");
+   {
+      std::vector<std::string> ops = { "<=", ">=", "==", "!=", "&&", "||", "+=", "-=", "*=", "/=" };
+      for (const auto& op : ops)
+      {
+         std::vector<Field::Token> toks;
+         Field::FieldError err;
+         if (!Field::Lex(op, toks, err) || toks.size() != 2 || toks[0].text != op || toks[0].kind != Field::TokenKind::Op)
+         {
+            printf("SECTION B (Lexer): FAIL - maximal munch failed for '%s'\n", op.c_str());
+            secBOk = false;
+         }
+      }
+   }
+   if (secBOk)
+      printf("SECTION B (Lexer): OK\n");
+   else
+      printf("SECTION B (Lexer): FAIL\n");
 
    // Section C: Source Spans
    bool secCOk = true;
-   printf("SECTION C: (Spans): OK\n");
+   {
+      std::vector<Field::Token> toks;
+      Field::FieldError err;
+      Field::Lex("a +\n  b", toks, err);
+      // 'b' should be at line 2, col 3
+      bool foundB = false;
+      for (const auto& t : toks)
+      {
+         if (t.text == "b")
+         {
+            foundB = true;
+            if (t.span.line != 2 || t.span.col != 3)
+            {
+               printf("SECTION C (Spans): FAIL - 'b' span expected line 2 col 3, got line %d col %d\n", t.span.line, t.span.col);
+               secCOk = false;
+            }
+         }
+      }
+      if (!foundB)
+      {
+         printf("SECTION C (Spans): FAIL - token 'b' not found\n");
+         secCOk = false;
+      }
+   }
+   if (secCOk)
+      printf("SECTION C (Spans): OK\n");
+   else
+      printf("SECTION C (Spans): FAIL\n");
 
    // Section D: Types & Rank Polymorphism Baseline
    bool secDOk = true;
-   printf("SECTION D: (Types): OK\n");
+   {
+      std::vector<Field::Token> toks;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::IRNodePtr ir;
+
+      if (Field::Lex("1 + 2", toks, err) && Field::ParseExpression(toks, ast, err) && Field::LowerAstToIR(ast, ir, err))
+      {
+         if (ir->type != Field::DataType::Float)
+         {
+            printf("SECTION D (Types): FAIL - '1 + 2' expected Float type\n");
+            secDOk = false;
+         }
+      }
+      else
+      {
+         printf("SECTION D (Types): FAIL - failed to lower '1 + 2'\n");
+         secDOk = false;
+      }
+
+      toks.clear();
+      err.Clear();
+      if (Field::Lex("1 < 2", toks, err) && Field::ParseExpression(toks, ast, err) && Field::LowerAstToIR(ast, ir, err))
+      {
+         if (ir->type != Field::DataType::Bool)
+         {
+            printf("SECTION D (Types): FAIL - '1 < 2' expected Bool type\n");
+            secDOk = false;
+         }
+      }
+      else
+      {
+         printf("SECTION D (Types): FAIL - failed to lower '1 < 2'\n");
+         secDOk = false;
+      }
+   }
+   if (secDOk)
+      printf("SECTION D (Types): OK\n");
+   else
+      printf("SECTION D (Types): FAIL\n");
 
    bool allOk = secAOk && secBOk && secCOk && secDOk;
    printf("INFINITE_FIELDTEST: %s\n", allOk ? "OK" : "FAIL");

@@ -4,12 +4,9 @@
 #include <string>
 
 // A small algebraic expression evaluator for inline parameter expressions
-// (typed directly into a numeric field, prefixed with '='). Deliberately not
-// the FormulaNode machinery: FormulaNode hands its text straight to the GLSL
-// compiler for a per-pixel shape function, which is far too heavy to run
-// once a frame per parameter. This is a plain recursive-descent parser over
-// floats, re-parsed on every evaluation - expressions are short, so the cost
-// is negligible next to a shader recompile.
+// (typed directly into a numeric field, prefixed with '='). Powered by the
+// Field pipeline (lexer -> AST -> typed IR -> register bytecode VM) with an
+// LRU compiled program cache for low per-frame evaluation overhead.
 namespace Expression
 {
    // Evaluates `text` (without the leading '=') to a float.
