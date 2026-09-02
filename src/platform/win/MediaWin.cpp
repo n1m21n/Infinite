@@ -248,6 +248,13 @@ namespace
    // clip long enough that the wrap is a forward jump. One second.
    constexpr LONGLONG kVideoForwardSeekHns = 10000000;
 
+   // Used only as a deliberately-out-of-range seek target when probing for a
+   // duration MF wouldn't report directly (see VideoThreadMain). Media
+   // Foundation clamps an out-of-range SetCurrentPosition to the end of the
+   // stream rather than failing, which is exactly the behaviour the probe
+   // relies on. ~1,000,000 hours - far beyond any real media file.
+   constexpr LONGLONG kVideoDurationProbeHns = 1000000LL * 3600LL * 10000000LL;
+
    struct DecodedVideoFrame
    {
       LONGLONG timeHns = -1;
@@ -506,6 +513,75 @@ namespace
           duration.vt == VT_I8)
          video->durationSeconds = (double)duration.hVal.QuadPart / 10000000.0;
       PropVariantClear(&duration);
+
+      // Some fragmented/streamed containers don't surface MF_PD_DURATION
+      // through the source reader's attribute passthrough even though the
+      // underlying media source has it - this is a genuinely different query
+      // (the presentation descriptor directly), not a retry of the one that
+      // just failed. Left at 0.0 here means "duration truly unknown", which
+      // the probe below still gets a shot at.
+      if (video->durationSeconds <= 0.0)
+      {
+         IMFMediaSource* mediaSource = nullptr;
+         if (SUCCEEDED(video->reader->GetServiceForStream(
+                MF_SOURCE_READER_MEDIASOURCE, GUID_NULL, IID_PPV_ARGS(&mediaSource))) &&
+             mediaSource != nullptr)
+         {
+            IMFPresentationDescriptor* pd = nullptr;
+            if (SUCCEEDED(mediaSource->CreatePresentationDescriptor(&pd)) && pd != nullptr)
+            {
+               UINT64 durationHns = 0;
+               if (SUCCEEDED(pd->GetUINT64(MF_PD_DURATION, &durationHns)) && durationHns > 0)
+                  video->durationSeconds = (double)durationHns / 10000000.0;
+               SafeRelease(&pd);
+            }
+            SafeRelease(&mediaSource);
+         }
+      }
+
+      // Last resort: neither attribute query above returned a duration, but
+      // the file may still be a real finite, seekable asset - some headers
+      // just don't carry duration anywhere MF looks for it. Probe by seeking
+      // far past any real end-of-file (MF clamps an out-of-range
+      // SetCurrentPosition to the stream's actual end rather than failing)
+      // and reading forward to the last sample's timestamp, then seeking
+      // back to the start before the decode loop below begins. A genuinely
+      // unbounded source (live/streaming, no fixed length) won't produce a
+      // usable timestamp here, so durationSeconds correctly stays 0.0
+      // ("unknown") rather than being forced into a bogus loop length -
+      // VideoSourceNode::CookIfNeeded already treats <= 0.0 as "don't loop".
+      if (video->durationSeconds <= 0.0)
+      {
+         PROPVARIANT probe {};
+         probe.vt = VT_I8;
+         probe.hVal.QuadPart = kVideoDurationProbeHns;
+         if (SUCCEEDED(video->reader->SetCurrentPosition(GUID_NULL, probe)))
+         {
+            LONGLONG lastTimeHns = -1;
+            std::vector<unsigned char> scratch;
+            std::string probeError;
+            // However many reads it takes to reach end-of-stream from
+            // wherever MF actually clamped the seek to. This runs once at
+            // open, off the render thread, so the cost is a non-issue.
+            for (int i = 0; i < 8; ++i)
+            {
+               LONGLONG t = 0;
+               const int got = ReadNextVideoFrame(video, scratch, t, probeError);
+               if (got <= 0)
+                  break;
+               lastTimeHns = t;
+            }
+            if (lastTimeHns > 0)
+               video->durationSeconds = (double)lastTimeHns / 10000000.0;
+
+            // Restore the position the decode loop below expects to start
+            // from - the probe must not leave the reader parked at the end.
+            PROPVARIANT reset {};
+            reset.vt = VT_I8;
+            reset.hVal.QuadPart = 0;
+            video->reader->SetCurrentPosition(GUID_NULL, reset);
+         }
+      }
 
       if (video->width <= 0 || video->height <= 0)
       {
