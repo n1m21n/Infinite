@@ -166,10 +166,13 @@ min(1) | 0.0 | none | none | 0 | 0 | min() expects 2 argument(s)
 clamp(1, 2) | 0.0 | none | none | 0 | 0 | clamp() expects 3 argument(s)
 
 # -------------------------------------------------------------
-# Section 8: Random Functions (Current Legacy Implementation)
-# Tag: random (To be re-baselined in Step 2)
+# Section 8: Random Functions (Pure Seeded Randomness)
+# Re-baselined in Field Step 2 (commit b4ff650)
+# Tag: random
 # -------------------------------------------------------------
-rand() | 1.25 | none | none | 0.76586776971817017 | 1 | none
-noise(2) | 1.25 | none | none | 0.55055892467498779 | 1 | none
-rand(0, 1, 2) | 1.25 | none | none | 0.55055892467498779 | 1 | none
-sh(0, 1, 4) | 1.25 | none | none | 0.17868475615978241 | 1 | none
+rand() | 1.25 | none | none | 0.007148213684558868 | 1 | none
+noise(2) | 1.25 | none | none | 0.014296427369117737 | 1 | none
+rand(0, 1, 2) | 1.25 | none | none | 0.014296427369117737 | 1 | none
+sh(0, 1, 4) | 1.25 | none | none | 0.028592854738235474 | 1 | none
+rand(0, 1, 2, 7) | 1.25 | none | none | 0.88440695218741894 | 1 | none
+sh(1, 0, 2, 1) | 1.25 | none | none | 0.41606359556317329 | 1 | none
