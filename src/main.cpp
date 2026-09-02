@@ -20221,6 +20221,10 @@ namespace
             if (ModCheckbox(p.label.c_str(), &checked))
                *slot = checked ? 1.0f : 0.0f;
          }
+         else if (p.isDegrees)
+         {
+            ModSlider(p.label.c_str(), n->ParamPtr(i), p.minVal, p.maxVal, "%.1f\xC2\xB0");
+         }
          else
          {
             ModSlider(p.label.c_str(), n->ParamPtr(i), p.minVal, p.maxVal);
@@ -24338,7 +24342,7 @@ namespace
          { "pixelate", "Chunks the image into flat colour blocks. Block Size sets how large each block is." },
          { "addnoise", "Adds random per-pixel grain, re-randomised every frame. Amount sets how strong it is." },
          { "vignette", "Darkens the image toward the edges, framing the centre. Radius and Softness shape the falloff, Center X/Y offsets it." },
-         { "transform", "Translates, scales, rotates, and flips (horizontal/vertical) the whole image. Scale X/Y let you stretch non-uniformly on top of the overall Scale." },
+         { "transform", "Translates, scales, rotates, and flips (horizontal/vertical) the whole image. Scale X/Y let you stretch non-uniformly on top of the overall Scale. Crop X/Y symmetrically crop the source in from each axis before the rest of the transform is applied." },
          { "brightnesscontrast", "Basic exposure control: Brightness adds or subtracts a flat amount, Contrast steepens or flattens the curve around mid-grey." },
          { "levels", "Remaps the input range: Black Point and White Point set what maps to pure black/white, Gamma curves the midtones." },
          { "hsl", "Shifts Hue, scales Saturation and adds Lightness, independent of the underlying colour." },

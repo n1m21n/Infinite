@@ -31,6 +31,12 @@ struct FilterParamDef
    // param - for filters (like a combined color-adjustments node) whose
    // param list is long enough that a flat list stops being readable.
    std::string sectionLabel;
+
+   // Float params only: stored/displayed in degrees (range, default, and the
+   // params-panel slider all use degrees), converted to radians only at the
+   // point of GL upload (FilterNode::CookIfNeeded). The shader itself still
+   // receives radians, matching the rest of the app's rotation convention.
+   bool isDegrees = false;
 };
 
 struct FilterDef

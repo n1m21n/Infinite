@@ -18,7 +18,7 @@ namespace
       return p;
    }
 
-   FilterParamDef P(const char* label, const char* uniform, T type, float minV, float maxV, float def0, float def1 = 0, float def2 = 0)
+   FilterParamDef P(const char* label, const char* uniform, T type, float minV, float maxV, float def0, float def1 = 0, float def2 = 0, bool isDegrees = false)
    {
       FilterParamDef p;
       p.label = label;
@@ -29,6 +29,7 @@ namespace
       p.defaultVal[0] = def0;
       p.defaultVal[1] = def1;
       p.defaultVal[2] = def2;
+      p.isDegrees = isDegrees;
       return p;
    }
 
@@ -247,6 +248,8 @@ const std::vector<FilterDef>& GetFilterDefs()
         "uniform float uScaleX;\n"
         "uniform float uScaleY;\n"
         "uniform float uRotation;\n"
+        "uniform float uCropX;\n"
+        "uniform float uCropY;\n"
         "uniform int uFlipH;\n"
         "uniform int uFlipV;\n"
         "void main() {\n"
@@ -259,7 +262,9 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   if (uFlipV != 0) uv.y = -uv.y;\n"
         "   uv -= vec2(uTranslateX, uTranslateY);\n"
         "   uv += vec2(0.5, 0.5);\n"
-        "   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) fragColor = vec4(0.0);\n"
+        "   float loX = uCropX * 0.5, hiX = 1.0 - uCropX * 0.5;\n"
+        "   float loY = uCropY * 0.5, hiY = 1.0 - uCropY * 0.5;\n"
+        "   if (uv.x < max(loX, 0.0) || uv.x > min(hiX, 1.0) || uv.y < max(loY, 0.0) || uv.y > min(hiY, 1.0)) fragColor = vec4(0.0);\n"
         "   else fragColor = texture(uSrc, uv);\n"
         "}\n",
         { P("Translate X", "uTranslateX", T::Float, -1.0f, 1.0f, 0.0f),
@@ -267,7 +272,9 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Scale", "uScale", T::Float, 0.1f, 4.0f, 1.0f),
           P("Scale X", "uScaleX", T::Float, 0.1f, 4.0f, 1.0f),
           P("Scale Y", "uScaleY", T::Float, 0.1f, 4.0f, 1.0f),
-          P("Rotation", "uRotation", T::Float, -6.2832f, 6.2832f, 0.0f),
+          P("Rotation", "uRotation", T::Float, -180.0f, 180.0f, 0.0f, 0.0f, 0.0f, /*isDegrees=*/true),
+          P("Crop X", "uCropX", T::Float, 0.0f, 0.95f, 0.0f),
+          P("Crop Y", "uCropY", T::Float, 0.0f, 0.95f, 0.0f),
           P("Flip Horizontal", "uFlipH", T::Bool, 0.0f, 1.0f, 0.0f),
           P("Flip Vertical", "uFlipV", T::Bool, 0.0f, 1.0f, 0.0f) } },
 

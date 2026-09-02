@@ -1,6 +1,7 @@
 #include "FilterNode.h"
 
 #include "gl3.h"
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -114,7 +115,11 @@ void FilterNode::CookIfNeeded(int frameId)
          switch (p.type)
          {
             case FilterParamDef::Type::Float:
-               glUniform1f(loc, mParamValues[i][0]);
+               // Degree-storing params (e.g. Transform's Rotation) are kept in
+               // degrees for save/load and the params-panel slider; convert to
+               // radians only here, at the point the shader actually reads it.
+               glUniform1f(loc, p.isDegrees ? mParamValues[i][0] * (float)M_PI / 180.0f
+                                             : mParamValues[i][0]);
                break;
             case FilterParamDef::Type::Int:
             case FilterParamDef::Type::Bool:
