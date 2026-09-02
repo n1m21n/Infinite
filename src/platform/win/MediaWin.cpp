@@ -1374,9 +1374,11 @@ namespace Platform
          int liveChannels = 0;
          long long liveSamplesWritten = 0;
 
-         // File-mux mode: decoded once, written at Stop when the final video
-         // duration is known (looped or truncated to match). Written on the
-         // encoder thread too, from WriteFileAudioTrack at Stop.
+         // File-mux mode: decoded once at Start (the stream has to be added
+         // to the writer before BeginWriting), then written at Stop when the
+         // final video duration is known, looped or truncated to match.
+         // WriteFileAudioTrack runs on the stopping thread, after the encoder
+         // thread has been joined - not on the encoder thread.
          std::string audioPath;
          std::string outputPath; // kept so a cancelled take can delete its partial file
          bool loopAudio = true;
@@ -1535,16 +1537,54 @@ namespace Platform
          return true;
       }
 
+      // Creates the MP4 sink writer. Throttling is turned off deliberately:
+      // by default WriteSample blocks the caller to rate-limit a stream that
+      // has run ahead of its siblings, and WriteFileAudioTrack writes an
+      // entire audio track in one burst at Stop, long after the last video
+      // sample. That is exactly the pattern throttling exists to slow down,
+      // and here it would only stall the stopping thread for no benefit - the
+      // video stream is already complete by then.
+      HRESULT CreateRecorderSinkWriter(const std::string& path, IMFSinkWriter** outWriter)
+      {
+         IMFAttributes* attrs = nullptr;
+         HRESULT hr = MFCreateAttributes(&attrs, 1);
+         if (SUCCEEDED(hr))
+            hr = attrs->SetUINT32(MF_SINK_WRITER_DISABLE_THROTTLING, TRUE);
+         if (SUCCEEDED(hr))
+            hr = MFCreateSinkWriterFromURL(WinCommon::Utf8ToWide(path).c_str(), nullptr,
+                                           attrs, outWriter);
+         SafeRelease(&attrs);
+         return hr;
+      }
+
       // Adds the AAC audio stream. `inputRate` is whatever PCM we'll actually
       // feed; the output AAC rate matches when standard so no resampling is
       // needed, else 48k and the sink writer's inserted converter handles it.
+      //
+      // MUST be called before BeginWriting. IMFSinkWriter::AddStream is only
+      // legal while the writer is still being configured; once BeginWriting
+      // has run it returns MF_E_INVALIDREQUEST (0xC00D36B2) and the take comes
+      // out video-only. AVAssetWriter on the macOS side refuses addInput: the
+      // same way, for the same reason - see the note in Platform.mm.
       bool AddRecorderAudioStream(RecorderHandleMf* rec, double inputRate, int channels,
                                    std::string& outError)
       {
          if (channels <= 0)
             channels = 2;
-         const bool standardRate =
-            inputRate == 44100.0 || inputRate == 48000.0 || inputRate == 32000.0;
+         if (!(inputRate > 0.0))
+         {
+            // Guarded here rather than left to the encoder: a zero rate sails
+            // through AddStream (the out-type falls back to 48k below) and
+            // only fails at SetInputMediaType, by which point the writer is
+            // already carrying a typeless stream.
+            outError = "audio source reported no sample rate";
+            return false;
+         }
+         // The Windows AAC encoder accepts *only* 44100 or 48000 as its output
+         // rate. 32000 used to be passed through here as if it were standard;
+         // it is not, and a 32k source failed to encode. Everything
+         // non-standard goes to 48k and the inserted resampler converts.
+         const bool standardRate = inputRate == 44100.0 || inputRate == 48000.0;
          const UINT32 outRate = (UINT32)(standardRate ? inputRate : 48000.0);
          const UINT32 outBytesPerSec = 24000; // 192 kbps
 
@@ -1581,6 +1621,18 @@ namespace Platform
          if (SUCCEEDED(hr))
             hr = inType->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT,
                                    (UINT32)(channels * sizeof(float)));
+         if (SUCCEEDED(hr))
+         {
+            // The resampler the sink writer inserts between our float PCM and
+            // the encoder's 16-bit PCM lists the channel mask among its
+            // required attributes; without it SetInputMediaType can come back
+            // MF_E_INVALIDMEDIATYPE. Literal speaker bits rather than the
+            // SPEAKER_* names so this doesn't drag in ksmedia.h.
+            const UINT32 kFrontCentre = 0x4;
+            const UINT32 kFrontLeftRight = 0x1 | 0x2;
+            hr = inType->SetUINT32(MF_MT_AUDIO_CHANNEL_MASK,
+                                   channels == 1 ? kFrontCentre : kFrontLeftRight);
+         }
          if (SUCCEEDED(hr))
             hr = inType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,
                                    (UINT32)((double)inputRate * channels * sizeof(float)));
@@ -1789,8 +1841,7 @@ namespace Platform
       rec->outputPath = path;
       rec->loopAudio = loopAudio;
 
-      HRESULT hr = MFCreateSinkWriterFromURL(WinCommon::Utf8ToWide(path).c_str(), nullptr,
-                                             nullptr, &rec->writer);
+      HRESULT hr = CreateRecorderSinkWriter(path, &rec->writer);
       if (FAILED(hr))
       {
          // The handle's destructor pairs the MFStartup above; don't shut MF
@@ -1806,21 +1857,64 @@ namespace Platform
          return nullptr;
       }
 
+      // Both audio modes add their stream here, before BeginWriting. File
+      // mode used to defer this to Stop - by which point AddStream is illegal
+      // (MF_E_INVALIDREQUEST) and every take with an Audio File node cabled
+      // into Output came out silent.
+      bool audioFailed = false;
+      std::string audioErr;
       if (liveAudioSampleRate > 0.0)
       {
          rec->liveRate = liveAudioSampleRate;
          rec->liveChannels = liveAudioChannels > 0 ? liveAudioChannels : 2;
-         std::string audioErr;
-         if (!AddRecorderAudioStream(rec, liveAudioSampleRate, rec->liveChannels, audioErr))
-            outError = "audio track unavailable: " + audioErr; // record video anyway
+         audioFailed =
+            !AddRecorderAudioStream(rec, liveAudioSampleRate, rec->liveChannels, audioErr);
       }
       else if (!audioPath.empty())
       {
-         // Decode up front; the samples are written at Stop once the real
-         // video duration is known. Recording does not depend on playback.
-         std::string decodeErr;
-         if (!DecodeAudioFileToBuffer(audioPath, rec->fileAudio, decodeErr))
-            outError = "audio muxing unavailable: " + decodeErr;
+         // Decoded up front for two reasons: the stream has to exist before
+         // BeginWriting, and its rate and channel count aren't known until the
+         // file has been read. The samples themselves are still written at
+         // Stop, once the real video duration is known. Recording does not
+         // depend on playback.
+         if (!DecodeAudioFileToBuffer(audioPath, rec->fileAudio, audioErr))
+            audioFailed = true;
+         else if (rec->fileAudio.numFrames <= 0 || rec->fileAudio.channels <= 0 ||
+                  rec->fileAudio.sampleRate <= 0.0)
+         {
+            audioErr = "decoded audio file is empty";
+            audioFailed = true;
+         }
+         else
+            audioFailed = !AddRecorderAudioStream(rec, rec->fileAudio.sampleRate,
+                                                  rec->fileAudio.channels, audioErr);
+      }
+      if (audioFailed)
+      {
+         // A half-configured stream can't be un-added, and a stream with no
+         // input type takes the whole movie down at BeginWriting. So the
+         // writer is thrown away and rebuilt video-only: a take that loses its
+         // audio track still has to produce a playable file, which is what the
+         // macOS path does too.
+         outError = "audio track unavailable: " + audioErr; // record video anyway
+         rec->audioStreamId = kInvalidStreamId;
+         rec->fileAudio = SampleBuffer();
+         rec->audioPath.clear();
+         SafeRelease(&rec->writer);
+         hr = CreateRecorderSinkWriter(path, &rec->writer);
+         std::string videoErr;
+         if (FAILED(hr))
+         {
+            outError = WinCommon::HrToString("creating MP4 writer", hr);
+            delete rec;
+            return nullptr;
+         }
+         if (!ConfigureRecorderVideo(rec, videoErr))
+         {
+            outError = videoErr;
+            delete rec;
+            return nullptr;
+         }
       }
 
       hr = rec->writer->BeginWriting();
@@ -2058,21 +2152,23 @@ namespace Platform
       if (outDroppedCount != nullptr)
          *outDroppedCount = rec->droppedCount.load(std::memory_order_relaxed);
 
-      // File-audio mode muxes here, now that the movie's real duration is known.
-      if (!rec->audioPath.empty() && !rec->finalized)
+      // File-audio mode writes its samples here, now that the movie's real
+      // duration is known. The stream itself was added back in RecorderStart -
+      // adding it at this point is illegal and was the reason muxed audio
+      // never made it into the file.
+      if (!rec->audioPath.empty() && !rec->finalized &&
+          rec->audioStreamId != kInvalidStreamId)
       {
          std::string audioErr;
-         if (!AddRecorderAudioStream(rec, rec->fileAudio.sampleRate, rec->fileAudio.channels,
-                                     audioErr))
-            outError = "audio muxing skipped: " + audioErr;
-         else if (!WriteFileAudioTrack(rec, audioErr))
+         if (!WriteFileAudioTrack(rec, audioErr))
             outError = audioErr;
       }
 
-      HRESULT hr = rec->writer->Flush(0);
-      if (rec->audioStreamId != kInvalidStreamId)
-         rec->writer->Flush(rec->audioStreamId);
-      hr = rec->writer->Finalize();
+      // No Flush before Finalize: IMFSinkWriter::Flush *discards* whatever is
+      // still queued for a stream rather than pushing it out, so flushing the
+      // audio stream here would throw away the track WriteFileAudioTrack just
+      // wrote. Finalize already drains every stream and writes the index.
+      HRESULT hr = rec->writer->Finalize();
       rec->finalized = true;
 
       const bool ok = SUCCEEDED(hr);

@@ -108,9 +108,15 @@ bool OutputNode::StartRecording(const std::string& path)
 
    AllocateReadbackBuffers();
 
-   mRecordStatus = (includeAudio && (!audioPath.empty() || liveAudioSampleRate > 0.0))
-                      ? "recording with audio..."
-                      : "recording...";
+   // A non-null handle with an error set means the recorder started but had
+   // to drop the audio track (bad file, unsupported rate, encoder refused it).
+   // Say so instead of claiming "recording with audio..." over a silent take.
+   const bool wantedAudio =
+      includeAudio && (!audioPath.empty() || liveAudioSampleRate > 0.0);
+   if (wantedAudio && !error.empty())
+      mRecordStatus = "recording (no audio: " + error + ")";
+   else
+      mRecordStatus = wantedAudio ? "recording with audio..." : "recording...";
    return true;
 }
 
