@@ -81,9 +81,15 @@ reorder, or existing patches' modulation cables silently rewire.
 | 3 | `sensitivity` | `AudioSlider` | 0 .. 100 `%.0f %%` | 65 | linear |
 | 4 | `pitch` | `AudioSlider` | −24 .. +24 `%.1f st` | 0 | linear |
 | 5 | `finetune` | `AudioSlider` | −100 .. +100 `%.0f c` | 0 | linear |
-| 6 | `speed` | `AudioSlider` | 0.25 .. 4.0 `%.2fx` | 1.0 | exponential (linear in log2) |
-| 7 | `decay` | `AudioSlider` | 5 .. 5000 ms + ∞ detent | ∞ | `LogTaper` |
-| 8 | `volume` | `AudioSlider` | 0 .. 1 `%.2f` | 0.8 | linear |
+| 6 | `attack` | `AudioSlider` | 0 .. 500 ms `%.1f ms` | 0 | `SkewAttack100Taper` |
+| 7 | `decay` | `AudioSlider` | 5 .. 5000 ms + no-decay detent (`hold`) | hold | `LogTaper` |
+| 8 | `speed` | `AudioSlider` | 0.25 .. 4.0 `%.2fx` | 1.0 | exponential (linear in log2) |
+| 9 | `volume` | `AudioSlider` | 0 .. 1 `%.2f` | 0.8 | linear |
+| 10 | `crossthrough` | `ModCheckbox` | bool | off | — |
+
+The `decay` detent is an **envelope** detent, not a boundary one: at the top of
+its throw the slice holds at full level after its attack. Whether it may play
+past its own next onset is `crossthrough`'s job and nothing else's.
 
 Cells 2a/2b are the **same grid cell** (pillar P5): the cell index must not
 move when `slice by` changes. Both are always drawn; the inactive one is
@@ -143,10 +149,21 @@ The trigger hook already exists in the sibling:
 `void TriggerVoice(int note, float velocity, float overrideStartFrac, int voiceId, float bendSemitones)`.
 The whole feature is `TriggerVoice(note, vel, sliceStartFrac[note - 36], voiceId, bend)`.
 
+**Attack.** A per-slice fade-in that **extends** the hidden 2 ms de-click ramp
+rather than stacking a second envelope on it — one raised cosine of
+`max(2 ms, attack)`. At `attack = 0` the output is bit-identical to no attack
+control at all.
+
 **Decay.** Amplitude release measured from note-on, exponential `exp(-t/tau)`
-with `tau = decaySeconds / 4.6` (−60 dB at `decay`). At the top-of-range **∞
-detent** the slice instead plays through to its next slice boundary and stops
-there.
+with `tau = decaySeconds / 4.6`. At the top-of-range **no-decay detent** the
+slice holds at full level after its attack instead of decaying; that says
+nothing about where it stops. Decay runs from note-on independently of attack,
+so a long attack against a short decay peaks below unity (standard AD).
+
+**Crossthrough.** The boundary control, latched per voice at note-on. Off (the
+default): the slice stops at its own next onset, with a 3 ms raised-cosine fade
+that *completes* at the boundary, so no audio past it is ever read. On: the
+slice runs to the end of the sample, straight through every later slice.
 
 **Sensitivity vs. onsets.** `sensitivity` sets the onset-detection threshold
 (which transients qualify as candidates). `onsets` then caps the kept set to
@@ -180,8 +197,12 @@ Denominators: `1/4`→4, `1/8`→8, `1/8T`→8×⅔, `1/16`→16, `1/16T`→16×
 | Voice-steal crossfade | 2 ms |
 | Max slices | 64 |
 
-When `speed < 1.0`, a slice **must be allowed to read past its end boundary**
-during the decay tail — otherwise the tail truncates and you hear a gap.
+`speed < 1.0` needs no special case. Confinement is expressed in read-head
+**position**, not wall-clock: `pos` advances by `rate` (pitch × speed × sr
+ratio), so at speed 0.5 the boundary simply arrives in twice the wall-clock
+time and the tail stretches with it. A tail that genuinely wants to run past
+the boundary is what `crossthrough = on` is for — an explicit user choice, not
+an implicit consequence of moving the decay slider.
 
 ---
 
