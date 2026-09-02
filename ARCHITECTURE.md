@@ -34,6 +34,7 @@ What each node type does: math, state, per-node parameter UI.
 | File | Node |
 |---|---|
 | ImageSourceNode | File-backed image source (stb_image) |
+| SlideshowNode | Folder-backed, transport-synchronised image sequence with GPU transitions |
 | ShapeNode | Procedural SDF shapes |
 | FormulaNode | User GLSL expression source |
 | FilterNode | Generic single-in/out shader-pass (covers every filter table entry) |
