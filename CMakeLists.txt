@@ -221,6 +221,7 @@ set(COMMON_SOURCES
     src/core/field/FieldIR.cpp
     src/core/field/FieldBytecode.cpp
     src/core/field/FieldVM.cpp
+    src/core/field/FieldRandom.cpp
     src/core/field/FieldProgramCache.cpp
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp

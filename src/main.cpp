@@ -83,6 +83,7 @@ namespace
 #include "core/field/FieldLex.h"
 #include "core/field/FieldParse.h"
 #include "core/field/FieldIR.h"
+#include "core/field/FieldRandom.h"
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
@@ -34684,7 +34685,147 @@ static int RunFieldTest()
    else
       printf("SECTION D (Types): FAIL\n");
 
-   bool allOk = secAOk && secBOk && secCOk && secDOk;
+   // Section E: Pure Randomness (Step 2)
+   bool secEOk = true;
+   {
+      // 1. Non-negativity & Range [0, 1) across time and seed space
+      uint64_t testSeeds[] = { 0, 1, 2, 7, 42, 1000, 0x12345678ULL, 0x8000000000000000ULL, 0xFFFFFFFFFFFFFFFFULL };
+      for (uint64_t s : testSeeds)
+      {
+         for (double t = -300.0; t <= 300.0; t += 0.5)
+         {
+            double r = Field::TimeToRand(t, s);
+            if (r < 0.0 || r >= 1.0)
+            {
+               printf("SECTION E (Random): FAIL - TimeToRand(%.1f, %llu) out of range: %.17g\n", t, (unsigned long long)s, r);
+               secEOk = false;
+               break;
+            }
+         }
+         if (!secEOk) break;
+      }
+
+      // 2. Determinism / Reproducibility: same (t, seed) produces identical value
+      for (int i = 0; i < 100; ++i)
+      {
+         double t = (double)i * 0.37;
+         uint64_t s = (uint64_t)(i * 1337);
+         double r1 = Field::TimeToRand(t, s);
+         double r2 = Field::TimeToRand(t, s);
+         if (r1 != r2)
+         {
+            printf("SECTION E (Random): FAIL - non-deterministic TimeToRand at t=%.2f, s=%llu\n", t, (unsigned long long)s);
+            secEOk = false;
+            break;
+         }
+      }
+
+      // 3. Different seeds produce distinct values
+      int seedCollisions = 0;
+      for (int i = 0; i < 100; ++i)
+      {
+         double t = (double)i * 0.5;
+         double rA = Field::TimeToRand(t, 0);
+         double rB = Field::TimeToRand(t, 1);
+         if (rA == rB)
+            seedCollisions++;
+      }
+      if (seedCollisions > 0)
+      {
+         printf("SECTION E (Random): FAIL - different seeds collided %d times out of 100\n", seedCollisions);
+         secEOk = false;
+      }
+
+      // 4. Decorrelation: adjacent frames at 60 fps have correlation < 0.20
+      {
+         const int N = 10000;
+         const double dt = 1.0 / 60.0;
+         double sumX = 0.0, sumY = 0.0;
+         std::vector<double> xs(N), ys(N);
+         for (int i = 0; i < N; ++i)
+         {
+            xs[i] = Field::TimeToRand((double)i * dt, 0);
+            ys[i] = Field::TimeToRand((double)(i + 1) * dt, 0);
+            sumX += xs[i];
+            sumY += ys[i];
+         }
+         double meanX = sumX / N;
+         double meanY = sumY / N;
+         double cov = 0.0, varX = 0.0, varY = 0.0;
+         for (int i = 0; i < N; ++i)
+         {
+            cov += (xs[i] - meanX) * (ys[i] - meanY);
+            varX += (xs[i] - meanX) * (xs[i] - meanX);
+            varY += (ys[i] - meanY) * (ys[i] - meanY);
+         }
+         double corr = cov / std::sqrt(varX * varY);
+         if (std::fabs(corr) >= 0.20)
+         {
+            printf("SECTION E (Random): FAIL - 60fps correlation too high: %.4f (expected < 0.20)\n", corr);
+            secEOk = false;
+         }
+      }
+
+      // 5. Periodicity: exactly 300 seconds
+      {
+         double p1 = Field::TimeToRand(1.25, 7);
+         double p2 = Field::TimeToRand(301.25, 7);
+         double p3 = Field::TimeToRand(601.25, 7);
+         if (p1 != p2 || p1 != p3)
+         {
+            printf("SECTION E (Random): FAIL - 300s period check failed (%.17g vs %.17g vs %.17g)\n", p1, p2, p3);
+            secEOk = false;
+         }
+      }
+
+      // 6. sh step boundaries: constant across step, changes at boundary
+      {
+         double shA = Field::Sh(0.0, 1.0, 4.0, 0.0, 0.1);
+         double shB = Field::Sh(0.0, 1.0, 4.0, 0.0, 0.24);
+         double shC = Field::Sh(0.0, 1.0, 4.0, 0.0, 0.26);
+         if (shA != shB)
+         {
+            printf("SECTION E (Random): FAIL - sh changed within step interval [0.1, 0.24]\n");
+            secEOk = false;
+         }
+         if (shA == shC)
+         {
+            printf("SECTION E (Random): FAIL - sh did not change across step boundary at t=0.25\n");
+            secEOk = false;
+         }
+      }
+
+      // 7. Arity check: 5 arguments produces expected error
+      {
+         float outV = 0.0f;
+         std::string errStr;
+         bool res = Expression::Evaluate("rand(0, 1, 2, 3, 4)", 0.0, nullptr, nullptr, outV, errStr);
+         if (res || errStr.find("expects 0 to 4 arguments") == std::string::npos)
+         {
+            printf("SECTION E (Random): FAIL - 5-arg rand did not produce expected error (ok=%d, err='%s')\n", (int)res, errStr.c_str());
+            secEOk = false;
+         }
+      }
+
+      // 8. Constant folding prevention across t
+      {
+         float vA = 0.0f, vB = 0.0f;
+         std::string errA, errB;
+         bool okA = Expression::Evaluate("rand(0, 1, 2)", 1.0, nullptr, nullptr, vA, errA);
+         bool okB = Expression::Evaluate("rand(0, 1, 2)", 2.0, nullptr, nullptr, vB, errB);
+         if (!okA || !okB || vA == vB)
+         {
+            printf("SECTION E (Random): FAIL - cached rand program did not vary across t (vA=%.7g, vB=%.7g)\n", vA, vB);
+            secEOk = false;
+         }
+      }
+   }
+   if (secEOk)
+      printf("SECTION E (Pure Randomness): OK\n");
+   else
+      printf("SECTION E (Pure Randomness): FAIL\n");
+
+   bool allOk = secAOk && secBOk && secCOk && secDOk && secEOk;
    printf("INFINITE_FIELDTEST: %s\n", allOk ? "OK" : "FAIL");
    return allOk ? 0 : 1;
 }
@@ -51936,7 +52077,7 @@ int main(int argc, char** argv)
                ImGui::TextDisabled("functions   sin cos tan abs sign sqrt exp log pow");
                ImGui::TextDisabled("            floor ceil round mod min max clamp lerp");
                ImGui::TextDisabled("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)");
-               ImGui::TextDisabled("            rand(speed) rand(min,max,speed) sh(min,max,speed)");
+               ImGui::TextDisabled("            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)");
                ImGui::TextDisabled("bound       t = transport seconds, pi");
                ImGui::TextDisabled("in a param  lo / hi = that param's own range, plus its siblings");
                ImGui::TextDisabled("            a sibling of the same name shadows a global");

@@ -1,4 +1,5 @@
 #include "FieldVM.h"
+#include "FieldRandom.h"
 
 #include <algorithm>
 #include <cmath>
@@ -85,6 +86,7 @@ namespace Field
             double minVal = 0.0;
             double maxVal = 1.0;
             double speed = 1.0;
+            double seed = 0.0;
             if (numArgs == 1)
             {
                speed = args[0];
@@ -94,21 +96,27 @@ namespace Field
                minVal = args[0];
                maxVal = args[1];
             }
-            else if (numArgs >= 3)
+            else if (numArgs == 3)
             {
                minVal = args[0];
                maxVal = args[1];
                speed = args[2];
             }
-            const double tau_t = t * speed;
-            const double n = (sin(tau_t) + sin(tau_t * 1.618033988749895) + sin(tau_t * 2.718281828459045)) / 6.0 + 0.5;
-            return minVal + (maxVal - minVal) * n;
+            else if (numArgs >= 4)
+            {
+               minVal = args[0];
+               maxVal = args[1];
+               speed = args[2];
+               seed = args[3];
+            }
+            return Rand(minVal, maxVal, speed, seed, t);
          }
          if (name == "sh")
          {
             double minVal = 0.0;
             double maxVal = 1.0;
             double speed = 1.0;
+            double seed = 0.0;
             if (numArgs == 1)
             {
                speed = args[0];
@@ -118,15 +126,20 @@ namespace Field
                minVal = args[0];
                maxVal = args[1];
             }
-            else if (numArgs >= 3)
+            else if (numArgs == 3)
             {
                minVal = args[0];
                maxVal = args[1];
                speed = args[2];
             }
-            const double seed = floor(t * speed) * 123.456;
-            const double frac = fabs(fmod(sin(seed) * 43758.5453123, 1.0));
-            return minVal + (maxVal - minVal) * frac;
+            else if (numArgs >= 4)
+            {
+               minVal = args[0];
+               maxVal = args[1];
+               speed = args[2];
+               seed = args[3];
+            }
+            return Sh(minVal, maxVal, speed, seed, t);
          }
          if (name == "if")
          {
@@ -297,12 +310,19 @@ namespace Field
 
             case Opcode::OpCallBuiltin:
             {
-               int argStart = inst.src1;
-               int argCount = inst.src2;
                double argBuf[8];
-               for (int i = 0; i < argCount && i < 8; ++i)
+               size_t argCount = inst.argRegs.empty() ? (size_t)inst.src2 : inst.argRegs.size();
+               size_t count = std::min(argCount, (size_t)8);
+               if (!inst.argRegs.empty())
                {
-                  argBuf[i] = regs[argStart + i];
+                  for (size_t i = 0; i < count; ++i)
+                     argBuf[i] = regs[inst.argRegs[i]];
+               }
+               else
+               {
+                  int argStart = inst.src1;
+                  for (size_t i = 0; i < count; ++i)
+                     argBuf[i] = regs[argStart + (int)i];
                }
                regs[inst.dst] = CallBuiltin(inst.stringData, argBuf, argCount, env.t, outError);
                if (!outError.empty())

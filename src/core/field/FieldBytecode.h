@@ -39,6 +39,7 @@ namespace Field
       int src2 = 0;
       int extra = 0;
       std::string stringData;
+      std::vector<int> argRegs;
    };
 
    struct BytecodeProgram

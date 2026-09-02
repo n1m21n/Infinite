@@ -141,7 +141,7 @@ because the fixture must encode the old behaviour before replacing it:
 | Function | Today | After step 2 |
 |---|---|---|
 | `rand` / `noise` | `(sin(τt) + sin(1.618τt) + sin(2.718τt)) / 6 + 0.5`, scaled into `[min,max]` | `TimeToRand`-based, per `field-language` §12 |
-| `sh` | `fract(sin(floor(t·speed)·123.456) · 43758.5453)` | same hash family, per-`(t, seed)` |
+| `sh` | `fabs(fmod(sin(floor(t·speed)·123.456) · 43758.5453123, 1.0))` | same hash family, per-`(t, seed)` |
 
 Note that neither has a hidden counter today — both are already pure in `t`.
 The defect is autocorrelation and the absence of a seed, not statelessness.

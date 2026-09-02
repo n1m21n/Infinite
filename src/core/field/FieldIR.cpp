@@ -54,14 +54,14 @@ namespace Field
          }
          if (name == "rand" || name == "noise" || name == "sh")
          {
-            if (argCount > 3)
+            if (argCount > 4)
             {
                error.severity = Severity::Error;
                error.span = span;
                if (name == "sh")
-                  error.message = "sh() expects 0 to 3 arguments (min, max, speed)";
+                  error.message = "sh() expects 0 to 4 arguments (min, max, speed, seed)";
                else
-                  error.message = name + "() expects 0 to 3 arguments (e.g. rand(speed) or rand(min, max, speed))";
+                  error.message = name + "() expects 0 to 4 arguments (e.g. rand(speed) or rand(min, max, speed, seed))";
                return false;
             }
             return true;

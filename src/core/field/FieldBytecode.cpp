@@ -122,6 +122,7 @@ namespace Field
                   inst.src1 = argRegs.empty() ? -1 : argRegs.front();
                   inst.src2 = (int)argRegs.size();
                   inst.extra = argRegs.empty() ? -1 : argRegs.front();
+                  inst.argRegs = argRegs;
                   prog.code.push_back(inst);
                   return r;
                }

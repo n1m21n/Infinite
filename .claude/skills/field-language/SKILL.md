@@ -288,8 +288,8 @@ regression corpus.
 **What the code actually does today** (`src/core/Expression.cpp:166–222`):
 there is no hidden counter — `rand`/`noise` are already deterministic in `t`,
 computed as a sum of three incommensurate sines
-(`(sin(τ) + sin(1.618τ) + sin(2.718τ)) / 6 + 0.5`), and `sh` is
-`fract(sin(floor(t·speed)·123.456) · 43758.5453)`. The defect is not
+(`(sin(τ) + sin(1.618τ) + sin(2.718τ)) / 6 + 0.5`), and `sh` was
+`fabs(fmod(sin(floor(t·speed)·123.456) · 43758.5453123, 1.0))`. The defect is not
 statelessness — it is that the three-sine sum is strongly autocorrelated and
 neither takes a `seed`, so two `rand()` calls in one patch return the identical
 value.
