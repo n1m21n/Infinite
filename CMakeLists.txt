@@ -315,10 +315,12 @@ set(COMMON_SOURCES
     src/audio/dsp/SpectralAdditiveSynth.cpp
     src/audio/dsp/MolderDsp.cpp
     src/audio/dsp/GrainMolderDsp.cpp
+    src/audio/dsp/SlicerDsp.cpp
     src/nodes/OscillatorNode.cpp
     src/nodes/MetallicNode.cpp
     src/nodes/AudioEffectNode.cpp
     src/nodes/SamplerNode.cpp
+    src/nodes/SlicerNode.cpp
     src/nodes/PaulStretchNode.cpp
     src/nodes/MolderNode.cpp
     src/nodes/GrainMolderNode.cpp
