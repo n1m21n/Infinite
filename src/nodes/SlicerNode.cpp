@@ -29,6 +29,7 @@ namespace
    constexpr int kSpeedParam = 2;
    constexpr int kVolumeParam = 3;
    constexpr int kDecayParam = 4;
+   constexpr int kAttackParam = 5;
 
    // Hidden constants - not user-visible params (see SlicerNode.h's header
    // comment and the design spec).
@@ -83,6 +84,7 @@ public:
       mMailbox.SetImmediate(kSpeedParam, mSpeed.load(std::memory_order_relaxed));
       mMailbox.SetImmediate(kVolumeParam, mVolume.load(std::memory_order_relaxed));
       mMailbox.SetImmediate(kDecayParam, mDecay.load(std::memory_order_relaxed));
+      mMailbox.SetImmediate(kAttackParam, mAttack.load(std::memory_order_relaxed));
 
       if (mRecordBuffer.empty())
          mRecordBuffer.resize((size_t)kMaxRecordSeconds * kMaxRecordSampleRate);
@@ -98,17 +100,23 @@ public:
    void PushBuffer(Platform::SampleBuffer* buf) { mSampleSlot.Push(buf); }
    void DrainRetired() { mSampleSlot.DrainRetired(); }
 
-   void PushParams(float pitch, float finetune, float speed, float volume, float decayMs)
+   // `crossthrough` is a plain atomic and deliberately NOT a mailbox param:
+   // a bool has no ramp, and it is latched per voice at note-on anyway.
+   void PushParams(float pitch, float finetune, float speed, float volume, float attackMs,
+                   float decayMs, bool crossthrough)
    {
       mPitch.store(pitch, std::memory_order_relaxed);
       mFinetune.store(finetune, std::memory_order_relaxed);
       mSpeed.store(speed, std::memory_order_relaxed);
       mVolume.store(volume, std::memory_order_relaxed);
+      mAttack.store(attackMs, std::memory_order_relaxed);
       mDecay.store(decayMs, std::memory_order_relaxed);
+      mCrossthrough.store(crossthrough, std::memory_order_relaxed);
       mMailbox.Push(kPitchParam, pitch);
       mMailbox.Push(kFinetuneParam, finetune);
       mMailbox.Push(kSpeedParam, speed);
       mMailbox.Push(kVolumeParam, volume);
+      mMailbox.Push(kAttackParam, attackMs);
       mMailbox.Push(kDecayParam, decayMs);
    }
 
@@ -233,7 +241,7 @@ public:
                g *= RaisedCosine(1.0f - (float)vo.fadeInLeft / (float)vo.fadeInTotal);
                vo.fadeInLeft--;
             }
-            if (!vo.infinite)
+            if (!vo.noDecay)
                g *= std::exp(-(float)vo.elapsed / vo.tau);
             if (vo.fadeOutLeft >= 0)
             {
@@ -253,15 +261,22 @@ public:
 
             if (vo.fadeOutLeft < 0)
             {
-               // An infinite-decay slice stops at its own next boundary. A
-               // decaying one is deliberately allowed to read PAST that
-               // boundary (at speed < 1 the tail would otherwise truncate
-               // audibly) and only stops at the buffer's end or when the
-               // envelope has run out.
-               const double stopPos = vo.infinite ? vo.endPos : (double)(numFrames - 1);
+               // Confinement is the boundary's own control, latched at
+               // note-on from !crossthrough - it is NOT the envelope's job.
+               // A confined voice stops at its slice's next onset; a
+               // crossthrough voice runs to the end of the buffer.
+               //
+               // The test is in read-head POSITION, not wall-clock, so it
+               // stretches correctly with speed: vo.pos advances by `rate`,
+               // so at speed 0.5 the boundary arrives in twice the time. The
+               // fade starts early in position (fadeOutSamples * rate) so it
+               // COMPLETES at the boundary and no audio past endPos is ever
+               // read - "the playhead never travels past the next slice
+               // marker" is literally, not approximately, true.
+               const double stopPos = vo.confine ? vo.endPos : (double)(numFrames - 1);
                if (vo.pos + fadeOutSamples * rate >= stopPos)
                   BeginFadeOut(vo);
-               else if (!vo.infinite && std::exp(-(float)vo.elapsed / vo.tau) < 1.0e-4f)
+               else if (!vo.noDecay && std::exp(-(float)vo.elapsed / vo.tau) < 1.0e-4f)
                   BeginFadeOut(vo);
             }
          }
@@ -301,7 +316,11 @@ private:
       float velocity = 1.0f;
       float elapsed = 0.0f;
       float tau = 1.0f;
-      bool infinite = true;
+      // Two separate concerns that used to share one `infinite` flag:
+      // noDecay is the ENVELOPE (hold at full level), confine is the
+      // BOUNDARY (stop at this slice's next onset).
+      bool noDecay = true;
+      bool confine = true;
       int fadeInLeft = 0;
       int fadeInTotal = 1;
       int fadeOutLeft = -1;
@@ -377,7 +396,13 @@ private:
          endFrac = 1.0f;
 
       const int numFrames = mActiveBuffer->numFrames;
-      const float decayMs = mMailbox.SmoothedValue(kDecayParam);
+      // Read the PLAIN atomics, never SmoothedValue: a detent is a discrete
+      // decision and the mailbox's one-pole is mid-ramp for tens of ms after
+      // the user lets go of the slider, so a note-on landing in that window
+      // would silently start a decaying voice. (SmoothedValue also advances
+      // the smoother, out of phase with the per-sample loop.)
+      const float decayMs = mDecay.load(std::memory_order_relaxed);
+      const float attackMs = mAttack.load(std::memory_order_relaxed);
 
       v.active = true;
       v.note = note;
@@ -387,9 +412,19 @@ private:
       v.endPos = (double)endFrac * numFrames;
       v.velocity = std::clamp(velocity, 0.0f, 1.0f);
       v.elapsed = 0.0f;
-      v.infinite = decayMs >= SlicerNode::kDecayInfinite;
+      v.noDecay = decayMs >= SlicerNode::kDecayInfinite;
+      v.confine = !mCrossthrough.load(std::memory_order_relaxed);
       v.tau = std::max(1.0e-4f, (decayMs * 0.001f) / kDecayTauDivisor);
-      v.fadeInTotal = std::max(1, (int)(kFadeInMs * 0.001f * (float)mSampleRate));
+      // Attack EXTENDS the hidden 2 ms de-click ramp rather than stacking a
+      // second envelope on top of it - one raised cosine, never two. At
+      // attack = 0 this is bit-for-bit the old behaviour.
+      //
+      // decay runs from note-on independently of attack, so a long attack
+      // against a short decay peaks below unity (standard AD, correct); with
+      // crossthrough off an attack longer than the slice is cut short by the
+      // boundary fade (also correct and expected).
+      const float rampMs = std::max(kFadeInMs, attackMs);
+      v.fadeInTotal = std::max(1, (int)(rampMs * 0.001f * (float)mSampleRate));
       v.fadeInLeft = v.fadeInTotal;
       v.fadeOutLeft = -1;
       v.lastGain = 0.0f;
@@ -434,11 +469,12 @@ private:
    {
       // A slicer is one-shot by design: a slice plays its own length (or its
       // decay) regardless of how long the key is held, which is what every
-      // hardware slicer does. Note-off is therefore only honoured for an
-      // infinite-decay voice, where nothing else would ever stop it early.
+      // hardware slicer does. Note-off is therefore only honoured for a
+      // no-decay voice, where the envelope would never stop it early. (A
+      // confined voice still stops at its boundary regardless.)
       for (int v = 0; v < kNumNoteVoices; v++)
       {
-         if (mVoices[v].active && mVoices[v].voiceId == voiceId && mVoices[v].infinite)
+         if (mVoices[v].active && mVoices[v].voiceId == voiceId && mVoices[v].noDecay)
             BeginFadeOut(mVoices[v]);
       }
    }
@@ -482,7 +518,9 @@ private:
    std::atomic<float> mFinetune { 0.0f };
    std::atomic<float> mSpeed { 1.0f };
    std::atomic<float> mVolume { 0.8f };
+   std::atomic<float> mAttack { 0.0f };
    std::atomic<float> mDecay { 5000.0f };
+   std::atomic<bool> mCrossthrough { false };
 
    std::atomic<int> mPreviewSlice { -2 };
    std::atomic<bool> mStopRequested { false };
@@ -523,9 +561,11 @@ void SlicerNode::VisitParams(ParamVisitor& v)
    v.Float("sensitivity", sensitivity);
    v.Float("pitch", pitch);
    v.Float("finetune", finetune);
-   v.Float("speed", speed);
+   v.Float("attack", attack);
    v.Float("decay", decay);
+   v.Float("speed", speed);
    v.Float("volume", volume);
+   v.Bool("crossthrough", crossthrough);
    // The detected (and possibly hand-dragged) markers, so a save/load or a
    // copy/paste doesn't have to re-run analysis - and, more importantly, so
    // manual marker edits survive at all.
@@ -543,8 +583,9 @@ void SlicerNode::CookIfNeeded(int frameId)
    sliceBy = std::clamp(sliceBy, 0, 1);
    onsets = std::clamp(onsets, 1, kMaxSlices);
    division = std::clamp(division, 0, kSlicerNumDivisions - 1);
+   attack = std::clamp(attack, 0.0f, 500.0f);
 
-   mAudioNode->PushParams(pitch, finetune, speed, volume, decay);
+   mAudioNode->PushParams(pitch, finetune, speed, volume, attack, decay, crossthrough);
    mAudioNode->DrainRetired();
 
    if (mResultReady.load(std::memory_order_acquire))
@@ -903,8 +944,10 @@ void SlicerNode::ReloadFromPath()
    const float savedPitch = pitch;
    const float savedFinetune = finetune;
    const float savedSpeed = speed;
+   const float savedAttack = attack;
    const float savedDecay = decay;
    const float savedVolume = volume;
+   const bool savedCrossthrough = crossthrough;
 
    LoadFile(mFilePath);
 
@@ -915,8 +958,10 @@ void SlicerNode::ReloadFromPath()
    pitch = savedPitch;
    finetune = savedFinetune;
    speed = savedSpeed;
+   attack = savedAttack;
    decay = savedDecay;
    volume = savedVolume;
+   crossthrough = savedCrossthrough;
 
    if (!savedBlob.empty())
    {

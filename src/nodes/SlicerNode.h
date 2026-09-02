@@ -62,6 +62,33 @@ struct SlicerVoiceSnapshot
 //
 // A note at or above 36 + sliceCount is silent: it does not wrap, clamp, or
 // fall back to slice 0.
+//
+// Two separate controls decide how long a slice lasts, and they must not be
+// conflated (an earlier build did, in a single Voice::infinite flag):
+//
+//   crossthrough (bool) owns the BOUNDARY - whether playback is allowed to
+//                       run past the slice's own next onset. Off by default:
+//                       each slice stops where the next one begins.
+//   decay (float ms)    owns the ENVELOPE only - how fast the amplitude
+//                       falls after the attack ramp. At the top of its throw
+//                       it is a no-decay detent (the slice holds at full
+//                       level); that says nothing about where it stops.
+//
+// The four combinations:
+//   1. cross off + no decay   - attack ramp, full level, a 3 ms raised-cosine
+//                               fade completing exactly at the next onset.
+//                               The classic tight chop; the shipped default.
+//   2. cross off + decay      - ends at whichever comes first: the envelope
+//                               falling under 1e-4, or the next onset.
+//   3. cross on + no decay    - full level through every later slice to the
+//                               end of the sample. The only case a note-off
+//                               can shorten.
+//   4. cross on + decay       - a one-shot with a tail over the rest of the
+//                               break.
+//
+// Confinement is expressed in read-head POSITION, not wall-clock, so it
+// stretches correctly with `speed`: at speed 0.5 the boundary arrives in
+// twice the wall-clock time, and no audio past the boundary is ever read.
 class SlicerNode : public INode, public IAudioSource
 {
 public:
@@ -141,12 +168,15 @@ public:
    float sensitivity = 65.0f; // 0..100, onset-detection threshold
    float pitch = 0.0f;      // semitones, +/-24
    float finetune = 0.0f;   // cents, +/-100
+   float attack = 0.0f;     // ms, 0..500; per-slice attack ramp
+   float decay = 5000.0f;   // ms; the top of the range is the no-decay detent
    float speed = 1.0f;      // 0.25..4 playback rate multiplier
-   float decay = 5000.0f;   // ms; the top of the range is the infinity detent
    float volume = 0.8f;     // 0..1
+   bool crossthrough = false; // let a slice run past its own next onset
 
-   // Above this the decay slider is at its infinity detent: the slice plays
-   // through to its next boundary and stops there instead of decaying.
+   // At or above this the decay slider is at its no-decay detent: after its
+   // attack the slice holds at full level instead of decaying. It says
+   // NOTHING about where the slice stops - that is `crossthrough`'s job.
    static constexpr float kDecayInfinite = 4999.0f;
 
    NoteCable noteInput;
