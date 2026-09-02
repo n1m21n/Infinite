@@ -721,8 +721,10 @@ namespace
    bool gNodePanelOpen = false;
    // The dockable viewport panel: every node index in this list gets its own
    // card, stacked left-to-right when bottom-docked or top-to-bottom when
-   // right/left-docked (see DrawViewportPanelContainer). Session UI state only,
-   // like gNodePanelOpen above - not serialized to patch data or tracked by undo.
+   // right/left-docked (see DrawViewportPanelContainer). Session UI state
+   // only, like gNodePanelOpen above - not serialized to patch data, but
+   // carried across Undo/Redo via RemapViewportPanelNodes since those
+   // respawn every node with a new index.
    bool gViewportPanelOpen = false;
    std::vector<int> gViewportPanelNodes;
    int gViewportPanelDock = 1;        // 0 = bottom, 1 = right, 2 = left
@@ -26775,7 +26777,7 @@ namespace
    // disk) and Undo/Redo (from the in-memory stacks). Callers decide what
    // happens to gPatchPath/gUndoStack/gRedoStack afterwards; a loaded file is
    // a new document boundary, an undo is not.
-   void ApplyPatchData(const Patch::Data& data)
+   void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap = nullptr)
    {
       ScopedPerfTimer perfTimer("ApplyPatchData");
       gSuppressUndoCheckpoints = true;
@@ -26955,6 +26957,9 @@ namespace
       Transport::Instance().SetKey(data.transport.key);
       Transport::Instance().SetScale(data.transport.scale);
 
+      if (outRemap != nullptr)
+         *outRemap = remap;
+
       gSuppressUndoCheckpoints = false;
    }
 
@@ -27023,6 +27028,26 @@ namespace
    bool gDragSnapshotValid = false;
    bool gDragSnapshotPushed = false;
 
+   // Undo/Redo rebuild the graph via ApplyPatchData, which respawns every
+   // node with a fresh index (see NewPatch). gViewportPanelNodes is session
+   // UI state, not part of Patch::Data, so it has to be carried across that
+   // respawn by hand using the same old-index -> new-index remap
+   // ApplyPatchData already builds for cables/modulation/etc. Entries with
+   // no entry in remap belonged to a node that no longer exists at this
+   // point in history and are dropped.
+   void RemapViewportPanelNodes(const std::map<int, int>& remap)
+   {
+      std::vector<int> remapped;
+      remapped.reserve(gViewportPanelNodes.size());
+      for (int idx : gViewportPanelNodes)
+      {
+         auto it = remap.find(idx);
+         if (it != remap.end())
+            remapped.push_back(it->second);
+      }
+      gViewportPanelNodes = std::move(remapped);
+   }
+
    void Undo()
    {
       if (gUndoStack.empty())
@@ -27030,7 +27055,9 @@ namespace
       gRedoStack.push_back(BuildPatchData());
       Patch::Data prev = std::move(gUndoStack.back());
       gUndoStack.pop_back();
-      ApplyPatchData(prev);
+      std::map<int, int> remap;
+      ApplyPatchData(prev, &remap);
+      RemapViewportPanelNodes(remap);
       gPatchDirty = true;
       gPatchStatus = "Undo";
    }
@@ -27042,7 +27069,9 @@ namespace
       gUndoStack.push_back(BuildPatchData());
       Patch::Data next = std::move(gRedoStack.back());
       gRedoStack.pop_back();
-      ApplyPatchData(next);
+      std::map<int, int> remap;
+      ApplyPatchData(next, &remap);
+      RemapViewportPanelNodes(remap);
       gPatchDirty = true;
       gPatchStatus = "Redo";
    }
