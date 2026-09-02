@@ -5842,7 +5842,8 @@ namespace
          // Step number label below column
          char label[8];
          snprintf(label, sizeof(label), "%d", i + 1);
-         const float labelFontSize = count <= 8 ? ImGui::GetFontSize() : std::max(8.0f, cellW * 0.95f);
+         const float labelFontSize = count <= 8 ? ImGui::GetFontSize()
+                                                 : std::clamp(cellW * 0.95f, 8.0f, ImGui::GetFontSize());
          const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
          const ImU32 stepNumCol = isCurrent
             ? (isLight ? IM_COL32(225, 130, 20, 255) : IM_COL32(255, 200, 80, 255))
