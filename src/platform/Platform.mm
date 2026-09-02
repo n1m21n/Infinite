@@ -287,6 +287,68 @@ namespace Platform
          return true;
       }
    }
+
+   bool LoadImageRGBAFromMemory(const std::vector<unsigned char>& bytes,
+                                std::vector<unsigned char>& outPixels,
+                                int& outWidth, int& outHeight, std::string& outError)
+   {
+      @autoreleasepool
+      {
+         if (bytes.empty())
+         {
+            outError = "empty image data";
+            return false;
+         }
+
+         NSData* nsData = [NSData dataWithBytes:bytes.data() length:bytes.size()];
+         NSImage* image = [[NSImage alloc] initWithData:nsData];
+         if (image == nil)
+         {
+            outError = "not an image this Mac can read";
+            return false;
+         }
+
+         CGImageRef cgImage = [image CGImageForProposedRect:NULL context:nil hints:nil];
+         if (cgImage == NULL)
+         {
+            outError = "could not decode image";
+            return false;
+         }
+
+         const int w = (int)CGImageGetWidth(cgImage);
+         const int h = (int)CGImageGetHeight(cgImage);
+         if (w <= 0 || h <= 0)
+         {
+            outError = "empty image";
+            return false;
+         }
+
+         std::vector<unsigned char> topDown((size_t)w * h * 4, 0);
+         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+         CGContextRef ctx = CGBitmapContextCreate(topDown.data(), w, h, 8, (size_t)w * 4,
+                                                  colorSpace, kCGImageAlphaPremultipliedLast);
+         CGColorSpaceRelease(colorSpace);
+         if (ctx == NULL)
+         {
+            outError = "could not allocate bitmap";
+            return false;
+         }
+
+         CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), cgImage);
+         CGContextRelease(ctx);
+
+         // Same bottom-up flip as LoadImageRGBA - GL wants row 0 at the bottom.
+         outPixels.assign((size_t)w * h * 4, 0);
+         const size_t stride = (size_t)w * 4;
+         for (int y = 0; y < h; y++)
+            memcpy(&outPixels[y * stride], &topDown[(h - 1 - y) * stride], stride);
+
+         outWidth = w;
+         outHeight = h;
+         outError.clear();
+         return true;
+      }
+   }
 }
 
 // ============================================================ video decoding
