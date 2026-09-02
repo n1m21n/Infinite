@@ -59,12 +59,15 @@ public:
    float speed = 1.0f;
    bool audioEnabled = true;
    float volume = 1.0f;
+   float trimStart = 0.0f;
+   float trimEnd = 0.0f;   // <= 0.0 means "unset - use full duration", same sentinel convention as mDuration
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Text("path", mLoadedPath);
       v.Bool("loop", loop); v.Float("speed", speed);
       v.Bool("audioEnabled", audioEnabled); v.Float("volume", volume);
+      v.Float("trimStart", trimStart); v.Float("trimEnd", trimEnd);
    }
 
    // Reloads from whatever path a patch restored. Called after loading.

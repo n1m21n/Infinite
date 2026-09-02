@@ -17,6 +17,8 @@ namespace
    constexpr int kAudioEnabledParam = 0;
    constexpr int kVolumeParam = 1;
    constexpr int kSpeedParam = 2;
+   constexpr int kTrimStartParam = 3;
+   constexpr int kTrimEndParam = 4;
 
    // Frames of drift between the free-running read position and a freshly
    // published one beyond which this is treated as a seek/loop-wrap rather
@@ -38,21 +40,27 @@ public:
       mMailbox.SetImmediate(kAudioEnabledParam, mAudioEnabled ? 1.0f : 0.0f);
       mMailbox.SetImmediate(kVolumeParam, mVolume);
       mMailbox.SetImmediate(kSpeedParam, mSpeed);
+      mMailbox.SetImmediate(kTrimStartParam, mTrimStart);
+      mMailbox.SetImmediate(kTrimEndParam, mTrimEnd);
    }
 
    // Main thread only.
    void PushBuffer(Platform::SampleBuffer* buf) { mSampleSlot.Push(buf); }
    void DrainRetired() { mSampleSlot.DrainRetired(); }
    void PublishPosition(double seconds) { mPublishedPositionSeconds.store(seconds, std::memory_order_relaxed); }
-   void PushParams(bool audioEnabled, float volume, float speed, bool loop)
+   void PushParams(bool audioEnabled, float volume, float speed, bool loop, float trimStart, float trimEnd)
    {
       mAudioEnabled = audioEnabled;
       mVolume = volume;
       mSpeed = speed;
       mLoop = loop;
+      mTrimStart = trimStart;
+      mTrimEnd = trimEnd;
       mMailbox.Push(kAudioEnabledParam, audioEnabled ? 1.0f : 0.0f);
       mMailbox.Push(kVolumeParam, volume);
       mMailbox.Push(kSpeedParam, speed);
+      mMailbox.Push(kTrimStartParam, trimStart);
+      mMailbox.Push(kTrimEndParam, trimEnd);
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
@@ -90,6 +98,24 @@ public:
       }
 
       const double mailboxSr = mMailbox.SampleRate() > 0.0 ? mMailbox.SampleRate() : sr;
+
+      // Mirror VideoSourceNode::CookIfNeeded's effective-trim-window
+      // computation (in frames rather than seconds) so the free-running
+      // cursor wraps at the same in/out points as the video's own position,
+      // rather than relying solely on the discontinuity snap above - which
+      // is too coarse (250ms) to keep short trim windows in sync.
+      const double totalFrames = (double)mActiveBuffer->numFrames;
+      const float trimStart = mMailbox.SmoothedValue(kTrimStartParam);
+      const float trimEnd = mMailbox.SmoothedValue(kTrimEndParam);
+      double effStartFrame = std::clamp((double)trimStart * sr, 0.0, totalFrames > 0.0 ? totalFrames : (double)trimStart * sr);
+      double effEndFrame = (trimEnd <= 0.0f || (double)trimEnd * sr > totalFrames) ? totalFrames : (double)trimEnd * sr;
+      if (totalFrames > 0.0 && effEndFrame - effStartFrame < 0.001 * sr)
+      {
+         effStartFrame = 0.0;
+         effEndFrame = totalFrames;
+      }
+      const double trimRangeFrames = effEndFrame - effStartFrame;
+
       double cursor = mFreeRunFrame;
       const bool isLooping = mLoop;
       for (int i = 0; i < buffer.numFrames; i++)
@@ -102,11 +128,11 @@ public:
          cursor += stepPerSample;
       }
 
-      if (isLooping && mActiveBuffer->numFrames > 0)
+      if (isLooping && trimRangeFrames > 0.0)
       {
-         cursor = std::fmod(cursor, (double)mActiveBuffer->numFrames);
-         if (cursor < 0.0)
-            cursor += (double)mActiveBuffer->numFrames;
+         cursor = effStartFrame + std::fmod(cursor - effStartFrame, trimRangeFrames);
+         if (cursor < effStartFrame)
+            cursor += trimRangeFrames;
       }
       mFreeRunFrame = cursor;
    }
@@ -142,6 +168,8 @@ private:
    float mVolume = 1.0f;
    float mSpeed = 1.0f;
    bool mLoop = true;
+   float mTrimStart = 0.0f;
+   float mTrimEnd = 0.0f;
    std::atomic<double> mPublishedPositionSeconds { 0.0 };
    double mFreeRunFrame = 0.0;
    bool mHavePosition = false;
@@ -239,7 +267,7 @@ bool VideoSourceNode::Open(const std::string& path)
    mLoadedPath = path;
    mLastError.clear();
    mHasPlaceholder = false;
-   mPosition = 0.0;
+   mPosition = trimStart;
    mLastTransportSeconds = Transport::Instance().Seconds();
 
    LoadAudioTrack(path);
@@ -277,7 +305,7 @@ void VideoSourceNode::CookIfNeeded(int frameId)
 
    if (mAudioNode)
    {
-      mAudioNode->PushParams(audioEnabled, volume, speed, loop);
+      mAudioNode->PushParams(audioEnabled, volume, speed, loop, trimStart, trimEnd);
       mAudioNode->DrainRetired();
    }
 
@@ -293,22 +321,36 @@ void VideoSourceNode::CookIfNeeded(int frameId)
    mLastTransportSeconds = now;
    mPosition += delta * (double)speed;
 
+   // Effective trim window for this cook. Guarded against degenerate/inverted
+   // ranges since trimStart/trimEnd are modulatable and can be driven to any
+   // value at runtime.
+   double effStart = std::clamp((double)trimStart, 0.0, mDuration > 0.0 ? mDuration : (double)trimStart);
+   double effEnd = (trimEnd <= 0.0f || (double)trimEnd > mDuration) ? mDuration : (double)trimEnd;
+   if (mDuration > 0.0 && effEnd - effStart < 0.001)
+   {
+      // Degenerate/inverted trim window - fall back to full clip rather than
+      // divide-by-near-zero in fmod below.
+      effStart = 0.0;
+      effEnd = mDuration;
+   }
+
    if (mDuration > 0.0)
    {
+      double range = effEnd - effStart;
       if (loop)
       {
-         mPosition = std::fmod(mPosition, mDuration);
-         if (mPosition < 0.0)
-            mPosition += mDuration; // fmod keeps the sign of the dividend
+         mPosition = effStart + std::fmod(mPosition - effStart, range);
+         if (mPosition < effStart)
+            mPosition += range; // fmod keeps the sign of the dividend
       }
       else
       {
-         mPosition = std::clamp(mPosition, 0.0, mDuration);
+         mPosition = std::clamp(mPosition, effStart, effEnd);
       }
    }
    else
    {
-      mPosition = std::max(mPosition, 0.0);
+      mPosition = std::max(mPosition, (double)trimStart);
    }
 
    // Published for the audio half to read - see VideoAudioNode's class

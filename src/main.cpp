@@ -5343,6 +5343,12 @@ namespace
       }
       ModCheckbox("loop", &n->loop);
       ModSlider("speed", &n->speed, -2.0f, 4.0f);
+      {
+         double dur = n->Duration();
+         float sliderMax = (dur > 0.0) ? (float)dur : 1.0f;
+         ModSlider("start", &n->trimStart, 0.0f, sliderMax);
+         ModSlider("end", &n->trimEnd, 0.0f, sliderMax);
+      }
 
       NodeSeparator();
       if (n->HasAudio())
