@@ -45338,6 +45338,26 @@ int main(int argc, char** argv)
             const bool forwardOk = forwardUpdates > 30;
             (void)reverseUpdates;
             printf("%s\n", (reverseOk && forwardOk) ? "VIDEOSPEEDTEST OK" : "VIDEOSPEEDTEST FAIL - BUG");
+
+            // Separate, additive check for the "loops once then freezes on
+            // the last frame" bug: at speed +4 over 60 real frames the
+            // unwrapped position (sForwardStartPos + elapsed*4) blows well
+            // past this clip's ~1.5s duration, so a healthy loop must have
+            // wrapped Position() back into [0, Duration()) at least once.
+            // If CookIfNeeded's fmod/clamp branch is ever skipped (the
+            // Windows bug this guards: mDuration <= 0 falls through to an
+            // unbounded max(mPosition, 0.0)), Position() keeps growing past
+            // Duration() instead of wrapping, and this fails even though
+            // reverseOk/forwardOk above still pass (they only check that
+            // frames keep decoding, not that the position is sane).
+            const double duration = sVideo->Duration();
+            const double position = sVideo->Position();
+            const bool loopWrapOk =
+               duration > 0.0 && position >= 0.0 && position < duration + 0.05;
+            printf("loop wrap check: position=%.3f duration=%.3f (forward start was %.3f) %s\n",
+                   position, duration, sForwardStartPos,
+                   loopWrapOk ? "WRAPPED" : "NOT WRAPPED");
+            printf("%s\n", loopWrapOk ? "VIDEOLOOPWRAPTEST OK" : "VIDEOLOOPWRAPTEST FAIL - BUG");
          }
       }
 
