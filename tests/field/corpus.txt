@@ -1,0 +1,175 @@
+# Field Step 1 Regression Corpus
+# Format: expr | t | siblings | globals | expect | expectOk | expectErrSubstr
+# Tag: deterministic or random (for step 2 re-baselining)
+
+# -------------------------------------------------------------
+# Section 1: Basic Arithmetic & Precedence
+# -------------------------------------------------------------
+0 | 0.0 | none | none | 0 | 1 | none
+42 | 0.0 | none | none | 42 | 1 | none
+3.14159 | 0.0 | none | none | 3.14159 | 1 | none
+1 + 2 | 0.0 | none | none | 3 | 1 | none
+10 - 4 | 0.0 | none | none | 6 | 1 | none
+3 * 4 | 0.0 | none | none | 12 | 1 | none
+20 / 4 | 0.0 | none | none | 5 | 1 | none
+7 % 4 | 0.0 | none | none | 3 | 1 | none
+2 + 3 * 4 | 0.0 | none | none | 14 | 1 | none
+(2 + 3) * 4 | 0.0 | none | none | 20 | 1 | none
+10 - 2 - 3 | 0.0 | none | none | 5 | 1 | none
+100 / 10 / 2 | 0.0 | none | none | 5 | 1 | none
+  1   +   2   | 0.0 | none | none | 3 | 1 | none
+
+# -------------------------------------------------------------
+# Section 2: Unary Operators & Power
+# -------------------------------------------------------------
++5 | 0.0 | none | none | 5 | 1 | none
+-5 | 0.0 | none | none | -5 | 1 | none
+--5 | 0.0 | none | none | 5 | 1 | none
++-5 | 0.0 | none | none | -5 | 1 | none
+2 ^ 3 | 0.0 | none | none | 8 | 1 | none
+2 ^ 3 ^ 2 | 0.0 | none | none | 512 | 1 | none
+(2 ^ 3) ^ 2 | 0.0 | none | none | 64 | 1 | none
+-2 ^ 2 | 0.0 | none | none | 4 | 1 | none
+-(2 ^ 2) | 0.0 | none | none | -4 | 1 | none
+!0 | 0.0 | none | none | 1 | 1 | none
+!1 | 0.0 | none | none | 0 | 1 | none
+!42 | 0.0 | none | none | 0 | 1 | none
+!-5 | 0.0 | none | none | 0 | 1 | none
+!!1 | 0.0 | none | none | 1 | 1 | none
+
+# -------------------------------------------------------------
+# Section 3: Relational & Logical Operators
+# -------------------------------------------------------------
+1 < 2 | 0.0 | none | none | 1 | 1 | none
+2 < 1 | 0.0 | none | none | 0 | 1 | none
+2 <= 2 | 0.0 | none | none | 1 | 1 | none
+3 <= 2 | 0.0 | none | none | 0 | 1 | none
+5 > 3 | 0.0 | none | none | 1 | 1 | none
+3 > 5 | 0.0 | none | none | 0 | 1 | none
+4 >= 4 | 0.0 | none | none | 1 | 1 | none
+3 >= 4 | 0.0 | none | none | 0 | 1 | none
+5 == 5 | 0.0 | none | none | 1 | 1 | none
+5 == 6 | 0.0 | none | none | 0 | 1 | none
+5 != 6 | 0.0 | none | none | 1 | 1 | none
+5 != 5 | 0.0 | none | none | 0 | 1 | none
+2 < 3 < 1 | 0.0 | none | none | 0 | 1 | none
+1 < 2 < 2 | 0.0 | none | none | 1 | 1 | none
+1 + 2 > 2 | 0.0 | none | none | 1 | 1 | none
+1 + 2 == 3 | 0.0 | none | none | 1 | 1 | none
+1 && 1 | 0.0 | none | none | 1 | 1 | none
+1 && 0 | 0.0 | none | none | 0 | 1 | none
+0 && 1 | 0.0 | none | none | 0 | 1 | none
+0 && 0 | 0.0 | none | none | 0 | 1 | none
+2 && 3 | 0.0 | none | none | 1 | 1 | none
+1 || 0 | 0.0 | none | none | 1 | 1 | none
+0 || 1 | 0.0 | none | none | 1 | 1 | none
+0 || 0 | 0.0 | none | none | 0 | 1 | none
+1 || 2 | 0.0 | none | none | 1 | 1 | none
+1 + 1 == 2 && 3 * 2 == 6 | 0.0 | none | none | 1 | 1 | none
+
+# -------------------------------------------------------------
+# Section 4: Built-in Math Functions
+# -------------------------------------------------------------
+sin(0) | 0.0 | none | none | 0 | 1 | none
+cos(0) | 0.0 | none | none | 1 | 1 | none
+tan(0) | 0.0 | none | none | 0 | 1 | none
+abs(-5.5) | 0.0 | none | none | 5.5 | 1 | none
+abs(5.5) | 0.0 | none | none | 5.5 | 1 | none
+floor(2.9) | 0.0 | none | none | 2 | 1 | none
+floor(-2.1) | 0.0 | none | none | -3 | 1 | none
+ceil(2.1) | 0.0 | none | none | 3 | 1 | none
+ceil(-2.9) | 0.0 | none | none | -2 | 1 | none
+round(2.4) | 0.0 | none | none | 2 | 1 | none
+round(2.5) | 0.0 | none | none | 3 | 1 | none
+round(-0.5) | 0.0 | none | none | 0 | 1 | none
+round(-1.5) | 0.0 | none | none | -1 | 1 | none
+min(3, 7) | 0.0 | none | none | 3 | 1 | none
+max(3, 7) | 0.0 | none | none | 7 | 1 | none
+clamp(5, 0, 1) | 0.0 | none | none | 1 | 1 | none
+clamp(-5, 0, 1) | 0.0 | none | none | 0 | 1 | none
+clamp(0.5, 0, 1) | 0.0 | none | none | 0.5 | 1 | none
+lerp(10, 20, 0.5) | 0.0 | none | none | 15 | 1 | none
+lerp(10, 20, 0.0) | 0.0 | none | none | 10 | 1 | none
+lerp(10, 20, 1.0) | 0.0 | none | none | 20 | 1 | none
+mod(7, 4) | 0.0 | none | none | 3 | 1 | none
+mod(-3, 2) | 0.0 | none | none | -1 | 1 | none
+-3 % 2 | 0.0 | none | none | -1 | 1 | none
+sign(5) | 0.0 | none | none | 1 | 1 | none
+sign(-5) | 0.0 | none | none | -1 | 1 | none
+sign(0) | 0.0 | none | none | 0 | 1 | none
+exp(0) | 0.0 | none | none | 1 | 1 | none
+pow(2, 4) | 0.0 | none | none | 16 | 1 | none
+sqrt(16) | 0.0 | none | none | 4 | 1 | none
+sqrt(0) | 0.0 | none | none | 0 | 1 | none
+log(1) | 0.0 | none | none | 0 | 1 | none
+step(0.5, 0.7) | 0.0 | none | none | 1 | 1 | none
+step(0.5, 0.3) | 0.0 | none | none | 0 | 1 | none
+smoothstep(0, 1, 0.5) | 0.0 | none | none | 0.5 | 1 | none
+smoothstep(0, 1, 0.0) | 0.0 | none | none | 0 | 1 | none
+smoothstep(0, 1, 1.0) | 0.0 | none | none | 1 | 1 | none
+if(1, 10, 20) | 0.0 | none | none | 10 | 1 | none
+if(0, 10, 20) | 0.0 | none | none | 20 | 1 | none
+if(2 > 1, 100, 200) | 0.0 | none | none | 100 | 1 | none
+
+# -------------------------------------------------------------
+# Section 5: Precision, Constants & Variables
+# -------------------------------------------------------------
+pi | 0.0 | none | none | 3.141592653589793 | 1 | none
+2 * pi | 0.0 | none | none | 6.283185307179586 | 1 | none
+t | 1.25 | none | none | 1.25 | 1 | none
+t * 2 | 2.5 | none | none | 5 | 1 | none
+0.1 + 0.2 | 0.0 | none | none | 0.30000001192092896 | 1 | none
+
+# Siblings and Globals
+width * 2 | 0.0 | width=100,height=50 | none | 200 | 1 | none
+width + height | 0.0 | width=100,height=50 | none | 150 | 1 | none
+gFactor * 4 | 0.0 | none | gFactor=2.5 | 10 | 1 | none
+lo + (hi - lo) * 0.5 | 0.0 | lo=10,hi=30 | none | 20 | 1 | none
+
+# Shadowing: Sibling wins over global
+val | 0.0 | val=10 | val=99 | 10 | 1 | none
+
+# Function vs Variable Lookahead (min/max)
+max | 1.25 | max=7,min=3,lo=0,hi=1 | none | 7 | 1 | none
+min | 1.25 | max=7,min=3,lo=0,hi=1 | none | 3 | 1 | none
+max(1, 2) | 1.25 | max=7,min=3,lo=0,hi=1 | none | 2 | 1 | none
+min(1, 2) | 1.25 | max=7,min=3,lo=0,hi=1 | none | 1 | 1 | none
+max * max(1, 2) | 1.25 | max=7,min=3,lo=0,hi=1 | none | 14 | 1 | none
+
+# -------------------------------------------------------------
+# Section 6: Non-Short-Circuit & Runtime Errors
+# -------------------------------------------------------------
+0 && 1/0 | 0.0 | none | none | 0 | 0 | division by zero
+1 || 1/0 | 0.0 | none | none | 0 | 0 | division by zero
+if(0, 1/0, 5) | 0.0 | none | none | 0 | 0 | division by zero
+if(1, 5, 1/0) | 0.0 | none | none | 0 | 0 | division by zero
+1 / 0 | 0.0 | none | none | 0 | 0 | division by zero
+5 % 0 | 0.0 | none | none | 0 | 0 | division by zero
+sqrt(-1) | 0.0 | none | none | 0 | 0 | sqrt() of a negative number
+sqrt(0 - 1) | 0.0 | none | none | 0 | 0 | sqrt() of a negative number
+log(0) | 0.0 | none | none | 0 | 0 | log() needs a positive argument
+log(-5) | 0.0 | none | none | 0 | 0 | log() needs a positive argument
+
+# -------------------------------------------------------------
+# Section 7: Parse Errors & Grammar Traps
+# -------------------------------------------------------------
+   | 0.0 | none | none | 0 | 0 | empty expression
+(1 + 2 | 0.0 | none | none | 0 | 0 | expected ')'
+1, 2 | 0.0 | none | none | 0 | 0 | unexpected trailing text
+1 + 2 3 | 0.0 | none | none | 0 | 0 | unexpected trailing text
+@foo | 0.0 | none | none | 0 | 0 | unexpected character
+unknownVar | 0.0 | none | none | 0 | 0 | unknown identifier 'unknownVar'
+foo(1) | 0.0 | none | none | 0 | 0 | unknown function 'foo'
+sin() | 0.0 | none | none | 0 | 0 | sin() expects 1 argument(s)
+sin(1, 2) | 0.0 | none | none | 0 | 0 | sin() expects 1 argument(s)
+min(1) | 0.0 | none | none | 0 | 0 | min() expects 2 argument(s)
+clamp(1, 2) | 0.0 | none | none | 0 | 0 | clamp() expects 3 argument(s)
+
+# -------------------------------------------------------------
+# Section 8: Random Functions (Current Legacy Implementation)
+# Tag: random (To be re-baselined in Step 2)
+# -------------------------------------------------------------
+rand() | 1.25 | none | none | 0.76586776971817017 | 1 | none
+noise(2) | 1.25 | none | none | 0.55055892467498779 | 1 | none
+rand(0, 1, 2) | 1.25 | none | none | 0.55055892467498779 | 1 | none
+sh(0, 1, 4) | 1.25 | none | none | 0.17868475615978241 | 1 | none
