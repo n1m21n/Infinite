@@ -118,6 +118,7 @@ namespace
 #include "nodes/SceneNodes.h"
 #include "nodes/EnvironmentNode.h"
 #include "nodes/ModelSourceNode.h"
+#include "GltfImport.h"
 #include "nodes/Text3DNode.h"
 #include "nodes/UtilityNodes.h"
 #include "nodes/PointDistributionNodes.h"
@@ -41352,6 +41353,11 @@ int main(int argc, char** argv)
          static const std::vector<std::string> kModelExt = {
             "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc"
          };
+         // glTF/GLB are handled by their own branch (below, checked before
+         // kModelExt) rather than folded into it: on a fresh drop they
+         // auto-spawn a whole Material + Image Source rig, not just a bare
+         // Model 3D node - see GltfImport.h.
+         static const std::vector<std::string> kGltfExt = { "gltf", "glb" };
          // Plugin bundles, not files - see the branch that consumes this.
          static const std::vector<std::string> kPluginBundleExt = { "component", "vst3" };
          ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
@@ -41504,6 +41510,105 @@ int main(int argc, char** argv)
                spawned = SpawnNode("Plugin", "AudioEffects", canvasPos.x + offset, canvasPos.y);
                if (spawned != nullptr)
                   static_cast<AudioPluginNode*>(spawned->node.get())->LoadPlugin(desc);
+            }
+            else if (HasExtension(path, kGltfExt))
+            {
+               if (dropTargetModel != nullptr)
+               {
+                  // Reload in place - do NOT auto-spawn a duplicate
+                  // Material/texture rig on top of whatever is already wired.
+                  ensureDroppedCheckpoint();
+                  dropTargetModel->Load(path);
+                  dropTargetModel = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
+
+               // Fresh drop: Model 3D + Material + one Image Source per
+               // present texture map, already wired - the whole point of
+               // this feature is zero manual cabling. Everything from here
+               // to gSuppressUndoCheckpoints=false is one undo step.
+               ensureDroppedCheckpoint();
+               gSuppressUndoCheckpoints = true;
+
+               // GraphNode* from SpawnNode points into gNodes' own storage,
+               // which a LATER SpawnNode call can reallocate (std::vector
+               // growth) - holding modelNode/materialNode across the several
+               // more SpawnNode calls below would dangle. Capture the
+               // stable `index` field immediately instead and re-resolve
+               // via FindNodeByIndex() each time a node is actually needed.
+               int modelIndex = -1;
+               {
+                  GraphNode* modelNode = SpawnNode("Model 3D", "3D", canvasPos.x + offset, canvasPos.y);
+                  if (modelNode != nullptr)
+                  {
+                     modelIndex = modelNode->index;
+                     static_cast<ModelSourceNode*>(modelNode->node.get())->Load(path);
+                  }
+               }
+
+               int materialIndex = -1;
+               {
+                  GraphNode* materialNode =
+                     SpawnNode("Material", "3D", canvasPos.x + offset + 260.0f, canvasPos.y);
+                  if (materialNode != nullptr)
+                     materialIndex = materialNode->index;
+               }
+
+               if (modelIndex != -1 && materialIndex != -1)
+               {
+                  std::string wireErr;
+                  ConnectNodes(modelIndex, 0, materialIndex, 0, wireErr);
+               }
+
+               std::string gltfErr;
+               const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(path, gltfErr);
+               if (pkg != nullptr && materialIndex != -1)
+               {
+                  struct MapSlot
+                  {
+                     const GltfImport::GltfDecodedImage* img;
+                     int mapIndex;
+                     const char* slot;
+                  };
+                  const MapSlot maps[] = {
+                     { &pkg->albedo, kMapAlbedo, "albedo" },
+                     { &pkg->roughness, kMapRoughness, "roughness" },
+                     { &pkg->metallic, kMapMetallic, "metallic" },
+                     { &pkg->normalMap, kMapNormal, "normal" },
+                     { &pkg->occlusion, kMapAmbientOcclusion, "ao" },
+                     { &pkg->emissive, kMapEmission, "emission" },
+                  };
+
+                  const float texX = canvasPos.x + offset + 560.0f;
+                  float texY = canvasPos.y;
+                  for (const MapSlot& m : maps)
+                  {
+                     if (m.img->pixels.empty())
+                        continue;
+
+                     GraphNode* texNode = SpawnNode("Image Source", "Source", texX, texY);
+                     if (texNode != nullptr)
+                     {
+                        auto* imgNode = static_cast<ImageSourceNode*>(texNode->node.get());
+                        imgNode->LoadFromDecoded(m.img->pixels, m.img->width, m.img->height,
+                                                 std::string("gltf://") + path + "#" + m.slot);
+                        std::string wireErr;
+                        ConnectNodes(texNode->index, 0, materialIndex, 1 + m.mapIndex, wireErr);
+                     }
+                     texY += 160.0f;
+                  }
+               }
+
+               if (GraphNode* modelNode = (modelIndex != -1) ? FindNodeByIndex(modelIndex) : nullptr)
+                  modelNode->showParams = true;
+               if (GraphNode* materialNode = (materialIndex != -1) ? FindNodeByIndex(materialIndex) : nullptr)
+                  materialNode->showParams = true;
+
+               gSuppressUndoCheckpoints = false;
+               gPatchDirty = true;
+               offset += 240.0f;
+               continue;
             }
             else if (HasExtension(path, kModelExt))
             {
@@ -42951,6 +43056,223 @@ int main(int argc, char** argv)
 
          const bool ok = changed && changed2 && instCount1 != instCount2;
          printf("%s\n", ok ? "LIVE UPDATE OK" : "SUSPECT");
+      }
+
+      // Drives the real glTF/GLB drop handler (main.cpp's kGltfExt branch)
+      // end to end by pushing real paths into gDroppedFiles/gDropPos - the
+      // same internal queue a real OS file-drop populates - rather than any
+      // OS-level UI automation of the ImGui canvas. A push at frame N is
+      // consumed by the drop-handling code (above, unconditional every
+      // frame) during frame N+1, before this block runs again that same
+      // frame, so two-frame spacing between "push" and "verify" stages
+      // gives a safety margin. Paths come from env vars so the fixture
+      // doesn't depend on committing binary glTF assets into the repo.
+      if (getenv("INFINITE_GLTFDROPTEST") != nullptr)
+      {
+         auto countType = [](const char* typeName) -> int
+         {
+            int c = 0;
+            for (GraphNode& gn : gNodes)
+               if (gn.typeName == typeName)
+                  c++;
+            return c;
+         };
+         auto findFirst = [](const char* typeName) -> GraphNode*
+         {
+            for (GraphNode& gn : gNodes)
+               if (gn.typeName == typeName)
+                  return &gn;
+            return nullptr;
+         };
+         auto check = [](bool cond, const char* what) -> bool
+         {
+            printf("GLTFDROPTEST %s: %s\n", cond ? "PASS" : "FAIL", what);
+            return cond;
+         };
+         // Verifies the wiring a fresh drop should have produced: exactly
+         // one Model 3D + one Material, geometry-connected, plus one Image
+         // Source per non-empty map in `pkg`, each connected into the
+         // matching MaterialMap slot and each carrying the right
+         // "gltf://<path>#<slot>" pseudo-path.
+         auto verifyRig = [&](const GltfImport::GltfDecodePackage* pkg, const char* label) -> bool
+         {
+            bool ok = true;
+            ok = check(countType("Model 3D") == 1, (std::string(label) + ": exactly one Model 3D").c_str()) && ok;
+            GraphNode* materialGn = findFirst("Material");
+            ok = check(materialGn != nullptr, (std::string(label) + ": Material spawned").c_str()) && ok;
+            if (materialGn == nullptr || pkg == nullptr)
+               return false;
+            auto* material = static_cast<MaterialNode*>(materialGn->node.get());
+            GraphNode* modelGn = findFirst("Model 3D");
+            ok = check(modelGn != nullptr &&
+                          material->input == dynamic_cast<IGeometrySource*>(modelGn->node.get()),
+                       (std::string(label) + ": Material's geo input is the Model 3D").c_str()) &&
+                 ok;
+
+            struct MapSlot
+            {
+               const GltfImport::GltfDecodedImage* img;
+               int mapIndex;
+               const char* slot;
+            };
+            const MapSlot maps[] = {
+               { &pkg->albedo, kMapAlbedo, "albedo" },       { &pkg->roughness, kMapRoughness, "roughness" },
+               { &pkg->metallic, kMapMetallic, "metallic" }, { &pkg->normalMap, kMapNormal, "normal" },
+               { &pkg->occlusion, kMapAmbientOcclusion, "ao" }, { &pkg->emissive, kMapEmission, "emission" },
+            };
+            int expectedImageSources = 0;
+            for (const MapSlot& m : maps)
+            {
+               if (m.img->pixels.empty())
+               {
+                  ok = check(!material->MapInput(m.mapIndex).IsConnected(),
+                             (std::string(label) + ": no " + m.slot + " map -> slot left unconnected").c_str()) &&
+                       ok;
+                  continue;
+               }
+               expectedImageSources++;
+               INode* src = material->MapInput(m.mapIndex).GetSource();
+               auto* imgSrc = src ? dynamic_cast<ImageSourceNode*>(src) : nullptr;
+               const bool wiredRight = imgSrc != nullptr && imgSrc->LoadedPath().size() > 5 &&
+                  imgSrc->LoadedPath().compare(imgSrc->LoadedPath().size() - std::strlen(m.slot) - 1, std::string::npos,
+                                               std::string("#") + m.slot) == 0;
+               ok = check(wiredRight, (std::string(label) + ": " + m.slot + " map wired to a gltf:// Image Source").c_str()) && ok;
+            }
+            ok = check(countType("Image Source") == expectedImageSources,
+                       (std::string(label) + ": Image Source count matches present maps").c_str()) &&
+                 ok;
+            return ok;
+         };
+
+         static int sNodeCountAfterFreshDrop = -1;
+         static int sNodeCountBeforeSecondDrop = -1;
+         static bool sOverallOk = true;
+
+         const char* glbPath = getenv("INFINITE_GLTFDROPTEST_GLB");
+         const char* notexPath = getenv("INFINITE_GLTFDROPTEST_NOTEX");
+         const char* gltfPath = getenv("INFINITE_GLTFDROPTEST_GLTF");
+
+         if (frameId == 4 && glbPath != nullptr)
+         {
+            NewPatch();
+
+            // Criterion 7: a combined metallicRoughness texture must decode
+            // into two distinct maps (channel split), not the same buffer
+            // twice or swapped channels. Checked directly against the
+            // decoder - no drop/UI involved.
+            std::string err;
+            const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(glbPath, err);
+            const bool haveBoth = pkg != nullptr && !pkg->roughness.pixels.empty() && !pkg->metallic.pixels.empty();
+            sOverallOk = check(haveBoth, "metallicRoughness decoded into distinct roughness+metallic maps") && sOverallOk;
+            if (haveBoth)
+            {
+               bool differ = false;
+               for (size_t i = 0; i + 3 < pkg->roughness.pixels.size() && !differ; i += 4)
+                  if (pkg->roughness.pixels[i] != pkg->metallic.pixels[i])
+                     differ = true;
+               sOverallOk = check(differ, "roughness and metallic pixel data actually differ (not swapped/identical)") && sOverallOk;
+            }
+
+            // Criterion 1: fresh drop onto empty canvas.
+            gDropPos = ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f,
+                               gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
+            gDroppedFiles.push_back(glbPath);
+         }
+         else if (frameId == 6 && glbPath != nullptr)
+         {
+            std::string err;
+            const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(glbPath, err);
+            sOverallOk = verifyRig(pkg, "fresh .glb drop") && sOverallOk;
+            sNodeCountAfterFreshDrop = (int)gNodes.size();
+
+            // Criterion 4: one undo removes the entire spawned rig in a
+            // single step.
+            Undo();
+            sOverallOk = check(gNodes.empty(), "one undo removes the entire spawned rig") && sOverallOk;
+            Redo();
+            sOverallOk = check((int)gNodes.size() == sNodeCountAfterFreshDrop,
+                                "redo brings the entire rig back") && sOverallOk;
+
+            // Criterion 3: save, start a new patch, reload - model and
+            // every gltf-derived texture must come back via the gltf://
+            // pseudo-path with zero special-casing.
+            const std::string tmpPath = TmpPath("infinite_gltfdroptest.infinite");
+            SavePatchTo(tmpPath);
+            NewPatch();
+            LoadPatchFrom(tmpPath);
+            sOverallOk = verifyRig(pkg, "save/reload round-trip") && sOverallOk;
+            sNodeCountBeforeSecondDrop = (int)gNodes.size();
+         }
+         else if (frameId == 8 && glbPath != nullptr)
+         {
+            // Criterion 5 setup: drop the same file again, this time
+            // targeted at the reloaded Model 3D node, so the next stage can
+            // confirm it reloads in place rather than spawning a duplicate
+            // Material/texture rig. Deferred to its own frame (rather than
+            // done right after the frame-6 reload) so the node editor has
+            // had at least one frame to lay out the just-reloaded node -
+            // ed::GetNodePosition/SetNodePosition sync happens later in the
+            // same frame a node first appears (see FindFreeSpawnPosition's
+            // comment above), so querying it the instant a node is loaded
+            // reads a stale/zero position.
+            GraphNode* modelGn = findFirst("Model 3D");
+            if (modelGn != nullptr)
+            {
+               const ImVec2 canvasPt = ed::GetNodePosition(modelGn->NodeId());
+               gDropPos = ed::CanvasToScreen(ImVec2(canvasPt.x + 10.0f, canvasPt.y + 10.0f));
+               gDroppedFiles.push_back(glbPath);
+            }
+         }
+         else if (frameId == 10)
+         {
+            if (glbPath != nullptr)
+            {
+               sOverallOk = check((int)gNodes.size() == sNodeCountBeforeSecondDrop,
+                                   "dropping onto an existing Model 3D reloads in place, no duplicate rig") &&
+                            sOverallOk;
+            }
+
+            if (notexPath != nullptr)
+            {
+               NewPatch();
+               gDropPos = ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f,
+                                  gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
+               gDroppedFiles.push_back(notexPath);
+            }
+         }
+         else if (frameId == 12)
+         {
+            if (notexPath != nullptr)
+            {
+               // Criterion 6: a glTF with no textures at all spawns Model 3D
+               // + Material and zero Image Source nodes - and, implicitly,
+               // didn't crash getting here.
+               std::string err;
+               const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(notexPath, err);
+               sOverallOk = verifyRig(pkg, "textureless .glb drop") && sOverallOk;
+            }
+
+            if (gltfPath != nullptr)
+            {
+               NewPatch();
+               gDropPos = ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f,
+                                  gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
+               gDroppedFiles.push_back(gltfPath);
+            }
+         }
+         else if (frameId == 14)
+         {
+            if (gltfPath != nullptr)
+            {
+               // Criterion 2: loose .gltf + external .bin + external
+               // textures, same wiring expectations as a .glb.
+               std::string err;
+               const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(gltfPath, err);
+               sOverallOk = verifyRig(pkg, "loose .gltf drop") && sOverallOk;
+            }
+
+            printf("%s\n", sOverallOk ? "GLTFDROPTEST OK" : "GLTFDROPTEST SUSPECT");
+         }
       }
 
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)

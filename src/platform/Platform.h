@@ -29,6 +29,15 @@ namespace Platform
    bool LoadImageRGBA(const std::string& path, std::vector<unsigned char>& outPixels,
                       int& outWidth, int& outHeight, std::string& outError);
 
+   // Same decode/output contract as LoadImageRGBA (tightly packed RGBA8,
+   // row-flipped for OpenGL's bottom-up convention), but for image bytes
+   // already in memory rather than a file on disk - glTF/GLB textures are
+   // either base64 data-URIs or raw bytes inside the .glb binary chunk,
+   // neither of which is a path. Returns false and fills outError on failure.
+   bool LoadImageRGBAFromMemory(const std::vector<unsigned char>& bytes,
+                                std::vector<unsigned char>& outPixels,
+                                int& outWidth, int& outHeight, std::string& outError);
+
    // Native open panel filtered to HDR equirectangular formats. ImageIO/NSImage
    // do not recognise .hdr, so this needs its own panel rather than reusing
    // OpenImageDialog - the same reason OpenModelDialog is separate from it.

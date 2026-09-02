@@ -2,9 +2,11 @@
 
 #include "gl3.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 #include "AssetCache.h"
+#include "GltfImport.h"
 #include "Platform.h"
 #include "Transport.h"
 
@@ -32,39 +34,88 @@ ModelSourceNode::~ModelSourceNode()
    GLUtil::DestroyFbo(mPreview);
 }
 
+namespace
+{
+   // Case-insensitive, no bundled extension-utility shared with main.cpp's
+   // kModelExt/kGltfExt (that lives at the drop-handler layer, not the node
+   // layer), so this is its own tiny check.
+   bool HasLowerExtension(const std::string& path, const char* ext)
+   {
+      const size_t dot = path.find_last_of('.');
+      if (dot == std::string::npos)
+         return false;
+      std::string got = path.substr(dot + 1);
+      for (char& c : got) c = (char)std::tolower((unsigned char)c);
+      return got == ext;
+   }
+}
+
 bool ModelSourceNode::Load(const std::string& path)
 {
-   auto& cache = GetModelDecodeCache();
-   const RawModelData* cached = nullptr;
-   RawModelData decoded;
-   if (const RawModelData* hit = cache.Get(path))
+   const bool isGltf = HasLowerExtension(path, "gltf") || HasLowerExtension(path, "glb");
+
+   std::string note;
+   if (isGltf)
    {
-      cached = hit;
+      std::string error;
+      const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(path, error);
+      if (pkg == nullptr)
+      {
+         mStatus = error.empty() ? "could not load glTF model" : error;
+         return false;
+      }
+
+      mMesh.vertices.clear();
+      mMesh.indices = pkg->indices;
+      mMesh.vertices.reserve(pkg->vertices.size());
+      for (const Platform::ModelVertex& src : pkg->vertices)
+      {
+         Vertex v;
+         v.px = src.px; v.py = src.py; v.pz = src.pz;
+         v.nx = src.nx; v.ny = src.ny; v.nz = src.nz;
+         v.u = src.u; v.v = src.v;
+         mMesh.vertices.push_back(v);
+      }
+
+      if (pkg->hadMultipleMaterials)
+         note += " (first of multiple materials)";
+      if (pkg->hadMultipleUVSets)
+         note += " (TEXCOORD_0 only)";
    }
    else
    {
-      std::string error;
-      if (!Platform::LoadModel(path, decoded.vertices, decoded.indices, error))
+      auto& cache = GetModelDecodeCache();
+      const RawModelData* cached = nullptr;
+      RawModelData decoded;
+      if (const RawModelData* hit = cache.Get(path))
       {
-         mStatus = error.empty() ? "could not load model" : error;
-         return false;
+         cached = hit;
       }
-      const size_t bytes = decoded.vertices.size() * sizeof(Platform::ModelVertex) +
-                            decoded.indices.size() * sizeof(unsigned int);
-      cache.Put(path, decoded, bytes);
-      cached = &decoded;
-   }
+      else
+      {
+         std::string error;
+         if (!Platform::LoadModel(path, decoded.vertices, decoded.indices, error))
+         {
+            mStatus = error.empty() ? "could not load model" : error;
+            return false;
+         }
+         const size_t bytes = decoded.vertices.size() * sizeof(Platform::ModelVertex) +
+                               decoded.indices.size() * sizeof(unsigned int);
+         cache.Put(path, decoded, bytes);
+         cached = &decoded;
+      }
 
-   mMesh.vertices.clear();
-   mMesh.indices = cached->indices;
-   mMesh.vertices.reserve(cached->vertices.size());
-   for (const Platform::ModelVertex& src : cached->vertices)
-   {
-      Vertex v;
-      v.px = src.px; v.py = src.py; v.pz = src.pz;
-      v.nx = src.nx; v.ny = src.ny; v.nz = src.nz;
-      v.u = src.u; v.v = src.v;
-      mMesh.vertices.push_back(v);
+      mMesh.vertices.clear();
+      mMesh.indices = cached->indices;
+      mMesh.vertices.reserve(cached->vertices.size());
+      for (const Platform::ModelVertex& src : cached->vertices)
+      {
+         Vertex v;
+         v.px = src.px; v.py = src.py; v.pz = src.pz;
+         v.nx = src.nx; v.ny = src.ny; v.nz = src.nz;
+         v.u = src.u; v.v = src.v;
+         mMesh.vertices.push_back(v);
+      }
    }
 
    Normalize();
@@ -73,7 +124,7 @@ bool ModelSourceNode::Load(const std::string& path)
 
    const size_t slash = path.find_last_of('/');
    const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
-   mStatus = name + " - " + std::to_string(mMesh.indices.size() / 3) + " triangles";
+   mStatus = name + " - " + std::to_string(mMesh.indices.size() / 3) + " triangles" + note;
    return true;
 }
 

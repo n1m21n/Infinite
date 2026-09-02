@@ -167,6 +167,7 @@ option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" ON)
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)
 set(STB_DIR external/stb)
+set(CGLTF_DIR external/cgltf)
 set(SYPHON_DIR external/syphon)
 # Windows counterpart to SYPHON_DIR: Spout2's "SpoutGL" library, vendored as
 # plain source (not FetchContent/vcpkg) the same way SYPHON_DIR is - see
@@ -223,6 +224,7 @@ set(COMMON_SOURCES
     src/core/OscMessage.cpp
     src/core/UpdateCheck.cpp
     src/core/AudioDecodeCache.cpp
+    src/core/GltfImport.cpp
     src/audio/AudioEngine.cpp
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp
@@ -485,6 +487,7 @@ target_include_directories(Infinite PRIVATE
     ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
     ${STB_DIR}
+    ${CGLTF_DIR}
     external
     external/json
     external/shine
