@@ -11696,14 +11696,14 @@ namespace
       AudioSlider("volume", &n->volume, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
 
       // Row 9: Trim Start & End
-      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
       {
          n->start = std::min(n->start, n->end - 0.01f);
          if (n->position < n->start)
             n->Seek(n->start);
       }
       ImGui::SameLine();
-      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
       {
          n->end = std::max(n->end, n->start + 0.01f);
          if (n->position > n->end)
