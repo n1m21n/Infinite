@@ -11083,13 +11083,33 @@ namespace
    // params are appended at the end forever - reordering silently rewires
    // every saved patch's modulation cables.
    //
+   // Row order (all two-column, each cell exactly AudioHalfWidth()):
+   //    1: slice by (dropdown) | onsets
+   //    2: division (dropdown) | sensitivity
+   //    3: pitch               | finetune
+   //    4: attack              | decay        <- the envelope pair, adjacent
+   //    5: speed               | volume
+   //    6: crossthrough (cbox) | (deliberately empty)
+   //
    // Pillars: P1 every control sits on the two-column grid (the button strip
-   // is the one deliberate full-width row); P3 both selectors occupy the left
-   // column of two consecutive rows; P5 the mode swap greys the inactive
-   // control instead of removing its cell, so no cell ever moves; P6 the grid
-   // is filled - `volume` takes a full-width row rather than leaving a hole;
-   // P10 the dropdowns go through AudioBareDropdown's shared styling, never a
-   // hand-rolled colour; P11 everything numeric goes to the readout strip.
+   // is the one deliberate full-width row); P2 the crossthrough checkbox uses
+   // ModCheckbox, which passes ImGui::GetFrameHeight() to
+   // DrawDiscreteParamPin and so centres its modulation dot with no per-node
+   // offset code (same idiom as DrawWavetableBody's engine on/off); P3 both
+   // selectors and the checkbox occupy the left column of their rows, so the
+   // left edge reads as one non-slider column; P5 the mode swap greys the
+   // inactive control instead of removing its cell, so no cell ever moves;
+   // P6 eleven controls is odd, so exactly one cell must be spare - it is the
+   // far-right of the last row, P6's sanctioned position, rather than the
+   // ragged full-width `volume` row this used to end on; P10 the dropdowns
+   // and the checkbox go through the shared AudioBareDropdown /
+   // PushCheckboxStyle theming, never a hand-rolled colour; P11 everything
+   // numeric goes to the readout strip. P4 does not apply - a Synths node
+   // has no `mix`.
+   //
+   // Discrete params (the two dropdowns and the checkbox) are allocated from
+   // kDiscreteParamBase and keyed by label hash, NOT from gParamCounter, so
+   // adding the checkbox shifts no float pin ordinal.
    void DrawSlicerBody(GraphNode& gn, SlicerNode* n)
    {
       static const std::vector<std::string> kSliceByNames = { "onsets", "grid" };
@@ -11209,18 +11229,43 @@ namespace
       ImGui::SameLine();
       AudioSlider("finetune", &n->finetune, -100.0f, 100.0f, "%.0f c", halfW);
 
+      // attack extends the hidden 2 ms de-click ramp rather than adding a
+      // second envelope, so 0 is exactly the old (instant) behaviour. The
+      // skew puts 100 ms at 12 o'clock over the 0..500 throw.
+      AudioSlider("attack", &n->attack, 0.0f, 500.0f, "%.1f ms", halfW,
+                  SkewAttack100Taper::PosToValue, SkewAttack100Taper::ValueToPos);
+      ImGui::SameLine();
+      // decay owns the ENVELOPE only. The top of its throw is a no-decay
+      // detent - the slice holds at full level after its attack. Where it
+      // stops is `crossthrough`'s business, not decay's.
+      const char* decayFmt = (n->decay >= SlicerNode::kDecayInfinite) ? "hold" : "%.0f ms";
+      AudioSlider("decay", &n->decay, 5.0f, 5000.0f, decayFmt, halfW, LogTaper::PosToValue,
+                  LogTaper::ValueToPos);
+
       // speed is exponential (linear in log2) so 1.0x sits at the middle of
       // the 0.25..4 throw instead of a quarter of the way along it.
       AudioSlider("speed", &n->speed, 0.25f, 4.0f, "%.2fx", halfW, LogTaper::PosToValue,
                   LogTaper::ValueToPos);
       ImGui::SameLine();
-      // The top of decay's throw is an infinity detent: the slice plays
-      // through to its own next boundary instead of decaying.
-      const char* decayFmt = (n->decay >= SlicerNode::kDecayInfinite) ? "inf" : "%.0f ms";
-      AudioSlider("decay", &n->decay, 5.0f, 5000.0f, decayFmt, halfW, LogTaper::PosToValue,
-                  LogTaper::ValueToPos);
+      AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", halfW);
 
-      AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", AudioFullWidth());
+      // Row 6, left cell only: the right cell is the one deliberate spare
+      // (P6). The `bool tmp` dance is required - ModCheckbox reports a
+      // modulator-driven flip only through its return value.
+      {
+         const float y = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, y));
+         bool cross = n->crossthrough;
+         if (ModCheckbox("crossthrough##slicerCrossthrough", &cross))
+         {
+            PushUndoCheckpoint();
+            n->crossthrough = cross;
+         }
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("crossthrough",
+                            n->crossthrough ? "slices run past their own boundary"
+                                            : "each slice stops at the next onset");
+      }
       (void)gap;
 
       EndAudioBody();
@@ -24511,7 +24556,7 @@ namespace
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Equation Synth", "A synth defined by a live formula (y = f(x, a, b, c, d, t)) instead of a fixed waveform - knobs a-d feed the equation directly, so turning them reshapes the waveform itself rather than modulating a preset one." },
          { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
-         { "Slicer", "Chops a sample into slices and maps them chromatically to the keyboard from MIDI note 36 upward - note 36 plays slice 1, 37 plays slice 2, and so on. A note past the last slice is silent; it does not wrap round to slice 1. Load a file (or drag one in from the Samples panel), or record from the audio input pin. slice by picks where the boundaries come from: onsets runs transient detection over the sample on a background thread, grid divides it arithmetically at the *global transport tempo* (there is no per-node bpm - change the tempo and the grid follows). sensitivity is the detection threshold and is the only control that re-runs the analysis; onsets just caps the result to the strongest N, and division/slice by recompute boundaries instantly. Click a slice band in the waveform to audition it, and in onsets mode drag any marker to move a boundary by hand - hand-edited markers are saved with the patch. decay at the top of its throw reads inf: the slice plays through to its next boundary and stops there instead of decaying." },
+         { "Slicer", "Chops a sample into slices and maps them chromatically to the keyboard from MIDI note 36 upward - note 36 plays slice 1, 37 plays slice 2, and so on. A note past the last slice is silent; it does not wrap round to slice 1. Load a file (or drag one in from the Samples panel), or record from the audio input pin. slice by picks where the boundaries come from: onsets runs transient detection over the sample on a background thread, grid divides it arithmetically at the *global transport tempo* (there is no per-node bpm - change the tempo and the grid follows). sensitivity is the detection threshold and is the only control that re-runs the analysis; onsets just caps the result to the strongest N, and division/slice by recompute boundaries instantly. Click a slice band in the waveform to audition it, and in onsets mode drag any marker to move a boundary by hand - hand-edited markers are saved with the patch. Two separate controls decide how long a slice lasts: crossthrough sets whether playback may run PAST the slice's own next onset (off by default - each slice stops where the next begins), while decay shapes only the amplitude envelope, reading 'hold' at the top of its throw where the slice stays at full level. So: crossthrough off + hold is the classic tight chop; crossthrough off + a decay ends at whichever comes first; crossthrough on + hold plays through the rest of the sample; crossthrough on + a decay is a one-shot with a tail over the rest of the break. attack extends each slice's own fade-in from instant up to half a second." },
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
@@ -25119,7 +25164,7 @@ namespace
                { "Wavetable Synth", "Multi-voice polyphonic wavetable oscillator (up to 8 voices) with two independent A/B wavetable engines crossfaded against each other, wavetable position morphing, detuned unison, and integrated stereo spread." },
                { "Sampler", "High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback." },
                { "Drum Sequencer", "8-lane pattern drum sequencer with individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, and decay envelopes." },
-               { "Slicer", "Transient- or grid-sliced sample playback: chops a loaded sample into up to 64 slices and maps them chromatically from MIDI note 36, with draggable slice markers and a per-slice decay." },
+               { "Slicer", "Transient- or grid-sliced sample playback: chops a loaded sample into up to 64 slices and maps them chromatically from MIDI note 36, with draggable slice markers, a per-slice attack/decay pair, and a crossthrough toggle that lets a slice run past its own boundary." },
                { "Equation Synth", "Real-time bytebeat and mathematical expression synthesis evaluating user formulas with dynamic variables (t, x, y, inputs)." },
                { "Wave Terrain Synth", "2D terrain trajectory orbital synthesis - a moving point traces a path across a height-mapped surface to generate a waveform." },
                { "Spectral Synth", "Additive harmonic-bank synthesis with overtone-series sculpting." },
@@ -34697,8 +34742,11 @@ static bool RunAudioDisplacementFixture()
 
 // Slicer: synthesises a WAV with transients at known positions, asserts the
 // detector finds them, that each slice triggers from its own MIDI note (36 +
-// k), that a note past the last slice is silent, and that grid mode at a
-// known transport tempo produces the arithmetically expected boundaries.
+// k), that a note past the last slice is silent, that grid mode at a known
+// transport tempo produces the arithmetically expected boundaries, that
+// `crossthrough` off confines a slice to its own next onset and on lets it
+// run past, and that `attack` actually ramps the slice in (against a
+// zero-attack control render).
 static bool RunSlicerFixture()
 {
    const int sampleRate = 44100;
@@ -34729,6 +34777,29 @@ static bool RunSlicerFixture()
       for (int i = 0; i < numFrames; i++)
          pcm[i] = (int16_t)(std::clamp(mono[i], -1.0f, 1.0f) * 32000.0f);
       std::ofstream f(path, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+      writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)pcm.data(), dataSize);
+   }
+
+   // A second, deliberately DIFFERENT signal for the attack test: 1.0 s of
+   // constant-amplitude 220 Hz sine. The burst WAV above cannot be used -
+   // its bursts are exp(-t*200) enveloped, so by t = 50 ms the source itself
+   // is already ~4.5e-5 and a 50 ms attack would measure as a false FAIL.
+   const std::string sinePath = TmpPath("infinite_slicer_attack.wav");
+   {
+      std::vector<int16_t> pcm((size_t)numFrames);
+      for (int i = 0; i < numFrames; i++)
+      {
+         const float t = (float)i / (float)sampleRate;
+         pcm[i] = (int16_t)(0.8f * sinf(2.0f * 3.14159265f * 220.0f * t) * 32000.0f);
+      }
+      std::ofstream f(sinePath, std::ios::binary);
       auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
       auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
       const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
@@ -34788,6 +34859,79 @@ static bool RunSlicerFixture()
          }
       }
    }
+
+   // Renders a single note-on into `out` (mono, `frames` long) and returns
+   // false only if the fixture's own WAV failed to load. `grid` picks grid
+   // mode (deterministic boundaries, no analysis wait) instead of onsets.
+   auto renderNoteBuf = [&](const std::string& wavPath, int note, int frames, float attackMs,
+                            float decayMs, bool crossthrough, bool grid,
+                            std::vector<float>& out) -> bool
+   {
+      SlicerNode node;
+      int frame = 1;
+      if (!node.LoadFile(wavPath))
+         return false;
+      if (grid)
+      {
+         node.sliceBy = 1;
+         node.division = 0; // 1/4 -> 0.5 s at 120 BPM, one boundary in 1.0 s
+      }
+      else
+      {
+         settle(node, frame);
+      }
+
+      // These reach the audio thread ONLY through PushParams, which runs
+      // inside CookIfNeeded - so they must be set before that cook, not
+      // after it.
+      node.attack = attackMs;
+      node.decay = decayMs;
+      node.crossthrough = crossthrough;
+
+      AudioNode* an = node.GetAudioNode();
+      an->PrepareToPlay((double)sampleRate, frames);
+      node.CookIfNeeded(frame++);
+
+      NoteEventQueue queue;
+      const int cursor = queue.RegisterConsumer();
+      an->SetNoteInbox(&queue, cursor);
+      NoteEvent on;
+      on.note = note;
+      on.velocity = 1.0f;
+      on.isNoteOn = true;
+      on.frameOffset = 0;
+      queue.Push(on);
+
+      std::vector<float> l((size_t)frames, 0.0f), r((size_t)frames, 0.0f);
+      float* chans[2] = { l.data(), r.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = frames;
+      an->ProcessBlock(nullptr, 0, buf);
+
+      out = std::move(l);
+      return true;
+   };
+
+   auto peakRange = [](const std::vector<float>& v, int lo, int hi) -> float
+   {
+      float peak = 0.0f;
+      for (int i = std::max(0, lo); i < std::min((int)v.size(), hi); i++)
+         peak = std::max(peak, std::fabs(v[i]));
+      return peak;
+   };
+   auto rmsRange = [](const std::vector<float>& v, int lo, int hi) -> float
+   {
+      double acc = 0.0;
+      int n = 0;
+      for (int i = std::max(0, lo); i < std::min((int)v.size(), hi); i++)
+      {
+         acc += (double)v[i] * (double)v[i];
+         n++;
+      }
+      return (n > 0) ? (float)std::sqrt(acc / n) : 0.0f;
+   };
 
    // ---- 2. every slice triggers from 36 + k; 36 + count is silent -------
    {
@@ -34929,6 +35073,93 @@ static bool RunSlicerFixture()
       if (node.IsAnalyzing())
       {
          printf("SLICERTEST changing 'slice by'/'division' relaunched the worker FAIL\n");
+         ok = false;
+      }
+   }
+
+   // ---- 5. crossthrough OFF confines a slice to its own next onset ------
+   // The assertion the whole feature exists for. Boundary = slice 1 at
+   // 0.25 s = frame 11025; the +/-256 guard covers the 3 ms (132-frame)
+   // fade-out plus interpolation slop.
+   {
+      const int boundary = (int)(0.25 * sampleRate);
+      std::vector<float> outL;
+      if (!renderNoteBuf(path, SlicerNode::kBaseNote, 16384, 0.0f, 5000.0f, /*cross=*/false,
+                         /*grid=*/false, outL))
+      {
+         printf("SLICERTEST BUG (fixture failed to load its own test file)\n");
+         return false;
+      }
+      const float before = peakRange(outL, 0, boundary - 256);
+      const float after = peakRange(outL, boundary + 256, 16384);
+      if (before < 0.05f)
+      {
+         printf("SLICERTEST crossthrough off: slice never sounded (peak %.5f) FAIL\n", before);
+         ok = false;
+      }
+      if (after > 1.0e-4f)
+      {
+         printf("SLICERTEST crossthrough off: slice ran past its own next onset "
+                "(peak %.5f after frame %d) FAIL\n", after, boundary + 256);
+         ok = false;
+      }
+   }
+
+   // ---- 6. crossthrough ON keeps going past the boundary ----------------
+   {
+      const int boundary = (int)(0.25 * sampleRate);
+      std::vector<float> outL;
+      if (!renderNoteBuf(path, SlicerNode::kBaseNote, 16384, 0.0f, 5000.0f, /*cross=*/true,
+                         /*grid=*/false, outL))
+      {
+         printf("SLICERTEST BUG (fixture failed to load its own test file)\n");
+         return false;
+      }
+      const float after = peakRange(outL, boundary + 256, 16384);
+      if (after < 0.05f)
+      {
+         printf("SLICERTEST crossthrough on: slice stopped at its boundary anyway "
+                "(peak %.5f after frame %d) FAIL\n", after, boundary + 256);
+         ok = false;
+      }
+   }
+
+   // ---- 7. attack ramps the slice in; attack 0 does not -----------------
+   // Uses the constant-amplitude sine, never the burst WAV. RMS, not peak:
+   // a 220 Hz carrier's zero crossings make a short-window peak noisy.
+   {
+      const float savedTempo = Transport::Instance().Tempo();
+      Transport::Instance().SetTempo(120.0f);
+
+      std::vector<float> withAttack, control;
+      const bool okA = renderNoteBuf(sinePath, SlicerNode::kBaseNote, 16384, 50.0f, 5000.0f,
+                                     /*cross=*/false, /*grid=*/true, withAttack);
+      const bool okB = renderNoteBuf(sinePath, SlicerNode::kBaseNote, 16384, 0.0f, 5000.0f,
+                                     /*cross=*/false, /*grid=*/true, control);
+      Transport::Instance().SetTempo(savedTempo);
+
+      if (!okA || !okB)
+      {
+         printf("SLICERTEST BUG (fixture failed to load its own attack test file)\n");
+         return false;
+      }
+
+      // 50 ms attack = 2205 frames. First 10 ms vs ~40-60 ms, still climbing.
+      const float earlyA = rmsRange(withAttack, 0, 441);
+      const float lateA = rmsRange(withAttack, 1764, 2646);
+      const float earlyB = rmsRange(control, 0, 441);
+      const float lateB = rmsRange(control, 1764, 2646);
+
+      if (!(lateA > 1.0e-3f && earlyA * 10.0f < lateA))
+      {
+         printf("SLICERTEST attack 50 ms did not ramp: rms(0-10ms)=%.6f rms(40-60ms)=%.6f FAIL\n",
+                earlyA, lateA);
+         ok = false;
+      }
+      if (!(lateB > 1.0e-3f && earlyB > lateB * 0.5f && earlyB < lateB * 2.0f))
+      {
+         printf("SLICERTEST attack 0 control was not flat: rms(0-10ms)=%.6f rms(40-60ms)=%.6f "
+                "FAIL\n", earlyB, lateB);
          ok = false;
       }
    }
