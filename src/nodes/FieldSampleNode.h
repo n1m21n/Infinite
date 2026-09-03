@@ -67,11 +67,23 @@ public:
    // yet or the kernel has no reduce.rms statement.
    bool ReadRmsLatest(float& out);
 
+   // Recent samples of the kernel's mixed `out` signal, straight off the
+   // audio thread's MeterRing - same pattern as WavetableSynthCore's
+   // mScopeRing, for the Field sample editor's live waveform (item 10).
+   int ReadScope(float* out, int capacity);
+
    std::string code = "state float y = 0\ny = y * 0.999 + in * 0.1\nout = y\n";
    int maxVoices = 8;
 
    NoteCable noteInput;
    AudioCable audioInput;
+
+   // Editor-window scope cache, drained/redrawn at a capped rate - mirrors
+   // WavetableNode::scopeCache (main.cpp's DrawWavetableScope).
+   static constexpr int kScopeCacheCapacity = 128;
+   float scopeCache[kScopeCacheCapacity] = {};
+   int scopeCacheCount = 0;
+   double scopeCacheTime = -1.0;
 
 private:
    std::unique_ptr<AudioFieldSampleNode> mAudioNode;

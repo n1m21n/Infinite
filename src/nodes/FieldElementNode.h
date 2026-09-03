@@ -32,6 +32,7 @@ public:
    {
       v.Text("code", code);
       v.Int("maxElements", maxElements);
+      v.Int("generateCount", generateCount);
       mParamTable.VisitParams(v);
       mState.VisitParams(v);
    }
@@ -85,6 +86,10 @@ public:
    std::string code;
    int maxElements = 65536;
    int presetIndex = 0;
+   // Used only when nothing is wired into `input`: FieldElement then acts as
+   // a generator (like DistributePointsInGridNode) instead of a modifier,
+   // producing this many fresh points for the kernel to shape via `i`/`count`.
+   int generateCount = 64;
 
 private:
    Field::ElementStore mStore;

@@ -64,6 +64,7 @@ public:
 
    uint64_t FaultCount() const { return mFaultCount.load(std::memory_order_relaxed); }
    bool ReadRmsLatest(float& out) { return mMeter.ReadLatest(out); }
+   MeterRing& ScopeRing() { return mScopeRing; }
 
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& buffer) override
    {
@@ -188,6 +189,10 @@ public:
 
          for (int ch = 0; ch < buffer.numChannels; ch++)
             buffer.channels[ch][i] = sampleAcc;
+
+         // Same pattern as WavetableSynthCore's mScopeRing - one sample per
+         // Write() call, decimation and cadence are the UI reader's job.
+         mScopeRing.Write(&sampleAcc, 1);
       }
 
       // Once-per-block NaN/inf sweep over live voice state (not per sample -
@@ -255,6 +260,7 @@ private:
    int mNoteCursor = -1;
 
    MeterRing mMeter;
+   MeterRing mScopeRing;
    std::atomic<uint64_t> mFaultCount { 0 };
 
    double mSampleRate = 44100.0;
@@ -274,6 +280,7 @@ AudioNode* FieldSampleNode::GetAudioNode() { return mAudioNode.get(); }
 
 uint64_t FieldSampleNode::FaultCount() const { return mAudioNode->FaultCount(); }
 bool FieldSampleNode::ReadRmsLatest(float& out) { return mAudioNode->ReadRmsLatest(out); }
+int FieldSampleNode::ReadScope(float* out, int capacity) { return mAudioNode->ScopeRing().Read(out, capacity); }
 
 bool FieldSampleNode::Apply()
 {
