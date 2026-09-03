@@ -957,8 +957,8 @@ env INFINITE_FIELDPIXELTEST=1 INFINITE_EXITAFTER=35 "$BIN" >/tmp/f7_fixture.log 
 chk "fixture produced output" "$( [ -s /tmp/f7_fixture.log ] && echo y || echo n )" "y"
 chk "fixture no negative verdict" \
     "$(grep -cE 'FAIL|BUG$|MISMATCH|SUSPECT|DID NOT MOVE' /tmp/f7_fixture.log)" "0"
-chk "fixture 12 positive verdicts" \
-    "$(grep -cE ' OK$|PASS$' /tmp/f7_fixture.log)" "12"
+chk "fixture 18 positive verdicts" \
+    "$(grep -cE ' OK$|PASS$' /tmp/f7_fixture.log)" "18"
 grep -E 'FIELDPIXEL' /tmp/f7_fixture.log
 
 # ----------------------------------- 8. tier-1 regression gate (unchanged)
@@ -987,7 +987,7 @@ version histogram:   58 #version 150
 do-not-retry guard present (T13): OK
 fixture produced output: OK
 fixture no negative verdict: OK
-fixture 12 positive verdicts: OK
+fixture 18 positive verdicts: OK
 tier1 clean: OK
 -----
 step-07 exit criterion: PASS

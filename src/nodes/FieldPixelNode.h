@@ -85,6 +85,8 @@ private:
    int mLocFrame = -1;
    int mLocSrcTex = -1;
    int mLocSrcAlpha = -1;
+   int mLocOutMode = -1;
+   int mLocStateBank0 = -1;
 
    unsigned long long mLastResetEpoch = 0;
    int mNodeIndex = -1;

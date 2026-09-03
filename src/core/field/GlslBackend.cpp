@@ -26,7 +26,10 @@ namespace Field
          if (t.lanes == 1)
          {
             if (t.kind == DataType::Int) return "int";
-            if (t.kind == DataType::Bool) return "bool";
+            // Bool lowers to float: every comparison / ! / && / || this backend
+            // emits produces a 0.0-or-1.0 float, and GLSL has no implicit
+            // bool <-> float conversion, so a `bool` declaration cannot be
+            // initialised from one.
             return "float";
          }
          if (t.lanes == 2) return "vec2";
@@ -44,6 +47,18 @@ namespace Field
          return "bool";
       }
 
+      // GLSL performs no implicit scalar->vector conversion on function
+      // arguments, and the fld_ helpers replace builtins that DO carry
+      // (genType, float, float) overloads - clamp, mix, smoothstep, mod.
+      // Promote every scalar argument to the call's result rank so
+      // `clamp(col, 0.0, 1.0)` keeps working.
+      std::string Broadcast(const std::string& arg, int argLanes, int resLanes)
+      {
+         if (argLanes == 1 && resLanes > 1)
+            return "vec" + std::to_string(resLanes) + "(" + arg + ")";
+         return arg;
+      }
+
       struct EmitterContext
       {
          std::ostringstream out;
@@ -52,6 +67,7 @@ namespace Field
          std::unordered_set<std::string> declaredLocals;
          std::unordered_map<std::string, int> hoistedMap; // varName -> uniform index
          std::unordered_set<std::string> stateNames;
+         std::unordered_set<std::string> paramNames;
          std::vector<int> lineToIrNode;
          int currentLine = 1;
 
@@ -79,7 +95,7 @@ namespace Field
                if (node->type.lanes == 1)
                {
                   if (node->type.kind == DataType::Bool)
-                     return node->numberValue != 0.0 ? "true" : "false";
+                     return node->numberValue != 0.0 ? "1.0" : "0.0";
                   if (node->type.kind == DataType::Int)
                      return std::to_string((int)node->numberValue);
                   return FormatFloat(node->numberValue);
@@ -116,10 +132,13 @@ namespace Field
                   return "fld_h" + std::to_string(hit->second);
                }
 
-               // Check if state cell
-               if (ctx.stateNames.find(name) != ctx.stateNames.end())
+               // A declared param is a uniform in its own namespace. Without
+               // this the body referenced fld_v_<name> while the declaration
+               // emitted fld_p_<name>, so every kernel using a param failed to
+               // link with "undeclared identifier".
+               if (ctx.paramNames.find(name) != ctx.paramNames.end())
                {
-                  return "fld_v_" + name;
+                  return "fld_p_" + name;
                }
 
                return "fld_v_" + name;
@@ -165,13 +184,20 @@ namespace Field
                std::string typeStr = GlslTypeString(node->type);
 
                const std::string& op = node->op;
+               const int resLanes = node->type.lanes;
+               const int lLanes = node->children[0]->type.lanes;
+               const int rLanes = node->children[1]->type.lanes;
                if (op == "%")
                {
-                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_mod(" + lhs + ", " + rhs + ");");
+                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_mod(" +
+                               Broadcast(lhs, lLanes, resLanes) + ", " +
+                               Broadcast(rhs, rLanes, resLanes) + ");");
                }
                else if (op == "^")
                {
-                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_pow(" + lhs + ", " + rhs + ");");
+                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_pow(" +
+                               Broadcast(lhs, lLanes, resLanes) + ", " +
+                               Broadcast(rhs, rLanes, resLanes) + ");");
                }
                else if (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "==" || op == "!=")
                {
@@ -220,6 +246,14 @@ namespace Field
 
                std::string resTemp = ctx.FreshTemp();
                std::string typeStr = GlslTypeString(node->type);
+               const int resLanes = node->type.lanes;
+
+               // Every fld_ helper is declared only at matched rank, so a scalar
+               // argument to a vector-valued call must be broadcast explicitly.
+               auto bc = [&](size_t i) -> std::string {
+                  if (i >= args.size() || i >= node->children.size()) return i < args.size() ? args[i] : "0.0";
+                  return Broadcast(args[i], node->children[i]->type.lanes, resLanes);
+               };
 
                if (name == "vec2" || name == "vec3" || name == "vec4")
                {
@@ -233,23 +267,23 @@ namespace Field
                }
                else if (name == "mod" || name == "fmod")
                {
-                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_mod(" + args[0] + ", " + args[1] + ");");
+                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_mod(" + bc(0) + ", " + bc(1) + ");");
                }
                else if (name == "pow")
                {
-                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_pow(" + args[0] + ", " + args[1] + ");");
+                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_pow(" + bc(0) + ", " + bc(1) + ");");
                }
                else if (name == "clamp")
                {
-                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_clamp(" + args[0] + ", " + args[1] + ", " + args[2] + ");");
+                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_clamp(" + bc(0) + ", " + bc(1) + ", " + bc(2) + ");");
                }
                else if (name == "lerp" || name == "mix")
                {
-                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_lerp(" + args[0] + ", " + args[1] + ", " + args[2] + ");");
+                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_lerp(" + bc(0) + ", " + bc(1) + ", " + bc(2) + ");");
                }
                else if (name == "smoothstep")
                {
-                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_smoothstep(" + args[0] + ", " + args[1] + ", " + args[2] + ");");
+                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_smoothstep(" + bc(0) + ", " + bc(1) + ", " + bc(2) + ");");
                }
                else if (name == "round")
                {
@@ -265,15 +299,23 @@ namespace Field
                else if (name == "if")
                {
                   ctx.branchCount++;
-                  // if(c, a, b) in Field -> mix(b, a, cond) in GLSL
-                  int lanes = node->type.lanes;
-                  if (lanes == 1)
+                  // if(c, a, b) in Field -> mix(b, a, c != 0.0) in GLSL, using
+                  // the BOOL-SELECTOR overload genType mix(genType, genType,
+                  // genBType). The float overload is an arithmetic blend, so an
+                  // inf/NaN in the unselected branch reaches the result as
+                  // x * 1.0 + inf * 0.0 = NaN. Field's truth rule is "any
+                  // non-zero is true", hence `!= 0.0` and not step(0.5, c).
+                  // Argument order: mix returns its FIRST operand when the
+                  // selector is false, so the false branch (args[2]) comes first.
+                  const std::string sel = "(" + args[0] + " != 0.0)";
+                  if (resLanes == 1)
                   {
-                     ctx.EmitLine("   " + typeStr + " " + resTemp + " = mix(" + args[2] + ", " + args[1] + ", (" + args[0] + " != 0.0) ? 1.0 : 0.0);");
+                     ctx.EmitLine("   " + typeStr + " " + resTemp + " = mix(" + bc(2) + ", " + bc(1) + ", " + sel + ");");
                   }
                   else
                   {
-                     ctx.EmitLine("   " + typeStr + " " + resTemp + " = mix(" + args[2] + ", " + args[1] + ", " + typeStr + "((" + args[0] + " != 0.0) ? 1.0 : 0.0));");
+                     ctx.EmitLine("   " + typeStr + " " + resTemp + " = mix(" + bc(2) + ", " + bc(1) + ", " +
+                                  GlslBoolVecType(resLanes) + "(" + sel + "));");
                   }
                }
                else
@@ -469,6 +511,8 @@ namespace Field
             slot.domain = Domain::Graph;
             slot.paramIndex = (int)i;
             result.uniforms.push_back(slot);
+
+            ctx.paramNames.insert(p.name);
          }
          ctx.EmitLine("");
       }
@@ -477,7 +521,13 @@ namespace Field
       if (!program.declaredStates.empty())
       {
          ctx.EmitLine("// ---- pixel state read samplers ----");
-         ctx.EmitLine("uniform sampler2D fld_s_bank0;\n");
+         ctx.EmitLine("uniform sampler2D fld_s_bank0;");
+         // One color attachment per pass (T12), so a state kernel needs two
+         // passes: one writing the cells into the ping-pong target, one writing
+         // `col` into the display FBO. Both read the same pre-swap state
+         // texture, so they never disagree. The selector is frame-uniform, so
+         // the branch costs nothing on the GPU.
+         ctx.EmitLine("uniform int       fld_outMode;   // 0 = write state cells, 1 = write display colour\n");
 
          for (size_t i = 0; i < program.declaredStates.size() && i < 4; i++)
          {
@@ -532,30 +582,15 @@ namespace Field
       ctx.EmitLine("\n   // ---- writes ----");
       if (!program.declaredStates.empty())
       {
-         const char* chanNames[] = { "fld_v_cell0", "fld_v_cell1", "fld_v_cell2", "fld_v_cell3" };
-         std::string chans[4] = { "0.0", "0.0", "0.0", "1.0" };
+         std::string chans[4] = { "0.0", "0.0", "0.0", "0.0" };
          for (size_t i = 0; i < program.declaredStates.size() && i < 4; i++)
          {
             chans[i] = "fld_v_" + program.declaredStates[i].name;
          }
-         // If unused channels exist, let col / alpha pass
-         if (program.declaredStates.size() == 1)
-         {
-            chans[1] = "col.g";
-            chans[2] = "col.b";
-            chans[3] = "alpha * fld_srcAlpha";
-         }
-         else if (program.declaredStates.size() == 2)
-         {
-            chans[2] = "col.b";
-            chans[3] = "alpha * fld_srcAlpha";
-         }
-         else if (program.declaredStates.size() == 3)
-         {
-            chans[3] = "alpha * fld_srcAlpha";
-         }
-
-         ctx.EmitLine("   fragColor = vec4(" + chans[0] + ", " + chans[1] + ", " + chans[2] + ", " + chans[3] + ");");
+         ctx.EmitLine("   // cell -> channel by declaration order: 0=.r 1=.g 2=.b 3=.a");
+         ctx.EmitLine("   vec4 fld_stateOut = vec4(" + chans[0] + ", " + chans[1] + ", " + chans[2] + ", " + chans[3] + ");");
+         ctx.EmitLine("   vec4 fld_colorOut = vec4(col, alpha * fld_srcAlpha);");
+         ctx.EmitLine("   fragColor = (fld_outMode == 0) ? fld_stateOut : fld_colorOut;");
       }
       else
       {

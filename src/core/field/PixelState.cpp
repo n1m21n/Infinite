@@ -1,6 +1,6 @@
 #include "PixelState.h"
 #include <algorithm>
-#include <OpenGL/gl3.h>
+#include "gl3.h"
 
 namespace Field
 {
@@ -32,13 +32,14 @@ namespace Field
       mFront = 1 - mFront;
    }
 
-   void PixelStateBank::BindReadUnits(unsigned int program)
+   // samplerLoc is resolved once after link, not looked up per cook (T22).
+   void PixelStateBank::BindReadUnits(unsigned int program, int samplerLoc)
    {
+      (void)program;
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, mPair[mFront].tex);
-      int loc = glGetUniformLocation(program, "fld_s_bank0");
-      if (loc >= 0)
-         glUniform1i(loc, 0);
+      if (samplerLoc >= 0)
+         glUniform1i(samplerLoc, 0);
    }
 
    void PixelStateBank::ClearBoth(const float initRgba[4])

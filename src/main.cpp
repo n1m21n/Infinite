@@ -45599,8 +45599,16 @@ int main(int argc, char** argv)
             const std::string& src = node.EmitResult().source;
             size_t mainPos = src.find("void main()");
             std::string body = mainPos != std::string::npos ? src.substr(mainPos) : src;
-            bool pass = body.find("mix(") != std::string::npos &&
-                        body.find("!= 0.0") != std::string::npos &&
+            // Must be the BOOL-SELECTOR overload mix(b, a, c != 0.0), not the
+            // arithmetic float mix with a 0.0/1.0 selector - the float form
+            // turns an inf/NaN in the unselected branch into NaN in the result.
+            size_t mixPos = body.find("mix(");
+            std::string mixStmt = mixPos != std::string::npos
+                                     ? body.substr(mixPos, body.find(';', mixPos) - mixPos)
+                                     : std::string();
+            bool pass = mixPos != std::string::npos &&
+                        mixStmt.find("!= 0.0") != std::string::npos &&
+                        mixStmt.find("? 1.0") == std::string::npos &&
                         body.find("step(0.5") == std::string::npos;
             printf("[FIELDPIXELTEST] Assertion 5 (If Lowering): %s\n", pass ? "OK" : "FAIL");
          }
@@ -45850,6 +45858,106 @@ int main(int argc, char** argv)
             bool ok = node.Apply();
             bool pass = !ok && (node.LastError().find("4 cells max") != std::string::npos);
             printf("[FIELDPIXELTEST] Assertion 12 (State Cell Cap): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 13. Every shipped preset compiles. The node's own presets are the
+         //     first thing a user sees; step 4 shipped with 2 of 5 broken.
+         {
+            bool pass = true;
+            for (size_t pi = 0; pi < FieldPixelNode::Presets().size(); pi++)
+            {
+               FieldPixelNode node;
+               node.code = FieldPixelNode::Presets()[pi].code;
+               if (!node.Apply())
+               {
+                  pass = false;
+                  printf("[FIELDPIXELTEST]   preset %zu '%s' failed: %s\n", pi,
+                         FieldPixelNode::Presets()[pi].name, node.LastError().c_str());
+               }
+            }
+            printf("[FIELDPIXELTEST] Assertion 13 (Presets Compile): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 14. A declared param reaches the shader as fld_p_<name> and links.
+         {
+            FieldPixelNode node;
+            node.code = "param float speed = 2.0 [0.1, 10.0];\ncol = vec3(uv.x * speed);";
+            bool ok = node.Apply();
+            const std::string& src = node.EmitResult().source;
+            size_t mainPos = src.find("void main()");
+            std::string body = mainPos != std::string::npos ? src.substr(mainPos) : src;
+            bool pass = ok && node.LastError().empty() &&
+                        src.find("uniform float fld_p_speed;") != std::string::npos &&
+                        body.find("fld_p_speed") != std::string::npos &&
+                        body.find("fld_v_speed") == std::string::npos;
+            printf("[FIELDPIXELTEST] Assertion 14 (Param Uniform): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 15. Scalar args broadcast to a vector-valued helper call. GLSL's own
+         //     clamp/mix/smoothstep carry (genType, float, float) overloads; the
+         //     fld_ helpers replace them and must not lose that shape.
+         {
+            const char* kernels[] = {
+               "col = clamp(col, 0.0, 1.0);",
+               "w = lerp(vec3(0.0), vec3(1.0), uv.x);\ncol = w;",
+               "col = smoothstep(0.0, 1.0, col);",
+               "g = fmod(uv * 8.0, 1.0);\ncol = vec3(g.x, g.y, 0.0);"
+            };
+            bool pass = true;
+            for (const char* kc : kernels)
+            {
+               FieldPixelNode node; node.code = kc;
+               if (!node.Apply())
+               {
+                  pass = false;
+                  printf("[FIELDPIXELTEST]   broadcast kernel failed: %s\n", node.LastError().c_str());
+               }
+            }
+            printf("[FIELDPIXELTEST] Assertion 15 (Scalar Broadcast): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 16. Bool-typed locals. GLSL has no implicit float<->bool conversion,
+         //     so a bool declaration cannot be initialised from a 0.0/1.0 temp.
+         {
+            FieldPixelNode node;
+            node.code = "a = !(uv.x > 0.5);\nb = (uv.x > 0.2) && (uv.y > 0.2);\ncol = vec3(a, b, 0.0);";
+            bool pass = node.Apply();
+            if (!pass) printf("[FIELDPIXELTEST]   bool kernel failed: %s\n", node.LastError().c_str());
+            printf("[FIELDPIXELTEST] Assertion 16 (Bool Locals): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 17. The filter idiom: read the input image, then write col. `col`
+         //     arrives holding the source, so this is not a delay-free cycle.
+         {
+            FieldPixelNode node;
+            node.code = "y = col.r * 2.0;\ncol = vec3(y, col.g, col.b);";
+            bool pass = node.Apply();
+            if (!pass) printf("[FIELDPIXELTEST]   filter kernel failed: %s\n", node.LastError().c_str());
+            printf("[FIELDPIXELTEST] Assertion 17 (Read Before Write col): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 18. A state kernel's VISIBLE output is `col`, not the raw state
+         //     cells. The ping-pong pair holds state; mOut holds picture.
+         {
+            FieldPixelNode node;
+            node.width = 64.0f; node.height = 64.0f;
+            node.code = "state float x = 0;\nx = x + 0.5;\ncol = vec3(0.25, 0.25, 0.25);";
+            bool ok = node.Apply();
+            node.CookIfNeeded(200);
+            node.CookIfNeeded(201);
+            node.CookIfNeeded(202);
+            unsigned int scratchFbo = 0;
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratchFbo, node.GetOutputTexture(), 64, 64, px);
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+            // x is 1.5 by now; if the display still showed state, red would be 1.5.
+            bool pass = ok && px.size() >= 4 &&
+                        std::abs(px[0] - 0.25f) < 1.0e-3f &&
+                        std::abs(px[1] - 0.25f) < 1.0e-3f &&
+                        std::abs(px[2] - 0.25f) < 1.0e-3f;
+            if (!pass && px.size() >= 4)
+               printf("[FIELDPIXELTEST]   display rgb = (%f, %f, %f), want 0.25 each\n", px[0], px[1], px[2]);
+            printf("[FIELDPIXELTEST] Assertion 18 (State Kernel Displays col): %s\n", pass ? "OK" : "FAIL");
          }
 
          printf("[FIELDPIXELTEST] Test suite complete.\n");

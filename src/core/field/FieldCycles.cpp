@@ -229,8 +229,16 @@ namespace Field
       // assignment in this body yields THIS element's input value, never a forward
       // reference to a later statement. Only plain locals can forward-reference.
       auto isEntryValued = [&](const std::string& n) -> bool {
+         // Element-domain entry values...
          if (n == "P" || n == "N" || n == "uv" || n == "Cd" || n == "i" || n == "count" ||
              n == "t" || n == "dt" || n == "frame")
+            return true;
+         // ...and pixel-domain ones. `col` and `alpha` arrive holding the input
+         // image, so reading one before writing it is a read of the source, not
+         // a loop back to the later write. Without these, the canonical filter
+         // shape `y = col.r * 2.0` / `col = vec3(y, 0, 0)` was rejected as a
+         // delay-free cycle.
+         if (n == "col" || n == "alpha" || n == "xy" || n == "res" || n == "aspect")
             return true;
          for (const auto& s : stmts)
          {

@@ -15,7 +15,7 @@ namespace Field
       void Resize(int w, int h);
       void Reset();
       void Swap();
-      void BindReadUnits(unsigned int program);
+      void BindReadUnits(unsigned int program, int samplerLoc);
       void ClearBoth(const float initRgba[4] = nullptr);
 
       GLUtil::Fbo& ReadFbo() { return mPair[mFront]; }
