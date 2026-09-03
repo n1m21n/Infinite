@@ -360,6 +360,26 @@ namespace Field
                 s == "vec2" || s == "vec3" || s == "vec4";
       }
 
+      // Build step 12: output/input declarations accept the ordinary scalar
+      // type keywords plus three reserved structural type-names that are not
+      // registered as lexer keywords (they remain plain identifiers
+      // everywhere else) - geometry (input-only, whole mesh), audio (an
+      // alias for a sample-domain float), image (an alias for a pixel-domain
+      // vec4). See docs/plans/field/step-12-dynamic-pins-ir.md S1.5/S5.6.
+      bool IsPinTypeToken(const Token& tok)
+      {
+         if (IsTypeKeyword(tok.text)) return true;
+         if (tok.kind != TokenKind::Ident) return false;
+         return tok.text == "geometry" || tok.text == "audio" || tok.text == "image";
+      }
+
+      bool IsDomainToken(const Token& tok)
+      {
+         if (tok.kind != TokenKind::Ident) return false;
+         return tok.text == "graph" || tok.text == "frame" || tok.text == "element" ||
+                tok.text == "pixel" || tok.text == "sample";
+      }
+
       bool ParseLiteralNumber(ParserState& p, double& outVal, SourceSpan& outSpan)
       {
          if (p.AtEnd()) return false;
@@ -621,6 +641,71 @@ namespace Field
          return std::make_shared<AstDeclAttrib>(typeTok.text, nameTok.text, initExpr, attribTok.span);
       }
 
+      // Build step 12: `output <domain> <type> <name> = <expr>`
+      AstNodePtr ParseOutputDecl(ParserState& p)
+      {
+         Token outputTok = p.Advance(); // consume 'output'
+         if (p.AtEnd() || !IsDomainToken(p.Peek()))
+         {
+            p.Fail("expected a domain name (graph, frame, element, pixel, sample) after 'output'", p.Peek().span);
+            return nullptr;
+         }
+         Token domainTok = p.Advance();
+
+         if (p.AtEnd() || !IsPinTypeToken(p.Peek()))
+         {
+            p.Fail("expected a type after 'output " + domainTok.text + "'", p.Peek().span);
+            return nullptr;
+         }
+         Token typeTok = p.Advance();
+
+         if (p.AtEnd() || (p.Peek().kind != TokenKind::Ident && p.Peek().kind != TokenKind::Keyword))
+         {
+            p.Fail("expected output pin name", typeTok.span);
+            return nullptr;
+         }
+         Token nameTok = p.Advance();
+
+         if (!p.MatchOp("="))
+         {
+            p.Fail("expected '=' after output pin name", nameTok.span);
+            return nullptr;
+         }
+
+         AstNodePtr initExpr = ParseOr(p);
+         if (p.Failed() || !initExpr) return nullptr;
+
+         return std::make_shared<AstDeclOutput>(domainTok.text, typeTok.text, nameTok.text, initExpr, outputTok.span);
+      }
+
+      // Build step 12: `input <domain> <type> <name>`
+      AstNodePtr ParseInputDecl(ParserState& p)
+      {
+         Token inputTok = p.Advance(); // consume 'input'
+         if (p.AtEnd() || !IsDomainToken(p.Peek()))
+         {
+            p.Fail("expected a domain name (graph, frame, element, pixel, sample) after 'input'", p.Peek().span);
+            return nullptr;
+         }
+         Token domainTok = p.Advance();
+
+         if (p.AtEnd() || !IsPinTypeToken(p.Peek()))
+         {
+            p.Fail("expected a type after 'input " + domainTok.text + "'", p.Peek().span);
+            return nullptr;
+         }
+         Token typeTok = p.Advance();
+
+         if (p.AtEnd() || (p.Peek().kind != TokenKind::Ident && p.Peek().kind != TokenKind::Keyword))
+         {
+            p.Fail("expected input pin name", typeTok.span);
+            return nullptr;
+         }
+         Token nameTok = p.Advance();
+
+         return std::make_shared<AstDeclInput>(domainTok.text, typeTok.text, nameTok.text, inputTok.span);
+      }
+
       AstNodePtr ParseIf(ParserState& p)
       {
          Token ifTok = p.Advance(); // consume 'if'
@@ -765,6 +850,14 @@ namespace Field
             if (tok.text == "param")
             {
                return ParseParamDecl(p);
+            }
+            if (tok.text == "output")
+            {
+               return ParseOutputDecl(p);
+            }
+            if (tok.text == "input")
+            {
+               return ParseInputDecl(p);
             }
             if (tok.text == "if")
             {

@@ -146,6 +146,12 @@ namespace Field
          // give it the globals-specific error message everywhere that check
          // is made, without touching Element/Pixel/Sample lowering at all.
          bool isGlobal = false;
+         // Build step 12: declared via `output`/`input`. isStructuralGeometry
+         // marks a `geometry`-typed input pin (whole-mesh, no FieldType) -
+         // only legal as the base of a `.P`/`.N`/`.uv`/`.Cd` field access.
+         bool isOutputPin = false;
+         bool isInputPin = false;
+         bool isStructuralGeometry = false;
       };
 
       struct ElementScope
@@ -160,6 +166,10 @@ namespace Field
          // key. Domain-generic ElementScope carries it for free; every other
          // domain's lowering never touches it.
          int graphLoopDepth = 0;
+         // Build step 12: incremented while lowering the body of an if/for/map
+         // so DeclOutput/DeclInput can refuse a nested occurrence with a
+         // clear "must be declared at top level" message.
+         int declDepth = 0;
 
          bool Has(const std::string& name) const
          {
@@ -221,6 +231,13 @@ namespace Field
                const VarSymbol* sym = scope.Find(id->name);
                if (sym)
                {
+                  if (sym->isStructuralGeometry)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = id->span;
+                     error.message = "geometry input '" + id->name + "' cannot be used as a value directly; access a field, e.g. '" + id->name + ".P'";
+                     return nullptr;
+                  }
                   if (sym->isState)
                   {
                      // If written earlier in this body, reads current SSA value;
@@ -265,6 +282,43 @@ namespace Field
             case AstKind::Access:
             {
                auto acc = std::static_pointer_cast<AstAccess>(ast);
+
+               // Build step 12: `<name>.P` / `.N` / `.uv` / `.Cd` on a
+               // declared `geometry`-typed input pin is a structural field
+               // read, not a swizzle (geometry has no FieldType to swizzle).
+               if (acc->base->kind == AstKind::Ident)
+               {
+                  const std::string& baseName = std::static_pointer_cast<AstIdent>(acc->base)->name;
+                  const VarSymbol* baseSym = scope.Find(baseName);
+                  if (baseSym && baseSym->isStructuralGeometry)
+                  {
+                     FieldType fieldType;
+                     if (acc->field == "P" || acc->field == "N" || acc->field == "Cd")
+                        fieldType = FieldType(DataType::Vec3, 3);
+                     else if (acc->field == "uv")
+                        fieldType = FieldType(DataType::Vec2, 2);
+                     else
+                     {
+                        error.severity = Severity::Error;
+                        error.span = acc->span;
+                        error.message = "geometry input '" + baseName + "' has no field '" + acc->field +
+                                          "' (supported: P, N, uv, Cd)";
+                        return nullptr;
+                     }
+
+                     auto ir = std::make_shared<IRNode>(IRKind::Access, acc->span);
+                     ir->type = fieldType;
+                     ir->domain = baseSym->domain;
+                     ir->field = baseName + "." + acc->field;
+                     auto baseVar = std::make_shared<IRNode>(IRKind::Variable, acc->base->span);
+                     baseVar->varName = baseName;
+                     baseVar->type = fieldType;
+                     baseVar->domain = baseSym->domain;
+                     ir->children.push_back(baseVar);
+                     return ir;
+                  }
+               }
+
                auto baseIR = LowerAstExpr(acc->base, scope, error);
                if (!baseIR) return nullptr;
 
@@ -886,6 +940,39 @@ namespace Field
          return DataType::Void;
       }
 
+      // Build step 12: v1 ceiling on the combined number of output+input
+      // pins a single kernel may declare (mirrors PinTable::kMaxDeclaredPins).
+      static constexpr size_t kFieldMaxDeclaredPinsPerProgram = 16;
+
+      // Build step 12 (doc S5.3 "domain-join check"): is it legal for an
+      // `output <declaredDomain> ... = <expr>` initializer whose lowered
+      // domain is `exprDomain` to feed a pin declared at `declaredDomain`?
+      // Legal iff exprDomain == declaredDomain, or exprDomain is Graph
+      // (a constant broadcasts to anything), or exprDomain is Frame and
+      // declaredDomain isn't Graph (frame broadcasts down to any finer
+      // domain). Anything else is illegal - either exprDomain is strictly
+      // finer than declaredDomain (needs an explicit reduce/resample), or
+      // the two domains are mutually incomparable peers (Element/Pixel/Sample).
+      bool CheckPinDomainOk(Domain exprDomain, Domain declaredDomain, bool& outIsFinerThanDeclared)
+      {
+         outIsFinerThanDeclared = false;
+         if (exprDomain == declaredDomain) return true;
+         if (exprDomain == Domain::Graph) return true;
+         if (exprDomain == Domain::Frame && declaredDomain != Domain::Graph) return true;
+
+         // Walk exprDomain's coarsening chain (Element/Pixel/Sample -> Frame
+         // -> Graph) to see whether declaredDomain lies on it - if so,
+         // exprDomain is strictly finer than declaredDomain.
+         Domain cur = exprDomain;
+         for (int i = 0; i < 3; ++i)
+         {
+            cur = DomainCoarsen(cur);
+            if (cur == declaredDomain) { outIsFinerThanDeclared = true; return false; }
+            if (cur == Domain::Graph) break;
+         }
+         return false;
+      }
+
       static AstNodePtr CloneAstForMap(const AstNodePtr& node,
                                        const std::unordered_map<std::string, std::string>& stateRenames,
                                        int mapIdx)
@@ -1068,6 +1155,7 @@ namespace Field
          }
 
          // Unroll N instances
+         scope.declDepth++;
          for (int k = 0; k < count; ++k)
          {
             std::unordered_map<std::string, std::string> renames;
@@ -1084,15 +1172,16 @@ namespace Field
 
                auto cloned = CloneAstForMap(bs, renames, k);
                auto irS = LowerAstStmt(cloned, scope, outProgram, outError);
-               if (!outError.Empty()) return false;
+               if (!outError.Empty()) { scope.declDepth--; return false; }
                if (irS)
                {
                   if (!ValidateMap(scope.targetDomain, irS->domain, mapAst->span, outError))
-                     return false;
+                     { scope.declDepth--; return false; }
                   outStmts.push_back(irS);
                }
             }
          }
+         scope.declDepth--;
 
          return true;
       }
@@ -1306,6 +1395,297 @@ namespace Field
                stmt->stateLanes = lanes;
                stmt->stateInitValues = initVals;
                return stmt;
+            }
+
+            case AstKind::DeclOutput:
+            {
+               auto decl = std::static_pointer_cast<AstDeclOutput>(ast);
+
+               if (scope.declDepth > 0)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'output' must be declared at top level (not inside if/for/map)";
+                  return nullptr;
+               }
+
+               Domain declaredDomain;
+               if (!DomainFromString(decl->domainName, declaredDomain))
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "unknown domain '" + decl->domainName + "' in output declaration";
+                  return nullptr;
+               }
+               if (declaredDomain == Domain::Graph)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'output' cannot declare a graph-domain pin (graph domain has no per-frame dataflow to expose)";
+                  return nullptr;
+               }
+
+               if (decl->name == "P" || decl->name == "N" || decl->name == "uv" ||
+                   decl->name == "Cd" || decl->name == "i" || decl->name == "count")
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'" + decl->name + "' is a reserved word of the element domain";
+                  return nullptr;
+               }
+               if (decl->name == "t" || decl->name == "dt" || decl->name == "frame")
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'" + decl->name + "' is a reserved word of the frame domain";
+                  return nullptr;
+               }
+               if (scope.Has(decl->name))
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "duplicate declaration of '" + decl->name + "'";
+                  return nullptr;
+               }
+
+               if (prog.declaredOutputs.size() + prog.declaredInputs.size() >= kFieldMaxDeclaredPinsPerProgram)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "declared pin count exceeds the " + std::to_string(kFieldMaxDeclaredPinsPerProgram) + "-pin-per-kernel ceiling (build step 12 v1 limit)";
+                  return nullptr;
+               }
+
+               if (decl->typeName == "geometry")
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'geometry' is an input-only structural type; use it with 'input', not 'output'";
+                  return nullptr;
+               }
+               // S5.6/S5.8 row 4: each structural pin type has exactly one
+               // legal domain - 'audio' only makes sense at 'sample' rate,
+               // 'image' only at 'pixel' rate. A cross-domain structural pin
+               // is a resample, out of scope for this step (S5.6).
+               if (decl->typeName == "audio" && declaredDomain != Domain::Sample)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'audio' pins are only legal in the 'sample' domain (got '" + decl->domainName +
+                                    "'); a cross-domain audio read would need an explicit resample, not supported in v1";
+                  return nullptr;
+               }
+               if (decl->typeName == "image" && declaredDomain != Domain::Pixel)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'image' pins are only legal in the 'pixel' domain (got '" + decl->domainName +
+                                    "'); a cross-domain image read would need an explicit resample, not supported in v1";
+                  return nullptr;
+               }
+
+               bool isStructural = (decl->typeName == "audio" || decl->typeName == "image");
+               DataType dt = DataType::Float;
+               int lanes = 1;
+               if (isStructural)
+               {
+                  if (decl->typeName == "audio") { dt = DataType::Float; lanes = 1; }
+                  else { dt = DataType::Vec4; lanes = 4; } // "image"
+               }
+               else
+               {
+                  dt = ParseDataType(decl->typeName);
+                  if (dt == DataType::Void)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = decl->span;
+                     error.message = "unknown type '" + decl->typeName + "' in output declaration";
+                     return nullptr;
+                  }
+                  lanes = FieldType::GetLanesForType(dt);
+               }
+
+               if (!decl->initExpr)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "output '" + decl->name + "' requires an initializer expression";
+                  return nullptr;
+               }
+               IRNodePtr initIR = LowerAstExpr(decl->initExpr, scope, error);
+               if (!initIR) return nullptr;
+
+               bool isFiner = false;
+               if (!CheckPinDomainOk(initIR->domain, declaredDomain, isFiner))
+               {
+                  if (isFiner)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = decl->initExpr->span;
+                     error.message = "output '" + decl->name + "' is declared " + std::string(DomainToString(declaredDomain)) +
+                                       "-domain but its expression is " + std::string(DomainToString(initIR->domain)) +
+                                       "-domain (finer); wrap it in an explicit reduce/resample to coarsen it first";
+                     error.hint = "e.g. reduce.mean(x) or reduce.rms(x)";
+                     return nullptr;
+                  }
+                  error = MakeIncomparableDomainError(initIR->domain, decl->initExpr->span, declaredDomain, decl->span,
+                                                      "output '" + decl->name + "' declaration");
+                  return nullptr;
+               }
+
+               DeclaredOutput out;
+               out.name = decl->name;
+               out.typeName = decl->typeName;
+               out.isStructural = isStructural;
+               out.type = dt;
+               out.lanes = lanes;
+               out.domain = declaredDomain;
+               out.span = decl->span;
+               prog.declaredOutputs.push_back(out);
+
+               VarSymbol sym;
+               sym.name = decl->name;
+               sym.type = FieldType(dt, lanes);
+               sym.domain = declaredDomain;
+               sym.isOutputPin = true;
+               sym.isReadOnly = true;
+               scope.Add(sym);
+
+               // Purely a declaration + collection for step 12 - nothing in
+               // the kernel body reads or writes this name as a runtime
+               // value, so no IRStmt is emitted (mirrors DeclParam, which
+               // also returns nullptr here).
+               return nullptr;
+            }
+
+            case AstKind::DeclInput:
+            {
+               auto decl = std::static_pointer_cast<AstDeclInput>(ast);
+
+               if (scope.declDepth > 0)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'input' must be declared at top level (not inside if/for/map)";
+                  return nullptr;
+               }
+
+               Domain declaredDomain;
+               if (!DomainFromString(decl->domainName, declaredDomain))
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "unknown domain '" + decl->domainName + "' in input declaration";
+                  return nullptr;
+               }
+               if (declaredDomain == Domain::Graph)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'input' cannot declare a graph-domain pin (graph domain has no per-frame dataflow to receive into)";
+                  return nullptr;
+               }
+
+               if (decl->name == "P" || decl->name == "N" || decl->name == "uv" ||
+                   decl->name == "Cd" || decl->name == "i" || decl->name == "count")
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'" + decl->name + "' is a reserved word of the element domain";
+                  return nullptr;
+               }
+               if (decl->name == "t" || decl->name == "dt" || decl->name == "frame")
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'" + decl->name + "' is a reserved word of the frame domain";
+                  return nullptr;
+               }
+               if (scope.Has(decl->name))
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "duplicate declaration of '" + decl->name + "'";
+                  return nullptr;
+               }
+
+               if (prog.declaredOutputs.size() + prog.declaredInputs.size() >= kFieldMaxDeclaredPinsPerProgram)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "declared pin count exceeds the " + std::to_string(kFieldMaxDeclaredPinsPerProgram) + "-pin-per-kernel ceiling (build step 12 v1 limit)";
+                  return nullptr;
+               }
+
+               // S5.6/S5.8 row 4: each structural pin type has exactly one
+               // legal domain.
+               if (decl->typeName == "geometry" && declaredDomain != Domain::Element)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'geometry' pins are only legal in the 'element' domain (got '" + decl->domainName +
+                                    "'); a cross-domain geometry read would need an explicit resample, not supported in v1";
+                  return nullptr;
+               }
+               if (decl->typeName == "audio" && declaredDomain != Domain::Sample)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'audio' pins are only legal in the 'sample' domain (got '" + decl->domainName +
+                                    "'); a cross-domain audio read would need an explicit resample, not supported in v1";
+                  return nullptr;
+               }
+               if (decl->typeName == "image" && declaredDomain != Domain::Pixel)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "'image' pins are only legal in the 'pixel' domain (got '" + decl->domainName +
+                                    "'); a cross-domain image read would need an explicit resample, not supported in v1";
+                  return nullptr;
+               }
+
+               bool isStructural = (decl->typeName == "geometry" || decl->typeName == "audio" || decl->typeName == "image");
+               DataType dt = DataType::Float;
+               int lanes = 1;
+               if (isStructural)
+               {
+                  if (decl->typeName == "audio") { dt = DataType::Float; lanes = 1; }
+                  else if (decl->typeName == "image") { dt = DataType::Vec4; lanes = 4; }
+                  // "geometry" has no FieldType - dt/lanes stay at defaults and are unused.
+               }
+               else
+               {
+                  dt = ParseDataType(decl->typeName);
+                  if (dt == DataType::Void)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = decl->span;
+                     error.message = "unknown type '" + decl->typeName + "' in input declaration";
+                     return nullptr;
+                  }
+                  lanes = FieldType::GetLanesForType(dt);
+               }
+
+               DeclaredInput in;
+               in.name = decl->name;
+               in.typeName = decl->typeName;
+               in.isStructural = isStructural;
+               in.type = dt;
+               in.lanes = lanes;
+               in.domain = declaredDomain;
+               in.span = decl->span;
+               prog.declaredInputs.push_back(in);
+
+               VarSymbol sym;
+               sym.name = decl->name;
+               sym.type = FieldType(dt, lanes);
+               sym.domain = declaredDomain;
+               sym.isInputPin = true;
+               sym.isReadOnly = true;
+               sym.isStructuralGeometry = (decl->typeName == "geometry");
+               scope.Add(sym);
+
+               return nullptr;
             }
 
             case AstKind::Assign:
@@ -1559,6 +1939,7 @@ namespace Field
                   return nullptr;
                }
 
+               scope.declDepth++;
                std::vector<IRStmtPtr> thenStmts;
                if (ifAst->thenBlock)
                {
@@ -1568,14 +1949,14 @@ namespace Field
                      for (const auto& s : blk->statements)
                      {
                         auto irS = LowerAstStmt(s, scope, prog, error);
-                        if (!irS) return nullptr;
+                        if (!irS) { scope.declDepth--; return nullptr; }
                         thenStmts.push_back(irS);
                      }
                   }
                   else
                   {
                      auto irS = LowerAstStmt(ifAst->thenBlock, scope, prog, error);
-                     if (!irS) return nullptr;
+                     if (!irS) { scope.declDepth--; return nullptr; }
                      thenStmts.push_back(irS);
                   }
                }
@@ -1589,17 +1970,18 @@ namespace Field
                      for (const auto& s : blk->statements)
                      {
                         auto irS = LowerAstStmt(s, scope, prog, error);
-                        if (!irS) return nullptr;
+                        if (!irS) { scope.declDepth--; return nullptr; }
                         elseStmts.push_back(irS);
                      }
                   }
                   else
                   {
                      auto irS = LowerAstStmt(ifAst->elseBlock, scope, prog, error);
-                     if (!irS) return nullptr;
+                     if (!irS) { scope.declDepth--; return nullptr; }
                      elseStmts.push_back(irS);
                   }
                }
+               scope.declDepth--;
 
                Domain ifDomain = condIR->domain;
                for (const auto& s : thenStmts)
@@ -1669,6 +2051,7 @@ namespace Field
                }
 
                std::vector<IRStmtPtr> bodyStmts;
+               scope.declDepth++;
                if (forAst->body)
                {
                   if (forAst->body->kind == AstKind::Block)
@@ -1677,17 +2060,18 @@ namespace Field
                      for (const auto& s : blk->statements)
                      {
                         auto irS = LowerAstStmt(s, scope, prog, error);
-                        if (!irS) return nullptr;
+                        if (!irS) { scope.declDepth--; return nullptr; }
                         bodyStmts.push_back(irS);
                      }
                   }
                   else
                   {
                      auto irS = LowerAstStmt(forAst->body, scope, prog, error);
-                     if (!irS) return nullptr;
+                     if (!irS) { scope.declDepth--; return nullptr; }
                      bodyStmts.push_back(irS);
                   }
                }
+               scope.declDepth--;
 
                Domain forDomain = Domain::Graph;
                if (initStmt) { bool c = true; Domain d = JoinDomains(forDomain, initStmt->domain, c); if (!c) { error = MakeIncomparableDomainError(forDomain, forAst->span, initStmt->domain, initStmt->span, "for loop init"); return nullptr; } forDomain = d; }
@@ -2252,6 +2636,10 @@ namespace Field
             declaredNames.insert(std::static_pointer_cast<AstDeclParam>(s)->name);
          else if (s->kind == AstKind::DeclState)
             declaredNames.insert(std::static_pointer_cast<AstDeclState>(s)->name);
+         else if (s->kind == AstKind::DeclOutput)
+            declaredNames.insert(std::static_pointer_cast<AstDeclOutput>(s)->name);
+         else if (s->kind == AstKind::DeclInput)
+            declaredNames.insert(std::static_pointer_cast<AstDeclInput>(s)->name);
       }
 
       for (const auto& s : stmts)
@@ -2573,6 +2961,10 @@ namespace Field
             declaredNames.insert(std::static_pointer_cast<AstDeclParam>(s)->name);
          else if (s->kind == AstKind::DeclState)
             declaredNames.insert(std::static_pointer_cast<AstDeclState>(s)->name);
+         else if (s->kind == AstKind::DeclOutput)
+            declaredNames.insert(std::static_pointer_cast<AstDeclOutput>(s)->name);
+         else if (s->kind == AstKind::DeclInput)
+            declaredNames.insert(std::static_pointer_cast<AstDeclInput>(s)->name);
       }
 
       // Pass 0: pre-scan assignments
@@ -2690,6 +3082,157 @@ namespace Field
             stmt->stateLanes = lanes;
             stmt->stateInitValues = initVals;
             irStmts.push_back(stmt);
+            continue;
+         }
+         else if (s->kind == AstKind::DeclOutput || s->kind == AstKind::DeclInput)
+         {
+            bool isOutput = (s->kind == AstKind::DeclOutput);
+            std::string domainName = isOutput ? std::static_pointer_cast<AstDeclOutput>(s)->domainName
+                                               : std::static_pointer_cast<AstDeclInput>(s)->domainName;
+            std::string typeName = isOutput ? std::static_pointer_cast<AstDeclOutput>(s)->typeName
+                                             : std::static_pointer_cast<AstDeclInput>(s)->typeName;
+            std::string pinName = isOutput ? std::static_pointer_cast<AstDeclOutput>(s)->name
+                                            : std::static_pointer_cast<AstDeclInput>(s)->name;
+            AstNodePtr initExpr = isOutput ? std::static_pointer_cast<AstDeclOutput>(s)->initExpr : nullptr;
+
+            Domain declaredDomain;
+            if (!DomainFromString(domainName, declaredDomain))
+            {
+               outError.severity = Severity::Error;
+               outError.span = s->span;
+               outError.message = "unknown domain '" + domainName + "' in " + std::string(isOutput ? "output" : "input") + " declaration";
+               return false;
+            }
+            if (declaredDomain == Domain::Graph)
+            {
+               outError.severity = Severity::Error;
+               outError.span = s->span;
+               outError.message = std::string("'") + (isOutput ? "output" : "input") + "' cannot declare a graph-domain pin (graph domain has no per-frame dataflow)";
+               return false;
+            }
+            if (isOutput && typeName == "geometry")
+            {
+               outError.severity = Severity::Error;
+               outError.span = s->span;
+               outError.message = "'geometry' is an input-only structural type; use it with 'input', not 'output'";
+               return false;
+            }
+            if (scope.Has(pinName))
+            {
+               outError.severity = Severity::Error;
+               outError.span = s->span;
+               outError.message = "duplicate declaration of '" + pinName + "'";
+               return false;
+            }
+            if (outProgram.declaredOutputs.size() + outProgram.declaredInputs.size() >= kFieldMaxDeclaredPinsPerProgram)
+            {
+               outError.severity = Severity::Error;
+               outError.span = s->span;
+               outError.message = "declared pin count exceeds the " + std::to_string(kFieldMaxDeclaredPinsPerProgram) + "-pin-per-kernel ceiling (build step 12 v1 limit)";
+               return false;
+            }
+
+            // S5.6/S5.8 row 4: each structural pin type has exactly one
+            // legal domain.
+            if (!isOutput && typeName == "geometry" && declaredDomain != Domain::Element)
+            {
+               outError.severity = Severity::Error;
+               outError.span = s->span;
+               outError.message = "'geometry' pins are only legal in the 'element' domain (got '" + domainName +
+                                    "'); a cross-domain geometry read would need an explicit resample, not supported in v1";
+               return false;
+            }
+            if (typeName == "audio" && declaredDomain != Domain::Sample)
+            {
+               outError.severity = Severity::Error;
+               outError.span = s->span;
+               outError.message = "'audio' pins are only legal in the 'sample' domain (got '" + domainName +
+                                    "'); a cross-domain audio read would need an explicit resample, not supported in v1";
+               return false;
+            }
+            if (typeName == "image" && declaredDomain != Domain::Pixel)
+            {
+               outError.severity = Severity::Error;
+               outError.span = s->span;
+               outError.message = "'image' pins are only legal in the 'pixel' domain (got '" + domainName +
+                                    "'); a cross-domain image read would need an explicit resample, not supported in v1";
+               return false;
+            }
+
+            bool isStructural = (typeName == "audio" || typeName == "image" || (!isOutput && typeName == "geometry"));
+            DataType dt = DataType::Float;
+            int lanes = 1;
+            if (isStructural)
+            {
+               if (typeName == "audio") { dt = DataType::Float; lanes = 1; }
+               else if (typeName == "image") { dt = DataType::Vec4; lanes = 4; }
+               // "geometry" (input-only): no FieldType, dt/lanes unused.
+            }
+            else
+            {
+               dt = ParseDataType(typeName);
+               if (dt == DataType::Void)
+               {
+                  outError.severity = Severity::Error;
+                  outError.span = s->span;
+                  outError.message = "unknown type '" + typeName + "' in " + std::string(isOutput ? "output" : "input") + " declaration";
+                  return false;
+               }
+               lanes = FieldType::GetLanesForType(dt);
+            }
+
+            if (isOutput)
+            {
+               if (!initExpr)
+               {
+                  outError.severity = Severity::Error;
+                  outError.span = s->span;
+                  outError.message = "output '" + pinName + "' requires an initializer expression";
+                  return false;
+               }
+               IRNodePtr initIR = LowerAstExpr(initExpr, scope, outError);
+               if (!initIR) return false;
+
+               bool isFiner = false;
+               if (!CheckPinDomainOk(initIR->domain, declaredDomain, isFiner))
+               {
+                  if (isFiner)
+                  {
+                     outError.severity = Severity::Error;
+                     outError.span = initExpr->span;
+                     outError.message = "output '" + pinName + "' is declared " + std::string(DomainToString(declaredDomain)) +
+                                          "-domain but its expression is " + std::string(DomainToString(initIR->domain)) +
+                                          "-domain (finer); wrap it in an explicit reduce/resample to coarsen it first";
+                     outError.hint = "e.g. reduce.mean(x) or reduce.rms(x)";
+                     return false;
+                  }
+                  outError = MakeIncomparableDomainError(initIR->domain, initExpr->span, declaredDomain, s->span,
+                                                         "output '" + pinName + "' declaration");
+                  return false;
+               }
+
+               DeclaredOutput out;
+               out.name = pinName; out.typeName = typeName; out.isStructural = isStructural;
+               out.type = dt; out.lanes = lanes; out.domain = declaredDomain; out.span = s->span;
+               outProgram.declaredOutputs.push_back(out);
+            }
+            else
+            {
+               DeclaredInput in;
+               in.name = pinName; in.typeName = typeName; in.isStructural = isStructural;
+               in.type = dt; in.lanes = lanes; in.domain = declaredDomain; in.span = s->span;
+               outProgram.declaredInputs.push_back(in);
+            }
+
+            VarSymbol sym;
+            sym.name = pinName;
+            sym.type = FieldType(dt, lanes);
+            sym.domain = declaredDomain;
+            sym.isOutputPin = isOutput;
+            sym.isInputPin = !isOutput;
+            sym.isReadOnly = true;
+            sym.isStructuralGeometry = (!isOutput && typeName == "geometry");
+            scope.Add(sym);
             continue;
          }
          else if (s->kind != AstKind::Assign && s->kind != AstKind::If && s->kind != AstKind::For)
@@ -3284,6 +3827,14 @@ namespace Field
             outError.severity = Severity::Error;
             outError.span = s->span;
             outError.message = "attrib/state declarations are not allowed in the graph domain (the kernel runs once at edit time - there is no per-frame or per-element loop to hold state across)";
+            return false;
+         }
+
+         if (s->kind == AstKind::DeclOutput || s->kind == AstKind::DeclInput)
+         {
+            outError.severity = Severity::Error;
+            outError.span = s->span;
+            outError.message = "output/input declarations are not allowed in the graph domain (the kernel runs once at edit time - use emit()/connect()/set()/place() for graph-domain dataflow instead)";
             return false;
          }
 

@@ -97,6 +97,8 @@ namespace
 #include "core/field/GlslBackend.h"
 #include "core/field/Transfer.h"
 #include "core/field/ReduceOps.h"
+#include "core/field/BackendRegister.h"
+#include "core/field/PinTable.h"
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
@@ -38708,6 +38710,628 @@ static int RunFieldSampleTest()
    return allOk ? 0 : 1;
 }
 
+// Build step 12 (docs/plans/field/step-12-dynamic-pins-ir.md): dynamic
+// output/input pin declarations. This harness is compiler-level only - it
+// drives Lex/ParseProgram/LowerElementProgramToIR/LowerPixelProgramToIR and
+// BackendRegister::CompileSampleProgram directly (never through a node class,
+// since FieldElementNode/FieldSampleNode only expose the post-backend
+// compiled program, not the intermediate IR's declaredOutputs/declaredInputs
+// vectors) plus a standalone Field::PinTable, per this step's "compiler/IR
+// work only, nothing in src/nodes/ changes" scope restriction.
+static int RunFieldPinDeclTest()
+{
+   printf("[FIELDPINDECLTEST] Running Field dynamic-pins declaration harness...\n");
+   bool allOk = true;
+
+   // ------------------------------------------------------------
+   // SECTION 1: Element-domain output/input collection (shared IR path)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src =
+         "output frame float bright = t\n"
+         "input sample audio sidechain\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      if (!Field::Lex(src, tokens, err) ||
+          !Field::ParseProgram(tokens, ast, err) ||
+          !Field::LowerElementProgramToIR(ast, ir, err))
+      {
+         printf("SECTION 1: FAIL - valid snippet did not compile: %s\n", err.message.c_str());
+         secOk = false;
+      }
+      else
+      {
+         if (ir.declaredOutputs.size() != 1 || ir.declaredOutputs[0].name != "bright" ||
+             ir.declaredOutputs[0].domain != Field::Domain::Frame ||
+             ir.declaredOutputs[0].type != Field::DataType::Float)
+         {
+            printf("SECTION 1: FAIL - declaredOutputs does not match expected ('bright', Frame, Float)\n");
+            secOk = false;
+         }
+         if (ir.declaredInputs.size() != 1 || ir.declaredInputs[0].name != "sidechain" ||
+             ir.declaredInputs[0].domain != Field::Domain::Sample || !ir.declaredInputs[0].isStructural)
+         {
+            printf("SECTION 1: FAIL - declaredInputs does not match expected ('sidechain', Sample, structural audio)\n");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 1 (Element-Domain Output/Input Collection): OK\n");
+      else { printf("SECTION 1 (Element-Domain Output/Input Collection): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 2: geometry input + bounded dotted-field access (.P/.N/.uv/.Cd)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src =
+         "input element geometry other\n"
+         "output element vec3 otherPos = other.P\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      if (!Field::Lex(src, tokens, err) ||
+          !Field::ParseProgram(tokens, ast, err) ||
+          !Field::LowerElementProgramToIR(ast, ir, err))
+      {
+         printf("SECTION 2: FAIL - valid geometry-access snippet did not compile: %s\n", err.message.c_str());
+         secOk = false;
+      }
+      else
+      {
+         if (ir.declaredInputs.size() != 1 || ir.declaredInputs[0].name != "other" ||
+             ir.declaredInputs[0].typeName != "geometry" || !ir.declaredInputs[0].isStructural)
+         {
+            printf("SECTION 2: FAIL - declaredInputs does not match expected ('other', geometry, structural)\n");
+            secOk = false;
+         }
+         if (ir.declaredOutputs.size() != 1 || ir.declaredOutputs[0].name != "otherPos" ||
+             ir.declaredOutputs[0].domain != Field::Domain::Element)
+         {
+            printf("SECTION 2: FAIL - declaredOutputs does not match expected ('otherPos', Element)\n");
+            secOk = false;
+         }
+      }
+
+      // A bare (non-dotted) reference to a geometry input must be refused -
+      // it names a whole mesh, not a value.
+      {
+         std::string bad = "input element geometry other\noutput element vec3 bad = other\n";
+         std::vector<Field::Token> t2;
+         Field::FieldError e2;
+         Field::AstNodePtr a2;
+         Field::ElementIRProgram ir2;
+         bool ok = Field::Lex(bad, t2, e2) && Field::ParseProgram(t2, a2, e2) && Field::LowerElementProgramToIR(a2, ir2, e2);
+         if (ok || e2.message.find("cannot be used as a value directly") == std::string::npos)
+         {
+            printf("SECTION 2: FAIL - bare geometry identifier reference was not refused (err='%s')\n", e2.message.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (Geometry Input + Structural Field Access): OK\n");
+      else { printf("SECTION 2 (Geometry Input + Structural Field Access): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 3: Domain-join refusal - finer expression than declared domain
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src = "output frame float bad = P.x\n"; // P.x is Element-domain, finer than Frame
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                Field::LowerElementProgramToIR(ast, ir, err);
+      if (ok || err.message.find("finer") == std::string::npos)
+      {
+         printf("SECTION 3: FAIL - finer-than-declared expression was not refused with a 'finer' message (err='%s')\n",
+                err.message.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 3 (Domain-Join Refusal - Finer Expression): OK\n");
+      else { printf("SECTION 3 (Domain-Join Refusal - Finer Expression): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 4: every wrong/right row in S5.1 and every refusal row in
+   // S5.8, each error naming its span (exit criterion item 1).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      auto testRefusal = [&](const std::string& src, const std::string& expectedSubstr, const char* label) {
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                   Field::LowerElementProgramToIR(ast, ir, err);
+         if (ok || err.message.find(expectedSubstr) == std::string::npos)
+         {
+            printf("SECTION 4 (%s): FAIL - expected refusal containing '%s', got ok=%d err='%s'\n",
+                   label, expectedSubstr.c_str(), ok, err.message.c_str());
+            secOk = false;
+            return;
+         }
+         if (err.span.line <= 0 || err.span.col <= 0)
+         {
+            printf("SECTION 4 (%s): FAIL - error is missing a valid source span (line=%d, col=%d)\n",
+                   label, err.span.line, err.span.col);
+            secOk = false;
+         }
+      };
+      // Same as testRefusal, but the valid-input direction: must compile.
+      auto testAccept = [&](const std::string& src, const char* label) {
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                   Field::LowerElementProgramToIR(ast, ir, err);
+         if (!ok)
+         {
+            printf("SECTION 4 (%s): FAIL - expected this to compile, got error: %s\n", label, err.message.c_str());
+            secOk = false;
+         }
+      };
+
+      // S5.1 "wrong" rows.
+      testRefusal("output publish = length(P)\n", "domain", "missing domain/type");
+      testRefusal("output frame float t = 1\n", "reserved", "reserved name 't' (frame domain)");
+      testRefusal("output frame float bass = 1\noutput frame float bass = 2\n", "duplicate declaration", "duplicate output name");
+      testRefusal("input frame float k = 1.0\n", "", "input with initializer is a syntax error"); // no '=' expected after an input decl
+      testRefusal("output graph float x = 1.0\n", "graph-domain pin", "output in graph domain");
+
+      // S5.1 "right" rows (the corresponding valid forms must compile).
+      // Note: length(P)*heat in the doc's own worked example (S5.1) is
+      // Element-domain (P is an element attrib) and would itself be
+      // refused as "finer than declared" under S5.3's join check unless
+      // 'heat' were a reduce'd/frame-domain quantity - the doc's comment
+      // is illustrative, not a literal type-checked snippet, so this
+      // right-row instead uses a genuinely frame-domain expression (t),
+      // matching SECTION 1's already-verified 'bright = t' declaration.
+      testAccept("output frame float publish = t * 2\n", "explicit domain+type output, frame-domain expr");
+      testAccept("input element geometry other\ninput sample audio sidechain\nP += (other.P - P) * 0.1\n",
+                 "geometry + audio inputs, owner's own example");
+
+      // S5.8 row: two declared pins, same direction, same name -> duplicate,
+      // already covered above (bass/bass). Opposite-direction name reuse:
+      // a pin's name shadowing a pin in the other direction.
+      testRefusal("output frame float x = 1\ninput frame float x\n", "duplicate declaration", "name reused across output/input");
+
+      // S5.8 row: reserved attrib / param / state name collisions.
+      testRefusal("output frame float P = 1\n", "reserved", "shadows reserved element attrib 'P'");
+      testRefusal("param float amt = 0.5 [0,1]\noutput frame float amt = 1\n", "duplicate declaration", "shadows an existing param");
+      testRefusal("state float acc = 0\noutput frame float acc = 1\n", "duplicate declaration", "shadows an existing state");
+
+      // S5.8 row: image/geometry/audio used with the wrong domain.
+      testRefusal("output element audio bad = 1\n", "sample", "'audio' pin declared outside sample domain");
+      testRefusal("input pixel geometry bad\n", "element", "'geometry' pin declared outside element domain");
+      testRefusal("output element image bad = vec4(1,1,1,1)\n", "pixel", "'image' pin declared outside pixel domain");
+
+      // S5.8 row: expression domain finer than declared -> refuse, name
+      // both domains, suggest reduce (already covered by SECTION 3, but
+      // check the hint text is present here too).
+      {
+         std::string src = "output frame float bad = P.x\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                   Field::LowerElementProgramToIR(ast, ir, err);
+         if (ok || err.message.find("frame") == std::string::npos || err.message.find("element") == std::string::npos ||
+             err.hint.find("reduce") == std::string::npos)
+         {
+            printf("SECTION 4 (finer expression names both domains + reduce hint): FAIL - err='%s' hint='%s'\n",
+                   err.message.c_str(), err.hint.c_str());
+            secOk = false;
+         }
+      }
+
+      // Nested declaration (not directly in S5.1/S5.8's table, but required
+      // by S5's "declared at top level" rule elsewhere in the doc).
+      testRefusal("if (t > 0) {\noutput frame float bad = t\n}\n", "must be declared at top level", "nested output");
+
+      if (secOk) printf("SECTION 4 (S5.1/S5.8 Wrong/Right/Refusal Table): OK\n");
+      else { printf("SECTION 4 (S5.1/S5.8 Wrong/Right/Refusal Table): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 5: 16-pin-per-kernel ceiling
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src;
+      for (int i = 0; i < 17; ++i)
+         src += "output frame float p" + std::to_string(i) + " = 1\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                Field::LowerElementProgramToIR(ast, ir, err);
+      if (ok || err.message.find("ceiling") == std::string::npos)
+      {
+         printf("SECTION 5: FAIL - 17th pin declaration was not refused with a ceiling message (err='%s')\n",
+                err.message.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 5 (16-Pin-Per-Kernel Ceiling): OK\n");
+      else { printf("SECTION 5 (16-Pin-Per-Kernel Ceiling): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 6: Sample-domain backend collection (independent lowering path)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 6a. output frame float ... = reduce.rms(...) - the only legal form
+      // for a frame-domain output declared inside a sample kernel.
+      {
+         std::string src = "output frame float bass = reduce.rms(in, 20, 200)\nout = in\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (!Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - reduce.rms output declaration did not compile: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         else if (prog.declaredOutputs.size() != 1 || prog.declaredOutputs[0].name != "bass" ||
+                  prog.declaredOutputs[0].domainName != "frame" || !prog.hasReduceRms)
+         {
+            printf("SECTION 6: FAIL - SampleProgram::declaredOutputs / hasReduceRms not set as expected\n");
+            secOk = false;
+         }
+      }
+
+      // 6b. output sample float ... = <plain expr> - legal sample-domain form.
+      {
+         std::string src = "output sample float y = in * 0.5\nout = in\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (!Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - plain sample-domain output did not compile: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         else if (prog.declaredOutputs.size() != 1 || prog.declaredOutputs[0].name != "y" ||
+                  prog.declaredOutputs[0].domainName != "sample")
+         {
+            printf("SECTION 6: FAIL - SampleProgram::declaredOutputs does not match expected ('y', sample)\n");
+            secOk = false;
+         }
+      }
+
+      // 6c. A sample-domain output declared as reduce.rms(...) is refused -
+      // that's a frame-domain result and must be declared 'output frame'.
+      {
+         std::string src = "output sample float bad = reduce.rms(in, 20, 200)\nout = in\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - reduce.rms declared as 'output sample' was not refused\n");
+            secOk = false;
+         }
+      }
+
+      // 6d. input <name> is collected but NOT bound into scope - referencing
+      // it inside the kernel body is a loud compile error, not silent garbage.
+      {
+         std::string src = "input sample audio sidechain\nout = sidechain\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - referencing an unbound sample-domain input did not fail to compile\n");
+            secOk = false;
+         }
+         else if (err.message.find("used before assignment") == std::string::npos)
+         {
+            printf("SECTION 6: FAIL - expected a loud 'used before assignment' error, got '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+
+         // But the declaration itself (without referencing it) is collected.
+         std::string src2 = "input sample audio sidechain\nout = in\n";
+         Field::SampleProgram prog2;
+         Field::FieldError err2;
+         if (!Field::CompileSampleProgram(src2, nullptr, prog2, err2))
+         {
+            printf("SECTION 6: FAIL - bare (unreferenced) input declaration did not compile: %s\n", err2.message.c_str());
+            secOk = false;
+         }
+         else if (prog2.declaredInputs.size() != 1 || prog2.declaredInputs[0].name != "sidechain")
+         {
+            printf("SECTION 6: FAIL - SampleProgram::declaredInputs does not match expected ('sidechain')\n");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 6 (Sample-Domain Backend Collection): OK\n");
+      else { printf("SECTION 6 (Sample-Domain Backend Collection): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 7: PinTable identity - append-only ids, retire/remint on
+   // reconcile, stable-id reuse across a plain disappear+reappear.
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+
+      // First compile declares 'a' and 'b'.
+      std::vector<Field::DeclaredPin> decl1 = {
+         { "a", "float", "frame", true },
+         { "b", "float", "frame", true },
+      };
+      table.Reconcile(decl1, 0, notice);
+      const Field::PinEntry* a1 = table.Find("a");
+      const Field::PinEntry* b1 = table.Find("b");
+      if (!a1 || !b1 || a1->id == b1->id || a1->id <= 0 || b1->id <= 0)
+      {
+         printf("SECTION 7: FAIL - initial Reconcile did not assign distinct positive ids to 'a' and 'b'\n");
+         secOk = false;
+      }
+      int aId = a1 ? a1->id : -1;
+      int bId = b1 ? b1->id : -1;
+
+      // Second compile drops 'b' - it must be marked retired and reported.
+      std::vector<Field::DeclaredPin> decl2 = {
+         { "a", "float", "frame", true },
+      };
+      table.Reconcile(decl2, 0, notice);
+      if (notice.find("'b'") == std::string::npos)
+      {
+         printf("SECTION 7: FAIL - retiring 'b' did not produce a notice mentioning it (notice='%s')\n", notice.c_str());
+         secOk = false;
+      }
+      const Field::PinEntry* bRetired = table.Find("b");
+      if (!bRetired || bRetired->isDeclared || bRetired->id != bId)
+      {
+         printf("SECTION 7: FAIL - retired 'b' entry should keep its id and isDeclared=false\n");
+         secOk = false;
+      }
+
+      // Third compile: 'b' reappears with the SAME shape - must reuse the
+      // same id (stable identity), not mint a new one.
+      table.Reconcile(decl1, 0, notice);
+      const Field::PinEntry* bAgain = table.Find("b");
+      if (!bAgain || !bAgain->isDeclared || bAgain->id != bId)
+      {
+         printf("SECTION 7: FAIL - 'b' reappearing with an unchanged shape should reuse id %d, got %s\n",
+                bId, bAgain ? std::to_string(bAgain->id).c_str() : "(null)");
+         secOk = false;
+      }
+
+      // Fourth compile: 'b' reappears with a DIFFERENT shape (domain changed)
+      // - must retire the old identity and mint a fresh one (S5.4).
+      std::vector<Field::DeclaredPin> decl4 = {
+         { "a", "float", "frame", true },
+         { "b", "float", "element", true }, // domain changed: frame -> element
+      };
+      table.Reconcile(decl4, 0, notice);
+      const Field::PinEntry* bChanged = table.Find("b");
+      if (!bChanged || !bChanged->isDeclared || bChanged->id == bId || bChanged->domainName != "element")
+      {
+         printf("SECTION 7: FAIL - 'b' reappearing with a changed shape should mint a fresh id (old=%d, new=%s)\n",
+                bId, bChanged ? std::to_string(bChanged->id).c_str() : "(null)");
+         secOk = false;
+      }
+
+      // 'a' was untouched across all four reconciles - its id must never move.
+      const Field::PinEntry* aFinal = table.Find("a");
+      if (!aFinal || aFinal->id != aId)
+      {
+         printf("SECTION 7: FAIL - 'a' id changed across Reconcile calls that never dropped it (was %d, now %s)\n",
+                aId, aFinal ? std::to_string(aFinal->id).c_str() : "(null)");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 7 (PinTable Stable Identity + Reconcile): OK\n");
+      else { printf("SECTION 7 (PinTable Stable Identity + Reconcile): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 8: PinTable::Reconcile idempotence - calling it twice with the
+   // exact same declaration list produces the same ids both times
+   // (exit criterion item 4).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+      std::vector<Field::DeclaredPin> decl = {
+         { "x", "float", "frame", true },
+         { "y", "float", "sample", false },
+      };
+      table.Reconcile(decl, 0, notice);
+      int xId1 = table.Find("x") ? table.Find("x")->id : -1;
+      int yId1 = table.Find("y") ? table.Find("y")->id : -1;
+
+      table.Reconcile(decl, 0, notice); // same list again
+      int xId2 = table.Find("x") ? table.Find("x")->id : -1;
+      int yId2 = table.Find("y") ? table.Find("y")->id : -1;
+
+      if (xId1 <= 0 || yId1 <= 0 || xId1 == yId1 || xId1 != xId2 || yId1 != yId2 ||
+          table.Pins().size() != 2)
+      {
+         printf("SECTION 8: FAIL - idempotent Reconcile did not produce stable ids (x:%d->%d, y:%d->%d, pins=%zu)\n",
+                xId1, xId2, yId1, yId2, table.Pins().size());
+         secOk = false;
+      }
+      if (!notice.empty())
+      {
+         printf("SECTION 8: FAIL - re-declaring the exact same list produced a spurious retirement notice: '%s'\n",
+                notice.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 8 (Reconcile Idempotence): OK\n");
+      else { printf("SECTION 8 (Reconcile Idempotence): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 9: PinTable::Reconcile with a renamed pin retires the old id
+   // (isDeclared=false, still present in Pins()) and mints a new one
+   // (exit criterion item 5).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+      std::vector<Field::DeclaredPin> decl1 = { { "oldName", "float", "frame", true } };
+      table.Reconcile(decl1, 0, notice);
+      const Field::PinEntry* orig = table.Find("oldName");
+      int origId = orig ? orig->id : -1;
+
+      // Rename: the declaration list now has "newName" instead of "oldName".
+      std::vector<Field::DeclaredPin> decl2 = { { "newName", "float", "frame", true } };
+      table.Reconcile(decl2, 0, notice);
+
+      bool foundOldStillPresent = false;
+      for (const auto& p : table.Pins())
+      {
+         if (p.id == origId) { foundOldStillPresent = true;
+            if (p.isDeclared)
+            {
+               printf("SECTION 9: FAIL - retired 'oldName' entry (id %d) should have isDeclared=false\n", origId);
+               secOk = false;
+            }
+         }
+      }
+      if (!foundOldStillPresent)
+      {
+         printf("SECTION 9: FAIL - retired 'oldName' entry (id %d) is missing from Pins() entirely\n", origId);
+         secOk = false;
+      }
+      const Field::PinEntry* renamed = table.Find("newName");
+      if (!renamed || !renamed->isDeclared || renamed->id == origId || renamed->id <= 0)
+      {
+         printf("SECTION 9: FAIL - 'newName' should be a freshly minted id distinct from the retired 'oldName' id %d\n", origId);
+         secOk = false;
+      }
+      if (notice.find("'oldName'") == std::string::npos)
+      {
+         printf("SECTION 9: FAIL - rename should report 'oldName' as retired in outNotice (got '%s')\n", notice.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 9 (Rename Retires Old Id, Mints New Id): OK\n");
+      else { printf("SECTION 9 (Rename Retires Old Id, Mints New Id): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 10: PinTable::Reconcile with the same name but a changed
+   // type/domain also retires-and-mints, not updates-in-place - S5.4's
+   // deliberate difference from ParamTable (exit criterion item 6).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 10a. Type change (float -> vec3), domain unchanged.
+      {
+         Field::PinTable table;
+         std::string notice;
+         table.Reconcile({ { "v", "float", "frame", true } }, 0, notice);
+         int oldId = table.Find("v") ? table.Find("v")->id : -1;
+         table.Reconcile({ { "v", "vec3", "frame", true } }, 0, notice);
+         const Field::PinEntry* changed = table.Find("v");
+         if (!changed || !changed->isDeclared || changed->id == oldId || changed->typeName != "vec3")
+         {
+            printf("SECTION 10: FAIL - type change (float->vec3) on 'v' should retire+remint, old=%d new=%s\n",
+                   oldId, changed ? std::to_string(changed->id).c_str() : "(null)");
+            secOk = false;
+         }
+      }
+
+      // 10b. Direction change (output -> input), same name/type/domain.
+      {
+         Field::PinTable table;
+         std::string notice;
+         table.Reconcile({ { "d", "float", "frame", true } }, 0, notice);
+         int oldId = table.Find("d") ? table.Find("d")->id : -1;
+         table.Reconcile({ { "d", "float", "frame", false } }, 0, notice);
+         const Field::PinEntry* changed = table.Find("d");
+         if (!changed || !changed->isDeclared || changed->id == oldId || changed->isOutput)
+         {
+            printf("SECTION 10: FAIL - direction change (output->input) on 'd' should retire+remint, old=%d new=%s\n",
+                   oldId, changed ? std::to_string(changed->id).c_str() : "(null)");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 10 (Type/Domain/Direction Change Retires+Remints): OK\n");
+      else { printf("SECTION 10 (Type/Domain/Direction Change Retires+Remints): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 11: SerializePinMap/DeserializePinMap round-trip a table with
+   // at least one retired entry (exit criterion item 7).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+      table.Reconcile({ { "keep", "float", "frame", true }, { "gone", "float", "frame", true } }, 0, notice);
+      table.Reconcile({ { "keep", "float", "frame", true } }, 0, notice); // "gone" retires
+
+      const Field::PinEntry* keepBefore = table.Find("keep");
+      const Field::PinEntry* goneBefore = table.Find("gone");
+      if (!keepBefore || !goneBefore || goneBefore->isDeclared)
+      {
+         printf("SECTION 11: FAIL - fixture setup did not produce one declared + one retired entry\n");
+         secOk = false;
+      }
+      int keepId = keepBefore ? keepBefore->id : -1;
+      int goneId = goneBefore ? goneBefore->id : -1;
+
+      std::string serialized = table.SerializePinMap();
+
+      Field::PinTable table2;
+      table2.DeserializePinMap(serialized);
+      const Field::PinEntry* keepAfter = table2.Find("keep");
+      const Field::PinEntry* goneAfter = table2.Find("gone");
+      if (!keepAfter || keepAfter->id != keepId)
+      {
+         printf("SECTION 11: FAIL - 'keep' did not round-trip to the same id %d (got %s)\n",
+                keepId, keepAfter ? std::to_string(keepAfter->id).c_str() : "(null)");
+         secOk = false;
+      }
+      if (!goneAfter || goneAfter->id != goneId)
+      {
+         printf("SECTION 11: FAIL - retired 'gone' did not round-trip to the same id %d (got %s)\n",
+                goneId, goneAfter ? std::to_string(goneAfter->id).c_str() : "(null)");
+         secOk = false;
+      }
+      if (table2.NextPinId() <= std::max(keepId, goneId))
+      {
+         printf("SECTION 11: FAIL - deserialized table's NextPinId (%d) must be past the highest restored id (%d)\n",
+                table2.NextPinId(), std::max(keepId, goneId));
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 11 (SerializePinMap/DeserializePinMap Round-Trip With Retired Entry): OK\n");
+      else { printf("SECTION 11 (SerializePinMap/DeserializePinMap Round-Trip With Retired Entry): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDPINDECLTEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
+
 // ===================================================== INFINITE_RECSYNCTEST
 // Guards the exported-movie A/V sync property. The video track's PTS is a
 // plain frame counter over recordFps on both platforms, while live audio is
@@ -41931,6 +42555,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_FIELDSAMPLETEST") != nullptr)
       return RunFieldSampleTest();
+
+   if (getenv("INFINITE_FIELDPINDECLTEST") != nullptr)
+      return RunFieldPinDeclTest();
 
    if (getenv("INFINITE_MOLDERTEST") != nullptr)
       return RunMolderFixture() ? 0 : 1;
