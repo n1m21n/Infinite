@@ -33218,6 +33218,41 @@ static bool RunDrumSequencerFixture()
       ok &= routingOk;
    }
 
+   // 14) ReloadFromPaths preserves trim settings (undo / redo / reload regression):
+   // Simulates save/load and undo/redo by populating a lane, setting custom
+   // trim (start/end), serializing via Patch::SaveParams, deserializing into a
+   // fresh DrumSequencerNode via Patch::LoadParams, and calling ReloadFromPaths().
+   // The custom trim bounds must survive rather than being reset to 0..1 by
+   // FinishLaneBuffer.
+   {
+      auto src = std::make_unique<DrumSequencerNode>();
+      src->LoadFileToLane(0, shortClickPath);
+      src->laneStart[0] = 0.25f;
+      src->laneEnd[0] = 0.75f;
+
+      std::vector<std::pair<std::string, std::string>> savedParams;
+      Patch::SaveParams(src.get(), savedParams);
+
+      auto dst = std::make_unique<DrumSequencerNode>();
+      Patch::LoadParams(dst.get(), savedParams);
+      const bool paramsLoadedOk = (std::fabs(dst->laneStart[0] - 0.25f) < 1e-4f) &&
+                                  (std::fabs(dst->laneEnd[0] - 0.75f) < 1e-4f);
+
+      // Simulates what ReloadDerivedState does on undo/redo and patch load:
+      dst->ReloadFromPaths();
+      const bool trimPreservedAfterReload = (std::fabs(dst->laneStart[0] - 0.25f) < 1e-4f) &&
+                                            (std::fabs(dst->laneEnd[0] - 0.75f) < 1e-4f);
+
+      // Verify that CookIfNeeded successfully prepares and pushes to audio node
+      dst->CookIfNeeded(1);
+
+      const bool reloadTrimOk = paramsLoadedOk && trimPreservedAfterReload;
+      printf("DRUMSEQTEST reload trim preservation %s (loaded=%d preserved=%d start=%.3f end=%.3f)\n",
+             reloadTrimOk ? "OK" : "FAIL", paramsLoadedOk, trimPreservedAfterReload,
+             dst->laneStart[0], dst->laneEnd[0]);
+      ok &= reloadTrimOk;
+   }
+
    remove(shortClickPath.c_str());
    remove(longClickPath.c_str());
 

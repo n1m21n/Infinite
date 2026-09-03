@@ -721,7 +721,7 @@ bool DrumSequencerNode::LoadFileToLane(int lane, const std::string& path)
       laneStatus[lane] = error.empty() ? "failed to load" : error;
       return false;
    }
-   const size_t slash = path.find_last_of('/');
+   const size_t slash = path.find_last_of("/\\");
    const std::string fileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
    FinishLaneBuffer(lane, decoded, fileName, path, "loaded");
    return true;
@@ -771,13 +771,34 @@ void DrumSequencerNode::FinishLaneBuffer(int lane, Platform::SampleBuffer* decod
    // selected range's length) - force a re-push next cook even though
    // laneDecay itself didn't change.
    mLastLaneDecay[lane] = -1.0f;
+   mLastLaneStart[lane] = -1.0f;
+   mLastLaneEnd[lane] = -1.0f;
 }
 
 void DrumSequencerNode::ReloadFromPaths()
 {
+   // Preserve start/end trim settings across file reloads (mirrors
+   // SamplerNode::ReloadFromPath) - patch loading, undo/redo, and copy/paste
+   // all restore node params first and then call ReloadDerivedState ->
+   // ReloadFromPaths to reload decoded sample buffers. Without preserving
+   // them here, FinishLaneBuffer's fresh-buffer defaults (0..1) wipe out
+   // the user's trim settings on every reload and undo checkpoint.
+   float savedStart[kNumLanes];
+   float savedEnd[kNumLanes];
    for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      savedStart[lane] = laneStart[lane];
+      savedEnd[lane] = laneEnd[lane];
+   }
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
       if (!laneFilePath[lane].empty())
+      {
          LoadFileToLane(lane, laneFilePath[lane]);
+         laneStart[lane] = savedStart[lane];
+         laneEnd[lane] = savedEnd[lane];
+      }
+   }
 }
 
 void DrumSequencerNode::Randomize()
@@ -857,4 +878,7 @@ void DrumSequencerNode::ClearLane(int lane)
    laneWaveCount[lane] = 0;
    laneStart[lane] = 0.0f;
    laneEnd[lane] = 1.0f;
+   mLastLaneDecay[lane] = -1.0f;
+   mLastLaneStart[lane] = -1.0f;
+   mLastLaneEnd[lane] = -1.0f;
 }
