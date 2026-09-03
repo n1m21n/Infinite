@@ -552,7 +552,7 @@ namespace Field
             p.Fail("state cell '" + name + "' cannot shadow reserved attribute of element domain", nameTok.span);
             return nullptr;
          }
-         if (name == "in" || name == "out" || name == "sr")
+         if (name == "in" || name == "out" || name == "sr" || name == "freq" || name == "gate")
          {
             p.Fail("state cell '" + name + "' cannot shadow reserved attribute of sample domain", nameTok.span);
             return nullptr;

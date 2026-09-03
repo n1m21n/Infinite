@@ -24,7 +24,8 @@ namespace Field
    {
       bool IsReservedName(const std::string& name)
       {
-         return name == "in" || name == "out" || name == "sr" || name == "n";
+         return name == "in" || name == "out" || name == "sr" || name == "n" ||
+                name == "freq" || name == "gate";
       }
 
       struct Ctx
@@ -187,6 +188,18 @@ namespace Field
                {
                   uint8_t dst = ctx.AllocReg(node->span);
                   ctx.Emit(SampleOp::LoadN, dst, 0, 0, 0, 0.0f, node->span);
+                  return dst;
+               }
+               if (id->name == "freq")
+               {
+                  uint8_t dst = ctx.AllocReg(node->span);
+                  ctx.Emit(SampleOp::LoadFreq, dst, 0, 0, 0, 0.0f, node->span);
+                  return dst;
+               }
+               if (id->name == "gate")
+               {
+                  uint8_t dst = ctx.AllocReg(node->span);
+                  ctx.Emit(SampleOp::LoadGate, dst, 0, 0, 0, 0.0f, node->span);
                   return dst;
                }
                auto it = scope.find(id->name);
@@ -366,7 +379,7 @@ namespace Field
                   return;
                }
                const std::string& name = static_cast<AstIdent*>(a->lvalue.get())->name;
-               if (name == "in" || name == "sr" || name == "n")
+               if (name == "in" || name == "sr" || name == "n" || name == "freq" || name == "gate")
                {
                   ctx.Fail("cannot assign to '" + name + "' (reserved, read-only)", stmt->span);
                   return;

@@ -37995,6 +37995,10 @@ static int RunFieldTransferTest()
 //   - reduce.rms(in, loHz, hiHz) publishes to MeterRing, readable via
 //     FieldSampleNode::ReadRmsLatest
 //   - zero allocation across N steady-state ProcessBlock calls
+//   - freq/gate reserved sample-domain symbols: a kernel that never reads
+//     'in' generates from freq/gate alone; gate drops to 0 the instant
+//     note-off arrives, independent of the amplitude envelope's own
+//     release tail (design-prompt-sample-generator-mode.md)
 //
 // Deliberately deferred (not covered by this fixture): true voice-stealing
 // across more concurrent notes than kMaxVoices, hot-reload across a type
@@ -38509,6 +38513,88 @@ static int RunFieldSampleTest()
 
       if (secOk) printf("SECTION 9 (Zero Allocation, Steady State): OK\n");
       else { printf("SECTION 9 (Zero Allocation, Steady State): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 10: freq/gate reserved sample-domain symbols (generator mode)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      FieldSampleNode node;
+      // No 'in' read anywhere - a self-contained generator kernel, the
+      // whole point of design-prompt-sample-generator-mode.md. Scaled by
+      // 0.001 so 440 Hz lands well under AudioFieldSampleNode's +-4.0
+      // output headroom clamp - this kernel is checking the raw freq/gate
+      // values reach the register machine, not synthesizing real audio.
+      // freq*gate is 0 the instant gate drops, even though the voice's
+      // amplitude envelope (applied externally, outside the kernel) is
+      // still mid-release and would otherwise mask a gate stuck at 1.
+      node.code = "out = freq * gate * 0.001\n";
+      if (!node.Apply())
+      {
+         printf("SECTION 10: FAIL - compile failed: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay(kSr, kBlock);
+         NoteEventQueue notes;
+         const int cursor = notes.RegisterConsumer();
+         an->SetNoteInbox(&notes, cursor);
+
+         const int voiceId = NextVoiceId();
+         NoteEvent on;
+         on.isNoteOn = true;
+         on.note = 69; // A4 = 440 Hz exactly, by construction of the MIDI->Hz formula
+         on.velocity = 1.0f;
+         on.voiceId = voiceId;
+         on.frameOffset = 0;
+         notes.Push(on);
+
+         std::vector<float> chan(kBlock, 0.0f);
+         float* chans[1] = { chan.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 1;
+         buf.numFrames = kBlock;
+
+         // Block 1: attack ramping. Block 2: well past the 2ms/96-sample
+         // attack+0ms decay, so the envelope is exactly at its 1.0 sustain
+         // level by the end of block 2 - output should equal freq*gate
+         // (440 * 1) with no envelope scaling left to account for.
+         an->ProcessBlock(nullptr, 0, buf);
+         an->ProcessBlock(nullptr, 0, buf);
+         const float heldOut = chan[kBlock - 1];
+         const float kExpectedHeld = 440.0f * 0.001f; // freq * gate(1) * 0.001
+         if (std::fabs(heldOut - kExpectedHeld) > 0.01f)
+         {
+            printf("SECTION 10: FAIL - held-note output %f is not close to expected %f (freq=440 Hz, gate should be 1)\n",
+                   heldOut, kExpectedHeld);
+            secOk = false;
+         }
+
+         // Note-off: gate must drop to 0 on the very next block, even
+         // though the 30ms release means the voice is still active (its
+         // envelope is still mid-decay) - if gate were wrongly left at 1,
+         // output would still read close to 440 * (still-high envelope),
+         // not 0.
+         NoteEvent off;
+         off.isNoteOn = false;
+         off.voiceId = voiceId;
+         off.frameOffset = 0;
+         notes.Push(off);
+         an->ProcessBlock(nullptr, 0, buf);
+         const float releasedOut = chan[kBlock - 1];
+         if (std::fabs(releasedOut) > 0.001f)
+         {
+            printf("SECTION 10: FAIL - output after note-off is %f, expected exactly 0 (gate did not drop)\n", releasedOut);
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 10 (freq/gate Reserved Symbols): OK\n");
+      else { printf("SECTION 10 (freq/gate Reserved Symbols): FAIL\n"); allOk = false; }
    }
 
    printf("INFINITE_FIELDSAMPLETEST: %s\n", allOk ? "OK" : "FAIL");

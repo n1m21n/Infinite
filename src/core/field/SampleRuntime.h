@@ -18,6 +18,12 @@ namespace Field
    // `paramVals` are fetched once per sample, ABOVE the voice loop, by the
    // caller (see FieldSampleNode.cpp) - fetching them per-voice would let
    // the effective param smoothing time constant drift with voice count.
+   // `freq`/`gate` are per-voice (unlike in/sr/n/paramVals): the caller
+   // fetches them fresh for each voice, from that voice's own note-on
+   // frequency and held state - see FieldSampleNode.cpp's per-voice loop.
+   // Always populated regardless of whether `in` is connected - a Field
+   // sample kernel can be a self-contained generator with no upstream
+   // audio source (design-prompt-sample-generator-mode.md).
    // `stateCur`/`stateNext` are per-voice: the caller passes that voice's
    // own state banks.
    struct SampleRuntimeInput
@@ -25,6 +31,8 @@ namespace Field
       float in = 0.0f;
       float sr = 0.0f;
       float n = 0.0f;
+      float freq = 0.0f;
+      float gate = 0.0f;
       const float* paramVals = nullptr; // indexed by SampleProgram::params[i] order
       const float* stateCur = nullptr;  // indexed by SampleProgram::state[i] order
       float* stateNext = nullptr;       // write-only; same indexing as stateCur
@@ -47,6 +55,8 @@ namespace Field
             case SampleOp::LoadIn: regs[ins.dst] = in.in; break;
             case SampleOp::LoadSr: regs[ins.dst] = in.sr; break;
             case SampleOp::LoadN: regs[ins.dst] = in.n; break;
+            case SampleOp::LoadFreq: regs[ins.dst] = in.freq; break;
+            case SampleOp::LoadGate: regs[ins.dst] = in.gate; break;
             case SampleOp::LoadParam: regs[ins.dst] = in.paramVals[ins.a]; break;
             case SampleOp::LoadState: regs[ins.dst] = in.stateCur[ins.a]; break;
             case SampleOp::StoreState: in.stateNext[ins.a] = DspMath::FlushDenormal(regs[ins.b]); break;

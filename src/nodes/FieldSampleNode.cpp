@@ -22,6 +22,16 @@ namespace
 {
    constexpr int kMaxVoices = 16; // fixed cap; FieldSampleNode::maxVoices (UI) selects how many of these are used
    constexpr float kOutClamp = 4.0f; // ~12dB headroom, matches the rest of the audio graph's clamp convention
+
+   // Same formula and naming convention as every other synth node's local
+   // helper (OscillatorNode/ImageSpectralSynthNode/WaveTerrainNode/
+   // EquationNode/MetallicNode all define their own copy rather than share
+   // one from a header) - see WavetableSynthCore::NoteToHz for the
+   // canonical form this mirrors.
+   inline float MidiNoteToHz(int midiNote)
+   {
+      return 440.0f * powf(2.0f, ((float)midiNote - 69.0f) / 12.0f);
+   }
 }
 
 // ------------------------------------------------------------- audio thread
@@ -32,6 +42,7 @@ public:
    {
       std::memset(mStateCur, 0, sizeof(mStateCur));
       std::memset(mStateNext, 0, sizeof(mStateNext));
+      std::memset(mGateHeld, 0, sizeof(mGateHeld));
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
@@ -126,6 +137,11 @@ public:
             {
                const int v = mVoices.NoteOn(evts[evtIdx].note, evts[evtIdx].velocity, evts[evtIdx].voiceId);
                mVoiceId[v] = evts[evtIdx].voiceId;
+               // Field 'gate': 1.0 for as long as this voice's note is
+               // held, dropping to 0.0 the instant note-off arrives below -
+               // independent of the amplitude envelope's own release tail
+               // (EnvelopeAt(v), which keeps decaying after gate goes low).
+               mGateHeld[v] = true;
                // Every voice assignment (idle or stolen) resets that voice's
                // Field 'state' cells to their declared initial values - a
                // new note is a fresh instance of the kernel's own per-voice
@@ -140,7 +156,17 @@ public:
                }
             }
             else
+            {
                mVoices.NoteOff(evts[evtIdx].voiceId);
+               // mVoiceId[] is this class's own record of which voice index
+               // currently holds which voiceId (kMaxVoices is small and
+               // fixed, so this bounded scan is real-time safe) - matches
+               // VoiceAllocator::NoteOff's own internal lookup without
+               // needing a second accessor added to the shared class.
+               for (int gv = 0; gv < kMaxVoices; gv++)
+                  if (mVoiceId[gv] == evts[evtIdx].voiceId)
+                     mGateHeld[gv] = false;
+            }
             evtIdx++;
          }
 
@@ -168,6 +194,15 @@ public:
             rin.in = inVal;
             rin.sr = srVal;
             rin.n = nVal;
+            // Per-voice, unlike in/sr/n above - freq/gate are always
+            // populated regardless of whether 'in' is connected, so a
+            // kernel can be a self-contained generator (design-prompt-
+            // sample-generator-mode.md). freq holds the voice's last
+            // triggered note's frequency even after gate drops to 0 (no
+            // reason to zero it - a released voice's kernel may still want
+            // to know what it was playing during its own release tail).
+            rin.freq = MidiNoteToHz(mVoices.NoteAt(v));
+            rin.gate = mGateHeld[v] ? 1.0f : 0.0f;
             rin.paramVals = paramVals;
             rin.stateCur = mStateCur[v];
             rin.stateNext = mStateNext[v];
@@ -247,6 +282,7 @@ public:
 private:
    VoiceAllocator mVoices;
    int mVoiceId[kMaxVoices] = {};
+   bool mGateHeld[kMaxVoices] = {}; // Field 'gate': true from note-on until note-off, independent of envelope release
    int mNumVoicesInUse = kMaxVoices;
 
    ParamMailbox mMailbox;

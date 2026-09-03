@@ -99,6 +99,55 @@ unresolved name is a compile error with a source span, not a runtime `0.0`.
 
 ---
 
+## 0.5 Addendum — `freq`/`gate` generator-mode symbols, added later on `feature/field-sample-generator-mode`
+
+This section postdates the rest of the file, same as §0. It records what
+changed when `docs/plans/field/design-prompt-sample-generator-mode.md` was
+implemented, after step 9 had already shipped.
+
+Two more sample-domain reserved names joined `in`/`out`/`sr`/`n` everywhere
+that quartet is seeded or checked:
+
+- **`freq`** (`float`, read-only) — the current voice's note frequency in Hz,
+  `440 * 2^((note-69)/12)` from `VoiceAllocator::NoteAt(v)`, computed by a
+  local `MidiNoteToHz` helper in `FieldSampleNode.cpp` (matching the existing
+  per-node-local convention already used by `OscillatorNode`/
+  `ImageSpectralSynthNode`/`WaveTerrainNode`/`EquationNode`/`MetallicNode`,
+  rather than pulling in `WavetableSynthCore.h` for one formula).
+- **`gate`** (`float`, read-only) — `1.0` from note-on until note-off, `0.0`
+  otherwise. **Not** the same signal as the per-voice amplitude envelope:
+  `AudioFieldSampleNode` tracks gate state itself (`mGateHeld[kMaxVoices]`,
+  set in the existing note-on/note-off event loop in `ProcessBlock`), because
+  `VoiceAllocator::IsVoiceActive` stays true through the *entire* release
+  tail — gate needs to drop the instant note-off arrives, independent of how
+  long the envelope keeps decaying afterward.
+
+Both were added at the same choke points `in`/`out`/`sr`/`n` already go
+through, rather than a new mechanism:
+
+| File | What changed |
+|---|---|
+| `src/core/field/SampleProgram.h` | two new opcodes, `LoadFreq`/`LoadGate` |
+| `src/core/field/SampleRuntime.h` | `SampleRuntimeInput::freq`/`gate` fields; two opcode cases |
+| `src/core/field/BackendRegister.cpp` | `IsReservedName`; the `Ident` compile case; the assign-to-reserved refusal |
+| `src/core/field/FieldParse.cpp` | the cross-domain `state` shadowing check |
+| `src/core/field/FieldIR.cpp` | the graph-domain reserved-word seed (error-message quality only) |
+| `src/nodes/FieldSampleNode.cpp` | per-voice `rin.freq`/`rin.gate` wiring inside the existing voice loop; no new voice-allocation mechanism |
+
+Per the design doc's open questions: idle voices are unaffected — the
+existing `if (!mVoices.IsVoiceActive(v)) continue;` skip means the kernel
+simply does not run for a voice with no note, so `state` cells still reset to
+their declared initial value on note-on exactly as before (§5.9 below).
+`freq`/`gate` are **never** gated on whether `in` is connected — deliberately
+the opposite of `FieldElementNode`'s `generateCount`-when-unconnected
+pattern — so a kernel that never reads `in` is a valid, fully self-contained
+generator. `INFINITE_FIELDSAMPLETEST` SECTION 10 covers this: a kernel
+writing only `freq * gate` with no `in` reference produces the voice's note
+frequency while held and drops to exactly `0` the block after note-off, even
+though the amplitude envelope is still mid-release at that point.
+
+---
+
 ## 1. Invariants — restated verbatim, they override anything you infer
 
 ### 1.1 Clean room (hard rule, non-negotiable)
