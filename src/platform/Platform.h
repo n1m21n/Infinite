@@ -335,6 +335,8 @@ namespace Platform
       uint32_t deviceId = 0;
       bool isInput = false;
       bool isOutput = false;
+      int inputChannels = 0;
+      int outputChannels = 0;
    };
 
    std::vector<AudioDeviceInfo> AudioListDevices();
@@ -382,6 +384,8 @@ namespace Platform
    // without any node needing to notice the device came back.
    void AudioInputCaptureAddRef();
    void AudioInputCaptureRemoveRef();
+   void AudioInputCaptureSetDevice(uint32_t deviceId);
+   uint32_t AudioInputCaptureGetDevice();
    void AudioInputCapturePump(std::string& outError);
    bool AudioInputCaptureIsRunning();
 
@@ -389,7 +393,15 @@ namespace Platform
    // per-channel buffers (outChannels[ch][0..numFrames)). Underrun frames are
    // zero-filled. Returns the channel count actually captured (0 if capture
    // isn't running yet, e.g. still waiting on the device to open or on mic
-   // permission). Audio-thread safe: lock-free, no allocation.
+   // permission).
+   // `readerCursor` is per-reader state maintained across calls so multiple
+   // Audio In nodes can read concurrently without starving each other.
+   // `channelOffset`: 0-indexed channel to read (0 = input 1, 1 = input 2, etc.)
+   // `isMono`: when true, copies channelOffset to both outChannels[0] and outChannels[1] (center mono).
+   //           when false, reads stereo pair (channelOffset and channelOffset + 1).
+   // Audio-thread safe: lock-free, no allocation.
+   int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels,
+                             uint64_t& readerCursor, int channelOffset = 0, bool isMono = false);
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels);
 
    // ---- audio plugin hosting -----------------------------------------------

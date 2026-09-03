@@ -389,7 +389,10 @@ public:
       // reading source samples rather than samples it has already scaled.
       const int frames = std::min(buffer.numFrames, kMaxCaptureFrames);
       float* chans[2] = { mScratch[0], mScratch[1] };
-      const int captured = Platform::AudioInputCaptureRead(chans, frames, 2);
+      const int mode = mChannelMode.load(std::memory_order_relaxed);
+      const int channelOffset = (mode <= 0) ? 0 : (mode - 1);
+      const bool isMono = (mode > 0);
+      const int captured = Platform::AudioInputCaptureRead(chans, frames, 2, mReaderCursor, channelOffset, isMono);
 
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)
@@ -397,7 +400,7 @@ public:
          const float linear = DspMath::DbToLinear(mMailbox.SmoothedValue(kGainDbParam));
          for (int ch = 0; ch < buffer.numChannels; ch++)
          {
-            const float s = (captured > 0 && i < frames) ? mScratch[std::min(ch, captured - 1)][i] : 0.0f;
+            const float s = (captured > 0 && i < frames) ? mScratch[std::min(ch, 1)][i] : 0.0f;
             const float v = s * linear;
             buffer.channels[ch][i] = v;
             peak = std::max(peak, std::fabs(v));
@@ -407,9 +410,10 @@ public:
    }
 
    // Main thread only.
-   void PushParams(float gainDb)
+   void PushParams(float gainDb, int channelMode)
    {
       mGainDb.store(gainDb, std::memory_order_relaxed);
+      mChannelMode.store(channelMode, std::memory_order_relaxed);
       mMailbox.Push(kGainDbParam, gainDb);
    }
 
@@ -421,6 +425,8 @@ private:
    ParamMailbox mMailbox;
    MeterRing mMeter;
    std::atomic<float> mGainDb { 0.0f };
+   std::atomic<int> mChannelMode { 0 };
+   uint64_t mReaderCursor = 0;
    float mScratch[2][kMaxCaptureFrames] = {};
 };
 
@@ -435,7 +441,10 @@ void AudioInputNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioCaptureNode>();
-   mAudioNode->PushParams(gainDb);
+   mAudioNode->PushParams(gainDb, channelMode);
+
+   if (deviceId != 0)
+      Platform::AudioInputCaptureSetDevice((uint32_t)deviceId);
 
    // The pump's error used to be collected into a local and dropped on the
    // floor, so every reason the tap can fail to install - permission denied,
@@ -453,6 +462,9 @@ void AudioInputNode::CookIfNeeded(int frameId)
 void AudioInputNode::VisitParams(ParamVisitor& v)
 {
    v.Float("gainDb", gainDb);
+   v.Int("channelMode", channelMode);
+   v.Int("deviceId", deviceId);
+   v.Text("deviceName", deviceName);
 }
 
 AudioNode* AudioInputNode::GetAudioNode()

@@ -235,6 +235,9 @@ public:
    const std::string& Status() const { return mStatus; }
 
    float gainDb = 0.0f;
+   int channelMode = 0; // 0 = Stereo (1+2), 1 = Input 1 (mono), 2 = Input 2 (mono), 3 = Input 3 (mono)...
+   int deviceId = 0;    // 0 = system default, or specific device ID
+   std::string deviceName;
 
 private:
    std::unique_ptr<AudioCaptureNode> mAudioNode;

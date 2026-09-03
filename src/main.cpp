@@ -13188,27 +13188,108 @@ namespace
       ImGui::PopID();
    }
 
+   struct AudioInChoice
+   {
+      std::string label;       // e.g. "Stereo (1+2)", "Input 1 (Mono)"
+      std::string shortName;   // e.g. "Stereo", "In 1"
+      std::string category;    // Device name or "System Default"
+      uint32_t deviceId = 0;
+      int channelMode = 0;     // 0 = Stereo (1+2), 1 = In 1, 2 = In 2, 3 = In 3...
+   };
+
    // Mirror image of Audio Out's body (a terminal with no controls at all) -
-   // Audio In has exactly one control, a trim fader, drawn the same way
-   // Gain's is. The stat line reports whether the mic tap is actually live
-   // (Platform::AudioInputCaptureIsRunning), since silence could otherwise
-   // mean either "nothing arriving" or "not listening yet".
+   // Audio In has an input channel/device selector and a trim fader.
+   // The stat line reports the active input and whether the mic tap is
+   // actually live (Platform::AudioInputCaptureIsRunning).
    void DrawAudioInBody(GraphNode& gn, AudioInputNode* n)
    {
-      // "idle" alone can't distinguish "no node has pumped the tap yet" from
-      // "macOS refused the microphone" - report the pump's own reason when it
-      // has one (AudioInputNode::Status).
+      std::vector<AudioInChoice> choices;
+      const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
+
+      // System Default options
+      choices.push_back({ "Stereo (1+2)", "Stereo", "System Default", 0, 0 });
+      choices.push_back({ "Input 1 (Mono)", "In 1", "System Default", 0, 1 });
+      choices.push_back({ "Input 2 (Mono)", "In 2", "System Default", 0, 2 });
+
+      for (const Platform::AudioDeviceInfo& d : devices)
+      {
+         if (!d.isInput)
+            continue;
+
+         const int chCount = std::max(1, d.inputChannels > 0 ? d.inputChannels : 2);
+         const std::string devPrefix = (devices.size() > 1) ? (d.name + ": ") : "";
+
+         if (chCount >= 2)
+         {
+            choices.push_back({ "Stereo (1+2)", devPrefix + "Stereo", d.name, d.deviceId, 0 });
+            choices.push_back({ "Input 1 (Mono)", devPrefix + "In 1", d.name, d.deviceId, 1 });
+            choices.push_back({ "Input 2 (Mono)", devPrefix + "In 2", d.name, d.deviceId, 2 });
+            for (int ch = 3; ch <= chCount; ch++)
+            {
+               char lbl[32], sname[64];
+               snprintf(lbl, sizeof(lbl), "Input %d (Mono)", ch);
+               snprintf(sname, sizeof(sname), "%sIn %d", devPrefix.c_str(), ch);
+               choices.push_back({ lbl, sname, d.name, d.deviceId, ch });
+            }
+         }
+         else
+         {
+            choices.push_back({ "Input 1 (Mono)", devPrefix + "In 1", d.name, d.deviceId, 1 });
+         }
+      }
+
+      int currentIdx = 0;
+      for (int i = 0; i < (int)choices.size(); i++)
+      {
+         if (choices[i].channelMode == n->channelMode &&
+             ((n->deviceId == 0 && choices[i].deviceId == 0) ||
+              (n->deviceId != 0 && (choices[i].deviceId == (uint32_t)n->deviceId || choices[i].category == n->deviceName))))
+         {
+            currentIdx = i;
+            break;
+         }
+      }
+
+      std::vector<std::string> options;
+      std::vector<std::string> categories;
+      options.reserve(choices.size());
+      categories.reserve(choices.size());
+      for (const auto& c : choices)
+      {
+         options.push_back(c.label);
+         categories.push_back(c.category);
+      }
+
+      const std::string& inputDesc = choices[currentIdx].shortName;
       char stat[96];
       if (Platform::AudioInputCaptureIsRunning())
-         snprintf(stat, sizeof(stat), "%+.1f dB   mic in - live", n->gainDb);
+         snprintf(stat, sizeof(stat), "%+.1f dB   %s - live", n->gainDb, inputDesc.c_str());
       else if (!n->Status().empty())
          snprintf(stat, sizeof(stat), "%+.1f dB   %s", n->gainDb, n->Status().c_str());
       else
-         snprintf(stat, sizeof(stat), "%+.1f dB   mic in - idle", n->gainDb);
-      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+         snprintf(stat, sizeof(stat), "%+.1f dB   %s - idle", n->gainDb, inputDesc.c_str());
 
-      const float faderH = 132.0f;
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      {
+         AudioKnobRow row(1);
+         row.Dropdown("input", options, currentIdx, [n, choices](int idx) {
+            if (idx >= 0 && idx < (int)choices.size())
+            {
+               PushUndoCheckpoint();
+               n->channelMode = choices[idx].channelMode;
+               n->deviceId = (int)choices[idx].deviceId;
+               n->deviceName = choices[idx].category;
+               Platform::AudioInputCaptureSetDevice(choices[idx].deviceId);
+            }
+         }, categories);
+         row.End();
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      const float faderH = 120.0f;
       const float stripTop = ImGui::GetCursorScreenPos().y;
       DrawStripMeter(gAudioContentX + gAudioContentW * 0.5f + 26.0f, stripTop + 6.0f, 10.0f, faderH - 12.0f,
                      n->Level());
@@ -26639,7 +26720,10 @@ namespace
          if (key == "outputDeviceId")
             gAudioOutputDeviceId = (uint32_t)strtoul(val.c_str(), nullptr, 10);
          else if (key == "inputDeviceId")
+         {
             gAudioInputDeviceId = (uint32_t)strtoul(val.c_str(), nullptr, 10);
+            Platform::AudioInputCaptureSetDevice(gAudioInputDeviceId);
+         }
          else if (key == "sampleRate")
             gAudioSampleRate = strtod(val.c_str(), nullptr);
          else if (key == "bufferFrames")
@@ -27171,13 +27255,19 @@ namespace
             if (ImGui::BeginCombo("Input device", inputLabel.c_str()))
             {
                if (ImGui::Selectable("System default", gAudioInputDeviceId == 0))
+               {
                   gAudioInputDeviceId = 0;
+                  Platform::AudioInputCaptureSetDevice(0);
+               }
                for (const Platform::AudioDeviceInfo& d : devices)
                {
                   if (!d.isInput)
                      continue;
                   if (ImGui::Selectable(d.name.c_str(), d.deviceId == gAudioInputDeviceId))
+                  {
                      gAudioInputDeviceId = d.deviceId;
+                     Platform::AudioInputCaptureSetDevice(d.deviceId);
+                  }
                }
                ImGui::EndCombo();
             }

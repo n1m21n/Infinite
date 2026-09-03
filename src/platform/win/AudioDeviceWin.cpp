@@ -58,6 +58,7 @@ namespace
       std::wstring endpointId;
       std::string name;
       bool isInput = false;
+      int channels = 0;
    };
 
    std::mutex gDevicesMutex;
@@ -210,6 +211,18 @@ namespace
                }
                PropVariantClear(&var);
                props->Release();
+            }
+            IAudioClient* queryClient = nullptr;
+            if (SUCCEEDED(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
+                                           reinterpret_cast<void**>(&queryClient))) && queryClient != nullptr)
+            {
+               WAVEFORMATEX* queryFmt = nullptr;
+               if (SUCCEEDED(queryClient->GetMixFormat(&queryFmt)) && queryFmt != nullptr)
+               {
+                  entry.channels = queryFmt->nChannels;
+                  CoTaskMemFree(queryFmt);
+               }
+               queryClient->Release();
             }
             if (!entry.endpointId.empty())
                list.push_back(std::move(entry));
@@ -807,6 +820,8 @@ namespace Platform
          info.deviceId = (uint32_t)(i + 1);
          info.isInput = gDevices[i].isInput;
          info.isOutput = !gDevices[i].isInput;
+         info.inputChannels = gDevices[i].isInput ? gDevices[i].channels : 0;
+         info.outputChannels = !gDevices[i].isInput ? gDevices[i].channels : 0;
          out.push_back(std::move(info));
       }
       return out;
@@ -975,10 +990,19 @@ namespace
          }
 
          IMMDevice* device = nullptr;
-         hr = enumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &device);
+         const uint32_t reqId = gRequestedInputDeviceId.load(std::memory_order_relaxed);
+         if (reqId != 0)
+         {
+            std::wstring endpointId;
+            std::string name;
+            if (ResolveEndpoint(reqId, endpointId, name))
+               enumerator->GetDevice(endpointId.c_str(), &device);
+         }
+         if (device == nullptr)
+            hr = enumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &device);
          if (FAILED(hr) || device == nullptr)
          {
-            error = "no default input device";
+            error = "no audio input device";
             running.store(false, std::memory_order_release);
             cleanup();
             return;
@@ -1361,6 +1385,9 @@ namespace Platform
 
    // ---- audio input capture (Audio In node) ---------------------------------
 
+   std::atomic<uint32_t> gRequestedInputDeviceId{ 0 };
+   uint32_t gActiveInputDeviceId = 0;
+
    void AudioInputCaptureAddRef()
    {
       gTapRefs.fetch_add(1, std::memory_order_relaxed);
@@ -1373,13 +1400,29 @@ namespace Platform
          gTap.Stop(); // last consumer gone - tear the tap down promptly
    }
 
+   void AudioInputCaptureSetDevice(uint32_t deviceId)
+   {
+      gRequestedInputDeviceId.store(deviceId, std::memory_order_relaxed);
+   }
+
+   uint32_t AudioInputCaptureGetDevice()
+   {
+      return gRequestedInputDeviceId.load(std::memory_order_relaxed);
+   }
+
    void AudioInputCapturePump(std::string& outError)
    {
       outError.clear();
       if (gTapRefs.load(std::memory_order_relaxed) <= 0)
          return;
+      const uint32_t reqDevice = gRequestedInputDeviceId.load(std::memory_order_relaxed);
       if (gTap.running.load(std::memory_order_acquire) && gTap.sampleRate > 0.0)
-         return; // healthy
+      {
+         if (gActiveInputDeviceId == reqDevice)
+            return; // healthy
+         gTap.Stop();
+      }
+      gActiveInputDeviceId = reqDevice;
       std::string err;
       if (!gTap.Start(err))
          outError = err; // reported by the node's status text, retried next frame
@@ -1394,7 +1437,8 @@ namespace Platform
              gTap.ready.load(std::memory_order_acquire);
    }
 
-   int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels)
+   int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels,
+                             uint64_t& readerCursor, int channelOffset, bool isMono)
    {
       if (outChannels == nullptr || numFrames <= 0 || maxChannels <= 0)
          return 0;
@@ -1405,30 +1449,59 @@ namespace Platform
          return 0;
       }
 
-      const int chs = std::min(gTap.ring.channels, maxChannels);
+      const int availableChannels = gTap.ring.channels;
       const uint64_t w = gTap.ring.writeIndex.load(std::memory_order_acquire);
-      uint64_t cursor = gTapReadCursor.load(std::memory_order_relaxed);
+      uint64_t cursor = readerCursor;
 
       // First read jumps straight to the live edge; a stalled consumer that
       // fell further behind than the ring holds drops the missed frames.
-      if (cursor == 0 || w - cursor > (uint64_t)LatestRing::kCapacity)
+      if (cursor == 0 || w - cursor > (uint64_t)LatestRing::kCapacity || cursor > w)
          cursor = (w > (uint64_t)numFrames) ? w - numFrames : 0;
 
       const uint64_t available = w - cursor;
       const int n = (int)std::min<uint64_t>(numFrames, available);
       const int cap = LatestRing::kCapacity;
 
-      for (int i = 0; i < n; i++)
+      if (isMono)
       {
-         const uint64_t slot = (cursor + i) % cap;
-         for (int ch = 0; ch < chs; ch++)
-            outChannels[ch][i] = gTap.ring.buffers[(size_t)ch * cap + slot];
+         const int ch = std::clamp(channelOffset, 0, availableChannels - 1);
+         for (int i = 0; i < n; i++)
+         {
+            const uint64_t slot = (cursor + i) % cap;
+            outChannels[0][i] = gTap.ring.buffers[(size_t)ch * cap + slot];
+         }
+         for (int i = n; i < numFrames; i++)
+            outChannels[0][i] = 0.0f;
+         if (maxChannels > 1)
+            std::copy(outChannels[0], outChannels[0] + numFrames, outChannels[1]);
+         readerCursor = cursor + n;
+         return n > 0 ? 1 : 0;
       }
-      for (int i = n; i < numFrames; i++) // underrun zero-fill
-         for (int ch = 0; ch < chs; ch++)
-            outChannels[ch][i] = 0.0f;
+      else
+      {
+         const int ch0 = std::clamp(channelOffset, 0, availableChannels - 1);
+         const int ch1 = (channelOffset + 1 < availableChannels) ? (channelOffset + 1) : ch0;
+         for (int i = 0; i < n; i++)
+         {
+            const uint64_t slot = (cursor + i) % cap;
+            outChannels[0][i] = gTap.ring.buffers[(size_t)ch0 * cap + slot];
+            if (maxChannels > 1)
+               outChannels[1][i] = gTap.ring.buffers[(size_t)ch1 * cap + slot];
+         }
+         for (int i = n; i < numFrames; i++)
+         {
+            outChannels[0][i] = 0.0f;
+            if (maxChannels > 1)
+               outChannels[1][i] = 0.0f;
+         }
+         readerCursor = cursor + n;
+         return (n > 0) ? (ch0 != ch1 ? 2 : 1) : 0;
+      }
+   }
 
-      gTapReadCursor.store(cursor + n, std::memory_order_relaxed);
-      return chs;
+   int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels)
+   {
+      static uint64_t sLegacyCursor = 0;
+      return AudioInputCaptureRead(outChannels, numFrames, maxChannels, sLegacyCursor, 0, false);
    }
 }
