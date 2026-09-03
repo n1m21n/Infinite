@@ -140,6 +140,12 @@ FieldPixelNode::~FieldPixelNode()
 // colour into mOut on a second pass, so `col` means the same thing whether or
 // not the kernel declares state cells.
 unsigned int FieldPixelNode::GetOutputTexture() { return GLUtil::FboTexture(mOut); }
+unsigned int FieldPixelNode::GetOutputTexture(int index)
+{
+   if (index == 1 && exposeAuxTexture && !mIR.declaredStates.empty())
+      return mState.CurrentOutputTexture();
+   return index == 0 ? GetOutputTexture() : 0;
+}
 int FieldPixelNode::GetOutputWidth() const { return mOut.w; }
 int FieldPixelNode::GetOutputHeight() const { return mOut.h; }
 

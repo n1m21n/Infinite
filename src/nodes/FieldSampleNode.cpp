@@ -307,6 +307,7 @@ private:
 FieldSampleNode::FieldSampleNode()
    : mAudioNode(std::make_unique<AudioFieldSampleNode>())
 {
+   mRmsOutput.owner = this;
    Apply();
 }
 
@@ -383,5 +384,6 @@ void FieldSampleNode::VisitParams(ParamVisitor& v)
 {
    v.Text("code", code);
    v.Int("maxVoices", maxVoices);
+   v.Bool("exposeRmsOutput", exposeRmsOutput);
    mParamTable.VisitParams(v);
 }

@@ -617,6 +617,24 @@ namespace
       }
       return nullptr;
    }
+
+   // Dynamic pins, Phase 1 (build step 11, decision 4): toggling a menu entry
+   // off while a live cable is attached to the output pin it would remove
+   // must be refused rather than silently orphaning the cable. gLinks is
+   // rebuilt earlier in this same frame (see CaptureClusterLinks' comment
+   // above), so this reads current topology, not last frame's.
+   bool FieldOutputPinHasLiveCable(int nodeIndex, int outputIndex)
+   {
+      for (const LinkInfo& link : gLinks)
+      {
+         if (!GraphNode::IsOutputPin(link.srcPin))
+            continue;
+         if (GraphNode::NodeIndexFromPin(link.srcPin) == nodeIndex &&
+             GraphNode::OutputIndexFromPin(link.srcPin) == outputIndex)
+            return true;
+      }
+      return false;
+   }
    bool gSnapToGrid = true;
    float gGridSnap = 20.0f;
    // Audio device/rate/buffer selection, applied to AudioEngine on next
@@ -4617,7 +4635,7 @@ namespace
       {
          ImageCable* cable = CableFor(dstNode, slot);
          if (cable != nullptr)
-            cable->Connect(srcNode.node.get());
+            cable->Connect(srcNode.node.get(), srcOutputIndex);
       }
    }
 
@@ -5384,6 +5402,28 @@ namespace
       if (!n->input)
          ModSliderInt("generate count", &n->generateCount, 1, 100000);
 
+      {
+         bool publish = n->publishScalarOutput;
+         if (ModCheckbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
+         {
+            if (!publish && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: publish output is still wired";
+            }
+            else
+            {
+               n->publishScalarOutput = publish;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
       for (auto& p : n->GetParamTable().Params())
       {
          if (!p.isDeclared)
@@ -5433,6 +5473,28 @@ namespace
 
       ModSliderInt("max voices", &n->maxVoices, 1, 32);
 
+      {
+         bool expose = n->exposeRmsOutput;
+         if (ModCheckbox("expose rms output", &expose) && expose != n->exposeRmsOutput)
+         {
+            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: rms output is still wired";
+            }
+            else
+            {
+               n->exposeRmsOutput = expose;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
       for (auto& p : n->GetParamTable().Params())
       {
          if (!p.isDeclared)
@@ -5471,6 +5533,28 @@ namespace
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
             ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      {
+         bool addTrigger = n->addTriggerInput;
+         if (ModCheckbox("trigger input", &addTrigger) && addTrigger != n->addTriggerInput)
+         {
+            if (!addTrigger && n->TriggerInputWired())
+            {
+               n->pinRefusal = "refused: trigger input is still wired";
+            }
+            else
+            {
+               n->addTriggerInput = addTrigger;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
             ImGui::PopTextWrapPos();
          }
       }
@@ -5529,6 +5613,28 @@ namespace
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModCheckbox("animate", &n->animate);
+
+      {
+         bool expose = n->exposeAuxTexture;
+         if (ModCheckbox("expose state texture output", &expose) && expose != n->exposeAuxTexture)
+         {
+            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: state output is still wired";
+            }
+            else
+            {
+               n->exposeAuxTexture = expose;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
 
       for (auto& p : n->GetParamTable().Params())
       {
@@ -26480,7 +26586,7 @@ namespace
                   continue;
                auto it = addrToIndex.find((const void*)cable->GetSource());
                if (it != addrToIndex.end())
-                  data.cables.push_back({ gn.index, slot, it->second });
+                  data.cables.push_back({ gn.index, slot, it->second, cable->GetSourceOutput() });
             }
          }
          // Audio/note cables are typed like image cables (a plain
@@ -27524,7 +27630,7 @@ namespace
          if (dst == nullptr || src == nullptr)
             continue;
          if (ImageCable* cable = CableFor(*dst, c.dstSlot))
-            cable->Connect(src->node.get());
+            cable->Connect(src->node.get(), c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.geometry)
       {
@@ -48693,6 +48799,297 @@ int main(int argc, char** argv)
          printf("%s\n", allOk ? "FIELDGRAPHBLAST OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_FIELDPINSTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDPINSTEST] Running dynamic pins (build step 11) harness...\n");
+         bool allOk = true;
+
+         // SECTION 1: headless pin-shape assertions - OutputCount/OutputLabel/
+         // ModulatorOutput toggling for the three image/element/sample node
+         // types, and append-only ordering (index 0's label/identity never
+         // moves when index 1 appears).
+         {
+            FieldElementNode n;
+            bool pass = (n.OutputCount() == 1) && (std::string(n.OutputLabel(0)) == "geo") &&
+                        (n.ModulatorOutput(1) == nullptr);
+            n.publishScalarOutput = true;
+            pass = pass && (n.OutputCount() == 2) && (std::string(n.OutputLabel(0)) == "geo") &&
+                   (std::string(n.OutputLabel(1)) == "publish") && (n.ModulatorOutput(1) != nullptr) &&
+                   (n.ModulatorOutput(0) == nullptr);
+            printf("[FIELDPINSTEST] Assertion 1 (FieldElementNode publish pin, append-only): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            FieldSampleNode n;
+            bool pass = (n.OutputCount() == 1) && n.IsAudioOutputIndex(0) && (n.ModulatorOutput(1) == nullptr);
+            n.exposeRmsOutput = true;
+            pass = pass && (n.OutputCount() == 2) && n.IsAudioOutputIndex(0) && !n.IsAudioOutputIndex(1) &&
+                   (std::string(n.OutputLabel(0)) == "out") && (std::string(n.OutputLabel(1)) == "rms") &&
+                   (n.ModulatorOutput(1) != nullptr);
+            printf("[FIELDPINSTEST] Assertion 2 (FieldSampleNode rms pin, IsAudioOutputIndex trap): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            FieldPixelNode n;
+            bool pass = (n.OutputCount() == 1) && (n.GetOutputTexture(1) == 0);
+            n.exposeAuxTexture = true;
+            // No declared state cells yet - GetOutputTexture(1) must stay 0
+            // rather than handing out a stale/zero-resolution FBO.
+            pass = pass && (n.OutputCount() == 2) && (n.GetOutputTexture(1) == 0) &&
+                   (std::string(n.OutputLabel(0)) == "out") && (std::string(n.OutputLabel(1)) == "state");
+            n.width = 32.0f;
+            n.height = 32.0f;
+            n.code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(fract(x));";
+            n.Apply();
+            n.CookIfNeeded(1);
+            pass = pass && (n.GetOutputTexture(1) != 0);
+            printf("[FIELDPINSTEST] Assertion 3 (FieldPixelNode aux texture, live only when states declared): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            FieldGraphNode n;
+            bool pass = (n.ModulatorInputCount() == 0) && (n.ModulatorInputSlot(0) == nullptr) &&
+                        !n.TriggerInputWired();
+            n.addTriggerInput = true;
+            pass = pass && (n.ModulatorInputCount() == 1) && (n.ModulatorInputSlot(0) != nullptr) &&
+                   (std::string(n.InputLabel(0)) == "trigger");
+            // Rising-edge detection: a fake IModulator whose Value01() is
+            // driven by hand, no ParamMailbox/MeterRing involved (§8 - reuse
+            // ModulatorOutput/MeterRing only, never a new channel).
+            struct FakeMod : public IModulator { float v = 0.0f; float Value01() override { return v; } };
+            FakeMod fake;
+            *n.ModulatorInputSlot(0) = &fake;
+            pass = pass && n.TriggerInputWired() && !n.PollTriggerEdge(); // starts low, no edge yet
+            fake.v = 1.0f;
+            pass = pass && n.PollTriggerEdge();  // 0 -> 1 is a rising edge
+            pass = pass && !n.PollTriggerEdge(); // holding high is not a second edge
+            fake.v = 0.0f;
+            pass = pass && !n.PollTriggerEdge(); // falling edge does not fire
+            fake.v = 1.0f;
+            pass = pass && n.PollTriggerEdge();  // rises again
+            printf("[FIELDPINSTEST] Assertion 4 (FieldGraphNode trigger pin + rising-edge detection): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 2: cable-orphaning refusal detection, live graph. Image/
+         // modulator-output cables are UI-link-derived (gLinks, rebuilt from
+         // the node editor's own frame), so a headless ConnectNodes() call
+         // does not populate them - synthetic LinkInfo entries stand in for
+         // what a real dragged cable would leave in gLinks. The graph node's
+         // trigger *input*, by contrast, is read directly off the node
+         // (TriggerInputWired()), so it is exercised through a real
+         // ConnectNodes() wiring instead.
+         NewPatch();
+         int elemIdx = -1, sampleIdx = -1, pixelSrcIdx = -1, pixelDstIdx = -1, graphSinkIdx = -1;
+         {
+            // Each SpawnNode() call can reallocate gNodes (a std::vector),
+            // invalidating any GraphNode* returned by an earlier call in this
+            // same sequence (trap T14 again, this time on the test's own
+            // fixture setup) - so every pointer is used and discarded before
+            // the next SpawnNode() runs; only the (reallocation-proof) index
+            // survives to the next statement.
+            GraphNode* ge = SpawnNode("Field Element", "3D", 0.0f, 0.0f);
+            bool spawned = ge != nullptr;
+            if (spawned)
+            {
+               elemIdx = ge->index;
+               static_cast<FieldElementNode*>(ge->node.get())->publishScalarOutput = true;
+            }
+
+            GraphNode* gs = SpawnNode("Field Sample", "Synths", 200.0f, 0.0f);
+            spawned = spawned && (gs != nullptr);
+            if (gs)
+            {
+               sampleIdx = gs->index;
+               static_cast<FieldSampleNode*>(gs->node.get())->exposeRmsOutput = true;
+            }
+
+            GraphNode* gpSrc = SpawnNode("FieldPixel", "Source", 400.0f, 0.0f);
+            spawned = spawned && (gpSrc != nullptr);
+            if (gpSrc)
+            {
+               pixelSrcIdx = gpSrc->index;
+               auto* pixSrc = static_cast<FieldPixelNode*>(gpSrc->node.get());
+               pixSrc->exposeAuxTexture = true;
+               pixSrc->width = 32.0f;
+               pixSrc->height = 32.0f;
+               pixSrc->code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(fract(x));";
+               pixSrc->Apply();
+               pixSrc->CookIfNeeded(1);
+            }
+
+            GraphNode* gpDst = SpawnNode("FieldPixel", "Source", 600.0f, 0.0f);
+            spawned = spawned && (gpDst != nullptr);
+            if (gpDst)
+               pixelDstIdx = gpDst->index;
+
+            GraphNode* gg = SpawnNode("Field Graph", "Utility", 800.0f, 0.0f);
+            spawned = spawned && (gg != nullptr);
+            if (gg)
+            {
+               graphSinkIdx = gg->index;
+               static_cast<FieldGraphNode*>(gg->node.get())->addTriggerInput = true;
+            }
+
+            printf("[FIELDPINSTEST] Assertion 5 (spawn fixture graph): %s\n", spawned ? "OK" : "FAIL");
+            allOk = allOk && spawned;
+         }
+         {
+            GraphNode* ge = FindNodeByIndex(elemIdx);
+            GraphNode* gs = FindNodeByIndex(sampleIdx);
+            GraphNode* gpSrc = FindNodeByIndex(pixelSrcIdx);
+            GraphNode* gpDst = FindNodeByIndex(pixelDstIdx);
+            bool before = !FieldOutputPinHasLiveCable(elemIdx, 1) && !FieldOutputPinHasLiveCable(sampleIdx, 1) &&
+                          !FieldOutputPinHasLiveCable(pixelSrcIdx, 1);
+            gLinks.push_back({ 5000001, ge->OutputPinId(1), gs->InputPinId(0) });
+            gLinks.push_back({ 5000002, gs->OutputPinId(1), gpSrc->InputPinId(0) });
+            gLinks.push_back({ 5000003, gpSrc->OutputPinId(1), gpDst->InputPinId(0) });
+            bool after = FieldOutputPinHasLiveCable(elemIdx, 1) && FieldOutputPinHasLiveCable(sampleIdx, 1) &&
+                         FieldOutputPinHasLiveCable(pixelSrcIdx, 1) &&
+                         !FieldOutputPinHasLiveCable(elemIdx, 0); // index 0 (the pre-existing pin) never flags live
+            gLinks.clear();
+            bool afterClear = !FieldOutputPinHasLiveCable(elemIdx, 1) && !FieldOutputPinHasLiveCable(sampleIdx, 1) &&
+                               !FieldOutputPinHasLiveCable(pixelSrcIdx, 1);
+            bool pass = before && after && afterClear;
+            printf("[FIELDPINSTEST] Assertion 6 (FieldOutputPinHasLiveCable detects/clears synthetic cables): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            // Real wiring for the graph node's trigger *input*: the sample
+            // node's rms output feeds it, going through the same
+            // ConnectNodes()/IsInputSlotCompatible() path a live drag uses.
+            //
+            // Deliberately NOT the element node's publish output here - see
+            // the [FIELDPINSTEST FINDING] note below assertion 8. In short:
+            // IsInputSlotCompatible's srcGeometry/srcCamera/srcLight checks
+            // are whole-node dynamic_casts, not scoped to the specific output
+            // index a cable is dragged from, so a connection from
+            // FieldElementNode's *modulator* output (index 1) is wrongly
+            // rejected by the "3D cables only go into 3D nodes" rule, because
+            // FieldElementNode is also (always) an IGeometrySource. The
+            // audio-source check three lines above it does not have this
+            // bug - it consults IsAudioOutputIndex(srcOutputIndex) rather
+            // than dynamic_cast<IAudioSource*> alone - so routing this
+            // assertion through FieldSampleNode's rms output instead
+            // exercises the identical TriggerInputWired()/ModulatorInputSlot
+            // plumbing without tripping the geometry-side gap.
+            std::string err;
+            bool connected = ConnectNodes(sampleIdx, 1, graphSinkIdx, 0, err);
+            auto* gg = static_cast<FieldGraphNode*>(FindNodeByIndex(graphSinkIdx)->node.get());
+            bool wiredNow = connected && gg->TriggerInputWired();
+            bool sourceMatches = wiredNow &&
+               (*gg->ModulatorInputSlot(0) ==
+                static_cast<FieldSampleNode*>(FindNodeByIndex(sampleIdx)->node.get())->ModulatorOutput(1));
+            *gg->ModulatorInputSlot(0) = nullptr; // simulate disconnect
+            bool unwiredAfter = !gg->TriggerInputWired();
+            bool pass = connected && wiredNow && sourceMatches && unwiredAfter;
+            printf("[FIELDPINSTEST] Assertion 7 (FieldGraphNode trigger wired via real ConnectNodes, TriggerInputWired): %s (%s)\n",
+                   pass ? "OK" : "FAIL", err.c_str());
+            allOk = allOk && pass;
+            // Restore the real wiring for the save/load section below.
+            ConnectNodes(sampleIdx, 1, graphSinkIdx, 0, err);
+
+            // [FIELDPINSTEST FINDING - pre-existing gap, first exercised by
+            // this step, left unfixed per doc §8's "stop and report" rule]:
+            // confirm the gap actually exists and is exactly what's
+            // described above, so this comment cannot silently go stale.
+            std::string geoErr;
+            bool geoBlocked = !ConnectNodes(elemIdx, 1, graphSinkIdx, 0, geoErr);
+            if (!geoBlocked)
+            {
+               *gg->ModulatorInputSlot(0) = nullptr; // undo if it unexpectedly succeeded
+               printf("[FIELDPINSTEST] NOTE: FieldElementNode publish -> ModulatorInputSlot no longer blocked - the finding below may be stale, re-check IsInputSlotCompatible.\n");
+            }
+         }
+
+         // SECTION 3: save/load round trip carries the new bool and, for the
+         // pixel aux output, the srcOutput fix (Patch.cpp "cable"/"geo" tags -
+         // see the fix's own commit note). Also covers the real image cable
+         // wired between the two FieldPixel fixture nodes.
+         {
+            std::string err;
+            bool imgConnected = ConnectNodes(pixelSrcIdx, 1, pixelDstIdx, 0, err);
+
+            Patch::Data saved = BuildPatchData();
+            NewPatch();
+            ApplyPatchData(saved);
+
+            auto* elemR = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+            auto* sampleR = dynamic_cast<FieldSampleNode*>(FindNodeByIndex(sampleIdx) ? FindNodeByIndex(sampleIdx)->node.get() : nullptr);
+            auto* pixelSrcR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixelSrcIdx) ? FindNodeByIndex(pixelSrcIdx)->node.get() : nullptr);
+            auto* pixelDstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixelDstIdx) ? FindNodeByIndex(pixelDstIdx)->node.get() : nullptr);
+            auto* graphR = dynamic_cast<FieldGraphNode*>(FindNodeByIndex(graphSinkIdx) ? FindNodeByIndex(graphSinkIdx)->node.get() : nullptr);
+
+            bool boolsSurvived = elemR && sampleR && pixelSrcR && graphR &&
+                                  elemR->publishScalarOutput && sampleR->exposeRmsOutput &&
+                                  pixelSrcR->exposeAuxTexture && graphR->addTriggerInput;
+            bool imageCableSurvived = imgConnected && pixelDstR &&
+                                       (pixelDstR->TextureInput().GetSource() == pixelSrcR) &&
+                                       (pixelDstR->TextureInput().GetSourceOutput() == 1);
+            bool triggerCableSurvived = graphR && graphR->TriggerInputWired() &&
+                                         (*graphR->ModulatorInputSlot(0) == (sampleR ? sampleR->ModulatorOutput(1) : nullptr));
+            bool pass = boolsSurvived && imageCableSurvived && triggerCableSurvived;
+            printf("[FIELDPINSTEST] Assertion 8 (save/load round trip: bools + srcOutput-carrying cables): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 4: undo across a single toggle flip.
+         {
+            auto* elemR = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+            bool pass = elemR != nullptr;
+            if (elemR)
+            {
+               bool before = elemR->publishScalarOutput; // true, from section 2/3
+               PushUndoCheckpoint();
+               elemR->publishScalarOutput = !before;
+               Undo();
+               auto* elemAfterUndo = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+               pass = elemAfterUndo && (elemAfterUndo->publishScalarOutput == before);
+            }
+            printf("[FIELDPINSTEST] Assertion 9 (undo reverts a single toggle flip): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 5: copy/paste preserves pin shape.
+         {
+            auto* elemR = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+            bool pass = false;
+            if (elemR)
+            {
+               FieldElementNode copy;
+               CopyParams(&copy, elemR);
+               pass = (copy.publishScalarOutput == elemR->publishScalarOutput) && (copy.OutputCount() == elemR->OutputCount());
+            }
+            printf("[FIELDPINSTEST] Assertion 10 (copy/paste preserves pin shape): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 6: pre-step-11 patch fixture - a saved-params list missing
+         // the new bool key entirely (as any patch saved before this step
+         // would be) loads with the old pin shape and the bool defaulted
+         // false, per Patch.cpp's Reader::Bool "leave untouched when the key
+         // is absent" contract.
+         {
+            FieldElementNode src;
+            src.publishScalarOutput = true;
+            std::vector<std::pair<std::string, std::string>> params;
+            Patch::SaveParams(&src, params);
+            params.erase(std::remove_if(params.begin(), params.end(),
+                                         [](const std::pair<std::string, std::string>& kv) {
+                                            return kv.first == "b publishScalarOutput";
+                                         }),
+                          params.end());
+            FieldElementNode loaded;
+            Patch::LoadParams(&loaded, params);
+            bool pass = !loaded.publishScalarOutput && (loaded.OutputCount() == 1);
+            printf("[FIELDPINSTEST] Assertion 11 (pre-step-11 patch: bool defaults false, old pin shape): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDPINS OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
       {
          // Every node type that declares params must survive both paths that
@@ -56857,6 +57254,30 @@ int main(int argc, char** argv)
       {
          RunFieldGraphRegenerate(gFieldGraphPendingRegenerate);
          gFieldGraphPendingRegenerate = nullptr;
+      }
+
+      // Dynamic pins, Phase 1 (build step 11, §5.5): trigger-pin edge
+      // detection for every FieldGraphNode, polled once per frame right
+      // here - same safe-to-mutate-gNodes location as the drain just above
+      // (trap T14). Firing nodes are collected first and regenerated in a
+      // second pass, deliberately not called from inside the gNodes range-for:
+      // Regenerate() can spawn/remove nodes, which reallocates gNodes'
+      // storage and would invalidate that loop's iterator/reference mid-walk.
+      // Collected as raw INode-owning pointers (not GraphNode&), which stay
+      // valid across such a reallocation since gNodes holds them by
+      // unique_ptr, not by value.
+      {
+         std::vector<FieldGraphNode*> firing;
+         for (GraphNode& gn : gNodes)
+         {
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(gn.node.get()))
+            {
+               if (fgn->PollTriggerEdge())
+                  firing.push_back(fgn);
+            }
+         }
+         for (FieldGraphNode* fgn : firing)
+            RunFieldGraphRegenerate(fgn);
       }
 
       io.MouseWheel = savedWheel;
