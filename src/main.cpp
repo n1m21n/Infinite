@@ -8291,9 +8291,14 @@ namespace
       // it keeps its DrawVideoParams body (file picker, loop/speed, preview)
       // rather than the generic v3 audio body, which has no case for it and
       // would otherwise drop path/loop/speed/audioEnabled/volume entirely.
+      // FieldSampleNode needs the same carve-out: it has both a NoteCable and
+      // an AudioCable, so it trips this gate, but DrawAudioNodeBody has no
+      // case for it either - it rendered as a bare pin column with no "Edit
+      // Field..." button and no way to reach DrawFieldSampleParams at all.
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
           dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
-          dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr)
+          dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr ||
+          dynamic_cast<FieldSampleNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -26150,7 +26155,14 @@ namespace
          gn->spawnY = y;
          gn->liveX = x;
          gn->liveY = y;
-         gn->needsPosition = false;
+         // Do NOT clear needsPosition here: for a freshly-mounted node it is
+         // still true, and it's the only signal that tells the main.cpp:~53053
+         // per-frame tick to push spawnX/spawnY into the node-editor library
+         // via ed::SetNodePosition on the next frame. Clearing it here (as
+         // this used to) stomped that pending push before it ever fired, so
+         // every place()'d node kept whatever default position the editor
+         // library assigns unpositioned nodes - producing the fully-stacked
+         // cluster instead of the requested layout.
       }
 
       bool Alive(int id) const override { return FindNodeByIndex(id) != nullptr; }
@@ -41408,6 +41420,17 @@ void ApplyModulationAndPalette(int frameId)
    for (GraphNode& gn : gNodes)
    {
       if (dynamic_cast<IPaletteSource*>(gn.node.get()) != nullptr)
+         gn.node->CookIfNeeded(frameId);
+   }
+
+   // Same reasoning as the Palette loop just above: a standalone FieldPixel
+   // node with nothing wired downstream is never reached by the sink-driven
+   // 2D cook loop (only OutputNode/SyphonOutNode/OscSendNode pull their
+   // inputs), so its preview thumbnail stayed black even for a correctly
+   // compiling kernel - CookIfNeeded was simply never being called on it.
+   for (GraphNode& gn : gNodes)
+   {
+      if (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr)
          gn.node->CookIfNeeded(frameId);
    }
 
