@@ -45134,7 +45134,7 @@ int main(int argc, char** argv)
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
          }
 
-         // Transport controls styling: clean, symmetrical, unboxed.
+         // Transport controls styling: clean, symmetrical, unboxed with pixel-perfect alignment.
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
          ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
          ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
@@ -45143,135 +45143,258 @@ int main(int argc, char** argv)
          ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
          ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 2.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 2.0f));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
-         ImGui::Separator();
+         auto TransportSeparator = []() {
+            ImGui::SameLine(0.0f, 10.0f);
+            ImGui::Separator();
+            ImGui::SameLine(0.0f, 10.0f);
+         };
 
-         // Tempo: draggable left/right (0.2 bpm step), double-click to enter exact text mode.
+         static const int kDens[] = { 1, 2, 4, 8, 16 };
+         auto SnapToValidDenominator = [](int val) -> int {
+            int bestDen = kDens[0];
+            int bestDist = std::abs(val - kDens[0]);
+            for (int d : kDens)
+            {
+               int dist = std::abs(val - d);
+               if (dist < bestDist)
+               {
+                  bestDist = dist;
+                  bestDen = d;
+               }
+            }
+            return bestDen;
+         };
+         auto DenToIdx = [](int d) -> int {
+            for (int i = 0; i < 5; i++)
+               if (kDens[i] == d) return i;
+            return 2;
+         };
+
+         enum class TopBarField { None, Bpm, TsNum, TsDen };
+         static TopBarField sActiveField = TopBarField::None;
+         static char sFieldText[32] = "";
+         static bool sFieldJustOpened = false;
+         static float sDragAccumY = 0.0f;
+
+         TransportSeparator();
+
+         // Tempo: vertical drag (up/down) to adjust, hover-and-type or double-click to type exact BPM.
          {
             float bpm = transport.Tempo();
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("BPM");
             ImGui::SameLine(0.0f, 4.0f);
-            ImGui::SetNextItemWidth(48.0f);
-            if (ImGui::DragFloat("##bpm", &bpm, 0.2f, 20.0f, 300.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp))
-               transport.SetTempo(std::clamp(bpm, 20.0f, 300.0f));
-            if (ImGui::IsItemHovered())
-               ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-         }
 
-         ImGui::Separator();
-
-         // Time signature: both numerator and denominator draggable and editable via double-click.
-         // Numerator draggable 1-99; denominator draggable and snaps strictly to {1, 2, 4, 8, 16}.
-         {
-            int tsNum = transport.TimeSigNumerator();
-            const int tsDen = transport.TimeSigDenominator();
-
-            ImGui::SetNextItemWidth(tsNum >= 10 ? 24.0f : 18.0f);
-            if (ImGui::DragInt("##tsNum", &tsNum, 0.15f, 1, 99, "%d", ImGuiSliderFlags_AlwaysClamp))
-               transport.SetTimeSignature(std::clamp(tsNum, 1, 99), tsDen);
-            if (ImGui::IsItemHovered())
-               ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-            ImGui::SameLine(0.0f, 3.0f);
-            ImGui::TextDisabled("/");
-            ImGui::SameLine(0.0f, 3.0f);
-
-            static const int kDens[] = { 1, 2, 4, 8, 16 };
-            auto SnapToValidDenominator = [](int val) -> int {
-               int bestDen = kDens[0];
-               int bestDist = std::abs(val - kDens[0]);
-               for (int d : kDens)
-               {
-                  int dist = std::abs(val - d);
-                  if (dist < bestDist)
-                  {
-                     bestDist = dist;
-                     bestDen = d;
-                  }
-               }
-               return bestDen;
-            };
-            auto DenToIdx = [](int d) -> int {
-               for (int i = 0; i < 5; i++)
-                  if (kDens[i] == d) return i;
-               return 2;
-            };
-
-            static bool sTsDenEditing = false;
-            static char sTsDenText[16] = "";
-            static float sTsDenDragAccum = 0.0f;
-
-            if (sTsDenEditing)
+            if (sActiveField == TopBarField::Bpm)
             {
-               ImGui::SetNextItemWidth(tsDen >= 10 ? 24.0f : 18.0f);
-               const bool entered = ImGui::InputText("##tsDenInput", sTsDenText, sizeof(sTsDenText),
+               ImGui::SetNextItemWidth(54.0f);
+               if (sFieldJustOpened)
+               {
+                  ImGui::SetKeyboardFocusHere();
+                  sFieldJustOpened = false;
+               }
+               const bool entered = ImGui::InputText("##bpmInput", sFieldText, sizeof(sFieldText),
                                                      ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
                if (entered || ImGui::IsItemDeactivated())
                {
-                  const int typed = atoi(sTsDenText);
-                  const int snapped = SnapToValidDenominator(typed);
-                  transport.SetTimeSignature(tsNum, snapped);
-                  sTsDenEditing = false;
+                  char* end = nullptr;
+                  float parsed = strtof(sFieldText, &end);
+                  if (end != sFieldText && parsed > 0.0f)
+                     transport.SetTempo(std::clamp(parsed, 20.0f, 300.0f));
+                  sActiveField = TopBarField::None;
                }
             }
             else
             {
-               char denStr[8];
-               snprintf(denStr, sizeof(denStr), "%d", tsDen);
-               const ImVec2 textSize = ImGui::CalcTextSize(denStr);
-               const float itemW = std::max(tsDen >= 10 ? 24.0f : 18.0f, textSize.x + 6.0f);
-               const ImVec2 size(itemW, ImGui::GetFrameHeight());
-
-               ImGui::InvisibleButton("##tsDenBtn", size);
-               const bool hovered = ImGui::IsItemHovered();
-               const bool active = ImGui::IsItemActive();
-               const ImVec2 bmin = ImGui::GetItemRectMin();
-               const ImVec2 bmax = ImGui::GetItemRectMax();
-
-               if (hovered)
-                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-               if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+               char bpmBuf[32];
+               snprintf(bpmBuf, sizeof(bpmBuf), "%.1f", bpm);
+               ImGui::Button(bpmBuf);
+               if (ImGui::IsItemHovered())
                {
-                  sTsDenEditing = true;
-                  snprintf(sTsDenText, sizeof(sTsDenText), "%d", tsDen);
-                  ImGui::SetKeyboardFocusHere();
-               }
-               else if (active)
-               {
-                  sTsDenDragAccum += ImGui::GetIO().MouseDelta.x;
-                  const float kStepPx = 14.0f;
-                  if (std::abs(sTsDenDragAccum) >= kStepPx)
+                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                   {
-                     const int steps = (int)(sTsDenDragAccum / kStepPx);
-                     sTsDenDragAccum -= steps * kStepPx;
-                     const int curIdx = DenToIdx(tsDen);
-                     const int nextIdx = std::clamp(curIdx + steps, 0, 4);
+                     sActiveField = TopBarField::Bpm;
+                     snprintf(sFieldText, sizeof(sFieldText), "%.1f", bpm);
+                     sFieldJustOpened = true;
+                  }
+                  else
+                  {
+                     ImGuiIO& io = ImGui::GetIO();
+                     for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+                     {
+                        ImWchar ch = io.InputQueueCharacters[i];
+                        if ((ch >= '0' && ch <= '9') || ch == '.' || ch == '-')
+                        {
+                           sActiveField = TopBarField::Bpm;
+                           sFieldText[0] = (char)ch;
+                           sFieldText[1] = '\0';
+                           sFieldJustOpened = true;
+                           break;
+                        }
+                     }
+                  }
+               }
+               if (ImGui::IsItemActive())
+               {
+                  const float dy = -ImGui::GetIO().MouseDelta.y;
+                  const float speed = ImGui::GetIO().KeyShift ? 0.05f : 0.25f;
+                  bpm = std::clamp(bpm + dy * speed, 20.0f, 300.0f);
+                  transport.SetTempo(bpm);
+               }
+            }
+         }
+
+         TransportSeparator();
+
+         // Time signature: numerator draggable 1-99; denominator draggable snapping to {1, 2, 4, 8, 16}.
+         // Both support hover-and-type and double-click to type.
+         {
+            int tsNum = transport.TimeSigNumerator();
+            const int tsDen = transport.TimeSigDenominator();
+
+            // Numerator
+            if (sActiveField == TopBarField::TsNum)
+            {
+               ImGui::SetNextItemWidth(30.0f);
+               if (sFieldJustOpened)
+               {
+                  ImGui::SetKeyboardFocusHere();
+                  sFieldJustOpened = false;
+               }
+               const bool entered = ImGui::InputText("##tsNumInput", sFieldText, sizeof(sFieldText),
+                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               if (entered || ImGui::IsItemDeactivated())
+               {
+                  int parsed = atoi(sFieldText);
+                  if (parsed > 0)
+                     transport.SetTimeSignature(std::clamp(parsed, 1, 99), tsDen);
+                  sActiveField = TopBarField::None;
+               }
+            }
+            else
+            {
+               char numBuf[16];
+               snprintf(numBuf, sizeof(numBuf), "%d", tsNum);
+               ImGui::Button(numBuf);
+               if (ImGui::IsItemHovered())
+               {
+                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                  {
+                     sActiveField = TopBarField::TsNum;
+                     snprintf(sFieldText, sizeof(sFieldText), "%d", tsNum);
+                     sFieldJustOpened = true;
+                  }
+                  else
+                  {
+                     ImGuiIO& io = ImGui::GetIO();
+                     for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+                     {
+                        ImWchar ch = io.InputQueueCharacters[i];
+                        if (ch >= '0' && ch <= '9')
+                        {
+                           sActiveField = TopBarField::TsNum;
+                           sFieldText[0] = (char)ch;
+                           sFieldText[1] = '\0';
+                           sFieldJustOpened = true;
+                           break;
+                        }
+                     }
+                  }
+               }
+               if (ImGui::IsItemActive())
+               {
+                  const float dy = -ImGui::GetIO().MouseDelta.y;
+                  sDragAccumY += dy;
+                  const float kStep = 6.0f;
+                  if (std::abs(sDragAccumY) >= kStep)
+                  {
+                     int steps = (int)(sDragAccumY / kStep);
+                     sDragAccumY -= steps * kStep;
+                     tsNum = std::clamp(tsNum + steps, 1, 99);
+                     transport.SetTimeSignature(tsNum, tsDen);
+                  }
+               }
+            }
+
+            ImGui::SameLine(0.0f, 4.0f);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("/");
+            ImGui::SameLine(0.0f, 4.0f);
+
+            // Denominator
+            if (sActiveField == TopBarField::TsDen)
+            {
+               ImGui::SetNextItemWidth(30.0f);
+               if (sFieldJustOpened)
+               {
+                  ImGui::SetKeyboardFocusHere();
+                  sFieldJustOpened = false;
+               }
+               const bool entered = ImGui::InputText("##tsDenInput", sFieldText, sizeof(sFieldText),
+                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               if (entered || ImGui::IsItemDeactivated())
+               {
+                  int parsed = atoi(sFieldText);
+                  int snapped = SnapToValidDenominator(parsed);
+                  transport.SetTimeSignature(tsNum, snapped);
+                  sActiveField = TopBarField::None;
+               }
+            }
+            else
+            {
+               char denBuf[16];
+               snprintf(denBuf, sizeof(denBuf), "%d", tsDen);
+               ImGui::Button(denBuf);
+               if (ImGui::IsItemHovered())
+               {
+                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                  {
+                     sActiveField = TopBarField::TsDen;
+                     snprintf(sFieldText, sizeof(sFieldText), "%d", tsDen);
+                     sFieldJustOpened = true;
+                  }
+                  else
+                  {
+                     ImGuiIO& io = ImGui::GetIO();
+                     for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+                     {
+                        ImWchar ch = io.InputQueueCharacters[i];
+                        if (ch >= '0' && ch <= '9')
+                        {
+                           sActiveField = TopBarField::TsDen;
+                           sFieldText[0] = (char)ch;
+                           sFieldText[1] = '\0';
+                           sFieldJustOpened = true;
+                           break;
+                        }
+                     }
+                  }
+               }
+               if (ImGui::IsItemActive())
+               {
+                  const float dy = -ImGui::GetIO().MouseDelta.y;
+                  sDragAccumY += dy;
+                  const float kStep = 10.0f;
+                  if (std::abs(sDragAccumY) >= kStep)
+                  {
+                     int steps = (int)(sDragAccumY / kStep);
+                     sDragAccumY -= steps * kStep;
+                     int curIdx = DenToIdx(tsDen);
+                     int nextIdx = std::clamp(curIdx + steps, 0, 4);
                      if (nextIdx != curIdx)
                         transport.SetTimeSignature(tsNum, kDens[nextIdx]);
                   }
                }
-               else
-               {
-                  sTsDenDragAccum = 0.0f;
-               }
-
-               ImDrawList* dl = ImGui::GetWindowDrawList();
-               if (active)
-                  dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImGuiCol_FrameBgActive), 3.0f);
-               else if (hovered)
-                  dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImGuiCol_FrameBgHovered), 3.0f);
-
-               const ImVec2 tpos(bmin.x + (bmax.x - bmin.x - textSize.x) * 0.5f,
-                                 bmin.y + (bmax.y - bmin.y - textSize.y) * 0.5f);
-               dl->AddText(tpos, ImGui::GetColorU32(ImGuiCol_Text), denStr);
             }
          }
 
-         ImGui::Separator();
+         TransportSeparator();
 
          // Global Key and Scale
          {
@@ -45339,8 +45462,9 @@ int main(int argc, char** argv)
          ImGui::PopStyleColor(6);
          ImGui::PopStyleVar(4);
 
-         ImGui::Separator();
+         TransportSeparator();
 
+         ImGui::AlignTextToFramePadding();
          ImGui::TextDisabled("bar %d  beat %.2f",
                              1 + (int)transport.Bars(),
                              std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
