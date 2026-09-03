@@ -118,6 +118,15 @@ public:
    virtual int GetOutputWidth() const = 0;
    virtual int GetOutputHeight() const = 0;
 
+   // Indexed overload for a node with more than one *image* output (build
+   // step 11, §5.3 - Phase 1's only such node is FieldPixelNode's aux state
+   // texture). Additive: the default falls back to the single-output getter
+   // for index 0 and returns 0 for anything else, so every existing
+   // single-output node needs no change at all. ImageCable::Pull() calls
+   // this one; the 0-arg GetOutputTexture() above stays the primary API
+   // every other call site already uses.
+   virtual unsigned int GetOutputTexture(int index) { return index == 0 ? GetOutputTexture() : 0; }
+
    // Ensure this node has produced its output for the given frame (memoized).
    // Nodes with inputs should pull their inputs' CookIfNeeded() before rendering themselves.
    virtual void CookIfNeeded(int frameId) = 0;

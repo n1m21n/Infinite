@@ -20,11 +20,30 @@ public:
 
    // INode overrides
    unsigned int GetOutputTexture() override;
+   // Dynamic pins, Phase 1 (build step 11, §5.3): a second image output
+   // exposing the state ping-pong bank (mState) that already exists for the
+   // kernel's own `state` cells - the entry that actually exercises the
+   // ImageCable/INode::GetOutputTexture(int)/Patch.cpp "cable"-tag srcOutput
+   // plumbing added for this, since nothing before this pin supported more
+   // than one image output per node. index==0 is the ordinary render output
+   // (unchanged); index==1 is the aux texture, live only when
+   // exposeAuxTexture is on AND the kernel actually declared state cells -
+   // mState is never resized/populated otherwise, so returning its texture
+   // then would hand out a stale or zero FBO.
+   unsigned int GetOutputTexture(int index) override;
    int GetOutputWidth() const override;
    int GetOutputHeight() const override;
    void CookIfNeeded(int frameId) override;
    INode* BypassSource() override { return input.GetSource(); }
    const char* InputLabel(int) const override { return "src"; }
+
+   int OutputCount() const override { return exposeAuxTexture ? 2 : 1; }
+   const char* OutputLabel(int index) const override { return index == 1 ? "state" : "out"; }
+
+   bool exposeAuxTexture = false;
+   // Transient (not saved) - see FieldElementNode::pinRefusal for the
+   // rationale; identical cable-orphaning refusal policy (decision 4).
+   std::string pinRefusal;
 
    // The one-and-only image input ("src" in the kernel), wired the same way
    // as every other image-consuming node - see CableFor/InputCountFor in
@@ -38,6 +57,7 @@ public:
       v.Float("width", width);
       v.Float("height", height);
       v.Bool("animate", animate);
+      v.Bool("exposeAuxTexture", exposeAuxTexture);
       mParamTable.VisitParams(v);
    }
 

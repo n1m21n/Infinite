@@ -2,6 +2,7 @@
 
 #include "INode.h"
 #include "Geometry3DNodes.h"
+#include "Modulation.h"
 #include "field/ElementStore.h"
 #include "field/ElementBackend.h"
 #include "field/FieldState.h"
@@ -28,11 +29,35 @@ public:
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
 
+   // Dynamic pins, Phase 1 (build step 11, §5.1): a second output, "publish",
+   // reads a Frame-domain-hoisted scalar (e.g. `publish = ...` at prologue
+   // scope) out of the compiled program via ElementVM::ReadFrameVar - no IR
+   // or domain-inference change, purely C++-hardcoded plumbing. Append-only:
+   // output 0 (geometry) never moves.
+   int OutputCount() const override { return publishScalarOutput ? 2 : 1; }
+   const char* OutputLabel(int index) const override { return index == 1 ? "publish" : "geo"; }
+   IModulator* ModulatorOutput(int index) override
+   {
+      // Gated on publishScalarOutput, not just index==1: OutputCount() is 1
+      // when the pin is off, so index 1 does not nominally exist - a caller
+      // that reaches for it anyway (e.g. a headless ConnectNodes(idx, 1, ...))
+      // must see nullptr, the same as any other out-of-range output index,
+      // not a live IModulator for a pin the UI never drew.
+      return (publishScalarOutput && index == 1) ? static_cast<IModulator*>(&mPublishOutput) : nullptr;
+   }
+
+   bool publishScalarOutput = false;
+   // Transient (not saved) - set by the UI toggle handler when a cable-
+   // orphaning refusal happens, so the node body can surface a one-line
+   // reason. Cleared as soon as the refused state is no longer relevant.
+   std::string pinRefusal;
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Text("code", code);
       v.Int("maxElements", maxElements);
       v.Int("generateCount", generateCount);
+      v.Bool("publishScalarOutput", publishScalarOutput);
       mParamTable.VisitParams(v);
       mState.VisitParams(v);
    }
@@ -91,6 +116,24 @@ public:
    // producing this many fresh points for the kernel to shape via `i`/`count`.
    int generateCount = 64;
 
+   // Reads the last-executed program's Frame-domain `publish` value, if one
+   // was assigned; 0.0 when unused (not an error - §5.1 step 4). Modeled on
+   // MacroXYNode::YAxis (src/nodes/MacroNodes.h) - a small owned IModulator
+   // with an owner back-pointer, added as the 2nd output rather than reused
+   // via inheritance since output 0 (geometry) has no IModulator meaning here.
+   struct PublishOutput : public IModulator
+   {
+      FieldElementNode* owner = nullptr;
+      float Value01() override
+      {
+         if (owner == nullptr)
+            return 0.0f;
+         float v = 0.0f;
+         owner->mVM.ReadFrameVar("publish", v);
+         return v;
+      }
+   };
+
 private:
    Field::ElementStore mStore;
    Field::ElementVM mVM;
@@ -100,6 +143,7 @@ private:
    std::string mLastError;
    std::string mNotice;
    int mNodeIndex = -1;
+   PublishOutput mPublishOutput;
 
    Mesh mOutMesh;
    unsigned long long mMeshRevision = 1;
