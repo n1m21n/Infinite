@@ -13298,12 +13298,12 @@ namespace
 
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      const float faderH = 80.0f;
+      const float faderH = 138.0f;
       const float stripTop = ImGui::GetCursorScreenPos().y;
-      DrawStripMeter(gAudioContentX + gAudioContentW * 0.5f + 24.0f, stripTop + 4.0f, 8.0f, faderH - 8.0f,
-                     n->Level());
+      const float cx = gAudioContentX + 0.5f * gAudioContentW;
+      DrawStripMeter(cx + 14.0f, stripTop + 6.0f, 8.0f, faderH - 12.0f, n->Level());
       AudioKnobRow row(1, faderH);
-      row.Fader("trim", &n->gainDb, -24.0f, 24.0f, "%.1f dB", faderH);
+      row.Fader("trim", &n->gainDb, -60.0f, 12.0f, "%.1f dB", faderH, /*dbTaper=*/true);
       row.End();
       EndAudioBody();
    }
