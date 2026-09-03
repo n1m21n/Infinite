@@ -98,7 +98,7 @@ public:
    // back to 4 rather than producing a nonsensical BeatsPerBar().
    void SetTimeSignature(int numerator, int denominator)
    {
-      numerator = numerator < 1 ? 1 : (numerator > 16 ? 16 : numerator);
+      numerator = numerator < 1 ? 1 : (numerator > 99 ? 99 : numerator);
       static const int kValidDenominators[] = { 1, 2, 4, 8, 16 };
       bool ok = false;
       for (int v : kValidDenominators)

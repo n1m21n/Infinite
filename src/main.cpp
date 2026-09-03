@@ -45134,51 +45134,140 @@ int main(int argc, char** argv)
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
          }
 
+         // Transport controls styling: clean, symmetrical, unboxed.
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 2.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
+
          ImGui::Separator();
 
-         // Tempo: a plain text-entry field (not a slider) so typing an exact
-         // BPM is a direct click-and-type rather than a click-drag gesture.
-         float bpm = transport.Tempo();
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextUnformatted("BPM");
-         ImGui::SameLine(0.0f, 4.0f);
-         ImGui::SetNextItemWidth(52);
-         if (ImGui::InputFloat("##bpm", &bpm, 0.0f, 0.0f, "%.1f"))
-            transport.SetTempo(std::clamp(bpm, 20.0f, 300.0f));
+         // Tempo: draggable left/right (0.2 bpm step), double-click to enter exact text mode.
+         {
+            float bpm = transport.Tempo();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("BPM");
+            ImGui::SameLine(0.0f, 4.0f);
+            ImGui::SetNextItemWidth(48.0f);
+            if (ImGui::DragFloat("##bpm", &bpm, 0.2f, 20.0f, 300.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp))
+               transport.SetTempo(std::clamp(bpm, 20.0f, 300.0f));
+            if (ImGui::IsItemHovered())
+               ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+         }
 
          ImGui::Separator();
 
-         // Time signature (docs/plans/audio/P3c-P3a2-design.md §0.2): every
-         // bar-relative rate (Note Sequencer length, arp retrigger-on-bar,
-         // euclidean rotation) reads Transport::BeatsPerBar(), so this is the
-         // one place that controls all of them at once.
+         // Time signature: both numerator and denominator draggable and editable via double-click.
+         // Numerator draggable 1-99; denominator draggable and snaps strictly to {1, 2, 4, 8, 16}.
          {
             int tsNum = transport.TimeSigNumerator();
             const int tsDen = transport.TimeSigDenominator();
-            ImGui::SetNextItemWidth(36);
-            if (ImGui::InputInt("##tsNum", &tsNum, 0, 0))
-               transport.SetTimeSignature(tsNum, tsDen);
-            ImGui::SameLine(0.0f, 2.0f);
-            ImGui::TextUnformatted("/");
-            ImGui::SameLine(0.0f, 2.0f);
+
+            ImGui::SetNextItemWidth(tsNum >= 10 ? 24.0f : 18.0f);
+            if (ImGui::DragInt("##tsNum", &tsNum, 0.15f, 1, 99, "%d", ImGuiSliderFlags_AlwaysClamp))
+               transport.SetTimeSignature(std::clamp(tsNum, 1, 99), tsDen);
+            if (ImGui::IsItemHovered())
+               ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+            ImGui::SameLine(0.0f, 3.0f);
+            ImGui::TextDisabled("/");
+            ImGui::SameLine(0.0f, 3.0f);
+
             static const int kDens[] = { 1, 2, 4, 8, 16 };
-            int denIdx = 2;
-            for (int i = 0; i < 5; i++)
-               if (kDens[i] == tsDen)
-                  denIdx = i;
-            char denLabel[4];
-            snprintf(denLabel, sizeof(denLabel), "%d", tsDen);
-            ImGui::SetNextItemWidth(44);
-            if (ImGui::BeginCombo("##tsDen", denLabel))
-            {
-               for (int i = 0; i < 5; i++)
+            auto SnapToValidDenominator = [](int val) -> int {
+               int bestDen = kDens[0];
+               int bestDist = std::abs(val - kDens[0]);
+               for (int d : kDens)
                {
-                  char opt[4];
-                  snprintf(opt, sizeof(opt), "%d", kDens[i]);
-                  if (ImGui::Selectable(opt, i == denIdx))
-                     transport.SetTimeSignature(tsNum, kDens[i]);
+                  int dist = std::abs(val - d);
+                  if (dist < bestDist)
+                  {
+                     bestDist = dist;
+                     bestDen = d;
+                  }
                }
-               ImGui::EndCombo();
+               return bestDen;
+            };
+            auto DenToIdx = [](int d) -> int {
+               for (int i = 0; i < 5; i++)
+                  if (kDens[i] == d) return i;
+               return 2;
+            };
+
+            static bool sTsDenEditing = false;
+            static char sTsDenText[16] = "";
+            static float sTsDenDragAccum = 0.0f;
+
+            if (sTsDenEditing)
+            {
+               ImGui::SetNextItemWidth(tsDen >= 10 ? 24.0f : 18.0f);
+               const bool entered = ImGui::InputText("##tsDenInput", sTsDenText, sizeof(sTsDenText),
+                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               if (entered || ImGui::IsItemDeactivated())
+               {
+                  const int typed = atoi(sTsDenText);
+                  const int snapped = SnapToValidDenominator(typed);
+                  transport.SetTimeSignature(tsNum, snapped);
+                  sTsDenEditing = false;
+               }
+            }
+            else
+            {
+               char denStr[8];
+               snprintf(denStr, sizeof(denStr), "%d", tsDen);
+               const ImVec2 textSize = ImGui::CalcTextSize(denStr);
+               const float itemW = std::max(tsDen >= 10 ? 24.0f : 18.0f, textSize.x + 6.0f);
+               const ImVec2 size(itemW, ImGui::GetFrameHeight());
+
+               ImGui::InvisibleButton("##tsDenBtn", size);
+               const bool hovered = ImGui::IsItemHovered();
+               const bool active = ImGui::IsItemActive();
+               const ImVec2 bmin = ImGui::GetItemRectMin();
+               const ImVec2 bmax = ImGui::GetItemRectMax();
+
+               if (hovered)
+                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+               if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+               {
+                  sTsDenEditing = true;
+                  snprintf(sTsDenText, sizeof(sTsDenText), "%d", tsDen);
+                  ImGui::SetKeyboardFocusHere();
+               }
+               else if (active)
+               {
+                  sTsDenDragAccum += ImGui::GetIO().MouseDelta.x;
+                  const float kStepPx = 14.0f;
+                  if (std::abs(sTsDenDragAccum) >= kStepPx)
+                  {
+                     const int steps = (int)(sTsDenDragAccum / kStepPx);
+                     sTsDenDragAccum -= steps * kStepPx;
+                     const int curIdx = DenToIdx(tsDen);
+                     const int nextIdx = std::clamp(curIdx + steps, 0, 4);
+                     if (nextIdx != curIdx)
+                        transport.SetTimeSignature(tsNum, kDens[nextIdx]);
+                  }
+               }
+               else
+               {
+                  sTsDenDragAccum = 0.0f;
+               }
+
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               if (active)
+                  dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImGuiCol_FrameBgActive), 3.0f);
+               else if (hovered)
+                  dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImGuiCol_FrameBgHovered), 3.0f);
+
+               const ImVec2 tpos(bmin.x + (bmax.x - bmin.x - textSize.x) * 0.5f,
+                                 bmin.y + (bmax.y - bmin.y - textSize.y) * 0.5f);
+               dl->AddText(tpos, ImGui::GetColorU32(ImGuiCol_Text), denStr);
             }
          }
 
@@ -45189,36 +45278,66 @@ int main(int argc, char** argv)
             static const char* const kKeyNames[] = {
                "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
             };
+            auto FormatScaleDisplayName = [](const std::string& name) -> std::string {
+               std::string out = name;
+               bool capNext = true;
+               for (size_t i = 0; i < out.size(); i++)
+               {
+                  if (std::isalpha((unsigned char)out[i]))
+                  {
+                     if (capNext)
+                     {
+                        out[i] = (char)std::toupper((unsigned char)out[i]);
+                        capNext = false;
+                     }
+                  }
+                  else
+                  {
+                     capNext = true;
+                  }
+               }
+               return out;
+            };
+
             int curKey = transport.Key();
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Key");
             ImGui::SameLine(0.0f, 4.0f);
-            ImGui::SetNextItemWidth(45);
-            if (ImGui::BeginCombo("##globalKey", kKeyNames[std::clamp(curKey, 0, 11)]))
+
+            if (ImGui::Button(kKeyNames[std::clamp(curKey, 0, 11)]))
+               ImGui::OpenPopup("##globalKeyPopup");
+            if (ImGui::BeginPopup("##globalKeyPopup"))
             {
                for (int i = 0; i < 12; i++)
                {
                   if (ImGui::Selectable(kKeyNames[i], i == curKey))
                      transport.SetKey(i);
                }
-               ImGui::EndCombo();
+               ImGui::EndPopup();
             }
 
-            ImGui::SameLine(0.0f, 6.0f);
+            ImGui::SameLine(0.0f, 4.0f);
             int curScale = transport.Scale();
             const auto& scaleList = MusicTime::ScaleTypeList();
             const char* curScaleName = (curScale >= 0 && curScale < (int)scaleList.size()) ? scaleList[curScale].c_str() : "major";
-            ImGui::SetNextItemWidth(110);
-            if (ImGui::BeginCombo("##globalScale", curScaleName))
+            const std::string capScaleName = FormatScaleDisplayName(curScaleName);
+
+            if (ImGui::Button(capScaleName.c_str()))
+               ImGui::OpenPopup("##globalScalePopup");
+            if (ImGui::BeginPopup("##globalScalePopup"))
             {
                for (int i = 0; i < (int)scaleList.size(); i++)
                {
-                  if (ImGui::Selectable(scaleList[i].c_str(), i == curScale))
+                  const std::string capOpt = FormatScaleDisplayName(scaleList[i]);
+                  if (ImGui::Selectable(capOpt.c_str(), i == curScale))
                      transport.SetScale(i);
                }
-               ImGui::EndCombo();
+               ImGui::EndPopup();
             }
          }
+
+         ImGui::PopStyleColor(6);
+         ImGui::PopStyleVar(4);
 
          ImGui::Separator();
 
