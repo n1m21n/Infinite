@@ -181,6 +181,7 @@ void FieldGraphNode::VisitParams(ParamVisitor& v)
 {
    v.Text("code", code);
    v.Text("uid", mUid);
+   v.Bool("addTriggerInput", addTriggerInput);
    std::string prevOwnershipText = ownershipText;
    v.Text("ownershipText", ownershipText);
    mParamTable.VisitParams(v);

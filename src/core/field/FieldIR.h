@@ -71,6 +71,8 @@ namespace Field
       Assign,
       DeclAttrib,
       DeclState,
+      DeclOutput,
+      DeclInput,
       StateWrite,
       If,
       For,
@@ -85,6 +87,34 @@ namespace Field
 
    struct IRStmt;
    using IRStmtPtr = std::shared_ptr<IRStmt>;
+
+   // Build step 12: `output <domain> <type> <name> = <expr>` /
+   // `input <domain> <type> <name>`. `typeName` is the raw source-level type
+   // word, e.g. "float", "geometry", "audio", "image"; `isStructural` is
+   // true for the three reserved structural type-names, which have no
+   // DataType (type/lanes are left at their defaults and unused in that
+   // case) - see step-12-dynamic-pins-ir.md S1.5/S5.6.
+   struct DeclaredOutput
+   {
+      std::string name;
+      std::string typeName;
+      bool isStructural = false;
+      DataType type = DataType::Float;
+      int lanes = 1;
+      Domain domain = Domain::Element;
+      SourceSpan span;
+   };
+
+   struct DeclaredInput
+   {
+      std::string name;
+      std::string typeName;
+      bool isStructural = false;
+      DataType type = DataType::Float;
+      int lanes = 1;
+      Domain domain = Domain::Element;
+      SourceSpan span;
+   };
 
    struct DeclaredState
    {
@@ -124,6 +154,15 @@ namespace Field
       DataType stateType = DataType::Float;
       int stateLanes = 1;
       std::vector<float> stateInitValues;
+
+      // DeclOutput / DeclInput (build step 12)
+      std::string pinName;
+      std::string pinTypeName;
+      bool pinIsStructural = false;
+      DataType pinType = DataType::Float;
+      int pinLanes = 1;
+      Domain pinDomain = Domain::Element;
+      IRNodePtr pinInitExpr; // DeclOutput only
 
       // If
       IRNodePtr ifCond;
@@ -186,6 +225,8 @@ namespace Field
       std::vector<std::pair<std::string, DataType>> declaredAttribs;
       std::vector<DeclaredParam> declaredParams;
       std::vector<DeclaredState> declaredStates;
+      std::vector<DeclaredOutput> declaredOutputs;
+      std::vector<DeclaredInput> declaredInputs;
       bool isTimeDependent = false;
    };
 
@@ -195,6 +236,8 @@ namespace Field
       std::vector<IRStmtPtr> pixelBody;   // Per-pixel statements
       std::vector<DeclaredParam> declaredParams;
       std::vector<DeclaredState> declaredStates;
+      std::vector<DeclaredOutput> declaredOutputs;
+      std::vector<DeclaredInput> declaredInputs;
       bool isTimeDependent = false;
    };
 

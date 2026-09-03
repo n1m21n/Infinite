@@ -97,6 +97,8 @@ namespace
 #include "core/field/GlslBackend.h"
 #include "core/field/Transfer.h"
 #include "core/field/ReduceOps.h"
+#include "core/field/BackendRegister.h"
+#include "core/field/PinTable.h"
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
@@ -616,6 +618,54 @@ namespace
             return &link;
       }
       return nullptr;
+   }
+
+   // Dynamic pins, Phase 1 (build step 11, decision 4): toggling a menu entry
+   // off while a live cable is attached to the output pin it would remove
+   // must be refused rather than silently orphaning the cable. gLinks is
+   // rebuilt earlier in this same frame (see CaptureClusterLinks' comment
+   // above), so this reads current topology, not last frame's.
+   bool FieldOutputPinHasLiveCable(int nodeIndex, int outputIndex)
+   {
+      for (const LinkInfo& link : gLinks)
+      {
+         if (!GraphNode::IsOutputPin(link.srcPin))
+            continue;
+         if (GraphNode::NodeIndexFromPin(link.srcPin) == nodeIndex &&
+             GraphNode::OutputIndexFromPin(link.srcPin) == outputIndex)
+            return true;
+      }
+      return false;
+   }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): symmetric to
+   // FieldOutputPinHasLiveCable above, but scans destination (input) pins -
+   // needed so a kernel edit that would retire a declared `input` pin (not
+   // just a declared `output`) can refuse rather than silently orphan
+   // whatever is wired into it.
+   bool FieldInputPinHasLiveCable(int nodeIndex, int inputIndex)
+   {
+      for (const LinkInfo& link : gLinks)
+      {
+         if (!GraphNode::IsInputPin(link.dstPin))
+            continue;
+         if (GraphNode::NodeIndexFromPin(link.dstPin) == nodeIndex &&
+             GraphNode::InputSlotFromPin(link.dstPin) == inputIndex)
+            return true;
+      }
+      return false;
+   }
+
+   // Bridge installed into Field::gLiveCableChecker (see PinTable.h) so
+   // Field*Node::Apply() - compiled in separate translation units, and
+   // never able to see gLinks (private to this anonymous namespace) - can
+   // still ask "does this pin's current compacted slot have a live cable".
+   // Taking the address of an internal-linkage function and storing it in
+   // an externally-linked function pointer is legal; only the pointer
+   // itself needs external linkage.
+   bool CheckFieldLiveCableBridge(int nodeIndex, int slot, bool isOutput)
+   {
+      return isOutput ? FieldOutputPinHasLiveCable(nodeIndex, slot) : FieldInputPinHasLiveCable(nodeIndex, slot);
    }
    bool gSnapToGrid = true;
    float gGridSnap = 20.0f;
@@ -4194,8 +4244,11 @@ namespace
          return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
-      if (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr)
-         return 1; // the kernel's "src" texture input
+      if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
+         // Dynamic pins, Phase 2b (build step 13, §5.7): the native "src"
+         // texture input at slot 0, then one slot per currently-declared
+         // `input image` pin.
+         return 1 + fp->DeclaredImageInputCount();
       if (dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr)
          return 1; // the kernel's optional "geo" input (generator when unwired)
       // (Audio Analyze used to need an entry here for its fileSource pin; it
@@ -4336,7 +4389,13 @@ namespace
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
-         return slot == 0 ? &fp->TextureInput() : nullptr;
+      {
+         // Dynamic pins, Phase 2b (build step 13, §5.7): slot 0 is the
+         // native "src" input; slot 1..N route to the currently-declared
+         // `input image` pins in PinTable order.
+         if (slot == 0) return &fp->TextureInput();
+         return fp->DeclaredImageInput(slot - 1);
+      }
       if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
          return slot == 0 ? &model->TextureInput() : nullptr;
       if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
@@ -4617,7 +4676,7 @@ namespace
       {
          ImageCable* cable = CableFor(dstNode, slot);
          if (cable != nullptr)
-            cable->Connect(srcNode.node.get());
+            cable->Connect(srcNode.node.get(), srcOutputIndex);
       }
    }
 
@@ -5384,6 +5443,28 @@ namespace
       if (!n->input)
          ModSliderInt("generate count", &n->generateCount, 1, 100000);
 
+      {
+         bool publish = n->publishScalarOutput;
+         if (ModCheckbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
+         {
+            if (!publish && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: publish output is still wired";
+            }
+            else
+            {
+               n->publishScalarOutput = publish;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
       for (auto& p : n->GetParamTable().Params())
       {
          if (!p.isDeclared)
@@ -5433,6 +5514,28 @@ namespace
 
       ModSliderInt("max voices", &n->maxVoices, 1, 32);
 
+      {
+         bool expose = n->exposeRmsOutput;
+         if (ModCheckbox("expose rms output", &expose) && expose != n->exposeRmsOutput)
+         {
+            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: rms output is still wired";
+            }
+            else
+            {
+               n->exposeRmsOutput = expose;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
       for (auto& p : n->GetParamTable().Params())
       {
          if (!p.isDeclared)
@@ -5471,6 +5574,28 @@ namespace
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
             ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      {
+         bool addTrigger = n->addTriggerInput;
+         if (ModCheckbox("trigger input", &addTrigger) && addTrigger != n->addTriggerInput)
+         {
+            if (!addTrigger && n->TriggerInputWired())
+            {
+               n->pinRefusal = "refused: trigger input is still wired";
+            }
+            else
+            {
+               n->addTriggerInput = addTrigger;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
             ImGui::PopTextWrapPos();
          }
       }
@@ -5529,6 +5654,28 @@ namespace
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModCheckbox("animate", &n->animate);
+
+      {
+         bool expose = n->exposeAuxTexture;
+         if (ModCheckbox("expose state texture output", &expose) && expose != n->exposeAuxTexture)
+         {
+            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: state output is still wired";
+            }
+            else
+            {
+               n->exposeAuxTexture = expose;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
 
       for (auto& p : n->GetParamTable().Params())
       {
@@ -26480,7 +26627,7 @@ namespace
                   continue;
                auto it = addrToIndex.find((const void*)cable->GetSource());
                if (it != addrToIndex.end())
-                  data.cables.push_back({ gn.index, slot, it->second });
+                  data.cables.push_back({ gn.index, slot, it->second, cable->GetSourceOutput() });
             }
          }
          // Audio/note cables are typed like image cables (a plain
@@ -27524,7 +27671,7 @@ namespace
          if (dst == nullptr || src == nullptr)
             continue;
          if (ImageCable* cable = CableFor(*dst, c.dstSlot))
-            cable->Connect(src->node.get());
+            cable->Connect(src->node.get(), c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.geometry)
       {
@@ -38602,6 +38749,628 @@ static int RunFieldSampleTest()
    return allOk ? 0 : 1;
 }
 
+// Build step 12 (docs/plans/field/step-12-dynamic-pins-ir.md): dynamic
+// output/input pin declarations. This harness is compiler-level only - it
+// drives Lex/ParseProgram/LowerElementProgramToIR/LowerPixelProgramToIR and
+// BackendRegister::CompileSampleProgram directly (never through a node class,
+// since FieldElementNode/FieldSampleNode only expose the post-backend
+// compiled program, not the intermediate IR's declaredOutputs/declaredInputs
+// vectors) plus a standalone Field::PinTable, per this step's "compiler/IR
+// work only, nothing in src/nodes/ changes" scope restriction.
+static int RunFieldPinDeclTest()
+{
+   printf("[FIELDPINDECLTEST] Running Field dynamic-pins declaration harness...\n");
+   bool allOk = true;
+
+   // ------------------------------------------------------------
+   // SECTION 1: Element-domain output/input collection (shared IR path)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src =
+         "output frame float bright = t\n"
+         "input sample audio sidechain\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      if (!Field::Lex(src, tokens, err) ||
+          !Field::ParseProgram(tokens, ast, err) ||
+          !Field::LowerElementProgramToIR(ast, ir, err))
+      {
+         printf("SECTION 1: FAIL - valid snippet did not compile: %s\n", err.message.c_str());
+         secOk = false;
+      }
+      else
+      {
+         if (ir.declaredOutputs.size() != 1 || ir.declaredOutputs[0].name != "bright" ||
+             ir.declaredOutputs[0].domain != Field::Domain::Frame ||
+             ir.declaredOutputs[0].type != Field::DataType::Float)
+         {
+            printf("SECTION 1: FAIL - declaredOutputs does not match expected ('bright', Frame, Float)\n");
+            secOk = false;
+         }
+         if (ir.declaredInputs.size() != 1 || ir.declaredInputs[0].name != "sidechain" ||
+             ir.declaredInputs[0].domain != Field::Domain::Sample || !ir.declaredInputs[0].isStructural)
+         {
+            printf("SECTION 1: FAIL - declaredInputs does not match expected ('sidechain', Sample, structural audio)\n");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 1 (Element-Domain Output/Input Collection): OK\n");
+      else { printf("SECTION 1 (Element-Domain Output/Input Collection): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 2: geometry input + bounded dotted-field access (.P/.N/.uv/.Cd)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src =
+         "input element geometry other\n"
+         "output element vec3 otherPos = other.P\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      if (!Field::Lex(src, tokens, err) ||
+          !Field::ParseProgram(tokens, ast, err) ||
+          !Field::LowerElementProgramToIR(ast, ir, err))
+      {
+         printf("SECTION 2: FAIL - valid geometry-access snippet did not compile: %s\n", err.message.c_str());
+         secOk = false;
+      }
+      else
+      {
+         if (ir.declaredInputs.size() != 1 || ir.declaredInputs[0].name != "other" ||
+             ir.declaredInputs[0].typeName != "geometry" || !ir.declaredInputs[0].isStructural)
+         {
+            printf("SECTION 2: FAIL - declaredInputs does not match expected ('other', geometry, structural)\n");
+            secOk = false;
+         }
+         if (ir.declaredOutputs.size() != 1 || ir.declaredOutputs[0].name != "otherPos" ||
+             ir.declaredOutputs[0].domain != Field::Domain::Element)
+         {
+            printf("SECTION 2: FAIL - declaredOutputs does not match expected ('otherPos', Element)\n");
+            secOk = false;
+         }
+      }
+
+      // A bare (non-dotted) reference to a geometry input must be refused -
+      // it names a whole mesh, not a value.
+      {
+         std::string bad = "input element geometry other\noutput element vec3 bad = other\n";
+         std::vector<Field::Token> t2;
+         Field::FieldError e2;
+         Field::AstNodePtr a2;
+         Field::ElementIRProgram ir2;
+         bool ok = Field::Lex(bad, t2, e2) && Field::ParseProgram(t2, a2, e2) && Field::LowerElementProgramToIR(a2, ir2, e2);
+         if (ok || e2.message.find("cannot be used as a value directly") == std::string::npos)
+         {
+            printf("SECTION 2: FAIL - bare geometry identifier reference was not refused (err='%s')\n", e2.message.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (Geometry Input + Structural Field Access): OK\n");
+      else { printf("SECTION 2 (Geometry Input + Structural Field Access): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 3: Domain-join refusal - finer expression than declared domain
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src = "output frame float bad = P.x\n"; // P.x is Element-domain, finer than Frame
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                Field::LowerElementProgramToIR(ast, ir, err);
+      if (ok || err.message.find("finer") == std::string::npos)
+      {
+         printf("SECTION 3: FAIL - finer-than-declared expression was not refused with a 'finer' message (err='%s')\n",
+                err.message.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 3 (Domain-Join Refusal - Finer Expression): OK\n");
+      else { printf("SECTION 3 (Domain-Join Refusal - Finer Expression): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 4: every wrong/right row in S5.1 and every refusal row in
+   // S5.8, each error naming its span (exit criterion item 1).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      auto testRefusal = [&](const std::string& src, const std::string& expectedSubstr, const char* label) {
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                   Field::LowerElementProgramToIR(ast, ir, err);
+         if (ok || err.message.find(expectedSubstr) == std::string::npos)
+         {
+            printf("SECTION 4 (%s): FAIL - expected refusal containing '%s', got ok=%d err='%s'\n",
+                   label, expectedSubstr.c_str(), ok, err.message.c_str());
+            secOk = false;
+            return;
+         }
+         if (err.span.line <= 0 || err.span.col <= 0)
+         {
+            printf("SECTION 4 (%s): FAIL - error is missing a valid source span (line=%d, col=%d)\n",
+                   label, err.span.line, err.span.col);
+            secOk = false;
+         }
+      };
+      // Same as testRefusal, but the valid-input direction: must compile.
+      auto testAccept = [&](const std::string& src, const char* label) {
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                   Field::LowerElementProgramToIR(ast, ir, err);
+         if (!ok)
+         {
+            printf("SECTION 4 (%s): FAIL - expected this to compile, got error: %s\n", label, err.message.c_str());
+            secOk = false;
+         }
+      };
+
+      // S5.1 "wrong" rows.
+      testRefusal("output publish = length(P)\n", "domain", "missing domain/type");
+      testRefusal("output frame float t = 1\n", "reserved", "reserved name 't' (frame domain)");
+      testRefusal("output frame float bass = 1\noutput frame float bass = 2\n", "duplicate declaration", "duplicate output name");
+      testRefusal("input frame float k = 1.0\n", "", "input with initializer is a syntax error"); // no '=' expected after an input decl
+      testRefusal("output graph float x = 1.0\n", "graph-domain pin", "output in graph domain");
+
+      // S5.1 "right" rows (the corresponding valid forms must compile).
+      // Note: length(P)*heat in the doc's own worked example (S5.1) is
+      // Element-domain (P is an element attrib) and would itself be
+      // refused as "finer than declared" under S5.3's join check unless
+      // 'heat' were a reduce'd/frame-domain quantity - the doc's comment
+      // is illustrative, not a literal type-checked snippet, so this
+      // right-row instead uses a genuinely frame-domain expression (t),
+      // matching SECTION 1's already-verified 'bright = t' declaration.
+      testAccept("output frame float publish = t * 2\n", "explicit domain+type output, frame-domain expr");
+      testAccept("input element geometry other\ninput sample audio sidechain\nP += (other.P - P) * 0.1\n",
+                 "geometry + audio inputs, owner's own example");
+
+      // S5.8 row: two declared pins, same direction, same name -> duplicate,
+      // already covered above (bass/bass). Opposite-direction name reuse:
+      // a pin's name shadowing a pin in the other direction.
+      testRefusal("output frame float x = 1\ninput frame float x\n", "duplicate declaration", "name reused across output/input");
+
+      // S5.8 row: reserved attrib / param / state name collisions.
+      testRefusal("output frame float P = 1\n", "reserved", "shadows reserved element attrib 'P'");
+      testRefusal("param float amt = 0.5 [0,1]\noutput frame float amt = 1\n", "duplicate declaration", "shadows an existing param");
+      testRefusal("state float acc = 0\noutput frame float acc = 1\n", "duplicate declaration", "shadows an existing state");
+
+      // S5.8 row: image/geometry/audio used with the wrong domain.
+      testRefusal("output element audio bad = 1\n", "sample", "'audio' pin declared outside sample domain");
+      testRefusal("input pixel geometry bad\n", "element", "'geometry' pin declared outside element domain");
+      testRefusal("output element image bad = vec4(1,1,1,1)\n", "pixel", "'image' pin declared outside pixel domain");
+
+      // S5.8 row: expression domain finer than declared -> refuse, name
+      // both domains, suggest reduce (already covered by SECTION 3, but
+      // check the hint text is present here too).
+      {
+         std::string src = "output frame float bad = P.x\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                   Field::LowerElementProgramToIR(ast, ir, err);
+         if (ok || err.message.find("frame") == std::string::npos || err.message.find("element") == std::string::npos ||
+             err.hint.find("reduce") == std::string::npos)
+         {
+            printf("SECTION 4 (finer expression names both domains + reduce hint): FAIL - err='%s' hint='%s'\n",
+                   err.message.c_str(), err.hint.c_str());
+            secOk = false;
+         }
+      }
+
+      // Nested declaration (not directly in S5.1/S5.8's table, but required
+      // by S5's "declared at top level" rule elsewhere in the doc).
+      testRefusal("if (t > 0) {\noutput frame float bad = t\n}\n", "must be declared at top level", "nested output");
+
+      if (secOk) printf("SECTION 4 (S5.1/S5.8 Wrong/Right/Refusal Table): OK\n");
+      else { printf("SECTION 4 (S5.1/S5.8 Wrong/Right/Refusal Table): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 5: 16-pin-per-kernel ceiling
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src;
+      for (int i = 0; i < 17; ++i)
+         src += "output frame float p" + std::to_string(i) + " = 1\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                Field::LowerElementProgramToIR(ast, ir, err);
+      if (ok || err.message.find("ceiling") == std::string::npos)
+      {
+         printf("SECTION 5: FAIL - 17th pin declaration was not refused with a ceiling message (err='%s')\n",
+                err.message.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 5 (16-Pin-Per-Kernel Ceiling): OK\n");
+      else { printf("SECTION 5 (16-Pin-Per-Kernel Ceiling): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 6: Sample-domain backend collection (independent lowering path)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 6a. output frame float ... = reduce.rms(...) - the only legal form
+      // for a frame-domain output declared inside a sample kernel.
+      {
+         std::string src = "output frame float bass = reduce.rms(in, 20, 200)\nout = in\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (!Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - reduce.rms output declaration did not compile: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         else if (prog.declaredOutputs.size() != 1 || prog.declaredOutputs[0].name != "bass" ||
+                  prog.declaredOutputs[0].domainName != "frame" || !prog.hasReduceRms)
+         {
+            printf("SECTION 6: FAIL - SampleProgram::declaredOutputs / hasReduceRms not set as expected\n");
+            secOk = false;
+         }
+      }
+
+      // 6b. output sample float ... = <plain expr> - legal sample-domain form.
+      {
+         std::string src = "output sample float y = in * 0.5\nout = in\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (!Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - plain sample-domain output did not compile: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         else if (prog.declaredOutputs.size() != 1 || prog.declaredOutputs[0].name != "y" ||
+                  prog.declaredOutputs[0].domainName != "sample")
+         {
+            printf("SECTION 6: FAIL - SampleProgram::declaredOutputs does not match expected ('y', sample)\n");
+            secOk = false;
+         }
+      }
+
+      // 6c. A sample-domain output declared as reduce.rms(...) is refused -
+      // that's a frame-domain result and must be declared 'output frame'.
+      {
+         std::string src = "output sample float bad = reduce.rms(in, 20, 200)\nout = in\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - reduce.rms declared as 'output sample' was not refused\n");
+            secOk = false;
+         }
+      }
+
+      // 6d. input <name> is collected but NOT bound into scope - referencing
+      // it inside the kernel body is a loud compile error, not silent garbage.
+      {
+         std::string src = "input sample audio sidechain\nout = sidechain\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - referencing an unbound sample-domain input did not fail to compile\n");
+            secOk = false;
+         }
+         else if (err.message.find("used before assignment") == std::string::npos)
+         {
+            printf("SECTION 6: FAIL - expected a loud 'used before assignment' error, got '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+
+         // But the declaration itself (without referencing it) is collected.
+         std::string src2 = "input sample audio sidechain\nout = in\n";
+         Field::SampleProgram prog2;
+         Field::FieldError err2;
+         if (!Field::CompileSampleProgram(src2, nullptr, prog2, err2))
+         {
+            printf("SECTION 6: FAIL - bare (unreferenced) input declaration did not compile: %s\n", err2.message.c_str());
+            secOk = false;
+         }
+         else if (prog2.declaredInputs.size() != 1 || prog2.declaredInputs[0].name != "sidechain")
+         {
+            printf("SECTION 6: FAIL - SampleProgram::declaredInputs does not match expected ('sidechain')\n");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 6 (Sample-Domain Backend Collection): OK\n");
+      else { printf("SECTION 6 (Sample-Domain Backend Collection): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 7: PinTable identity - append-only ids, retire/remint on
+   // reconcile, stable-id reuse across a plain disappear+reappear.
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+
+      // First compile declares 'a' and 'b'.
+      std::vector<Field::DeclaredPin> decl1 = {
+         { "a", "float", "frame", true },
+         { "b", "float", "frame", true },
+      };
+      table.Reconcile(decl1, 0, notice);
+      const Field::PinEntry* a1 = table.Find("a");
+      const Field::PinEntry* b1 = table.Find("b");
+      if (!a1 || !b1 || a1->id == b1->id || a1->id <= 0 || b1->id <= 0)
+      {
+         printf("SECTION 7: FAIL - initial Reconcile did not assign distinct positive ids to 'a' and 'b'\n");
+         secOk = false;
+      }
+      int aId = a1 ? a1->id : -1;
+      int bId = b1 ? b1->id : -1;
+
+      // Second compile drops 'b' - it must be marked retired and reported.
+      std::vector<Field::DeclaredPin> decl2 = {
+         { "a", "float", "frame", true },
+      };
+      table.Reconcile(decl2, 0, notice);
+      if (notice.find("'b'") == std::string::npos)
+      {
+         printf("SECTION 7: FAIL - retiring 'b' did not produce a notice mentioning it (notice='%s')\n", notice.c_str());
+         secOk = false;
+      }
+      const Field::PinEntry* bRetired = table.Find("b");
+      if (!bRetired || bRetired->isDeclared || bRetired->id != bId)
+      {
+         printf("SECTION 7: FAIL - retired 'b' entry should keep its id and isDeclared=false\n");
+         secOk = false;
+      }
+
+      // Third compile: 'b' reappears with the SAME shape - must reuse the
+      // same id (stable identity), not mint a new one.
+      table.Reconcile(decl1, 0, notice);
+      const Field::PinEntry* bAgain = table.Find("b");
+      if (!bAgain || !bAgain->isDeclared || bAgain->id != bId)
+      {
+         printf("SECTION 7: FAIL - 'b' reappearing with an unchanged shape should reuse id %d, got %s\n",
+                bId, bAgain ? std::to_string(bAgain->id).c_str() : "(null)");
+         secOk = false;
+      }
+
+      // Fourth compile: 'b' reappears with a DIFFERENT shape (domain changed)
+      // - must retire the old identity and mint a fresh one (S5.4).
+      std::vector<Field::DeclaredPin> decl4 = {
+         { "a", "float", "frame", true },
+         { "b", "float", "element", true }, // domain changed: frame -> element
+      };
+      table.Reconcile(decl4, 0, notice);
+      const Field::PinEntry* bChanged = table.Find("b");
+      if (!bChanged || !bChanged->isDeclared || bChanged->id == bId || bChanged->domainName != "element")
+      {
+         printf("SECTION 7: FAIL - 'b' reappearing with a changed shape should mint a fresh id (old=%d, new=%s)\n",
+                bId, bChanged ? std::to_string(bChanged->id).c_str() : "(null)");
+         secOk = false;
+      }
+
+      // 'a' was untouched across all four reconciles - its id must never move.
+      const Field::PinEntry* aFinal = table.Find("a");
+      if (!aFinal || aFinal->id != aId)
+      {
+         printf("SECTION 7: FAIL - 'a' id changed across Reconcile calls that never dropped it (was %d, now %s)\n",
+                aId, aFinal ? std::to_string(aFinal->id).c_str() : "(null)");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 7 (PinTable Stable Identity + Reconcile): OK\n");
+      else { printf("SECTION 7 (PinTable Stable Identity + Reconcile): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 8: PinTable::Reconcile idempotence - calling it twice with the
+   // exact same declaration list produces the same ids both times
+   // (exit criterion item 4).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+      std::vector<Field::DeclaredPin> decl = {
+         { "x", "float", "frame", true },
+         { "y", "float", "sample", false },
+      };
+      table.Reconcile(decl, 0, notice);
+      int xId1 = table.Find("x") ? table.Find("x")->id : -1;
+      int yId1 = table.Find("y") ? table.Find("y")->id : -1;
+
+      table.Reconcile(decl, 0, notice); // same list again
+      int xId2 = table.Find("x") ? table.Find("x")->id : -1;
+      int yId2 = table.Find("y") ? table.Find("y")->id : -1;
+
+      if (xId1 <= 0 || yId1 <= 0 || xId1 == yId1 || xId1 != xId2 || yId1 != yId2 ||
+          table.Pins().size() != 2)
+      {
+         printf("SECTION 8: FAIL - idempotent Reconcile did not produce stable ids (x:%d->%d, y:%d->%d, pins=%zu)\n",
+                xId1, xId2, yId1, yId2, table.Pins().size());
+         secOk = false;
+      }
+      if (!notice.empty())
+      {
+         printf("SECTION 8: FAIL - re-declaring the exact same list produced a spurious retirement notice: '%s'\n",
+                notice.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 8 (Reconcile Idempotence): OK\n");
+      else { printf("SECTION 8 (Reconcile Idempotence): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 9: PinTable::Reconcile with a renamed pin retires the old id
+   // (isDeclared=false, still present in Pins()) and mints a new one
+   // (exit criterion item 5).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+      std::vector<Field::DeclaredPin> decl1 = { { "oldName", "float", "frame", true } };
+      table.Reconcile(decl1, 0, notice);
+      const Field::PinEntry* orig = table.Find("oldName");
+      int origId = orig ? orig->id : -1;
+
+      // Rename: the declaration list now has "newName" instead of "oldName".
+      std::vector<Field::DeclaredPin> decl2 = { { "newName", "float", "frame", true } };
+      table.Reconcile(decl2, 0, notice);
+
+      bool foundOldStillPresent = false;
+      for (const auto& p : table.Pins())
+      {
+         if (p.id == origId) { foundOldStillPresent = true;
+            if (p.isDeclared)
+            {
+               printf("SECTION 9: FAIL - retired 'oldName' entry (id %d) should have isDeclared=false\n", origId);
+               secOk = false;
+            }
+         }
+      }
+      if (!foundOldStillPresent)
+      {
+         printf("SECTION 9: FAIL - retired 'oldName' entry (id %d) is missing from Pins() entirely\n", origId);
+         secOk = false;
+      }
+      const Field::PinEntry* renamed = table.Find("newName");
+      if (!renamed || !renamed->isDeclared || renamed->id == origId || renamed->id <= 0)
+      {
+         printf("SECTION 9: FAIL - 'newName' should be a freshly minted id distinct from the retired 'oldName' id %d\n", origId);
+         secOk = false;
+      }
+      if (notice.find("'oldName'") == std::string::npos)
+      {
+         printf("SECTION 9: FAIL - rename should report 'oldName' as retired in outNotice (got '%s')\n", notice.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 9 (Rename Retires Old Id, Mints New Id): OK\n");
+      else { printf("SECTION 9 (Rename Retires Old Id, Mints New Id): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 10: PinTable::Reconcile with the same name but a changed
+   // type/domain also retires-and-mints, not updates-in-place - S5.4's
+   // deliberate difference from ParamTable (exit criterion item 6).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 10a. Type change (float -> vec3), domain unchanged.
+      {
+         Field::PinTable table;
+         std::string notice;
+         table.Reconcile({ { "v", "float", "frame", true } }, 0, notice);
+         int oldId = table.Find("v") ? table.Find("v")->id : -1;
+         table.Reconcile({ { "v", "vec3", "frame", true } }, 0, notice);
+         const Field::PinEntry* changed = table.Find("v");
+         if (!changed || !changed->isDeclared || changed->id == oldId || changed->typeName != "vec3")
+         {
+            printf("SECTION 10: FAIL - type change (float->vec3) on 'v' should retire+remint, old=%d new=%s\n",
+                   oldId, changed ? std::to_string(changed->id).c_str() : "(null)");
+            secOk = false;
+         }
+      }
+
+      // 10b. Direction change (output -> input), same name/type/domain.
+      {
+         Field::PinTable table;
+         std::string notice;
+         table.Reconcile({ { "d", "float", "frame", true } }, 0, notice);
+         int oldId = table.Find("d") ? table.Find("d")->id : -1;
+         table.Reconcile({ { "d", "float", "frame", false } }, 0, notice);
+         const Field::PinEntry* changed = table.Find("d");
+         if (!changed || !changed->isDeclared || changed->id == oldId || changed->isOutput)
+         {
+            printf("SECTION 10: FAIL - direction change (output->input) on 'd' should retire+remint, old=%d new=%s\n",
+                   oldId, changed ? std::to_string(changed->id).c_str() : "(null)");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 10 (Type/Domain/Direction Change Retires+Remints): OK\n");
+      else { printf("SECTION 10 (Type/Domain/Direction Change Retires+Remints): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 11: SerializePinMap/DeserializePinMap round-trip a table with
+   // at least one retired entry (exit criterion item 7).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+      table.Reconcile({ { "keep", "float", "frame", true }, { "gone", "float", "frame", true } }, 0, notice);
+      table.Reconcile({ { "keep", "float", "frame", true } }, 0, notice); // "gone" retires
+
+      const Field::PinEntry* keepBefore = table.Find("keep");
+      const Field::PinEntry* goneBefore = table.Find("gone");
+      if (!keepBefore || !goneBefore || goneBefore->isDeclared)
+      {
+         printf("SECTION 11: FAIL - fixture setup did not produce one declared + one retired entry\n");
+         secOk = false;
+      }
+      int keepId = keepBefore ? keepBefore->id : -1;
+      int goneId = goneBefore ? goneBefore->id : -1;
+
+      std::string serialized = table.SerializePinMap();
+
+      Field::PinTable table2;
+      table2.DeserializePinMap(serialized);
+      const Field::PinEntry* keepAfter = table2.Find("keep");
+      const Field::PinEntry* goneAfter = table2.Find("gone");
+      if (!keepAfter || keepAfter->id != keepId)
+      {
+         printf("SECTION 11: FAIL - 'keep' did not round-trip to the same id %d (got %s)\n",
+                keepId, keepAfter ? std::to_string(keepAfter->id).c_str() : "(null)");
+         secOk = false;
+      }
+      if (!goneAfter || goneAfter->id != goneId)
+      {
+         printf("SECTION 11: FAIL - retired 'gone' did not round-trip to the same id %d (got %s)\n",
+                goneId, goneAfter ? std::to_string(goneAfter->id).c_str() : "(null)");
+         secOk = false;
+      }
+      if (table2.NextPinId() <= std::max(keepId, goneId))
+      {
+         printf("SECTION 11: FAIL - deserialized table's NextPinId (%d) must be past the highest restored id (%d)\n",
+                table2.NextPinId(), std::max(keepId, goneId));
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 11 (SerializePinMap/DeserializePinMap Round-Trip With Retired Entry): OK\n");
+      else { printf("SECTION 11 (SerializePinMap/DeserializePinMap Round-Trip With Retired Entry): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDPINDECLTEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
+
 // ===================================================== INFINITE_RECSYNCTEST
 // Guards the exported-movie A/V sync property. The video track's PTS is a
 // plain frame counter over recordFps on both platforms, while live audio is
@@ -41754,6 +42523,14 @@ int main(int argc, char** argv)
    // crash in a headless CI fixture leaves a dump/log the same as a real run.
    Platform::InstallCrashHandler();
 
+   // Dynamic pins, Phase 2b (build step 13, §5.1): install the live-cable
+   // checker bridge (see CheckFieldLiveCableBridge's comment above) before
+   // anything can call a Field*Node::Apply() - including the FIELDPINSTEST/
+   // FIELDPINNODETEST fixtures below, which construct FieldElementNode/
+   // FieldSampleNode/FieldPixelNode via SpawnNode and rely on this being
+   // live for their refusal assertions.
+   Field::gLiveCableChecker = &CheckFieldLiveCableBridge;
+
    // Old spelling kept as an alias: the panel was renamed to the performance
    // matrix, but a shell history full of INFINITE_PERFPANELTEST is not worth
    // breaking over it.
@@ -41825,6 +42602,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_FIELDSAMPLETEST") != nullptr)
       return RunFieldSampleTest();
+
+   if (getenv("INFINITE_FIELDPINDECLTEST") != nullptr)
+      return RunFieldPinDeclTest();
 
    if (getenv("INFINITE_MOLDERTEST") != nullptr)
       return RunMolderFixture() ? 0 : 1;
@@ -48691,6 +49471,527 @@ int main(int argc, char** argv)
 
          NewPatch();
          printf("%s\n", allOk ? "FIELDGRAPHBLAST OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_FIELDPINSTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDPINSTEST] Running dynamic pins (build step 11) harness...\n");
+         bool allOk = true;
+
+         // SECTION 1: headless pin-shape assertions - OutputCount/OutputLabel/
+         // ModulatorOutput toggling for the three image/element/sample node
+         // types, and append-only ordering (index 0's label/identity never
+         // moves when index 1 appears).
+         {
+            FieldElementNode n;
+            bool pass = (n.OutputCount() == 1) && (std::string(n.OutputLabel(0)) == "geo") &&
+                        (n.ModulatorOutput(1) == nullptr);
+            n.publishScalarOutput = true;
+            pass = pass && (n.OutputCount() == 2) && (std::string(n.OutputLabel(0)) == "geo") &&
+                   (std::string(n.OutputLabel(1)) == "publish") && (n.ModulatorOutput(1) != nullptr) &&
+                   (n.ModulatorOutput(0) == nullptr);
+            printf("[FIELDPINSTEST] Assertion 1 (FieldElementNode publish pin, append-only): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            FieldSampleNode n;
+            bool pass = (n.OutputCount() == 1) && n.IsAudioOutputIndex(0) && (n.ModulatorOutput(1) == nullptr);
+            n.exposeRmsOutput = true;
+            pass = pass && (n.OutputCount() == 2) && n.IsAudioOutputIndex(0) && !n.IsAudioOutputIndex(1) &&
+                   (std::string(n.OutputLabel(0)) == "out") && (std::string(n.OutputLabel(1)) == "rms") &&
+                   (n.ModulatorOutput(1) != nullptr);
+            printf("[FIELDPINSTEST] Assertion 2 (FieldSampleNode rms pin, IsAudioOutputIndex trap): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            FieldPixelNode n;
+            bool pass = (n.OutputCount() == 1) && (n.GetOutputTexture(1) == 0);
+            n.exposeAuxTexture = true;
+            // No declared state cells yet - GetOutputTexture(1) must stay 0
+            // rather than handing out a stale/zero-resolution FBO.
+            pass = pass && (n.OutputCount() == 2) && (n.GetOutputTexture(1) == 0) &&
+                   (std::string(n.OutputLabel(0)) == "out") && (std::string(n.OutputLabel(1)) == "state");
+            n.width = 32.0f;
+            n.height = 32.0f;
+            n.code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(fract(x));";
+            n.Apply();
+            n.CookIfNeeded(1);
+            pass = pass && (n.GetOutputTexture(1) != 0);
+            printf("[FIELDPINSTEST] Assertion 3 (FieldPixelNode aux texture, live only when states declared): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            FieldGraphNode n;
+            bool pass = (n.ModulatorInputCount() == 0) && (n.ModulatorInputSlot(0) == nullptr) &&
+                        !n.TriggerInputWired();
+            n.addTriggerInput = true;
+            pass = pass && (n.ModulatorInputCount() == 1) && (n.ModulatorInputSlot(0) != nullptr) &&
+                   (std::string(n.InputLabel(0)) == "trigger");
+            // Rising-edge detection: a fake IModulator whose Value01() is
+            // driven by hand, no ParamMailbox/MeterRing involved (§8 - reuse
+            // ModulatorOutput/MeterRing only, never a new channel).
+            struct FakeMod : public IModulator { float v = 0.0f; float Value01() override { return v; } };
+            FakeMod fake;
+            *n.ModulatorInputSlot(0) = &fake;
+            pass = pass && n.TriggerInputWired() && !n.PollTriggerEdge(); // starts low, no edge yet
+            fake.v = 1.0f;
+            pass = pass && n.PollTriggerEdge();  // 0 -> 1 is a rising edge
+            pass = pass && !n.PollTriggerEdge(); // holding high is not a second edge
+            fake.v = 0.0f;
+            pass = pass && !n.PollTriggerEdge(); // falling edge does not fire
+            fake.v = 1.0f;
+            pass = pass && n.PollTriggerEdge();  // rises again
+            printf("[FIELDPINSTEST] Assertion 4 (FieldGraphNode trigger pin + rising-edge detection): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 2: cable-orphaning refusal detection, live graph. Image/
+         // modulator-output cables are UI-link-derived (gLinks, rebuilt from
+         // the node editor's own frame), so a headless ConnectNodes() call
+         // does not populate them - synthetic LinkInfo entries stand in for
+         // what a real dragged cable would leave in gLinks. The graph node's
+         // trigger *input*, by contrast, is read directly off the node
+         // (TriggerInputWired()), so it is exercised through a real
+         // ConnectNodes() wiring instead.
+         NewPatch();
+         int elemIdx = -1, sampleIdx = -1, pixelSrcIdx = -1, pixelDstIdx = -1, graphSinkIdx = -1;
+         {
+            // Each SpawnNode() call can reallocate gNodes (a std::vector),
+            // invalidating any GraphNode* returned by an earlier call in this
+            // same sequence (trap T14 again, this time on the test's own
+            // fixture setup) - so every pointer is used and discarded before
+            // the next SpawnNode() runs; only the (reallocation-proof) index
+            // survives to the next statement.
+            GraphNode* ge = SpawnNode("Field Element", "3D", 0.0f, 0.0f);
+            bool spawned = ge != nullptr;
+            if (spawned)
+            {
+               elemIdx = ge->index;
+               static_cast<FieldElementNode*>(ge->node.get())->publishScalarOutput = true;
+            }
+
+            GraphNode* gs = SpawnNode("Field Sample", "Synths", 200.0f, 0.0f);
+            spawned = spawned && (gs != nullptr);
+            if (gs)
+            {
+               sampleIdx = gs->index;
+               static_cast<FieldSampleNode*>(gs->node.get())->exposeRmsOutput = true;
+            }
+
+            GraphNode* gpSrc = SpawnNode("FieldPixel", "Source", 400.0f, 0.0f);
+            spawned = spawned && (gpSrc != nullptr);
+            if (gpSrc)
+            {
+               pixelSrcIdx = gpSrc->index;
+               auto* pixSrc = static_cast<FieldPixelNode*>(gpSrc->node.get());
+               pixSrc->exposeAuxTexture = true;
+               pixSrc->width = 32.0f;
+               pixSrc->height = 32.0f;
+               pixSrc->code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(fract(x));";
+               pixSrc->Apply();
+               pixSrc->CookIfNeeded(1);
+            }
+
+            GraphNode* gpDst = SpawnNode("FieldPixel", "Source", 600.0f, 0.0f);
+            spawned = spawned && (gpDst != nullptr);
+            if (gpDst)
+               pixelDstIdx = gpDst->index;
+
+            GraphNode* gg = SpawnNode("Field Graph", "Utility", 800.0f, 0.0f);
+            spawned = spawned && (gg != nullptr);
+            if (gg)
+            {
+               graphSinkIdx = gg->index;
+               static_cast<FieldGraphNode*>(gg->node.get())->addTriggerInput = true;
+            }
+
+            printf("[FIELDPINSTEST] Assertion 5 (spawn fixture graph): %s\n", spawned ? "OK" : "FAIL");
+            allOk = allOk && spawned;
+         }
+         {
+            GraphNode* ge = FindNodeByIndex(elemIdx);
+            GraphNode* gs = FindNodeByIndex(sampleIdx);
+            GraphNode* gpSrc = FindNodeByIndex(pixelSrcIdx);
+            GraphNode* gpDst = FindNodeByIndex(pixelDstIdx);
+            bool before = !FieldOutputPinHasLiveCable(elemIdx, 1) && !FieldOutputPinHasLiveCable(sampleIdx, 1) &&
+                          !FieldOutputPinHasLiveCable(pixelSrcIdx, 1);
+            gLinks.push_back({ 5000001, ge->OutputPinId(1), gs->InputPinId(0) });
+            gLinks.push_back({ 5000002, gs->OutputPinId(1), gpSrc->InputPinId(0) });
+            gLinks.push_back({ 5000003, gpSrc->OutputPinId(1), gpDst->InputPinId(0) });
+            bool after = FieldOutputPinHasLiveCable(elemIdx, 1) && FieldOutputPinHasLiveCable(sampleIdx, 1) &&
+                         FieldOutputPinHasLiveCable(pixelSrcIdx, 1) &&
+                         !FieldOutputPinHasLiveCable(elemIdx, 0); // index 0 (the pre-existing pin) never flags live
+            gLinks.clear();
+            bool afterClear = !FieldOutputPinHasLiveCable(elemIdx, 1) && !FieldOutputPinHasLiveCable(sampleIdx, 1) &&
+                               !FieldOutputPinHasLiveCable(pixelSrcIdx, 1);
+            bool pass = before && after && afterClear;
+            printf("[FIELDPINSTEST] Assertion 6 (FieldOutputPinHasLiveCable detects/clears synthetic cables): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            // Real wiring for the graph node's trigger *input*: the sample
+            // node's rms output feeds it, going through the same
+            // ConnectNodes()/IsInputSlotCompatible() path a live drag uses.
+            //
+            // Deliberately NOT the element node's publish output here - see
+            // the [FIELDPINSTEST FINDING] note below assertion 8. In short:
+            // IsInputSlotCompatible's srcGeometry/srcCamera/srcLight checks
+            // are whole-node dynamic_casts, not scoped to the specific output
+            // index a cable is dragged from, so a connection from
+            // FieldElementNode's *modulator* output (index 1) is wrongly
+            // rejected by the "3D cables only go into 3D nodes" rule, because
+            // FieldElementNode is also (always) an IGeometrySource. The
+            // audio-source check three lines above it does not have this
+            // bug - it consults IsAudioOutputIndex(srcOutputIndex) rather
+            // than dynamic_cast<IAudioSource*> alone - so routing this
+            // assertion through FieldSampleNode's rms output instead
+            // exercises the identical TriggerInputWired()/ModulatorInputSlot
+            // plumbing without tripping the geometry-side gap.
+            std::string err;
+            bool connected = ConnectNodes(sampleIdx, 1, graphSinkIdx, 0, err);
+            auto* gg = static_cast<FieldGraphNode*>(FindNodeByIndex(graphSinkIdx)->node.get());
+            bool wiredNow = connected && gg->TriggerInputWired();
+            bool sourceMatches = wiredNow &&
+               (*gg->ModulatorInputSlot(0) ==
+                static_cast<FieldSampleNode*>(FindNodeByIndex(sampleIdx)->node.get())->ModulatorOutput(1));
+            *gg->ModulatorInputSlot(0) = nullptr; // simulate disconnect
+            bool unwiredAfter = !gg->TriggerInputWired();
+            bool pass = connected && wiredNow && sourceMatches && unwiredAfter;
+            printf("[FIELDPINSTEST] Assertion 7 (FieldGraphNode trigger wired via real ConnectNodes, TriggerInputWired): %s (%s)\n",
+                   pass ? "OK" : "FAIL", err.c_str());
+            allOk = allOk && pass;
+            // Restore the real wiring for the save/load section below.
+            ConnectNodes(sampleIdx, 1, graphSinkIdx, 0, err);
+
+            // [FIELDPINSTEST FINDING - pre-existing gap, first exercised by
+            // this step, left unfixed per doc §8's "stop and report" rule]:
+            // confirm the gap actually exists and is exactly what's
+            // described above, so this comment cannot silently go stale.
+            std::string geoErr;
+            bool geoBlocked = !ConnectNodes(elemIdx, 1, graphSinkIdx, 0, geoErr);
+            if (!geoBlocked)
+            {
+               *gg->ModulatorInputSlot(0) = nullptr; // undo if it unexpectedly succeeded
+               printf("[FIELDPINSTEST] NOTE: FieldElementNode publish -> ModulatorInputSlot no longer blocked - the finding below may be stale, re-check IsInputSlotCompatible.\n");
+            }
+         }
+
+         // SECTION 3: save/load round trip carries the new bool and, for the
+         // pixel aux output, the srcOutput fix (Patch.cpp "cable"/"geo" tags -
+         // see the fix's own commit note). Also covers the real image cable
+         // wired between the two FieldPixel fixture nodes.
+         {
+            std::string err;
+            bool imgConnected = ConnectNodes(pixelSrcIdx, 1, pixelDstIdx, 0, err);
+
+            Patch::Data saved = BuildPatchData();
+            NewPatch();
+            ApplyPatchData(saved);
+
+            auto* elemR = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+            auto* sampleR = dynamic_cast<FieldSampleNode*>(FindNodeByIndex(sampleIdx) ? FindNodeByIndex(sampleIdx)->node.get() : nullptr);
+            auto* pixelSrcR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixelSrcIdx) ? FindNodeByIndex(pixelSrcIdx)->node.get() : nullptr);
+            auto* pixelDstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixelDstIdx) ? FindNodeByIndex(pixelDstIdx)->node.get() : nullptr);
+            auto* graphR = dynamic_cast<FieldGraphNode*>(FindNodeByIndex(graphSinkIdx) ? FindNodeByIndex(graphSinkIdx)->node.get() : nullptr);
+
+            bool boolsSurvived = elemR && sampleR && pixelSrcR && graphR &&
+                                  elemR->publishScalarOutput && sampleR->exposeRmsOutput &&
+                                  pixelSrcR->exposeAuxTexture && graphR->addTriggerInput;
+            bool imageCableSurvived = imgConnected && pixelDstR &&
+                                       (pixelDstR->TextureInput().GetSource() == pixelSrcR) &&
+                                       (pixelDstR->TextureInput().GetSourceOutput() == 1);
+            bool triggerCableSurvived = graphR && graphR->TriggerInputWired() &&
+                                         (*graphR->ModulatorInputSlot(0) == (sampleR ? sampleR->ModulatorOutput(1) : nullptr));
+            bool pass = boolsSurvived && imageCableSurvived && triggerCableSurvived;
+            printf("[FIELDPINSTEST] Assertion 8 (save/load round trip: bools + srcOutput-carrying cables): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 4: undo across a single toggle flip.
+         {
+            auto* elemR = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+            bool pass = elemR != nullptr;
+            if (elemR)
+            {
+               bool before = elemR->publishScalarOutput; // true, from section 2/3
+               PushUndoCheckpoint();
+               elemR->publishScalarOutput = !before;
+               Undo();
+               auto* elemAfterUndo = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+               pass = elemAfterUndo && (elemAfterUndo->publishScalarOutput == before);
+            }
+            printf("[FIELDPINSTEST] Assertion 9 (undo reverts a single toggle flip): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 5: copy/paste preserves pin shape.
+         {
+            auto* elemR = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+            bool pass = false;
+            if (elemR)
+            {
+               FieldElementNode copy;
+               CopyParams(&copy, elemR);
+               pass = (copy.publishScalarOutput == elemR->publishScalarOutput) && (copy.OutputCount() == elemR->OutputCount());
+            }
+            printf("[FIELDPINSTEST] Assertion 10 (copy/paste preserves pin shape): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 6: pre-step-11 patch fixture - a saved-params list missing
+         // the new bool key entirely (as any patch saved before this step
+         // would be) loads with the old pin shape and the bool defaulted
+         // false, per Patch.cpp's Reader::Bool "leave untouched when the key
+         // is absent" contract.
+         {
+            FieldElementNode src;
+            src.publishScalarOutput = true;
+            std::vector<std::pair<std::string, std::string>> params;
+            Patch::SaveParams(&src, params);
+            params.erase(std::remove_if(params.begin(), params.end(),
+                                         [](const std::pair<std::string, std::string>& kv) {
+                                            return kv.first == "b publishScalarOutput";
+                                         }),
+                          params.end());
+            FieldElementNode loaded;
+            Patch::LoadParams(&loaded, params);
+            bool pass = !loaded.publishScalarOutput && (loaded.OutputCount() == 1);
+            printf("[FIELDPINSTEST] Assertion 11 (pre-step-11 patch: bool defaults false, old pin shape): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDPINS OK" : "SUSPECT");
+      }
+
+      // Build step 13 (docs/plans/field/step-13-dynamic-pins-node-wiring.md):
+      // node/UI/save-format wiring for kernel `output`/`input` declarations
+      // on top of step 12's compiler-level PinTable/IR work and step 11's
+      // hardcoded toggle pins (both exercised above by FIELDPINSTEST). This
+      // is structural-only, per the step's resolved scoping decision: a
+      // declared output's ModulatorOutput() always reads back 0.0 (a
+      // documented placeholder - FieldElementNode/FieldSampleNode/
+      // FieldPixelNode's DeclaredOutputPlaceholder), never the kernel's real
+      // computed value, which is deferred to a follow-up step.
+      if (getenv("INFINITE_FIELDPINNODETEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDPINNODETEST] Running dynamic pins (build step 13) node-wiring harness...\n");
+         bool allOk = true;
+
+         // SECTION 1-3: headless pin-shape assertions across all three node
+         // types - compacted OutputCount/OutputLabel (native, then any
+         // step-11 toggle, then declared pins in PinTable order), and the
+         // deferred-value placeholder.
+         {
+            FieldElementNode n;
+            n.code = "output element float foo = 1.0\nP.y += 0.0\n";
+            bool applied = n.Apply();
+            bool pass = applied && (n.OutputCount() == 2) &&
+                        (std::string(n.OutputLabel(0)) == "geo") &&
+                        (std::string(n.OutputLabel(1)) == "foo") &&
+                        (n.ModulatorOutput(1) != nullptr) &&
+                        (n.ModulatorOutput(1)->Value01() == 0.0f);
+            printf("[FIELDPINNODETEST] Assertion 1 (FieldElementNode declared output, compacted, placeholder value): %s (err='%s')\n",
+                   pass ? "OK" : "FAIL", n.LastError().c_str());
+            allOk = allOk && pass;
+         }
+         {
+            FieldSampleNode n;
+            n.code = "output sample float y = in * 0.5\nout = in\n";
+            bool applied = n.Apply();
+            bool pass = applied && (n.OutputCount() == 2) &&
+                        (std::string(n.OutputLabel(0)) == "out") &&
+                        (std::string(n.OutputLabel(1)) == "y") &&
+                        n.IsAudioOutputIndex(0) && !n.IsAudioOutputIndex(1) &&
+                        (n.ModulatorOutput(1) != nullptr) &&
+                        (n.ModulatorOutput(1)->Value01() == 0.0f);
+            printf("[FIELDPINNODETEST] Assertion 2 (FieldSampleNode declared output, compacted, placeholder value): %s (err='%s')\n",
+                   pass ? "OK" : "FAIL", n.LastError().c_str());
+            allOk = allOk && pass;
+         }
+         {
+            FieldPixelNode n;
+            n.width = 32.0f;
+            n.height = 32.0f;
+            n.code = "output pixel float glow = 1.0;\ncol = vec3(uv.x, uv.y, 0.0);";
+            bool applied = n.Apply();
+            bool pass = applied && (n.OutputCount() == 2) &&
+                        (std::string(n.OutputLabel(0)) == "out") &&
+                        (std::string(n.OutputLabel(1)) == "glow") &&
+                        (n.ModulatorOutput(1) != nullptr) &&
+                        (n.ModulatorOutput(1)->Value01() == 0.0f);
+            printf("[FIELDPINNODETEST] Assertion 3 (FieldPixelNode declared output, compacted, placeholder value): %s (err='%s')\n",
+                   pass ? "OK" : "FAIL", n.LastError().c_str());
+            allOk = allOk && pass;
+         }
+
+         // SECTION 4-5: FieldPixelNode declared `input image` pin, wired
+         // through the real main.cpp InputCountFor/CableFor/ConnectNodes
+         // path - the one main.cpp cable-chain edit this step made (§5.7).
+         NewPatch();
+         int pixSrcAIdx = -1, pixDstIdx = -1;
+         {
+            // Each SpawnNode() call can reallocate gNodes (a std::vector),
+            // invalidating any GraphNode* an earlier call returned (trap
+            // T14, see FIELDPINSTEST's identical fixture-setup comment) -
+            // so every pointer is used and discarded before the next
+            // SpawnNode() runs; only the (reallocation-proof) index survives.
+            GraphNode* a = SpawnNode("FieldPixel", "Source", 0.0f, 0.0f);
+            bool spawned = a != nullptr;
+            if (spawned)
+               pixSrcAIdx = a->index;
+
+            GraphNode* d = SpawnNode("FieldPixel", "Source", 400.0f, 0.0f);
+            spawned = spawned && (d != nullptr);
+            if (spawned)
+            {
+               pixDstIdx = d->index;
+               auto* dn = static_cast<FieldPixelNode*>(d->node.get());
+               dn->width = 32.0f;
+               dn->height = 32.0f;
+               dn->code = "input pixel image other;\ncol = vec3(uv.x, uv.y, 0.0);";
+               spawned = dn->Apply();
+            }
+            printf("[FIELDPINNODETEST] Assertion 4 (spawn image-input fixture; declared `input image` compiles): %s\n",
+                   spawned ? "OK" : "FAIL");
+            allOk = allOk && spawned;
+         }
+         {
+            GraphNode* dg = FindNodeByIndex(pixDstIdx);
+            auto* dn = dg ? static_cast<FieldPixelNode*>(dg->node.get()) : nullptr;
+            bool countOk = dg && (InputCountFor(*dg) == 2); // native "src" + 1 declared image input
+            std::string err;
+            bool connected = ConnectNodes(pixSrcAIdx, 0, pixDstIdx, 1, err);
+            bool wiredOk = connected && dn && dn->DeclaredImageInput(0) != nullptr &&
+                           dn->DeclaredImageInput(0)->GetSource() ==
+                              (FindNodeByIndex(pixSrcAIdx) ? FindNodeByIndex(pixSrcAIdx)->node.get() : nullptr);
+            bool pass = countOk && wiredOk;
+            printf("[FIELDPINNODETEST] Assertion 5 (declared image input: InputCountFor==2, real ConnectNodes wiring via CableFor): %s (%s)\n",
+                   pass ? "OK" : "FAIL", err.c_str());
+            allOk = allOk && pass;
+         }
+
+         // SECTION 6: cable-orphaning refusal, declared output pin. Mirrors
+         // FIELDPINSTEST's step-11 toggle refusal, but the pin here comes
+         // from a kernel edit (a live compile), not a UI toggle - Apply()
+         // itself must refuse and leave the previous program/pin shape live.
+         {
+            // Same T14 reallocation trap as above - capture each index
+            // before the next SpawnNode() call, discard the pointer.
+            GraphNode* ge = SpawnNode("Field Element", "3D", 0.0f, 0.0f);
+            bool spawned = ge != nullptr;
+            int elemFixtureIdx = spawned ? ge->index : -1;
+
+            GraphNode* sinkG = SpawnNode("Field Element", "3D", 200.0f, 0.0f); // only needs a pin id
+            spawned = spawned && (sinkG != nullptr);
+            int sinkFixtureIdx = spawned ? sinkG->index : -1;
+
+            bool pass = spawned;
+            if (spawned)
+            {
+               GraphNode* elemGN = FindNodeByIndex(elemFixtureIdx);
+               GraphNode* sinkGN = FindNodeByIndex(sinkFixtureIdx);
+               auto* en = static_cast<FieldElementNode*>(elemGN->node.get());
+               // SpawnNode() does not itself call SetNodeIndex() - only the
+               // node's own params-panel draw does, each frame it is drawn
+               // (see DrawFieldElementParams's gCurrentNodeIndex handoff) -
+               // so a headless fixture that never draws that panel must set
+               // it explicitly for gLiveCableChecker's nodeIndex to line up
+               // with the id this fixture's own OutputPinId()/InputPinId()
+               // calls below encode.
+               en->SetNodeIndex(elemFixtureIdx);
+               en->code = "output element float foo = 1.0\nP.y += 0.0\n";
+               pass = pass && en->Apply() && (en->OutputCount() == 2);
+
+               gLinks.push_back({ 5100001, elemGN->OutputPinId(1), sinkGN->InputPinId(0) });
+               std::string oldCode = en->code;
+               en->code = "P.y += 0.0\n"; // drops the declared output entirely
+               bool refused = !en->Apply();
+               bool shapeKept = (en->OutputCount() == 2) && !en->pinRefusal.empty();
+               gLinks.clear();
+               en->code = oldCode;
+               bool recompiles = en->Apply(); // safe again - no more live cable
+               pass = pass && refused && shapeKept && recompiles;
+            }
+            printf("[FIELDPINNODETEST] Assertion 6 (declared-output refusal keeps old program + shape while a live cable is attached): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 7 (trap: never reuse a freed identity): renaming a
+         // declared pin retires the old PinEntry and mints a fresh id for
+         // the new name, even though the visible compacted slot (index 1)
+         // is reused - see PinTable::Reconcile's S5.4 comment.
+         {
+            FieldElementNode n;
+            n.code = "output element float foo = 1.0\nP.y += 0.0\n";
+            bool applied = n.Apply();
+            const Field::PinEntry* before = applied ? n.OutputPinTable().Find("foo") : nullptr;
+            int beforeId = before ? before->id : -1;
+            n.code = "output element float bar = 1.0\nP.y += 0.0\n";
+            bool applied2 = n.Apply();
+            const Field::PinEntry* after = applied2 ? n.OutputPinTable().Find("bar") : nullptr;
+            int afterId = after ? after->id : -1;
+            bool pass = applied && applied2 && before && after && (beforeId != afterId) && (n.OutputCount() == 2);
+            printf("[FIELDPINNODETEST] Assertion 7 (renamed declared pin mints a fresh PinTable id, never reused): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 8: save/load round trip - the declared image-input pin
+         // and its real cable both survive.
+         {
+            Patch::Data saved = BuildPatchData();
+            NewPatch();
+            ApplyPatchData(saved);
+            auto* dstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+            const Field::PinEntry* pinR = dstR ? dstR->InputPinTable().Find("other") : nullptr;
+            bool pass = dstR && pinR && pinR->isDeclared && dstR->DeclaredImageInput(0) != nullptr &&
+                        dstR->DeclaredImageInput(0)->GetSource() ==
+                           (FindNodeByIndex(pixSrcAIdx) ? FindNodeByIndex(pixSrcAIdx)->node.get() : nullptr);
+            printf("[FIELDPINNODETEST] Assertion 8 (save/load round trip: declared image-input pin + its cable survive): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 9: undo reverts a kernel edit, restoring the declared
+         // pin's shape along with the code string it came from.
+         {
+            auto* dstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+            bool pass = dstR != nullptr;
+            if (dstR)
+            {
+               std::string before = dstR->code;
+               PushUndoCheckpoint();
+               dstR->code = "col = vec3(1.0);"; // drops the declared input entirely
+               dstR->Apply();
+               Undo();
+               auto* afterUndo = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+               const Field::PinEntry* pinR = afterUndo ? afterUndo->InputPinTable().Find("other") : nullptr;
+               pass = afterUndo && (afterUndo->code == before) && pinR && pinR->isDeclared;
+            }
+            printf("[FIELDPINNODETEST] Assertion 9 (undo reverts a kernel edit; declared pin shape restored): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 10: copy/paste preserves declared pin shape.
+         {
+            auto* dstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+            bool pass = false;
+            if (dstR)
+            {
+               FieldPixelNode copy;
+               CopyParams(&copy, dstR);
+               const Field::PinEntry* pinR = copy.InputPinTable().Find("other");
+               pass = (copy.OutputCount() == dstR->OutputCount()) && pinR && pinR->isDeclared;
+            }
+            printf("[FIELDPINNODETEST] Assertion 10 (copy/paste preserves declared pin shape): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDPINNODE OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
@@ -56857,6 +58158,30 @@ int main(int argc, char** argv)
       {
          RunFieldGraphRegenerate(gFieldGraphPendingRegenerate);
          gFieldGraphPendingRegenerate = nullptr;
+      }
+
+      // Dynamic pins, Phase 1 (build step 11, §5.5): trigger-pin edge
+      // detection for every FieldGraphNode, polled once per frame right
+      // here - same safe-to-mutate-gNodes location as the drain just above
+      // (trap T14). Firing nodes are collected first and regenerated in a
+      // second pass, deliberately not called from inside the gNodes range-for:
+      // Regenerate() can spawn/remove nodes, which reallocates gNodes'
+      // storage and would invalidate that loop's iterator/reference mid-walk.
+      // Collected as raw INode-owning pointers (not GraphNode&), which stay
+      // valid across such a reallocation since gNodes holds them by
+      // unique_ptr, not by value.
+      {
+         std::vector<FieldGraphNode*> firing;
+         for (GraphNode& gn : gNodes)
+         {
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(gn.node.get()))
+            {
+               if (fgn->PollTriggerEdge())
+                  firing.push_back(fgn);
+            }
+         }
+         for (FieldGraphNode* fgn : firing)
+            RunFieldGraphRegenerate(fgn);
       }
 
       io.MouseWheel = savedWheel;
