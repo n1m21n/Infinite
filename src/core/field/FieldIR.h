@@ -46,6 +46,11 @@ namespace Field
       TransferKind transferKind = TransferKind::None;
       int divisor = 1;
 
+      // graph domain (step 10): true when this Variable node refers to a
+      // handle bound by emit() rather than an ordinary typed value. Handles
+      // have no FieldType - `type` is left at its default and unused.
+      bool isHandle = false;
+
       double numberValue = 0.0;
       double vecValues[4] = { 0.0, 0.0, 0.0, 0.0 };
 
@@ -69,7 +74,13 @@ namespace Field
       StateWrite,
       If,
       For,
-      Expr
+      Expr,
+      // graph domain (step 10) intrinsics - see FieldGraphKernel.h. Kept as
+      // IRStmt variants rather than a fifth IR node type (I7).
+      Emit,
+      Connect,
+      SetParam,
+      Place
    };
 
    struct IRStmt;
@@ -129,8 +140,42 @@ namespace Field
       // Expr
       IRNodePtr expr;
 
+      // Emit: `<emitTargetName> = emit("<emitTypeName>", k0, k1, ...)`.
+      // emitKeyArgs are the identity-key arguments (must all be Domain::Graph,
+      // enforced by the Phase 2 rate-zero walk); emitTypeName is the literal
+      // string, validated to be a spawnable node type at interpret time
+      // (FieldGraphKernel.cpp), not at lowering time.
+      std::string emitTargetName;
+      std::string emitTypeName;
+      std::vector<IRNodePtr> emitKeyArgs;
+
+      // Connect: connect(<connectSrc>, <connectSrcSlot>, <connectDst>, <connectDstSlot>)
+      IRNodePtr connectSrc;
+      IRNodePtr connectSrcSlot;
+      IRNodePtr connectDst;
+      IRNodePtr connectDstSlot;
+
+      // SetParam: set(<setTarget>, "<setParamName>", <setValue>)
+      IRNodePtr setTarget;
+      std::string setParamName;
+      IRNodePtr setValue;
+
+      // Place: place(<placeTarget>, <placeX>, <placeY>)
+      IRNodePtr placeTarget;
+      IRNodePtr placeX;
+      IRNodePtr placeY;
+
       explicit IRStmt(IRStmtKind k, SourceSpan sp = {})
          : kind(k), span(sp) {}
+   };
+
+   // Graph domain (step 10): a flat statement list, no prologue/loop split -
+   // the kernel runs once, top to bottom, at edit time. See
+   // FieldGraphKernel.h for the interpreter that walks this into a GraphPlan.
+   struct GraphIRProgram
+   {
+      std::vector<IRStmtPtr> statements;
+      std::vector<DeclaredParam> declaredParams;
    };
 
    struct ElementIRProgram
@@ -163,5 +208,11 @@ namespace Field
 
    // Lowers a Pixel program AST to typed Pixel IR with domain inference and hoisting
    bool LowerPixelProgramToIR(const AstNodePtr& ast, PixelIRProgram& outProgram, FieldError& outError);
+
+   // Lowers a Graph program AST to typed Graph IR: domain inference, then a
+   // rate-zero enforcement walk (Phase 2, step 10 doc §5.2) rejecting any
+   // value reachable from an emit/connect/set/place argument whose domain
+   // is not Domain::Graph.
+   bool LowerGraphProgramToIR(const AstNodePtr& ast, GraphIRProgram& outProgram, FieldError& outError);
 }
 

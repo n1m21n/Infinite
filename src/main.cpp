@@ -133,6 +133,7 @@ namespace
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/FieldElementNode.h"
+#include "nodes/FieldGraphNode.h"
 #include "nodes/FieldPixelNode.h"
 #include "nodes/FieldSampleNode.h"
 #include "nodes/SceneNodes.h"
@@ -462,6 +463,13 @@ namespace
    // functions in the file.
    void PushUndoCheckpoint();
    GraphNode* FindNodeByIndex(int index);
+
+   // Field 'graph' domain (build step 10): forward-declared for the same
+   // reason as the two above - ApplyPatchData (far below) needs to remap
+   // every FieldGraphNode's persisted key->index ownership map to the fresh
+   // indices it just assigned, and the definition lives next to
+   // RemapViewportPanelNodes, after ApplyPatchData in file order.
+   void RemapFieldGraphOwnership(const std::map<int, int>& remap);
 
    // Offline Render (non-realtime export) - defined near RebuildAudioTopology/
    // StartAudioEngine below, forward-declared here since the node-params UI
@@ -965,6 +973,12 @@ namespace
    bool gFieldPixelEditorOpen = false;
    FieldSampleNode* gFieldSampleEditor = nullptr;
    bool gFieldSampleEditorOpen = false;
+   FieldGraphNode* gFieldGraphEditor = nullptr;
+   bool gFieldGraphEditorOpen = false;
+   // Set by a "Regenerate" button click inside DrawFieldGraphParams (nested
+   // in ed::Begin()/ed::End()); drained once, outside that pass, after
+   // ed::End() returns - see trap T14 and RunFieldGraphRegenerate.
+   FieldGraphNode* gFieldGraphPendingRegenerate = nullptr;
    bool gGlobalsOpen = false;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
@@ -3945,6 +3959,7 @@ namespace
       REGISTER_NODE(GrainMolderNode, Grain Molder, "Synths");
       REGISTER_NODE(GranularNode, Granular, "Synths");
       REGISTER_NODE(FieldSampleNode, Field Sample, "Synths");
+      REGISTER_NODE(FieldGraphNode, Field Graph, "Utility");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
@@ -5058,6 +5073,8 @@ namespace
          formula->Apply();
       if (auto* fe = dynamic_cast<FieldElementNode*>(node))
          fe->Apply();
+      if (auto* fgn = dynamic_cast<FieldGraphNode*>(node))
+         fgn->Apply(); // compile-only (T11) - never Regenerate() from here
       if (auto* fp = dynamic_cast<FieldPixelNode*>(node))
          fp->Apply();
       if (auto* fs = dynamic_cast<FieldSampleNode*>(node))
@@ -5401,6 +5418,48 @@ namespace
       }
 
       ModSliderInt("max voices", &n->maxVoices, 1, 32);
+
+      for (auto& p : n->GetParamTable().Params())
+      {
+         if (!p.isDeclared)
+            continue;
+         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
+      }
+   }
+
+   void DrawFieldGraphParams(FieldGraphNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldGraphEditor = n;
+            gFieldGraphEditorOpen = true;
+         }
+
+         // Queues the actual mutation rather than calling it here: this runs
+         // nested inside ed::Begin()/ed::End(), and Regenerate() spawns/
+         // removes/reconnects real nodes - see gFieldGraphPendingRegenerate's
+         // drain after ed::End() (trap T14).
+         if (ImGui::Button("Regenerate", ImVec2(kPreviewSize, 0)))
+            gFieldGraphPendingRegenerate = n;
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
 
       for (auto& p : n->GetParamTable().Params())
       {
@@ -24356,6 +24415,7 @@ namespace
          { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
          { "Field Element", "Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution." },
          { "Field Sample", "Runs a Field kernel once per audio sample per voice, on the audio thread - write your own sample-domain synth or effect. `in` is the audio input pin, `state` declares per-voice memory that resets on note-on/steal, `param` exposes a modulatable knob. `reduce.rms(in, loHz, hiHz)` publishes a band-limited RMS meter reading once per block." },
+         { "Field Graph", "Runs a Field kernel once, at edit time, to build part of the graph itself - emit(\"Type Name\", k0, k1, ...) spawns a node and hands back a handle, connect()/set()/place() wire it up, set its params and position it. Press Regenerate to re-run: it diffs against what it built last time (by emit-site identity) instead of deleting and respawning, so hand-edits to params on the spawned nodes survive an unrelated Regenerate." },
          { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
          { "Ramp", "Generates a gradient from scratch (no input) between up to 8 user-set colour stops, at a chosen angle, scale and offset. Gamma and dither smooth out visible banding." },
          { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
@@ -25908,6 +25968,247 @@ namespace
       // DisconnectAllTo's own comment warns about, just on the audio thread.
       RebuildAudioTopology();
    }
+
+   // Field 'graph' domain (build step 10): thin forwarder from
+   // Field::IFieldGraphHost onto the real graph (gNodes/SpawnNode/
+   // RemoveNodeByIndex/ConnectNodes above). No policy here - the reconciler
+   // (FieldGraphReconciler.cpp) owns every decision about what to mount/
+   // update/unmount/connect; this only carries the calls out.
+   struct MainGraphHost final : public Field::IFieldGraphHost
+   {
+      int mDroppedModCount = 0;
+      int mDetachedCableCount = 0;
+      int DroppedModCount() const override { return mDroppedModCount; }
+      int DetachedCableCount() const override { return mDetachedCableCount; }
+
+      int Mount(const std::string& typeName) override
+      {
+         if (!Spawnable(typeName))
+            return -1;
+         std::string category;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+            {
+               category = cat;
+               break;
+            }
+         }
+         GraphNode* gn = SpawnNode(typeName, category, 0.0f, 0.0f);
+         return gn != nullptr ? gn->index : -1;
+      }
+
+      void Unmount(int id) override
+      {
+         for (const auto& entry : Modulation::Instance().Links())
+            if (entry.first.first == id) mDroppedModCount++;
+
+         GraphNode* unmounting = FindNodeByIndex(id);
+         if (unmounting && unmounting->node)
+         {
+            INode* targetSrc = unmounting->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == id) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+            }
+         }
+         RemoveNodeByIndex(id);
+      }
+
+      int Remount(int existing, const std::string& typeName) override
+      {
+         // 1. Group membership rescue (doc §5.7 Case 2)
+         GroupNode* ownerGroup = nullptr;
+         for (auto& entry : gGroupMembers)
+         {
+            if (entry.second.count(existing))
+            {
+               ownerGroup = entry.first;
+               break;
+            }
+         }
+
+         // 2. Modulation / inbound cluster link rescue (doc §5.7 Case 4 & 5)
+         std::set<int> dying = { existing };
+         std::vector<ClusterLink> rescuedLinks;
+         std::vector<ClusterModLink> rescuedMod;
+         std::vector<ClusterPaletteLink> rescuedPalette;
+         CaptureClusterLinks(dying, rescuedLinks, rescuedMod, rescuedPalette);
+
+         // 3. Outbound cable rescue (generated node feeding external node, doc §5.7 Case 5)
+         struct OutboundLink {
+            int srcSlot;
+            int dstIndex;
+            int dstSlot;
+         };
+         std::vector<OutboundLink> rescuedOutbound;
+         GraphNode* dyingGn = FindNodeByIndex(existing);
+         if (dyingGn && dyingGn->node)
+         {
+            INode* targetSrc = dyingGn->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == existing) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ cable->GetOutputSlot(), gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+            }
+         }
+
+         RemoveNodeByIndex(existing);
+         int fresh = Mount(typeName);
+         if (fresh >= 0)
+         {
+            if (ownerGroup)
+               gGroupMembers[ownerGroup].insert(fresh);
+
+            GraphNode* freshGn = FindNodeByIndex(fresh);
+            if (freshGn)
+            {
+               std::map<int, GraphNode*> newByOrig;
+               newByOrig[existing] = freshGn;
+               ApplyClusterLinks(newByOrig, rescuedLinks, rescuedMod, rescuedPalette);
+            }
+
+            for (const auto& ob : rescuedOutbound)
+            {
+               std::string connErr;
+               ConnectNodes(fresh, ob.srcSlot, ob.dstIndex, ob.dstSlot, connErr);
+            }
+         }
+         return fresh;
+      }
+
+      void SetParam(int id, const std::string& paramName, float value) override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         if (gn == nullptr)
+            return;
+
+         struct SetFloatVisitor : public ParamVisitor
+         {
+            const std::string& targetName;
+            float targetValue;
+            explicit SetFloatVisitor(const std::string& name, float v) : targetName(name), targetValue(v) {}
+            void Float(const char* name, float& v) override { if (targetName == name) v = targetValue; }
+            void Int(const char* name, int& v) override { if (targetName == name) v = (int)std::lround((double)targetValue); }
+            void Bool(const char* name, bool& v) override { if (targetName == name) v = targetValue != 0.0f; }
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float[3]) override {}
+         } visitor(paramName, value);
+         gn->node->VisitParams(visitor);
+      }
+
+      void Connect(int srcId, int srcSlot, int dstId, int dstSlot) override
+      {
+         std::string err;
+         ConnectNodes(srcId, srcSlot, dstId, dstSlot, err);
+      }
+
+      void Place(int id, float x, float y) override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         if (gn == nullptr)
+            return;
+         gn->spawnX = x;
+         gn->spawnY = y;
+         gn->liveX = x;
+         gn->liveY = y;
+         gn->needsPosition = false;
+      }
+
+      bool Alive(int id) const override { return FindNodeByIndex(id) != nullptr; }
+
+      std::string TypeNameOf(int id) const override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         return gn != nullptr ? gn->typeName : std::string();
+      }
+
+      bool Spawnable(const std::string& typeName) const override
+      {
+         if (typeName == "Field Graph" || !IsUserSpawnable(typeName))
+            return false;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+               return true;
+         }
+         return false;
+      }
+   };
+
+   bool IsKernelDrivenParam(int nodeIndex, int paramIndex)
+   {
+      GraphNode* gn = FindNodeByIndex(nodeIndex);
+      if (!gn || !gn->node) return false;
+      struct ParamNameVisitor : public ParamVisitor {
+         int target;
+         int cur = 0;
+         std::string name;
+         ParamNameVisitor(int t) : target(t) {}
+         void Float(const char* n, float&) override { if (cur++ == target) name = n; }
+         void Int(const char* n, int&) override { if (cur++ == target) name = n; }
+         void Bool(const char* n, bool&) override { if (cur++ == target) name = n; }
+         void Text(const char* n, std::string&) override { if (cur++ == target) name = n; }
+         void Color(const char* n, float[3]) override { if (cur++ == target) name = n; }
+      } v(paramIndex);
+      gn->node->VisitParams(v);
+      if (v.name.empty()) return false;
+
+      for (const GraphNode& node : gNodes)
+      {
+         if (auto* fgn = dynamic_cast<FieldGraphNode*>(node.node.get()))
+         {
+            if (fgn->DrivesParam(nodeIndex, v.name))
+               return true;
+         }
+      }
+      return false;
+   }
+
+   bool CanBindModulation(int dstNodeIndex, int paramIndex)
+   {
+      return !IsKernelDrivenParam(dstNodeIndex, paramIndex);
+   }
+
    std::string gPatchPath;      // "" until the patch has been saved somewhere
    bool gPatchDirty = false;
    std::string gPatchStatus;
@@ -27020,6 +27321,14 @@ namespace
             geomOp->MigrateDeprecatedOp();
       }
 
+      // `remap` is fully populated now (every node in `data.nodes` has been
+      // spawned) - VisitParams/LoadParams above already parsed each
+      // FieldGraphNode's ownershipText into old-index terms (see
+      // FieldGraphNode::VisitParams), so this rewrites it to match the fresh
+      // indices just assigned, exactly like cable/modulation resolution
+      // below does via `resolve`.
+      RemapFieldGraphOwnership(remap);
+
       auto resolve = [&](int savedIndex) -> GraphNode*
       {
          auto it = remap.find(savedIndex);
@@ -27249,6 +27558,149 @@ namespace
             remapped.push_back(it->second);
       }
       gViewportPanelNodes = std::move(remapped);
+   }
+
+   // Field 'graph' domain (build step 10): mirrors RemapViewportPanelNodes
+   // immediately above, for the one other piece of per-node state that isn't
+   // part of Patch::Data proper but still keys off node index - a
+   // FieldGraphNode's persisted key->index ownership map (doc §5.3.1,
+   // §5.6.3). Unlike gViewportPanelNodes this is per-node rather than one
+   // session-wide list, so it walks gNodes rather than a global. Called from
+   // inside ApplyPatchData itself (shared by Undo, Redo and LoadPatchFrom)
+   // right after `remap` is fully built, rather than separately from each
+   // caller.
+   void RemapFieldGraphOwnership(const std::map<int, int>& remap)
+   {
+      for (GraphNode& gn : gNodes)
+      {
+         if (auto* fgn = dynamic_cast<FieldGraphNode*>(gn.node.get()))
+         {
+            fgn->Ownership().Remap(remap);
+            fgn->ownershipText = fgn->Ownership().ToText();
+         }
+      }
+   }
+
+   // Runs a FieldGraphNode's Regenerate() as exactly one undo step (doc
+   // §5.4): one checkpoint pushed up front, every SpawnNode/
+   // RemoveNodeByIndex/ConnectNodes call inside Regenerate() suppresses its
+   // own via the same gSuppressUndoCheckpoints region every other multi-step
+   // mutation in this file uses (see the glTF-drop block above). Must only
+   // be called outside the ed::Begin()/ed::End() node-editor pass (trap
+   // T14) - see the deferred gFieldGraphPendingRegenerate drain after
+   // ed::End() near the bottom of the main loop.
+   void RunFieldGraphRegenerate(FieldGraphNode* target)
+   {
+      if (target == nullptr)
+         return;
+      PushUndoCheckpoint();
+      gSuppressUndoCheckpoints = true;
+      MainGraphHost host;
+      target->Regenerate(host);
+      gSuppressUndoCheckpoints = false;
+      gPatchDirty = true;
+   }
+
+   void PerformCopyPaste(const std::set<int>& toCopy)
+   {
+      if (toCopy.empty()) return;
+      std::vector<std::string> clipboard;
+      std::vector<INode*> clipboardSources;
+      std::vector<int> clipboardOrigIndex;
+      std::vector<int> clipboardOrigGroup;
+      std::vector<ClusterLink> clipboardLinks;
+      std::vector<ClusterModLink> clipboardModLinks;
+      std::vector<ClusterPaletteLink> clipboardPaletteLinks;
+
+      for (int index : toCopy)
+      {
+         GraphNode* gn = FindNodeByIndex(index);
+         if (gn == nullptr)
+            continue;
+         clipboard.push_back(gn->typeName);
+         clipboardSources.push_back(gn->node.get());
+         clipboardOrigIndex.push_back(gn->index);
+         clipboardOrigGroup.push_back(IndexOfGroupNode(GroupOwning(gn->index)));
+      }
+      CaptureClusterLinks(toCopy, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
+
+      const ImVec2 off =
+         ClusterOffset(std::set<int>(clipboardOrigIndex.begin(), clipboardOrigIndex.end()));
+
+      struct PasteItem
+      {
+         std::string type; std::string category; INode* src; ImVec2 pos;
+         int origIndex; int origGroup;
+      };
+      std::vector<PasteItem> items;
+      for (size_t i = 0; i < clipboard.size(); i++)
+      {
+         for (GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == clipboardSources[i])
+            {
+               items.push_back({ clipboard[i], gn.category, gn.node.get(),
+                                 ImVec2(gn.liveX + off.x, gn.liveY + off.y),
+                                 clipboardOrigIndex[i], clipboardOrigGroup[i] });
+               break;
+            }
+         }
+      }
+
+      PushUndoCheckpoint();
+      gSuppressUndoCheckpoints = true;
+      std::map<int, int> newIndexByOrig;
+      for (const PasteItem& item : items)
+      {
+         GraphNode* copy = SpawnNode(item.type, item.category, item.pos.x, item.pos.y);
+         if (copy)
+         {
+            CopyParams(copy->node.get(), item.src);
+            ReloadDerivedState(copy->node.get());
+            if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
+               rn->seed = RandomNode::NextSeed();
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+            {
+               fgn->SetUid(FieldGraphNode::NewUid());
+            }
+            newIndexByOrig[item.origIndex] = copy->index;
+         }
+      }
+      for (const auto& kv : newIndexByOrig)
+      {
+         GraphNode* copy = FindNodeByIndex(kv.second);
+         if (copy && copy->node)
+         {
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+            {
+               fgn->Ownership().Remap(newIndexByOrig);
+               fgn->ownershipText = fgn->Ownership().ToText();
+            }
+         }
+      }
+      for (const PasteItem& item : items)
+      {
+         if (item.origGroup < 0)
+            continue;
+         auto groupIt = newIndexByOrig.find(item.origGroup);
+         auto memberIt = newIndexByOrig.find(item.origIndex);
+         if (groupIt == newIndexByOrig.end() || memberIt == newIndexByOrig.end())
+            continue;
+         GraphNode* grpGn = FindNodeByIndex(groupIt->second);
+         if (grpGn && grpGn->node)
+         {
+            if (auto* g = dynamic_cast<GroupNode*>(grpGn->node.get()))
+               gGroupMembers[g].insert(memberIt->second);
+         }
+      }
+      std::map<int, GraphNode*> newByOrig;
+      for (const auto& kv : newIndexByOrig)
+      {
+         if (GraphNode* gn = FindNodeByIndex(kv.second))
+            newByOrig[kv.first] = gn;
+      }
+      ApplyClusterLinks(newByOrig, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
+      gSuppressUndoCheckpoints = false;
    }
 
    void Undo()
@@ -47189,6 +47641,744 @@ int main(int argc, char** argv)
          printf("[FIELDPIXELTEST] Test suite complete.\n");
       }
 
+      // Field step 10 (graph domain): the reconciler diffs a fresh GraphPlan
+      // against a persisted key->index ownership map (doc §5.3.3) rather than
+      // delete-and-respawn. Structural actions (mount/remount/unmount) are
+      // what the doc's exit criterion cares about; an unchanged live key
+      // still emits an Update action every regenerate (params may need
+      // reapplying) even when nothing about it changed, so "idempotent"
+      // below is asserted as "zero structural actions", not "zero actions".
+      if (getenv("INFINITE_FIELDGRAPHTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHTEST] Running Field graph-domain reconciler harness...\n");
+         bool ok = true;
+
+         auto parseNotice = [](const std::string& notice, int& mounted, int& updated, int& remounted, int& unmounted, int& connected)
+         {
+            mounted = updated = remounted = unmounted = connected = -1;
+            sscanf(notice.c_str(), "mounted %d, updated %d, remounted %d, unmounted %d, %d connections",
+                   &mounted, &updated, &remounted, &unmounted, &connected);
+         };
+
+         // 1. A kernel emitting `voices` (=4) LFOs mounts exactly 4 nodes.
+         {
+            NewPatch();
+            FieldGraphNode node;
+            node.code =
+               "param int voices = 4 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "      set(osc, \"rateBeats\", 1.0 + i)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            bool regenerated = node.Regenerate(host);
+            int mounted, updated, remounted, unmounted, connected;
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass = regenerated && gNodes.size() == 4 && mounted == 4 && remounted == 0 && unmounted == 0;
+            if (!regenerated) printf("[FIELDGRAPHTEST]   error: %s\n", node.LastError().c_str());
+            printf("[FIELDGRAPHTEST] Assertion 1 (Initial Mount): gNodes=%zu mounted=%d  %s\n",
+                   gNodes.size(), mounted, pass ? "OK" : "FAIL");
+            ok = ok && pass;
+
+            // 2. Idempotence: regenerating an unchanged kernel produces zero
+            //    structural actions and leaves gNodes and every index alone.
+            std::vector<int> before;
+            for (const GraphNode& gn : gNodes) before.push_back(gn.index);
+            bool regenerated2 = node.Regenerate(host);
+            std::vector<int> after;
+            for (const GraphNode& gn : gNodes) after.push_back(gn.index);
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass2 = regenerated2 && gNodes.size() == 4 && mounted == 0 && remounted == 0 && unmounted == 0 && before == after;
+            printf("[FIELDGRAPHTEST] Assertion 2 (Idempotence): gNodes=%zu mounted=%d unmounted=%d indicesUnchanged=%d  %s\n",
+                   gNodes.size(), mounted, unmounted, (int)(before == after), pass2 ? "OK" : "FAIL");
+            ok = ok && pass2;
+
+            // 3. Raising voices 4 -> 6 mounts exactly 2, unmounts/remounts 0.
+            node.GetParamTable().Find("voices")->value = 6.0f;
+            bool regenerated3 = node.Regenerate(host);
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass3 = regenerated3 && gNodes.size() == 6 && mounted == 2 && remounted == 0 && unmounted == 0;
+            printf("[FIELDGRAPHTEST] Assertion 3 (Raise 4->6): gNodes=%zu mounted=%d  %s\n",
+                   gNodes.size(), mounted, pass3 ? "OK" : "FAIL");
+            ok = ok && pass3;
+
+            // 4. Lowering voices 6 -> 3 unmounts exactly 3, mounts 0.
+            node.GetParamTable().Find("voices")->value = 3.0f;
+            bool regenerated4 = node.Regenerate(host);
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass4 = regenerated4 && gNodes.size() == 3 && unmounted == 3 && mounted == 0 && remounted == 0;
+            printf("[FIELDGRAPHTEST] Assertion 4 (Lower 6->3): gNodes=%zu unmounted=%d  %s\n",
+                   gNodes.size(), unmounted, pass4 ? "OK" : "FAIL");
+            ok = ok && pass4;
+         }
+
+         // 5. Changing one set() value (voices held fixed at 4): exactly 4
+         //    updates, 0 mounts, 0 unmounts, and every node index unchanged (T13).
+         {
+            NewPatch();
+            FieldGraphNode node;
+            node.code =
+               "param int voices = 4 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "      set(osc, \"rateBeats\", 1.0 + i)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            node.Regenerate(host);
+            std::vector<int> before;
+            for (const GraphNode& gn : gNodes) before.push_back(gn.index);
+
+            node.code =
+               "param int voices = 4 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "      set(osc, \"rateBeats\", 2.0 + i)\n"
+               "   }\n"
+               "}\n";
+            bool regenerated = node.Regenerate(host);
+            std::vector<int> after;
+            for (const GraphNode& gn : gNodes) after.push_back(gn.index);
+            int mounted, updated, remounted, unmounted, connected;
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass = regenerated && updated == 4 && mounted == 0 && unmounted == 0 && before == after;
+            printf("[FIELDGRAPHTEST] Assertion 5 (Set-Value Change, T13): updated=%d mounted=%d unmounted=%d indicesUnchanged=%d  %s\n",
+                   updated, mounted, unmounted, (int)(before == after), pass ? "OK" : "FAIL");
+            ok = ok && pass;
+         }
+
+         // 6. Renaming the emit target changes every key -> 3 unmounts + 3 mounts.
+         {
+            NewPatch();
+            FieldGraphNode node;
+            node.code =
+               "param int voices = 3 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            node.Regenerate(host);
+
+            node.code =
+               "param int voices = 3 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc2 = emit(\"LFO\", i)\n"
+               "   }\n"
+               "}\n";
+            bool regenerated = node.Regenerate(host);
+            int mounted, updated, remounted, unmounted, connected;
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass = regenerated && mounted == 3 && unmounted == 3 && gNodes.size() == 3;
+            printf("[FIELDGRAPHTEST] Assertion 6 (Rename Emit Target): mounted=%d unmounted=%d  %s\n",
+                   mounted, unmounted, pass ? "OK" : "FAIL");
+            ok = ok && pass;
+         }
+
+         // 7. Inserting a second emit ABOVE the first in source leaves the
+         //    first emit's keyed nodes at their existing indices (T2) -
+         //    identity is name+key path, not source position.
+         {
+            NewPatch();
+            FieldGraphNode node;
+            node.code =
+               "param int voices = 3 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            node.Regenerate(host);
+            std::vector<int> before;
+            for (const std::string& key : { std::string("osc#0"), std::string("osc#1"), std::string("osc#2") })
+               before.push_back(node.Ownership().Get(key));
+
+            node.code =
+               "param int voices = 3 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      trig = emit(\"Ramp\", i)\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "   }\n"
+               "}\n";
+            bool regenerated = node.Regenerate(host);
+            std::vector<int> after;
+            for (const std::string& key : { std::string("osc#0"), std::string("osc#1"), std::string("osc#2") })
+               after.push_back(node.Ownership().Get(key));
+            int mounted, updated, remounted, unmounted, connected;
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass = regenerated && before == after &&
+                        std::find(before.begin(), before.end(), -1) == before.end() &&
+                        mounted == 3 && unmounted == 0 && remounted == 0 && gNodes.size() == 6;
+            printf("[FIELDGRAPHTEST] Assertion 7 (Insert Emit Above, T2): mounted=%d gNodes=%zu indicesUnchanged=%d  %s\n",
+                   mounted, gNodes.size(), (int)(before == after), pass ? "OK" : "FAIL");
+            ok = ok && pass;
+         }
+
+         NewPatch();
+         printf("%s\n", ok ? "FIELDGRAPH OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHRATETEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHRATETEST] Running Field graph-domain rate-zero and syntax validation harness...\n");
+         bool allOk = true;
+
+         auto checkCompileError = [&](const char* label, const std::string& code, const std::string& mustContainLeaf, const std::string& mustContainFix) -> bool {
+            FieldGraphNode node;
+            node.code = code;
+            bool res = node.Apply();
+            bool hasErr = !res && !node.LastError().empty();
+            bool leafMatch = node.LastError().find(mustContainLeaf) != std::string::npos;
+            bool fixMatch = node.LastError().find(mustContainFix) != std::string::npos;
+            bool pass = hasErr && leafMatch && fixMatch;
+            if (!pass)
+            {
+               printf("[FIELDGRAPHRATETEST]   %s failed: res=%d, err='%s' (expected leaf '%s' and fix '%s')\n",
+                      label, (int)res, node.LastError().c_str(), mustContainLeaf.c_str(), mustContainFix.c_str());
+            }
+            printf("[FIELDGRAPHRATETEST] %s: %s\n", label, pass ? "OK" : "FAIL");
+            return pass;
+         };
+
+         // 1. t in a set value
+         allOk = checkCompileError("Assertion 1 (t in set value)",
+            "osc = emit(\"LFO\", 0)\nset(osc, \"rateBeats\", t)\n",
+            "t", "Fix:") && allOk;
+
+         // 2. P in a loop bound
+         allOk = checkCompileError("Assertion 2 (P in loop bound)",
+            "for (k = 0; k < P.x; k += 1) {\n   osc = emit(\"LFO\", k)\n}\n",
+            "P", "Fix:") && allOk;
+
+         // 3. uv anywhere
+         allOk = checkCompileError("Assertion 3 (uv anywhere)",
+            "x = uv\n",
+            "uv", "Fix:") && allOk;
+
+         // 4. in anywhere
+         allOk = checkCompileError("Assertion 4 (in anywhere)",
+            "x = in\n",
+            "in", "Fix:") && allOk;
+
+         // 5. rand() in a set value
+         allOk = checkCompileError("Assertion 5 (rand() in set value)",
+            "osc = emit(\"LFO\", 0)\nset(osc, \"rateBeats\", rand())\n",
+            "rand()", "Fix:") && allOk;
+
+         // 6. a t-dependent global
+         {
+            ExprGlobals::All().push_back({"rateTGlobal", "t * 2.0", 0.0f, ""});
+            bool pass = checkCompileError("Assertion 6 (t-dependent global)",
+               "osc = emit(\"LFO\", 0)\nset(osc, \"rateBeats\", rateTGlobal)\n",
+               "rateTGlobal", "Fix:");
+            ExprGlobals::All().pop_back();
+            allOk = pass && allOk;
+         }
+
+         // 7. reduce from sample
+         allOk = checkCompileError("Assertion 7 (reduce from sample)",
+            "x = reduce.rms(in, 20.0, 2000.0)\n",
+            "in", "Fix:") && allOk;
+
+         // 8. assignment to a global
+         {
+            ExprGlobals::All().push_back({"myConstGlobal", "42.0", 42.0f, ""});
+            bool pass = checkCompileError("Assertion 8 (assignment to global)",
+               "myConstGlobal = 10.0\n",
+               "myConstGlobal", "Fix:");
+            ExprGlobals::All().pop_back();
+            allOk = pass && allOk;
+         }
+
+         // 9. emit(\"Group\", i)
+         allOk = checkCompileError("Assertion 9 (emit Group)",
+            "g = emit(\"Group\", 0)\n",
+            "Group", "Fix:") && allOk;
+
+         // 10. emit(\"Field Graph\", i)
+         allOk = checkCompileError("Assertion 10 (emit Field Graph)",
+            "fg = emit(\"Field Graph\", 0)\n",
+            "Field Graph", "Fix:") && allOk;
+
+         // 11. emit in a loop with no key
+         allOk = checkCompileError("Assertion 11 (emit in loop no key)",
+            "for (k = 0; k < 4; k += 1) {\n   osc = emit(\"LFO\")\n}\n",
+            "LFO", "Fix:") && allOk;
+
+         // 12. two emits with the same name
+         allOk = checkCompileError("Assertion 12 (two emits same name)",
+            "osc = emit(\"LFO\", 0)\nosc = emit(\"LFO\", 1)\n",
+            "osc", "Fix:") && allOk;
+
+         // 13. a non-literal type name
+         allOk = checkCompileError("Assertion 13 (non-literal type name)",
+            "k = 1\nosc = emit(k, 0)\n",
+            "type name", "Fix:") && allOk;
+
+         // 14. clean kernel compiles with zero errors and infers domain graph
+         {
+            FieldGraphNode cleanNode;
+            cleanNode.code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 1.0 + k)\n"
+               "   }\n"
+               "}\n";
+            bool res = cleanNode.Apply();
+            bool pass = res && cleanNode.LastError().empty();
+            if (!pass)
+               printf("[FIELDGRAPHRATETEST]   Clean kernel failed: %s\n", cleanNode.LastError().c_str());
+            printf("[FIELDGRAPHRATETEST] Assertion 14 (Clean Kernel): %s\n", pass ? "OK" : "FAIL");
+            allOk = pass && allOk;
+         }
+
+         printf("%s\n", allOk ? "FIELDGRAPHRATE OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHUNDOTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHUNDOTEST] Running Field graph-domain undo/redo harness...\n");
+         bool ok = true;
+         NewPatch();
+
+         PushUndoCheckpoint(); // clean baseline checkpoint
+
+         // 1. Spawn a Field Graph node emitting 8 nodes
+         GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+         auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+         fgn->code =
+            "param float voices = 8 [1, 8]\n"
+            "for (k = 0; k < 8; k += 1) {\n"
+            "   if (k < voices) {\n"
+            "      osc = emit(\"LFO\", k)\n"
+            "      set(osc, \"rateBeats\", 1.0 + k)\n"
+            "   }\n"
+            "}\n";
+
+         size_t undoSizeBefore = gUndoStack.size();
+         RunFieldGraphRegenerate(fgn);
+         size_t undoSizeAfter = gUndoStack.size();
+
+         bool pass1 = (undoSizeAfter == undoSizeBefore + 1) && (gNodes.size() == 9);
+         printf("[FIELDGRAPHUNDOTEST] Assertion 1 (Regenerate 8 nodes stack growth 1): stackBefore=%zu stackAfter=%zu gNodes=%zu  %s\n",
+                undoSizeBefore, undoSizeAfter, gNodes.size(), pass1 ? "OK" : "FAIL");
+         ok = ok && pass1;
+
+         // 2. Undo -> all 8 gone, kernel source reverted
+         Undo();
+         bool pass2 = (gNodes.size() == 1);
+         printf("[FIELDGRAPHUNDOTEST] Assertion 2 (Undo: 8 gone): gNodes=%zu  %s\n",
+                gNodes.size(), pass2 ? "OK" : "FAIL");
+         ok = ok && pass2;
+
+         // 3. Redo -> all 8 back, ownership resolves
+         Redo();
+         fgn = nullptr;
+         for (GraphNode& n : gNodes)
+            if (auto* fg = dynamic_cast<FieldGraphNode*>(n.node.get())) fgn = fg;
+         bool resolves8 = (fgn != nullptr) && (gNodes.size() == 9);
+         if (resolves8)
+         {
+            for (int i = 0; i < 8; ++i)
+            {
+               int idx = fgn->Ownership().Get("osc#" + std::to_string(i));
+               if (idx < 0 || FindNodeByIndex(idx) == nullptr) resolves8 = false;
+            }
+         }
+         bool pass3 = (gNodes.size() == 9) && resolves8;
+         printf("[FIELDGRAPHUNDOTEST] Assertion 3 (Redo: 8 back and ownership resolves): resolves=%d gNodes=%zu  %s\n",
+                (int)resolves8, gNodes.size(), pass3 ? "OK" : "FAIL");
+         ok = ok && pass3;
+
+         // 4. Undo past the regeneration to before the kernel existed -> no orphan nodes, no regeneration fired (T11)
+         Undo(); // back to kernel only
+         Undo(); // back to empty baseline
+         bool pass4 = gNodes.empty();
+         printf("[FIELDGRAPHUNDOTEST] Assertion 4 (Undo past regeneration to before kernel): gNodes=%zu  %s\n",
+                gNodes.size(), pass4 ? "OK" : "FAIL");
+         ok = ok && pass4;
+
+         // 5. Redo forward -> identical graph
+         Redo(); // kernel restored
+         Redo(); // 8 nodes regenerated
+         fgn = nullptr;
+         for (GraphNode& n : gNodes)
+            if (auto* fg = dynamic_cast<FieldGraphNode*>(n.node.get())) fgn = fg;
+         bool pass5 = (gNodes.size() == 9) && (fgn != nullptr);
+         printf("[FIELDGRAPHUNDOTEST] Assertion 5 (Redo forward to identical graph): gNodes=%zu  %s\n",
+                gNodes.size(), pass5 ? "OK" : "FAIL");
+         ok = ok && pass5;
+
+         // 6. After ApplyPatchData, ownership map indices all resolve via FindNodeByIndex (T1, §4.2 remap)
+         Patch::Data patchData = BuildPatchData();
+         NewPatch();
+         ApplyPatchData(patchData);
+         fgn = nullptr;
+         for (GraphNode& n : gNodes)
+            if (auto* fg = dynamic_cast<FieldGraphNode*>(n.node.get())) fgn = fg;
+         bool pass6 = (fgn != nullptr) && (gNodes.size() == 9);
+         if (pass6)
+         {
+            for (int i = 0; i < 8; ++i)
+            {
+               int idx = fgn->Ownership().Get("osc#" + std::to_string(i));
+               if (idx < 0 || FindNodeByIndex(idx) == nullptr) pass6 = false;
+            }
+         }
+         printf("[FIELDGRAPHUNDOTEST] Assertion 6 (ApplyPatchData ownership map resolves): resolves=%d gNodes=%zu  %s\n",
+                (int)pass6, gNodes.size(), pass6 ? "OK" : "FAIL");
+         ok = ok && pass6;
+
+         // 7. 30 consecutive regenerations leave gUndoStack.size() <= 30 and do not evict an earlier checkpoint (T9)
+         PushUndoCheckpoint();
+         size_t stackBefore30 = gUndoStack.size();
+         for (int i = 0; i < 30; ++i)
+         {
+            fgn->GetParamTable().Find("voices")->value = (float)(1 + (i % 8));
+            RunFieldGraphRegenerate(fgn);
+         }
+         size_t stackAfter30 = gUndoStack.size();
+         bool pass7 = (stackAfter30 <= stackBefore30 + 30) && (stackAfter30 < 200);
+         printf("[FIELDGRAPHUNDOTEST] Assertion 7 (30 regenerations <= 30 checkpoints): stackBefore=%zu stackAfter=%zu  %s\n",
+                stackBefore30, stackAfter30, pass7 ? "OK" : "FAIL");
+         ok = ok && pass7;
+
+         NewPatch();
+         printf("%s\n", ok ? "FIELDGRAPHUNDO OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHBLASTTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHBLASTTEST] Running Field graph-domain blast radius harness...\n");
+         bool allOk = true;
+
+         // Case 1: hand-delete a generated node -> kernel reports 1 missing, no crash;
+         // regenerate -> it returns; index differs; nothing else moved.
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 1.0 + k)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int osc0Before = fgn->Ownership().Get("osc#0");
+            int osc1Before = fgn->Ownership().Get("osc#1");
+            int osc2Before = fgn->Ownership().Get("osc#2");
+            int osc3Before = fgn->Ownership().Get("osc#3");
+
+            // Hand-delete osc#1
+            RemoveNodeByIndex(osc1Before);
+            bool missingReported = (FindNodeByIndex(osc1Before) == nullptr);
+
+            // Regenerate brings it back
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int osc1After = fgn->Ownership().Get("osc#1");
+            bool osc1Back = (osc1After >= 0 && FindNodeByIndex(osc1After) != nullptr);
+            bool indexDiffers = (osc1After != osc1Before);
+            bool othersUnchanged = (fgn->Ownership().Get("osc#0") == osc0Before &&
+                                   fgn->Ownership().Get("osc#2") == osc2Before &&
+                                   fgn->Ownership().Get("osc#3") == osc3Before);
+
+            bool pass1 = missingReported && osc1Back && indexDiffers && othersUnchanged && (gNodes.size() == 5);
+            printf("[FIELDGRAPHBLASTTEST] Assertion 1 (Hand-delete & return): missing=%d back=%d diffIndex=%d othersSame=%d  %s\n",
+                   (int)missingReported, (int)osc1Back, (int)indexDiffers, (int)othersUnchanged, pass1 ? "OK" : "FAIL");
+            allOk = allOk && pass1;
+         }
+
+         // Case 2: put 2 generated nodes in a group, force a type-change remount ->
+         // both are still in the group afterwards; emit(\"Group\", i) is refused.
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int osc0 = fgn->Ownership().Get("osc#0");
+            int osc2 = fgn->Ownership().Get("osc#2");
+
+            GraphNode* grpGn = SpawnNode("Group", "Compositing", 0.0f, 0.0f);
+            int grpIdx = grpGn->index;
+            auto* grp = static_cast<GroupNode*>(grpGn->node.get());
+            gGroupMembers[grp].insert(osc0);
+            gGroupMembers[grp].insert(osc2);
+
+            // Re-fetch fgn after SpawnNode
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+
+            // Force type change LFO -> Ramp
+            fgn->code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"Ramp\", k)\n"
+               "   }\n"
+               "}\n";
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            grpGn = FindNodeByIndex(grpIdx);
+            grp = static_cast<GroupNode*>(grpGn->node.get());
+
+            int osc0New = fgn->Ownership().Get("osc#0");
+            int osc2New = fgn->Ownership().Get("osc#2");
+            bool bothInGroup = (gGroupMembers[grp].count(osc0New) != 0) &&
+                               (gGroupMembers[grp].count(osc2New) != 0);
+
+            // emit(\"Group\", i) refused
+            FieldGraphNode groupEmitNode;
+            groupEmitNode.code = "g = emit(\"Group\", 0)\n";
+            bool groupRefused = !groupEmitNode.Apply();
+
+            bool pass2 = bothInGroup && groupRefused;
+            printf("[FIELDGRAPHBLASTTEST] Assertion 2 (Group membership rescued, emit Group refused): groupRescued=%d groupRefused=%d  %s\n",
+                   (int)bothInGroup, (int)groupRefused, pass2 ? "OK" : "FAIL");
+            allOk = allOk && pass2;
+         }
+
+         // Case 3: copy/paste
+         // copy kernel+children, paste -> pasted kernel's uid differs, both kernels regenerate
+         // without stealing each other's nodes, and node count doubles exactly once;
+         // copy children alone -> copies are owned by nobody and survive regeneration of original.
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            std::string uid1 = fgn->Uid();
+
+            std::set<int> kernelAndChildren;
+            kernelAndChildren.insert(kernelIdx);
+            for (int i = 0; i < 4; ++i)
+               kernelAndChildren.insert(fgn->Ownership().Get("osc#" + std::to_string(i)));
+
+            PerformCopyPaste(kernelAndChildren);
+            bool countDoubled = (gNodes.size() == 10);
+
+            // Find pasted kernel
+            int fgn2Idx = -1;
+            for (const GraphNode& n : gNodes)
+            {
+               if (n.index != kernelIdx && dynamic_cast<FieldGraphNode*>(n.node.get()) != nullptr)
+               {
+                  fgn2Idx = n.index;
+                  break;
+               }
+            }
+            GraphNode* gn2 = FindNodeByIndex(fgn2Idx);
+            auto* fgn2 = gn2 ? static_cast<FieldGraphNode*>(gn2->node.get()) : nullptr;
+            bool uidsDiffer = (fgn2 != nullptr && fgn2->Uid() != uid1);
+
+            // Regenerate both safely
+            gn = FindNodeByIndex(kernelIdx);
+            if (gn) static_cast<FieldGraphNode*>(gn->node.get())->Regenerate(host);
+            gn2 = FindNodeByIndex(fgn2Idx);
+            if (gn2) static_cast<FieldGraphNode*>(gn2->node.get())->Regenerate(host);
+            bool noStealing = (gNodes.size() == 10);
+
+            // Copy children alone
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            std::set<int> childrenOnly;
+            for (int i = 0; i < 4; ++i)
+               childrenOnly.insert(fgn->Ownership().Get("osc#" + std::to_string(i)));
+            PerformCopyPaste(childrenOnly);
+            size_t countAfterChildrenPaste = gNodes.size();
+
+            // Regenerate original
+            gn = FindNodeByIndex(kernelIdx);
+            if (gn) static_cast<FieldGraphNode*>(gn->node.get())->Regenerate(host);
+            bool childrenSurvive = (gNodes.size() == countAfterChildrenPaste);
+
+            bool pass3 = countDoubled && uidsDiffer && noStealing && (countAfterChildrenPaste == 14) && childrenSurvive;
+            printf("[FIELDGRAPHBLASTTEST] Assertion 3 (Copy/paste subgraph & orphan children): doubled=%d diffUid=%d noStealing=%d childrenSurvive=%d  %s\n",
+                   (int)countDoubled, (int)uidsDiffer, (int)noStealing, (int)childrenSurvive, pass3 ? "OK" : "FAIL");
+            allOk = allOk && pass3;
+         }
+
+         // Case 4: modulation-cable rescue
+         // binding survives a remount and points at the new index;
+         // binding to a kernel-driven param is refused;
+         // true unmount clears the binding and the kernel reports it.
+         {
+            NewPatch();
+            GraphNode* lfoMod = SpawnNode("LFO", "Utility", -200.0f, 0.0f);
+            int lfoModIdx = lfoMod->index;
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 1 [1, 8]\n"
+               "osc = emit(\"LFO\", 0)\n"
+               "set(osc, \"rateBeats\", 2.0)\n";
+            MainGraphHost host;
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int oscIdx = fgn->Ownership().Get("osc#0");
+
+            // Binding to kernel-driven param is refused (param 1 is rateBeats)
+            bool bindDrivenRefused = !CanBindModulation(oscIdx, 1);
+
+            // Binding to a free param is accepted (param 2 is bipolar)
+            bool bindFreeAllowed = CanBindModulation(oscIdx, 2);
+            Modulation::Instance().Bind(oscIdx, 2, lfoModIdx, 0);
+            bool modBound = Modulation::Instance().IsModulated(oscIdx, 2);
+
+            // Force remount LFO -> Ramp
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 1 [1, 8]\n"
+               "osc = emit(\"Ramp\", 0)\n";
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int newOscIdx = fgn->Ownership().Get("osc#0");
+            bool remounted = (newOscIdx != oscIdx && newOscIdx >= 0);
+            bool modRescued = Modulation::Instance().IsModulated(newOscIdx, 2);
+
+            // True unmount: emit nothing
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code = "x = 1\n";
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            bool modCleared = !Modulation::Instance().IsModulated(newOscIdx, 2);
+            bool noticeReported = (fgn->Notice().find("modulation bindings dropped") != std::string::npos);
+
+            bool pass4 = bindDrivenRefused && bindFreeAllowed && modBound && remounted && modRescued && modCleared && noticeReported;
+            printf("[FIELDGRAPHBLASTTEST] Assertion 4 (Modulation rescue & refuse): refusedDriven=%d bound=%d rescued=%d cleared=%d reported=%d  %s\n",
+                   (int)bindDrivenRefused, (int)modBound, (int)modRescued, (int)modCleared, (int)noticeReported, pass4 ? "OK" : "FAIL");
+            allOk = allOk && pass4;
+         }
+
+         // Case 5: cable rescue
+         // a generated->hand-placed cable survives a remount;
+         // a true unmount clears the cable, the kernel reports the detach,
+         // and one undo restores both node and cable.
+         {
+            NewPatch();
+            GraphNode* fitNode = SpawnNode("Fit", "Compositing", 300.0f, 0.0f);
+            int fitIdx = fitNode->index;
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 1 [1, 8]\n"
+               "osc = emit(\"Ramp\", 0)\n";
+            RunFieldGraphRegenerate(fgn);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int oscIdx = fgn->Ownership().Get("osc#0");
+            std::string connErr;
+            ConnectNodes(oscIdx, 0, fitIdx, 0, connErr);
+            auto hasCableToFit = [&](int fromIdx) {
+               GraphNode* src = FindNodeByIndex(fromIdx);
+               GraphNode* dst = FindNodeByIndex(fitIdx);
+               if (!src || !dst) return false;
+               ImageCable* cable = CableFor(*dst, 0);
+               return cable != nullptr && cable->IsConnected() && cable->GetSource() == src->node.get();
+            };
+            bool initialCable = hasCableToFit(oscIdx);
+
+            // Force remount Ramp -> Noise
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 1 [1, 8]\n"
+               "osc = emit(\"Noise\", 0)\n";
+            RunFieldGraphRegenerate(fgn);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int remountIdx = fgn->Ownership().Get("osc#0");
+            bool remountedCable = (remountIdx != oscIdx) && hasCableToFit(remountIdx);
+
+            // True unmount
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code = "x = 1\n";
+            RunFieldGraphRegenerate(fgn);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            bool cableGone = !hasCableToFit(remountIdx);
+            bool unmountReported = (fgn->Notice().find("cables with unmounted nodes") != std::string::npos);
+
+            // One undo restores both node and cable
+            Undo();
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = gn ? dynamic_cast<FieldGraphNode*>(gn->node.get()) : nullptr;
+            int restoredIdx = fgn ? fgn->Ownership().Get("osc#0") : -1;
+            bool undoRestoredNode = (restoredIdx >= 0 && FindNodeByIndex(restoredIdx) != nullptr);
+            bool undoRestoredCable = hasCableToFit(restoredIdx);
+
+            bool pass5 = initialCable && remountedCable && cableGone && unmountReported && undoRestoredNode && undoRestoredCable;
+            printf("[FIELDGRAPHBLASTTEST] Assertion 5 (Cable rescue, detach & one undo): initCable=%d rescuedCable=%d cableGone=%d reported=%d undoNode=%d undoCable=%d  %s\n",
+                   (int)initialCable, (int)remountedCable, (int)cableGone, (int)unmountReported, (int)undoRestoredNode, (int)undoRestoredCable, pass5 ? "OK" : "FAIL");
+            allOk = allOk && pass5;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDGRAPHBLAST OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
       {
          // Every node type that declares params must survive both paths that
@@ -47267,7 +48457,55 @@ int main(int argc, char** argv)
                 typesTested - copyFails, typesTested, copyFails == 0 ? "OK" : "FAIL");
          printf("save/load:  %d/%d types round trip  %s\n",
                 typesTested - loadFails, typesTested, loadFails == 0 ? "OK" : "FAIL");
-         printf("%s\n", (copyFails == 0 && loadFails == 0) ? "ROUND TRIP OK" : "SUSPECT");
+
+         // Field step 10: 8-generated-node save/load round-trip case (doc §7.6)
+         bool fieldGraphRoundTripOk = false;
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            if (gn && gn->node)
+            {
+               auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+               fgn->code =
+                  "param float voices = 8 [1, 8]\n"
+                  "for (k = 0; k < 8; k += 1) {\n"
+                  "   if (k < voices) {\n"
+                  "      osc = emit(\"LFO\", k)\n"
+                  "      set(osc, \"rateBeats\", 1.0 + k)\n"
+                  "   }\n"
+                  "}\n";
+               MainGraphHost host;
+               fgn->Regenerate(host);
+               const bool generated8 = gNodes.size() == 9;
+               Patch::Data saved = BuildPatchData();
+               NewPatch();
+               ApplyPatchData(saved);
+               const bool reloaded8 = gNodes.size() == 9;
+               FieldGraphNode* reloadedFgn = nullptr;
+               for (GraphNode& node : gNodes)
+               {
+                  if (auto* fg = dynamic_cast<FieldGraphNode*>(node.node.get()))
+                     reloadedFgn = fg;
+               }
+               bool ownershipResolves = (reloadedFgn != nullptr);
+               if (ownershipResolves)
+               {
+                  for (int i = 0; i < 8; ++i)
+                  {
+                     std::string key = "osc#" + std::to_string(i);
+                     int idx = reloadedFgn->Ownership().Get(key);
+                     if (idx < 0 || FindNodeByIndex(idx) == nullptr)
+                        ownershipResolves = false;
+                  }
+               }
+               fieldGraphRoundTripOk = generated8 && reloaded8 && ownershipResolves;
+               printf("field graph 8-node save/load round-trip: generated=%d reloaded=%d ownershipResolves=%d  %s\n",
+                      (int)generated8, (int)reloaded8, (int)ownershipResolves,
+                      fieldGraphRoundTripOk ? "OK" : "FAIL");
+            }
+         }
+
+         printf("%s\n", (copyFails == 0 && loadFails == 0 && fieldGraphRoundTripOk) ? "ROUND TRIP OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_PHASEFTEST") != nullptr && frameId == 4)
@@ -52413,6 +53651,8 @@ int main(int argc, char** argv)
                DrawFieldPixelParams(n);
             else if (auto* n = dynamic_cast<FieldSampleNode*>(gn.node.get()))
                DrawFieldSampleParams(n);
+            else if (auto* n = dynamic_cast<FieldGraphNode*>(gn.node.get()))
+               DrawFieldGraphParams(n);
             else if (auto* n = dynamic_cast<TextNode*>(gn.node.get()))
                DrawTextParams(n);
             else if (auto* n = dynamic_cast<LayerStackNode*>(gn.node.get()))
@@ -53050,7 +54290,14 @@ int main(int argc, char** argv)
                   // modulators patch into parameters and into Math's inputs;
                   // image nodes patch into image inputs
                   if (GraphNode::IsParamPin(b))
+                  {
                      valid = srcIsModulator;
+                     if (valid && IsKernelDrivenParam(dstNode->index, GraphNode::ParamIndexFromPin(b)))
+                     {
+                        valid = false;
+                        rejectReason = "Cannot modulate a parameter driven by a Field Graph kernel";
+                     }
+                  }
                   else if (GraphNode::IsColorPin(b))
                      valid = srcPalette != nullptr;
                   else if (GraphNode::IsInputPin(b))
@@ -53705,6 +54952,18 @@ int main(int argc, char** argv)
                   CopyParams(copy->node.get(), item.src);
                   if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
                      rn->seed = RandomNode::NextSeed();
+                  // A duplicate's ownership map, just copied verbatim by
+                  // CopyParams, still points at the ORIGINAL's live nodes -
+                  // the copy's identity must diverge (doc §5.7.3) so its
+                  // next Regenerate treats every emit() as fresh (mount, not
+                  // "I already own that node") instead of fighting the
+                  // original over the same indices.
+                  if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+                  {
+                     fgn->SetUid(FieldGraphNode::NewUid());
+                     fgn->Ownership() = Field::GraphOwnershipMap();
+                     fgn->ownershipText.clear();
+                  }
                   copy->showParams = item.params;
                   copy->showMiniViewport = item.miniViewport;
                   copy->showAdvancedParams = item.advancedParams;
@@ -53996,6 +55255,14 @@ int main(int argc, char** argv)
                CopyParams(copy->node.get(), item.src);
                if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
                   rn->seed = RandomNode::NextSeed();
+               // See the duplicate path's identical comment above (doc
+               // §5.7.3) - a paste needs the same fresh-identity treatment.
+               if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+               {
+                  fgn->SetUid(FieldGraphNode::NewUid());
+                  fgn->Ownership() = Field::GraphOwnershipMap();
+                  fgn->ownershipText.clear();
+               }
                newByOrig[item.origIndex] = copy;
             }
          }
@@ -55243,6 +56510,18 @@ int main(int argc, char** argv)
       // EndNodeParams.
       EndNodeParams();
 
+      // Field 'graph' domain (build step 10, trap T14): a "Regenerate"
+      // button click sets this flag from inside DrawFieldGraphParams, which
+      // runs nested in the ed::Begin()/ed::End() pass just closed above -
+      // SpawnNode/RemoveNodeByIndex there would mutate gNodes (reallocating
+      // its storage) while imgui-node-editor is still mid-frame over it.
+      // Draining here, once per frame, right after that pass ends, is safe.
+      if (gFieldGraphPendingRegenerate != nullptr)
+      {
+         RunFieldGraphRegenerate(gFieldGraphPendingRegenerate);
+         gFieldGraphPendingRegenerate = nullptr;
+      }
+
       io.MouseWheel = savedWheel;
       io.MouseWheelH = savedWheelH;
 
@@ -55663,6 +56942,74 @@ int main(int argc, char** argv)
             if (!gFieldSampleEditor->LastError().empty())
             {
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSampleEditor->LastError().c_str());
+            }
+         }
+         ImGui::End();
+      }
+
+      if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gFieldGraphEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gFieldGraphEditor = nullptr;
+            gFieldGraphEditorOpen = false;
+         }
+      }
+
+      if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Field graph editor", &gFieldGraphEditorOpen))
+         {
+            ImGui::TextDisabled("Field graph-domain kernel (edit-time, runs once). emit(\"Type Name\", k0, k1, ...) -> handle");
+            ImGui::TextDisabled("connect(src, srcSlot, dst, dstSlot)   set(handle, \"paramName\", value)   place(handle, x, y)");
+            ImGui::Separator();
+
+            static char editBuf[8192];
+            static FieldGraphNode* lastEdited = nullptr;
+            if (lastEdited != gFieldGraphEditor)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
+               lastEdited = gFieldGraphEditor;
+            }
+
+            ImGui::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               // Compile-only (T11): never mutates the real graph on its own -
+               // see FieldGraphNode::Apply()'s doc comment. Regenerate (below)
+               // is the only path that does.
+               gFieldGraphEditor->code = editBuf;
+               gFieldGraphEditor->Apply();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
+            ImGui::SameLine();
+            if (ImGui::Button("Regenerate", ImVec2(120, 0)))
+            {
+               // Safe to call directly (not deferred) here: this window draws
+               // after ed::End() has already returned for the frame, unlike
+               // DrawFieldGraphParams' Regenerate button (see trap T14 there).
+               gFieldGraphEditor->code = editBuf;
+               RunFieldGraphRegenerate(gFieldGraphEditor);
+            }
+
+            if (!gFieldGraphEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldGraphEditor->LastError().c_str());
+            }
+            if (!gFieldGraphEditor->Notice().empty())
+            {
+               ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", gFieldGraphEditor->Notice().c_str());
             }
          }
          ImGui::End();

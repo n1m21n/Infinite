@@ -15,7 +15,10 @@ namespace Field
       Op,
       Punct,
       Newline,
-      Comment
+      Comment,
+      String // D7 (step 10, graph domain): quoted string literal. The only
+             // place a string appears in Field - never a value type, never
+             // bound to a name. `text` holds the unescaped content.
    };
 
    struct Token

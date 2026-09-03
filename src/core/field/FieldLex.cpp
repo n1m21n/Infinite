@@ -91,6 +91,54 @@ namespace Field
             continue;
          }
 
+         // String literal: "..." with \" and \\ escapes, no newlines inside.
+         // D7 (step 10): the only string syntax in Field - legal only as
+         // emit()'s first argument or set()'s second argument, enforced
+         // during graph-program lowering (LowerGraphProgramToIR), not here.
+         if (c == '"')
+         {
+            size_t tokenOffset = pos;
+            int tokenLine = line;
+            int tokenCol = col;
+            advance(); // consume opening quote
+            std::string text;
+            bool closed = false;
+            while (pos < src.size())
+            {
+               char sc = peek();
+               if (sc == '"')
+               {
+                  advance();
+                  closed = true;
+                  break;
+               }
+               if (sc == '\n')
+                  break;
+               if (sc == '\\' && (peek(1) == '"' || peek(1) == '\\'))
+               {
+                  advance();
+                  text += advance();
+                  continue;
+               }
+               text += advance();
+            }
+
+            if (!closed)
+            {
+               error.severity = Severity::Error;
+               error.span = { tokenOffset, tokenLine, tokenCol, pos - tokenOffset };
+               error.message = "unterminated string literal";
+               return false;
+            }
+
+            Token tok;
+            tok.kind = TokenKind::String;
+            tok.span = { tokenOffset, tokenLine, tokenCol, pos - tokenOffset };
+            tok.text = text;
+            tokens.push_back(tok);
+            continue;
+         }
+
          // Comment: # to end of line
          if (c == '#')
          {

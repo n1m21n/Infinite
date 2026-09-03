@@ -1,8 +1,11 @@
 #include "FieldIR.h"
 #include "FieldSwizzle.h"
 #include "FieldCycles.h"
+#include "ExprGlobals.h"
 
+#include <cctype>
 #include <cmath>
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -133,6 +136,16 @@ namespace Field
          // inference (`c = vec3(1,0,0)` was rejected as "cannot assign vec3 to float").
          // The Assign lowering back-patches the symbol from the RHS and clears this.
          bool isProvisional = false;
+         // graph domain (step 10): bound by `name = emit(...)`. Handles carry
+         // no FieldType - `type` is unused when this is set.
+         bool isHandle = false;
+         // graph domain (step 10, doc §5.5.2/5.5.3): seeded from ExprGlobals
+         // rather than declared in the kernel. Only ever set inside
+         // LowerGraphProgramToIR, so a read-only-assignment hit against a
+         // symbol with this set can only happen in a graph kernel - safe to
+         // give it the globals-specific error message everywhere that check
+         // is made, without touching Element/Pixel/Sample lowering at all.
+         bool isGlobal = false;
       };
 
       struct ElementScope
@@ -141,6 +154,12 @@ namespace Field
          std::unordered_set<std::string> writtenStates;
          Domain targetDomain = Domain::Element;
          bool enforceDeclaration = false;
+         // graph domain (step 10, doc §5.3.2): incremented while lowering a
+         // for-loop body, so an Emit statement inside can require a key path
+         // - otherwise every iteration would collapse onto the same identity
+         // key. Domain-generic ElementScope carries it for free; every other
+         // domain's lowering never touches it.
+         int graphLoopDepth = 0;
 
          bool Has(const std::string& name) const
          {
@@ -178,6 +197,13 @@ namespace Field
             case AstKind::Literal:
             {
                auto lit = std::static_pointer_cast<AstLiteral>(ast);
+               if (lit->isString)
+               {
+                  error.severity = Severity::Error;
+                  error.span = lit->span;
+                  error.message = "a string literal is only valid as emit()'s first argument or set()'s second argument";
+                  return nullptr;
+               }
                auto ir = std::make_shared<IRNode>(IRKind::Literal, lit->span);
                ir->type = lit->isBool ? FieldType(DataType::Bool, 1) : FieldType(DataType::Float, 1);
                ir->domain = Domain::Graph;
@@ -211,6 +237,7 @@ namespace Field
                   ir->varName = id->name;
                   ir->type = sym->type;
                   ir->domain = sym->domain;
+                  ir->isHandle = sym->isHandle;
                   return ir;
                }
                else
@@ -1689,6 +1716,473 @@ namespace Field
             }
          }
       }
+
+      // graph domain (step 10): recursive statement lowering, structurally
+      // parallel to LowerAstStmt above but recursing into itself (not
+      // LowerAstStmt) so emit/connect/set/place are recognized at any
+      // nesting depth inside if/for. Reuses LowerAstExpr for ordinary
+      // expressions and ElementScope for locals - both are already
+      // domain-generic (Pixel reuses them the same way).
+      IRStmtPtr LowerGraphStmt(const AstNodePtr& ast, ElementScope& scope, FieldError& error)
+      {
+         if (!ast || !error.Empty()) return nullptr;
+
+         auto requireHandle = [&](const AstNodePtr& argAst, const char* who) -> IRNodePtr {
+            auto ir = LowerAstExpr(argAst, scope, error);
+            if (!ir) return nullptr;
+            if (!ir->isHandle)
+            {
+               error.severity = Severity::Error;
+               error.span = argAst->span;
+               error.message = std::string(who) + " expects a handle returned by emit() (hint: pass the variable emit()'s result was assigned to)";
+               return nullptr;
+            }
+            return ir;
+         };
+
+         auto requireLiteralString = [&](const AstNodePtr& argAst, const char* who) -> const std::string* {
+            if (argAst->kind != AstKind::Literal)
+            {
+               error.severity = Severity::Error;
+               error.span = argAst->span;
+               error.message = std::string(who) + " must be a literal string. Fix: pass a string literal like \"Wavetable\" directly.";
+               return nullptr;
+            }
+            auto lit = std::static_pointer_cast<AstLiteral>(argAst);
+            if (!lit->isString)
+            {
+               error.severity = Severity::Error;
+               error.span = argAst->span;
+               error.message = std::string(who) + " must be a literal string (got a number). Fix: pass a string literal like \"Wavetable\" directly.";
+               return nullptr;
+            }
+            return &lit->stringValue;
+         };
+
+         if (ast->kind == AstKind::Assign)
+         {
+            auto assign = std::static_pointer_cast<AstAssign>(ast);
+
+            // emit(): `name = emit("Type", k0, k1, ...)`
+            if (assign->op == "=" && assign->rvalue && assign->rvalue->kind == AstKind::Call &&
+                std::static_pointer_cast<AstCall>(assign->rvalue)->callee == "emit")
+            {
+               if (assign->lvalue->kind != AstKind::Ident)
+               {
+                  error.severity = Severity::Error;
+                  error.span = assign->lvalue->span;
+                  error.message = "emit()'s result must be assigned to a plain name, e.g. 'n = emit(\"Oscillator\", 0)'";
+                  return nullptr;
+               }
+               auto call = std::static_pointer_cast<AstCall>(assign->rvalue);
+               if (call->args.empty())
+               {
+                  error.severity = Severity::Error;
+                  error.span = call->span;
+                  error.message = "emit() expects at least 1 argument: emit(\"Type Name\", k0, k1, ...)";
+                  return nullptr;
+               }
+               const std::string* typeName = requireLiteralString(call->args[0], "emit()'s first argument (node type name)");
+               if (!typeName) return nullptr;
+
+               if (*typeName == "Group" || *typeName == "Field Graph")
+               {
+                  error.severity = Severity::Error;
+                  error.span = call->args[0]->span;
+                  error.message = "emit(\"" + *typeName + "\") is not allowed (doc §5.7.2/RATETEST: a graph kernel cannot emit a Group or another Field Graph node). Fix: emit ordinary leaf node types only.";
+                  return nullptr;
+               }
+
+               std::vector<IRNodePtr> keyArgs;
+               for (size_t i = 1; i < call->args.size(); ++i)
+               {
+                  auto kIR = LowerAstExpr(call->args[i], scope, error);
+                  if (!kIR) return nullptr;
+                  keyArgs.push_back(kIR);
+               }
+
+               if (scope.graphLoopDepth > 0 && keyArgs.empty())
+               {
+                  error.severity = Severity::Error;
+                  error.span = call->span;
+                  error.message = "emit(\"" + *typeName + "\") is inside a loop and has no key, so every iteration would name the same node. Fix: add the loop variable as a key, e.g. emit(\"" + *typeName + "\", i);";
+                  return nullptr;
+               }
+
+               std::string targetName = std::static_pointer_cast<AstIdent>(assign->lvalue)->name;
+               const VarSymbol* existing = scope.Find(targetName);
+               // doc §5.3.2: two distinct emit() statements must not target the
+               // same name, whether or not the earlier one was itself a handle -
+               // a second textually-distinct `osc = emit(...)` shadowing the
+               // first would silently orphan the first emit's identity key.
+               // (A single emit() statement re-run per loop iteration at
+               // *runtime* only ever reaches this compile-time check once, since
+               // loops aren't unrolled during lowering - so this can't fire on
+               // the doc's own keyed-loop pattern.)
+               if (existing && !existing->isProvisional)
+               {
+                  error.severity = Severity::Error;
+                  error.span = assign->lvalue->span;
+                  if (existing->isHandle)
+                     error.message = "two emit targets are both named '" + targetName + "'; each emit target must have its own name. Fix: give each emit target a unique variable name.";
+                  else
+                     error.message = "'" + targetName + "' is already declared as a non-handle value; emit()'s result needs its own name. Fix: give emit's target a distinct name.";
+                  return nullptr;
+               }
+
+               VarSymbol sym;
+               sym.name = targetName;
+               sym.domain = Domain::Graph;
+               sym.isHandle = true;
+               scope.Add(sym);
+
+               auto stmt = std::make_shared<IRStmt>(IRStmtKind::Emit, assign->span);
+               stmt->domain = Domain::Graph;
+               stmt->emitTargetName = targetName;
+               stmt->emitTypeName = *typeName;
+               stmt->emitKeyArgs = std::move(keyArgs);
+               return stmt;
+            }
+
+            // Ordinary local assignment (graph domain has no P/N/uv/Cd/attrib/state)
+            if (assign->lvalue->kind != AstKind::Ident)
+            {
+               error.severity = Severity::Error;
+               error.span = assign->lvalue->span;
+               error.message = "a graph kernel local must be a plain name (no swizzle targets)";
+               return nullptr;
+            }
+            auto id = std::static_pointer_cast<AstIdent>(assign->lvalue);
+            std::string targetName = id->name;
+            const VarSymbol* sym = scope.Find(targetName);
+            if (sym && sym->isProvisional) sym = nullptr;
+
+            FieldType lvalType;
+            Domain lvalDomain = Domain::Graph;
+            if (sym)
+            {
+               if (sym->isHandle)
+               {
+                  error.severity = Severity::Error;
+                  error.span = id->span;
+                  error.message = "'" + targetName + "' is a handle bound by emit(); it cannot be reassigned as an ordinary value";
+                  return nullptr;
+               }
+               if (sym->isReadOnly)
+               {
+                  error.severity = Severity::Error;
+                  error.span = id->span;
+                  // doc §5.5.3: writing a global would break ExprGlobals'
+                  // "a global can only reference globals above it" guarantee,
+                  // which is what makes a value cycle among globals
+                  // structurally impossible rather than something to detect
+                  // at runtime.
+                  if (sym->isGlobal)
+                     error.message = "a graph kernel cannot assign to the global '" + targetName +
+                        "'. Globals are evaluated top-down so that a cycle is structurally impossible; "
+                        "letting a kernel rewrite the list would break that. Fix: emit a node and set "
+                        "its param instead, or edit the global in the Globals window.";
+                  else
+                     error.message = "cannot assign to read-only variable '" + targetName + "'";
+                  return nullptr;
+               }
+               lvalType = sym->type;
+               lvalDomain = sym->domain;
+            }
+            else if (assign->op != "=")
+            {
+               error.severity = Severity::Error;
+               error.span = id->span;
+               error.message = "use of undeclared identifier '" + targetName + "'";
+               return nullptr;
+            }
+            else
+            {
+               lvalType = FieldType(DataType::Void, 0);
+            }
+
+            auto rhsIR = LowerAstExpr(assign->rvalue, scope, error);
+            if (!rhsIR) return nullptr;
+            if (rhsIR->isHandle)
+            {
+               error.severity = Severity::Error;
+               error.span = assign->rvalue->span;
+               error.message = "a handle can only be bound directly by 'name = emit(...)', not copied to another name";
+               return nullptr;
+            }
+
+            if (lvalType.kind == DataType::Void)
+            {
+               lvalType = rhsIR->type;
+               lvalDomain = rhsIR->domain;
+               VarSymbol newSym;
+               newSym.name = targetName;
+               newSym.type = lvalType;
+               newSym.domain = lvalDomain;
+               scope.Add(newSym);
+            }
+            else if (assign->op == "=")
+            {
+               if (lvalType != rhsIR->type && rhsIR->type.lanes != 1)
+               {
+                  error.severity = Severity::Error;
+                  error.span = assign->span;
+                  error.message = "cannot assign " + std::string(rhsIR->type.ToString()) +
+                                  " to " + std::string(lvalType.ToString()) +
+                                  " (hint: broadcast goes scalar to vector only)";
+                  return nullptr;
+               }
+            }
+            else
+            {
+               FieldType resType;
+               std::string rErr;
+               if (!JoinRank(lvalType, rhsIR->type, resType, rErr))
+               {
+                  error.severity = Severity::Error;
+                  error.span = assign->span;
+                  error.message = rErr;
+                  return nullptr;
+               }
+            }
+
+            bool compatible = true;
+            Domain stmtDomain = JoinDomains(lvalDomain, rhsIR->domain, compatible);
+            if (!compatible)
+            {
+               error = MakeIncomparableDomainError(lvalDomain, assign->lvalue->span, rhsIR->domain, assign->rvalue->span, "assignment to '" + targetName + "'");
+               return nullptr;
+            }
+
+            auto stmt = std::make_shared<IRStmt>(IRStmtKind::Assign, assign->span);
+            stmt->domain = stmtDomain;
+            stmt->assignTarget = targetName;
+            stmt->assignOp = assign->op;
+            stmt->rvalueExpr = rhsIR;
+            return stmt;
+         }
+
+         if (ast->kind == AstKind::Call)
+         {
+            auto call = std::static_pointer_cast<AstCall>(ast);
+
+            if (call->callee == "connect")
+            {
+               if (call->args.size() != 4)
+               {
+                  error.severity = Severity::Error;
+                  error.span = call->span;
+                  error.message = "connect() expects 4 arguments: connect(srcHandle, srcSlot, dstHandle, dstSlot)";
+                  return nullptr;
+               }
+               auto srcIR = requireHandle(call->args[0], "connect()'s source argument");
+               if (!srcIR) return nullptr;
+               auto srcSlotIR = LowerAstExpr(call->args[1], scope, error);
+               if (!srcSlotIR) return nullptr;
+               auto dstIR = requireHandle(call->args[2], "connect()'s destination argument");
+               if (!dstIR) return nullptr;
+               auto dstSlotIR = LowerAstExpr(call->args[3], scope, error);
+               if (!dstSlotIR) return nullptr;
+
+               auto stmt = std::make_shared<IRStmt>(IRStmtKind::Connect, call->span);
+               stmt->domain = Domain::Graph;
+               stmt->connectSrc = srcIR;
+               stmt->connectSrcSlot = srcSlotIR;
+               stmt->connectDst = dstIR;
+               stmt->connectDstSlot = dstSlotIR;
+               return stmt;
+            }
+
+            if (call->callee == "set")
+            {
+               if (call->args.size() != 3)
+               {
+                  error.severity = Severity::Error;
+                  error.span = call->span;
+                  error.message = "set() expects 3 arguments: set(handle, \"paramName\", value)";
+                  return nullptr;
+               }
+               auto targetIR = requireHandle(call->args[0], "set()'s target argument");
+               if (!targetIR) return nullptr;
+               const std::string* paramName = requireLiteralString(call->args[1], "set()'s second argument (param name)");
+               if (!paramName) return nullptr;
+               auto valueIR = LowerAstExpr(call->args[2], scope, error);
+               if (!valueIR) return nullptr;
+
+               auto stmt = std::make_shared<IRStmt>(IRStmtKind::SetParam, call->span);
+               stmt->domain = Domain::Graph;
+               stmt->setTarget = targetIR;
+               stmt->setParamName = *paramName;
+               stmt->setValue = valueIR;
+               return stmt;
+            }
+
+            if (call->callee == "place")
+            {
+               if (call->args.size() != 3)
+               {
+                  error.severity = Severity::Error;
+                  error.span = call->span;
+                  error.message = "place() expects 3 arguments: place(handle, x, y)";
+                  return nullptr;
+               }
+               auto targetIR = requireHandle(call->args[0], "place()'s target argument");
+               if (!targetIR) return nullptr;
+               auto xIR = LowerAstExpr(call->args[1], scope, error);
+               if (!xIR) return nullptr;
+               auto yIR = LowerAstExpr(call->args[2], scope, error);
+               if (!yIR) return nullptr;
+
+               auto stmt = std::make_shared<IRStmt>(IRStmtKind::Place, call->span);
+               stmt->domain = Domain::Graph;
+               stmt->placeTarget = targetIR;
+               stmt->placeX = xIR;
+               stmt->placeY = yIR;
+               return stmt;
+            }
+         }
+
+         if (ast->kind == AstKind::If)
+         {
+            auto ifAst = std::static_pointer_cast<AstIf>(ast);
+            auto condIR = LowerAstExpr(ifAst->cond, scope, error);
+            if (!condIR) return nullptr;
+            if (condIR->type.kind != DataType::Bool)
+            {
+               error.severity = Severity::Error;
+               error.span = ifAst->cond->span;
+               error.message = "if condition must be a bool expression (got " + std::string(condIR->type.ToString()) + ")";
+               return nullptr;
+            }
+            if (condIR->domain != Domain::Graph)
+            {
+               error.severity = Severity::Error;
+               error.span = ifAst->cond->span;
+               error.message = "if condition must be a compile-time (graph-domain) value (graph domain has no coarser domain to fall back to)";
+               return nullptr;
+            }
+
+            auto lowerBlock = [&](const AstNodePtr& blockAst, std::vector<IRStmtPtr>& out) -> bool {
+               if (!blockAst) return true;
+               if (blockAst->kind == AstKind::Block)
+               {
+                  auto blk = std::static_pointer_cast<AstBlock>(blockAst);
+                  for (const auto& s : blk->statements)
+                  {
+                     auto irS = LowerGraphStmt(s, scope, error);
+                     if (!irS) return false;
+                     out.push_back(irS);
+                  }
+               }
+               else
+               {
+                  auto irS = LowerGraphStmt(blockAst, scope, error);
+                  if (!irS) return false;
+                  out.push_back(irS);
+               }
+               return true;
+            };
+
+            std::vector<IRStmtPtr> thenStmts, elseStmts;
+            if (!lowerBlock(ifAst->thenBlock, thenStmts)) return nullptr;
+            if (!lowerBlock(ifAst->elseBlock, elseStmts)) return nullptr;
+
+            auto stmt = std::make_shared<IRStmt>(IRStmtKind::If, ifAst->span);
+            stmt->domain = condIR->domain;
+            stmt->ifCond = condIR;
+            stmt->thenStmts = std::move(thenStmts);
+            stmt->elseStmts = std::move(elseStmts);
+
+            // emit() IS allowed inside if - it is the sanctioned way to make
+            // a kernel's node count depend on a param (doc §5.1/T5: a
+            // param-dependent *loop bound* is refused because it makes the
+            // plan unbounded, but "literal bound + if guard" is the doc's
+            // own prescribed fix, used throughout its worked examples). The
+            // if's condition is already required to be graph-domain (checked
+            // above), and each emit's key path is still the loop variable,
+            // so the if does not make any key non-statically-enumerable -
+            // it only decides, per key, whether that iteration's emit runs.
+            return stmt;
+         }
+
+         if (ast->kind == AstKind::For)
+         {
+            auto forAst = std::static_pointer_cast<AstFor>(ast);
+
+            IRStmtPtr initStmt = nullptr;
+            if (forAst->init)
+            {
+               initStmt = LowerGraphStmt(forAst->init, scope, error);
+               if (!initStmt) return nullptr;
+            }
+
+            IRNodePtr condIR = nullptr;
+            if (forAst->cond)
+            {
+               condIR = LowerAstExpr(forAst->cond, scope, error);
+               if (!condIR) return nullptr;
+            }
+
+            IRStmtPtr stepStmt = nullptr;
+            if (forAst->step)
+            {
+               stepStmt = LowerGraphStmt(forAst->step, scope, error);
+               if (!stepStmt) return nullptr;
+            }
+
+            std::vector<IRStmtPtr> bodyStmts;
+            if (forAst->body)
+            {
+               struct LoopDepthGuard
+               {
+                  int& depth;
+                  LoopDepthGuard(int& d) : depth(d) { depth++; }
+                  ~LoopDepthGuard() { depth--; }
+               } guard(scope.graphLoopDepth);
+
+               if (forAst->body->kind == AstKind::Block)
+               {
+                  auto blk = std::static_pointer_cast<AstBlock>(forAst->body);
+                  for (const auto& s : blk->statements)
+                  {
+                     auto irS = LowerGraphStmt(s, scope, error);
+                     if (!irS) return nullptr;
+                     bodyStmts.push_back(irS);
+                  }
+               }
+               else
+               {
+                  auto irS = LowerGraphStmt(forAst->body, scope, error);
+                  if (!irS) return nullptr;
+                  bodyStmts.push_back(irS);
+               }
+            }
+
+            auto stmt = std::make_shared<IRStmt>(IRStmtKind::For, forAst->span);
+            stmt->domain = Domain::Graph;
+            stmt->forInit = initStmt;
+            stmt->forCond = condIR;
+            stmt->forStep = stepStmt;
+            stmt->forBody = std::move(bodyStmts);
+
+            // emit() inside for IS the doc's canonical pattern (§5.1's worked
+            // example: `for (i = 0; i < 8; i++) { if (i < voices) { osc =
+            // emit("Wavetable", i) ... } } }`), not something to refuse. What
+            // §5.3.2 actually refuses is narrower and already enforced at
+            // the Emit case itself: an emit with no key path inside a loop,
+            // or a key path that is not the loop variable (both would make
+            // every iteration collapse onto the same key). The loop bound
+            // being a literal constant (checked above) is what keeps the
+            // key set statically enumerable - the loop body's shape doesn't
+            // need any further restriction.
+            return stmt;
+         }
+
+         error.severity = Severity::Error;
+         error.span = ast->span;
+         error.message = "unsupported statement in graph kernel (only assignment, if, for, emit()/connect()/set()/place() are allowed - no attrib/state/map)";
+         return nullptr;
+      }
    }
 
    bool LowerAstToIR(const AstNodePtr& ast, IRNodePtr& outIR, FieldError& outError)
@@ -2541,6 +3035,271 @@ namespace Field
          }
       }
 
+      return true;
+   }
+
+   namespace
+   {
+      // Phase 2 (step 10 doc §5.2): walks down from a non-Graph-domain node
+      // to the leaf (Variable/StateRead) responsible, so the error names the
+      // actual offending identifier rather than "some expression somewhere".
+      bool FindNonGraphLeaf(const IRNodePtr& node, std::string& outName, Domain& outDomain)
+      {
+         if (!node || node->domain == Domain::Graph) return false;
+
+         if (node->kind == IRKind::Variable || node->kind == IRKind::StateRead)
+         {
+            outName = node->varName.empty() ? "<value>" : node->varName;
+            outDomain = node->domain;
+            return true;
+         }
+         for (const auto& c : node->children)
+         {
+            if (FindNonGraphLeaf(c, outName, outDomain)) return true;
+         }
+         if (node->kind == IRKind::Call)
+         {
+            outName = node->callee.empty() ? "<call>" : (node->callee + "()");
+            outDomain = node->domain;
+            return true;
+         }
+         outName = "<expression>";
+         outDomain = node->domain;
+         return true;
+      }
+
+      bool CheckArgIsRateZero(const IRNodePtr& node, const std::string& where, FieldError& outError)
+      {
+         if (!node || node->domain == Domain::Graph) return true;
+
+         std::string leafName;
+         Domain leafDomain = Domain::Graph;
+         FindNonGraphLeaf(node, leafName, leafDomain);
+
+         outError.severity = Severity::Error;
+         outError.span = node->span;
+         outError.message = where + " must be a compile-time (graph-domain) value, but '" + leafName +
+                             "' is " + DomainToString(leafDomain) + "-domain. Fix: the graph kernel runs once "
+                             "at edit time and cannot read a per-frame/per-element/per-pixel/per-sample value - "
+                             "hoist a graph-domain param or literal instead.";
+         return false;
+      }
+
+      bool CheckGraphStmtRateZero(const IRStmtPtr& s, FieldError& outError)
+      {
+         if (!s) return true;
+
+         switch (s->kind)
+         {
+            case IRStmtKind::Emit:
+               for (const auto& k : s->emitKeyArgs)
+                  if (!CheckArgIsRateZero(k, "emit()'s identity-key argument", outError)) return false;
+               return true;
+            case IRStmtKind::Connect:
+               if (!CheckArgIsRateZero(s->connectSrcSlot, "connect()'s source slot", outError)) return false;
+               if (!CheckArgIsRateZero(s->connectDstSlot, "connect()'s destination slot", outError)) return false;
+               return true;
+            case IRStmtKind::SetParam:
+               if (!CheckArgIsRateZero(s->setValue, "set()'s value argument", outError)) return false;
+               return true;
+            case IRStmtKind::Place:
+               if (!CheckArgIsRateZero(s->placeX, "place()'s x argument", outError)) return false;
+               if (!CheckArgIsRateZero(s->placeY, "place()'s y argument", outError)) return false;
+               return true;
+            case IRStmtKind::If:
+               if (!CheckArgIsRateZero(s->ifCond, "if condition", outError)) return false;
+               for (const auto& t : s->thenStmts) if (!CheckGraphStmtRateZero(t, outError)) return false;
+               for (const auto& e : s->elseStmts) if (!CheckGraphStmtRateZero(e, outError)) return false;
+               return true;
+            case IRStmtKind::For:
+               if (!CheckArgIsRateZero(s->forCond, "loop bound", outError)) return false;
+               for (const auto& b : s->forBody) if (!CheckGraphStmtRateZero(b, outError)) return false;
+               return true;
+            case IRStmtKind::Assign:
+               // Deviation from the doc's "only rate-critical uses are
+               // checked" design: every local in a graph kernel is required
+               // to be Graph-domain, full stop. The kernel is edit-time-only
+               // interpreted code with no per-frame/element/pixel/sample
+               // value available to read, so a local that picked up a finer
+               // domain (e.g. `x = t`) can never be given a real value at
+               // interpret time - better to reject it here, at the point of
+               // assignment, than defer to a confusing failure (or a silent
+               // placeholder, which rule 0.4 forbids) if it's ever read.
+               if (!CheckArgIsRateZero(s->rvalueExpr, "a graph kernel local", outError)) return false;
+               return true;
+            case IRStmtKind::Expr:
+               if (!CheckArgIsRateZero(s->expr, "a graph kernel expression", outError)) return false;
+               return true;
+            default:
+               return true;
+         }
+      }
+   }
+
+   bool LowerGraphProgramToIR(const AstNodePtr& ast, GraphIRProgram& outProgram, FieldError& outError)
+   {
+      outError.Clear();
+      outProgram = GraphIRProgram{};
+
+      if (!ast)
+      {
+         outError.severity = Severity::Error;
+         outError.message = "empty program";
+         return false;
+      }
+
+      ElementScope scope;
+      scope.targetDomain = Domain::Graph;
+      scope.enforceDeclaration = false;
+
+      // Seed reserved words of every other domain, purely so a graph kernel
+      // that references them gets the leaf-naming rate-zero error from the
+      // Phase 2 walk below instead of a confusing "undeclared identifier".
+      {
+         auto addSym = [&](const std::string& name, FieldType type, Domain dom) {
+            VarSymbol sym;
+            sym.name = name;
+            sym.type = type;
+            sym.domain = dom;
+            sym.isReserved = true;
+            sym.isReadOnly = true;
+            scope.Add(sym);
+         };
+         addSym("t", FieldType(DataType::Float, 1), Domain::Frame);
+         addSym("dt", FieldType(DataType::Float, 1), Domain::Frame);
+         addSym("frame", FieldType(DataType::Float, 1), Domain::Frame);
+         addSym("count", FieldType(DataType::Int, 1), Domain::Frame);
+         addSym("P", FieldType(DataType::Vec3, 3), Domain::Element);
+         addSym("N", FieldType(DataType::Vec3, 3), Domain::Element);
+         addSym("Cd", FieldType(DataType::Vec3, 3), Domain::Element);
+         addSym("i", FieldType(DataType::Int, 1), Domain::Element);
+         addSym("uv", FieldType(DataType::Vec2, 2), Domain::Pixel);
+         addSym("col", FieldType(DataType::Vec3, 3), Domain::Pixel);
+         addSym("in", FieldType(DataType::Float, 1), Domain::Sample);
+         addSym("out", FieldType(DataType::Float, 1), Domain::Sample);
+         addSym("sr", FieldType(DataType::Float, 1), Domain::Sample);
+         addSym("n", FieldType(DataType::Float, 1), Domain::Sample);
+      }
+
+      // doc §5.5.2: a graph kernel may read a global, but only one whose
+      // expression is constant-foldable (no t/rand/noise/sh, and every
+      // global it references is itself graph-domain) - otherwise it is
+      // frame-domain and reading it from a rate-zero kernel is the same
+      // violation as reading `t` directly, caught by the same Phase 2 walk
+      // below. ExprGlobals' own evaluation order guarantees a global can
+      // only reference globals *above* it in the list, so one forward pass
+      // is a complete fixpoint - no cycle handling needed.
+      {
+         std::unordered_set<std::string> frameDomainGlobals;
+         for (const auto& g : ExprGlobals::All())
+         {
+            bool isFrameDomain = false;
+            size_t i = 0;
+            while (i < g.expr.size())
+            {
+               if (std::isalpha((unsigned char)g.expr[i]) || g.expr[i] == '_')
+               {
+                  size_t start = i;
+                  while (i < g.expr.size() && (std::isalnum((unsigned char)g.expr[i]) || g.expr[i] == '_')) i++;
+                  std::string token = g.expr.substr(start, i - start);
+                  if (token == "t" || token == "rand" || token == "noise" || token == "sh" ||
+                      frameDomainGlobals.count(token))
+                  {
+                     isFrameDomain = true;
+                     break;
+                  }
+               }
+               else
+               {
+                  i++;
+               }
+            }
+            if (isFrameDomain)
+               frameDomainGlobals.insert(g.name);
+
+            VarSymbol sym;
+            sym.name = g.name;
+            sym.type = FieldType(DataType::Float, 1);
+            sym.domain = isFrameDomain ? Domain::Frame : Domain::Graph;
+            sym.isReadOnly = true;
+            sym.isGlobal = true;
+            scope.Add(sym);
+         }
+      }
+
+      std::vector<AstNodePtr> stmts;
+      if (ast->kind == AstKind::Program)
+      {
+         auto progAst = std::static_pointer_cast<AstProgram>(ast);
+         stmts = progAst->statements;
+      }
+      else
+      {
+         stmts.push_back(ast);
+      }
+
+      std::vector<IRStmtPtr> irStmts;
+      for (const auto& s : stmts)
+      {
+         if (s->kind == AstKind::DeclParam)
+         {
+            auto dp = std::static_pointer_cast<AstDeclParam>(s);
+            if (scope.Has(dp->name) && scope.Find(dp->name) && !scope.Find(dp->name)->isReserved)
+            {
+               outError.severity = Severity::Error;
+               outError.span = dp->span;
+               outError.message = "duplicate declaration of param '" + dp->name + "'";
+               return false;
+            }
+
+            DeclaredParam p;
+            p.name = dp->name;
+            p.typeName = dp->typeName.empty() ? "float" : dp->typeName;
+            p.defaultValue = dp->defaultValue;
+            p.minValue = dp->minVal;
+            p.maxValue = dp->maxVal;
+            outProgram.declaredParams.push_back(p);
+
+            VarSymbol sym;
+            sym.name = dp->name;
+            sym.type = FieldType(DataType::Float, 1);
+            sym.domain = Domain::Graph;
+            sym.isParam = true;
+            sym.isReadOnly = true;
+            scope.Add(sym);
+            continue;
+         }
+
+         if (s->kind == AstKind::DeclAttrib || s->kind == AstKind::DeclState)
+         {
+            outError.severity = Severity::Error;
+            outError.span = s->span;
+            outError.message = "attrib/state declarations are not allowed in the graph domain (the kernel runs once at edit time - there is no per-frame or per-element loop to hold state across)";
+            return false;
+         }
+
+         if (s->kind == AstKind::Map)
+         {
+            outError.severity = Severity::Error;
+            outError.span = s->span;
+            outError.message = "map() is not allowed in the graph domain; use 'for' with a compile-time-constant bound instead";
+            return false;
+         }
+
+         auto irS = LowerGraphStmt(s, scope, outError);
+         if (!irS) return false;
+         irStmts.push_back(irS);
+      }
+
+      // Phase 2 (doc §5.2): rate-zero enforcement, one walk after the whole
+      // program's domains are settled.
+      for (const auto& s : irStmts)
+      {
+         if (!CheckGraphStmtRateZero(s, outError))
+            return false;
+      }
+
+      outProgram.statements = std::move(irStmts);
       return true;
    }
 }

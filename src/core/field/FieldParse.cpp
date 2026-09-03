@@ -140,6 +140,14 @@ namespace Field
             return std::make_shared<AstLiteral>(numTok.numberValue, numTok.span);
          }
 
+         // String literal (D7, step 10): only legal as emit()'s first arg or
+         // set()'s second arg - checked during graph-program lowering.
+         if (tok.kind == TokenKind::String)
+         {
+            Token strTok = p.Advance();
+            return std::make_shared<AstLiteral>(strTok.text, strTok.span, true);
+         }
+
          // Boolean keyword literal: true / false
          if (tok.kind == TokenKind::Keyword && (tok.text == "true" || tok.text == "false"))
          {

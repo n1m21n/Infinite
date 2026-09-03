@@ -234,6 +234,9 @@ set(COMMON_SOURCES
     src/core/field/Transfer.cpp
     src/core/field/ReduceOps.cpp
     src/core/field/BackendRegister.cpp
+    src/core/field/FieldGraphKernel.cpp
+    src/core/field/FieldGraphReconciler.cpp
+    src/core/field/FieldGraphOwnership.cpp
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp
@@ -312,6 +315,7 @@ set(COMMON_SOURCES
     src/nodes/FieldElementNode.cpp
     src/nodes/FieldSampleNode.cpp
     src/nodes/FieldPixelNode.cpp
+    src/nodes/FieldGraphNode.cpp
     src/nodes/PointDistributionNodes.cpp
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp

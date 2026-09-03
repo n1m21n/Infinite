@@ -42,11 +42,19 @@ namespace Field
       double numberValue = 0.0;
       bool isBool = false;
       bool boolValue = false;
+      // D7 (step 10, graph domain): a quoted string literal. Only legal as
+      // emit()'s first argument or set()'s second argument - enforced during
+      // graph-program lowering, not at parse time (mirrors how e.g.
+      // downsample()'s literal-only factor argument is enforced).
+      bool isString = false;
+      std::string stringValue;
 
       AstLiteral(double val, SourceSpan sp = {})
          : AstNode(AstKind::Literal, sp), numberValue(val) {}
       AstLiteral(bool b, SourceSpan sp = {})
          : AstNode(AstKind::Literal, sp), isBool(true), boolValue(b), numberValue(b ? 1.0 : 0.0) {}
+      AstLiteral(std::string s, SourceSpan sp, bool /*stringTag*/)
+         : AstNode(AstKind::Literal, sp), isString(true), stringValue(std::move(s)) {}
    };
 
    struct AstIdent : public AstNode
