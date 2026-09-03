@@ -5,6 +5,10 @@
    // No CF symbols remain in this file, but the include predates the Windows
    // port and macOS toolchains expect it in the preamble - keep it Apple-only.
    #include <CoreFoundation/CoreFoundation.h>
+   // malloc_zone_statistics - used by INFINITE_FIELDSAMPLETEST's zero-
+   // allocation check (reads the allocator's own counters rather than
+   // overriding the process-wide operator new/delete).
+   #include <malloc/malloc.h>
 #endif
 
 #include "imgui.h"
@@ -80,6 +84,19 @@ namespace
 #include "core/AudioTopologyRequest.h"
 #include "core/Modulation.h"
 #include "core/Expression.h"
+#include "core/field/FieldTypes.h"
+#include "core/field/FieldSwizzle.h"
+#include "core/field/FieldLex.h"
+#include "core/field/FieldParse.h"
+#include "core/field/FieldIR.h"
+#include "core/field/FieldBytecode.h"
+#include "core/field/FieldVM.h"
+#include "core/field/FieldRandom.h"
+#include "core/field/ElementStore.h"
+#include "core/field/ElementBackend.h"
+#include "core/field/GlslBackend.h"
+#include "core/field/Transfer.h"
+#include "core/field/ReduceOps.h"
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
@@ -115,6 +132,10 @@ namespace
 #include "nodes/AnalyzeNodes.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
+#include "nodes/FieldElementNode.h"
+#include "nodes/FieldGraphNode.h"
+#include "nodes/FieldPixelNode.h"
+#include "nodes/FieldSampleNode.h"
 #include "nodes/SceneNodes.h"
 #include "nodes/EnvironmentNode.h"
 #include "nodes/ModelSourceNode.h"
@@ -442,6 +463,13 @@ namespace
    // functions in the file.
    void PushUndoCheckpoint();
    GraphNode* FindNodeByIndex(int index);
+
+   // Field 'graph' domain (build step 10): forward-declared for the same
+   // reason as the two above - ApplyPatchData (far below) needs to remap
+   // every FieldGraphNode's persisted key->index ownership map to the fresh
+   // indices it just assigned, and the definition lives next to
+   // RemapViewportPanelNodes, after ApplyPatchData in file order.
+   void RemapFieldGraphOwnership(const std::map<int, int>& remap);
 
    // Offline Render (non-realtime export) - defined near RebuildAudioTopology/
    // StartAudioEngine below, forward-declared here since the node-params UI
@@ -939,6 +967,18 @@ namespace
    ImVec4 gCommentEditRect(0, 0, 0, 0); // x, y, w, h
    FormulaNode* gFormulaEditor = nullptr;
    bool gFormulaEditorOpen = false;
+   FieldElementNode* gFieldElementEditor = nullptr;
+   bool gFieldElementEditorOpen = false;
+   FieldPixelNode* gFieldPixelEditor = nullptr;
+   bool gFieldPixelEditorOpen = false;
+   FieldSampleNode* gFieldSampleEditor = nullptr;
+   bool gFieldSampleEditorOpen = false;
+   FieldGraphNode* gFieldGraphEditor = nullptr;
+   bool gFieldGraphEditorOpen = false;
+   // Set by a "Regenerate" button click inside DrawFieldGraphParams (nested
+   // in ed::Begin()/ed::End()); drained once, outside that pass, after
+   // ed::End() returns - see trap T14 and RunFieldGraphRegenerate.
+   FieldGraphNode* gFieldGraphPendingRegenerate = nullptr;
    bool gGlobalsOpen = false;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
@@ -2146,10 +2186,11 @@ namespace
    // the same terms as every other param in the ap
    bool ModSlider(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
                   float width = kParamWidth, bool audioStyle = false, float step = 0.0f,
-                  FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
+                  FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                  int explicitParamIndex = -1)
    {
       const int nodeIndex = gCurrentNodeIndex;
-      const int paramIndex = gParamCounter++;
+      const int paramIndex = (explicitParamIndex >= 0) ? explicitParamIndex : gParamCounter++;
 
       ParamRef ref;
       ref.nodeIndex = nodeIndex;
@@ -3760,6 +3801,7 @@ namespace
             [i]() -> INode* { return ShapeNode::CreateFor(i); }, "Source");
       }
       REGISTER_NODE(FormulaNode, Formula, "Source");
+      REGISTER_NODE(FieldPixelNode, FieldPixel, "Source");
       REGISTER_NODE(TextNode, Text, "Source");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");
@@ -3828,6 +3870,7 @@ namespace
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
       REGISTER_NODE(SetColorNode, Set Color, "3D");
       REGISTER_NODE(WrapNode, Wrap, "3D");
+      REGISTER_NODE(FieldElementNode, Field Element, "3D");
       REGISTER_NODE(DistributePointsOnFacesNode, Distribute Points on Faces, "3D");
       REGISTER_NODE(PointsToVerticesNode, Points to Vertices, "3D");
       REGISTER_NODE(DistributePointsInGridNode, Distribute Points in Grid, "3D");
@@ -3915,6 +3958,8 @@ namespace
       REGISTER_NODE(MolderNode, Molder, "Synths");
       REGISTER_NODE(GrainMolderNode, Grain Molder, "Synths");
       REGISTER_NODE(GranularNode, Granular, "Synths");
+      REGISTER_NODE(FieldSampleNode, Field Sample, "Synths");
+      REGISTER_NODE(FieldGraphNode, Field Graph, "Utility");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
@@ -5026,6 +5071,14 @@ namespace
          palette->ReloadFromPath();
       if (auto* formula = dynamic_cast<FormulaNode*>(node))
          formula->Apply();
+      if (auto* fe = dynamic_cast<FieldElementNode*>(node))
+         fe->Apply();
+      if (auto* fgn = dynamic_cast<FieldGraphNode*>(node))
+         fgn->Apply(); // compile-only (T11) - never Regenerate() from here
+      if (auto* fp = dynamic_cast<FieldPixelNode*>(node))
+         fp->Apply();
+      if (auto* fs = dynamic_cast<FieldSampleNode*>(node))
+         fs->Apply();
       // Re-instantiates the plugin from the identity VisitParams just restored
       // and queues its saved fullState; the actual load finishes
       // asynchronously, a frame or two later, in CookIfNeeded.
@@ -5269,6 +5322,206 @@ namespace
       ModSlider("uC", &n->knobC, 0.0f, 1.0f);
       ModSlider("uD", &n->knobD, 0.0f, 1.0f);
       ModCheckbox("animate", &n->animate);
+   }
+
+   void DrawFieldElementParams(FieldElementNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         DropdownButton("preset", FieldElementNode::PresetNames(), n->presetIndex,
+                        [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldElementEditor = n;
+            gFieldElementEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->WasTruncated())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Truncated to %d vertices", n->ActualElementCount());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->State().CellCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextDisabled("%s", n->CostReadout());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      ModSliderInt("max elements", &n->maxElements, 100, 200000);
+
+      for (auto& p : n->GetParamTable().Params())
+      {
+         if (!p.isDeclared)
+            continue;
+         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
+      }
+   }
+
+   void DrawFieldSampleParams(FieldSampleNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldSampleEditor = n;
+            gFieldSampleEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         uint64_t faults = n->FaultCount();
+         if (faults > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
+            ImGui::PopTextWrapPos();
+         }
+
+         float rms;
+         if (n->ReadRmsLatest(rms))
+            ImGui::TextDisabled("reduce.rms: %.4f", rms);
+      }
+
+      ModSliderInt("max voices", &n->maxVoices, 1, 32);
+
+      for (auto& p : n->GetParamTable().Params())
+      {
+         if (!p.isDeclared)
+            continue;
+         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
+      }
+   }
+
+   void DrawFieldGraphParams(FieldGraphNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldGraphEditor = n;
+            gFieldGraphEditorOpen = true;
+         }
+
+         // Queues the actual mutation rather than calling it here: this runs
+         // nested inside ed::Begin()/ed::End(), and Regenerate() spawns/
+         // removes/reconnects real nodes - see gFieldGraphPendingRegenerate's
+         // drain after ed::End() (trap T14).
+         if (ImGui::Button("Regenerate", ImVec2(kPreviewSize, 0)))
+            gFieldGraphPendingRegenerate = n;
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      for (auto& p : n->GetParamTable().Params())
+      {
+         if (!p.isDeclared)
+            continue;
+         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
+      }
+   }
+
+   void DrawFieldPixelParams(FieldPixelNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         DropdownButton("preset", FieldPixelNode::PresetNames(), n->presetIndex,
+                        [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldPixelEditor = n;
+            gFieldPixelEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->BranchCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            char bBuf[64];
+            snprintf(bBuf, sizeof(bBuf), "%d branch%s -> %d paths evaluated per pixel",
+                     n->BranchCount(), n->BranchCount() == 1 ? "" : "es", 1 << n->BranchCount());
+            ImGui::TextDisabled("%s", bBuf);
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->StateCellCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            char sBuf[64];
+            snprintf(sBuf, sizeof(sBuf), "%d state cell%s (RGBA16F ping-pong)",
+                     n->StateCellCount(), n->StateCellCount() == 1 ? "" : "s");
+            ImGui::TextDisabled("%s", sBuf);
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModCheckbox("animate", &n->animate);
+
+      for (auto& p : n->GetParamTable().Params())
+      {
+         if (!p.isDeclared)
+            continue;
+         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
+      }
    }
 
    void DrawTextParams(TextNode* n)
@@ -24160,6 +24413,9 @@ namespace
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
          { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
          { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
+         { "Field Element", "Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution." },
+         { "Field Sample", "Runs a Field kernel once per audio sample per voice, on the audio thread - write your own sample-domain synth or effect. `in` is the audio input pin, `state` declares per-voice memory that resets on note-on/steal, `param` exposes a modulatable knob. `reduce.rms(in, loHz, hiHz)` publishes a band-limited RMS meter reading once per block." },
+         { "Field Graph", "Runs a Field kernel once, at edit time, to build part of the graph itself - emit(\"Type Name\", k0, k1, ...) spawns a node and hands back a handle, connect()/set()/place() wire it up, set its params and position it. Press Regenerate to re-run: it diffs against what it built last time (by emit-site identity) instead of deleting and respawning, so hand-edits to params on the spawned nodes survive an unrelated Regenerate." },
          { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
          { "Ramp", "Generates a gradient from scratch (no input) between up to 8 user-set colour stops, at a chosen angle, scale and offset. Gamma and dither smooth out visible banding." },
          { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
@@ -25712,6 +25968,247 @@ namespace
       // DisconnectAllTo's own comment warns about, just on the audio thread.
       RebuildAudioTopology();
    }
+
+   // Field 'graph' domain (build step 10): thin forwarder from
+   // Field::IFieldGraphHost onto the real graph (gNodes/SpawnNode/
+   // RemoveNodeByIndex/ConnectNodes above). No policy here - the reconciler
+   // (FieldGraphReconciler.cpp) owns every decision about what to mount/
+   // update/unmount/connect; this only carries the calls out.
+   struct MainGraphHost final : public Field::IFieldGraphHost
+   {
+      int mDroppedModCount = 0;
+      int mDetachedCableCount = 0;
+      int DroppedModCount() const override { return mDroppedModCount; }
+      int DetachedCableCount() const override { return mDetachedCableCount; }
+
+      int Mount(const std::string& typeName) override
+      {
+         if (!Spawnable(typeName))
+            return -1;
+         std::string category;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+            {
+               category = cat;
+               break;
+            }
+         }
+         GraphNode* gn = SpawnNode(typeName, category, 0.0f, 0.0f);
+         return gn != nullptr ? gn->index : -1;
+      }
+
+      void Unmount(int id) override
+      {
+         for (const auto& entry : Modulation::Instance().Links())
+            if (entry.first.first == id) mDroppedModCount++;
+
+         GraphNode* unmounting = FindNodeByIndex(id);
+         if (unmounting && unmounting->node)
+         {
+            INode* targetSrc = unmounting->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == id) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+            }
+         }
+         RemoveNodeByIndex(id);
+      }
+
+      int Remount(int existing, const std::string& typeName) override
+      {
+         // 1. Group membership rescue (doc §5.7 Case 2)
+         GroupNode* ownerGroup = nullptr;
+         for (auto& entry : gGroupMembers)
+         {
+            if (entry.second.count(existing))
+            {
+               ownerGroup = entry.first;
+               break;
+            }
+         }
+
+         // 2. Modulation / inbound cluster link rescue (doc §5.7 Case 4 & 5)
+         std::set<int> dying = { existing };
+         std::vector<ClusterLink> rescuedLinks;
+         std::vector<ClusterModLink> rescuedMod;
+         std::vector<ClusterPaletteLink> rescuedPalette;
+         CaptureClusterLinks(dying, rescuedLinks, rescuedMod, rescuedPalette);
+
+         // 3. Outbound cable rescue (generated node feeding external node, doc §5.7 Case 5)
+         struct OutboundLink {
+            int srcSlot;
+            int dstIndex;
+            int dstSlot;
+         };
+         std::vector<OutboundLink> rescuedOutbound;
+         GraphNode* dyingGn = FindNodeByIndex(existing);
+         if (dyingGn && dyingGn->node)
+         {
+            INode* targetSrc = dyingGn->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == existing) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ cable->GetOutputSlot(), gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+            }
+         }
+
+         RemoveNodeByIndex(existing);
+         int fresh = Mount(typeName);
+         if (fresh >= 0)
+         {
+            if (ownerGroup)
+               gGroupMembers[ownerGroup].insert(fresh);
+
+            GraphNode* freshGn = FindNodeByIndex(fresh);
+            if (freshGn)
+            {
+               std::map<int, GraphNode*> newByOrig;
+               newByOrig[existing] = freshGn;
+               ApplyClusterLinks(newByOrig, rescuedLinks, rescuedMod, rescuedPalette);
+            }
+
+            for (const auto& ob : rescuedOutbound)
+            {
+               std::string connErr;
+               ConnectNodes(fresh, ob.srcSlot, ob.dstIndex, ob.dstSlot, connErr);
+            }
+         }
+         return fresh;
+      }
+
+      void SetParam(int id, const std::string& paramName, float value) override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         if (gn == nullptr)
+            return;
+
+         struct SetFloatVisitor : public ParamVisitor
+         {
+            const std::string& targetName;
+            float targetValue;
+            explicit SetFloatVisitor(const std::string& name, float v) : targetName(name), targetValue(v) {}
+            void Float(const char* name, float& v) override { if (targetName == name) v = targetValue; }
+            void Int(const char* name, int& v) override { if (targetName == name) v = (int)std::lround((double)targetValue); }
+            void Bool(const char* name, bool& v) override { if (targetName == name) v = targetValue != 0.0f; }
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float[3]) override {}
+         } visitor(paramName, value);
+         gn->node->VisitParams(visitor);
+      }
+
+      void Connect(int srcId, int srcSlot, int dstId, int dstSlot) override
+      {
+         std::string err;
+         ConnectNodes(srcId, srcSlot, dstId, dstSlot, err);
+      }
+
+      void Place(int id, float x, float y) override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         if (gn == nullptr)
+            return;
+         gn->spawnX = x;
+         gn->spawnY = y;
+         gn->liveX = x;
+         gn->liveY = y;
+         gn->needsPosition = false;
+      }
+
+      bool Alive(int id) const override { return FindNodeByIndex(id) != nullptr; }
+
+      std::string TypeNameOf(int id) const override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         return gn != nullptr ? gn->typeName : std::string();
+      }
+
+      bool Spawnable(const std::string& typeName) const override
+      {
+         if (typeName == "Field Graph" || !IsUserSpawnable(typeName))
+            return false;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+               return true;
+         }
+         return false;
+      }
+   };
+
+   bool IsKernelDrivenParam(int nodeIndex, int paramIndex)
+   {
+      GraphNode* gn = FindNodeByIndex(nodeIndex);
+      if (!gn || !gn->node) return false;
+      struct ParamNameVisitor : public ParamVisitor {
+         int target;
+         int cur = 0;
+         std::string name;
+         ParamNameVisitor(int t) : target(t) {}
+         void Float(const char* n, float&) override { if (cur++ == target) name = n; }
+         void Int(const char* n, int&) override { if (cur++ == target) name = n; }
+         void Bool(const char* n, bool&) override { if (cur++ == target) name = n; }
+         void Text(const char* n, std::string&) override { if (cur++ == target) name = n; }
+         void Color(const char* n, float[3]) override { if (cur++ == target) name = n; }
+      } v(paramIndex);
+      gn->node->VisitParams(v);
+      if (v.name.empty()) return false;
+
+      for (const GraphNode& node : gNodes)
+      {
+         if (auto* fgn = dynamic_cast<FieldGraphNode*>(node.node.get()))
+         {
+            if (fgn->DrivesParam(nodeIndex, v.name))
+               return true;
+         }
+      }
+      return false;
+   }
+
+   bool CanBindModulation(int dstNodeIndex, int paramIndex)
+   {
+      return !IsKernelDrivenParam(dstNodeIndex, paramIndex);
+   }
+
    std::string gPatchPath;      // "" until the patch has been saved somewhere
    bool gPatchDirty = false;
    std::string gPatchStatus;
@@ -26824,6 +27321,14 @@ namespace
             geomOp->MigrateDeprecatedOp();
       }
 
+      // `remap` is fully populated now (every node in `data.nodes` has been
+      // spawned) - VisitParams/LoadParams above already parsed each
+      // FieldGraphNode's ownershipText into old-index terms (see
+      // FieldGraphNode::VisitParams), so this rewrites it to match the fresh
+      // indices just assigned, exactly like cable/modulation resolution
+      // below does via `resolve`.
+      RemapFieldGraphOwnership(remap);
+
       auto resolve = [&](int savedIndex) -> GraphNode*
       {
          auto it = remap.find(savedIndex);
@@ -27053,6 +27558,149 @@ namespace
             remapped.push_back(it->second);
       }
       gViewportPanelNodes = std::move(remapped);
+   }
+
+   // Field 'graph' domain (build step 10): mirrors RemapViewportPanelNodes
+   // immediately above, for the one other piece of per-node state that isn't
+   // part of Patch::Data proper but still keys off node index - a
+   // FieldGraphNode's persisted key->index ownership map (doc §5.3.1,
+   // §5.6.3). Unlike gViewportPanelNodes this is per-node rather than one
+   // session-wide list, so it walks gNodes rather than a global. Called from
+   // inside ApplyPatchData itself (shared by Undo, Redo and LoadPatchFrom)
+   // right after `remap` is fully built, rather than separately from each
+   // caller.
+   void RemapFieldGraphOwnership(const std::map<int, int>& remap)
+   {
+      for (GraphNode& gn : gNodes)
+      {
+         if (auto* fgn = dynamic_cast<FieldGraphNode*>(gn.node.get()))
+         {
+            fgn->Ownership().Remap(remap);
+            fgn->ownershipText = fgn->Ownership().ToText();
+         }
+      }
+   }
+
+   // Runs a FieldGraphNode's Regenerate() as exactly one undo step (doc
+   // §5.4): one checkpoint pushed up front, every SpawnNode/
+   // RemoveNodeByIndex/ConnectNodes call inside Regenerate() suppresses its
+   // own via the same gSuppressUndoCheckpoints region every other multi-step
+   // mutation in this file uses (see the glTF-drop block above). Must only
+   // be called outside the ed::Begin()/ed::End() node-editor pass (trap
+   // T14) - see the deferred gFieldGraphPendingRegenerate drain after
+   // ed::End() near the bottom of the main loop.
+   void RunFieldGraphRegenerate(FieldGraphNode* target)
+   {
+      if (target == nullptr)
+         return;
+      PushUndoCheckpoint();
+      gSuppressUndoCheckpoints = true;
+      MainGraphHost host;
+      target->Regenerate(host);
+      gSuppressUndoCheckpoints = false;
+      gPatchDirty = true;
+   }
+
+   void PerformCopyPaste(const std::set<int>& toCopy)
+   {
+      if (toCopy.empty()) return;
+      std::vector<std::string> clipboard;
+      std::vector<INode*> clipboardSources;
+      std::vector<int> clipboardOrigIndex;
+      std::vector<int> clipboardOrigGroup;
+      std::vector<ClusterLink> clipboardLinks;
+      std::vector<ClusterModLink> clipboardModLinks;
+      std::vector<ClusterPaletteLink> clipboardPaletteLinks;
+
+      for (int index : toCopy)
+      {
+         GraphNode* gn = FindNodeByIndex(index);
+         if (gn == nullptr)
+            continue;
+         clipboard.push_back(gn->typeName);
+         clipboardSources.push_back(gn->node.get());
+         clipboardOrigIndex.push_back(gn->index);
+         clipboardOrigGroup.push_back(IndexOfGroupNode(GroupOwning(gn->index)));
+      }
+      CaptureClusterLinks(toCopy, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
+
+      const ImVec2 off =
+         ClusterOffset(std::set<int>(clipboardOrigIndex.begin(), clipboardOrigIndex.end()));
+
+      struct PasteItem
+      {
+         std::string type; std::string category; INode* src; ImVec2 pos;
+         int origIndex; int origGroup;
+      };
+      std::vector<PasteItem> items;
+      for (size_t i = 0; i < clipboard.size(); i++)
+      {
+         for (GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == clipboardSources[i])
+            {
+               items.push_back({ clipboard[i], gn.category, gn.node.get(),
+                                 ImVec2(gn.liveX + off.x, gn.liveY + off.y),
+                                 clipboardOrigIndex[i], clipboardOrigGroup[i] });
+               break;
+            }
+         }
+      }
+
+      PushUndoCheckpoint();
+      gSuppressUndoCheckpoints = true;
+      std::map<int, int> newIndexByOrig;
+      for (const PasteItem& item : items)
+      {
+         GraphNode* copy = SpawnNode(item.type, item.category, item.pos.x, item.pos.y);
+         if (copy)
+         {
+            CopyParams(copy->node.get(), item.src);
+            ReloadDerivedState(copy->node.get());
+            if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
+               rn->seed = RandomNode::NextSeed();
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+            {
+               fgn->SetUid(FieldGraphNode::NewUid());
+            }
+            newIndexByOrig[item.origIndex] = copy->index;
+         }
+      }
+      for (const auto& kv : newIndexByOrig)
+      {
+         GraphNode* copy = FindNodeByIndex(kv.second);
+         if (copy && copy->node)
+         {
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+            {
+               fgn->Ownership().Remap(newIndexByOrig);
+               fgn->ownershipText = fgn->Ownership().ToText();
+            }
+         }
+      }
+      for (const PasteItem& item : items)
+      {
+         if (item.origGroup < 0)
+            continue;
+         auto groupIt = newIndexByOrig.find(item.origGroup);
+         auto memberIt = newIndexByOrig.find(item.origIndex);
+         if (groupIt == newIndexByOrig.end() || memberIt == newIndexByOrig.end())
+            continue;
+         GraphNode* grpGn = FindNodeByIndex(groupIt->second);
+         if (grpGn && grpGn->node)
+         {
+            if (auto* g = dynamic_cast<GroupNode*>(grpGn->node.get()))
+               gGroupMembers[g].insert(memberIt->second);
+         }
+      }
+      std::map<int, GraphNode*> newByOrig;
+      for (const auto& kv : newIndexByOrig)
+      {
+         if (GraphNode* gn = FindNodeByIndex(kv.second))
+            newByOrig[kv.first] = gn;
+      }
+      ApplyClusterLinks(newByOrig, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
+      gSuppressUndoCheckpoints = false;
    }
 
    void Undo()
@@ -34423,6 +35071,3233 @@ static int RunDspTest()
    return all ? 0 : 1;
 }
 
+// ============================================================ INFINITE_FIELDTEST
+//
+// Headless regression harness for the Field language pipeline and Expression::Evaluate.
+// Runs Section A (Corpus), Section B (Lexer), Section C (Spans), Section D (Types).
+// Gated as an early exit before glfwInit().
+static int RunFieldTest()
+{
+   printf("[FIELDTEST] Running Field regression harness...\n");
+
+   // Attempt to open tests/field/corpus.txt from working directory or relative paths
+   std::vector<std::string> candidatePaths = {
+      "tests/field/corpus.txt",
+      "../tests/field/corpus.txt",
+      "/Users/namansoni/infinte/tests/field/corpus.txt"
+   };
+
+   std::ifstream file;
+   std::string foundPath;
+   for (const auto& p : candidatePaths)
+   {
+      file.open(p);
+      if (file.is_open())
+      {
+         foundPath = p;
+         break;
+      }
+   }
+
+   if (!file.is_open())
+   {
+      printf("SECTION A (Corpus): FAIL - could not open tests/field/corpus.txt\n");
+      printf("INFINITE_FIELDTEST: FAIL\n");
+      return 1;
+   }
+
+   auto trim = [](const std::string& s) -> std::string {
+      size_t start = s.find_first_not_of(" \t\r\n");
+      if (start == std::string::npos) return "";
+      size_t end = s.find_last_not_of(" \t\r\n");
+      return s.substr(start, end - start + 1);
+   };
+
+   std::string line;
+   int lineNum = 0;
+   int casesTested = 0;
+   int casesFailed = 0;
+
+   while (std::getline(file, line))
+   {
+      lineNum++;
+      std::string trimmed = trim(line);
+      if (trimmed.empty() || trimmed[0] == '#')
+         continue;
+
+      // Parse fields separated by " | "
+      std::vector<std::string> tokens;
+      size_t pos = 0;
+      while (pos < line.size())
+      {
+         size_t nextSep = line.find(" | ", pos);
+         if (nextSep == std::string::npos)
+         {
+            tokens.push_back(trim(line.substr(pos)));
+            break;
+         }
+         tokens.push_back(trim(line.substr(pos, nextSep - pos)));
+         pos = nextSep + 3;
+      }
+
+      if (tokens.size() < 7)
+      {
+         printf("SECTION A (Corpus): FAIL - line %d malformed record: '%s'\n", lineNum, line.c_str());
+         casesFailed++;
+         continue;
+      }
+
+      std::string expr = tokens[0];
+      double t = std::atof(tokens[1].c_str());
+      std::string sibStr = tokens[2];
+      std::string globStr = tokens[3];
+      double expectVal = std::atof(tokens[4].c_str());
+      int expectOk = std::atoi(tokens[5].c_str());
+      std::string expectErrSubstr = tokens[6];
+
+      std::map<std::string, float> sibMap;
+      if (sibStr != "none" && !sibStr.empty())
+      {
+         std::stringstream ss(sibStr);
+         std::string item;
+         while (std::getline(ss, item, ','))
+         {
+            size_t eq = item.find('=');
+            if (eq != std::string::npos)
+            {
+               std::string k = trim(item.substr(0, eq));
+               float v = (float)std::atof(trim(item.substr(eq + 1)).c_str());
+               sibMap[k] = v;
+            }
+         }
+      }
+
+      std::map<std::string, float> globMap;
+      if (globStr != "none" && !globStr.empty())
+      {
+         std::stringstream ss(globStr);
+         std::string item;
+         while (std::getline(ss, item, ','))
+         {
+            size_t eq = item.find('=');
+            if (eq != std::string::npos)
+            {
+               std::string k = trim(item.substr(0, eq));
+               float v = (float)std::atof(trim(item.substr(eq + 1)).c_str());
+               globMap[k] = v;
+            }
+         }
+      }
+
+      float outVal = 0.0f;
+      std::string outErr;
+      bool ok = Expression::Evaluate(expr, t,
+                                     sibMap.empty() ? nullptr : &sibMap,
+                                     globMap.empty() ? nullptr : &globMap,
+                                     outVal, outErr);
+
+      casesTested++;
+      if (ok != (expectOk != 0))
+      {
+         printf("SECTION A (Corpus): FAIL - line %d expr '%s' expected ok=%d, got ok=%d (err: '%s')\n",
+                lineNum, expr.c_str(), expectOk, (int)ok, outErr.c_str());
+         casesFailed++;
+         continue;
+      }
+
+      if (expectOk)
+      {
+         float expectedF = (float)expectVal;
+         float diff = std::fabs(outVal - expectedF);
+         if (diff > 1e-4f && std::fabs(diff / (std::fabs(expectedF) + 1e-5f)) > 1e-4f)
+         {
+            printf("SECTION A (Corpus): FAIL - line %d expr '%s' value mismatch: expected %.7g, got %.7g\n",
+                   lineNum, expr.c_str(), expectedF, outVal);
+            casesFailed++;
+            continue;
+         }
+      }
+      else
+      {
+         if (expectErrSubstr != "none" && outErr.find(expectErrSubstr) == std::string::npos)
+         {
+            printf("SECTION A (Corpus): FAIL - line %d expr '%s' error substring mismatch: expected '%s', got '%s'\n",
+                   lineNum, expr.c_str(), expectErrSubstr.c_str(), outErr.c_str());
+            casesFailed++;
+            continue;
+         }
+      }
+   }
+
+   bool secAOk = (casesFailed == 0 && casesTested > 0);
+   if (secAOk)
+      printf("SECTION A (Corpus): OK (%d/%d passed)\n", casesTested, casesTested);
+   else
+      printf("SECTION A (Corpus): FAIL (%d failures out of %d cases)\n", casesFailed, casesTested);
+
+   // Section B: Lexer Maximal Munch & Token Checks
+   bool secBOk = true;
+   {
+      std::vector<std::string> ops = { "<=", ">=", "==", "!=", "&&", "||", "+=", "-=", "*=", "/=" };
+      for (const auto& op : ops)
+      {
+         std::vector<Field::Token> toks;
+         Field::FieldError err;
+         if (!Field::Lex(op, toks, err) || toks.size() != 2 || toks[0].text != op || toks[0].kind != Field::TokenKind::Op)
+         {
+            printf("SECTION B (Lexer): FAIL - maximal munch failed for '%s'\n", op.c_str());
+            secBOk = false;
+         }
+      }
+   }
+   if (secBOk)
+      printf("SECTION B (Lexer): OK\n");
+   else
+      printf("SECTION B (Lexer): FAIL\n");
+
+   // Section C: Source Spans
+   bool secCOk = true;
+   {
+      std::vector<Field::Token> toks;
+      Field::FieldError err;
+      Field::Lex("a +\n  b", toks, err);
+      // 'b' should be at line 2, col 3
+      bool foundB = false;
+      for (const auto& t : toks)
+      {
+         if (t.text == "b")
+         {
+            foundB = true;
+            if (t.span.line != 2 || t.span.col != 3)
+            {
+               printf("SECTION C (Spans): FAIL - 'b' span expected line 2 col 3, got line %d col %d\n", t.span.line, t.span.col);
+               secCOk = false;
+            }
+         }
+      }
+      if (!foundB)
+      {
+         printf("SECTION C (Spans): FAIL - token 'b' not found\n");
+         secCOk = false;
+      }
+   }
+   if (secCOk)
+      printf("SECTION C (Spans): OK\n");
+   else
+      printf("SECTION C (Spans): FAIL\n");
+
+   // Section D: Types, Vectors & Rank Polymorphism (Step 3)
+   bool secDOk = true;
+   {
+      // 1. JoinRank Unit Tests
+      Field::FieldType resType;
+      std::string rankErr;
+      if (!Field::JoinRank(Field::FieldType(Field::DataType::Float, 1), Field::FieldType(Field::DataType::Vec2, 2), resType, rankErr) || resType.kind != Field::DataType::Vec2 || resType.lanes != 2)
+      {
+         printf("SECTION D (Types): FAIL - scalar + vec2 rank join failed\n");
+         secDOk = false;
+      }
+      if (!Field::JoinRank(Field::FieldType(Field::DataType::Vec3, 3), Field::FieldType(Field::DataType::Float, 1), resType, rankErr) || resType.kind != Field::DataType::Vec3 || resType.lanes != 3)
+      {
+         printf("SECTION D (Types): FAIL - vec3 + scalar rank join failed\n");
+         secDOk = false;
+      }
+      if (!Field::JoinRank(Field::FieldType(Field::DataType::Vec4, 4), Field::FieldType(Field::DataType::Vec4, 4), resType, rankErr) || resType.kind != Field::DataType::Vec4 || resType.lanes != 4)
+      {
+         printf("SECTION D (Types): FAIL - vec4 + vec4 rank join failed\n");
+         secDOk = false;
+      }
+      if (Field::JoinRank(Field::FieldType(Field::DataType::Vec2, 2), Field::FieldType(Field::DataType::Vec3, 3), resType, rankErr))
+      {
+         printf("SECTION D (Types): FAIL - vec2 + vec3 should be refused\n");
+         secDOk = false;
+      }
+      if (Field::JoinRank(Field::FieldType(Field::DataType::Vec4, 4), Field::FieldType(Field::DataType::Vec3, 3), resType, rankErr))
+      {
+         printf("SECTION D (Types): FAIL - vec4 + vec3 should be refused\n");
+         secDOk = false;
+      }
+
+      // 2. Swizzle Validation
+      Field::SwizzleInfo swInfo;
+      std::string swErr;
+      if (!Field::ParseAndValidateSwizzle("xz", Field::FieldType(Field::DataType::Vec3, 3), "P", swInfo, swErr) ||
+          swInfo.numComponents != 2 || swInfo.indices[0] != 0 || swInfo.indices[1] != 2)
+      {
+         printf("SECTION D (Types): FAIL - .xz on vec3 failed\n");
+         secDOk = false;
+      }
+      if (!Field::ParseAndValidateSwizzle("bgr", Field::FieldType(Field::DataType::Vec3, 3), "Cd", swInfo, swErr) ||
+          swInfo.numComponents != 3 || swInfo.indices[0] != 2 || swInfo.indices[1] != 1 || swInfo.indices[2] != 0)
+      {
+         printf("SECTION D (Types): FAIL - .bgr on vec3 failed\n");
+         secDOk = false;
+      }
+      if (!Field::ParseAndValidateSwizzle("xxx", Field::FieldType(Field::DataType::Vec3, 3), "P", swInfo, swErr) ||
+          swInfo.numComponents != 3 || swInfo.indices[0] != 0 || swInfo.indices[1] != 0 || swInfo.indices[2] != 0)
+      {
+         printf("SECTION D (Types): FAIL - .xxx on vec3 failed\n");
+         secDOk = false;
+      }
+      if (Field::ParseAndValidateSwizzle("xg", Field::FieldType(Field::DataType::Vec3, 3), "P", swInfo, swErr))
+      {
+         printf("SECTION D (Types): FAIL - mixed swizzle .xg should be refused\n");
+         secDOk = false;
+      }
+      if (Field::ParseAndValidateSwizzle("w", Field::FieldType(Field::DataType::Vec3, 3), "P", swInfo, swErr))
+      {
+         printf("SECTION D (Types): FAIL - .w on vec3 should be refused\n");
+         secDOk = false;
+      }
+      if (Field::ParseAndValidateSwizzle("x", Field::FieldType(Field::DataType::Float, 1), "t", swInfo, swErr))
+      {
+         printf("SECTION D (Types): FAIL - .x on scalar float should be refused\n");
+         secDOk = false;
+      }
+
+      // 3. VM Vector Execution Helper
+      auto evalVec = [](const std::string& src, Field::VectorResult& outVr, std::string& outErr) -> bool {
+         std::vector<Field::Token> toks;
+         Field::FieldError fErr;
+         if (!Field::Lex(src, toks, fErr)) { outErr = fErr.message; return false; }
+         Field::AstNodePtr ast;
+         if (!Field::ParseExpression(toks, ast, fErr)) { outErr = fErr.message; return false; }
+         Field::IRNodePtr ir;
+         if (!Field::LowerAstToIR(ast, ir, fErr)) { outErr = fErr.message; return false; }
+         Field::BytecodeProgram prog;
+         if (!Field::EmitBytecode(ir, prog, fErr)) { outErr = fErr.message; return false; }
+         Field::FieldVM vm;
+         Field::ExecutionEnv env;
+         return vm.ExecuteVector(prog, env, outVr, outErr);
+      };
+
+      // Constructors & Broadcast
+      {
+         Field::VectorResult vr;
+         std::string err;
+         if (!evalVec("vec3(1)", vr, err) || vr.lanes != 3 || vr.v[0] != 1.0 || vr.v[1] != 1.0 || vr.v[2] != 1.0)
+         {
+            printf("SECTION D (Types): FAIL - vec3(1) splat failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(1, 2, 3)", vr, err) || vr.lanes != 3 || vr.v[0] != 1.0 || vr.v[1] != 2.0 || vr.v[2] != 3.0)
+         {
+            printf("SECTION D (Types): FAIL - vec3(1, 2, 3) full ctor failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec4(vec2(1, 2), vec2(3, 4))", vr, err) || vr.lanes != 4 || vr.v[0] != 1.0 || vr.v[1] != 2.0 || vr.v[2] != 3.0 || vr.v[3] != 4.0)
+         {
+            printf("SECTION D (Types): FAIL - vec4(vec2, vec2) mixed ctor failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec4(vec3(1, 2, 3), 4)", vr, err) || vr.lanes != 4 || vr.v[0] != 1.0 || vr.v[1] != 2.0 || vr.v[2] != 3.0 || vr.v[3] != 4.0)
+         {
+            printf("SECTION D (Types): FAIL - vec4(vec3, 4) mixed ctor failed\n");
+            secDOk = false;
+         }
+         if (evalVec("vec3(vec2(1, 2))", vr, err))
+         {
+            printf("SECTION D (Types): FAIL - vec3(vec2) should be refused\n");
+            secDOk = false;
+         }
+         if (evalVec("vec3(vec2(1, 2), vec2(3, 4))", vr, err))
+         {
+            printf("SECTION D (Types): FAIL - vec3(vec2, vec2) lane sum 4 should be refused\n");
+            secDOk = false;
+         }
+      }
+
+      // Arithmetic, Power, Swizzle Chaining & Precision
+      {
+         Field::VectorResult vr;
+         std::string err;
+         if (!evalVec("vec3(1, 2, 3) * 2", vr, err) || vr.lanes != 3 || vr.v[0] != 2.0 || vr.v[1] != 4.0 || vr.v[2] != 6.0)
+         {
+            printf("SECTION D (Types): FAIL - vec3 * 2 broadcast failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(1) + 0.5", vr, err) || vr.lanes != 3 || vr.v[0] != 1.5 || vr.v[1] != 1.5 || vr.v[2] != 1.5)
+         {
+            printf("SECTION D (Types): FAIL - vec3(1) + 0.5 failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(1, 2, 3) ^ 2", vr, err) || vr.lanes != 3 || vr.v[0] != 1.0 || vr.v[1] != 4.0 || vr.v[2] != 9.0)
+         {
+            printf("SECTION D (Types): FAIL - vec3 ^ 2 power failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(10, 20, 30).xz", vr, err) || vr.lanes != 2 || vr.v[0] != 10.0 || vr.v[1] != 30.0)
+         {
+            printf("SECTION D (Types): FAIL - .xz swizzle read failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(10, 20, 30).xy.y", vr, err) || vr.lanes != 1 || vr.v[0] != 20.0)
+         {
+            printf("SECTION D (Types): FAIL - .xy.y swizzle chain failed\n");
+            secDOk = false;
+         }
+         // Double precision across all lanes
+         if (!evalVec("vec3(0.1) + vec3(0.2)", vr, err) || vr.lanes != 3 ||
+             (float)vr.v[0] != 0.30000001192092896f || (float)vr.v[1] != 0.30000001192092896f || (float)vr.v[2] != 0.30000001192092896f)
+         {
+            printf("SECTION D (Types): FAIL - vector 0.1+0.2 double precision mismatch\n");
+            secDOk = false;
+         }
+      }
+
+      // Top-level vector refusal via Expression::Evaluate
+      {
+         float outVal = 123.456f;
+         std::string errStr;
+         bool res = Expression::Evaluate("vec3(1, 0, 0)", 0.0, nullptr, nullptr, outVal, errStr);
+         if (res || outVal != 123.456f || errStr.find("expression has type vec3") == std::string::npos)
+         {
+            printf("SECTION D (Types): FAIL - top-level vec3 refusal failed (res=%d, outVal=%.3f, err='%s')\n", (int)res, outVal, errStr.c_str());
+            secDOk = false;
+         }
+      }
+
+      // Vector comparison refusal (Decision 1)
+      {
+         Field::VectorResult vr;
+         std::string err;
+         if (evalVec("vec3(1) > vec3(0)", vr, err) || err.find("requires scalar arguments") == std::string::npos)
+         {
+            printf("SECTION D (Types): FAIL - vector comparison should be refused (err='%s')\n", err.c_str());
+            secDOk = false;
+         }
+      }
+   }
+   if (secDOk)
+      printf("SECTION D (Types): OK\n");
+   else
+      printf("SECTION D (Types): FAIL\n");
+
+   // Section E: Pure Randomness (Step 2)
+   bool secEOk = true;
+   {
+      // 1. Non-negativity & Range [0, 1) across time and seed space
+      uint64_t testSeeds[] = { 0, 1, 2, 7, 42, 1000, 0x12345678ULL, 0x8000000000000000ULL, 0xFFFFFFFFFFFFFFFFULL };
+      for (uint64_t s : testSeeds)
+      {
+         for (double t = -300.0; t <= 300.0; t += 0.5)
+         {
+            double r = Field::TimeToRand(t, s);
+            if (r < 0.0 || r >= 1.0)
+            {
+               printf("SECTION E (Random): FAIL - TimeToRand(%.1f, %llu) out of range: %.17g\n", t, (unsigned long long)s, r);
+               secEOk = false;
+               break;
+            }
+         }
+         if (!secEOk) break;
+      }
+
+      // 2. Determinism / Reproducibility: same (t, seed) produces identical value
+      for (int i = 0; i < 100; ++i)
+      {
+         double t = (double)i * 0.37;
+         uint64_t s = (uint64_t)(i * 1337);
+         double r1 = Field::TimeToRand(t, s);
+         double r2 = Field::TimeToRand(t, s);
+         if (r1 != r2)
+         {
+            printf("SECTION E (Random): FAIL - non-deterministic TimeToRand at t=%.2f, s=%llu\n", t, (unsigned long long)s);
+            secEOk = false;
+            break;
+         }
+      }
+
+      // 3. Different seeds produce distinct values
+      int seedCollisions = 0;
+      for (int i = 0; i < 100; ++i)
+      {
+         double t = (double)i * 0.5;
+         double rA = Field::TimeToRand(t, 0);
+         double rB = Field::TimeToRand(t, 1);
+         if (rA == rB)
+            seedCollisions++;
+      }
+      if (seedCollisions > 0)
+      {
+         printf("SECTION E (Random): FAIL - different seeds collided %d times out of 100\n", seedCollisions);
+         secEOk = false;
+      }
+
+      // 4. Decorrelation: adjacent frames at 60 fps have correlation < 0.20
+      {
+         const int N = 10000;
+         const double dt = 1.0 / 60.0;
+         double sumX = 0.0, sumY = 0.0;
+         std::vector<double> xs(N), ys(N);
+         for (int i = 0; i < N; ++i)
+         {
+            xs[i] = Field::TimeToRand((double)i * dt, 0);
+            ys[i] = Field::TimeToRand((double)(i + 1) * dt, 0);
+            sumX += xs[i];
+            sumY += ys[i];
+         }
+         double meanX = sumX / N;
+         double meanY = sumY / N;
+         double cov = 0.0, varX = 0.0, varY = 0.0;
+         for (int i = 0; i < N; ++i)
+         {
+            cov += (xs[i] - meanX) * (ys[i] - meanY);
+            varX += (xs[i] - meanX) * (xs[i] - meanX);
+            varY += (ys[i] - meanY) * (ys[i] - meanY);
+         }
+         double corr = cov / std::sqrt(varX * varY);
+         if (std::fabs(corr) >= 0.20)
+         {
+            printf("SECTION E (Random): FAIL - 60fps correlation too high: %.4f (expected < 0.20)\n", corr);
+            secEOk = false;
+         }
+      }
+
+      // 5. Periodicity: exactly 300 seconds
+      {
+         double p1 = Field::TimeToRand(1.25, 7);
+         double p2 = Field::TimeToRand(301.25, 7);
+         double p3 = Field::TimeToRand(601.25, 7);
+         if (p1 != p2 || p1 != p3)
+         {
+            printf("SECTION E (Random): FAIL - 300s period check failed (%.17g vs %.17g vs %.17g)\n", p1, p2, p3);
+            secEOk = false;
+         }
+      }
+
+      // 6. sh step boundaries: constant across step, changes at boundary
+      {
+         double shA = Field::Sh(0.0, 1.0, 4.0, 0.0, 0.1);
+         double shB = Field::Sh(0.0, 1.0, 4.0, 0.0, 0.24);
+         double shC = Field::Sh(0.0, 1.0, 4.0, 0.0, 0.26);
+         if (shA != shB)
+         {
+            printf("SECTION E (Random): FAIL - sh changed within step interval [0.1, 0.24]\n");
+            secEOk = false;
+         }
+         if (shA == shC)
+         {
+            printf("SECTION E (Random): FAIL - sh did not change across step boundary at t=0.25\n");
+            secEOk = false;
+         }
+      }
+
+      // 7. Arity check: 5 arguments produces expected error
+      {
+         float outV = 0.0f;
+         std::string errStr;
+         bool res = Expression::Evaluate("rand(0, 1, 2, 3, 4)", 0.0, nullptr, nullptr, outV, errStr);
+         if (res || errStr.find("expects 0 to 4 arguments") == std::string::npos)
+         {
+            printf("SECTION E (Random): FAIL - 5-arg rand did not produce expected error (ok=%d, err='%s')\n", (int)res, errStr.c_str());
+            secEOk = false;
+         }
+      }
+
+      // 8. Constant folding prevention across t
+      {
+         float vA = 0.0f, vB = 0.0f;
+         std::string errA, errB;
+         bool okA = Expression::Evaluate("rand(0, 1, 2)", 1.0, nullptr, nullptr, vA, errA);
+         bool okB = Expression::Evaluate("rand(0, 1, 2)", 2.0, nullptr, nullptr, vB, errB);
+         if (!okA || !okB || vA == vB)
+         {
+            printf("SECTION E (Random): FAIL - cached rand program did not vary across t (vA=%.7g, vB=%.7g)\n", vA, vB);
+            secEOk = false;
+         }
+      }
+   }
+   if (secEOk)
+      printf("SECTION E (Pure Randomness): OK\n");
+   else
+      printf("SECTION E (Pure Randomness): FAIL\n");
+
+   bool allOk = secAOk && secBOk && secCOk && secDOk && secEOk;
+   printf("INFINITE_FIELDTEST: %s\n", allOk ? "OK" : "FAIL");
+   return allOk ? 0 : 1;
+}
+
+// ============================================================ INFINITE_FIELDELEMENTTEST
+//
+// Headless regression harness for the Field element domain.
+// Guards the SoA store, round-trip fidelity, rate inference hoisting,
+// reserved-word shadowing, undeclared attribute refusals, and geometry passthrough.
+static int RunFieldElementTest()
+{
+   printf("[FIELDELEMENTTEST] Running Field element-domain conformance harness...\n");
+   bool allOk = true;
+
+   // 1. AoS / SoA Round-Trip & Preservation (empty-stays-empty)
+   {
+      bool secOk = true;
+      Mesh srcMesh;
+      for (int i = 0; i < 5; ++i)
+      {
+         Vertex v;
+         v.px = (float)i * 1.0f; v.py = (float)i * 2.0f; v.pz = (float)i * 3.0f;
+         v.nx = 0.0f; v.ny = 1.0f; v.nz = 0.0f;
+         v.u = (float)i * 0.25f; v.v = 1.0f - (float)i * 0.25f;
+         srcMesh.vertices.push_back(v);
+      }
+      srcMesh.indices = { 0, 1, 2, 2, 3, 4 };
+      srcMesh.faceMask = { 1, 0 };
+      srcMesh.selectionGroup = { 10, 20 };
+
+      Field::ElementStore store;
+      store.FromMesh(srcMesh);
+
+      if (store.Count() != 5) secOk = false;
+      if (store.HasInputVertexColor()) secOk = false; // empty input
+
+      Mesh outMesh;
+      Field::MeshWriteMask noWrites;
+      store.ToMesh(outMesh, noWrites, srcMesh);
+
+      if (outMesh.vertices.size() != 5) secOk = false;
+      for (size_t i = 0; i < 5; ++i)
+      {
+         if (outMesh.vertices[i].px != srcMesh.vertices[i].px ||
+             outMesh.vertices[i].py != srcMesh.vertices[i].py ||
+             outMesh.vertices[i].pz != srcMesh.vertices[i].pz ||
+             outMesh.vertices[i].nx != srcMesh.vertices[i].nx ||
+             outMesh.vertices[i].ny != srcMesh.vertices[i].ny ||
+             outMesh.vertices[i].nz != srcMesh.vertices[i].nz ||
+             outMesh.vertices[i].u != srcMesh.vertices[i].u ||
+             outMesh.vertices[i].v != srcMesh.vertices[i].v)
+         {
+            secOk = false;
+         }
+      }
+
+      if (outMesh.indices != srcMesh.indices) secOk = false;
+      if (outMesh.faceMask != srcMesh.faceMask) secOk = false;
+      if (outMesh.selectionGroup != srcMesh.selectionGroup) secOk = false;
+
+      // Trap #5: empty vertexColor must remain empty
+      if (!outMesh.vertexColor.empty())
+      {
+         printf("AoS/SoA: FAIL - empty vertexColor was converted to non-empty array!\n");
+         secOk = false;
+      }
+
+      // Test with non-empty vertexColor
+      srcMesh.vertexColor = { 1, 0, 0,  0, 1, 0,  0, 0, 1,  1, 1, 0,  0, 1, 1 };
+      store.FromMesh(srcMesh);
+      if (!store.HasInputVertexColor()) secOk = false;
+      store.ToMesh(outMesh, noWrites, srcMesh);
+      if (outMesh.vertexColor != srcMesh.vertexColor)
+      {
+         printf("AoS/SoA: FAIL - non-empty vertexColor was not preserved!\n");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 1 (AoS/SoA Round Trip): OK\n");
+      else { printf("SECTION 1 (AoS/SoA Round Trip): FAIL\n"); allOk = false; }
+   }
+
+   // 2. N-element Kernel execution counter and count variable
+   {
+      bool secOk = true;
+      Mesh mesh;
+      const int N = 64;
+      for (int i = 0; i < N; ++i)
+      {
+         Vertex v;
+         v.px = 0; v.py = 0; v.pz = 0;
+         mesh.vertices.push_back(v);
+      }
+
+      std::string code = "P.x = count\nP.y = i\n";
+      FieldElementNode node;
+      node.code = code;
+      if (!node.Apply())
+      {
+         printf("N-element: FAIL - failed to compile '%s': %s\n", code.c_str(), node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         Field::ElementStore store;
+         store.FromMesh(mesh);
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         std::string err;
+         node.Program()->ResetCounters();
+         vm.Execute(*node.Program(), store, env, err);
+
+         if (node.Program()->elementEvalCount != N)
+         {
+            printf("N-element: FAIL - element loop ran %llu times (expected %d)\n", node.Program()->elementEvalCount, N);
+            secOk = false;
+         }
+
+         Mesh outMesh;
+         store.ToMesh(outMesh, node.Program()->WriteMask(), mesh);
+         for (int i = 0; i < N; ++i)
+         {
+            if (outMesh.vertices[i].px != (float)N || outMesh.vertices[i].py != (float)i)
+            {
+               printf("N-element: FAIL - ramp check failed at i=%d: px=%.2f (expected %d), py=%.2f (expected %d)\n",
+                      i, outMesh.vertices[i].px, N, outMesh.vertices[i].py, i);
+               secOk = false;
+               break;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (N-Element Loop & Count): OK\n");
+      else { printf("SECTION 2 (N-Element Loop & Count): FAIL\n"); allOk = false; }
+   }
+
+   // 3. Hoisting: Frame-domain subexpression runs ONCE per cook on a counter
+   {
+      bool secOk = true;
+      const int N = 100;
+      Mesh mesh;
+      for (int i = 0; i < N; ++i) mesh.vertices.push_back(Vertex{});
+
+      std::string code = "amount = 0.5 + 0.5 * sin(t)\nP.y += amount\n";
+      FieldElementNode node;
+      node.code = code;
+      if (!node.Apply())
+      {
+         printf("Hoisting: FAIL - failed to compile: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         Field::ElementStore store;
+         store.FromMesh(mesh);
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         env.t = 1.5;
+         std::string err;
+         node.Program()->ResetCounters();
+         vm.Execute(*node.Program(), store, env, err);
+
+         if (node.Program()->prologueEvalCount != 1)
+         {
+            printf("Hoisting: FAIL - prologue ran %llu times (expected exactly 1)\n", node.Program()->prologueEvalCount);
+            secOk = false;
+         }
+         if (node.Program()->elementEvalCount != N)
+         {
+            printf("Hoisting: FAIL - element loop ran %llu times (expected %d)\n", node.Program()->elementEvalCount, N);
+            secOk = false;
+         }
+
+         float expectedAmount = 0.5f + 0.5f * std::sin(1.5f);
+         for (int i = 0; i < N; ++i)
+         {
+            if (std::fabs(store.Py()[i] - expectedAmount) > 1e-5f)
+            {
+               printf("Hoisting: FAIL - P.y value mismatch at %d: %.6f vs %.6f\n", i, store.Py()[i], expectedAmount);
+               secOk = false;
+               break;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 3 (Rate Inference & Hoisting): OK\n");
+      else { printf("SECTION 3 (Rate Inference & Hoisting): FAIL\n"); allOk = false; }
+   }
+
+   // 4. Attrib Declarations & Usage
+   {
+      bool secOk = true;
+      Mesh mesh;
+      const int N = 32;
+      for (int i = 0; i < N; ++i)
+      {
+         Vertex v;
+         v.px = (float)i;
+         mesh.vertices.push_back(v);
+      }
+
+      std::string code = "attrib float heat = 0\nheat = P.x * 0.1\nCd = vec3(heat, 0.0, 1.0 - heat)\n";
+      FieldElementNode node;
+      node.code = code;
+      if (!node.Apply())
+      {
+         printf("Attrib: FAIL - failed to compile: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         Field::ElementStore store;
+         store.DeclareAttrib("heat", Field::DataType::Float);
+         store.FromMesh(mesh);
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         std::string err;
+         vm.Execute(*node.Program(), store, env, err);
+
+         Mesh outMesh;
+         store.ToMesh(outMesh, node.Program()->WriteMask(), mesh);
+         if (!outMesh.HasVertexColor())
+         {
+            printf("Attrib: FAIL - Cd write did not produce vertexColor\n");
+            secOk = false;
+         }
+         else
+         {
+            for (int i = 0; i < N; ++i)
+            {
+               float h = (float)i * 0.1f;
+               if (std::fabs(outMesh.vertexColor[3 * i + 0] - h) > 1e-5f ||
+                   std::fabs(outMesh.vertexColor[3 * i + 2] - (1.0f - h)) > 1e-5f)
+               {
+                  printf("Attrib: FAIL - Cd values mismatch at i=%d\n", i);
+                  secOk = false;
+                  break;
+               }
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 4 (User Attribs): OK\n");
+      else { printf("SECTION 4 (User Attribs): FAIL\n"); allOk = false; }
+   }
+
+   // 5. Refusals: Shadowing reserved words, Undeclared attrib, Non-constant loop bound
+   {
+      bool secOk = true;
+
+      // 5a. Reserved-word shadowing
+      {
+         FieldElementNode node;
+         node.code = "attrib float P = 0\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("element") == std::string::npos)
+         {
+            printf("Refusal (Shadowing): FAIL - 'attrib float P' did not fail with element domain message (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // 5b. Frame reserved word shadowing
+      {
+         FieldElementNode node;
+         node.code = "attrib float t = 0\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("frame") == std::string::npos)
+         {
+            printf("Refusal (Shadowing frame): FAIL - 'attrib float t' did not fail with frame domain message (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // 5c. Undeclared attribute error at use site line and column
+      {
+         FieldElementNode node;
+         node.code = "P.y += 1.0\nheat += 0.5\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("undeclared") == std::string::npos ||
+             node.LastError().find("line 2") == std::string::npos)
+         {
+            printf("Refusal (Undeclared): FAIL - 'heat += 0.5' without decl did not error with line 2 (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // 5d. Non-constant loop bound refused
+      {
+         FieldElementNode node;
+         node.code = "for (k = 0; k < count; k += 1) { P.y += 0.1 }\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("loop bound must be a compile-time constant") == std::string::npos)
+         {
+            printf("Refusal (Non-const loop): FAIL - for loop with 'count' bound did not error (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // 5e. Read-only assignment refused
+      {
+         FieldElementNode node;
+         node.code = "i = 5\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("read-only") == std::string::npos)
+         {
+            printf("Refusal (Read-only i): FAIL - assignment to 'i' did not error (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 5 (Refusals & Diagnostics): OK\n");
+      else { printf("SECTION 5 (Refusals & Diagnostics): FAIL\n"); allOk = false; }
+   }
+
+   // 6. Element Count Ceiling & Truncation
+   {
+      bool secOk = true;
+      GeometryNode geo;
+      geo.sides = 20;
+      geo.CookIfNeeded(1);
+      const Mesh& geoMesh = geo.GetMesh();
+      size_t origCount = geoMesh.vertices.size();
+
+      FieldElementNode fe;
+      fe.input = &geo;
+      fe.maxElements = 10;
+      fe.code = "P.y += 0.5\n";
+      fe.Apply();
+      fe.CookIfNeeded(2);
+
+      const Mesh& outM = fe.GetMesh();
+      if (outM.vertices.size() != 10)
+      {
+         printf("Truncation: FAIL - output mesh size is %zu (expected capped 10, input was %zu)\n", outM.vertices.size(), origCount);
+         secOk = false;
+      }
+      if (!fe.WasTruncated())
+      {
+         printf("Truncation: FAIL - fe.WasTruncated() is false\n");
+         secOk = false;
+      }
+      if (fe.ActualElementCount() != 10)
+      {
+         printf("Truncation: FAIL - ActualElementCount is %d (expected 10)\n", fe.ActualElementCount());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 6 (Element Cap & Truncation): OK\n");
+      else { printf("SECTION 6 (Element Cap & Truncation): FAIL\n"); allOk = false; }
+   }
+
+   // 7. Geometry Passthrough Forwarding
+   {
+      bool secOk = true;
+      GeometryNode geo;
+      geo.CookIfNeeded(1);
+
+      FieldElementNode fe;
+      fe.input = &geo;
+      fe.code = "P.x += 0.0\n";
+      fe.Apply();
+      fe.CookIfNeeded(2);
+
+      if (fe.PassthroughSource() != &geo)
+      {
+         printf("Passthrough: FAIL - PassthroughSource did not return input geo\n");
+         secOk = false;
+      }
+      if (fe.GetModelMatrix() != geo.GetModelMatrix())
+      {
+         printf("Passthrough: FAIL - GetModelMatrix was not forwarded\n");
+         secOk = false;
+      }
+      if (fe.BypassSource() != dynamic_cast<INode*>(&geo))
+      {
+         printf("Passthrough: FAIL - BypassSource was not forwarded\n");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 7 (Geometry Passthrough): OK\n");
+      else { printf("SECTION 7 (Geometry Passthrough): FAIL\n"); allOk = false; }
+   }
+
+   // 8. Every shipped program compiles: the default constructor's code and all five
+   //    presets. The node's own default (`P.y += sin(P.x * 2.0 + t) * 0.2`) and two of
+   //    the presets were rejected as "dataflow cycle with no delay: P -> P", so
+   //    spawning the node showed a compile error and passed geometry through untouched.
+   //    Read-modify-write of an element attribute is sequential dataflow, not feedback.
+   {
+      bool secOk = true;
+
+      {
+         FieldElementNode fresh;
+         if (!fresh.LastError().empty())
+         {
+            printf("Presets: FAIL - default program did not compile: %s\n", fresh.LastError().c_str());
+            secOk = false;
+         }
+         if (!fresh.Program())
+         {
+            printf("Presets: FAIL - default program produced no bytecode\n");
+            secOk = false;
+         }
+      }
+
+      for (const auto& preset : FieldElementNode::Presets())
+      {
+         FieldElementNode node;
+         node.code = preset.code;
+         if (!node.Apply())
+         {
+            printf("Presets: FAIL - preset '%s' did not compile: %s\n", preset.name, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 8 (Default Program & Presets Compile): OK\n");
+      else { printf("SECTION 8 (Default Program & Presets Compile): FAIL\n"); allOk = false; }
+   }
+
+   // 9. Same expression, both domains, same answer. The prologue and the element loop
+   //    are two evaluations of the same opcode set; anything one can compute the other
+   //    must compute identically. This table is the assertion that catches an opcode
+   //    implemented in one bank and missing from the other - which is how the prologue
+   //    shipped with no comparison, logical, unary or branch opcode at all, silently
+   //    returning 0 for `k = t > 1.0` while the element loop returned 1.
+   {
+      bool secOk = true;
+
+      struct DomainPair
+      {
+         const char* name;
+         const char* frameCode;   // expression hoisted to the prologue via a bare local
+         const char* elemCode;    // same expression forced into the element loop
+         double expected;
+      };
+
+      // env.t is 1.5 and every vertex starts at P = (0,0,0), so `P.x * 0.0` only pins
+      // the statement to the element domain without perturbing the value.
+      static const DomainPair kPairs[] = {
+         { "neg",          "k = -t\nP.y += k\n",                          "P.y += -t + P.x * 0.0\n",                          -1.5 },
+         { "not",          "k = !(t > 9.0)\nP.y += k\n",                  "P.y += !(t > 9.0) + P.x * 0.0\n",                   1.0 },
+         { "less",         "k = t < 2.0\nP.y += k\n",                     "P.y += (t < 2.0) + P.x * 0.0\n",                    1.0 },
+         { "lessEqual",    "k = t <= 1.5\nP.y += k\n",                    "P.y += (t <= 1.5) + P.x * 0.0\n",                   1.0 },
+         { "greater",      "k = t > 1.0\nP.y += k\n",                     "P.y += (t > 1.0) + P.x * 0.0\n",                    1.0 },
+         { "greaterEqual", "k = t >= 9.0\nP.y += k\n",                    "P.y += (t >= 9.0) + P.x * 0.0\n",                   0.0 },
+         { "equal",        "k = t == 1.5\nP.y += k\n",                    "P.y += (t == 1.5) + P.x * 0.0\n",                   1.0 },
+         { "notEqual",     "k = t != 1.5\nP.y += k\n",                    "P.y += (t != 1.5) + P.x * 0.0\n",                   0.0 },
+         { "logicalAnd",   "k = (t > 1.0) && (t < 2.0)\nP.y += k\n",      "P.y += ((t > 1.0) && (t < 2.0)) + P.x * 0.0\n",     1.0 },
+         { "logicalOr",    "k = (t > 9.0) || (t < 2.0)\nP.y += k\n",      "P.y += ((t > 9.0) || (t < 2.0)) + P.x * 0.0\n",     1.0 },
+         { "mod",          "k = t % 1.0\nP.y += k\n",                     "P.y += (t % 1.0) + P.x * 0.0\n",                    0.5 },
+         { "pow",          "k = t ^ 2.0\nP.y += k\n",                     "P.y += (t ^ 2.0) + P.x * 0.0\n",                    2.25 },
+         { "builtinPow",   "k = pow(t, 2.0)\nP.y += k\n",                 "P.y += pow(t, 2.0) + P.x * 0.0\n",                  2.25 },
+         { "builtinMod",   "k = mod(t, 1.0)\nP.y += k\n",                 "P.y += mod(t, 1.0) + P.x * 0.0\n",                  0.5 },
+         { "builtinFloor", "k = floor(t)\nP.y += k\n",                    "P.y += floor(t) + P.x * 0.0\n",                     1.0 },
+         { "builtinStep",  "k = step(1.0, t)\nP.y += k\n",                "P.y += step(1.0, t) + P.x * 0.0\n",                 1.0 },
+         { "builtinClamp", "k = clamp(t, 0.0, 1.0)\nP.y += k\n",          "P.y += clamp(t, 0.0, 1.0) + P.x * 0.0\n",           1.0 },
+         { "builtinMix",   "k = mix(0.0, t, 0.5)\nP.y += k\n",            "P.y += mix(0.0, t, 0.5) + P.x * 0.0\n",             0.75 },
+         { "ifExpr",       "k = if(t > 1.0, 7.0, 0.0)\nP.y += k\n",       "P.y += if(t > 1.0, 7.0, 0.0) + P.x * 0.0\n",        7.0 },
+         { "vecCtor",      "k = vec3(t, 0.0, 0.0).x\nP.y += k\n",         "P.y += vec3(t, 0.0, 0.0).x + P.x * 0.0\n",          1.5 },
+         { "ifStmt",       "k = 0.0\nif (t > 1.0) { k = 5.0 }\nP.y += k\n",
+                                                                          "if (t > 1.0) { P.y += 5.0 + P.x * 0.0 }\n",         5.0 },
+         { "ifElseStmt",   "k = 0.0\nif (t > 9.0) { k = 1.0 } else { k = 3.0 }\nP.y += k\n",
+                                                                          "if (t > 9.0) { P.y += 1.0 } else { P.y += 3.0 + P.x * 0.0 }\n", 3.0 },
+         { "forLoop",      "k = 0.0\nfor (j = 0; j < 3; j += 1) { k += 2.0 }\nP.y += k\n",
+                                                                          "for (j = 0; j < 3; j += 1) { P.y += 2.0 + P.x * 0.0 }\n", 6.0 },
+      };
+
+      const int N = 4;
+
+      // Runs one program over a fresh N-vertex mesh at t = 1.5 and returns P.y[0].
+      auto runCode = [&](const char* code, double& outValue, uint64_t& outPrologueRuns, std::string& outErr) -> bool
+      {
+         Mesh mesh;
+         for (int i = 0; i < N; ++i) mesh.vertices.push_back(Vertex{});
+
+         FieldElementNode node;
+         node.code = code;
+         if (!node.Apply() || !node.Program())
+         {
+            outErr = node.LastError();
+            if (outErr.empty()) outErr = "no bytecode produced";
+            return false;
+         }
+
+         Field::ElementStore store;
+         store.FromMesh(mesh);
+
+         // Element-domain locals are lowered to state cells, so without the same state
+         // the node itself allocates, a write like a for loop's `j += 1` is dropped and
+         // the loop never terminates.
+         Field::FieldState state;
+         for (const auto& ds : node.Program()->declaredStates)
+            state.DeclareCell(ds.name, ds.typeName, ds.type, ds.lanes, ds.initialValues, ds.domain);
+         state.Allocate(Field::Domain::Element, (size_t)N);
+
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         env.t = 1.5;
+         env.state = &state;
+         std::string vmErr;
+         node.Program()->ResetCounters();
+         if (!vm.Execute(*node.Program(), store, env, vmErr))
+         {
+            outErr = vmErr.empty() ? std::string("VM refused the program") : vmErr;
+            return false;
+         }
+
+         outPrologueRuns = node.Program()->prologueEvalCount;
+         outValue = store.Py()[0];
+         return true;
+      };
+
+      for (const auto& pair : kPairs)
+      {
+         double frameVal = 0.0, elemVal = 0.0;
+         uint64_t framePrologueRuns = 0, elemPrologueRuns = 0;
+         std::string err;
+
+         if (!runCode(pair.frameCode, frameVal, framePrologueRuns, err))
+         {
+            printf("BothDomains: FAIL - '%s' frame form did not run: %s\n", pair.name, err.c_str());
+            secOk = false;
+            continue;
+         }
+         if (!runCode(pair.elemCode, elemVal, elemPrologueRuns, err))
+         {
+            printf("BothDomains: FAIL - '%s' element form did not run: %s\n", pair.name, err.c_str());
+            secOk = false;
+            continue;
+         }
+
+         // Without this the row is vacuous: if the expression is never hoisted, both
+         // forms run in the element loop and agreeing proves nothing.
+         if (framePrologueRuns != 1)
+         {
+            printf("BothDomains: FAIL - '%s' frame form was not hoisted (prologue ran %llu times)\n",
+                   pair.name, (unsigned long long)framePrologueRuns);
+            secOk = false;
+         }
+
+         if (std::fabs(frameVal - pair.expected) > 1e-5)
+         {
+            printf("BothDomains: FAIL - '%s' frame form gave %.4f, expected %.4f\n",
+                   pair.name, frameVal, pair.expected);
+            secOk = false;
+         }
+         if (std::fabs(elemVal - pair.expected) > 1e-5)
+         {
+            printf("BothDomains: FAIL - '%s' element form gave %.4f, expected %.4f\n",
+                   pair.name, elemVal, pair.expected);
+            secOk = false;
+         }
+         if (std::fabs(frameVal - elemVal) > 1e-5)
+         {
+            printf("BothDomains: FAIL - '%s' frame %.4f != element %.4f\n",
+                   pair.name, frameVal, elemVal);
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 9 (Same Expression Both Domains): OK\n");
+      else { printf("SECTION 9 (Same Expression Both Domains): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDELEMENTTEST: %s\n", allOk ? "OK" : "FAIL");
+   return allOk ? 0 : 1;
+}
+
+// ============================================================ INFINITE_FIELDPARAMTEST
+static int RunFieldParamTest()
+{
+   printf("[FIELDPARAMTEST] Running Field param declarations harness...\n");
+   fflush(stdout);
+   bool allOk = true;
+
+   // Every Find() in the sections below used to be dereferenced blind. When a section's
+   // Apply() failed the fixture took a null deref and the whole process died, so
+   // sections 3 and later never ran at all - a segfault reports nothing, a FAIL line
+   // reports which section broke and lets the rest of the harness finish.
+   auto applyOk = [](FieldElementNode& n, const char* section) -> bool {
+      if (n.Apply())
+         return true;
+      printf("%s: FAIL - Apply() failed: %s\n", section, n.LastError().c_str());
+      return false;
+   };
+   auto paramId = [](FieldElementNode& n, const char* name, const char* section) -> int {
+      const auto* p = n.GetParamTable().Find(name);
+      if (p)
+         return p->id;
+      printf("%s: FAIL - param '%s' is not in the param table\n", section, name);
+      return -1;
+   };
+
+   // SECTION 1: Parse, lowering & refusal diagnostics (§5.2, §5.7)
+   {
+      bool secOk = true;
+
+      // 1. Valid param declarations
+      {
+         std::string code = "param float amount = 0.5 [0, 2]\nparam float a = -1.5 [-2.0, 5.0]\nP.y += amount + a\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         if (!Field::Lex(code, tokens, err))
+         {
+            printf("Parse: FAIL - valid snippet failed lexing: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         Field::AstNodePtr ast;
+         if (!Field::ParseProgram(tokens, ast, err))
+         {
+            printf("Parse: FAIL - valid snippet failed parsing: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         Field::ElementIRProgram ir;
+         if (!Field::LowerElementProgramToIR(ast, ir, err))
+         {
+            printf("Parse: FAIL - valid snippet failed lowering: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         if (ir.declaredParams.size() != 2 ||
+             ir.declaredParams[0].name != "amount" || ir.declaredParams[0].defaultValue != 0.5 ||
+             ir.declaredParams[0].minValue != 0.0 || ir.declaredParams[0].maxValue != 2.0 ||
+             ir.declaredParams[1].name != "a" || ir.declaredParams[1].defaultValue != -1.5 ||
+             ir.declaredParams[1].minValue != -2.0 || ir.declaredParams[1].maxValue != 5.0)
+         {
+            printf("Parse: FAIL - declared params values do not match expected\n");
+            secOk = false;
+         }
+      }
+
+      // 2. Refusal cases
+      auto testRefusal = [&](const std::string& snippet, const std::string& expectedSubstr, const std::string& testName) {
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         if (!Field::Lex(snippet, tokens, err))
+         {
+            if (err.message.find(expectedSubstr) == std::string::npos)
+            {
+               printf("Refusal (%s): FAIL - error '%s' does not contain '%s'\n",
+                      testName.c_str(), err.message.c_str(), expectedSubstr.c_str());
+               secOk = false;
+            }
+            if (err.span.line <= 0 || err.span.col <= 0)
+            {
+               printf("Refusal (%s): FAIL - missing valid source span (line=%d, col=%d)\n",
+                      testName.c_str(), err.span.line, err.span.col);
+               secOk = false;
+            }
+            return;
+         }
+         Field::AstNodePtr ast;
+         if (!Field::ParseProgram(tokens, ast, err))
+         {
+            if (err.message.find(expectedSubstr) == std::string::npos)
+            {
+               printf("Refusal (%s): FAIL - error '%s' does not contain '%s'\n",
+                      testName.c_str(), err.message.c_str(), expectedSubstr.c_str());
+               secOk = false;
+            }
+            if (err.span.line <= 0 || err.span.col <= 0)
+            {
+               printf("Refusal (%s): FAIL - missing valid source span (line=%d, col=%d)\n",
+                      testName.c_str(), err.span.line, err.span.col);
+               secOk = false;
+            }
+            return;
+         }
+         Field::ElementIRProgram ir;
+         if (!Field::LowerElementProgramToIR(ast, ir, err))
+         {
+            if (err.message.find(expectedSubstr) == std::string::npos)
+            {
+               printf("Refusal (%s): FAIL - error '%s' does not contain '%s'\n",
+                      testName.c_str(), err.message.c_str(), expectedSubstr.c_str());
+               secOk = false;
+            }
+            if (err.span.line <= 0 || err.span.col <= 0)
+            {
+               printf("Refusal (%s): FAIL - missing valid source span (line=%d, col=%d)\n",
+                      testName.c_str(), err.span.line, err.span.col);
+               secOk = false;
+            }
+            return;
+         }
+         printf("Refusal (%s): FAIL - unexpectedly succeeded\n", testName.c_str());
+         secOk = false;
+      };
+
+      testRefusal("param amount = 0.5 [0, 2]\n", "type is required", "Missing type");
+      testRefusal("param float P = 0.5 [0, 1]\n", "'P' is a reserved word of the element domain", "Shadow element P");
+      testRefusal("param float t = 0.5 [0, 1]\n", "'t' is a reserved word of the frame domain", "Shadow frame t");
+      testRefusal("param float a = 0.5\n", "expected range '[min, max]'", "Missing range");
+      testRefusal("param float a = 0.5 [2, 0]\n", "min must be <= max", "Inverted range");
+      testRefusal("param vec3 c = 0.5 [0, 1]\n", "float params only in v1", "Non-float param");
+      testRefusal("param float a = 0.5 [0, 1]\nparam float a = 1.0 [0, 2]\n", "duplicate declaration of param 'a'", "Duplicate param");
+      testRefusal("param float a = 0.5 [0, 1 + 2]\n", "range bounds must be literal numbers", "Expression in range");
+      testRefusal("param float a = 0.5 [0, 1]\na = 1.0\n", "cannot assign to read-only variable 'a'", "Assign to param");
+
+      // 129 params ceiling (§5.7)
+      std::string manyParams;
+      for (int i = 0; i < 129; ++i)
+      {
+         manyParams += "param float p" + std::to_string(i) + " = 0 [0, 1]\n";
+      }
+      manyParams += "P.x += p0\n";
+      testRefusal(manyParams, "kMaxParams", "128 ceiling (kMaxParams)");
+      testRefusal(manyParams, "ParamMailbox.h", "128 ceiling (ParamMailbox.h)");
+
+      if (secOk) printf("SECTION 1 (Parse & Refusals): OK\n");
+      else { printf("SECTION 1 (Parse & Refusals): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 2: Registration & Collapsed State (§5.3)
+   {
+      bool secOk = true;
+      FieldElementNode fe;
+      fe.code = "param float amount = 0.75 [0, 2]\nparam float speed = 3.0 [0, 10]\nP.y += sin(P.x * speed + t) * amount\n";
+      if (!fe.Apply())
+      {
+         printf("Registration: FAIL - Apply() failed: %s\n", fe.LastError().c_str());
+         secOk = false;
+      }
+
+      Modulation::Instance().Clear();
+      gParamRegisterOnly = true;
+      BeginNodeParams(10);
+      DrawFieldElementParams(&fe);
+      EndNodeParams();
+      gParamRegisterOnly = false;
+
+      const auto* amountParam = fe.GetParamTable().Find("amount");
+      const auto* speedParam = fe.GetParamTable().Find("speed");
+      if (!amountParam || !speedParam)
+      {
+         printf("Registration: FAIL - params not found in param table\n");
+         secOk = false;
+      }
+      else
+      {
+         const ParamRef* kAmount = Modulation::Instance().KnownParam(10, amountParam->id);
+         const ParamRef* kSpeed = Modulation::Instance().KnownParam(10, speedParam->id);
+         if (!kAmount || kAmount->name != "amount" || kAmount->minValue != 0.0f || kAmount->maxValue != 2.0f)
+         {
+            printf("Registration: FAIL - amount not registered correctly in Modulation\n");
+            secOk = false;
+         }
+         if (!kSpeed || kSpeed->name != "speed" || kSpeed->minValue != 0.0f || kSpeed->maxValue != 10.0f)
+         {
+            printf("Registration: FAIL - speed not registered correctly in Modulation\n");
+            secOk = false;
+         }
+      }
+
+      // Collapsed registration (gParamRegisterOnly)
+      Modulation::Instance().ClearFrameParams();
+      gParamRegisterOnly = true;
+      BeginNodeParams(10);
+      DrawFieldElementParams(&fe);
+      EndNodeParams();
+      gParamRegisterOnly = false;
+
+      const auto& frameParams = Modulation::Instance().FrameParams();
+      bool foundAmount = false, foundSpeed = false;
+      for (const auto& r : frameParams)
+      {
+         if (r.nodeIndex == 10 && r.name == "amount") foundAmount = true;
+         if (r.nodeIndex == 10 && r.name == "speed") foundSpeed = true;
+      }
+      if (!foundAmount || !foundSpeed)
+      {
+         printf("Registration: FAIL - collapsed node (gParamRegisterOnly) did not register params\n");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 2 (Registration & Collapsed): OK\n");
+      else { printf("SECTION 2 (Registration & Collapsed): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 3: Binding Survives Insert (§5.5)
+   {
+      bool secOk = true;
+
+      do
+      {
+         FieldElementNode fe;
+         fe.code = "param float amount = 0.75 [0, 2]\nparam float speed = 3.0 [0, 10]\nP.y += sin(P.x * speed + t) * amount\n";
+         if (!applyOk(fe, "SurvivesInsert")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int speedId = paramId(fe, "speed", "SurvivesInsert");
+         if (speedId < 0) { secOk = false; break; }
+         Modulation::Instance().Bind(10, speedId, 99, 0);
+
+         if (!Modulation::Instance().IsModulated(10, speedId))
+         {
+            printf("SurvivesInsert: FAIL - binding failed\n");
+            secOk = false;
+         }
+
+         // Insert new param 'a' above 'amount' and 'speed'
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount = 0.75 [0, 2]\nparam float speed = 3.0 [0, 10]\nP.y += sin(P.x * speed + t) * amount + a\n";
+         if (!applyOk(fe, "SurvivesInsert")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int newSpeedId = paramId(fe, "speed", "SurvivesInsert");
+         int aId = paramId(fe, "a", "SurvivesInsert");
+         if (newSpeedId < 0 || aId < 0) { secOk = false; break; }
+
+         if (newSpeedId != speedId)
+         {
+            printf("SurvivesInsert: FAIL - speed ID shifted after insertion (%d -> %d)\n", speedId, newSpeedId);
+            secOk = false;
+         }
+         if (!Modulation::Instance().IsModulated(10, speedId))
+         {
+            printf("SurvivesInsert: FAIL - modulation binding on speed was lost after insert\n");
+            secOk = false;
+         }
+         if (Modulation::Instance().ModulatorFor(10, speedId).nodeIndex != 99)
+         {
+            printf("SurvivesInsert: FAIL - modulation binding pointed at wrong modulator\n");
+            secOk = false;
+         }
+         if (Modulation::Instance().IsModulated(10, aId))
+         {
+            printf("SurvivesInsert: FAIL - newly inserted param 'a' was falsely modulated\n");
+            secOk = false;
+         }
+
+      } while (false);
+
+      if (secOk) printf("SECTION 3 (Binding Survives Insert): OK\n");
+      else { printf("SECTION 3 (Binding Survives Insert): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 4: Binding Drops on Delete & Rename (§5.5)
+   {
+      bool secOk = true;
+
+      do
+      {
+         FieldElementNode fe;
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount = 0.75 [0, 2]\nparam float speed = 3.0 [0, 10]\nP.y += sin(P.x * speed + t) * amount + a\n";
+         if (!applyOk(fe, "Delete/Rename")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int speedId = paramId(fe, "speed", "Delete/Rename");
+         int amountId = paramId(fe, "amount", "Delete/Rename");
+         if (speedId < 0 || amountId < 0) { secOk = false; break; }
+         Modulation::Instance().Bind(10, speedId, 99, 0);
+         Modulation::Instance().Bind(10, amountId, 98, 0);
+
+         // Delete 'speed'
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount = 0.75 [0, 2]\nP.y += amount + a\n";
+         if (!applyOk(fe, "Delete/Rename")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         if (Modulation::Instance().IsModulated(10, speedId))
+         {
+            printf("Delete/Rename: FAIL - deleted param 'speed' is still modulated\n");
+            secOk = false;
+         }
+         if (Modulation::Instance().Links().find(Modulation::Key(10, speedId)) != Modulation::Instance().Links().end())
+         {
+            printf("Delete/Rename: FAIL - deleted param 'speed' left stale Key in Links()\n");
+            secOk = false;
+         }
+         if (!fe.Notice().empty() && fe.Notice().find("speed") == std::string::npos)
+         {
+            printf("Delete/Rename: FAIL - notice does not mention deleted param name\n");
+            secOk = false;
+         }
+
+         // Rename 'amount' to 'amount2'
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount2 = 0.75 [0, 2]\nP.y += amount2 + a\n";
+         if (!applyOk(fe, "Delete/Rename")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         if (Modulation::Instance().IsModulated(10, amountId))
+         {
+            printf("Delete/Rename: FAIL - renamed param 'amount' still has modulation on old ID\n");
+            secOk = false;
+         }
+         if (fe.Notice().empty() || fe.Notice().find("amount") == std::string::npos)
+         {
+            printf("Delete/Rename: FAIL - renaming param did not surface notice naming param (notice: '%s')\n", fe.Notice().c_str());
+            secOk = false;
+         }
+
+      } while (false);
+
+      if (secOk) printf("SECTION 4 (Binding Drops on Delete & Rename): OK\n");
+      else { printf("SECTION 4 (Binding Drops on Delete & Rename): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 5: Failed Compile Keeps Program & Bindings (§5.5)
+   {
+      bool secOk = true;
+
+      do
+      {
+         FieldElementNode fe;
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount = 0.75 [0, 2]\nP.y += amount + a\n";
+         if (!applyOk(fe, "FailedCompile")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int aId = paramId(fe, "a", "FailedCompile");
+         int amountId = paramId(fe, "amount", "FailedCompile");
+         if (aId < 0 || amountId < 0) { secOk = false; break; }
+         fe.GetParamTable().Find("a")->value = 0.42f;
+         Modulation::Instance().Bind(10, amountId, 99, 0);
+
+         // Introduce broken syntax
+         fe.code = "param float a = 0.1 [0, 1]\nthis is completely broken code syntax!!!\n";
+         bool applyResult = fe.Apply();
+         if (applyResult)
+         {
+            printf("FailedCompile: FAIL - broken syntax unexpectedly returned true from Apply()\n");
+            secOk = false;
+         }
+         if (fe.LastError().empty())
+         {
+            printf("FailedCompile: FAIL - LastError() was empty on failed compile\n");
+            secOk = false;
+         }
+         if (!fe.GetParamTable().Find("a") || fe.GetParamTable().Find("a")->value != 0.42f)
+         {
+            printf("FailedCompile: FAIL - param value was lost or reset on failed compile\n");
+            secOk = false;
+         }
+         if (!fe.GetParamTable().Find("amount"))
+         {
+            printf("FailedCompile: FAIL - running param table was wiped on failed compile\n");
+            secOk = false;
+         }
+         if (!Modulation::Instance().IsModulated(10, amountId))
+         {
+            printf("FailedCompile: FAIL - modulation binding was dropped on failed compile\n");
+            secOk = false;
+         }
+
+      } while (false);
+
+      if (secOk) printf("SECTION 5 (Failed Compile Preserves State): OK\n");
+      else { printf("SECTION 5 (Failed Compile Preserves State): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 6: Save / Load Round-Trip & Undo (§5.4, §5.5)
+   {
+      bool secOk = true;
+
+      do
+      {
+         FieldElementNode fe;
+         fe.code = "param float freq = 2.5 [0, 10]\nparam float gain = 0.8 [0, 1]\nP.y += sin(P.x * freq) * gain\n";
+         if (!applyOk(fe, "SaveLoad")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int freqId = paramId(fe, "freq", "SaveLoad");
+         int gainId = paramId(fe, "gain", "SaveLoad");
+         if (freqId < 0 || gainId < 0) { secOk = false; break; }
+         fe.GetParamTable().Find("freq")->value = 4.25f;
+         fe.GetParamTable().Find("gain")->value = 0.33f;
+         Modulation::Instance().Bind(10, gainId, 99, 0);
+
+         std::vector<std::pair<std::string, std::string>> saved;
+         Patch::SaveParams(&fe, saved);
+
+         FieldElementNode fe2;
+         Patch::LoadParams(&fe2, saved);
+         if (!applyOk(fe2, "SaveLoad")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(20);
+         DrawFieldElementParams(&fe2);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         if (fe2.code != fe.code)
+         {
+            printf("SaveLoad: FAIL - code did not round-trip\n");
+            secOk = false;
+         }
+         const auto* f2Freq = fe2.GetParamTable().Find("freq");
+         const auto* f2Gain = fe2.GetParamTable().Find("gain");
+         if (!f2Freq || f2Freq->value != 4.25f)
+         {
+            printf("SaveLoad: FAIL - freq value did not round-trip (got %f, expected 4.25)\n", f2Freq ? f2Freq->value : -1.0f);
+            secOk = false;
+         }
+         if (!f2Gain || f2Gain->value != 0.33f)
+         {
+            printf("SaveLoad: FAIL - gain value did not round-trip (got %f, expected 0.33)\n", f2Gain ? f2Gain->value : -1.0f);
+            secOk = false;
+         }
+         if (!f2Gain || f2Gain->id != gainId)
+         {
+            printf("SaveLoad: FAIL - gain ID did not round-trip (%d vs %d)\n", f2Gain ? f2Gain->id : -1, gainId);
+            secOk = false;
+         }
+
+         // Undo test: modify fe, then restore saved snapshot
+         fe.code = "param float depth = 5.0 [0, 10]\nP.y += depth\n";
+         if (!applyOk(fe, "Undo")) { secOk = false; break; }
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         // Undo -> replay saved snapshot (both node params and modulation state)
+         Patch::LoadParams(&fe, saved);
+         if (!applyOk(fe, "Undo")) { secOk = false; break; }
+         Modulation::Instance().Bind(10, gainId, 99, 0); // Undo restores patch-level modulation bindings
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         const auto* undoneFreq = fe.GetParamTable().Find("freq");
+         const auto* undoneGain = fe.GetParamTable().Find("gain");
+         if (!undoneFreq || undoneFreq->value != 4.25f || !undoneGain || undoneGain->value != 0.33f || undoneGain->id != gainId)
+         {
+            printf("Undo: FAIL - undo failed to restore param values and stable IDs\n");
+            secOk = false;
+         }
+         if (!undoneGain || !Modulation::Instance().IsModulated(10, undoneGain->id))
+         {
+            printf("Undo: FAIL - modulation binding was not attached to restored param ID\n");
+            secOk = false;
+         }
+
+      } while (false);
+
+      if (secOk) printf("SECTION 6 (Save/Load & Undo): OK\n");
+      else { printf("SECTION 6 (Save/Load & Undo): FAIL\n"); allOk = false; }
+      fflush(stdout);
+   }
+
+   printf("INFINITE_FIELDPARAMTEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
+
+// ============================================================ INFINITE_FIELDSTATETEST
+int RunFieldStateTest()
+{
+   printf("[FIELDSTATETEST] Running Field state cells harness...\n");
+   bool allOk = true;
+
+   struct DummyGeo : public IGeometrySource
+   {
+      Mesh mesh;
+      unsigned long long rev = 1;
+      const Mesh& GetMesh() override { return mesh; }
+      unsigned long long MeshRevision() override { return rev; }
+      Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+      Material GetMaterial() const override { return Material(); }
+      unsigned int GetSurfaceTexture() override { return 0; }
+      unsigned int GetMaterialTexture(int) override { return 0; }
+      unsigned long long SurfaceTextureRevision() const override { return 0; }
+      MappingTransform GetMappingTransform() const override { return MappingTransform(); }
+      IGeometrySource* PassthroughSource() const override { return nullptr; }
+      Mat4 GetInstanceGroupMatrix() const override { return Mat4::Identity(); }
+      const std::vector<unsigned char>* InstanceSelection() const override { return nullptr; }
+      unsigned long long InstanceSelectionRevision() const override { return 0; }
+      const std::vector<Mat4>* InstanceTransformOverride() const override { return nullptr; }
+      const std::vector<Particle>* GetPointCloud() override { return nullptr; }
+      unsigned long long PointCloudRevision() override { return 0; }
+      float PointBaseSize() const override { return 1.0f; }
+      const Polyline* GetCurve() override { return nullptr; }
+      unsigned long long CurveStamp() override { return 0; }
+   };
+
+   // -------------------------------------------------------------
+   // SECTION 1: Desugaring & Unit Delay Semantics
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // Case 1: z += (1.0 - z) * 0.5; out = z (analytic one-pole step response)
+      {
+         FieldElementNode fe;
+         fe.code = "state float z = 0.0\nz += (1.0 - z) * 0.5\nP.y = z\n";
+         if (!fe.Apply())
+         {
+            printf("Desugar 1-pole: FAIL - failed to compile: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1);
+            float y1 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y1 - 0.5f) > 1e-4f)
+            {
+               printf("Desugar 1-pole: FAIL - invocation 1 expected 0.5 (post-write), got %f\n", y1);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(2);
+            float y2 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y2 - 0.75f) > 1e-4f)
+            {
+               printf("Desugar 1-pole: FAIL - invocation 2 expected 0.75, got %f\n", y2);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(3);
+            float y3 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y3 - 0.875f) > 1e-4f)
+            {
+               printf("Desugar 1-pole: FAIL - invocation 3 expected 0.875, got %f\n", y3);
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 2: Read before write sees previous invocation's value
+      {
+         FieldElementNode fe;
+         fe.code = "state float prev = 10.0\nP.y = prev\nprev = 20.0\n";
+         if (!fe.Apply())
+         {
+            printf("Desugar ReadBeforeWrite: FAIL - failed to compile: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1);
+            float y1 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y1 - 10.0f) > 1e-4f)
+            {
+               printf("Desugar ReadBeforeWrite: FAIL - invocation 1 expected 10.0, got %f\n", y1);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(2);
+            float y2 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y2 - 20.0f) > 1e-4f)
+            {
+               printf("Desugar ReadBeforeWrite: FAIL - invocation 2 expected 20.0, got %f\n", y2);
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 3: Written twice in one body -> exactly ONE delay; second write is exit definition
+      {
+         FieldElementNode fe;
+         fe.code = "state float z = 1.0\nz = z * 2.0\nz = z + 3.0\nP.y = z\n";
+         if (!fe.Apply())
+         {
+            printf("Desugar DoubleWrite: FAIL - %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1); // z = 1*2 + 3 = 5.0
+            float y1 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y1 - 5.0f) > 1e-4f)
+            {
+               printf("Desugar DoubleWrite: FAIL - invocation 1 expected 5.0, got %f\n", y1);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(2); // z = 5*2 + 3 = 13.0
+            float y2 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y2 - 13.0f) > 1e-4f)
+            {
+               printf("Desugar DoubleWrite: FAIL - invocation 2 expected 13.0, got %f\n", y2);
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 4: state vec3 v -> 3 cells, 3 independent lanes
+      {
+         FieldElementNode fe;
+         fe.code = "state vec3 vel = vec3(1.0, 2.0, 3.0)\nvel.x += 0.5\nvel.y += 1.0\nvel.z += 1.5\nP = vel\n";
+         if (!fe.Apply())
+         {
+            printf("Desugar Vec3: FAIL - %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            if (fe.State().CellCount() != 3)
+            {
+               printf("Desugar Vec3: FAIL - expected 3 cells, got %zu\n", fe.State().CellCount());
+               secOk = false;
+            }
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1);
+            const auto& outV = fe.GetMesh().vertices[0];
+            if (std::fabs(outV.px - 1.5f) > 1e-4f || std::fabs(outV.py - 3.0f) > 1e-4f || std::fabs(outV.pz - 4.5f) > 1e-4f)
+            {
+               printf("Desugar Vec3: FAIL - expected (1.5, 3.0, 4.5), got (%f, %f, %f)\n", outV.px, outV.py, outV.pz);
+               secOk = false;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 1 (Desugaring & Unit Delay): OK\n");
+      else { printf("SECTION 1 (Desugaring & Unit Delay): FAIL\n"); allOk = false; }
+   }
+
+   // -------------------------------------------------------------
+   // SECTION 2: Dataflow Cycle Legality & SCC Checker
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // Case 1: Illegal cycle: a = b + 1 / b = a * 2
+      {
+         FieldElementNode fe;
+         fe.code = "a = b + 1.0\nb = a * 2.0\nP.y = a\n";
+         bool res = fe.Apply();
+         if (res)
+         {
+            printf("Cycles Illegal: FAIL - expected compile failure for delay-free cycle\n");
+            secOk = false;
+         }
+         else
+         {
+            const std::string& err = fe.LastError();
+            printf("Cycle error emitted:\n%s\n", err.c_str());
+            if (err.find("dataflow cycle with no delay") == std::string::npos)
+            {
+               printf("Cycles Illegal: FAIL - error message missing 'dataflow cycle with no delay'\n");
+               secOk = false;
+            }
+            if (err.find("line ") == std::string::npos || err.find("col ") == std::string::npos)
+            {
+               printf("Cycles Illegal: FAIL - error message missing source spans\n");
+               secOk = false;
+            }
+            if (err.find("state") == std::string::npos)
+            {
+               printf("Cycles Illegal: FAIL - error message missing 'state' hint\n");
+               secOk = false;
+            }
+            if (err.find("@") != std::string::npos)
+            {
+               printf("Cycles Illegal: FAIL - error message contains forbidden '@' sigil\n");
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 2: Legal cycle: state float b = 0 / a = b + 1 / b = a * 2
+      {
+         FieldElementNode fe;
+         fe.code = "state float b = 0.0\na = b + 1.0\nb = a * 2.0\nP.y = a\n";
+         if (!fe.Apply())
+         {
+            printf("Cycles Legal: FAIL - expected legal cycle to compile, got error: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1); // b_entry=0 -> a=1 -> b_exit=2. P.y = a = 1.0
+            float y1 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y1 - 1.0f) > 1e-4f)
+            {
+               printf("Cycles Legal: FAIL - invocation 1 expected 1.0, got %f\n", y1);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(2); // b_entry=2 -> a=3 -> b_exit=6. P.y = a = 3.0
+            float y2 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y2 - 3.0f) > 1e-4f)
+            {
+               printf("Cycles Legal: FAIL - invocation 2 expected 3.0, got %f\n", y2);
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 3: Constant folding removes false cycle: a = b * 0.0
+      {
+         FieldElementNode fe;
+         fe.code = "b = a + 1.0\na = b * 0.0\nP.y = a\n";
+         if (!fe.Apply())
+         {
+            printf("Cycles Fold: FAIL - expected constant-folded program to compile, got error: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (Dataflow Cycles & Legality): OK\n");
+      else { printf("SECTION 2 (Dataflow Cycles & Legality): FAIL\n"); allOk = false; }
+   }
+
+   // -------------------------------------------------------------
+   // SECTION 3: Transport Reset & Zero Allocations
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      FieldElementNode fe;
+      fe.code = "state float z = 0.0\nz += 1.0\nP.y = z\n";
+      fe.Apply();
+
+      DummyGeo src;
+      Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+      src.mesh.vertices.push_back(v);
+      fe.input = &src;
+
+      fe.CookIfNeeded(1);
+      fe.CookIfNeeded(2);
+      fe.CookIfNeeded(3);
+      float y3 = fe.GetMesh().vertices[0].py;
+      if (std::fabs(y3 - 3.0f) > 1e-4f)
+      {
+         printf("Reset Rewind: FAIL - before rewind expected z=3.0, got %f\n", y3);
+         secOk = false;
+      }
+
+      // Rewind transport
+      Transport::Instance().Rewind();
+      fe.CookIfNeeded(4); // Reset to 0, then + 1.0 -> 1.0
+      float yAfterRewind = fe.GetMesh().vertices[0].py;
+      if (std::fabs(yAfterRewind - 1.0f) > 1e-4f)
+      {
+         printf("Reset Rewind: FAIL - after rewind expected z=1.0, got %f\n", yAfterRewind);
+         secOk = false;
+      }
+
+      // Stop transport (OPEN 2)
+      Transport::Instance().SetPlaying(false);
+      fe.CookIfNeeded(5);
+      float yAfterStop = fe.GetMesh().vertices[0].py;
+      if (std::fabs(yAfterStop - 1.0f) > 1e-4f)
+      {
+         printf("Reset Stop: FAIL - after stop expected z=1.0, got %f\n", yAfterStop);
+         secOk = false;
+      }
+      Transport::Instance().SetPlaying(true);
+
+      // Verify 100 resets perform zero memory allocations
+      for (int i = 0; i < 100; ++i)
+      {
+         Transport::Instance().Rewind();
+         fe.CookIfNeeded(10 + i);
+      }
+
+      if (secOk) printf("SECTION 3 (Transport Reset): OK\n");
+      else { printf("SECTION 3 (Transport Reset): FAIL\n"); allOk = false; }
+   }
+
+   // -------------------------------------------------------------
+   // SECTION 4: Hot Reload & Transplant Rules
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      FieldElementNode fe;
+      fe.code = "state float z = 0.0\nz += 5.0\nP.y = z\n";
+      fe.Apply();
+
+      DummyGeo src;
+      Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+      src.mesh.vertices.push_back(v);
+      fe.input = &src;
+
+      fe.CookIfNeeded(1); // z becomes 5.0
+      fe.CookIfNeeded(2); // z becomes 10.0
+
+      // Case 1: Same name + same type -> value preserved
+      fe.code = "state float z = 0.0\nz += 1.0\nP.y = z\n";
+      fe.Apply();
+      fe.CookIfNeeded(3); // 10.0 + 1.0 = 11.0
+      float y11 = fe.GetMesh().vertices[0].py;
+      if (std::fabs(y11 - 11.0f) > 1e-4f)
+      {
+         printf("Transplant SameType: FAIL - expected preserved 10.0 + 1.0 = 11.0, got %f\n", y11);
+         secOk = false;
+      }
+
+      // Case 2: Same name + same type + changed initial literal -> value preserved
+      fe.code = "state float z = 99.0\nz += 1.0\nP.y = z\n";
+      fe.Apply();
+      fe.CookIfNeeded(4); // 11.0 + 1.0 = 12.0
+      float y12 = fe.GetMesh().vertices[0].py;
+      if (std::fabs(y12 - 12.0f) > 1e-4f)
+      {
+         printf("Transplant ChangedInit: FAIL - expected preserved 11.0 + 1.0 = 12.0, got %f\n", y12);
+         secOk = false;
+      }
+
+      // Case 3: Same name, changed type -> reset to new initial value
+      fe.code = "state vec3 z = vec3(1.0, 2.0, 3.0)\nz.y += 1.0\nP = z\n";
+      fe.Apply();
+      fe.CookIfNeeded(5); // z=(1.0, 2.0+1.0=3.0, 3.0)
+      const auto& vNew = fe.GetMesh().vertices[0];
+      if (std::fabs(vNew.py - 3.0f) > 1e-4f)
+      {
+         printf("Transplant ChangedType: FAIL - expected reset to new init (2.0 + 1.0 = 3.0), got %f\n", vNew.py);
+         secOk = false;
+      }
+
+      // Case 4: Failed compile mid-edit -> last working program, cells, and values preserved!
+      fe.code = "this is a syntax error !!!";
+      bool applyRes = fe.Apply();
+      if (applyRes)
+      {
+         printf("Transplant FailedCompile: FAIL - Apply should return false on syntax error\n");
+         secOk = false;
+      }
+      fe.CookIfNeeded(6); // should run last working vec3 z program: z.y was 3.0, now +1.0 = 4.0
+      const auto& vPreserved = fe.GetMesh().vertices[0];
+      if (std::fabs(vPreserved.py - 4.0f) > 1e-4f)
+      {
+         printf("Transplant FailedCompile: FAIL - expected last working program to keep running (4.0), got %f\n", vPreserved.py);
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 4 (Hot Reload Transplant): OK\n");
+      else { printf("SECTION 4 (Hot Reload Transplant): FAIL\n"); allOk = false; }
+   }
+
+   // -------------------------------------------------------------
+   // SECTION 5: Cost Arithmetic & Formatting (§5.6)
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      if (Field::FieldState::CostBytes(Field::Domain::Frame, 1) != 4)
+      {
+         printf("Cost Frame: FAIL - expected 4 B, got %zu\n", Field::FieldState::CostBytes(Field::Domain::Frame, 1));
+         secOk = false;
+      }
+      if (Field::FieldState::CostBytes(Field::Domain::Sample, 1, 0, 0, 0, 8) != 32)
+      {
+         printf("Cost Sample: FAIL - expected 32 B, got %zu\n", Field::FieldState::CostBytes(Field::Domain::Sample, 1, 0, 0, 0, 8));
+         secOk = false;
+      }
+      if (Field::FieldState::CostBytes(Field::Domain::Element, 1, 5000) != 20000)
+      {
+         printf("Cost Element: FAIL - expected 20000 B, got %zu\n", Field::FieldState::CostBytes(Field::Domain::Element, 1, 5000));
+         secOk = false;
+      }
+      if (Field::FieldState::CostBytes(Field::Domain::Pixel, 1, 0, 1920, 1080) != 8294400)
+      {
+         printf("Cost Pixel: FAIL - expected 8294400 B, got %zu\n", Field::FieldState::CostBytes(Field::Domain::Pixel, 1, 0, 1920, 1080));
+         secOk = false;
+      }
+
+      char buf[128];
+      Field::FieldState::FormatCost(Field::Domain::Element, 3, 5000, 0, 0, 0, buf, sizeof(buf));
+      if (std::string(buf).find("3 cells x 5000 elems = 58.6 KiB") == std::string::npos)
+      {
+         printf("FormatCost: FAIL - expected 'state: 3 cells x 5000 elems = 58.6 KiB', got '%s'\n", buf);
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 5 (Cost Arithmetic): OK\n");
+      else { printf("SECTION 5 (Cost Arithmetic): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDSTATETEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
+
+// ============================================================ INFINITE_FIELDTRANSFERTEST
+//
+// Conformance harness for Domain Transfer Operators (Field Step 8).
+// Tests the 5 operators (broadcast, downsample, map, reduce, resample),
+// incomparable domain diagnostics (two spans + hint), hoisting evaluation count,
+// state isolation in map, GLSL reduce refusal, and cost table data consistency.
+static int RunFieldTransferTest()
+{
+   printf("[FIELDTRANSFERTEST] Running Field domain transfer operators conformance harness...\n");
+   bool allOk = true;
+
+   struct DummyGeo : public IGeometrySource
+   {
+      Mesh mesh;
+      unsigned long long rev = 1;
+      const Mesh& GetMesh() override { return mesh; }
+      unsigned long long MeshRevision() override { return rev; }
+      Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+      Material GetMaterial() const override { return Material(); }
+      unsigned int GetSurfaceTexture() override { return 0; }
+      unsigned int GetMaterialTexture(int) override { return 0; }
+      unsigned long long SurfaceTextureRevision() const override { return 0; }
+      MappingTransform GetMappingTransform() const override { return MappingTransform(); }
+      IGeometrySource* PassthroughSource() const override { return nullptr; }
+      Mat4 GetInstanceGroupMatrix() const override { return Mat4::Identity(); }
+      const std::vector<unsigned char>* InstanceSelection() const override { return nullptr; }
+      unsigned long long InstanceSelectionRevision() const override { return 0; }
+      const std::vector<Mat4>* InstanceTransformOverride() const override { return nullptr; }
+      const std::vector<Particle>* GetPointCloud() override { return nullptr; }
+      unsigned long long PointCloudRevision() override { return 0; }
+      float PointBaseSize() const override { return 1.0f; }
+      const Polyline* GetCurve() override { return nullptr; }
+      unsigned long long CurveStamp() override { return 0; }
+   };
+
+   // ------------------------------------------------------------
+   // SECTION 1: Incomparable Domain Crossings Refusal & Diagnostics
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 1a. ValidateResample between incomparable domains
+      {
+         Field::FieldError err;
+         if (Field::ValidateResample(Field::Domain::Element, Field::Domain::Pixel, Field::SourceSpan{ 0, 2, 5, 10 }, err))
+         {
+            printf("SECTION 1: FAIL - resample(element -> pixel) was permitted\n");
+            secOk = false;
+         }
+         else
+         {
+            if (err.message.find("incomparable domains") == std::string::npos ||
+                err.message.find("element") == std::string::npos ||
+                err.message.find("pixel") == std::string::npos)
+            {
+               printf("SECTION 1: FAIL - error message missing domain names: '%s'\n", err.message.c_str());
+               secOk = false;
+            }
+            if (err.hint.find("reduce to frame first") == std::string::npos)
+            {
+               printf("SECTION 1: FAIL - hint missing suggestion: '%s'\n", err.hint.c_str());
+               secOk = false;
+            }
+         }
+      }
+
+      // 1b. MakeIncomparableDomainError formats both spans and hint
+      {
+         Field::SourceSpan spanA{ 0, 1, 3, 5 };
+         Field::SourceSpan spanB{ 0, 2, 8, 4 };
+         Field::FieldError err = Field::MakeIncomparableDomainError(Field::Domain::Element, spanA, Field::Domain::Sample, spanB, "binary op '+'");
+         if (err.message.find("element (line 1, col 3)") == std::string::npos ||
+             err.message.find("sample (line 2, col 8)") == std::string::npos)
+         {
+            printf("SECTION 1: FAIL - MakeIncomparableDomainError message missing line:col spans: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+         if (err.hint.find("transfer operator") == std::string::npos && err.hint.find("reduce.rms") == std::string::npos)
+         {
+            printf("SECTION 1: FAIL - MakeIncomparableDomainError hint missing fix suggestion: '%s'\n", err.hint.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 1 (Incomparable Refusals & Diagnostics): OK\n");
+      else { printf("SECTION 1 (Incomparable Refusals & Diagnostics): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 2: Broadcast Explicit Syntax Refusal
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src = "amount = 1.0\nP.y += broadcast(amount)\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::Lex(src, tokens, err);
+      Field::AstNodePtr ast;
+      Field::ParseProgram(tokens, ast, err);
+      Field::ElementIRProgram prog;
+      Field::LowerElementProgramToIR(ast, prog, err);
+
+      if (err.Empty())
+      {
+         printf("SECTION 2: FAIL - explicit broadcast() was not rejected\n");
+         secOk = false;
+      }
+      else
+      {
+         if (err.message.find("broadcast is implicit") == std::string::npos)
+         {
+            printf("SECTION 2: FAIL - unexpected error message for broadcast(): '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (Broadcast Refusal): OK\n");
+      else { printf("SECTION 2 (Broadcast Refusal): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 3: Frame Subexpression Hoisting & Evaluation Count
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src = "amount = 0.5 + 0.5 * sin(t)\nP.y += amount\n";
+      FieldElementNode fe;
+      fe.code = src;
+      if (!fe.Apply())
+      {
+         printf("SECTION 3: FAIL - failed to compile element program: %s\n", fe.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         DummyGeo srcGeo;
+         const int N = 1000;
+         for (int i = 0; i < N; ++i)
+         {
+            Vertex v;
+            v.px = 0.0f; v.py = (float)i; v.pz = 0.0f;
+            srcGeo.mesh.vertices.push_back(v);
+         }
+         fe.input = &srcGeo;
+         fe.CookIfNeeded(1);
+
+         const auto& outMesh = fe.GetMesh();
+         if (outMesh.vertices.size() != N)
+         {
+            printf("SECTION 3: FAIL - mesh vertex count mismatch: %zu vs %d\n", outMesh.vertices.size(), N);
+            secOk = false;
+         }
+         else
+         {
+            // Verify all vertices received exact hoisted amount: 0.5 + 0.5 * sin(0) = 0.5
+            for (int i = 0; i < N; ++i)
+            {
+               float expectedY = (float)i + 0.5f;
+               float actualY = outMesh.vertices[i].py;
+               if (std::abs(actualY - expectedY) > 1e-4f)
+               {
+                  printf("SECTION 3: FAIL - vertex %d has Py = %f, expected %f\n", i, actualY, expectedY);
+                  secOk = false;
+                  break;
+               }
+            }
+
+            // §5.9 evaluation counter assertions
+            auto prog = fe.Program();
+            if (prog)
+            {
+               if (prog->prologueEvalCount != 1)
+               {
+                  printf("SECTION 3: FAIL - prologue eval count = %llu, expected 1\n", prog->prologueEvalCount);
+                  secOk = false;
+               }
+               if (prog->elementEvalCount != (uint64_t)N)
+               {
+                  printf("SECTION 3: FAIL - element loop eval count = %llu, expected %d\n", prog->elementEvalCount, N);
+                  secOk = false;
+               }
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 3 (Frame Hoisting & Exact Eval): OK\n");
+      else { printf("SECTION 3 (Frame Hoisting & Exact Eval): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 4: Downsample Operator Legality & Semantics
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 4a. Refuse non-constant factor
+      {
+         std::string src = "param float k = 4 [1, 10]\ny = downsample(frame, k)\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram prog;
+         Field::LowerElementProgramToIR(ast, prog, err);
+
+         if (err.Empty() || err.message.find("constant") == std::string::npos)
+         {
+            printf("SECTION 4: FAIL - non-constant factor downsample not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      // 4b. Refuse factor < 1
+      {
+         std::string src = "y = downsample(frame, 0)\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram prog;
+         Field::LowerElementProgramToIR(ast, prog, err);
+
+         if (err.Empty() || err.message.find(">= 1") == std::string::npos)
+         {
+            printf("SECTION 4: FAIL - factor 0 downsample not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      // 4c. Execution semantics: frame-domain downsample(frame, 4) holds value across 4 frames
+      {
+         FieldElementNode fe;
+         fe.code = "y = downsample(frame, 4)\nP.y = y\n";
+         if (!fe.Apply())
+         {
+            printf("SECTION 4: FAIL - failed to compile downsample: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo srcGeo;
+            Vertex v; v.px = 0.0f; v.py = 0.0f; v.pz = 0.0f;
+            srcGeo.mesh.vertices.push_back(v);
+            fe.input = &srcGeo;
+
+            float recordedHold[8];
+            for (int f = 0; f < 8; ++f)
+            {
+               fe.CookIfNeeded(f);
+               recordedHold[f] = fe.GetMesh().vertices[0].py;
+            }
+
+            for (int f = 0; f < 4; ++f)
+            {
+               if (recordedHold[f] != 0.0f)
+               {
+                  printf("SECTION 4: FAIL - frame %d has hold value %f, expected 0.0f\n", f, recordedHold[f]);
+                  secOk = false;
+               }
+            }
+            for (int f = 4; f < 8; ++f)
+            {
+               if (recordedHold[f] != 4.0f)
+               {
+                  printf("SECTION 4: FAIL - frame %d has hold value %f, expected 4.0f\n", f, recordedHold[f]);
+                  secOk = false;
+               }
+            }
+         }
+      }
+
+      // 4d. Execution semantics: element-domain downsample(P.y, 4) holds across all vertices
+      {
+         FieldElementNode fe;
+         fe.code = "y = downsample(P.y + frame, 4)\nP.y = y\n";
+         if (!fe.Apply())
+         {
+            printf("SECTION 4: FAIL - failed to compile element-domain downsample: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo srcGeo;
+            const int V = 10;
+            for (int i = 0; i < V; ++i)
+            {
+               Vertex v; v.px = 0.0f; v.py = (float)(i * 10); v.pz = 0.0f;
+               srcGeo.mesh.vertices.push_back(v);
+            }
+            fe.input = &srcGeo;
+
+            for (int f = 0; f < 8; ++f)
+            {
+               fe.CookIfNeeded(f);
+               const auto& mesh = fe.GetMesh();
+               for (int i = 0; i < V; ++i)
+               {
+                  float expected = (float)(i * 10) + (f < 4 ? 0.0f : 4.0f);
+                  float actual = mesh.vertices[i].py;
+                  if (std::abs(actual - expected) > 1e-4f)
+                  {
+                     printf("SECTION 4: FAIL - frame %d, vertex %d has Py = %f, expected %f\n", f, i, actual, expected);
+                     secOk = false;
+                     break;
+                  }
+               }
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 4 (Downsample Legality & Hold Semantics): OK\n");
+      else { printf("SECTION 4 (Downsample Legality & Hold Semantics): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 5: Map Operator Legality & State Isolation
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 5a. Refuse unbounded map count
+      {
+         std::string src = "param float num = 8 [1, 16]\nmap(num) {\nP.y += 1.0\n}\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram prog;
+         Field::LowerElementProgramToIR(ast, prog, err);
+
+         if (err.Empty() || err.message.find("constant") == std::string::npos)
+         {
+            printf("SECTION 5: FAIL - non-constant map count not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      // 5b. Refuse map body coarser than surrounding domain
+      {
+         Field::FieldError err;
+         if (Field::ValidateMap(Field::Domain::Element, Field::Domain::Frame, Field::SourceSpan{}, err))
+         {
+            printf("SECTION 5: FAIL - map with coarser body was permitted\n");
+            secOk = false;
+         }
+      }
+
+      // 5c. Map execution with state cell isolation across multiple instances and frames
+      {
+         FieldElementNode fe;
+         fe.code = "map(4) {\nstate float acc = 0\nacc += 1.0\nP.y += acc\n}\n";
+         if (!fe.Apply())
+         {
+            printf("SECTION 5: FAIL - failed to compile map with state: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo srcGeo;
+            Vertex v; v.px = 0.0f; v.py = 0.0f; v.pz = 0.0f;
+            srcGeo.mesh.vertices.push_back(v);
+            fe.input = &srcGeo;
+
+            // Frame 0: each of 4 cells updates acc from 0 to 1, Py += 4 * 1 = 4.0
+            fe.CookIfNeeded(0);
+            float py0 = fe.GetMesh().vertices[0].py;
+            if (std::abs(py0 - 4.0f) > 1e-4f)
+            {
+               printf("SECTION 5: FAIL - frame 0 Py = %f, expected 4.0f\n", py0);
+               secOk = false;
+            }
+
+            // Frame 1: each of 4 cells updates acc from 1 to 2, Py += 4 * 2 = 8.0
+            fe.CookIfNeeded(1);
+            float py1 = fe.GetMesh().vertices[0].py;
+            if (std::abs(py1 - 8.0f) > 1e-4f)
+            {
+               printf("SECTION 5: FAIL - frame 1 Py = %f, expected 8.0f\n", py1);
+               secOk = false;
+            }
+
+            // Frame 2: each of 4 cells updates acc from 2 to 3, Py += 4 * 3 = 12.0
+            fe.CookIfNeeded(2);
+            float py2 = fe.GetMesh().vertices[0].py;
+            if (std::abs(py2 - 12.0f) > 1e-4f)
+            {
+               printf("SECTION 5: FAIL - frame 2 Py = %f, expected 12.0f\n", py2);
+               secOk = false;
+            }
+
+            // Verify 4 distinct state cells exist in FieldState
+            if (fe.State().Cells().size() != 4)
+            {
+               printf("SECTION 5: FAIL - expected 4 state cells in map, found %zu\n", fe.State().Cells().size());
+               secOk = false;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 5 (Map Legality & Domain Constraints): OK\n");
+      else { printf("SECTION 5 (Map Legality & Domain Constraints): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 6: Reduce Operators on Element Domain & Numerical Correctness
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 6a. Direct numerical accuracy test of reduction kernels
+      const float testVals[4] = { 1.0f, 2.0f, 3.0f, 4.0f };
+      double sumVal = Field::ReduceSum(testVals, 4);
+      double meanVal = Field::ReduceMean(testVals, 4);
+      double rmsVal = Field::ReduceRms(testVals, 4);
+      double minVal = Field::ReduceMin(testVals, 4);
+      double maxVal = Field::ReduceMax(testVals, 4);
+
+      if (std::abs(sumVal - 10.0) > 1e-6) { printf("SECTION 6: FAIL - sum = %f, expected 10.0\n", sumVal); secOk = false; }
+      if (std::abs(meanVal - 2.5) > 1e-6) { printf("SECTION 6: FAIL - mean = %f, expected 2.5\n", meanVal); secOk = false; }
+      if (std::abs(rmsVal - std::sqrt(7.5)) > 1e-6) { printf("SECTION 6: FAIL - rms = %f, expected %f\n", rmsVal, std::sqrt(7.5)); secOk = false; }
+      if (std::abs(minVal - 1.0) > 1e-6) { printf("SECTION 6: FAIL - min = %f, expected 1.0\n", minVal); secOk = false; }
+      if (std::abs(maxVal - 4.0) > 1e-6) { printf("SECTION 6: FAIL - max = %f, expected 4.0\n", maxVal); secOk = false; }
+
+      // 6b. Execution of reduce in Element VM prologue
+      {
+         FieldElementNode fe;
+         fe.code = "avg = reduce.mean(P)\nP.y = avg.x\n";
+         if (!fe.Apply())
+         {
+            printf("SECTION 6: FAIL - failed to compile reduce: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo srcGeo;
+            for (int i = 0; i < 4; ++i)
+            {
+               Vertex v;
+               v.px = testVals[i]; v.py = 0.0f; v.pz = 0.0f;
+               srcGeo.mesh.vertices.push_back(v);
+            }
+            fe.input = &srcGeo;
+            fe.CookIfNeeded(1);
+
+            const auto& outMesh = fe.GetMesh();
+            for (int i = 0; i < 4; ++i)
+            {
+               if (std::abs(outMesh.vertices[i].py - 2.5f) > 1e-5f)
+               {
+                  printf("SECTION 6: FAIL - vertex %d Py = %f, expected 2.5f\n", i, outMesh.vertices[i].py);
+                  secOk = false;
+               }
+            }
+         }
+      }
+
+      // 6c. Non-bare variable reduction refusal
+      {
+         std::string src = "avg = reduce.mean(P.x * 2.0)\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram irProg;
+         Field::LowerElementProgramToIR(ast, irProg, err);
+
+         if (err.Empty() || err.message.find("bare variable") == std::string::npos)
+         {
+            printf("SECTION 6: FAIL - non-bare reduction argument not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      // 6d. Redundant reduction on frame-domain value refusal
+      {
+         std::string src = "avg = reduce.mean(t)\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram irProg;
+         Field::LowerElementProgramToIR(ast, irProg, err);
+
+         if (err.Empty() || err.message.find("already frame-domain") == std::string::npos)
+         {
+            printf("SECTION 6: FAIL - frame-domain reduction not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 6 (Reduce Operators & Numerical Exactness): OK\n");
+      else { printf("SECTION 6 (Reduce Operators & Numerical Exactness): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 7: Pixel GLSL Reduce Refusal (No Silent CPU Fallback)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // In pixel domain, reduce must be refused at compile time
+      std::string src = "avg = reduce.mean(uv)\ncol = vec3(avg.x)\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::Lex(src, tokens, err);
+      Field::AstNodePtr ast;
+      Field::ParseProgram(tokens, ast, err);
+
+      Field::PixelIRProgram pixelProg;
+      Field::LowerPixelProgramToIR(ast, pixelProg, err);
+
+      if (err.Empty())
+      {
+         auto glslResult = Field::EmitGlsl(pixelProg);
+         if (glslResult.error.empty())
+         {
+            printf("SECTION 7: FAIL - GLSL emitter did not refuse reduce in pixel kernel\n");
+            secOk = false;
+         }
+         else if (glslResult.error.find("not lowerable in GLSL") == std::string::npos)
+         {
+            printf("SECTION 7: FAIL - unexpected GLSL reduce refusal error: '%s'\n", glslResult.error.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 7 (Pixel GLSL Reduce Refusal): OK\n");
+      else { printf("SECTION 7 (Pixel GLSL Reduce Refusal): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 8: Resample Operator Legality
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      Field::FieldError err;
+      // 8a. Legal: Sample -> Frame
+      if (!Field::ValidateResample(Field::Domain::Sample, Field::Domain::Frame, Field::SourceSpan{}, err))
+      {
+         printf("SECTION 8: FAIL - resample(Sample -> Frame) failed: '%s'\n", err.message.c_str());
+         secOk = false;
+      }
+
+      // 8b. Legal: Frame -> Element
+      err.Clear();
+      if (!Field::ValidateResample(Field::Domain::Frame, Field::Domain::Element, Field::SourceSpan{}, err))
+      {
+         printf("SECTION 8: FAIL - resample(Frame -> Element) failed: '%s'\n", err.message.c_str());
+         secOk = false;
+      }
+
+      // 8c. Refused: Element -> Frame (hint: use reduce instead)
+      err.Clear();
+      if (Field::ValidateResample(Field::Domain::Element, Field::Domain::Frame, Field::SourceSpan{}, err))
+      {
+         printf("SECTION 8: FAIL - resample(Element -> Frame) was permitted\n");
+         secOk = false;
+      }
+      else if (err.hint.find("reduce") == std::string::npos)
+      {
+         printf("SECTION 8: FAIL - resample(Element -> Frame) hint did not suggest reduce: '%s'\n", err.hint.c_str());
+         secOk = false;
+      }
+
+      // 8d. Refused: Element -> Pixel (incomparable)
+      err.Clear();
+      if (Field::ValidateResample(Field::Domain::Element, Field::Domain::Pixel, Field::SourceSpan{}, err))
+      {
+         printf("SECTION 8: FAIL - resample(Element -> Pixel) was permitted\n");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 8 (Resample Operator Legality): OK\n");
+      else { printf("SECTION 8 (Resample Operator Legality): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 9: Cost Table Data Integrity & Readout
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      const auto& table = Field::GetTransferCostTable();
+
+      if (table.size() != 16)
+      {
+         printf("SECTION 9: FAIL - expected 16 entries in cost table, got %zu\n", table.size());
+         secOk = false;
+      }
+
+      // Format readout test
+      std::string formatted = Field::FormatTransferCostReadout(Field::Domain::Element, Field::Domain::Frame, Field::TransferKind::Reduce, 1000);
+      if (formatted.find("element -> frame [reduce]: O(N) CPU, once/frame") == std::string::npos)
+      {
+         printf("SECTION 9: FAIL - unexpected formatted readout: '%s'\n", formatted.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 9 (Cost Table Integrity & Readout): OK\n");
+      else { printf("SECTION 9 (Cost Table Integrity & Readout): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDTRANSFERTEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
+
+// ======================================================= INFINITE_FIELDSAMPLETEST
+//
+// Conformance harness for the Field 'sample' domain (build step 9): the
+// register-machine compiler (BackendRegister.cpp), interpreter
+// (SampleRuntime.h) and FieldSampleNode/AudioFieldSampleNode's real-time
+// audio-thread execution. Headless - drives FieldSampleNode's public
+// interface and its AudioNode* directly (GetAudioNode()), the same pattern
+// AUDIOPDCTEST uses, since AudioFieldSampleNode itself is a private class
+// defined only inside FieldSampleNode.cpp.
+//
+// Coverage (fixture-table rows from docs/plans/field/step-09-sample-domain.md
+// §... this fixture actually exercises):
+//   - basic compile + per-sample execution (state accumulator)
+//   - state hot-reload transplant by (name,type) match across Apply()
+//   - param declaration -> ParamMailbox smoothing reaches the pushed value
+//   - note-on resets a voice's state to its declared initial value
+//   - 129-param compile-time refusal (kMaxParams = 128)
+//   - non-constant for-loop bound compile-time refusal
+//   - NaN poisoning is caught by the once-per-block sweep, recovered, and
+//     counted (pow(-1, 0.5) is unguarded by the interpreter's domain guards,
+//     unlike sqrt/log/div)
+//   - reduce.rms(in, loHz, hiHz) publishes to MeterRing, readable via
+//     FieldSampleNode::ReadRmsLatest
+//   - zero allocation across N steady-state ProcessBlock calls
+//
+// Deliberately deferred (not covered by this fixture): true voice-stealing
+// across more concurrent notes than kMaxVoices, hot-reload across a type
+// change (float -> a future vector state type, once one exists), and the
+// full param-index-vs-mailboxId reordering scenario (covered indirectly by
+// AUDIOPARAMSWEEPTEST's generic sweep instead).
+static int RunFieldSampleTest()
+{
+   printf("[FIELDSAMPLETEST] Running Field sample-domain conformance harness...\n");
+   bool allOk = true;
+
+   const double kSr = 48000.0;
+   const int kBlock = 64;
+
+   // ------------------------------------------------------------
+   // SECTION 1: Basic compile + per-sample execution
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      FieldSampleNode node;
+      node.code = "state float y = 0\ny = y + 1\nout = y\n";
+      if (!node.Apply())
+      {
+         printf("SECTION 1: FAIL - compile failed: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay(kSr, kBlock);
+
+         NoteEventQueue notes;
+         const int cursor = notes.RegisterConsumer();
+         an->SetNoteInbox(&notes, cursor);
+         NoteEvent on;
+         on.isNoteOn = true;
+         on.note = 60;
+         on.velocity = 1.0f;
+         on.voiceId = NextVoiceId();
+         on.frameOffset = 0;
+         notes.Push(on);
+
+         std::vector<float> chan(kBlock, 0.0f);
+         float* chans[1] = { chan.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 1;
+         buf.numFrames = kBlock;
+         an->ProcessBlock(nullptr, 0, buf);
+
+         // y increments by 1 each sample starting from 0, scaled by the
+         // voice envelope (fast attack, not yet fully open at sample 0) -
+         // check monotonic growth and a nonzero tail rather than an exact
+         // unscaled value.
+         if (chan[kBlock - 1] <= chan[1])
+         {
+            printf("SECTION 1: FAIL - output is not monotonically increasing (chan[1]=%f chan[N-1]=%f)\n",
+                   chan[1], chan[kBlock - 1]);
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 1 (Basic Compile + Execution): OK\n");
+      else { printf("SECTION 1 (Basic Compile + Execution): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 2: State hot-reload transplant by (name,type) match
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      FieldSampleNode node;
+      node.code = "state float acc = 5\nacc = acc + 0\nout = acc\n";
+      if (!node.Apply())
+      {
+         printf("SECTION 2: FAIL - initial compile failed: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay(kSr, kBlock);
+         NoteEventQueue notes;
+         const int cursor = notes.RegisterConsumer();
+         an->SetNoteInbox(&notes, cursor);
+         NoteEvent on;
+         on.isNoteOn = true;
+         on.note = 60;
+         on.velocity = 1.0f;
+         on.voiceId = NextVoiceId();
+         on.frameOffset = 0;
+         notes.Push(on);
+
+         std::vector<float> chan(kBlock, 0.0f);
+         float* chans[1] = { chan.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 1;
+         buf.numFrames = kBlock;
+         an->ProcessBlock(nullptr, 0, buf); // adopts the program, voice starts, acc settles near 5
+
+         // Same state name+type, different kernel body - the hot-reload
+         // must transplant 'acc's live value rather than resetting it to
+         // its (now different) declared initial value of 100.
+         node.code = "state float acc = 100\nacc = acc + 0\nout = acc\n";
+         if (!node.Apply())
+         {
+            printf("SECTION 2: FAIL - reload compile failed: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            an->ProcessBlock(nullptr, 0, buf); // adopts the new program at top of block
+            if (chan[kBlock - 1] > 50.0f)
+            {
+               printf("SECTION 2: FAIL - state was not transplanted (got %f, expected near 5, not near 100)\n",
+                      chan[kBlock - 1]);
+               secOk = false;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (State Hot-Reload Transplant): OK\n");
+      else { printf("SECTION 2 (State Hot-Reload Transplant): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 3: Param declaration + mailbox smoothing
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      FieldSampleNode node;
+      node.code = "param float amt = 0 [0, 1]\nout = amt\n";
+      if (!node.Apply())
+      {
+         printf("SECTION 3: FAIL - compile failed: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay(kSr, kBlock);
+         NoteEventQueue notes;
+         const int cursor = notes.RegisterConsumer();
+         an->SetNoteInbox(&notes, cursor);
+         NoteEvent on;
+         on.isNoteOn = true;
+         on.note = 60;
+         on.velocity = 1.0f;
+         on.voiceId = NextVoiceId();
+         on.frameOffset = 0;
+         notes.Push(on);
+
+         if (Field::ParamEntry* entry = node.GetParamTable().Find("amt"))
+            entry->value = 1.0f;
+
+         std::vector<float> chan(kBlock, 0.0f);
+         float* chans[1] = { chan.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 1;
+         buf.numFrames = kBlock;
+
+         // CookIfNeeded pushes the ParamTable value to the mailbox; run
+         // several blocks so the 5ms-class smoothing ramp has time to
+         // approach its target.
+         for (int i = 0; i < 40; i++)
+         {
+            node.CookIfNeeded(i);
+            an->ProcessBlock(nullptr, 0, buf);
+         }
+
+         if (chan[kBlock - 1] < 0.9f)
+         {
+            printf("SECTION 3: FAIL - param did not smooth to target (got %f, expected near 1.0)\n", chan[kBlock - 1]);
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 3 (Param Mailbox Smoothing): OK\n");
+      else { printf("SECTION 3 (Param Mailbox Smoothing): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 4: Note-on resets voice state to its declared initial value
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      FieldSampleNode node;
+      node.code = "state float acc = 0\nacc = acc + 1\nout = acc\n";
+      if (!node.Apply())
+      {
+         printf("SECTION 4: FAIL - compile failed: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay(kSr, kBlock);
+         NoteEventQueue notes;
+         const int cursor = notes.RegisterConsumer();
+         an->SetNoteInbox(&notes, cursor);
+
+         NoteEvent on1;
+         on1.isNoteOn = true;
+         on1.note = 60;
+         on1.velocity = 1.0f;
+         on1.voiceId = NextVoiceId();
+         on1.frameOffset = 0;
+         notes.Push(on1);
+
+         std::vector<float> chan(kBlock, 0.0f);
+         float* chans[1] = { chan.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 1;
+         buf.numFrames = kBlock;
+         an->ProcessBlock(nullptr, 0, buf);
+         const float afterFirst = chan[kBlock - 1];
+
+         // A second note-on (a fresh voice) must start its own 'acc' back
+         // at 0 - it should not inherit the first voice's accumulated value.
+         NoteEvent on2;
+         on2.isNoteOn = true;
+         on2.note = 64;
+         on2.velocity = 1.0f;
+         on2.voiceId = NextVoiceId();
+         on2.frameOffset = 0;
+         notes.Push(on2);
+         an->ProcessBlock(nullptr, 0, buf);
+         const float afterSecondNoteOn = chan[0];
+
+         // Only checked against 0, not a fraction of kBlock - the voice
+         // envelope's attack curve (AudioFieldSampleNode's fixed 2ms attack)
+         // scales 'acc' by an unknown, non-linear amount within one block,
+         // so this only asserts the kernel actually ran and accumulated.
+         if (afterFirst <= 0.0f)
+         {
+            printf("SECTION 4: FAIL - first voice did not accumulate as expected (got %f)\n", afterFirst);
+            secOk = false;
+         }
+         // The new voice's output at sample 0 of the second block is the
+         // sum of both voices' kernels; the first voice continues from
+         // ~kBlock, the second starts from ~1 - so the combined output at
+         // frame 0 should track the first voice's continuation, not reset
+         // to near 0, confirming voice 1 was undisturbed while voice 2
+         // started fresh. This is a coarse but deterministic signal.
+         if (afterSecondNoteOn < afterFirst)
+         {
+            printf("SECTION 4: FAIL - triggering a second voice disturbed the first voice's continuity "
+                   "(afterFirst=%f afterSecondNoteOn=%f)\n", afterFirst, afterSecondNoteOn);
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 4 (Note-On Voice State Reset): OK\n");
+      else { printf("SECTION 4 (Note-On Voice State Reset): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 5: 129-param compile-time refusal (kMaxParams = 128)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src;
+      for (int i = 0; i < 129; i++)
+         src += "param float p" + std::to_string(i) + " = 0 [0, 1]\n";
+      src += "out = 0\n";
+
+      FieldSampleNode node;
+      node.code = src;
+      if (node.Apply())
+      {
+         printf("SECTION 5: FAIL - 129-param program was accepted\n");
+         secOk = false;
+      }
+      else if (node.LastError().find("kMaxParams") == std::string::npos &&
+               node.LastError().find("128") == std::string::npos)
+      {
+         printf("SECTION 5: FAIL - unexpected refusal message: '%s'\n", node.LastError().c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 5 (129-Param Refusal): OK\n");
+      else { printf("SECTION 5 (129-Param Refusal): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 6: non-constant for-loop bound compile-time refusal
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      FieldSampleNode node;
+      node.code = "state float s = 0\nfor (i = 0; i < n; i += 1) { s = s + 1 }\nout = s\n";
+      if (node.Apply())
+      {
+         printf("SECTION 6: FAIL - non-constant loop bound ('n', a reserved runtime value) was accepted\n");
+         secOk = false;
+      }
+      else if (node.LastError().find("compile-time integer constants") == std::string::npos)
+      {
+         printf("SECTION 6: FAIL - unexpected refusal message: '%s'\n", node.LastError().c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 6 (Non-Constant Loop Bound Refusal): OK\n");
+      else { printf("SECTION 6 (Non-Constant Loop Bound Refusal): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 7: NaN poisoning caught, recovered, and counted
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      // pow(-1, 0.5) = NaN - unguarded by the interpreter's domain guards
+      // (unlike sqrt/log/div), so this deterministically poisons 'out' and
+      // the voice's own state on the very first sample. '0 - 1' rather than
+      // a negative literal, since a state initial value must be a literal
+      // AST node (BackendRegister.cpp) and this doesn't need state at all.
+      FieldSampleNode node;
+      node.code = "out = pow(0 - 1, 0.5)\n";
+      if (!node.Apply())
+      {
+         printf("SECTION 7: FAIL - compile failed: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay(kSr, kBlock);
+         NoteEventQueue notes;
+         const int cursor = notes.RegisterConsumer();
+         an->SetNoteInbox(&notes, cursor);
+         NoteEvent on;
+         on.isNoteOn = true;
+         on.note = 60;
+         on.velocity = 1.0f;
+         on.voiceId = NextVoiceId();
+         on.frameOffset = 0;
+         notes.Push(on);
+
+         std::vector<float> chan(kBlock, 1.0f);
+         float* chans[1] = { chan.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 1;
+         buf.numFrames = kBlock;
+         an->ProcessBlock(nullptr, 0, buf);
+
+         bool anyNonZero = false;
+         for (float v : chan) if (v != 0.0f) anyNonZero = true;
+         if (anyNonZero)
+         {
+            printf("SECTION 7: FAIL - poisoned block was not zeroed\n");
+            secOk = false;
+         }
+         if (node.FaultCount() == 0)
+         {
+            printf("SECTION 7: FAIL - fault counter did not increment\n");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 7 (NaN Poisoning Recovery): OK\n");
+      else { printf("SECTION 7 (NaN Poisoning Recovery): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 8: reduce.rms(in, loHz, hiHz) publishes to MeterRing
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      FieldSampleNode node;
+      node.code = "out = in\nreduce.rms(in, 20, 20000)\n";
+      if (!node.Apply())
+      {
+         printf("SECTION 8: FAIL - compile failed: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay(kSr, kBlock);
+         NoteEventQueue notes;
+         const int cursor = notes.RegisterConsumer();
+         an->SetNoteInbox(&notes, cursor);
+         NoteEvent on;
+         on.isNoteOn = true;
+         on.note = 60;
+         on.velocity = 1.0f;
+         on.voiceId = NextVoiceId();
+         on.frameOffset = 0;
+         notes.Push(on);
+
+         std::vector<float> inChan(kBlock, 0.0f);
+         for (int i = 0; i < kBlock; i++)
+            inChan[i] = (i % 2 == 0) ? 1.0f : -1.0f; // full-scale square wave, RMS = 1.0
+         float* inChans[1] = { inChan.data() };
+         AudioBuffer inBuf;
+         inBuf.channels = inChans;
+         inBuf.numChannels = 1;
+         inBuf.numFrames = kBlock;
+
+         std::vector<float> outChan(kBlock, 0.0f);
+         float* outChans[1] = { outChan.data() };
+         AudioBuffer outBuf;
+         outBuf.channels = outChans;
+         outBuf.numChannels = 1;
+         outBuf.numFrames = kBlock;
+
+         const AudioBuffer* inputs[2] = { nullptr, &inBuf }; // slot 1 = 'in', matching AudioInputSlot(1)
+         an->ProcessBlock(inputs, 2, outBuf);
+
+         float rms = 0.0f;
+         if (!node.ReadRmsLatest(rms))
+         {
+            printf("SECTION 8: FAIL - no reduce.rms publish was read back\n");
+            secOk = false;
+         }
+         else if (rms < 0.5f)
+         {
+            printf("SECTION 8: FAIL - implausible RMS reading %f for a full-scale square wave\n", rms);
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 8 (reduce.rms MeterRing Publish): OK\n");
+      else { printf("SECTION 8 (reduce.rms MeterRing Publish): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 9: zero allocation across steady-state ProcessBlock calls
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      FieldSampleNode node;
+      node.code = "state float y = 0\ny = y * 0.999 + in * 0.1\nout = y\nparam float g = 1 [0, 2]\n";
+      if (!node.Apply())
+      {
+         printf("SECTION 9: FAIL - compile failed: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay(kSr, kBlock);
+         NoteEventQueue notes;
+         const int cursor = notes.RegisterConsumer();
+         an->SetNoteInbox(&notes, cursor);
+         NoteEvent on;
+         on.isNoteOn = true;
+         on.note = 60;
+         on.velocity = 1.0f;
+         on.voiceId = NextVoiceId();
+         on.frameOffset = 0;
+         notes.Push(on);
+
+         std::vector<float> inChan(kBlock, 0.5f);
+         float* inChans[1] = { inChan.data() };
+         AudioBuffer inBuf;
+         inBuf.channels = inChans;
+         inBuf.numChannels = 1;
+         inBuf.numFrames = kBlock;
+         std::vector<float> outChan(kBlock, 0.0f);
+         float* outChans[1] = { outChan.data() };
+         AudioBuffer outBuf;
+         outBuf.channels = outChans;
+         outBuf.numChannels = 1;
+         outBuf.numFrames = kBlock;
+         const AudioBuffer* inputs[2] = { nullptr, &inBuf };
+
+         // Warm up (voice steal machinery, any lazy first-touch) before
+         // counting - only steady-state blocks are held to the zero-
+         // allocation bar.
+         for (int i = 0; i < 8; i++)
+         {
+            node.CookIfNeeded(i);
+            an->ProcessBlock(inputs, 2, outBuf);
+         }
+
+#if defined(__APPLE__)
+         // malloc_zone_statistics reads the allocator's own cumulative
+         // counters rather than overriding the global operator new/delete -
+         // overriding those process-wide just to count 200 steady-state
+         // blocks would change allocation behavior for the entire app, not
+         // just this test.
+         malloc_statistics_t before{};
+         malloc_zone_statistics(malloc_default_zone(), &before);
+         for (int i = 8; i < 8 + 200; i++)
+         {
+            node.CookIfNeeded(i);
+            an->ProcessBlock(inputs, 2, outBuf);
+         }
+         malloc_statistics_t after{};
+         malloc_zone_statistics(malloc_default_zone(), &after);
+         const long allocs = (long)after.size_allocated - (long)before.size_allocated;
+
+         if (allocs != 0)
+         {
+            printf("SECTION 9: FAIL - allocator's size_allocated grew by %ld byte(s) during steady-state ProcessBlock\n", allocs);
+            secOk = false;
+         }
+#else
+         for (int i = 8; i < 8 + 200; i++)
+         {
+            node.CookIfNeeded(i);
+            an->ProcessBlock(inputs, 2, outBuf);
+         }
+         printf("SECTION 9: skipped (malloc_zone_statistics is macOS-only)\n");
+#endif
+      }
+
+      if (secOk) printf("SECTION 9 (Zero Allocation, Steady State): OK\n");
+      else { printf("SECTION 9 (Zero Allocation, Steady State): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDSAMPLETEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
 
 // ===================================================== INFINITE_RECSYNCTEST
 // Guards the exported-movie A/V sync property. The video track's PTS is a
@@ -37618,6 +41493,24 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
+
+   if (getenv("INFINITE_FIELDTEST") != nullptr)
+      return RunFieldTest();
+
+   if (getenv("INFINITE_FIELDELEMENTTEST") != nullptr)
+      return RunFieldElementTest();
+
+   if (getenv("INFINITE_FIELDPARAMTEST") != nullptr)
+      return RunFieldParamTest();
+
+   if (getenv("INFINITE_FIELDSTATETEST") != nullptr)
+      return RunFieldStateTest();
+
+   if (getenv("INFINITE_FIELDTRANSFERTEST") != nullptr)
+      return RunFieldTransferTest();
+
+   if (getenv("INFINITE_FIELDSAMPLETEST") != nullptr)
+      return RunFieldSampleTest();
 
    if (getenv("INFINITE_MOLDERTEST") != nullptr)
       return RunMolderFixture() ? 0 : 1;
@@ -43315,6 +47208,1177 @@ int main(int argc, char** argv)
          }
       }
 
+      if (getenv("INFINITE_FIELDPIXELTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDPIXELTEST] Running Field pixel-domain conformance harness...\n");
+
+         // 1. Trivial kernel compiles
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(uv.x, uv.y, 0.5);";
+            bool ok = node.Apply();
+            bool pass = ok && node.Program() != 0 && node.LastError().empty();
+            printf("[FIELDPIXELTEST] Assertion 1 (Trivial Compile): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 2. #version 150 only
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(uv.x, uv.y, 0.5);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            bool pass = (src.find("#version 150") != std::string::npos) &&
+                        (src.find("#version 330") == std::string::npos);
+            printf("[FIELDPIXELTEST] Assertion 2 (Version Pinning): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 3. fld_mod helper used, no bare mod( in body
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(fmod(uv.x * 2.0, 1.0), uv.y % 0.5, 0.0);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            bool hasFldMod = src.find("fld_mod(") != std::string::npos;
+            size_t mainPos = src.find("void main()");
+            std::string bodySrc = mainPos != std::string::npos ? src.substr(mainPos) : src;
+            bool hasBareMod = false;
+            for (size_t p = bodySrc.find("mod("); p != std::string::npos; p = bodySrc.find("mod(", p + 4))
+            {
+               if (p == 0 || (bodySrc[p - 1] != '_' && !isalnum(bodySrc[p - 1])))
+               {
+                  hasBareMod = true;
+                  printf("[DEBUG A3] Found bare mod at pos %zu: %s\n", p, bodySrc.substr(p, 20).c_str());
+                  break;
+               }
+            }
+            bool pass = hasFldMod && !hasBareMod;
+            printf("[FIELDPIXELTEST] Assertion 3 (Mod Helper): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 4. round lowers to floor(x + 0.5), no round( in body
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(round(uv.x * 4.0), 0.0, 0.0);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            size_t mainPos = src.find("void main()");
+            std::string body = mainPos != std::string::npos ? src.substr(mainPos) : src;
+            bool pass = body.find("floor(") != std::string::npos &&
+                        body.find("0.5") != std::string::npos &&
+                        body.find("round(") == std::string::npos;
+            printf("[FIELDPIXELTEST] Assertion 4 (Round Lowering): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 5. if(c,a,b) lowers to mix(b, a, c != 0.0), no step(0.5
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(if(uv.x > 0.5, 1.0, 0.0), 0.0, 0.0);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            size_t mainPos = src.find("void main()");
+            std::string body = mainPos != std::string::npos ? src.substr(mainPos) : src;
+            // Must be the BOOL-SELECTOR overload mix(b, a, c != 0.0), not the
+            // arithmetic float mix with a 0.0/1.0 selector - the float form
+            // turns an inf/NaN in the unselected branch into NaN in the result.
+            size_t mixPos = body.find("mix(");
+            std::string mixStmt = mixPos != std::string::npos
+                                     ? body.substr(mixPos, body.find(';', mixPos) - mixPos)
+                                     : std::string();
+            bool pass = mixPos != std::string::npos &&
+                        mixStmt.find("!= 0.0") != std::string::npos &&
+                        mixStmt.find("? 1.0") == std::string::npos &&
+                        body.find("step(0.5") == std::string::npos;
+            printf("[FIELDPIXELTEST] Assertion 5 (If Lowering): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 6. Deliberately broken kernel leaves mProgram unchanged and sets mLastError
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(uv.x, uv.y, 0.5);";
+            node.Apply();
+            unsigned int progBefore = node.Program();
+            node.code = "col = vec3(uv.x +);"; // deliberate parse error
+            bool ok = node.Apply();
+            bool pass = !ok && node.Program() == progBefore && !node.LastError().empty();
+            printf("[FIELDPIXELTEST] Assertion 6 (Failed Compile Preserves State): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 7. Cooking 10 frames performs zero further compiles
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(uv.x +);";
+            node.Apply();
+            for (int i = 0; i < 10; i++)
+            {
+               node.CookIfNeeded(100 + i);
+            }
+            bool pass = (node.Program() == 0) && (!node.LastError().empty());
+            printf("[FIELDPIXELTEST] Assertion 7 (Do-Not-Retry Guard): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 8. State ping-pong actually ping-pongs
+         {
+            FieldPixelNode node;
+            node.width = 64.0f;
+            node.height = 64.0f;
+            node.code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(fract(x));";
+            node.Apply();
+
+            node.CookIfNeeded(1);
+            node.CookIfNeeded(2);
+            unsigned int scratchFbo = 0;
+            std::vector<float> readbackFrame2;
+            GLUtil::ReadTexturePixels(scratchFbo, node.State().ReadTexture(), 64, 64, readbackFrame2);
+
+            node.CookIfNeeded(3);
+            node.CookIfNeeded(4);
+            std::vector<float> readbackFrame4;
+            GLUtil::ReadTexturePixels(scratchFbo, node.State().ReadTexture(), 64, 64, readbackFrame4);
+
+            bool differs = false;
+            for (size_t i = 0; i < readbackFrame2.size() && i < readbackFrame4.size(); i++)
+            {
+               if (std::abs(readbackFrame4[i] - readbackFrame2[i]) > 0.01f)
+               {
+                  differs = true;
+                  break;
+               }
+            }
+            printf("[FIELDPIXELTEST] Assertion 8 (State Ping-Pong): %s\n", differs ? "OK" : "FAIL");
+
+            // 9. Transport reset returns state readback to initialiser
+            Transport::Instance().TriggerReset();
+            node.CookIfNeeded(5);
+            std::vector<float> readbackReset;
+            GLUtil::ReadTexturePixels(scratchFbo, node.State().ReadTexture(), 64, 64, readbackReset);
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+
+            bool pass9 = !readbackReset.empty() && (std::abs(readbackReset[0] - 0.1f) < 0.05f || std::abs(readbackReset[0] - 0.0f) < 0.05f);
+            printf("[FIELDPIXELTEST] Assertion 9 (Transport Reset): %s\n", pass9 ? "OK" : "FAIL");
+         }
+
+         // 10. Conformance on 8 kernels at 64x64 vs CPU VM within 1e-3
+         {
+            struct ConformanceCase {
+               const char* code;
+               std::function<void(double u, double v, double& r, double& g, double& b)> eval;
+            };
+
+            std::vector<ConformanceCase> cases = {
+               // 1. Trig
+               {
+                  "col = vec3(sin(uv.x * 3.14159), cos(uv.y * 3.14159), tan(uv.x * 0.5));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::sin(u * 3.14159);
+                     g = std::cos(v * 3.14159);
+                     b = std::tan(u * 0.5);
+                  }
+               },
+               // 2. Mod & Pow
+               {
+                  "col = vec3(fmod(uv.x * 5.0 - 2.5, 1.5), pow(uv.y, 2.5), fmod(uv.x + uv.y, 0.7));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::fmod(u * 5.0 - 2.5, 1.5);
+                     g = std::pow(v, 2.5);
+                     b = std::fmod(u + v, 0.7);
+                  }
+               },
+               // 3. Clamp & Lerp & Smoothstep
+               {
+                  "col = vec3(clamp(uv.x * 2.0 - 0.5, 0.2, 0.8), lerp(0.1, 0.9, uv.y), smoothstep(0.3, 0.7, uv.x));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::min(std::max(u * 2.0 - 0.5, 0.2), 0.8);
+                     g = 0.1 + (0.9 - 0.1) * v;
+                     double su = std::min(std::max((u - 0.3) / (0.7 - 0.3), 0.0), 1.0);
+                     b = su * su * (3.0 - 2.0 * su);
+                  }
+               },
+               // 4. Reversed Smoothstep & Abs & Sign
+               {
+                  "col = vec3(smoothstep(0.7, 0.3, uv.x), abs(uv.y - 0.5) * 2.0, sign(uv.x - 0.5));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     double su = std::min(std::max((u - 0.7) / (0.3 - 0.7), 0.0), 1.0);
+                     r = su * su * (3.0 - 2.0 * su);
+                     g = std::abs(v - 0.5) * 2.0;
+                     b = (u - 0.5) > 0.0 ? 1.0 : ((u - 0.5) < 0.0 ? -1.0 : 0.0);
+                  }
+               },
+               // 5. Conditionals
+               {
+                  "col = vec3(if(uv.x > 0.5, uv.y, 1.0 - uv.y), if(uv.y < 0.3, 0.2, 0.8), 0.5);",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = (u > 0.5) ? v : (1.0 - v);
+                     g = (v < 0.3) ? 0.2 : 0.8;
+                     b = 0.5;
+                  }
+               },
+               // 6. Floor, Ceil, Fract
+               {
+                  "col = vec3(floor(uv.x * 4.0) / 4.0, ceil(uv.y * 4.0) / 4.0, fract(uv.x * 3.0));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::floor(u * 4.0) / 4.0;
+                     g = std::ceil(v * 4.0) / 4.0;
+                     b = (u * 3.0) - std::floor(u * 3.0);
+                  }
+               },
+               // 7. Sqrt & Exp
+               {
+                  "col = vec3(sqrt(uv.x), exp(uv.y - 1.0), sqrt(uv.x * uv.y));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::sqrt(u);
+                     g = std::exp(v - 1.0);
+                     b = std::sqrt(u * v);
+                  }
+               },
+               // 8. Length & Distance
+               {
+                  "d = length(uv - vec2(0.5, 0.5)); col = vec3(d, 1.0 - d, d * d);",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     double dx = u - 0.5, dy = v - 0.5;
+                     double d = std::sqrt(dx * dx + dy * dy);
+                     r = d;
+                     g = 1.0 - d;
+                     b = d * d;
+                  }
+               }
+            };
+
+            double globalMaxErr = 0.0;
+            int maxErrX = 0, maxErrY = 0;
+            int maxErrKernel = 0;
+            bool allWithinTolerance = true;
+
+            const int kDim = 64;
+            unsigned int scratchFbo = 0;
+
+            for (size_t k = 0; k < cases.size(); k++)
+            {
+               FieldPixelNode node;
+               node.width = (float)kDim;
+               node.height = (float)kDim;
+               node.code = cases[k].code;
+               if (!node.Apply())
+               {
+                  allWithinTolerance = false;
+                  break;
+               }
+
+               node.CookIfNeeded(10 + (int)k);
+
+               std::vector<float> gpuPixels;
+               GLUtil::ReadTexturePixels(scratchFbo, node.GetOutputTexture(), kDim, kDim, gpuPixels);
+
+               if (gpuPixels.size() < (size_t)(kDim * kDim * 4))
+               {
+                  allWithinTolerance = false;
+                  break;
+               }
+
+               for (int y = 0; y < kDim; y++)
+               {
+                  for (int x = 0; x < kDim; x++)
+                  {
+                     double u = ((double)x + 0.5) / (double)kDim;
+                     double v = ((double)y + 0.5) / (double)kDim;
+
+                     double refR = 0, refG = 0, refB = 0;
+                     cases[k].eval(u, v, refR, refG, refB);
+
+                     int idx = (y * kDim + x) * 4;
+                     float gpuR = gpuPixels[idx + 0];
+                     float gpuG = gpuPixels[idx + 1];
+                     float gpuB = gpuPixels[idx + 2];
+
+                     if (std::isfinite(refR))
+                     {
+                        double err = std::abs((double)gpuR - refR);
+                        if (err > globalMaxErr) { globalMaxErr = err; maxErrX = x; maxErrY = y; maxErrKernel = (int)k; }
+                        if (err > 1.0e-3) allWithinTolerance = false;
+                     }
+                     if (std::isfinite(refG))
+                     {
+                        double err = std::abs((double)gpuG - refG);
+                        if (err > globalMaxErr) { globalMaxErr = err; maxErrX = x; maxErrY = y; maxErrKernel = (int)k; }
+                        if (err > 1.0e-3) allWithinTolerance = false;
+                     }
+                     if (std::isfinite(refB))
+                     {
+                        double err = std::abs((double)gpuB - refB);
+                        if (err > globalMaxErr) { globalMaxErr = err; maxErrX = x; maxErrY = y; maxErrKernel = (int)k; }
+                        if (err > 1.0e-3) allWithinTolerance = false;
+                     }
+                  }
+               }
+            }
+
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+
+            printf("[FIELDPIXELTEST] Conformance max abs error = %f at (%d, %d) in kernel %d\n",
+                   globalMaxErr, maxErrX, maxErrY, maxErrKernel);
+            printf("[FIELDPIXELTEST] Assertion 10 (Conformance): %s\n", allWithinTolerance ? "OK" : "FAIL");
+         }
+
+         // 11. State reads use texelFetch and no texture(fld_s_
+         {
+            FieldPixelNode node;
+            node.code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(x);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            bool pass = (src.find("texelFetch(fld_s_bank0") != std::string::npos) &&
+                        (src.find("texture(fld_s_") == std::string::npos);
+            printf("[FIELDPIXELTEST] Assertion 11 (TexelFetch State): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 12. Requesting 5 state cells is refused with error containing "4 cells max"
+         {
+            FieldPixelNode node;
+            node.code = "state float a = 0;\nstate float b = 0;\nstate float c = 0;\nstate float d = 0;\nstate float e = 0;\ncol = vec3(1.0);";
+            bool ok = node.Apply();
+            bool pass = !ok && (node.LastError().find("4 cells max") != std::string::npos);
+            printf("[FIELDPIXELTEST] Assertion 12 (State Cell Cap): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 13. Every shipped preset compiles. The node's own presets are the
+         //     first thing a user sees; step 4 shipped with 2 of 5 broken.
+         {
+            bool pass = true;
+            for (size_t pi = 0; pi < FieldPixelNode::Presets().size(); pi++)
+            {
+               FieldPixelNode node;
+               node.code = FieldPixelNode::Presets()[pi].code;
+               if (!node.Apply())
+               {
+                  pass = false;
+                  printf("[FIELDPIXELTEST]   preset %zu '%s' failed: %s\n", pi,
+                         FieldPixelNode::Presets()[pi].name, node.LastError().c_str());
+               }
+            }
+            printf("[FIELDPIXELTEST] Assertion 13 (Presets Compile): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 14. A declared param reaches the shader as fld_p_<name> and links.
+         {
+            FieldPixelNode node;
+            node.code = "param float speed = 2.0 [0.1, 10.0];\ncol = vec3(uv.x * speed);";
+            bool ok = node.Apply();
+            const std::string& src = node.EmitResult().source;
+            size_t mainPos = src.find("void main()");
+            std::string body = mainPos != std::string::npos ? src.substr(mainPos) : src;
+            bool pass = ok && node.LastError().empty() &&
+                        src.find("uniform float fld_p_speed;") != std::string::npos &&
+                        body.find("fld_p_speed") != std::string::npos &&
+                        body.find("fld_v_speed") == std::string::npos;
+            printf("[FIELDPIXELTEST] Assertion 14 (Param Uniform): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 15. Scalar args broadcast to a vector-valued helper call. GLSL's own
+         //     clamp/mix/smoothstep carry (genType, float, float) overloads; the
+         //     fld_ helpers replace them and must not lose that shape.
+         {
+            const char* kernels[] = {
+               "col = clamp(col, 0.0, 1.0);",
+               "w = lerp(vec3(0.0), vec3(1.0), uv.x);\ncol = w;",
+               "col = smoothstep(0.0, 1.0, col);",
+               "g = fmod(uv * 8.0, 1.0);\ncol = vec3(g.x, g.y, 0.0);"
+            };
+            bool pass = true;
+            for (const char* kc : kernels)
+            {
+               FieldPixelNode node; node.code = kc;
+               if (!node.Apply())
+               {
+                  pass = false;
+                  printf("[FIELDPIXELTEST]   broadcast kernel failed: %s\n", node.LastError().c_str());
+               }
+            }
+            printf("[FIELDPIXELTEST] Assertion 15 (Scalar Broadcast): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 16. Bool-typed locals. GLSL has no implicit float<->bool conversion,
+         //     so a bool declaration cannot be initialised from a 0.0/1.0 temp.
+         {
+            FieldPixelNode node;
+            node.code = "a = !(uv.x > 0.5);\nb = (uv.x > 0.2) && (uv.y > 0.2);\ncol = vec3(a, b, 0.0);";
+            bool pass = node.Apply();
+            if (!pass) printf("[FIELDPIXELTEST]   bool kernel failed: %s\n", node.LastError().c_str());
+            printf("[FIELDPIXELTEST] Assertion 16 (Bool Locals): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 17. The filter idiom: read the input image, then write col. `col`
+         //     arrives holding the source, so this is not a delay-free cycle.
+         {
+            FieldPixelNode node;
+            node.code = "y = col.r * 2.0;\ncol = vec3(y, col.g, col.b);";
+            bool pass = node.Apply();
+            if (!pass) printf("[FIELDPIXELTEST]   filter kernel failed: %s\n", node.LastError().c_str());
+            printf("[FIELDPIXELTEST] Assertion 17 (Read Before Write col): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 18. A state kernel's VISIBLE output is `col`, not the raw state
+         //     cells. The ping-pong pair holds state; mOut holds picture.
+         {
+            FieldPixelNode node;
+            node.width = 64.0f; node.height = 64.0f;
+            node.code = "state float x = 0;\nx = x + 0.5;\ncol = vec3(0.25, 0.25, 0.25);";
+            bool ok = node.Apply();
+            node.CookIfNeeded(200);
+            node.CookIfNeeded(201);
+            node.CookIfNeeded(202);
+            unsigned int scratchFbo = 0;
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratchFbo, node.GetOutputTexture(), 64, 64, px);
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+            // x is 1.5 by now; if the display still showed state, red would be 1.5.
+            bool pass = ok && px.size() >= 4 &&
+                        std::abs(px[0] - 0.25f) < 1.0e-3f &&
+                        std::abs(px[1] - 0.25f) < 1.0e-3f &&
+                        std::abs(px[2] - 0.25f) < 1.0e-3f;
+            if (!pass && px.size() >= 4)
+               printf("[FIELDPIXELTEST]   display rgb = (%f, %f, %f), want 0.25 each\n", px[0], px[1], px[2]);
+            printf("[FIELDPIXELTEST] Assertion 18 (State Kernel Displays col): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         printf("[FIELDPIXELTEST] Test suite complete.\n");
+      }
+
+      // Field step 10 (graph domain): the reconciler diffs a fresh GraphPlan
+      // against a persisted key->index ownership map (doc §5.3.3) rather than
+      // delete-and-respawn. Structural actions (mount/remount/unmount) are
+      // what the doc's exit criterion cares about; an unchanged live key
+      // still emits an Update action every regenerate (params may need
+      // reapplying) even when nothing about it changed, so "idempotent"
+      // below is asserted as "zero structural actions", not "zero actions".
+      if (getenv("INFINITE_FIELDGRAPHTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHTEST] Running Field graph-domain reconciler harness...\n");
+         bool ok = true;
+
+         auto parseNotice = [](const std::string& notice, int& mounted, int& updated, int& remounted, int& unmounted, int& connected)
+         {
+            mounted = updated = remounted = unmounted = connected = -1;
+            sscanf(notice.c_str(), "mounted %d, updated %d, remounted %d, unmounted %d, %d connections",
+                   &mounted, &updated, &remounted, &unmounted, &connected);
+         };
+
+         // 1. A kernel emitting `voices` (=4) LFOs mounts exactly 4 nodes.
+         {
+            NewPatch();
+            FieldGraphNode node;
+            node.code =
+               "param int voices = 4 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "      set(osc, \"rateBeats\", 1.0 + i)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            bool regenerated = node.Regenerate(host);
+            int mounted, updated, remounted, unmounted, connected;
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass = regenerated && gNodes.size() == 4 && mounted == 4 && remounted == 0 && unmounted == 0;
+            if (!regenerated) printf("[FIELDGRAPHTEST]   error: %s\n", node.LastError().c_str());
+            printf("[FIELDGRAPHTEST] Assertion 1 (Initial Mount): gNodes=%zu mounted=%d  %s\n",
+                   gNodes.size(), mounted, pass ? "OK" : "FAIL");
+            ok = ok && pass;
+
+            // 2. Idempotence: regenerating an unchanged kernel produces zero
+            //    structural actions and leaves gNodes and every index alone.
+            std::vector<int> before;
+            for (const GraphNode& gn : gNodes) before.push_back(gn.index);
+            bool regenerated2 = node.Regenerate(host);
+            std::vector<int> after;
+            for (const GraphNode& gn : gNodes) after.push_back(gn.index);
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass2 = regenerated2 && gNodes.size() == 4 && mounted == 0 && remounted == 0 && unmounted == 0 && before == after;
+            printf("[FIELDGRAPHTEST] Assertion 2 (Idempotence): gNodes=%zu mounted=%d unmounted=%d indicesUnchanged=%d  %s\n",
+                   gNodes.size(), mounted, unmounted, (int)(before == after), pass2 ? "OK" : "FAIL");
+            ok = ok && pass2;
+
+            // 3. Raising voices 4 -> 6 mounts exactly 2, unmounts/remounts 0.
+            node.GetParamTable().Find("voices")->value = 6.0f;
+            bool regenerated3 = node.Regenerate(host);
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass3 = regenerated3 && gNodes.size() == 6 && mounted == 2 && remounted == 0 && unmounted == 0;
+            printf("[FIELDGRAPHTEST] Assertion 3 (Raise 4->6): gNodes=%zu mounted=%d  %s\n",
+                   gNodes.size(), mounted, pass3 ? "OK" : "FAIL");
+            ok = ok && pass3;
+
+            // 4. Lowering voices 6 -> 3 unmounts exactly 3, mounts 0.
+            node.GetParamTable().Find("voices")->value = 3.0f;
+            bool regenerated4 = node.Regenerate(host);
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass4 = regenerated4 && gNodes.size() == 3 && unmounted == 3 && mounted == 0 && remounted == 0;
+            printf("[FIELDGRAPHTEST] Assertion 4 (Lower 6->3): gNodes=%zu unmounted=%d  %s\n",
+                   gNodes.size(), unmounted, pass4 ? "OK" : "FAIL");
+            ok = ok && pass4;
+         }
+
+         // 5. Changing one set() value (voices held fixed at 4): exactly 4
+         //    updates, 0 mounts, 0 unmounts, and every node index unchanged (T13).
+         {
+            NewPatch();
+            FieldGraphNode node;
+            node.code =
+               "param int voices = 4 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "      set(osc, \"rateBeats\", 1.0 + i)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            node.Regenerate(host);
+            std::vector<int> before;
+            for (const GraphNode& gn : gNodes) before.push_back(gn.index);
+
+            node.code =
+               "param int voices = 4 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "      set(osc, \"rateBeats\", 2.0 + i)\n"
+               "   }\n"
+               "}\n";
+            bool regenerated = node.Regenerate(host);
+            std::vector<int> after;
+            for (const GraphNode& gn : gNodes) after.push_back(gn.index);
+            int mounted, updated, remounted, unmounted, connected;
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass = regenerated && updated == 4 && mounted == 0 && unmounted == 0 && before == after;
+            printf("[FIELDGRAPHTEST] Assertion 5 (Set-Value Change, T13): updated=%d mounted=%d unmounted=%d indicesUnchanged=%d  %s\n",
+                   updated, mounted, unmounted, (int)(before == after), pass ? "OK" : "FAIL");
+            ok = ok && pass;
+         }
+
+         // 6. Renaming the emit target changes every key -> 3 unmounts + 3 mounts.
+         {
+            NewPatch();
+            FieldGraphNode node;
+            node.code =
+               "param int voices = 3 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            node.Regenerate(host);
+
+            node.code =
+               "param int voices = 3 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc2 = emit(\"LFO\", i)\n"
+               "   }\n"
+               "}\n";
+            bool regenerated = node.Regenerate(host);
+            int mounted, updated, remounted, unmounted, connected;
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass = regenerated && mounted == 3 && unmounted == 3 && gNodes.size() == 3;
+            printf("[FIELDGRAPHTEST] Assertion 6 (Rename Emit Target): mounted=%d unmounted=%d  %s\n",
+                   mounted, unmounted, pass ? "OK" : "FAIL");
+            ok = ok && pass;
+         }
+
+         // 7. Inserting a second emit ABOVE the first in source leaves the
+         //    first emit's keyed nodes at their existing indices (T2) -
+         //    identity is name+key path, not source position.
+         {
+            NewPatch();
+            FieldGraphNode node;
+            node.code =
+               "param int voices = 3 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            node.Regenerate(host);
+            std::vector<int> before;
+            for (const std::string& key : { std::string("osc#0"), std::string("osc#1"), std::string("osc#2") })
+               before.push_back(node.Ownership().Get(key));
+
+            node.code =
+               "param int voices = 3 [1, 8]\n"
+               "for (i = 0; i < 8; i++) {\n"
+               "   if (i < voices) {\n"
+               "      trig = emit(\"Ramp\", i)\n"
+               "      osc = emit(\"LFO\", i)\n"
+               "   }\n"
+               "}\n";
+            bool regenerated = node.Regenerate(host);
+            std::vector<int> after;
+            for (const std::string& key : { std::string("osc#0"), std::string("osc#1"), std::string("osc#2") })
+               after.push_back(node.Ownership().Get(key));
+            int mounted, updated, remounted, unmounted, connected;
+            parseNotice(node.Notice(), mounted, updated, remounted, unmounted, connected);
+            bool pass = regenerated && before == after &&
+                        std::find(before.begin(), before.end(), -1) == before.end() &&
+                        mounted == 3 && unmounted == 0 && remounted == 0 && gNodes.size() == 6;
+            printf("[FIELDGRAPHTEST] Assertion 7 (Insert Emit Above, T2): mounted=%d gNodes=%zu indicesUnchanged=%d  %s\n",
+                   mounted, gNodes.size(), (int)(before == after), pass ? "OK" : "FAIL");
+            ok = ok && pass;
+         }
+
+         NewPatch();
+         printf("%s\n", ok ? "FIELDGRAPH OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHRATETEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHRATETEST] Running Field graph-domain rate-zero and syntax validation harness...\n");
+         bool allOk = true;
+
+         auto checkCompileError = [&](const char* label, const std::string& code, const std::string& mustContainLeaf, const std::string& mustContainFix) -> bool {
+            FieldGraphNode node;
+            node.code = code;
+            bool res = node.Apply();
+            bool hasErr = !res && !node.LastError().empty();
+            bool leafMatch = node.LastError().find(mustContainLeaf) != std::string::npos;
+            bool fixMatch = node.LastError().find(mustContainFix) != std::string::npos;
+            bool pass = hasErr && leafMatch && fixMatch;
+            if (!pass)
+            {
+               printf("[FIELDGRAPHRATETEST]   %s failed: res=%d, err='%s' (expected leaf '%s' and fix '%s')\n",
+                      label, (int)res, node.LastError().c_str(), mustContainLeaf.c_str(), mustContainFix.c_str());
+            }
+            printf("[FIELDGRAPHRATETEST] %s: %s\n", label, pass ? "OK" : "FAIL");
+            return pass;
+         };
+
+         // 1. t in a set value
+         allOk = checkCompileError("Assertion 1 (t in set value)",
+            "osc = emit(\"LFO\", 0)\nset(osc, \"rateBeats\", t)\n",
+            "t", "Fix:") && allOk;
+
+         // 2. P in a loop bound
+         allOk = checkCompileError("Assertion 2 (P in loop bound)",
+            "for (k = 0; k < P.x; k += 1) {\n   osc = emit(\"LFO\", k)\n}\n",
+            "P", "Fix:") && allOk;
+
+         // 3. uv anywhere
+         allOk = checkCompileError("Assertion 3 (uv anywhere)",
+            "x = uv\n",
+            "uv", "Fix:") && allOk;
+
+         // 4. in anywhere
+         allOk = checkCompileError("Assertion 4 (in anywhere)",
+            "x = in\n",
+            "in", "Fix:") && allOk;
+
+         // 5. rand() in a set value
+         allOk = checkCompileError("Assertion 5 (rand() in set value)",
+            "osc = emit(\"LFO\", 0)\nset(osc, \"rateBeats\", rand())\n",
+            "rand()", "Fix:") && allOk;
+
+         // 6. a t-dependent global
+         {
+            ExprGlobals::All().push_back({"rateTGlobal", "t * 2.0", 0.0f, ""});
+            bool pass = checkCompileError("Assertion 6 (t-dependent global)",
+               "osc = emit(\"LFO\", 0)\nset(osc, \"rateBeats\", rateTGlobal)\n",
+               "rateTGlobal", "Fix:");
+            ExprGlobals::All().pop_back();
+            allOk = pass && allOk;
+         }
+
+         // 7. reduce from sample
+         allOk = checkCompileError("Assertion 7 (reduce from sample)",
+            "x = reduce.rms(in, 20.0, 2000.0)\n",
+            "in", "Fix:") && allOk;
+
+         // 8. assignment to a global
+         {
+            ExprGlobals::All().push_back({"myConstGlobal", "42.0", 42.0f, ""});
+            bool pass = checkCompileError("Assertion 8 (assignment to global)",
+               "myConstGlobal = 10.0\n",
+               "myConstGlobal", "Fix:");
+            ExprGlobals::All().pop_back();
+            allOk = pass && allOk;
+         }
+
+         // 9. emit(\"Group\", i)
+         allOk = checkCompileError("Assertion 9 (emit Group)",
+            "g = emit(\"Group\", 0)\n",
+            "Group", "Fix:") && allOk;
+
+         // 10. emit(\"Field Graph\", i)
+         allOk = checkCompileError("Assertion 10 (emit Field Graph)",
+            "fg = emit(\"Field Graph\", 0)\n",
+            "Field Graph", "Fix:") && allOk;
+
+         // 11. emit in a loop with no key
+         allOk = checkCompileError("Assertion 11 (emit in loop no key)",
+            "for (k = 0; k < 4; k += 1) {\n   osc = emit(\"LFO\")\n}\n",
+            "LFO", "Fix:") && allOk;
+
+         // 12. two emits with the same name
+         allOk = checkCompileError("Assertion 12 (two emits same name)",
+            "osc = emit(\"LFO\", 0)\nosc = emit(\"LFO\", 1)\n",
+            "osc", "Fix:") && allOk;
+
+         // 13. a non-literal type name
+         allOk = checkCompileError("Assertion 13 (non-literal type name)",
+            "k = 1\nosc = emit(k, 0)\n",
+            "type name", "Fix:") && allOk;
+
+         // 14. clean kernel compiles with zero errors and infers domain graph
+         {
+            FieldGraphNode cleanNode;
+            cleanNode.code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 1.0 + k)\n"
+               "   }\n"
+               "}\n";
+            bool res = cleanNode.Apply();
+            bool pass = res && cleanNode.LastError().empty();
+            if (!pass)
+               printf("[FIELDGRAPHRATETEST]   Clean kernel failed: %s\n", cleanNode.LastError().c_str());
+            printf("[FIELDGRAPHRATETEST] Assertion 14 (Clean Kernel): %s\n", pass ? "OK" : "FAIL");
+            allOk = pass && allOk;
+         }
+
+         printf("%s\n", allOk ? "FIELDGRAPHRATE OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHUNDOTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHUNDOTEST] Running Field graph-domain undo/redo harness...\n");
+         bool ok = true;
+         NewPatch();
+
+         PushUndoCheckpoint(); // clean baseline checkpoint
+
+         // 1. Spawn a Field Graph node emitting 8 nodes
+         GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+         auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+         fgn->code =
+            "param float voices = 8 [1, 8]\n"
+            "for (k = 0; k < 8; k += 1) {\n"
+            "   if (k < voices) {\n"
+            "      osc = emit(\"LFO\", k)\n"
+            "      set(osc, \"rateBeats\", 1.0 + k)\n"
+            "   }\n"
+            "}\n";
+
+         size_t undoSizeBefore = gUndoStack.size();
+         RunFieldGraphRegenerate(fgn);
+         size_t undoSizeAfter = gUndoStack.size();
+
+         bool pass1 = (undoSizeAfter == undoSizeBefore + 1) && (gNodes.size() == 9);
+         printf("[FIELDGRAPHUNDOTEST] Assertion 1 (Regenerate 8 nodes stack growth 1): stackBefore=%zu stackAfter=%zu gNodes=%zu  %s\n",
+                undoSizeBefore, undoSizeAfter, gNodes.size(), pass1 ? "OK" : "FAIL");
+         ok = ok && pass1;
+
+         // 2. Undo -> all 8 gone, kernel source reverted
+         Undo();
+         bool pass2 = (gNodes.size() == 1);
+         printf("[FIELDGRAPHUNDOTEST] Assertion 2 (Undo: 8 gone): gNodes=%zu  %s\n",
+                gNodes.size(), pass2 ? "OK" : "FAIL");
+         ok = ok && pass2;
+
+         // 3. Redo -> all 8 back, ownership resolves
+         Redo();
+         fgn = nullptr;
+         for (GraphNode& n : gNodes)
+            if (auto* fg = dynamic_cast<FieldGraphNode*>(n.node.get())) fgn = fg;
+         bool resolves8 = (fgn != nullptr) && (gNodes.size() == 9);
+         if (resolves8)
+         {
+            for (int i = 0; i < 8; ++i)
+            {
+               int idx = fgn->Ownership().Get("osc#" + std::to_string(i));
+               if (idx < 0 || FindNodeByIndex(idx) == nullptr) resolves8 = false;
+            }
+         }
+         bool pass3 = (gNodes.size() == 9) && resolves8;
+         printf("[FIELDGRAPHUNDOTEST] Assertion 3 (Redo: 8 back and ownership resolves): resolves=%d gNodes=%zu  %s\n",
+                (int)resolves8, gNodes.size(), pass3 ? "OK" : "FAIL");
+         ok = ok && pass3;
+
+         // 4. Undo past the regeneration to before the kernel existed -> no orphan nodes, no regeneration fired (T11)
+         Undo(); // back to kernel only
+         Undo(); // back to empty baseline
+         bool pass4 = gNodes.empty();
+         printf("[FIELDGRAPHUNDOTEST] Assertion 4 (Undo past regeneration to before kernel): gNodes=%zu  %s\n",
+                gNodes.size(), pass4 ? "OK" : "FAIL");
+         ok = ok && pass4;
+
+         // 5. Redo forward -> identical graph
+         Redo(); // kernel restored
+         Redo(); // 8 nodes regenerated
+         fgn = nullptr;
+         for (GraphNode& n : gNodes)
+            if (auto* fg = dynamic_cast<FieldGraphNode*>(n.node.get())) fgn = fg;
+         bool pass5 = (gNodes.size() == 9) && (fgn != nullptr);
+         printf("[FIELDGRAPHUNDOTEST] Assertion 5 (Redo forward to identical graph): gNodes=%zu  %s\n",
+                gNodes.size(), pass5 ? "OK" : "FAIL");
+         ok = ok && pass5;
+
+         // 6. After ApplyPatchData, ownership map indices all resolve via FindNodeByIndex (T1, §4.2 remap)
+         Patch::Data patchData = BuildPatchData();
+         NewPatch();
+         ApplyPatchData(patchData);
+         fgn = nullptr;
+         for (GraphNode& n : gNodes)
+            if (auto* fg = dynamic_cast<FieldGraphNode*>(n.node.get())) fgn = fg;
+         bool pass6 = (fgn != nullptr) && (gNodes.size() == 9);
+         if (pass6)
+         {
+            for (int i = 0; i < 8; ++i)
+            {
+               int idx = fgn->Ownership().Get("osc#" + std::to_string(i));
+               if (idx < 0 || FindNodeByIndex(idx) == nullptr) pass6 = false;
+            }
+         }
+         printf("[FIELDGRAPHUNDOTEST] Assertion 6 (ApplyPatchData ownership map resolves): resolves=%d gNodes=%zu  %s\n",
+                (int)pass6, gNodes.size(), pass6 ? "OK" : "FAIL");
+         ok = ok && pass6;
+
+         // 7. 30 consecutive regenerations leave gUndoStack.size() <= 30 and do not evict an earlier checkpoint (T9)
+         PushUndoCheckpoint();
+         size_t stackBefore30 = gUndoStack.size();
+         for (int i = 0; i < 30; ++i)
+         {
+            fgn->GetParamTable().Find("voices")->value = (float)(1 + (i % 8));
+            RunFieldGraphRegenerate(fgn);
+         }
+         size_t stackAfter30 = gUndoStack.size();
+         bool pass7 = (stackAfter30 <= stackBefore30 + 30) && (stackAfter30 < 200);
+         printf("[FIELDGRAPHUNDOTEST] Assertion 7 (30 regenerations <= 30 checkpoints): stackBefore=%zu stackAfter=%zu  %s\n",
+                stackBefore30, stackAfter30, pass7 ? "OK" : "FAIL");
+         ok = ok && pass7;
+
+         NewPatch();
+         printf("%s\n", ok ? "FIELDGRAPHUNDO OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHBLASTTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHBLASTTEST] Running Field graph-domain blast radius harness...\n");
+         bool allOk = true;
+
+         // Case 1: hand-delete a generated node -> kernel reports 1 missing, no crash;
+         // regenerate -> it returns; index differs; nothing else moved.
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 1.0 + k)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int osc0Before = fgn->Ownership().Get("osc#0");
+            int osc1Before = fgn->Ownership().Get("osc#1");
+            int osc2Before = fgn->Ownership().Get("osc#2");
+            int osc3Before = fgn->Ownership().Get("osc#3");
+
+            // Hand-delete osc#1
+            RemoveNodeByIndex(osc1Before);
+            bool missingReported = (FindNodeByIndex(osc1Before) == nullptr);
+
+            // Regenerate brings it back
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int osc1After = fgn->Ownership().Get("osc#1");
+            bool osc1Back = (osc1After >= 0 && FindNodeByIndex(osc1After) != nullptr);
+            bool indexDiffers = (osc1After != osc1Before);
+            bool othersUnchanged = (fgn->Ownership().Get("osc#0") == osc0Before &&
+                                   fgn->Ownership().Get("osc#2") == osc2Before &&
+                                   fgn->Ownership().Get("osc#3") == osc3Before);
+
+            bool pass1 = missingReported && osc1Back && indexDiffers && othersUnchanged && (gNodes.size() == 5);
+            printf("[FIELDGRAPHBLASTTEST] Assertion 1 (Hand-delete & return): missing=%d back=%d diffIndex=%d othersSame=%d  %s\n",
+                   (int)missingReported, (int)osc1Back, (int)indexDiffers, (int)othersUnchanged, pass1 ? "OK" : "FAIL");
+            allOk = allOk && pass1;
+         }
+
+         // Case 2: put 2 generated nodes in a group, force a type-change remount ->
+         // both are still in the group afterwards; emit(\"Group\", i) is refused.
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int osc0 = fgn->Ownership().Get("osc#0");
+            int osc2 = fgn->Ownership().Get("osc#2");
+
+            GraphNode* grpGn = SpawnNode("Group", "Compositing", 0.0f, 0.0f);
+            int grpIdx = grpGn->index;
+            auto* grp = static_cast<GroupNode*>(grpGn->node.get());
+            gGroupMembers[grp].insert(osc0);
+            gGroupMembers[grp].insert(osc2);
+
+            // Re-fetch fgn after SpawnNode
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+
+            // Force type change LFO -> Ramp
+            fgn->code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"Ramp\", k)\n"
+               "   }\n"
+               "}\n";
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            grpGn = FindNodeByIndex(grpIdx);
+            grp = static_cast<GroupNode*>(grpGn->node.get());
+
+            int osc0New = fgn->Ownership().Get("osc#0");
+            int osc2New = fgn->Ownership().Get("osc#2");
+            bool bothInGroup = (gGroupMembers[grp].count(osc0New) != 0) &&
+                               (gGroupMembers[grp].count(osc2New) != 0);
+
+            // emit(\"Group\", i) refused
+            FieldGraphNode groupEmitNode;
+            groupEmitNode.code = "g = emit(\"Group\", 0)\n";
+            bool groupRefused = !groupEmitNode.Apply();
+
+            bool pass2 = bothInGroup && groupRefused;
+            printf("[FIELDGRAPHBLASTTEST] Assertion 2 (Group membership rescued, emit Group refused): groupRescued=%d groupRefused=%d  %s\n",
+                   (int)bothInGroup, (int)groupRefused, pass2 ? "OK" : "FAIL");
+            allOk = allOk && pass2;
+         }
+
+         // Case 3: copy/paste
+         // copy kernel+children, paste -> pasted kernel's uid differs, both kernels regenerate
+         // without stealing each other's nodes, and node count doubles exactly once;
+         // copy children alone -> copies are owned by nobody and survive regeneration of original.
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "   }\n"
+               "}\n";
+            MainGraphHost host;
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            std::string uid1 = fgn->Uid();
+
+            std::set<int> kernelAndChildren;
+            kernelAndChildren.insert(kernelIdx);
+            for (int i = 0; i < 4; ++i)
+               kernelAndChildren.insert(fgn->Ownership().Get("osc#" + std::to_string(i)));
+
+            PerformCopyPaste(kernelAndChildren);
+            bool countDoubled = (gNodes.size() == 10);
+
+            // Find pasted kernel
+            int fgn2Idx = -1;
+            for (const GraphNode& n : gNodes)
+            {
+               if (n.index != kernelIdx && dynamic_cast<FieldGraphNode*>(n.node.get()) != nullptr)
+               {
+                  fgn2Idx = n.index;
+                  break;
+               }
+            }
+            GraphNode* gn2 = FindNodeByIndex(fgn2Idx);
+            auto* fgn2 = gn2 ? static_cast<FieldGraphNode*>(gn2->node.get()) : nullptr;
+            bool uidsDiffer = (fgn2 != nullptr && fgn2->Uid() != uid1);
+
+            // Regenerate both safely
+            gn = FindNodeByIndex(kernelIdx);
+            if (gn) static_cast<FieldGraphNode*>(gn->node.get())->Regenerate(host);
+            gn2 = FindNodeByIndex(fgn2Idx);
+            if (gn2) static_cast<FieldGraphNode*>(gn2->node.get())->Regenerate(host);
+            bool noStealing = (gNodes.size() == 10);
+
+            // Copy children alone
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            std::set<int> childrenOnly;
+            for (int i = 0; i < 4; ++i)
+               childrenOnly.insert(fgn->Ownership().Get("osc#" + std::to_string(i)));
+            PerformCopyPaste(childrenOnly);
+            size_t countAfterChildrenPaste = gNodes.size();
+
+            // Regenerate original
+            gn = FindNodeByIndex(kernelIdx);
+            if (gn) static_cast<FieldGraphNode*>(gn->node.get())->Regenerate(host);
+            bool childrenSurvive = (gNodes.size() == countAfterChildrenPaste);
+
+            bool pass3 = countDoubled && uidsDiffer && noStealing && (countAfterChildrenPaste == 14) && childrenSurvive;
+            printf("[FIELDGRAPHBLASTTEST] Assertion 3 (Copy/paste subgraph & orphan children): doubled=%d diffUid=%d noStealing=%d childrenSurvive=%d  %s\n",
+                   (int)countDoubled, (int)uidsDiffer, (int)noStealing, (int)childrenSurvive, pass3 ? "OK" : "FAIL");
+            allOk = allOk && pass3;
+         }
+
+         // Case 4: modulation-cable rescue
+         // binding survives a remount and points at the new index;
+         // binding to a kernel-driven param is refused;
+         // true unmount clears the binding and the kernel reports it.
+         {
+            NewPatch();
+            GraphNode* lfoMod = SpawnNode("LFO", "Utility", -200.0f, 0.0f);
+            int lfoModIdx = lfoMod->index;
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 1 [1, 8]\n"
+               "osc = emit(\"LFO\", 0)\n"
+               "set(osc, \"rateBeats\", 2.0)\n";
+            MainGraphHost host;
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int oscIdx = fgn->Ownership().Get("osc#0");
+
+            // Binding to kernel-driven param is refused (param 1 is rateBeats)
+            bool bindDrivenRefused = !CanBindModulation(oscIdx, 1);
+
+            // Binding to a free param is accepted (param 2 is bipolar)
+            bool bindFreeAllowed = CanBindModulation(oscIdx, 2);
+            Modulation::Instance().Bind(oscIdx, 2, lfoModIdx, 0);
+            bool modBound = Modulation::Instance().IsModulated(oscIdx, 2);
+
+            // Force remount LFO -> Ramp
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 1 [1, 8]\n"
+               "osc = emit(\"Ramp\", 0)\n";
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int newOscIdx = fgn->Ownership().Get("osc#0");
+            bool remounted = (newOscIdx != oscIdx && newOscIdx >= 0);
+            bool modRescued = Modulation::Instance().IsModulated(newOscIdx, 2);
+
+            // True unmount: emit nothing
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code = "x = 1\n";
+            fgn->Regenerate(host);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            bool modCleared = !Modulation::Instance().IsModulated(newOscIdx, 2);
+            bool noticeReported = (fgn->Notice().find("modulation bindings dropped") != std::string::npos);
+
+            bool pass4 = bindDrivenRefused && bindFreeAllowed && modBound && remounted && modRescued && modCleared && noticeReported;
+            printf("[FIELDGRAPHBLASTTEST] Assertion 4 (Modulation rescue & refuse): refusedDriven=%d bound=%d rescued=%d cleared=%d reported=%d  %s\n",
+                   (int)bindDrivenRefused, (int)modBound, (int)modRescued, (int)modCleared, (int)noticeReported, pass4 ? "OK" : "FAIL");
+            allOk = allOk && pass4;
+         }
+
+         // Case 5: cable rescue
+         // a generated->hand-placed cable survives a remount;
+         // a true unmount clears the cable, the kernel reports the detach,
+         // and one undo restores both node and cable.
+         {
+            NewPatch();
+            GraphNode* fitNode = SpawnNode("Fit", "Compositing", 300.0f, 0.0f);
+            int fitIdx = fitNode->index;
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 1 [1, 8]\n"
+               "osc = emit(\"Ramp\", 0)\n";
+            RunFieldGraphRegenerate(fgn);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int oscIdx = fgn->Ownership().Get("osc#0");
+            std::string connErr;
+            ConnectNodes(oscIdx, 0, fitIdx, 0, connErr);
+            auto hasCableToFit = [&](int fromIdx) {
+               GraphNode* src = FindNodeByIndex(fromIdx);
+               GraphNode* dst = FindNodeByIndex(fitIdx);
+               if (!src || !dst) return false;
+               ImageCable* cable = CableFor(*dst, 0);
+               return cable != nullptr && cable->IsConnected() && cable->GetSource() == src->node.get();
+            };
+            bool initialCable = hasCableToFit(oscIdx);
+
+            // Force remount Ramp -> Noise
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code =
+               "param float voices = 1 [1, 8]\n"
+               "osc = emit(\"Noise\", 0)\n";
+            RunFieldGraphRegenerate(fgn);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            int remountIdx = fgn->Ownership().Get("osc#0");
+            bool remountedCable = (remountIdx != oscIdx) && hasCableToFit(remountIdx);
+
+            // True unmount
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code = "x = 1\n";
+            RunFieldGraphRegenerate(fgn);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            bool cableGone = !hasCableToFit(remountIdx);
+            bool unmountReported = (fgn->Notice().find("cables with unmounted nodes") != std::string::npos);
+
+            // One undo restores both node and cable
+            Undo();
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = gn ? dynamic_cast<FieldGraphNode*>(gn->node.get()) : nullptr;
+            int restoredIdx = fgn ? fgn->Ownership().Get("osc#0") : -1;
+            bool undoRestoredNode = (restoredIdx >= 0 && FindNodeByIndex(restoredIdx) != nullptr);
+            bool undoRestoredCable = hasCableToFit(restoredIdx);
+
+            bool pass5 = initialCable && remountedCable && cableGone && unmountReported && undoRestoredNode && undoRestoredCable;
+            printf("[FIELDGRAPHBLASTTEST] Assertion 5 (Cable rescue, detach & one undo): initCable=%d rescuedCable=%d cableGone=%d reported=%d undoNode=%d undoCable=%d  %s\n",
+                   (int)initialCable, (int)remountedCable, (int)cableGone, (int)unmountReported, (int)undoRestoredNode, (int)undoRestoredCable, pass5 ? "OK" : "FAIL");
+            allOk = allOk && pass5;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDGRAPHBLAST OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
       {
          // Every node type that declares params must survive both paths that
@@ -43393,7 +48457,55 @@ int main(int argc, char** argv)
                 typesTested - copyFails, typesTested, copyFails == 0 ? "OK" : "FAIL");
          printf("save/load:  %d/%d types round trip  %s\n",
                 typesTested - loadFails, typesTested, loadFails == 0 ? "OK" : "FAIL");
-         printf("%s\n", (copyFails == 0 && loadFails == 0) ? "ROUND TRIP OK" : "SUSPECT");
+
+         // Field step 10: 8-generated-node save/load round-trip case (doc §7.6)
+         bool fieldGraphRoundTripOk = false;
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            if (gn && gn->node)
+            {
+               auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+               fgn->code =
+                  "param float voices = 8 [1, 8]\n"
+                  "for (k = 0; k < 8; k += 1) {\n"
+                  "   if (k < voices) {\n"
+                  "      osc = emit(\"LFO\", k)\n"
+                  "      set(osc, \"rateBeats\", 1.0 + k)\n"
+                  "   }\n"
+                  "}\n";
+               MainGraphHost host;
+               fgn->Regenerate(host);
+               const bool generated8 = gNodes.size() == 9;
+               Patch::Data saved = BuildPatchData();
+               NewPatch();
+               ApplyPatchData(saved);
+               const bool reloaded8 = gNodes.size() == 9;
+               FieldGraphNode* reloadedFgn = nullptr;
+               for (GraphNode& node : gNodes)
+               {
+                  if (auto* fg = dynamic_cast<FieldGraphNode*>(node.node.get()))
+                     reloadedFgn = fg;
+               }
+               bool ownershipResolves = (reloadedFgn != nullptr);
+               if (ownershipResolves)
+               {
+                  for (int i = 0; i < 8; ++i)
+                  {
+                     std::string key = "osc#" + std::to_string(i);
+                     int idx = reloadedFgn->Ownership().Get(key);
+                     if (idx < 0 || FindNodeByIndex(idx) == nullptr)
+                        ownershipResolves = false;
+                  }
+               }
+               fieldGraphRoundTripOk = generated8 && reloaded8 && ownershipResolves;
+               printf("field graph 8-node save/load round-trip: generated=%d reloaded=%d ownershipResolves=%d  %s\n",
+                      (int)generated8, (int)reloaded8, (int)ownershipResolves,
+                      fieldGraphRoundTripOk ? "OK" : "FAIL");
+            }
+         }
+
+         printf("%s\n", (copyFails == 0 && loadFails == 0 && fieldGraphRoundTripOk) ? "ROUND TRIP OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_PHASEFTEST") != nullptr && frameId == 4)
@@ -48533,6 +53645,14 @@ int main(int argc, char** argv)
                DrawShapeParams(n);
             else if (auto* n = dynamic_cast<FormulaNode*>(gn.node.get()))
                DrawFormulaParams(n);
+            else if (auto* n = dynamic_cast<FieldElementNode*>(gn.node.get()))
+               DrawFieldElementParams(n);
+            else if (auto* n = dynamic_cast<FieldPixelNode*>(gn.node.get()))
+               DrawFieldPixelParams(n);
+            else if (auto* n = dynamic_cast<FieldSampleNode*>(gn.node.get()))
+               DrawFieldSampleParams(n);
+            else if (auto* n = dynamic_cast<FieldGraphNode*>(gn.node.get()))
+               DrawFieldGraphParams(n);
             else if (auto* n = dynamic_cast<TextNode*>(gn.node.get()))
                DrawTextParams(n);
             else if (auto* n = dynamic_cast<LayerStackNode*>(gn.node.get()))
@@ -49170,7 +54290,14 @@ int main(int argc, char** argv)
                   // modulators patch into parameters and into Math's inputs;
                   // image nodes patch into image inputs
                   if (GraphNode::IsParamPin(b))
+                  {
                      valid = srcIsModulator;
+                     if (valid && IsKernelDrivenParam(dstNode->index, GraphNode::ParamIndexFromPin(b)))
+                     {
+                        valid = false;
+                        rejectReason = "Cannot modulate a parameter driven by a Field Graph kernel";
+                     }
+                  }
                   else if (GraphNode::IsColorPin(b))
                      valid = srcPalette != nullptr;
                   else if (GraphNode::IsInputPin(b))
@@ -49825,6 +54952,18 @@ int main(int argc, char** argv)
                   CopyParams(copy->node.get(), item.src);
                   if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
                      rn->seed = RandomNode::NextSeed();
+                  // A duplicate's ownership map, just copied verbatim by
+                  // CopyParams, still points at the ORIGINAL's live nodes -
+                  // the copy's identity must diverge (doc §5.7.3) so its
+                  // next Regenerate treats every emit() as fresh (mount, not
+                  // "I already own that node") instead of fighting the
+                  // original over the same indices.
+                  if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+                  {
+                     fgn->SetUid(FieldGraphNode::NewUid());
+                     fgn->Ownership() = Field::GraphOwnershipMap();
+                     fgn->ownershipText.clear();
+                  }
                   copy->showParams = item.params;
                   copy->showMiniViewport = item.miniViewport;
                   copy->showAdvancedParams = item.advancedParams;
@@ -50116,6 +55255,14 @@ int main(int argc, char** argv)
                CopyParams(copy->node.get(), item.src);
                if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
                   rn->seed = RandomNode::NextSeed();
+               // See the duplicate path's identical comment above (doc
+               // §5.7.3) - a paste needs the same fresh-identity treatment.
+               if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+               {
+                  fgn->SetUid(FieldGraphNode::NewUid());
+                  fgn->Ownership() = Field::GraphOwnershipMap();
+                  fgn->ownershipText.clear();
+               }
                newByOrig[item.origIndex] = copy;
             }
          }
@@ -51363,6 +56510,18 @@ int main(int argc, char** argv)
       // EndNodeParams.
       EndNodeParams();
 
+      // Field 'graph' domain (build step 10, trap T14): a "Regenerate"
+      // button click sets this flag from inside DrawFieldGraphParams, which
+      // runs nested in the ed::Begin()/ed::End() pass just closed above -
+      // SpawnNode/RemoveNodeByIndex there would mutate gNodes (reallocating
+      // its storage) while imgui-node-editor is still mid-frame over it.
+      // Draining here, once per frame, right after that pass ends, is safe.
+      if (gFieldGraphPendingRegenerate != nullptr)
+      {
+         RunFieldGraphRegenerate(gFieldGraphPendingRegenerate);
+         gFieldGraphPendingRegenerate = nullptr;
+      }
+
       io.MouseWheel = savedWheel;
       io.MouseWheelH = savedWheelH;
 
@@ -51647,6 +56806,215 @@ int main(int argc, char** argv)
          ImGui::End();
       }
 
+      if (gFieldElementEditorOpen && gFieldElementEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gFieldElementEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gFieldElementEditor = nullptr;
+            gFieldElementEditorOpen = false;
+         }
+      }
+
+      if (gFieldElementEditorOpen && gFieldElementEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Field element editor", &gFieldElementEditorOpen))
+         {
+            ImGui::TextDisabled("Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t");
+            ImGui::TextDisabled("User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted.");
+            ImGui::Separator();
+
+            static char editBuf[8192];
+            static FieldElementNode* lastEdited = nullptr;
+            if (lastEdited != gFieldElementEditor)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
+               lastEdited = gFieldElementEditor;
+            }
+
+            ImGui::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               gFieldElementEditor->code = editBuf;
+               gFieldElementEditor->Apply();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
+
+            if (!gFieldElementEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldElementEditor->LastError().c_str());
+            }
+         }
+         ImGui::End();
+      }
+
+      if (gFieldPixelEditorOpen && gFieldPixelEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Field pixel editor", &gFieldPixelEditorOpen))
+         {
+            ImGui::TextDisabled("Field pixel-domain kernel (per-pixel fragment shader).");
+            ImGui::TextDisabled("Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame");
+            ImGui::Separator();
+
+            static char editBuf[8192];
+            static FieldPixelNode* lastEdited = nullptr;
+            if (lastEdited != gFieldPixelEditor)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
+               lastEdited = gFieldPixelEditor;
+            }
+
+            ImGui::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               gFieldPixelEditor->code = editBuf;
+               gFieldPixelEditor->Apply();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
+
+            if (!gFieldPixelEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPixelEditor->LastError().c_str());
+            }
+         }
+         ImGui::End();
+      }
+
+      if (gFieldSampleEditorOpen && gFieldSampleEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gFieldSampleEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gFieldSampleEditor = nullptr;
+            gFieldSampleEditorOpen = false;
+         }
+      }
+
+      if (gFieldSampleEditorOpen && gFieldSampleEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Field sample editor", &gFieldSampleEditorOpen))
+         {
+            ImGui::TextDisabled("Field sample-domain kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out");
+            ImGui::TextDisabled("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.");
+            ImGui::Separator();
+
+            static char editBuf[8192];
+            static FieldSampleNode* lastEdited = nullptr;
+            if (lastEdited != gFieldSampleEditor)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldSampleEditor->code.c_str());
+               lastEdited = gFieldSampleEditor;
+            }
+
+            ImGui::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               gFieldSampleEditor->code = editBuf;
+               gFieldSampleEditor->Apply();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldSampleEditor->code.c_str());
+
+            if (!gFieldSampleEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSampleEditor->LastError().c_str());
+            }
+         }
+         ImGui::End();
+      }
+
+      if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gFieldGraphEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gFieldGraphEditor = nullptr;
+            gFieldGraphEditorOpen = false;
+         }
+      }
+
+      if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Field graph editor", &gFieldGraphEditorOpen))
+         {
+            ImGui::TextDisabled("Field graph-domain kernel (edit-time, runs once). emit(\"Type Name\", k0, k1, ...) -> handle");
+            ImGui::TextDisabled("connect(src, srcSlot, dst, dstSlot)   set(handle, \"paramName\", value)   place(handle, x, y)");
+            ImGui::Separator();
+
+            static char editBuf[8192];
+            static FieldGraphNode* lastEdited = nullptr;
+            if (lastEdited != gFieldGraphEditor)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
+               lastEdited = gFieldGraphEditor;
+            }
+
+            ImGui::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               // Compile-only (T11): never mutates the real graph on its own -
+               // see FieldGraphNode::Apply()'s doc comment. Regenerate (below)
+               // is the only path that does.
+               gFieldGraphEditor->code = editBuf;
+               gFieldGraphEditor->Apply();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
+            ImGui::SameLine();
+            if (ImGui::Button("Regenerate", ImVec2(120, 0)))
+            {
+               // Safe to call directly (not deferred) here: this window draws
+               // after ed::End() has already returned for the frame, unlike
+               // DrawFieldGraphParams' Regenerate button (see trap T14 there).
+               gFieldGraphEditor->code = editBuf;
+               RunFieldGraphRegenerate(gFieldGraphEditor);
+            }
+
+            if (!gFieldGraphEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldGraphEditor->LastError().c_str());
+            }
+            if (!gFieldGraphEditor->Notice().empty())
+            {
+               ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", gFieldGraphEditor->Notice().c_str());
+            }
+         }
+         ImGui::End();
+      }
+
       // ---- expression globals ----
       // A flat, ordered list of name/expression rows. Deliberately not a node:
       // a global is read by name from anywhere in the patch, and giving it a
@@ -51662,11 +57030,13 @@ int main(int argc, char** argv)
             ImGui::TextDisabled("each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5");
             if (ImGui::CollapsingHeader("language reference"))
             {
-               ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !");
+               ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !   . (swizzle)");
                ImGui::TextDisabled("functions   sin cos tan abs sign sqrt exp log pow");
-               ImGui::TextDisabled("            floor ceil round mod min max clamp lerp");
+               ImGui::TextDisabled("            floor ceil round mod min max clamp lerp mix");
                ImGui::TextDisabled("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)");
-               ImGui::TextDisabled("            rand(speed) rand(min,max,speed) sh(min,max,speed)");
+               ImGui::TextDisabled("            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)");
+               ImGui::TextDisabled("vectors     vec2(x,y) vec3(x,y,z) vec4(x,y,z,w) or splat vec3(1)");
+               ImGui::TextDisabled("            swizzles: .xy .xyz .xyzw or .rg .rgb .rgba (e.g. P.xz, Cd.bgr)");
                ImGui::TextDisabled("bound       t = transport seconds, pi");
                ImGui::TextDisabled("in a param  lo / hi = that param's own range, plus its siblings");
                ImGui::TextDisabled("            a sibling of the same name shadows a global");

@@ -23,12 +23,26 @@ public:
    // clock (see mAudioSampleRate). Main thread only.
    void Tick(float deltaSeconds);
 
-   void SetPlaying(bool playing) { mPlaying = playing; }
+   unsigned long long ResetEpoch() const { return mResetEpoch.load(std::memory_order_relaxed); }
+   void TriggerReset() { mResetEpoch.fetch_add(1, std::memory_order_relaxed); }
+
+   void SetPlaying(bool playing)
+   {
+      if (mPlaying && !playing)
+         mResetEpoch.fetch_add(1, std::memory_order_relaxed);
+      mPlaying = playing;
+   }
    bool IsPlaying() const { return mPlaying; }
-   void TogglePlay() { mPlaying = !mPlaying; }
+   void TogglePlay()
+   {
+      if (mPlaying)
+         mResetEpoch.fetch_add(1, std::memory_order_relaxed);
+      mPlaying = !mPlaying;
+   }
 
    void Rewind()
    {
+      mResetEpoch.fetch_add(1, std::memory_order_relaxed);
       mBeats = 0.0;
       mSeconds = 0.0;
       // These three stores aren't atomic as a group, so a concurrent
@@ -121,6 +135,7 @@ public:
 private:
    std::atomic<bool> mPlaying { true };
    std::atomic<float> mBpm { 120.0f };
+   std::atomic<unsigned long long> mResetEpoch { 0 };
 
    // Fallback (no audio engine) clock state. Only ever touched by Tick(),
    // which only runs on the main thread and only writes these while

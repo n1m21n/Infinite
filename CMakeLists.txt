@@ -216,6 +216,27 @@ set(COMMON_SOURCES
     src/core/Transport.cpp
     src/core/Modulation.cpp
     src/core/Expression.cpp
+    src/core/field/FieldLex.cpp
+    src/core/field/FieldParse.cpp
+    src/core/field/FieldIR.cpp
+    src/core/field/FieldBytecode.cpp
+    src/core/field/FieldVM.cpp
+    src/core/field/FieldRandom.cpp
+    src/core/field/FieldProgramCache.cpp
+    src/core/field/FieldSwizzle.cpp
+    src/core/field/ElementStore.cpp
+    src/core/field/ElementBackend.cpp
+    src/core/field/FieldState.cpp
+    src/core/field/FieldCycles.cpp
+    src/core/field/ParamTable.cpp
+    src/core/field/GlslBackend.cpp
+    src/core/field/PixelState.cpp
+    src/core/field/Transfer.cpp
+    src/core/field/ReduceOps.cpp
+    src/core/field/BackendRegister.cpp
+    src/core/field/FieldGraphKernel.cpp
+    src/core/field/FieldGraphReconciler.cpp
+    src/core/field/FieldGraphOwnership.cpp
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp
@@ -291,6 +312,10 @@ set(COMMON_SOURCES
     src/nodes/SimulationNodes.cpp
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
+    src/nodes/FieldElementNode.cpp
+    src/nodes/FieldSampleNode.cpp
+    src/nodes/FieldPixelNode.cpp
+    src/nodes/FieldGraphNode.cpp
     src/nodes/PointDistributionNodes.cpp
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp
