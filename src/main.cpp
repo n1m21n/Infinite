@@ -13207,9 +13207,9 @@ namespace
       const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
 
       // System Default options
-      choices.push_back({ "Stereo (1+2)", "Stereo", "System Default", 0, 0 });
-      choices.push_back({ "Input 1 (Mono)", "In 1", "System Default", 0, 1 });
-      choices.push_back({ "Input 2 (Mono)", "In 2", "System Default", 0, 2 });
+      choices.push_back({ "Default: Stereo (1+2)", "Default: Stereo", "System Default", 0, 0 });
+      choices.push_back({ "Default: Input 1 (Mono)", "Default: In 1", "System Default", 0, 1 });
+      choices.push_back({ "Default: Input 2 (Mono)", "Default: In 2", "System Default", 0, 2 });
 
       for (const Platform::AudioDeviceInfo& d : devices)
       {
@@ -13217,24 +13217,24 @@ namespace
             continue;
 
          const int chCount = std::max(1, d.inputChannels > 0 ? d.inputChannels : 2);
-         const std::string devPrefix = (devices.size() > 1) ? (d.name + ": ") : "";
+         const std::string devPrefix = d.name + ": ";
 
          if (chCount >= 2)
          {
-            choices.push_back({ "Stereo (1+2)", devPrefix + "Stereo", d.name, d.deviceId, 0 });
-            choices.push_back({ "Input 1 (Mono)", devPrefix + "In 1", d.name, d.deviceId, 1 });
-            choices.push_back({ "Input 2 (Mono)", devPrefix + "In 2", d.name, d.deviceId, 2 });
+            choices.push_back({ devPrefix + "Stereo (1+2)", devPrefix + "Stereo", d.name, d.deviceId, 0 });
+            choices.push_back({ devPrefix + "Input 1 (Mono)", devPrefix + "In 1", d.name, d.deviceId, 1 });
+            choices.push_back({ devPrefix + "Input 2 (Mono)", devPrefix + "In 2", d.name, d.deviceId, 2 });
             for (int ch = 3; ch <= chCount; ch++)
             {
-               char lbl[32], sname[64];
-               snprintf(lbl, sizeof(lbl), "Input %d (Mono)", ch);
+               char lbl[64], sname[64];
+               snprintf(lbl, sizeof(lbl), "%sInput %d (Mono)", devPrefix.c_str(), ch);
                snprintf(sname, sizeof(sname), "%sIn %d", devPrefix.c_str(), ch);
                choices.push_back({ lbl, sname, d.name, d.deviceId, ch });
             }
          }
          else
          {
-            choices.push_back({ "Input 1 (Mono)", devPrefix + "In 1", d.name, d.deviceId, 1 });
+            choices.push_back({ devPrefix + "Input 1 (Mono)", devPrefix + "In 1", d.name, d.deviceId, 1 });
          }
       }
 
@@ -56528,11 +56528,24 @@ int main(int argc, char** argv)
          searchRequestClose = false;
       }
 
-      ImGui::SetNextWindowSizeConstraints(ImVec2(220, 0), ImVec2(420, 480));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(520, 480));
       if (ImGui::BeginPopup("##dropdown"))
       {
+         std::string lastCategory;
          for (int i = 0; i < (int)gDropdown.options.size(); i++)
          {
+            if (i < (int)gDropdown.categories.size() && !gDropdown.categories[i].empty())
+            {
+               if (gDropdown.categories[i] != lastCategory)
+               {
+                  if (i > 0)
+                     ImGui::Separator();
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
+                  ImGui::TextUnformatted(gDropdown.categories[i].c_str());
+                  ImGui::PopStyleColor();
+                  lastCategory = gDropdown.categories[i];
+               }
+            }
             bool selected = (i == gDropdown.current);
             if (ImGui::Selectable(gDropdown.options[i].c_str(), selected))
             {
