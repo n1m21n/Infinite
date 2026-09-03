@@ -152,6 +152,26 @@ entry if a refactor makes it stale.
   `INFINITE_GLTFDROPTEST` for a worked example including the position-
   timing gotcha above.
 
+- **`main.cpp`'s `getenv("INFINITE_...")`-gated self-test fixtures are not all
+  wired into `run-infinite-hygiene`'s `driver.sh`.** A fixture existing in
+  `main.cpp` (e.g. `FIELDGRAPHTEST`, `FIELDGRAPHRATETEST`, `FIELDGRAPHUNDOTEST`,
+  `FIELDGRAPHBLASTTEST`) is not the same as `driver.sh` ever running it —
+  check its `TIER1_CHECKS`/`GROUP_*`/`FULL_TESTS` arrays before assuming a
+  named test is part of the hygiene gate, and before adding anything to
+  `known-test-failures.txt` (which only takes effect for tests `driver.sh`
+  actually invokes). A prior investigation hand-ran `INFINITE_FIELDGRAPHTEST=1`
+  outside the harness, got a real SIGSEGV, and misattributed the same crash to
+  the unrelated `FIELDGRAPHBLASTTEST` fixture next to it — re-running the
+  crashing test repeatedly never caught the misattribution because nobody
+  diffed the log against source per-test. The real bug (fixed) was two
+  independent issues stacked in the `FIELDGRAPHTEST` fixture itself, not the
+  app: `main.cpp:48193` declared `param int voices` when
+  `src/core/field/FieldParse.cpp:404-407` only ever allowed `float` params
+  (causing an unguarded `ParamTable::Find("voices")->value` null-deref at
+  `main.cpp:48224`), and its for-loop used `i` as the loop variable, which
+  `i` is reserved as the element-domain per-element index in Field (see
+  `field-language`) — every sibling fixture in the file already used `k`.
+
 ## Adding to this map
 
 At the end of a task that touched `src/`, if you found a cross-file wiring

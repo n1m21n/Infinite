@@ -48190,11 +48190,11 @@ int main(int argc, char** argv)
             NewPatch();
             FieldGraphNode node;
             node.code =
-               "param int voices = 4 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
-               "      set(osc, \"rateBeats\", 1.0 + i)\n"
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 1.0 + k)\n"
                "   }\n"
                "}\n";
             MainGraphHost host;
@@ -48245,11 +48245,11 @@ int main(int argc, char** argv)
             NewPatch();
             FieldGraphNode node;
             node.code =
-               "param int voices = 4 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
-               "      set(osc, \"rateBeats\", 1.0 + i)\n"
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 1.0 + k)\n"
                "   }\n"
                "}\n";
             MainGraphHost host;
@@ -48258,11 +48258,11 @@ int main(int argc, char** argv)
             for (const GraphNode& gn : gNodes) before.push_back(gn.index);
 
             node.code =
-               "param int voices = 4 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
-               "      set(osc, \"rateBeats\", 2.0 + i)\n"
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 2.0 + k)\n"
                "   }\n"
                "}\n";
             bool regenerated = node.Regenerate(host);
@@ -48281,20 +48281,20 @@ int main(int argc, char** argv)
             NewPatch();
             FieldGraphNode node;
             node.code =
-               "param int voices = 3 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
+               "param float voices = 3 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
                "   }\n"
                "}\n";
             MainGraphHost host;
             node.Regenerate(host);
 
             node.code =
-               "param int voices = 3 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc2 = emit(\"LFO\", i)\n"
+               "param float voices = 3 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc2 = emit(\"LFO\", k)\n"
                "   }\n"
                "}\n";
             bool regenerated = node.Regenerate(host);
@@ -48313,10 +48313,10 @@ int main(int argc, char** argv)
             NewPatch();
             FieldGraphNode node;
             node.code =
-               "param int voices = 3 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
+               "param float voices = 3 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
                "   }\n"
                "}\n";
             MainGraphHost host;
@@ -48326,11 +48326,11 @@ int main(int argc, char** argv)
                before.push_back(node.Ownership().Get(key));
 
             node.code =
-               "param int voices = 3 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      trig = emit(\"Ramp\", i)\n"
-               "      osc = emit(\"LFO\", i)\n"
+               "param float voices = 3 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      trig = emit(\"Ramp\", k)\n"
+               "      osc = emit(\"LFO\", k)\n"
                "   }\n"
                "}\n";
             bool regenerated = node.Regenerate(host);
