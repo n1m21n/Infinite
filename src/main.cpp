@@ -637,6 +637,36 @@ namespace
       }
       return false;
    }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): symmetric to
+   // FieldOutputPinHasLiveCable above, but scans destination (input) pins -
+   // needed so a kernel edit that would retire a declared `input` pin (not
+   // just a declared `output`) can refuse rather than silently orphan
+   // whatever is wired into it.
+   bool FieldInputPinHasLiveCable(int nodeIndex, int inputIndex)
+   {
+      for (const LinkInfo& link : gLinks)
+      {
+         if (!GraphNode::IsInputPin(link.dstPin))
+            continue;
+         if (GraphNode::NodeIndexFromPin(link.dstPin) == nodeIndex &&
+             GraphNode::InputSlotFromPin(link.dstPin) == inputIndex)
+            return true;
+      }
+      return false;
+   }
+
+   // Bridge installed into Field::gLiveCableChecker (see PinTable.h) so
+   // Field*Node::Apply() - compiled in separate translation units, and
+   // never able to see gLinks (private to this anonymous namespace) - can
+   // still ask "does this pin's current compacted slot have a live cable".
+   // Taking the address of an internal-linkage function and storing it in
+   // an externally-linked function pointer is legal; only the pointer
+   // itself needs external linkage.
+   bool CheckFieldLiveCableBridge(int nodeIndex, int slot, bool isOutput)
+   {
+      return isOutput ? FieldOutputPinHasLiveCable(nodeIndex, slot) : FieldInputPinHasLiveCable(nodeIndex, slot);
+   }
    bool gSnapToGrid = true;
    float gGridSnap = 20.0f;
    // Audio device/rate/buffer selection, applied to AudioEngine on next
@@ -4214,8 +4244,11 @@ namespace
          return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
-      if (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr)
-         return 1; // the kernel's "src" texture input
+      if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
+         // Dynamic pins, Phase 2b (build step 13, §5.7): the native "src"
+         // texture input at slot 0, then one slot per currently-declared
+         // `input image` pin.
+         return 1 + fp->DeclaredImageInputCount();
       if (dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr)
          return 1; // the kernel's optional "geo" input (generator when unwired)
       // (Audio Analyze used to need an entry here for its fileSource pin; it
@@ -4356,7 +4389,13 @@ namespace
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
-         return slot == 0 ? &fp->TextureInput() : nullptr;
+      {
+         // Dynamic pins, Phase 2b (build step 13, §5.7): slot 0 is the
+         // native "src" input; slot 1..N route to the currently-declared
+         // `input image` pins in PinTable order.
+         if (slot == 0) return &fp->TextureInput();
+         return fp->DeclaredImageInput(slot - 1);
+      }
       if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
          return slot == 0 ? &model->TextureInput() : nullptr;
       if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
@@ -42484,6 +42523,14 @@ int main(int argc, char** argv)
    // crash in a headless CI fixture leaves a dump/log the same as a real run.
    Platform::InstallCrashHandler();
 
+   // Dynamic pins, Phase 2b (build step 13, §5.1): install the live-cable
+   // checker bridge (see CheckFieldLiveCableBridge's comment above) before
+   // anything can call a Field*Node::Apply() - including the FIELDPINSTEST/
+   // FIELDPINNODETEST fixtures below, which construct FieldElementNode/
+   // FieldSampleNode/FieldPixelNode via SpawnNode and rely on this being
+   // live for their refusal assertions.
+   Field::gLiveCableChecker = &CheckFieldLiveCableBridge;
+
    // Old spelling kept as an alias: the panel was renamed to the performance
    // matrix, but a shell history full of INFINITE_PERFPANELTEST is not worth
    // breaking over it.
@@ -49715,6 +49762,236 @@ int main(int argc, char** argv)
 
          NewPatch();
          printf("%s\n", allOk ? "FIELDPINS OK" : "SUSPECT");
+      }
+
+      // Build step 13 (docs/plans/field/step-13-dynamic-pins-node-wiring.md):
+      // node/UI/save-format wiring for kernel `output`/`input` declarations
+      // on top of step 12's compiler-level PinTable/IR work and step 11's
+      // hardcoded toggle pins (both exercised above by FIELDPINSTEST). This
+      // is structural-only, per the step's resolved scoping decision: a
+      // declared output's ModulatorOutput() always reads back 0.0 (a
+      // documented placeholder - FieldElementNode/FieldSampleNode/
+      // FieldPixelNode's DeclaredOutputPlaceholder), never the kernel's real
+      // computed value, which is deferred to a follow-up step.
+      if (getenv("INFINITE_FIELDPINNODETEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDPINNODETEST] Running dynamic pins (build step 13) node-wiring harness...\n");
+         bool allOk = true;
+
+         // SECTION 1-3: headless pin-shape assertions across all three node
+         // types - compacted OutputCount/OutputLabel (native, then any
+         // step-11 toggle, then declared pins in PinTable order), and the
+         // deferred-value placeholder.
+         {
+            FieldElementNode n;
+            n.code = "output element float foo = 1.0\nP.y += 0.0\n";
+            bool applied = n.Apply();
+            bool pass = applied && (n.OutputCount() == 2) &&
+                        (std::string(n.OutputLabel(0)) == "geo") &&
+                        (std::string(n.OutputLabel(1)) == "foo") &&
+                        (n.ModulatorOutput(1) != nullptr) &&
+                        (n.ModulatorOutput(1)->Value01() == 0.0f);
+            printf("[FIELDPINNODETEST] Assertion 1 (FieldElementNode declared output, compacted, placeholder value): %s (err='%s')\n",
+                   pass ? "OK" : "FAIL", n.LastError().c_str());
+            allOk = allOk && pass;
+         }
+         {
+            FieldSampleNode n;
+            n.code = "output sample float y = in * 0.5\nout = in\n";
+            bool applied = n.Apply();
+            bool pass = applied && (n.OutputCount() == 2) &&
+                        (std::string(n.OutputLabel(0)) == "out") &&
+                        (std::string(n.OutputLabel(1)) == "y") &&
+                        n.IsAudioOutputIndex(0) && !n.IsAudioOutputIndex(1) &&
+                        (n.ModulatorOutput(1) != nullptr) &&
+                        (n.ModulatorOutput(1)->Value01() == 0.0f);
+            printf("[FIELDPINNODETEST] Assertion 2 (FieldSampleNode declared output, compacted, placeholder value): %s (err='%s')\n",
+                   pass ? "OK" : "FAIL", n.LastError().c_str());
+            allOk = allOk && pass;
+         }
+         {
+            FieldPixelNode n;
+            n.width = 32.0f;
+            n.height = 32.0f;
+            n.code = "output pixel float glow = 1.0;\ncol = vec3(uv.x, uv.y, 0.0);";
+            bool applied = n.Apply();
+            bool pass = applied && (n.OutputCount() == 2) &&
+                        (std::string(n.OutputLabel(0)) == "out") &&
+                        (std::string(n.OutputLabel(1)) == "glow") &&
+                        (n.ModulatorOutput(1) != nullptr) &&
+                        (n.ModulatorOutput(1)->Value01() == 0.0f);
+            printf("[FIELDPINNODETEST] Assertion 3 (FieldPixelNode declared output, compacted, placeholder value): %s (err='%s')\n",
+                   pass ? "OK" : "FAIL", n.LastError().c_str());
+            allOk = allOk && pass;
+         }
+
+         // SECTION 4-5: FieldPixelNode declared `input image` pin, wired
+         // through the real main.cpp InputCountFor/CableFor/ConnectNodes
+         // path - the one main.cpp cable-chain edit this step made (§5.7).
+         NewPatch();
+         int pixSrcAIdx = -1, pixDstIdx = -1;
+         {
+            // Each SpawnNode() call can reallocate gNodes (a std::vector),
+            // invalidating any GraphNode* an earlier call returned (trap
+            // T14, see FIELDPINSTEST's identical fixture-setup comment) -
+            // so every pointer is used and discarded before the next
+            // SpawnNode() runs; only the (reallocation-proof) index survives.
+            GraphNode* a = SpawnNode("FieldPixel", "Source", 0.0f, 0.0f);
+            bool spawned = a != nullptr;
+            if (spawned)
+               pixSrcAIdx = a->index;
+
+            GraphNode* d = SpawnNode("FieldPixel", "Source", 400.0f, 0.0f);
+            spawned = spawned && (d != nullptr);
+            if (spawned)
+            {
+               pixDstIdx = d->index;
+               auto* dn = static_cast<FieldPixelNode*>(d->node.get());
+               dn->width = 32.0f;
+               dn->height = 32.0f;
+               dn->code = "input pixel image other;\ncol = vec3(uv.x, uv.y, 0.0);";
+               spawned = dn->Apply();
+            }
+            printf("[FIELDPINNODETEST] Assertion 4 (spawn image-input fixture; declared `input image` compiles): %s\n",
+                   spawned ? "OK" : "FAIL");
+            allOk = allOk && spawned;
+         }
+         {
+            GraphNode* dg = FindNodeByIndex(pixDstIdx);
+            auto* dn = dg ? static_cast<FieldPixelNode*>(dg->node.get()) : nullptr;
+            bool countOk = dg && (InputCountFor(*dg) == 2); // native "src" + 1 declared image input
+            std::string err;
+            bool connected = ConnectNodes(pixSrcAIdx, 0, pixDstIdx, 1, err);
+            bool wiredOk = connected && dn && dn->DeclaredImageInput(0) != nullptr &&
+                           dn->DeclaredImageInput(0)->GetSource() ==
+                              (FindNodeByIndex(pixSrcAIdx) ? FindNodeByIndex(pixSrcAIdx)->node.get() : nullptr);
+            bool pass = countOk && wiredOk;
+            printf("[FIELDPINNODETEST] Assertion 5 (declared image input: InputCountFor==2, real ConnectNodes wiring via CableFor): %s (%s)\n",
+                   pass ? "OK" : "FAIL", err.c_str());
+            allOk = allOk && pass;
+         }
+
+         // SECTION 6: cable-orphaning refusal, declared output pin. Mirrors
+         // FIELDPINSTEST's step-11 toggle refusal, but the pin here comes
+         // from a kernel edit (a live compile), not a UI toggle - Apply()
+         // itself must refuse and leave the previous program/pin shape live.
+         {
+            // Same T14 reallocation trap as above - capture each index
+            // before the next SpawnNode() call, discard the pointer.
+            GraphNode* ge = SpawnNode("Field Element", "3D", 0.0f, 0.0f);
+            bool spawned = ge != nullptr;
+            int elemFixtureIdx = spawned ? ge->index : -1;
+
+            GraphNode* sinkG = SpawnNode("Field Element", "3D", 200.0f, 0.0f); // only needs a pin id
+            spawned = spawned && (sinkG != nullptr);
+            int sinkFixtureIdx = spawned ? sinkG->index : -1;
+
+            bool pass = spawned;
+            if (spawned)
+            {
+               GraphNode* elemGN = FindNodeByIndex(elemFixtureIdx);
+               GraphNode* sinkGN = FindNodeByIndex(sinkFixtureIdx);
+               auto* en = static_cast<FieldElementNode*>(elemGN->node.get());
+               // SpawnNode() does not itself call SetNodeIndex() - only the
+               // node's own params-panel draw does, each frame it is drawn
+               // (see DrawFieldElementParams's gCurrentNodeIndex handoff) -
+               // so a headless fixture that never draws that panel must set
+               // it explicitly for gLiveCableChecker's nodeIndex to line up
+               // with the id this fixture's own OutputPinId()/InputPinId()
+               // calls below encode.
+               en->SetNodeIndex(elemFixtureIdx);
+               en->code = "output element float foo = 1.0\nP.y += 0.0\n";
+               pass = pass && en->Apply() && (en->OutputCount() == 2);
+
+               gLinks.push_back({ 5100001, elemGN->OutputPinId(1), sinkGN->InputPinId(0) });
+               std::string oldCode = en->code;
+               en->code = "P.y += 0.0\n"; // drops the declared output entirely
+               bool refused = !en->Apply();
+               bool shapeKept = (en->OutputCount() == 2) && !en->pinRefusal.empty();
+               gLinks.clear();
+               en->code = oldCode;
+               bool recompiles = en->Apply(); // safe again - no more live cable
+               pass = pass && refused && shapeKept && recompiles;
+            }
+            printf("[FIELDPINNODETEST] Assertion 6 (declared-output refusal keeps old program + shape while a live cable is attached): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 7 (trap: never reuse a freed identity): renaming a
+         // declared pin retires the old PinEntry and mints a fresh id for
+         // the new name, even though the visible compacted slot (index 1)
+         // is reused - see PinTable::Reconcile's S5.4 comment.
+         {
+            FieldElementNode n;
+            n.code = "output element float foo = 1.0\nP.y += 0.0\n";
+            bool applied = n.Apply();
+            const Field::PinEntry* before = applied ? n.OutputPinTable().Find("foo") : nullptr;
+            int beforeId = before ? before->id : -1;
+            n.code = "output element float bar = 1.0\nP.y += 0.0\n";
+            bool applied2 = n.Apply();
+            const Field::PinEntry* after = applied2 ? n.OutputPinTable().Find("bar") : nullptr;
+            int afterId = after ? after->id : -1;
+            bool pass = applied && applied2 && before && after && (beforeId != afterId) && (n.OutputCount() == 2);
+            printf("[FIELDPINNODETEST] Assertion 7 (renamed declared pin mints a fresh PinTable id, never reused): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 8: save/load round trip - the declared image-input pin
+         // and its real cable both survive.
+         {
+            Patch::Data saved = BuildPatchData();
+            NewPatch();
+            ApplyPatchData(saved);
+            auto* dstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+            const Field::PinEntry* pinR = dstR ? dstR->InputPinTable().Find("other") : nullptr;
+            bool pass = dstR && pinR && pinR->isDeclared && dstR->DeclaredImageInput(0) != nullptr &&
+                        dstR->DeclaredImageInput(0)->GetSource() ==
+                           (FindNodeByIndex(pixSrcAIdx) ? FindNodeByIndex(pixSrcAIdx)->node.get() : nullptr);
+            printf("[FIELDPINNODETEST] Assertion 8 (save/load round trip: declared image-input pin + its cable survive): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 9: undo reverts a kernel edit, restoring the declared
+         // pin's shape along with the code string it came from.
+         {
+            auto* dstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+            bool pass = dstR != nullptr;
+            if (dstR)
+            {
+               std::string before = dstR->code;
+               PushUndoCheckpoint();
+               dstR->code = "col = vec3(1.0);"; // drops the declared input entirely
+               dstR->Apply();
+               Undo();
+               auto* afterUndo = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+               const Field::PinEntry* pinR = afterUndo ? afterUndo->InputPinTable().Find("other") : nullptr;
+               pass = afterUndo && (afterUndo->code == before) && pinR && pinR->isDeclared;
+            }
+            printf("[FIELDPINNODETEST] Assertion 9 (undo reverts a kernel edit; declared pin shape restored): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 10: copy/paste preserves declared pin shape.
+         {
+            auto* dstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+            bool pass = false;
+            if (dstR)
+            {
+               FieldPixelNode copy;
+               CopyParams(&copy, dstR);
+               const Field::PinEntry* pinR = copy.InputPinTable().Find("other");
+               pass = (copy.OutputCount() == dstR->OutputCount()) && pinR && pinR->isDeclared;
+            }
+            printf("[FIELDPINNODETEST] Assertion 10 (copy/paste preserves declared pin shape): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDPINNODE OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)

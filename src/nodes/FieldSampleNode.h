@@ -5,6 +5,7 @@
 #include "core/NoteCable.h"
 #include "Modulation.h"
 #include "field/ParamTable.h"
+#include "field/PinTable.h"
 #include "field/SampleProgram.h"
 
 #include <atomic>
@@ -50,22 +51,86 @@ public:
    // Output 0 stays the audio buffer - IsAudioOutputIndex must be overridden
    // once OutputCount() > 1, or every downstream audio consumer breaks
    // (trap 2: the IAudioSource default is "every output index is audio").
-   int OutputCount() const override { return exposeRmsOutput ? 2 : 1; }
-   const char* OutputLabel(int index) const override { return index == 1 ? "rms" : "out"; }
-   bool IsAudioOutputIndex(int index) const override { return index == 0; }
+   // Dynamic pins, Phase 2b (build step 13, §5.1): kernel `output` decls on
+   // top of the native "out" and toggle "rms" outputs above, compacted with
+   // no gap - see FieldElementNode's identical layering scheme and Apply()
+   // for how mOutputPins gets reconciled/refused.
+   int NativeOutputCount() const { return exposeRmsOutput ? 2 : 1; }
+   int DeclaredOutputCount() const
+   {
+      int n = 0;
+      for (const auto& p : mOutputPins.Pins())
+         if (p.isDeclared) n++;
+      return n;
+   }
+   int OutputCount() const override { return NativeOutputCount() + DeclaredOutputCount(); }
+   const char* OutputLabel(int index) const override
+   {
+      if (index == 0) return "out";
+      if (exposeRmsOutput && index == 1) return "rms";
+      int declIdx = index - NativeOutputCount();
+      int seen = 0;
+      for (const auto& p : mOutputPins.Pins())
+      {
+         if (!p.isDeclared) continue;
+         if (seen == declIdx) return p.name.c_str();
+         seen++;
+      }
+      return "out";
+   }
+   // A declared output pin is audio-typed only if the kernel declared it
+   // `output sample audio <name>` - see the structural-type/domain table
+   // (step-12 doc §5.6). Every other index (native "out", toggle "rms", and
+   // any scalar/vector declared output) is not audio.
+   bool IsAudioOutputIndex(int index) const override
+   {
+      if (index == 0) return true;
+      int declIdx = index - NativeOutputCount();
+      if (declIdx < 0) return false;
+      int seen = 0;
+      for (const auto& p : mOutputPins.Pins())
+      {
+         if (!p.isDeclared) continue;
+         if (seen == declIdx) return p.typeName == "audio";
+         seen++;
+      }
+      return false;
+   }
    IModulator* ModulatorOutput(int index) override
    {
       // Gated on exposeRmsOutput - see FieldElementNode::ModulatorOutput's
       // identical comment; index 1 does not nominally exist when the pin is
       // off (OutputCount() == 1 then), so this must not hand back a live
       // IModulator for it regardless.
-      return (exposeRmsOutput && index == 1) ? static_cast<IModulator*>(&mRmsOutput) : nullptr;
+      if (exposeRmsOutput && index == 1)
+         return static_cast<IModulator*>(&mRmsOutput);
+      int declIdx = index - NativeOutputCount();
+      if (declIdx < 0)
+         return nullptr;
+      int seen = 0;
+      for (const auto& p : mOutputPins.Pins())
+      {
+         if (!p.isDeclared) continue;
+         if (seen == declIdx)
+         {
+            // Audio-typed declared outputs have no IModulator meaning
+            // (same rationale as FieldElementNode's native "geo" output).
+            if (p.typeName == "audio")
+               return nullptr;
+            return (declIdx < Field::PinTable::kMaxDeclaredPins) ? &mDeclaredOutputMods[declIdx] : nullptr;
+         }
+         seen++;
+      }
+      return nullptr;
    }
 
    bool exposeRmsOutput = false;
    // Transient (not saved) - see FieldElementNode::pinRefusal for the
    // rationale; identical cable-orphaning refusal policy (decision 4).
    std::string pinRefusal;
+
+   const Field::PinTable& OutputPinTable() const { return mOutputPins; }
+   const Field::PinTable& InputPinTable() const { return mInputPins; }
 
    // Compiles `code` and, on success, hot-swaps the audio thread's program
    // via the existing SampleSlotT compile-swap channel (state transplanted
@@ -129,6 +194,16 @@ private:
    std::unique_ptr<AudioFieldSampleNode> mAudioNode;
    RmsOutput mRmsOutput;
    Field::ParamTable mParamTable;
+
+   // Dynamic pins, Phase 2b (build step 13) - see FieldElementNode's
+   // identical members for the full rationale.
+   Field::PinTable mOutputPins;
+   Field::PinTable mInputPins;
+   struct DeclaredOutputPlaceholder : public IModulator
+   {
+      float Value01() override { return 0.0f; }
+   };
+   DeclaredOutputPlaceholder mDeclaredOutputMods[Field::PinTable::kMaxDeclaredPins];
    // (name -> mailboxId) for the currently-compiled program's params, set by
    // Apply(); CookIfNeeded pushes each frame by walking this list rather
    // than assuming ParamTable's own iteration order matches mailbox id

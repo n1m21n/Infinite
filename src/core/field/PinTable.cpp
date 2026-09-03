@@ -5,6 +5,8 @@
 
 namespace Field
 {
+   LiveCableChecker gLiveCableChecker = nullptr;
+
    const PinEntry* PinTable::Find(const std::string& name) const
    {
       const PinEntry* declaredMatch = nullptr;
@@ -171,5 +173,57 @@ namespace Field
             }
          }
       }
+   }
+
+   bool ReconcileFieldPins(PinTable& live, const std::vector<DeclaredPin>& declared, int nodeIndex,
+                            int nativeCount, std::string& outNotice, std::string& outRefusal)
+   {
+      outRefusal.clear();
+
+      // Compute each currently-declared entry's pre-compile compacted slot
+      // before mutating anything. Reconcile only ever appends new entries
+      // or flips isDeclared in place on existing ones - it never reorders
+      // mPins - so this position is stable to read now and compare against
+      // after the scratch reconcile below.
+      std::vector<int> preSlot(live.Pins().size(), -1);
+      {
+         int slot = nativeCount;
+         for (size_t i = 0; i < live.Pins().size(); ++i)
+         {
+            if (live.Pins()[i].isDeclared)
+               preSlot[i] = slot++;
+         }
+      }
+
+      PinTable scratch = live;
+      scratch.Reconcile(declared, nodeIndex, outNotice);
+
+      if (gLiveCableChecker != nullptr)
+      {
+         for (size_t i = 0; i < live.Pins().size(); ++i)
+         {
+            const PinEntry& oldEntry = live.Pins()[i];
+            if (!oldEntry.isDeclared || preSlot[i] < 0)
+               continue;
+            const PinEntry* nowEntry = scratch.FindById(oldEntry.id);
+            if (nowEntry != nullptr && !nowEntry->isDeclared &&
+                gLiveCableChecker(nodeIndex, preSlot[i], oldEntry.isOutput))
+            {
+               if (!outRefusal.empty()) outRefusal += ", ";
+               outRefusal += "'" + oldEntry.name + "'";
+            }
+         }
+      }
+
+      if (!outRefusal.empty())
+      {
+         bool plural = outRefusal.find(',') != std::string::npos;
+         outRefusal = std::string("Cannot apply: pin") + (plural ? "s " : " ") + outRefusal +
+                      " still connected - disconnect the cable first.";
+         return false;
+      }
+
+      live = std::move(scratch);
+      return true;
    }
 }

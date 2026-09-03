@@ -80,4 +80,41 @@ namespace Field
       std::map<std::string, int> mPinIdByName;
       int mNextPinId = 1;
    };
+
+   // Build step 13 (docs/plans/field/step-13-dynamic-pins-node-wiring.md
+   // S5.1): the cable-orphan refusal check needs to know whether a pin slot
+   // currently has a live cable attached, but that information (gLinks) is
+   // only known to main.cpp's UI/graph-editor code, which is compiled in a
+   // different translation unit (and inside an anonymous namespace) from
+   // the Field*Node::Apply() methods that need to ask the question. Rather
+   // than exposing gLinks itself, main.cpp installs this single function
+   // pointer once at startup; Apply() calls it (a null checker - e.g. in a
+   // headless/test context that never installed one - is treated as "no
+   // live cable", i.e. never refuses). isOutput selects which pin table
+   // (output vs input) `slot` indexes into, using the same compacted,
+   // gap-free slot numbering as INode::OutputLabel/ModulatorOutput and
+   // GeometryInputSlot/AudioInputSlot/ModulatorInputSlot.
+   using LiveCableChecker = bool (*)(int nodeIndex, int slot, bool isOutput);
+   extern LiveCableChecker gLiveCableChecker;
+
+   // Shared S5.1 reconcile/refuse/commit step, used identically by
+   // FieldElementNode, FieldSampleNode and FieldPixelNode's Apply(). Tries
+   // to reconcile `live` against a fresh compile's `declared` list. If any
+   // pin that would retire (removed, or redeclared with a changed shape)
+   // still has a live cable attached to its current compacted slot (per
+   // gLiveCableChecker), the whole reconcile is refused: `live` is left
+   // completely untouched, `outRefusal` names the offending pin(s) for the
+   // caller to surface as an error, and this returns false - the caller
+   // must then abort Apply() entirely (keep the previous program live), the
+   // same "keep last working program" discipline as a compile error.
+   // On success, `live` has been updated in place (same object identity,
+   // so any raw PinEntry* a caller cached across the call is invalidated)
+   // and this returns true.
+   // `nativeCount` is how many non-PinTable-tracked pins occupy the front
+   // of the compacted slot numbering (e.g. FieldElementNode output 0 "geo",
+   // plus output 1 "publish" when its toggle is on) - needed to translate a
+   // PinTable entry's position among currently-declared entries into the
+   // real compacted slot number gLiveCableChecker expects.
+   bool ReconcileFieldPins(PinTable& live, const std::vector<DeclaredPin>& declared, int nodeIndex,
+                            int nativeCount, std::string& outNotice, std::string& outRefusal);
 }

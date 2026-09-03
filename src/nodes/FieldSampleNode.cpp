@@ -321,6 +321,7 @@ int FieldSampleNode::ReadScope(float* out, int capacity) { return mAudioNode->Sc
 
 bool FieldSampleNode::Apply()
 {
+   pinRefusal.clear();
    // (name,type) state transplant (BackendRegister.h / §5.9) is resolved
    // against mLastCompiled - the main thread's own retained copy of the last
    // successfully compiled program, not the live audio-thread one (reading
@@ -332,6 +333,32 @@ bool FieldSampleNode::Apply()
    {
       mLastError = err.message + " at line " + std::to_string(err.span.line) + ", col " + std::to_string(err.span.col);
       return false;
+   }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): reconcile the declared
+   // output/input pin tables against this compile's SampleProgram - unlike
+   // Element/Pixel, the sample backend (BackendRegister.cpp) already fully
+   // populates declaredOutputs/declaredInputs on the compiled program
+   // itself, so no local-IR-only step is needed. Must run before any other
+   // live state is mutated so a refusal here leaves Apply() a no-op.
+   {
+      std::vector<Field::DeclaredPin> declOut, declIn;
+      for (const auto& d : newProgram->declaredOutputs)
+         declOut.push_back({ d.name, d.typeName, d.domainName, true });
+      for (const auto& d : newProgram->declaredInputs)
+         declIn.push_back({ d.name, d.typeName, d.domainName, false });
+
+      std::string pinNotice, pinRefusalMsg;
+      bool outOk = Field::ReconcileFieldPins(mOutputPins, declOut, mNodeIndex, NativeOutputCount(), pinNotice, pinRefusalMsg);
+      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, /*nativeCount=*/2, pinNotice, pinRefusalMsg);
+      if (!outOk || !inOk)
+      {
+         mLastError = pinRefusalMsg;
+         pinRefusal = pinRefusalMsg;
+         return false;
+      }
+      if (!pinNotice.empty())
+         mNotice = pinNotice;
    }
 
    std::vector<Field::DeclaredParam> declared;
@@ -386,4 +413,12 @@ void FieldSampleNode::VisitParams(ParamVisitor& v)
    v.Int("maxVoices", maxVoices);
    v.Bool("exposeRmsOutput", exposeRmsOutput);
    mParamTable.VisitParams(v);
+   // Dynamic pins, Phase 2b (build step 13, §5.1 step 8) - see
+   // FieldElementNode::VisitParams's identical block for the rationale.
+   std::string outPins = mOutputPins.SerializePinMap();
+   std::string inPins = mInputPins.SerializePinMap();
+   v.Text("__outputPins", outPins);
+   v.Text("__inputPins", inPins);
+   mOutputPins.DeserializePinMap(outPins);
+   mInputPins.DeserializePinMap(inPins);
 }

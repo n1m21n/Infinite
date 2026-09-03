@@ -48,6 +48,7 @@ FieldElementNode::FieldElementNode()
 
 bool FieldElementNode::Apply()
 {
+   pinRefusal.clear();
    std::vector<Field::Token> tokens;
    Field::FieldError err;
 
@@ -76,6 +77,32 @@ bool FieldElementNode::Apply()
    {
       mLastError = err.message + " at line " + std::to_string(err.span.line) + ", col " + std::to_string(err.span.col);
       return false;
+   }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): reconcile the declared
+   // output/input pin tables against this compile's irProgram.declaredOutputs
+   // / declaredInputs (populated by LowerElementProgramToIR above - NOT on
+   // `prog`, which doesn't carry them). Must run before any other live
+   // state is mutated so a refusal here leaves the whole Apply() a no-op,
+   // same as a compile error.
+   {
+      std::vector<Field::DeclaredPin> declOut, declIn;
+      for (const auto& d : irProgram.declaredOutputs)
+         declOut.push_back({ d.name, d.typeName, Field::DomainToString(d.domain), true });
+      for (const auto& d : irProgram.declaredInputs)
+         declIn.push_back({ d.name, d.typeName, Field::DomainToString(d.domain), false });
+
+      std::string pinNotice, pinRefusal;
+      bool outOk = Field::ReconcileFieldPins(mOutputPins, declOut, mNodeIndex, NativeOutputCount(), pinNotice, pinRefusal);
+      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, /*nativeCount=*/1, pinNotice, pinRefusal);
+      if (!outOk || !inOk)
+      {
+         mLastError = pinRefusal;
+         this->pinRefusal = pinRefusal;
+         return false;
+      }
+      if (!pinNotice.empty())
+         mNotice = pinNotice;
    }
 
    // Reconcile param table with newly declared params

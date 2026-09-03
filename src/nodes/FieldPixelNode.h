@@ -3,10 +3,12 @@
 #include "INode.h"
 #include "ImageCable.h"
 #include "GLUtil.h"
+#include "Modulation.h"
 #include "field/FieldIR.h"
 #include "field/GlslBackend.h"
 #include "field/PixelState.h"
 #include "field/ParamTable.h"
+#include "field/PinTable.h"
 #include <string>
 #include <vector>
 
@@ -37,19 +39,100 @@ public:
    INode* BypassSource() override { return input.GetSource(); }
    const char* InputLabel(int) const override { return "src"; }
 
-   int OutputCount() const override { return exposeAuxTexture ? 2 : 1; }
-   const char* OutputLabel(int index) const override { return index == 1 ? "state" : "out"; }
+   // Dynamic pins, Phase 2b (build step 13, §5.1): kernel `output` decls on
+   // top of the native "out" and toggle "state" outputs above, compacted
+   // with no gap - see FieldElementNode's identical layering scheme.
+   int NativeOutputCount() const { return exposeAuxTexture ? 2 : 1; }
+   int DeclaredOutputCount() const
+   {
+      int n = 0;
+      for (const auto& p : mOutputPins.Pins())
+         if (p.isDeclared) n++;
+      return n;
+   }
+   int OutputCount() const override { return NativeOutputCount() + DeclaredOutputCount(); }
+   const char* OutputLabel(int index) const override
+   {
+      if (index == 0) return "out";
+      if (exposeAuxTexture && index == 1) return "state";
+      int declIdx = index - NativeOutputCount();
+      int seen = 0;
+      for (const auto& p : mOutputPins.Pins())
+      {
+         if (!p.isDeclared) continue;
+         if (seen == declIdx) return p.name.c_str();
+         seen++;
+      }
+      return "out";
+   }
+   IModulator* ModulatorOutput(int index) override
+   {
+      // A declared `image` output has no IModulator meaning (routed via
+      // GetOutputTexture(int)/ImageCable instead, like the native "out" and
+      // toggle "state" outputs); only a scalar/vector declared output gets
+      // a placeholder modulator.
+      int declIdx = index - NativeOutputCount();
+      if (declIdx < 0)
+         return nullptr;
+      int seen = 0;
+      for (const auto& p : mOutputPins.Pins())
+      {
+         if (!p.isDeclared) continue;
+         if (seen == declIdx)
+         {
+            if (p.typeName == "image")
+               return nullptr;
+            return (declIdx < Field::PinTable::kMaxDeclaredPins) ? &mDeclaredOutputMods[declIdx] : nullptr;
+         }
+         seen++;
+      }
+      return nullptr;
+   }
 
    bool exposeAuxTexture = false;
    // Transient (not saved) - see FieldElementNode::pinRefusal for the
    // rationale; identical cable-orphaning refusal policy (decision 4).
    std::string pinRefusal;
 
-   // The one-and-only image input ("src" in the kernel), wired the same way
-   // as every other image-consuming node - see CableFor/InputCountFor in
-   // main.cpp. Was a bare INode* before this pin was actually registered
-   // there, which meant nothing could ever be connected to it.
+   const Field::PinTable& OutputPinTable() const { return mOutputPins; }
+   const Field::PinTable& InputPinTable() const { return mInputPins; }
+
+   // The one-and-only native image input ("src" in the kernel), wired the
+   // same way as every other image-consuming node - see CableFor/
+   // InputCountFor in main.cpp. Was a bare INode* before this pin was
+   // actually registered there, which meant nothing could ever be
+   // connected to it.
    ImageCable& TextureInput() { return input; }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.7): kernel `input image`
+   // decls, one ImageCable each, wired at main.cpp input slots 1..N (slot 0
+   // stays the native "src" above) - see main.cpp's InputCountFor/CableFor
+   // FieldPixelNode branches. Only image-typed declared inputs get a real
+   // cable; a declared scalar/vector input is tracked in mInputPins for
+   // refusal/save-load purposes only (its value is not read by the kernel
+   // yet - same deferred-runtime-value scoping as declared outputs).
+   int DeclaredImageInputCount() const
+   {
+      int n = 0;
+      for (const auto& p : mInputPins.Pins())
+         if (p.isDeclared && p.typeName == "image") n++;
+      return n;
+   }
+   // `i` is 0-based among currently-declared image inputs only (not the
+   // same numbering as mInputPins.Pins() itself, which also holds
+   // non-image declared inputs).
+   ImageCable* DeclaredImageInput(int i)
+   {
+      if (i < 0 || i >= Field::PinTable::kMaxDeclaredPins) return nullptr;
+      int seen = 0;
+      for (const auto& p : mInputPins.Pins())
+      {
+         if (!p.isDeclared || p.typeName != "image") continue;
+         if (seen == i) return &mDeclaredImageInputs[i];
+         seen++;
+      }
+      return nullptr;
+   }
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -59,6 +142,14 @@ public:
       v.Bool("animate", animate);
       v.Bool("exposeAuxTexture", exposeAuxTexture);
       mParamTable.VisitParams(v);
+      // Dynamic pins, Phase 2b (build step 13, §5.1 step 8) - see
+      // FieldElementNode::VisitParams's identical block for the rationale.
+      std::string outPins = mOutputPins.SerializePinMap();
+      std::string inPins = mInputPins.SerializePinMap();
+      v.Text("__outputPins", outPins);
+      v.Text("__inputPins", inPins);
+      mOutputPins.DeserializePinMap(outPins);
+      mInputPins.DeserializePinMap(inPins);
    }
 
    // Compilation & UI
@@ -105,6 +196,17 @@ private:
    Field::PixelIRProgram mIR;
    Field::GlslEmitResult mEmitResult;
    std::vector<int> mUniformLocs;
+
+   // Dynamic pins, Phase 2b (build step 13) - see FieldElementNode's
+   // identical members for the full rationale.
+   Field::PinTable mOutputPins;
+   Field::PinTable mInputPins;
+   struct DeclaredOutputPlaceholder : public IModulator
+   {
+      float Value01() override { return 0.0f; }
+   };
+   DeclaredOutputPlaceholder mDeclaredOutputMods[Field::PinTable::kMaxDeclaredPins];
+   ImageCable mDeclaredImageInputs[Field::PinTable::kMaxDeclaredPins];
 
    int mLocRes = -1;
    int mLocT = -1;
