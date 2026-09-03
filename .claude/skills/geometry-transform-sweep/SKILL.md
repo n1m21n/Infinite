@@ -200,6 +200,11 @@ or a simulation resets when it shouldn't, that's a sweep blind spot — report
 which two (or more) node types you chained together and what you moved or
 changed, so a fixture can be added here for it.
 
+**Untested chain worth adding:** `Instance on Points` fed through a
+passthrough-mode node (e.g. `Blend` set to pass through) that is itself fed
+from a `Transform`. Passthrough nodes have swallowed a wrapping `Transform`'s
+group matrix before — this specific three-node shape is the regression case.
+
 ## Gotchas
 
 - Like `run-infinite-hygiene`'s suite, the verdict is a printf line, not an
