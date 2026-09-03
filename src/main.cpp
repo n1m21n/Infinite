@@ -13273,25 +13273,34 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
 
       {
-         AudioKnobRow row(1);
-         row.Dropdown("input", options, currentIdx, [n, choices](int idx) {
-            if (idx >= 0 && idx < (int)choices.size())
-            {
-               PushUndoCheckpoint();
-               n->channelMode = choices[idx].channelMode;
-               n->deviceId = (int)choices[idx].deviceId;
-               n->deviceName = choices[idx].category;
-               Platform::AudioInputCaptureSetDevice(choices[idx].deviceId);
-            }
-         }, categories);
-         row.End();
+         PushDropdownStyle();
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + 4.0f, ImGui::GetCursorScreenPos().y));
+         const std::string caption = options[currentIdx] + "##audioin_input";
+         if (ImGui::Button(caption.c_str(), ImVec2(gAudioContentW - 8.0f, 0)))
+         {
+            gDropdown.options = options;
+            gDropdown.categories = categories;
+            gDropdown.onSelect = [n, choices](int idx) {
+               if (idx >= 0 && idx < (int)choices.size())
+               {
+                  PushUndoCheckpoint();
+                  n->channelMode = choices[idx].channelMode;
+                  n->deviceId = (int)choices[idx].deviceId;
+                  n->deviceName = choices[idx].category;
+                  Platform::AudioInputCaptureSetDevice(choices[idx].deviceId);
+               }
+            };
+            gDropdown.current = currentIdx;
+            gDropdown.justOpened = true;
+         }
+         PopDropdownStyle();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      const float faderH = 120.0f;
+      const float faderH = 80.0f;
       const float stripTop = ImGui::GetCursorScreenPos().y;
-      DrawStripMeter(gAudioContentX + gAudioContentW * 0.5f + 26.0f, stripTop + 6.0f, 10.0f, faderH - 12.0f,
+      DrawStripMeter(gAudioContentX + gAudioContentW * 0.5f + 24.0f, stripTop + 4.0f, 8.0f, faderH - 8.0f,
                      n->Level());
       AudioKnobRow row(1, faderH);
       row.Fader("trim", &n->gainDb, -24.0f, 24.0f, "%.1f dB", faderH);
