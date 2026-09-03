@@ -41,6 +41,16 @@ namespace Field
       std::string targetKey;
       std::string paramName;
       float value = 0.0f;
+      // Build step 15 §4.2: non-empty iff this set()'s value expression is
+      // exactly a bare Variable node naming one of the program's declared
+      // params - i.e. a direct, unconditional pass-through
+      // (`set(osc, "rate", amount)`), not a literal or a computed expression
+      // (`set(osc, "rate", amount * 2)`). Empty for every other case; the
+      // `value` field above is still baked exactly as before in every case,
+      // this is additive provenance only, consumed by
+      // FieldGraphNode::RebuildLiveForward to build the live-forwarding
+      // fast path (main.cpp's PushLiveParams call, no Regenerate() needed).
+      std::string sourceParamName;
       SourceSpan span;
    };
 

@@ -150,6 +150,16 @@ bool FieldGraphNode::Regenerate(Field::IFieldGraphHost& host)
    ownershipText = mOwnership.ToText();
    mLastPlan = std::move(plan);
 
+   // §3.1: derived cache, mirrors mOwnership's values as a flat set for O(1)
+   // membership tests (node-editor draw loop, inline-preview terminal
+   // lookup). Rebuilt wholesale rather than patched incrementally - cheap,
+   // and immune to ever drifting from the real source of truth.
+   mMountedIndices.clear();
+   for (const auto& entry : mOwnership.Entries())
+      mMountedIndices.insert(entry.second);
+
+   RebuildLiveForward();
+
    int mounted = 0, updated = 0, remounted = 0, unmounted = 0, connected = 0;
    for (const auto& a : actions)
    {
@@ -177,11 +187,83 @@ bool FieldGraphNode::Regenerate(Field::IFieldGraphHost& host)
    return true;
 }
 
+void FieldGraphNode::RebuildLiveForward()
+{
+   // Derived-only (doc §4.2/§6) - rebuilt wholesale from mLastPlan.sets +
+   // mOwnership every successful Regenerate(), never persisted.
+   mLiveForward.clear();
+   for (const auto& s : mLastPlan.sets)
+   {
+      if (s.sourceParamName.empty())
+         continue;
+      int idx = mOwnership.Get(s.targetKey);
+      if (idx < 0)
+         continue;
+      mLiveForward[s.sourceParamName].push_back({ idx, s.paramName });
+   }
+   // Values captured before this regenerate no longer describe the current
+   // program - drop them so the very next PushLiveParams call re-pushes
+   // every live-forwarded param's current value at least once, rather than
+   // trusting a stale "already pushed" record from before the mounted set
+   // changed.
+   mLastPushedValue.clear();
+}
+
+void FieldGraphNode::PushLiveParams(Field::IFieldGraphHost& host)
+{
+   if (mLiveForward.empty())
+      return;
+   for (auto& p : mParamTable.Params())
+   {
+      auto fwdIt = mLiveForward.find(p.name);
+      if (fwdIt == mLiveForward.end())
+         continue;
+      auto lastIt = mLastPushedValue.find(p.name);
+      if (lastIt != mLastPushedValue.end() && lastIt->second == p.value)
+         continue;
+      for (const auto& target : fwdIt->second)
+      {
+         if (!host.Alive(target.first))
+            continue;
+         host.SetParam(target.first, target.second, p.value);
+      }
+      mLastPushedValue[p.name] = p.value;
+   }
+}
+
+std::vector<int> FieldGraphNode::TerminalIndices() const
+{
+   std::vector<int> result;
+   if (!mLastPlan.valid)
+      return result;
+   std::set<std::string> consumedKeys;
+   for (const auto& c : mLastPlan.connects)
+      consumedKeys.insert(c.srcKey);
+   for (const auto& e : mLastPlan.emits)
+   {
+      if (consumedKeys.count(e.key) != 0)
+         continue;
+      int idx = mOwnership.Get(e.key);
+      if (idx >= 0)
+         result.push_back(idx);
+   }
+   return result;
+}
+
 void FieldGraphNode::VisitParams(ParamVisitor& v)
 {
    v.Text("code", code);
    v.Text("uid", mUid);
    v.Bool("addTriggerInput", addTriggerInput);
+   // Build step 15 §6: a patch saved before this field existed has no
+   // "b encapsulated" line, so this call leaves `encapsulated` at whatever
+   // it already was going in - which is why ApplyPatchData (main.cpp) sets
+   // it to false immediately before calling Patch::LoadParams() for a
+   // record with no such key, rather than relying on this member's own
+   // compile-time default (true, for a brand-new node created via the node
+   // picker, which never goes through LoadParams at all). Do not "fix" this
+   // by changing this member's default - see doc trap 5.
+   v.Bool("encapsulated", encapsulated);
    std::string prevOwnershipText = ownershipText;
    v.Text("ownershipText", ownershipText);
    mParamTable.VisitParams(v);

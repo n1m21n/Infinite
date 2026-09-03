@@ -8,7 +8,11 @@
 #include "field/FieldIR.h"
 #include "field/ParamTable.h"
 
+#include <map>
+#include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
 // Field 'graph' domain (build step 10): a kernel that runs once, at edit
 // time, and emits/wires/configures real Infinite nodes (main.cpp §MainGraphHost
@@ -105,6 +109,42 @@ public:
       return false;
    }
 
+   // Build step 15 ("Instrument Mode"): true (default, new nodes) = mounted
+   // children are real gNodes entries flagged GraphNode::hiddenFromCanvas,
+   // never drawn/picked in the node editor. False after step 16's "Unpack to
+   // Canvas" (or on loading a patch saved before this field existed - see
+   // VisitParams below, the load-time default is the opposite of this
+   // member's own compile-time default).
+   bool encapsulated = true;
+
+   // The gNodes indices this FieldGraphNode currently owns, mirroring
+   // mOwnership's values as a flat set for O(1) "is this index mine" checks.
+   // Rebuilt from mOwnership at the end of every successful Regenerate() -
+   // never a second source of truth, never persisted (VisitParams doesn't
+   // need a line for it; ownershipText already round-trips the real data).
+   const std::set<int>& MountedIndices() const { return mMountedIndices; }
+   bool OwnsMountedIndex(int idx) const { return mMountedIndices.count(idx) > 0; }
+
+   // Build step 15 §4.2: pushes any declared param whose value has changed
+   // since the last call directly to its live-forwarded target(s) via
+   // host.SetParam - no re-interpretation, no ReconcileGraphPlan, no
+   // Mount/Unmount. Safe to call every frame; a no-op when mLiveForward is
+   // empty (nothing in the program was a bare-param pass-through set()).
+   // Main-thread only - see field-integration §4 / doc trap 7.
+   void PushLiveParams(Field::IFieldGraphHost& host);
+
+   // Build step 15 §5.1: boundary-output candidates - entries in
+   // mLastPlan.emits whose key never appears as a connect's srcKey, i.e.
+   // nothing inside the graph consumes their output, so each is a leaf of
+   // the internal wiring. Returned as mounted gNodes indices (via
+   // mOwnership), in plan.emits order; empty if nothing has been
+   // regenerated yet or the last regenerate failed. This file has no
+   // gNodes/FindNodeByIndex reference (same discipline as
+   // FieldGraphKernel.h) - the caller (main.cpp's node-body draw dispatch)
+   // resolves each index to a real INode* and picks the first one that
+   // answers "yes" to whichever of §5.1's three questions it's asking.
+   std::vector<int> TerminalIndices() const;
+
    std::string code =
       "# emit(\"Type Name\", k0, k1, ...) -> handle\n"
       "# connect(srcHandle, srcSlot, dstHandle, dstSlot)\n"
@@ -125,4 +165,17 @@ private:
 
    IModulator* mTriggerInput = nullptr;
    float mLastTriggerValue = 0.0f;
+
+   std::set<int> mMountedIndices;
+
+   // (declared param name) -> list of (mounted node index, paramName) it
+   // forwards to directly - built once per successful Regenerate() from
+   // mLastPlan.sets' sourceParamName provenance (FieldGraphKernel.h §4.2)
+   // and mOwnership. Never saved - fully re-derivable from code+ownership.
+   std::map<std::string, std::vector<std::pair<int, std::string>>> mLiveForward;
+   // Last value pushed per declared param name, so PushLiveParams only calls
+   // host.SetParam for params that actually changed since the last call.
+   std::map<std::string, float> mLastPushedValue;
+
+   void RebuildLiveForward();
 };
