@@ -21385,6 +21385,119 @@ namespace
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
    }
 
+   // Build step 15 follow-up (§5.3.1): inline min/max waveform preview for
+   // an encapsulated FieldGraphNode's audio-domain terminal - the sibling of
+   // DrawPreview above for the "terminal has no texture, but does have
+   // RequiresAudioProcessing()" case. No generic "any INode's live audio"
+   // hook exists anywhere in this codebase (confirmed by grep: ReadScope()/
+   // scopeCache/scopeCacheCount/scopeCacheTime is a repeated-but-not-
+   // virtualized method+field set independently implemented on
+   // WavetableNode, FieldSampleNode, OscillatorNode, MetallicNode,
+   // WaveTerrainNode, ImageSpectralSynthNode and EquationNode - each already
+   // backed by that node's own MeterRing, the one sanctioned audio-thread-
+   // to-main-thread channel in this codebase, field-integration §4). This
+   // dispatches to whichever of those the resolved terminal happens to be,
+   // the exact same dynamic_cast-chain shape DrawAudioNodeBody already uses
+   // to pick a per-type body-draw function for a directly-visible node of
+   // one of these types - not a new mechanism, the established one for
+   // "which concrete node type is this" here. A terminal whose type has no
+   // scope hook (Gain, Mixer, DrumSequencer, ...) falls back to the same
+   // "idle" placeholder those per-type scope draws already show when they
+   // have nothing queued, rather than fabricating data or reaching into
+   // ProcessBlock directly (doc trap 7).
+   //
+   // The 256-slot decimated min/max cache itself lives on FieldGraphNode
+   // (kWaveformCacheSize/waveformMin/waveformMax/waveformCacheCount), not on
+   // the terminal - adapting GranularNode's own shape (GranularNode.h
+   // kWaveformCacheSize/waveformMin/waveformMax) rather than a fourth
+   // pattern. Rebuilt on a throttled ~30Hz cadence, matching
+   // DrawFieldSampleScope's own cadence above - never synchronously inside
+   // an audio callback.
+   void DrawFieldGraphWaveform(FieldGraphNode* fgn, INode* audioTerminal)
+   {
+      const double now = ImGui::GetTime();
+      if (fgn->waveformCacheTime < 0.0 || now - fgn->waveformCacheTime > 1.0 / 30.0)
+      {
+         float raw[256];
+         int rawCount = 0;
+         if (auto* n = dynamic_cast<WavetableNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, WavetableNode::kScopeCacheCapacity);
+         else if (auto* n = dynamic_cast<FieldSampleNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, FieldSampleNode::kScopeCacheCapacity);
+         else if (auto* n = dynamic_cast<OscillatorNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, OscillatorNode::kScopeCacheCapacity);
+         else if (auto* n = dynamic_cast<MetallicNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, MetallicNode::kScopeCacheCapacity);
+         else if (auto* n = dynamic_cast<WaveTerrainNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, WaveTerrainNode::kScopeCapacity);
+         else if (auto* n = dynamic_cast<ImageSpectralSynthNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, ImageSpectralSynthNode::kScopeCapacity);
+         else if (auto* n = dynamic_cast<EquationNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, EquationNode::kScopeCapacity);
+
+         if (rawCount > 1)
+         {
+            const int bucketCount = std::min(FieldGraphNode::kWaveformCacheSize, rawCount);
+            const int bucketSize = std::max(1, rawCount / bucketCount);
+            for (int b = 0; b < bucketCount; b++)
+            {
+               const int startI = b * bucketSize;
+               const int endI = std::min(rawCount, (b + 1) * bucketSize);
+               float minV = 0.0f;
+               float maxV = 0.0f;
+               for (int i = startI; i < endI; i++)
+               {
+                  const float v = raw[i];
+                  if (v < minV) minV = v;
+                  if (v > maxV) maxV = v;
+               }
+               fgn->waveformMin[b] = minV;
+               fgn->waveformMax[b] = maxV;
+            }
+            fgn->waveformCacheCount = bucketCount;
+         }
+         else
+         {
+            fgn->waveformCacheCount = 0;
+         }
+         fgn->waveformCacheTime = now;
+      }
+
+      const float w = AudioFullWidth();
+      const float h = 100.0f;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (fgn->waveformCacheCount > 0)
+      {
+         const bool isLight = IsThemeLight();
+         const int count = fgn->waveformCacheCount;
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - fgn->waveformMax[i] * h * 0.45f;
+            const float bottom = midY - fgn->waveformMin[i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(40, 90, 200, 200) : IM_COL32(140, 160, 220, 175));
+         }
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
    // Rolling history so a modulator reads like a scope rather than a number.
    std::map<int, std::vector<float>> gModHistory;
 
@@ -28131,6 +28244,26 @@ namespace
       }
    }
 
+   // Build step 15 follow-up (§5.1/§5.4): resolves the same "first terminal
+   // with a texture" node the inline preview dispatch (main.cpp's node-body
+   // draw loop) already computes every frame - this is also this
+   // FieldGraphNode's single derived boundary output pin's target. Kept as
+   // its own small free function rather than a FieldGraphNode member because
+   // it needs FindNodeByIndex/gNodes, which FieldGraphNode.h/.cpp
+   // deliberately have no access to (same discipline as TerminalIndices()'s
+   // own doc comment).
+   INode* ResolveFieldGraphBoundaryTerminal(FieldGraphNode* fgn)
+   {
+      for (int idx : fgn->TerminalIndices())
+      {
+         GraphNode* term = FindNodeByIndex(idx);
+         if (term != nullptr && term->node && term->node->GetOutputTexture() != 0 &&
+             term->node->GetOutputWidth() > 0)
+            return term->node.get();
+      }
+      return nullptr;
+   }
+
    // Runs a FieldGraphNode's Regenerate() as exactly one undo step (doc
    // §5.4): one checkpoint pushed up front, every SpawnNode/
    // RemoveNodeByIndex/ConnectNodes call inside Regenerate() suppresses its
@@ -28145,6 +28278,15 @@ namespace
          return;
       PushUndoCheckpoint();
       gSuppressUndoCheckpoints = true;
+
+      // Build step 15 follow-up (§5.4): capture what the boundary output pin
+      // resolves to BEFORE this regenerate, so a terminal that disappears
+      // (unmounted outright, or simply no longer a terminal because a new
+      // connect() now consumes it - §5.1) can be told apart from the pin
+      // just continuing to point at the same node it always did. Purely
+      // local to this call - never held past it.
+      INode* oldBoundaryTarget = ResolveFieldGraphBoundaryTerminal(target);
+
       // Build step 15: encapsulated (Instrument Mode, the default) mounts
       // through VirtualGraphHost, which hides every mounted child from the
       // canvas; false (step 16's "Unpack to Canvas", or a patch saved
@@ -28161,6 +28303,71 @@ namespace
          MainGraphHost host;
          target->Regenerate(host);
       }
+
+      // §5.4: this node's boundary output pin always re-resolves to
+      // whichever terminal is now primary (nullptr if none), refreshed here
+      // so a cook that lands before the next draw frame already reads the
+      // right target - the draw dispatch (main.cpp's node-body loop) does
+      // the same call every frame regardless, so this is belt-and-braces,
+      // not the only place it happens.
+      INode* newBoundaryTarget = ResolveFieldGraphBoundaryTerminal(target);
+      target->SetBoundaryOutputTarget(newBoundaryTarget);
+
+      // If the pin's old target is gone (the identity it backed is no
+      // longer a terminal at all, whether unmounted or merely consumed by a
+      // new internal connect()), any outer cable still plugged into this
+      // node's own output pin is now stale and needs detaching - same
+      // count-then-DisconnectAllTo shape, and the same "detached N cables"
+      // notice vocabulary, MainGraphHost::Unmount already uses for an
+      // internal node going away (doc trap 6) - extending that existing
+      // accounting/notice path rather than building a second, competing
+      // detached-cable mechanism. A single physical pin can only ever back
+      // one terminal at a time in
+      // this implementation (§5.1's multi-terminal case is not exposed as
+      // multiple real output pins here), so any change to what the pin
+      // resolves to - not only an outright disappearance - is treated as
+      // the pin's identity changing and is handled the same conservative
+      // way: detach rather than silently swap the picture under a
+      // connected cable.
+      int boundaryCablesDetached = 0;
+      if (oldBoundaryTarget != nullptr && newBoundaryTarget != oldBoundaryTarget)
+      {
+         INode* boundarySource = target;
+         for (GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == boundarySource)
+               continue;
+            int inputs = InputCountFor(gn);
+            for (int slot = 0; slot < inputs; slot++)
+            {
+               ImageCable* cable = CableFor(gn, slot);
+               if (cable && cable->IsConnected() && cable->GetSource() == boundarySource)
+                  boundaryCablesDetached++;
+            }
+            for (int slot = 0; slot < kMaxAudioSlots; slot++)
+            {
+               AudioCable* cable = gn.node->AudioInputSlot(slot);
+               if (cable && cable->IsConnected() && cable->GetSource() == boundarySource)
+                  boundaryCablesDetached++;
+            }
+            for (int slot = 0; slot < kMaxNoteSlots; slot++)
+            {
+               NoteCable* cable = gn.node->NoteInputSlot(slot);
+               if (cable && cable->IsConnected() && cable->GetSource() == boundarySource)
+                  boundaryCablesDetached++;
+            }
+         }
+         if (boundaryCablesDetached > 0)
+            DisconnectAllTo(boundarySource);
+      }
+      if (boundaryCablesDetached > 0)
+      {
+         std::ostringstream oss;
+         oss << "detached " << boundaryCablesDetached
+             << " outer cable(s) from a boundary pin whose terminal disappeared";
+         target->AppendNotice(oss.str());
+      }
+
       gSuppressUndoCheckpoints = false;
       gPatchDirty = true;
    }
@@ -49911,6 +50118,60 @@ int main(int argc, char** argv)
             allOk = allOk && pass5;
          }
 
+         // Assertion 6 (step 15 follow-up, §5.4): a REAL outer cable wired
+         // into the FieldGraphNode's own (derived, single) boundary output
+         // pin - not the terminal directly, exactly what an outer patch
+         // author actually drags a link onto - gets detached, counted, and
+         // reported when the next Regenerate() makes its terminal disappear.
+         // Mirrors MainGraphHost/VirtualGraphHost::Unmount's existing
+         // scan-then-DisconnectAllTo shape (doc trap 6: no second counter).
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int fgnIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code = "osc = emit(\"Noise\", 0)\n";
+            RunFieldGraphRegenerate(fgn);
+
+            // Cook once so the terminal has a real texture - the same
+            // precondition DrawPreview/the inline waveform already need
+            // (§5.3), and what ResolveFieldGraphBoundaryTerminal itself
+            // checks for.
+            ApplyModulationAndPalette(4);
+            fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+            fgn->SetBoundaryOutputTarget(ResolveFieldGraphBoundaryTerminal(fgn));
+
+            GraphNode* consumer = SpawnNode("Curves", "Compositing", 300.0f, 0.0f);
+            int consumerIdx = consumer->index;
+            std::string connErr;
+            bool connected = ConnectNodes(fgnIdx, 0, consumerIdx, 0, connErr);
+
+            consumer = FindNodeByIndex(consumerIdx);
+            ImageCable* consumerCable = consumer ? CableFor(*consumer, 0) : nullptr;
+            bool wiredToKernel = connected && consumerCable != nullptr && consumerCable->IsConnected() &&
+                                 consumerCable->GetSource() == FindNodeByIndex(fgnIdx)->node.get();
+
+            // The emit call-site is gone entirely - the terminal this pin
+            // used to resolve to no longer exists after the next Regenerate.
+            fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+            fgn->code = "x = 1\n";
+            RunFieldGraphRegenerate(fgn);
+
+            consumer = FindNodeByIndex(consumerIdx);
+            ImageCable* afterCable = consumer ? CableFor(*consumer, 0) : nullptr;
+            bool detached = afterCable == nullptr || !afterCable->IsConnected();
+
+            fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+            const std::string& notice = fgn->Notice();
+            bool noticeReports = notice.find("detached") != std::string::npos &&
+                                  notice.find("boundary") != std::string::npos;
+
+            bool pass6 = wiredToKernel && detached && noticeReports;
+            printf("[FIELDGRAPHENCAPTEST] Assertion 6 (Boundary pin cable detach on terminal loss): wired=%d detached=%d reported=%d  %s\n",
+                   (int)wiredToKernel, (int)detached, (int)noticeReports, pass6 ? "OK" : "FAIL");
+            allOk = allOk && pass6;
+         }
+
          NewPatch();
          printf("%s\n", allOk ? "FIELDGRAPHENCAP OK" : "SUSPECT");
       }
@@ -55570,10 +55831,10 @@ int main(int argc, char** argv)
             // the first one that actually has a texture, via the same
             // DrawPreview every other image-producing node's body already
             // uses (doc trap 8: no signature change, no second widget).
-            // A geometry- or audio-only terminal (§5.3.1, out of scope for
-            // this pass - see docs/plans/field/step-15-fieldgraph-encapsulation.md
-            // §5.3.1) falls through to "nothing to show", same as an empty/
-            // uncompiled program.
+            // A texture-less terminal falls through to §5.3.1's audio-domain
+            // case (RequiresAudioProcessing(), no texture) below; a geometry-
+            // only terminal (neither) falls through to "nothing to show",
+            // same as an empty/uncompiled program.
             INode* previewTarget = nullptr;
             for (int idx : fgnPreview->TerminalIndices())
             {
@@ -55585,8 +55846,32 @@ int main(int argc, char** argv)
                   break;
                }
             }
+            // §5.4: this is also the node's single (derived) boundary output
+            // pin's target - refresh it every draw frame so an outer cable
+            // plugged into that pin (main.cpp's ordinary ImageCable/cable-
+            // record machinery, resolved generically by pin, not specially
+            // for FieldGraphNode) reads whichever terminal currently backs
+            // it, re-resolved fresh rather than held stale across a
+            // Regenerate()'s own SpawnNode/RemoveNodeByIndex churn.
+            fgnPreview->SetBoundaryOutputTarget(previewTarget);
             if (previewTarget != nullptr)
                DrawPreview(previewTarget);
+            else
+            {
+               INode* audioTerminal = nullptr;
+               for (int idx : fgnPreview->TerminalIndices())
+               {
+                  GraphNode* term = FindNodeByIndex(idx);
+                  if (term != nullptr && term->node && term->node->RequiresAudioProcessing() &&
+                      term->node->GetOutputTexture() == 0)
+                  {
+                     audioTerminal = term->node.get();
+                     break;
+                  }
+               }
+               if (audioTerminal != nullptr)
+                  DrawFieldGraphWaveform(fgnPreview, audioTerminal);
+            }
          }
          else if (isAudioBody)
             DrawAudioNodeBody(gn);

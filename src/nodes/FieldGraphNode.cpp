@@ -231,6 +231,16 @@ void FieldGraphNode::PushLiveParams(Field::IFieldGraphHost& host)
    }
 }
 
+void FieldGraphNode::AppendNotice(const std::string& extra)
+{
+   if (extra.empty())
+      return;
+   if (mNotice.empty())
+      mNotice = extra;
+   else
+      mNotice += "; " + extra;
+}
+
 std::vector<int> FieldGraphNode::TerminalIndices() const
 {
    std::vector<int> result;

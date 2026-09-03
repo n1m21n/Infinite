@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/INode.h"
+#include "core/ImageCable.h"
 #include "core/Modulation.h"
 #include "field/FieldGraphHost.h"
 #include "field/FieldGraphKernel.h"
@@ -18,18 +19,59 @@
 // time, and emits/wires/configures real Infinite nodes (main.cpp §MainGraphHost
 // drives the real graph; see FieldGraphReconciler.h for the diff and
 // FieldGraphKernel.h for the interpreter). Main-thread-only, edit-time-only -
-// no audio-thread object, no CookIfNeeded, unlike the other three Field node
-// types.
+// this node itself never cooks any DSP/pixels of its own, unlike the other
+// three Field node types. Build step 15 follow-up (§5.4): GetOutputTexture()/
+// CookIfNeeded() below DO forward to whatever mBoundaryOutput currently
+// points at, so an outer cable plugged into this node's own (single, derived)
+// boundary output pin reads the current primary terminal's picture - see
+// SetBoundaryOutputTarget's comment for who calls it and when.
 class FieldGraphNode : public INode
 {
 public:
    static INode* Create() { return new FieldGraphNode(); }
 
-   unsigned int GetOutputTexture() override { return 0; }
-   int GetOutputWidth() const override { return 0; }
-   int GetOutputHeight() const override { return 0; }
-   void CookIfNeeded(int /*frameId*/) override {}
+   // Forwards through mBoundaryOutput exactly the way NullNode
+   // (UtilityNodes.h) already forwards through its own ImageCable input -
+   // not a new pattern, the same one. mBoundaryOutput's target is refreshed
+   // by main.cpp's node-body draw dispatch every frame and right after every
+   // Regenerate() (RunFieldGraphRegenerate) via SetBoundaryOutputTarget,
+   // never cached here across a SpawnNode call (§5.4; this class has no
+   // gNodes access to resolve mOwnership indices itself, hence the push
+   // rather than a pull).
+   unsigned int GetOutputTexture() override
+   {
+      INode* src = mBoundaryOutput.Resolved();
+      return src ? src->GetOutputTexture() : 0;
+   }
+   int GetOutputWidth() const override { return mBoundaryOutput.Width(); }
+   int GetOutputHeight() const override { return mBoundaryOutput.Height(); }
+   void CookIfNeeded(int frameId) override
+   {
+      if (mLastCookFrame == frameId)
+         return;
+      mLastCookFrame = frameId;
+      mBoundaryOutput.Pull(frameId);
+   }
    void VisitParams(ParamVisitor& v) override;
+
+   // Build step 15 follow-up (§5.4): sets this frame's boundary-output-pin
+   // target - the terminal (§5.1) that an outer cable plugged into this
+   // node's own output pin should read from. Called by main.cpp's node-body
+   // draw dispatch (every frame, using the same "first terminal with a
+   // texture" resolution the inline preview already computes) and by
+   // RunFieldGraphRegenerate right after Regenerate() (so a cook that
+   // happens before the next draw still reads the right target). Passing
+   // nullptr is correct and expected whenever nothing has been regenerated
+   // yet, or no terminal currently produces a texture.
+   void SetBoundaryOutputTarget(INode* target) { mBoundaryOutput.Connect(target); }
+   INode* BoundaryOutputTarget() const { return mBoundaryOutput.GetSource(); }
+
+   // Appends one more clause to mNotice (semicolon-separated, matching the
+   // style Regenerate() itself already builds mNotice in) - used by
+   // RunFieldGraphRegenerate to report a boundary-pin cable detachment that
+   // happens after Regenerate() has already built its own notice string
+   // (§5.4), without a second/competing notice mechanism.
+   void AppendNotice(const std::string& extra);
 
    // Dynamic pins, Phase 1 (build step 11, §5.5): one modulator INPUT pin, a
    // trigger. This is ordinary INode pin plumbing (ModulatorInputSlot),
@@ -145,6 +187,23 @@ public:
    // answers "yes" to whichever of §5.1's three questions it's asking.
    std::vector<int> TerminalIndices() const;
 
+   // Build step 15 follow-up (§5.3.1): inline audio-terminal waveform
+   // preview cache. Lives here, not on the terminal (the terminal doesn't
+   // know it's being previewed) - adapts GranularNode's own decimated
+   // min/max shape (GranularNode.h kWaveformCacheSize/waveformMin/Max)
+   // rather than inventing a new one. Filled by main.cpp's
+   // DrawFieldGraphWaveform, which decimates whatever the resolved audio
+   // terminal's own pre-existing MeterRing-backed scope (ReadScope(), the
+   // pattern several concrete audio node types already implement) reports,
+   // on a throttled cadence - never written from the audio thread, never
+   // serialized (same discipline as every other node's scopeCache/
+   // waveformMin/Max member in this codebase).
+   static constexpr int kWaveformCacheSize = 256;
+   float waveformMin[kWaveformCacheSize] = {};
+   float waveformMax[kWaveformCacheSize] = {};
+   int waveformCacheCount = 0;
+   double waveformCacheTime = -1.0;
+
    std::string code =
       "# emit(\"Type Name\", k0, k1, ...) -> handle\n"
       "# connect(srcHandle, srcSlot, dstHandle, dstSlot)\n"
@@ -176,6 +235,17 @@ private:
    // Last value pushed per declared param name, so PushLiveParams only calls
    // host.SetParam for params that actually changed since the last call.
    std::map<std::string, float> mLastPushedValue;
+
+   // Build step 15 follow-up (§5.4): the boundary output pin's current
+   // target, held as an ImageCable (the same forwarding member NullNode
+   // uses for its input) rather than a bare INode* precisely so
+   // GetOutputTexture()/CookIfNeeded() above can reuse ImageCable::
+   // Resolved()/Pull() instead of duplicating the bypass-walking/cook
+   // dance. Set only by SetBoundaryOutputTarget - never resolved from
+   // mOwnership in this file (no gNodes access here, same discipline as
+   // TerminalIndices() above).
+   ImageCable mBoundaryOutput;
+   int mLastCookFrame = -1;
 
    void RebuildLiveForward();
 };
