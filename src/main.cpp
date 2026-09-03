@@ -13681,21 +13681,11 @@ namespace
    }
 
    // Shared by every tempo-synced note generator (Arp, Note Sequencer,
-   // Random Note Generator): a rate expressed either as a note division
-   // (synced to tempo) or free seconds - see QuantizerNode::div's header
-   // comment (NoteNodes.h) for the equivalent quantize-grid table.
-   static const std::vector<std::string> kRateDivisionLabels = { "1/1", "1/2", "1/4", "1/8", "1/16", "1/32" };
-   static const float kRateDivisionBeats[] = { 4.0f, 2.0f, 1.0f, 0.5f, 0.25f, 0.125f };
-   int NearestRateDivision(float beats)
+   // Random Note Generator, Note Echo, Note Switcher): a rate expressed either
+   // as a note division (synced to tempo) or free seconds.
+   inline int NearestRateDivision(float beats)
    {
-      int best = 2;
-      float bestDiff = 1e9f;
-      for (int i = 0; i < 6; i++)
-      {
-         const float d = std::fabs(kRateDivisionBeats[i] - beats);
-         if (d < bestDiff) { bestDiff = d; best = i; }
-      }
-      return best;
+      return (int)MusicTime::NearestRateDivision((double)beats);
    }
 
    // Draws a "rateMode" toggle plus whichever rate control it selects -
@@ -13709,9 +13699,9 @@ namespace
       if (*rateMode == 0)
       {
          int div = NearestRateDivision(*rateBeats);
-         row.Dropdown("rate", kRateDivisionLabels, div, [rateBeats](int i) {
+         row.Dropdown("rate", MusicTime::RateDivisionList(), div, [rateBeats](int i) {
             PushUndoCheckpoint();
-            *rateBeats = kRateDivisionBeats[std::clamp(i, 0, 5)];
+            *rateBeats = (float)MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(i, 0, (int)MusicTime::kNumRateDivisions - 1));
          });
          // The rate knob isn't drawn in Synced mode, but it still must consume
          // a paramIndex ordinal (see ModKnob's comment on gParamCounter):
@@ -13737,9 +13727,9 @@ namespace
       }
    }
 
-   // Shared "quantize to grid" dropdown - Off, 1/4, 1/8, 1/16, 1/32 - used by
+   // Shared "quantize to grid" dropdown - Off, 4 bars down to 1/32 (with dotted and triplets), 1/64 - used by
    // Quantizer (live note-on timing) and Note Capturer (recorded timing).
-   static const std::vector<std::string> kQuantizeLabels = { "Off", "1/4", "1/8", "1/16", "1/32" };
+   #define kQuantizeLabels MusicTime::QuantizeGridList()
 
    // Standard shape for a one-knob note node (Note Transpose, Pitch Bend,
    // Gate, Glide, Vibrato below) - narrow body, one big centred knob, no
@@ -13880,43 +13870,18 @@ namespace
 
    void DrawQuantizerBody(GraphNode& gn, QuantizerNode* n)
    {
+      const auto& options = MusicTime::QuantizeGridList();
+      const int safeDiv = std::clamp(n->div, 0, (int)options.size() - 1);
       char stat[48];
-      snprintf(stat, sizeof(stat), "%s", kQuantizeLabels[std::clamp(n->div, 0, 4)].c_str());
+      snprintf(stat, sizeof(stat), "%s", options[safeDiv].c_str());
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-
-      const float totalW = gAudioBodyW;
-      const int count = (int)kQuantizeLabels.size();
-      const float spacing = 3.0f;
-      const float btnW = (totalW - spacing * (float)(count - 1)) / (float)count;
-      const float btnH = 22.0f;
-      const bool isLight = IsThemeLight();
-
-      for (int i = 0; i < count; i++)
-      {
-         if (i > 0)
-            ImGui::SameLine(0.0f, spacing);
-         const bool selected = (n->div == i);
-         if (selected)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.20f, 0.48f, 0.88f, 1.0f) : ImVec4(0.25f, 0.55f, 0.95f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-         }
-         else
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.88f, 0.90f, 0.94f, 1.0f) : ImVec4(0.18f, 0.20f, 0.26f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.2f, 0.2f, 0.25f, 1.0f) : ImVec4(0.7f, 0.72f, 0.78f, 1.0f));
-         }
-         char btnId[32];
-         snprintf(btnId, sizeof(btnId), "%s##qdiv_%d", kQuantizeLabels[i].c_str(), i);
-         if (ImGui::Button(btnId, ImVec2(btnW, btnH)))
-         {
-            PushUndoCheckpoint();
-            n->div = i;
-         }
-         ImGui::PopStyleColor(2);
-      }
-
+      AudioKnobRow row(1);
+      row.Dropdown("grid", options, safeDiv, [n](int i) {
+         PushUndoCheckpoint();
+         n->div = i;
+      });
+      row.End();
       EndAudioBody();
    }
 
@@ -13980,7 +13945,7 @@ namespace
       else if (n->rateMode == 0)
       {
          int div = NearestRateDivision(n->rateBeats);
-         snprintf(stat, sizeof(stat), "every %s  -  slot %d", kRateDivisionLabels[std::clamp(div, 0, (int)kRateDivisionLabels.size() - 1)].c_str(), active + 1);
+         snprintf(stat, sizeof(stat), "every %s  -  slot %d", MusicTime::RateDivisionName(div), active + 1);
       }
       else
          snprintf(stat, sizeof(stat), "every %.2fs  -  slot %d", n->rateSeconds, active + 1);
@@ -14753,7 +14718,9 @@ namespace
          // plus a caption-line reservation.
          AudioKnobRow row(4, 20.0f, 8.0f, false);
          row.Checkbox("loop##capturerLoop", &n->loop);
-         row.Skip();
+         row.Dropdown("grid", MusicTime::QuantizeGridList(),
+                      std::clamp(n->quantizeDiv, 0, (int)MusicTime::QuantizeGridList().size() - 1),
+                      [n](int i) { PushUndoCheckpoint(); n->quantizeDiv = i; });
          row.Skip();
          row.Skip();
          row.End();
@@ -30064,6 +30031,7 @@ static bool RunMusicTimeFixture()
       { kSixteenthDot, "1/16.", 0.375, false, 0.0 },
       { kSixteenthTrip, "1/16T", 1.0 / 6.0, false, 0.0 },
       { kThirtySecond, "1/32", 0.125, false, 0.0 },
+      { kThirtySecondDot, "1/32.", 0.1875, false, 0.0 },
       { kThirtySecondTrip, "1/32T", 1.0 / 12.0, false, 0.0 },
       { kSixtyFourth, "1/64", 0.0625, false, 0.0 },
    };
