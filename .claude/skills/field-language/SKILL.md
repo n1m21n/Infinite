@@ -232,7 +232,7 @@ float; float does not demote to int without an explicit call).
 
 | Class | Operators |
 |---|---|
-| arithmetic | `+ - * / %` |
+| arithmetic | `+ - * / % ^` |
 | compound assign | `+= -= *= /=` |
 | assign / compare | `= == != < <= > >=` |
 | logical | `&& \|\| !` |
@@ -240,17 +240,10 @@ float; float does not demote to int without an explicit call).
 | grouping | `()` call and precedence, `{}` block |
 | comment | `#` to end of line |
 
-> **OPEN — `^` (power).** `src/core/Expression.cpp` **today** implements `^` as
-> a right-associative power operator, and `src/core/Expression.h:30` documents
-> it as part of the supported grammar. The design brief's operator list does
-> not mention it. Every saved patch containing `=2^x` in an `expr` line is part
-> of the step-1 regression corpus, so **dropping `^` is a breaking change to
-> saved patches**. Options: **(a)** keep `^` as-is (safest, but `^` is XOR in C
-> and GLSL, which will surprise anyone reading generated GLSL);
-> **(b)** keep `^` in the surface syntax and lower it to `pow()` in the IR
-> (recommended default — preserves the corpus, generates clean GLSL);
-> **(c)** remove it and migrate patches on load. Ask the owner; **(b)** is the
-> only option that costs nothing.
+> **Settled in Step 3 — `^` (power).** `src/core/Expression.cpp` implements `^` as
+> a right-associative power operator (`2^3^2 == 512`, `-2^2 == 4`), component-wise
+> on vectors (`vec3(1,2,3)^2 == (1,4,9)`). Following option **(b)**: `^` is kept in
+> the surface syntax and lowered to `pow()` in the IR, generating clean GLSL.
 
 ## 11. Branching is allowed — with a cost model attached
 

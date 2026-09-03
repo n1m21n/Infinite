@@ -223,6 +223,14 @@ set(COMMON_SOURCES
     src/core/field/FieldVM.cpp
     src/core/field/FieldRandom.cpp
     src/core/field/FieldProgramCache.cpp
+    src/core/field/FieldSwizzle.cpp
+    src/core/field/ElementStore.cpp
+    src/core/field/ElementBackend.cpp
+    src/core/field/FieldState.cpp
+    src/core/field/FieldCycles.cpp
+    src/core/field/ParamTable.cpp
+    src/core/field/GlslBackend.cpp
+    src/core/field/PixelState.cpp
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp
@@ -298,6 +306,8 @@ set(COMMON_SOURCES
     src/nodes/SimulationNodes.cpp
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
+    src/nodes/FieldElementNode.cpp
+    src/nodes/FieldPixelNode.cpp
     src/nodes/PointDistributionNodes.cpp
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp

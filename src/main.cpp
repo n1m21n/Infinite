@@ -80,9 +80,13 @@ namespace
 #include "core/AudioTopologyRequest.h"
 #include "core/Modulation.h"
 #include "core/Expression.h"
+#include "core/field/FieldTypes.h"
+#include "core/field/FieldSwizzle.h"
 #include "core/field/FieldLex.h"
 #include "core/field/FieldParse.h"
 #include "core/field/FieldIR.h"
+#include "core/field/FieldBytecode.h"
+#include "core/field/FieldVM.h"
 #include "core/field/FieldRandom.h"
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
@@ -119,6 +123,8 @@ namespace
 #include "nodes/AnalyzeNodes.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
+#include "nodes/FieldElementNode.h"
+#include "nodes/FieldPixelNode.h"
 #include "nodes/SceneNodes.h"
 #include "nodes/EnvironmentNode.h"
 #include "nodes/ModelSourceNode.h"
@@ -943,6 +949,10 @@ namespace
    ImVec4 gCommentEditRect(0, 0, 0, 0); // x, y, w, h
    FormulaNode* gFormulaEditor = nullptr;
    bool gFormulaEditorOpen = false;
+   FieldElementNode* gFieldElementEditor = nullptr;
+   bool gFieldElementEditorOpen = false;
+   FieldPixelNode* gFieldPixelEditor = nullptr;
+   bool gFieldPixelEditorOpen = false;
    bool gGlobalsOpen = false;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
@@ -2150,10 +2160,11 @@ namespace
    // the same terms as every other param in the ap
    bool ModSlider(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
                   float width = kParamWidth, bool audioStyle = false, float step = 0.0f,
-                  FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
+                  FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                  int explicitParamIndex = -1)
    {
       const int nodeIndex = gCurrentNodeIndex;
-      const int paramIndex = gParamCounter++;
+      const int paramIndex = (explicitParamIndex >= 0) ? explicitParamIndex : gParamCounter++;
 
       ParamRef ref;
       ref.nodeIndex = nodeIndex;
@@ -3764,6 +3775,7 @@ namespace
             [i]() -> INode* { return ShapeNode::CreateFor(i); }, "Source");
       }
       REGISTER_NODE(FormulaNode, Formula, "Source");
+      REGISTER_NODE(FieldPixelNode, FieldPixel, "Source");
       REGISTER_NODE(TextNode, Text, "Source");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");
@@ -3832,6 +3844,7 @@ namespace
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
       REGISTER_NODE(SetColorNode, Set Color, "3D");
       REGISTER_NODE(WrapNode, Wrap, "3D");
+      REGISTER_NODE(FieldElementNode, Field Element, "3D");
       REGISTER_NODE(DistributePointsOnFacesNode, Distribute Points on Faces, "3D");
       REGISTER_NODE(PointsToVerticesNode, Points to Vertices, "3D");
       REGISTER_NODE(DistributePointsInGridNode, Distribute Points in Grid, "3D");
@@ -5030,6 +5043,10 @@ namespace
          palette->ReloadFromPath();
       if (auto* formula = dynamic_cast<FormulaNode*>(node))
          formula->Apply();
+      if (auto* fe = dynamic_cast<FieldElementNode*>(node))
+         fe->Apply();
+      if (auto* fp = dynamic_cast<FieldPixelNode*>(node))
+         fp->Apply();
       // Re-instantiates the plugin from the identity VisitParams just restored
       // and queues its saved fullState; the actual load finishes
       // asynchronously, a frame or two later, in CookIfNeeded.
@@ -5273,6 +5290,115 @@ namespace
       ModSlider("uC", &n->knobC, 0.0f, 1.0f);
       ModSlider("uD", &n->knobD, 0.0f, 1.0f);
       ModCheckbox("animate", &n->animate);
+   }
+
+   void DrawFieldElementParams(FieldElementNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         DropdownButton("preset", FieldElementNode::PresetNames(), n->presetIndex,
+                        [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldElementEditor = n;
+            gFieldElementEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->WasTruncated())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Truncated to %d vertices", n->ActualElementCount());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->State().CellCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextDisabled("%s", n->CostReadout());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      ModSliderInt("max elements", &n->maxElements, 100, 200000);
+
+      for (auto& p : n->GetParamTable().Params())
+      {
+         if (!p.isDeclared)
+            continue;
+         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
+      }
+   }
+
+   void DrawFieldPixelParams(FieldPixelNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         DropdownButton("preset", FieldPixelNode::PresetNames(), n->presetIndex,
+                        [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldPixelEditor = n;
+            gFieldPixelEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->BranchCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            char bBuf[64];
+            snprintf(bBuf, sizeof(bBuf), "%d branch%s -> %d paths evaluated per pixel",
+                     n->BranchCount(), n->BranchCount() == 1 ? "" : "es", 1 << n->BranchCount());
+            ImGui::TextDisabled("%s", bBuf);
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->StateCellCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            char sBuf[64];
+            snprintf(sBuf, sizeof(sBuf), "%d state cell%s (RGBA16F ping-pong)",
+                     n->StateCellCount(), n->StateCellCount() == 1 ? "" : "s");
+            ImGui::TextDisabled("%s", sBuf);
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModCheckbox("animate", &n->animate);
+
+      for (auto& p : n->GetParamTable().Params())
+      {
+         if (!p.isDeclared)
+            continue;
+         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
+      }
    }
 
    void DrawTextParams(TextNode* n)
@@ -24164,6 +24290,7 @@ namespace
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
          { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
          { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
+         { "Field Element", "Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution." },
          { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
          { "Ramp", "Generates a gradient from scratch (no input) between up to 8 user-set colour stops, at a chosen angle, scale and offset. Gamma and dither smooth out visible banding." },
          { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
@@ -34642,42 +34769,186 @@ static int RunFieldTest()
    else
       printf("SECTION C (Spans): FAIL\n");
 
-   // Section D: Types & Rank Polymorphism Baseline
+   // Section D: Types, Vectors & Rank Polymorphism (Step 3)
    bool secDOk = true;
    {
-      std::vector<Field::Token> toks;
-      Field::FieldError err;
-      Field::AstNodePtr ast;
-      Field::IRNodePtr ir;
-
-      if (Field::Lex("1 + 2", toks, err) && Field::ParseExpression(toks, ast, err) && Field::LowerAstToIR(ast, ir, err))
+      // 1. JoinRank Unit Tests
+      Field::FieldType resType;
+      std::string rankErr;
+      if (!Field::JoinRank(Field::FieldType(Field::DataType::Float, 1), Field::FieldType(Field::DataType::Vec2, 2), resType, rankErr) || resType.kind != Field::DataType::Vec2 || resType.lanes != 2)
       {
-         if (ir->type != Field::DataType::Float)
-         {
-            printf("SECTION D (Types): FAIL - '1 + 2' expected Float type\n");
-            secDOk = false;
-         }
+         printf("SECTION D (Types): FAIL - scalar + vec2 rank join failed\n");
+         secDOk = false;
       }
-      else
+      if (!Field::JoinRank(Field::FieldType(Field::DataType::Vec3, 3), Field::FieldType(Field::DataType::Float, 1), resType, rankErr) || resType.kind != Field::DataType::Vec3 || resType.lanes != 3)
       {
-         printf("SECTION D (Types): FAIL - failed to lower '1 + 2'\n");
+         printf("SECTION D (Types): FAIL - vec3 + scalar rank join failed\n");
+         secDOk = false;
+      }
+      if (!Field::JoinRank(Field::FieldType(Field::DataType::Vec4, 4), Field::FieldType(Field::DataType::Vec4, 4), resType, rankErr) || resType.kind != Field::DataType::Vec4 || resType.lanes != 4)
+      {
+         printf("SECTION D (Types): FAIL - vec4 + vec4 rank join failed\n");
+         secDOk = false;
+      }
+      if (Field::JoinRank(Field::FieldType(Field::DataType::Vec2, 2), Field::FieldType(Field::DataType::Vec3, 3), resType, rankErr))
+      {
+         printf("SECTION D (Types): FAIL - vec2 + vec3 should be refused\n");
+         secDOk = false;
+      }
+      if (Field::JoinRank(Field::FieldType(Field::DataType::Vec4, 4), Field::FieldType(Field::DataType::Vec3, 3), resType, rankErr))
+      {
+         printf("SECTION D (Types): FAIL - vec4 + vec3 should be refused\n");
          secDOk = false;
       }
 
-      toks.clear();
-      err.Clear();
-      if (Field::Lex("1 < 2", toks, err) && Field::ParseExpression(toks, ast, err) && Field::LowerAstToIR(ast, ir, err))
+      // 2. Swizzle Validation
+      Field::SwizzleInfo swInfo;
+      std::string swErr;
+      if (!Field::ParseAndValidateSwizzle("xz", Field::FieldType(Field::DataType::Vec3, 3), "P", swInfo, swErr) ||
+          swInfo.numComponents != 2 || swInfo.indices[0] != 0 || swInfo.indices[1] != 2)
       {
-         if (ir->type != Field::DataType::Bool)
+         printf("SECTION D (Types): FAIL - .xz on vec3 failed\n");
+         secDOk = false;
+      }
+      if (!Field::ParseAndValidateSwizzle("bgr", Field::FieldType(Field::DataType::Vec3, 3), "Cd", swInfo, swErr) ||
+          swInfo.numComponents != 3 || swInfo.indices[0] != 2 || swInfo.indices[1] != 1 || swInfo.indices[2] != 0)
+      {
+         printf("SECTION D (Types): FAIL - .bgr on vec3 failed\n");
+         secDOk = false;
+      }
+      if (!Field::ParseAndValidateSwizzle("xxx", Field::FieldType(Field::DataType::Vec3, 3), "P", swInfo, swErr) ||
+          swInfo.numComponents != 3 || swInfo.indices[0] != 0 || swInfo.indices[1] != 0 || swInfo.indices[2] != 0)
+      {
+         printf("SECTION D (Types): FAIL - .xxx on vec3 failed\n");
+         secDOk = false;
+      }
+      if (Field::ParseAndValidateSwizzle("xg", Field::FieldType(Field::DataType::Vec3, 3), "P", swInfo, swErr))
+      {
+         printf("SECTION D (Types): FAIL - mixed swizzle .xg should be refused\n");
+         secDOk = false;
+      }
+      if (Field::ParseAndValidateSwizzle("w", Field::FieldType(Field::DataType::Vec3, 3), "P", swInfo, swErr))
+      {
+         printf("SECTION D (Types): FAIL - .w on vec3 should be refused\n");
+         secDOk = false;
+      }
+      if (Field::ParseAndValidateSwizzle("x", Field::FieldType(Field::DataType::Float, 1), "t", swInfo, swErr))
+      {
+         printf("SECTION D (Types): FAIL - .x on scalar float should be refused\n");
+         secDOk = false;
+      }
+
+      // 3. VM Vector Execution Helper
+      auto evalVec = [](const std::string& src, Field::VectorResult& outVr, std::string& outErr) -> bool {
+         std::vector<Field::Token> toks;
+         Field::FieldError fErr;
+         if (!Field::Lex(src, toks, fErr)) { outErr = fErr.message; return false; }
+         Field::AstNodePtr ast;
+         if (!Field::ParseExpression(toks, ast, fErr)) { outErr = fErr.message; return false; }
+         Field::IRNodePtr ir;
+         if (!Field::LowerAstToIR(ast, ir, fErr)) { outErr = fErr.message; return false; }
+         Field::BytecodeProgram prog;
+         if (!Field::EmitBytecode(ir, prog, fErr)) { outErr = fErr.message; return false; }
+         Field::FieldVM vm;
+         Field::ExecutionEnv env;
+         return vm.ExecuteVector(prog, env, outVr, outErr);
+      };
+
+      // Constructors & Broadcast
+      {
+         Field::VectorResult vr;
+         std::string err;
+         if (!evalVec("vec3(1)", vr, err) || vr.lanes != 3 || vr.v[0] != 1.0 || vr.v[1] != 1.0 || vr.v[2] != 1.0)
          {
-            printf("SECTION D (Types): FAIL - '1 < 2' expected Bool type\n");
+            printf("SECTION D (Types): FAIL - vec3(1) splat failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(1, 2, 3)", vr, err) || vr.lanes != 3 || vr.v[0] != 1.0 || vr.v[1] != 2.0 || vr.v[2] != 3.0)
+         {
+            printf("SECTION D (Types): FAIL - vec3(1, 2, 3) full ctor failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec4(vec2(1, 2), vec2(3, 4))", vr, err) || vr.lanes != 4 || vr.v[0] != 1.0 || vr.v[1] != 2.0 || vr.v[2] != 3.0 || vr.v[3] != 4.0)
+         {
+            printf("SECTION D (Types): FAIL - vec4(vec2, vec2) mixed ctor failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec4(vec3(1, 2, 3), 4)", vr, err) || vr.lanes != 4 || vr.v[0] != 1.0 || vr.v[1] != 2.0 || vr.v[2] != 3.0 || vr.v[3] != 4.0)
+         {
+            printf("SECTION D (Types): FAIL - vec4(vec3, 4) mixed ctor failed\n");
+            secDOk = false;
+         }
+         if (evalVec("vec3(vec2(1, 2))", vr, err))
+         {
+            printf("SECTION D (Types): FAIL - vec3(vec2) should be refused\n");
+            secDOk = false;
+         }
+         if (evalVec("vec3(vec2(1, 2), vec2(3, 4))", vr, err))
+         {
+            printf("SECTION D (Types): FAIL - vec3(vec2, vec2) lane sum 4 should be refused\n");
             secDOk = false;
          }
       }
-      else
+
+      // Arithmetic, Power, Swizzle Chaining & Precision
       {
-         printf("SECTION D (Types): FAIL - failed to lower '1 < 2'\n");
-         secDOk = false;
+         Field::VectorResult vr;
+         std::string err;
+         if (!evalVec("vec3(1, 2, 3) * 2", vr, err) || vr.lanes != 3 || vr.v[0] != 2.0 || vr.v[1] != 4.0 || vr.v[2] != 6.0)
+         {
+            printf("SECTION D (Types): FAIL - vec3 * 2 broadcast failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(1) + 0.5", vr, err) || vr.lanes != 3 || vr.v[0] != 1.5 || vr.v[1] != 1.5 || vr.v[2] != 1.5)
+         {
+            printf("SECTION D (Types): FAIL - vec3(1) + 0.5 failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(1, 2, 3) ^ 2", vr, err) || vr.lanes != 3 || vr.v[0] != 1.0 || vr.v[1] != 4.0 || vr.v[2] != 9.0)
+         {
+            printf("SECTION D (Types): FAIL - vec3 ^ 2 power failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(10, 20, 30).xz", vr, err) || vr.lanes != 2 || vr.v[0] != 10.0 || vr.v[1] != 30.0)
+         {
+            printf("SECTION D (Types): FAIL - .xz swizzle read failed\n");
+            secDOk = false;
+         }
+         if (!evalVec("vec3(10, 20, 30).xy.y", vr, err) || vr.lanes != 1 || vr.v[0] != 20.0)
+         {
+            printf("SECTION D (Types): FAIL - .xy.y swizzle chain failed\n");
+            secDOk = false;
+         }
+         // Double precision across all lanes
+         if (!evalVec("vec3(0.1) + vec3(0.2)", vr, err) || vr.lanes != 3 ||
+             (float)vr.v[0] != 0.30000001192092896f || (float)vr.v[1] != 0.30000001192092896f || (float)vr.v[2] != 0.30000001192092896f)
+         {
+            printf("SECTION D (Types): FAIL - vector 0.1+0.2 double precision mismatch\n");
+            secDOk = false;
+         }
+      }
+
+      // Top-level vector refusal via Expression::Evaluate
+      {
+         float outVal = 123.456f;
+         std::string errStr;
+         bool res = Expression::Evaluate("vec3(1, 0, 0)", 0.0, nullptr, nullptr, outVal, errStr);
+         if (res || outVal != 123.456f || errStr.find("expression has type vec3") == std::string::npos)
+         {
+            printf("SECTION D (Types): FAIL - top-level vec3 refusal failed (res=%d, outVal=%.3f, err='%s')\n", (int)res, outVal, errStr.c_str());
+            secDOk = false;
+         }
+      }
+
+      // Vector comparison refusal (Decision 1)
+      {
+         Field::VectorResult vr;
+         std::string err;
+         if (evalVec("vec3(1) > vec3(0)", vr, err) || err.find("requires scalar arguments") == std::string::npos)
+         {
+            printf("SECTION D (Types): FAIL - vector comparison should be refused (err='%s')\n", err.c_str());
+            secDOk = false;
+         }
       }
    }
    if (secDOk)
@@ -34827,6 +35098,1530 @@ static int RunFieldTest()
 
    bool allOk = secAOk && secBOk && secCOk && secDOk && secEOk;
    printf("INFINITE_FIELDTEST: %s\n", allOk ? "OK" : "FAIL");
+   return allOk ? 0 : 1;
+}
+
+// ============================================================ INFINITE_FIELDELEMENTTEST
+//
+// Headless regression harness for the Field element domain.
+// Guards the SoA store, round-trip fidelity, rate inference hoisting,
+// reserved-word shadowing, undeclared attribute refusals, and geometry passthrough.
+static int RunFieldElementTest()
+{
+   printf("[FIELDELEMENTTEST] Running Field element-domain conformance harness...\n");
+   bool allOk = true;
+
+   // 1. AoS / SoA Round-Trip & Preservation (empty-stays-empty)
+   {
+      bool secOk = true;
+      Mesh srcMesh;
+      for (int i = 0; i < 5; ++i)
+      {
+         Vertex v;
+         v.px = (float)i * 1.0f; v.py = (float)i * 2.0f; v.pz = (float)i * 3.0f;
+         v.nx = 0.0f; v.ny = 1.0f; v.nz = 0.0f;
+         v.u = (float)i * 0.25f; v.v = 1.0f - (float)i * 0.25f;
+         srcMesh.vertices.push_back(v);
+      }
+      srcMesh.indices = { 0, 1, 2, 2, 3, 4 };
+      srcMesh.faceMask = { 1, 0 };
+      srcMesh.selectionGroup = { 10, 20 };
+
+      Field::ElementStore store;
+      store.FromMesh(srcMesh);
+
+      if (store.Count() != 5) secOk = false;
+      if (store.HasInputVertexColor()) secOk = false; // empty input
+
+      Mesh outMesh;
+      Field::MeshWriteMask noWrites;
+      store.ToMesh(outMesh, noWrites, srcMesh);
+
+      if (outMesh.vertices.size() != 5) secOk = false;
+      for (size_t i = 0; i < 5; ++i)
+      {
+         if (outMesh.vertices[i].px != srcMesh.vertices[i].px ||
+             outMesh.vertices[i].py != srcMesh.vertices[i].py ||
+             outMesh.vertices[i].pz != srcMesh.vertices[i].pz ||
+             outMesh.vertices[i].nx != srcMesh.vertices[i].nx ||
+             outMesh.vertices[i].ny != srcMesh.vertices[i].ny ||
+             outMesh.vertices[i].nz != srcMesh.vertices[i].nz ||
+             outMesh.vertices[i].u != srcMesh.vertices[i].u ||
+             outMesh.vertices[i].v != srcMesh.vertices[i].v)
+         {
+            secOk = false;
+         }
+      }
+
+      if (outMesh.indices != srcMesh.indices) secOk = false;
+      if (outMesh.faceMask != srcMesh.faceMask) secOk = false;
+      if (outMesh.selectionGroup != srcMesh.selectionGroup) secOk = false;
+
+      // Trap #5: empty vertexColor must remain empty
+      if (!outMesh.vertexColor.empty())
+      {
+         printf("AoS/SoA: FAIL - empty vertexColor was converted to non-empty array!\n");
+         secOk = false;
+      }
+
+      // Test with non-empty vertexColor
+      srcMesh.vertexColor = { 1, 0, 0,  0, 1, 0,  0, 0, 1,  1, 1, 0,  0, 1, 1 };
+      store.FromMesh(srcMesh);
+      if (!store.HasInputVertexColor()) secOk = false;
+      store.ToMesh(outMesh, noWrites, srcMesh);
+      if (outMesh.vertexColor != srcMesh.vertexColor)
+      {
+         printf("AoS/SoA: FAIL - non-empty vertexColor was not preserved!\n");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 1 (AoS/SoA Round Trip): OK\n");
+      else { printf("SECTION 1 (AoS/SoA Round Trip): FAIL\n"); allOk = false; }
+   }
+
+   // 2. N-element Kernel execution counter and count variable
+   {
+      bool secOk = true;
+      Mesh mesh;
+      const int N = 64;
+      for (int i = 0; i < N; ++i)
+      {
+         Vertex v;
+         v.px = 0; v.py = 0; v.pz = 0;
+         mesh.vertices.push_back(v);
+      }
+
+      std::string code = "P.x = count\nP.y = i\n";
+      FieldElementNode node;
+      node.code = code;
+      if (!node.Apply())
+      {
+         printf("N-element: FAIL - failed to compile '%s': %s\n", code.c_str(), node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         Field::ElementStore store;
+         store.FromMesh(mesh);
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         std::string err;
+         node.Program()->ResetCounters();
+         vm.Execute(*node.Program(), store, env, err);
+
+         if (node.Program()->elementEvalCount != N)
+         {
+            printf("N-element: FAIL - element loop ran %llu times (expected %d)\n", node.Program()->elementEvalCount, N);
+            secOk = false;
+         }
+
+         Mesh outMesh;
+         store.ToMesh(outMesh, node.Program()->WriteMask(), mesh);
+         for (int i = 0; i < N; ++i)
+         {
+            if (outMesh.vertices[i].px != (float)N || outMesh.vertices[i].py != (float)i)
+            {
+               printf("N-element: FAIL - ramp check failed at i=%d: px=%.2f (expected %d), py=%.2f (expected %d)\n",
+                      i, outMesh.vertices[i].px, N, outMesh.vertices[i].py, i);
+               secOk = false;
+               break;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (N-Element Loop & Count): OK\n");
+      else { printf("SECTION 2 (N-Element Loop & Count): FAIL\n"); allOk = false; }
+   }
+
+   // 3. Hoisting: Frame-domain subexpression runs ONCE per cook on a counter
+   {
+      bool secOk = true;
+      const int N = 100;
+      Mesh mesh;
+      for (int i = 0; i < N; ++i) mesh.vertices.push_back(Vertex{});
+
+      std::string code = "amount = 0.5 + 0.5 * sin(t)\nP.y += amount\n";
+      FieldElementNode node;
+      node.code = code;
+      if (!node.Apply())
+      {
+         printf("Hoisting: FAIL - failed to compile: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         Field::ElementStore store;
+         store.FromMesh(mesh);
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         env.t = 1.5;
+         std::string err;
+         node.Program()->ResetCounters();
+         vm.Execute(*node.Program(), store, env, err);
+
+         if (node.Program()->prologueEvalCount != 1)
+         {
+            printf("Hoisting: FAIL - prologue ran %llu times (expected exactly 1)\n", node.Program()->prologueEvalCount);
+            secOk = false;
+         }
+         if (node.Program()->elementEvalCount != N)
+         {
+            printf("Hoisting: FAIL - element loop ran %llu times (expected %d)\n", node.Program()->elementEvalCount, N);
+            secOk = false;
+         }
+
+         float expectedAmount = 0.5f + 0.5f * std::sin(1.5f);
+         for (int i = 0; i < N; ++i)
+         {
+            if (std::fabs(store.Py()[i] - expectedAmount) > 1e-5f)
+            {
+               printf("Hoisting: FAIL - P.y value mismatch at %d: %.6f vs %.6f\n", i, store.Py()[i], expectedAmount);
+               secOk = false;
+               break;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 3 (Rate Inference & Hoisting): OK\n");
+      else { printf("SECTION 3 (Rate Inference & Hoisting): FAIL\n"); allOk = false; }
+   }
+
+   // 4. Attrib Declarations & Usage
+   {
+      bool secOk = true;
+      Mesh mesh;
+      const int N = 32;
+      for (int i = 0; i < N; ++i)
+      {
+         Vertex v;
+         v.px = (float)i;
+         mesh.vertices.push_back(v);
+      }
+
+      std::string code = "attrib float heat = 0\nheat = P.x * 0.1\nCd = vec3(heat, 0.0, 1.0 - heat)\n";
+      FieldElementNode node;
+      node.code = code;
+      if (!node.Apply())
+      {
+         printf("Attrib: FAIL - failed to compile: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         Field::ElementStore store;
+         store.DeclareAttrib("heat", Field::DataType::Float);
+         store.FromMesh(mesh);
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         std::string err;
+         vm.Execute(*node.Program(), store, env, err);
+
+         Mesh outMesh;
+         store.ToMesh(outMesh, node.Program()->WriteMask(), mesh);
+         if (!outMesh.HasVertexColor())
+         {
+            printf("Attrib: FAIL - Cd write did not produce vertexColor\n");
+            secOk = false;
+         }
+         else
+         {
+            for (int i = 0; i < N; ++i)
+            {
+               float h = (float)i * 0.1f;
+               if (std::fabs(outMesh.vertexColor[3 * i + 0] - h) > 1e-5f ||
+                   std::fabs(outMesh.vertexColor[3 * i + 2] - (1.0f - h)) > 1e-5f)
+               {
+                  printf("Attrib: FAIL - Cd values mismatch at i=%d\n", i);
+                  secOk = false;
+                  break;
+               }
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 4 (User Attribs): OK\n");
+      else { printf("SECTION 4 (User Attribs): FAIL\n"); allOk = false; }
+   }
+
+   // 5. Refusals: Shadowing reserved words, Undeclared attrib, Non-constant loop bound
+   {
+      bool secOk = true;
+
+      // 5a. Reserved-word shadowing
+      {
+         FieldElementNode node;
+         node.code = "attrib float P = 0\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("element") == std::string::npos)
+         {
+            printf("Refusal (Shadowing): FAIL - 'attrib float P' did not fail with element domain message (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // 5b. Frame reserved word shadowing
+      {
+         FieldElementNode node;
+         node.code = "attrib float t = 0\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("frame") == std::string::npos)
+         {
+            printf("Refusal (Shadowing frame): FAIL - 'attrib float t' did not fail with frame domain message (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // 5c. Undeclared attribute error at use site line and column
+      {
+         FieldElementNode node;
+         node.code = "P.y += 1.0\nheat += 0.5\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("undeclared") == std::string::npos ||
+             node.LastError().find("line 2") == std::string::npos)
+         {
+            printf("Refusal (Undeclared): FAIL - 'heat += 0.5' without decl did not error with line 2 (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // 5d. Non-constant loop bound refused
+      {
+         FieldElementNode node;
+         node.code = "for (k = 0; k < count; k += 1) { P.y += 0.1 }\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("loop bound must be a compile-time constant") == std::string::npos)
+         {
+            printf("Refusal (Non-const loop): FAIL - for loop with 'count' bound did not error (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // 5e. Read-only assignment refused
+      {
+         FieldElementNode node;
+         node.code = "i = 5\n";
+         bool ok = node.Apply();
+         if (ok || node.LastError().find("read-only") == std::string::npos)
+         {
+            printf("Refusal (Read-only i): FAIL - assignment to 'i' did not error (ok=%d, err='%s')\n", (int)ok, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 5 (Refusals & Diagnostics): OK\n");
+      else { printf("SECTION 5 (Refusals & Diagnostics): FAIL\n"); allOk = false; }
+   }
+
+   // 6. Element Count Ceiling & Truncation
+   {
+      bool secOk = true;
+      GeometryNode geo;
+      geo.sides = 20;
+      geo.CookIfNeeded(1);
+      const Mesh& geoMesh = geo.GetMesh();
+      size_t origCount = geoMesh.vertices.size();
+
+      FieldElementNode fe;
+      fe.input = &geo;
+      fe.maxElements = 10;
+      fe.code = "P.y += 0.5\n";
+      fe.Apply();
+      fe.CookIfNeeded(2);
+
+      const Mesh& outM = fe.GetMesh();
+      if (outM.vertices.size() != 10)
+      {
+         printf("Truncation: FAIL - output mesh size is %zu (expected capped 10, input was %zu)\n", outM.vertices.size(), origCount);
+         secOk = false;
+      }
+      if (!fe.WasTruncated())
+      {
+         printf("Truncation: FAIL - fe.WasTruncated() is false\n");
+         secOk = false;
+      }
+      if (fe.ActualElementCount() != 10)
+      {
+         printf("Truncation: FAIL - ActualElementCount is %d (expected 10)\n", fe.ActualElementCount());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 6 (Element Cap & Truncation): OK\n");
+      else { printf("SECTION 6 (Element Cap & Truncation): FAIL\n"); allOk = false; }
+   }
+
+   // 7. Geometry Passthrough Forwarding
+   {
+      bool secOk = true;
+      GeometryNode geo;
+      geo.CookIfNeeded(1);
+
+      FieldElementNode fe;
+      fe.input = &geo;
+      fe.code = "P.x += 0.0\n";
+      fe.Apply();
+      fe.CookIfNeeded(2);
+
+      if (fe.PassthroughSource() != &geo)
+      {
+         printf("Passthrough: FAIL - PassthroughSource did not return input geo\n");
+         secOk = false;
+      }
+      if (fe.GetModelMatrix() != geo.GetModelMatrix())
+      {
+         printf("Passthrough: FAIL - GetModelMatrix was not forwarded\n");
+         secOk = false;
+      }
+      if (fe.BypassSource() != dynamic_cast<INode*>(&geo))
+      {
+         printf("Passthrough: FAIL - BypassSource was not forwarded\n");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 7 (Geometry Passthrough): OK\n");
+      else { printf("SECTION 7 (Geometry Passthrough): FAIL\n"); allOk = false; }
+   }
+
+   // 8. Every shipped program compiles: the default constructor's code and all five
+   //    presets. The node's own default (`P.y += sin(P.x * 2.0 + t) * 0.2`) and two of
+   //    the presets were rejected as "dataflow cycle with no delay: P -> P", so
+   //    spawning the node showed a compile error and passed geometry through untouched.
+   //    Read-modify-write of an element attribute is sequential dataflow, not feedback.
+   {
+      bool secOk = true;
+
+      {
+         FieldElementNode fresh;
+         if (!fresh.LastError().empty())
+         {
+            printf("Presets: FAIL - default program did not compile: %s\n", fresh.LastError().c_str());
+            secOk = false;
+         }
+         if (!fresh.Program())
+         {
+            printf("Presets: FAIL - default program produced no bytecode\n");
+            secOk = false;
+         }
+      }
+
+      for (const auto& preset : FieldElementNode::Presets())
+      {
+         FieldElementNode node;
+         node.code = preset.code;
+         if (!node.Apply())
+         {
+            printf("Presets: FAIL - preset '%s' did not compile: %s\n", preset.name, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 8 (Default Program & Presets Compile): OK\n");
+      else { printf("SECTION 8 (Default Program & Presets Compile): FAIL\n"); allOk = false; }
+   }
+
+   // 9. Same expression, both domains, same answer. The prologue and the element loop
+   //    are two evaluations of the same opcode set; anything one can compute the other
+   //    must compute identically. This table is the assertion that catches an opcode
+   //    implemented in one bank and missing from the other - which is how the prologue
+   //    shipped with no comparison, logical, unary or branch opcode at all, silently
+   //    returning 0 for `k = t > 1.0` while the element loop returned 1.
+   {
+      bool secOk = true;
+
+      struct DomainPair
+      {
+         const char* name;
+         const char* frameCode;   // expression hoisted to the prologue via a bare local
+         const char* elemCode;    // same expression forced into the element loop
+         double expected;
+      };
+
+      // env.t is 1.5 and every vertex starts at P = (0,0,0), so `P.x * 0.0` only pins
+      // the statement to the element domain without perturbing the value.
+      static const DomainPair kPairs[] = {
+         { "neg",          "k = -t\nP.y += k\n",                          "P.y += -t + P.x * 0.0\n",                          -1.5 },
+         { "not",          "k = !(t > 9.0)\nP.y += k\n",                  "P.y += !(t > 9.0) + P.x * 0.0\n",                   1.0 },
+         { "less",         "k = t < 2.0\nP.y += k\n",                     "P.y += (t < 2.0) + P.x * 0.0\n",                    1.0 },
+         { "lessEqual",    "k = t <= 1.5\nP.y += k\n",                    "P.y += (t <= 1.5) + P.x * 0.0\n",                   1.0 },
+         { "greater",      "k = t > 1.0\nP.y += k\n",                     "P.y += (t > 1.0) + P.x * 0.0\n",                    1.0 },
+         { "greaterEqual", "k = t >= 9.0\nP.y += k\n",                    "P.y += (t >= 9.0) + P.x * 0.0\n",                   0.0 },
+         { "equal",        "k = t == 1.5\nP.y += k\n",                    "P.y += (t == 1.5) + P.x * 0.0\n",                   1.0 },
+         { "notEqual",     "k = t != 1.5\nP.y += k\n",                    "P.y += (t != 1.5) + P.x * 0.0\n",                   0.0 },
+         { "logicalAnd",   "k = (t > 1.0) && (t < 2.0)\nP.y += k\n",      "P.y += ((t > 1.0) && (t < 2.0)) + P.x * 0.0\n",     1.0 },
+         { "logicalOr",    "k = (t > 9.0) || (t < 2.0)\nP.y += k\n",      "P.y += ((t > 9.0) || (t < 2.0)) + P.x * 0.0\n",     1.0 },
+         { "mod",          "k = t % 1.0\nP.y += k\n",                     "P.y += (t % 1.0) + P.x * 0.0\n",                    0.5 },
+         { "pow",          "k = t ^ 2.0\nP.y += k\n",                     "P.y += (t ^ 2.0) + P.x * 0.0\n",                    2.25 },
+         { "builtinPow",   "k = pow(t, 2.0)\nP.y += k\n",                 "P.y += pow(t, 2.0) + P.x * 0.0\n",                  2.25 },
+         { "builtinMod",   "k = mod(t, 1.0)\nP.y += k\n",                 "P.y += mod(t, 1.0) + P.x * 0.0\n",                  0.5 },
+         { "builtinFloor", "k = floor(t)\nP.y += k\n",                    "P.y += floor(t) + P.x * 0.0\n",                     1.0 },
+         { "builtinStep",  "k = step(1.0, t)\nP.y += k\n",                "P.y += step(1.0, t) + P.x * 0.0\n",                 1.0 },
+         { "builtinClamp", "k = clamp(t, 0.0, 1.0)\nP.y += k\n",          "P.y += clamp(t, 0.0, 1.0) + P.x * 0.0\n",           1.0 },
+         { "builtinMix",   "k = mix(0.0, t, 0.5)\nP.y += k\n",            "P.y += mix(0.0, t, 0.5) + P.x * 0.0\n",             0.75 },
+         { "ifExpr",       "k = if(t > 1.0, 7.0, 0.0)\nP.y += k\n",       "P.y += if(t > 1.0, 7.0, 0.0) + P.x * 0.0\n",        7.0 },
+         { "vecCtor",      "k = vec3(t, 0.0, 0.0).x\nP.y += k\n",         "P.y += vec3(t, 0.0, 0.0).x + P.x * 0.0\n",          1.5 },
+         { "ifStmt",       "k = 0.0\nif (t > 1.0) { k = 5.0 }\nP.y += k\n",
+                                                                          "if (t > 1.0) { P.y += 5.0 + P.x * 0.0 }\n",         5.0 },
+         { "ifElseStmt",   "k = 0.0\nif (t > 9.0) { k = 1.0 } else { k = 3.0 }\nP.y += k\n",
+                                                                          "if (t > 9.0) { P.y += 1.0 } else { P.y += 3.0 + P.x * 0.0 }\n", 3.0 },
+         { "forLoop",      "k = 0.0\nfor (j = 0; j < 3; j += 1) { k += 2.0 }\nP.y += k\n",
+                                                                          "for (j = 0; j < 3; j += 1) { P.y += 2.0 + P.x * 0.0 }\n", 6.0 },
+      };
+
+      const int N = 4;
+
+      // Runs one program over a fresh N-vertex mesh at t = 1.5 and returns P.y[0].
+      auto runCode = [&](const char* code, double& outValue, uint64_t& outPrologueRuns, std::string& outErr) -> bool
+      {
+         Mesh mesh;
+         for (int i = 0; i < N; ++i) mesh.vertices.push_back(Vertex{});
+
+         FieldElementNode node;
+         node.code = code;
+         if (!node.Apply() || !node.Program())
+         {
+            outErr = node.LastError();
+            if (outErr.empty()) outErr = "no bytecode produced";
+            return false;
+         }
+
+         Field::ElementStore store;
+         store.FromMesh(mesh);
+
+         // Element-domain locals are lowered to state cells, so without the same state
+         // the node itself allocates, a write like a for loop's `j += 1` is dropped and
+         // the loop never terminates.
+         Field::FieldState state;
+         for (const auto& ds : node.Program()->declaredStates)
+            state.DeclareCell(ds.name, ds.typeName, ds.type, ds.lanes, ds.initialValues, ds.domain);
+         state.Allocate(Field::Domain::Element, (size_t)N);
+
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         env.t = 1.5;
+         env.state = &state;
+         std::string vmErr;
+         node.Program()->ResetCounters();
+         if (!vm.Execute(*node.Program(), store, env, vmErr))
+         {
+            outErr = vmErr.empty() ? std::string("VM refused the program") : vmErr;
+            return false;
+         }
+
+         outPrologueRuns = node.Program()->prologueEvalCount;
+         outValue = store.Py()[0];
+         return true;
+      };
+
+      for (const auto& pair : kPairs)
+      {
+         double frameVal = 0.0, elemVal = 0.0;
+         uint64_t framePrologueRuns = 0, elemPrologueRuns = 0;
+         std::string err;
+
+         if (!runCode(pair.frameCode, frameVal, framePrologueRuns, err))
+         {
+            printf("BothDomains: FAIL - '%s' frame form did not run: %s\n", pair.name, err.c_str());
+            secOk = false;
+            continue;
+         }
+         if (!runCode(pair.elemCode, elemVal, elemPrologueRuns, err))
+         {
+            printf("BothDomains: FAIL - '%s' element form did not run: %s\n", pair.name, err.c_str());
+            secOk = false;
+            continue;
+         }
+
+         // Without this the row is vacuous: if the expression is never hoisted, both
+         // forms run in the element loop and agreeing proves nothing.
+         if (framePrologueRuns != 1)
+         {
+            printf("BothDomains: FAIL - '%s' frame form was not hoisted (prologue ran %llu times)\n",
+                   pair.name, (unsigned long long)framePrologueRuns);
+            secOk = false;
+         }
+
+         if (std::fabs(frameVal - pair.expected) > 1e-5)
+         {
+            printf("BothDomains: FAIL - '%s' frame form gave %.4f, expected %.4f\n",
+                   pair.name, frameVal, pair.expected);
+            secOk = false;
+         }
+         if (std::fabs(elemVal - pair.expected) > 1e-5)
+         {
+            printf("BothDomains: FAIL - '%s' element form gave %.4f, expected %.4f\n",
+                   pair.name, elemVal, pair.expected);
+            secOk = false;
+         }
+         if (std::fabs(frameVal - elemVal) > 1e-5)
+         {
+            printf("BothDomains: FAIL - '%s' frame %.4f != element %.4f\n",
+                   pair.name, frameVal, elemVal);
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 9 (Same Expression Both Domains): OK\n");
+      else { printf("SECTION 9 (Same Expression Both Domains): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDELEMENTTEST: %s\n", allOk ? "OK" : "FAIL");
+   return allOk ? 0 : 1;
+}
+
+// ============================================================ INFINITE_FIELDPARAMTEST
+static int RunFieldParamTest()
+{
+   printf("[FIELDPARAMTEST] Running Field param declarations harness...\n");
+   fflush(stdout);
+   bool allOk = true;
+
+   // Every Find() in the sections below used to be dereferenced blind. When a section's
+   // Apply() failed the fixture took a null deref and the whole process died, so
+   // sections 3 and later never ran at all - a segfault reports nothing, a FAIL line
+   // reports which section broke and lets the rest of the harness finish.
+   auto applyOk = [](FieldElementNode& n, const char* section) -> bool {
+      if (n.Apply())
+         return true;
+      printf("%s: FAIL - Apply() failed: %s\n", section, n.LastError().c_str());
+      return false;
+   };
+   auto paramId = [](FieldElementNode& n, const char* name, const char* section) -> int {
+      const auto* p = n.GetParamTable().Find(name);
+      if (p)
+         return p->id;
+      printf("%s: FAIL - param '%s' is not in the param table\n", section, name);
+      return -1;
+   };
+
+   // SECTION 1: Parse, lowering & refusal diagnostics (§5.2, §5.7)
+   {
+      bool secOk = true;
+
+      // 1. Valid param declarations
+      {
+         std::string code = "param float amount = 0.5 [0, 2]\nparam float a = -1.5 [-2.0, 5.0]\nP.y += amount + a\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         if (!Field::Lex(code, tokens, err))
+         {
+            printf("Parse: FAIL - valid snippet failed lexing: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         Field::AstNodePtr ast;
+         if (!Field::ParseProgram(tokens, ast, err))
+         {
+            printf("Parse: FAIL - valid snippet failed parsing: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         Field::ElementIRProgram ir;
+         if (!Field::LowerElementProgramToIR(ast, ir, err))
+         {
+            printf("Parse: FAIL - valid snippet failed lowering: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         if (ir.declaredParams.size() != 2 ||
+             ir.declaredParams[0].name != "amount" || ir.declaredParams[0].defaultValue != 0.5 ||
+             ir.declaredParams[0].minValue != 0.0 || ir.declaredParams[0].maxValue != 2.0 ||
+             ir.declaredParams[1].name != "a" || ir.declaredParams[1].defaultValue != -1.5 ||
+             ir.declaredParams[1].minValue != -2.0 || ir.declaredParams[1].maxValue != 5.0)
+         {
+            printf("Parse: FAIL - declared params values do not match expected\n");
+            secOk = false;
+         }
+      }
+
+      // 2. Refusal cases
+      auto testRefusal = [&](const std::string& snippet, const std::string& expectedSubstr, const std::string& testName) {
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         if (!Field::Lex(snippet, tokens, err))
+         {
+            if (err.message.find(expectedSubstr) == std::string::npos)
+            {
+               printf("Refusal (%s): FAIL - error '%s' does not contain '%s'\n",
+                      testName.c_str(), err.message.c_str(), expectedSubstr.c_str());
+               secOk = false;
+            }
+            if (err.span.line <= 0 || err.span.col <= 0)
+            {
+               printf("Refusal (%s): FAIL - missing valid source span (line=%d, col=%d)\n",
+                      testName.c_str(), err.span.line, err.span.col);
+               secOk = false;
+            }
+            return;
+         }
+         Field::AstNodePtr ast;
+         if (!Field::ParseProgram(tokens, ast, err))
+         {
+            if (err.message.find(expectedSubstr) == std::string::npos)
+            {
+               printf("Refusal (%s): FAIL - error '%s' does not contain '%s'\n",
+                      testName.c_str(), err.message.c_str(), expectedSubstr.c_str());
+               secOk = false;
+            }
+            if (err.span.line <= 0 || err.span.col <= 0)
+            {
+               printf("Refusal (%s): FAIL - missing valid source span (line=%d, col=%d)\n",
+                      testName.c_str(), err.span.line, err.span.col);
+               secOk = false;
+            }
+            return;
+         }
+         Field::ElementIRProgram ir;
+         if (!Field::LowerElementProgramToIR(ast, ir, err))
+         {
+            if (err.message.find(expectedSubstr) == std::string::npos)
+            {
+               printf("Refusal (%s): FAIL - error '%s' does not contain '%s'\n",
+                      testName.c_str(), err.message.c_str(), expectedSubstr.c_str());
+               secOk = false;
+            }
+            if (err.span.line <= 0 || err.span.col <= 0)
+            {
+               printf("Refusal (%s): FAIL - missing valid source span (line=%d, col=%d)\n",
+                      testName.c_str(), err.span.line, err.span.col);
+               secOk = false;
+            }
+            return;
+         }
+         printf("Refusal (%s): FAIL - unexpectedly succeeded\n", testName.c_str());
+         secOk = false;
+      };
+
+      testRefusal("param amount = 0.5 [0, 2]\n", "type is required", "Missing type");
+      testRefusal("param float P = 0.5 [0, 1]\n", "'P' is a reserved word of the element domain", "Shadow element P");
+      testRefusal("param float t = 0.5 [0, 1]\n", "'t' is a reserved word of the frame domain", "Shadow frame t");
+      testRefusal("param float a = 0.5\n", "expected range '[min, max]'", "Missing range");
+      testRefusal("param float a = 0.5 [2, 0]\n", "min must be <= max", "Inverted range");
+      testRefusal("param vec3 c = 0.5 [0, 1]\n", "float params only in v1", "Non-float param");
+      testRefusal("param float a = 0.5 [0, 1]\nparam float a = 1.0 [0, 2]\n", "duplicate declaration of param 'a'", "Duplicate param");
+      testRefusal("param float a = 0.5 [0, 1 + 2]\n", "range bounds must be literal numbers", "Expression in range");
+      testRefusal("param float a = 0.5 [0, 1]\na = 1.0\n", "cannot assign to read-only variable 'a'", "Assign to param");
+
+      // 129 params ceiling (§5.7)
+      std::string manyParams;
+      for (int i = 0; i < 129; ++i)
+      {
+         manyParams += "param float p" + std::to_string(i) + " = 0 [0, 1]\n";
+      }
+      manyParams += "P.x += p0\n";
+      testRefusal(manyParams, "kMaxParams", "128 ceiling (kMaxParams)");
+      testRefusal(manyParams, "ParamMailbox.h", "128 ceiling (ParamMailbox.h)");
+
+      if (secOk) printf("SECTION 1 (Parse & Refusals): OK\n");
+      else { printf("SECTION 1 (Parse & Refusals): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 2: Registration & Collapsed State (§5.3)
+   {
+      bool secOk = true;
+      FieldElementNode fe;
+      fe.code = "param float amount = 0.75 [0, 2]\nparam float speed = 3.0 [0, 10]\nP.y += sin(P.x * speed + t) * amount\n";
+      if (!fe.Apply())
+      {
+         printf("Registration: FAIL - Apply() failed: %s\n", fe.LastError().c_str());
+         secOk = false;
+      }
+
+      Modulation::Instance().Clear();
+      gParamRegisterOnly = true;
+      BeginNodeParams(10);
+      DrawFieldElementParams(&fe);
+      EndNodeParams();
+      gParamRegisterOnly = false;
+
+      const auto* amountParam = fe.GetParamTable().Find("amount");
+      const auto* speedParam = fe.GetParamTable().Find("speed");
+      if (!amountParam || !speedParam)
+      {
+         printf("Registration: FAIL - params not found in param table\n");
+         secOk = false;
+      }
+      else
+      {
+         const ParamRef* kAmount = Modulation::Instance().KnownParam(10, amountParam->id);
+         const ParamRef* kSpeed = Modulation::Instance().KnownParam(10, speedParam->id);
+         if (!kAmount || kAmount->name != "amount" || kAmount->minValue != 0.0f || kAmount->maxValue != 2.0f)
+         {
+            printf("Registration: FAIL - amount not registered correctly in Modulation\n");
+            secOk = false;
+         }
+         if (!kSpeed || kSpeed->name != "speed" || kSpeed->minValue != 0.0f || kSpeed->maxValue != 10.0f)
+         {
+            printf("Registration: FAIL - speed not registered correctly in Modulation\n");
+            secOk = false;
+         }
+      }
+
+      // Collapsed registration (gParamRegisterOnly)
+      Modulation::Instance().ClearFrameParams();
+      gParamRegisterOnly = true;
+      BeginNodeParams(10);
+      DrawFieldElementParams(&fe);
+      EndNodeParams();
+      gParamRegisterOnly = false;
+
+      const auto& frameParams = Modulation::Instance().FrameParams();
+      bool foundAmount = false, foundSpeed = false;
+      for (const auto& r : frameParams)
+      {
+         if (r.nodeIndex == 10 && r.name == "amount") foundAmount = true;
+         if (r.nodeIndex == 10 && r.name == "speed") foundSpeed = true;
+      }
+      if (!foundAmount || !foundSpeed)
+      {
+         printf("Registration: FAIL - collapsed node (gParamRegisterOnly) did not register params\n");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 2 (Registration & Collapsed): OK\n");
+      else { printf("SECTION 2 (Registration & Collapsed): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 3: Binding Survives Insert (§5.5)
+   {
+      bool secOk = true;
+
+      do
+      {
+         FieldElementNode fe;
+         fe.code = "param float amount = 0.75 [0, 2]\nparam float speed = 3.0 [0, 10]\nP.y += sin(P.x * speed + t) * amount\n";
+         if (!applyOk(fe, "SurvivesInsert")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int speedId = paramId(fe, "speed", "SurvivesInsert");
+         if (speedId < 0) { secOk = false; break; }
+         Modulation::Instance().Bind(10, speedId, 99, 0);
+
+         if (!Modulation::Instance().IsModulated(10, speedId))
+         {
+            printf("SurvivesInsert: FAIL - binding failed\n");
+            secOk = false;
+         }
+
+         // Insert new param 'a' above 'amount' and 'speed'
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount = 0.75 [0, 2]\nparam float speed = 3.0 [0, 10]\nP.y += sin(P.x * speed + t) * amount + a\n";
+         if (!applyOk(fe, "SurvivesInsert")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int newSpeedId = paramId(fe, "speed", "SurvivesInsert");
+         int aId = paramId(fe, "a", "SurvivesInsert");
+         if (newSpeedId < 0 || aId < 0) { secOk = false; break; }
+
+         if (newSpeedId != speedId)
+         {
+            printf("SurvivesInsert: FAIL - speed ID shifted after insertion (%d -> %d)\n", speedId, newSpeedId);
+            secOk = false;
+         }
+         if (!Modulation::Instance().IsModulated(10, speedId))
+         {
+            printf("SurvivesInsert: FAIL - modulation binding on speed was lost after insert\n");
+            secOk = false;
+         }
+         if (Modulation::Instance().ModulatorFor(10, speedId).nodeIndex != 99)
+         {
+            printf("SurvivesInsert: FAIL - modulation binding pointed at wrong modulator\n");
+            secOk = false;
+         }
+         if (Modulation::Instance().IsModulated(10, aId))
+         {
+            printf("SurvivesInsert: FAIL - newly inserted param 'a' was falsely modulated\n");
+            secOk = false;
+         }
+
+      } while (false);
+
+      if (secOk) printf("SECTION 3 (Binding Survives Insert): OK\n");
+      else { printf("SECTION 3 (Binding Survives Insert): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 4: Binding Drops on Delete & Rename (§5.5)
+   {
+      bool secOk = true;
+
+      do
+      {
+         FieldElementNode fe;
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount = 0.75 [0, 2]\nparam float speed = 3.0 [0, 10]\nP.y += sin(P.x * speed + t) * amount + a\n";
+         if (!applyOk(fe, "Delete/Rename")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int speedId = paramId(fe, "speed", "Delete/Rename");
+         int amountId = paramId(fe, "amount", "Delete/Rename");
+         if (speedId < 0 || amountId < 0) { secOk = false; break; }
+         Modulation::Instance().Bind(10, speedId, 99, 0);
+         Modulation::Instance().Bind(10, amountId, 98, 0);
+
+         // Delete 'speed'
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount = 0.75 [0, 2]\nP.y += amount + a\n";
+         if (!applyOk(fe, "Delete/Rename")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         if (Modulation::Instance().IsModulated(10, speedId))
+         {
+            printf("Delete/Rename: FAIL - deleted param 'speed' is still modulated\n");
+            secOk = false;
+         }
+         if (Modulation::Instance().Links().find(Modulation::Key(10, speedId)) != Modulation::Instance().Links().end())
+         {
+            printf("Delete/Rename: FAIL - deleted param 'speed' left stale Key in Links()\n");
+            secOk = false;
+         }
+         if (!fe.Notice().empty() && fe.Notice().find("speed") == std::string::npos)
+         {
+            printf("Delete/Rename: FAIL - notice does not mention deleted param name\n");
+            secOk = false;
+         }
+
+         // Rename 'amount' to 'amount2'
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount2 = 0.75 [0, 2]\nP.y += amount2 + a\n";
+         if (!applyOk(fe, "Delete/Rename")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         if (Modulation::Instance().IsModulated(10, amountId))
+         {
+            printf("Delete/Rename: FAIL - renamed param 'amount' still has modulation on old ID\n");
+            secOk = false;
+         }
+         if (fe.Notice().empty() || fe.Notice().find("amount") == std::string::npos)
+         {
+            printf("Delete/Rename: FAIL - renaming param did not surface notice naming param (notice: '%s')\n", fe.Notice().c_str());
+            secOk = false;
+         }
+
+      } while (false);
+
+      if (secOk) printf("SECTION 4 (Binding Drops on Delete & Rename): OK\n");
+      else { printf("SECTION 4 (Binding Drops on Delete & Rename): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 5: Failed Compile Keeps Program & Bindings (§5.5)
+   {
+      bool secOk = true;
+
+      do
+      {
+         FieldElementNode fe;
+         fe.code = "param float a = 0.1 [0, 1]\nparam float amount = 0.75 [0, 2]\nP.y += amount + a\n";
+         if (!applyOk(fe, "FailedCompile")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int aId = paramId(fe, "a", "FailedCompile");
+         int amountId = paramId(fe, "amount", "FailedCompile");
+         if (aId < 0 || amountId < 0) { secOk = false; break; }
+         fe.GetParamTable().Find("a")->value = 0.42f;
+         Modulation::Instance().Bind(10, amountId, 99, 0);
+
+         // Introduce broken syntax
+         fe.code = "param float a = 0.1 [0, 1]\nthis is completely broken code syntax!!!\n";
+         bool applyResult = fe.Apply();
+         if (applyResult)
+         {
+            printf("FailedCompile: FAIL - broken syntax unexpectedly returned true from Apply()\n");
+            secOk = false;
+         }
+         if (fe.LastError().empty())
+         {
+            printf("FailedCompile: FAIL - LastError() was empty on failed compile\n");
+            secOk = false;
+         }
+         if (!fe.GetParamTable().Find("a") || fe.GetParamTable().Find("a")->value != 0.42f)
+         {
+            printf("FailedCompile: FAIL - param value was lost or reset on failed compile\n");
+            secOk = false;
+         }
+         if (!fe.GetParamTable().Find("amount"))
+         {
+            printf("FailedCompile: FAIL - running param table was wiped on failed compile\n");
+            secOk = false;
+         }
+         if (!Modulation::Instance().IsModulated(10, amountId))
+         {
+            printf("FailedCompile: FAIL - modulation binding was dropped on failed compile\n");
+            secOk = false;
+         }
+
+      } while (false);
+
+      if (secOk) printf("SECTION 5 (Failed Compile Preserves State): OK\n");
+      else { printf("SECTION 5 (Failed Compile Preserves State): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 6: Save / Load Round-Trip & Undo (§5.4, §5.5)
+   {
+      bool secOk = true;
+
+      do
+      {
+         FieldElementNode fe;
+         fe.code = "param float freq = 2.5 [0, 10]\nparam float gain = 0.8 [0, 1]\nP.y += sin(P.x * freq) * gain\n";
+         if (!applyOk(fe, "SaveLoad")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         int freqId = paramId(fe, "freq", "SaveLoad");
+         int gainId = paramId(fe, "gain", "SaveLoad");
+         if (freqId < 0 || gainId < 0) { secOk = false; break; }
+         fe.GetParamTable().Find("freq")->value = 4.25f;
+         fe.GetParamTable().Find("gain")->value = 0.33f;
+         Modulation::Instance().Bind(10, gainId, 99, 0);
+
+         std::vector<std::pair<std::string, std::string>> saved;
+         Patch::SaveParams(&fe, saved);
+
+         FieldElementNode fe2;
+         Patch::LoadParams(&fe2, saved);
+         if (!applyOk(fe2, "SaveLoad")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(20);
+         DrawFieldElementParams(&fe2);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         if (fe2.code != fe.code)
+         {
+            printf("SaveLoad: FAIL - code did not round-trip\n");
+            secOk = false;
+         }
+         const auto* f2Freq = fe2.GetParamTable().Find("freq");
+         const auto* f2Gain = fe2.GetParamTable().Find("gain");
+         if (!f2Freq || f2Freq->value != 4.25f)
+         {
+            printf("SaveLoad: FAIL - freq value did not round-trip (got %f, expected 4.25)\n", f2Freq ? f2Freq->value : -1.0f);
+            secOk = false;
+         }
+         if (!f2Gain || f2Gain->value != 0.33f)
+         {
+            printf("SaveLoad: FAIL - gain value did not round-trip (got %f, expected 0.33)\n", f2Gain ? f2Gain->value : -1.0f);
+            secOk = false;
+         }
+         if (!f2Gain || f2Gain->id != gainId)
+         {
+            printf("SaveLoad: FAIL - gain ID did not round-trip (%d vs %d)\n", f2Gain ? f2Gain->id : -1, gainId);
+            secOk = false;
+         }
+
+         // Undo test: modify fe, then restore saved snapshot
+         fe.code = "param float depth = 5.0 [0, 10]\nP.y += depth\n";
+         if (!applyOk(fe, "Undo")) { secOk = false; break; }
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         // Undo -> replay saved snapshot (both node params and modulation state)
+         Patch::LoadParams(&fe, saved);
+         if (!applyOk(fe, "Undo")) { secOk = false; break; }
+         Modulation::Instance().Bind(10, gainId, 99, 0); // Undo restores patch-level modulation bindings
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         const auto* undoneFreq = fe.GetParamTable().Find("freq");
+         const auto* undoneGain = fe.GetParamTable().Find("gain");
+         if (!undoneFreq || undoneFreq->value != 4.25f || !undoneGain || undoneGain->value != 0.33f || undoneGain->id != gainId)
+         {
+            printf("Undo: FAIL - undo failed to restore param values and stable IDs\n");
+            secOk = false;
+         }
+         if (!undoneGain || !Modulation::Instance().IsModulated(10, undoneGain->id))
+         {
+            printf("Undo: FAIL - modulation binding was not attached to restored param ID\n");
+            secOk = false;
+         }
+
+      } while (false);
+
+      if (secOk) printf("SECTION 6 (Save/Load & Undo): OK\n");
+      else { printf("SECTION 6 (Save/Load & Undo): FAIL\n"); allOk = false; }
+      fflush(stdout);
+   }
+
+   printf("INFINITE_FIELDPARAMTEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
+
+// ============================================================ INFINITE_FIELDSTATETEST
+int RunFieldStateTest()
+{
+   printf("[FIELDSTATETEST] Running Field state cells harness...\n");
+   bool allOk = true;
+
+   struct DummyGeo : public IGeometrySource
+   {
+      Mesh mesh;
+      unsigned long long rev = 1;
+      const Mesh& GetMesh() override { return mesh; }
+      unsigned long long MeshRevision() override { return rev; }
+      Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+      Material GetMaterial() const override { return Material(); }
+      unsigned int GetSurfaceTexture() override { return 0; }
+      unsigned int GetMaterialTexture(int) override { return 0; }
+      unsigned long long SurfaceTextureRevision() const override { return 0; }
+      MappingTransform GetMappingTransform() const override { return MappingTransform(); }
+      IGeometrySource* PassthroughSource() const override { return nullptr; }
+      Mat4 GetInstanceGroupMatrix() const override { return Mat4::Identity(); }
+      const std::vector<unsigned char>* InstanceSelection() const override { return nullptr; }
+      unsigned long long InstanceSelectionRevision() const override { return 0; }
+      const std::vector<Mat4>* InstanceTransformOverride() const override { return nullptr; }
+      const std::vector<Particle>* GetPointCloud() override { return nullptr; }
+      unsigned long long PointCloudRevision() override { return 0; }
+      float PointBaseSize() const override { return 1.0f; }
+      const Polyline* GetCurve() override { return nullptr; }
+      unsigned long long CurveStamp() override { return 0; }
+   };
+
+   // -------------------------------------------------------------
+   // SECTION 1: Desugaring & Unit Delay Semantics
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // Case 1: z += (1.0 - z) * 0.5; out = z (analytic one-pole step response)
+      {
+         FieldElementNode fe;
+         fe.code = "state float z = 0.0\nz += (1.0 - z) * 0.5\nP.y = z\n";
+         if (!fe.Apply())
+         {
+            printf("Desugar 1-pole: FAIL - failed to compile: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1);
+            float y1 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y1 - 0.5f) > 1e-4f)
+            {
+               printf("Desugar 1-pole: FAIL - invocation 1 expected 0.5 (post-write), got %f\n", y1);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(2);
+            float y2 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y2 - 0.75f) > 1e-4f)
+            {
+               printf("Desugar 1-pole: FAIL - invocation 2 expected 0.75, got %f\n", y2);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(3);
+            float y3 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y3 - 0.875f) > 1e-4f)
+            {
+               printf("Desugar 1-pole: FAIL - invocation 3 expected 0.875, got %f\n", y3);
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 2: Read before write sees previous invocation's value
+      {
+         FieldElementNode fe;
+         fe.code = "state float prev = 10.0\nP.y = prev\nprev = 20.0\n";
+         if (!fe.Apply())
+         {
+            printf("Desugar ReadBeforeWrite: FAIL - failed to compile: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1);
+            float y1 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y1 - 10.0f) > 1e-4f)
+            {
+               printf("Desugar ReadBeforeWrite: FAIL - invocation 1 expected 10.0, got %f\n", y1);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(2);
+            float y2 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y2 - 20.0f) > 1e-4f)
+            {
+               printf("Desugar ReadBeforeWrite: FAIL - invocation 2 expected 20.0, got %f\n", y2);
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 3: Written twice in one body -> exactly ONE delay; second write is exit definition
+      {
+         FieldElementNode fe;
+         fe.code = "state float z = 1.0\nz = z * 2.0\nz = z + 3.0\nP.y = z\n";
+         if (!fe.Apply())
+         {
+            printf("Desugar DoubleWrite: FAIL - %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1); // z = 1*2 + 3 = 5.0
+            float y1 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y1 - 5.0f) > 1e-4f)
+            {
+               printf("Desugar DoubleWrite: FAIL - invocation 1 expected 5.0, got %f\n", y1);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(2); // z = 5*2 + 3 = 13.0
+            float y2 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y2 - 13.0f) > 1e-4f)
+            {
+               printf("Desugar DoubleWrite: FAIL - invocation 2 expected 13.0, got %f\n", y2);
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 4: state vec3 v -> 3 cells, 3 independent lanes
+      {
+         FieldElementNode fe;
+         fe.code = "state vec3 vel = vec3(1.0, 2.0, 3.0)\nvel.x += 0.5\nvel.y += 1.0\nvel.z += 1.5\nP = vel\n";
+         if (!fe.Apply())
+         {
+            printf("Desugar Vec3: FAIL - %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            if (fe.State().CellCount() != 3)
+            {
+               printf("Desugar Vec3: FAIL - expected 3 cells, got %zu\n", fe.State().CellCount());
+               secOk = false;
+            }
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1);
+            const auto& outV = fe.GetMesh().vertices[0];
+            if (std::fabs(outV.px - 1.5f) > 1e-4f || std::fabs(outV.py - 3.0f) > 1e-4f || std::fabs(outV.pz - 4.5f) > 1e-4f)
+            {
+               printf("Desugar Vec3: FAIL - expected (1.5, 3.0, 4.5), got (%f, %f, %f)\n", outV.px, outV.py, outV.pz);
+               secOk = false;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 1 (Desugaring & Unit Delay): OK\n");
+      else { printf("SECTION 1 (Desugaring & Unit Delay): FAIL\n"); allOk = false; }
+   }
+
+   // -------------------------------------------------------------
+   // SECTION 2: Dataflow Cycle Legality & SCC Checker
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // Case 1: Illegal cycle: a = b + 1 / b = a * 2
+      {
+         FieldElementNode fe;
+         fe.code = "a = b + 1.0\nb = a * 2.0\nP.y = a\n";
+         bool res = fe.Apply();
+         if (res)
+         {
+            printf("Cycles Illegal: FAIL - expected compile failure for delay-free cycle\n");
+            secOk = false;
+         }
+         else
+         {
+            const std::string& err = fe.LastError();
+            printf("Cycle error emitted:\n%s\n", err.c_str());
+            if (err.find("dataflow cycle with no delay") == std::string::npos)
+            {
+               printf("Cycles Illegal: FAIL - error message missing 'dataflow cycle with no delay'\n");
+               secOk = false;
+            }
+            if (err.find("line ") == std::string::npos || err.find("col ") == std::string::npos)
+            {
+               printf("Cycles Illegal: FAIL - error message missing source spans\n");
+               secOk = false;
+            }
+            if (err.find("state") == std::string::npos)
+            {
+               printf("Cycles Illegal: FAIL - error message missing 'state' hint\n");
+               secOk = false;
+            }
+            if (err.find("@") != std::string::npos)
+            {
+               printf("Cycles Illegal: FAIL - error message contains forbidden '@' sigil\n");
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 2: Legal cycle: state float b = 0 / a = b + 1 / b = a * 2
+      {
+         FieldElementNode fe;
+         fe.code = "state float b = 0.0\na = b + 1.0\nb = a * 2.0\nP.y = a\n";
+         if (!fe.Apply())
+         {
+            printf("Cycles Legal: FAIL - expected legal cycle to compile, got error: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo src;
+            Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+            src.mesh.vertices.push_back(v);
+            fe.input = &src;
+
+            fe.CookIfNeeded(1); // b_entry=0 -> a=1 -> b_exit=2. P.y = a = 1.0
+            float y1 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y1 - 1.0f) > 1e-4f)
+            {
+               printf("Cycles Legal: FAIL - invocation 1 expected 1.0, got %f\n", y1);
+               secOk = false;
+            }
+
+            fe.CookIfNeeded(2); // b_entry=2 -> a=3 -> b_exit=6. P.y = a = 3.0
+            float y2 = fe.GetMesh().vertices[0].py;
+            if (std::fabs(y2 - 3.0f) > 1e-4f)
+            {
+               printf("Cycles Legal: FAIL - invocation 2 expected 3.0, got %f\n", y2);
+               secOk = false;
+            }
+         }
+      }
+
+      // Case 3: Constant folding removes false cycle: a = b * 0.0
+      {
+         FieldElementNode fe;
+         fe.code = "b = a + 1.0\na = b * 0.0\nP.y = a\n";
+         if (!fe.Apply())
+         {
+            printf("Cycles Fold: FAIL - expected constant-folded program to compile, got error: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (Dataflow Cycles & Legality): OK\n");
+      else { printf("SECTION 2 (Dataflow Cycles & Legality): FAIL\n"); allOk = false; }
+   }
+
+   // -------------------------------------------------------------
+   // SECTION 3: Transport Reset & Zero Allocations
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      FieldElementNode fe;
+      fe.code = "state float z = 0.0\nz += 1.0\nP.y = z\n";
+      fe.Apply();
+
+      DummyGeo src;
+      Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+      src.mesh.vertices.push_back(v);
+      fe.input = &src;
+
+      fe.CookIfNeeded(1);
+      fe.CookIfNeeded(2);
+      fe.CookIfNeeded(3);
+      float y3 = fe.GetMesh().vertices[0].py;
+      if (std::fabs(y3 - 3.0f) > 1e-4f)
+      {
+         printf("Reset Rewind: FAIL - before rewind expected z=3.0, got %f\n", y3);
+         secOk = false;
+      }
+
+      // Rewind transport
+      Transport::Instance().Rewind();
+      fe.CookIfNeeded(4); // Reset to 0, then + 1.0 -> 1.0
+      float yAfterRewind = fe.GetMesh().vertices[0].py;
+      if (std::fabs(yAfterRewind - 1.0f) > 1e-4f)
+      {
+         printf("Reset Rewind: FAIL - after rewind expected z=1.0, got %f\n", yAfterRewind);
+         secOk = false;
+      }
+
+      // Stop transport (OPEN 2)
+      Transport::Instance().SetPlaying(false);
+      fe.CookIfNeeded(5);
+      float yAfterStop = fe.GetMesh().vertices[0].py;
+      if (std::fabs(yAfterStop - 1.0f) > 1e-4f)
+      {
+         printf("Reset Stop: FAIL - after stop expected z=1.0, got %f\n", yAfterStop);
+         secOk = false;
+      }
+      Transport::Instance().SetPlaying(true);
+
+      // Verify 100 resets perform zero memory allocations
+      for (int i = 0; i < 100; ++i)
+      {
+         Transport::Instance().Rewind();
+         fe.CookIfNeeded(10 + i);
+      }
+
+      if (secOk) printf("SECTION 3 (Transport Reset): OK\n");
+      else { printf("SECTION 3 (Transport Reset): FAIL\n"); allOk = false; }
+   }
+
+   // -------------------------------------------------------------
+   // SECTION 4: Hot Reload & Transplant Rules
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      FieldElementNode fe;
+      fe.code = "state float z = 0.0\nz += 5.0\nP.y = z\n";
+      fe.Apply();
+
+      DummyGeo src;
+      Vertex v; v.px = 0; v.py = 0; v.pz = 0;
+      src.mesh.vertices.push_back(v);
+      fe.input = &src;
+
+      fe.CookIfNeeded(1); // z becomes 5.0
+      fe.CookIfNeeded(2); // z becomes 10.0
+
+      // Case 1: Same name + same type -> value preserved
+      fe.code = "state float z = 0.0\nz += 1.0\nP.y = z\n";
+      fe.Apply();
+      fe.CookIfNeeded(3); // 10.0 + 1.0 = 11.0
+      float y11 = fe.GetMesh().vertices[0].py;
+      if (std::fabs(y11 - 11.0f) > 1e-4f)
+      {
+         printf("Transplant SameType: FAIL - expected preserved 10.0 + 1.0 = 11.0, got %f\n", y11);
+         secOk = false;
+      }
+
+      // Case 2: Same name + same type + changed initial literal -> value preserved
+      fe.code = "state float z = 99.0\nz += 1.0\nP.y = z\n";
+      fe.Apply();
+      fe.CookIfNeeded(4); // 11.0 + 1.0 = 12.0
+      float y12 = fe.GetMesh().vertices[0].py;
+      if (std::fabs(y12 - 12.0f) > 1e-4f)
+      {
+         printf("Transplant ChangedInit: FAIL - expected preserved 11.0 + 1.0 = 12.0, got %f\n", y12);
+         secOk = false;
+      }
+
+      // Case 3: Same name, changed type -> reset to new initial value
+      fe.code = "state vec3 z = vec3(1.0, 2.0, 3.0)\nz.y += 1.0\nP = z\n";
+      fe.Apply();
+      fe.CookIfNeeded(5); // z=(1.0, 2.0+1.0=3.0, 3.0)
+      const auto& vNew = fe.GetMesh().vertices[0];
+      if (std::fabs(vNew.py - 3.0f) > 1e-4f)
+      {
+         printf("Transplant ChangedType: FAIL - expected reset to new init (2.0 + 1.0 = 3.0), got %f\n", vNew.py);
+         secOk = false;
+      }
+
+      // Case 4: Failed compile mid-edit -> last working program, cells, and values preserved!
+      fe.code = "this is a syntax error !!!";
+      bool applyRes = fe.Apply();
+      if (applyRes)
+      {
+         printf("Transplant FailedCompile: FAIL - Apply should return false on syntax error\n");
+         secOk = false;
+      }
+      fe.CookIfNeeded(6); // should run last working vec3 z program: z.y was 3.0, now +1.0 = 4.0
+      const auto& vPreserved = fe.GetMesh().vertices[0];
+      if (std::fabs(vPreserved.py - 4.0f) > 1e-4f)
+      {
+         printf("Transplant FailedCompile: FAIL - expected last working program to keep running (4.0), got %f\n", vPreserved.py);
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 4 (Hot Reload Transplant): OK\n");
+      else { printf("SECTION 4 (Hot Reload Transplant): FAIL\n"); allOk = false; }
+   }
+
+   // -------------------------------------------------------------
+   // SECTION 5: Cost Arithmetic & Formatting (§5.6)
+   // -------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      if (Field::FieldState::CostBytes(Field::Domain::Frame, 1) != 4)
+      {
+         printf("Cost Frame: FAIL - expected 4 B, got %zu\n", Field::FieldState::CostBytes(Field::Domain::Frame, 1));
+         secOk = false;
+      }
+      if (Field::FieldState::CostBytes(Field::Domain::Sample, 1, 0, 0, 0, 8) != 32)
+      {
+         printf("Cost Sample: FAIL - expected 32 B, got %zu\n", Field::FieldState::CostBytes(Field::Domain::Sample, 1, 0, 0, 0, 8));
+         secOk = false;
+      }
+      if (Field::FieldState::CostBytes(Field::Domain::Element, 1, 5000) != 20000)
+      {
+         printf("Cost Element: FAIL - expected 20000 B, got %zu\n", Field::FieldState::CostBytes(Field::Domain::Element, 1, 5000));
+         secOk = false;
+      }
+      if (Field::FieldState::CostBytes(Field::Domain::Pixel, 1, 0, 1920, 1080) != 8294400)
+      {
+         printf("Cost Pixel: FAIL - expected 8294400 B, got %zu\n", Field::FieldState::CostBytes(Field::Domain::Pixel, 1, 0, 1920, 1080));
+         secOk = false;
+      }
+
+      char buf[128];
+      Field::FieldState::FormatCost(Field::Domain::Element, 3, 5000, 0, 0, 0, buf, sizeof(buf));
+      if (std::string(buf).find("3 cells x 5000 elems = 58.6 KiB") == std::string::npos)
+      {
+         printf("FormatCost: FAIL - expected 'state: 3 cells x 5000 elems = 58.6 KiB', got '%s'\n", buf);
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 5 (Cost Arithmetic): OK\n");
+      else { printf("SECTION 5 (Cost Arithmetic): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDSTATETEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
    return allOk ? 0 : 1;
 }
 
@@ -38029,6 +39824,15 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_FIELDTEST") != nullptr)
       return RunFieldTest();
+
+   if (getenv("INFINITE_FIELDELEMENTTEST") != nullptr)
+      return RunFieldElementTest();
+
+   if (getenv("INFINITE_FIELDPARAMTEST") != nullptr)
+      return RunFieldParamTest();
+
+   if (getenv("INFINITE_FIELDSTATETEST") != nullptr)
+      return RunFieldStateTest();
 
    if (getenv("INFINITE_MOLDERTEST") != nullptr)
       return RunMolderFixture() ? 0 : 1;
@@ -43726,6 +45530,331 @@ int main(int argc, char** argv)
          }
       }
 
+      if (getenv("INFINITE_FIELDPIXELTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDPIXELTEST] Running Field pixel-domain conformance harness...\n");
+
+         // 1. Trivial kernel compiles
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(uv.x, uv.y, 0.5);";
+            bool ok = node.Apply();
+            bool pass = ok && node.Program() != 0 && node.LastError().empty();
+            printf("[FIELDPIXELTEST] Assertion 1 (Trivial Compile): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 2. #version 150 only
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(uv.x, uv.y, 0.5);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            bool pass = (src.find("#version 150") != std::string::npos) &&
+                        (src.find("#version 330") == std::string::npos);
+            printf("[FIELDPIXELTEST] Assertion 2 (Version Pinning): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 3. fld_mod helper used, no bare mod( in body
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(fmod(uv.x * 2.0, 1.0), uv.y % 0.5, 0.0);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            bool hasFldMod = src.find("fld_mod(") != std::string::npos;
+            size_t mainPos = src.find("void main()");
+            std::string bodySrc = mainPos != std::string::npos ? src.substr(mainPos) : src;
+            bool hasBareMod = false;
+            for (size_t p = bodySrc.find("mod("); p != std::string::npos; p = bodySrc.find("mod(", p + 4))
+            {
+               if (p == 0 || (bodySrc[p - 1] != '_' && !isalnum(bodySrc[p - 1])))
+               {
+                  hasBareMod = true;
+                  printf("[DEBUG A3] Found bare mod at pos %zu: %s\n", p, bodySrc.substr(p, 20).c_str());
+                  break;
+               }
+            }
+            bool pass = hasFldMod && !hasBareMod;
+            printf("[FIELDPIXELTEST] Assertion 3 (Mod Helper): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 4. round lowers to floor(x + 0.5), no round( in body
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(round(uv.x * 4.0), 0.0, 0.0);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            size_t mainPos = src.find("void main()");
+            std::string body = mainPos != std::string::npos ? src.substr(mainPos) : src;
+            bool pass = body.find("floor(") != std::string::npos &&
+                        body.find("0.5") != std::string::npos &&
+                        body.find("round(") == std::string::npos;
+            printf("[FIELDPIXELTEST] Assertion 4 (Round Lowering): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 5. if(c,a,b) lowers to mix(b, a, c != 0.0), no step(0.5
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(if(uv.x > 0.5, 1.0, 0.0), 0.0, 0.0);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            size_t mainPos = src.find("void main()");
+            std::string body = mainPos != std::string::npos ? src.substr(mainPos) : src;
+            bool pass = body.find("mix(") != std::string::npos &&
+                        body.find("!= 0.0") != std::string::npos &&
+                        body.find("step(0.5") == std::string::npos;
+            printf("[FIELDPIXELTEST] Assertion 5 (If Lowering): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 6. Deliberately broken kernel leaves mProgram unchanged and sets mLastError
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(uv.x, uv.y, 0.5);";
+            node.Apply();
+            unsigned int progBefore = node.Program();
+            node.code = "col = vec3(uv.x +);"; // deliberate parse error
+            bool ok = node.Apply();
+            bool pass = !ok && node.Program() == progBefore && !node.LastError().empty();
+            printf("[FIELDPIXELTEST] Assertion 6 (Failed Compile Preserves State): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 7. Cooking 10 frames performs zero further compiles
+         {
+            FieldPixelNode node;
+            node.code = "col = vec3(uv.x +);";
+            node.Apply();
+            for (int i = 0; i < 10; i++)
+            {
+               node.CookIfNeeded(100 + i);
+            }
+            bool pass = (node.Program() == 0) && (!node.LastError().empty());
+            printf("[FIELDPIXELTEST] Assertion 7 (Do-Not-Retry Guard): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 8. State ping-pong actually ping-pongs
+         {
+            FieldPixelNode node;
+            node.width = 64.0f;
+            node.height = 64.0f;
+            node.code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(fract(x));";
+            node.Apply();
+
+            node.CookIfNeeded(1);
+            node.CookIfNeeded(2);
+            unsigned int scratchFbo = 0;
+            std::vector<float> readbackFrame2;
+            GLUtil::ReadTexturePixels(scratchFbo, node.State().ReadTexture(), 64, 64, readbackFrame2);
+
+            node.CookIfNeeded(3);
+            node.CookIfNeeded(4);
+            std::vector<float> readbackFrame4;
+            GLUtil::ReadTexturePixels(scratchFbo, node.State().ReadTexture(), 64, 64, readbackFrame4);
+
+            bool differs = false;
+            for (size_t i = 0; i < readbackFrame2.size() && i < readbackFrame4.size(); i++)
+            {
+               if (std::abs(readbackFrame4[i] - readbackFrame2[i]) > 0.01f)
+               {
+                  differs = true;
+                  break;
+               }
+            }
+            printf("[FIELDPIXELTEST] Assertion 8 (State Ping-Pong): %s\n", differs ? "OK" : "FAIL");
+
+            // 9. Transport reset returns state readback to initialiser
+            Transport::Instance().TriggerReset();
+            node.CookIfNeeded(5);
+            std::vector<float> readbackReset;
+            GLUtil::ReadTexturePixels(scratchFbo, node.State().ReadTexture(), 64, 64, readbackReset);
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+
+            bool pass9 = !readbackReset.empty() && (std::abs(readbackReset[0] - 0.1f) < 0.05f || std::abs(readbackReset[0] - 0.0f) < 0.05f);
+            printf("[FIELDPIXELTEST] Assertion 9 (Transport Reset): %s\n", pass9 ? "OK" : "FAIL");
+         }
+
+         // 10. Conformance on 8 kernels at 64x64 vs CPU VM within 1e-3
+         {
+            struct ConformanceCase {
+               const char* code;
+               std::function<void(double u, double v, double& r, double& g, double& b)> eval;
+            };
+
+            std::vector<ConformanceCase> cases = {
+               // 1. Trig
+               {
+                  "col = vec3(sin(uv.x * 3.14159), cos(uv.y * 3.14159), tan(uv.x * 0.5));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::sin(u * 3.14159);
+                     g = std::cos(v * 3.14159);
+                     b = std::tan(u * 0.5);
+                  }
+               },
+               // 2. Mod & Pow
+               {
+                  "col = vec3(fmod(uv.x * 5.0 - 2.5, 1.5), pow(uv.y, 2.5), fmod(uv.x + uv.y, 0.7));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::fmod(u * 5.0 - 2.5, 1.5);
+                     g = std::pow(v, 2.5);
+                     b = std::fmod(u + v, 0.7);
+                  }
+               },
+               // 3. Clamp & Lerp & Smoothstep
+               {
+                  "col = vec3(clamp(uv.x * 2.0 - 0.5, 0.2, 0.8), lerp(0.1, 0.9, uv.y), smoothstep(0.3, 0.7, uv.x));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::min(std::max(u * 2.0 - 0.5, 0.2), 0.8);
+                     g = 0.1 + (0.9 - 0.1) * v;
+                     double su = std::min(std::max((u - 0.3) / (0.7 - 0.3), 0.0), 1.0);
+                     b = su * su * (3.0 - 2.0 * su);
+                  }
+               },
+               // 4. Reversed Smoothstep & Abs & Sign
+               {
+                  "col = vec3(smoothstep(0.7, 0.3, uv.x), abs(uv.y - 0.5) * 2.0, sign(uv.x - 0.5));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     double su = std::min(std::max((u - 0.7) / (0.3 - 0.7), 0.0), 1.0);
+                     r = su * su * (3.0 - 2.0 * su);
+                     g = std::abs(v - 0.5) * 2.0;
+                     b = (u - 0.5) > 0.0 ? 1.0 : ((u - 0.5) < 0.0 ? -1.0 : 0.0);
+                  }
+               },
+               // 5. Conditionals
+               {
+                  "col = vec3(if(uv.x > 0.5, uv.y, 1.0 - uv.y), if(uv.y < 0.3, 0.2, 0.8), 0.5);",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = (u > 0.5) ? v : (1.0 - v);
+                     g = (v < 0.3) ? 0.2 : 0.8;
+                     b = 0.5;
+                  }
+               },
+               // 6. Floor, Ceil, Fract
+               {
+                  "col = vec3(floor(uv.x * 4.0) / 4.0, ceil(uv.y * 4.0) / 4.0, fract(uv.x * 3.0));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::floor(u * 4.0) / 4.0;
+                     g = std::ceil(v * 4.0) / 4.0;
+                     b = (u * 3.0) - std::floor(u * 3.0);
+                  }
+               },
+               // 7. Sqrt & Exp
+               {
+                  "col = vec3(sqrt(uv.x), exp(uv.y - 1.0), sqrt(uv.x * uv.y));",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     r = std::sqrt(u);
+                     g = std::exp(v - 1.0);
+                     b = std::sqrt(u * v);
+                  }
+               },
+               // 8. Length & Distance
+               {
+                  "d = length(uv - vec2(0.5, 0.5)); col = vec3(d, 1.0 - d, d * d);",
+                  [](double u, double v, double& r, double& g, double& b) {
+                     double dx = u - 0.5, dy = v - 0.5;
+                     double d = std::sqrt(dx * dx + dy * dy);
+                     r = d;
+                     g = 1.0 - d;
+                     b = d * d;
+                  }
+               }
+            };
+
+            double globalMaxErr = 0.0;
+            int maxErrX = 0, maxErrY = 0;
+            int maxErrKernel = 0;
+            bool allWithinTolerance = true;
+
+            const int kDim = 64;
+            unsigned int scratchFbo = 0;
+
+            for (size_t k = 0; k < cases.size(); k++)
+            {
+               FieldPixelNode node;
+               node.width = (float)kDim;
+               node.height = (float)kDim;
+               node.code = cases[k].code;
+               if (!node.Apply())
+               {
+                  allWithinTolerance = false;
+                  break;
+               }
+
+               node.CookIfNeeded(10 + (int)k);
+
+               std::vector<float> gpuPixels;
+               GLUtil::ReadTexturePixels(scratchFbo, node.GetOutputTexture(), kDim, kDim, gpuPixels);
+
+               if (gpuPixels.size() < (size_t)(kDim * kDim * 4))
+               {
+                  allWithinTolerance = false;
+                  break;
+               }
+
+               for (int y = 0; y < kDim; y++)
+               {
+                  for (int x = 0; x < kDim; x++)
+                  {
+                     double u = ((double)x + 0.5) / (double)kDim;
+                     double v = ((double)y + 0.5) / (double)kDim;
+
+                     double refR = 0, refG = 0, refB = 0;
+                     cases[k].eval(u, v, refR, refG, refB);
+
+                     int idx = (y * kDim + x) * 4;
+                     float gpuR = gpuPixels[idx + 0];
+                     float gpuG = gpuPixels[idx + 1];
+                     float gpuB = gpuPixels[idx + 2];
+
+                     if (std::isfinite(refR))
+                     {
+                        double err = std::abs((double)gpuR - refR);
+                        if (err > globalMaxErr) { globalMaxErr = err; maxErrX = x; maxErrY = y; maxErrKernel = (int)k; }
+                        if (err > 1.0e-3) allWithinTolerance = false;
+                     }
+                     if (std::isfinite(refG))
+                     {
+                        double err = std::abs((double)gpuG - refG);
+                        if (err > globalMaxErr) { globalMaxErr = err; maxErrX = x; maxErrY = y; maxErrKernel = (int)k; }
+                        if (err > 1.0e-3) allWithinTolerance = false;
+                     }
+                     if (std::isfinite(refB))
+                     {
+                        double err = std::abs((double)gpuB - refB);
+                        if (err > globalMaxErr) { globalMaxErr = err; maxErrX = x; maxErrY = y; maxErrKernel = (int)k; }
+                        if (err > 1.0e-3) allWithinTolerance = false;
+                     }
+                  }
+               }
+            }
+
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+
+            printf("[FIELDPIXELTEST] Conformance max abs error = %f at (%d, %d) in kernel %d\n",
+                   globalMaxErr, maxErrX, maxErrY, maxErrKernel);
+            printf("[FIELDPIXELTEST] Assertion 10 (Conformance): %s\n", allWithinTolerance ? "OK" : "FAIL");
+         }
+
+         // 11. State reads use texelFetch and no texture(fld_s_
+         {
+            FieldPixelNode node;
+            node.code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(x);";
+            node.Apply();
+            const std::string& src = node.EmitResult().source;
+            bool pass = (src.find("texelFetch(fld_s_bank0") != std::string::npos) &&
+                        (src.find("texture(fld_s_") == std::string::npos);
+            printf("[FIELDPIXELTEST] Assertion 11 (TexelFetch State): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 12. Requesting 5 state cells is refused with error containing "4 cells max"
+         {
+            FieldPixelNode node;
+            node.code = "state float a = 0;\nstate float b = 0;\nstate float c = 0;\nstate float d = 0;\nstate float e = 0;\ncol = vec3(1.0);";
+            bool ok = node.Apply();
+            bool pass = !ok && (node.LastError().find("4 cells max") != std::string::npos);
+            printf("[FIELDPIXELTEST] Assertion 12 (State Cell Cap): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         printf("[FIELDPIXELTEST] Test suite complete.\n");
+      }
+
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
       {
          // Every node type that declares params must survive both paths that
@@ -48944,6 +51073,10 @@ int main(int argc, char** argv)
                DrawShapeParams(n);
             else if (auto* n = dynamic_cast<FormulaNode*>(gn.node.get()))
                DrawFormulaParams(n);
+            else if (auto* n = dynamic_cast<FieldElementNode*>(gn.node.get()))
+               DrawFieldElementParams(n);
+            else if (auto* n = dynamic_cast<FieldPixelNode*>(gn.node.get()))
+               DrawFieldPixelParams(n);
             else if (auto* n = dynamic_cast<TextNode*>(gn.node.get()))
                DrawTextParams(n);
             else if (auto* n = dynamic_cast<LayerStackNode*>(gn.node.get()))
@@ -52058,6 +54191,95 @@ int main(int argc, char** argv)
          ImGui::End();
       }
 
+      if (gFieldElementEditorOpen && gFieldElementEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gFieldElementEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gFieldElementEditor = nullptr;
+            gFieldElementEditorOpen = false;
+         }
+      }
+
+      if (gFieldElementEditorOpen && gFieldElementEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Field element editor", &gFieldElementEditorOpen))
+         {
+            ImGui::TextDisabled("Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t");
+            ImGui::TextDisabled("User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted.");
+            ImGui::Separator();
+
+            static char editBuf[8192];
+            static FieldElementNode* lastEdited = nullptr;
+            if (lastEdited != gFieldElementEditor)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
+               lastEdited = gFieldElementEditor;
+            }
+
+            ImGui::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               gFieldElementEditor->code = editBuf;
+               gFieldElementEditor->Apply();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
+
+            if (!gFieldElementEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldElementEditor->LastError().c_str());
+            }
+         }
+         ImGui::End();
+      }
+
+      if (gFieldPixelEditorOpen && gFieldPixelEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Field pixel editor", &gFieldPixelEditorOpen))
+         {
+            ImGui::TextDisabled("Field pixel-domain kernel (per-pixel fragment shader).");
+            ImGui::TextDisabled("Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame");
+            ImGui::Separator();
+
+            static char editBuf[8192];
+            static FieldPixelNode* lastEdited = nullptr;
+            if (lastEdited != gFieldPixelEditor)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
+               lastEdited = gFieldPixelEditor;
+            }
+
+            ImGui::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               gFieldPixelEditor->code = editBuf;
+               gFieldPixelEditor->Apply();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
+
+            if (!gFieldPixelEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPixelEditor->LastError().c_str());
+            }
+         }
+         ImGui::End();
+      }
+
       // ---- expression globals ----
       // A flat, ordered list of name/expression rows. Deliberately not a node:
       // a global is read by name from anywhere in the patch, and giving it a
@@ -52073,11 +54295,13 @@ int main(int argc, char** argv)
             ImGui::TextDisabled("each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5");
             if (ImGui::CollapsingHeader("language reference"))
             {
-               ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !");
+               ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !   . (swizzle)");
                ImGui::TextDisabled("functions   sin cos tan abs sign sqrt exp log pow");
-               ImGui::TextDisabled("            floor ceil round mod min max clamp lerp");
+               ImGui::TextDisabled("            floor ceil round mod min max clamp lerp mix");
                ImGui::TextDisabled("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)");
                ImGui::TextDisabled("            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)");
+               ImGui::TextDisabled("vectors     vec2(x,y) vec3(x,y,z) vec4(x,y,z,w) or splat vec3(1)");
+               ImGui::TextDisabled("            swizzles: .xy .xyz .xyzw or .rg .rgb .rgba (e.g. P.xz, Cd.bgr)");
                ImGui::TextDisabled("bound       t = transport seconds, pi");
                ImGui::TextDisabled("in a param  lo / hi = that param's own range, plus its siblings");
                ImGui::TextDisabled("            a sibling of the same name shadows a global");

@@ -1,9 +1,78 @@
 # Field — Step 7: The Pixel Domain (IR → GLSL)
 
 **Status:** ready to implement
-**Depends on:** steps 1, 3, 5, 6 (see §9 — this is not optional, step 6 names step 7 as its dependent)
+**Depends on:** steps 1, 3, 4, 5, 6 (see §9 — this is not optional, step 6 names step 7 as its dependent)
 **Deliverable:** a GLSL backend that turns the typed IR from step 1 into `#version 150` fragment-shader
 text, hands it to `GLUtil::CompileProgram`, and runs it once per pixel per frame.
+
+---
+
+## 0. Regression gate and branch discipline — added 2026-09-03, read this first
+
+This section postdates the rest of this file. Where anything below conflicts with it, **this section
+wins**. It exists because of what actually happened when steps 3, 4, 5 and 6 were implemented as one
+batch on one branch:
+
+- Step 6 added a pre-scan in `LowerElementProgramToIR` (`src/core/field/FieldIR.cpp`) that pinned every
+  bare local to `(float, Domain::Element)`. That silently defeated **step 4's rate inference** — nothing
+  was ever hoisted, `ir.prologue` was empty for every program, and a frame variable left in the element
+  loop read `0.0` instead of erroring. It also killed **step 3's** local type inference:
+  `c = vec3(1,0,0)` was rejected as "cannot assign vec3 to float".
+- Step 6's cycle checker used one graph node per assign-target *name*, so `P.y += sin(P.x) * 2.0` was
+  rejected as a delay-free cycle. That is the canonical element idiom — the Field Element node's own
+  default program and 2 of its 5 presets did not compile.
+- Step 5's harness dereferenced a null `Find()` and **segfaulted**, so 4 of its 6 sections had never
+  executed even once.
+- Step 4's element backend shipped **two near-duplicate opcode interpreters** (a prologue switch and an
+  element-loop switch). Unhandled opcodes fell through `default:` and left the register at `0.0` with no
+  error. Frame-hoisted `-t`, `t > 1.0`, `if(t > 1.0, a, b)`, `&&`, `||`, `!` and `for` loops all
+  evaluated to zero, silently.
+
+None of this was caught by the step that caused it, and step 4's harness was registered in **no tier** of
+the hygiene driver, so nothing ever ran it. Four rules follow.
+
+### 0.1 One step, one branch, one commit
+
+```bash
+git checkout -b feature/field-step-NN-slug   # off the previous step's branch, before writing any code
+```
+
+Commit on that branch when the step's harness passes. **Never** leave two steps uncommitted in one tree —
+that is what made the failures above unattributable. The chain today is
+`main → feature/field-step-01-expression-ir → …-02-pure-randomness → …-03-vectors-and-rank → …`.
+
+### 0.2 Run every Field harness, not only your own
+
+Your step is not done when your fixture passes. It is done when **all** of them pass:
+
+```bash
+cmake --build build -j8
+for v in FIELDTEST FIELDELEMENTTEST FIELDPARAMTEST FIELDSTATETEST NEWFIXTURES; do
+  echo "== $v"; env INFINITE_$v=1 ./build/Infinite.app/Contents/MacOS/Infinite | tail -20
+done
+```
+
+(replace `NEWFIXTURES` with every `INFINITE_FIELD*` fixture that exists by the time you run this —
+`grep -o 'INFINITE_FIELD[A-Z0-9]*' src/main.cpp | sort -u`.)
+
+A FAIL in an **earlier** step's harness is a regression in **your** change, not a pre-existing problem to
+report and move past. `INFINITE_FIELDTEST` section A must stay at 170/170; if a corpus golden value
+changes, that is a bug in your change — **do not re-baseline the corpus.**
+
+### 0.3 Register your fixture in the hygiene driver
+
+Add every fixture you create to `TIER1_CHECKS` in
+`.claude/skills/run-infinite-hygiene/driver.sh` (the Field fixtures are headless early-exit runs costing
+~1s each, so tier 1 is correct). A fixture that is not in the driver does not exist — that is exactly how
+step 4's regression survived.
+
+### 0.4 Never write an opcode switch with a silent `default:`
+
+If this step adds a backend or an interpreter: **one** implementation per opcode, shared across every
+register bank or execution context, and an unhandled opcode must be **loud** (an `outError` or an assert),
+never a zero-valued fallthrough. Two switches over the same opcode enum will drift, and the drift is
+invisible because the wrong answer is a plausible number. Same rule for a silent value fallback: an
+unresolved name is a compile error with a source span, not a runtime `0.0`.
 
 ---
 

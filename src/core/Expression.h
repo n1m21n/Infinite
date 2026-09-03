@@ -26,8 +26,9 @@ namespace Expression
    //     clamp to nothing on a parameter measured in milliseconds.
    // Supports + - * / % ^ (with unary minus and right-associative ^), the
    // comparisons < <= > >= == !=, the logical operators && || !, the
-   // functions sin cos tan abs min max clamp floor ceil round mod lerp sqrt
+   // functions sin cos tan abs min max clamp floor ceil round mod lerp mix sqrt
    // exp log pow sign step smoothstep rand noise sh (with optional seed 4th arg) if,
+   // the vector constructors vec2 vec3 vec4, component swizzles (.xy, .rgb, etc.),
    // and the constant pi. Returns false
    // and fills outError on a parse or evaluation error (unknown identifier,
    // wrong argument count, division by zero from a malformed expression,

@@ -97,6 +97,13 @@ namespace Field
                newEntry.success = false;
                newEntry.compileError = err.message;
             }
+            else if (ir->type.lanes > 1)
+            {
+               // Top-level vector refusal (§5.8)
+               newEntry.success = false;
+               newEntry.compileError = "expression has type " + std::string(ir->type.ToString()) +
+                                       "; a parameter expression must produce a single number (hint: take a component, e.g. P.x)";
+            }
             else
             {
                BytecodeProgram prog;

@@ -18,6 +18,23 @@ namespace Field
       {
          return kKeywords.find(str) != kKeywords.end();
       }
+
+      bool CanEndOperand(const std::vector<Token>& tokens)
+      {
+         for (auto it = tokens.rbegin(); it != tokens.rend(); ++it)
+         {
+            if (it->kind == TokenKind::Comment || it->kind == TokenKind::Newline)
+               continue;
+            if (it->kind == TokenKind::Number || it->kind == TokenKind::Ident)
+               return true;
+            if (it->kind == TokenKind::Keyword)
+               return (it->text == "true" || it->text == "false");
+            if (it->kind == TokenKind::Punct)
+               return (it->text == ")" || it->text == "]" || it->text == "}");
+            return false;
+         }
+         return false;
+      }
    }
 
    bool Lex(const std::string& src, std::vector<Token>& tokens, FieldError& error)
@@ -53,7 +70,7 @@ namespace Field
       {
          char c = peek();
 
-         // Whitespace (except newline which can be significant in some contexts)
+         // Whitespace
          if (c == ' ' || c == '\t' || c == '\r')
          {
             advance();
@@ -98,28 +115,39 @@ namespace Field
          int tokenCol = col;
 
          // Numbers: [0-9]+ ( . [0-9]* )? ( [eE] [+-]? [0-9]+ )? or . [0-9]+
-         if (isdigit((unsigned char)c) || (c == '.' && isdigit((unsigned char)peek(1))))
+         // Rule §5.4: Inside a NUMBER, consume at most one '.'.
+         // A leading '.' starts a NUMBER only when the next character is a digit
+         // AND the previously emitted token cannot end an operand.
+         bool isLeadingDotNumber = (c == '.' && isdigit((unsigned char)peek(1)) && !CanEndOperand(tokens));
+         if (isdigit((unsigned char)c) || isLeadingDotNumber)
          {
             size_t start = pos;
-            bool hasDot = false;
             if (c == '.')
             {
-               hasDot = true;
-               advance(); // consume '.'
-            }
-            while (isdigit((unsigned char)peek()))
-            {
-               advance();
-            }
-            if (!hasDot && peek() == '.' && isdigit((unsigned char)peek(1)))
-            {
-               hasDot = true;
                advance(); // consume '.'
                while (isdigit((unsigned char)peek()))
-               {
                   advance();
+            }
+            else
+            {
+               while (isdigit((unsigned char)peek()))
+                  advance();
+               if (peek() == '.')
+               {
+                  char next = peek(1);
+                  if (isdigit((unsigned char)next))
+                  {
+                     advance(); // consume '.'
+                     while (isdigit((unsigned char)peek()))
+                        advance();
+                  }
+                  else if (next != '.' && !isalpha((unsigned char)next) && next != '_')
+                  {
+                     advance(); // consume trailing '.'
+                  }
                }
             }
+
             if (peek() == 'e' || peek() == 'E')
             {
                char next = peek(1);
@@ -128,11 +156,10 @@ namespace Field
                   advance(); // consume e/E
                   if (peek() == '+' || peek() == '-') advance();
                   while (isdigit((unsigned char)peek()))
-                  {
                      advance();
-                  }
                }
             }
+
             size_t len = pos - start;
             std::string numStr = src.substr(start, len);
             char* endPtr = nullptr;

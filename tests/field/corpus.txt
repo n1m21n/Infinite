@@ -176,3 +176,45 @@ rand(0, 1, 2) | 1.25 | none | none | 0.014296427369117737 | 1 | none
 sh(0, 1, 4) | 1.25 | none | none | 0.028592854738235474 | 1 | none
 rand(0, 1, 2, 7) | 1.25 | none | none | 0.88440695218741894 | 1 | none
 sh(1, 0, 2, 1) | 1.25 | none | none | 0.41606359556317329 | 1 | none
+
+# -------------------------------------------------------------
+# Section 9: Vectors, Swizzles & Rank Polymorphism (Step 3)
+# Tag: deterministic
+# -------------------------------------------------------------
+vec2(1, 2).x | 0.0 | none | none | 1 | 1 | none
+vec2(1, 2).y | 0.0 | none | none | 2 | 1 | none
+vec3(1, 2, 3).x | 0.0 | none | none | 1 | 1 | none
+vec3(1, 2, 3).y | 0.0 | none | none | 2 | 1 | none
+vec3(1, 2, 3).z | 0.0 | none | none | 3 | 1 | none
+vec4(1, 2, 3, 4).w | 0.0 | none | none | 4 | 1 | none
+vec3(1).y | 0.0 | none | none | 1 | 1 | none
+(vec3(1, 2, 3) * 2).y | 0.0 | none | none | 4 | 1 | none
+(vec3(1) + 0.5).z | 0.0 | none | none | 1.5 | 1 | none
+(vec3(1, 2, 3) ^ 2).y | 0.0 | none | none | 4 | 1 | none
+(vec3(1, 2, 3) ^ 2).z | 0.0 | none | none | 9 | 1 | none
+lerp(vec3(0, 10, 20), vec3(100, 110, 120), 0.5).y | 0.0 | none | none | 60 | 1 | none
+mix(0, 10, 0.2) | 0.0 | none | none | 2 | 1 | none
+mix(vec3(0, 10, 20), vec3(100, 110, 120), 0.5).z | 0.0 | none | none | 70 | 1 | none
+clamp(vec3(-5, 0.5, 10), 0, 1).x | 0.0 | none | none | 0 | 1 | none
+clamp(vec3(-5, 0.5, 10), 0, 1).y | 0.0 | none | none | 0.5 | 1 | none
+clamp(vec3(-5, 0.5, 10), 0, 1).z | 0.0 | none | none | 1 | 1 | none
+(vec3(0.1) + vec3(0.2)).x | 0.0 | none | none | 0.30000001192092896 | 1 | none
+(vec3(0.1) + vec3(0.2)).y | 0.0 | none | none | 0.30000001192092896 | 1 | none
+(vec3(0.1) + vec3(0.2)).z | 0.0 | none | none | 0.30000001192092896 | 1 | none
+vec3(10, 20, 30).xy.y | 0.0 | none | none | 20 | 1 | none
+vec4(vec2(1, 2), vec2(3, 4)).z | 0.0 | none | none | 3 | 1 | none
+vec4(vec3(1, 2, 3), 4).w | 0.0 | none | none | 4 | 1 | none
+.5 | 0.0 | none | none | 0.5 | 1 | none
+1. | 0.0 | none | none | 1 | 1 | none
+2 * .5 | 0.0 | none | none | 1 | 1 | none
+
+# Failure Cases & Diagnostics
+vec3(1, 2, 3) | 0.0 | none | none | 0 | 0 | expression has type vec3
+vec2(1, 2) + vec3(1, 2, 3) | 0.0 | none | none | 0 | 0 | cannot combine vec2 and vec3
+vec3(1, 2, 3).w | 0.0 | none | none | 0 | 0 | out of range
+vec3(1, 2, 3).xg | 0.0 | none | none | 0 | 0 | mixed swizzle sets
+t.x | 0.0 | none | none | 0 | 0 | is a float; '.x' needs a vec2, vec3 or vec4
+vec3(1) > vec3(0) | 0.0 | none | none | 0 | 0 | requires scalar arguments
+1.2.3 | 0.0 | none | none | 0 | 0 | expected a component name after '.'
+vec3(vec2(1, 2)) | 0.0 | none | none | 0 | 0 | cannot construct vec3
+vec3(vec2(1, 2), vec2(3, 4)) | 0.0 | none | none | 0 | 0 | cannot construct vec3

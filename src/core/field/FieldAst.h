@@ -146,12 +146,13 @@ namespace Field
    {
       std::string typeName;
       std::string name;
+      double defaultValue = 0.0;
       double minVal = 0.0;
       double maxVal = 1.0;
       AstNodePtr initExpr;
 
-      AstDeclParam(std::string t, std::string n, double mn, double mx, AstNodePtr init = nullptr, SourceSpan sp = {})
-         : AstNode(AstKind::DeclParam, sp), typeName(std::move(t)), name(std::move(n)), minVal(mn), maxVal(mx), initExpr(std::move(init)) {}
+      AstDeclParam(std::string t, std::string n, double defVal, double mn, double mx, AstNodePtr init = nullptr, SourceSpan sp = {})
+         : AstNode(AstKind::DeclParam, sp), typeName(std::move(t)), name(std::move(n)), defaultValue(defVal), minVal(mn), maxVal(mx), initExpr(std::move(init)) {}
    };
 
    struct AstDeclState : public AstNode
