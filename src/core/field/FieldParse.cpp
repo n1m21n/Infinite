@@ -182,7 +182,7 @@ namespace Field
          return nullptr;
       }
 
-      // Postfix access (swizzles): Primary ( '.' SWIZZLE )*
+      // Postfix access (swizzles / dotted calls like reduce.sum): Primary ( '.' ( SWIZZLE | METHOD(...) ) )*
       AstNodePtr ParsePostfix(ParserState& p)
       {
          AstNodePtr base = ParsePrimary(p);
@@ -197,9 +197,47 @@ namespace Field
                return nullptr;
             }
             Token fieldTok = p.Advance();
-            SourceSpan span = { base->span.offset, base->span.line, base->span.col,
-                                (fieldTok.span.offset + fieldTok.span.length) - base->span.offset };
-            base = std::make_shared<AstAccess>(base, fieldTok.text, span);
+
+            if (!p.AtEnd() && p.Peek().IsPunct('('))
+            {
+               Token lparen = p.Advance(); // consume '('
+               std::vector<AstNodePtr> args;
+               if (!p.MatchPunct(')'))
+               {
+                  AstNodePtr firstArg = ParseOr(p);
+                  if (firstArg) args.push_back(firstArg);
+                  while (p.MatchPunct(','))
+                  {
+                     AstNodePtr nextArg = ParseOr(p);
+                     if (nextArg) args.push_back(nextArg);
+                  }
+                  if (!p.MatchPunct(')'))
+                  {
+                     p.Fail("expected ')'", lparen.span);
+                     return nullptr;
+                  }
+               }
+
+               std::string calleeName;
+               if (base->kind == AstKind::Ident)
+               {
+                  calleeName = std::static_pointer_cast<AstIdent>(base)->name + "." + fieldTok.text;
+               }
+               else
+               {
+                  calleeName = fieldTok.text;
+               }
+
+               SourceSpan span = { base->span.offset, base->span.line, base->span.col,
+                                   (fieldTok.span.offset + fieldTok.span.length) - base->span.offset };
+               base = std::make_shared<AstCall>(calleeName, std::move(args), span);
+            }
+            else
+            {
+               SourceSpan span = { base->span.offset, base->span.line, base->span.col,
+                                   (fieldTok.span.offset + fieldTok.span.length) - base->span.offset };
+               base = std::make_shared<AstAccess>(base, fieldTok.text, span);
+            }
          }
 
          return base;
@@ -727,6 +765,25 @@ namespace Field
             if (tok.text == "for")
             {
                return ParseFor(p);
+            }
+            if (tok.text == "map")
+            {
+               Token mapTok = p.Advance(); // consume 'map'
+               AstNodePtr countExpr = nullptr;
+               if (!p.AtEnd() && p.Peek().IsPunct('('))
+               {
+                  p.Advance(); // consume '('
+                  countExpr = ParseOr(p);
+                  if (!p.MatchPunct(')'))
+                  {
+                     p.Fail("expected ')' after map count expression", mapTok.span);
+                     return nullptr;
+                  }
+               }
+               p.SkipSeparators();
+               AstNodePtr body = ParseStatement(p);
+               if (p.Failed() || !body) return nullptr;
+               return std::make_shared<AstMap>(countExpr, body, mapTok.span);
             }
          }
 

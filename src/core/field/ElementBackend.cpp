@@ -1,6 +1,7 @@
 #include "ElementBackend.h"
 #include "FieldRandom.h"
 #include "FieldState.h"
+#include "ReduceOps.h"
 
 #include <cmath>
 #include <algorithm>
@@ -252,6 +253,34 @@ namespace Field
                   ElemInstruction inst;
                   inst.dst = reg;
                   inst.lanes = node->type.lanes;
+
+                  if (node->transferKind == TransferKind::Reduce)
+                  {
+                     std::string reduceOp = node->callee.substr(7); // "sum", "rms", "min", "max", "mean"
+                     std::string targetVar;
+                     if (!node->children.empty())
+                     {
+                        const auto& child = node->children[0];
+                        if (child->kind == IRKind::Variable || child->kind == IRKind::StateRead)
+                           targetVar = child->varName;
+                        else if (child->kind == IRKind::Access && !child->children.empty())
+                           targetVar = child->children[0]->varName;
+                     }
+
+                     inst.op = ElemOpcode::OpReduceElementAttrib;
+                     inst.stringData = targetVar;
+                     inst.stringData2 = reduceOp;
+                     compiled.code.push_back(inst);
+                     return reg;
+                  }
+                  else if (node->transferKind == TransferKind::Resample || node->transferKind == TransferKind::Downsample)
+                  {
+                     if (!node->children.empty())
+                     {
+                        return EmitExpr(node->children[0]);
+                     }
+                     return reg;
+                  }
 
                   if (node->callee == "vec2" || node->callee == "vec3" || node->callee == "vec4")
                   {
@@ -839,6 +868,8 @@ namespace Field
                          double& outValue)
       {
          if (name == "t") { outValue = env.t; return true; }
+         if (name == "dt") { outValue = env.dt; return true; }
+         if (name == "frame") { outValue = env.frame; return true; }
          if (name == "count") { outValue = (double)elementCount; return true; }
          if (env.params)
          {
@@ -1155,6 +1186,89 @@ namespace Field
                      if (isComp) val = (inst.swizzleCount == 1) ? src.v[0] : src.v[k];
                      else val = (src.lanes == 1) ? src.v[0] : src.v[k];
                      ApplyCompound((*laneVec)[ei], op, val);
+                  }
+               }
+               break;
+            }
+
+            case ElemOpcode::OpReduceElementAttrib:
+            {
+               outRanAnInstruction = true;
+               const std::string& name = inst.stringData;
+               const std::string& opName = inst.stringData2;
+               ReduceOpKind opKind = ParseReduceOpKind(opName);
+               auto& dst = regs[inst.dst];
+               dst.lanes = inst.lanes;
+
+               if (!ctx.store || ctx.count == 0)
+               {
+                  for (int l = 0; l < inst.lanes; ++l) dst.v[l] = 0.0;
+                  break;
+               }
+
+               const float* lanePtrs[4] = { nullptr, nullptr, nullptr, nullptr };
+               if (name == "P")
+               {
+                  if (ctx.store->Px().size() >= ctx.count) lanePtrs[0] = ctx.store->Px().data();
+                  if (ctx.store->Py().size() >= ctx.count) lanePtrs[1] = ctx.store->Py().data();
+                  if (ctx.store->Pz().size() >= ctx.count) lanePtrs[2] = ctx.store->Pz().data();
+               }
+               else if (name == "N")
+               {
+                  if (ctx.store->Nx().size() >= ctx.count) lanePtrs[0] = ctx.store->Nx().data();
+                  if (ctx.store->Ny().size() >= ctx.count) lanePtrs[1] = ctx.store->Ny().data();
+                  if (ctx.store->Nz().size() >= ctx.count) lanePtrs[2] = ctx.store->Nz().data();
+               }
+               else if (name == "uv")
+               {
+                  if (ctx.store->U().size() >= ctx.count) lanePtrs[0] = ctx.store->U().data();
+                  if (ctx.store->V().size() >= ctx.count) lanePtrs[1] = ctx.store->V().data();
+               }
+               else if (name == "Cd")
+               {
+                  if (ctx.store->Cr().size() >= ctx.count) lanePtrs[0] = ctx.store->Cr().data();
+                  if (ctx.store->Cg().size() >= ctx.count) lanePtrs[1] = ctx.store->Cg().data();
+                  if (ctx.store->Cb().size() >= ctx.count) lanePtrs[2] = ctx.store->Cb().data();
+               }
+               else
+               {
+                  for (int l = 0; l < inst.lanes; ++l)
+                  {
+                     const auto* lVec = ctx.store->GetAttribLane(name, l);
+                     if (lVec && lVec->size() >= ctx.count)
+                        lanePtrs[l] = lVec->data();
+                  }
+               }
+
+               for (int l = 0; l < inst.lanes; ++l)
+               {
+                  if (lanePtrs[l])
+                  {
+                     switch (opKind)
+                     {
+                        case ReduceOpKind::Sum:
+                           dst.v[l] = ReduceSum(lanePtrs[l], ctx.count);
+                           break;
+                        case ReduceOpKind::Mean:
+                           dst.v[l] = ReduceMean(lanePtrs[l], ctx.count);
+                           break;
+                        case ReduceOpKind::Rms:
+                           dst.v[l] = ReduceRms(lanePtrs[l], ctx.count);
+                           break;
+                        case ReduceOpKind::Min:
+                           dst.v[l] = ReduceMin(lanePtrs[l], ctx.count);
+                           break;
+                        case ReduceOpKind::Max:
+                           dst.v[l] = ReduceMax(lanePtrs[l], ctx.count);
+                           break;
+                        default:
+                           dst.v[l] = 0.0;
+                           break;
+                     }
+                  }
+                  else
+                  {
+                     dst.v[l] = 0.0;
                   }
                }
                break;

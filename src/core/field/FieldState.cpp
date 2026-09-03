@@ -76,6 +76,11 @@ namespace Field
       mElementCount = elementCount;
       size_t totalLanes = TotalLanes();
 
+      if (mFrameValues.size() != totalLanes)
+      {
+         mFrameValues.resize(totalLanes, 0.0f);
+      }
+
       if (domain == Domain::Element)
       {
          bool sizeChanged = (mElementLanes.size() != totalLanes);
@@ -96,11 +101,7 @@ namespace Field
       }
       else
       {
-         if (mFrameValues.size() != totalLanes)
-         {
-            mFrameValues.resize(totalLanes, 0.0f);
-            ResetAll();
-         }
+         ResetAll();
       }
    }
 
@@ -113,18 +114,16 @@ namespace Field
             float initVal = (comp < (int)cell.initialValues.size()) ? cell.initialValues[comp] : 0.0f;
             int laneIdx = cell.slotOffset + comp;
 
+            if (laneIdx >= 0 && laneIdx < (int)mFrameValues.size())
+            {
+               mFrameValues[laneIdx] = initVal;
+            }
+
             if (mDomain == Domain::Element)
             {
                if (laneIdx >= 0 && laneIdx < (int)mElementLanes.size())
                {
                   std::fill(mElementLanes[laneIdx].begin(), mElementLanes[laneIdx].end(), initVal);
-               }
-            }
-            else
-            {
-               if (laneIdx >= 0 && laneIdx < (int)mFrameValues.size())
-               {
-                  mFrameValues[laneIdx] = initVal;
                }
             }
          }

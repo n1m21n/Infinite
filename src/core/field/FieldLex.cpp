@@ -9,7 +9,7 @@ namespace Field
    namespace
    {
       static const std::unordered_set<std::string> kKeywords = {
-         "attrib", "param", "state", "if", "else", "for",
+         "attrib", "param", "state", "if", "else", "for", "map",
          "float", "int", "bool", "vec2", "vec3", "vec4",
          "true", "false"
       };

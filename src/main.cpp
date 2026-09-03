@@ -88,6 +88,11 @@ namespace
 #include "core/field/FieldBytecode.h"
 #include "core/field/FieldVM.h"
 #include "core/field/FieldRandom.h"
+#include "core/field/ElementStore.h"
+#include "core/field/ElementBackend.h"
+#include "core/field/GlslBackend.h"
+#include "core/field/Transfer.h"
+#include "core/field/ReduceOps.h"
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
@@ -36625,7 +36630,617 @@ int RunFieldStateTest()
    return allOk ? 0 : 1;
 }
 
+// ============================================================ INFINITE_FIELDTRANSFERTEST
+//
+// Conformance harness for Domain Transfer Operators (Field Step 8).
+// Tests the 5 operators (broadcast, downsample, map, reduce, resample),
+// incomparable domain diagnostics (two spans + hint), hoisting evaluation count,
+// state isolation in map, GLSL reduce refusal, and cost table data consistency.
+static int RunFieldTransferTest()
+{
+   printf("[FIELDTRANSFERTEST] Running Field domain transfer operators conformance harness...\n");
+   bool allOk = true;
 
+   struct DummyGeo : public IGeometrySource
+   {
+      Mesh mesh;
+      unsigned long long rev = 1;
+      const Mesh& GetMesh() override { return mesh; }
+      unsigned long long MeshRevision() override { return rev; }
+      Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+      Material GetMaterial() const override { return Material(); }
+      unsigned int GetSurfaceTexture() override { return 0; }
+      unsigned int GetMaterialTexture(int) override { return 0; }
+      unsigned long long SurfaceTextureRevision() const override { return 0; }
+      MappingTransform GetMappingTransform() const override { return MappingTransform(); }
+      IGeometrySource* PassthroughSource() const override { return nullptr; }
+      Mat4 GetInstanceGroupMatrix() const override { return Mat4::Identity(); }
+      const std::vector<unsigned char>* InstanceSelection() const override { return nullptr; }
+      unsigned long long InstanceSelectionRevision() const override { return 0; }
+      const std::vector<Mat4>* InstanceTransformOverride() const override { return nullptr; }
+      const std::vector<Particle>* GetPointCloud() override { return nullptr; }
+      unsigned long long PointCloudRevision() override { return 0; }
+      float PointBaseSize() const override { return 1.0f; }
+      const Polyline* GetCurve() override { return nullptr; }
+      unsigned long long CurveStamp() override { return 0; }
+   };
+
+   // ------------------------------------------------------------
+   // SECTION 1: Incomparable Domain Crossings Refusal & Diagnostics
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 1a. ValidateResample between incomparable domains
+      {
+         Field::FieldError err;
+         if (Field::ValidateResample(Field::Domain::Element, Field::Domain::Pixel, Field::SourceSpan{ 0, 2, 5, 10 }, err))
+         {
+            printf("SECTION 1: FAIL - resample(element -> pixel) was permitted\n");
+            secOk = false;
+         }
+         else
+         {
+            if (err.message.find("incomparable domains") == std::string::npos ||
+                err.message.find("element") == std::string::npos ||
+                err.message.find("pixel") == std::string::npos)
+            {
+               printf("SECTION 1: FAIL - error message missing domain names: '%s'\n", err.message.c_str());
+               secOk = false;
+            }
+            if (err.hint.find("reduce to frame first") == std::string::npos)
+            {
+               printf("SECTION 1: FAIL - hint missing suggestion: '%s'\n", err.hint.c_str());
+               secOk = false;
+            }
+         }
+      }
+
+      // 1b. MakeIncomparableDomainError formats both spans and hint
+      {
+         Field::SourceSpan spanA{ 0, 1, 3, 5 };
+         Field::SourceSpan spanB{ 0, 2, 8, 4 };
+         Field::FieldError err = Field::MakeIncomparableDomainError(Field::Domain::Element, spanA, Field::Domain::Sample, spanB, "binary op '+'");
+         if (err.message.find("element (line 1, col 3)") == std::string::npos ||
+             err.message.find("sample (line 2, col 8)") == std::string::npos)
+         {
+            printf("SECTION 1: FAIL - MakeIncomparableDomainError message missing line:col spans: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+         if (err.hint.find("transfer operator") == std::string::npos && err.hint.find("reduce.rms") == std::string::npos)
+         {
+            printf("SECTION 1: FAIL - MakeIncomparableDomainError hint missing fix suggestion: '%s'\n", err.hint.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 1 (Incomparable Refusals & Diagnostics): OK\n");
+      else { printf("SECTION 1 (Incomparable Refusals & Diagnostics): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 2: Broadcast Explicit Syntax Refusal
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src = "amount = 1.0\nP.y += broadcast(amount)\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::Lex(src, tokens, err);
+      Field::AstNodePtr ast;
+      Field::ParseProgram(tokens, ast, err);
+      Field::ElementIRProgram prog;
+      Field::LowerElementProgramToIR(ast, prog, err);
+
+      if (err.Empty())
+      {
+         printf("SECTION 2: FAIL - explicit broadcast() was not rejected\n");
+         secOk = false;
+      }
+      else
+      {
+         if (err.message.find("broadcast is implicit") == std::string::npos)
+         {
+            printf("SECTION 2: FAIL - unexpected error message for broadcast(): '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (Broadcast Refusal): OK\n");
+      else { printf("SECTION 2 (Broadcast Refusal): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 3: Frame Subexpression Hoisting & Evaluation Count
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src = "amount = 0.5 + 0.5 * sin(t)\nP.y += amount\n";
+      FieldElementNode fe;
+      fe.code = src;
+      if (!fe.Apply())
+      {
+         printf("SECTION 3: FAIL - failed to compile element program: %s\n", fe.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         DummyGeo srcGeo;
+         const int N = 1000;
+         for (int i = 0; i < N; ++i)
+         {
+            Vertex v;
+            v.px = 0.0f; v.py = (float)i; v.pz = 0.0f;
+            srcGeo.mesh.vertices.push_back(v);
+         }
+         fe.input = &srcGeo;
+         fe.CookIfNeeded(1);
+
+         const auto& outMesh = fe.GetMesh();
+         if (outMesh.vertices.size() != N)
+         {
+            printf("SECTION 3: FAIL - mesh vertex count mismatch: %zu vs %d\n", outMesh.vertices.size(), N);
+            secOk = false;
+         }
+         else
+         {
+            // Verify all vertices received exact hoisted amount: 0.5 + 0.5 * sin(0) = 0.5
+            for (int i = 0; i < N; ++i)
+            {
+               float expectedY = (float)i + 0.5f;
+               float actualY = outMesh.vertices[i].py;
+               if (std::abs(actualY - expectedY) > 1e-4f)
+               {
+                  printf("SECTION 3: FAIL - vertex %d has Py = %f, expected %f\n", i, actualY, expectedY);
+                  secOk = false;
+                  break;
+               }
+            }
+
+            // §5.9 evaluation counter assertions
+            auto prog = fe.Program();
+            if (prog)
+            {
+               if (prog->prologueEvalCount != 1)
+               {
+                  printf("SECTION 3: FAIL - prologue eval count = %llu, expected 1\n", prog->prologueEvalCount);
+                  secOk = false;
+               }
+               if (prog->elementEvalCount != (uint64_t)N)
+               {
+                  printf("SECTION 3: FAIL - element loop eval count = %llu, expected %d\n", prog->elementEvalCount, N);
+                  secOk = false;
+               }
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 3 (Frame Hoisting & Exact Eval): OK\n");
+      else { printf("SECTION 3 (Frame Hoisting & Exact Eval): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 4: Downsample Operator Legality & Semantics
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 4a. Refuse non-constant factor
+      {
+         std::string src = "param float k = 4 [1, 10]\ny = downsample(frame, k)\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram prog;
+         Field::LowerElementProgramToIR(ast, prog, err);
+
+         if (err.Empty() || err.message.find("constant") == std::string::npos)
+         {
+            printf("SECTION 4: FAIL - non-constant factor downsample not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      // 4b. Refuse factor < 1
+      {
+         std::string src = "y = downsample(frame, 0)\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram prog;
+         Field::LowerElementProgramToIR(ast, prog, err);
+
+         if (err.Empty() || err.message.find(">= 1") == std::string::npos)
+         {
+            printf("SECTION 4: FAIL - factor 0 downsample not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      // 4c. Execution semantics: frame-domain downsample(frame, 4) holds value across 4 frames
+      {
+         FieldElementNode fe;
+         fe.code = "y = downsample(frame, 4)\nP.y = y\n";
+         if (!fe.Apply())
+         {
+            printf("SECTION 4: FAIL - failed to compile downsample: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo srcGeo;
+            Vertex v; v.px = 0.0f; v.py = 0.0f; v.pz = 0.0f;
+            srcGeo.mesh.vertices.push_back(v);
+            fe.input = &srcGeo;
+
+            float recordedHold[8];
+            for (int f = 0; f < 8; ++f)
+            {
+               fe.CookIfNeeded(f);
+               recordedHold[f] = fe.GetMesh().vertices[0].py;
+            }
+
+            for (int f = 0; f < 4; ++f)
+            {
+               if (recordedHold[f] != 0.0f)
+               {
+                  printf("SECTION 4: FAIL - frame %d has hold value %f, expected 0.0f\n", f, recordedHold[f]);
+                  secOk = false;
+               }
+            }
+            for (int f = 4; f < 8; ++f)
+            {
+               if (recordedHold[f] != 4.0f)
+               {
+                  printf("SECTION 4: FAIL - frame %d has hold value %f, expected 4.0f\n", f, recordedHold[f]);
+                  secOk = false;
+               }
+            }
+         }
+      }
+
+      // 4d. Execution semantics: element-domain downsample(P.y, 4) holds across all vertices
+      {
+         FieldElementNode fe;
+         fe.code = "y = downsample(P.y + frame, 4)\nP.y = y\n";
+         if (!fe.Apply())
+         {
+            printf("SECTION 4: FAIL - failed to compile element-domain downsample: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo srcGeo;
+            const int V = 10;
+            for (int i = 0; i < V; ++i)
+            {
+               Vertex v; v.px = 0.0f; v.py = (float)(i * 10); v.pz = 0.0f;
+               srcGeo.mesh.vertices.push_back(v);
+            }
+            fe.input = &srcGeo;
+
+            for (int f = 0; f < 8; ++f)
+            {
+               fe.CookIfNeeded(f);
+               const auto& mesh = fe.GetMesh();
+               for (int i = 0; i < V; ++i)
+               {
+                  float expected = (float)(i * 10) + (f < 4 ? 0.0f : 4.0f);
+                  float actual = mesh.vertices[i].py;
+                  if (std::abs(actual - expected) > 1e-4f)
+                  {
+                     printf("SECTION 4: FAIL - frame %d, vertex %d has Py = %f, expected %f\n", f, i, actual, expected);
+                     secOk = false;
+                     break;
+                  }
+               }
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 4 (Downsample Legality & Hold Semantics): OK\n");
+      else { printf("SECTION 4 (Downsample Legality & Hold Semantics): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 5: Map Operator Legality & State Isolation
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 5a. Refuse unbounded map count
+      {
+         std::string src = "param float num = 8 [1, 16]\nmap(num) {\nP.y += 1.0\n}\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram prog;
+         Field::LowerElementProgramToIR(ast, prog, err);
+
+         if (err.Empty() || err.message.find("constant") == std::string::npos)
+         {
+            printf("SECTION 5: FAIL - non-constant map count not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      // 5b. Refuse map body coarser than surrounding domain
+      {
+         Field::FieldError err;
+         if (Field::ValidateMap(Field::Domain::Element, Field::Domain::Frame, Field::SourceSpan{}, err))
+         {
+            printf("SECTION 5: FAIL - map with coarser body was permitted\n");
+            secOk = false;
+         }
+      }
+
+      // 5c. Map execution with state cell isolation across multiple instances and frames
+      {
+         FieldElementNode fe;
+         fe.code = "map(4) {\nstate float acc = 0\nacc += 1.0\nP.y += acc\n}\n";
+         if (!fe.Apply())
+         {
+            printf("SECTION 5: FAIL - failed to compile map with state: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo srcGeo;
+            Vertex v; v.px = 0.0f; v.py = 0.0f; v.pz = 0.0f;
+            srcGeo.mesh.vertices.push_back(v);
+            fe.input = &srcGeo;
+
+            // Frame 0: each of 4 cells updates acc from 0 to 1, Py += 4 * 1 = 4.0
+            fe.CookIfNeeded(0);
+            float py0 = fe.GetMesh().vertices[0].py;
+            if (std::abs(py0 - 4.0f) > 1e-4f)
+            {
+               printf("SECTION 5: FAIL - frame 0 Py = %f, expected 4.0f\n", py0);
+               secOk = false;
+            }
+
+            // Frame 1: each of 4 cells updates acc from 1 to 2, Py += 4 * 2 = 8.0
+            fe.CookIfNeeded(1);
+            float py1 = fe.GetMesh().vertices[0].py;
+            if (std::abs(py1 - 8.0f) > 1e-4f)
+            {
+               printf("SECTION 5: FAIL - frame 1 Py = %f, expected 8.0f\n", py1);
+               secOk = false;
+            }
+
+            // Frame 2: each of 4 cells updates acc from 2 to 3, Py += 4 * 3 = 12.0
+            fe.CookIfNeeded(2);
+            float py2 = fe.GetMesh().vertices[0].py;
+            if (std::abs(py2 - 12.0f) > 1e-4f)
+            {
+               printf("SECTION 5: FAIL - frame 2 Py = %f, expected 12.0f\n", py2);
+               secOk = false;
+            }
+
+            // Verify 4 distinct state cells exist in FieldState
+            if (fe.State().Cells().size() != 4)
+            {
+               printf("SECTION 5: FAIL - expected 4 state cells in map, found %zu\n", fe.State().Cells().size());
+               secOk = false;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 5 (Map Legality & Domain Constraints): OK\n");
+      else { printf("SECTION 5 (Map Legality & Domain Constraints): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 6: Reduce Operators on Element Domain & Numerical Correctness
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 6a. Direct numerical accuracy test of reduction kernels
+      const float testVals[4] = { 1.0f, 2.0f, 3.0f, 4.0f };
+      double sumVal = Field::ReduceSum(testVals, 4);
+      double meanVal = Field::ReduceMean(testVals, 4);
+      double rmsVal = Field::ReduceRms(testVals, 4);
+      double minVal = Field::ReduceMin(testVals, 4);
+      double maxVal = Field::ReduceMax(testVals, 4);
+
+      if (std::abs(sumVal - 10.0) > 1e-6) { printf("SECTION 6: FAIL - sum = %f, expected 10.0\n", sumVal); secOk = false; }
+      if (std::abs(meanVal - 2.5) > 1e-6) { printf("SECTION 6: FAIL - mean = %f, expected 2.5\n", meanVal); secOk = false; }
+      if (std::abs(rmsVal - std::sqrt(7.5)) > 1e-6) { printf("SECTION 6: FAIL - rms = %f, expected %f\n", rmsVal, std::sqrt(7.5)); secOk = false; }
+      if (std::abs(minVal - 1.0) > 1e-6) { printf("SECTION 6: FAIL - min = %f, expected 1.0\n", minVal); secOk = false; }
+      if (std::abs(maxVal - 4.0) > 1e-6) { printf("SECTION 6: FAIL - max = %f, expected 4.0\n", maxVal); secOk = false; }
+
+      // 6b. Execution of reduce in Element VM prologue
+      {
+         FieldElementNode fe;
+         fe.code = "avg = reduce.mean(P)\nP.y = avg.x\n";
+         if (!fe.Apply())
+         {
+            printf("SECTION 6: FAIL - failed to compile reduce: %s\n", fe.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            DummyGeo srcGeo;
+            for (int i = 0; i < 4; ++i)
+            {
+               Vertex v;
+               v.px = testVals[i]; v.py = 0.0f; v.pz = 0.0f;
+               srcGeo.mesh.vertices.push_back(v);
+            }
+            fe.input = &srcGeo;
+            fe.CookIfNeeded(1);
+
+            const auto& outMesh = fe.GetMesh();
+            for (int i = 0; i < 4; ++i)
+            {
+               if (std::abs(outMesh.vertices[i].py - 2.5f) > 1e-5f)
+               {
+                  printf("SECTION 6: FAIL - vertex %d Py = %f, expected 2.5f\n", i, outMesh.vertices[i].py);
+                  secOk = false;
+               }
+            }
+         }
+      }
+
+      // 6c. Non-bare variable reduction refusal
+      {
+         std::string src = "avg = reduce.mean(P.x * 2.0)\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram irProg;
+         Field::LowerElementProgramToIR(ast, irProg, err);
+
+         if (err.Empty() || err.message.find("bare variable") == std::string::npos)
+         {
+            printf("SECTION 6: FAIL - non-bare reduction argument not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      // 6d. Redundant reduction on frame-domain value refusal
+      {
+         std::string src = "avg = reduce.mean(t)\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::Lex(src, tokens, err);
+         Field::AstNodePtr ast;
+         Field::ParseProgram(tokens, ast, err);
+         Field::ElementIRProgram irProg;
+         Field::LowerElementProgramToIR(ast, irProg, err);
+
+         if (err.Empty() || err.message.find("already frame-domain") == std::string::npos)
+         {
+            printf("SECTION 6: FAIL - frame-domain reduction not refused: '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 6 (Reduce Operators & Numerical Exactness): OK\n");
+      else { printf("SECTION 6 (Reduce Operators & Numerical Exactness): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 7: Pixel GLSL Reduce Refusal (No Silent CPU Fallback)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // In pixel domain, reduce must be refused at compile time
+      std::string src = "avg = reduce.mean(uv)\ncol = vec3(avg.x)\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::Lex(src, tokens, err);
+      Field::AstNodePtr ast;
+      Field::ParseProgram(tokens, ast, err);
+
+      Field::PixelIRProgram pixelProg;
+      Field::LowerPixelProgramToIR(ast, pixelProg, err);
+
+      if (err.Empty())
+      {
+         auto glslResult = Field::EmitGlsl(pixelProg);
+         if (glslResult.error.empty())
+         {
+            printf("SECTION 7: FAIL - GLSL emitter did not refuse reduce in pixel kernel\n");
+            secOk = false;
+         }
+         else if (glslResult.error.find("not lowerable in GLSL") == std::string::npos)
+         {
+            printf("SECTION 7: FAIL - unexpected GLSL reduce refusal error: '%s'\n", glslResult.error.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 7 (Pixel GLSL Reduce Refusal): OK\n");
+      else { printf("SECTION 7 (Pixel GLSL Reduce Refusal): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 8: Resample Operator Legality
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      Field::FieldError err;
+      // 8a. Legal: Sample -> Frame
+      if (!Field::ValidateResample(Field::Domain::Sample, Field::Domain::Frame, Field::SourceSpan{}, err))
+      {
+         printf("SECTION 8: FAIL - resample(Sample -> Frame) failed: '%s'\n", err.message.c_str());
+         secOk = false;
+      }
+
+      // 8b. Legal: Frame -> Element
+      err.Clear();
+      if (!Field::ValidateResample(Field::Domain::Frame, Field::Domain::Element, Field::SourceSpan{}, err))
+      {
+         printf("SECTION 8: FAIL - resample(Frame -> Element) failed: '%s'\n", err.message.c_str());
+         secOk = false;
+      }
+
+      // 8c. Refused: Element -> Frame (hint: use reduce instead)
+      err.Clear();
+      if (Field::ValidateResample(Field::Domain::Element, Field::Domain::Frame, Field::SourceSpan{}, err))
+      {
+         printf("SECTION 8: FAIL - resample(Element -> Frame) was permitted\n");
+         secOk = false;
+      }
+      else if (err.hint.find("reduce") == std::string::npos)
+      {
+         printf("SECTION 8: FAIL - resample(Element -> Frame) hint did not suggest reduce: '%s'\n", err.hint.c_str());
+         secOk = false;
+      }
+
+      // 8d. Refused: Element -> Pixel (incomparable)
+      err.Clear();
+      if (Field::ValidateResample(Field::Domain::Element, Field::Domain::Pixel, Field::SourceSpan{}, err))
+      {
+         printf("SECTION 8: FAIL - resample(Element -> Pixel) was permitted\n");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 8 (Resample Operator Legality): OK\n");
+      else { printf("SECTION 8 (Resample Operator Legality): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 9: Cost Table Data Integrity & Readout
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      const auto& table = Field::GetTransferCostTable();
+
+      if (table.size() != 16)
+      {
+         printf("SECTION 9: FAIL - expected 16 entries in cost table, got %zu\n", table.size());
+         secOk = false;
+      }
+
+      // Format readout test
+      std::string formatted = Field::FormatTransferCostReadout(Field::Domain::Element, Field::Domain::Frame, Field::TransferKind::Reduce, 1000);
+      if (formatted.find("element -> frame [reduce]: O(N) CPU, once/frame") == std::string::npos)
+      {
+         printf("SECTION 9: FAIL - unexpected formatted readout: '%s'\n", formatted.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 9 (Cost Table Integrity & Readout): OK\n");
+      else { printf("SECTION 9 (Cost Table Integrity & Readout): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDTRANSFERTEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
 
 // ===================================================== INFINITE_RECSYNCTEST
 // Guards the exported-movie A/V sync property. The video track's PTS is a
@@ -39833,6 +40448,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_FIELDSTATETEST") != nullptr)
       return RunFieldStateTest();
+
+   if (getenv("INFINITE_FIELDTRANSFERTEST") != nullptr)
+      return RunFieldTransferTest();
 
    if (getenv("INFINITE_MOLDERTEST") != nullptr)
       return RunMolderFixture() ? 0 : 1;

@@ -231,6 +231,8 @@ set(COMMON_SOURCES
     src/core/field/ParamTable.cpp
     src/core/field/GlslBackend.cpp
     src/core/field/PixelState.cpp
+    src/core/field/Transfer.cpp
+    src/core/field/ReduceOps.cpp
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp

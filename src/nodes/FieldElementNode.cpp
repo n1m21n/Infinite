@@ -194,6 +194,8 @@ void FieldElementNode::CookIfNeeded(int frameId)
    // 2. Execute Element VM
    Field::ExecutionEnv env;
    env.t = t;
+   env.dt = (mLastEvalT > -900000.0f) ? (t - mLastEvalT) : (1.0 / 60.0);
+   env.frame = (double)frameId;
    std::map<std::string, float> paramValues = mParamTable.ValueMap();
    env.params = &paramValues;
    env.state = &mState;

@@ -5,6 +5,7 @@
 #include "FieldTypes.h"
 #include "ElementStore.h"
 #include "ParamTable.h"
+#include "Transfer.h"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -41,6 +42,9 @@ namespace Field
       FieldType type = FieldType(DataType::Float, 1);
       Domain domain = Domain::Graph;
       SourceSpan span;
+
+      TransferKind transferKind = TransferKind::None;
+      int divisor = 1;
 
       double numberValue = 0.0;
       double vecValues[4] = { 0.0, 0.0, 0.0, 0.0 };

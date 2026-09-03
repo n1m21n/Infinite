@@ -16,6 +16,7 @@ namespace Field
       Assign,
       If,
       For,
+      Map,
       Block,
       Binary,
       Unary,
@@ -130,6 +131,15 @@ namespace Field
 
       AstFor(AstNodePtr i, AstNodePtr c, AstNodePtr s, AstNodePtr b, SourceSpan sp = {})
          : AstNode(AstKind::For, sp), init(std::move(i)), cond(std::move(c)), step(std::move(s)), body(std::move(b)) {}
+   };
+
+   struct AstMap : public AstNode
+   {
+      AstNodePtr countExpr;
+      AstNodePtr body;
+
+      AstMap(AstNodePtr cnt, AstNodePtr b, SourceSpan sp = {})
+         : AstNode(AstKind::Map, sp), countExpr(std::move(cnt)), body(std::move(b)) {}
    };
 
    struct AstDeclAttrib : public AstNode

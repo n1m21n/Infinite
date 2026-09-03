@@ -65,6 +65,8 @@ namespace Field
       OpStoreState,
       OpStoreStateComp,
 
+      OpReduceElementAttrib,
+
       OpLoadFrameVar, // reads variable computed in prologue
       OpStoreFrameVar,
 

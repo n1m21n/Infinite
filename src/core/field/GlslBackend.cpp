@@ -70,6 +70,7 @@ namespace Field
          std::unordered_set<std::string> paramNames;
          std::vector<int> lineToIrNode;
          int currentLine = 1;
+         std::string error;
 
          void EmitLine(const std::string& line, int nodeIdx = -1)
          {
@@ -86,6 +87,7 @@ namespace Field
 
       std::string EmitNode(const IRNodePtr& node, EmitterContext& ctx)
       {
+         if (!ctx.error.empty()) return "";
          if (!node) return "0.0";
 
          switch (node->kind)
@@ -318,6 +320,11 @@ namespace Field
                                   GlslBoolVecType(resLanes) + "(" + sel + "));");
                   }
                }
+                else if (name.rfind("reduce.", 0) == 0 || node->transferKind == TransferKind::Reduce)
+                {
+                   ctx.error = "reduce is not lowerable in GLSL — it must arrive as a uniform from CPU reduction";
+                   return "";
+                }
                else
                {
                   // Standard direct built-ins: sin, cos, tan, abs, floor, ceil, fract, min, max, sign, step, sqrt, length, dot, cross, normalize, distance, exp, log
@@ -339,7 +346,7 @@ namespace Field
 
       void EmitStmt(const IRStmtPtr& stmt, EmitterContext& ctx)
       {
-         if (!stmt) return;
+         if (!ctx.error.empty() || !stmt) return;
 
          switch (stmt->kind)
          {
@@ -440,6 +447,25 @@ namespace Field
    GlslEmitResult EmitGlsl(const PixelIRProgram& program)
    {
       GlslEmitResult result;
+
+      auto hasReduce = [](const auto& self, const IRNodePtr& node) -> bool {
+         if (!node) return false;
+         if (node->transferKind == TransferKind::Reduce || node->callee.rfind("reduce.", 0) == 0)
+            return true;
+         for (const auto& c : node->children)
+            if (self(self, c)) return true;
+         return false;
+      };
+
+      for (const auto& s : program.pixelBody)
+      {
+         if (s->rvalueExpr && hasReduce(hasReduce, s->rvalueExpr))
+         {
+            result.error = "reduce is not lowerable in GLSL; a reduction must arrive as a uniform";
+            return result;
+         }
+      }
+
       EmitterContext ctx;
 
       // 1. Version header
@@ -576,6 +602,11 @@ namespace Field
       for (const auto& s : program.pixelBody)
       {
          EmitStmt(s, ctx);
+         if (!ctx.error.empty())
+         {
+            result.error = ctx.error;
+            return result;
+         }
       }
 
       // 12. Writes

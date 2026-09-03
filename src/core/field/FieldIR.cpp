@@ -28,6 +28,29 @@ namespace Field
 
    namespace
    {
+      bool IsLiteralConstant(const AstNodePtr& node, std::string& outNonConst)
+      {
+         if (!node) return true;
+         if (node->kind == AstKind::Literal) return true;
+         if (node->kind == AstKind::Ident)
+         {
+            outNonConst = std::static_pointer_cast<AstIdent>(node)->name;
+            return false;
+         }
+         if (node->kind == AstKind::Binary)
+         {
+            auto bin = std::static_pointer_cast<AstBinary>(node);
+            return IsLiteralConstant(bin->lhs, outNonConst) && IsLiteralConstant(bin->rhs, outNonConst);
+         }
+         if (node->kind == AstKind::Unary)
+         {
+            auto un = std::static_pointer_cast<AstUnary>(node);
+            return IsLiteralConstant(un->operand, outNonConst);
+         }
+         outNonConst = "expression";
+         return false;
+      }
+
       bool IsVecConstructor(const std::string& name)
       {
          return name == "vec2" || name == "vec3" || name == "vec4";
@@ -315,9 +338,7 @@ namespace Field
                Domain joinedDomain = JoinDomains(lhsIR->domain, rhsIR->domain, compatible);
                if (!compatible)
                {
-                  error.severity = Severity::Error;
-                  error.span = bin->span;
-                  error.message = "incomparable domains in binary operation";
+                  error = MakeIncomparableDomainError(lhsIR->domain, lhsIR->span, rhsIR->domain, rhsIR->span, "binary operation '" + bin->op + "'");
                   return nullptr;
                }
 
@@ -390,6 +411,199 @@ namespace Field
             {
                auto call = std::static_pointer_cast<AstCall>(ast);
 
+               // 1. broadcast is implicit and must never be written
+               if (call->callee == "broadcast")
+               {
+                  error.severity = Severity::Error;
+                  error.span = call->span;
+                  error.message = "broadcast is implicit; write 'P.y += amount'";
+                  error.hint = "coarse-to-fine domain transitions happen automatically via rate inference";
+                  return nullptr;
+               }
+
+               // 2. resample(x, D)
+               if (call->callee == "resample")
+               {
+                  if (call->args.size() != 2)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->span;
+                     error.message = "resample() expects 2 arguments: resample(x, Domain)";
+                     return nullptr;
+                  }
+
+                  auto xIR = LowerAstExpr(call->args[0], scope, error);
+                  if (!xIR) return nullptr;
+
+                  std::string domainStr;
+                  if (call->args[1]->kind == AstKind::Ident)
+                  {
+                     domainStr = std::static_pointer_cast<AstIdent>(call->args[1])->name;
+                  }
+                  else
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->args[1]->span;
+                     error.message = "resample() target domain must be an identifier (frame, element, pixel, sample)";
+                     return nullptr;
+                  }
+
+                  Domain targetDomain;
+                  if (!DomainFromString(domainStr, targetDomain))
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->args[1]->span;
+                     error.message = "unknown target domain '" + domainStr + "' in resample() (expected: frame, element, pixel, sample)";
+                     return nullptr;
+                  }
+
+                  if (!ValidateResample(xIR->domain, targetDomain, call->span, error))
+                  {
+                     return nullptr;
+                  }
+
+                  auto ir = std::make_shared<IRNode>(IRKind::Call, call->span);
+                  ir->callee = "resample";
+                  ir->transferKind = TransferKind::Resample;
+                  ir->type = xIR->type;
+                  ir->domain = targetDomain;
+                  ir->children.push_back(xIR);
+                  return ir;
+               }
+
+               // 3. downsample(x, k)
+               if (call->callee == "downsample")
+               {
+                  if (call->args.size() != 2)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->span;
+                     error.message = "downsample() expects 2 arguments: downsample(x, k)";
+                     return nullptr;
+                  }
+
+                  auto xIR = LowerAstExpr(call->args[0], scope, error);
+                  if (!xIR) return nullptr;
+
+                  if (call->args[1]->kind != AstKind::Literal)
+                  {
+                     std::string nonConst;
+                     if (call->args[1]->kind == AstKind::Ident)
+                        nonConst = std::static_pointer_cast<AstIdent>(call->args[1])->name;
+                     else
+                        nonConst = "expression";
+
+                     error.severity = Severity::Error;
+                     error.span = call->args[1]->span;
+                     error.message = "downsample factor k must be a compile-time constant integer literal >= 1 (got non-constant '" + nonConst + "')";
+                     return nullptr;
+                  }
+
+                  auto lit = std::static_pointer_cast<AstLiteral>(call->args[1]);
+                  int k = (int)lit->numberValue;
+                  if (k < 1)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->args[1]->span;
+                     error.message = "downsample factor k must be a compile-time constant integer >= 1 (got " + std::to_string(k) + ")";
+                     return nullptr;
+                  }
+
+                  auto ir = std::make_shared<IRNode>(IRKind::Call, call->span);
+                  ir->callee = "downsample";
+                  ir->transferKind = TransferKind::Downsample;
+                  ir->divisor = k;
+                  ir->type = xIR->type;
+                  ir->domain = xIR->domain;
+                  ir->children.push_back(xIR);
+                  return ir;
+               }
+
+               // 4. reduce.<op>(...)
+               if (call->callee.rfind("reduce.", 0) == 0)
+               {
+                  std::string reduceOp = call->callee.substr(7);
+                  if (call->args.empty())
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->span;
+                     error.message = call->callee + "() expects at least 1 argument";
+                     return nullptr;
+                  }
+
+                  if (call->args.size() == 1)
+                  {
+                     const auto& argAst = call->args[0];
+                     bool isBareVar = false;
+                     if (argAst->kind == AstKind::Ident)
+                     {
+                        isBareVar = true;
+                     }
+                     else if (argAst->kind == AstKind::Access)
+                     {
+                        auto acc = std::static_pointer_cast<AstAccess>(argAst);
+                        if (acc->base && acc->base->kind == AstKind::Ident)
+                           isBareVar = true;
+                     }
+
+                     auto xIR = LowerAstExpr(argAst, scope, error);
+                     if (!xIR) return nullptr;
+
+                     if (xIR->domain == Domain::Element && !isBareVar)
+                     {
+                        error.severity = Severity::Error;
+                        error.span = argAst->span;
+                        error.message = "reduction argument must be a bare variable or attribute name (got expression; hint: bind the expression to an attribute or variable first, e.g. 'heat = length(P) * 0.1; avg = reduce.mean(heat)')";
+                        return nullptr;
+                     }
+
+                     if (!ValidateReduce(reduceOp, 1, xIR->domain, call->span, error))
+                     {
+                        return nullptr;
+                     }
+
+                     auto ir = std::make_shared<IRNode>(IRKind::Call, call->span);
+                     ir->callee = call->callee;
+                     ir->transferKind = TransferKind::Reduce;
+                     ir->type = xIR->type;
+                     ir->domain = DomainCoarsen(xIR->domain);
+                     ir->children.push_back(xIR);
+                     return ir;
+                  }
+                  else if (call->args.size() == 3)
+                  {
+                     auto inIR = LowerAstExpr(call->args[0], scope, error);
+                     if (!inIR) return nullptr;
+                     auto loIR = LowerAstExpr(call->args[1], scope, error);
+                     if (!loIR) return nullptr;
+                     auto hiIR = LowerAstExpr(call->args[2], scope, error);
+                     if (!hiIR) return nullptr;
+
+                     if (!ValidateReduce(reduceOp, 3, inIR->domain, call->span, error))
+                     {
+                        return nullptr;
+                     }
+
+                     auto ir = std::make_shared<IRNode>(IRKind::Call, call->span);
+                     ir->callee = call->callee;
+                     ir->transferKind = TransferKind::Reduce;
+                     ir->type = FieldType(DataType::Float, 1);
+                     ir->domain = Domain::Frame;
+                     ir->children.push_back(inIR);
+                     ir->children.push_back(loIR);
+                     ir->children.push_back(hiIR);
+                     return ir;
+                  }
+                  else
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->span;
+                     error.message = call->callee + "() expects 1 argument" +
+                                     (reduceOp == "rms" ? " (or 3 for band-limited sample reduce: reduce.rms(in, lo, hi))" : "");
+                     return nullptr;
+                  }
+               }
+
                // Vector constructors: vec2(...), vec3(...), vec4(...)
                if (IsVecConstructor(call->callee))
                {
@@ -416,9 +630,7 @@ namespace Field
                      ctorDomain = JoinDomains(ctorDomain, aIR->domain, compatible);
                      if (!compatible)
                      {
-                        error.severity = Severity::Error;
-                        error.span = call->span;
-                        error.message = "incomparable domain arguments in vector constructor";
+                        error = MakeIncomparableDomainError(ctorDomain, call->span, aIR->domain, aIR->span, "vector constructor " + call->callee);
                         return nullptr;
                      }
 
@@ -507,9 +719,7 @@ namespace Field
                   fnDomain = JoinDomains(fnDomain, aIR->domain, compatible);
                   if (!compatible)
                   {
-                     error.severity = Severity::Error;
-                     error.span = call->span;
-                     error.message = "incomparable domain arguments in function call";
+                     error = MakeIncomparableDomainError(fnDomain, call->span, aIR->domain, aIR->span, "call to " + call->callee + "()");
                      return nullptr;
                   }
                   argIRs.push_back(aIR);
@@ -647,6 +857,217 @@ namespace Field
          if (name == "vec3") return DataType::Vec3;
          if (name == "vec4") return DataType::Vec4;
          return DataType::Void;
+      }
+
+      static AstNodePtr CloneAstForMap(const AstNodePtr& node,
+                                       const std::unordered_map<std::string, std::string>& stateRenames,
+                                       int mapIdx)
+      {
+         if (!node) return nullptr;
+         switch (node->kind)
+         {
+            case AstKind::Literal:
+            {
+               auto lit = std::static_pointer_cast<AstLiteral>(node);
+               if (lit->isBool)
+                  return std::make_shared<AstLiteral>(lit->boolValue, lit->span);
+               return std::make_shared<AstLiteral>(lit->numberValue, lit->span);
+            }
+            case AstKind::Ident:
+            {
+               auto id = std::static_pointer_cast<AstIdent>(node);
+               if (id->name == "map_index" || id->name == "_map_i")
+                  return std::make_shared<AstLiteral>((double)mapIdx, id->span);
+               auto it = stateRenames.find(id->name);
+               if (it != stateRenames.end())
+                  return std::make_shared<AstIdent>(it->second, id->span);
+               return std::make_shared<AstIdent>(id->name, id->span);
+            }
+            case AstKind::Access:
+            {
+               auto acc = std::static_pointer_cast<AstAccess>(node);
+               return std::make_shared<AstAccess>(CloneAstForMap(acc->base, stateRenames, mapIdx), acc->field, acc->span);
+            }
+            case AstKind::Unary:
+            {
+               auto un = std::static_pointer_cast<AstUnary>(node);
+               return std::make_shared<AstUnary>(un->op, CloneAstForMap(un->operand, stateRenames, mapIdx), un->span);
+            }
+            case AstKind::Binary:
+            {
+               auto bin = std::static_pointer_cast<AstBinary>(node);
+               return std::make_shared<AstBinary>(bin->op, CloneAstForMap(bin->lhs, stateRenames, mapIdx), CloneAstForMap(bin->rhs, stateRenames, mapIdx), bin->span);
+            }
+            case AstKind::Call:
+            {
+               auto call = std::static_pointer_cast<AstCall>(node);
+               std::vector<AstNodePtr> args;
+               for (const auto& a : call->args)
+                  args.push_back(CloneAstForMap(a, stateRenames, mapIdx));
+               return std::make_shared<AstCall>(call->callee, args, call->span);
+            }
+            case AstKind::Assign:
+            {
+               auto assign = std::static_pointer_cast<AstAssign>(node);
+               return std::make_shared<AstAssign>(assign->op, CloneAstForMap(assign->lvalue, stateRenames, mapIdx), CloneAstForMap(assign->rvalue, stateRenames, mapIdx), assign->span);
+            }
+            case AstKind::Block:
+            {
+               auto blk = std::static_pointer_cast<AstBlock>(node);
+               std::vector<AstNodePtr> stmts;
+               for (const auto& s : blk->statements)
+                  stmts.push_back(CloneAstForMap(s, stateRenames, mapIdx));
+               return std::make_shared<AstBlock>(stmts, blk->span);
+            }
+            case AstKind::If:
+            {
+               auto ifNode = std::static_pointer_cast<AstIf>(node);
+               return std::make_shared<AstIf>(CloneAstForMap(ifNode->cond, stateRenames, mapIdx),
+                                             CloneAstForMap(ifNode->thenBlock, stateRenames, mapIdx),
+                                             CloneAstForMap(ifNode->elseBlock, stateRenames, mapIdx),
+                                             ifNode->span);
+            }
+            case AstKind::For:
+            {
+               auto forNode = std::static_pointer_cast<AstFor>(node);
+               return std::make_shared<AstFor>(CloneAstForMap(forNode->init, stateRenames, mapIdx),
+                                              CloneAstForMap(forNode->cond, stateRenames, mapIdx),
+                                              CloneAstForMap(forNode->step, stateRenames, mapIdx),
+                                              CloneAstForMap(forNode->body, stateRenames, mapIdx),
+                                              forNode->span);
+            }
+            case AstKind::DeclState:
+            {
+               auto ds = std::static_pointer_cast<AstDeclState>(node);
+               auto it = stateRenames.find(ds->name);
+               std::string ren = (it != stateRenames.end()) ? it->second : ds->name;
+               return std::make_shared<AstDeclState>(ds->typeName, ren, CloneAstForMap(ds->initExpr, stateRenames, mapIdx), ds->span);
+            }
+            default:
+               return node;
+         }
+      }
+
+      static IRStmtPtr LowerAstStmt(const AstNodePtr& ast, ElementScope& scope, ElementIRProgram& prog, FieldError& error);
+
+      static bool LowerMapStatement(const std::shared_ptr<AstMap>& mapAst,
+                                    ElementScope& scope,
+                                    ElementIRProgram& outProgram,
+                                    std::vector<IRStmtPtr>& outStmts,
+                                    FieldError& outError)
+      {
+         if (!mapAst->countExpr)
+         {
+            outError.severity = Severity::Error;
+            outError.span = mapAst->span;
+            outError.message = "map() requires an element count expression, e.g. map(8) { ... }";
+            return false;
+         }
+
+         std::string nonConst;
+         if (!IsLiteralConstant(mapAst->countExpr, nonConst))
+         {
+            outError.severity = Severity::Error;
+            outError.span = mapAst->countExpr->span;
+            outError.message = "map() element count must be a compile-time constant integer (got non-constant '" + nonConst + "')";
+            return false;
+         }
+
+         int count = (int)std::static_pointer_cast<AstLiteral>(mapAst->countExpr)->numberValue;
+         if (count < 1 || count > 64)
+         {
+            outError.severity = Severity::Error;
+            outError.span = mapAst->countExpr->span;
+            outError.message = "map() element count must be between 1 and 64 (got " + std::to_string(count) + ")";
+            return false;
+         }
+
+         if (!mapAst->body) return true;
+
+         // Collect statements in map body
+         std::vector<AstNodePtr> bodyStmts;
+         if (mapAst->body->kind == AstKind::Block)
+            bodyStmts = std::static_pointer_cast<AstBlock>(mapAst->body)->statements;
+         else
+            bodyStmts.push_back(mapAst->body);
+
+         // Find state declarations in body
+         std::vector<std::shared_ptr<AstDeclState>> declaredStatesInMap;
+         for (const auto& bs : bodyStmts)
+         {
+            if (bs->kind == AstKind::DeclState)
+               declaredStatesInMap.push_back(std::static_pointer_cast<AstDeclState>(bs));
+         }
+
+         // Register N distinct state cells for each declared state
+         for (const auto& ds : declaredStatesInMap)
+         {
+            DataType dt = ParseDataType(ds->typeName);
+            int lanes = FieldType::GetLanesForType(dt);
+
+            std::vector<float> initVals(lanes, 0.0f);
+            if (ds->initExpr)
+            {
+               auto initIR = LowerAstExpr(ds->initExpr, scope, outError);
+               if (!initIR) return false;
+               if (initIR->kind == IRKind::Literal)
+               {
+                  for (int i = 0; i < lanes; ++i)
+                     initVals[i] = (float)initIR->vecValues[i];
+                  if (lanes == 1) initVals[0] = (float)initIR->numberValue;
+               }
+            }
+
+            for (int k = 0; k < count; ++k)
+            {
+               std::string instName = ds->name + "__m" + std::to_string(k);
+               DeclaredState st;
+               st.name = instName;
+               st.typeName = ds->typeName;
+               st.type = dt;
+               st.lanes = lanes;
+               st.initialValues = initVals;
+               st.domain = scope.targetDomain;
+               st.span = ds->span;
+               outProgram.declaredStates.push_back(st);
+
+               VarSymbol sym;
+               sym.name = instName;
+               sym.type = FieldType(dt, lanes);
+               sym.domain = scope.targetDomain;
+               sym.isState = true;
+               scope.Add(sym);
+            }
+         }
+
+         // Unroll N instances
+         for (int k = 0; k < count; ++k)
+         {
+            std::unordered_map<std::string, std::string> renames;
+            for (const auto& ds : declaredStatesInMap)
+               renames[ds->name] = ds->name + "__m" + std::to_string(k);
+
+            for (const auto& bs : bodyStmts)
+            {
+               // The state decl itself was already registered into scope and
+               // outProgram.declaredStates above, once per instance; re-lowering
+               // the (renamed) decl statement here would re-declare the same
+               // name and fail with "duplicate declaration".
+               if (bs->kind == AstKind::DeclState) continue;
+
+               auto cloned = CloneAstForMap(bs, renames, k);
+               auto irS = LowerAstStmt(cloned, scope, outProgram, outError);
+               if (!outError.Empty()) return false;
+               if (irS)
+               {
+                  if (!ValidateMap(scope.targetDomain, irS->domain, mapAst->span, outError))
+                     return false;
+                  outStmts.push_back(irS);
+               }
+            }
+         }
+
+         return true;
       }
 
       IRStmtPtr LowerAstStmt(const AstNodePtr& ast, ElementScope& scope, ElementIRProgram& prog, FieldError& error)
@@ -1042,9 +1463,7 @@ namespace Field
                Domain stmtDomain = JoinDomains(lvalDomain, rhsIR->domain, compatible);
                if (!compatible)
                {
-                  error.severity = Severity::Error;
-                  error.span = assign->span;
-                  error.message = "incomparable domains in assignment";
+                  error = MakeIncomparableDomainError(lvalDomain, assign->lvalue->span, rhsIR->domain, assign->rvalue->span, "assignment to '" + targetName + "'");
                   return nullptr;
                }
 
@@ -1080,6 +1499,16 @@ namespace Field
                   stmt->swizzleIndices[i] = swizzleIndices[i];
                stmt->rvalueExpr = rhsIR;
                return stmt;
+            }
+
+            case AstKind::Map:
+            {
+               auto mapAst = std::static_pointer_cast<AstMap>(ast);
+               std::vector<IRStmtPtr> unrolled;
+               if (!LowerMapStatement(mapAst, scope, prog, unrolled, error))
+                  return nullptr;
+               if (unrolled.empty()) return nullptr;
+               return unrolled.front();
             }
 
             case AstKind::If:
@@ -1142,26 +1571,24 @@ namespace Field
                for (const auto& s : thenStmts)
                {
                   bool comp = true;
-                  ifDomain = JoinDomains(ifDomain, s->domain, comp);
+                  Domain nextD = JoinDomains(ifDomain, s->domain, comp);
                   if (!comp)
                   {
-                     error.severity = Severity::Error;
-                     error.span = ifAst->span;
-                     error.message = "incomparable domains in if branch";
+                     error = MakeIncomparableDomainError(ifDomain, ifAst->span, s->domain, s->span, "if branch");
                      return nullptr;
                   }
+                  ifDomain = nextD;
                }
                for (const auto& s : elseStmts)
                {
                   bool comp = true;
-                  ifDomain = JoinDomains(ifDomain, s->domain, comp);
+                  Domain nextD = JoinDomains(ifDomain, s->domain, comp);
                   if (!comp)
                   {
-                     error.severity = Severity::Error;
-                     error.span = ifAst->span;
-                     error.message = "incomparable domains in else branch";
+                     error = MakeIncomparableDomainError(ifDomain, ifAst->span, s->domain, s->span, "else branch");
                      return nullptr;
                   }
+                  ifDomain = nextD;
                }
 
                auto stmt = std::make_shared<IRStmt>(IRStmtKind::If, ifAst->span);
@@ -1229,13 +1656,15 @@ namespace Field
                }
 
                Domain forDomain = Domain::Graph;
-               if (initStmt) { bool c = true; forDomain = JoinDomains(forDomain, initStmt->domain, c); }
-               if (condIR)   { bool c = true; forDomain = JoinDomains(forDomain, condIR->domain, c); }
-               if (stepStmt) { bool c = true; forDomain = JoinDomains(forDomain, stepStmt->domain, c); }
+               if (initStmt) { bool c = true; Domain d = JoinDomains(forDomain, initStmt->domain, c); if (!c) { error = MakeIncomparableDomainError(forDomain, forAst->span, initStmt->domain, initStmt->span, "for loop init"); return nullptr; } forDomain = d; }
+               if (condIR)   { bool c = true; Domain d = JoinDomains(forDomain, condIR->domain, c); if (!c) { error = MakeIncomparableDomainError(forDomain, forAst->span, condIR->domain, condIR->span, "for loop condition"); return nullptr; } forDomain = d; }
+               if (stepStmt) { bool c = true; Domain d = JoinDomains(forDomain, stepStmt->domain, c); if (!c) { error = MakeIncomparableDomainError(forDomain, forAst->span, stepStmt->domain, stepStmt->span, "for loop step"); return nullptr; } forDomain = d; }
                for (const auto& s : bodyStmts)
                {
                   bool c = true;
-                  forDomain = JoinDomains(forDomain, s->domain, c);
+                  Domain d = JoinDomains(forDomain, s->domain, c);
+                  if (!c) { error = MakeIncomparableDomainError(forDomain, forAst->span, s->domain, s->span, "for loop body"); return nullptr; }
+                  forDomain = d;
                }
 
                auto stmt = std::make_shared<IRStmt>(IRStmtKind::For, forAst->span);
@@ -1349,6 +1778,152 @@ namespace Field
       std::vector<IRStmtPtr> irStmts;
       for (const auto& s : stmts)
       {
+         if (s->kind == AstKind::Map)
+         {
+            auto mapAst = std::static_pointer_cast<AstMap>(s);
+            if (!LowerMapStatement(mapAst, scope, outProgram, irStmts, outError))
+               return false;
+            continue;
+         }
+
+         if (s->kind == AstKind::Assign)
+         {
+            auto assign = std::static_pointer_cast<AstAssign>(s);
+            if (assign->rvalue && assign->rvalue->kind == AstKind::Call)
+            {
+               auto call = std::static_pointer_cast<AstCall>(assign->rvalue);
+               if (call->callee == "downsample" && call->args.size() == 2)
+               {
+                  auto xIR = LowerAstExpr(call->args[0], scope, outError);
+                  if (!outError.Empty() || !xIR) return false;
+
+                  if (call->args[1]->kind != AstKind::Literal)
+                  {
+                     std::string nonConst;
+                     if (call->args[1]->kind == AstKind::Ident)
+                        nonConst = std::static_pointer_cast<AstIdent>(call->args[1])->name;
+                     else
+                        nonConst = "expression";
+
+                     outError.severity = Severity::Error;
+                     outError.span = call->args[1]->span;
+                     outError.message = "downsample factor k must be a compile-time constant integer literal >= 1 (got non-constant '" + nonConst + "')";
+                     return false;
+                  }
+
+                  int k = (int)std::static_pointer_cast<AstLiteral>(call->args[1])->numberValue;
+                  if (!ValidateDownsample(k, call->args[1]->span, outError))
+                     return false;
+
+                  std::string targetVar = "ds";
+                  if (assign->lvalue->kind == AstKind::Ident)
+                     targetVar = std::static_pointer_cast<AstIdent>(assign->lvalue)->name;
+                  std::string holdName = "__ds_hold_" + targetVar + "_L" + std::to_string(s->span.line) + "_C" + std::to_string(s->span.col);
+
+                  DeclaredState ds;
+                  ds.name = holdName;
+                  ds.typeName = xIR->type.ToString();
+                  ds.type = xIR->type.kind;
+                  ds.lanes = xIR->type.lanes;
+                  ds.domain = xIR->domain;
+                  ds.span = s->span;
+                  ds.initialValues.resize(xIR->type.lanes, 0.0f);
+                  outProgram.declaredStates.push_back(ds);
+
+                  VarSymbol stateSym;
+                  stateSym.name = holdName;
+                  stateSym.type = xIR->type;
+                  stateSym.domain = xIR->domain;
+                  stateSym.isState = true;
+                  scope.Add(stateSym);
+
+                  auto timeVarNode = std::make_shared<IRNode>(IRKind::Variable, s->span);
+                  timeVarNode->varName = "frame";
+                  timeVarNode->type = FieldType(DataType::Float, 1);
+                  timeVarNode->domain = xIR->domain;
+
+                  auto kLitNode = std::make_shared<IRNode>(IRKind::Literal, call->args[1]->span);
+                  kLitNode->type = FieldType(DataType::Float, 1);
+                  kLitNode->domain = Domain::Graph;
+                  kLitNode->numberValue = (double)k;
+                  kLitNode->vecValues[0] = (double)k;
+
+                  auto modCall = std::make_shared<IRNode>(IRKind::Call, s->span);
+                  modCall->callee = "mod";
+                  modCall->type = FieldType(DataType::Float, 1);
+                  modCall->domain = xIR->domain;
+                  modCall->children.push_back(timeVarNode);
+                  modCall->children.push_back(kLitNode);
+
+                  auto zeroLit = std::make_shared<IRNode>(IRKind::Literal, s->span);
+                  zeroLit->type = FieldType(DataType::Float, 1);
+                  zeroLit->domain = Domain::Graph;
+                  zeroLit->numberValue = 0.0;
+                  zeroLit->vecValues[0] = 0.0;
+
+                  auto gateCond = std::make_shared<IRNode>(IRKind::Binary, s->span);
+                  gateCond->op = "==";
+                  gateCond->type = FieldType(DataType::Bool, 1);
+                  gateCond->domain = xIR->domain;
+                  gateCond->children.push_back(modCall);
+                  gateCond->children.push_back(zeroLit);
+
+                  auto initRead = std::make_shared<IRNode>(IRKind::StateRead, s->span);
+                  initRead->varName = holdName;
+                  initRead->type = xIR->type;
+                  initRead->domain = xIR->domain;
+
+                  auto initAssign = std::make_shared<IRStmt>(IRStmtKind::Assign, s->span);
+                  initAssign->domain = xIR->domain;
+                  initAssign->assignTarget = holdName;
+                  initAssign->assignOp = "=";
+                  initAssign->rvalueExpr = initRead;
+                  irStmts.push_back(initAssign);
+
+                  auto holdAssign = std::make_shared<IRStmt>(IRStmtKind::Assign, s->span);
+                  holdAssign->domain = xIR->domain;
+                  holdAssign->assignTarget = holdName;
+                  holdAssign->assignOp = "=";
+                  holdAssign->rvalueExpr = xIR;
+
+                  auto gateIf = std::make_shared<IRStmt>(IRStmtKind::If, s->span);
+                  gateIf->domain = xIR->domain;
+                  gateIf->ifCond = gateCond;
+                  gateIf->thenStmts.push_back(holdAssign);
+                  irStmts.push_back(gateIf);
+
+                  auto stateRead = std::make_shared<IRNode>(IRKind::StateRead, s->span);
+                  stateRead->varName = holdName;
+                  stateRead->type = xIR->type;
+                  stateRead->domain = xIR->domain;
+
+                  std::string targetName;
+                  if (assign->lvalue->kind == AstKind::Ident)
+                     targetName = std::static_pointer_cast<AstIdent>(assign->lvalue)->name;
+
+                  auto finalAssign = std::make_shared<IRStmt>(IRStmtKind::Assign, s->span);
+                  finalAssign->domain = xIR->domain;
+                  finalAssign->assignTarget = targetName;
+                  finalAssign->assignOp = assign->op;
+                  finalAssign->rvalueExpr = stateRead;
+
+                  if (targetName == "P") outProgram.writeMask.wroteP = true;
+                  else if (targetName == "N") outProgram.writeMask.wroteN = true;
+                  else if (targetName == "uv") outProgram.writeMask.wroteUv = true;
+                  else if (targetName == "Cd") outProgram.writeMask.wroteCd = true;
+                  else
+                  {
+                     const VarSymbol* sym = scope.Find(targetName);
+                     if (sym && sym->isAttrib && !outProgram.writeMask.WroteAttrib(targetName))
+                        outProgram.writeMask.wroteAttribs.push_back(targetName);
+                  }
+
+                  irStmts.push_back(finalAssign);
+                  continue;
+               }
+            }
+         }
+
          auto irS = LowerAstStmt(s, scope, outProgram, outError);
          if (!outError.Empty())
          {
@@ -1631,6 +2206,226 @@ namespace Field
                irStmts.push_back(stmt);
             }
             continue;
+         }
+
+         if (s->kind == AstKind::Map)
+         {
+            auto mapAst = std::static_pointer_cast<AstMap>(s);
+            if (!mapAst->countExpr)
+            {
+               outError.severity = Severity::Error;
+               outError.span = mapAst->span;
+               outError.message = "map() requires an element count expression, e.g. map(8) { ... }";
+               return false;
+            }
+            std::string nonConst;
+            if (!IsLiteralConstant(mapAst->countExpr, nonConst))
+            {
+               outError.severity = Severity::Error;
+               outError.span = mapAst->countExpr->span;
+               outError.message = "map() element count must be a compile-time constant integer (got non-constant '" + nonConst + "')";
+               return false;
+            }
+            int count = (int)std::static_pointer_cast<AstLiteral>(mapAst->countExpr)->numberValue;
+            if (count < 1 || count > 64)
+            {
+               outError.severity = Severity::Error;
+               outError.span = mapAst->countExpr->span;
+               outError.message = "map() element count must be between 1 and 64 (got " + std::to_string(count) + ")";
+               return false;
+            }
+            if (mapAst->body)
+            {
+               std::vector<AstNodePtr> bodyStmts;
+               if (mapAst->body->kind == AstKind::Block)
+                  bodyStmts = std::static_pointer_cast<AstBlock>(mapAst->body)->statements;
+               else
+                  bodyStmts.push_back(mapAst->body);
+
+               std::vector<std::shared_ptr<AstDeclState>> declaredStatesInMap;
+               for (const auto& bs : bodyStmts)
+                  if (bs->kind == AstKind::DeclState)
+                     declaredStatesInMap.push_back(std::static_pointer_cast<AstDeclState>(bs));
+
+               for (const auto& ds : declaredStatesInMap)
+               {
+                  DataType dt = ParseDataType(ds->typeName);
+                  int lanes = FieldType::GetLanesForType(dt);
+                  std::vector<float> initVals(lanes, 0.0f);
+                  for (int k = 0; k < count; ++k)
+                  {
+                     std::string instName = ds->name + "__m" + std::to_string(k);
+                     DeclaredState st;
+                     st.name = instName;
+                     st.typeName = ds->typeName;
+                     st.type = dt;
+                     st.lanes = lanes;
+                     st.initialValues = initVals;
+                     st.domain = Domain::Pixel;
+                     st.span = ds->span;
+                     outProgram.declaredStates.push_back(st);
+
+                     VarSymbol sym;
+                     sym.name = instName;
+                     sym.type = FieldType(dt, lanes);
+                     sym.domain = Domain::Pixel;
+                     sym.isState = true;
+                     scope.Add(sym);
+                  }
+               }
+
+               for (int k = 0; k < count; ++k)
+               {
+                  std::unordered_map<std::string, std::string> renames;
+                  for (const auto& ds : declaredStatesInMap)
+                     renames[ds->name] = ds->name + "__m" + std::to_string(k);
+
+                  for (const auto& bs : bodyStmts)
+                  {
+                     // Already registered into scope and outProgram.declaredStates
+                     // above, once per instance; re-lowering it here would re-declare
+                     // the same name and fail with "duplicate declaration".
+                     if (bs->kind == AstKind::DeclState) continue;
+
+                     auto cloned = CloneAstForMap(bs, renames, k);
+                     auto irS = LowerAstStmt(cloned, scope, dummyElemProg, outError);
+                     if (!outError.Empty()) return false;
+                     if (irS)
+                     {
+                        if (!ValidateMap(Domain::Pixel, irS->domain, mapAst->span, outError))
+                           return false;
+                        irStmts.push_back(irS);
+                     }
+                  }
+               }
+            }
+            continue;
+         }
+
+         if (s->kind == AstKind::Assign)
+         {
+            auto assign = std::static_pointer_cast<AstAssign>(s);
+            if (assign->rvalue && assign->rvalue->kind == AstKind::Call)
+            {
+               auto call = std::static_pointer_cast<AstCall>(assign->rvalue);
+               if (call->callee == "downsample" && call->args.size() == 2)
+               {
+                  auto xIR = LowerAstExpr(call->args[0], scope, outError);
+                  if (!outError.Empty() || !xIR) return false;
+
+                  if (call->args[1]->kind != AstKind::Literal)
+                  {
+                     std::string nonConst;
+                     if (call->args[1]->kind == AstKind::Ident)
+                        nonConst = std::static_pointer_cast<AstIdent>(call->args[1])->name;
+                     else
+                        nonConst = "expression";
+
+                     outError.severity = Severity::Error;
+                     outError.span = call->args[1]->span;
+                     outError.message = "downsample factor k must be a compile-time constant integer literal >= 1 (got non-constant '" + nonConst + "')";
+                     return false;
+                  }
+
+                  int k = (int)std::static_pointer_cast<AstLiteral>(call->args[1])->numberValue;
+                  if (!ValidateDownsample(k, call->args[1]->span, outError))
+                     return false;
+
+                  std::string targetVar = "ds";
+                  if (assign->lvalue->kind == AstKind::Ident)
+                     targetVar = std::static_pointer_cast<AstIdent>(assign->lvalue)->name;
+                  std::string holdName = "__ds_hold_" + targetVar + "_L" + std::to_string(s->span.line) + "_C" + std::to_string(s->span.col);
+
+                  DeclaredState ds;
+                  ds.name = holdName;
+                  ds.typeName = xIR->type.ToString();
+                  ds.type = xIR->type.kind;
+                  ds.lanes = xIR->type.lanes;
+                  ds.domain = xIR->domain;
+                  ds.span = s->span;
+                  ds.initialValues.resize(xIR->type.lanes, 0.0f);
+                  outProgram.declaredStates.push_back(ds);
+
+                  VarSymbol stateSym;
+                  stateSym.name = holdName;
+                  stateSym.type = xIR->type;
+                  stateSym.domain = xIR->domain;
+                  stateSym.isState = true;
+                  scope.Add(stateSym);
+
+                  auto timeVarNode = std::make_shared<IRNode>(IRKind::Variable, s->span);
+                  timeVarNode->varName = "frame";
+                  timeVarNode->type = FieldType(DataType::Float, 1);
+                  timeVarNode->domain = Domain::Frame;
+
+                  auto kLitNode = std::make_shared<IRNode>(IRKind::Literal, call->args[1]->span);
+                  kLitNode->type = FieldType(DataType::Float, 1);
+                  kLitNode->domain = Domain::Graph;
+                  kLitNode->numberValue = (double)k;
+                  kLitNode->vecValues[0] = (double)k;
+
+                  auto modCall = std::make_shared<IRNode>(IRKind::Call, s->span);
+                  modCall->callee = "mod";
+                  modCall->type = FieldType(DataType::Float, 1);
+                  modCall->domain = Domain::Frame;
+                  modCall->children.push_back(timeVarNode);
+                  modCall->children.push_back(kLitNode);
+
+                  auto zeroLit = std::make_shared<IRNode>(IRKind::Literal, s->span);
+                  zeroLit->type = FieldType(DataType::Float, 1);
+                  zeroLit->domain = Domain::Graph;
+                  zeroLit->numberValue = 0.0;
+                  zeroLit->vecValues[0] = 0.0;
+
+                  auto gateCond = std::make_shared<IRNode>(IRKind::Binary, s->span);
+                  gateCond->op = "==";
+                  gateCond->type = FieldType(DataType::Bool, 1);
+                  gateCond->domain = Domain::Frame;
+                  gateCond->children.push_back(modCall);
+                  gateCond->children.push_back(zeroLit);
+
+                  auto initRead = std::make_shared<IRNode>(IRKind::StateRead, s->span);
+                  initRead->varName = holdName;
+                  initRead->type = xIR->type;
+                  initRead->domain = xIR->domain;
+
+                  auto initAssign = std::make_shared<IRStmt>(IRStmtKind::Assign, s->span);
+                  initAssign->domain = xIR->domain;
+                  initAssign->assignTarget = holdName;
+                  initAssign->assignOp = "=";
+                  initAssign->rvalueExpr = initRead;
+                  irStmts.push_back(initAssign);
+
+                  auto holdAssign = std::make_shared<IRStmt>(IRStmtKind::Assign, s->span);
+                  holdAssign->domain = xIR->domain;
+                  holdAssign->assignTarget = holdName;
+                  holdAssign->assignOp = "=";
+                  holdAssign->rvalueExpr = xIR;
+
+                  auto gateIf = std::make_shared<IRStmt>(IRStmtKind::If, s->span);
+                  gateIf->domain = xIR->domain;
+                  gateIf->ifCond = gateCond;
+                  gateIf->thenStmts.push_back(holdAssign);
+                  irStmts.push_back(gateIf);
+
+                  auto stateRead = std::make_shared<IRNode>(IRKind::StateRead, s->span);
+                  stateRead->varName = holdName;
+                  stateRead->type = xIR->type;
+                  stateRead->domain = xIR->domain;
+
+                  std::string targetName;
+                  if (assign->lvalue->kind == AstKind::Ident)
+                     targetName = std::static_pointer_cast<AstIdent>(assign->lvalue)->name;
+
+                  auto finalAssign = std::make_shared<IRStmt>(IRStmtKind::Assign, s->span);
+                  finalAssign->domain = xIR->domain;
+                  finalAssign->assignTarget = targetName;
+                  finalAssign->assignOp = assign->op;
+                  finalAssign->rvalueExpr = stateRead;
+                  irStmts.push_back(finalAssign);
+                  continue;
+               }
+            }
          }
 
          auto irS = LowerAstStmt(s, scope, dummyElemProg, outError);
