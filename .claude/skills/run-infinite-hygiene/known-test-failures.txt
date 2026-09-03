@@ -1,0 +1,22 @@
+# Whole-test-level known pre-existing failures for driver.sh.
+#
+# Format: TESTNAME|reason
+# One line per test currently known to fail (or crash, or flake) for a reason
+# already understood and NOT caused by whatever change you're testing.
+#
+# driver.sh checks every failing/crashing check name against this file:
+#   - listed here + still fails  -> printed as [xfail], does NOT fail the run
+#   - listed here + now passes  -> printed as [stale-baseline], does NOT fail
+#     the run, but tells you to delete the line (the fix landed)
+#   - NOT listed here + fails   -> printed as [FAIL], DOES fail the run
+#
+# This means: don't re-run a test to "confirm" it's the known one — if driver.sh
+# printed [xfail] for it, that IS the confirmation. Only chase a [FAIL] line.
+#
+# Add a line the same day you first confirm a failure is pre-existing and
+# unrelated to your change (check its log against the node's actual source
+# first — don't blindly baseline something that might be a real regression).
+# Delete a line the same day driver.sh reports it as [stale-baseline].
+
+PHASE1TEST|occasionally flaky on particle-system timing; if it fails once, this line lets you move on without a manual re-run
+PHASEATEST|pre-existing "Smooth" node-name collision unrelated to audio work — see spawned task to fix it
