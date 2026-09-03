@@ -82,3 +82,7 @@ rather than hidden).
   fixture covers the handover in both directions.
 - **MIDI CC / analyzer sources** need real input; they are not exercised
   headless.
+- **Untested chain worth adding:** bind an `LFO` to a param, delete the
+  destination node, spawn a new node that lands at the same index, and check
+  the modulation does not silently rebind to it. Unbind-on-delete is asserted
+  in isolation; the index-reuse race is not.
