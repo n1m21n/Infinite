@@ -2946,6 +2946,8 @@ namespace Platform
          info.deviceId = (uint32_t)deviceId;
          info.isInput = isInput;
          info.isOutput = isOutput;
+         info.inputChannels = (int)inChannels;
+         info.outputChannels = (int)outChannels;
          result.push_back(std::move(info));
       }
 
@@ -3001,48 +3003,45 @@ namespace Platform
       struct InputRing
       {
          float entries[kInputRingCapacity] {};
-         std::atomic<size_t> head { 0 };
-         std::atomic<size_t> tail { 0 };
+         std::atomic<uint64_t> writeCount { 0 };
 
          void Write(const float* samples, int count)
          {
-            size_t t = tail.load(std::memory_order_relaxed);
-            const size_t h = head.load(std::memory_order_acquire);
+            uint64_t w = writeCount.load(std::memory_order_relaxed);
             for (int i = 0; i < count; i++)
-            {
-               const size_t next = (t + 1) % kInputRingCapacity;
-               if (next == h)
-                  break; // full: consumer isn't draining fast enough, drop the rest
-               entries[t] = samples[i];
-               t = next;
-            }
-            tail.store(t, std::memory_order_release);
+               entries[(w + i) % kInputRingCapacity] = samples[i];
+            writeCount.store(w + count, std::memory_order_release);
          }
 
-         int Read(float* out, int maxCount)
+         int Read(uint64_t& readerCursor, float* out, int numFrames)
          {
-            size_t h = head.load(std::memory_order_relaxed);
-            const size_t t = tail.load(std::memory_order_acquire);
-            int n = 0;
-            while (h != t && n < maxCount)
-            {
-               out[n++] = entries[h];
-               h = (h + 1) % kInputRingCapacity;
-            }
-            head.store(h, std::memory_order_release);
-            return n;
+            const uint64_t w = writeCount.load(std::memory_order_acquire);
+            if (w == 0)
+               return 0;
+
+            if (readerCursor == 0 || readerCursor > w || (w - readerCursor) > kInputRingCapacity)
+               readerCursor = (w >= (uint64_t)numFrames) ? (w - numFrames) : 0;
+
+            const int available = (int)std::min((uint64_t)numFrames, w - readerCursor);
+            for (int i = 0; i < available; i++)
+               out[i] = entries[(readerCursor + i) % kInputRingCapacity];
+            readerCursor += available;
+            return available;
          }
 
          void Clear()
          {
-            head.store(0, std::memory_order_relaxed);
-            tail.store(0, std::memory_order_relaxed);
+            writeCount.store(0, std::memory_order_relaxed);
          }
       };
 
-      InputRing gInputRing[2];
+      constexpr int kMaxInputChannels = 16;
+      InputRing gInputRing[kMaxInputChannels];
+      int gInputChannelCount = 0;
       int gInputCaptureWantCount = 0; // how many AudioInputNode instances are alive
       bool gInputTapInstalled = false; // whether the tap is actually live on gInputEngine
+      std::atomic<uint32_t> gRequestedInputDeviceId { 0 };
+      uint32_t gActiveInputDeviceId = 0;
 
       // The capture tap's OWN engine, deliberately not the render engine
       // AudioDeviceOpen runs. On macOS an AVAudioEngine's inputNode and
@@ -3076,7 +3075,7 @@ namespace Platform
       // on a CoreAudio thread's stack.
       constexpr int kInputTapMaxOut = 8192;
       double gInputResamplePos = 0.0;
-      float gInputResampleScratch[2][kInputTapMaxOut] = {};
+      float gInputResampleScratch[kMaxInputChannels][kInputTapMaxOut] = {};
    }
 
    void AudioInputCaptureAddRef() { gInputCaptureWantCount++; }
@@ -3087,11 +3086,23 @@ namespace Platform
          gInputCaptureWantCount--;
    }
 
+   void AudioInputCaptureSetDevice(uint32_t deviceId)
+   {
+      gRequestedInputDeviceId.store(deviceId, std::memory_order_relaxed);
+   }
+
+   uint32_t AudioInputCaptureGetDevice()
+   {
+      return gRequestedInputDeviceId.load(std::memory_order_relaxed);
+   }
+
    void AudioInputCaptureTeardown()
    {
       if (gInputEngine == nil)
       {
          gInputTapInstalled = false;
+         gActiveInputDeviceId = 0;
+         gInputChannelCount = 0;
          return;
       }
       @autoreleasepool
@@ -3112,8 +3123,10 @@ namespace Platform
          gInputEngine = nil;
       }
       gInputTapInstalled = false;
-      gInputRing[0].Clear();
-      gInputRing[1].Clear();
+      gActiveInputDeviceId = 0;
+      gInputChannelCount = 0;
+      for (int ch = 0; ch < kMaxInputChannels; ch++)
+         gInputRing[ch].Clear();
    }
 
    void AudioInputCapturePump(std::string& outError)
@@ -3124,8 +3137,12 @@ namespace Platform
          return;
       }
 
-      if (gInputTapInstalled)
-         return; // already live - nothing to do
+      const uint32_t reqDevice = gRequestedInputDeviceId.load(std::memory_order_relaxed);
+      if (gInputTapInstalled && gActiveInputDeviceId == reqDevice)
+         return; // already live on requested device - nothing to do
+
+      if (gInputTapInstalled && gActiveInputDeviceId != reqDevice)
+         AudioInputCaptureTeardown();
 
       @autoreleasepool
       {
@@ -3157,6 +3174,15 @@ namespace Platform
 
          gInputEngine = [[AVAudioEngine alloc] init];
          AVAudioInputNode* input = [gInputEngine inputNode];
+
+         AudioObjectID targetDevice = (AudioObjectID)reqDevice;
+         if (targetDevice != 0)
+         {
+            AudioUnit inputUnit = input.audioUnit;
+            AudioUnitSetProperty(inputUnit, kAudioOutputUnitProperty_CurrentDevice,
+                                 kAudioUnitScope_Global, 0, &targetDevice, sizeof(targetDevice));
+         }
+
          AVAudioFormat* format = [input inputFormatForBus:0];
          if (format == nil || format.sampleRate <= 0 || format.channelCount == 0)
          {
@@ -3165,8 +3191,12 @@ namespace Platform
             return;
          }
 
-         gInputRing[0].Clear();
-         gInputRing[1].Clear();
+         const int tapChannels = std::min((int)format.channelCount, kMaxInputChannels);
+         gInputChannelCount = tapChannels;
+         gActiveInputDeviceId = reqDevice;
+
+         for (int ch = 0; ch < kMaxInputChannels; ch++)
+            gInputRing[ch].Clear();
          gInputResamplePos = 0.0;
 
          const double inRate = format.sampleRate;
@@ -3178,16 +3208,13 @@ namespace Platform
             const int numFrames = (int)buffer.frameLength;
             if (numFrames <= 0)
                return;
-            const float* src[2] = {
-               channels[0],
-               buffer.format.channelCount > 1 ? channels[1] : channels[0]
-            };
 
+            const int chCount = std::min((int)buffer.format.channelCount, kMaxInputChannels);
             const double outRate = gRenderSampleRate.load(std::memory_order_relaxed);
             if (outRate <= 0.0 || std::fabs(outRate - inRate) < 1.0)
             {
-               gInputRing[0].Write(src[0], numFrames);
-               gInputRing[1].Write(src[1], numFrames);
+               for (int ch = 0; ch < chCount; ch++)
+                  gInputRing[ch].Write(channels[ch], numFrames);
                gInputResamplePos = 0.0;
                return;
             }
@@ -3202,14 +3229,14 @@ namespace Platform
                const int i0 = std::max(0, (int)pos);
                const int i1 = std::min(i0 + 1, numFrames - 1);
                const float frac = (float)(pos - (double)i0);
-               gInputResampleScratch[0][n] = src[0][i0] + (src[0][i1] - src[0][i0]) * frac;
-               gInputResampleScratch[1][n] = src[1][i0] + (src[1][i1] - src[1][i0]) * frac;
+               for (int ch = 0; ch < chCount; ch++)
+                  gInputResampleScratch[ch][n] = channels[ch][i0] + (channels[ch][i1] - channels[ch][i0]) * frac;
                n++;
                pos += step;
             }
             gInputResamplePos = pos - (double)numFrames; // carry the sub-sample phase into the next buffer
-            gInputRing[0].Write(gInputResampleScratch[0], n);
-            gInputRing[1].Write(gInputResampleScratch[1], n);
+            for (int ch = 0; ch < chCount; ch++)
+               gInputRing[ch].Write(gInputResampleScratch[ch], n);
          }];
 
          NSError* err = nil;
@@ -3230,19 +3257,49 @@ namespace Platform
 
    bool AudioInputCaptureIsRunning() { return gInputTapInstalled; }
 
-   int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels)
+   int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels,
+                             uint64_t& readerCursor, int channelOffset, bool isMono)
    {
-      if (!gInputTapInstalled)
+      if (!gInputTapInstalled || outChannels == nullptr || numFrames <= 0)
          return 0;
 
-      const int channels = std::min(maxChannels, 2);
-      for (int ch = 0; ch < channels; ch++)
+      const int availableChannels = gInputChannelCount;
+      if (availableChannels <= 0)
+         return 0;
+
+      if (isMono)
       {
-         const int got = gInputRing[ch].Read(outChannels[ch], numFrames);
+         const int ch = std::clamp(channelOffset, 0, availableChannels - 1);
+         const int got = gInputRing[ch].Read(readerCursor, outChannels[0], numFrames);
          for (int i = got; i < numFrames; i++)
-            outChannels[ch][i] = 0.0f; // underrun tail: zero-fill rather than repeat stale samples
+            outChannels[0][i] = 0.0f;
+         if (maxChannels > 1)
+            std::copy(outChannels[0], outChannels[0] + numFrames, outChannels[1]);
+         return got > 0 ? 1 : 0;
       }
-      return channels;
+      else
+      {
+         const int ch0 = std::clamp(channelOffset, 0, availableChannels - 1);
+         const int ch1 = (channelOffset + 1 < availableChannels) ? (channelOffset + 1) : ch0;
+         uint64_t cursorCopy = readerCursor;
+         const int got0 = gInputRing[ch0].Read(readerCursor, outChannels[0], numFrames);
+         for (int i = got0; i < numFrames; i++)
+            outChannels[0][i] = 0.0f;
+
+         if (maxChannels > 1)
+         {
+            const int got1 = gInputRing[ch1].Read(cursorCopy, outChannels[1], numFrames);
+            for (int i = got1; i < numFrames; i++)
+               outChannels[1][i] = 0.0f;
+         }
+         return (got0 > 0) ? (ch0 != ch1 ? 2 : 1) : 0;
+      }
+   }
+
+   int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels)
+   {
+      static uint64_t sLegacyCursor = 0;
+      return AudioInputCaptureRead(outChannels, numFrames, maxChannels, sLegacyCursor, 0, false);
    }
 
    bool AudioDeviceOpen(AudioRenderCallback callback, void* userData, double& outSampleRate, std::string& outError,
