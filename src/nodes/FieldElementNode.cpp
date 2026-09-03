@@ -41,6 +41,7 @@ void FieldElementNode::LoadPreset(int index)
 
 FieldElementNode::FieldElementNode()
 {
+   mPublishOutput.owner = this;
    code = "P.y += sin(P.x * 2.0 + t) * 0.2\n";
    Apply();
 }

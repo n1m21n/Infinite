@@ -155,6 +155,24 @@ namespace Field
                    const ExecutionEnv& env,
                    std::string& outError);
 
+      // Reads a Frame-domain-hoisted assignment (OpStoreFrameVar) from the
+      // most recent Execute() call - e.g. `publish = ...` written at
+      // prologue scope. An element-loop (per-element) assignment to the
+      // same name never populates mFrameVars (it becomes an ordinary mesh
+      // attribute instead via OpStoreAttrib), so this deliberately returns
+      // false for that case rather than reading something else. Used by
+      // FieldElementNode's "publish scalar" second output (build step 11,
+      // §5.1) - reads register lane 0 only, since a publish output is a
+      // scalar float.
+      bool ReadFrameVar(const std::string& name, float& out) const
+      {
+         auto it = mFrameVars.find(name);
+         if (it == mFrameVars.end())
+            return false;
+         out = (float)it->second.v[0];
+         return true;
+      }
+
    private:
       // ONE interpreter for both banks. The prologue and the element loop used to be
       // two near-duplicate switches over the same ElemOpcode set, and they had already

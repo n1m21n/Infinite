@@ -210,10 +210,15 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
          file << "  " << p.first << " " << p.second << "\n";
       file << "end\n";
    }
+   // srcOutput is a later addition (build step 11, §5.3 - FieldPixelNode's
+   // aux texture output is the first image source with more than one image
+   // output): always written now, defaults to 0 via >>'s failed-extraction
+   // behaviour on any patch saved before this field existed - same pattern
+   // as "note"'s srcOutput and "mod"'s lo/hi/enabled below.
    for (const CableRecord& c : data.cables)
-      file << "cable " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
+      file << "cable " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const CableRecord& c : data.geometry)
-      file << "geo " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
+      file << "geo " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const CableRecord& c : data.audio)
       file << "aud " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
    for (const CableRecord& c : data.notes)
@@ -390,6 +395,16 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       {
          CableRecord c;
          in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
+         // srcOutput is a later addition (build step 11, §5.3); missing on
+         // older patches, where >>'s failed-extraction behaviour leaves it
+         // at its default of 0 - every pre-step-11 image cable and every
+         // geometry-slot binding only ever had output 0 anyway. A
+         // modulator-input-slot binding (also stored as "geo" - see
+         // ConnectGeometrySlot) with a non-zero source output on an old
+         // patch predates this field entirely and was already being
+         // silently truncated to output 0 on every prior save, so this is
+         // strictly a fix, not a new regression.
+         in >> c.srcOutput;
          if (tag == "cable")
             outData.cables.push_back(c);
          else

@@ -3,6 +3,7 @@
 #include "core/AudioCable.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
+#include "Modulation.h"
 #include "field/ParamTable.h"
 #include "field/SampleProgram.h"
 
@@ -41,6 +42,30 @@ public:
    {
       return slot == 0 ? "notes" : slot == 1 ? "in" : nullptr;
    }
+
+   // Dynamic pins, Phase 1 (build step 11, §5.2): a second output, "rms",
+   // exposes the existing reduce.rms(in, loHz, hiHz) meter reading (already
+   // crossing threads via MeterRing - see ReadRmsLatest above) as a real
+   // modulator output pin instead of only a read-only readout string.
+   // Output 0 stays the audio buffer - IsAudioOutputIndex must be overridden
+   // once OutputCount() > 1, or every downstream audio consumer breaks
+   // (trap 2: the IAudioSource default is "every output index is audio").
+   int OutputCount() const override { return exposeRmsOutput ? 2 : 1; }
+   const char* OutputLabel(int index) const override { return index == 1 ? "rms" : "out"; }
+   bool IsAudioOutputIndex(int index) const override { return index == 0; }
+   IModulator* ModulatorOutput(int index) override
+   {
+      // Gated on exposeRmsOutput - see FieldElementNode::ModulatorOutput's
+      // identical comment; index 1 does not nominally exist when the pin is
+      // off (OutputCount() == 1 then), so this must not hand back a live
+      // IModulator for it regardless.
+      return (exposeRmsOutput && index == 1) ? static_cast<IModulator*>(&mRmsOutput) : nullptr;
+   }
+
+   bool exposeRmsOutput = false;
+   // Transient (not saved) - see FieldElementNode::pinRefusal for the
+   // rationale; identical cable-orphaning refusal policy (decision 4).
+   std::string pinRefusal;
 
    // Compiles `code` and, on success, hot-swaps the audio thread's program
    // via the existing SampleSlotT compile-swap channel (state transplanted
@@ -85,8 +110,24 @@ public:
    int scopeCacheCount = 0;
    double scopeCacheTime = -1.0;
 
+   // Modeled on MacroXYNode::YAxis (src/nodes/MacroNodes.h) - reads
+   // ReadRmsLatest() through the owner rather than duplicating the
+   // MeterRing drain here.
+   struct RmsOutput : public IModulator
+   {
+      FieldSampleNode* owner = nullptr;
+      float Value01() override
+      {
+         float v = 0.0f;
+         if (owner)
+            owner->ReadRmsLatest(v);
+         return v;
+      }
+   };
+
 private:
    std::unique_ptr<AudioFieldSampleNode> mAudioNode;
+   RmsOutput mRmsOutput;
    Field::ParamTable mParamTable;
    // (name -> mailboxId) for the currently-compiled program's params, set by
    // Apply(); CookIfNeeded pushes each frame by walking this list rather
