@@ -3186,6 +3186,8 @@ namespace Field
          addSym("out", FieldType(DataType::Float, 1), Domain::Sample);
          addSym("sr", FieldType(DataType::Float, 1), Domain::Sample);
          addSym("n", FieldType(DataType::Float, 1), Domain::Sample);
+         addSym("freq", FieldType(DataType::Float, 1), Domain::Sample);
+         addSym("gate", FieldType(DataType::Float, 1), Domain::Sample);
       }
 
       // doc §5.5.2: a graph kernel may read a global, but only one whose

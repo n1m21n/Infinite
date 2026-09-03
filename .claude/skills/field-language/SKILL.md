@@ -122,7 +122,7 @@ not shadow one. Attempting to is a compile error, not a warning.
 | `frame` | `t` `dt` `frame` |
 | `element` | `P` `N` `uv` `Cd` `i` `count` |
 | `pixel` | `uv` `xy` `col` `res` |
-| `sample` | `in` `out` `sr` `n` |
+| `sample` | `in` `out` `sr` `n` `freq` `gate` |
 | `graph` | none |
 
 `uv` appears in two domains. It is the element's texture coordinate in
@@ -130,6 +130,20 @@ not shadow one. Attempting to is a compile error, not a warning.
 ever in one domain, so the two never collide inside one body — but the error
 message must say which domain it resolved in, or the user cannot tell why a
 `uv` reference typed the way it did.
+
+`freq` and `gate` are the per-voice **generator-mode** additions
+(`docs/plans/field/design-prompt-sample-generator-mode.md`): `freq` is the
+current voice's note frequency in Hz (MIDI note → Hz, `440 * 2^((note-69)/12)`
+— the same formula and naming convention as `WavetableSynthCore::NoteToHz`
+and every other synth node's local `MidiNoteToHz` helper); `gate` is `1.0`
+from note-on until note-off, `0.0` otherwise. Both are read-only, both are
+always populated — **never gated on whether `in` is connected**, unlike
+`FieldElementNode`'s `generateCount`-when-unconnected pattern — so a sample
+kernel can be a self-contained generator (an oscillator) with no upstream
+audio patched into `in` at all. `gate` reflects note-on/note-off directly; it
+is not the same signal as the per-voice amplitude envelope applied outside
+the kernel, which keeps decaying through its own release stage after `gate`
+has already dropped to `0`.
 
 **Precedent for the shadowing ban already in the codebase:**
 `ExprGlobals::IsValidName` (`src/core/ExprGlobals.h:44`) already refuses to let
@@ -366,6 +380,28 @@ The cycle `z -> z` is legal because it passes through the delay `state`
 introduces. This is the Kronos model (p.36: "cycles in the signal flow, as long
 as each cycle includes at least one sample of delay") reached through familiar
 syntax rather than a `z-1` operator.
+
+**Sample — a generator, no `in` required.** `freq`/`gate` let a sample kernel
+synthesize its own audio directly from the incoming notes, with no upstream
+audio source patched into `in` at all:
+
+```
+state float phase = 0
+phase = phase + freq / sr
+phase = phase - floor(phase)
+out = sin(phase * 6.283185) * gate
+```
+
+`phase` accumulates by `freq / sr` each sample — a phase increment of exactly
+one cycle per `sr / freq` samples — wraps with `phase - floor(phase)`, and
+`sin(phase * 2π)` turns it into a sine oscillator. Multiplying by `gate`
+silences the oscillator's raw output the instant the note releases, on top of
+(not instead of) the per-voice amplitude envelope `AudioFieldSampleNode`
+already applies outside the kernel. This is the reserved-word doc's example
+kernel, and `freq`/`gate` interact with `in` exactly like every other
+reserved name: a kernel is free to read both in the same body (e.g. a synth
+voice that also filters an `in` sidechain), because reading them costs
+nothing and neither is gated on the other being connected.
 
 ## 14. The wrong / right table — the mistakes a fresh session will make
 

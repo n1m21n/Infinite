@@ -1,9 +1,12 @@
 # Design prompt: FieldSample generator mode (freq/gate reserved symbols)
 
-Status: **not started, deliberately deferred.** Saved 2026-09-03 during the
-node-UX pass (`feature/field-node-ux-fixes`) at the user's explicit request —
-they want to reason through it as its own session rather than fold it into a
-UX-fix branch.
+Status: **implemented**, on `feature/field-sample-generator-mode`. `freq`/
+`gate` landed as reserved sample-domain symbols per this doc; see
+`docs/plans/field/step-09-sample-domain.md` §0.5 for exactly what changed and
+where. Originally saved 2026-09-03 during the node-UX pass
+(`feature/field-node-ux-fixes`) at the user's explicit request — they wanted
+to reason through it as its own session rather than fold it into a UX-fix
+branch.
 
 ## The gap this closes
 

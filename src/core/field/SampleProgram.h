@@ -29,6 +29,8 @@ namespace Field
       LoadIn,      // dst = in  (per-sample shared input)
       LoadSr,      // dst = sr  (per-sample shared sample rate)
       LoadN,       // dst = n   (per-sample shared running sample counter)
+      LoadFreq,    // dst = freq  (per-voice: the voice's current note frequency in Hz)
+      LoadGate,    // dst = gate  (per-voice: 1.0 while the voice's note is held, 0.0 after note-off)
       LoadParam,   // dst = paramVals[a]  (per-sample shared, hoisted above the voice loop)
       LoadState,   // dst = stateCur[a]   (per-voice)
       StoreState,  // stateNext[a] = <src in b>  (per-voice; emitted once per cell at program end)
