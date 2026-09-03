@@ -233,6 +233,7 @@ set(COMMON_SOURCES
     src/core/field/PixelState.cpp
     src/core/field/Transfer.cpp
     src/core/field/ReduceOps.cpp
+    src/core/field/BackendRegister.cpp
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp
@@ -309,6 +310,7 @@ set(COMMON_SOURCES
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
     src/nodes/FieldElementNode.cpp
+    src/nodes/FieldSampleNode.cpp
     src/nodes/FieldPixelNode.cpp
     src/nodes/PointDistributionNodes.cpp
     src/nodes/SceneNodes.cpp
