@@ -79,6 +79,8 @@ namespace Field
 
          bool Run(const GraphIRProgram& program)
          {
+            for (const auto& dp : program.declaredParams)
+               mDeclaredParamNames.insert(dp.name);
             for (const auto& s : program.statements)
             {
                if (!ExecStmt(s)) return false;
@@ -92,6 +94,7 @@ namespace Field
          GraphPlan& mPlan;
          FieldError& mError;
          std::unordered_map<std::string, LocalValue> mEnv;
+         std::set<std::string> mDeclaredParamNames;
 
          bool Fail(const SourceSpan& span, const std::string& msg)
          {
@@ -526,6 +529,14 @@ namespace Field
             spec.targetKey = targetKey;
             spec.paramName = s->setParamName;
             spec.value = (float)val.Scalar();
+            // Build step 15 §4.2: provenance for the live-forwarding fast
+            // path - true only for a bare `set(handle, "param", declaredName)`
+            // pass-through, never for a literal or a computed expression.
+            if (s->setValue && s->setValue->kind == IRKind::Variable && !s->setValue->isHandle &&
+                mDeclaredParamNames.count(s->setValue->varName) != 0)
+            {
+               spec.sourceParamName = s->setValue->varName;
+            }
             spec.span = s->span;
             mPlan.sets.push_back(spec);
             return true;

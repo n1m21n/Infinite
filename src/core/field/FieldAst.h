@@ -13,6 +13,8 @@ namespace Field
       DeclAttrib,
       DeclParam,
       DeclState,
+      DeclOutput,
+      DeclInput,
       Assign,
       If,
       For,
@@ -181,6 +183,31 @@ namespace Field
 
       AstDeclState(std::string t, std::string n, AstNodePtr init = nullptr, SourceSpan sp = {})
          : AstNode(AstKind::DeclState, sp), typeName(std::move(t)), name(std::move(n)), initExpr(std::move(init)) {}
+   };
+
+   // Build step 12: `output <domain> <type> <name> = <expr>` - declares a
+   // stable, dynamically-listed pin exposing a value computed by this kernel.
+   struct AstDeclOutput : public AstNode
+   {
+      std::string domainName;
+      std::string typeName;
+      std::string name;
+      AstNodePtr initExpr;
+
+      AstDeclOutput(std::string d, std::string t, std::string n, AstNodePtr init, SourceSpan sp = {})
+         : AstNode(AstKind::DeclOutput, sp), domainName(std::move(d)), typeName(std::move(t)), name(std::move(n)), initExpr(std::move(init)) {}
+   };
+
+   // Build step 12: `input <domain> <type> <name>` - declares a stable,
+   // dynamically-listed pin that other nodes may feed a value into.
+   struct AstDeclInput : public AstNode
+   {
+      std::string domainName;
+      std::string typeName;
+      std::string name;
+
+      AstDeclInput(std::string d, std::string t, std::string n, SourceSpan sp = {})
+         : AstNode(AstKind::DeclInput, sp), domainName(std::move(d)), typeName(std::move(t)), name(std::move(n)) {}
    };
 
    struct AstProgram : public AstNode

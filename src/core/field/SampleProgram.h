@@ -82,6 +82,20 @@ namespace Field
       float maxValue = 1.0f;
    };
 
+   // Build step 12: `output <domain> <type> <name> = <expr>` /
+   // `input <domain> <type> <name>` declared inside a sample-domain kernel.
+   // Collected independently of FieldIR.h's DeclaredOutput/DeclaredInput
+   // (S1.6 - the sample backend does not share the typed IR with
+   // Element/Pixel) but mirrors its shape. `domainName` is stored as a
+   // plain string rather than Field::Domain to keep this header free of a
+   // FieldIR.h dependency.
+   struct SampleDeclaredPin
+   {
+      std::string name;
+      std::string typeName = "float";
+      std::string domainName = "sample";
+   };
+
    struct SampleProgram
    {
       std::vector<SampleInstr> code; // fixed-size after Compile(); audio thread only indexes it
@@ -95,6 +109,9 @@ namespace Field
       bool hasReduceRms = false;
       float reduceLoHz = 20.0f;
       float reduceHiHz = 20000.0f;
+
+      std::vector<SampleDeclaredPin> declaredOutputs; // build step 12
+      std::vector<SampleDeclaredPin> declaredInputs;  // build step 12
 
       bool valid = false;
    };
