@@ -580,7 +580,14 @@ namespace Field
       ctx.EmitLine("   float aspect = fld_res.x / fld_res.y;");
       ctx.EmitLine("   vec4  src = texture(fld_srcTex, vUv);");
       ctx.EmitLine("   vec3  col = src.rgb;");
-      ctx.EmitLine("   float alpha = src.a;\n");
+      // Unconnected src is a 1x1 black texture with alpha 0 (fld_srcAlpha
+      // tracks that), so `alpha = src.a` alone made every standalone
+      // FieldPixelNode (no upstream input) render fully transparent by
+      // default - a kernel that only ever writes `col` (every built-in
+      // preset does) produced a correctly-computed image nobody could see.
+      // Default to opaque when unconnected; a real upstream still passes
+      // its own alpha through untouched.
+      ctx.EmitLine("   float alpha = mix(1.0, src.a, fld_srcAlpha);\n");
 
       // 10. State loads
       if (!program.declaredStates.empty())
@@ -620,12 +627,12 @@ namespace Field
          }
          ctx.EmitLine("   // cell -> channel by declaration order: 0=.r 1=.g 2=.b 3=.a");
          ctx.EmitLine("   vec4 fld_stateOut = vec4(" + chans[0] + ", " + chans[1] + ", " + chans[2] + ", " + chans[3] + ");");
-         ctx.EmitLine("   vec4 fld_colorOut = vec4(col, alpha * fld_srcAlpha);");
+         ctx.EmitLine("   vec4 fld_colorOut = vec4(col, alpha);");
          ctx.EmitLine("   fragColor = (fld_outMode == 0) ? fld_stateOut : fld_colorOut;");
       }
       else
       {
-         ctx.EmitLine("   fragColor = vec4(col, alpha * fld_srcAlpha);");
+         ctx.EmitLine("   fragColor = vec4(col, alpha);");
       }
 
       ctx.EmitLine("}");

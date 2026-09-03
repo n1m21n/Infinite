@@ -973,6 +973,12 @@ namespace
    bool gFieldPixelEditorOpen = false;
    FieldSampleNode* gFieldSampleEditor = nullptr;
    bool gFieldSampleEditorOpen = false;
+   // Live-preview state for the Field editor windows. One editor of each
+   // kind can be open at a time (singleton gField*Editor above), so a single
+   // dedicated instance is enough - no per-node map needed like the node
+   // body's own mini-viewports (gNodeViewports/gNodeCameras).
+   NodeViewport gFieldElementEditorViewport;
+   SharedViewportCamera gFieldElementEditorCamera;
    FieldGraphNode* gFieldGraphEditor = nullptr;
    bool gFieldGraphEditorOpen = false;
    // Set by a "Regenerate" button click inside DrawFieldGraphParams (nested
@@ -4188,6 +4194,10 @@ namespace
          return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
+      if (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr)
+         return 1; // the kernel's "src" texture input
+      if (dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr)
+         return 1; // the kernel's optional "geo" input (generator when unwired)
       // (Audio Analyze used to need an entry here for its fileSource pin; it
       // has a real AudioInputSlot now and is counted by the generic audio/note
       // probe below, like every other audio consumer.)
@@ -4325,6 +4335,8 @@ namespace
          return slot == 0 ? &an->Input() : nullptr;
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
+      if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
+         return slot == 0 ? &fp->TextureInput() : nullptr;
       if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
          return slot == 0 ? &model->TextureInput() : nullptr;
       if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
@@ -5369,6 +5381,8 @@ namespace
       }
 
       ModSliderInt("max elements", &n->maxElements, 100, 200000);
+      if (!n->input)
+         ModSliderInt("generate count", &n->generateCount, 1, 100000);
 
       for (auto& p : n->GetParamTable().Params())
       {
@@ -8291,9 +8305,14 @@ namespace
       // it keeps its DrawVideoParams body (file picker, loop/speed, preview)
       // rather than the generic v3 audio body, which has no case for it and
       // would otherwise drop path/loop/speed/audioEnabled/volume entirely.
+      // FieldSampleNode needs the same carve-out: it has both a NoteCable and
+      // an AudioCable, so it trips this gate, but DrawAudioNodeBody has no
+      // case for it either - it rendered as a bare pin column with no "Edit
+      // Field..." button and no way to reach DrawFieldSampleParams at all.
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
           dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
-          dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr)
+          dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr ||
+          dynamic_cast<FieldSampleNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -8339,6 +8358,63 @@ namespace
       {
          float buf[WavetableNode::kScopeCacheCapacity];
          const int count = n->ReadScope(buf, WavetableNode::kScopeCacheCapacity);
+         if (count > 0)
+         {
+            std::copy(buf, buf + count, n->scopeCache);
+            n->scopeCacheCount = count;
+         }
+         n->scopeCacheTime = now;
+      }
+
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      for (int i = 1; i < 8; i++)
+         dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
+                     ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (n->scopeCacheCount > 1)
+      {
+         const bool isLight = IsThemeLight();
+         const int count = n->scopeCacheCount;
+         for (int pass = 0; pass < 2; pass++)
+         {
+            dl->PathClear();
+            for (int i = 0; i < count; i++)
+            {
+               const float t = (float)i / (float)(count - 1);
+               const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
+            }
+            const ImU32 strokeCol = isLight
+               ? (pass == 0 ? IM_COL32(30, 110, 230, 50) : IM_COL32(20, 100, 230, 255))
+               : (pass == 0 ? IM_COL32(120, 200, 255, 46) : IM_COL32(150, 214, 255, 245));
+            dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
+         }
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawFieldSampleScope(FieldSampleNode* n, float h, float width)
+   {
+      const double now = ImGui::GetTime();
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      {
+         float buf[FieldSampleNode::kScopeCacheCapacity];
+         const int count = n->ReadScope(buf, FieldSampleNode::kScopeCacheCapacity);
          if (count > 0)
          {
             std::copy(buf, buf + count, n->scopeCache);
@@ -26150,7 +26226,14 @@ namespace
          gn->spawnY = y;
          gn->liveX = x;
          gn->liveY = y;
-         gn->needsPosition = false;
+         // Do NOT clear needsPosition here: for a freshly-mounted node it is
+         // still true, and it's the only signal that tells the main.cpp:~53053
+         // per-frame tick to push spawnX/spawnY into the node-editor library
+         // via ed::SetNodePosition on the next frame. Clearing it here (as
+         // this used to) stomped that pending push before it ever fired, so
+         // every place()'d node kept whatever default position the editor
+         // library assigns unpositioned nodes - producing the fully-stacked
+         // cluster instead of the requested layout.
       }
 
       bool Alive(int id) const override { return FindNodeByIndex(id) != nullptr; }
@@ -41446,6 +41529,17 @@ void ApplyModulationAndPalette(int frameId)
          gn.node->CookIfNeeded(frameId);
    }
 
+   // Same reasoning as the Palette loop just above: a standalone FieldPixel
+   // node with nothing wired downstream is never reached by the sink-driven
+   // 2D cook loop (only OutputNode/SyphonOutNode/OscSendNode pull their
+   // inputs), so its preview thumbnail stayed black even for a correctly
+   // compiling kernel - CookIfNeeded was simply never being called on it.
+   for (GraphNode& gn : gNodes)
+   {
+      if (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr)
+         gn.node->CookIfNeeded(frameId);
+   }
+
    // Colours, the same way and for the same reason: the registry was rebuilt
    // while the nodes drew, so every pointer here belongs to a node that
    // still exists. A palette has to cook before it can be read, and it is
@@ -53396,6 +53490,11 @@ int main(int argc, char** argv)
             DrawPalettePreview(palette);
          else if (auto* proj = dynamic_cast<ProjectionNode*>(gn.node.get()))
             DrawProjectionPreview(proj);
+         else if (dynamic_cast<FieldGraphNode*>(gn.node.get()) != nullptr)
+         {
+            // Meta-node, no picture to show (see the out-pin exclusion above) -
+            // its own params panel (Regenerate/ownership text) is the body.
+         }
          else if (isAudioBody)
             DrawAudioNodeBody(gn);
          else
@@ -53989,7 +54088,12 @@ int main(int argc, char** argv)
          // than useless: link validation only asks whether a source is an image
          // node, so a comment would happily patch into any image input and feed
          // it a blank texture. No pin, no way to make that mistake.
-         if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment)
+         // FieldGraphNode is a meta-node - it spawns/wires other real nodes at
+         // edit time and never produces a picture of its own (GetOutputTexture
+         // always returns 0), so an out pin on it is exactly as misleading as
+         // one on a comment would be.
+         if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment &&
+             dynamic_cast<FieldGraphNode*>(gn.node.get()) == nullptr)
          {
             // GeometryTableNode draws its row pins (index 4 and up) itself,
             // inline in the table grid in its params panel - only the four
@@ -56889,6 +56993,42 @@ int main(int argc, char** argv)
             {
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldElementEditor->LastError().c_str());
             }
+
+            // Live preview: this node's own solo render, same mechanism as
+            // the node body's monitor-icon mini-viewport (DrawMiniViewport),
+            // just with a dedicated NodeViewport/camera since only one Field
+            // element editor can be open at a time.
+            {
+               const float size = 200.0f;
+               ImVec2 origin = ImGui::GetCursorScreenPos();
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               DrawCheckerboardBackdrop(dl, origin, size);
+               unsigned int tex = gFieldElementEditorViewport.Render(gFieldElementEditor, gFieldElementEditorCamera, (int)size, (int)size);
+               if (tex != 0)
+                  dl->AddImage((ImTextureID)(intptr_t)tex, origin, ImVec2(origin.x + size, origin.y + size),
+                               ImVec2(0, 1), ImVec2(1, 0));
+               else
+                  dl->AddText(ImVec2(origin.x + 10, origin.y + size * 0.5f - 8),
+                              IM_COL32(120, 120, 135, 255), "no geometry");
+               dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), IM_COL32(70, 74, 90, 255), 4.0f);
+
+               ImGui::SetCursorScreenPos(origin);
+               ImGui::InvisibleButton("##fieldElementEditorViewport", ImVec2(size, size));
+               if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+               {
+                  const ImVec2 drag = ImGui::GetIO().MouseDelta;
+                  gFieldElementEditorViewport.Orbit(gFieldElementEditorCamera, drag.x * 0.6875f, drag.y * 0.6875f);
+               }
+               if (ImGui::IsItemHovered())
+               {
+                  ImGuiIO& vio = ImGui::GetIO();
+                  if (vio.MouseWheel != 0.0f)
+                  {
+                     gFieldElementEditorViewport.Zoom(vio.MouseWheel);
+                     vio.MouseWheel = 0.0f;
+                  }
+               }
+            }
          }
          ImGui::End();
       }
@@ -56925,6 +57065,28 @@ int main(int argc, char** argv)
             if (!gFieldPixelEditor->LastError().empty())
             {
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPixelEditor->LastError().c_str());
+            }
+
+            // Live preview: same texture the node body's own thumbnail reads
+            // (GetOutputTexture/Width/Height), re-cooked every frame by the
+            // per-frame FieldPixelNode CookIfNeeded loop, so it updates the
+            // instant Apply() recompiles the kernel - no separate render path.
+            unsigned int tex = gFieldPixelEditor->GetOutputTexture();
+            if (tex != 0 && gFieldPixelEditor->GetOutputWidth() > 0)
+            {
+               const float size = 200.0f;
+               float w = (float)gFieldPixelEditor->GetOutputWidth();
+               float h = (float)gFieldPixelEditor->GetOutputHeight();
+               float scale = size / std::max(w, h);
+               ImVec2 origin = ImGui::GetCursorScreenPos();
+               ImVec2 dims(w * scale, h * scale);
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               DrawCheckerboardBackdrop(dl, origin, size);
+               ImVec2 tl(origin.x + (size - dims.x) * 0.5f, origin.y + (size - dims.y) * 0.5f);
+               dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dims.x, tl.y + dims.y),
+                            ImVec2(0, 1), ImVec2(1, 0));
+               dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), IM_COL32(70, 74, 90, 255), 4.0f);
+               ImGui::Dummy(ImVec2(size, size));
             }
          }
          ImGui::End();
@@ -56978,6 +57140,10 @@ int main(int argc, char** argv)
             {
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSampleEditor->LastError().c_str());
             }
+
+            ImGui::Separator();
+            ImGui::TextDisabled("live output");
+            DrawFieldSampleScope(gFieldSampleEditor, 120.0f, ImGui::GetContentRegionAvail().x);
          }
          ImGui::End();
       }

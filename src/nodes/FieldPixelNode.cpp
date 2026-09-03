@@ -270,8 +270,12 @@ void FieldPixelNode::CookIfNeeded(int frameId)
       }
    }
 
-   unsigned int srcTex = (input && input->GetOutputTexture() != 0) ? input->GetOutputTexture() : GetDefaultBlackTexture();
-   float srcAlpha = (input && input->GetOutputTexture() != 0) ? 1.0f : 0.0f;
+   // Pull() cooks the upstream node for this frame first (it previously
+   // wasn't cooked at all here - a raw INode* with no ImageCable meant
+   // nothing upstream of this pin was ever guaranteed to have run this frame).
+   unsigned int upstreamTex = input.IsConnected() ? input.Pull(frameId) : 0;
+   unsigned int srcTex = upstreamTex != 0 ? upstreamTex : GetDefaultBlackTexture();
+   float srcAlpha = upstreamTex != 0 ? 1.0f : 0.0f;
 
    auto setupUniforms = [this, w, h, clock, dt, frameId, srcTex, srcAlpha, &hoistedValues]()
    {

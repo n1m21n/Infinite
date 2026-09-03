@@ -128,37 +128,49 @@ void FieldElementNode::CookIfNeeded(int frameId)
       Apply();
    }
 
-   if (!input)
+   // With nothing wired into `input`, act as a generator instead of a
+   // modifier - same shape as DistributePointsInGridNode's no-input point
+   // generation, just driven by the Field kernel instead of a grid formula.
+   // Points start spread along X so a kernel like "Wave Displace" produces
+   // something visible with zero extra code.
+   Mesh generatedMesh;
+   const Mesh* srcMesh;
+   unsigned long long upRev;
+   if (input)
    {
-      if (!mOutMesh.vertices.empty())
+      srcMesh = &input->GetMesh();
+      if (srcMesh->vertices.empty())
       {
-         mOutMesh.vertices.clear();
-         mOutMesh.indices.clear();
-         mOutMesh.faceMask.clear();
-         mOutMesh.selectionGroup.clear();
-         mOutMesh.vertexColor.clear();
-         mMeshRevision = NextMeshRevision();
+         if (!mOutMesh.vertices.empty())
+         {
+            mOutMesh.vertices.clear();
+            mOutMesh.indices.clear();
+            mOutMesh.faceMask.clear();
+            mOutMesh.selectionGroup.clear();
+            mOutMesh.vertexColor.clear();
+            mMeshRevision = NextMeshRevision();
+         }
+         return;
       }
-      return;
+      upRev = input->MeshRevision();
    }
-
-   const Mesh& inMesh = input->GetMesh();
-   if (inMesh.vertices.empty())
+   else
    {
-      if (!mOutMesh.vertices.empty())
+      int n = std::max(1, generateCount);
+      generatedMesh.vertices.resize((size_t)n);
+      for (int i = 0; i < n; ++i)
       {
-         mOutMesh.vertices.clear();
-         mOutMesh.indices.clear();
-         mOutMesh.faceMask.clear();
-         mOutMesh.selectionGroup.clear();
-         mOutMesh.vertexColor.clear();
-         mMeshRevision = NextMeshRevision();
+         float u = (n > 1) ? ((float)i / (float)(n - 1)) : 0.0f;
+         generatedMesh.vertices[(size_t)i].px = (u - 0.5f) * 2.0f;
       }
-      return;
+      srcMesh = &generatedMesh;
+      // Not a real mesh revision counter - only ever compared for equality
+      // against mLastUpstreamRevision to detect a generateCount change.
+      upRev = (unsigned long long)n;
    }
+   const Mesh& inMesh = *srcMesh;
 
    double t = Transport::Instance().Seconds();
-   unsigned long long upRev = input->MeshRevision();
 
    bool needRebuild = (upRev != mLastUpstreamRevision) ||
                       (mProgram && mProgram->isTimeDependent && (float)t != mLastEvalT) ||

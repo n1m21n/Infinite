@@ -1325,17 +1325,6 @@ namespace Field
                   auto id = std::static_pointer_cast<AstIdent>(assign->lvalue);
                   targetName = id->name;
 
-                  // Reserved word shadowing check for newly created locals:
-                  // If id is reserved in another domain or read-only
-                  if (targetName == "i" || targetName == "count" ||
-                      targetName == "t" || targetName == "dt" || targetName == "frame")
-                  {
-                     error.severity = Severity::Error;
-                     error.span = id->span;
-                     error.message = "cannot assign to read-only variable '" + targetName + "'";
-                     return nullptr;
-                  }
-
                   const VarSymbol* sym = scope.Find(targetName);
                   // A provisional symbol is a pass-0 placeholder, not a definition. Falling
                   // into the inference branch below is what lets the local take its type and
@@ -1343,6 +1332,24 @@ namespace Field
                   // the compile error it is supposed to be instead of a silent zero read.
                   if (sym && sym->isProvisional)
                      sym = nullptr;
+                  // A name reserved by an *unrelated* domain (graph scope pre-seeds every
+                  // other domain's reserved names purely to give a clean cross-domain-leak
+                  // error on read - see LowerGraphProgramToIR) is not a real conflict for a
+                  // fresh local declaration: `for (i = 0; ...)` in graph scope is the
+                  // language's own canonical idiom (step-10 doc S5.1) and must be allowed
+                  // to shadow the placeholder. Only a name reserved by the domain currently
+                  // being lowered is a genuine read-only builtin.
+                  if (sym && sym->isReserved && sym->domain != scope.targetDomain && assign->op == "=")
+                     sym = nullptr;
+                  else if (sym && sym->isReserved && sym->domain == scope.targetDomain &&
+                           (targetName == "i" || targetName == "count" ||
+                            targetName == "t" || targetName == "dt" || targetName == "frame"))
+                  {
+                     error.severity = Severity::Error;
+                     error.span = id->span;
+                     error.message = "cannot assign to read-only variable '" + targetName + "'";
+                     return nullptr;
+                  }
                   if (sym)
                   {
                      if (sym->isReadOnly)

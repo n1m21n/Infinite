@@ -1,6 +1,7 @@
 #pragma once
 
 #include "INode.h"
+#include "ImageCable.h"
 #include "GLUtil.h"
 #include "field/FieldIR.h"
 #include "field/GlslBackend.h"
@@ -22,8 +23,14 @@ public:
    int GetOutputWidth() const override;
    int GetOutputHeight() const override;
    void CookIfNeeded(int frameId) override;
-   INode* BypassSource() override { return input; }
+   INode* BypassSource() override { return input.GetSource(); }
    const char* InputLabel(int) const override { return "src"; }
+
+   // The one-and-only image input ("src" in the kernel), wired the same way
+   // as every other image-consuming node - see CableFor/InputCountFor in
+   // main.cpp. Was a bare INode* before this pin was actually registered
+   // there, which meant nothing could ever be connected to it.
+   ImageCable& TextureInput() { return input; }
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -59,7 +66,7 @@ public:
    static const std::vector<std::string>& PresetNames();
    void LoadPreset(int index);
 
-   INode* input = nullptr;
+   ImageCable input;
    std::string code;
    float width = 1024.0f;
    float height = 1024.0f;
