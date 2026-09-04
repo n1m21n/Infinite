@@ -41065,6 +41065,7 @@ static int RunFieldTransferTest()
 //     'in' generates from freq/gate alone; gate drops to 0 the instant
 //     note-off arrives, independent of the amplitude envelope's own
 //     release tail (design-prompt-sample-generator-mode.md)
+//   - polyphonic delay() ring buffer isolation across concurrent voices (FieldSynthNode)
 //
 // Deliberately deferred (not covered by this fixture): true voice-stealing
 // across more concurrent notes than kMaxVoices, hot-reload across a type
@@ -42035,6 +42036,203 @@ static int RunFieldSampleTest()
       }
       if (secOk) printf("SECTION 13 (FieldSynth Presets Zero-Fault Run): OK\n");
       else { printf("SECTION 13 (FieldSynth Presets Zero-Fault Run): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 14: FieldSynthNode Polyphonic delay() Isolation
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 14a. Real polyphony delay isolation with simultaneous and staggered notes.
+      // Two concurrent voices (note 57: A3 = 220Hz -> freq/440 = 0.5; note 69: A4 = 440Hz -> freq/440 = 1.0).
+      // Each voice generates an impulse (scaled to freq/440.0) after reaching sustain (sample 100).
+      // A 16-sample delay line delays the impulse.
+      // If delay storage were mistakenly shared across voices, the delay cursors would advance
+      // twice as fast during polyphony (premature output around sample 108) and voices would
+      // interleave/corrupt each other's delayed samples.
+      {
+         FieldSynthNode synth;
+         synth.code =
+            "state float p = 0\n"
+            "sig = if(p == 100.0, freq / 440.0, 0.0)\n"
+            "p = p + 1.0\n"
+            "out = delay(sig, 16)\n";
+
+         if (!synth.Apply())
+         {
+            printf("SECTION 14: FAIL - delay program did not compile: %s\n", synth.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = synth.GetAudioNode();
+            an->PrepareToPlay(44100.0, 128);
+
+            // Test case 1: Simultaneous notes triggered at frame 0.
+            // Voice 1: note 57 (freq 220Hz -> sig = 0.5f)
+            // Voice 2: note 69 (freq 440Hz -> sig = 1.0f)
+            // At frame 100: both voices fire impulse.
+            // At frame 116 (100 + 16): both delay lines output their respective impulse.
+            // Sum = 0.5f + 1.0f = 1.5f.
+            // Samples before frame 116 (e.g. frame 108 where shared cursor bug would fire) must be 0.0f.
+            {
+               NoteEventQueue notes;
+               const int cursor = notes.RegisterConsumer();
+               an->SetNoteInbox(&notes, cursor);
+
+               NoteEvent on1;
+               on1.isNoteOn = true;
+               on1.note = 57;
+               on1.velocity = 1.0f;
+               on1.voiceId = 1;
+               on1.frameOffset = 0;
+               notes.Push(on1);
+
+               NoteEvent on2;
+               on2.isNoteOn = true;
+               on2.note = 69;
+               on2.velocity = 1.0f;
+               on2.voiceId = 2;
+               on2.frameOffset = 0;
+               notes.Push(on2);
+
+               std::vector<float> l(128, 0.0f), r(128, 0.0f);
+               float* chans[2] = { l.data(), r.data() };
+               AudioBuffer buf;
+               buf.channels = chans;
+               buf.numChannels = 2;
+               buf.numFrames = 128;
+
+               synth.CookIfNeeded(1);
+               an->ProcessBlock(nullptr, 0, buf);
+
+               // Under the shared-buffer bug, cursor advances twice per sample, outputting at sample 108:
+               if (std::fabs(l[108]) > 1e-4f)
+               {
+                  printf("SECTION 14: FAIL - simultaneous notes: sample 108 is %f, expected 0.0f (shared ring buffer symptom)\n", l[108]);
+                  secOk = false;
+               }
+
+               // Frame 116 should be exactly 1.5f (0.5 + 1.0)
+               if (std::fabs(l[116] - 1.5f) > 1e-4f)
+               {
+                  printf("SECTION 14: FAIL - simultaneous notes: sample 116 is %f, expected 1.5f\n", l[116]);
+                  secOk = false;
+               }
+
+               // Surrounding samples must be 0
+               for (int s = 100; s < 116; s++)
+               {
+                  if (std::fabs(l[s]) > 1e-4f)
+                  {
+                     printf("SECTION 14: FAIL - simultaneous notes: sample %d is %f, expected 0.0f\n", s, l[s]);
+                     secOk = false;
+                     break;
+                  }
+               }
+               for (int s = 117; s < 128; s++)
+               {
+                  if (std::fabs(l[s]) > 1e-4f)
+                  {
+                     printf("SECTION 14: FAIL - simultaneous notes: sample %d is %f, expected 0.0f\n", s, l[s]);
+                     secOk = false;
+                     break;
+                  }
+               }
+            }
+
+            // Test case 2: Staggered notes across block boundary.
+            // Note 1 triggered at frame 0 (note 57 -> sig = 0.5f).
+            // Note 2 triggered at frame 20 (note 69 -> sig = 1.0f).
+            // Block 1 (frames 0..127):
+            //   - Voice 1 impulse at frame 100 -> output at frame 116 is 0.5f.
+            //   - Voice 2 impulse at frame 120 (20 + 100) -> 8 samples in block 1, remaining 8 in block 2.
+            // Block 2 (frames 128..255):
+            //   - Frame 8 (overall sample 136): Voice 2 delayed output is 1.0f.
+            //   - Voice 1 outputs 0.0f.
+            {
+               FieldSynthNode synth2;
+               synth2.code = synth.code;
+               synth2.Apply();
+               AudioNode* an2 = synth2.GetAudioNode();
+               an2->PrepareToPlay(44100.0, 128);
+
+               NoteEventQueue notes2;
+               const int cursor2 = notes2.RegisterConsumer();
+               an2->SetNoteInbox(&notes2, cursor2);
+
+               NoteEvent on1;
+               on1.isNoteOn = true;
+               on1.note = 57;
+               on1.velocity = 1.0f;
+               on1.voiceId = 1;
+               on1.frameOffset = 0;
+               notes2.Push(on1);
+
+               NoteEvent on2;
+               on2.isNoteOn = true;
+               on2.note = 69;
+               on2.velocity = 1.0f;
+               on2.voiceId = 2;
+               on2.frameOffset = 20;
+               notes2.Push(on2);
+
+               std::vector<float> l1(128, 0.0f), r1(128, 0.0f);
+               float* chans1[2] = { l1.data(), r1.data() };
+               AudioBuffer buf1;
+               buf1.channels = chans1;
+               buf1.numChannels = 2;
+               buf1.numFrames = 128;
+
+               synth2.CookIfNeeded(1);
+               an2->ProcessBlock(nullptr, 0, buf1);
+
+               // In block 1: Voice 1 outputs 0.5f at frame 116. Voice 2 is not yet due (it is at sample 96).
+               if (std::fabs(l1[116] - 0.5f) > 1e-4f)
+               {
+                  printf("SECTION 14: FAIL - staggered notes: block 1 sample 116 is %f, expected 0.5f (Voice 1 only)\n", l1[116]);
+                  secOk = false;
+               }
+               if (std::fabs(l1[115]) > 1e-4f || std::fabs(l1[117]) > 1e-4f)
+               {
+                  printf("SECTION 14: FAIL - staggered notes: bleed at sample 115 (%f) or 117 (%f)\n", l1[115], l1[117]);
+                  secOk = false;
+               }
+
+               std::vector<float> l2(128, 0.0f), r2(128, 0.0f);
+               float* chans2[2] = { l2.data(), r2.data() };
+               AudioBuffer buf2;
+               buf2.channels = chans2;
+               buf2.numChannels = 2;
+               buf2.numFrames = 128;
+
+               synth2.CookIfNeeded(2);
+               an2->ProcessBlock(nullptr, 0, buf2);
+
+               // In block 2: Voice 2 outputs 1.0f at frame 8 (overall 136). Voice 1 is silent.
+               if (std::fabs(l2[8] - 1.0f) > 1e-4f)
+               {
+                  printf("SECTION 14: FAIL - staggered notes: block 2 sample 8 (overall 136) is %f, expected 1.0f (Voice 2 only)\n", l2[8]);
+                  secOk = false;
+               }
+               if (std::fabs(l2[7]) > 1e-4f || std::fabs(l2[9]) > 1e-4f)
+               {
+                  printf("SECTION 14: FAIL - staggered notes: bleed at sample 7 (%f) or 9 (%f) in block 2\n", l2[7], l2[9]);
+                  secOk = false;
+               }
+
+               if (synth2.FaultCount() > 0)
+               {
+                  printf("SECTION 14: FAIL - synth generated %llu fault(s)\n", (unsigned long long)synth2.FaultCount());
+                  secOk = false;
+               }
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 14 (FieldSynth Polyphonic delay() Isolation): OK\n");
+      else { printf("SECTION 14 (FieldSynth Polyphonic delay() Isolation): FAIL\n"); allOk = false; }
    }
 
    printf("INFINITE_FIELDSAMPLETEST: %s\n", allOk ? "OK" : "FAIL");

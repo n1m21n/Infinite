@@ -38,10 +38,10 @@ public:
       std::memset(mStateCur, 0, sizeof(mStateCur));
       std::memset(mStateNext, 0, sizeof(mStateNext));
       std::memset(mGateHeld, 0, sizeof(mGateHeld));
-      std::fill(mDelayBuffer, mDelayBuffer + Field::kSampleMaxDelayCells, 0.0f);
-      std::fill(mDelaySwapBuffer, mDelaySwapBuffer + Field::kSampleMaxDelayCells, 0.0f);
-      std::fill(mDelayCursors, mDelayCursors + Field::kSampleMaxDelayLines, 0);
-      std::fill(mDelaySwapCursors, mDelaySwapCursors + Field::kSampleMaxDelayLines, 0);
+      std::memset(mDelayBuffer, 0, sizeof(mDelayBuffer));
+      std::memset(mDelaySwapBuffer, 0, sizeof(mDelaySwapBuffer));
+      std::memset(mDelayCursors, 0, sizeof(mDelayCursors));
+      std::memset(mDelaySwapCursors, 0, sizeof(mDelaySwapCursors));
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
@@ -95,25 +95,29 @@ public:
             }
          }
 
-         // Delay line transplant
-         std::memcpy(mDelaySwapBuffer, mDelayBuffer, sizeof(mDelaySwapBuffer));
-         std::memcpy(mDelaySwapCursors, mDelayCursors, sizeof(mDelaySwapCursors));
-         std::fill(mDelayBuffer, mDelayBuffer + Field::kSampleMaxDelayCells, 0.0f);
-         std::fill(mDelayCursors, mDelayCursors + Field::kSampleMaxDelayLines, 0);
-
-         for (const auto& dl : fresh->delays)
+         // Delay line transplant: preserve live ring buffer contents and
+         // cursor position per-voice across hot reloads when delay length matches.
+         for (int v = 0; v < kMaxVoices; v++)
          {
-            if (dl.transplantFromOffset >= 0 && dl.transplantFromLength == dl.length &&
-                dl.bufferOffset + dl.length <= Field::kSampleMaxDelayCells &&
-                dl.transplantFromOffset + dl.transplantFromLength <= Field::kSampleMaxDelayCells)
+            std::memcpy(mDelaySwapBuffer, mDelayBuffer[v], sizeof(mDelaySwapBuffer));
+            std::memcpy(mDelaySwapCursors, mDelayCursors[v], sizeof(mDelaySwapCursors));
+            std::fill(mDelayBuffer[v], mDelayBuffer[v] + Field::kSampleMaxDelayCells, 0.0f);
+            std::fill(mDelayCursors[v], mDelayCursors[v] + Field::kSampleMaxDelayLines, 0);
+
+            for (const auto& dl : fresh->delays)
             {
-               std::memcpy(mDelayBuffer + dl.bufferOffset,
-                           mDelaySwapBuffer + dl.transplantFromOffset,
-                           dl.length * sizeof(float));
-               if (dl.transplantFromCursor >= 0 && dl.transplantFromCursor < Field::kSampleMaxDelayLines &&
-                   dl.cursorIndex >= 0 && dl.cursorIndex < Field::kSampleMaxDelayLines)
+               if (dl.transplantFromOffset >= 0 && dl.transplantFromLength == dl.length &&
+                   dl.bufferOffset + dl.length <= Field::kSampleMaxDelayCells &&
+                   dl.transplantFromOffset + dl.transplantFromLength <= Field::kSampleMaxDelayCells)
                {
-                  mDelayCursors[dl.cursorIndex] = mDelaySwapCursors[dl.transplantFromCursor];
+                  std::memcpy(mDelayBuffer[v] + dl.bufferOffset,
+                              mDelaySwapBuffer + dl.transplantFromOffset,
+                              dl.length * sizeof(float));
+                  if (dl.transplantFromCursor >= 0 && dl.transplantFromCursor < Field::kSampleMaxDelayLines &&
+                      dl.cursorIndex >= 0 && dl.cursorIndex < Field::kSampleMaxDelayLines)
+                  {
+                     mDelayCursors[v][dl.cursorIndex] = mDelaySwapCursors[dl.transplantFromCursor];
+                  }
                }
             }
          }
@@ -154,6 +158,11 @@ public:
                   mStateCur[v][c] = mActiveProgram->state[c].initialValue;
                   mStateNext[v][c] = mActiveProgram->state[c].initialValue;
                }
+               for (const auto& dl : mActiveProgram->delays)
+               {
+                  std::fill(mDelayBuffer[v] + dl.bufferOffset, mDelayBuffer[v] + dl.bufferOffset + dl.length, 0.0f);
+                  mDelayCursors[v][dl.cursorIndex] = 0;
+               }
             }
             else
             {
@@ -193,8 +202,8 @@ public:
             rin.paramVals = paramVals;
             rin.stateCur = mStateCur[v];
             rin.stateNext = mStateNext[v];
-            rin.delayBuf = mDelayBuffer;
-            rin.delayCursors = mDelayCursors;
+            rin.delayBuf = mDelayBuffer[v];
+            rin.delayCursors = mDelayCursors[v];
 
             const float kernelOut = Field::RunSampleProgram(*mActiveProgram, rin, regs);
             const float env = mVoices.EnvelopeAt(v).Process();
@@ -230,6 +239,22 @@ public:
                break;
             }
          }
+         if (!sawFault)
+         {
+            for (const auto& dl : mActiveProgram->delays)
+            {
+               const float* ptr = mDelayBuffer[v] + dl.bufferOffset;
+               for (int k = 0; k < dl.length; k++)
+               {
+                  if (std::isnan(ptr[k]) || std::isinf(ptr[k]))
+                  {
+                     sawFault = true;
+                     break;
+                  }
+               }
+               if (sawFault) break;
+            }
+         }
       }
 
       if (sawFault)
@@ -243,6 +268,11 @@ public:
             {
                mStateCur[v][c] = mActiveProgram->state[c].initialValue;
                mStateNext[v][c] = mActiveProgram->state[c].initialValue;
+            }
+            for (const auto& dl : mActiveProgram->delays)
+            {
+               std::fill(mDelayBuffer[v] + dl.bufferOffset, mDelayBuffer[v] + dl.bufferOffset + dl.length, 0.0f);
+               mDelayCursors[v][dl.cursorIndex] = 0;
             }
          }
          mFaultCount.fetch_add(1, std::memory_order_relaxed);
@@ -272,9 +302,9 @@ private:
    float mStateCur[kMaxVoices][Field::kSampleMaxStateCells];
    float mStateNext[kMaxVoices][Field::kSampleMaxStateCells];
 
-   float mDelayBuffer[Field::kSampleMaxDelayCells];
+   float mDelayBuffer[kMaxVoices][Field::kSampleMaxDelayCells];
    float mDelaySwapBuffer[Field::kSampleMaxDelayCells];
-   int mDelayCursors[Field::kSampleMaxDelayLines];
+   int mDelayCursors[kMaxVoices][Field::kSampleMaxDelayLines];
    int mDelaySwapCursors[Field::kSampleMaxDelayLines];
 
    NoteEventQueue* mNoteInbox = nullptr;
