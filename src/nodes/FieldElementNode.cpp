@@ -8,44 +8,58 @@
 const std::vector<FieldElementNode::Preset>& FieldElementNode::Presets()
 {
    static const std::vector<Preset> kPresets = {
-      { "Wave Displace", "P.y += sin(P.x * 4.0 + t * 2.0) * 0.25\n" },
-      { "Color by Normal", "Cd = N * 0.5 + 0.5\n" },
-      { "Twist", "a = P.y * 2.0 + t\nP.x = P.x * cos(a) - P.z * sin(a)\nP.z = P.x * sin(a) + P.z * cos(a)\n" },
-      { "Noise Ripple", "n = rand(0, 1, 2.0, 0)\nP += N * (n - 0.5) * 0.2\n" },
-      { "Attrib Ramp", "attrib float heat = 0\nheat = (P.y + 1.0) * 0.5\nCd = vec3(heat, 0.2, 1.0 - heat)\n" },
-      { "Bass Ribbon Mirror (Device #7)",
+      { "Wave Displace",
+        "param float amp = 0.3 [0.0, 2.0]\n"
+        "param float freq = 3.5 [0.5, 10.0]\n"
+        "param float speed = 2.0 [0.0, 8.0]\n"
+        "P.y += sin(P.x * freq + t * speed) * amp\n"
+        "publish = sin(t * speed)\n" },
+      { "Twist Modifier",
+        "param float twist = 2.5 [0.0, 8.0]\n"
+        "a = P.y * twist\n"
+        "px = P.x\n"
+        "pz = P.z\n"
+        "P.x = px * cos(a) - pz * sin(a)\n"
+        "P.z = px * sin(a) + pz * cos(a)\n"
+        "publish = sin(t)\n" },
+      { "Radial Ripple",
+        "param float freq = 8.0 [1.0, 25.0]\n"
+        "param float amp = 0.25 [0.0, 1.5]\n"
+        "param float speed = 3.0 [0.0, 10.0]\n"
+        "d = length(vec2(P.x, P.z))\n"
+        "P.y += sin(d * freq - t * speed) * amp / (1.0 + d)\n"
+        "publish = sin(t * speed)\n" },
+      { "Spherical Bulge",
+        "param float radius = 1.0 [0.2, 3.0]\n"
+        "param float strength = 0.5 [-1.5, 1.5]\n"
+        "d = length(P)\n"
+        "factor = max(0.0, 1.0 - d / radius)\n"
+        "P += N * (factor * factor * strength)\n"
+        "publish = sin(t)\n" },
+      { "Normal Colorizer",
+        "param float blend = 1.0 [0.0, 1.0]\n"
+        "normCol = N * 0.5 + 0.5\n"
+        "Cd = mix(Cd, normCol, blend)\n"
+        "publish = sin(t)\n" },
+      { "Noise Ripple", "n = rand(0, 1, 2.0, 0)\nP += N * (n - 0.5) * 0.2\npublish = sin(t)\n" },
+      { "Attrib Ramp", "attrib float heat = 0\nheat = (P.y + 1.0) * 0.5\nCd = vec3(heat, 0.2, 1.0 - heat)\npublish = sin(t)\n" },
+      { "Bass Ribbon Mirror",
         "param float amp = 0.8 [0.0, 3.0]\n"
         "param float wave = 4.0 [0.5, 16.0]\n"
         "param float speed = 3.0 [0.5, 10.0]\n"
         "disp = sin(P.x * wave + t * speed) * amp * 0.25\n"
         "P.y += disp\n"
         "Cd = vec3(0.5 + 0.5 * sin(P.x * 2.0 + t), 0.3, 0.9)\n"
-        "output frame float glow = abs(sin(t * speed))\n" },
-      { "Chladni Sand Dispersion (Device #11)",
-        "param float m = 3.0 [1.0, 10.0]\n"
-        "param float n = 5.0 [1.0, 10.0]\n"
-        "param float amp = 0.25 [0.0, 1.0]\n"
-        "p = vec2(P.x, P.z) * 3.14159265\n"
-        "val = cos(n * p.x) * cos(m * p.y) - cos(m * p.x) * cos(n * p.y)\n"
-        "P.y = abs(val) * amp\n"
-        "Cd = vec3(1.0 - abs(val), 0.7, 0.4)\n" },
-      { "Boundary Chime Sensor (Device #19)",
+        "output frame float glow = abs(sin(t * speed))\n"
+        "publish = abs(sin(t * speed))\n" },
+      { "Boundary Chime Sensor",
         "param float threshold = 0.3 [0.0, 1.0]\n"
         "param float freq = 2.0 [0.1, 8.0]\n"
         "P.y += sin(P.x * 4.0 + t * freq) * 0.1\n"
         "hit = if(P.y > threshold, 1.0, 0.0)\n"
         "Cd = if(hit > 0.5, vec3(1.0, 0.2, 0.2), vec3(0.2, 0.6, 1.0))\n"
-        "output frame float chime = reduce.max(hit)\n" },
-      { "Predictive Collision Bounce",
-        "param float floorY = -0.5 [-2.0, 1.0]\n"
-        "param float bounce = 0.65 [0.0, 0.95]\n"
-        "state vec3 prevP = vec3(0.0, 0.0, 0.0)\n"
-        "cur = P\n"
-        "vel = cur - prevP\n"
-        "nextY = cur.y + vel.y\n"
-        "vel.y = if(nextY < floorY, -vel.y * bounce, vel.y)\n"
-        "P = cur + vel\n"
-        "prevP = cur\n" }
+        "output frame float chime = reduce.max(hit)\n"
+        "publish = reduce.max(hit)\n" }
    };
    return kPresets;
 }
@@ -272,13 +286,24 @@ void FieldElementNode::CookIfNeeded(int frameId)
 
    double t = Transport::Instance().Seconds();
 
+   std::map<std::string, float> paramValues = mParamTable.ValueMap();
+   size_t paramHash = 0;
+   for (const auto& kv : paramValues)
+   {
+      paramHash ^= std::hash<std::string>{}(kv.first) + 0x9e3779b9 + (paramHash << 6) + (paramHash >> 2);
+      paramHash ^= std::hash<float>{}(kv.second) + 0x9e3779b9 + (paramHash << 6) + (paramHash >> 2);
+   }
+
    bool needRebuild = (upRev != mLastUpstreamRevision) ||
                       (mProgram && mProgram->isTimeDependent && (float)t != mLastEvalT) ||
                       (mOutMesh.vertices.empty()) ||
-                      (!mState.Cells().empty());
+                      (!mState.Cells().empty()) ||
+                      (paramHash != mLastParamHash);
 
    if (!needRebuild)
       return;
+
+   mLastParamHash = paramHash;
 
    if (!mProgram)
    {
@@ -308,7 +333,6 @@ void FieldElementNode::CookIfNeeded(int frameId)
    env.t = t;
    env.dt = (mLastEvalT > -900000.0f) ? (t - mLastEvalT) : (1.0 / 60.0);
    env.frame = (double)frameId;
-   std::map<std::string, float> paramValues = mParamTable.ValueMap();
    env.params = &paramValues;
    env.state = &mState;
    std::string vmErr;

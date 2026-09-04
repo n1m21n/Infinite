@@ -315,7 +315,9 @@ set(COMMON_SOURCES
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
     src/nodes/FieldElementNode.cpp
+    src/nodes/FieldPrimitiveNode.cpp
     src/nodes/FieldSampleNode.cpp
+    src/nodes/FieldSynthNode.cpp
     src/nodes/FieldPixelNode.cpp
     src/nodes/FieldGraphNode.cpp
     src/nodes/PointDistributionNodes.cpp
@@ -811,9 +813,11 @@ if(APPLE)
 
     target_sources(Infinite PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns"
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/InfinitePatch.icns")
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/InfinitePatch.icns"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/InfiniteDevice.icns")
     set_source_files_properties(
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/Infinite.icns"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/InfinitePatch.icns"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/InfiniteDevice.icns"
         PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 endif()

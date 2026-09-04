@@ -97,16 +97,31 @@ namespace Field
    using LiveCableChecker = bool (*)(int nodeIndex, int slot, bool isOutput);
    extern LiveCableChecker gLiveCableChecker;
 
+   // Sibling bridge to gLiveCableChecker: when a pin that would retire still
+   // has a live cable, ReconcileFieldPins calls this (if installed) to sever
+   // that cable at its actual node-graph source rather than refusing the
+   // whole reconcile - a preset switch that drops a declared pin (e.g. Field
+   // Modifier's `glow`) should auto-disconnect and retire it, not block the
+   // preset load until the user manually unplugs it first. A null
+   // disconnector (headless/test context) falls back to the old refuse
+   // behavior.
+   using LiveCableDisconnector = void (*)(int nodeIndex, int slot, bool isOutput);
+   extern LiveCableDisconnector gLiveCableDisconnector;
+
    // Shared S5.1 reconcile/refuse/commit step, used identically by
    // FieldElementNode, FieldSampleNode and FieldPixelNode's Apply(). Tries
    // to reconcile `live` against a fresh compile's `declared` list. If any
    // pin that would retire (removed, or redeclared with a changed shape)
    // still has a live cable attached to its current compacted slot (per
-   // gLiveCableChecker), the whole reconcile is refused: `live` is left
-   // completely untouched, `outRefusal` names the offending pin(s) for the
-   // caller to surface as an error, and this returns false - the caller
-   // must then abort Apply() entirely (keep the previous program live), the
-   // same "keep last working program" discipline as a compile error.
+   // gLiveCableChecker), that cable is auto-disconnected via
+   // gLiveCableDisconnector (if installed) and the retirement proceeds -
+   // `outNotice` names the auto-disconnected pin(s) so the caller can surface
+   // it as an FYI, not an error. Only when no disconnector is installed
+   // (headless/test context) does a live cable fall back to refusing the
+   // whole reconcile: `live` is left completely untouched, `outRefusal`
+   // names the offending pin(s), and this returns false - the caller must
+   // then abort Apply() entirely (keep the previous program live), the same
+   // "keep last working program" discipline as a compile error.
    // On success, `live` has been updated in place (same object identity,
    // so any raw PinEntry* a caller cached across the call is invalidated)
    // and this returns true.

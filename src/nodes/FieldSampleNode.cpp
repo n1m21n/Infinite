@@ -2,10 +2,8 @@
 
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
-#include "audio/AudioVoice.h"
 #include "audio/DspMath.h"
 #include "audio/MeterRing.h"
-#include "audio/NoteEventQueue.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
 #include "field/BackendRegister.h"
@@ -20,46 +18,27 @@
 
 namespace
 {
-   constexpr int kMaxVoices = 16; // fixed cap; FieldSampleNode::maxVoices (UI) selects how many of these are used
    constexpr float kOutClamp = 4.0f; // ~12dB headroom, matches the rest of the audio graph's clamp convention
-
-   // Same formula and naming convention as every other synth node's local
-   // helper (OscillatorNode/ImageSpectralSynthNode/WaveTerrainNode/
-   // EquationNode/MetallicNode all define their own copy rather than share
-   // one from a header) - see WavetableSynthCore::NoteToHz for the
-   // canonical form this mirrors.
-   inline float MidiNoteToHz(int midiNote)
-   {
-      return 440.0f * powf(2.0f, ((float)midiNote - 69.0f) / 12.0f);
-   }
 }
 
 // ------------------------------------------------------------- audio thread
 class AudioFieldSampleNode : public AudioNode
 {
 public:
-   AudioFieldSampleNode() : mVoices(kMaxVoices)
+   AudioFieldSampleNode()
    {
       std::memset(mStateCur, 0, sizeof(mStateCur));
       std::memset(mStateNext, 0, sizeof(mStateNext));
-      std::memset(mGateHeld, 0, sizeof(mGateHeld));
+      std::fill(mDelayBuffer, mDelayBuffer + Field::kSampleMaxDelayCells, 0.0f);
+      std::fill(mDelaySwapBuffer, mDelaySwapBuffer + Field::kSampleMaxDelayCells, 0.0f);
+      std::fill(mDelayCursors, mDelayCursors + Field::kSampleMaxDelayLines, 0);
+      std::fill(mDelaySwapCursors, mDelaySwapCursors + Field::kSampleMaxDelayLines, 0);
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
       mSampleRate = sampleRate;
       mMailbox.PrepareToPlay(sampleRate);
-      mVoices.SetSampleRate(sampleRate);
-      // Fast fixed attack/release just enough to avoid a click on trigger/
-      // release - the Field kernel's own 'state' cells are where any real
-      // envelope shaping happens; this is not a musical parameter.
-      mVoices.SetADSR(2.0f, 0.0f, 1.0f, 30.0f);
-   }
-
-   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
-   {
-      mNoteInbox = inbox;
-      mNoteCursor = cursor;
    }
 
    // Main thread only. Hands over a freshly compiled program; retired via
@@ -70,8 +49,6 @@ public:
 
    // Main thread only, called once per frame for every declared param.
    void PushParam(int mailboxId, float value) { mMailbox.Push(mailboxId, value); }
-
-   void SetMaxVoices(int n) { mNumVoicesInUse = std::clamp(n, 1, kMaxVoices); }
 
    uint64_t FaultCount() const { return mFaultCount.load(std::memory_order_relaxed); }
    bool ReadRmsLatest(float& out) { return mMeter.ReadLatest(out); }
@@ -87,25 +64,47 @@ public:
       if (mProgramSlot.SwapIn())
       {
          Field::SampleProgram* fresh = mProgramSlot.Active();
-         for (int v = 0; v < kMaxVoices; v++)
+         float oldCur[Field::kSampleMaxStateCells];
+         std::memcpy(oldCur, mStateCur, sizeof(oldCur));
+         const int n = (int)fresh->state.size();
+         for (int i = 0; i < n; i++)
          {
-            float oldCur[Field::kSampleMaxStateCells];
-            std::memcpy(oldCur, mStateCur[v], sizeof(oldCur));
-            const int n = (int)fresh->state.size();
-            for (int i = 0; i < n; i++)
+            const int from = fresh->state[i].transplantFromIndex;
+            const float val = (from >= 0 && from < Field::kSampleMaxStateCells)
+               ? oldCur[from] : fresh->state[i].initialValue;
+            mStateCur[i] = val;
+            mStateNext[i] = val;
+         }
+         for (int i = n; i < Field::kSampleMaxStateCells; i++)
+         {
+            mStateCur[i] = 0.0f;
+            mStateNext[i] = 0.0f;
+         }
+
+         // Delay line transplant (Step 19): preserve live ring buffer contents and
+         // cursor position across hot reloads when delay length matches.
+         std::memcpy(mDelaySwapBuffer, mDelayBuffer, sizeof(mDelaySwapBuffer));
+         std::memcpy(mDelaySwapCursors, mDelayCursors, sizeof(mDelaySwapCursors));
+         std::fill(mDelayBuffer, mDelayBuffer + Field::kSampleMaxDelayCells, 0.0f);
+         std::fill(mDelayCursors, mDelayCursors + Field::kSampleMaxDelayLines, 0);
+
+         for (const auto& dl : fresh->delays)
+         {
+            if (dl.transplantFromOffset >= 0 && dl.transplantFromLength == dl.length &&
+                dl.bufferOffset + dl.length <= Field::kSampleMaxDelayCells &&
+                dl.transplantFromOffset + dl.transplantFromLength <= Field::kSampleMaxDelayCells)
             {
-               const int from = fresh->state[i].transplantFromIndex;
-               const float val = (from >= 0 && from < Field::kSampleMaxStateCells)
-                  ? oldCur[from] : fresh->state[i].initialValue;
-               mStateCur[v][i] = val;
-               mStateNext[v][i] = val;
-            }
-            for (int i = n; i < Field::kSampleMaxStateCells; i++)
-            {
-               mStateCur[v][i] = 0.0f;
-               mStateNext[v][i] = 0.0f;
+               std::memcpy(mDelayBuffer + dl.bufferOffset,
+                           mDelaySwapBuffer + dl.transplantFromOffset,
+                           dl.length * sizeof(float));
+               if (dl.transplantFromCursor >= 0 && dl.transplantFromCursor < Field::kSampleMaxDelayLines &&
+                   dl.cursorIndex >= 0 && dl.cursorIndex < Field::kSampleMaxDelayLines)
+               {
+                  mDelayCursors[dl.cursorIndex] = mDelaySwapCursors[dl.transplantFromCursor];
+               }
             }
          }
+
          mActiveProgram = fresh;
       }
 
@@ -115,15 +114,9 @@ public:
       if (mActiveProgram == nullptr || !mActiveProgram->valid)
          return;
 
-      // Slot 1, not 0 - slot 0 is the note pin's slot in the shared pin
-      // index space (see FieldSampleNode.h's AudioInputSlot override).
-      const AudioBuffer* inBuf = (numInputs > 1) ? inputs[1] : nullptr;
-
-      NoteEvent evts[64];
-      int numEvts = 0;
-      int evtIdx = 0;
-      if (mNoteInbox != nullptr)
-         numEvts = mNoteInbox->Pop(mNoteCursor, evts, 64);
+      // "in" lives at slot 0 (FieldSampleNode.h's AudioInputSlot override) -
+      // the note pin that used to occupy slot 0 is gone.
+      const AudioBuffer* inBuf = (numInputs > 0) ? inputs[0] : nullptr;
 
       float paramVals[Field::kSampleMaxParams] = {};
 
@@ -131,48 +124,6 @@ public:
 
       for (int i = 0; i < buffer.numFrames; i++)
       {
-         while (evtIdx < numEvts && evts[evtIdx].frameOffset <= i)
-         {
-            if (evts[evtIdx].isNoteOn)
-            {
-               const int v = mVoices.NoteOn(evts[evtIdx].note, evts[evtIdx].velocity, evts[evtIdx].voiceId);
-               mVoiceId[v] = evts[evtIdx].voiceId;
-               // Field 'gate': 1.0 for as long as this voice's note is
-               // held, dropping to 0.0 the instant note-off arrives below -
-               // independent of the amplitude envelope's own release tail
-               // (EnvelopeAt(v), which keeps decaying after gate goes low).
-               mGateHeld[v] = true;
-               // Every voice assignment (idle or stolen) resets that voice's
-               // Field 'state' cells to their declared initial values - a
-               // new note is a fresh instance of the kernel's own per-voice
-               // memory, unlike the envelope curve (which intentionally does
-               // NOT reset on a same-note legato retrigger; see Envelope::
-               // ResetLevel's comment). Field has no such legato exception.
-               const int n = (int)mActiveProgram->state.size();
-               for (int c = 0; c < n; c++)
-               {
-                  mStateCur[v][c] = mActiveProgram->state[c].initialValue;
-                  mStateNext[v][c] = mActiveProgram->state[c].initialValue;
-               }
-            }
-            else
-            {
-               mVoices.NoteOff(evts[evtIdx].voiceId);
-               // mVoiceId[] is this class's own record of which voice index
-               // currently holds which voiceId (kMaxVoices is small and
-               // fixed, so this bounded scan is real-time safe) - matches
-               // VoiceAllocator::NoteOff's own internal lookup without
-               // needing a second accessor added to the shared class.
-               for (int gv = 0; gv < kMaxVoices; gv++)
-                  if (mVoiceId[gv] == evts[evtIdx].voiceId)
-                     mGateHeld[gv] = false;
-            }
-            evtIdx++;
-         }
-
-         // Fetched once per sample, ABOVE the voice loop - fetching per
-         // voice would corrupt the smoothing ramp's effective time constant
-         // based on voice count (see SampleRuntime.h).
          const float inVal = (inBuf != nullptr && inBuf->numChannels > 0) ? inBuf->channels[0][i] : 0.0f;
          const float srVal = (float)mSampleRate;
          const float nVal = (float)mAbsSampleCounter;
@@ -182,38 +133,27 @@ public:
          for (int p = 0; p < numParams; p++)
             paramVals[p] = mMailbox.SmoothedValue(mActiveProgram->params[p].mailboxId);
 
-         float sampleAcc = 0.0f;
          float regs[Field::kSampleMaxRegs];
 
-         for (int v = 0; v < mNumVoicesInUse; v++)
-         {
-            if (!mVoices.IsVoiceActive(v))
-               continue;
+         // Field Effect is a continuous audio effect, not a note-triggered
+         // synth (the note pin was removed - see FieldSampleNode.h) - it runs
+         // one always-on kernel instance (state bank 0) every sample, with no
+         // voice allocation and no envelope gate. freq/gate stay at 0 since
+         // there is no note to report.
+         Field::SampleRuntimeInput rin;
+         rin.in = inVal;
+         rin.sr = srVal;
+         rin.n = nVal;
+         rin.freq = 0.0f;
+         rin.gate = 0.0f;
+         rin.paramVals = paramVals;
+         rin.stateCur = mStateCur;
+         rin.stateNext = mStateNext;
+         rin.delayBuf = mDelayBuffer;
+         rin.delayCursors = mDelayCursors;
 
-            Field::SampleRuntimeInput rin;
-            rin.in = inVal;
-            rin.sr = srVal;
-            rin.n = nVal;
-            // Per-voice, unlike in/sr/n above - freq/gate are always
-            // populated regardless of whether 'in' is connected, so a
-            // kernel can be a self-contained generator (design-prompt-
-            // sample-generator-mode.md). freq holds the voice's last
-            // triggered note's frequency even after gate drops to 0 (no
-            // reason to zero it - a released voice's kernel may still want
-            // to know what it was playing during its own release tail).
-            rin.freq = MidiNoteToHz(mVoices.NoteAt(v));
-            rin.gate = mGateHeld[v] ? 1.0f : 0.0f;
-            rin.paramVals = paramVals;
-            rin.stateCur = mStateCur[v];
-            rin.stateNext = mStateNext[v];
-
-            const float kernelOut = Field::RunSampleProgram(*mActiveProgram, rin, regs);
-            const float env = mVoices.EnvelopeAt(v).Process();
-            sampleAcc += kernelOut * env;
-
-            // Ping-pong the per-voice state bank for the next sample.
-            std::memcpy(mStateCur[v], mStateNext[v], sizeof(mStateCur[v]));
-         }
+         float sampleAcc = Field::RunSampleProgram(*mActiveProgram, rin, regs);
+         std::memcpy(mStateCur, mStateNext, sizeof(mStateCur));
 
          if (std::isnan(sampleAcc) || std::isinf(sampleAcc))
          {
@@ -230,21 +170,37 @@ public:
          mScopeRing.Write(&sampleAcc, 1);
       }
 
-      // Once-per-block NaN/inf sweep over live voice state (not per sample -
-      // that would be a real-time-hostile unbounded-looking cost on every
-      // sample; a poisoned state cell is caught within one block either
-      // way). A hit zeroes the block just rendered, resets every voice's
-      // state to its declared initial values, and bumps the fault counter
-      // rather than silently propagating NaN forever.
-      for (int v = 0; v < mNumVoicesInUse && !sawFault; v++)
+      // Once-per-block NaN/inf sweep over the kernel's live state (not per
+      // sample - that would be a real-time-hostile unbounded-looking cost on
+      // every sample; a poisoned state cell is caught within one block either
+      // way). A hit zeroes the block just rendered, resets state back to its
+      // declared initial values, and bumps the fault counter rather than
+      // silently propagating NaN forever.
+      if (!sawFault)
       {
          const int n = (int)mActiveProgram->state.size();
          for (int c = 0; c < n; c++)
          {
-            if (std::isnan(mStateCur[v][c]) || std::isinf(mStateCur[v][c]))
+            if (std::isnan(mStateCur[c]) || std::isinf(mStateCur[c]))
             {
                sawFault = true;
                break;
+            }
+         }
+         if (!sawFault)
+         {
+            for (const auto& dl : mActiveProgram->delays)
+            {
+               const float* ptr = mDelayBuffer + dl.bufferOffset;
+               for (int k = 0; k < dl.length; k++)
+               {
+                  if (std::isnan(ptr[k]) || std::isinf(ptr[k]))
+                  {
+                     sawFault = true;
+                     break;
+                  }
+               }
+               if (sawFault) break;
             }
          }
       }
@@ -253,13 +209,15 @@ public:
          for (int ch = 0; ch < buffer.numChannels; ch++)
             std::fill(buffer.channels[ch], buffer.channels[ch] + buffer.numFrames, 0.0f);
          const int n = (int)mActiveProgram->state.size();
-         for (int v = 0; v < kMaxVoices; v++)
+         for (int c = 0; c < n; c++)
          {
-            for (int c = 0; c < n; c++)
-            {
-               mStateCur[v][c] = mActiveProgram->state[c].initialValue;
-               mStateNext[v][c] = mActiveProgram->state[c].initialValue;
-            }
+            mStateCur[c] = mActiveProgram->state[c].initialValue;
+            mStateNext[c] = mActiveProgram->state[c].initialValue;
+         }
+         for (const auto& dl : mActiveProgram->delays)
+         {
+            std::fill(mDelayBuffer + dl.bufferOffset, mDelayBuffer + dl.bufferOffset + dl.length, 0.0f);
+            mDelayCursors[dl.cursorIndex] = 0;
          }
          mFaultCount.fetch_add(1, std::memory_order_relaxed);
       }
@@ -280,20 +238,19 @@ public:
    }
 
 private:
-   VoiceAllocator mVoices;
-   int mVoiceId[kMaxVoices] = {};
-   bool mGateHeld[kMaxVoices] = {}; // Field 'gate': true from note-on until note-off, independent of envelope release
-   int mNumVoicesInUse = kMaxVoices;
-
    ParamMailbox mMailbox;
    SampleSlotT<Field::SampleProgram> mProgramSlot;
    Field::SampleProgram* mActiveProgram = nullptr;
 
-   float mStateCur[kMaxVoices][Field::kSampleMaxStateCells];
-   float mStateNext[kMaxVoices][Field::kSampleMaxStateCells];
+   float mStateCur[Field::kSampleMaxStateCells];
+   float mStateNext[Field::kSampleMaxStateCells];
 
-   NoteEventQueue* mNoteInbox = nullptr;
-   int mNoteCursor = -1;
+   // Step 19: Ring-buffer delay line storage and write cursors.
+   // Audio runtime state - not persisted in patches (resets on patch load).
+   float mDelayBuffer[Field::kSampleMaxDelayCells];
+   float mDelaySwapBuffer[Field::kSampleMaxDelayCells];
+   int mDelayCursors[Field::kSampleMaxDelayLines];
+   int mDelaySwapCursors[Field::kSampleMaxDelayLines];
 
    MeterRing mMeter;
    MeterRing mScopeRing;
@@ -306,6 +263,162 @@ private:
 const std::vector<FieldSampleNode::Preset>& FieldSampleNode::Presets()
 {
    static const std::vector<Preset> kPresets = {
+      // Real Schroeder-style diffuser: 4 series allpass stages with actual
+      // multi-sample delay lines (7/11/13/17 samples, shift-register state
+      // cells - Field's sample domain has no ring-buffer primitive, only
+      // scalar `state` cells, capped at Field::kSampleMaxStateCells = 64 per
+      // kernel) plus a global feedback path (fbstate/fb) that recirculates
+      // the diffused signal back through the whole chain, so energy actually
+      // decays over multiple passes instead of a single-sample smear. The
+      // old version used 1-sample "delay" registers per stage, which is a
+      // pure phase-only allpass with no audible diffusion at all - this is
+      // why it didn't sound like reverb. Ceiling: 64 cells is ~1.45ms at
+      // 44.1kHz, so this reads as a short metallic/spring-verb character,
+      // not a spacious hall - a real hall tail needs a proper delay-line
+      // (ring buffer) primitive, which the compiler doesn't have yet.
+      { "Reverb",
+        "param float size = 0.75 [0.1, 0.95]\n"
+        "param float mix = 0.45 [0.0, 1.0]\n"
+        "state float fbstate = 0\n"
+        "state float d1_1 = 0\n"
+        "state float d1_2 = 0\n"
+        "state float d1_3 = 0\n"
+        "state float d1_4 = 0\n"
+        "state float d1_5 = 0\n"
+        "state float d1_6 = 0\n"
+        "state float d1_7 = 0\n"
+        "state float d2_1 = 0\n"
+        "state float d2_2 = 0\n"
+        "state float d2_3 = 0\n"
+        "state float d2_4 = 0\n"
+        "state float d2_5 = 0\n"
+        "state float d2_6 = 0\n"
+        "state float d2_7 = 0\n"
+        "state float d2_8 = 0\n"
+        "state float d2_9 = 0\n"
+        "state float d2_10 = 0\n"
+        "state float d2_11 = 0\n"
+        "state float d3_1 = 0\n"
+        "state float d3_2 = 0\n"
+        "state float d3_3 = 0\n"
+        "state float d3_4 = 0\n"
+        "state float d3_5 = 0\n"
+        "state float d3_6 = 0\n"
+        "state float d3_7 = 0\n"
+        "state float d3_8 = 0\n"
+        "state float d3_9 = 0\n"
+        "state float d3_10 = 0\n"
+        "state float d3_11 = 0\n"
+        "state float d3_12 = 0\n"
+        "state float d3_13 = 0\n"
+        "state float d4_1 = 0\n"
+        "state float d4_2 = 0\n"
+        "state float d4_3 = 0\n"
+        "state float d4_4 = 0\n"
+        "state float d4_5 = 0\n"
+        "state float d4_6 = 0\n"
+        "state float d4_7 = 0\n"
+        "state float d4_8 = 0\n"
+        "state float d4_9 = 0\n"
+        "state float d4_10 = 0\n"
+        "state float d4_11 = 0\n"
+        "state float d4_12 = 0\n"
+        "state float d4_13 = 0\n"
+        "state float d4_14 = 0\n"
+        "state float d4_15 = 0\n"
+        "state float d4_16 = 0\n"
+        "state float d4_17 = 0\n"
+        "\n"
+        "g = 0.35 + size * 0.25\n"
+        "fb = 0.2 + size * 0.5\n"
+        "x0 = in + fbstate * fb\n"
+        "tap1 = d1_7\n"
+        "out1 = -(x0) * g + tap1\n"
+        "din1 = (x0) + out1 * g\n"
+        "d1_7 = d1_6\n"
+        "d1_6 = d1_5\n"
+        "d1_5 = d1_4\n"
+        "d1_4 = d1_3\n"
+        "d1_3 = d1_2\n"
+        "d1_2 = d1_1\n"
+        "d1_1 = din1\n"
+        "\n"
+        "tap2 = d2_11\n"
+        "out2 = -(out1) * g + tap2\n"
+        "din2 = (out1) + out2 * g\n"
+        "d2_11 = d2_10\n"
+        "d2_10 = d2_9\n"
+        "d2_9 = d2_8\n"
+        "d2_8 = d2_7\n"
+        "d2_7 = d2_6\n"
+        "d2_6 = d2_5\n"
+        "d2_5 = d2_4\n"
+        "d2_4 = d2_3\n"
+        "d2_3 = d2_2\n"
+        "d2_2 = d2_1\n"
+        "d2_1 = din2\n"
+        "\n"
+        "tap3 = d3_13\n"
+        "out3 = -(out2) * g + tap3\n"
+        "din3 = (out2) + out3 * g\n"
+        "d3_13 = d3_12\n"
+        "d3_12 = d3_11\n"
+        "d3_11 = d3_10\n"
+        "d3_10 = d3_9\n"
+        "d3_9 = d3_8\n"
+        "d3_8 = d3_7\n"
+        "d3_7 = d3_6\n"
+        "d3_6 = d3_5\n"
+        "d3_5 = d3_4\n"
+        "d3_4 = d3_3\n"
+        "d3_3 = d3_2\n"
+        "d3_2 = d3_1\n"
+        "d3_1 = din3\n"
+        "\n"
+        "tap4 = d4_17\n"
+        "out4 = -(out3) * g + tap4\n"
+        "din4 = (out3) + out4 * g\n"
+        "d4_17 = d4_16\n"
+        "d4_16 = d4_15\n"
+        "d4_15 = d4_14\n"
+        "d4_14 = d4_13\n"
+        "d4_13 = d4_12\n"
+        "d4_12 = d4_11\n"
+        "d4_11 = d4_10\n"
+        "d4_10 = d4_9\n"
+        "d4_9 = d4_8\n"
+        "d4_8 = d4_7\n"
+        "d4_7 = d4_6\n"
+        "d4_6 = d4_5\n"
+        "d4_5 = d4_4\n"
+        "d4_4 = d4_3\n"
+        "d4_3 = d4_2\n"
+        "d4_2 = d4_1\n"
+        "d4_1 = din4\n"
+        "\n"
+        "wet = out4\n"
+        "fbstate = wet\n"
+        "out = in * (1.0 - mix) + wet * mix\n" },
+      // Slapback / Echo delay using the first-class delay(x, samples) ring-buffer
+      // intrinsic (Step 19). 4410 samples @ 44.1kHz is a crisp 100ms echo tap
+      // with low-pass damping in the feedback recirculation loop.
+      { "Delay",
+        "param float feedback = 0.55 [0.0, 0.95]\n"
+        "param float damp = 0.25 [0.0, 0.9]\n"
+        "param float mix = 0.5 [0.0, 1.0]\n"
+        "state float lp = 0\n"
+        "state float fb = 0\n"
+        "d = delay(in + fb * feedback, 4410)\n"
+        "lp = lp * damp + d * (1.0 - damp)\n"
+        "fb = lp\n"
+        "wet = d\n"
+        "out = in * (1.0 - mix) + wet * mix\n" },
+      { "Soft Saturation",
+        "param float drive = 2.5 [1.0, 8.0]\n"
+        "param float mix = 1.0 [0.0, 1.0]\n"
+        "x = in * drive\n"
+        "sat = x / (1.0 + abs(x))\n"
+        "out = in * (1.0 - mix) + sat * mix\n" },
       { "NLMS Feedback Killer",
         "param float mu = 0.3 [0.001, 1.9]\n"
         "param float mode = 0.0 [0.0, 1.0]\n"
@@ -344,22 +457,13 @@ const std::vector<FieldSampleNode::Preset>& FieldSampleNode::Presets()
         "bp = bp + f * hp\n"
         "lp = lp + f * bp\n\n"
         "out = lp * mixLp + bp * mixBp + hp * mixHp\n" },
-      { "Polyphonic FM Bell",
-        "param float modRatio = 2.76 [0.5, 8.0]\n"
-        "param float modIndex = 3.5 [0.0, 10.0]\n"
-        "state float pCarrier = 0\n"
-        "state float pMod = 0\n\n"
-        "pMod = (pMod + (freq * modRatio) / sr) % 1.0\n"
-        "modSig = sin(6.283185 * pMod) * modIndex\n\n"
-        "pCarrier = (pCarrier + (freq / sr) * (1.0 + modSig)) % 1.0\n"
-        "out = sin(6.283185 * pCarrier) * gate\n" },
-      { "Bass Ribbon Driver (Device #7)",
+      { "Bass Ribbon Driver",
         "param float boost = 1.5 [0.5, 4.0]\n"
         "output frame float bass = reduce.rms(in, 20.0, 160.0)\n"
         "state float env = 0\n"
         "env = env * 0.995 + abs(in) * 0.005\n"
         "out = in * boost\n" },
-      { "Boundary Chime Resonator (Device #19)",
+      { "Boundary Chime Resonator",
         "param float pitch = 880.0 [110.0, 3520.0]\n"
         "param float damp = 0.9992 [0.99, 0.9999]\n"
         "state float env = 0\n"
@@ -367,7 +471,7 @@ const std::vector<FieldSampleNode::Preset>& FieldSampleNode::Presets()
         "env = env * damp + abs(in) * 0.2\n"
         "phase = (phase + pitch / sr) % 1.0\n"
         "out = sin(6.283185 * phase) * env\n" },
-      { "Chladni Resonant Tone (Device #11)",
+      { "Chladni Resonant Tone",
         "param float freq1 = 220.0 [55.0, 1760.0]\n"
         "param float ratio = 1.67 [1.0, 4.0]\n"
         "state float p1 = 0\n"
@@ -413,16 +517,12 @@ Field::DeviceFile FieldSampleNode::ToDeviceFile() const
       if (p.isDeclared)
          device.params[p.name] = p.value;
    }
-   device.nodeSettings["maxVoices"] = (double)maxVoices;
    return device;
 }
 
 void FieldSampleNode::LoadDeviceFile(const Field::DeviceFile& device)
 {
    code = device.code;
-   auto itV = device.nodeSettings.find("maxVoices");
-   if (itV != device.nodeSettings.end())
-      maxVoices = (int)itV->second;
    Apply();
    for (const auto& kv : device.params)
    {
@@ -506,7 +606,6 @@ bool FieldSampleNode::Apply()
    mCompiledParams = newProgram->params;
    mLastCompiled = *newProgram; // retained copy for the next Apply()'s transplant resolution
 
-   mAudioNode->SetMaxVoices(maxVoices);
    mAudioNode->PushProgram(newProgram.release());
    mLastError.clear();
    return true;
@@ -519,7 +618,6 @@ void FieldSampleNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
 
    mAudioNode->DrainRetired();
-   mAudioNode->SetMaxVoices(maxVoices);
 
    // Push every declared param's current (UI-editable) value to the audio
    // thread's mailbox every frame - the mailbox is "latest value wins", so
@@ -539,7 +637,6 @@ void FieldSampleNode::CookIfNeeded(int frameId)
 void FieldSampleNode::VisitParams(ParamVisitor& v)
 {
    v.Text("code", code);
-   v.Int("maxVoices", maxVoices);
    v.Bool("exposeRmsOutput", exposeRmsOutput);
    mParamTable.VisitParams(v);
    // Dynamic pins, Phase 2b (build step 13, §5.1 step 8) - see

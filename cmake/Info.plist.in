@@ -47,6 +47,24 @@
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
 		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Infinite Device</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>infdev</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>InfiniteDevice</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.namansoni.infinite.device</string>
+			</array>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+		</dict>
 	</array>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
@@ -68,6 +86,26 @@
 				<array>
 					<string>inf</string>
 					<string>infinite</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.namansoni.infinite.device</string>
+			<key>UTTypeDescription</key>
+			<string>Infinite Device</string>
+			<key>UTTypeIconFile</key>
+			<string>InfiniteDevice</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.content</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>infdev</string>
 				</array>
 			</dict>
 		</dict>

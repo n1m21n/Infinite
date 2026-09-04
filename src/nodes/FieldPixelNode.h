@@ -37,8 +37,20 @@ public:
    int GetOutputWidth() const override;
    int GetOutputHeight() const override;
    void CookIfNeeded(int frameId) override;
-   INode* BypassSource() override { return input.GetSource(); }
-   const char* InputLabel(int) const override { return "src"; }
+   // No native input pin (see the device-catalog simplification: Field Pixel
+   // is generation-only for now) - BypassSource has nothing upstream to skip
+   // to, so it falls back to INode's default (returns nullptr).
+   const char* InputLabel(int slot) const override
+   {
+      int seen = 0;
+      for (const auto& p : mInputPins.Pins())
+      {
+         if (!p.isDeclared || p.typeName != "image") continue;
+         if (seen == slot) return p.name.c_str();
+         seen++;
+      }
+      return nullptr;
+   }
 
    // Dynamic pins, Phase 2b (build step 13, §5.1): kernel `output` decls on
    // top of the native "out" and toggle "state" outputs above, compacted
@@ -98,16 +110,10 @@ public:
    const Field::PinTable& OutputPinTable() const { return mOutputPins; }
    const Field::PinTable& InputPinTable() const { return mInputPins; }
 
-   // The one-and-only native image input ("src" in the kernel), wired the
-   // same way as every other image-consuming node - see CableFor/
-   // InputCountFor in main.cpp. Was a bare INode* before this pin was
-   // actually registered there, which meant nothing could ever be
-   // connected to it.
-   ImageCable& TextureInput() { return input; }
-
    // Dynamic pins, Phase 2b (build step 13, §5.7): kernel `input image`
-   // decls, one ImageCable each, wired at main.cpp input slots 1..N (slot 0
-   // stays the native "src" above) - see main.cpp's InputCountFor/CableFor
+   // decls, one ImageCable each, wired at main.cpp input slots 0..N-1 (no
+   // native pin ahead of them - see the device-catalog simplification's
+   // removal of the native "src" pin) - see main.cpp's InputCountFor/CableFor
    // FieldPixelNode branches. Only image-typed declared inputs get a real
    // cable; a declared scalar/vector input is tracked in mInputPins for
    // refusal/save-load purposes only (its value is not read by the kernel
@@ -183,7 +189,6 @@ public:
    Field::DeviceFile ToDeviceFile() const;
    void LoadDeviceFile(const Field::DeviceFile& device);
 
-   ImageCable input;
    std::string code;
    float width = 1024.0f;
    float height = 1024.0f;

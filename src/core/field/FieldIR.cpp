@@ -1551,10 +1551,29 @@ namespace Field
                sym.isReadOnly = true;
                scope.Add(sym);
 
-               // Purely a declaration + collection for step 12 - nothing in
-               // the kernel body reads or writes this name as a runtime
-               // value, so no IRStmt is emitted (mirrors DeclParam, which
-               // also returns nullptr here).
+               // Frame-domain, non-structural declared outputs (`chime`,
+               // `glow`, ...) get a real runtime value: emit a synthetic
+               // top-level Assign identical in shape to an ordinary
+               // `<name> = <expr>` statement (the exact mechanism `publish`
+               // already uses, unwired to the compiler at all). Codegen and
+               // prologue/loop placement then handle it exactly like any
+               // other frame-domain assignment - see ElementVM::mFrameVars/
+               // ReadFrameVar and the declared-output-wiring plan.
+               // Structural types (audio/image) and non-Frame domains
+               // (element/pixel/sample) have no such name-keyed runtime
+               // channel yet, so they stay a declaration-only collection -
+               // nothing in the kernel body reads or writes them as a
+               // runtime value (mirrors DeclParam, which also returns
+               // nullptr here).
+               if (declaredDomain == Domain::Frame && !isStructural)
+               {
+                  auto stmt = std::make_shared<IRStmt>(IRStmtKind::Assign, decl->span);
+                  stmt->domain = Domain::Frame;
+                  stmt->assignTarget = decl->name;
+                  stmt->assignOp = "=";
+                  stmt->rvalueExpr = initIR;
+                  return stmt;
+               }
                return nullptr;
             }
 
