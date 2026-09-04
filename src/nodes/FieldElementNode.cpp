@@ -128,7 +128,16 @@ void FieldElementNode::LoadDeviceFile(const Field::DeviceFile& device)
 FieldElementNode::FieldElementNode()
 {
    mPublishOutput.owner = this;
-   code = "P.y += sin(P.x * 2.0 + t) * 0.2\n";
+   // Seed from the first factory preset, not a bare unparented stub: the
+   // stub declares no `param float` lines, so a freshly spawned node
+   // compiled zero params into GetParamTable() while presetIndex (defaulted
+   // to 0) still pointed the dropdown label at Presets()[0]'s name - see
+   // FieldSampleNode's constructor for the identical bug and full writeup.
+   const auto& presets = Presets();
+   if (!presets.empty())
+      code = presets[0].code;
+   else
+      code = "P.y += sin(P.x * 2.0 + t) * 0.2\n";
    Apply();
 }
 

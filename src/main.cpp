@@ -395,6 +395,13 @@ namespace
          return "paul stretch";
       if (name == "Granular")
          return "granular";
+      // Registered type key stays "FieldPixel" (patches key off it, and it
+      // was registered without a space unlike its Field Modifier/Primitive/
+      // Synth/Effect/Graph siblings), but every sibling reads with a space
+      // in the UI, so match that here rather than leave this one node an
+      // unspaced outlier in search/spawn menus.
+      if (name == "FieldPixel")
+         return "field pixel";
 #if defined(_WIN32)
       // Registered type key stays "Syphon In"/"Syphon Out" (patch files key
       // off it), but the Windows implementation is backed by Spout2, not
@@ -48434,6 +48441,24 @@ int main(int argc, char** argv)
 
          ImGui::Separator();
 
+         // Transport controls styling: clean, symmetrical, unboxed with pixel-perfect
+         // alignment. Pushed here (ahead of Stop Audio) and popped after the bar/beat
+         // readout below so every element sharing this row - Stop Audio, BPM, time
+         // signature, Key/Scale, and the bar/beat text - has the same frame height and
+         // AlignTextToFramePadding() baseline. Previously Stop Audio sat outside this
+         // block (default, taller FramePadding) while BPM/Key sat inside it (shorter),
+         // so the row visibly broke into different baselines.
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 2.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
+
          // Audio engine on/off, independent of Play/Pause above: Play just
          // drives the timeline (what modulators/visuals read), so someone
          // working on visuals shouldn't have audio hardware opened just to
@@ -48467,18 +48492,6 @@ int main(int argc, char** argv)
             if (!audioOn && !gAudioStartError.empty() && ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
          }
-
-         // Transport controls styling: clean, symmetrical, unboxed with pixel-perfect alignment.
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 2.0f));
-         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
          auto TransportSeparator = []() {
             ImGui::SameLine(0.0f, 10.0f);
@@ -48544,7 +48557,16 @@ int main(int argc, char** argv)
             else
             {
                char bpmBuf[32];
-               snprintf(bpmBuf, sizeof(bpmBuf), "%.1f", bpm);
+               // "###bpmBtn" keeps ImGui's hashed widget ID fixed to the
+               // suffix alone (ImHashStr resets its running hash whenever it
+               // sees "###"), so the ID stays stable across the drag even
+               // though the displayed text changes every frame as bpm
+               // updates. Without it, the changing label changed the ID
+               // every frame, ImGui dropped ActiveId one frame after the
+               // drag started, and the node-editor canvas - which only
+               // refuses to pan while another item is ActiveId - saw no
+               // active item and took over the drag as a pan instead.
+               snprintf(bpmBuf, sizeof(bpmBuf), "%.1f###bpmBtn", bpm);
                ImGui::Button(bpmBuf);
                if (ImGui::IsItemHovered())
                {
@@ -48612,7 +48634,7 @@ int main(int argc, char** argv)
             else
             {
                char numBuf[16];
-               snprintf(numBuf, sizeof(numBuf), "%d", tsNum);
+               snprintf(numBuf, sizeof(numBuf), "%d###tsNumBtn", tsNum);
                ImGui::Button(numBuf);
                if (ImGui::IsItemHovered())
                {
@@ -48682,7 +48704,7 @@ int main(int argc, char** argv)
             else
             {
                char denBuf[16];
-               snprintf(denBuf, sizeof(denBuf), "%d", tsDen);
+               snprintf(denBuf, sizeof(denBuf), "%d###tsDenBtn", tsDen);
                ImGui::Button(denBuf);
                if (ImGui::IsItemHovered())
                {
@@ -48793,15 +48815,15 @@ int main(int argc, char** argv)
             }
          }
 
-         ImGui::PopStyleColor(6);
-         ImGui::PopStyleVar(4);
-
          TransportSeparator();
 
          ImGui::AlignTextToFramePadding();
          ImGui::TextDisabled("bar %d  beat %.2f",
                              1 + (int)transport.Bars(),
                              std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
+
+         ImGui::PopStyleColor(6);
+         ImGui::PopStyleVar(4);
 
          // Frame cost, pinned right. Measured from the swap-to-swap wall clock
          // rather than ImGui's smoothed rate, so a heavy patch shows its real

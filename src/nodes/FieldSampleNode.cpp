@@ -457,6 +457,17 @@ FieldSampleNode::FieldSampleNode()
    : mAudioNode(std::make_unique<AudioFieldSampleNode>())
 {
    mRmsOutput.owner = this;
+   // Seed from the first factory preset rather than the bare passthrough
+   // stub `code`'s member initializer defaults to: that stub declares no
+   // `param float` lines, so a freshly spawned node compiled zero params
+   // into GetParamTable() while presetIndex (also defaulted to 0) still
+   // pointed the dropdown label at Presets()[0]'s name - the node looked
+   // like it had that preset loaded but showed none of its sliders until
+   // the user re-picked a preset through LoadPreset(), which does this
+   // same code/Apply() pairing.
+   const auto& presets = Presets();
+   if (!presets.empty())
+      code = presets[0].code;
    Apply();
 }
 
