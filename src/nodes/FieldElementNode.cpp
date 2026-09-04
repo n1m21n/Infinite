@@ -39,14 +39,55 @@ void FieldElementNode::LoadPreset(int index)
    }
 }
 
+Field::DeviceFile FieldElementNode::ToDeviceFile() const
+{
+   Field::DeviceFile device;
+   device.domain = "element";
+   device.code = code;
+   for (const auto& p : mParamTable.Params())
+   {
+      if (p.isDeclared)
+         device.params[p.name] = p.value;
+   }
+   device.nodeSettings["maxElements"] = (double)maxElements;
+   // Only meaningful when nothing is wired into `input` - see the
+   // `if (!n->input)` guard around this same field in main.cpp.
+   if (!input)
+      device.nodeSettings["generateCount"] = (double)generateCount;
+   return device;
+}
+
+void FieldElementNode::LoadDeviceFile(const Field::DeviceFile& device)
+{
+   code = device.code;
+   auto itMax = device.nodeSettings.find("maxElements");
+   if (itMax != device.nodeSettings.end())
+      maxElements = (int)itMax->second;
+   auto itGen = device.nodeSettings.find("generateCount");
+   if (itGen != device.nodeSettings.end())
+      generateCount = (int)itGen->second;
+   Apply();
+   // Param values are matched by name against whatever the freshly-compiled
+   // program actually declared - a name the target's code doesn't declare
+   // is silently skipped (Find returns nullptr), never phantom-added.
+   for (const auto& kv : device.params)
+   {
+      Field::ParamEntry* p = mParamTable.Find(kv.first);
+      if (p != nullptr)
+         p->value = kv.second;
+   }
+}
+
 FieldElementNode::FieldElementNode()
 {
+   mPublishOutput.owner = this;
    code = "P.y += sin(P.x * 2.0 + t) * 0.2\n";
    Apply();
 }
 
 bool FieldElementNode::Apply()
 {
+   pinRefusal.clear();
    std::vector<Field::Token> tokens;
    Field::FieldError err;
 
@@ -75,6 +116,32 @@ bool FieldElementNode::Apply()
    {
       mLastError = err.message + " at line " + std::to_string(err.span.line) + ", col " + std::to_string(err.span.col);
       return false;
+   }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): reconcile the declared
+   // output/input pin tables against this compile's irProgram.declaredOutputs
+   // / declaredInputs (populated by LowerElementProgramToIR above - NOT on
+   // `prog`, which doesn't carry them). Must run before any other live
+   // state is mutated so a refusal here leaves the whole Apply() a no-op,
+   // same as a compile error.
+   {
+      std::vector<Field::DeclaredPin> declOut, declIn;
+      for (const auto& d : irProgram.declaredOutputs)
+         declOut.push_back({ d.name, d.typeName, Field::DomainToString(d.domain), true });
+      for (const auto& d : irProgram.declaredInputs)
+         declIn.push_back({ d.name, d.typeName, Field::DomainToString(d.domain), false });
+
+      std::string pinNotice, pinRefusal;
+      bool outOk = Field::ReconcileFieldPins(mOutputPins, declOut, mNodeIndex, NativeOutputCount(), pinNotice, pinRefusal);
+      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, /*nativeCount=*/1, pinNotice, pinRefusal);
+      if (!outOk || !inOk)
+      {
+         mLastError = pinRefusal;
+         this->pinRefusal = pinRefusal;
+         return false;
+      }
+      if (!pinNotice.empty())
+         mNotice = pinNotice;
    }
 
    // Reconcile param table with newly declared params

@@ -369,7 +369,7 @@ public:
    INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
-   int div = 0; // 0 = off, else index into kQuantizeDivisions (see .cpp)
+   int div = 0; // 0 = off, else index into MusicTime::QuantizeGridList()
    NoteCable noteInput;
 
 private:
@@ -897,7 +897,7 @@ public:
    AudioNode* GetAudioNode() override;
 
    bool loop = true;
-   int quantizeDiv = 0; // 0 = off, else index into kQuantizeBeats (NoteNodes.cpp) - snaps recorded onsets on StopRecording
+   int quantizeDiv = 0; // 0 = off, else index into MusicTime::QuantizeGridList() - snaps recorded onsets on StopRecording
    bool useGlobalScale = false; // snaps replayed notes to Transport key/scale on playback only - recording is unaffected
    NoteCable noteInput;
 

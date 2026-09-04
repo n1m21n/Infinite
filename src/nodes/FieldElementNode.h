@@ -2,10 +2,13 @@
 
 #include "INode.h"
 #include "Geometry3DNodes.h"
+#include "Modulation.h"
 #include "field/ElementStore.h"
 #include "field/ElementBackend.h"
 #include "field/FieldState.h"
 #include "field/ParamTable.h"
+#include "field/PinTable.h"
+#include "field/FieldDevice.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,13 +31,104 @@ public:
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
 
+   // Dynamic pins, Phase 1 (build step 11, §5.1): a second output, "publish",
+   // reads a Frame-domain-hoisted scalar (e.g. `publish = ...` at prologue
+   // scope) out of the compiled program via ElementVM::ReadFrameVar - no IR
+   // or domain-inference change, purely C++-hardcoded plumbing. Append-only:
+   // output 0 (geometry) never moves.
+   //
+   // Dynamic pins, Phase 2b (build step 13, §5.1): kernel `output` decls on
+   // top of the two native/toggle outputs above, compacted with no gap -
+   // native "geo" (0), then "publish" when the toggle is on, then each
+   // currently-declared entry of mOutputPins in PinTable insertion order.
+   // See Apply() for how mOutputPins gets reconciled/refused; see
+   // mDeclaredOutputMods below for why ModulatorOutput() on a declared pin
+   // is a placeholder, not the kernel's real computed value.
+   int NativeOutputCount() const { return publishScalarOutput ? 2 : 1; }
+   int DeclaredOutputCount() const
+   {
+      int n = 0;
+      for (const auto& p : mOutputPins.Pins())
+         if (p.isDeclared) n++;
+      return n;
+   }
+   int OutputCount() const override { return NativeOutputCount() + DeclaredOutputCount(); }
+   const char* OutputLabel(int index) const override
+   {
+      if (index == 0) return "geo";
+      if (publishScalarOutput && index == 1) return "publish";
+      int declIdx = index - NativeOutputCount();
+      int seen = 0;
+      for (const auto& p : mOutputPins.Pins())
+      {
+         if (!p.isDeclared) continue;
+         if (seen == declIdx) return p.name.c_str();
+         seen++;
+      }
+      return "out";
+   }
+   IModulator* ModulatorOutput(int index) override
+   {
+      // Gated on publishScalarOutput, not just index==1: OutputCount() is 1
+      // when the pin is off, so index 1 does not nominally exist - a caller
+      // that reaches for it anyway (e.g. a headless ConnectNodes(idx, 1, ...))
+      // must see nullptr, the same as any other out-of-range output index,
+      // not a live IModulator for a pin the UI never drew.
+      if (publishScalarOutput && index == 1)
+         return static_cast<IModulator*>(&mPublishOutput);
+      int declIdx = index - NativeOutputCount();
+      if (declIdx < 0)
+         return nullptr;
+      int seen = 0;
+      for (const auto& p : mOutputPins.Pins())
+      {
+         if (!p.isDeclared) continue;
+         if (seen == declIdx)
+            return (declIdx < Field::PinTable::kMaxDeclaredPins) ? &mDeclaredOutputMods[declIdx] : nullptr;
+         seen++;
+      }
+      return nullptr;
+   }
+
+   bool publishScalarOutput = false;
+   // Transient (not saved) - set by the UI toggle handler when a cable-
+   // orphaning refusal happens, so the node body can surface a one-line
+   // reason. Cleared as soon as the refused state is no longer relevant.
+   // Also set by Apply() itself (step 13) when a kernel edit would orphan a
+   // cable attached to a declared pin that the edit would retire.
+   std::string pinRefusal;
+
+   const Field::PinTable& OutputPinTable() const { return mOutputPins; }
+   const Field::PinTable& InputPinTable() const { return mInputPins; }
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Text("code", code);
       v.Int("maxElements", maxElements);
       v.Int("generateCount", generateCount);
+      v.Bool("publishScalarOutput", publishScalarOutput);
       mParamTable.VisitParams(v);
       mState.VisitParams(v);
+      // Dynamic pins, Phase 2b (build step 13, §5.1 step 8): persists each
+      // table's (name -> id) map so a reload reconciles declared pins
+      // against the same identities cables were saved against, rather than
+      // reminting ids from scratch. DeserializePinMap runs here, before
+      // ReloadDerivedState calls Apply() (see main.cpp) - that ordering is
+      // what makes reload-time reconcile faithful.
+      std::string outPins = mOutputPins.SerializePinMap();
+      std::string inPins = mInputPins.SerializePinMap();
+      v.Text("__outputPins", outPins);
+      v.Text("__inputPins", inPins);
+      // Unconditional: on a save, outPins/inPins already equal what
+      // SerializePinMap just produced, so this is a harmless no-op
+      // reconstruction of the same skeleton entries (PinEntry::Find below
+      // finds the already-declared ones and adds nothing new). On a load,
+      // `v.Text` overwrote outPins/inPins with the saved string, and this
+      // is what actually restores mNextPinId/mPinIdByName before Apply()
+      // (called by ReloadDerivedState right after VisitParams returns)
+      // reconciles against the freshly-compiled program.
+      mOutputPins.DeserializePinMap(outPins);
+      mInputPins.DeserializePinMap(inPins);
    }
 
    // IGeometrySource overrides & passthrough forwarding
@@ -82,6 +176,12 @@ public:
    static const std::vector<std::string>& PresetNames();
    void LoadPreset(int index);
 
+   // Field build step 17 (.infdev device files): reads code, GetParamTable(),
+   // generateCount, maxElements into/out of a portable Field::DeviceFile. See
+   // FieldDevice.h and docs/plans/field/step-17-infdev-format.md §3.
+   Field::DeviceFile ToDeviceFile() const;
+   void LoadDeviceFile(const Field::DeviceFile& device);
+
    IGeometrySource* input = nullptr;
    std::string code;
    int maxElements = 65536;
@@ -90,6 +190,24 @@ public:
    // a generator (like DistributePointsInGridNode) instead of a modifier,
    // producing this many fresh points for the kernel to shape via `i`/`count`.
    int generateCount = 64;
+
+   // Reads the last-executed program's Frame-domain `publish` value, if one
+   // was assigned; 0.0 when unused (not an error - §5.1 step 4). Modeled on
+   // MacroXYNode::YAxis (src/nodes/MacroNodes.h) - a small owned IModulator
+   // with an owner back-pointer, added as the 2nd output rather than reused
+   // via inheritance since output 0 (geometry) has no IModulator meaning here.
+   struct PublishOutput : public IModulator
+   {
+      FieldElementNode* owner = nullptr;
+      float Value01() override
+      {
+         if (owner == nullptr)
+            return 0.0f;
+         float v = 0.0f;
+         owner->mVM.ReadFrameVar("publish", v);
+         return v;
+      }
+   };
 
 private:
    Field::ElementStore mStore;
@@ -100,6 +218,30 @@ private:
    std::string mLastError;
    std::string mNotice;
    int mNodeIndex = -1;
+   PublishOutput mPublishOutput;
+
+   // Dynamic pins, Phase 2b (build step 13). mOutputPins/mInputPins track
+   // this node's kernel `output`/`input` declarations (see PinTable.h);
+   // Apply() reconciles them each successful compile, refusing the whole
+   // Apply() if that reconcile would orphan a live cable (§5.1).
+   Field::PinTable mOutputPins;
+   Field::PinTable mInputPins;
+
+   // Placeholder IModulator per declared-output slot position. The Field
+   // compiler pipeline (FieldIR.cpp/ElementBackend.cpp) does not yet read or
+   // write a declared output's actual runtime value - see step-13 agent
+   // notes / the step-13 doc's resolved scoping decision - so this always
+   // reads 0. Real per-pin computed values are deferred to a follow-up
+   // step; wiring a cable to a declared output pin today is structurally
+   // valid (connects, saves/loads, survives undo) but always carries 0
+   // until that follow-up lands. One instance per slot position (not a
+   // single shared instance) so distinct declared pins are distinct
+   // IModulator identities, matching every other multi-output node.
+   struct DeclaredOutputPlaceholder : public IModulator
+   {
+      float Value01() override { return 0.0f; }
+   };
+   DeclaredOutputPlaceholder mDeclaredOutputMods[Field::PinTable::kMaxDeclaredPins];
 
    Mesh mOutMesh;
    unsigned long long mMeshRevision = 1;

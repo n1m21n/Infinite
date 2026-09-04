@@ -6,9 +6,10 @@ description: The standard procedure for adding any audio, note, or synth node to
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 
 This skill is the **implementation** half. The **appearance** half is the
-`audio-node-ui` skill (`docs/plans/audio/audio-node-ui-system.md`). Every node
-needs both: this one to be correct, that one to be usable. Read this first,
-then that one before writing any `Draw*Body`.
+`audio-node-ui` skill (`docs/plans/audio/audio-node-ui-system.md`). For any
+node involving tempo sync, rate divisions, or quantization, also follow the
+`rhythmic-quantization-standard` skill (`src/audio/MusicTime.h`). Every node
+needs these to be correct and usable. Read these first before writing any code.
 
 ---
 

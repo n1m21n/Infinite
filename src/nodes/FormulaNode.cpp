@@ -375,6 +375,21 @@ void FormulaNode::LoadPreset(int index)
    Apply();
 }
 
+Field::DeviceFile FormulaNode::ToDeviceFile() const
+{
+   Field::DeviceFile device;
+   device.domain = "formula";
+   device.code = formula;
+   // No params - see the header comment and plan §7.
+   return device;
+}
+
+void FormulaNode::LoadDeviceFile(const Field::DeviceFile& device)
+{
+   formula = device.code;
+   Apply();
+}
+
 FormulaNode::FormulaNode()
 {
    formula = kDefaultFormula;

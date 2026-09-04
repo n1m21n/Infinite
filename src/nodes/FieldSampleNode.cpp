@@ -303,10 +303,44 @@ private:
    double mAbsSampleCounter = 0.0;
 };
 
+// Field build step 17 (.infdev device files) - see FieldElementNode's
+// identical pair for the rationale. FieldSampleNode has no factory
+// Presets() (§0.2 of the plan doc), so this is the only save/load path
+// beyond the enclosing .inf patch.
+Field::DeviceFile FieldSampleNode::ToDeviceFile() const
+{
+   Field::DeviceFile device;
+   device.domain = "sample";
+   device.code = code;
+   for (const auto& p : mParamTable.Params())
+   {
+      if (p.isDeclared)
+         device.params[p.name] = p.value;
+   }
+   device.nodeSettings["maxVoices"] = (double)maxVoices;
+   return device;
+}
+
+void FieldSampleNode::LoadDeviceFile(const Field::DeviceFile& device)
+{
+   code = device.code;
+   auto itV = device.nodeSettings.find("maxVoices");
+   if (itV != device.nodeSettings.end())
+      maxVoices = (int)itV->second;
+   Apply();
+   for (const auto& kv : device.params)
+   {
+      Field::ParamEntry* p = mParamTable.Find(kv.first);
+      if (p != nullptr)
+         p->value = kv.second;
+   }
+}
+
 // -------------------------------------------------------------- main thread
 FieldSampleNode::FieldSampleNode()
    : mAudioNode(std::make_unique<AudioFieldSampleNode>())
 {
+   mRmsOutput.owner = this;
    Apply();
 }
 
@@ -320,6 +354,7 @@ int FieldSampleNode::ReadScope(float* out, int capacity) { return mAudioNode->Sc
 
 bool FieldSampleNode::Apply()
 {
+   pinRefusal.clear();
    // (name,type) state transplant (BackendRegister.h / §5.9) is resolved
    // against mLastCompiled - the main thread's own retained copy of the last
    // successfully compiled program, not the live audio-thread one (reading
@@ -331,6 +366,32 @@ bool FieldSampleNode::Apply()
    {
       mLastError = err.message + " at line " + std::to_string(err.span.line) + ", col " + std::to_string(err.span.col);
       return false;
+   }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): reconcile the declared
+   // output/input pin tables against this compile's SampleProgram - unlike
+   // Element/Pixel, the sample backend (BackendRegister.cpp) already fully
+   // populates declaredOutputs/declaredInputs on the compiled program
+   // itself, so no local-IR-only step is needed. Must run before any other
+   // live state is mutated so a refusal here leaves Apply() a no-op.
+   {
+      std::vector<Field::DeclaredPin> declOut, declIn;
+      for (const auto& d : newProgram->declaredOutputs)
+         declOut.push_back({ d.name, d.typeName, d.domainName, true });
+      for (const auto& d : newProgram->declaredInputs)
+         declIn.push_back({ d.name, d.typeName, d.domainName, false });
+
+      std::string pinNotice, pinRefusalMsg;
+      bool outOk = Field::ReconcileFieldPins(mOutputPins, declOut, mNodeIndex, NativeOutputCount(), pinNotice, pinRefusalMsg);
+      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, /*nativeCount=*/2, pinNotice, pinRefusalMsg);
+      if (!outOk || !inOk)
+      {
+         mLastError = pinRefusalMsg;
+         pinRefusal = pinRefusalMsg;
+         return false;
+      }
+      if (!pinNotice.empty())
+         mNotice = pinNotice;
    }
 
    std::vector<Field::DeclaredParam> declared;
@@ -383,5 +444,14 @@ void FieldSampleNode::VisitParams(ParamVisitor& v)
 {
    v.Text("code", code);
    v.Int("maxVoices", maxVoices);
+   v.Bool("exposeRmsOutput", exposeRmsOutput);
    mParamTable.VisitParams(v);
+   // Dynamic pins, Phase 2b (build step 13, §5.1 step 8) - see
+   // FieldElementNode::VisitParams's identical block for the rationale.
+   std::string outPins = mOutputPins.SerializePinMap();
+   std::string inPins = mInputPins.SerializePinMap();
+   v.Text("__outputPins", outPins);
+   v.Text("__inputPins", inPins);
+   mOutputPins.DeserializePinMap(outPins);
+   mInputPins.DeserializePinMap(inPins);
 }

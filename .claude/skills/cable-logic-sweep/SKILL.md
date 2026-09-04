@@ -99,6 +99,15 @@ that the accept/refuse verdict matches the matrix, and in particular that
 to rule 10. Until it exists, a new node type that lands in the wrong branch of
 that chain is caught only by someone dragging a cable by hand.
 
+Two specific untested chains worth adding once that harness exists:
+- a 2D `Feedback` loop walked through itself at 64+ hops, to check the
+  `ImageCable::Resolved()` bypass-walk cap boundary rather than just its
+  existence;
+- a `Group` containing a node with a live cable to a node outside the group,
+  then the group duplicated — cross-group cable rehoming on copy is a known
+  sharp edge (see `FieldGraphNode.h`'s doc-comment on regenerating identity
+  on paste for the analogous case in the Field graph domain).
+
 ## Interpreting results
 
 - `check.py` failure = a real wiring gap; the report names the chain and the

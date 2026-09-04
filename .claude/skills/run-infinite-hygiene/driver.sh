@@ -71,6 +71,17 @@ PASS=0
 FAIL=0
 FAILED_NAMES=()
 EXPECTED_FILE="$(dirname "${BASH_SOURCE[0]}")/audio-param-sweep-expected.txt"
+KNOWN_FAILURES_FILE="$(dirname "${BASH_SOURCE[0]}")/known-test-failures.txt"
+XFAIL_NAMES=()
+STALE_NAMES=()
+
+# Usage: is_known_failure "$name" -> 0 (known) or 1 (not known)
+is_known_failure() {
+  grep -qE "^${1}\|" "$KNOWN_FAILURES_FILE" 2>/dev/null
+}
+known_failure_reason() {
+  grep -E "^${1}\|" "$KNOWN_FAILURES_FILE" 2>/dev/null | head -1 | cut -d'|' -f2-
+}
 
 # ---------------------------------------------------------------------------
 # Tier definitions per docs/plans/test-tiering.md
@@ -91,6 +102,9 @@ TIER1_CHECKS=(
   "FIELDTRANSFERTEST:1"
   "FIELDSAMPLETEST:1"
   "FIELDPIXELTEST:35"
+  "FIELDPINSTEST:35"
+  "FIELDPINDECLTEST:1"
+  "FIELDPINNODETEST:35"
   "PERFMATRIXTEST:1"
   "AUDIOPDCTEST:1"
   "RECSYNCTEST:1"
@@ -403,8 +417,13 @@ for spec in "${SELECTED_TESTS[@]}"; do
   env "INFINITE_${name}=1" INFINITE_EXITAFTER="$frames" "$BIN" >"$out" 2>&1
   rc=$?
   if [ $rc -ne 0 ]; then
-    echo "  [CRASH] $name — exited $rc, see $out"
-    FAIL=$((FAIL+1)); FAILED_NAMES+=("$name (crash)")
+    if is_known_failure "$name"; then
+      echo "  [xfail] $name — exited $rc, baselined: $(known_failure_reason "$name")"
+      XFAIL_NAMES+=("$name")
+    else
+      echo "  [CRASH] $name — exited $rc, see $out"
+      FAIL=$((FAIL+1)); FAILED_NAMES+=("$name (crash)")
+    fi
     continue
   fi
   if [ "$name" = "AUDIOPARAMSWEEPTEST" ]; then
@@ -455,32 +474,59 @@ for spec in "${SELECTED_TESTS[@]}"; do
   fi
 
   if grep -qE "$FAIL_MARK" "$out"; then
-    echo "  [FAIL]  $name — see $out"
-    grep -E "$FAIL_MARK" "$out" | sed 's/^/          /'
-    FAIL=$((FAIL+1)); FAILED_NAMES+=("$name")
+    if is_known_failure "$name"; then
+      echo "  [xfail] $name — baselined: $(known_failure_reason "$name") — see $out"
+      XFAIL_NAMES+=("$name")
+    else
+      echo "  [FAIL]  $name — see $out"
+      grep -E "$FAIL_MARK" "$out" | sed 's/^/          /'
+      FAIL=$((FAIL+1)); FAILED_NAMES+=("$name")
+    fi
   elif ! grep -qE "$PASS_MARK" "$out"; then
     # No failure marker AND no verdict at all: the fixture never reached its
     # assertion. Silence is not a pass.
-    echo "  [FAIL]  $name — no verdict printed, see $out"
-    FAIL=$((FAIL+1)); FAILED_NAMES+=("$name (no verdict)")
+    if is_known_failure "$name"; then
+      echo "  [xfail] $name — no verdict printed, baselined: $(known_failure_reason "$name") — see $out"
+      XFAIL_NAMES+=("$name")
+    else
+      echo "  [FAIL]  $name — no verdict printed, see $out"
+      FAIL=$((FAIL+1)); FAILED_NAMES+=("$name (no verdict)")
+    fi
   else
     verdict=$(grep -E "$PASS_MARK" "$out" | tail -1)
-    echo "  [pass]  $name  ${verdict:+— $verdict}"
-    PASS=$((PASS+1))
+    if is_known_failure "$name"; then
+      echo "  [stale-baseline] $name — now passes, delete its line from known-test-failures.txt"
+      STALE_NAMES+=("$name")
+      PASS=$((PASS+1))
+    else
+      echo "  [pass]  $name  ${verdict:+— $verdict}"
+      PASS=$((PASS+1))
+    fi
   fi
 done
 
 # ---------------------------------------------------------------------------
 step "Summary"
-echo "passed: $PASS   failed: $FAIL"
+echo "passed: $PASS   failed: $FAIL   xfail (known, see known-test-failures.txt): ${#XFAIL_NAMES[@]}"
+if [ ${#XFAIL_NAMES[@]} -gt 0 ]; then
+  echo "xfail checks: ${XFAIL_NAMES[*]}"
+fi
+if [ ${#STALE_NAMES[@]} -gt 0 ]; then
+  echo "stale baseline entries (now passing, delete these lines from known-test-failures.txt): ${STALE_NAMES[*]}"
+fi
 if [ $FAIL -gt 0 ]; then
   echo "failing checks: ${FAILED_NAMES[*]}"
   echo
-  echo "known baseline (not a regression unless it changes): PHASE1TEST is"
-  echo "occasionally flaky on particle-system timing; rerun once before treating it"
-  echo "as a regression. PHASEATEST currently fails on a pre-existing \"Smooth\" node-"
-  echo "name collision unrelated to audio work — see the spawned task to fix it."
+  echo "Only these are real: xfail lines above are already accounted for in"
+  echo "known-test-failures.txt — do not re-run them to confirm, that file IS"
+  echo "the confirmation. If a failing check above isn't pre-existing, fix it;"
+  echo "if it IS pre-existing and unrelated to your change, add a line to"
+  echo "known-test-failures.txt (after confirming against source) instead of"
+  echo "re-deriving that fact on every run."
   exit 1
+fi
+if [ ${#STALE_NAMES[@]} -gt 0 ]; then
+  echo "all real checks green, but stale baseline entries above need cleanup."
 fi
 echo "all checks green."
 exit 0

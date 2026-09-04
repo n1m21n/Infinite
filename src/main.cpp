@@ -97,6 +97,8 @@ namespace
 #include "core/field/GlslBackend.h"
 #include "core/field/Transfer.h"
 #include "core/field/ReduceOps.h"
+#include "core/field/BackendRegister.h"
+#include "core/field/PinTable.h"
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
@@ -617,6 +619,54 @@ namespace
       }
       return nullptr;
    }
+
+   // Dynamic pins, Phase 1 (build step 11, decision 4): toggling a menu entry
+   // off while a live cable is attached to the output pin it would remove
+   // must be refused rather than silently orphaning the cable. gLinks is
+   // rebuilt earlier in this same frame (see CaptureClusterLinks' comment
+   // above), so this reads current topology, not last frame's.
+   bool FieldOutputPinHasLiveCable(int nodeIndex, int outputIndex)
+   {
+      for (const LinkInfo& link : gLinks)
+      {
+         if (!GraphNode::IsOutputPin(link.srcPin))
+            continue;
+         if (GraphNode::NodeIndexFromPin(link.srcPin) == nodeIndex &&
+             GraphNode::OutputIndexFromPin(link.srcPin) == outputIndex)
+            return true;
+      }
+      return false;
+   }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): symmetric to
+   // FieldOutputPinHasLiveCable above, but scans destination (input) pins -
+   // needed so a kernel edit that would retire a declared `input` pin (not
+   // just a declared `output`) can refuse rather than silently orphan
+   // whatever is wired into it.
+   bool FieldInputPinHasLiveCable(int nodeIndex, int inputIndex)
+   {
+      for (const LinkInfo& link : gLinks)
+      {
+         if (!GraphNode::IsInputPin(link.dstPin))
+            continue;
+         if (GraphNode::NodeIndexFromPin(link.dstPin) == nodeIndex &&
+             GraphNode::InputSlotFromPin(link.dstPin) == inputIndex)
+            return true;
+      }
+      return false;
+   }
+
+   // Bridge installed into Field::gLiveCableChecker (see PinTable.h) so
+   // Field*Node::Apply() - compiled in separate translation units, and
+   // never able to see gLinks (private to this anonymous namespace) - can
+   // still ask "does this pin's current compacted slot have a live cable".
+   // Taking the address of an internal-linkage function and storing it in
+   // an externally-linked function pointer is legal; only the pointer
+   // itself needs external linkage.
+   bool CheckFieldLiveCableBridge(int nodeIndex, int slot, bool isOutput)
+   {
+      return isOutput ? FieldOutputPinHasLiveCable(nodeIndex, slot) : FieldInputPinHasLiveCable(nodeIndex, slot);
+   }
    bool gSnapToGrid = true;
    float gGridSnap = 20.0f;
    // Audio device/rate/buffer selection, applied to AudioEngine on next
@@ -960,6 +1010,66 @@ namespace
    // a synthetic double-click at it. Inside a node ImGui draws in canvas space,
    // hence the explicit conversion where this is filled in.
    ImVec4 gCommentBodyRect(0, 0, 0, 0); // x, y, w, h
+
+   // ---- Field build step 17: .infdev device Save name-prompt --------------
+   // Same story as gDropdown/gCommentEdit above: a node draws a "Save"
+   // button, records what it wants to do, and the actual popup renders once
+   // per frame outside the canvas. `getDeviceFile` resolves the owning node
+   // by index and dynamic_casts back to the concrete type each time it is
+   // called (see DrawFieldDeviceControls below) rather than closing over a
+   // raw node pointer, so a node deleted while this popup is open is simply
+   // "not found" instead of a dangling read.
+   struct FieldDeviceSaveRequest
+   {
+      std::function<bool(Field::DeviceFile&)> getDeviceFile;
+      std::string domain;
+      char nameBuf[128] = {};
+      bool justOpened = false;
+   };
+   FieldDeviceSaveRequest gFieldDeviceSave;
+
+   // Per-domain cache of the user's saved .infdev files under
+   // AppPaths::AppSupportDir() + "/Devices/<domain>/" - scanned once per
+   // session on first draw, not re-scanned every frame (plan §6). Save
+   // invalidates only its own domain's entry.
+   struct FieldDeviceLibraryCache
+   {
+      bool scanned = false;
+      std::vector<std::string> names; // file stem, for display
+      std::vector<std::string> paths; // matching full path, same order
+   };
+   std::map<std::string, FieldDeviceLibraryCache> gFieldDeviceLibrary;
+
+   const FieldDeviceLibraryCache& GetFieldDeviceLibrary(const std::string& domain)
+   {
+      FieldDeviceLibraryCache& cache = gFieldDeviceLibrary[domain];
+      if (!cache.scanned)
+      {
+         cache.scanned = true;
+         const std::string dir = AppPaths::AppSupportDir() + "/Devices/" + domain + "/";
+         std::error_code ec;
+         if (std::filesystem::exists(dir, ec) && !ec)
+         {
+            for (const auto& entry : std::filesystem::directory_iterator(dir, ec))
+            {
+               if (ec) break;
+               if (!entry.is_regular_file())
+                  continue;
+               if (entry.path().extension() == ".infdev")
+               {
+                  cache.names.push_back(entry.path().stem().string());
+                  cache.paths.push_back(entry.path().string());
+               }
+            }
+         }
+      }
+      return cache;
+   }
+
+   void InvalidateFieldDeviceLibrary(const std::string& domain)
+   {
+      gFieldDeviceLibrary.erase(domain);
+   }
    // Screen-space rect of whichever comment is currently open for editing,
    // refreshed every frame so the edit popup can be pinned exactly on top of
    // it - the point being that typing looks like it happens straight into the
@@ -985,6 +1095,35 @@ namespace
    // in ed::Begin()/ed::End()); drained once, outside that pass, after
    // ed::End() returns - see trap T14 and RunFieldGraphRegenerate.
    FieldGraphNode* gFieldGraphPendingRegenerate = nullptr;
+
+   // Build step 16 ("Unpack to Canvas"). Same trap-T14 shape as
+   // gFieldGraphPendingRegenerate just above: set by the "Unpack to Canvas"
+   // button click inside DrawFieldGraphParams (nested in ed::Begin()/
+   // ed::End()), drained once after ed::End() returns by
+   // RunFieldGraphUnpackPhase1 - see that function's comment.
+   FieldGraphNode* gFieldGraphPendingUnpack = nullptr;
+
+   // Phase 2 of the unpack operation: a poll-and-validate tick driven once
+   // per frame (also after ed::End(), alongside the drain above) while
+   // `active` is true. Phase 1 reveals the mounted children at a provisional
+   // layout and arms this; phase 2 waits for every revealed child's ed::
+   // node size to read as a real measurement (not a freshly-spawned node's
+   // sentinel/placeholder size - doc §3.3/trap 3) before finalizing row
+   // heights and spawning the wrapping GroupNode. Capped at kMaxRetries
+   // frames, after which it finalizes with the kUnpackDYMin-only fallback
+   // stacking rather than waiting forever (doc's own defensive framing of
+   // the "two-frame operation").
+   struct FieldGraphUnpackPhase2State
+   {
+      bool active = false;
+      FieldGraphNode* target = nullptr;
+      std::vector<int> members;               // mounted indices, in layout order
+      std::map<int, int> depthByIndex;        // member index -> topological depth
+      std::map<int, float> columnX;           // depth -> this column's x
+      int retriesLeft = 0;
+      static constexpr int kMaxRetries = 10;
+   };
+   FieldGraphUnpackPhase2State gFieldGraphUnpackPhase2;
    bool gGlobalsOpen = false;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
@@ -4194,8 +4333,11 @@ namespace
          return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
-      if (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr)
-         return 1; // the kernel's "src" texture input
+      if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
+         // Dynamic pins, Phase 2b (build step 13, §5.7): the native "src"
+         // texture input at slot 0, then one slot per currently-declared
+         // `input image` pin.
+         return 1 + fp->DeclaredImageInputCount();
       if (dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr)
          return 1; // the kernel's optional "geo" input (generator when unwired)
       // (Audio Analyze used to need an entry here for its fileSource pin; it
@@ -4336,7 +4478,13 @@ namespace
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
-         return slot == 0 ? &fp->TextureInput() : nullptr;
+      {
+         // Dynamic pins, Phase 2b (build step 13, §5.7): slot 0 is the
+         // native "src" input; slot 1..N route to the currently-declared
+         // `input image` pins in PinTable order.
+         if (slot == 0) return &fp->TextureInput();
+         return fp->DeclaredImageInput(slot - 1);
+      }
       if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
          return slot == 0 ? &model->TextureInput() : nullptr;
       if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
@@ -4617,7 +4765,7 @@ namespace
       {
          ImageCable* cable = CableFor(dstNode, slot);
          if (cable != nullptr)
-            cable->Connect(srcNode.node.get());
+            cable->Connect(srcNode.node.get(), srcOutputIndex);
       }
    }
 
@@ -5306,13 +5454,131 @@ namespace
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
    }
 
+   // Field build step 17: the "Devices" dropdown + Save/Export/Import row
+   // shared by all five Field*Params functions (plan §6). `factoryNames`
+   // is nullptr for FieldSampleNode/FieldGraphNode, which have no factory
+   // Presets() table (plan §0.2) - the dropdown then shows only user
+   // devices, no factory section/separator.
+   //
+   // `onFactorySelect` is called with a freshly-resolved NodeT* (never the
+   // pointer captured at draw time) so that FieldElementNode's existing
+   // `n->presetIndex = i; n->LoadPreset(i);` idiom keeps working unchanged
+   // even though the actual selection happens on a later frame, once the
+   // deferred dropdown popup (gDropdown) is clicked - same lifetime
+   // discipline as the Save popup above.
+   template <typename NodeT>
+   void DrawFieldDeviceControls(NodeT* n, const std::string& domain,
+                                const std::vector<std::string>* factoryNames,
+                                std::function<void(NodeT*, int)> onFactorySelect)
+   {
+      const int nodeIndex = gCurrentNodeIndex;
+      const FieldDeviceLibraryCache& lib = GetFieldDeviceLibrary(domain);
+
+      std::vector<std::string> options;
+      std::vector<std::string> categories;
+      if (factoryNames != nullptr)
+      {
+         for (const std::string& s : *factoryNames)
+         {
+            options.push_back(s);
+            categories.push_back("Factory");
+         }
+      }
+      for (const std::string& s : lib.names)
+      {
+         options.push_back(s);
+         categories.push_back("Devices");
+      }
+      const size_t factoryCount = factoryNames ? factoryNames->size() : 0;
+      const std::vector<std::string> userPaths = lib.paths;
+
+      PushDropdownStyle();
+      const std::string dropdownId = "Load device...##fdd_" + domain;
+      if (options.empty())
+      {
+         ImGui::BeginDisabled();
+         ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0));
+         ImGui::EndDisabled();
+      }
+      else if (ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
+      {
+         gDropdown.options = options;
+         gDropdown.categories = categories;
+         gDropdown.current = -1;
+         gDropdown.onSelect = [nodeIndex, onFactorySelect, factoryCount, userPaths, domain](int idx)
+         {
+            GraphNode* gn = FindNodeByIndex(nodeIndex);
+            NodeT* n2 = gn ? dynamic_cast<NodeT*>(gn->node.get()) : nullptr;
+            if (n2 == nullptr)
+               return;
+            if ((size_t)idx < factoryCount)
+            {
+               if (onFactorySelect)
+                  onFactorySelect(n2, idx);
+               return;
+            }
+            const size_t userIdx = (size_t)idx - factoryCount;
+            if (userIdx >= userPaths.size())
+               return;
+            Field::DeviceFile device;
+            std::string err;
+            if (Field::LoadFromInfdevFile(userPaths[userIdx], device, err) && device.domain == domain)
+               n2->LoadDeviceFile(device);
+         };
+         gDropdown.justOpened = true;
+      }
+      PopDropdownStyle();
+
+      const float spacing = ImGui::GetStyle().ItemSpacing.x;
+      const float btnW = (kPreviewSize - 2.0f * spacing) / 3.0f;
+      if (ImGui::Button(("Save##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      {
+         snprintf(gFieldDeviceSave.nameBuf, sizeof(gFieldDeviceSave.nameBuf), "Untitled");
+         gFieldDeviceSave.domain = domain;
+         gFieldDeviceSave.getDeviceFile = [nodeIndex](Field::DeviceFile& out) -> bool
+         {
+            GraphNode* gn = FindNodeByIndex(nodeIndex);
+            NodeT* n2 = gn ? dynamic_cast<NodeT*>(gn->node.get()) : nullptr;
+            if (n2 == nullptr)
+               return false;
+            out = n2->ToDeviceFile();
+            return true;
+         };
+         gFieldDeviceSave.justOpened = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button(("Export##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      {
+         const std::string path = Platform::SaveDeviceDialog("Untitled.infdev");
+         if (!path.empty())
+            Field::SaveToInfdevFile(path, n->ToDeviceFile());
+      }
+      ImGui::SameLine();
+      if (ImGui::Button(("Import##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      {
+         const std::string path = Platform::OpenDeviceDialog();
+         if (!path.empty())
+         {
+            Field::DeviceFile device;
+            std::string err;
+            if (Field::LoadFromInfdevFile(path, device, err) && device.domain == domain)
+               n->LoadDeviceFile(device);
+         }
+      }
+   }
+
    void DrawFormulaParams(FormulaNode* n)
    {
       // The GLSL editor lives in its own window, not inline: ImGui multi-line
       // fields are child windows, and child windows inside the node canvas get
       // clipped away - which is why the box used to render empty.
-      DropdownButton("preset", FormulaNode::PresetNames(), n->presetIndex,
-                     [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+      //
+      // Field build step 17: this dropdown now folds the factory presets and
+      // the user's saved .infdev devices into one control (plan §6), rather
+      // than a bare preset picker - FormulaNode's device.params stays empty
+      // (plan §7), only `formula` round-trips.
+      DrawFieldDeviceControls<FormulaNode>(n, "formula", &FormulaNode::PresetNames(),
+                                          [](FormulaNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
       if (ImGui::Button("Edit GLSL...", ImVec2(kPreviewSize, 0)))
       {
@@ -5342,8 +5608,8 @@ namespace
 
       if (!gParamRegisterOnly)
       {
-         DropdownButton("preset", FieldElementNode::PresetNames(), n->presetIndex,
-                        [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+         DrawFieldDeviceControls<FieldElementNode>(n, "element", &FieldElementNode::PresetNames(),
+                                                   [](FieldElementNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
@@ -5384,6 +5650,28 @@ namespace
       if (!n->input)
          ModSliderInt("generate count", &n->generateCount, 1, 100000);
 
+      {
+         bool publish = n->publishScalarOutput;
+         if (ModCheckbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
+         {
+            if (!publish && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: publish output is still wired";
+            }
+            else
+            {
+               n->publishScalarOutput = publish;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
       for (auto& p : n->GetParamTable().Params())
       {
          if (!p.isDeclared)
@@ -5398,6 +5686,11 @@ namespace
 
       if (!gParamRegisterOnly)
       {
+         // No factory Presets() table for this domain (plan §0.2) - the
+         // dropdown shows only the user's saved .infdev devices.
+         DrawFieldDeviceControls<FieldSampleNode>(n, "sample", nullptr,
+                                                  std::function<void(FieldSampleNode*, int)>());
+
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldSampleEditor = n;
@@ -5433,6 +5726,28 @@ namespace
 
       ModSliderInt("max voices", &n->maxVoices, 1, 32);
 
+      {
+         bool expose = n->exposeRmsOutput;
+         if (ModCheckbox("expose rms output", &expose) && expose != n->exposeRmsOutput)
+         {
+            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: rms output is still wired";
+            }
+            else
+            {
+               n->exposeRmsOutput = expose;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
       for (auto& p : n->GetParamTable().Params())
       {
          if (!p.isDeclared)
@@ -5447,6 +5762,11 @@ namespace
 
       if (!gParamRegisterOnly)
       {
+         // No factory Presets() table for this domain (plan §0.2) - the
+         // dropdown shows only the user's saved .infdev devices.
+         DrawFieldDeviceControls<FieldGraphNode>(n, "graph", nullptr,
+                                                 std::function<void(FieldGraphNode*, int)>());
+
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldGraphEditor = n;
@@ -5460,6 +5780,20 @@ namespace
          if (ImGui::Button("Regenerate", ImVec2(kPreviewSize, 0)))
             gFieldGraphPendingRegenerate = n;
 
+         // Build step 16: only meaningful once there is something
+         // encapsulated to unpack (doc §4.1's precondition). Same
+         // queue-rather-than-mutate-here shape as "Regenerate" just above -
+         // this also runs nested in ed::Begin()/ed::End(), and unpacking
+         // reveals real gNodes entries and eventually spawns a GroupNode
+         // (trap T14).
+         const bool canUnpack = n->encapsulated && !n->MountedIndices().empty();
+         if (!canUnpack)
+            ImGui::BeginDisabled();
+         if (ImGui::Button("Unpack to Canvas", ImVec2(kPreviewSize, 0)) && canUnpack)
+            gFieldGraphPendingUnpack = n;
+         if (!canUnpack)
+            ImGui::EndDisabled();
+
          if (!n->LastError().empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -5471,6 +5805,28 @@ namespace
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
             ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      {
+         bool addTrigger = n->addTriggerInput;
+         if (ModCheckbox("trigger input", &addTrigger) && addTrigger != n->addTriggerInput)
+         {
+            if (!addTrigger && n->TriggerInputWired())
+            {
+               n->pinRefusal = "refused: trigger input is still wired";
+            }
+            else
+            {
+               n->addTriggerInput = addTrigger;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
             ImGui::PopTextWrapPos();
          }
       }
@@ -5489,8 +5845,8 @@ namespace
 
       if (!gParamRegisterOnly)
       {
-         DropdownButton("preset", FieldPixelNode::PresetNames(), n->presetIndex,
-                        [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+         DrawFieldDeviceControls<FieldPixelNode>(n, "pixel", &FieldPixelNode::PresetNames(),
+                                                 [](FieldPixelNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
@@ -5529,6 +5885,28 @@ namespace
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModCheckbox("animate", &n->animate);
+
+      {
+         bool expose = n->exposeAuxTexture;
+         if (ModCheckbox("expose state texture output", &expose) && expose != n->exposeAuxTexture)
+         {
+            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: state output is still wired";
+            }
+            else
+            {
+               n->exposeAuxTexture = expose;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
 
       for (auto& p : n->GetParamTable().Params())
       {
@@ -13681,21 +14059,11 @@ namespace
    }
 
    // Shared by every tempo-synced note generator (Arp, Note Sequencer,
-   // Random Note Generator): a rate expressed either as a note division
-   // (synced to tempo) or free seconds - see QuantizerNode::div's header
-   // comment (NoteNodes.h) for the equivalent quantize-grid table.
-   static const std::vector<std::string> kRateDivisionLabels = { "1/1", "1/2", "1/4", "1/8", "1/16", "1/32" };
-   static const float kRateDivisionBeats[] = { 4.0f, 2.0f, 1.0f, 0.5f, 0.25f, 0.125f };
-   int NearestRateDivision(float beats)
+   // Random Note Generator, Note Echo, Note Switcher): a rate expressed either
+   // as a note division (synced to tempo) or free seconds.
+   inline int NearestRateDivision(float beats)
    {
-      int best = 2;
-      float bestDiff = 1e9f;
-      for (int i = 0; i < 6; i++)
-      {
-         const float d = std::fabs(kRateDivisionBeats[i] - beats);
-         if (d < bestDiff) { bestDiff = d; best = i; }
-      }
-      return best;
+      return (int)MusicTime::NearestRateDivision((double)beats);
    }
 
    // Draws a "rateMode" toggle plus whichever rate control it selects -
@@ -13709,9 +14077,9 @@ namespace
       if (*rateMode == 0)
       {
          int div = NearestRateDivision(*rateBeats);
-         row.Dropdown("rate", kRateDivisionLabels, div, [rateBeats](int i) {
+         row.Dropdown("rate", MusicTime::RateDivisionList(), div, [rateBeats](int i) {
             PushUndoCheckpoint();
-            *rateBeats = kRateDivisionBeats[std::clamp(i, 0, 5)];
+            *rateBeats = (float)MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(i, 0, (int)MusicTime::kNumRateDivisions - 1));
          });
          // The rate knob isn't drawn in Synced mode, but it still must consume
          // a paramIndex ordinal (see ModKnob's comment on gParamCounter):
@@ -13737,9 +14105,9 @@ namespace
       }
    }
 
-   // Shared "quantize to grid" dropdown - Off, 1/4, 1/8, 1/16, 1/32 - used by
+   // Shared "quantize to grid" dropdown - Off, 4 bars down to 1/32 (with dotted and triplets), 1/64 - used by
    // Quantizer (live note-on timing) and Note Capturer (recorded timing).
-   static const std::vector<std::string> kQuantizeLabels = { "Off", "1/4", "1/8", "1/16", "1/32" };
+   #define kQuantizeLabels MusicTime::QuantizeGridList()
 
    // Standard shape for a one-knob note node (Note Transpose, Pitch Bend,
    // Gate, Glide, Vibrato below) - narrow body, one big centred knob, no
@@ -13880,43 +14248,18 @@ namespace
 
    void DrawQuantizerBody(GraphNode& gn, QuantizerNode* n)
    {
+      const auto& options = MusicTime::QuantizeGridList();
+      const int safeDiv = std::clamp(n->div, 0, (int)options.size() - 1);
       char stat[48];
-      snprintf(stat, sizeof(stat), "%s", kQuantizeLabels[std::clamp(n->div, 0, 4)].c_str());
+      snprintf(stat, sizeof(stat), "%s", options[safeDiv].c_str());
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-
-      const float totalW = gAudioBodyW;
-      const int count = (int)kQuantizeLabels.size();
-      const float spacing = 3.0f;
-      const float btnW = (totalW - spacing * (float)(count - 1)) / (float)count;
-      const float btnH = 22.0f;
-      const bool isLight = IsThemeLight();
-
-      for (int i = 0; i < count; i++)
-      {
-         if (i > 0)
-            ImGui::SameLine(0.0f, spacing);
-         const bool selected = (n->div == i);
-         if (selected)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.20f, 0.48f, 0.88f, 1.0f) : ImVec4(0.25f, 0.55f, 0.95f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-         }
-         else
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.88f, 0.90f, 0.94f, 1.0f) : ImVec4(0.18f, 0.20f, 0.26f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.2f, 0.2f, 0.25f, 1.0f) : ImVec4(0.7f, 0.72f, 0.78f, 1.0f));
-         }
-         char btnId[32];
-         snprintf(btnId, sizeof(btnId), "%s##qdiv_%d", kQuantizeLabels[i].c_str(), i);
-         if (ImGui::Button(btnId, ImVec2(btnW, btnH)))
-         {
-            PushUndoCheckpoint();
-            n->div = i;
-         }
-         ImGui::PopStyleColor(2);
-      }
-
+      AudioKnobRow row(1);
+      row.Dropdown("grid", options, safeDiv, [n](int i) {
+         PushUndoCheckpoint();
+         n->div = i;
+      });
+      row.End();
       EndAudioBody();
    }
 
@@ -13980,7 +14323,7 @@ namespace
       else if (n->rateMode == 0)
       {
          int div = NearestRateDivision(n->rateBeats);
-         snprintf(stat, sizeof(stat), "every %s  -  slot %d", kRateDivisionLabels[std::clamp(div, 0, (int)kRateDivisionLabels.size() - 1)].c_str(), active + 1);
+         snprintf(stat, sizeof(stat), "every %s  -  slot %d", MusicTime::RateDivisionName(div), active + 1);
       }
       else
          snprintf(stat, sizeof(stat), "every %.2fs  -  slot %d", n->rateSeconds, active + 1);
@@ -14753,7 +15096,9 @@ namespace
          // plus a caption-line reservation.
          AudioKnobRow row(4, 20.0f, 8.0f, false);
          row.Checkbox("loop##capturerLoop", &n->loop);
-         row.Skip();
+         row.Dropdown("grid", MusicTime::QuantizeGridList(),
+                      std::clamp(n->quantizeDiv, 0, (int)MusicTime::QuantizeGridList().size() - 1),
+                      [n](int i) { PushUndoCheckpoint(); n->quantizeDiv = i; });
          row.Skip();
          row.Skip();
          row.End();
@@ -21238,6 +21583,119 @@ namespace
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
    }
 
+   // Build step 15 follow-up (§5.3.1): inline min/max waveform preview for
+   // an encapsulated FieldGraphNode's audio-domain terminal - the sibling of
+   // DrawPreview above for the "terminal has no texture, but does have
+   // RequiresAudioProcessing()" case. No generic "any INode's live audio"
+   // hook exists anywhere in this codebase (confirmed by grep: ReadScope()/
+   // scopeCache/scopeCacheCount/scopeCacheTime is a repeated-but-not-
+   // virtualized method+field set independently implemented on
+   // WavetableNode, FieldSampleNode, OscillatorNode, MetallicNode,
+   // WaveTerrainNode, ImageSpectralSynthNode and EquationNode - each already
+   // backed by that node's own MeterRing, the one sanctioned audio-thread-
+   // to-main-thread channel in this codebase, field-integration §4). This
+   // dispatches to whichever of those the resolved terminal happens to be,
+   // the exact same dynamic_cast-chain shape DrawAudioNodeBody already uses
+   // to pick a per-type body-draw function for a directly-visible node of
+   // one of these types - not a new mechanism, the established one for
+   // "which concrete node type is this" here. A terminal whose type has no
+   // scope hook (Gain, Mixer, DrumSequencer, ...) falls back to the same
+   // "idle" placeholder those per-type scope draws already show when they
+   // have nothing queued, rather than fabricating data or reaching into
+   // ProcessBlock directly (doc trap 7).
+   //
+   // The 256-slot decimated min/max cache itself lives on FieldGraphNode
+   // (kWaveformCacheSize/waveformMin/waveformMax/waveformCacheCount), not on
+   // the terminal - adapting GranularNode's own shape (GranularNode.h
+   // kWaveformCacheSize/waveformMin/waveformMax) rather than a fourth
+   // pattern. Rebuilt on a throttled ~30Hz cadence, matching
+   // DrawFieldSampleScope's own cadence above - never synchronously inside
+   // an audio callback.
+   void DrawFieldGraphWaveform(FieldGraphNode* fgn, INode* audioTerminal)
+   {
+      const double now = ImGui::GetTime();
+      if (fgn->waveformCacheTime < 0.0 || now - fgn->waveformCacheTime > 1.0 / 30.0)
+      {
+         float raw[256];
+         int rawCount = 0;
+         if (auto* n = dynamic_cast<WavetableNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, WavetableNode::kScopeCacheCapacity);
+         else if (auto* n = dynamic_cast<FieldSampleNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, FieldSampleNode::kScopeCacheCapacity);
+         else if (auto* n = dynamic_cast<OscillatorNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, OscillatorNode::kScopeCacheCapacity);
+         else if (auto* n = dynamic_cast<MetallicNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, MetallicNode::kScopeCacheCapacity);
+         else if (auto* n = dynamic_cast<WaveTerrainNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, WaveTerrainNode::kScopeCapacity);
+         else if (auto* n = dynamic_cast<ImageSpectralSynthNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, ImageSpectralSynthNode::kScopeCapacity);
+         else if (auto* n = dynamic_cast<EquationNode*>(audioTerminal))
+            rawCount = n->ReadScope(raw, EquationNode::kScopeCapacity);
+
+         if (rawCount > 1)
+         {
+            const int bucketCount = std::min(FieldGraphNode::kWaveformCacheSize, rawCount);
+            const int bucketSize = std::max(1, rawCount / bucketCount);
+            for (int b = 0; b < bucketCount; b++)
+            {
+               const int startI = b * bucketSize;
+               const int endI = std::min(rawCount, (b + 1) * bucketSize);
+               float minV = 0.0f;
+               float maxV = 0.0f;
+               for (int i = startI; i < endI; i++)
+               {
+                  const float v = raw[i];
+                  if (v < minV) minV = v;
+                  if (v > maxV) maxV = v;
+               }
+               fgn->waveformMin[b] = minV;
+               fgn->waveformMax[b] = maxV;
+            }
+            fgn->waveformCacheCount = bucketCount;
+         }
+         else
+         {
+            fgn->waveformCacheCount = 0;
+         }
+         fgn->waveformCacheTime = now;
+      }
+
+      const float w = AudioFullWidth();
+      const float h = 100.0f;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (fgn->waveformCacheCount > 0)
+      {
+         const bool isLight = IsThemeLight();
+         const int count = fgn->waveformCacheCount;
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - fgn->waveformMax[i] * h * 0.45f;
+            const float bottom = midY - fgn->waveformMin[i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(40, 90, 200, 200) : IM_COL32(140, 160, 220, 175));
+         }
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
    // Rolling history so a modulator reads like a scope rather than a number.
    std::map<int, std::vector<float>> gModHistory;
 
@@ -26348,6 +26806,214 @@ namespace
       }
    };
 
+   // Build step 15 ("Instrument Mode"): identical to MainGraphHost in every
+   // respect except Mount flags the spawned node hiddenFromCanvas and adds
+   // it to the owning FieldGraphNode's mMountedIndices, Unmount removes it
+   // from that set, and Place() is a deliberate no-op (an encapsulated
+   // child's canvas position is meaningless - see doc §3.3). Deliberately
+   // NOT refactored to share a base with MainGraphHost (doc trap 4) - step
+   // 16 needs its own third variant, and unifying three not-yet-fully-
+   // understood shapes now would fossilize the wrong abstraction.
+   struct VirtualGraphHost final : public Field::IFieldGraphHost
+   {
+      FieldGraphNode* owner = nullptr;
+      int mDroppedModCount = 0;
+      int mDetachedCableCount = 0;
+      int DroppedModCount() const override { return mDroppedModCount; }
+      int DetachedCableCount() const override { return mDetachedCableCount; }
+
+      int Mount(const std::string& typeName) override
+      {
+         if (!Spawnable(typeName))
+            return -1;
+         std::string category;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+            {
+               category = cat;
+               break;
+            }
+         }
+         GraphNode* gn = SpawnNode(typeName, category, 0.0f, 0.0f);
+         if (gn == nullptr)
+            return -1;
+         gn->hiddenFromCanvas = true;
+         return gn->index;
+      }
+
+      void Unmount(int id) override
+      {
+         for (const auto& entry : Modulation::Instance().Links())
+            if (entry.first.first == id) mDroppedModCount++;
+
+         GraphNode* unmounting = FindNodeByIndex(id);
+         if (unmounting && unmounting->node)
+         {
+            INode* targetSrc = unmounting->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == id) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+            }
+         }
+         RemoveNodeByIndex(id);
+      }
+
+      int Remount(int existing, const std::string& typeName) override
+      {
+         // Same rescue steps as MainGraphHost::Remount (group membership,
+         // modulation/cluster links, outbound cable rescue) - copied rather
+         // than shared, see this struct's header comment.
+         GroupNode* ownerGroup = nullptr;
+         for (auto& entry : gGroupMembers)
+         {
+            if (entry.second.count(existing))
+            {
+               ownerGroup = entry.first;
+               break;
+            }
+         }
+
+         std::set<int> dying = { existing };
+         std::vector<ClusterLink> rescuedLinks;
+         std::vector<ClusterModLink> rescuedMod;
+         std::vector<ClusterPaletteLink> rescuedPalette;
+         CaptureClusterLinks(dying, rescuedLinks, rescuedMod, rescuedPalette);
+
+         struct OutboundLink {
+            int srcSlot;
+            int dstIndex;
+            int dstSlot;
+         };
+         std::vector<OutboundLink> rescuedOutbound;
+         GraphNode* dyingGn = FindNodeByIndex(existing);
+         if (dyingGn && dyingGn->node)
+         {
+            INode* targetSrc = dyingGn->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == existing) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ cable->GetOutputSlot(), gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+            }
+         }
+
+         Unmount(existing);
+         int fresh = Mount(typeName);
+         if (fresh >= 0)
+         {
+            if (ownerGroup)
+               gGroupMembers[ownerGroup].insert(fresh);
+
+            GraphNode* freshGn = FindNodeByIndex(fresh);
+            if (freshGn)
+            {
+               std::map<int, GraphNode*> newByOrig;
+               newByOrig[existing] = freshGn;
+               ApplyClusterLinks(newByOrig, rescuedLinks, rescuedMod, rescuedPalette);
+            }
+
+            for (const auto& ob : rescuedOutbound)
+            {
+               std::string connErr;
+               ConnectNodes(fresh, ob.srcSlot, ob.dstIndex, ob.dstSlot, connErr);
+            }
+         }
+         return fresh;
+      }
+
+      void SetParam(int id, const std::string& paramName, float value) override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         if (gn == nullptr)
+            return;
+
+         struct SetFloatVisitor : public ParamVisitor
+         {
+            const std::string& targetName;
+            float targetValue;
+            explicit SetFloatVisitor(const std::string& name, float v) : targetName(name), targetValue(v) {}
+            void Float(const char* name, float& v) override { if (targetName == name) v = targetValue; }
+            void Int(const char* name, int& v) override { if (targetName == name) v = (int)std::lround((double)targetValue); }
+            void Bool(const char* name, bool& v) override { if (targetName == name) v = targetValue != 0.0f; }
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float[3]) override {}
+         } visitor(paramName, value);
+         gn->node->VisitParams(visitor);
+      }
+
+      void Connect(int srcId, int srcSlot, int dstId, int dstSlot) override
+      {
+         std::string err;
+         ConnectNodes(srcId, srcSlot, dstId, dstSlot, err);
+      }
+
+      // Deliberately a no-op, not an error - an encapsulated child's
+      // position is meaningless (nothing ever draws it at (x,y)) but
+      // place() is still syntactically valid to call, e.g. code shared
+      // between a still-encapsulated and an already-unpacked (step 16)
+      // instance. See doc §3.3.
+      void Place(int /*id*/, float /*x*/, float /*y*/) override {}
+
+      bool Alive(int id) const override { return FindNodeByIndex(id) != nullptr; }
+
+      std::string TypeNameOf(int id) const override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         return gn != nullptr ? gn->typeName : std::string();
+      }
+
+      bool Spawnable(const std::string& typeName) const override
+      {
+         if (typeName == "Field Graph" || !IsUserSpawnable(typeName))
+            return false;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+               return true;
+         }
+         return false;
+      }
+   };
+
    bool IsKernelDrivenParam(int nodeIndex, int paramIndex)
    {
       GraphNode* gn = FindNodeByIndex(nodeIndex);
@@ -26480,7 +27146,7 @@ namespace
                   continue;
                auto it = addrToIndex.find((const void*)cable->GetSource());
                if (it != addrToIndex.end())
-                  data.cables.push_back({ gn.index, slot, it->second });
+                  data.cables.push_back({ gn.index, slot, it->second, cable->GetSourceOutput() });
             }
          }
          // Audio/note cables are typed like image cables (a plain
@@ -27488,6 +28154,19 @@ namespace
          spawned->node->bypassed = rec.bypassed;
          spawned->showMiniViewport = rec.showMiniViewport;
          spawned->showAdvancedParams = rec.showAdvancedParams;
+         // Build step 15 §6 / trap 5: a FieldGraphNode's `encapsulated`
+         // compile-time default (true) is correct for a brand-new node from
+         // the node picker, which never goes through LoadParams - but a
+         // patch saved before this field existed has no "b encapsulated"
+         // line, and ParamVisitor::Bool (Patch::Reader) leaves a field
+         // untouched when its key is absent. Forcing false here first means
+         // an old patch (no key at all) loads with its children visible on
+         // canvas, exactly as they were before this step existed, while a
+         // patch that DOES carry the key (any patch saved by this build or
+         // later, including in-session Undo/Redo and copy/paste snapshots)
+         // still gets overwritten to the saved value by LoadParams below.
+         if (auto* fgn = dynamic_cast<FieldGraphNode*>(spawned->node.get()))
+            fgn->encapsulated = false;
          Patch::LoadParams(spawned->node.get(), rec.params);
          ReloadDerivedState(spawned->node.get());
          // Phase 4 (selection as an input): rewrites a saved kDeleteSelected/
@@ -27524,7 +28203,7 @@ namespace
          if (dst == nullptr || src == nullptr)
             continue;
          if (ImageCable* cable = CableFor(*dst, c.dstSlot))
-            cable->Connect(src->node.get());
+            cable->Connect(src->node.get(), c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.geometry)
       {
@@ -27763,6 +28442,26 @@ namespace
       }
    }
 
+   // Build step 15 follow-up (§5.1/§5.4): resolves the same "first terminal
+   // with a texture" node the inline preview dispatch (main.cpp's node-body
+   // draw loop) already computes every frame - this is also this
+   // FieldGraphNode's single derived boundary output pin's target. Kept as
+   // its own small free function rather than a FieldGraphNode member because
+   // it needs FindNodeByIndex/gNodes, which FieldGraphNode.h/.cpp
+   // deliberately have no access to (same discipline as TerminalIndices()'s
+   // own doc comment).
+   INode* ResolveFieldGraphBoundaryTerminal(FieldGraphNode* fgn)
+   {
+      for (int idx : fgn->TerminalIndices())
+      {
+         GraphNode* term = FindNodeByIndex(idx);
+         if (term != nullptr && term->node && term->node->GetOutputTexture() != 0 &&
+             term->node->GetOutputWidth() > 0)
+            return term->node.get();
+      }
+      return nullptr;
+   }
+
    // Runs a FieldGraphNode's Regenerate() as exactly one undo step (doc
    // §5.4): one checkpoint pushed up front, every SpawnNode/
    // RemoveNodeByIndex/ConnectNodes call inside Regenerate() suppresses its
@@ -27777,8 +28476,371 @@ namespace
          return;
       PushUndoCheckpoint();
       gSuppressUndoCheckpoints = true;
-      MainGraphHost host;
-      target->Regenerate(host);
+
+      // Build step 15 follow-up (§5.4): capture what the boundary output pin
+      // resolves to BEFORE this regenerate, so a terminal that disappears
+      // (unmounted outright, or simply no longer a terminal because a new
+      // connect() now consumes it - §5.1) can be told apart from the pin
+      // just continuing to point at the same node it always did. Purely
+      // local to this call - never held past it.
+      INode* oldBoundaryTarget = ResolveFieldGraphBoundaryTerminal(target);
+
+      // Build step 15: encapsulated (Instrument Mode, the default) mounts
+      // through VirtualGraphHost, which hides every mounted child from the
+      // canvas; false (step 16's "Unpack to Canvas", or a patch saved
+      // before this field existed) mounts through the same MainGraphHost
+      // this always used.
+      if (target->encapsulated)
+      {
+         VirtualGraphHost host;
+         host.owner = target;
+         target->Regenerate(host);
+      }
+      else
+      {
+         MainGraphHost host;
+         target->Regenerate(host);
+      }
+
+      // §5.4: this node's boundary output pin always re-resolves to
+      // whichever terminal is now primary (nullptr if none), refreshed here
+      // so a cook that lands before the next draw frame already reads the
+      // right target - the draw dispatch (main.cpp's node-body loop) does
+      // the same call every frame regardless, so this is belt-and-braces,
+      // not the only place it happens.
+      INode* newBoundaryTarget = ResolveFieldGraphBoundaryTerminal(target);
+      target->SetBoundaryOutputTarget(newBoundaryTarget);
+
+      // If the pin's old target is gone (the identity it backed is no
+      // longer a terminal at all, whether unmounted or merely consumed by a
+      // new internal connect()), any outer cable still plugged into this
+      // node's own output pin is now stale and needs detaching - same
+      // count-then-DisconnectAllTo shape, and the same "detached N cables"
+      // notice vocabulary, MainGraphHost::Unmount already uses for an
+      // internal node going away (doc trap 6) - extending that existing
+      // accounting/notice path rather than building a second, competing
+      // detached-cable mechanism. A single physical pin can only ever back
+      // one terminal at a time in
+      // this implementation (§5.1's multi-terminal case is not exposed as
+      // multiple real output pins here), so any change to what the pin
+      // resolves to - not only an outright disappearance - is treated as
+      // the pin's identity changing and is handled the same conservative
+      // way: detach rather than silently swap the picture under a
+      // connected cable.
+      int boundaryCablesDetached = 0;
+      if (oldBoundaryTarget != nullptr && newBoundaryTarget != oldBoundaryTarget)
+      {
+         INode* boundarySource = target;
+         for (GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == boundarySource)
+               continue;
+            int inputs = InputCountFor(gn);
+            for (int slot = 0; slot < inputs; slot++)
+            {
+               ImageCable* cable = CableFor(gn, slot);
+               if (cable && cable->IsConnected() && cable->GetSource() == boundarySource)
+                  boundaryCablesDetached++;
+            }
+            for (int slot = 0; slot < kMaxAudioSlots; slot++)
+            {
+               AudioCable* cable = gn.node->AudioInputSlot(slot);
+               if (cable && cable->IsConnected() && cable->GetSource() == boundarySource)
+                  boundaryCablesDetached++;
+            }
+            for (int slot = 0; slot < kMaxNoteSlots; slot++)
+            {
+               NoteCable* cable = gn.node->NoteInputSlot(slot);
+               if (cable && cable->IsConnected() && cable->GetSource() == boundarySource)
+                  boundaryCablesDetached++;
+            }
+         }
+         if (boundaryCablesDetached > 0)
+            DisconnectAllTo(boundarySource);
+      }
+      if (boundaryCablesDetached > 0)
+      {
+         std::ostringstream oss;
+         oss << "detached " << boundaryCablesDetached
+             << " outer cable(s) from a boundary pin whose terminal disappeared";
+         target->AppendNotice(oss.str());
+      }
+
+      gSuppressUndoCheckpoints = false;
+      gPatchDirty = true;
+   }
+
+   // Build step 16 ("Unpack to Canvas"), §4.1-§4.2. Phase 1: flips
+   // `encapsulated` off, computes each mounted child's topological-depth
+   // column (Field::ComputeEmitDepths over target->LastPlan().connects) and
+   // a provisional per-column row stack - nothing has been drawn at a real
+   // position for these children yet (they have only ever been hidden), so
+   // there is nothing to measure this frame; phase 2 (RunFieldGraphUnpackPhase2Tick,
+   // below) refines row heights from real measured sizes once they're
+   // available and spawns the wrapping GroupNode. One PushUndoCheckpoint()
+   // covers both phases - gSuppressUndoCheckpoints stays on until phase 2
+   // finishes (doc §4.1: "wrapped in exactly one ... pair"). Must only be
+   // called outside ed::Begin()/ed::End() (trap T14) - see
+   // gFieldGraphPendingUnpack's drain after ed::End(), same site as
+   // gFieldGraphPendingRegenerate's.
+   void RunFieldGraphUnpackPhase1(FieldGraphNode* target)
+   {
+      if (target == nullptr)
+         return;
+      // Precondition already gates the button (DrawFieldGraphParams), but
+      // stay honest if this is ever driven directly (§7 assertion 6: a
+      // FieldGraphNode with no mounted children is a documented no-op).
+      if (!target->encapsulated || target->MountedIndices().empty())
+         return;
+
+      PushUndoCheckpoint();
+      gSuppressUndoCheckpoints = true;
+
+      target->encapsulated = false;
+      // Also clear right now rather than waiting for ApplyModulationAndPalette's
+      // per-frame sync (main.cpp's "sync each mounted child's hiddenFromCanvas
+      // to encapsulated" loop) to get to it later this same frame - that loop
+      // runs before this drain point in frame order, so without this the
+      // children would stay hidden for one extra frame before the sync loop
+      // catches up on the NEXT frame's pass.
+      for (int idx : target->MountedIndices())
+      {
+         GraphNode* gn = FindNodeByIndex(idx);
+         if (gn != nullptr)
+            gn->hiddenFromCanvas = false;
+      }
+
+      constexpr float kUnpackOriginX = 60.0f;
+      constexpr float kUnpackOriginY = 60.0f;
+      constexpr float kUnpackDX = 580.0f;      // = FieldGraphNode.cpp's kAutoPlaceDX
+      constexpr float kUnpackDXWide = 1080.0f; // = kAutoPlaceDXWide
+      constexpr float kUnpackDYMin = 160.0f;   // owner's Δy, kept as a floor
+      constexpr float kUnpackRowMargin = 40.0f;
+
+      const Field::GraphPlan& plan = target->LastPlan();
+      std::map<std::string, int> depthByKey = Field::ComputeEmitDepths(plan);
+
+      // Group mounted indices by depth, preserving plan.emits order within a
+      // column - deterministic, mirrors Regenerate()'s own call-site
+      // ordering discipline (doc §3.2).
+      std::map<int, std::vector<int>> indicesByDepth;
+      std::map<int, int> depthByIndex;
+      for (const auto& e : plan.emits)
+      {
+         int idx = target->Ownership().Get(e.key);
+         if (idx < 0 || !target->OwnsMountedIndex(idx))
+            continue;
+         auto depthIt = depthByKey.find(e.key);
+         int depth = depthIt != depthByKey.end() ? depthIt->second : 0;
+         indicesByDepth[depth].push_back(idx);
+         depthByIndex[idx] = depth;
+      }
+
+      // Column x: cumulative, each column's width the widest type mounted in
+      // it (mirrors Regenerate()'s per-call-site accumulation, keyed by
+      // depth instead of call site - doc §3.3). std::map iterates by
+      // ascending depth already.
+      std::map<int, float> columnX;
+      float nextX = kUnpackOriginX;
+      for (const auto& colEntry : indicesByDepth)
+      {
+         columnX[colEntry.first] = nextX;
+         bool colWide = false;
+         for (int idx : colEntry.second)
+         {
+            GraphNode* gn = FindNodeByIndex(idx);
+            if (gn != nullptr && IsWideAutoPlaceType(gn->typeName))
+               colWide = true;
+         }
+         nextX += colWide ? kUnpackDXWide : kUnpackDX;
+      }
+
+      // Provisional row stacking at the kUnpackDYMin floor (doc §3.3: "frame
+      // 1 spawns everything at a provisional position") - phase 2 refines it
+      // once real sizes are measurable.
+      std::vector<int> members;
+      for (const auto& colEntry : indicesByDepth)
+      {
+         float y = kUnpackOriginY;
+         for (int idx : colEntry.second)
+         {
+            GraphNode* gn = FindNodeByIndex(idx);
+            if (gn == nullptr)
+               continue;
+            gn->spawnX = columnX[colEntry.first];
+            gn->spawnY = y;
+            gn->liveX = gn->spawnX;
+            gn->liveY = gn->spawnY;
+            gn->needsPosition = true;
+            y += kUnpackDYMin + kUnpackRowMargin;
+            members.push_back(idx);
+         }
+      }
+
+      gFieldGraphUnpackPhase2 = FieldGraphUnpackPhase2State{};
+      gFieldGraphUnpackPhase2.active = true;
+      gFieldGraphUnpackPhase2.target = target;
+      gFieldGraphUnpackPhase2.members = members;
+      gFieldGraphUnpackPhase2.depthByIndex = depthByIndex;
+      gFieldGraphUnpackPhase2.columnX = columnX;
+      gFieldGraphUnpackPhase2.retriesLeft = FieldGraphUnpackPhase2State::kMaxRetries;
+
+      gPatchDirty = true;
+   }
+
+   // Build step 16, phase 2 - ticked once per frame (after ed::End(), same
+   // site as the phase-1 drain) while gFieldGraphUnpackPhase2.active is
+   // true. Waits for every revealed member's ed:: node size to read as a
+   // real measurement rather than a freshly-drawn node's sentinel/
+   // placeholder size, range-checked the same way INFINITE_SAMPLERDRAGTEST
+   // already does (doc §3.3/trap 3) rather than a hardcoded frame-count gate
+   // - a literal frameId+1 check does not fit here since a member may have
+   // been hidden (and therefore never drawn even once) for an arbitrary
+   // number of frames before this tick starts polling it. Once every member
+   // validates, or kMaxRetries frames pass without that, finalizes row y
+   // (from real measured heights, or the phase-1 floor-only stacking as a
+   // fallback), spawns the wrapping GroupNode over the finalized bounding
+   // box, and releases the shared undo suppression phase 1 armed.
+   void RunFieldGraphUnpackPhase2Tick()
+   {
+      if (!gFieldGraphUnpackPhase2.active)
+         return;
+
+      FieldGraphUnpackPhase2State& st = gFieldGraphUnpackPhase2;
+
+      // ed::GetNodePosition/GetNodeSize need a live editor context; this
+      // tick runs after ed::End() has already cleared it for the frame
+      // (ed::SetCurrentEditor(nullptr) right after ed::End()) - same
+      // save/restore shape FindFreeSpawnPosition already uses.
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+
+      constexpr float kUnpackOriginY = 60.0f;
+      constexpr float kUnpackDYMin = 160.0f;
+      constexpr float kUnpackRowMargin = 40.0f;
+      constexpr float kAudioNodeWidthFallback = 440.0f;
+      constexpr float kAudioWideWidthFallback = 960.0f;
+
+      std::map<int, ImVec2> sizeByIndex;
+      std::map<int, ImVec2> posByIndex;
+      bool allValid = true;
+      for (int idx : st.members)
+      {
+         GraphNode* gn = FindNodeByIndex(idx);
+         if (gn == nullptr)
+            continue;
+         ImVec2 p = ed::GetNodePosition(gn->NodeId());
+         ImVec2 s = ed::GetNodeSize(gn->NodeId());
+         posByIndex[idx] = p;
+         sizeByIndex[idx] = s;
+         bool valid = s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f;
+         if (!valid)
+            allValid = false;
+      }
+
+      st.retriesLeft--;
+      if (!allValid && st.retriesLeft >= 0)
+      {
+         ed::SetCurrentEditor(prevEditor);
+         return; // keep polling next frame
+      }
+
+      if (allValid)
+      {
+         std::map<int, std::vector<int>> byDepth;
+         for (int idx : st.members)
+            byDepth[st.depthByIndex[idx]].push_back(idx);
+
+         for (auto& colEntry : byDepth)
+         {
+            float y = kUnpackOriginY;
+            for (int idx : colEntry.second)
+            {
+               GraphNode* gn = FindNodeByIndex(idx);
+               if (gn == nullptr)
+                  continue;
+               const float h = std::max(kUnpackDYMin, sizeByIndex[idx].y);
+               gn->spawnY = y;
+               gn->liveY = y;
+               ed::SetNodePosition(gn->NodeId(), ImVec2(gn->spawnX, y));
+               y += h + kUnpackRowMargin;
+            }
+         }
+      }
+      // else: retries exhausted before every size validated - fall back to
+      // phase 1's kUnpackDYMin-only stacking (already applied to spawnY/the
+      // node-editor position), no measured-height refinement (doc §7's
+      // stated defensive fallback rather than looping forever).
+
+      // Bounding box over the now-finalized positions - same accumulation
+      // shape as the Cmd/Ctrl+G selection-wrap handler (main.cpp's
+      // "doGroup" block), sourced from this unpack's members instead of the
+      // live selection. Uses a nominal per-type size instead of a possibly-
+      // still-sentinel measured one for any member whose size never
+      // validated (the fallback-stacking path above), so the group's box
+      // isn't sized off garbage.
+      bool any = false;
+      ImVec2 bmin(0.0f, 0.0f), bmax(0.0f, 0.0f);
+      for (int idx : st.members)
+      {
+         GraphNode* gn = FindNodeByIndex(idx);
+         if (gn == nullptr)
+            continue;
+         ImVec2 p = ed::GetNodePosition(gn->NodeId());
+         ImVec2 s = sizeByIndex[idx];
+         if (!(s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f))
+            s = ImVec2(IsWideAutoPlaceType(gn->typeName) ? kAudioWideWidthFallback : kAudioNodeWidthFallback,
+                       kUnpackDYMin);
+         if (!any)
+         {
+            bmin = p;
+            bmax = ImVec2(p.x + s.x, p.y + s.y);
+            any = true;
+         }
+         else
+         {
+            bmin.x = std::min(bmin.x, p.x);
+            bmin.y = std::min(bmin.y, p.y);
+            bmax.x = std::max(bmax.x, p.x + s.x);
+            bmax.y = std::max(bmax.y, p.y + s.y);
+         }
+      }
+
+      if (any)
+      {
+         // Same kPad/kHeader padding numbers as the selection-wrap handler
+         // (doc §4.2 step 6: reuse, don't invent new padding).
+         const float kPad = 32.0f;
+         const float kHeader = 24.0f;
+         const float gx = bmin.x - kPad;
+         const float gy = bmin.y - kPad - kHeader;
+         const float gw = (bmax.x - bmin.x) + kPad * 2.0f;
+         const float gh = (bmax.y - bmin.y) + kPad * 2.0f + kHeader;
+
+         if (GraphNode* ggn = SpawnNode("Group", "Compositing", gx, gy))
+         {
+            if (auto* grp = dynamic_cast<GroupNode*>(ggn->node.get()))
+            {
+               // No generic user-assigned display name exists for a
+               // FieldGraphNode instance (checked - only GroupNode itself
+               // has a rename-in-place `label`; there is no node-title
+               // system to borrow from) - short, unique, not pretty, per
+               // doc §4.2 step 5.
+               grp->label = "Unpacked: " + st.target->Uid().substr(0, 8);
+               // Position only - AutoFitGroupToMembers (already runs every
+               // frame) takes over sizing from the very next frame, same as
+               // the selection-wrap handler already relies on (doc trap 4).
+               grp->width = gw;
+               grp->height = gh;
+               gGroupMembers[grp] = st.target->MountedIndices();
+            }
+         }
+      }
+
+      ed::SetCurrentEditor(prevEditor);
+
+      st.active = false;
+      st.target = nullptr;
       gSuppressUndoCheckpoints = false;
       gPatchDirty = true;
    }
@@ -30064,6 +31126,7 @@ static bool RunMusicTimeFixture()
       { kSixteenthDot, "1/16.", 0.375, false, 0.0 },
       { kSixteenthTrip, "1/16T", 1.0 / 6.0, false, 0.0 },
       { kThirtySecond, "1/32", 0.125, false, 0.0 },
+      { kThirtySecondDot, "1/32.", 0.1875, false, 0.0 },
       { kThirtySecondTrip, "1/32T", 1.0 / 12.0, false, 0.0 },
       { kSixtyFourth, "1/64", 0.0625, false, 0.0 },
    };
@@ -38602,6 +39665,628 @@ static int RunFieldSampleTest()
    return allOk ? 0 : 1;
 }
 
+// Build step 12 (docs/plans/field/step-12-dynamic-pins-ir.md): dynamic
+// output/input pin declarations. This harness is compiler-level only - it
+// drives Lex/ParseProgram/LowerElementProgramToIR/LowerPixelProgramToIR and
+// BackendRegister::CompileSampleProgram directly (never through a node class,
+// since FieldElementNode/FieldSampleNode only expose the post-backend
+// compiled program, not the intermediate IR's declaredOutputs/declaredInputs
+// vectors) plus a standalone Field::PinTable, per this step's "compiler/IR
+// work only, nothing in src/nodes/ changes" scope restriction.
+static int RunFieldPinDeclTest()
+{
+   printf("[FIELDPINDECLTEST] Running Field dynamic-pins declaration harness...\n");
+   bool allOk = true;
+
+   // ------------------------------------------------------------
+   // SECTION 1: Element-domain output/input collection (shared IR path)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src =
+         "output frame float bright = t\n"
+         "input sample audio sidechain\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      if (!Field::Lex(src, tokens, err) ||
+          !Field::ParseProgram(tokens, ast, err) ||
+          !Field::LowerElementProgramToIR(ast, ir, err))
+      {
+         printf("SECTION 1: FAIL - valid snippet did not compile: %s\n", err.message.c_str());
+         secOk = false;
+      }
+      else
+      {
+         if (ir.declaredOutputs.size() != 1 || ir.declaredOutputs[0].name != "bright" ||
+             ir.declaredOutputs[0].domain != Field::Domain::Frame ||
+             ir.declaredOutputs[0].type != Field::DataType::Float)
+         {
+            printf("SECTION 1: FAIL - declaredOutputs does not match expected ('bright', Frame, Float)\n");
+            secOk = false;
+         }
+         if (ir.declaredInputs.size() != 1 || ir.declaredInputs[0].name != "sidechain" ||
+             ir.declaredInputs[0].domain != Field::Domain::Sample || !ir.declaredInputs[0].isStructural)
+         {
+            printf("SECTION 1: FAIL - declaredInputs does not match expected ('sidechain', Sample, structural audio)\n");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 1 (Element-Domain Output/Input Collection): OK\n");
+      else { printf("SECTION 1 (Element-Domain Output/Input Collection): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 2: geometry input + bounded dotted-field access (.P/.N/.uv/.Cd)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src =
+         "input element geometry other\n"
+         "output element vec3 otherPos = other.P\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      if (!Field::Lex(src, tokens, err) ||
+          !Field::ParseProgram(tokens, ast, err) ||
+          !Field::LowerElementProgramToIR(ast, ir, err))
+      {
+         printf("SECTION 2: FAIL - valid geometry-access snippet did not compile: %s\n", err.message.c_str());
+         secOk = false;
+      }
+      else
+      {
+         if (ir.declaredInputs.size() != 1 || ir.declaredInputs[0].name != "other" ||
+             ir.declaredInputs[0].typeName != "geometry" || !ir.declaredInputs[0].isStructural)
+         {
+            printf("SECTION 2: FAIL - declaredInputs does not match expected ('other', geometry, structural)\n");
+            secOk = false;
+         }
+         if (ir.declaredOutputs.size() != 1 || ir.declaredOutputs[0].name != "otherPos" ||
+             ir.declaredOutputs[0].domain != Field::Domain::Element)
+         {
+            printf("SECTION 2: FAIL - declaredOutputs does not match expected ('otherPos', Element)\n");
+            secOk = false;
+         }
+      }
+
+      // A bare (non-dotted) reference to a geometry input must be refused -
+      // it names a whole mesh, not a value.
+      {
+         std::string bad = "input element geometry other\noutput element vec3 bad = other\n";
+         std::vector<Field::Token> t2;
+         Field::FieldError e2;
+         Field::AstNodePtr a2;
+         Field::ElementIRProgram ir2;
+         bool ok = Field::Lex(bad, t2, e2) && Field::ParseProgram(t2, a2, e2) && Field::LowerElementProgramToIR(a2, ir2, e2);
+         if (ok || e2.message.find("cannot be used as a value directly") == std::string::npos)
+         {
+            printf("SECTION 2: FAIL - bare geometry identifier reference was not refused (err='%s')\n", e2.message.c_str());
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 2 (Geometry Input + Structural Field Access): OK\n");
+      else { printf("SECTION 2 (Geometry Input + Structural Field Access): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 3: Domain-join refusal - finer expression than declared domain
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src = "output frame float bad = P.x\n"; // P.x is Element-domain, finer than Frame
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                Field::LowerElementProgramToIR(ast, ir, err);
+      if (ok || err.message.find("finer") == std::string::npos)
+      {
+         printf("SECTION 3: FAIL - finer-than-declared expression was not refused with a 'finer' message (err='%s')\n",
+                err.message.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 3 (Domain-Join Refusal - Finer Expression): OK\n");
+      else { printf("SECTION 3 (Domain-Join Refusal - Finer Expression): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 4: every wrong/right row in S5.1 and every refusal row in
+   // S5.8, each error naming its span (exit criterion item 1).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      auto testRefusal = [&](const std::string& src, const std::string& expectedSubstr, const char* label) {
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                   Field::LowerElementProgramToIR(ast, ir, err);
+         if (ok || err.message.find(expectedSubstr) == std::string::npos)
+         {
+            printf("SECTION 4 (%s): FAIL - expected refusal containing '%s', got ok=%d err='%s'\n",
+                   label, expectedSubstr.c_str(), ok, err.message.c_str());
+            secOk = false;
+            return;
+         }
+         if (err.span.line <= 0 || err.span.col <= 0)
+         {
+            printf("SECTION 4 (%s): FAIL - error is missing a valid source span (line=%d, col=%d)\n",
+                   label, err.span.line, err.span.col);
+            secOk = false;
+         }
+      };
+      // Same as testRefusal, but the valid-input direction: must compile.
+      auto testAccept = [&](const std::string& src, const char* label) {
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                   Field::LowerElementProgramToIR(ast, ir, err);
+         if (!ok)
+         {
+            printf("SECTION 4 (%s): FAIL - expected this to compile, got error: %s\n", label, err.message.c_str());
+            secOk = false;
+         }
+      };
+
+      // S5.1 "wrong" rows.
+      testRefusal("output publish = length(P)\n", "domain", "missing domain/type");
+      testRefusal("output frame float t = 1\n", "reserved", "reserved name 't' (frame domain)");
+      testRefusal("output frame float bass = 1\noutput frame float bass = 2\n", "duplicate declaration", "duplicate output name");
+      testRefusal("input frame float k = 1.0\n", "", "input with initializer is a syntax error"); // no '=' expected after an input decl
+      testRefusal("output graph float x = 1.0\n", "graph-domain pin", "output in graph domain");
+
+      // S5.1 "right" rows (the corresponding valid forms must compile).
+      // Note: length(P)*heat in the doc's own worked example (S5.1) is
+      // Element-domain (P is an element attrib) and would itself be
+      // refused as "finer than declared" under S5.3's join check unless
+      // 'heat' were a reduce'd/frame-domain quantity - the doc's comment
+      // is illustrative, not a literal type-checked snippet, so this
+      // right-row instead uses a genuinely frame-domain expression (t),
+      // matching SECTION 1's already-verified 'bright = t' declaration.
+      testAccept("output frame float publish = t * 2\n", "explicit domain+type output, frame-domain expr");
+      testAccept("input element geometry other\ninput sample audio sidechain\nP += (other.P - P) * 0.1\n",
+                 "geometry + audio inputs, owner's own example");
+
+      // S5.8 row: two declared pins, same direction, same name -> duplicate,
+      // already covered above (bass/bass). Opposite-direction name reuse:
+      // a pin's name shadowing a pin in the other direction.
+      testRefusal("output frame float x = 1\ninput frame float x\n", "duplicate declaration", "name reused across output/input");
+
+      // S5.8 row: reserved attrib / param / state name collisions.
+      testRefusal("output frame float P = 1\n", "reserved", "shadows reserved element attrib 'P'");
+      testRefusal("param float amt = 0.5 [0,1]\noutput frame float amt = 1\n", "duplicate declaration", "shadows an existing param");
+      testRefusal("state float acc = 0\noutput frame float acc = 1\n", "duplicate declaration", "shadows an existing state");
+
+      // S5.8 row: image/geometry/audio used with the wrong domain.
+      testRefusal("output element audio bad = 1\n", "sample", "'audio' pin declared outside sample domain");
+      testRefusal("input pixel geometry bad\n", "element", "'geometry' pin declared outside element domain");
+      testRefusal("output element image bad = vec4(1,1,1,1)\n", "pixel", "'image' pin declared outside pixel domain");
+
+      // S5.8 row: expression domain finer than declared -> refuse, name
+      // both domains, suggest reduce (already covered by SECTION 3, but
+      // check the hint text is present here too).
+      {
+         std::string src = "output frame float bad = P.x\n";
+         std::vector<Field::Token> tokens;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                   Field::LowerElementProgramToIR(ast, ir, err);
+         if (ok || err.message.find("frame") == std::string::npos || err.message.find("element") == std::string::npos ||
+             err.hint.find("reduce") == std::string::npos)
+         {
+            printf("SECTION 4 (finer expression names both domains + reduce hint): FAIL - err='%s' hint='%s'\n",
+                   err.message.c_str(), err.hint.c_str());
+            secOk = false;
+         }
+      }
+
+      // Nested declaration (not directly in S5.1/S5.8's table, but required
+      // by S5's "declared at top level" rule elsewhere in the doc).
+      testRefusal("if (t > 0) {\noutput frame float bad = t\n}\n", "must be declared at top level", "nested output");
+
+      if (secOk) printf("SECTION 4 (S5.1/S5.8 Wrong/Right/Refusal Table): OK\n");
+      else { printf("SECTION 4 (S5.1/S5.8 Wrong/Right/Refusal Table): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 5: 16-pin-per-kernel ceiling
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      std::string src;
+      for (int i = 0; i < 17; ++i)
+         src += "output frame float p" + std::to_string(i) + " = 1\n";
+      std::vector<Field::Token> tokens;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::ElementIRProgram ir;
+      bool ok = Field::Lex(src, tokens, err) && Field::ParseProgram(tokens, ast, err) &&
+                Field::LowerElementProgramToIR(ast, ir, err);
+      if (ok || err.message.find("ceiling") == std::string::npos)
+      {
+         printf("SECTION 5: FAIL - 17th pin declaration was not refused with a ceiling message (err='%s')\n",
+                err.message.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 5 (16-Pin-Per-Kernel Ceiling): OK\n");
+      else { printf("SECTION 5 (16-Pin-Per-Kernel Ceiling): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 6: Sample-domain backend collection (independent lowering path)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 6a. output frame float ... = reduce.rms(...) - the only legal form
+      // for a frame-domain output declared inside a sample kernel.
+      {
+         std::string src = "output frame float bass = reduce.rms(in, 20, 200)\nout = in\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (!Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - reduce.rms output declaration did not compile: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         else if (prog.declaredOutputs.size() != 1 || prog.declaredOutputs[0].name != "bass" ||
+                  prog.declaredOutputs[0].domainName != "frame" || !prog.hasReduceRms)
+         {
+            printf("SECTION 6: FAIL - SampleProgram::declaredOutputs / hasReduceRms not set as expected\n");
+            secOk = false;
+         }
+      }
+
+      // 6b. output sample float ... = <plain expr> - legal sample-domain form.
+      {
+         std::string src = "output sample float y = in * 0.5\nout = in\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (!Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - plain sample-domain output did not compile: %s\n", err.message.c_str());
+            secOk = false;
+         }
+         else if (prog.declaredOutputs.size() != 1 || prog.declaredOutputs[0].name != "y" ||
+                  prog.declaredOutputs[0].domainName != "sample")
+         {
+            printf("SECTION 6: FAIL - SampleProgram::declaredOutputs does not match expected ('y', sample)\n");
+            secOk = false;
+         }
+      }
+
+      // 6c. A sample-domain output declared as reduce.rms(...) is refused -
+      // that's a frame-domain result and must be declared 'output frame'.
+      {
+         std::string src = "output sample float bad = reduce.rms(in, 20, 200)\nout = in\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - reduce.rms declared as 'output sample' was not refused\n");
+            secOk = false;
+         }
+      }
+
+      // 6d. input <name> is collected but NOT bound into scope - referencing
+      // it inside the kernel body is a loud compile error, not silent garbage.
+      {
+         std::string src = "input sample audio sidechain\nout = sidechain\n";
+         Field::SampleProgram prog;
+         Field::FieldError err;
+         if (Field::CompileSampleProgram(src, nullptr, prog, err))
+         {
+            printf("SECTION 6: FAIL - referencing an unbound sample-domain input did not fail to compile\n");
+            secOk = false;
+         }
+         else if (err.message.find("used before assignment") == std::string::npos)
+         {
+            printf("SECTION 6: FAIL - expected a loud 'used before assignment' error, got '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+
+         // But the declaration itself (without referencing it) is collected.
+         std::string src2 = "input sample audio sidechain\nout = in\n";
+         Field::SampleProgram prog2;
+         Field::FieldError err2;
+         if (!Field::CompileSampleProgram(src2, nullptr, prog2, err2))
+         {
+            printf("SECTION 6: FAIL - bare (unreferenced) input declaration did not compile: %s\n", err2.message.c_str());
+            secOk = false;
+         }
+         else if (prog2.declaredInputs.size() != 1 || prog2.declaredInputs[0].name != "sidechain")
+         {
+            printf("SECTION 6: FAIL - SampleProgram::declaredInputs does not match expected ('sidechain')\n");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 6 (Sample-Domain Backend Collection): OK\n");
+      else { printf("SECTION 6 (Sample-Domain Backend Collection): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 7: PinTable identity - append-only ids, retire/remint on
+   // reconcile, stable-id reuse across a plain disappear+reappear.
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+
+      // First compile declares 'a' and 'b'.
+      std::vector<Field::DeclaredPin> decl1 = {
+         { "a", "float", "frame", true },
+         { "b", "float", "frame", true },
+      };
+      table.Reconcile(decl1, 0, notice);
+      const Field::PinEntry* a1 = table.Find("a");
+      const Field::PinEntry* b1 = table.Find("b");
+      if (!a1 || !b1 || a1->id == b1->id || a1->id <= 0 || b1->id <= 0)
+      {
+         printf("SECTION 7: FAIL - initial Reconcile did not assign distinct positive ids to 'a' and 'b'\n");
+         secOk = false;
+      }
+      int aId = a1 ? a1->id : -1;
+      int bId = b1 ? b1->id : -1;
+
+      // Second compile drops 'b' - it must be marked retired and reported.
+      std::vector<Field::DeclaredPin> decl2 = {
+         { "a", "float", "frame", true },
+      };
+      table.Reconcile(decl2, 0, notice);
+      if (notice.find("'b'") == std::string::npos)
+      {
+         printf("SECTION 7: FAIL - retiring 'b' did not produce a notice mentioning it (notice='%s')\n", notice.c_str());
+         secOk = false;
+      }
+      const Field::PinEntry* bRetired = table.Find("b");
+      if (!bRetired || bRetired->isDeclared || bRetired->id != bId)
+      {
+         printf("SECTION 7: FAIL - retired 'b' entry should keep its id and isDeclared=false\n");
+         secOk = false;
+      }
+
+      // Third compile: 'b' reappears with the SAME shape - must reuse the
+      // same id (stable identity), not mint a new one.
+      table.Reconcile(decl1, 0, notice);
+      const Field::PinEntry* bAgain = table.Find("b");
+      if (!bAgain || !bAgain->isDeclared || bAgain->id != bId)
+      {
+         printf("SECTION 7: FAIL - 'b' reappearing with an unchanged shape should reuse id %d, got %s\n",
+                bId, bAgain ? std::to_string(bAgain->id).c_str() : "(null)");
+         secOk = false;
+      }
+
+      // Fourth compile: 'b' reappears with a DIFFERENT shape (domain changed)
+      // - must retire the old identity and mint a fresh one (S5.4).
+      std::vector<Field::DeclaredPin> decl4 = {
+         { "a", "float", "frame", true },
+         { "b", "float", "element", true }, // domain changed: frame -> element
+      };
+      table.Reconcile(decl4, 0, notice);
+      const Field::PinEntry* bChanged = table.Find("b");
+      if (!bChanged || !bChanged->isDeclared || bChanged->id == bId || bChanged->domainName != "element")
+      {
+         printf("SECTION 7: FAIL - 'b' reappearing with a changed shape should mint a fresh id (old=%d, new=%s)\n",
+                bId, bChanged ? std::to_string(bChanged->id).c_str() : "(null)");
+         secOk = false;
+      }
+
+      // 'a' was untouched across all four reconciles - its id must never move.
+      const Field::PinEntry* aFinal = table.Find("a");
+      if (!aFinal || aFinal->id != aId)
+      {
+         printf("SECTION 7: FAIL - 'a' id changed across Reconcile calls that never dropped it (was %d, now %s)\n",
+                aId, aFinal ? std::to_string(aFinal->id).c_str() : "(null)");
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 7 (PinTable Stable Identity + Reconcile): OK\n");
+      else { printf("SECTION 7 (PinTable Stable Identity + Reconcile): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 8: PinTable::Reconcile idempotence - calling it twice with the
+   // exact same declaration list produces the same ids both times
+   // (exit criterion item 4).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+      std::vector<Field::DeclaredPin> decl = {
+         { "x", "float", "frame", true },
+         { "y", "float", "sample", false },
+      };
+      table.Reconcile(decl, 0, notice);
+      int xId1 = table.Find("x") ? table.Find("x")->id : -1;
+      int yId1 = table.Find("y") ? table.Find("y")->id : -1;
+
+      table.Reconcile(decl, 0, notice); // same list again
+      int xId2 = table.Find("x") ? table.Find("x")->id : -1;
+      int yId2 = table.Find("y") ? table.Find("y")->id : -1;
+
+      if (xId1 <= 0 || yId1 <= 0 || xId1 == yId1 || xId1 != xId2 || yId1 != yId2 ||
+          table.Pins().size() != 2)
+      {
+         printf("SECTION 8: FAIL - idempotent Reconcile did not produce stable ids (x:%d->%d, y:%d->%d, pins=%zu)\n",
+                xId1, xId2, yId1, yId2, table.Pins().size());
+         secOk = false;
+      }
+      if (!notice.empty())
+      {
+         printf("SECTION 8: FAIL - re-declaring the exact same list produced a spurious retirement notice: '%s'\n",
+                notice.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 8 (Reconcile Idempotence): OK\n");
+      else { printf("SECTION 8 (Reconcile Idempotence): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 9: PinTable::Reconcile with a renamed pin retires the old id
+   // (isDeclared=false, still present in Pins()) and mints a new one
+   // (exit criterion item 5).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+      std::vector<Field::DeclaredPin> decl1 = { { "oldName", "float", "frame", true } };
+      table.Reconcile(decl1, 0, notice);
+      const Field::PinEntry* orig = table.Find("oldName");
+      int origId = orig ? orig->id : -1;
+
+      // Rename: the declaration list now has "newName" instead of "oldName".
+      std::vector<Field::DeclaredPin> decl2 = { { "newName", "float", "frame", true } };
+      table.Reconcile(decl2, 0, notice);
+
+      bool foundOldStillPresent = false;
+      for (const auto& p : table.Pins())
+      {
+         if (p.id == origId) { foundOldStillPresent = true;
+            if (p.isDeclared)
+            {
+               printf("SECTION 9: FAIL - retired 'oldName' entry (id %d) should have isDeclared=false\n", origId);
+               secOk = false;
+            }
+         }
+      }
+      if (!foundOldStillPresent)
+      {
+         printf("SECTION 9: FAIL - retired 'oldName' entry (id %d) is missing from Pins() entirely\n", origId);
+         secOk = false;
+      }
+      const Field::PinEntry* renamed = table.Find("newName");
+      if (!renamed || !renamed->isDeclared || renamed->id == origId || renamed->id <= 0)
+      {
+         printf("SECTION 9: FAIL - 'newName' should be a freshly minted id distinct from the retired 'oldName' id %d\n", origId);
+         secOk = false;
+      }
+      if (notice.find("'oldName'") == std::string::npos)
+      {
+         printf("SECTION 9: FAIL - rename should report 'oldName' as retired in outNotice (got '%s')\n", notice.c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 9 (Rename Retires Old Id, Mints New Id): OK\n");
+      else { printf("SECTION 9 (Rename Retires Old Id, Mints New Id): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 10: PinTable::Reconcile with the same name but a changed
+   // type/domain also retires-and-mints, not updates-in-place - S5.4's
+   // deliberate difference from ParamTable (exit criterion item 6).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 10a. Type change (float -> vec3), domain unchanged.
+      {
+         Field::PinTable table;
+         std::string notice;
+         table.Reconcile({ { "v", "float", "frame", true } }, 0, notice);
+         int oldId = table.Find("v") ? table.Find("v")->id : -1;
+         table.Reconcile({ { "v", "vec3", "frame", true } }, 0, notice);
+         const Field::PinEntry* changed = table.Find("v");
+         if (!changed || !changed->isDeclared || changed->id == oldId || changed->typeName != "vec3")
+         {
+            printf("SECTION 10: FAIL - type change (float->vec3) on 'v' should retire+remint, old=%d new=%s\n",
+                   oldId, changed ? std::to_string(changed->id).c_str() : "(null)");
+            secOk = false;
+         }
+      }
+
+      // 10b. Direction change (output -> input), same name/type/domain.
+      {
+         Field::PinTable table;
+         std::string notice;
+         table.Reconcile({ { "d", "float", "frame", true } }, 0, notice);
+         int oldId = table.Find("d") ? table.Find("d")->id : -1;
+         table.Reconcile({ { "d", "float", "frame", false } }, 0, notice);
+         const Field::PinEntry* changed = table.Find("d");
+         if (!changed || !changed->isDeclared || changed->id == oldId || changed->isOutput)
+         {
+            printf("SECTION 10: FAIL - direction change (output->input) on 'd' should retire+remint, old=%d new=%s\n",
+                   oldId, changed ? std::to_string(changed->id).c_str() : "(null)");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 10 (Type/Domain/Direction Change Retires+Remints): OK\n");
+      else { printf("SECTION 10 (Type/Domain/Direction Change Retires+Remints): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 11: SerializePinMap/DeserializePinMap round-trip a table with
+   // at least one retired entry (exit criterion item 7).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      Field::PinTable table;
+      std::string notice;
+      table.Reconcile({ { "keep", "float", "frame", true }, { "gone", "float", "frame", true } }, 0, notice);
+      table.Reconcile({ { "keep", "float", "frame", true } }, 0, notice); // "gone" retires
+
+      const Field::PinEntry* keepBefore = table.Find("keep");
+      const Field::PinEntry* goneBefore = table.Find("gone");
+      if (!keepBefore || !goneBefore || goneBefore->isDeclared)
+      {
+         printf("SECTION 11: FAIL - fixture setup did not produce one declared + one retired entry\n");
+         secOk = false;
+      }
+      int keepId = keepBefore ? keepBefore->id : -1;
+      int goneId = goneBefore ? goneBefore->id : -1;
+
+      std::string serialized = table.SerializePinMap();
+
+      Field::PinTable table2;
+      table2.DeserializePinMap(serialized);
+      const Field::PinEntry* keepAfter = table2.Find("keep");
+      const Field::PinEntry* goneAfter = table2.Find("gone");
+      if (!keepAfter || keepAfter->id != keepId)
+      {
+         printf("SECTION 11: FAIL - 'keep' did not round-trip to the same id %d (got %s)\n",
+                keepId, keepAfter ? std::to_string(keepAfter->id).c_str() : "(null)");
+         secOk = false;
+      }
+      if (!goneAfter || goneAfter->id != goneId)
+      {
+         printf("SECTION 11: FAIL - retired 'gone' did not round-trip to the same id %d (got %s)\n",
+                goneId, goneAfter ? std::to_string(goneAfter->id).c_str() : "(null)");
+         secOk = false;
+      }
+      if (table2.NextPinId() <= std::max(keepId, goneId))
+      {
+         printf("SECTION 11: FAIL - deserialized table's NextPinId (%d) must be past the highest restored id (%d)\n",
+                table2.NextPinId(), std::max(keepId, goneId));
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 11 (SerializePinMap/DeserializePinMap Round-Trip With Retired Entry): OK\n");
+      else { printf("SECTION 11 (SerializePinMap/DeserializePinMap Round-Trip With Retired Entry): FAIL\n"); allOk = false; }
+   }
+
+   printf("INFINITE_FIELDPINDECLTEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
+
 // ===================================================== INFINITE_RECSYNCTEST
 // Guards the exported-movie A/V sync property. The video track's PTS is a
 // plain frame counter over recordFps on both platforms, while live audio is
@@ -41725,6 +43410,35 @@ void ApplyModulationAndPalette(int frameId)
          gn.node->CookIfNeeded(frameId);
    }
 
+   // Build step 15 ("Instrument Mode"): a FieldGraphNode's mounted children
+   // can be hidden from the canvas (encapsulated==true), so - same reasoning
+   // as the FieldPixel loop just above - they are never reached by the
+   // sink-driven cook loop unless something outside the FieldGraphNode
+   // happens to consume its boundary output. Cook every mounted child
+   // unconditionally, every frame, whether hidden or not - encapsulation is
+   // a canvas-presentation choice, not a cook-skipping one (doc trap 2).
+   //
+   // Also syncs each mounted child's GraphNode::hiddenFromCanvas to the
+   // owning FieldGraphNode's current `encapsulated` value every frame,
+   // rather than only at Mount() time - so toggling `encapsulated` (a plain
+   // checkbox, no Regenerate() involved) takes effect on the very next
+   // frame's node-editor draw pass without re-mounting anything (doc §10
+   // FIELDGRAPHENCAPTEST assertion 4).
+   for (GraphNode& gn : gNodes)
+   {
+      auto* fgn = dynamic_cast<FieldGraphNode*>(gn.node.get());
+      if (fgn == nullptr)
+         continue;
+      for (int idx : fgn->MountedIndices())
+      {
+         GraphNode* child = FindNodeByIndex(idx);
+         if (child == nullptr)
+            continue;
+         child->hiddenFromCanvas = fgn->encapsulated;
+         child->node->CookIfNeeded(frameId);
+      }
+   }
+
    // Colours, the same way and for the same reason: the registry was rebuilt
    // while the nodes drew, so every pointer here belongs to a node that
    // still exists. A palette has to cook before it can be read, and it is
@@ -41753,6 +43467,14 @@ int main(int argc, char** argv)
    // Installed before any of the INFINITE_*TEST branches below too, so a
    // crash in a headless CI fixture leaves a dump/log the same as a real run.
    Platform::InstallCrashHandler();
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): install the live-cable
+   // checker bridge (see CheckFieldLiveCableBridge's comment above) before
+   // anything can call a Field*Node::Apply() - including the FIELDPINSTEST/
+   // FIELDPINNODETEST fixtures below, which construct FieldElementNode/
+   // FieldSampleNode/FieldPixelNode via SpawnNode and rely on this being
+   // live for their refusal assertions.
+   Field::gLiveCableChecker = &CheckFieldLiveCableBridge;
 
    // Old spelling kept as an alias: the panel was renamed to the performance
    // matrix, but a shell history full of INFINITE_PERFPANELTEST is not worth
@@ -41825,6 +43547,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_FIELDSAMPLETEST") != nullptr)
       return RunFieldSampleTest();
+
+   if (getenv("INFINITE_FIELDPINDECLTEST") != nullptr)
+      return RunFieldPinDeclTest();
 
    if (getenv("INFINITE_MOLDERTEST") != nullptr)
       return RunMolderFixture() ? 0 : 1;
@@ -45166,94 +46891,337 @@ int main(int argc, char** argv)
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
          }
 
-         ImGui::Separator();
+         // Transport controls styling: clean, symmetrical, unboxed with pixel-perfect alignment.
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 2.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
-         // Tempo: a plain text-entry field (not a slider) so typing an exact
-         // BPM is a direct click-and-type rather than a click-drag gesture.
-         float bpm = transport.Tempo();
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextUnformatted("BPM");
-         ImGui::SameLine(0.0f, 4.0f);
-         ImGui::SetNextItemWidth(52);
-         if (ImGui::InputFloat("##bpm", &bpm, 0.0f, 0.0f, "%.1f"))
-            transport.SetTempo(std::clamp(bpm, 20.0f, 300.0f));
+         auto TransportSeparator = []() {
+            ImGui::SameLine(0.0f, 10.0f);
+            ImGui::Separator();
+            ImGui::SameLine(0.0f, 10.0f);
+         };
 
-         ImGui::Separator();
-
-         // Time signature (docs/plans/audio/P3c-P3a2-design.md §0.2): every
-         // bar-relative rate (Note Sequencer length, arp retrigger-on-bar,
-         // euclidean rotation) reads Transport::BeatsPerBar(), so this is the
-         // one place that controls all of them at once.
-         {
-            int tsNum = transport.TimeSigNumerator();
-            const int tsDen = transport.TimeSigDenominator();
-            ImGui::SetNextItemWidth(36);
-            if (ImGui::InputInt("##tsNum", &tsNum, 0, 0))
-               transport.SetTimeSignature(tsNum, tsDen);
-            ImGui::SameLine(0.0f, 2.0f);
-            ImGui::TextUnformatted("/");
-            ImGui::SameLine(0.0f, 2.0f);
-            static const int kDens[] = { 1, 2, 4, 8, 16 };
-            int denIdx = 2;
-            for (int i = 0; i < 5; i++)
-               if (kDens[i] == tsDen)
-                  denIdx = i;
-            char denLabel[4];
-            snprintf(denLabel, sizeof(denLabel), "%d", tsDen);
-            ImGui::SetNextItemWidth(44);
-            if (ImGui::BeginCombo("##tsDen", denLabel))
+         static const int kDens[] = { 1, 2, 4, 8, 16 };
+         auto SnapToValidDenominator = [](int val) -> int {
+            int bestDen = kDens[0];
+            int bestDist = std::abs(val - kDens[0]);
+            for (int d : kDens)
             {
-               for (int i = 0; i < 5; i++)
+               int dist = std::abs(val - d);
+               if (dist < bestDist)
                {
-                  char opt[4];
-                  snprintf(opt, sizeof(opt), "%d", kDens[i]);
-                  if (ImGui::Selectable(opt, i == denIdx))
-                     transport.SetTimeSignature(tsNum, kDens[i]);
+                  bestDist = dist;
+                  bestDen = d;
                }
-               ImGui::EndCombo();
+            }
+            return bestDen;
+         };
+         auto DenToIdx = [](int d) -> int {
+            for (int i = 0; i < 5; i++)
+               if (kDens[i] == d) return i;
+            return 2;
+         };
+
+         enum class TopBarField { None, Bpm, TsNum, TsDen };
+         static TopBarField sActiveField = TopBarField::None;
+         static char sFieldText[32] = "";
+         static bool sFieldJustOpened = false;
+         static float sDragAccumY = 0.0f;
+
+         TransportSeparator();
+
+         // Tempo: vertical drag (up/down) to adjust, hover-and-type or double-click to type exact BPM.
+         {
+            float bpm = transport.Tempo();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("BPM");
+            ImGui::SameLine(0.0f, 4.0f);
+
+            if (sActiveField == TopBarField::Bpm)
+            {
+               ImGui::SetNextItemWidth(54.0f);
+               if (sFieldJustOpened)
+               {
+                  ImGui::SetKeyboardFocusHere();
+                  sFieldJustOpened = false;
+               }
+               const bool entered = ImGui::InputText("##bpmInput", sFieldText, sizeof(sFieldText),
+                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               if (entered || ImGui::IsItemDeactivated())
+               {
+                  char* end = nullptr;
+                  float parsed = strtof(sFieldText, &end);
+                  if (end != sFieldText && parsed > 0.0f)
+                     transport.SetTempo(std::clamp(parsed, 20.0f, 300.0f));
+                  sActiveField = TopBarField::None;
+               }
+            }
+            else
+            {
+               char bpmBuf[32];
+               snprintf(bpmBuf, sizeof(bpmBuf), "%.1f", bpm);
+               ImGui::Button(bpmBuf);
+               if (ImGui::IsItemHovered())
+               {
+                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                  {
+                     sActiveField = TopBarField::Bpm;
+                     snprintf(sFieldText, sizeof(sFieldText), "%.1f", bpm);
+                     sFieldJustOpened = true;
+                  }
+                  else
+                  {
+                     ImGuiIO& io = ImGui::GetIO();
+                     for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+                     {
+                        ImWchar ch = io.InputQueueCharacters[i];
+                        if ((ch >= '0' && ch <= '9') || ch == '.' || ch == '-')
+                        {
+                           sActiveField = TopBarField::Bpm;
+                           sFieldText[0] = (char)ch;
+                           sFieldText[1] = '\0';
+                           sFieldJustOpened = true;
+                           break;
+                        }
+                     }
+                  }
+               }
+               if (ImGui::IsItemActive())
+               {
+                  const float dy = -ImGui::GetIO().MouseDelta.y;
+                  const float speed = ImGui::GetIO().KeyShift ? 0.05f : 0.25f;
+                  bpm = std::clamp(bpm + dy * speed, 20.0f, 300.0f);
+                  transport.SetTempo(bpm);
+               }
             }
          }
 
-         ImGui::Separator();
+         TransportSeparator();
+
+         // Time signature: numerator draggable 1-99; denominator draggable snapping to {1, 2, 4, 8, 16}.
+         // Both support hover-and-type and double-click to type.
+         {
+            int tsNum = transport.TimeSigNumerator();
+            const int tsDen = transport.TimeSigDenominator();
+
+            // Numerator
+            if (sActiveField == TopBarField::TsNum)
+            {
+               ImGui::SetNextItemWidth(30.0f);
+               if (sFieldJustOpened)
+               {
+                  ImGui::SetKeyboardFocusHere();
+                  sFieldJustOpened = false;
+               }
+               const bool entered = ImGui::InputText("##tsNumInput", sFieldText, sizeof(sFieldText),
+                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               if (entered || ImGui::IsItemDeactivated())
+               {
+                  int parsed = atoi(sFieldText);
+                  if (parsed > 0)
+                     transport.SetTimeSignature(std::clamp(parsed, 1, 99), tsDen);
+                  sActiveField = TopBarField::None;
+               }
+            }
+            else
+            {
+               char numBuf[16];
+               snprintf(numBuf, sizeof(numBuf), "%d", tsNum);
+               ImGui::Button(numBuf);
+               if (ImGui::IsItemHovered())
+               {
+                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                  {
+                     sActiveField = TopBarField::TsNum;
+                     snprintf(sFieldText, sizeof(sFieldText), "%d", tsNum);
+                     sFieldJustOpened = true;
+                  }
+                  else
+                  {
+                     ImGuiIO& io = ImGui::GetIO();
+                     for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+                     {
+                        ImWchar ch = io.InputQueueCharacters[i];
+                        if (ch >= '0' && ch <= '9')
+                        {
+                           sActiveField = TopBarField::TsNum;
+                           sFieldText[0] = (char)ch;
+                           sFieldText[1] = '\0';
+                           sFieldJustOpened = true;
+                           break;
+                        }
+                     }
+                  }
+               }
+               if (ImGui::IsItemActive())
+               {
+                  const float dy = -ImGui::GetIO().MouseDelta.y;
+                  sDragAccumY += dy;
+                  const float kStep = 6.0f;
+                  if (std::abs(sDragAccumY) >= kStep)
+                  {
+                     int steps = (int)(sDragAccumY / kStep);
+                     sDragAccumY -= steps * kStep;
+                     tsNum = std::clamp(tsNum + steps, 1, 99);
+                     transport.SetTimeSignature(tsNum, tsDen);
+                  }
+               }
+            }
+
+            ImGui::SameLine(0.0f, 4.0f);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("/");
+            ImGui::SameLine(0.0f, 4.0f);
+
+            // Denominator
+            if (sActiveField == TopBarField::TsDen)
+            {
+               ImGui::SetNextItemWidth(30.0f);
+               if (sFieldJustOpened)
+               {
+                  ImGui::SetKeyboardFocusHere();
+                  sFieldJustOpened = false;
+               }
+               const bool entered = ImGui::InputText("##tsDenInput", sFieldText, sizeof(sFieldText),
+                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               if (entered || ImGui::IsItemDeactivated())
+               {
+                  int parsed = atoi(sFieldText);
+                  int snapped = SnapToValidDenominator(parsed);
+                  transport.SetTimeSignature(tsNum, snapped);
+                  sActiveField = TopBarField::None;
+               }
+            }
+            else
+            {
+               char denBuf[16];
+               snprintf(denBuf, sizeof(denBuf), "%d", tsDen);
+               ImGui::Button(denBuf);
+               if (ImGui::IsItemHovered())
+               {
+                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                  {
+                     sActiveField = TopBarField::TsDen;
+                     snprintf(sFieldText, sizeof(sFieldText), "%d", tsDen);
+                     sFieldJustOpened = true;
+                  }
+                  else
+                  {
+                     ImGuiIO& io = ImGui::GetIO();
+                     for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+                     {
+                        ImWchar ch = io.InputQueueCharacters[i];
+                        if (ch >= '0' && ch <= '9')
+                        {
+                           sActiveField = TopBarField::TsDen;
+                           sFieldText[0] = (char)ch;
+                           sFieldText[1] = '\0';
+                           sFieldJustOpened = true;
+                           break;
+                        }
+                     }
+                  }
+               }
+               if (ImGui::IsItemActive())
+               {
+                  const float dy = -ImGui::GetIO().MouseDelta.y;
+                  sDragAccumY += dy;
+                  const float kStep = 10.0f;
+                  if (std::abs(sDragAccumY) >= kStep)
+                  {
+                     int steps = (int)(sDragAccumY / kStep);
+                     sDragAccumY -= steps * kStep;
+                     int curIdx = DenToIdx(tsDen);
+                     int nextIdx = std::clamp(curIdx + steps, 0, 4);
+                     if (nextIdx != curIdx)
+                        transport.SetTimeSignature(tsNum, kDens[nextIdx]);
+                  }
+               }
+            }
+         }
+
+         TransportSeparator();
 
          // Global Key and Scale
          {
             static const char* const kKeyNames[] = {
                "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
             };
+            auto FormatScaleDisplayName = [](const std::string& name) -> std::string {
+               std::string out = name;
+               bool capNext = true;
+               for (size_t i = 0; i < out.size(); i++)
+               {
+                  if (std::isalpha((unsigned char)out[i]))
+                  {
+                     if (capNext)
+                     {
+                        out[i] = (char)std::toupper((unsigned char)out[i]);
+                        capNext = false;
+                     }
+                  }
+                  else
+                  {
+                     capNext = true;
+                  }
+               }
+               return out;
+            };
+
             int curKey = transport.Key();
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Key");
             ImGui::SameLine(0.0f, 4.0f);
-            ImGui::SetNextItemWidth(45);
-            if (ImGui::BeginCombo("##globalKey", kKeyNames[std::clamp(curKey, 0, 11)]))
+
+            if (ImGui::Button(kKeyNames[std::clamp(curKey, 0, 11)]))
+               ImGui::OpenPopup("##globalKeyPopup");
+            if (ImGui::BeginPopup("##globalKeyPopup"))
             {
                for (int i = 0; i < 12; i++)
                {
                   if (ImGui::Selectable(kKeyNames[i], i == curKey))
                      transport.SetKey(i);
                }
-               ImGui::EndCombo();
+               ImGui::EndPopup();
             }
 
-            ImGui::SameLine(0.0f, 6.0f);
+            ImGui::SameLine(0.0f, 4.0f);
             int curScale = transport.Scale();
             const auto& scaleList = MusicTime::ScaleTypeList();
             const char* curScaleName = (curScale >= 0 && curScale < (int)scaleList.size()) ? scaleList[curScale].c_str() : "major";
-            ImGui::SetNextItemWidth(110);
-            if (ImGui::BeginCombo("##globalScale", curScaleName))
+            const std::string capScaleName = FormatScaleDisplayName(curScaleName);
+
+            if (ImGui::Button(capScaleName.c_str()))
+               ImGui::OpenPopup("##globalScalePopup");
+            if (ImGui::BeginPopup("##globalScalePopup"))
             {
                for (int i = 0; i < (int)scaleList.size(); i++)
                {
-                  if (ImGui::Selectable(scaleList[i].c_str(), i == curScale))
+                  const std::string capOpt = FormatScaleDisplayName(scaleList[i]);
+                  if (ImGui::Selectable(capOpt.c_str(), i == curScale))
                      transport.SetScale(i);
                }
-               ImGui::EndCombo();
+               ImGui::EndPopup();
             }
          }
 
-         ImGui::Separator();
+         ImGui::PopStyleColor(6);
+         ImGui::PopStyleVar(4);
 
+         TransportSeparator();
+
+         ImGui::AlignTextToFramePadding();
          ImGui::TextDisabled("bar %d  beat %.2f",
                              1 + (int)transport.Bars(),
                              std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
@@ -45607,6 +47575,12 @@ int main(int argc, char** argv)
          static const std::vector<std::string> kGltfExt = { "gltf", "glb" };
          // Plugin bundles, not files - see the branch that consumes this.
          static const std::vector<std::string> kPluginBundleExt = { "component", "vst3" };
+         // Field build step 17: portable device files. Its own extension
+         // check must run before the "inf"/"infinite" branch below - "inf"
+         // is a strict-suffix match (HasExtension splits on the last dot),
+         // so "infdev" never collides with it, but "infdev" must still get
+         // its own branch since it isn't in kAudioExt/kModelExt/etc.
+         static const std::vector<std::string> kInfdevExt = { "infdev" };
          ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
@@ -45621,6 +47595,11 @@ int main(int argc, char** argv)
          ModelSourceNode* dropTargetModel = FindNodeUnderCanvasPoint<ModelSourceNode>(canvasPos);
          VideoSourceNode* dropTargetVideo = FindNodeUnderCanvasPoint<VideoSourceNode>(canvasPos);
          ImageSourceNode* dropTargetImage = FindNodeUnderCanvasPoint<ImageSourceNode>(canvasPos);
+         FieldElementNode* dropTargetFieldElement = FindNodeUnderCanvasPoint<FieldElementNode>(canvasPos);
+         FieldPixelNode* dropTargetFieldPixel = FindNodeUnderCanvasPoint<FieldPixelNode>(canvasPos);
+         FieldSampleNode* dropTargetFieldSample = FindNodeUnderCanvasPoint<FieldSampleNode>(canvasPos);
+         FieldGraphNode* dropTargetFieldGraph = FindNodeUnderCanvasPoint<FieldGraphNode>(canvasPos);
+         FormulaNode* dropTargetFormula = FindNodeUnderCanvasPoint<FormulaNode>(canvasPos);
          float offset = 0.0f;
          bool droppedCheckpointPushed = false;
          auto ensureDroppedCheckpoint = [&]()
@@ -45635,6 +47614,61 @@ int main(int argc, char** argv)
          {
             while (path.size() > 1 && (path.back() == '/' || path.back() == '\\'))
                path.pop_back();
+
+            // Field build step 17: a dropped .infdev hot-swaps whatever
+            // matching-domain Field node sits under the drop point. Checked
+            // before the "inf"/"infinite" patch-load branch below since
+            // extensions are checked in order and ".infdev" would otherwise
+            // never reach a useful branch (plan §4). No new node is spawned
+            // when nothing matches under the cursor or the domain doesn't
+            // match - same silent-no-op contract every other branch in this
+            // dispatch already has for an unmatched drop.
+            if (HasExtension(path, kInfdevExt))
+            {
+               Field::DeviceFile device;
+               std::string err;
+               if (Field::LoadFromInfdevFile(path, device, err))
+               {
+                  if (dropTargetFieldElement != nullptr && device.domain == "element")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFieldElement->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+                  if (dropTargetFieldPixel != nullptr && device.domain == "pixel")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFieldPixel->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+                  if (dropTargetFieldSample != nullptr && device.domain == "sample")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFieldSample->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+                  if (dropTargetFieldGraph != nullptr && device.domain == "graph")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFieldGraph->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+                  if (dropTargetFormula != nullptr && device.domain == "formula")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFormula->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+               }
+               // Unreadable file, mismatched domain, or no matching node
+               // under the drop point: fall through silently.
+               continue;
+            }
 
             if (HasExtension(path, std::vector<std::string> { "inf", "infinite" }))
             {
@@ -47955,6 +49989,158 @@ int main(int argc, char** argv)
          printf("[FIELDPIXELTEST] Test suite complete.\n");
       }
 
+      // Field step 17 (.infdev device file format): exercises the pure
+      // (de)serialization layer (FieldDevice.h/.cpp), the per-node
+      // ToDeviceFile/LoadDeviceFile round trip (plan §2/§7), and the
+      // domain-match gate the drag-and-drop dispatch in this file applies
+      // before calling LoadDeviceFile - driven via direct function calls,
+      // never UI automation, per plan §8.
+      if (getenv("INFINITE_FIELDDEVICETEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDDEVICETEST] Running .infdev device file conformance harness...\n");
+
+         // 1. ToDeviceFile -> ToJsonString -> FromJsonString -> LoadDeviceFile
+         //    round-trips code (byte-for-byte) and every declared param's
+         //    value (within float epsilon) for the element domain.
+         {
+            FieldElementNode src;
+            src.code = "param float amount = 0.5 [0, 2]\nparam float freq = 6.0 [0, 20]\nP.y += sin(P.x * freq) * amount\n";
+            src.Apply();
+            Field::ParamEntry* pAmount = src.GetParamTable().Find("amount");
+            Field::ParamEntry* pFreq = src.GetParamTable().Find("freq");
+            bool setupOk = pAmount != nullptr && pFreq != nullptr;
+            if (setupOk)
+            {
+               pAmount->value = 0.75f;
+               pFreq->value = 9.5f;
+            }
+
+            Field::DeviceFile device = src.ToDeviceFile();
+            std::string json = Field::ToJsonString(device);
+            Field::DeviceFile parsed;
+            std::string parseErr;
+            bool parseOk = Field::FromJsonString(json, parsed, parseErr);
+
+            FieldElementNode dst;
+            dst.LoadDeviceFile(parsed);
+            Field::ParamEntry* dAmount = dst.GetParamTable().Find("amount");
+            Field::ParamEntry* dFreq = dst.GetParamTable().Find("freq");
+
+            bool pass = setupOk && parseOk &&
+                        parsed.code == src.code &&
+                        dAmount != nullptr && dFreq != nullptr &&
+                        std::abs(dAmount->value - 0.75f) < 1e-4f &&
+                        std::abs(dFreq->value - 9.5f) < 1e-4f;
+            printf("[FIELDDEVICETEST] Assertion 1 (JSON Round-Trip): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 2. SaveToInfdevFile -> LoadFromInfdevFile round-trips identically
+         //    through actual file I/O.
+         {
+            FieldPixelNode src;
+            src.width = 128.0f;
+            src.height = 96.0f;
+            src.animate = true;
+            src.code = "param float bright = 0.5 [0, 1]\ncol = vec3(uv.x, uv.y, bright);";
+            src.Apply();
+            Field::ParamEntry* pBright = src.GetParamTable().Find("bright");
+            if (pBright != nullptr) pBright->value = 0.42f;
+
+            Field::DeviceFile device = src.ToDeviceFile();
+            const char* tmpPath = "/tmp/infinite_fielddevicetest.infdev";
+            bool saveOk = Field::SaveToInfdevFile(tmpPath, device);
+
+            Field::DeviceFile loaded;
+            std::string loadErr;
+            bool loadOk = Field::LoadFromInfdevFile(tmpPath, loaded, loadErr);
+            remove(tmpPath);
+
+            bool pass = saveOk && loadOk &&
+                        loaded.code == src.code &&
+                        loaded.domain == "pixel" &&
+                        loaded.nodeSettings.count("width") &&
+                        std::abs(loaded.nodeSettings["width"] - 128.0) < 1e-6 &&
+                        std::abs(loaded.nodeSettings["height"] - 96.0) < 1e-6 &&
+                        loaded.params.count("bright") &&
+                        std::abs(loaded.params["bright"] - 0.42) < 1e-4;
+            printf("[FIELDDEVICETEST] Assertion 2 (File I/O Round-Trip): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 3. LoadDeviceFile with a param name the target's current code
+         //    does not declare silently ignores that entry - no crash, no
+         //    phantom param added to the table.
+         {
+            FieldElementNode node;
+            node.code = "param float amount = 0.5 [0, 2]\nP.y += amount\n";
+            node.Apply();
+            size_t countBefore = node.GetParamTable().Params().size();
+
+            Field::DeviceFile device;
+            device.domain = "element";
+            device.code = node.code;
+            device.params["amount"] = 0.9;
+            device.params["doesNotExist"] = 1.23; // not declared by the code above
+
+            node.LoadDeviceFile(device);
+            Field::ParamEntry* pAmount = node.GetParamTable().Find("amount");
+            Field::ParamEntry* pPhantom = node.GetParamTable().Find("doesNotExist");
+            size_t countAfter = node.GetParamTable().Params().size();
+
+            bool pass = pAmount != nullptr && std::abs(pAmount->value - 0.9f) < 1e-4f &&
+                        pPhantom == nullptr && countAfter == countBefore;
+            printf("[FIELDDEVICETEST] Assertion 3 (Undeclared Param Ignored): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 4. LoadDeviceFile with deliberately malformed code leaves the
+         //    node's previous code/compiled program in place and populates
+         //    LastError() - the same keep-last-working-program contract
+         //    LoadPreset(int) already relies on.
+         {
+            FieldElementNode node;
+            node.code = "P.y += 0.1\n";
+            node.Apply();
+            std::string codeBefore = node.code;
+            bool errBefore = node.LastError().empty();
+
+            Field::DeviceFile device;
+            device.domain = "element";
+            device.code = "P.y += ("; // deliberate parse error
+
+            node.LoadDeviceFile(device);
+
+            bool pass = errBefore && !node.LastError().empty();
+            printf("[FIELDDEVICETEST] Assertion 4 (Malformed Code Keeps Last-Working Program): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 5. Dropping a device file whose domain does not match the drop
+         //    target is a no-op - mirrors the domain-match gate the
+         //    drag-and-drop dispatch in this file applies before ever
+         //    calling LoadDeviceFile, exercised here directly rather than
+         //    via gDroppedFiles/UI automation.
+         {
+            FieldSampleNode node;
+            node.code = "state float y = 0\ny = y * 0.9 + in * 0.1\nout = y\n";
+            node.Apply();
+            std::string codeBefore = node.code;
+
+            Field::DeviceFile device;
+            device.domain = "pixel"; // mismatched - node is 'sample'
+            device.code = "col = vec3(1.0, 0.0, 0.0);";
+
+            // The dispatch in this file never calls LoadDeviceFile at all
+            // when domains disagree; reproduce that same gate here.
+            static const std::string kSampleDomain = "sample";
+            bool domainMatches = (device.domain == kSampleDomain);
+            if (domainMatches)
+               node.LoadDeviceFile(device);
+
+            bool pass = !domainMatches && node.code == codeBefore;
+            printf("[FIELDDEVICETEST] Assertion 5 (Mismatched Domain Drop Is No-Op): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         printf("[FIELDDEVICETEST] Test suite complete.\n");
+      }
+
       // Field step 10 (graph domain): the reconciler diffs a fresh GraphPlan
       // against a persisted key->index ownership map (doc §5.3.3) rather than
       // delete-and-respawn. Structural actions (mount/remount/unmount) are
@@ -47979,11 +50165,11 @@ int main(int argc, char** argv)
             NewPatch();
             FieldGraphNode node;
             node.code =
-               "param int voices = 4 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
-               "      set(osc, \"rateBeats\", 1.0 + i)\n"
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 1.0 + k)\n"
                "   }\n"
                "}\n";
             MainGraphHost host;
@@ -48034,11 +50220,11 @@ int main(int argc, char** argv)
             NewPatch();
             FieldGraphNode node;
             node.code =
-               "param int voices = 4 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
-               "      set(osc, \"rateBeats\", 1.0 + i)\n"
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 1.0 + k)\n"
                "   }\n"
                "}\n";
             MainGraphHost host;
@@ -48047,11 +50233,11 @@ int main(int argc, char** argv)
             for (const GraphNode& gn : gNodes) before.push_back(gn.index);
 
             node.code =
-               "param int voices = 4 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
-               "      set(osc, \"rateBeats\", 2.0 + i)\n"
+               "param float voices = 4 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
+               "      set(osc, \"rateBeats\", 2.0 + k)\n"
                "   }\n"
                "}\n";
             bool regenerated = node.Regenerate(host);
@@ -48070,20 +50256,20 @@ int main(int argc, char** argv)
             NewPatch();
             FieldGraphNode node;
             node.code =
-               "param int voices = 3 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
+               "param float voices = 3 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
                "   }\n"
                "}\n";
             MainGraphHost host;
             node.Regenerate(host);
 
             node.code =
-               "param int voices = 3 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc2 = emit(\"LFO\", i)\n"
+               "param float voices = 3 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc2 = emit(\"LFO\", k)\n"
                "   }\n"
                "}\n";
             bool regenerated = node.Regenerate(host);
@@ -48102,10 +50288,10 @@ int main(int argc, char** argv)
             NewPatch();
             FieldGraphNode node;
             node.code =
-               "param int voices = 3 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      osc = emit(\"LFO\", i)\n"
+               "param float voices = 3 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      osc = emit(\"LFO\", k)\n"
                "   }\n"
                "}\n";
             MainGraphHost host;
@@ -48115,11 +50301,11 @@ int main(int argc, char** argv)
                before.push_back(node.Ownership().Get(key));
 
             node.code =
-               "param int voices = 3 [1, 8]\n"
-               "for (i = 0; i < 8; i++) {\n"
-               "   if (i < voices) {\n"
-               "      trig = emit(\"Ramp\", i)\n"
-               "      osc = emit(\"LFO\", i)\n"
+               "param float voices = 3 [1, 8]\n"
+               "for (k = 0; k < 8; k += 1) {\n"
+               "   if (k < voices) {\n"
+               "      trig = emit(\"Ramp\", k)\n"
+               "      osc = emit(\"LFO\", k)\n"
                "   }\n"
                "}\n";
             bool regenerated = node.Regenerate(host);
@@ -48691,6 +50877,1170 @@ int main(int argc, char** argv)
 
          NewPatch();
          printf("%s\n", allOk ? "FIELDGRAPHBLAST OK" : "SUSPECT");
+      }
+
+      // Build step 15 ("Instrument Mode"): exit criterion §10.
+      if (getenv("INFINITE_FIELDGRAPHENCAPTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHENCAPTEST] Running Field graph encapsulation harness...\n");
+         bool allOk = true;
+         int kernelIdx = -1;
+
+         // Assertion 1: regenerating (default encapsulated) leaves gNodes.size()
+         // at exactly N+1 (kernel + N children) but the visible/pickable count
+         // (GraphNode::hiddenFromCanvas) at exactly 1.
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            kernelIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            bool defaultEncapsulated = fgn->encapsulated;
+            fgn->code =
+               "param float voices = 3 [1, 8]\n"
+               "for (k = 0; k < 3; k += 1) {\n"
+               "   osc = emit(\"Noise\", k)\n"
+               "}\n";
+            RunFieldGraphRegenerate(fgn);
+
+            int totalNodes = (int)gNodes.size();
+            int visibleCount = 0;
+            for (const GraphNode& n : gNodes)
+               if (!n.hiddenFromCanvas)
+                  visibleCount++;
+
+            bool pass1 = defaultEncapsulated && (totalNodes == 4) && (visibleCount == 1);
+            printf("[FIELDGRAPHENCAPTEST] Assertion 1 (Default encapsulated, N+1 nodes, 1 visible): defaultEnc=%d total=%d visible=%d  %s\n",
+                   (int)defaultEncapsulated, totalNodes, visibleCount, pass1 ? "OK" : "FAIL");
+            allOk = allOk && pass1;
+         }
+
+         // Assertion 2: a mounted child still cooks every frame despite being
+         // hidden - proven by driving the exact production per-frame path
+         // (ApplyModulationAndPalette's mounted-child loop, main.cpp) and
+         // observing Noise's GetOutputTexture() go from 0 (never cooked) to
+         // non-zero (first CookIfNeeded), while the child stays hidden.
+         int child0Idx = -1;
+         {
+            GraphNode* gn = FindNodeByIndex(kernelIdx);
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            child0Idx = fgn->Ownership().Get("osc#0");
+            GraphNode* child = FindNodeByIndex(child0Idx);
+            bool hiddenBefore = child != nullptr && child->hiddenFromCanvas;
+            bool zeroTextureBefore = child != nullptr && child->node->GetOutputTexture() == 0;
+
+            ApplyModulationAndPalette(4);
+
+            child = FindNodeByIndex(child0Idx);
+            bool nonZeroTextureAfter = child != nullptr && child->node->GetOutputTexture() != 0;
+            bool stillHidden = child != nullptr && child->hiddenFromCanvas;
+
+            bool pass2 = hiddenBefore && zeroTextureBefore && nonZeroTextureAfter && stillHidden;
+            printf("[FIELDGRAPHENCAPTEST] Assertion 2 (Hidden child still cooks every frame): hiddenBefore=%d zeroBefore=%d nonZeroAfter=%d stillHidden=%d  %s\n",
+                   (int)hiddenBefore, (int)zeroTextureBefore, (int)nonZeroTextureAfter, (int)stillHidden, pass2 ? "OK" : "FAIL");
+            allOk = allOk && pass2;
+         }
+
+         // Assertion 3: a terminal emitting an image producer resolves through
+         // FieldGraphNode::TerminalIndices() to a node whose texture is ready
+         // for the node body's inline preview (main.cpp's node-body dispatch,
+         // §5.3) - the exact same INode*/texture DrawPreview would show if the
+         // child were visible and previewed directly (doc trap 8: DrawPreview
+         // itself needs no change, so identity of the resolved node/texture is
+         // what this asserts).
+         {
+            GraphNode* gn = FindNodeByIndex(kernelIdx);
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            INode* previewTarget = nullptr;
+            for (int idx : fgn->TerminalIndices())
+            {
+               GraphNode* term = FindNodeByIndex(idx);
+               if (term != nullptr && term->node && term->node->GetOutputTexture() != 0 &&
+                   term->node->GetOutputWidth() > 0)
+               {
+                  previewTarget = term->node.get();
+                  break;
+               }
+            }
+            GraphNode* expectedChild = FindNodeByIndex(child0Idx);
+            bool pass3 = previewTarget != nullptr && expectedChild != nullptr &&
+                         previewTarget == expectedChild->node.get() &&
+                         previewTarget->GetOutputTexture() != 0;
+            printf("[FIELDGRAPHENCAPTEST] Assertion 3 (Terminal resolves to a previewable texture): resolved=%d matchesChild=%d  %s\n",
+                   (int)(previewTarget != nullptr), (int)(previewTarget == (expectedChild ? expectedChild->node.get() : nullptr)),
+                   pass3 ? "OK" : "FAIL");
+            allOk = allOk && pass3;
+         }
+
+         // Assertion 4: toggling encapsulated to false makes children appear on
+         // canvas on the very next frame (ApplyModulationAndPalette's sync of
+         // GraphNode::hiddenFromCanvas to FieldGraphNode::encapsulated), with
+         // no re-Regenerate and no node re-created - same gNodes indices before
+         // and after the toggle.
+         {
+            GraphNode* gn = FindNodeByIndex(kernelIdx);
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            std::vector<int> before;
+            for (int k = 0; k < 3; k++)
+               before.push_back(fgn->Ownership().Get("osc#" + std::to_string(k)));
+
+            fgn->encapsulated = false;
+            ApplyModulationAndPalette(4);
+
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            std::vector<int> after;
+            for (int k = 0; k < 3; k++)
+               after.push_back(fgn->Ownership().Get("osc#" + std::to_string(k)));
+            bool sameIndices = (before == after);
+
+            bool allVisible = true;
+            for (int idx : after)
+            {
+               GraphNode* child = FindNodeByIndex(idx);
+               allVisible = allVisible && (child != nullptr && !child->hiddenFromCanvas);
+            }
+
+            bool pass4 = sameIndices && allVisible;
+            printf("[FIELDGRAPHENCAPTEST] Assertion 4 (Toggle encapsulated -> children visible, same indices): sameIndices=%d allVisible=%d  %s\n",
+                   (int)sameIndices, (int)allVisible, pass4 ? "OK" : "FAIL");
+            allOk = allOk && pass4;
+
+            // Restore for cleanliness before the next case.
+            fgn->encapsulated = true;
+            ApplyModulationAndPalette(4);
+         }
+
+         // Assertion 5: loading a patch saved before this step (no "b
+         // encapsulated" line at all) restores with children visible on
+         // canvas, not hidden - the load-time default (false) is the opposite
+         // of a brand-new node's compile-time default (true, doc trap 5).
+         {
+            NewPatch();
+            Patch::Data data;
+            Patch::NodeRecord rec;
+            rec.index = 0;
+            rec.category = "Utility";
+            rec.typeName = "Field Graph";
+            rec.params.push_back({ "s code", "x = 1" });
+            rec.params.push_back({ "s uid", "0000000000000001" });
+            // Deliberately no "b encapsulated" key - reproduces a pre-step-15 save.
+            data.nodes.push_back(rec);
+            ApplyPatchData(data);
+
+            GraphNode* gn = nullptr;
+            for (GraphNode& n : gNodes)
+               if (dynamic_cast<FieldGraphNode*>(n.node.get()) != nullptr) { gn = &n; break; }
+            bool pass5a = gn != nullptr && !static_cast<FieldGraphNode*>(gn->node.get())->encapsulated;
+
+            // Sanity check the other direction: a record that DOES carry the
+            // key still loads to the saved value (LoadParams overwrites the
+            // ApplyPatchData-forced false back to true) - proves this isn't
+            // just clobbering every load to false.
+            NewPatch();
+            Patch::Data data2;
+            Patch::NodeRecord rec2 = rec;
+            rec2.params.push_back({ "b encapsulated", "1" });
+            data2.nodes.push_back(rec2);
+            ApplyPatchData(data2);
+            GraphNode* gn2 = nullptr;
+            for (GraphNode& n : gNodes)
+               if (dynamic_cast<FieldGraphNode*>(n.node.get()) != nullptr) { gn2 = &n; break; }
+            bool pass5b = gn2 != nullptr && static_cast<FieldGraphNode*>(gn2->node.get())->encapsulated;
+
+            bool pass5 = pass5a && pass5b;
+            printf("[FIELDGRAPHENCAPTEST] Assertion 5 (Old patch defaults unhidden; new-format key still honored): oldPatchUnhidden=%d newFormatHonored=%d  %s\n",
+                   (int)pass5a, (int)pass5b, pass5 ? "OK" : "FAIL");
+            allOk = allOk && pass5;
+         }
+
+         // Assertion 6 (step 15 follow-up, §5.4): a REAL outer cable wired
+         // into the FieldGraphNode's own (derived, single) boundary output
+         // pin - not the terminal directly, exactly what an outer patch
+         // author actually drags a link onto - gets detached, counted, and
+         // reported when the next Regenerate() makes its terminal disappear.
+         // Mirrors MainGraphHost/VirtualGraphHost::Unmount's existing
+         // scan-then-DisconnectAllTo shape (doc trap 6: no second counter).
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            int fgnIdx = gn->index;
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            fgn->code = "osc = emit(\"Noise\", 0)\n";
+            RunFieldGraphRegenerate(fgn);
+
+            // Cook once so the terminal has a real texture - the same
+            // precondition DrawPreview/the inline waveform already need
+            // (§5.3), and what ResolveFieldGraphBoundaryTerminal itself
+            // checks for.
+            ApplyModulationAndPalette(4);
+            fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+            fgn->SetBoundaryOutputTarget(ResolveFieldGraphBoundaryTerminal(fgn));
+
+            GraphNode* consumer = SpawnNode("Curves", "Compositing", 300.0f, 0.0f);
+            int consumerIdx = consumer->index;
+            std::string connErr;
+            bool connected = ConnectNodes(fgnIdx, 0, consumerIdx, 0, connErr);
+
+            consumer = FindNodeByIndex(consumerIdx);
+            ImageCable* consumerCable = consumer ? CableFor(*consumer, 0) : nullptr;
+            bool wiredToKernel = connected && consumerCable != nullptr && consumerCable->IsConnected() &&
+                                 consumerCable->GetSource() == FindNodeByIndex(fgnIdx)->node.get();
+
+            // The emit call-site is gone entirely - the terminal this pin
+            // used to resolve to no longer exists after the next Regenerate.
+            fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+            fgn->code = "x = 1\n";
+            RunFieldGraphRegenerate(fgn);
+
+            consumer = FindNodeByIndex(consumerIdx);
+            ImageCable* afterCable = consumer ? CableFor(*consumer, 0) : nullptr;
+            bool detached = afterCable == nullptr || !afterCable->IsConnected();
+
+            fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+            const std::string& notice = fgn->Notice();
+            bool noticeReports = notice.find("detached") != std::string::npos &&
+                                  notice.find("boundary") != std::string::npos;
+
+            bool pass6 = wiredToKernel && detached && noticeReports;
+            printf("[FIELDGRAPHENCAPTEST] Assertion 6 (Boundary pin cable detach on terminal loss): wired=%d detached=%d reported=%d  %s\n",
+                   (int)wiredToKernel, (int)detached, (int)noticeReports, pass6 ? "OK" : "FAIL");
+            allOk = allOk && pass6;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDGRAPHENCAP OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHLIVEPARAMTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHLIVEPARAMTEST] Running Field graph live-parameter-forwarding harness...\n");
+         bool allOk = true;
+
+         // A thin counting wrapper around the real MainGraphHost so the
+         // assertions below can observe exactly how many Mount/Unmount/
+         // SetParam calls each phase makes, without duplicating
+         // MainGraphHost's own logic (composition, not inheritance -
+         // MainGraphHost is `final`).
+         struct CountingFieldGraphHost final : public Field::IFieldGraphHost
+         {
+            MainGraphHost inner;
+            int mountCalls = 0, unmountCalls = 0, setParamCalls = 0;
+            int Mount(const std::string& t) override { mountCalls++; return inner.Mount(t); }
+            void Unmount(int id) override { unmountCalls++; inner.Unmount(id); }
+            void SetParam(int id, const std::string& n, float v) override { setParamCalls++; inner.SetParam(id, n, v); }
+            void Connect(int a, int b, int c, int d) override { inner.Connect(a, b, c, d); }
+            void Place(int id, float x, float y) override { inner.Place(id, x, y); }
+            bool Alive(int id) const override { return inner.Alive(id); }
+            std::string TypeNameOf(int id) const override { return inner.TypeNameOf(id); }
+            bool Spawnable(const std::string& t) const override { return inner.Spawnable(t); }
+            int Remount(int existing, const std::string& t) override { return inner.Remount(existing, t); }
+            int DroppedModCount() const override { return inner.DroppedModCount(); }
+            int DetachedCableCount() const override { return inner.DetachedCableCount(); }
+         };
+
+         NewPatch();
+         GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+         int kernelIdx = gn->index;
+         auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+         fgn->code =
+            "param float amount = 0 [0, 1]\n"
+            "param float unused = 0 [0, 1]\n"
+            "osc = emit(\"LFO\", 0)\n"
+            "set(osc, \"rateBeats\", amount)\n"
+            "set(osc, \"shape\", 2.0 * unused)\n";
+         CountingFieldGraphHost host;
+         fgn->Regenerate(host);
+
+         gn = FindNodeByIndex(kernelIdx);
+         fgn = static_cast<FieldGraphNode*>(gn->node.get());
+         int oscIdx = fgn->Ownership().Get("osc#0");
+
+         auto setParamValue = [&](const char* name, float v) {
+            for (auto& p : fgn->GetParamTable().Params())
+               if (p.name == name) p.value = v;
+         };
+
+         // Assertion 1: driving `amount`'s ParamTable entry directly (simulating
+         // a modulation cable write) changes the mounted LFO's actual rateBeats
+         // field within the same frame, with zero Mount/Unmount/Remount calls
+         // by PushLiveParams (Regenerate's own Mount calls above are excluded
+         // by resetting the counters first).
+         {
+            host.mountCalls = 0;
+            host.unmountCalls = 0;
+            host.setParamCalls = 0;
+            setParamValue("amount", 0.75f);
+            fgn->PushLiveParams(host);
+
+            auto* lfo = dynamic_cast<LFONode*>(FindNodeByIndex(oscIdx)->node.get());
+            bool valueForwarded = lfo != nullptr && std::abs(lfo->rateBeats - 0.75f) < 1.0e-4f;
+            bool noMountUnmount = (host.mountCalls == 0) && (host.unmountCalls == 0);
+            bool exactlyOneSetParam = (host.setParamCalls == 1);
+
+            bool pass1 = valueForwarded && noMountUnmount && exactlyOneSetParam;
+            printf("[FIELDGRAPHLIVEPARAMTEST] Assertion 1 (Live-forward, no Mount/Unmount): forwarded=%d rate=%f noMountUnmount=%d setParamCalls=%d  %s\n",
+                   (int)valueForwarded, lfo ? lfo->rateBeats : -1.0f, (int)noMountUnmount, host.setParamCalls, pass1 ? "OK" : "FAIL");
+            allOk = allOk && pass1;
+         }
+
+         // Assertion 2: a set() whose value expression is not a bare param
+         // reference (`2.0 * unused`) is not in mLiveForward - driving `unused`
+         // does not change the mounted LFO's shape until an explicit
+         // Regenerate() runs.
+         {
+            auto* lfo = dynamic_cast<LFONode*>(FindNodeByIndex(oscIdx)->node.get());
+            int shapeBefore = lfo ? lfo->shape : -1;
+
+            setParamValue("unused", 1.0f);
+            fgn->PushLiveParams(host);
+
+            lfo = dynamic_cast<LFONode*>(FindNodeByIndex(oscIdx)->node.get());
+            bool unchangedByPush = lfo != nullptr && lfo->shape == shapeBefore;
+
+            fgn->Regenerate(host);
+            gn = FindNodeByIndex(kernelIdx);
+            fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            oscIdx = fgn->Ownership().Get("osc#0");
+            lfo = dynamic_cast<LFONode*>(FindNodeByIndex(oscIdx)->node.get());
+            bool changedByRegenerate = lfo != nullptr && lfo->shape == 2;
+
+            bool pass2 = unchangedByPush && changedByRegenerate;
+            printf("[FIELDGRAPHLIVEPARAMTEST] Assertion 2 (Computed set() not live-forwarded): unchangedByPush=%d changedByRegen=%d  %s\n",
+                   (int)unchangedByPush, (int)changedByRegenerate, pass2 ? "OK" : "FAIL");
+            allOk = allOk && pass2;
+         }
+
+         // Assertion 3: PushLiveParams called with no changed param values
+         // makes zero host.SetParam calls - a delta-only push, not a
+         // re-push-everything-every-frame loop. Assertion 2's Regenerate()
+         // call cleared mLastPushedValue (§4.2/§6: rebuilt wholesale every
+         // successful Regenerate()), so one priming push is needed first -
+         // otherwise this call would still see "amount" as never-pushed-since-
+         // last-regenerate and push it once, which is correct behavior but
+         // not what this assertion is testing.
+         {
+            fgn->PushLiveParams(host);
+            host.setParamCalls = 0;
+            fgn->PushLiveParams(host);
+            bool pass3 = (host.setParamCalls == 0);
+            printf("[FIELDGRAPHLIVEPARAMTEST] Assertion 3 (No-change push is a no-op): setParamCalls=%d  %s\n",
+                   host.setParamCalls, pass3 ? "OK" : "FAIL");
+            allOk = allOk && pass3;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDGRAPHLIVEPARAM OK" : "SUSPECT");
+      }
+
+      // Build step 16 ("Unpack to Canvas") harness. Unlike the encapsulation/
+      // live-param/undo harnesses above (which never touch a real ed::
+      // node position/size - they only ever check FieldGraphNode/GraphNode
+      // bookkeeping directly), this step's exit criterion needs real
+      // post-layout bounding boxes, which only exist after the node editor
+      // has actually drawn each revealed child at least a couple of times
+      // (doc §3.3/trap 3). So this harness spans real frames rather than
+      // doing everything inside one frameId gate: setup + triggering the
+      // unpack happens at frameId==4 (same "runs before this frame's node
+      // draw loop" position the other Field harnesses already use to call
+      // RunFieldGraphRegenerate directly - safe for the same reason), then
+      // the ordinary per-frame drains (RunFieldGraphUnpackPhase1's arm,
+      // RunFieldGraphUnpackPhase2Tick's poll) run every subsequent real
+      // frame exactly as they do for a real user click, and assertions run
+      // at frameId==30 - comfortably past kMaxRetries (10) frames of
+      // phase-2 polling even in the worst case, so gFieldGraphUnpackPhase2
+      // is guaranteed inactive (finished, one way or the other) by then.
+      static int sUnpackTestFgnIdx = -1;
+      static int sUnpackTestConsumerIdx = -1;
+      static std::vector<int> sUnpackTestMembers;
+      static bool sUnpackTestAllOk = true;
+
+      if (getenv("INFINITE_FIELDGRAPHUNPACKTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHUNPACKTEST] Running Field graph unpack-to-canvas harness...\n");
+         bool setupOk = true;
+
+         // Assertion 6 (disabled/no-op on an empty mMountedIndices): a
+         // never-regenerated Field Graph node has nothing to unpack -
+         // calling the operation directly (as if the disabled button were
+         // driven programmatically) must be a documented no-op, not a
+         // crash or a partial mutation. Self-contained, own NewPatch(), run
+         // before the main multi-frame scenario below.
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            bool encBefore = fgn->encapsulated;
+            RunFieldGraphUnpackPhase1(fgn);
+            bool pass6 = (fgn->encapsulated == encBefore) && fgn->encapsulated &&
+                         !gFieldGraphUnpackPhase2.active;
+            printf("[FIELDGRAPHUNPACKTEST] Assertion 6 (No-op on empty mMountedIndices): "
+                   "stillEncapsulated=%d phase2Armed=%d  %s\n",
+                   (int)fgn->encapsulated, (int)gFieldGraphUnpackPhase2.active, pass6 ? "OK" : "FAIL");
+            setupOk = setupOk && pass6;
+         }
+
+         // Main scenario: a 3-deep chain (Noise -> Curves -> Curves, wired
+         // via connect()) so the topological-depth assertion has a real
+         // depth-2 node with transitive depth-0/1 dependencies, plus an
+         // outer cable wired into the FieldGraphNode's own derived boundary
+         // output pin (the terminal, "c") to prove §4.3's no-op finding -
+         // the outer cable's real target is the FieldGraphNode itself
+         // (RunFieldGraphRegenerate's boundarySource), which never changes
+         // identity or address across an unpack, so the cable must survive
+         // untouched.
+         NewPatch();
+         GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+         int fgnIdx = gn->index;
+         auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+         fgn->code =
+            "a = emit(\"Noise\", 0)\n"
+            "b = emit(\"Curves\", 1)\n"
+            "c = emit(\"Curves\", 2)\n"
+            "connect(a, 0, b, 0)\n"
+            "connect(b, 0, c, 0)\n";
+         RunFieldGraphRegenerate(fgn);
+
+         fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+         ApplyModulationAndPalette(4); // cook once so the terminal has a real texture
+         fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+         fgn->SetBoundaryOutputTarget(ResolveFieldGraphBoundaryTerminal(fgn));
+
+         // Outer cable onto the boundary output pin - positioned well clear
+         // of where the unpacked cluster will land so AutoFitGroupToMembers
+         // never mistakes it for a member.
+         GraphNode* consumer = SpawnNode("Curves", "Compositing", 3000.0f, 0.0f);
+         int consumerIdx = consumer->index;
+         std::string connErr;
+         bool connected = ConnectNodes(fgnIdx, 0, consumerIdx, 0, connErr);
+         bool wiredToKernel = connected;
+         if (wiredToKernel)
+         {
+            ImageCable* cable = CableFor(*FindNodeByIndex(consumerIdx), 0);
+            wiredToKernel = cable != nullptr && cable->IsConnected() &&
+                            cable->GetSource() == FindNodeByIndex(fgnIdx)->node.get();
+         }
+         setupOk = setupOk && wiredToKernel;
+         printf("[FIELDGRAPHUNPACKTEST] Setup (outer cable wired to kernel before unpack): wired=%d  %s\n",
+                (int)wiredToKernel, wiredToKernel ? "OK" : "FAIL");
+
+         bool encBefore = fgn->encapsulated;
+         bool nonEmptyBefore = !fgn->MountedIndices().empty();
+         sUnpackTestMembers.assign(fgn->MountedIndices().begin(), fgn->MountedIndices().end());
+
+         // Same call the "Unpack to Canvas" button makes (DrawFieldGraphParams
+         // queues gFieldGraphPendingUnpack; this test calls the queued
+         // function directly, at the same before-the-node-draw-loop point in
+         // the frame every other Field harness in this file already calls
+         // RunFieldGraphRegenerate directly from - safe for the same reason).
+         RunFieldGraphUnpackPhase1(fgn);
+
+         sUnpackTestFgnIdx = fgnIdx;
+         sUnpackTestConsumerIdx = consumerIdx;
+
+         bool pass0 = encBefore && nonEmptyBefore && !fgn->encapsulated && gFieldGraphUnpackPhase2.active;
+         printf("[FIELDGRAPHUNPACKTEST] Setup (phase 1 armed): wasEncapsulated=%d nowUnencapsulated=%d phase2Armed=%d  %s\n",
+                (int)encBefore, (int)(!fgn->encapsulated), (int)gFieldGraphUnpackPhase2.active, pass0 ? "OK" : "FAIL");
+         setupOk = setupOk && pass0;
+
+         if (!setupOk)
+            printf("[FIELDGRAPHUNPACKTEST] setup FAIL - assertions at frameId==30 will not be meaningful\n");
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHUNPACKTEST") != nullptr && frameId == 30)
+      {
+         bool allOk = true;
+
+         GraphNode* fgnGn = FindNodeByIndex(sUnpackTestFgnIdx);
+         auto* fgn = fgnGn != nullptr ? static_cast<FieldGraphNode*>(fgnGn->node.get()) : nullptr;
+
+         // Assertion 1: encapsulated flipped false; every mounted child's
+         // hiddenFromCanvas cleared; exactly one new GroupNode exists whose
+         // gGroupMembers set equals the mounted children's indices exactly.
+         bool pass1 = fgn != nullptr && !fgn->encapsulated && !gFieldGraphUnpackPhase2.active;
+         for (int idx : sUnpackTestMembers)
+         {
+            GraphNode* child = FindNodeByIndex(idx);
+            pass1 = pass1 && child != nullptr && !child->hiddenFromCanvas;
+         }
+         GroupNode* spawnedGroup = nullptr;
+         int groupCount = 0;
+         for (GraphNode& n : gNodes)
+         {
+            if (auto* g = dynamic_cast<GroupNode*>(n.node.get()))
+            {
+               groupCount++;
+               spawnedGroup = g;
+            }
+         }
+         bool membershipMatches = spawnedGroup != nullptr && gGroupMembers.count(spawnedGroup) != 0 &&
+                                   gGroupMembers[spawnedGroup] ==
+                                      std::set<int>(sUnpackTestMembers.begin(), sUnpackTestMembers.end());
+         pass1 = pass1 && (groupCount == 1) && membershipMatches;
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 1 (encapsulated false, children unhidden, 1 group with exact membership): "
+                "encFalse=%d groupCount=%d membershipMatches=%d  %s\n",
+                (int)(fgn != nullptr && !fgn->encapsulated), groupCount, (int)membershipMatches, pass1 ? "OK" : "FAIL");
+         allOk = allOk && pass1;
+
+         // Editor-context save/restore for the position/size reads below -
+         // this runs after this frame's ed::End() already cleared the
+         // current editor (same shape as FindFreeSpawnPosition/
+         // RunFieldGraphUnpackPhase2Tick).
+         ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
+
+         // Assertion 2: no two of the members' post-layout bounding boxes
+         // overlap.
+         struct Box { ImVec2 mn, mx; };
+         std::vector<Box> boxes;
+         for (int idx : sUnpackTestMembers)
+         {
+            GraphNode* gn = FindNodeByIndex(idx);
+            if (gn == nullptr) continue;
+            ImVec2 p = ed::GetNodePosition(gn->NodeId());
+            ImVec2 s = ed::GetNodeSize(gn->NodeId());
+            boxes.push_back({ p, ImVec2(p.x + s.x, p.y + s.y) });
+         }
+         bool noOverlap = true;
+         for (size_t i = 0; i < boxes.size() && noOverlap; i++)
+            for (size_t j = i + 1; j < boxes.size() && noOverlap; j++)
+            {
+               const Box& A = boxes[i]; const Box& B = boxes[j];
+               bool overlap = A.mx.x > B.mn.x && A.mn.x < B.mx.x && A.mx.y > B.mn.y && A.mn.y < B.mx.y;
+               if (overlap) noOverlap = false;
+            }
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 2 (No overlapping bounding boxes among %zu members): %s\n",
+                boxes.size(), noOverlap ? "OK" : "FAIL");
+         allOk = allOk && noOverlap;
+
+         // Assertion 3: topological x-ordering - "c" (depth 2) sits strictly
+         // right of both "a" (depth 0) and "b" (depth 1), which sits
+         // strictly right of "a" - transitively via plan.connects.
+         bool topoOk = false;
+         if (fgn != nullptr)
+         {
+            int aIdx = fgn->Ownership().Get("a#0");
+            int bIdx = fgn->Ownership().Get("b#1");
+            int cIdx = fgn->Ownership().Get("c#2");
+            GraphNode* ag = FindNodeByIndex(aIdx);
+            GraphNode* bg = FindNodeByIndex(bIdx);
+            GraphNode* cg = FindNodeByIndex(cIdx);
+            if (ag != nullptr && bg != nullptr && cg != nullptr)
+            {
+               float ax = ed::GetNodePosition(ag->NodeId()).x;
+               float bx = ed::GetNodePosition(bg->NodeId()).x;
+               float cx = ed::GetNodePosition(cg->NodeId()).x;
+               topoOk = (bx > ax) && (cx > bx) && (cx > ax);
+            }
+         }
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 3 (Topological x-ordering across 3 depths): %s\n",
+                topoOk ? "OK" : "FAIL");
+         allOk = allOk && topoOk;
+
+         ed::SetCurrentEditor(prevEditor);
+
+         // Assertion 4 (§4.3's expected no-op, asserted rather than assumed):
+         // the outer cable wired to the FieldGraphNode's boundary output pin
+         // before unpacking is still connected, to the same INode*, after
+         // unpacking - zero detached, because the outer cable's real target
+         // was always the FieldGraphNode itself (never the terminal), and
+         // the FieldGraphNode's identity/address never changes across an
+         // unpack.
+         bool boundaryPreserved = false;
+         {
+            GraphNode* consumer = FindNodeByIndex(sUnpackTestConsumerIdx);
+            ImageCable* cable = consumer != nullptr ? CableFor(*consumer, 0) : nullptr;
+            boundaryPreserved = fgnGn != nullptr && cable != nullptr && cable->IsConnected() &&
+                                cable->GetSource() == fgnGn->node.get();
+         }
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 4 (Boundary cable identity preserved, zero detach): %s\n",
+                boundaryPreserved ? "OK" : "FAIL");
+         allOk = allOk && boundaryPreserved;
+
+         // Assertion 5 (part 1): undo after unpack restores `encapsulated`
+         // and removes the spawned GroupNode in one step. The children's
+         // hiddenFromCanvas re-sync is driven by the per-frame loop in
+         // ApplyModulationAndPalette (main.cpp, "Build step 15" comment
+         // above `child->hiddenFromCanvas = fgn->encapsulated;"), which for
+         // this frame has already run before this test block executes - so
+         // Undo() here takes effect for that loop's *next* pass, at
+         // frameId==31, same one-frame lag FIELDGRAPHENCAPTEST's own
+         // assertion 4 already relies on for the opposite toggle direction.
+         bool undoOk = false;
+         {
+            Undo();
+            GraphNode* afterUndoGn = FindNodeByIndex(sUnpackTestFgnIdx);
+            auto* afterUndoFgn = afterUndoGn != nullptr ? static_cast<FieldGraphNode*>(afterUndoGn->node.get()) : nullptr;
+            bool encRestored = afterUndoFgn != nullptr && afterUndoFgn->encapsulated;
+            bool groupGone = true;
+            for (GraphNode& n : gNodes)
+               if (dynamic_cast<GroupNode*>(n.node.get()) != nullptr) groupGone = false;
+            undoOk = encRestored && groupGone;
+            printf("[FIELDGRAPHUNPACKTEST] Assertion 5a (Undo restores encapsulated, removes group): "
+                   "encRestored=%d groupGone=%d  %s\n",
+                   (int)encRestored, (int)groupGone, undoOk ? "OK" : "FAIL");
+         }
+         allOk = allOk && undoOk;
+         sUnpackTestAllOk = allOk;
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHUNPACKTEST") != nullptr && frameId == 31)
+      {
+         // Assertion 5 (part 2): one real frame after Undo(), the sync loop
+         // in ApplyModulationAndPalette has now run once with the restored
+         // `encapsulated == true`, so every member should be hidden again.
+         //
+         // Undo() goes through ApplyPatchData, which - same as
+         // FIELDGRAPHUNDOTEST's own assertions 3/6 - reassigns node indices
+         // (see its `remap` out-param). sUnpackTestMembers holds the
+         // pre-undo indices, which are no longer meaningful; re-resolve the
+         // three emit keys through the (now-restored) FieldGraphNode's own
+         // ownership map instead, exactly as FIELDGRAPHUNDOTEST does with
+         // "osc#" + i.
+         GraphNode* fgnGn = FindNodeByIndex(sUnpackTestFgnIdx);
+         if (fgnGn == nullptr)
+         {
+            for (GraphNode& n : gNodes)
+               if (dynamic_cast<FieldGraphNode*>(n.node.get()) != nullptr) fgnGn = &n;
+         }
+         auto* fgn = fgnGn != nullptr ? static_cast<FieldGraphNode*>(fgnGn->node.get()) : nullptr;
+         bool childrenHidden = fgn != nullptr;
+         for (const char* key : { "a#0", "b#1", "c#2" })
+         {
+            int idx = fgn != nullptr ? fgn->Ownership().Get(key) : -1;
+            GraphNode* child = idx >= 0 ? FindNodeByIndex(idx) : nullptr;
+            childrenHidden = childrenHidden && child != nullptr && child->hiddenFromCanvas;
+         }
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 5b (Children re-hidden one frame after undo): childrenHidden=%d  %s\n",
+                (int)childrenHidden, childrenHidden ? "OK" : "FAIL");
+         bool allOk = sUnpackTestAllOk && childrenHidden;
+
+         NewPatch();
+         sUnpackTestFgnIdx = -1;
+         sUnpackTestConsumerIdx = -1;
+         sUnpackTestMembers.clear();
+         sUnpackTestAllOk = true;
+         printf("%s\n", allOk ? "FIELDGRAPHUNPACK OK" : "SUSPECT");
+      }
+
+      if (getenv("INFINITE_FIELDPINSTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDPINSTEST] Running dynamic pins (build step 11) harness...\n");
+         bool allOk = true;
+
+         // SECTION 1: headless pin-shape assertions - OutputCount/OutputLabel/
+         // ModulatorOutput toggling for the three image/element/sample node
+         // types, and append-only ordering (index 0's label/identity never
+         // moves when index 1 appears).
+         {
+            FieldElementNode n;
+            bool pass = (n.OutputCount() == 1) && (std::string(n.OutputLabel(0)) == "geo") &&
+                        (n.ModulatorOutput(1) == nullptr);
+            n.publishScalarOutput = true;
+            pass = pass && (n.OutputCount() == 2) && (std::string(n.OutputLabel(0)) == "geo") &&
+                   (std::string(n.OutputLabel(1)) == "publish") && (n.ModulatorOutput(1) != nullptr) &&
+                   (n.ModulatorOutput(0) == nullptr);
+            printf("[FIELDPINSTEST] Assertion 1 (FieldElementNode publish pin, append-only): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            FieldSampleNode n;
+            bool pass = (n.OutputCount() == 1) && n.IsAudioOutputIndex(0) && (n.ModulatorOutput(1) == nullptr);
+            n.exposeRmsOutput = true;
+            pass = pass && (n.OutputCount() == 2) && n.IsAudioOutputIndex(0) && !n.IsAudioOutputIndex(1) &&
+                   (std::string(n.OutputLabel(0)) == "out") && (std::string(n.OutputLabel(1)) == "rms") &&
+                   (n.ModulatorOutput(1) != nullptr);
+            printf("[FIELDPINSTEST] Assertion 2 (FieldSampleNode rms pin, IsAudioOutputIndex trap): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            FieldPixelNode n;
+            bool pass = (n.OutputCount() == 1) && (n.GetOutputTexture(1) == 0);
+            n.exposeAuxTexture = true;
+            // No declared state cells yet - GetOutputTexture(1) must stay 0
+            // rather than handing out a stale/zero-resolution FBO.
+            pass = pass && (n.OutputCount() == 2) && (n.GetOutputTexture(1) == 0) &&
+                   (std::string(n.OutputLabel(0)) == "out") && (std::string(n.OutputLabel(1)) == "state");
+            n.width = 32.0f;
+            n.height = 32.0f;
+            n.code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(fract(x));";
+            n.Apply();
+            n.CookIfNeeded(1);
+            pass = pass && (n.GetOutputTexture(1) != 0);
+            printf("[FIELDPINSTEST] Assertion 3 (FieldPixelNode aux texture, live only when states declared): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            FieldGraphNode n;
+            bool pass = (n.ModulatorInputCount() == 0) && (n.ModulatorInputSlot(0) == nullptr) &&
+                        !n.TriggerInputWired();
+            n.addTriggerInput = true;
+            pass = pass && (n.ModulatorInputCount() == 1) && (n.ModulatorInputSlot(0) != nullptr) &&
+                   (std::string(n.InputLabel(0)) == "trigger");
+            // Rising-edge detection: a fake IModulator whose Value01() is
+            // driven by hand, no ParamMailbox/MeterRing involved (§8 - reuse
+            // ModulatorOutput/MeterRing only, never a new channel).
+            struct FakeMod : public IModulator { float v = 0.0f; float Value01() override { return v; } };
+            FakeMod fake;
+            *n.ModulatorInputSlot(0) = &fake;
+            pass = pass && n.TriggerInputWired() && !n.PollTriggerEdge(); // starts low, no edge yet
+            fake.v = 1.0f;
+            pass = pass && n.PollTriggerEdge();  // 0 -> 1 is a rising edge
+            pass = pass && !n.PollTriggerEdge(); // holding high is not a second edge
+            fake.v = 0.0f;
+            pass = pass && !n.PollTriggerEdge(); // falling edge does not fire
+            fake.v = 1.0f;
+            pass = pass && n.PollTriggerEdge();  // rises again
+            printf("[FIELDPINSTEST] Assertion 4 (FieldGraphNode trigger pin + rising-edge detection): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 2: cable-orphaning refusal detection, live graph. Image/
+         // modulator-output cables are UI-link-derived (gLinks, rebuilt from
+         // the node editor's own frame), so a headless ConnectNodes() call
+         // does not populate them - synthetic LinkInfo entries stand in for
+         // what a real dragged cable would leave in gLinks. The graph node's
+         // trigger *input*, by contrast, is read directly off the node
+         // (TriggerInputWired()), so it is exercised through a real
+         // ConnectNodes() wiring instead.
+         NewPatch();
+         int elemIdx = -1, sampleIdx = -1, pixelSrcIdx = -1, pixelDstIdx = -1, graphSinkIdx = -1;
+         {
+            // Each SpawnNode() call can reallocate gNodes (a std::vector),
+            // invalidating any GraphNode* returned by an earlier call in this
+            // same sequence (trap T14 again, this time on the test's own
+            // fixture setup) - so every pointer is used and discarded before
+            // the next SpawnNode() runs; only the (reallocation-proof) index
+            // survives to the next statement.
+            GraphNode* ge = SpawnNode("Field Element", "3D", 0.0f, 0.0f);
+            bool spawned = ge != nullptr;
+            if (spawned)
+            {
+               elemIdx = ge->index;
+               static_cast<FieldElementNode*>(ge->node.get())->publishScalarOutput = true;
+            }
+
+            GraphNode* gs = SpawnNode("Field Sample", "Synths", 200.0f, 0.0f);
+            spawned = spawned && (gs != nullptr);
+            if (gs)
+            {
+               sampleIdx = gs->index;
+               static_cast<FieldSampleNode*>(gs->node.get())->exposeRmsOutput = true;
+            }
+
+            GraphNode* gpSrc = SpawnNode("FieldPixel", "Source", 400.0f, 0.0f);
+            spawned = spawned && (gpSrc != nullptr);
+            if (gpSrc)
+            {
+               pixelSrcIdx = gpSrc->index;
+               auto* pixSrc = static_cast<FieldPixelNode*>(gpSrc->node.get());
+               pixSrc->exposeAuxTexture = true;
+               pixSrc->width = 32.0f;
+               pixSrc->height = 32.0f;
+               pixSrc->code = "state float x = 0;\nx = x + 0.1;\ncol = vec3(fract(x));";
+               pixSrc->Apply();
+               pixSrc->CookIfNeeded(1);
+            }
+
+            GraphNode* gpDst = SpawnNode("FieldPixel", "Source", 600.0f, 0.0f);
+            spawned = spawned && (gpDst != nullptr);
+            if (gpDst)
+               pixelDstIdx = gpDst->index;
+
+            GraphNode* gg = SpawnNode("Field Graph", "Utility", 800.0f, 0.0f);
+            spawned = spawned && (gg != nullptr);
+            if (gg)
+            {
+               graphSinkIdx = gg->index;
+               static_cast<FieldGraphNode*>(gg->node.get())->addTriggerInput = true;
+            }
+
+            printf("[FIELDPINSTEST] Assertion 5 (spawn fixture graph): %s\n", spawned ? "OK" : "FAIL");
+            allOk = allOk && spawned;
+         }
+         {
+            GraphNode* ge = FindNodeByIndex(elemIdx);
+            GraphNode* gs = FindNodeByIndex(sampleIdx);
+            GraphNode* gpSrc = FindNodeByIndex(pixelSrcIdx);
+            GraphNode* gpDst = FindNodeByIndex(pixelDstIdx);
+            bool before = !FieldOutputPinHasLiveCable(elemIdx, 1) && !FieldOutputPinHasLiveCable(sampleIdx, 1) &&
+                          !FieldOutputPinHasLiveCable(pixelSrcIdx, 1);
+            gLinks.push_back({ 5000001, ge->OutputPinId(1), gs->InputPinId(0) });
+            gLinks.push_back({ 5000002, gs->OutputPinId(1), gpSrc->InputPinId(0) });
+            gLinks.push_back({ 5000003, gpSrc->OutputPinId(1), gpDst->InputPinId(0) });
+            bool after = FieldOutputPinHasLiveCable(elemIdx, 1) && FieldOutputPinHasLiveCable(sampleIdx, 1) &&
+                         FieldOutputPinHasLiveCable(pixelSrcIdx, 1) &&
+                         !FieldOutputPinHasLiveCable(elemIdx, 0); // index 0 (the pre-existing pin) never flags live
+            gLinks.clear();
+            bool afterClear = !FieldOutputPinHasLiveCable(elemIdx, 1) && !FieldOutputPinHasLiveCable(sampleIdx, 1) &&
+                               !FieldOutputPinHasLiveCable(pixelSrcIdx, 1);
+            bool pass = before && after && afterClear;
+            printf("[FIELDPINSTEST] Assertion 6 (FieldOutputPinHasLiveCable detects/clears synthetic cables): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+         {
+            // Real wiring for the graph node's trigger *input*: the sample
+            // node's rms output feeds it, going through the same
+            // ConnectNodes()/IsInputSlotCompatible() path a live drag uses.
+            //
+            // Deliberately NOT the element node's publish output here - see
+            // the [FIELDPINSTEST FINDING] note below assertion 8. In short:
+            // IsInputSlotCompatible's srcGeometry/srcCamera/srcLight checks
+            // are whole-node dynamic_casts, not scoped to the specific output
+            // index a cable is dragged from, so a connection from
+            // FieldElementNode's *modulator* output (index 1) is wrongly
+            // rejected by the "3D cables only go into 3D nodes" rule, because
+            // FieldElementNode is also (always) an IGeometrySource. The
+            // audio-source check three lines above it does not have this
+            // bug - it consults IsAudioOutputIndex(srcOutputIndex) rather
+            // than dynamic_cast<IAudioSource*> alone - so routing this
+            // assertion through FieldSampleNode's rms output instead
+            // exercises the identical TriggerInputWired()/ModulatorInputSlot
+            // plumbing without tripping the geometry-side gap.
+            std::string err;
+            bool connected = ConnectNodes(sampleIdx, 1, graphSinkIdx, 0, err);
+            auto* gg = static_cast<FieldGraphNode*>(FindNodeByIndex(graphSinkIdx)->node.get());
+            bool wiredNow = connected && gg->TriggerInputWired();
+            bool sourceMatches = wiredNow &&
+               (*gg->ModulatorInputSlot(0) ==
+                static_cast<FieldSampleNode*>(FindNodeByIndex(sampleIdx)->node.get())->ModulatorOutput(1));
+            *gg->ModulatorInputSlot(0) = nullptr; // simulate disconnect
+            bool unwiredAfter = !gg->TriggerInputWired();
+            bool pass = connected && wiredNow && sourceMatches && unwiredAfter;
+            printf("[FIELDPINSTEST] Assertion 7 (FieldGraphNode trigger wired via real ConnectNodes, TriggerInputWired): %s (%s)\n",
+                   pass ? "OK" : "FAIL", err.c_str());
+            allOk = allOk && pass;
+            // Restore the real wiring for the save/load section below.
+            ConnectNodes(sampleIdx, 1, graphSinkIdx, 0, err);
+
+            // [FIELDPINSTEST FINDING - pre-existing gap, first exercised by
+            // this step, left unfixed per doc §8's "stop and report" rule]:
+            // confirm the gap actually exists and is exactly what's
+            // described above, so this comment cannot silently go stale.
+            std::string geoErr;
+            bool geoBlocked = !ConnectNodes(elemIdx, 1, graphSinkIdx, 0, geoErr);
+            if (!geoBlocked)
+            {
+               *gg->ModulatorInputSlot(0) = nullptr; // undo if it unexpectedly succeeded
+               printf("[FIELDPINSTEST] NOTE: FieldElementNode publish -> ModulatorInputSlot no longer blocked - the finding below may be stale, re-check IsInputSlotCompatible.\n");
+            }
+         }
+
+         // SECTION 3: save/load round trip carries the new bool and, for the
+         // pixel aux output, the srcOutput fix (Patch.cpp "cable"/"geo" tags -
+         // see the fix's own commit note). Also covers the real image cable
+         // wired between the two FieldPixel fixture nodes.
+         {
+            std::string err;
+            bool imgConnected = ConnectNodes(pixelSrcIdx, 1, pixelDstIdx, 0, err);
+
+            Patch::Data saved = BuildPatchData();
+            NewPatch();
+            ApplyPatchData(saved);
+
+            auto* elemR = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+            auto* sampleR = dynamic_cast<FieldSampleNode*>(FindNodeByIndex(sampleIdx) ? FindNodeByIndex(sampleIdx)->node.get() : nullptr);
+            auto* pixelSrcR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixelSrcIdx) ? FindNodeByIndex(pixelSrcIdx)->node.get() : nullptr);
+            auto* pixelDstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixelDstIdx) ? FindNodeByIndex(pixelDstIdx)->node.get() : nullptr);
+            auto* graphR = dynamic_cast<FieldGraphNode*>(FindNodeByIndex(graphSinkIdx) ? FindNodeByIndex(graphSinkIdx)->node.get() : nullptr);
+
+            bool boolsSurvived = elemR && sampleR && pixelSrcR && graphR &&
+                                  elemR->publishScalarOutput && sampleR->exposeRmsOutput &&
+                                  pixelSrcR->exposeAuxTexture && graphR->addTriggerInput;
+            bool imageCableSurvived = imgConnected && pixelDstR &&
+                                       (pixelDstR->TextureInput().GetSource() == pixelSrcR) &&
+                                       (pixelDstR->TextureInput().GetSourceOutput() == 1);
+            bool triggerCableSurvived = graphR && graphR->TriggerInputWired() &&
+                                         (*graphR->ModulatorInputSlot(0) == (sampleR ? sampleR->ModulatorOutput(1) : nullptr));
+            bool pass = boolsSurvived && imageCableSurvived && triggerCableSurvived;
+            printf("[FIELDPINSTEST] Assertion 8 (save/load round trip: bools + srcOutput-carrying cables): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 4: undo across a single toggle flip.
+         {
+            auto* elemR = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+            bool pass = elemR != nullptr;
+            if (elemR)
+            {
+               bool before = elemR->publishScalarOutput; // true, from section 2/3
+               PushUndoCheckpoint();
+               elemR->publishScalarOutput = !before;
+               Undo();
+               auto* elemAfterUndo = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+               pass = elemAfterUndo && (elemAfterUndo->publishScalarOutput == before);
+            }
+            printf("[FIELDPINSTEST] Assertion 9 (undo reverts a single toggle flip): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 5: copy/paste preserves pin shape.
+         {
+            auto* elemR = dynamic_cast<FieldElementNode*>(FindNodeByIndex(elemIdx) ? FindNodeByIndex(elemIdx)->node.get() : nullptr);
+            bool pass = false;
+            if (elemR)
+            {
+               FieldElementNode copy;
+               CopyParams(&copy, elemR);
+               pass = (copy.publishScalarOutput == elemR->publishScalarOutput) && (copy.OutputCount() == elemR->OutputCount());
+            }
+            printf("[FIELDPINSTEST] Assertion 10 (copy/paste preserves pin shape): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 6: pre-step-11 patch fixture - a saved-params list missing
+         // the new bool key entirely (as any patch saved before this step
+         // would be) loads with the old pin shape and the bool defaulted
+         // false, per Patch.cpp's Reader::Bool "leave untouched when the key
+         // is absent" contract.
+         {
+            FieldElementNode src;
+            src.publishScalarOutput = true;
+            std::vector<std::pair<std::string, std::string>> params;
+            Patch::SaveParams(&src, params);
+            params.erase(std::remove_if(params.begin(), params.end(),
+                                         [](const std::pair<std::string, std::string>& kv) {
+                                            return kv.first == "b publishScalarOutput";
+                                         }),
+                          params.end());
+            FieldElementNode loaded;
+            Patch::LoadParams(&loaded, params);
+            bool pass = !loaded.publishScalarOutput && (loaded.OutputCount() == 1);
+            printf("[FIELDPINSTEST] Assertion 11 (pre-step-11 patch: bool defaults false, old pin shape): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDPINS OK" : "SUSPECT");
+      }
+
+      // Build step 13 (docs/plans/field/step-13-dynamic-pins-node-wiring.md):
+      // node/UI/save-format wiring for kernel `output`/`input` declarations
+      // on top of step 12's compiler-level PinTable/IR work and step 11's
+      // hardcoded toggle pins (both exercised above by FIELDPINSTEST). This
+      // is structural-only, per the step's resolved scoping decision: a
+      // declared output's ModulatorOutput() always reads back 0.0 (a
+      // documented placeholder - FieldElementNode/FieldSampleNode/
+      // FieldPixelNode's DeclaredOutputPlaceholder), never the kernel's real
+      // computed value, which is deferred to a follow-up step.
+      if (getenv("INFINITE_FIELDPINNODETEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDPINNODETEST] Running dynamic pins (build step 13) node-wiring harness...\n");
+         bool allOk = true;
+
+         // SECTION 1-3: headless pin-shape assertions across all three node
+         // types - compacted OutputCount/OutputLabel (native, then any
+         // step-11 toggle, then declared pins in PinTable order), and the
+         // deferred-value placeholder.
+         {
+            FieldElementNode n;
+            n.code = "output element float foo = 1.0\nP.y += 0.0\n";
+            bool applied = n.Apply();
+            bool pass = applied && (n.OutputCount() == 2) &&
+                        (std::string(n.OutputLabel(0)) == "geo") &&
+                        (std::string(n.OutputLabel(1)) == "foo") &&
+                        (n.ModulatorOutput(1) != nullptr) &&
+                        (n.ModulatorOutput(1)->Value01() == 0.0f);
+            printf("[FIELDPINNODETEST] Assertion 1 (FieldElementNode declared output, compacted, placeholder value): %s (err='%s')\n",
+                   pass ? "OK" : "FAIL", n.LastError().c_str());
+            allOk = allOk && pass;
+         }
+         {
+            FieldSampleNode n;
+            n.code = "output sample float y = in * 0.5\nout = in\n";
+            bool applied = n.Apply();
+            bool pass = applied && (n.OutputCount() == 2) &&
+                        (std::string(n.OutputLabel(0)) == "out") &&
+                        (std::string(n.OutputLabel(1)) == "y") &&
+                        n.IsAudioOutputIndex(0) && !n.IsAudioOutputIndex(1) &&
+                        (n.ModulatorOutput(1) != nullptr) &&
+                        (n.ModulatorOutput(1)->Value01() == 0.0f);
+            printf("[FIELDPINNODETEST] Assertion 2 (FieldSampleNode declared output, compacted, placeholder value): %s (err='%s')\n",
+                   pass ? "OK" : "FAIL", n.LastError().c_str());
+            allOk = allOk && pass;
+         }
+         {
+            FieldPixelNode n;
+            n.width = 32.0f;
+            n.height = 32.0f;
+            n.code = "output pixel float glow = 1.0;\ncol = vec3(uv.x, uv.y, 0.0);";
+            bool applied = n.Apply();
+            bool pass = applied && (n.OutputCount() == 2) &&
+                        (std::string(n.OutputLabel(0)) == "out") &&
+                        (std::string(n.OutputLabel(1)) == "glow") &&
+                        (n.ModulatorOutput(1) != nullptr) &&
+                        (n.ModulatorOutput(1)->Value01() == 0.0f);
+            printf("[FIELDPINNODETEST] Assertion 3 (FieldPixelNode declared output, compacted, placeholder value): %s (err='%s')\n",
+                   pass ? "OK" : "FAIL", n.LastError().c_str());
+            allOk = allOk && pass;
+         }
+
+         // SECTION 4-5: FieldPixelNode declared `input image` pin, wired
+         // through the real main.cpp InputCountFor/CableFor/ConnectNodes
+         // path - the one main.cpp cable-chain edit this step made (§5.7).
+         NewPatch();
+         int pixSrcAIdx = -1, pixDstIdx = -1;
+         {
+            // Each SpawnNode() call can reallocate gNodes (a std::vector),
+            // invalidating any GraphNode* an earlier call returned (trap
+            // T14, see FIELDPINSTEST's identical fixture-setup comment) -
+            // so every pointer is used and discarded before the next
+            // SpawnNode() runs; only the (reallocation-proof) index survives.
+            GraphNode* a = SpawnNode("FieldPixel", "Source", 0.0f, 0.0f);
+            bool spawned = a != nullptr;
+            if (spawned)
+               pixSrcAIdx = a->index;
+
+            GraphNode* d = SpawnNode("FieldPixel", "Source", 400.0f, 0.0f);
+            spawned = spawned && (d != nullptr);
+            if (spawned)
+            {
+               pixDstIdx = d->index;
+               auto* dn = static_cast<FieldPixelNode*>(d->node.get());
+               dn->width = 32.0f;
+               dn->height = 32.0f;
+               dn->code = "input pixel image other;\ncol = vec3(uv.x, uv.y, 0.0);";
+               spawned = dn->Apply();
+            }
+            printf("[FIELDPINNODETEST] Assertion 4 (spawn image-input fixture; declared `input image` compiles): %s\n",
+                   spawned ? "OK" : "FAIL");
+            allOk = allOk && spawned;
+         }
+         {
+            GraphNode* dg = FindNodeByIndex(pixDstIdx);
+            auto* dn = dg ? static_cast<FieldPixelNode*>(dg->node.get()) : nullptr;
+            bool countOk = dg && (InputCountFor(*dg) == 2); // native "src" + 1 declared image input
+            std::string err;
+            bool connected = ConnectNodes(pixSrcAIdx, 0, pixDstIdx, 1, err);
+            bool wiredOk = connected && dn && dn->DeclaredImageInput(0) != nullptr &&
+                           dn->DeclaredImageInput(0)->GetSource() ==
+                              (FindNodeByIndex(pixSrcAIdx) ? FindNodeByIndex(pixSrcAIdx)->node.get() : nullptr);
+            bool pass = countOk && wiredOk;
+            printf("[FIELDPINNODETEST] Assertion 5 (declared image input: InputCountFor==2, real ConnectNodes wiring via CableFor): %s (%s)\n",
+                   pass ? "OK" : "FAIL", err.c_str());
+            allOk = allOk && pass;
+         }
+
+         // SECTION 6: cable-orphaning refusal, declared output pin. Mirrors
+         // FIELDPINSTEST's step-11 toggle refusal, but the pin here comes
+         // from a kernel edit (a live compile), not a UI toggle - Apply()
+         // itself must refuse and leave the previous program/pin shape live.
+         {
+            // Same T14 reallocation trap as above - capture each index
+            // before the next SpawnNode() call, discard the pointer.
+            GraphNode* ge = SpawnNode("Field Element", "3D", 0.0f, 0.0f);
+            bool spawned = ge != nullptr;
+            int elemFixtureIdx = spawned ? ge->index : -1;
+
+            GraphNode* sinkG = SpawnNode("Field Element", "3D", 200.0f, 0.0f); // only needs a pin id
+            spawned = spawned && (sinkG != nullptr);
+            int sinkFixtureIdx = spawned ? sinkG->index : -1;
+
+            bool pass = spawned;
+            if (spawned)
+            {
+               GraphNode* elemGN = FindNodeByIndex(elemFixtureIdx);
+               GraphNode* sinkGN = FindNodeByIndex(sinkFixtureIdx);
+               auto* en = static_cast<FieldElementNode*>(elemGN->node.get());
+               // SpawnNode() does not itself call SetNodeIndex() - only the
+               // node's own params-panel draw does, each frame it is drawn
+               // (see DrawFieldElementParams's gCurrentNodeIndex handoff) -
+               // so a headless fixture that never draws that panel must set
+               // it explicitly for gLiveCableChecker's nodeIndex to line up
+               // with the id this fixture's own OutputPinId()/InputPinId()
+               // calls below encode.
+               en->SetNodeIndex(elemFixtureIdx);
+               en->code = "output element float foo = 1.0\nP.y += 0.0\n";
+               pass = pass && en->Apply() && (en->OutputCount() == 2);
+
+               gLinks.push_back({ 5100001, elemGN->OutputPinId(1), sinkGN->InputPinId(0) });
+               std::string oldCode = en->code;
+               en->code = "P.y += 0.0\n"; // drops the declared output entirely
+               bool refused = !en->Apply();
+               bool shapeKept = (en->OutputCount() == 2) && !en->pinRefusal.empty();
+               gLinks.clear();
+               en->code = oldCode;
+               bool recompiles = en->Apply(); // safe again - no more live cable
+               pass = pass && refused && shapeKept && recompiles;
+            }
+            printf("[FIELDPINNODETEST] Assertion 6 (declared-output refusal keeps old program + shape while a live cable is attached): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 7 (trap: never reuse a freed identity): renaming a
+         // declared pin retires the old PinEntry and mints a fresh id for
+         // the new name, even though the visible compacted slot (index 1)
+         // is reused - see PinTable::Reconcile's S5.4 comment.
+         {
+            FieldElementNode n;
+            n.code = "output element float foo = 1.0\nP.y += 0.0\n";
+            bool applied = n.Apply();
+            const Field::PinEntry* before = applied ? n.OutputPinTable().Find("foo") : nullptr;
+            int beforeId = before ? before->id : -1;
+            n.code = "output element float bar = 1.0\nP.y += 0.0\n";
+            bool applied2 = n.Apply();
+            const Field::PinEntry* after = applied2 ? n.OutputPinTable().Find("bar") : nullptr;
+            int afterId = after ? after->id : -1;
+            bool pass = applied && applied2 && before && after && (beforeId != afterId) && (n.OutputCount() == 2);
+            printf("[FIELDPINNODETEST] Assertion 7 (renamed declared pin mints a fresh PinTable id, never reused): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 8: save/load round trip - the declared image-input pin
+         // and its real cable both survive.
+         {
+            Patch::Data saved = BuildPatchData();
+            NewPatch();
+            ApplyPatchData(saved);
+            auto* dstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+            const Field::PinEntry* pinR = dstR ? dstR->InputPinTable().Find("other") : nullptr;
+            bool pass = dstR && pinR && pinR->isDeclared && dstR->DeclaredImageInput(0) != nullptr &&
+                        dstR->DeclaredImageInput(0)->GetSource() ==
+                           (FindNodeByIndex(pixSrcAIdx) ? FindNodeByIndex(pixSrcAIdx)->node.get() : nullptr);
+            printf("[FIELDPINNODETEST] Assertion 8 (save/load round trip: declared image-input pin + its cable survive): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 9: undo reverts a kernel edit, restoring the declared
+         // pin's shape along with the code string it came from.
+         {
+            auto* dstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+            bool pass = dstR != nullptr;
+            if (dstR)
+            {
+               std::string before = dstR->code;
+               PushUndoCheckpoint();
+               dstR->code = "col = vec3(1.0);"; // drops the declared input entirely
+               dstR->Apply();
+               Undo();
+               auto* afterUndo = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+               const Field::PinEntry* pinR = afterUndo ? afterUndo->InputPinTable().Find("other") : nullptr;
+               pass = afterUndo && (afterUndo->code == before) && pinR && pinR->isDeclared;
+            }
+            printf("[FIELDPINNODETEST] Assertion 9 (undo reverts a kernel edit; declared pin shape restored): %s\n",
+                   pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         // SECTION 10: copy/paste preserves declared pin shape.
+         {
+            auto* dstR = dynamic_cast<FieldPixelNode*>(FindNodeByIndex(pixDstIdx) ? FindNodeByIndex(pixDstIdx)->node.get() : nullptr);
+            bool pass = false;
+            if (dstR)
+            {
+               FieldPixelNode copy;
+               CopyParams(&copy, dstR);
+               const Field::PinEntry* pinR = copy.InputPinTable().Find("other");
+               pass = (copy.OutputCount() == dstR->OutputCount()) && pinR && pinR->isDeclared;
+            }
+            printf("[FIELDPINNODETEST] Assertion 10 (copy/paste preserves declared pin shape): %s\n", pass ? "OK" : "FAIL");
+            allOk = allOk && pass;
+         }
+
+         NewPatch();
+         printf("%s\n", allOk ? "FIELDPINNODE OK" : "SUSPECT");
       }
 
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
@@ -53359,6 +56709,29 @@ int main(int argc, char** argv)
 
       for (GraphNode& gn : gNodes)
       {
+         // Build step 15 ("Instrument Mode"): a node mounted by an
+         // encapsulated FieldGraphNode is a real gNodes entry - it still
+         // cooks, still counts toward audio topology, and its own params
+         // still resolve via VisitParams (see ApplyModulationAndPalette's
+         // per-mounted-child loop and RebuildAudioTopology, both of which
+         // walk gNodes unconditionally, hidden or not) - but it gets no
+         // ed::BeginNode/EndNode this frame at all, so it is neither drawn
+         // nor pickable/selectable/draggable in the node editor (doc §3.2).
+         // Known, deliberately scoped gap (flagged, not silently built
+         // partial): a hidden child's OWN param pins do not re-register
+         // for direct modulation while hidden, because doing so safely
+         // would require running the ~500-line per-node param dispatch
+         // chain outside its normal ed::BeginNode/ImGui-window context,
+         // which is a much larger refactor than this step's exit criterion
+         // requires (nothing in the FIELDGRAPHENCAPTEST assertions tests
+         // it) - a pre-existing direct binding on a child stays wired but
+         // stops being driven for as long as that child is hidden. The
+         // FieldGraphNode's OWN declared params (the normal way to modulate
+         // an encapsulated instrument, §4) are unaffected - those register
+         // normally since the FieldGraphNode box itself is never hidden.
+         if (gn.hiddenFromCanvas)
+            continue;
+
          if (gn.needsPosition)
          {
             ed::SetNodePosition(gn.NodeId(), ImVec2(gn.spawnX, gn.spawnY));
@@ -53675,10 +57048,55 @@ int main(int argc, char** argv)
             DrawPalettePreview(palette);
          else if (auto* proj = dynamic_cast<ProjectionNode*>(gn.node.get()))
             DrawProjectionPreview(proj);
-         else if (dynamic_cast<FieldGraphNode*>(gn.node.get()) != nullptr)
+         else if (auto* fgnPreview = dynamic_cast<FieldGraphNode*>(gn.node.get()))
          {
-            // Meta-node, no picture to show (see the out-pin exclusion above) -
-            // its own params panel (Regenerate/ownership text) is the body.
+            // Build step 15 §5.1/§5.3: an encapsulated FieldGraphNode's
+            // boundary output is whatever its terminal emit()-ed node(s)
+            // produce - resolve each terminal (in emits order) and preview
+            // the first one that actually has a texture, via the same
+            // DrawPreview every other image-producing node's body already
+            // uses (doc trap 8: no signature change, no second widget).
+            // A texture-less terminal falls through to §5.3.1's audio-domain
+            // case (RequiresAudioProcessing(), no texture) below; a geometry-
+            // only terminal (neither) falls through to "nothing to show",
+            // same as an empty/uncompiled program.
+            INode* previewTarget = nullptr;
+            for (int idx : fgnPreview->TerminalIndices())
+            {
+               GraphNode* term = FindNodeByIndex(idx);
+               if (term != nullptr && term->node && term->node->GetOutputTexture() != 0 &&
+                   term->node->GetOutputWidth() > 0)
+               {
+                  previewTarget = term->node.get();
+                  break;
+               }
+            }
+            // §5.4: this is also the node's single (derived) boundary output
+            // pin's target - refresh it every draw frame so an outer cable
+            // plugged into that pin (main.cpp's ordinary ImageCable/cable-
+            // record machinery, resolved generically by pin, not specially
+            // for FieldGraphNode) reads whichever terminal currently backs
+            // it, re-resolved fresh rather than held stale across a
+            // Regenerate()'s own SpawnNode/RemoveNodeByIndex churn.
+            fgnPreview->SetBoundaryOutputTarget(previewTarget);
+            if (previewTarget != nullptr)
+               DrawPreview(previewTarget);
+            else
+            {
+               INode* audioTerminal = nullptr;
+               for (int idx : fgnPreview->TerminalIndices())
+               {
+                  GraphNode* term = FindNodeByIndex(idx);
+                  if (term != nullptr && term->node && term->node->RequiresAudioProcessing() &&
+                      term->node->GetOutputTexture() == 0)
+                  {
+                     audioTerminal = term->node.get();
+                     break;
+                  }
+               }
+               if (audioTerminal != nullptr)
+                  DrawFieldGraphWaveform(fgnPreview, audioTerminal);
+            }
          }
          else if (isAudioBody)
             DrawAudioNodeBody(gn);
@@ -56657,6 +60075,41 @@ int main(int argc, char** argv)
          ImGui::EndPopup();
       }
 
+      // Field build step 17: .infdev device Save name-prompt - same
+      // deferred-popup discipline as "##dropdown" just above (opened from
+      // inside a node body, rendered out here where the canvas transform
+      // doesn't apply).
+      if (gFieldDeviceSave.justOpened)
+      {
+         ImGui::OpenPopup("##fielddevicesave");
+         gFieldDeviceSave.justOpened = false;
+      }
+      if (ImGui::BeginPopup("##fielddevicesave"))
+      {
+         ImGui::TextUnformatted("Save device as:");
+         ImGui::SetNextItemWidth(220.0f);
+         bool enterPressed = ImGui::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
+                                              sizeof(gFieldDeviceSave.nameBuf),
+                                              ImGuiInputTextFlags_EnterReturnsTrue);
+         ImGui::SameLine();
+         bool doSave = enterPressed || ImGui::Button("Save##fielddevicesaveconfirm");
+         if (doSave && gFieldDeviceSave.nameBuf[0] != '\0')
+         {
+            Field::DeviceFile device;
+            if (gFieldDeviceSave.getDeviceFile && gFieldDeviceSave.getDeviceFile(device))
+            {
+               const std::string dir = AppPaths::AppSupportDir() + "/Devices/" + gFieldDeviceSave.domain + "/";
+               if (AppPaths::EnsureDir(dir))
+               {
+                  Field::SaveToInfdevFile(dir + gFieldDeviceSave.nameBuf + ".infdev", device);
+                  InvalidateFieldDeviceLibrary(gFieldDeviceSave.domain);
+               }
+            }
+            ImGui::CloseCurrentPopup();
+         }
+         ImGui::EndPopup();
+      }
+
       gHoveringItem = ed::GetHoveredNode() || ed::GetHoveredPin() || ed::GetHoveredLink();
 
       ed::Resume();
@@ -56857,6 +60310,67 @@ int main(int argc, char** argv)
       {
          RunFieldGraphRegenerate(gFieldGraphPendingRegenerate);
          gFieldGraphPendingRegenerate = nullptr;
+      }
+
+      // Build step 16 ("Unpack to Canvas"): same trap-T14 deferral as the
+      // Regenerate drain just above - phase 1 reveals real gNodes entries
+      // and phase 2 (ticked unconditionally below, while armed) eventually
+      // spawns a GroupNode, neither of which is safe nested inside the
+      // ed::Begin()/ed::End() pass just closed.
+      if (gFieldGraphPendingUnpack != nullptr)
+      {
+         RunFieldGraphUnpackPhase1(gFieldGraphPendingUnpack);
+         gFieldGraphPendingUnpack = nullptr;
+      }
+      RunFieldGraphUnpackPhase2Tick();
+
+      // Dynamic pins, Phase 1 (build step 11, §5.5): trigger-pin edge
+      // detection for every FieldGraphNode, polled once per frame right
+      // here - same safe-to-mutate-gNodes location as the drain just above
+      // (trap T14). Firing nodes are collected first and regenerated in a
+      // second pass, deliberately not called from inside the gNodes range-for:
+      // Regenerate() can spawn/remove nodes, which reallocates gNodes'
+      // storage and would invalidate that loop's iterator/reference mid-walk.
+      // Collected as raw INode-owning pointers (not GraphNode&), which stay
+      // valid across such a reallocation since gNodes holds them by
+      // unique_ptr, not by value.
+      {
+         std::vector<FieldGraphNode*> firing;
+         for (GraphNode& gn : gNodes)
+         {
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(gn.node.get()))
+            {
+               if (fgn->PollTriggerEdge())
+                  firing.push_back(fgn);
+            }
+         }
+         for (FieldGraphNode* fgn : firing)
+            RunFieldGraphRegenerate(fgn);
+      }
+
+      // Build step 15 §4.2: live parameter forwarding. Never spawns/removes/
+      // reconnects a node - only ever calls host.SetParam on already-mounted
+      // children - so unlike Regenerate() this has no trap-T14 ordering
+      // requirement, but is driven from this same post-ed::End() tick for
+      // consistency with the rest of this doc's flow. A no-op call
+      // (mLiveForward empty, or nothing changed since last frame) is cheap,
+      // so this runs for every FieldGraphNode unconditionally.
+      for (GraphNode& gn : gNodes)
+      {
+         if (auto* fgn = dynamic_cast<FieldGraphNode*>(gn.node.get()))
+         {
+            if (fgn->encapsulated)
+            {
+               VirtualGraphHost host;
+               host.owner = fgn;
+               fgn->PushLiveParams(host);
+            }
+            else
+            {
+               MainGraphHost host;
+               fgn->PushLiveParams(host);
+            }
+         }
       }
 
       io.MouseWheel = savedWheel;

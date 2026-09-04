@@ -122,6 +122,43 @@ void FieldPixelNode::LoadPreset(int index)
    }
 }
 
+Field::DeviceFile FieldPixelNode::ToDeviceFile() const
+{
+   Field::DeviceFile device;
+   device.domain = "pixel";
+   device.code = code;
+   for (const auto& p : mParamTable.Params())
+   {
+      if (p.isDeclared)
+         device.params[p.name] = p.value;
+   }
+   device.nodeSettings["width"] = (double)width;
+   device.nodeSettings["height"] = (double)height;
+   device.nodeSettings["animate"] = animate ? 1.0 : 0.0;
+   return device;
+}
+
+void FieldPixelNode::LoadDeviceFile(const Field::DeviceFile& device)
+{
+   code = device.code;
+   auto itW = device.nodeSettings.find("width");
+   if (itW != device.nodeSettings.end())
+      width = (float)itW->second;
+   auto itH = device.nodeSettings.find("height");
+   if (itH != device.nodeSettings.end())
+      height = (float)itH->second;
+   auto itA = device.nodeSettings.find("animate");
+   if (itA != device.nodeSettings.end())
+      animate = itA->second != 0.0;
+   Apply();
+   for (const auto& kv : device.params)
+   {
+      Field::ParamEntry* p = mParamTable.Find(kv.first);
+      if (p != nullptr)
+         p->value = kv.second;
+   }
+}
+
 FieldPixelNode::FieldPixelNode()
 {
    code = Presets()[0].code;
@@ -140,11 +177,18 @@ FieldPixelNode::~FieldPixelNode()
 // colour into mOut on a second pass, so `col` means the same thing whether or
 // not the kernel declares state cells.
 unsigned int FieldPixelNode::GetOutputTexture() { return GLUtil::FboTexture(mOut); }
+unsigned int FieldPixelNode::GetOutputTexture(int index)
+{
+   if (index == 1 && exposeAuxTexture && !mIR.declaredStates.empty())
+      return mState.CurrentOutputTexture();
+   return index == 0 ? GetOutputTexture() : 0;
+}
 int FieldPixelNode::GetOutputWidth() const { return mOut.w; }
 int FieldPixelNode::GetOutputHeight() const { return mOut.h; }
 
 bool FieldPixelNode::Apply()
 {
+   pinRefusal.clear();
    std::vector<Field::Token> tokens;
    Field::FieldError lexErr;
    if (!Field::Lex(code, tokens, lexErr))
@@ -182,6 +226,32 @@ bool FieldPixelNode::Apply()
    {
       mLastError = compileErr;
       return false;
+   }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): reconcile the declared
+   // output/input pin tables against this compile's LOCAL `ir` (not yet
+   // swapped into mIR) - a refusal here must leave mIR/mProgram untouched,
+   // same "keep last working program" discipline as a GLSL compile error
+   // above. Must run before the mProgram/mIR commit below.
+   {
+      std::vector<Field::DeclaredPin> declOut, declIn;
+      for (const auto& d : ir.declaredOutputs)
+         declOut.push_back({ d.name, d.typeName, Field::DomainToString(d.domain), true });
+      for (const auto& d : ir.declaredInputs)
+         declIn.push_back({ d.name, d.typeName, Field::DomainToString(d.domain), false });
+
+      std::string pinNotice, pinRefusalMsg;
+      bool outOk = Field::ReconcileFieldPins(mOutputPins, declOut, mNodeIndex, NativeOutputCount(), pinNotice, pinRefusalMsg);
+      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, /*nativeCount=*/1, pinNotice, pinRefusalMsg);
+      if (!outOk || !inOk)
+      {
+         glDeleteProgram(program);
+         mLastError = pinRefusalMsg;
+         pinRefusal = pinRefusalMsg;
+         return false;
+      }
+      if (!pinNotice.empty())
+         mNotice = pinNotice;
    }
 
    if (mProgram != 0)

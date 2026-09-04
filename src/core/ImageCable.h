@@ -12,9 +12,13 @@
 class ImageCable
 {
 public:
-   void Connect(INode* source) { mSource = source; }
-   void Disconnect() { mSource = nullptr; }
+   // outputIndex selects which of the source's image outputs this cable
+   // reads (build step 11, §5.3) - 0 for every pre-existing call site,
+   // matching the pre-step-11 behaviour exactly.
+   void Connect(INode* source, int outputIndex = 0) { mSource = source; mSourceOutput = outputIndex; }
+   void Disconnect() { mSource = nullptr; mSourceOutput = 0; }
    INode* GetSource() const { return mSource; }
+   int GetSourceOutput() const { return mSourceOutput; }
    bool IsConnected() const { return mSource != nullptr; }
 
    // Walks past bypassed nodes to the first one that is actually enabled. The
@@ -34,7 +38,7 @@ public:
       if (node == nullptr)
          return 0;
       node->CookIfNeeded(frameId);
-      return node->GetOutputTexture();
+      return node->GetOutputTexture(mSourceOutput);
    }
 
    int Width() const
@@ -59,4 +63,5 @@ public:
 
 private:
    INode* mSource = nullptr;
+   int mSourceOutput = 0;
 };

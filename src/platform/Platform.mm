@@ -583,6 +583,53 @@ namespace Platform
       }
    }
 
+   std::string OpenDeviceDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Open device"];
+         if (@available(macOS 11.0, *))
+         {
+            // No registered UTType for ".infdev" (unlike the patch dialogs'
+            // "com.namansoni.infinite.patch") - matched by extension instead,
+            // the same fallback OpenModelDialog below uses for obj/ply/stl.
+            UTType* type = [UTType typeWithFilenameExtension:@"infdev"];
+            if (type != nil)
+               [panel setAllowedContentTypes:@[ type ]];
+         }
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
+   std::string SaveDeviceDialog(const std::string& suggestedName)
+   {
+      @autoreleasepool
+      {
+         NSSavePanel* panel = [NSSavePanel savePanel];
+         [panel setTitle:@"Save device"];
+         [panel setNameFieldStringValue:
+            [NSString stringWithUTF8String:suggestedName.empty() ? "Untitled.infdev"
+                                                                 : suggestedName.c_str()]];
+         if (@available(macOS 11.0, *))
+         {
+            UTType* type = [UTType typeWithFilenameExtension:@"infdev"];
+            if (type != nil)
+               [panel setAllowedContentTypes:@[ type ]];
+         }
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [panel URL];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
    std::string OpenModelDialog()
    {
       @autoreleasepool

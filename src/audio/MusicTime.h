@@ -35,6 +35,7 @@ namespace MusicTime
       kSixteenthDot,
       kSixteenthTrip,
       kThirtySecond,
+      kThirtySecondDot,
       kThirtySecondTrip,
       kSixtyFourth,
       kNumRateDivisions
@@ -70,6 +71,7 @@ namespace MusicTime
          case kSixteenthDot: return 0.25 * 1.5;
          case kSixteenthTrip: return 0.25 * 2.0 / 3.0;
          case kThirtySecond: return 0.125;
+         case kThirtySecondDot: return 0.125 * 1.5;
          case kThirtySecondTrip: return 0.125 * 2.0 / 3.0;
          case kSixtyFourth: return 0.0625;
          default: return 1.0;
@@ -96,7 +98,7 @@ namespace MusicTime
          "1/4", "1/4.", "1/4T",
          "1/8", "1/8.", "1/8T",
          "1/16", "1/16.", "1/16T",
-         "1/32", "1/32T",
+         "1/32", "1/32.", "1/32T",
          "1/64"
       };
       return kNames;
@@ -117,6 +119,47 @@ namespace MusicTime
          for (int i = 0; i < kNumRateDivisions; i++)
             list.push_back(RateDivisionNames()[i]);
       return list;
+   }
+
+   // Finds the closest RateDivision for an arbitrary beat length.
+   inline RateDivision NearestRateDivision(double beats)
+   {
+      RateDivision best = kSixteenth;
+      double bestDiff = 1e9;
+      for (int i = 0; i < kNumRateDivisions; i++)
+      {
+         const double d = std::abs(BeatsFor((RateDivision)i) - beats);
+         if (d < bestDiff) { bestDiff = d; best = (RateDivision)i; }
+      }
+      return best;
+   }
+
+   // Shared "quantize to grid" list used by Quantizer and Note Capturer:
+   // index 0 is "Off", index 1..kNumRateDivisions corresponds to RateDivision (index - 1).
+   inline const std::vector<std::string>& QuantizeGridList()
+   {
+      static std::vector<std::string> list;
+      if (list.empty())
+      {
+         list.push_back("Off");
+         for (int i = 0; i < kNumRateDivisions; i++)
+            list.push_back(RateDivisionNames()[i]);
+      }
+      return list;
+   }
+
+   inline double QuantizeGridBeats(int gridIndex)
+   {
+      if (gridIndex <= 0 || gridIndex > kNumRateDivisions)
+         return 0.0;
+      return BeatsFor((RateDivision)(gridIndex - 1));
+   }
+
+   inline const char* QuantizeGridName(int gridIndex)
+   {
+      if (gridIndex <= 0 || gridIndex > kNumRateDivisions)
+         return "Off";
+      return RateDivisionName(gridIndex - 1);
    }
 
    // ------------------------------------------------------------------ scale
