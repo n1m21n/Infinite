@@ -339,3 +339,26 @@ state float C = 0 [border]    # outside reads C's declared initial value
 The clamp is half a texel in on purpose, so a clamped fetch lands on the edge
 texel's centre rather than blending with whatever the sampler decides lives
 past it.
+
+---
+
+## Element state and neighbour reads (build step 23)
+
+An `element` state cell is **per element**: one lane vector of `count` floats
+per component, allocated when the bank is sized and zeroed when it is resized.
+
+Two consequences that decide how an element simulation must be written:
+
+| | |
+|---|---|
+| `P` is not memory | the element store is refilled from the incoming mesh **every cook**, so `P +=` accumulates nothing. A simulation keeps its positions in a `state` cell, seeds that cell from `P` on the first cook (`age`), and writes `P` back at the end |
+| `.at()` reads a snapshot | `X.at(k)` reads the cook's input buffer — the incoming mesh for an attribute, the **previous cook's** value for a state cell. The snapshot is taken once, after the prologue and before any element runs, and only for the bases the kernel actually names |
+
+The snapshot is what makes the loop order-independent: element `j`'s result can
+never depend on whether element `j-1` has already run, which is what keeps the
+domain vectorizable and leaves the door open to a GPU compute backend. The
+price is one cook (~16 ms) of staleness on every neighbour value.
+
+`age` — cooks since the bank was cleared — is reserved in **both** the pixel
+(step 22) and element (step 23) domains. It resets on a transport reset, on a
+recompile, and on an element-count change, because all three zero the bank.

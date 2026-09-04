@@ -13,6 +13,8 @@ namespace Field
       double t = 0.0;
       double dt = 1.0 / 60.0;
       double frame = 0.0;
+      // Build steps 22/23: cooks since this node's state bank was cleared.
+      double age = 0.0;
       const std::map<std::string, float>* params = nullptr;
       const std::map<std::string, float>* siblings = nullptr;
       const std::map<std::string, float>* globals = nullptr;

@@ -268,6 +268,9 @@ private:
    unsigned long long mLastResetEpoch = 0;
    char mCostReadout[128] = { 0 };
    float mLastEvalT = -999999.0f;
+   // Build step 23: cooks since this node's state bank was cleared, bound to
+   // the reserved name `age`. Lets a kernel seed itself exactly once.
+   float mStateAge = 0.0f;
    bool mWasTruncated = false;
    int mActualElementCount = 0;
    int mLastCookFrame = -1;

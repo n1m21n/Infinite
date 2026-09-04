@@ -39149,6 +39149,318 @@ static int RunFieldElementTest()
       else { printf("SECTION 10 (FieldPrimitiveNode Pure Generation): FAIL\n"); allOk = false; }
    }
 
+   // ---- Build step 23 (OPEN-B): element neighbour reads ----
+
+   // Drives a program over a straight-line mesh for `cooks` cooks, sharing one
+   // state bank and one store across them, and hands back the final positions.
+   // `age` is advanced the way FieldElementNode advances it.
+   auto runElementCooks = [](const std::string& code,
+                             int n,
+                             int cooks,
+                             std::vector<float>& outX,
+                             std::vector<float>& outY,
+                             std::string& outErr) -> bool
+   {
+      Mesh mesh;
+      for (int i = 0; i < n; ++i)
+      {
+         Vertex v;
+         v.px = (float)i / (float)(n - 1);
+         v.py = 0.0f;
+         v.pz = 0.0f;
+         mesh.vertices.push_back(v);
+      }
+
+      FieldElementNode node;
+      node.code = code;
+      if (!node.Apply()) { outErr = node.LastError(); return false; }
+
+      Field::FieldState state;
+      for (const auto& ds : node.Program()->declaredStates)
+         state.DeclareCell(ds.name, ds.typeName, ds.type, ds.lanes, ds.initialValues, ds.domain);
+      state.Allocate(Field::Domain::Element, (size_t)n);
+
+      // Params default to their declared value, the way the node's ParamTable
+      // seeds them. Leaving env.params null instead makes every param read 0,
+      // which silently turns a simulation into a no-op.
+      std::map<std::string, float> params;
+      for (const auto& dp : node.Program()->declaredParams)
+         params[dp.name] = (float)dp.defaultValue;
+
+      Field::ElementStore store;
+      Field::ElementVM vm;
+      Mesh outMesh = mesh;
+
+      for (int c = 0; c < cooks; ++c)
+      {
+         store.FromMesh(mesh);
+         for (const auto& decl : node.Program()->declaredAttribs)
+            store.DeclareAttrib(decl.first, decl.second);
+
+         Field::ExecutionEnv env;
+         env.t = 0.05 * (double)c;
+         env.dt = 1.0 / 60.0;
+         env.frame = 1000.0 + (double)c;
+         env.age = (double)c;
+         env.params = &params;
+         env.state = &state;
+         std::string err;
+         if (!vm.Execute(*node.Program(), store, env, err)) { outErr = err; return false; }
+         store.ToMesh(outMesh, node.Program()->WriteMask(), mesh);
+      }
+
+      outX.clear(); outY.clear();
+      for (const auto& v : outMesh.vertices) { outX.push_back(v.px); outY.push_back(v.py); }
+      return true;
+   };
+
+   // 11. A neighbour read actually reaches the neighbour.
+   //
+   // This is the load-bearing assertion of the whole step. A ramp mesh has
+   // P.x = i/(n-1), so `P.at(i - 1).x` must be one step BELOW P.x everywhere
+   // except element 0, where the clamp makes it equal. If the index expression
+   // were ever dropped and `.at()` silently read the current element, every
+   // delta would be 0 and this fails.
+   {
+      bool secOk = true;
+      const int N = 16;
+      std::vector<float> xs, ys;
+      std::string err;
+      if (!runElementCooks("nbr = P.at(i - 1)\nP.y = P.x - nbr.x\n", N, 1, xs, ys, err))
+      {
+         printf("Neighbour: FAIL - %s\n", err.c_str());
+         secOk = false;
+      }
+      else
+      {
+         const float expect = 1.0f / (float)(N - 1);
+         if (std::fabs(ys[0]) > 1e-5f)
+         {
+            printf("Neighbour: FAIL - element 0 should clamp to itself (delta %.6f, expected 0)\n", ys[0]);
+            secOk = false;
+         }
+         for (int i = 1; i < N; ++i)
+         {
+            if (std::fabs(ys[i] - expect) > 1e-4f)
+            {
+               printf("Neighbour: FAIL - delta at i=%d is %.6f, expected %.6f\n", i, ys[i], expect);
+               secOk = false;
+               break;
+            }
+         }
+      }
+      if (secOk) printf("SECTION 11 (Neighbour Read Reaches The Neighbour): OK\n");
+      else { printf("SECTION 11 (Neighbour Read Reaches The Neighbour): FAIL\n"); allOk = false; }
+   }
+
+   // 12. The read is order-independent: it sees the cook's INPUT, never a value
+   // written earlier in this same loop.
+   //
+   // The kernel overwrites P.x with 99 and then reads its left neighbour. If
+   // `.at()` read live lanes, elements 1.. would see 99; reading the snapshot
+   // they must all still see the original ramp. This is the property that keeps
+   // the element loop vectorizable, so it gets its own test.
+   {
+      bool secOk = true;
+      const int N = 8;
+      std::vector<float> xs, ys;
+      std::string err;
+      if (!runElementCooks("P.x = 99.0\nP.y = P.at(i - 1).x\n", N, 1, xs, ys, err))
+      {
+         printf("Order: FAIL - %s\n", err.c_str());
+         secOk = false;
+      }
+      else
+      {
+         for (int i = 1; i < N; ++i)
+         {
+            const float expect = (float)(i - 1) / (float)(N - 1);
+            if (std::fabs(ys[i] - expect) > 1e-4f)
+            {
+               printf("Order: FAIL - i=%d read %.4f (expected input ramp %.4f%s)\n",
+                      i, ys[i], expect,
+                      (std::fabs(ys[i] - 99.0f) < 1e-3f) ? " - it read the LIVE lane" : "");
+               secOk = false;
+               break;
+            }
+         }
+      }
+      if (secOk) printf("SECTION 12 (Neighbour Read Is Order-Independent): OK\n");
+      else { printf("SECTION 12 (Neighbour Read Is Order-Independent): FAIL\n"); allOk = false; }
+   }
+
+   // 13. A neighbour read of an element STATE cell sees the PREVIOUS cook.
+   //
+   // The cell counts cooks per element; reading the left neighbour's counter
+   // must therefore be one behind after each cook. If the snapshot were taken
+   // after the loop instead of before it, this would read the current value.
+   {
+      bool secOk = true;
+      const int N = 8;
+      std::vector<float> xs, ys;
+      std::string err;
+      const char* code = "state float c = 0\nc += 1.0\nP.y = c - c.at(i - 1)\n";
+      if (!runElementCooks(code, N, 4, xs, ys, err))
+      {
+         printf("StateNbr: FAIL - %s\n", err.c_str());
+         secOk = false;
+      }
+      else if (std::fabs(ys[3] - 1.0f) > 1e-4f)
+      {
+         printf("StateNbr: FAIL - own counter minus previous-cook neighbour is %.4f, expected 1.0\n", ys[3]);
+         secOk = false;
+      }
+      if (secOk) printf("SECTION 13 (State Neighbour Read Is One Cook Behind): OK\n");
+      else { printf("SECTION 13 (State Neighbour Read Is One Cook Behind): FAIL\n"); allOk = false; }
+   }
+
+   // 14. Refusals: `.at()` on a value that has no per-element extent, and on an
+   // undeclared name. Both messages must say why, not just "error".
+   {
+      bool secOk = true;
+
+      FieldElementNode a;
+      a.code = "param float k = 1.0 [0, 2]\nP.y = k.at(i - 1)\n";
+      if (a.Apply())
+      {
+         printf("Refusal: FAIL - '.at()' on a graph-domain param was accepted\n");
+         secOk = false;
+      }
+      else if (a.LastError().find("not one per element") == std::string::npos)
+      {
+         printf("Refusal: FAIL - param message does not explain the extent: %s\n", a.LastError().c_str());
+         secOk = false;
+      }
+
+      FieldElementNode b;
+      b.code = "P.y = wobble.at(i - 1)\n";
+      if (b.Apply())
+      {
+         printf("Refusal: FAIL - '.at()' on an undeclared name was accepted\n");
+         secOk = false;
+      }
+      else if (b.LastError().find("not declared") == std::string::npos)
+      {
+         printf("Refusal: FAIL - undeclared message is unclear: %s\n", b.LastError().c_str());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 14 (Neighbour Read Refusals): OK\n");
+      else { printf("SECTION 14 (Neighbour Read Refusals): FAIL\n"); allOk = false; }
+   }
+
+   // 15. Cross-lane builtins return their actual value.
+   //
+   // length/normalize/distance/dot/cross were missing from the element
+   // interpreter and fell through its lane loop as 0.0, which is what made the
+   // shipping "Radial Ripple" and "Spherical Bulge" presets uniform instead of
+   // radial. A 3-4-5 triangle pins it: length(vec3(3,4,0)) is 5, not 0.
+   {
+      bool secOk = true;
+      const int N = 4;
+      std::vector<float> xs, ys;
+      std::string err;
+      if (!runElementCooks("P.y = length(vec3(3.0, 4.0, 0.0))\nP.x = dot(vec3(1.0, 2.0, 3.0), vec3(4.0, 5.0, 6.0))\n",
+                           N, 1, xs, ys, err))
+      {
+         printf("CrossLane: FAIL - %s\n", err.c_str());
+         secOk = false;
+      }
+      else
+      {
+         if (std::fabs(ys[0] - 5.0f) > 1e-4f)
+         {
+            printf("CrossLane: FAIL - length(3,4,0) = %.4f, expected 5\n", ys[0]);
+            secOk = false;
+         }
+         if (std::fabs(xs[0] - 32.0f) > 1e-4f)
+         {
+            printf("CrossLane: FAIL - dot((1,2,3),(4,5,6)) = %.4f, expected 32\n", xs[0]);
+            secOk = false;
+         }
+      }
+
+      std::vector<float> nx, ny;
+      if (secOk && runElementCooks("v = normalize(vec3(0.0, 3.0, 0.0))\nP.y = v.y\n", N, 1, nx, ny, err))
+      {
+         if (std::fabs(ny[0] - 1.0f) > 1e-4f)
+         {
+            printf("CrossLane: FAIL - normalize((0,3,0)).y = %.4f, expected 1\n", ny[0]);
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 15 (Cross-Lane Builtins): OK\n");
+      else { printf("SECTION 15 (Cross-Lane Builtins): FAIL\n"); allOk = false; }
+   }
+
+   // 16. `age` fires exactly once, and the two shipped simulations evolve.
+   //
+   // A seed gated on `age` must land one time only - a kernel that adds 0.25 on
+   // its first cook and nothing after holds 0.25 after twelve cooks, not 3.0.
+   // Then both new presets are run for 90 cooks and required to have MOVED and
+   // to have stayed finite: a preset that compiles but sits still, or blows up,
+   // is not a simulation.
+   {
+      bool secOk = true;
+      const int N = 24;
+      std::vector<float> xs, ys;
+      std::string err;
+      const char* seedCode =
+         "state float acc = 0\n"
+         "first = 1.0 - step(0.5, age)\n"
+         "acc += 0.25 * first\n"
+         "P.y = acc\n";
+      if (!runElementCooks(seedCode, N, 12, xs, ys, err))
+      {
+         printf("Age: FAIL - %s\n", err.c_str());
+         secOk = false;
+      }
+      else if (std::fabs(ys[0] - 0.25f) > 1e-4f)
+      {
+         printf("Age: FAIL - accumulator is %.4f after 12 cooks; 0.25 means once, 3.0 means every cook\n", ys[0]);
+         secOk = false;
+      }
+
+      for (const auto& preset : FieldElementNode::Presets())
+      {
+         const std::string pn(preset.name);
+         if (pn != "Verlet Rope" && pn != "Buckling Ribbon") continue;
+
+         std::vector<float> px, py;
+         std::string perr;
+         if (!runElementCooks(preset.code, 40, 90, px, py, perr))
+         {
+            printf("Preset: FAIL - '%s': %s\n", preset.name, perr.c_str());
+            secOk = false;
+            continue;
+         }
+
+         double moved = 0.0;
+         bool finite = true;
+         for (size_t k = 0; k < px.size(); ++k)
+         {
+            if (!std::isfinite(px[k]) || !std::isfinite(py[k])) finite = false;
+            moved += std::fabs((double)py[k]);
+            moved += std::fabs((double)px[k] - (double)k / (double)(px.size() - 1));
+         }
+         if (!finite)
+         {
+            printf("Preset: FAIL - '%s' produced a non-finite position\n", preset.name);
+            secOk = false;
+         }
+         if (moved < 1e-3)
+         {
+            printf("Preset: FAIL - '%s' never left its input mesh after 90 cooks (total motion %.6f)\n",
+                   preset.name, moved);
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 16 (age Seeds Once & Simulations Evolve): OK\n");
+      else { printf("SECTION 16 (age Seeds Once & Simulations Evolve): FAIL\n"); allOk = false; }
+   }
+
    printf("INFINITE_FIELDELEMENTTEST: %s\n", allOk ? "OK" : "FAIL");
    return allOk ? 0 : 1;
 }

@@ -492,6 +492,81 @@ namespace Field
             {
                auto call = std::static_pointer_cast<AstCall>(ast);
 
+               // 0a. Build step 23 (OPEN-B): `X.at(k)` is a NEIGHBOUR read of
+               // element k's X, not a method call. It reads the cook's input
+               // buffer - for a mesh attribute that is the incoming mesh, for
+               // an element state cell the previous cook's value - so element
+               // j's result never depends on whether element j-1 has already
+               // run. That is the whole reason the loop stays vectorizable.
+               if (call->callee.size() > 3 &&
+                   call->callee.compare(call->callee.size() - 3, 3, ".at") == 0)
+               {
+                  const std::string baseName = call->callee.substr(0, call->callee.size() - 3);
+
+                  if (scope.targetDomain != Domain::Element)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->span;
+                     error.message = "'.at()' is an element-domain form; this kernel is " +
+                                     std::string(DomainToString(scope.targetDomain)) + "-domain";
+                     if (scope.targetDomain == Domain::Pixel)
+                        error.hint = "a pixel kernel reads its neighbours as '" + baseName + "(uv + d)'";
+                     return nullptr;
+                  }
+
+                  const VarSymbol* baseSym = scope.Find(baseName);
+                  if (!baseSym)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->span;
+                     error.message = "'" + baseName + "' is not declared, so '" + baseName +
+                                     ".at()' has nothing to read";
+                     return nullptr;
+                  }
+
+                  if (baseSym->domain != Domain::Element)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->span;
+                     error.message = "'" + baseName + "' is " + std::string(DomainToString(baseSym->domain)) +
+                                     "-domain - it holds one value for the whole mesh, not one per element, " +
+                                     "so it cannot be read at an element index";
+                     error.hint = "write '" + baseName + "' on its own to read it";
+                     return nullptr;
+                  }
+
+                  if (call->args.size() != 1)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->span;
+                     error.message = "'" + baseName + ".at()' takes exactly 1 argument: " +
+                                     baseName + ".at(i - 1)";
+                     return nullptr;
+                  }
+
+                  auto idxIR = LowerAstExpr(call->args[0], scope, error);
+                  if (!idxIR) return nullptr;
+
+                  if (idxIR->type.lanes != 1)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->args[0]->span;
+                     error.message = "'" + baseName + ".at()' needs a single element index (got " +
+                                     idxIR->type.ToString() + ")";
+                     error.hint = "e.g. " + baseName + ".at(i - 1)";
+                     return nullptr;
+                  }
+
+                  auto ir = std::make_shared<IRNode>(baseSym->isState ? IRKind::StateRead : IRKind::Variable,
+                                                     call->span);
+                  ir->varName = baseName;
+                  ir->isNeighbourRead = true;
+                  ir->type = baseSym->type;
+                  ir->domain = Domain::Element;
+                  ir->children.push_back(idxIR);
+                  return ir;
+               }
+
                // 0. Build step 22 (OPEN-C): a call whose callee names a state
                // cell is an offset read of that cell - `A(uv + d)` - not a
                // function call. Bare `A` stays sugar for `A(uv)`, so this is
@@ -2683,6 +2758,11 @@ namespace Field
          sym.name = "t"; sym.type = FieldType(DataType::Float, 1); sym.domain = Domain::Frame; sym.isReserved = true; sym.isReadOnly = true; scope.Add(sym);
          sym.name = "dt"; sym.type = FieldType(DataType::Float, 1); sym.domain = Domain::Frame; sym.isReserved = true; sym.isReadOnly = true; scope.Add(sym);
          sym.name = "frame"; sym.type = FieldType(DataType::Float, 1); sym.domain = Domain::Frame; sym.isReserved = true; sym.isReadOnly = true; scope.Add(sym);
+         // Build step 23: cooks since this node's state bank was cleared, so a
+         // simulation can seed itself exactly once. `frame` cannot do that job -
+         // it is the global cook counter and is already in the thousands by the
+         // time a node is spawned.
+         sym.name = "age"; sym.type = FieldType(DataType::Float, 1); sym.domain = Domain::Frame; sym.isReserved = true; sym.isReadOnly = true; scope.Add(sym);
       }
 
       std::vector<AstNodePtr> stmts;
