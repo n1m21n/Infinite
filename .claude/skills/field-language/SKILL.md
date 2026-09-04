@@ -18,7 +18,7 @@ the `@` sigil.
 **The one rule that trips people up most:** domains do not mix inside a single
 kernel body. `in`/`out`/`sr`/`n`/`freq`/`gate` exist ONLY in a `sample`-domain
 kernel; `P`/`N`/`uv`/`Cd`/`i`/`count` ONLY in `element`; `uv`/`xy`/`col`/`res`/
-`aspect`/`alpha` ONLY in `pixel`. A kernel cannot reference another domain's
+`aspect`/`alpha`/`age` ONLY in `pixel`. A kernel cannot reference another domain's
 reserved names to "pull audio into geometry" or similar — v1 has no
 cross-domain read of an `audio` or `image` structural pin from inside kernel
 text (confirmed via `FieldIR.cpp`'s pin-validation and `Transfer.cpp`'s
@@ -99,7 +99,7 @@ in from its data dependencies:
 | no per-element name | once, at the coarsest rate its inputs allow |
 | `t`, `dt`, `frame` | per frame |
 | `P`, `N`, `uv`, `Cd`, `i`, `count` | per element |
-| `uv`, `xy`, `col`, `res` (pixel kernel) | per pixel |
+| `uv`, `xy`, `col`, `res`, `age` (pixel kernel) | per pixel |
 | `in`, `out`, `sr`, `n` | per sample |
 
 Worked example — the same three lines, three placements:
@@ -139,7 +139,7 @@ not shadow one. Attempting to is a compile error, not a warning.
 |---|---|
 | `frame` | `t` `dt` `frame` |
 | `element` | `P` `N` `uv` `Cd` `i` `count` |
-| `pixel` | `uv` `xy` `col` `res` `aspect` `alpha` |
+| `pixel` | `uv` `xy` `col` `res` `aspect` `alpha` `age` |
 | `sample` | `in` `out` `sr` `n` `freq` `gate` |
 | `graph` | none |
 
@@ -470,3 +470,45 @@ as a checkable fact:
    documented break (only §12's randomness change qualifies today).
 6. Any question this skill marks **OPEN** that the change touches has been put
    to the owner and answered — not silently resolved in code.
+
+
+---
+
+## Offset reads of a pixel state cell (build step 22, OPEN-C answered)
+
+A `pixel` state cell can be read **at a coordinate**, not only at the pixel
+that owns it. This is what makes reaction-diffusion, advection, blur and every
+flow effect writable, and it is the only new spelling the answer added.
+
+```
+state float A = 1 [wrap]
+d   = 1.0 / res
+lap = A(uv + vec2(d.x, 0)) + A(uv - vec2(d.x, 0))
+    + A(uv + vec2(0, d.y)) + A(uv - vec2(0, d.y)) - 4 * A
+A  += 0.2 * lap
+```
+
+| Rule | |
+|---|---|
+| spelling | `A(coord)` where `A` is a state cell and `coord` is a `vec2`. Bare `A` stays sugar for `A(uv)` |
+| what it reads | always the **previous cook's** cell, never a value written earlier in this body — that is what keeps the pass order-independent |
+| cost | exactly one `texture()` fetch, and the count is on the node face; at 1080p fetch bandwidth is the ceiling, not ALU |
+| domain | **pixel only.** A `frame`, `element` or `sample` cell has no spatial extent and an offset read of one is a compile error naming that fact |
+| boundary | declared per cell: `[clamp]` (default), `[wrap]`, `[border]`. Wrap tiles seamlessly; clamp accumulates at the edge; border reads the cell's declared initial value outside `[0,1]`. These are three different pictures, not three spellings of one |
+| precision | a kernel containing any offset read gets an **RGBA32F** state bank instead of RGBA16F, because it integrates for minutes and 16F drifts visibly within seconds. A kernel with none keeps the cheaper bank |
+
+### `age` — how a simulation seeds itself
+
+`age` is the number of cooks since this node's state was cleared: `0` on the
+first cook after a spawn or a transport reset. It exists because `frame` is the
+**global** cook counter and is already in the thousands when a node is spawned,
+so `frame < 1` is never a usable "first cook" test.
+
+```
+first = 1 - step(0.5, age)          # 1 on the first cook only, 0 after
+B    += first * step(0.94, hash)    # a one-shot scatter the reaction grows
+```
+
+Without it, a Gray-Scott kernel starting from a uniform `B = 0` sits on a fixed
+point and never starts, and a permanent injection large enough to start it is
+also large enough to saturate the frame.

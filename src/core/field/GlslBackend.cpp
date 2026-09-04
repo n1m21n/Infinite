@@ -67,6 +67,13 @@ namespace Field
          std::unordered_set<std::string> declaredLocals;
          std::unordered_map<std::string, int> hoistedMap; // varName -> uniform index
          std::unordered_set<std::string> stateNames;
+         // Build step 22 (OPEN-C): per-cell channel + boundary mode, so an
+         // offset read knows which channel of the bank to take and what to do
+         // outside [0,1].
+         std::unordered_map<std::string, int> stateChannel;
+         std::unordered_map<std::string, BoundaryMode> stateBoundary;
+         std::unordered_map<std::string, std::vector<float>> stateInit;
+         int offsetReadCount = 0;
          std::unordered_set<std::string> paramNames;
          std::vector<int> lineToIrNode;
          int currentLine = 1;
@@ -119,8 +126,57 @@ namespace Field
             case IRKind::StateRead:
             {
                const std::string& name = node->varName;
+
+               // Build step 22 (OPEN-C): `A(uv + d)` - one texture() fetch of
+               // the PRE-SWAP state texture, which is the same texture the
+               // ordinary state loads read, so the two can never disagree.
+               // The boundary rule is applied to the coordinate, not the
+               // result, so a wrapped fetch stays a single fetch.
+               if (node->kind == IRKind::StateRead && node->isOffsetRead && !node->children.empty())
+               {
+                  std::string coord = EmitNode(node->children[0], ctx);
+                  if (!ctx.error.empty()) return "";
+
+                  BoundaryMode bm = BoundaryMode::Clamp;
+                  auto bIt = ctx.stateBoundary.find(name);
+                  if (bIt != ctx.stateBoundary.end()) bm = bIt->second;
+
+                  int chan = 0;
+                  auto cIt = ctx.stateChannel.find(name);
+                  if (cIt != ctx.stateChannel.end()) chan = cIt->second;
+                  const char* chanNames[] = { "r", "g", "b", "a" };
+
+                  // Half a texel in, so a clamped fetch lands on the edge
+                  // texel's centre rather than blending with whatever the
+                  // sampler decides lives past it.
+                  std::string half = "(0.5 / fld_res)";
+                  std::string c;
+                  if (bm == BoundaryMode::Wrap)
+                     c = "fract(" + coord + ")";
+                  else
+                     c = "clamp(" + coord + ", " + half + ", vec2(1.0) - " + half + ")";
+
+                  std::string fetch = "texture(fld_s_bank0, " + c + ")." + chanNames[chan];
+
+                  if (bm == BoundaryMode::Border)
+                  {
+                     // Outside the frame the cell reads its declared initial
+                     // value - the rule that makes a diffusion kernel decay
+                     // into its background instead of smearing the edge.
+                     float initV = 0.0f;
+                     auto iIt = ctx.stateInit.find(name);
+                     if (iIt != ctx.stateInit.end() && !iIt->second.empty()) initV = iIt->second[0];
+
+                     std::string inside = "float(all(greaterThanEqual(" + coord + ", vec2(0.0))) && all(lessThanEqual(" + coord + ", vec2(1.0))))";
+                     fetch = "mix(" + FormatFloat((double)initV) + ", " + fetch + ", " + inside + ")";
+                  }
+
+                  ctx.offsetReadCount++;
+                  return "(" + fetch + ")";
+               }
+
                if (name == "uv" || name == "xy" || name == "res" || name == "aspect" ||
-                   name == "col" || name == "alpha")
+                   name == "col" || name == "alpha" || name == "age")
                {
                   return name;
                }
@@ -481,6 +537,12 @@ namespace Field
       ctx.EmitLine("uniform float     fld_t;        // transport seconds, from the frame domain");
       ctx.EmitLine("uniform float     fld_dt;       // seconds since previous cook");
       ctx.EmitLine("uniform int       fld_frame;    // monotonic frame id");
+      // Build step 22: cooks since this node's state was last cleared. A
+      // simulation needs a one-shot seed, and `frame` cannot give it - that
+      // counter is global and is already in the thousands by the time a node
+      // is spawned. `age` is 0 on the first cook after a clear or a transport
+      // reset, so `step(0.5, age)` is "not the first cook".
+      ctx.EmitLine("uniform float     fld_age;      // cooks since this node's state was cleared");
       ctx.EmitLine("uniform sampler2D fld_srcTex;   // input image, or a 1x1 black texture when unconnected");
       ctx.EmitLine("uniform float     fld_srcAlpha; // 1.0 when connected, 0.0 when not\n");
 
@@ -567,6 +629,9 @@ namespace Field
             sslot.initialValues = st.initialValues;
             result.state.push_back(sslot);
             ctx.stateNames.insert(st.name);
+            ctx.stateChannel[st.name] = (int)i;
+            ctx.stateBoundary[st.name] = st.boundary;
+            ctx.stateInit[st.name] = st.initialValues;
          }
       }
 
@@ -577,6 +642,7 @@ namespace Field
       ctx.EmitLine("   vec2  uv  = vUv;");
       ctx.EmitLine("   vec2  xy  = gl_FragCoord.xy;");
       ctx.EmitLine("   vec2  res = fld_res;");
+      ctx.EmitLine("   float age = fld_age;");
       ctx.EmitLine("   float aspect = fld_res.x / fld_res.y;");
       ctx.EmitLine("   vec4  src = texture(fld_srcTex, vUv);");
       ctx.EmitLine("   vec3  col = src.rgb;");
@@ -636,6 +702,9 @@ namespace Field
       }
 
       ctx.EmitLine("}");
+
+      result.offsetReadCount = ctx.offsetReadCount;
+      result.usesOffsetReads = ctx.offsetReadCount > 0;
 
       result.source = ctx.out.str();
       result.branchCount = ctx.branchCount;

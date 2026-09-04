@@ -118,7 +118,7 @@ namespace GLUtil
       DestroyFbo(fbo);
 
       GLenum format = GL_RGBA;
-      GLenum type = (internalFormat == GL_RGBA16F) ? GL_FLOAT : GL_UNSIGNED_BYTE;
+      GLenum type = (internalFormat == GL_RGBA16F || internalFormat == GL_RGBA32F) ? GL_FLOAT : GL_UNSIGNED_BYTE;
 
       glGenFramebuffers(1, &fbo.fbo);
       glGenTextures(1, &fbo.tex);

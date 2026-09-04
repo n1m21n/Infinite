@@ -46,6 +46,14 @@ namespace Field
       TransferKind transferKind = TransferKind::None;
       int divisor = 1;
 
+      // Build step 22 (OPEN-C): a StateRead carrying one child is an OFFSET
+      // read - `A(uv + d)` - and the child is the coordinate expression. A
+      // StateRead with no children is the ordinary current-position read.
+      // The offset form always reads the previous cook's cell, never a value
+      // written earlier in this body, which is what keeps the pass
+      // order-independent.
+      bool isOffsetRead = false;
+
       // graph domain (step 10): true when this Variable node refers to a
       // handle bound by emit() rather than an ordinary typed value. Handles
       // have no FieldType - `type` is left at its default and unused.
@@ -116,6 +124,17 @@ namespace Field
       SourceSpan span;
    };
 
+   // Build step 22 (OPEN-C): what an offset read of a pixel state cell
+   // returns outside [0,1]. Per-cell, not global - reaction-diffusion under
+   // Wrap tiles seamlessly and under Clamp piles up at the border, and those
+   // are two different pictures, not two spellings of one.
+   enum class BoundaryMode : int
+   {
+      Clamp,  // default; matches every shipping Feedback/Trails node
+      Wrap,
+      Border  // outside reads the cell's declared initial value
+   };
+
    struct DeclaredState
    {
       std::string name;
@@ -124,6 +143,7 @@ namespace Field
       int lanes = 1;
       std::vector<float> initialValues;
       Domain domain = Domain::Element;
+      BoundaryMode boundary = BoundaryMode::Clamp;
       SourceSpan span;
    };
 
