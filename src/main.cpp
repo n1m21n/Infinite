@@ -49628,7 +49628,12 @@ int main(int argc, char** argv)
             // Must be the BOOL-SELECTOR overload mix(b, a, c != 0.0), not the
             // arithmetic float mix with a 0.0/1.0 selector - the float form
             // turns an inf/NaN in the unselected branch into NaN in the result.
-            size_t mixPos = body.find("mix(");
+            // Search from the SSA body marker, not the top of main(): the
+            // fixed reserved-name prologue always emits its own unrelated
+            // "alpha = mix(1.0, src.a, fld_srcAlpha)" line first.
+            size_t ssaBodyPos = body.find("// ---- SSA body ----");
+            size_t searchFrom = ssaBodyPos != std::string::npos ? ssaBodyPos : 0;
+            size_t mixPos = body.find("mix(", searchFrom);
             std::string mixStmt = mixPos != std::string::npos
                                      ? body.substr(mixPos, body.find(';', mixPos) - mixPos)
                                      : std::string();

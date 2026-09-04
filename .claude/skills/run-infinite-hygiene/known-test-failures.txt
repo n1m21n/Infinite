@@ -20,4 +20,3 @@
 
 PHASE1TEST|occasionally flaky on particle-system timing; if it fails once, this line lets you move on without a manual re-run
 PHASEATEST|pre-existing "Smooth" node-name collision unrelated to audio work — see spawned task to fix it
-FIELDPIXELTEST|Assertion 5 (If Lowering) fails pre-existing to Field step 17 (.infdev format) work — step 17 only added ToDeviceFile/LoadDeviceFile methods to FieldPixelNode.cpp (git diff confirms no touch to FieldParse/FieldIR/if-lowering codegen); pre-existing bug in the if(c,a,b) -> mix(...) lowering, unrelated
