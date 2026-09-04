@@ -35,9 +35,10 @@ MODULATABLE = OrderedDict([
     ("row.Fader",          "fader"),
     ("row.Dropdown",       "dropdown"),
     ("row.DropdownKnob",   "dropdown + knob"),
+    ("row.Checkbox",       "checkbox"),
 ])
 # Same widgets reached through a differently-named AudioKnobRow local.
-ROW_CALL = re.compile(r"\b(\w*[Rr]ow\w*)\.(Knob|KnobInt|Fader|Dropdown|DropdownKnob)\s*\(")
+ROW_CALL = re.compile(r"\b(\w*[Rr]ow\w*)\.(Knob|KnobInt|Fader|Dropdown|DropdownKnob|Checkbox)\s*\(")
 
 # Widgets that draw a control but register nothing - no pin, no cable, not
 # assignable to a performance-surface element.
@@ -140,7 +141,8 @@ def scan(body):
             add(m.start(), label_of(body, m.end()), kind, True)
     for m in ROW_CALL.finditer(body):
         kind = {"Knob": "knob", "KnobInt": "knob (int)", "Fader": "fader",
-                "Dropdown": "dropdown", "DropdownKnob": "dropdown + knob"}[m.group(2)]
+                "Dropdown": "dropdown", "DropdownKnob": "dropdown + knob",
+                "Checkbox": "checkbox"}[m.group(2)]
         add(m.start(), label_of(body, m.end()), kind, True)
     for call, kind in PLAIN.items():
         for m in re.finditer(r"(?<![\w:.])" + re.escape(call) + r"\s*\(", body):

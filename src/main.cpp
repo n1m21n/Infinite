@@ -3179,7 +3179,8 @@ namespace
    bool ModKnob(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
                 float diameter = kKnobDiameter, float cellW = 0.0f,
                 AudioWidgetStyle style = AudioWidgetStyle::Knob, float step = 0.0f,
-                FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
+                FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                int explicitParamIndex = -1)
    {
       FaderPosToValueFn p2v = posToValue;
       FaderValueToPosFn v2p = valueToPos;
@@ -3255,7 +3256,7 @@ namespace
                                ? kFaderWidth : diameter;
 
       const int nodeIndex = gCurrentNodeIndex;
-      const int paramIndex = gParamCounter++;
+      const int paramIndex = (explicitParamIndex >= 0) ? explicitParamIndex : gParamCounter++;
 
       ParamRef ref;
       ref.nodeIndex = nodeIndex;
@@ -5602,320 +5603,6 @@ namespace
       ModCheckbox("animate", &n->animate);
    }
 
-   void DrawFieldElementParams(FieldElementNode* n)
-   {
-      n->SetNodeIndex(gCurrentNodeIndex);
-
-      if (!gParamRegisterOnly)
-      {
-         DrawFieldDeviceControls<FieldElementNode>(n, "element", &FieldElementNode::PresetNames(),
-                                                   [](FieldElementNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
-
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
-         {
-            gFieldElementEditor = n;
-            gFieldElementEditorOpen = true;
-         }
-
-         if (!n->LastError().empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
-            ImGui::PopTextWrapPos();
-         }
-
-         if (n->WasTruncated())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Truncated to %d vertices", n->ActualElementCount());
-            ImGui::PopTextWrapPos();
-         }
-
-         if (!n->Notice().empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
-            ImGui::PopTextWrapPos();
-         }
-
-         if (n->State().CellCount() > 0)
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextDisabled("%s", n->CostReadout());
-            ImGui::PopTextWrapPos();
-         }
-      }
-
-      ModSliderInt("max elements", &n->maxElements, 100, 200000);
-      if (!n->input)
-         ModSliderInt("generate count", &n->generateCount, 1, 100000);
-
-      {
-         bool publish = n->publishScalarOutput;
-         if (ModCheckbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
-         {
-            if (!publish && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
-            {
-               n->pinRefusal = "refused: publish output is still wired";
-            }
-            else
-            {
-               n->publishScalarOutput = publish;
-               n->pinRefusal.clear();
-            }
-         }
-         if (!gParamRegisterOnly && !n->pinRefusal.empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
-            ImGui::PopTextWrapPos();
-         }
-      }
-
-      for (auto& p : n->GetParamTable().Params())
-      {
-         if (!p.isDeclared)
-            continue;
-         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
-      }
-   }
-
-   void DrawFieldSampleParams(FieldSampleNode* n)
-   {
-      n->SetNodeIndex(gCurrentNodeIndex);
-
-      if (!gParamRegisterOnly)
-      {
-         // No factory Presets() table for this domain (plan §0.2) - the
-         // dropdown shows only the user's saved .infdev devices.
-         DrawFieldDeviceControls<FieldSampleNode>(n, "sample", nullptr,
-                                                  std::function<void(FieldSampleNode*, int)>());
-
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
-         {
-            gFieldSampleEditor = n;
-            gFieldSampleEditorOpen = true;
-         }
-
-         if (!n->LastError().empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
-            ImGui::PopTextWrapPos();
-         }
-
-         if (!n->Notice().empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
-            ImGui::PopTextWrapPos();
-         }
-
-         uint64_t faults = n->FaultCount();
-         if (faults > 0)
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
-            ImGui::PopTextWrapPos();
-         }
-
-         float rms;
-         if (n->ReadRmsLatest(rms))
-            ImGui::TextDisabled("reduce.rms: %.4f", rms);
-      }
-
-      ModSliderInt("max voices", &n->maxVoices, 1, 32);
-
-      {
-         bool expose = n->exposeRmsOutput;
-         if (ModCheckbox("expose rms output", &expose) && expose != n->exposeRmsOutput)
-         {
-            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
-            {
-               n->pinRefusal = "refused: rms output is still wired";
-            }
-            else
-            {
-               n->exposeRmsOutput = expose;
-               n->pinRefusal.clear();
-            }
-         }
-         if (!gParamRegisterOnly && !n->pinRefusal.empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
-            ImGui::PopTextWrapPos();
-         }
-      }
-
-      for (auto& p : n->GetParamTable().Params())
-      {
-         if (!p.isDeclared)
-            continue;
-         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
-      }
-   }
-
-   void DrawFieldGraphParams(FieldGraphNode* n)
-   {
-      n->SetNodeIndex(gCurrentNodeIndex);
-
-      if (!gParamRegisterOnly)
-      {
-         // No factory Presets() table for this domain (plan §0.2) - the
-         // dropdown shows only the user's saved .infdev devices.
-         DrawFieldDeviceControls<FieldGraphNode>(n, "graph", nullptr,
-                                                 std::function<void(FieldGraphNode*, int)>());
-
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
-         {
-            gFieldGraphEditor = n;
-            gFieldGraphEditorOpen = true;
-         }
-
-         // Queues the actual mutation rather than calling it here: this runs
-         // nested inside ed::Begin()/ed::End(), and Regenerate() spawns/
-         // removes/reconnects real nodes - see gFieldGraphPendingRegenerate's
-         // drain after ed::End() (trap T14).
-         if (ImGui::Button("Regenerate", ImVec2(kPreviewSize, 0)))
-            gFieldGraphPendingRegenerate = n;
-
-         // Build step 16: only meaningful once there is something
-         // encapsulated to unpack (doc §4.1's precondition). Same
-         // queue-rather-than-mutate-here shape as "Regenerate" just above -
-         // this also runs nested in ed::Begin()/ed::End(), and unpacking
-         // reveals real gNodes entries and eventually spawns a GroupNode
-         // (trap T14).
-         const bool canUnpack = n->encapsulated && !n->MountedIndices().empty();
-         if (!canUnpack)
-            ImGui::BeginDisabled();
-         if (ImGui::Button("Unpack to Canvas", ImVec2(kPreviewSize, 0)) && canUnpack)
-            gFieldGraphPendingUnpack = n;
-         if (!canUnpack)
-            ImGui::EndDisabled();
-
-         if (!n->LastError().empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
-            ImGui::PopTextWrapPos();
-         }
-
-         if (!n->Notice().empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
-            ImGui::PopTextWrapPos();
-         }
-      }
-
-      {
-         bool addTrigger = n->addTriggerInput;
-         if (ModCheckbox("trigger input", &addTrigger) && addTrigger != n->addTriggerInput)
-         {
-            if (!addTrigger && n->TriggerInputWired())
-            {
-               n->pinRefusal = "refused: trigger input is still wired";
-            }
-            else
-            {
-               n->addTriggerInput = addTrigger;
-               n->pinRefusal.clear();
-            }
-         }
-         if (!gParamRegisterOnly && !n->pinRefusal.empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
-            ImGui::PopTextWrapPos();
-         }
-      }
-
-      for (auto& p : n->GetParamTable().Params())
-      {
-         if (!p.isDeclared)
-            continue;
-         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
-      }
-   }
-
-   void DrawFieldPixelParams(FieldPixelNode* n)
-   {
-      n->SetNodeIndex(gCurrentNodeIndex);
-
-      if (!gParamRegisterOnly)
-      {
-         DrawFieldDeviceControls<FieldPixelNode>(n, "pixel", &FieldPixelNode::PresetNames(),
-                                                 [](FieldPixelNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
-
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
-         {
-            gFieldPixelEditor = n;
-            gFieldPixelEditorOpen = true;
-         }
-
-         if (!n->LastError().empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
-            ImGui::PopTextWrapPos();
-         }
-
-         if (n->BranchCount() > 0)
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            char bBuf[64];
-            snprintf(bBuf, sizeof(bBuf), "%d branch%s -> %d paths evaluated per pixel",
-                     n->BranchCount(), n->BranchCount() == 1 ? "" : "es", 1 << n->BranchCount());
-            ImGui::TextDisabled("%s", bBuf);
-            ImGui::PopTextWrapPos();
-         }
-
-         if (n->StateCellCount() > 0)
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            char sBuf[64];
-            snprintf(sBuf, sizeof(sBuf), "%d state cell%s (RGBA16F ping-pong)",
-                     n->StateCellCount(), n->StateCellCount() == 1 ? "" : "s");
-            ImGui::TextDisabled("%s", sBuf);
-            ImGui::PopTextWrapPos();
-         }
-      }
-
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
-      ModCheckbox("animate", &n->animate);
-
-      {
-         bool expose = n->exposeAuxTexture;
-         if (ModCheckbox("expose state texture output", &expose) && expose != n->exposeAuxTexture)
-         {
-            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
-            {
-               n->pinRefusal = "refused: state output is still wired";
-            }
-            else
-            {
-               n->exposeAuxTexture = expose;
-               n->pinRefusal.clear();
-            }
-         }
-         if (!gParamRegisterOnly && !n->pinRefusal.empty())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
-            ImGui::PopTextWrapPos();
-         }
-      }
-
-      for (auto& p : n->GetParamTable().Params())
-      {
-         if (!p.isDeclared)
-            continue;
-         ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, p.id);
-      }
-   }
-
    void DrawTextParams(TextNode* n)
    {
       char buf[512];
@@ -8225,27 +7912,38 @@ namespace
       // still shares one baseline - the alternative, letting the dropdown
       // cells be taller, is exactly the ragged row the bottom-align exists to
       // prevent.
+      // gParamRegisterOnly (a collapsed node, or - see DrawFieldElementParams
+      // et al. - a headless param-declaration test that runs before ImGui
+      // even has a context) means every ImGui:: call below is unsafe: there
+      // may be no current window, or no context at all. y0/rowH/Place() are
+      // only ever read to position real widgets, so it is safe to leave them
+      // at 0 in that mode - nothing downstream dereferences them before the
+      // early-outs in Knob()/Checkbox()/KnobInt()/Dropdown() below skip the
+      // draw.
       AudioKnobRow(int cellCount, float maxDiameter = kKnobSmall, float headerRowH = 0.0f, bool hasCaptions = true)
       {
          count = std::max(1, cellCount);
          maxDia = maxDiameter;
          headerH = headerRowH;
          x0 = gAudioContentX;
-         y0 = ImGui::GetCursorScreenPos().y;
+         y0 = gParamRegisterOnly ? 0.0f : ImGui::GetCursorScreenPos().y;
          cellW = gAudioContentW / (float)count;
          index = 0;
-         rowH = headerH + maxDia + (hasCaptions ? (4.0f + ImGui::GetTextLineHeight()) : 0.0f);
+         rowH = headerH + maxDia + (hasCaptions && !gParamRegisterOnly ? (4.0f + ImGui::GetTextLineHeight()) : 0.0f);
       }
 
       void Place(float dia) const
       {
+         if (gParamRegisterOnly)
+            return;
          ImGui::SetCursorScreenPos(ImVec2(x0 + (float)index * cellW, y0 + headerH + (maxDia - dia)));
       }
 
       void Knob(const char* label, float* v, float lo, float hi, const char* fmt,
                 float dia = kKnobSmall, bool dbTaper = false, bool freqTaper = false,
                 AudioWidgetStyle explicitStyle = AudioWidgetStyle::Knob,
-                FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
+                FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                int explicitParamIndex = -1)
       {
          Place(dia);
          AudioWidgetStyle style = explicitStyle;
@@ -8266,7 +7964,7 @@ namespace
                style = AudioWidgetStyle::KnobLog;
             }
          }
-         ModKnob(label, v, lo, hi, fmt, dia, cellW, style, 0.0f, posToValue, valueToPos);
+         ModKnob(label, v, lo, hi, fmt, dia, cellW, style, 0.0f, posToValue, valueToPos, explicitParamIndex);
          index++;
       }
 
@@ -8476,12 +8174,6 @@ namespace
             index++;
             return false;
          }
-         const float cellX0 = x0 + (float)index * cellW;
-         const float knobW = (maxDia >= kKnobLarge) ? kKnobLarge : kKnobSmall;
-         const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
-         const float pinW = 16.0f;
-         const float checkY = y0 + headerH + (maxDia - ImGui::GetFrameHeight()) * 0.5f;
-
          const DiscreteParamHandle h =
             RegisterDiscreteParam(label, *value ? 1.0f : 0.0f, 1.0f, /*isBool=*/true, nullptr);
 
@@ -8499,6 +8191,20 @@ namespace
                index++;
                return changed;
             }
+         }
+
+         // Geometry math below is unsafe under gParamRegisterOnly (no ImGui
+         // context guaranteed - see AudioKnobRow's constructor comment), but
+         // h.draw is exactly !gParamRegisterOnly, so the `if (!h.draw) return`
+         // above already exits before this point whenever that mode is on.
+         const float cellX0 = x0 + (float)index * cellW;
+         const float knobW = (maxDia >= kKnobLarge) ? kKnobLarge : kKnobSmall;
+         const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
+         const float pinW = 16.0f;
+         const float checkY = y0 + headerH + (maxDia - ImGui::GetFrameHeight()) * 0.5f;
+
+         if (h.registered)
+         {
             ImGui::SetCursorScreenPos(ImVec2(pinX, checkY + (ImGui::GetFrameHeight() - 12.0f) * 0.5f));
             DrawDiscreteParamPin(h, label, cellW - (pinX - cellX0) - pinW);
          }
@@ -8536,10 +8242,79 @@ namespace
 
       void End() const
       {
+         if (gParamRegisterOnly)
+            return;
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
          ImGui::Dummy(ImVec2(gAudioContentW, rowH));
       }
    };
+
+   // Field build step 18: the four Field*Params bodies (element/pixel/
+   // sample/graph) aren't IsAudioBodyNode() participants - they're
+   // dispatched through the same generic DrawXxxParams path as Render3D or
+   // Camera, never through BeginAudioBody() (see DrawAudioNodeBody's own
+   // comment on what that dispatch covers). AudioKnobRow's Place() math
+   // still reads gAudioBodyX/W and gAudioContentX/W though, so seed just
+   // those four geometry globals - not gAudioTint/gAudioSectionIndex,
+   // which nothing in these bodies reads - to the same kPreviewSize column
+   // every other control in these bodies already wraps its text to. Safe to
+   // leave un-restored afterward: every other consumer of these globals
+   // (an audio node's own BeginAudioBody, or another Field body) reseeds
+   // them itself before reading them.
+   void BeginFieldKnobGrid()
+   {
+      // gParamRegisterOnly can mean no ImGui context exists at all (see
+      // AudioKnobRow's constructor comment) - gAudioContentX is only ever
+      // read for real widget placement, so 0 is a safe stand-in and callers
+      // downstream (AudioKnobRow, ModKnob) already no-op before using it.
+      gAudioBodyX = gAudioContentX = gParamRegisterOnly ? 0.0f : ImGui::GetCursorScreenPos().x;
+      gAudioBodyW = gAudioContentW = kPreviewSize;
+   }
+
+   // Chunks a Field node's variable-length declared-param list into 2-knob
+   // rows. 2 per row, not the 3-4 a full-width audio node's cellW affords -
+   // kPreviewSize (190px) is closer to kAudioNarrowWidth (200px) than to
+   // kAudioNodeWidth (440px), and a 3-cell row at 190px leaves ~63px per
+   // cell, too tight for a user-authored param name caption under a 56px
+   // knob without clipping into the next cell.
+   //
+   // Passes each param's stable `id` through as AudioKnobRow::Knob's
+   // explicitParamIndex - NOT the row's draw-order index. Field's dynamic-
+   // pins design (build steps 11-14) keys a param's modulation cable pin to
+   // that id specifically so a cable stays attached to the right param
+   // when another param is declared or removed above it in the source and
+   // every subsequent draw-order index shifts; falling back to ModKnob's
+   // default gParamCounter++ numbering here would silently reassign pins
+   // out from under existing cables the next time the param count changed.
+   template <typename NodeT>
+   void DrawFieldParamKnobGrid(NodeT* n)
+   {
+      auto& allParams = n->GetParamTable().Params();
+      std::vector<int> declaredIdx;
+      for (int i = 0; i < (int)allParams.size(); i++)
+      {
+         if (allParams[i].isDeclared)
+            declaredIdx.push_back(i);
+      }
+      for (size_t i = 0; i < declaredIdx.size(); i += 2)
+      {
+         AudioKnobRow row(2);
+         auto& p0 = allParams[declaredIdx[i]];
+         row.Knob(p0.name.c_str(), &p0.value, p0.minValue, p0.maxValue, "%.3f", kKnobSmall, false, false,
+                  AudioWidgetStyle::Knob, nullptr, nullptr, p0.id);
+         if (i + 1 < declaredIdx.size())
+         {
+            auto& p1 = allParams[declaredIdx[i + 1]];
+            row.Knob(p1.name.c_str(), &p1.value, p1.minValue, p1.maxValue, "%.3f", kKnobSmall, false, false,
+                     AudioWidgetStyle::Knob, nullptr, nullptr, p1.id);
+         }
+         else
+         {
+            row.Skip();
+         }
+         row.End();
+      }
+   }
 
    // Full- and half-width audio sliders, sized from the content column so
    // two halves plus the gutter are exactly one full width.
@@ -8841,6 +8616,355 @@ namespace
       dl->PopClipRect();
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawFieldElementParams(FieldElementNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         DrawFieldDeviceControls<FieldElementNode>(n, "element", &FieldElementNode::PresetNames(),
+                                                   [](FieldElementNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldElementEditor = n;
+            gFieldElementEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->WasTruncated())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Truncated to %d vertices", n->ActualElementCount());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->State().CellCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextDisabled("%s", n->CostReadout());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      BeginFieldKnobGrid();
+      {
+         AudioKnobRow row(2);
+         row.KnobInt("max elements", &n->maxElements, 100, 200000);
+         if (!n->input)
+            row.KnobInt("generate count", &n->generateCount, 1, 100000);
+         else
+            row.Skip(); // P5: the cell stays reserved, not removed, while an input is wired
+         row.End();
+      }
+
+      {
+         bool publish = n->publishScalarOutput;
+         AudioKnobRow row(1);
+         if (row.Checkbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
+         {
+            if (!publish && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: publish output is still wired";
+            }
+            else
+            {
+               n->publishScalarOutput = publish;
+               n->pinRefusal.clear();
+            }
+         }
+         row.End();
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      DrawFieldParamKnobGrid(n);
+   }
+
+   void DrawFieldSampleParams(FieldSampleNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         // No factory Presets() table for this domain (plan §0.2) - the
+         // dropdown shows only the user's saved .infdev devices.
+         DrawFieldDeviceControls<FieldSampleNode>(n, "sample", nullptr,
+                                                  std::function<void(FieldSampleNode*, int)>());
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldSampleEditor = n;
+            gFieldSampleEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         uint64_t faults = n->FaultCount();
+         if (faults > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
+            ImGui::PopTextWrapPos();
+         }
+
+         float rms;
+         if (n->ReadRmsLatest(rms))
+            ImGui::TextDisabled("reduce.rms: %.4f", rms);
+      }
+
+      BeginFieldKnobGrid();
+      {
+         bool expose = n->exposeRmsOutput;
+         AudioKnobRow row(2);
+         row.KnobInt("max voices", &n->maxVoices, 1, 32);
+         if (row.Checkbox("expose rms output", &expose) && expose != n->exposeRmsOutput)
+         {
+            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: rms output is still wired";
+            }
+            else
+            {
+               n->exposeRmsOutput = expose;
+               n->pinRefusal.clear();
+            }
+         }
+         row.End();
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      DrawFieldParamKnobGrid(n);
+
+      if (!gParamRegisterOnly)
+      {
+         ImGui::Separator();
+         ImGui::TextDisabled("live output");
+         DrawFieldSampleScope(n, 40.0f, kPreviewSize);
+      }
+   }
+
+   void DrawFieldGraphParams(FieldGraphNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         // No factory Presets() table for this domain (plan §0.2) - the
+         // dropdown shows only the user's saved .infdev devices.
+         DrawFieldDeviceControls<FieldGraphNode>(n, "graph", nullptr,
+                                                 std::function<void(FieldGraphNode*, int)>());
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldGraphEditor = n;
+            gFieldGraphEditorOpen = true;
+         }
+
+         // Queues the actual mutation rather than calling it here: this runs
+         // nested inside ed::Begin()/ed::End(), and Regenerate() spawns/
+         // removes/reconnects real nodes - see gFieldGraphPendingRegenerate's
+         // drain after ed::End() (trap T14).
+         if (ImGui::Button("Regenerate", ImVec2(kPreviewSize, 0)))
+            gFieldGraphPendingRegenerate = n;
+
+         // Build step 16: only meaningful once there is something
+         // encapsulated to unpack (doc §4.1's precondition). Same
+         // queue-rather-than-mutate-here shape as "Regenerate" just above -
+         // this also runs nested in ed::Begin()/ed::End(), and unpacking
+         // reveals real gNodes entries and eventually spawns a GroupNode
+         // (trap T14).
+         const bool canUnpack = n->encapsulated && !n->MountedIndices().empty();
+         if (!canUnpack)
+            ImGui::BeginDisabled();
+         if (ImGui::Button("Unpack to Canvas", ImVec2(kPreviewSize, 0)) && canUnpack)
+            gFieldGraphPendingUnpack = n;
+         if (!canUnpack)
+            ImGui::EndDisabled();
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      BeginFieldKnobGrid();
+      {
+         bool addTrigger = n->addTriggerInput;
+         AudioKnobRow row(1);
+         if (row.Checkbox("trigger input", &addTrigger) && addTrigger != n->addTriggerInput)
+         {
+            if (!addTrigger && n->TriggerInputWired())
+            {
+               n->pinRefusal = "refused: trigger input is still wired";
+            }
+            else
+            {
+               n->addTriggerInput = addTrigger;
+               n->pinRefusal.clear();
+            }
+         }
+         row.End();
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      DrawFieldParamKnobGrid(n);
+   }
+
+   void DrawFieldPixelParams(FieldPixelNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         DrawFieldDeviceControls<FieldPixelNode>(n, "pixel", &FieldPixelNode::PresetNames(),
+                                                 [](FieldPixelNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldPixelEditor = n;
+            gFieldPixelEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->BranchCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            char bBuf[64];
+            snprintf(bBuf, sizeof(bBuf), "%d branch%s -> %d paths evaluated per pixel",
+                     n->BranchCount(), n->BranchCount() == 1 ? "" : "es", 1 << n->BranchCount());
+            ImGui::TextDisabled("%s", bBuf);
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->StateCellCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            char sBuf[64];
+            snprintf(sBuf, sizeof(sBuf), "%d state cell%s (RGBA16F ping-pong)",
+                     n->StateCellCount(), n->StateCellCount() == 1 ? "" : "s");
+            ImGui::TextDisabled("%s", sBuf);
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      // Inline live preview (plan §3.2): same GetOutputTexture() the editor
+      // window's own preview reads (main.cpp, "Field pixel editor"), just
+      // smaller - 96x96 vs. the editor's 200px kPreviewSize, since the
+      // compact body has far less room and this is meant as a glance, not a
+      // working canvas. Updates the instant Apply() recompiles; no separate
+      // render path.
+      if (!gParamRegisterOnly)
+      {
+         const float size = 96.0f;
+         unsigned int tex = n->GetOutputTexture();
+         ImVec2 origin = ImGui::GetCursorScreenPos();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         DrawCheckerboardBackdrop(dl, origin, size);
+         if (tex != 0 && n->GetOutputWidth() > 0)
+         {
+            const float w = (float)n->GetOutputWidth();
+            const float h = (float)n->GetOutputHeight();
+            const float scale = size / std::max(w, h);
+            const ImVec2 dims(w * scale, h * scale);
+            const ImVec2 tl(origin.x + (size - dims.x) * 0.5f, origin.y + (size - dims.y) * 0.5f);
+            dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dims.x, tl.y + dims.y),
+                        ImVec2(0, 1), ImVec2(1, 0));
+         }
+         dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), IM_COL32(70, 74, 90, 255), 4.0f);
+         ImGui::Dummy(ImVec2(size, size));
+      }
+
+      BeginFieldKnobGrid();
+      {
+         AudioKnobRow row(2);
+         row.Knob("width", &n->width, 16.0f, 4096.0f, "%.0f");
+         row.Knob("height", &n->height, 16.0f, 4096.0f, "%.0f");
+         row.End();
+      }
+
+      {
+         bool expose = n->exposeAuxTexture;
+         AudioKnobRow row(2);
+         row.Checkbox("animate", &n->animate);
+         if (row.Checkbox("expose state texture output", &expose) && expose != n->exposeAuxTexture)
+         {
+            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: state output is still wired";
+            }
+            else
+            {
+               n->exposeAuxTexture = expose;
+               n->pinRefusal.clear();
+            }
+         }
+         row.End();
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      DrawFieldParamKnobGrid(n);
    }
 
    void DrawOscillatorScope(OscillatorNode* n, float h, float width)
@@ -60686,12 +60810,26 @@ int main(int argc, char** argv)
             ImGui::TextDisabled("User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted.");
             ImGui::Separator();
 
+            // gCurrentNodeIndex is -1 here (EndNodeParams() reset it once the
+            // node canvas finished drawing for this frame - this window draws
+            // after that). DrawFieldDeviceControls captures gCurrentNodeIndex
+            // into its deferred onSelect closure, so it must be pointed at
+            // this editor's own node for the duration of the call, using the
+            // index the node cached the last time its compact body drew
+            // (NodeT::SetNodeIndex, see DrawFieldElementParams above).
+            gCurrentNodeIndex = gFieldElementEditor->NodeIndex();
+            DrawFieldDeviceControls<FieldElementNode>(gFieldElementEditor, "element", &FieldElementNode::PresetNames(),
+                                                      [](FieldElementNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+            gCurrentNodeIndex = -1;
+
             static char editBuf[8192];
             static FieldElementNode* lastEdited = nullptr;
-            if (lastEdited != gFieldElementEditor)
+            static std::string lastKnownCode;
+            if (lastEdited != gFieldElementEditor || gFieldElementEditor->code != lastKnownCode)
             {
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
                lastEdited = gFieldElementEditor;
+               lastKnownCode = gFieldElementEditor->code;
             }
 
             ImGui::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
@@ -60701,6 +60839,7 @@ int main(int argc, char** argv)
             {
                gFieldElementEditor->code = editBuf;
                gFieldElementEditor->Apply();
+               lastKnownCode = gFieldElementEditor->code;
             }
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
@@ -60759,12 +60898,19 @@ int main(int argc, char** argv)
             ImGui::TextDisabled("Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame");
             ImGui::Separator();
 
+            gCurrentNodeIndex = gFieldPixelEditor->NodeIndex();
+            DrawFieldDeviceControls<FieldPixelNode>(gFieldPixelEditor, "pixel", &FieldPixelNode::PresetNames(),
+                                                    [](FieldPixelNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+            gCurrentNodeIndex = -1;
+
             static char editBuf[8192];
             static FieldPixelNode* lastEdited = nullptr;
-            if (lastEdited != gFieldPixelEditor)
+            static std::string lastKnownCode;
+            if (lastEdited != gFieldPixelEditor || gFieldPixelEditor->code != lastKnownCode)
             {
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
                lastEdited = gFieldPixelEditor;
+               lastKnownCode = gFieldPixelEditor->code;
             }
 
             ImGui::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
@@ -60774,6 +60920,7 @@ int main(int argc, char** argv)
             {
                gFieldPixelEditor->code = editBuf;
                gFieldPixelEditor->Apply();
+               lastKnownCode = gFieldPixelEditor->code;
             }
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
@@ -60833,12 +60980,19 @@ int main(int argc, char** argv)
             ImGui::TextDisabled("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.");
             ImGui::Separator();
 
+            gCurrentNodeIndex = gFieldSampleEditor->NodeIndex();
+            DrawFieldDeviceControls<FieldSampleNode>(gFieldSampleEditor, "sample", nullptr,
+                                                     std::function<void(FieldSampleNode*, int)>());
+            gCurrentNodeIndex = -1;
+
             static char editBuf[8192];
             static FieldSampleNode* lastEdited = nullptr;
-            if (lastEdited != gFieldSampleEditor)
+            static std::string lastKnownCode;
+            if (lastEdited != gFieldSampleEditor || gFieldSampleEditor->code != lastKnownCode)
             {
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSampleEditor->code.c_str());
                lastEdited = gFieldSampleEditor;
+               lastKnownCode = gFieldSampleEditor->code;
             }
 
             ImGui::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
@@ -60848,6 +61002,7 @@ int main(int argc, char** argv)
             {
                gFieldSampleEditor->code = editBuf;
                gFieldSampleEditor->Apply();
+               lastKnownCode = gFieldSampleEditor->code;
             }
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
@@ -60889,12 +61044,19 @@ int main(int argc, char** argv)
             ImGui::TextDisabled("connect(src, srcSlot, dst, dstSlot)   set(handle, \"paramName\", value)   place(handle, x, y)");
             ImGui::Separator();
 
+            gCurrentNodeIndex = gFieldGraphEditor->NodeIndex();
+            DrawFieldDeviceControls<FieldGraphNode>(gFieldGraphEditor, "graph", nullptr,
+                                                    std::function<void(FieldGraphNode*, int)>());
+            gCurrentNodeIndex = -1;
+
             static char editBuf[8192];
             static FieldGraphNode* lastEdited = nullptr;
-            if (lastEdited != gFieldGraphEditor)
+            static std::string lastKnownCode;
+            if (lastEdited != gFieldGraphEditor || gFieldGraphEditor->code != lastKnownCode)
             {
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
                lastEdited = gFieldGraphEditor;
+               lastKnownCode = gFieldGraphEditor->code;
             }
 
             ImGui::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
@@ -60907,6 +61069,7 @@ int main(int argc, char** argv)
                // is the only path that does.
                gFieldGraphEditor->code = editBuf;
                gFieldGraphEditor->Apply();
+               lastKnownCode = gFieldGraphEditor->code;
             }
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
