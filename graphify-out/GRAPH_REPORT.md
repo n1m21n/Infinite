@@ -1,16 +1,16 @@
 # Graph Report - infinte  (2026-09-04)
 
 ## Corpus Check
-- 5078 files · ~9,116,687 words
+- 5078 files · ~9,117,086 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 59903 nodes · 116753 edges · 4265 communities (1486 shown, 90 thin omitted)
-- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 7571 edges (avg confidence: 0.84)
+- 59903 nodes · 116760 edges · 4251 communities (1455 shown, 107 thin omitted)
+- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 7577 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c93f76a7`
+- Built from commit: `c56b62f7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -25,31 +25,31 @@
 - ImGuiContext
 - imgui_draw.cpp
 - imgui_internal.h
-- funknownimpl.h
+- FUnknown
 - DelegationController
 - MeshToPointsNode
-- FieldIR.h
+- unordered_map
 - src/main.cpp
 - GeometryOpNode
-- printf
+- Transport
 - UIEditController
 - ImageAnalyzeNode
 - FieldError
 - DistributePointsOnFacesNode
 - ParamVisitor
 - vstguifwd.h
-- Mat4
+- InstanceOnPointsNode
 - Render3DNode
 - ViewCreatorAdapter
 - imgui.h
 - imgui_node_editor.cpp
 - BaseWrapper
 - win32factory.cpp
-- .setControllerClass
+- validator.cpp
 - cframe.cpp
 - UIAttributesController
 - UIDialogController
-- SharedPointer
+- IAction
 - fstring.cpp
 - NoteEventQueue
 - GraphNode
@@ -62,7 +62,7 @@
 - AudioEffect
 - FieldPrimitiveNode
 - imgui_tables.cpp
-- Win32Frame
+- HWND__
 - Platform.h
 - uidescription.cpp
 - EditorContext
@@ -73,7 +73,7 @@
 - ClothNode
 - MacroXYNode
 - imgui_node_editor_api.cpp
-- PluginScanner
+- UpdateCheck.cpp
 - uibitmapscontroller.cpp
 - nanovg.c
 - INode
@@ -83,8 +83,8 @@
 - ImVec2
 - VST3Editor
 - rapidjson/document.h
-- mdaBaseController.h
-- HostCheckerProcessor
+- DitherProcessor
+- IConnectionPoint
 - cview.cpp
 - againsimple.cpp
 - fontstash.h
@@ -111,11 +111,11 @@
 - CSegmentButton
 - cairographicscontext.cpp
 - cscrollview.cpp
-- Component
+- .setControllerClass
 - coptionmenu.cpp
 - CControl
 - stdint.h
-- cbitmapfilter.cpp
+- CBitmapPixelAccess
 - Data
 - Modulation
 - AudioDisplacementNode
@@ -123,7 +123,7 @@
 - cslider.cpp
 - ImFont
 - value::parser
-- tutorial.cpp
+- again.cpp
 - ValueType
 - FStreamer
 - ControllerWithUI
@@ -140,7 +140,7 @@
 - drflac_bool32
 - HostCheckerController
 - ImageToPointsNode
-- waylandframe.cpp
+- crect.h
 - AudioDeviceWin.cpp
 - AudioEffectNode
 - SpoutGL.cpp
@@ -169,7 +169,7 @@
 - AudioSamplerNode
 - CTextEdit
 - WaveTerrainNode
-- set
+- GraphInterpreter
 - GeometryNode
 - cgltf_extras
 - ImFontAtlas
@@ -183,7 +183,7 @@
 - d2dfont.cpp
 - EditController
 - mz_zip_archive
-- IAudioSource
+- AudioNodes.cpp
 - AudioPaulStretchNode
 - allocators.h
 - cbitmap.cpp
@@ -192,7 +192,7 @@
 - Direct3D12View
 - Buffer
 - csplitview.cpp
-- TransformViewTypeOperation
+- SharedPointer
 - Signature
 - Spout.cpp
 - reader.h
@@ -216,8 +216,8 @@
 - AudioNoteCapturerNode
 - AAXWrapper
 - jsoncxx.h
-- DataExchangeProcessor
-- ITestPlugProvider
+- ElementProgram
+- funknownimpl.h
 - ADelayProcessor
 - impl
 - UIEditMenuController
@@ -225,9 +225,9 @@
 - MediaWin.cpp
 - CurveNode
 - Text3DNode
-- DebugPrint
+- CBaseObject
 - HostCheck
-- SpoutLogNotice
+- SpoutDirectX.cpp
 - Interface
 - ImageFramesView
 - AudioWavetableNode
@@ -238,7 +238,7 @@
 - PlugProvider
 - UIViewCreatorController
 - uigradientscontroller.cpp
-- AudioChorderNode
+- ChorderNode
 - ResynthNode
 - CRowColumnView
 - tresult
@@ -264,7 +264,7 @@
 - AudioColorRampNode
 - GeometryTableNode
 - CGBitmap
-- endEdit
+- cswitch.cpp
 - xmltok.c
 - ImGui_ImplWGPU_Data
 - FObject
@@ -274,15 +274,15 @@
 - TextNode
 - segmentbuttoncreator.cpp
 - DRFLAC_API
-- Link
-- again.cpp
+- CreateItemAction
+- Mat4
 - VSTGUIWindowDelegate
-- DynamicsKernel
-- Transport
+- FrequencyShifterKernel
+- SampleScanner
 - handle_value
 - stbi__context
 - clistcontrol.cpp
-- MouseDownUpMoveEvent
+- MouseEventButtonState
 - Writer
 - OceanNode
 - HostComponentHandler
@@ -294,20 +294,20 @@
 - vst2persistence.cpp
 - fstrdefs.h
 - impl
-- ImGuiTableColumn
+- ImGuiDebugAllocInfo
 - DataExchangeController
 - CColorChooser
 - ViewListenerAdapter
 - xmlrole.c
 - AudioEngine
 - ProjectionNode
-- moduleinit.cpp
+- aaxentry.cpp
 - timer.cpp
 - ExampleRenderer
-- SpecMeterProcessor
+- mdaBaseController.h
 - stream.h
 - ScriptObject
-- crect.h
+- SceneSignature
 - HiDPISupport
 - module.cpp
 - dr_wav.h
@@ -320,7 +320,7 @@
 - UISelection
 - aaxwrapper.cpp
 - TEST_CASE
-- CBaseObject
+- BitmapFilterChangeAction
 - RunLoop
 - MultiBandProcessor
 - panner/source/plugprocessor.cpp
@@ -328,7 +328,7 @@
 - json.h
 - EmitterContext
 - cgltf_size
-- IAttributeList
+- IHostApplication
 - XdndHandler
 - PluginGUIEditor
 - CXYPad
@@ -338,8 +338,8 @@
 - BeatBoxProcessor
 - Button
 - uitemplatecontroller.cpp
-- FieldProgramCache
-- FormulaNode
+- WavetableShaperKernel
+- PluginScanner
 - stb/stb_image.h
 - base/jquery.js
 - basemodule/jquery.js
@@ -347,14 +347,14 @@
 - html/jquery.js
 - vstinterfaces/jquery.js
 - vstsdk/jquery.js
-- U
+- impl
 - Plug
 - stb_truetype.h
 - editorhost.cpp
 - AmbienceProcessor
 - RezFilterProcessor
 - timingfunctions.cpp
-- GenericSchemaDocument
+- ValueType
 - UIFontsController
 - PluginVST3Win.cpp
 - GranularNode
@@ -379,7 +379,7 @@
 - I
 - RingModProcessor
 - SubSynthProcessor
-- HRESULT
+- NoteStackNode
 - rapidjson.h
 - uitagscontroller.cpp
 - DelayKernel
@@ -422,13 +422,13 @@
 - Node
 - SpoutSenderNames.cpp
 - SyphonServerRendererCoreGL
-- legacymidiccout/source/plug.cpp
+- vsteventshelper.h
 - surfacedelegate.cpp
 - EPianoProcessor
-- AutomationTest
+- programchange/source/plug.cpp
 - IUniversalMidiPacketHandler
 - HWNDWindow
-- impl
+- AudioAnalyzeNode
 - xmlparser.cpp
 - CameraNode
 - VideoHandleMf
@@ -457,9 +457,9 @@
 - SyphonMessageReceiver
 - DX10Processor
 - SMTG_ALWAYS_INLINE
-- iplatformgraphicsdevice.h
+- tutorial.cpp
 - ParserState
-- AudioNodes.cpp
+- PinTable
 - AudioNoteSequencerNode
 - Switcher3DNode
 - VideoInNode
@@ -475,7 +475,7 @@
 - UIUndoManager
 - NoteFilterNode
 - OscillatorNode
-- basic_json
+- size_t
 - FVariant
 - AAX_Plugin_Desc
 - VSTInterAppAudioAppDelegateBase
@@ -489,13 +489,13 @@
 - UIColor
 - PerfRecord
 - AudioTextureNode
-- NoteSwitcherNode
+- GlobalParameterState
 - WavetableNode
 - MediaDecodeWin.cpp
 - XML_Char
 - cfileselector.cpp
-- IMultiBitmapControl
-- ImGuiKey
+- CMovieButton
+- ImGuiID
 - ComboProcessor
 - PresetBrowserViewController
 - UIColorStopEditView
@@ -514,14 +514,14 @@
 - PlugController
 - advanced-techniques-tutorial/source/processor.cpp
 - CView
-- BaseViewLayouterEntry
+- baseviewlayouter.h
 - HighScoreList
 - Win32Menu
 - ImageStitcherAppDelegate
-- AudioMixerNode
+- ImGuiPayload
 - SyphonInNode
 - CategoryColors.cpp
-- DBController
+- AudioFileNode
 - Pin
 - Settings
 - SyphonServerRendererGL
@@ -529,7 +529,7 @@
 - TestBase
 - PadController
 - progressindicatorview.cpp
-- win32application.cpp
+- SpectrumAnalyser
 - BaseController
 - Controller
 - TestSuite
@@ -546,20 +546,20 @@
 - funknown.h
 - SMTG_CONSTEXPR
 - TrackerProcessor
-- ProcessTest
+- ProcessTailTest
 - About VST 3
 - CFontDesc
-- CLayeredViewContainer
+- .getFrame
 - Listener
 - UIDescriptionAdapter
-- SchemaValidatingReader
+- algorithm.h
 - uri.h
 - AudioMetallicNode
 - AudioWaveTerrainNode
 - RecorderHandleMf
 - CCommandMenuItem
 - gdkrunloop.cpp
-- IComponentHandler
+- IEditController
 - OverdriveProcessor
 - ViewFactoryDelegate
 - AudioMolderNode
@@ -583,15 +583,15 @@
 - impl
 - Field — step 10: the `graph` domain (kernels that emit nodes, at edit time)
 - hufUncompress
-- TimerHandler
+- IContextMenu
 - IUnitInfo
 - stbi__jpeg
-- RoundPanProcessor
+- AudioFilePlayerAudioNode
 - TalkBoxProcessor
 - JSON5Writer
 - utility/objcclassbuilder.h
 - vstnoteexpressiontypes.cpp
-- ITextEditor
+- FindPanelController
 - ChildWindow
 - gdkapplication.cpp
 - uixmlpersistence.cpp
@@ -599,7 +599,7 @@
 - ColorRampNode
 - FilterNode
 - ShapeNode
-- PluginHostWin.cpp
+- MolderNode.cpp
 - TEST_CASE
 - 3D
 - 5. Procedure
@@ -618,12 +618,12 @@
 - getAttribute
 - Bitmap
 - encodings.h
-- ResonantMode
+- MaterialProfile
 - CurvesNode
-- VelocityCurveNode
-- testPossibleValues
+- AudioVelocityCurveNode
 - TEST_CASE
 - TEST_CASE
+- shared
 - Field build step 1 — restructure `Expression.cpp` into lexer → AST → typed IR → bytecode
 - Field build step 2 — `rand` / `noise` / `sh` become pure functions of `(t, seed)`
 - Field build step 3 — `vec2` / `vec3` / `vec4` and APL-style rank polymorphism
@@ -637,7 +637,7 @@
 - Style
 - CDataBrowser
 - waylandutils.cpp
-- Win32DataObjectEnumerator
+- COM_DECLSPEC_NOTHROW
 - DelegateAdapter
 - IValue
 - uidescriptionwindowcontroller.cpp
@@ -678,14 +678,14 @@
 - SearchBox
 - SearchBox
 - SearchBox
-- FONSfont
+- FONSglyph
 - ShcoreLibrary
 - Plug
-- multiple_programchanges/source/plug.cpp
+- TEST_CASE
 - ModuleInfoJsonParser
 - animations.cpp
-- UTF8String
-- MouseEventButtonState
+- TptSvf
+- PhaserKernel
 - IPlatformGraphicsDeviceContext
 - MacFactory
 - uiviewfactory.cpp
@@ -698,19 +698,19 @@
 - SyphonOpenGLServer
 - DegradeProcessor
 - DubDelayProcessor
-- CBitmapPixelAccess
+- ImGuiViewportP
 - IDataBrowserDelegate
 - IPlatformFrame
 - x11utils.cpp
-- tdefl_compressor
+- RenderState
 - SizeType
-- OutputStream
+- BufferedOutputStream
 - Handler
 - IUIDescription
-- FilterParamDef
+- mdaBaseController.cpp
 - NoiseNode
 - d2dbitmapcache.cpp
-- ConfigureCameraFormat
+- SafeRelease
 - cclipboard.cpp
 - UpdateHandler
 - Modulators
@@ -729,7 +729,7 @@
 - TestView
 - PlatformParentHandle
 - TinyJS.h
-- AudioCaptureRing
+- CompensationDelay
 - SpecBlurKernel
 - RampNode
 - SyphonOutNode
@@ -741,7 +741,7 @@
 - 5. Step-by-step procedure
 - Field build step 9 — the `sample` domain (a register machine on the audio thread)
 - Field build step 11 — dynamic pins, Phase 1: a fixed per-type menu
-- ImGuiNextWindowData
+- MappingTransform
 - NodeBuilder
 - TEST_CASE
 - SyphonClientConnectionManager
@@ -750,15 +750,15 @@
 - UITransportController
 - VoiceProcessor
 - EditorSizeController
-- mdaJX10Processor.cpp
+- GenericArray
 - setWantsFocus
-- x11platform.h
+- nvgText
 - ModelBinding
 - DummyUIDescription
 - BaseReaderHandler
 - UISelectionView
 - UITemplateController
-- sliderviewcreator.cpp
+- Filter
 - AstNode
 - cgltf_texture
 - uidesclist.cpp
@@ -777,34 +777,34 @@
 - Touch
 - CAViewLayer
 - GLKitOpenGLView
-- D2DBitmap
+- controlcreator.cpp
 - GroupController
 - Hasher
 - UIDescriptionListener
-- viewcreator.cpp
+- AnalyzeNodes.cpp
 - TremoloKernel
 - AudioPluginAudioNode
-- COM_DECLSPEC_NOTHROW
+- Voice
 - keycodes.h
 - stbtt__buf
 - UString
-- impl
 - clientcontext.cpp
-- WindowListenerAdapter
+- DebugPrint
+- TimingFunctionBase
 - TestComponent
 - PlatformFileSelectorConfig
-- impl
 - waylandclientcontext.cpp
+- CDataBrowser
 - JavaScriptViewFactory
 - ChorusKernel
 - Analysis
 - MidiCCNode
-- EnvelopeNode
+- makeClassInfo2
 - EngineBlock
 - HostConnectionProxy
 - AAXWrapper_GUI
 - TEST_CASE
-- datepicker_win32.cpp
+- DatePicker
 - Model
 - Notes
 - 5. Step-by-step procedure
@@ -813,15 +813,15 @@
 - Style
 - SyphonOpenGLClient
 - Platform
-- locale.h
+- moduleinfotool/source/main.cpp
 - HostProcessData
 - PresetManager
-- ProcessContextRequirements
+- ImPool
 - DataPackageIterator
 - InputHandler
 - IPlatformFactory
 - WindowControllerAdapter
-- impl
+- Signature
 - MouseEventCheckView
 - mz_uint64
 - uijsonpersistence.cpp
@@ -834,14 +834,14 @@
 - ThreadChecker
 - SyphonMetalServer
 - stbi_uc
-- SystemTime
+- Array
 - DynamicsProcessor
 - AUv3AudioEngine
-- TestBase
+- ITextEditorController
 - vstpresetfile.cpp
-- CTabButton
+- Genome
 - value.h
-- StaticStringValue
+- ValueBase
 - AppDelegate
 - ViewListener
 - UI Description Scripting
@@ -855,17 +855,17 @@
 - TEST_CASE
 - HeaderInfo
 - ImGui_ImplGlfw_Data
-- HWND__
+- SpoutLogNotice
 - stbi__zbuf
 - SyphonGLShader
 - SyphonServerRendererLegacyGL
 - vstspeaker.h
 - Platform
-- module_linux.cpp
+- ImGuiListClipperData
 - PresetFile
 - csearchtextedit.cpp
 - IPlatformTextEditCallback
-- IWindow
+- PresetSaveViewController
 - DescriptionListenerMock
 - BlendNode
 - MidiTriggerNode
@@ -891,22 +891,22 @@
 - StereoProcessor
 - PlugController
 - memoryibstream.h
-- DatePicker
-- iplatformtaskexecutor.h
+- TEST_CASE
+- task_test.cpp
 - PointerEvent
 - UITextEdit
 - Win32DataPackage
-- Win32MouseObserverWhileDragging
-- WaylandFrame
+- imgui_impl_dx10.cpp
+- TimerHandler
 - WindowConfiguration
 - TEST_CASE
 - ParseResult
 - stringbuffer.h
 - verifyView
-- multilinetextlabelcreator.cpp
+- ProcessContextCheck
 - AssetCache
 - BankData
-- MixerNode
+- DropTarget
 - AnalyserEngine
 - 3. The trap catalogue
 - TEST_CASE
@@ -916,10 +916,10 @@
 - ViewController
 - Window
 - mdaPianoProcessor.cpp
-- Gradient
+- PlatformGradientBase
 - D2DGraphicsDevice
 - EnterHighScoreViewController
-- Preferences
+- minefieldviewcontroller.cpp
 - IWindow
 - StdOutContext
 - ContentProviderWrapper
@@ -943,15 +943,15 @@
 - CFontChooserUIDefinition
 - UINavigationDataSource
 - ThreadPoolTaskExecutor
-- wl_surface
-- doDrag
+- KeyboardInputEvent
+- ResynthNode.cpp
 - MZ_FORCEINLINE
 - IScriptContext
 - CurveShape
 - GroupNode
 - Voice
 - Voice
-- RemoveAnimationInCallback
+- PlugController
 - DispatchList
 - AUv3Wrapper
 - The nine questions
@@ -963,25 +963,25 @@
 - SpoutGLextensions.cpp
 - GLuint
 - stbi__malloc
-- irunloopimpl.h
+- ProcessSetupCheck
 - mdaDX10Processor.cpp
 - VOICE
 - CompressedUIDescription
-- DoubleClickDetector
+- VSTInterAppAudioHostUIControllerViewController
 - ObjCVariable
 - TestViewContainerListener
 - UICrossLines
-- searchtexteditcreator.cpp
+- mdaDelayProcessor.cpp
 - CycleShaperKernel
 - Voice
 - create
 - TEST_CASE
-- Arg
+- mdaDetuneProcessor.cpp
 - TEST_CASE
-- PNGMemoryReader
-- dispatchMouseCancelEvent
+- mdaDubDelayProcessor.cpp
+- TEST_CASE
 - field-testing/SKILL.md
-- convert
+- d2d.h
 - fragmentShaderAA
 - MacTaskExecutor
 - Field build step 17 — `.infdev` device file format (save / load / export / import)
@@ -1003,7 +1003,7 @@
 - UTF8CharacterIterator
 - CViewContainerDropTarget
 - ICocoaTextInputClient
-- WinTimer
+- mdaRePsychoProcessor.cpp
 - UiTheme
 - DrawNode.cpp
 - TEST_CASE
@@ -1013,7 +1013,7 @@
 - TEST_CASE
 - node-ui-pillars/SKILL.md
 - TEST_CASE
-- TEST_CASE
+- mdaSplitterProcessor.cpp
 - CSpecialDigit
 - Utility
 - Synths
@@ -1032,17 +1032,17 @@
 - e
 - ParameterInfo
 - PlugController
-- BaseController
+- mdaSubSynthProcessor.cpp
 - mdaDegradeProcessor.cpp
 - GenericOptionMenuTheme
 - CocoaTextEdit
 - SplitViewController
-- SeparatorSubView
+- mdaThruZeroProcessor.cpp
 - SharedPointer
 - node_screenshot.py
 - SpectrogramMatrix
 - Voice
-- LatestRing
+- CaptureEngineBase
 - vstguidebug.cpp
 - ViewController
 - TEST_CASE
@@ -1050,7 +1050,7 @@
 - TEST_CASE
 - Source
 - Fix: undo/redo and node deletion stall on large patches (Windows + macOS)
-- .STDMETHOD
+- CDataBrowser
 - SyphonGLShader
 - FDynLibrary
 - AppDelegate
@@ -1060,23 +1060,23 @@
 - VSTSDK_AppDelegate
 - DummyFactory
 - mdaComboProcessor.cpp
-- mdaDynamicsProcessor.cpp
+- Signature
 - mdaEPianoController.cpp
 - mdaJX10Controller.cpp
 - mdaPianoController.cpp
-- mdaTrackerProcessor.cpp
+- eventlogger.h
 - AppDelegate
 - SettingsViewController
-- SpeakerArrangementTest
+- mdaDelayController.cpp
 - CGraphicsTransform
 - IPlatformGraphicsPath
 - CharPosition
-- XdndDataPackage
+- mdaDetuneController.cpp
 - MacTimer
 - MouseObserver
 - IViewCreator
 - Infinite
-- ChannelState
+- mdaRingModController.cpp
 - MidiNodes.cpp
 - PluginParamInfo
 - TEST_CASE
@@ -1089,18 +1089,18 @@
 - SyphonClientConnectionManager
 - IUpdateHandler
 - IParameterChanges
-- WaylandGlobals
-- WaylandGlobals
+- hostclasses.cpp
+- uint8_t
 - mdaBandistoController.cpp
 - mdaBeatBoxController.cpp
-- mdaBeatBoxProcessor.cpp
+- AlertBoxConfig
 - mdaDegradeController.cpp
 - mdaDitherController.cpp
 - mdaDubDelayController.cpp
 - mdaDynamicsController.cpp
-- mdaLeslieController.cpp
+- ColorChangeAction
 - mdaLimiterController.cpp
-- mdaLoudnessController.cpp
+- GradientChangeAction
 - mdaMultiBandController.cpp
 - mdaOverdriveController.cpp
 - mdaRePsychoController.cpp
@@ -1109,36 +1109,36 @@
 - mdaShepardController.cpp
 - mdaSplitterController.cpp
 - mdaStereoController.cpp
-- mdaStereoProcessor.cpp
+- AudioLevels
 - mdaSubSynthController.cpp
 - mdaTalkBoxController.cpp
 - mdaTalkBoxProcessor.cpp
 - mdaThruZeroController.cpp
 - mdaTrackerController.cpp
-- ParamChange
+- setTransparency
 - Handler
 - uid.h
 - getEntry
 - SpeakerArray
-- VST3AUPlugInController
+- audiounit-tutorial/source/processor.cpp
 - drawIconAndText
 - onKeyboardEvent
 - RuntimeObjCClass
 - CGGraphicsPathFactory
 - VSTGUI_UIView
-- drawBitmapNinePartTiled
-- win32optionmenu.cpp
-- .init
-- WindowController::EditImpl
+- convert
+- ZLibInputContentProvider
+- ReadDwordFromRegistry
+- VSTInterAppAudioAppDelegate
 - Controller
 - memorybuffer.h
 - ChangeTemplateMinMaxAction
-- FontChangeAction
-- uicontentprovider.cpp
+- BrownNoise
+- .rewind
 - audit_node_params.py
 - MolderDsp.cpp
-- ChannelState
-- NoteEvent
+- RangeParameter
+- AudioStrumNode
 - OfflineRenderState
 - Stamp
 - SamplerVoiceSnapshot
@@ -1166,13 +1166,13 @@
 - ComponentHandler
 - mdaDX10Controller.cpp
 - UTF16NameController
-- TestDefaults
+- owned
 - CColorChooserUISettings
-- IPlatformFrameCallback
+- DelayLine
 - IdleUpdateHandler
 - DigitsDisplayConverter
-- ButtonController
-- ViewWithAFrame
+- createAlertBox
+- PhysicalUIMapList
 - DataPackage
 - CursorStreamWrapper
 - IViewFactoryEditingSupport
@@ -1192,7 +1192,7 @@
 - Macros
 - 6. Step-by-step procedure
 - GLFWwindow
-- ImGuiResizeBorderDef
+- DelayController
 - searchResults
 - searchResults
 - searchResults
@@ -1200,17 +1200,17 @@
 - searchResults
 - searchResults
 - istreamwrapper.h
-- D3D11RenderThread
+- DetuneController
 - DX10Controller
 - PianoController
-- RangeNoteExpressionType
+- DubDelayController
 - Advanced Techniques Tutorial Plug-in
 - FinishedMessage
 - IControlListener
 - OptionMenuListenerAdapter
 - Iterator
 - IPlatformOpenGLView
-- Timer
+- RePsychoController
 - AttributeChangeAction
 - IController
 - AudioNode
@@ -1221,7 +1221,7 @@
 - PendingResult
 - initThreeJSCube
 - TEST_CASE
-- BasicJsonType
+- SplitterController
 - audio-node-sweep/SKILL.md
 - new-audio-node/SKILL.md
 - panels-sweep/SKILL.md
@@ -1239,17 +1239,17 @@
 - SyphonImageBase
 - IErrorContext
 - pluginbasefwd.h
-- ViewRect
+- SubSynthController
 - FONSquad
 - aaxwrapper_parameters.h
 - AUv3WrapperViewController
 - How to build
 - VSTGUIEditorInterface
 - IPlatformBitmap
-- GraphicsPathFactory
+- ThruZeroController
 - WinString
-- RangeValueConverter
-- async.cpp
+- createView
+- IApplication
 - EquationBank
 - Vertex
 - AudioDisplaceAudioSink
@@ -1284,35 +1284,35 @@
 - stbi__gif_load_next
 - stbtt__run_charstring
 - stbtt_vertex
-- BeatBoxController
+- OnePoleLP
 - ComboController
 - mdaComboController.h
 - DegradeController
-- DynamicsController
+- CookIfNeeded
 - EPianoController
 - KGRP
-- JX10Controller
+- SmoothedBlock
 - KGRP
-- StereoController
+- SyncDelayController
 - TalkBoxController
-- TrackerController
+- MovieInfo
 - AppDelegate
 - loadPreset
-- VST3AUPlugInProcessor
+- GetCGColorSpace
 - indexOf
 - UITouchEvent
 - IVisual
-- keyboardHook
-- IWindowController
-- IWindowListener
-- Command
+- KeyswitchTest
+- IContextMenuItem
+- ValidStateTransitionTest
+- error
 - TEST_CASE
 - PREFIX
 - readme.md
-- Property
+- AllpassStage
 - StringToken
 - AudioColumnState
-- DiscreteParamHandle
+- DecodePath
 - Preset
 - CookIfNeeded
 - FrameRequest
@@ -1326,8 +1326,8 @@
 - node-ui-sweep/SKILL.md
 - plugin-host-hardening/SKILL.md
 - shortcuts-sweep/SKILL.md
-- TEST_CASE
-- TEST_CASE
+- get_ref_impl
+- std::string to_string
 - .CD3DX12_HEAP_PROPERTIES
 - Node parameter audit
 - Design prompt: FieldSample generator mode (freq/gate reserved symbols)
@@ -1342,17 +1342,17 @@
 - Entry
 - ListenerProvider
 - IPlatformFont
-- IPlatformViewLayer
-- RedrawTimerHandler
-- tasks.cpp
-- ModelBindingPtr
+- PlatformOptionMenuResult
+- MinefieldViewController::MinefieldViewController
+- PadPoint
+- EditorClassesTest
 - CollectInvalidRectView
 - KeyboardHook
 - TestViewEventHandler
 - Template
-- FocusDrawingSettings
-- Params
-- EqCurveCache
+- midilearn.h
+- RealFft
+- midimapping.h
 - DecodeRecording
 - CompileEquation
 - DispatchSnapshot
@@ -1368,8 +1368,8 @@
 - 5. Rung 0 — pure formula
 - 7. Rung 2 — prediction
 - Windows VST3 Hosting — Status
-- imgui_canvas.h
-- data
+- parameterfunctionname.h
+- scanparameters.h
 - mz_zip_error
 - Spout.h
 - TEXRAttribute
@@ -1381,25 +1381,25 @@
 - initResizable
 - initResizable
 - initResizable
-- FONSstate
+- terminit.h
 - HostAttributeList
-- .get
+- noteexpression.h
 - Adding the AudioUnit Version 2 Target
 - VSTGUI
 - CPoint
 - ISplitViewController
-- IPlatformFrameTouchBarExtension
+- checkunitstructure.h
 - LinuxString
-- initSurfaceBuffer
-- .createView
+- scanprograms.h
+- scanunits.h
 - TEST_CASE
-- mz_zip_error
+- INode
 - OutputStreamWrapper
-- SpecBlurKernel.cpp
+- IGeometrySource
 - FastSineTable
 - AudioInChoice
 - EqBandValues
-- FilterCurveCache
+- .InstanceTransformOverride
 - .PushBuffer
 - .ProcessBlock
 - initWavesAnimation
@@ -1446,13 +1446,13 @@
 - Sync Delay
 - TransportControl
 - UTF16Name
-- silenceprocessing.cpp
-- Note
+- INode
+- INode
 - IAnimationTarget
 - Cell
-- IMouseObserver
-- onMouseEntered
-- FinalAction
+- .getVst2UniqueId
+- .createInstance
+- finally.h
 - IPlatformResourceInputStream
 - Handle
 - NSObject
@@ -1466,13 +1466,13 @@
 - Stream
 - PROFILE_README.md
 - sweep_runner.sh
-- Global
+- .createInstance
 - DrumGridDragState
 - FieldDeviceSaveRequest
-- GateState
+- AudioGateNode
 - Infinite AI Agent Instructions & Skills Index
-- TEST_CASE
-- CFReleaser
+- .createInstance
+- .createInstance
 - codebase-navigation/SKILL.md
 - bodies
 - git-branch-workflow/SKILL.md
@@ -1482,7 +1482,7 @@
 - glad_gl_find_extensions_gl
 - imgui_impl_glfw.h
 - ImGui_ImplVulkan_WindowRenderBuffers
-- ImGui::GetAllocatorFunctions
+- .createInstance
 - ImGuiPlotArrayGetterData
 - SyphonImageBase
 - half_to_float
@@ -1498,24 +1498,19 @@
 - MyWindowController
 - ModuleInfoLib
 - FuncAnimation::FuncAnimation
-- ITimingFunction
-- IViewAddedRemovedObserver
+- testbase.cpp
+- .AudioInputSlot
 - CResourceDescription
 - UndoRecord
-- IFontPainter
+- CurrentSignature
 - IPlatformGradient
-- IPlatformGraphicsPathFactory
-- IPlatformTimer
-- createPlatformFrameConfig
-- IContentProvider
+- INode
 - headless-tests.sh
-- CycleShaperKernel.cpp
 - ScaleDef
 - ArpGateDragState
 - PerfMidiRuntimeState
 - CookIfNeeded
 - RenderPreview
-- ComScope
 - initMobileCapabilitiesSlider
 - setCustomAllocator
 - audio-node-sweep/driver.sh
@@ -1539,11 +1534,9 @@
 - Welcome to VST 3 SDK Interfaces
 - Welcome to VST 3 SDK public_sdk
 - metallib
-- NSObject
 - IEditorExt
 - test010.js
 - Person
-- IModulator
 - DiscreteSlotScope
 - Point
 - INode
@@ -1556,7 +1549,6 @@
 - render-pipeline-sweep/driver.sh
 - glad_gl_get_proc_from_userptr
 - gladLoadGL
-- ImGui_ImplVulkan_LoadFunctions
 - generate_spv.sh
 - base/cookie.js
 - basemodule/cookie.js
@@ -1572,16 +1564,10 @@
 - .getVst2UniqueId
 - .createInstance
 - .createInstance
-- .getVst2UniqueId
-- .createInstance
-- .createInstance
-- .createInstance
 - .createInstance
 - tutorials/README.md
-- CView::getGlobalTransform
 - Readme.md
 - createuidescdata.sh
-- IRStmtKind
 - package.sh script
 - GetAudioNode
 - Seek
@@ -1619,15 +1605,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (4265 total, 90 thin omitted)
+## Communities (4251 total, 107 thin omitted)
 
 ### Community 0 - "imgui.cpp"
 Cohesion: 0.01
-Nodes (421): AddRootWindowToDrawData(), AddWindowToDrawData(), AddWindowToSortBuffer(), ApplyHoverFlagsForTooltip(), ApplyWindowSettings(), CalcDelayFromHoveredFlags(), CalcResizePosSizeFromAnyCorner(), CalcRoutingScore() (+413 more)
+Nodes (382): AddRootWindowToDrawData(), AddWindowToDrawData(), AddWindowToSortBuffer(), ApplyHoverFlagsForTooltip(), ApplyWindowSettings(), CalcDelayFromHoveredFlags(), CalcWindowAutoFitSize(), CalcWindowContentSizes() (+374 more)
 
 ### Community 1 - "string"
 Cohesion: 0.01
-Nodes (186): Algorithm, FringeScaleRef, FringeScaleScope, m_LastFringeScale, vector, Description, Description::Description(), kBool (+178 more)
+Nodes (203): Algorithm, set(), FringeScaleRef, FringeScaleScope, m_LastFringeScale, vector, spoutSenderNames::GetSenderNames(), spoutSenderNames::GetSenderSet() (+195 more)
 
 ### Community 2 - "sse2neon.h"
 Cohesion: 0.01
@@ -1635,15 +1621,15 @@ Nodes (447): drmp3dec_f32_to_s16(), ImRsqrt(), float32x4_t sse2neon_vld1q_f32_fr
 
 ### Community 3 - "events.h"
 Cohesion: 0.01
-Nodes (151): CGPoint, CGRect, CGSize, CViewContainerTest, array, string_view, list, Optional (+143 more)
+Nodes (149): CCheckboxTest, CGPoint, CGRect, CGSize, CViewContainerTest, ITimingFunction, getPosition, isDone (+141 more)
 
 ### Community 4 - "imgui_widgets.cpp"
 Cohesion: 0.01
-Nodes (351): CalcNextScrollFromScrollTargetAndClamp(), CalcScrollEdgeSnap(), ClampWindowPos(), ImTextureID, ImWchar, ImGui::RenderRectFilledRangeH(), ImGui::ShadeVertsLinearUV(), FormatTextureIDForDebugDisplay() (+343 more)
+Nodes (355): CalcNextScrollFromScrollTargetAndClamp(), ClampWindowPos(), ImTextureID, ImWchar, ImFont::CalcWordWrapPositionA(), ImGui::ShadeVertsLinearUV(), FormatTextureIDForDebugDisplay(), RenderText (+347 more)
 
 ### Community 5 - "cstring.h"
 Cohesion: 0.01
-Nodes (241): AnimationIndex, CAnimationSplashScreenCreatorTest, CAnimKnobCreatorTest, checkStyle, CHorizontalSwitchCreatorTest, CKickButtonCreatorTest, CLayeredViewContainerCreatorTest, ClearMarkInset (+233 more)
+Nodes (282): AnimationIndex, CAnimationSplashScreenCreatorTest, CAnimKnobCreatorTest, checkStyle, CHorizontalSwitchCreatorTest, CKickButtonCreatorTest, CLayeredViewContainerCreatorTest, ClearMarkInset (+274 more)
 
 ### Community 6 - "gl.c"
 Cohesion: 0.02
@@ -1651,83 +1637,83 @@ Nodes (326): glad_gl_find_core_gl(), glad_gl_load_GL_3DFX_tbuffer(), glad_gl_loa
 
 ### Community 7 - "ImGuiContext"
 Cohesion: 0.01
-Nodes (314): ImFontAtlas, ImGuiCol, ImGuiColorEditFlags, ImGuiDebugLogFlags, ImGuiDir, ImGuiDragDropFlags, ImGuiInputEventType, ImGuiInputSource (+306 more)
+Nodes (307): ImFontAtlas, ImGuiCol, ImGuiColorEditFlags, ImGuiDebugLogFlags, ImGuiDir, ImGuiDragDropFlags, ImGuiIO, ImGuiLogType (+299 more)
 
 ### Community 8 - "imgui_draw.cpp"
 Cohesion: 0.02
-Nodes (252): CalcWordWrapNextLineStartA(), ImDrawCallback, ImDrawFlags, ImFont, ImFontAtlas, ImFontConfig, ImGuiDir, ImGuiMouseCursor (+244 more)
+Nodes (254): CalcWordWrapNextLineStartA(), ImDrawCallback, ImDrawFlags, ImFont, ImFontAtlas, ImFontConfig, ImGuiDir, ImGuiMouseCursor (+246 more)
 
 ### Community 9 - "imgui_internal.h"
 Cohesion: 0.01
-Nodes (240): FlattenDrawDataIntoSingleLayer(), ImGui::AddContextHook(), ImGui::DebugNodeDrawList(), ImGui::DebugNodeViewport(), ImGui::DebugRenderViewportThumbnail(), ImGui::LogButtons(), ImGui::NavMoveRequestResolveWithLastItem(), ImGui::NavMoveRequestResolveWithPastTreeNode() (+232 more)
+Nodes (252): ImGui::AddContextHook(), ImGui::LogButtons(), ImGui::NavMoveRequestResolveWithLastItem(), ImGui::NavMoveRequestResolveWithPastTreeNode(), ImStricmp(), ImStrnicmp(), GetActiveID(), GetCurrentFocusScope() (+244 more)
 
-### Community 10 - "funknownimpl.h"
+### Community 10 - "FUnknown"
 Cohesion: 0.02
-Nodes (125): AUCocoaUIBase, AUView, BaseClass, DirectIFs, FUnknown, cast(), destroy(), Destroyer (+117 more)
+Nodes (120): AUCocoaUIBase, AUView, FUnknown, IPluginBase, iid, initialize, PLUGIN_API, FUID (+112 more)
 
 ### Community 11 - "DelegationController"
 Cohesion: 0.01
-Nodes (182): CreateViewControllerFunc, CreateViewControllerMap, enable_shared_from_this<TestModel>, Value, CView, IUIDescription, UIAttributes, CDataBrowser (+174 more)
+Nodes (211): CreateViewControllerFunc, CreateViewControllerMap, DBData, enable_shared_from_this<TestModel>, Value, string_view, CView, IUIDescription (+203 more)
 
 ### Community 12 - "MeshToPointsNode"
 Cohesion: 0.01
-Nodes (169): MappingTransform, rotate, scale, space, translate, triplanarBlend, IGeometrySource, INode (+161 more)
+Nodes (169): CommentEditRequest, framesOpen, justOpened, target, CommentNode, color, height, text (+161 more)
 
-### Community 13 - "FieldIR.h"
-Cohesion: 0.01
-Nodes (203): AstKind, ElemOpcode, Opcode, ReduceOpKind, map, Evaluate(), ApplyCompound(), CodeEmitter (+195 more)
+### Community 13 - "unordered_map"
+Cohesion: 0.02
+Nodes (152): AstKind, unordered_map, Opcode, Scope, CompileBlock(), CompileBodyNode(), CompileCall(), CompileExpr() (+144 more)
 
 ### Community 14 - "src/main.cpp"
-Cohesion: 0.03
-Nodes (250): stbi_flip_vertically_on_write(), stbi_write_png(), NodeT, IPaletteSource, GetSwatch, SwatchCount, AudioNodeWidth(), AudioSettingsPath() (+242 more)
+Cohesion: 0.02
+Nodes (258): stbi_flip_vertically_on_write(), stbi_write_png(), NodeT, IPaletteSource, GetSwatch, SwatchCount, AudioNodeWidth(), AudioSettingsPath() (+250 more)
 
 ### Community 15 - "GeometryOpNode"
 Cohesion: 0.01
-Nodes (175): DisplacementNode, clearcoat, clearcoatRoughness, color, emission, emissionColor, flatShade, flipNormals (+167 more)
+Nodes (209): IGeometrySource, vector, DisplacementNode, clearcoat, clearcoatRoughness, color, CookIfNeeded, CurrentSignature (+201 more)
 
-### Community 16 - "printf"
+### Community 16 - "Transport"
 Cohesion: 0.02
-Nodes (198): ImGui_ImplOpenGL3_Init(), printf(), ReadMode, Rng, SampleFn, Formants, f1, f2 (+190 more)
+Nodes (175): ImGui_ImplOpenGL3_Init(), printf(), ReadMode, SampleFn, Formants, f1, f2, f3 (+167 more)
 
 ### Community 17 - "UIEditController"
 Cohesion: 0.02
 Nodes (179): UIUndoManager, UIAttributesController::UIAttributesController(), CBitmap, CCommandMenuItem, CControl, CCoord, CDrawContext, CFontRef (+171 more)
 
 ### Community 18 - "ImageAnalyzeNode"
-Cohesion: 0.01
-Nodes (145): AudioAnalyzeNode, attack, AudioNodeForNotePorts, CookIfNeeded, EnsureAudioNode, gain, input, IsRunning (+137 more)
+Cohesion: 0.04
+Nodes (35): vector, ImageAnalyzeNode, clamp01, customFormula, gain, invert, mathOp, mExprError (+27 more)
 
 ### Community 19 - "FieldError"
-Cohesion: 0.02
-Nodes (179): Stack, IRKind, self, Severity, CheckDataflowCycles(), CollectReads(), IRNodePtr, IRStmtPtr (+171 more)
+Cohesion: 0.04
+Nodes (112): Stack, ReconcileActionKind, self, Severity, CheckDataflowCycles(), CollectReads(), IRNodePtr, IRStmtPtr (+104 more)
 
 ### Community 20 - "DistributePointsOnFacesNode"
 Cohesion: 0.01
-Nodes (135): Particle, age, alive, b, g, life, nx, ny (+127 more)
+Nodes (136): Particle, age, alive, b, g, life, nx, ny (+128 more)
 
 ### Community 21 - "ParamVisitor"
 Cohesion: 0.01
-Nodes (86): ParamVisitor, Bool, Color, Float, Int, Text, VisitParams, CompareNode (+78 more)
+Nodes (96): ParamVisitor, Bool, Color, Float, Int, Text, VisitParams, CompareNode (+88 more)
 
 ### Community 22 - "vstguifwd.h"
 Cohesion: 0.01
-Nodes (180): CMovieBitmap::CMovieBitmap(), CBitmap, CCoord, CPoint, CRect, IControlListener, CTextLabel, ITextLabelListener (+172 more)
+Nodes (182): CTextLabel, ITextLabelListener, onTextLabelTruncatedTextChanged, TextLabelListenerAdapter, IFocusDrawing, drawFocusOnTop, getFocusPath, AtomicReferenceCounted (+174 more)
 
-### Community 23 - "Mat4"
-Cohesion: 0.02
-Nodes (130): Array(), Mat4, m, MeshPoint, b, g, index, nx (+122 more)
+### Community 23 - "InstanceOnPointsNode"
+Cohesion: 0.03
+Nodes (76): MeshPoint, b, g, index, nx, ny, nz, px (+68 more)
 
 ### Community 24 - "Render3DNode"
-Cohesion: 0.01
-Nodes (150): vector, DummyEnvTexture(), DummyShadowTexture(), GetMaterial, GetOutputTexture, GetSurfaceTexture, MeshRevision, GpuMesh (+142 more)
+Cohesion: 0.02
+Nodes (122): vector, DummyEnvTexture(), DummyShadowTexture(), GetOutputTexture, MeshRevision, RebuildIfNeeded, GpuMesh, hasBounds (+114 more)
 
 ### Community 25 - "ViewCreatorAdapter"
 Cohesion: 0.02
-Nodes (156): BitmapToString, ColorToString, EmptyStringToTransparentColor, TEST_CASE(), AttrType, ConstStringPtrList, CView, StringList (+148 more)
+Nodes (204): BitmapToString, ColorToString, EmptyStringToTransparentColor, TEST_CASE(), CView, StringList, IUIDescription, UIAttributes (+196 more)
 
 ### Community 26 - "imgui.h"
-Cohesion: 0.01
-Nodes (130): ImGui_ImplSDL2_SetPlatformImeData(), begin(), BeginChildFrame(), clear_delete(), clear_destruct(), contains(), ImGuiListClipper, end() (+122 more)
+Cohesion: 0.02
+Nodes (114): DWRITE_GLYPH_RUN, DWRITE_GLYPH_RUN_DESCRIPTION, DWRITE_MEASURING_MODE, DWRITE_STRIKETHROUGH, DWRITE_UNDERLINE, ImGui_ImplSDL2_SetPlatformImeData(), begin(), BeginChildFrame() (+106 more)
 
 ### Community 27 - "imgui_node_editor.cpp"
 Cohesion: 0.02
@@ -1735,43 +1721,43 @@ Nodes (127): Animation, C, Config, DrawFlags, EditorContext, Id, ImGuiMouseCurso
 
 ### Community 28 - "BaseWrapper"
 Cohesion: 0.02
-Nodes (164): AAXWrapper::init(), setRenderingOffline, BaseEditorWrapper, BaseEditorWrapper::BaseEditorWrapper(), _close, createView, getRect, hasEditor (+156 more)
+Nodes (176): FUID, FUnknown, IAttributeList, iid, PLUGIN_API, IStreamAttributes, getAttributes, getFileName (+168 more)
 
 ### Community 29 - "win32factory.cpp"
-Cohesion: 0.02
-Nodes (153): AtomicReferenceCounted, IPlatformString, setUTF8String, BYTE, CPoint, CResourceDescription, PNGBitmapBuffer, UINT (+145 more)
+Cohesion: 0.01
+Nodes (232): exception, Win32Exception, _errorStr, IPlatformGraphicsDevice, createBitmapContext, IPlatformGraphicsDeviceContextBitmapExt, drawBitmapNinePartTiled, fillRectWithBitmap (+224 more)
 
-### Community 30 - ".setControllerClass"
+### Community 30 - "validator.cpp"
 Cohesion: 0.02
-Nodes (146): CButtonStateTests, FUID, FUnknown, IPluginCompatibility, getCompatibilityJSON, iid, FUID, FUnknown (+138 more)
+Nodes (105): CButtonStateTests, FUID, FUnknown, IPluginCompatibility, getCompatibilityJSON, iid, FUID, FUnknown (+97 more)
 
 ### Community 31 - "cframe.cpp"
-Cohesion: 0.03
-Nodes (167): CollectInvalidRects, EventProcessingFunction, CFrame, advanceNextFocusView, attached, beforeDelete, beginEdit, beginModalViewSession (+159 more)
+Cohesion: 0.04
+Nodes (127): CollectInvalidRects, EventProcessingFunction, CFrame, advanceNextFocusView, attached, beforeDelete, beginEdit, beginModalViewSession (+119 more)
 
 ### Community 32 - "UIAttributesController"
 Cohesion: 0.02
-Nodes (101): AutosizeController, controls, selection, BitmapController, BooleanController, control, ColorController, colorView (+93 more)
+Nodes (105): AutosizeController, controls, selection, BitmapController, BooleanController, control, ColorController, colorView (+97 more)
 
 ### Community 33 - "UIDialogController"
 Cohesion: 0.02
-Nodes (154): CTextButton, ScriptController, editButton, textEditor, CFrame, CRect, CView, CViewContainer (+146 more)
+Nodes (152): IGridProcessor, process, CFrame, CRect, CView, CViewContainer, IController, IControlListener (+144 more)
 
-### Community 34 - "SharedPointer"
+### Community 34 - "IAction"
 Cohesion: 0.02
-Nodes (160): AlternateFontChangeAction, description, fontName, newAlternateFontNames, oldAlternateFontNames, perform, undo, BitmapChangeAction (+152 more)
+Nodes (105): AlternateFontChangeAction, description, fontName, newAlternateFontNames, oldAlternateFontNames, perform, undo, BitmapChangeAction (+97 more)
 
 ### Community 35 - "fstring.cpp"
 Cohesion: 0.05
-Nodes (146): CFStringEncoding, CharGroup, CompareMode, readStringUtf8, ConstString, compare, compareAt, contains (+138 more)
+Nodes (146): CFStringEncoding, CharGroup, CompareMode, ConstString, compare, compareAt, contains, copyTo (+138 more)
 
 ### Community 36 - "NoteEventQueue"
 Cohesion: 0.02
-Nodes (116): kMaxPending, atomic, NoteEventQueue, kCapacity, kMaxConsumers, mCursorHeads, mEntries, mNumCursors (+108 more)
+Nodes (115): kMaxPending, atomic, NoteEventQueue, kCapacity, kMaxConsumers, mCursorHeads, mEntries, mNumCursors (+107 more)
 
 ### Community 37 - "GraphNode"
 Cohesion: 0.02
-Nodes (119): GraphNode, category, hasBipolarParams, hasExpressionParams, hasModulatedParams, hasPaletteColors, hasPerfPanelParams, hiddenFromCanvas (+111 more)
+Nodes (123): GraphNode, category, hasBipolarParams, hasExpressionParams, hasModulatedParams, hasPaletteColors, hasPerfPanelParams, hiddenFromCanvas (+115 more)
 
 ### Community 38 - "dr_flac.h"
 Cohesion: 0.06
@@ -1779,27 +1765,27 @@ Nodes (155): drflac, drflac_cache_t, DRFLAC_INLINE, drflac_int16, drflac_int32, 
 
 ### Community 39 - "T"
 Cohesion: 0.02
-Nodes (93): erase(), erase_unsorted(), find(), find_erase(), find_erase_unsorted(), find_index(), begin(), end() (+85 more)
+Nodes (87): CFTypeRef, begin(), end(), ImChunkStream, Buf, DataTypeClampT(), DataTypeCompareT(), ImGui::CheckboxFlagsT() (+79 more)
 
 ### Community 40 - "Mesh"
-Cohesion: 0.04
-Nodes (147): point, AllPolygons(), AppendMesh(), Arrow(), Bevel(), Boolean(), BoundaryLoops(), Build() (+139 more)
+Cohesion: 0.03
+Nodes (151): point, AllPolygons(), AppendMesh(), Arrow(), Bevel(), Boolean(), BoundaryLoops(), Build() (+143 more)
 
 ### Community 41 - "FieldSynthNode"
-Cohesion: 0.01
-Nodes (126): SampleOp, vector, SampleDeclaredPin, domainName, name, typeName, SampleDelayLine, bufferOffset (+118 more)
+Cohesion: 0.02
+Nodes (128): SampleOp, vector, SampleDeclaredPin, domainName, name, typeName, SampleDelayLine, bufferOffset (+120 more)
 
 ### Community 42 - "Voice"
-Cohesion: 0.02
-Nodes (137): Assign4CoordOperator, BrownNoise, CenterInside, Corners, CRectTest, Extend, Bound(), IEditController (+129 more)
+Cohesion: 0.05
+Nodes (48): Bound(), setFreqAndQ, int32, ParamValue, SamplePrecision, SMTG_OVERRIDE, Voice, currentLPFreq (+40 more)
 
 ### Community 43 - "cbuttons.cpp"
 Cohesion: 0.03
-Nodes (128): CKickButton, CCheckBox, boxFillColor, boxFrameColor, checkMarkColor, draw, font, fontColor (+120 more)
+Nodes (160): CKickButton, CCheckBox, boxFillColor, boxFrameColor, checkMarkColor, draw, font, fontColor (+152 more)
 
 ### Community 44 - "AudioEffect"
-Cohesion: 0.02
-Nodes (133): BusDirection, END_DEFINE_INTERFACES, FUnknown, int32, IParameterChanges, IParamValueQueue, REFCOUNT_METHODS, SpeakerArrangement (+125 more)
+Cohesion: 0.01
+Nodes (206): FUID, FUnknown, IAudioPresentationLatency, iid, setAudioPresentationLatencySamples, IAudioProcessor, canProcessSampleSize, getLatencySamples (+198 more)
 
 ### Community 45 - "FieldPrimitiveNode"
 Cohesion: 0.02
@@ -1807,11 +1793,11 @@ Nodes (109): PrimitiveTopology, ElementExecContext, cg, count, cr, index, inElem
 
 ### Community 46 - "imgui_tables.cpp"
 Cohesion: 0.02
-Nodes (132): ImGui::AddSettingsHandler(), ImGui::ClearIniSettings(), ImGui::DebugNodeColumns(), ImGui::GetCursorPos(), ImGui::GetCursorPosX(), ImGui::GetCursorPosY(), ImGui::GetCursorScreenPos(), ImGui::GetCursorStartPos() (+124 more)
+Nodes (154): ImGui::DebugNodeColumns(), ImGui::LocalizeRegisterEntries(), ImStrSkipBlank(), GetCurrentTable(), ImGuiOldColumnFlags, ImGuiTableColumnFlags, ImGuiTableFlags, ImBitArrayClearAllBits() (+146 more)
 
-### Community 47 - "Win32Frame"
-Cohesion: 0.02
-Nodes (133): mousePosition, IWin32PlatformFrame, getHWND, setTextInputClient, convert(), CBitmap, CButtonState, CCursorType (+125 more)
+### Community 47 - "HWND__"
+Cohesion: 0.01
+Nodes (189): COMDLG_FILTERSPEC, SpoutReceiver::SelectSender(), mousePosition, IIMETextInputClient, IWin32PlatformFrame, getHWND, setTextInputClient, D2D1_GRADIENT_STOP (+181 more)
 
 ### Community 48 - "Platform.h"
 Cohesion: 0.02
@@ -1831,19 +1817,19 @@ Nodes (134): CLayeredViewContainer, CMessageResult, IdStringPtr, collectExternal
 
 ### Community 52 - "IEffectKernel"
 Cohesion: 0.02
-Nodes (98): BitcrushKernel, mAnalog, mHoldL, mHoldR, mMailbox, mPhase, mPreFilterL, mPreFilterR (+90 more)
+Nodes (92): BitcrushKernel, mAnalog, mHoldL, mHoldR, mMailbox, mPhase, mPreFilterL, mPreFilterR (+84 more)
 
 ### Community 53 - "ctexteditor.cpp"
 Cohesion: 0.05
-Nodes (131): Style, make, cancel, convert(), convertWinLineEndingsToUnixLineEndings(), CCoord, CDrawContext, CGraphicsPath (+123 more)
+Nodes (114): convert(), convertWinLineEndingsToUnixLineEndings(), CDrawContext, CharT, const_iterator, CRect, IFocusDrawing, iterator (+106 more)
 
 ### Community 54 - "DocumentWindowController"
-Cohesion: 0.03
-Nodes (124): COffscreenContext, _Path, CScrollView, IPlatformBitmap, vector, DocumentPtr, Optional, pair (+116 more)
+Cohesion: 0.04
+Nodes (90): CMovieBitmap::CMovieBitmap(), CBitmap, CCoord, CPoint, CRect, IControlListener, IPlatformBitmap, CMovieBitmap (+82 more)
 
 ### Community 55 - "ClothNode"
 Cohesion: 0.02
-Nodes (115): NextMeshRevision(), RebuildIfNeeded, RebuildIfNeeded, ClothNode, bounce, clearcoat, clearcoatRoughness, color (+107 more)
+Nodes (110): ClothNode, bounce, clearcoat, clearcoatRoughness, color, damping, emission, emissionColor (+102 more)
 
 ### Community 56 - "MacroXYNode"
 Cohesion: 0.02
@@ -1853,9 +1839,9 @@ Nodes (68): DrawMacroBipolarKnobBody(), DrawMacroSliderBody(), PadPoint, vector,
 Cohesion: 0.02
 Nodes (96): ax::NodeEditor::AcceptNewItem(), ax::NodeEditor::Begin(), ax::NodeEditor::BeginCreate(), ax::NodeEditor::BeginGroupHint(), ax::NodeEditor::BeginNode(), ax::NodeEditor::BeginPin(), ax::NodeEditor::BreakLinks(), ax::NodeEditor::CanvasToScreen() (+88 more)
 
-### Community 58 - "PluginScanner"
-Cohesion: 0.02
-Nodes (117): json, operator "" _json(), promise, Entry, vector, FoldersPath(), atomic, Entry (+109 more)
+### Community 58 - "UpdateCheck.cpp"
+Cohesion: 0.05
+Nodes (51): json, promise, FILE, FloatToPcm16(), GenerateFilePath(), GetRecordingsDirectory(), WavWriter::Append(), WavWriter::Close() (+43 more)
 
 ### Community 59 - "uibitmapscontroller.cpp"
 Cohesion: 0.03
@@ -1863,47 +1849,47 @@ Nodes (127): array, CBitmap, CButtonState, CColorChooser, CControl, CCoord, CDat
 
 ### Community 60 - "nanovg.c"
 Cohesion: 0.04
-Nodes (132): NVGcolor, NVGcompositeOperationState, NVGpaint, NVGpath, nvg__absf(), nvg__acosf(), nvg__addPath(), nvg__addPoint() (+124 more)
+Nodes (133): NVGcolor, NVGcompositeOperationState, NVGpaint, NVGpath, nvg__absf(), nvg__acosf(), nvg__addPath(), nvg__addPoint() (+125 more)
 
 ### Community 61 - "INode"
 Cohesion: 0.02
-Nodes (73): INoteSource, GetAudioNode, GateNode, GetAudioNode, holdMs, mAudioNode, mLastCookFrame, noteInput (+65 more)
+Nodes (78): INoteSource, GetAudioNode, GateNode, holdMs, mAudioNode, mLastCookFrame, noteInput, GlideNode (+70 more)
 
 ### Community 62 - "PushUndoCheckpoint"
-Cohesion: 0.08
-Nodes (122): CalcTextSizeA, GainNode, GraphNode, AddRateModeCells(), AddSyncedRateCell(), AudioBareDropdown(), AudioFullWidth(), AudioHalfWidth() (+114 more)
+Cohesion: 0.07
+Nodes (132): CalcTextSizeA, GainNode, GraphNode, AddRateModeCells(), AddSyncedRateCell(), AudioBareDropdown(), AudioFullWidth(), AudioHalfWidth() (+124 more)
 
 ### Community 63 - "ProcessData"
-Cohesion: 0.02
-Nodes (111): DoProcessCallback, Min, AudioBusBuffers, numChannels, silenceFlags, int32, uint64, IEventList (+103 more)
+Cohesion: 0.03
+Nodes (91): DoProcessCallback, AudioBusBuffers, numChannels, silenceFlags, int32, uint64, IEventList, IParameterChanges (+83 more)
 
 ### Community 64 - "KeyboardViewBase"
 Cohesion: 0.03
-Nodes (112): BitmapArray, bound(), CButtonState, CCoord, CDrawContext, CFontDesc, CMouseEventResult, CPoint (+104 more)
+Nodes (99): BitmapArray, bound(), CButtonState, CCoord, CDrawContext, CFontDesc, CMouseEventResult, CPoint (+91 more)
 
 ### Community 65 - "ImVec2"
 Cohesion: 0.11
-Nodes (125): PathConcaveShape(), ShowDemoWindowLayout(), ShowExampleAppCustomRendering(), AddCircle, AddCircleFilled, AddConvexPolyFilled, AddImage, AddLine (+117 more)
+Nodes (126): PathConcaveShape(), ShowDemoWindowLayout(), ShowExampleAppCustomRendering(), AddCircle, AddCircleFilled, AddConvexPolyFilled, AddImage, AddLine (+118 more)
 
 ### Community 66 - "VST3Editor"
 Cohesion: 0.02
-Nodes (105): createContextMenu, getUnitInfo, MyVST3Editor::close(), AspectRatioVST3Editor, calcZoomFactor, canCalculateAspectRatio, checkSizeConstraint, getMinZoomFactor (+97 more)
+Nodes (107): getUnitInfo, MyVST3Editor::close(), AspectRatioVST3Editor, calcZoomFactor, canCalculateAspectRatio, checkSizeConstraint, getMinZoomFactor, initialSize (+99 more)
 
 ### Community 67 - "rapidjson/document.h"
-Cohesion: 0.05
+Cohesion: 0.04
 Nodes (101): Const_, ConstMemberIterator, Map, AddMember(), ArrayData, capacity, elements, size (+93 more)
 
-### Community 68 - "mdaBaseController.h"
-Cohesion: 0.02
-Nodes (100): BaseController::getMidiControllerAssignment(), BaseController::getProgramListCount(), BaseController::getProgramListInfo(), BaseController::getProgramName(), BaseController::getUnitByBus(), BaseController::initialize(), BaseController::notify(), BaseController::queryInterface() (+92 more)
+### Community 68 - "DitherProcessor"
+Cohesion: 0.05
+Nodes (36): DitherController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult, FUnknown (+28 more)
 
-### Community 69 - "HostCheckerProcessor"
-Cohesion: 0.02
-Nodes (112): FUID, FUnknown, IConnectionPoint, disconnect, iid, PLUGIN_API, IMessage, getAttributes (+104 more)
+### Community 69 - "IConnectionPoint"
+Cohesion: 0.03
+Nodes (75): FUID, FUnknown, IConnectionPoint, disconnect, iid, PLUGIN_API, IMessage, getAttributes (+67 more)
 
 ### Community 70 - "cview.cpp"
 Cohesion: 0.02
-Nodes (102): CButtonState, CMouseWheelAxis, CPoint, onWheel(), AttributeEntry, data, CDragContainerHelper, drag (+94 more)
+Nodes (110): CButtonState, CMouseWheelAxis, CPoint, onWheel(), AttributeEntry, data, CDragContainerHelper, drag (+102 more)
 
 ### Community 71 - "againsimple.cpp"
 Cohesion: 0.03
@@ -1911,7 +1897,7 @@ Nodes (116): AGainSimple, addUIMessageController, bBypass, bHalfGain, AGainSimpl
 
 ### Community 72 - "fontstash.h"
 Cohesion: 0.04
-Nodes (118): fons__addWhiteRect(), fons__allocAtlas(), fons__allocFont(), fons__allocGlyph(), fons__atlasAddRect(), fons__atlasAddSkylineLevel(), fons__atlasExpand(), fons__atlasInsertNode() (+110 more)
+Nodes (119): fons__addWhiteRect(), fons__allocAtlas(), fons__allocFont(), fons__allocGlyph(), fons__atlasAddRect(), fons__atlasAddSkylineLevel(), fons__atlasExpand(), fons__atlasInsertNode() (+111 more)
 
 ### Community 73 - "ImDrawData"
 Cohesion: 0.03
@@ -1931,7 +1917,7 @@ Nodes (107): main(), asInteger(), CLEAN(), JSCallback, ostream, string_view, CRE
 
 ### Community 77 - "NoteNodes.cpp"
 Cohesion: 0.02
-Nodes (62): CookIfNeeded, AudioNoteToCVNode, mGlideMs, mInbox, mLastNote, mLevel, mNoteCursor, mRangeHigh (+54 more)
+Nodes (59): CookIfNeeded, AudioNoteToCVNode, mGlideMs, mInbox, mLastNote, mLevel, mNoteCursor, mRangeHigh (+51 more)
 
 ### Community 78 - "imgui_freetype.cpp"
 Cohesion: 0.02
@@ -1939,51 +1925,51 @@ Nodes (108): stbrp_rect, stbtt_fontinfo, stbtt_pack_range, stbtt_packedchar, ImF
 
 ### Community 79 - "uinode.cpp"
 Cohesion: 0.03
-Nodes (99): Base64CodecTest, BitmapVariant, DecodeAscii, DecodeBinary, EncodeAscii, EncodeBinary, main(), TEST_CASE() (+91 more)
+Nodes (102): Base64CodecTest, BitmapVariant, ContainerClass, DecodeAscii, DecodeBinary, EncodeAscii, EncodeBinary, CViewContainer::getChildViewsOfType() (+94 more)
 
 ### Community 80 - "impl"
-Cohesion: 0.03
-Nodes (96): ConfigCallback, ExchangeDataT, DataExchangeBlock, blockID, data, size, DataExchangeBlockID, FUID (+88 more)
+Cohesion: 0.02
+Nodes (136): ConfigCallback, ExchangeDataT, DataExchangeBlock, blockID, data, size, DataExchangeBlockID, FUID (+128 more)
 
 ### Community 81 - "WindowController"
-Cohesion: 0.02
-Nodes (86): DescriptionsList, Descriptions, mCaption, mDescriptions, parse, print, key_type, ostream (+78 more)
+Cohesion: 0.04
+Nodes (59): ClassInfo, Command, CView, IController, IModelBinding, IUIDescription, IValue, NonAtomicReferenceCounted (+51 more)
 
 ### Community 82 - "vstgui_uidescription.cpp"
 Cohesion: 0.04
-Nodes (40): FocusDrawingSettings, IAction, getName, perform, undo, UIAttributes, IUIDescription, UIViewFactory (+32 more)
+Nodes (45): list, CommandMenuItemTargetAdapter, CCommandMenuItem, ICommandMenuItemTarget, onCommandMenuItemSelected, validateCommandMenuItem, NonAtomicReferenceCounted, TestCommandMenuItemTarget (+37 more)
 
 ### Community 83 - "cviewcontainer.cpp"
-Cohesion: 0.04
-Nodes (108): ContainerClass, setZoom, recalculateLayout, setSeparatorWidth, isVisible(), CButtonState, CDrawContext, CDrawStyle (+100 more)
+Cohesion: 0.05
+Nodes (104): checkSizeConstraint, setViewSize, setZoom, recalculateLayout, isVisible(), CButtonState, CDrawContext, CDrawStyle (+96 more)
 
 ### Community 84 - "FieldSampleNode"
 Cohesion: 0.02
-Nodes (84): vector, DeclaredPin, domainName, isOutput, name, typeName, map, vector (+76 more)
+Nodes (100): DeviceFile, author, code, description, domain, name, nodeSettings, params (+92 more)
 
 ### Community 85 - "AUWrapper"
 Cohesion: 0.02
-Nodes (110): AUParameterListenerRef, AUPreset, AUWRAPPER_BASE_CLASS, CachedParameterInfoMap, ClumpGroupVector, AUWrapper, audioProcessor, buildUnitInfos (+102 more)
+Nodes (112): AUParameterListenerRef, AUPreset, AUWRAPPER_BASE_CLASS, CachedParameterInfoMap, ClumpGroupVector, AUWrapper, audioProcessor, buildUnitInfos (+104 more)
 
 ### Community 86 - "vsteditcontroller.cpp"
 Cohesion: 0.04
-Nodes (100): int32, ProgramListID, String128, UnitID, ProgramListInfo, id, name, programCount (+92 more)
+Nodes (98): int32, ProgramListID, String128, UnitID, ProgramListInfo, id, name, programCount (+90 more)
 
 ### Community 87 - "ImGuiIO"
 Cohesion: 0.02
-Nodes (109): ImGuiInputEventType, ImWchar16, FindLatestInputEvent(), ImGuiKeyChord, ImGuiMouseSource, ImS8, ImU16, ImWchar16 (+101 more)
+Nodes (108): ImGuiInputEventType, ImWchar16, FindLatestInputEvent(), ImGuiKeyChord, ImGuiMouseSource, ImS8, ImU16, ImWchar16 (+100 more)
 
 ### Community 88 - "hostcheckercontroller.cpp"
-Cohesion: 0.04
-Nodes (101): ADelayController::setComponentState(), IBStream, tresult, BusDirection, CControl, char16, CMessageResult, CRect (+93 more)
+Cohesion: 0.05
+Nodes (96): BusDirection, char16, CMessageResult, CRect, CtrlNumber, CVSTGUITimer, DataExchangeUserContextID, FIDString (+88 more)
 
 ### Community 89 - "xmlparse.c"
 Cohesion: 0.04
 Nodes (108): build_model(), build_node(), XML_Content, XML_Size, entityValueInitProcessor(), entityValueProcessor(), errorProcessor(), externalEntityInitProcessor() (+100 more)
 
 ### Community 90 - "switchcreators.cpp"
-Cohesion: 0.03
-Nodes (95): applyStyleMask(), AnimKnobCreator, apply, create, getAttributeNames, getAttributeValue, getBaseViewName, getDisplayName (+87 more)
+Cohesion: 0.04
+Nodes (78): AnimKnobCreator, apply, create, getAttributeNames, getAttributeType, getAttributeValue, getBaseViewName, getDisplayName (+70 more)
 
 ### Community 91 - "cgltf_material"
 Cohesion: 0.02
@@ -1991,39 +1977,39 @@ Nodes (108): cgltf_alpha_mode, cgltf_float, cgltf_anisotropy, anisotropy_rotatio
 
 ### Community 92 - "IReference"
 Cohesion: 0.02
-Nodes (85): IListControlConfigurator, getRowDesc, IListControlDrawer, drawBackground, drawRow, CommandMenuItemTargetAdapter, CCommandMenuItem, ICommandMenuItemTarget (+77 more)
+Nodes (88): variant, Type, Property, getFloat, getInteger, getObject, type, value (+80 more)
 
 ### Community 93 - "CSegmentButton"
 Cohesion: 0.03
-Nodes (89): CButtonState, CCoord, CDrawContext, CFontRef, CGradient, CGraphicsPath, CHoriTxtAlign, CMouseEventResult (+81 more)
+Nodes (86): CButtonState, CCoord, CDrawContext, CFontRef, CGradient, CGraphicsPath, CHoriTxtAlign, CMouseEventResult (+78 more)
 
 ### Community 94 - "cairographicscontext.cpp"
 Cohesion: 0.04
 Nodes (94): cairo_matrix_t, CairoGraphicsDevice, CairoGraphicsDevice::CairoGraphicsDevice(), createBitmapContext, get, impl, device, CairoGraphicsDeviceContext (+86 more)
 
 ### Community 95 - "cscrollview.cpp"
-Cohesion: 0.04
-Nodes (93): Edge, recalculateLayout, CBitmap, CControl, CCoord, CDrawContext, Children, CMessageResult (+85 more)
+Cohesion: 0.07
+Nodes (68): Edge, recalculateLayout, CBitmap, CControl, CCoord, CDrawContext, CMessageResult, CPoint (+60 more)
 
-### Community 96 - "Component"
+### Community 96 - ".setControllerClass"
 Cohesion: 0.03
-Nodes (93): BusInfo, busType, channelCount, direction, flags, mediaType, name, BusDirection (+85 more)
+Nodes (86): BusInfo, busType, channelCount, direction, flags, mediaType, name, BusDirection (+78 more)
 
 ### Community 97 - "coptionmenu.cpp"
 Cohesion: 0.04
 Nodes (94): CMenuItemList, isCommandCategory, isCommandName, setCommandCategory, setCommandName, CMenuItem, CMenuItem::CMenuItem(), getIcon (+86 more)
 
 ### Community 98 - "CControl"
-Cohesion: 0.03
-Nodes (88): Agorithm, CheckDefaultValueEventFuncT, Clamp, ClampNorm, clamp(), clampNorm(), normalizedToPlain(), normalizedToSteps() (+80 more)
+Cohesion: 0.06
+Nodes (45): CheckDefaultValueEventFuncT, clamp(), CSlider, Slider, CControl, bounceValue, CControl::CControl(), CheckDefaultValueEventFunc (+37 more)
 
 ### Community 99 - "stdint.h"
-Cohesion: 0.03
-Nodes (68): bit_stream, bs_init(), bs_putbits(), encode_frame(), init_tables(), shine_close(), shine_encode_buffer_interleaved(), shine_flush() (+60 more)
+Cohesion: 0.04
+Nodes (58): bit_stream, bs_init(), bs_putbits(), encode_frame(), init_tables(), shine_close(), shine_encode_buffer_interleaved(), shine_flush() (+50 more)
 
-### Community 100 - "cbitmapfilter.cpp"
-Cohesion: 0.03
-Nodes (74): CreateFunction, CIBoxBlurFilter, run, IdStringPtr, BoxBlur, dv, pc0, pc1 (+66 more)
+### Community 100 - "CBitmapPixelAccess"
+Cohesion: 0.02
+Nodes (107): CreateFunction, CIBoxBlurFilter, run, IdStringPtr, CBitmapPixelAccess, address, bitmap, bytesPerRow (+99 more)
 
 ### Community 101 - "Data"
 Cohesion: 0.02
@@ -2034,8 +2020,8 @@ Cohesion: 0.03
 Nodes (86): FaderPosToValueFn, FaderValueToPosFn, Source, Key, map, vector, Modulation, Bind (+78 more)
 
 ### Community 103 - "AudioDisplacementNode"
-Cohesion: 0.02
-Nodes (83): AudioDisplacementNode, attack, axis, chladniM, chladniN, clearcoat, clearcoatRoughness, color (+75 more)
+Cohesion: 0.03
+Nodes (60): AudioDisplacementNode, attack, axis, chladniM, chladniN, clearcoat, clearcoatRoughness, color (+52 more)
 
 ### Community 104 - "STBTextEditView"
 Cohesion: 0.04
@@ -2043,35 +2029,35 @@ Nodes (88): convertSingleCodePoint, translateToLocal(), CBitmap, CButtonState, C
 
 ### Community 105 - "cslider.cpp"
 Cohesion: 0.05
-Nodes (95): CSliderMode, CHorizontalSlider, CBitmap, CButtonState, CCoord, CDrawContext, CMouseEventResult, CPoint (+87 more)
+Nodes (100): CSliderMode, getWheelInc, MouseWheelEvent, onMouseWheelEvent, CHorizontalSlider, CBitmap, CButtonState, CCoord (+92 more)
 
 ### Community 106 - "ImFont"
-Cohesion: 0.02
-Nodes (89): ImFont, ImFont::CalcWordWrapPositionA(), ImFontGlyphRangesBuilder::AddText(), ImU8, ImWchar, ImFont, AddRemapChar, Ascent (+81 more)
+Cohesion: 0.03
+Nodes (62): ImFont::FindGlyph(), ImFont::FindGlyphNoFallback(), ImU8, ImWchar, ImFont, AddRemapChar, Ascent, ConfigData (+54 more)
 
 ### Community 107 - "value::parser"
 Cohesion: 0.06
 Nodes (41): array, pair, value, cursor_state, m_LastCursor, m_Owner, dump_context_t, indent (+33 more)
 
-### Community 108 - "tutorial.cpp"
-Cohesion: 0.03
-Nodes (92): array, FUnknown, IBStream, int32, IParameterChanges, Parameter, RTTransfer, SMTG_OVERRIDE (+84 more)
+### Community 108 - "again.cpp"
+Cohesion: 0.02
+Nodes (118): AAXWrapper_GetDescription(), AAX_Effect_Desc, array, FUnknown, IBStream, int32, IParameterChanges, Parameter (+110 more)
 
 ### Community 109 - "ValueType"
-Cohesion: 0.03
-Nodes (61): AddOperator, ArrayType, Clear, ConstArray, ConstObject, ConstValueIterator, Copy, CopyOperator (+53 more)
+Cohesion: 0.05
+Nodes (36): ArrayType, ConstArray, ConstObject, GetArray(), GetBool(), GetDouble(), GetFloat(), GetInt() (+28 more)
 
 ### Community 110 - "FStreamer"
 Cohesion: 0.05
-Nodes (91): char16, char8, IBStream, int16, int32, int64, int8, tchar (+83 more)
+Nodes (92): char16, char8, IBStream, int16, int32, int64, int8, tchar (+84 more)
 
 ### Community 111 - "ControllerWithUI"
-Cohesion: 0.03
-Nodes (87): FUID, FUnknown, IMidiLearn, iid, onLiveMIDIControllerInput, BusIndex, CtrlNumber, FUID (+79 more)
+Cohesion: 0.02
+Nodes (99): FUID, FUnknown, IMidiLearn, iid, onLiveMIDIControllerInput, BusIndex, CtrlNumber, FUID (+91 more)
 
 ### Community 112 - "Window"
 Cohesion: 0.04
-Nodes (73): WindowStyle, flags, getApplicationPlatformAccess(), IApplication, ICommandHandler, IWindowListener, IPlatformApplication, canQuit (+65 more)
+Nodes (74): WindowStyle, flags, getApplicationPlatformAccess(), IApplication, ICommandHandler, IWindowListener, IPlatformApplication, canQuit (+66 more)
 
 ### Community 113 - "FieldPixelNode"
 Cohesion: 0.03
@@ -2079,15 +2065,15 @@ Nodes (75): map, vector, map, vector, ParamEntry, defaultValue, id, isDeclared (
 
 ### Community 114 - "cknob.cpp"
 Cohesion: 0.04
-Nodes (78): CAnimKnob, CKnob, getOldValue, setBackground, CKnob, addArc, CKnob::CKnob(), colorHandle (+70 more)
+Nodes (86): CAnimKnob, CKnob, previousPixmap, getFocusPath, getOldValue, CGraphicsPath, CAnimKnob, bInverseBitmap (+78 more)
 
 ### Community 115 - "include/fwd.h"
-Cohesion: 0.03
-Nodes (61): ConfigValue, type, value, Init, AlertBoxConfig, AlertBoxForWindowConfig, Command, Config (+53 more)
+Cohesion: 0.02
+Nodes (99): ConfigValue, type, value, Init, AlertBoxConfig, AlertBoxForWindowConfig, Command, Config (+91 more)
 
 ### Community 116 - "json.hpp"
-Cohesion: 0.06
-Nodes (91): byte_container_with_subtype, const_reverse_iterator, difference_type, else, adl_serializer, at(), begin(), cbegin() (+83 more)
+Cohesion: 0.05
+Nodes (113): array_t, boolean_t, byte_container_with_subtype, CompatibleType, const_reverse_iterator, difference_type, else, add() (+105 more)
 
 ### Community 117 - "CScrollbar"
 Cohesion: 0.04
@@ -2095,39 +2081,39 @@ Nodes (82): Animation, Animation::Animation(), animationTarget, done, lastPos, n
 
 ### Community 118 - "MolderNode"
 Cohesion: 0.03
-Nodes (74): AudioNode, Job, vector, atomic, AudioCable, INode, Job, thread (+66 more)
+Nodes (53): atomic, AudioCable, INode, Job, thread, unique_ptr, MolderNode, air (+45 more)
 
 ### Community 119 - "ModelData"
 Cohesion: 0.03
-Nodes (93): CommandKeyArray, CControl, CPoint, CScrollView, CTextEdit, CView, CViewContainer, CVSTGUITimer (+85 more)
+Nodes (75): CCoord, CPoint, CScrollView, CView, CVSTGUITimer, IFontPainter, Lines, shared_ptr (+67 more)
 
 ### Community 120 - "EnvironmentNode"
-Cohesion: 0.03
-Nodes (71): BufferBytes(), SampleBuffer, DecodeCached(), GltfDecodedImage, height, label, pixels, width (+63 more)
+Cohesion: 0.02
+Nodes (96): BufferBytes(), SampleBuffer, DecodeCached(), vector, E(), FilterDef, category, fragmentBody (+88 more)
 
 ### Community 121 - "GenericSchemaValidator"
-Cohesion: 0.05
-Nodes (23): GenericSchemaValidator, currentError_, depth_, documentStack_, error_, flags_, kDefaultDocumentStackCapacity, kDefaultSchemaStackCapacity (+15 more)
+Cohesion: 0.04
+Nodes (25): GenericSchemaValidator, currentError_, depth_, documentStack_, error_, flags_, kDefaultDocumentStackCapacity, kDefaultSchemaStackCapacity (+17 more)
 
 ### Community 122 - "drflac_bool32"
 Cohesion: 0.06
 Nodes (90): drflac_bool32, drflac_bs, drflac_frame, drflac_frame_header, drflac_int64, drflac_int8, drflac_ogg_crc_mismatch_recovery, drflac_oggbs (+82 more)
 
 ### Community 123 - "HostCheckerController"
-Cohesion: 0.02
-Nodes (86): EditFromHostMap, EditorMap, EditorVector, FUID, FUnknown, IAutomationState, iid, setAutomationState (+78 more)
+Cohesion: 0.03
+Nodes (74): EditFromHostMap, EditorMap, EditorVector, FUID, FUnknown, IAutomationState, iid, setAutomationState (+66 more)
 
 ### Community 124 - "ImageToPointsNode"
 Cohesion: 0.03
 Nodes (54): IGeometrySource, INode, pair, vector, Hash01(), ImageToPointsNode, CookIfNeeded, density (+46 more)
 
-### Community 125 - "waylandframe.cpp"
-Cohesion: 0.04
-Nodes (73): CBitmap, CButtonState, CCursorType, ChildWindow, CPoint, CRect, DragDescription, DragResult (+65 more)
+### Community 125 - "crect.h"
+Cohesion: 0.02
+Nodes (122): AddBiggerOne, AddMulti, AddOverlappingOne, AddSmallerOne, CInvalidRectListTest, CInvalidRectList, add, list (+114 more)
 
 ### Community 126 - "AudioDeviceWin.cpp"
-Cohesion: 0.04
-Nodes (71): AudioRenderCallback, IAudioRenderClient, IMMDeviceEnumerator, AudioDeviceBufferFrames(), AudioDeviceClose(), AudioDeviceName(), AudioDeviceOpen(), AudioInputCaptureIsRunning() (+63 more)
+Cohesion: 0.06
+Nodes (38): AudioRenderCallback, IMMDeviceEnumerator, AudioDeviceBufferFrames(), AudioDeviceClose(), AudioDeviceName(), AudioDeviceOpen(), AudioInputCaptureIsRunning(), AudioInputCapturePump() (+30 more)
 
 ### Community 127 - "AudioEffectNode"
 Cohesion: 0.03
@@ -2135,15 +2121,15 @@ Nodes (65): EffectVisualizerId, OnePole, coeff, current, EffectDef, bodyWidth, c
 
 ### Community 128 - "SpoutGL.cpp"
 Cohesion: 0.04
-Nodes (55): spoutFrameCount::SetFrameCount(), DXGI_FORMAT, GLenum, GLint, GLuint, HANDLE, ID3D11Device, ID3D11DeviceContext (+47 more)
+Nodes (48): DXGI_FORMAT, GLenum, GLint, GLuint, HANDLE, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D (+40 more)
 
 ### Community 129 - "FieldGraphNode"
 Cohesion: 0.03
-Nodes (66): isWide, IFieldGraphHost, Alive, Connect, Mount, Place, SetParam, Spawnable (+58 more)
+Nodes (58): isWide, IFieldGraphHost, Alive, Connect, Mount, Place, SetParam, Spawnable (+50 more)
 
 ### Community 130 - "cdatabrowser.cpp"
 Cohesion: 0.06
-Nodes (85): CDataBrowser, attached, beginTextEdit, CDataBrowser::CDataBrowser(), db, dbHeader, dbHeaderContainer, dbView (+77 more)
+Nodes (75): CDataBrowser, attached, beginTextEdit, db, dbHeader, dbHeaderContainer, dbView, getCellAt (+67 more)
 
 ### Community 131 - "UTF8StringPtr"
 Cohesion: 0.05
@@ -2151,7 +2137,7 @@ Nodes (81): UTF8StringPtr(), IControlListener, AlternateFontChangeAction::Altern
 
 ### Community 132 - "AudioToCVNode"
 Cohesion: 0.03
-Nodes (59): PatternGridDragState, lastStep, node, AudioAudioToCVNode, mAttackMs, mEnv, mGain, mLevel (+51 more)
+Nodes (62): PatternGridDragState, lastStep, node, AudioAudioToCVNode, mAttackMs, mEnv, mGain, mLevel (+54 more)
 
 ### Community 133 - "CColor"
 Cohesion: 0.04
@@ -2159,7 +2145,7 @@ Nodes (74): CGColorRef, CBitmapPixelAccessOrder, CColor(), CSSNamedColor, color,
 
 ### Community 134 - "ImVec4"
 Cohesion: 0.04
-Nodes (68): ImGuiTableColumnFlags, ImGuiTableFlags, Draw(), EditTableColumnsFlags(), EditTableSizingFlags(), ExampleAppDocuments, CloseQueue, Documents (+60 more)
+Nodes (73): CalcResizePosSizeFromAnyCorner(), CalcScrollEdgeSnap(), ImGuiTableColumnFlags, ImGuiTableFlags, Draw(), EditTableColumnsFlags(), EditTableSizingFlags(), ExampleAppDocuments (+65 more)
 
 ### Community 135 - "cgltf.h"
 Cohesion: 0.14
@@ -2171,43 +2157,43 @@ Nodes (59): atomic, AudioCable, INode, thread, OutputNode, exportImagePath, imag
 
 ### Community 137 - "mdaBaseProcessor.h"
 Cohesion: 0.03
-Nodes (65): EventArray, EventPos, IBStream, IEventList, int32, IParameterChanges, ParamID, ParamValue (+57 more)
+Nodes (64): EventArray, EventPos, IBStream, IEventList, int32, IParameterChanges, ParamID, ParamValue (+56 more)
 
 ### Community 138 - "EditorAction"
 Cohesion: 0.03
-Nodes (59): ContextMenuAction, Accept, m_CandidateMenu, m_ContextId, m_CurrentMenu, Process, Reject, ShowBackgroundContextMenu (+51 more)
+Nodes (45): ContextMenuAction, Accept, m_CandidateMenu, m_ContextId, m_CurrentMenu, Process, Reject, ShowBackgroundContextMenu (+37 more)
 
 ### Community 139 - "MinefieldViewController"
 Cohesion: 0.05
-Nodes (83): CButtonState, CCoord, CDataBrowser, CDrawContext, CFontRef, CMouseEventResult, CPoint, CRect (+75 more)
+Nodes (45): CDataBrowser, CFontDesc, CPoint, CView, CVSTGUITimer, IValue, Model, NonAtomicReferenceCounted (+37 more)
 
 ### Community 140 - "PaletteNode"
 Cohesion: 0.03
 Nodes (69): INode, vector, LabDistance2(), LabToDisplay(), LinearToOklab(), LinearToSrgb(), OklabToLinear(), PaletteNode (+61 more)
 
 ### Community 141 - "linuxfactory.cpp"
-Cohesion: 0.03
-Nodes (80): CairoGraphicsDeviceFactory, FILE, PlatformResourceInputStreamPtr, SeekMode, FileResourceInputStream, create, fileHandle, FileResourceInputStream::FileResourceInputStream() (+72 more)
+Cohesion: 0.02
+Nodes (123): CairoGraphicsDeviceFactory, FILE, PlatformResourceInputStreamPtr, SeekMode, FileResourceInputStream, create, fileHandle, FileResourceInputStream::FileResourceInputStream() (+115 more)
 
 ### Community 142 - "value.cpp"
-Cohesion: 0.06
-Nodes (58): convertStepToValue(), convertValueToStep(), initializer_list, IValueConverter, StepType, StringList, StringType, Type (+50 more)
+Cohesion: 0.05
+Nodes (63): convertStepToValue(), convertValueToStep(), initializer_list, IValueConverter, StepType, StringList, StringType, Type (+55 more)
 
 ### Community 143 - "uint32"
 Cohesion: 0.04
-Nodes (64): ConstString::toCFStringRef(), F, performRemove(), performRemoveChars(), performTrim(), String::fromCFStringRef(), hashPointer(), char8 (+56 more)
+Nodes (62): ConstString::toCFStringRef(), F, hashString(), hashString16(), hashString8(), performRemove(), performRemoveChars(), performTrim() (+54 more)
 
 ### Community 144 - "EditControllerEx1"
-Cohesion: 0.04
-Nodes (79): AGainController::initialize(), FUnknown, EventLogDataBrowserSource::EventLogDataBrowserSource(), FUnknown, IBStream, tresult, PlugController::initialize(), PlugController::setComponentState() (+71 more)
+Cohesion: 0.03
+Nodes (92): EventLogDataBrowserSource::EventLogDataBrowserSource(), FUnknown, IBStream, tresult, PlugController::initialize(), PlugController::setComponentState(), BaseController, addBypassParameter (+84 more)
 
 ### Community 145 - "impl"
 Cohesion: 0.06
 Nodes (51): callWhenScriptHasFunction(), CControl, CreateTemplateViewFunc, CRect, CView, CViewContainer, Event, IControlListener (+43 more)
 
 ### Community 146 - "UIViewSwitchContainer"
-Cohesion: 0.04
-Nodes (66): AnimationStyle, CControl, CRect, CView, CViewContainer, IController, IUIDescription, TimingFunction (+58 more)
+Cohesion: 0.05
+Nodes (50): AnimationStyle, CControl, CRect, CView, CViewContainer, IController, IUIDescription, TimingFunction (+42 more)
 
 ### Community 147 - "GrainMolderNode"
 Cohesion: 0.03
@@ -2227,7 +2213,7 @@ Nodes (81): _mm_add_pd(), _mm_add_sd(), _mm_addsub_pd(), _mm_and_pd(), _mm_ceil_
 
 ### Community 151 - "AudioSamplerNode"
 Cohesion: 0.03
-Nodes (61): AdvanceVoicePosition(), AudioSamplerNode, mActiveBuffer, mActiveNoteCount, mDecay, mEnd, mFinetune, mIsPlaying (+53 more)
+Nodes (57): AdvanceVoicePosition(), AudioSamplerNode, mActiveBuffer, mActiveNoteCount, mDecay, mEnd, mFinetune, mIsPlaying (+49 more)
 
 ### Community 152 - "CTextEdit"
 Cohesion: 0.04
@@ -2237,9 +2223,9 @@ Nodes (68): CBitmap, IControlListener, CSearchTextEdit::CSearchTextEdit(), CBitm
 Cohesion: 0.03
 Nodes (72): INode, NoteCable, time_point, unique_ptr, vector, WaveTerrainNode, ampAttack, ampDecay (+64 more)
 
-### Community 154 - "set"
+### Community 154 - "GraphInterpreter"
 Cohesion: 0.05
-Nodes (57): set(), spoutSenderNames::GetSenderNames(), spoutSenderNames::GetSenderSet(), spoutSenderNames::readSenderSetFromBuffer(), spoutSenderNames::writeBufferFromSenderSet(), ReconcileActionKind, ComputeEmitDepths(), ConnectSpec (+49 more)
+Nodes (58): ArgType, ComputeEmitDepths(), ConnectSpec, dstKey, dstSlot, span, srcKey, srcSlot (+50 more)
 
 ### Community 155 - "GeometryNode"
 Cohesion: 0.03
@@ -2251,15 +2237,15 @@ Nodes (78): cgltf_animation_path_type, cgltf_interpolation_type, cgltf_animation
 
 ### Community 157 - "ImFontAtlas"
 Cohesion: 0.03
-Nodes (73): ImFontBuilderIO, ImFontAtlas::Build(), ImFontAtlas::Clear(), ImFontAtlas::GetTexDataAsRGBA32(), ImFontAtlasGetBuilderForStbTruetype(), ImFontAtlas, AddCustomRectFontGlyph, AddCustomRectRegular (+65 more)
+Nodes (66): ImFontBuilderIO, ImFontAtlas::Build(), ImFontAtlas::Clear(), ImFontAtlas::GetTexDataAsRGBA32(), ImFontAtlasGetBuilderForStbTruetype(), ImFontAtlas, AddCustomRectFontGlyph, AddCustomRectRegular (+58 more)
 
 ### Community 158 - "NavigateAction"
-Cohesion: 0.03
-Nodes (54): ed::NavigateAction::GetNextZoom(), ed::NavigateAction::GetViewRect(), ed::NavigateAction::HandleZoom(), ed::NavigateAction::MatchZoom(), Add, GetBounds(), DrawFlags, friend (+46 more)
+Cohesion: 0.04
+Nodes (50): ed::NavigateAction::GetNextZoom(), ed::NavigateAction::GetViewRect(), ed::NavigateAction::HandleZoom(), ed::NavigateAction::MatchZoom(), ed::NavigateAction::Process(), NavigationReason, NavigateAction, Accept (+42 more)
 
 ### Community 159 - "SpoutUtils.cpp"
-Cohesion: 0.04
-Nodes (71): Spout::CheckSpoutPanel(), Spout::SelectSender(), Spout::SelectSenderPanel(), Spout::SetSenderName(), spoutDirectX::GetPerformancePreference(), spoutDirectX::IsPreferenceAvailable(), spoutGL::GetCPUmode(), spoutGL::GetDX9() (+63 more)
+Cohesion: 0.05
+Nodes (61): Spout::CheckSpoutPanel(), Spout::SelectSender(), Spout::SelectSenderPanel(), Spout::SetSenderName(), spoutDirectX::GetPerformancePreference(), spoutDirectX::IsPreferenceAvailable(), spoutGL::WriteTexture(), CloseSpoutConsole() (+53 more)
 
 ### Community 160 - "AudioPluginNode"
 Cohesion: 0.04
@@ -2282,8 +2268,8 @@ Cohesion: 0.03
 Nodes (70): DrumSequencerNode, ClearPattern, CurrentStep, globalDecay, globalPan, globalPitch, globalTransient, gridCanvasRowH (+62 more)
 
 ### Community 165 - "d2dfont.cpp"
-Cohesion: 0.04
-Nodes (67): COMDLG_FILTERSPEC, DWRITE_FONT_STRETCH, DWRITE_FONT_STYLE, DWRITE_FONT_WEIGHT, contains(), CCoord, CPoint, FontFamilyCallback (+59 more)
+Cohesion: 0.06
+Nodes (45): DWRITE_FONT_STRETCH, DWRITE_FONT_STYLE, DWRITE_FONT_WEIGHT, contains(), CCoord, CPoint, FontFamilyCallback, IDWriteTextLayout (+37 more)
 
 ### Community 166 - "EditController"
 Cohesion: 0.04
@@ -2291,11 +2277,11 @@ Nodes (64): editorAttached, editorDestroyed, editorRemoved, extractCurrentInfo, 
 
 ### Community 167 - "mz_zip_archive"
 Cohesion: 0.10
-Nodes (76): mz_bool, MZ_FILE, mz_file_write_func, mz_int64, mz_uint, mz_zip_archive, mz_zip_archive_file_stat, mz_zip_add_mem_to_archive_file_in_place() (+68 more)
+Nodes (79): mz_bool, MZ_FILE, mz_file_write_func, mz_int64, mz_uint, mz_zip_archive, mz_zip_archive_file_stat, mz_zip_error (+71 more)
 
-### Community 168 - "IAudioSource"
-Cohesion: 0.03
-Nodes (36): IAudioSource, GetAudioNode, AudioInputNode, channelMode, deviceId, deviceName, gainDb, mAudioNode (+28 more)
+### Community 168 - "AudioNodes.cpp"
+Cohesion: 0.02
+Nodes (108): AudioCaptureRing, enabled, kCapacity, mEntries, mHead, mTail, overflowCount, Read (+100 more)
 
 ### Community 169 - "AudioPaulStretchNode"
 Cohesion: 0.03
@@ -2307,15 +2293,15 @@ Nodes (52): allocator<T>, allocator<void>, BaseAllocator, const_pointer, A, addr
 
 ### Community 171 - "cbitmap.cpp"
 Cohesion: 0.05
-Nodes (59): BitmapVector, CBitmap, addBitmap, bitmaps, draw, getBestPlatformBitmapForScaleFactor, getHeight, getPlatformBitmap (+51 more)
+Nodes (58): BitmapVector, CBitmap, addBitmap, bitmaps, draw, getBestPlatformBitmapForScaleFactor, getHeight, getPlatformBitmap (+50 more)
 
 ### Community 172 - "SpoutSender.cpp"
 Cohesion: 0.03
 Nodes (7): DWORD, HANDLE, SpoutSender::CreateSender(), SpoutSender::GetHandle(), SpoutSender::GetSenderInfo(), SpoutSender::SetSenderFormat(), SpoutSender::WaitFrameSync()
 
 ### Community 173 - "ReverbKernel"
-Cohesion: 0.03
-Nodes (51): DriftLfo, driftPhase, phase, AllpassStage, x1, y1, AudioEffectNode, atomic (+43 more)
+Cohesion: 0.06
+Nodes (29): AllpassDiffuser, buf, g, pos, size, AudioEffectNode, FdnLine, buf (+21 more)
 
 ### Community 174 - "Direct3D12View"
 Cohesion: 0.04
@@ -2327,11 +2313,11 @@ Nodes (48): Buffer, appendString, appendString16, appendString8, buffer, copy, d
 
 ### Community 176 - "csplitview.cpp"
 Cohesion: 0.06
-Nodes (62): CCoord, CDrawContext, Children, CPoint, CRect, CSplitView, CView, CViewContainer (+54 more)
+Nodes (63): CCoord, CDrawContext, Children, CPoint, CRect, CSplitView, CView, CViewContainer (+55 more)
 
-### Community 177 - "TransformViewTypeOperation"
+### Community 177 - "SharedPointer"
 Cohesion: 0.04
-Nodes (63): BaseSelectionOperation, selection, CViewContainer, UISelection, CView, CViewContainer, EmbedViewOperation, newContainer (+55 more)
+Nodes (68): BaseSelectionOperation, selection, CViewContainer, UISelection, CView, CViewContainer, DeleteOperationViewAndNext, nextView (+60 more)
 
 ### Community 178 - "Signature"
 Cohesion: 0.03
@@ -2346,8 +2332,8 @@ Cohesion: 0.09
 Nodes (42): ClearStackOnExit, Consume(), GenericReader, IterativeParsingState, kDefaultStackCapacity, parseResult_, stack_, state_ (+34 more)
 
 ### Community 181 - "MetaBallNode"
-Cohesion: 0.03
-Nodes (59): MetaBall, strength, x, y, z, CommentEditRequest, framesOpen, justOpened (+51 more)
+Cohesion: 0.04
+Nodes (50): MetaBall, strength, x, y, z, MetaBallNode, bounds, clearcoat (+42 more)
 
 ### Community 182 - "UniversalMidiPacketHandlerAdapter"
 Cohesion: 0.09
@@ -2359,14 +2345,14 @@ Nodes (32): encoding, isUtf16, isUtf8, literalScanners, minBytesPerChar, scanner
 
 ### Community 184 - "Window"
 Cohesion: 0.05
-Nodes (67): Application, ApplicationWindow, gtkApp(), CFrame, CPoint, enable_shared_from_this<Window>, gpointer, IWindow (+59 more)
+Nodes (64): Application, ApplicationWindow, gtkApp(), CFrame, CPoint, enable_shared_from_this<Window>, gpointer, IWindow (+56 more)
 
 ### Community 185 - "mz_zip_archive"
 Cohesion: 0.11
 Nodes (70): mz_bool, MZ_FILE, mz_file_write_func, mz_int64, mz_uint, mz_zip_archive, mz_zip_archive_file_stat, mz_zip_reader_extract_iter_state (+62 more)
 
 ### Community 186 - "CParamDisplay"
-Cohesion: 0.05
+Cohesion: 0.04
 Nodes (58): CParamDisplay, backColor, backOffset, copyBackOffset, CParamDisplay::CParamDisplay(), draw, drawBack, drawPlatformText (+50 more)
 
 ### Community 187 - "NodeViewport"
@@ -2374,12 +2360,12 @@ Cohesion: 0.04
 Nodes (66): CompileShader(), GLenum, IGeometrySource, vector, LinkLitProgram(), LinkPointProgram(), LinkSelectionProgram(), NodeViewport (+58 more)
 
 ### Community 188 - "ctextlabel.cpp"
-Cohesion: 0.05
+Cohesion: 0.06
 Nodes (60): valueToStringFunction, CMultiLineTextLabel, autoHeight, calculateWrapLine, drawRect, drawStyleChanged, getMaxLineWidth, lineLayout (+52 more)
 
 ### Community 189 - "miniz/miniz.c"
 Cohesion: 0.05
-Nodes (65): FILE, MINIZ_EXPORT, mz_streamp, mz_ulong, mz_zip_mode, mz_zip_reader_extract_iter_state, mz_zip_type, tdefl_put_buf_func_ptr (+57 more)
+Nodes (78): MINIZ_EXPORT, mz_streamp, mz_ulong, mz_zip_mode, mz_zip_reader_extract_iter_state, mz_zip_type, tdefl_compressor, tdefl_flush (+70 more)
 
 ### Community 190 - "impl"
 Cohesion: 0.09
@@ -2399,22 +2385,22 @@ Nodes (68): STBTT_DEF, stbtt_int16, stbtt_pack_range, main(), stbtt_BakeFontBitm
 
 ### Community 194 - "impl"
 Cohesion: 0.05
-Nodes (66): allocate_shm_file(), IPtr, IWaylandClientContext, IWaylandHost, RunLoop, tresult, TUID, WindowClosedFunc (+58 more)
+Nodes (69): allocate_shm_file(), IPtr, IWaylandClientContext, IWaylandHost, RunLoop, tresult, TUID, WindowClosedFunc (+61 more)
 
 ### Community 195 - "KeyboardController"
 Cohesion: 0.04
-Nodes (39): ConditionalRemoveViewController, needed, createSubController, CView, Event, IController, IUIDescription, map (+31 more)
+Nodes (47): ConditionalRemoveViewController, needed, CView, Event, IController, IUIDescription, map, NoteIndex (+39 more)
 
 ### Community 196 - "Schema"
-Cohesion: 0.05
-Nodes (49): Context, printRaw, Schema, additionalItems_, additionalItemsSchema_, additionalProperties_, additionalPropertiesSchema_, allocator_ (+41 more)
+Cohesion: 0.04
+Nodes (57): Context, printRaw, PatternProperty, pattern, schema, Schema, additionalItems_, additionalItemsSchema_ (+49 more)
 
 ### Community 197 - "AudioArpeggiatorNode"
 Cohesion: 0.03
 Nodes (53): ArpeggiatorNode, ApplyPreset, CurrentGridStep, CurrentNote, gatePercent, HeldCount, kGateSteps, mAudioNode (+45 more)
 
 ### Community 198 - "AudioNoteCapturerNode"
-Cohesion: 0.03
+Cohesion: 0.04
 Nodes (51): AudioNoteCapturerNode, mCommand, mHeldBits, mInbox, mLoop, mNoteCursor, mOutbox, mPlayheadReadout (+43 more)
 
 ### Community 199 - "AAXWrapper"
@@ -2422,28 +2408,28 @@ Cohesion: 0.03
 Nodes (62): AAX_EComponentInstanceInitAction, AAX_CALLBACK AlgorithmInitFunction(), AAX_CALLBACK AlgorithmProcessFunction(), AAX_Effect_Desc, AAX_Plugin_Desc, AAXWrapper, AAXWrapper_Context, ptr (+54 more)
 
 ### Community 200 - "jsoncxx.h"
-Cohesion: 0.06
-Nodes (46): Base<json_array_element_s>, Base<json_array_s>, Base<json_number_s>, Base<json_object_element_s>, Base<json_object_s>, Base<json_string_s>, Base<json_value_s>, Array (+38 more)
+Cohesion: 0.09
+Nodes (33): Base<json_number_s>, Base<json_object_element_s>, Base<json_string_s>, Base<json_value_s>, Base, Boolean, value, Document (+25 more)
 
-### Community 201 - "DataExchangeProcessor"
-Cohesion: 0.04
-Nodes (58): FUID, FUnknown, IAudioPresentationLatency, iid, setAudioPresentationLatencySamples, IAudioProcessor, canProcessSampleSize, getBusArrangement (+50 more)
-
-### Community 202 - "ITestPlugProvider"
+### Community 201 - "ElementProgram"
 Cohesion: 0.03
-Nodes (49): FUID, FUnknown, ITestPlugProvider, ITestPlugProvider2, getPluginFactory, iid, getComponent, getComponentUID (+41 more)
+Nodes (90): ElemOpcode, ReduceOpKind, map, Evaluate(), ApplyCompound(), CodeEmitter, isPrologue, localRegs (+82 more)
+
+### Community 202 - "funknownimpl.h"
+Cohesion: 0.01
+Nodes (229): BaseClass, DirectIFs, cast(), destroy(), Destroyer, Directly, getInterface(), FUnknown (+221 more)
 
 ### Community 203 - "ADelayProcessor"
-Cohesion: 0.04
-Nodes (58): ADelayController, DEF_INTERFACE, PLUGIN_API, SMTG_OVERRIDE, EditController, END_DEFINE_INTERFACES, FUID, FUnknown (+50 more)
+Cohesion: 0.03
+Nodes (66): getBusArrangement, ADelayController, DEF_INTERFACE, ADelayController::initialize(), PLUGIN_API, ADelayController::setComponentState(), SMTG_OVERRIDE, FUnknown (+58 more)
 
 ### Community 204 - "impl"
-Cohesion: 0.04
-Nodes (55): CCursorType, ChildWindow, CRect, GenericOptionMenuTheme, IPlatformFrameCallback, IPlatformFrameConfig, Optional, PlatformGraphicsDevicePtr (+47 more)
+Cohesion: 0.02
+Nodes (148): xkb_context, xkb_state, CBitmap, CButtonState, CCursorType, ChildWindow, CPoint, CRect (+140 more)
 
 ### Community 205 - "UIEditMenuController"
-Cohesion: 0.05
-Nodes (63): addEntriesToMenu(), copyMenuItems(), CCommandMenuItem, CControl, COptionMenu, CView, CViewContainer, IActionPerformer (+55 more)
+Cohesion: 0.04
+Nodes (66): addEntriesToMenu(), copyMenuItems(), CCommandMenuItem, CControl, CMessageResult, COptionMenu, CView, CViewContainer (+58 more)
 
 ### Community 206 - "AAXWrapper_Parameters"
 Cohesion: 0.09
@@ -2451,7 +2437,7 @@ Nodes (64): AAX_CFieldIndex, AAX_CMidiPacket, AAX_CTypeID, AAX_EParameterOrienta
 
 ### Community 207 - "MediaWin.cpp"
 Cohesion: 0.06
-Nodes (62): IMFAttributes, IMFMediaBuffer, IMFSinkWriter, LONGLONG, CameraHandle, RecorderHandle, VideoHandle, AddRecorderAudioStream() (+54 more)
+Nodes (53): CameraResolution, IMFMediaBuffer, LONGLONG, CameraHandle, RecorderHandle, VideoHandle, BgraBottomUpToTopDown(), BufferFromMemory() (+45 more)
 
 ### Community 208 - "CurveNode"
 Cohesion: 0.03
@@ -2461,29 +2447,29 @@ Nodes (57): CurveNode, clearcoat, clearcoatRoughness, closed, color, CookIfNeede
 Cohesion: 0.03
 Nodes (57): IGeometrySource, INode, Text3DNode, bevel, clearcoat, clearcoatRoughness, color, CookIfNeeded (+49 more)
 
-### Community 210 - "DebugPrint"
-Cohesion: 0.04
-Nodes (57): Animators, onTimer, Animator, CVSTGUITimer, NonAtomicReferenceCounted, Timer, animators, gInstance (+49 more)
+### Community 210 - "CBaseObject"
+Cohesion: 0.03
+Nodes (88): AddAnimation, AnimationMessage, AnimatorTest, CancelAnimation, CancelAnimationWithCallback, DeferedChangesSet, DependentList, Buffer (+80 more)
 
 ### Community 211 - "HostCheck"
-Cohesion: 0.04
-Nodes (52): Codes, int32, EventLogger, addLogEvent, clearLogEvents, mLogEvents, resetLogEvents, LogEvent (+44 more)
+Cohesion: 0.11
+Nodes (23): BusDirection, IComponent, int32, ParamID, ProcessSetup, EventLogger, ParamIDs, HostCheck (+15 more)
 
-### Community 212 - "SpoutLogNotice"
-Cohesion: 0.06
-Nodes (59): D3D_FEATURE_LEVEL, Spout::CheckSender(), Spout::GetSenderAdapter(), Spout::ReleaseReceiver(), Spout::ReleaseSender(), DXGI_FORMAT, HANDLE, ID3D11Device (+51 more)
+### Community 212 - "SpoutDirectX.cpp"
+Cohesion: 0.08
+Nodes (35): D3D_FEATURE_LEVEL, DXGI_FORMAT, HANDLE, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, UINT, spoutDirectX::CloseDirectX11() (+27 more)
 
 ### Community 213 - "Interface"
-Cohesion: 0.04
-Nodes (53): Command, IWindow, SortFunction, UTF8String, MyApplication, Command, IMenuBuilder, SortFunction (+45 more)
+Cohesion: 0.03
+Nodes (70): Command, IWindow, SortFunction, UTF8String, MyApplication, Command, IMenuBuilder, SortFunction (+62 more)
 
 ### Community 214 - "ImageFramesView"
-Cohesion: 0.06
-Nodes (62): CButtonState, CDrawContext, CMouseEventResult, CPoint, CRect, DocumentContextPtr, DragEventData, DragOperation (+54 more)
+Cohesion: 0.03
+Nodes (103): COffscreenContext, _Path, CScrollView, vector, DocumentPtr, Optional, pair, Document (+95 more)
 
 ### Community 215 - "AudioWavetableNode"
-Cohesion: 0.04
-Nodes (52): AudioWavetableNode, mActiveVoices, mEngAmpAdsr, mEngFilterAdsr, mEngFilterAmount, mEngFilterType, mEngOctave, mEngOn (+44 more)
+Cohesion: 0.05
+Nodes (32): AudioWavetableNode, mActiveVoices, mEngAmpAdsr, mEngFilterAdsr, mEngFilterAmount, mEngFilterType, mEngOctave, mEngOn (+24 more)
 
 ### Community 216 - "Queue"
 Cohesion: 0.04
@@ -2494,32 +2480,32 @@ Cohesion: 0.04
 Nodes (64): cgltf_file_type, cgltf_result, cgltf_combine_paths(), cgltf_copy_extras_json(), cgltf_data, accessors, accessors_count, animations (+56 more)
 
 ### Community 218 - "DataSource"
-Cohesion: 0.07
-Nodes (37): ClickCallback, CBitmap, CButtonState, CCoord, CDataBrowser, CDrawContext, CFrame, CMenuItem (+29 more)
+Cohesion: 0.10
+Nodes (25): ClickCallback, CCoord, CFrame, CView, CViewContainer, GenericOptionMenuTheme, IMouseObserver, MouseEvent (+17 more)
 
 ### Community 219 - "nanovg_gl.h"
 Cohesion: 0.09
 Nodes (60): glnvg__allocCall(), glnvg__allocFragUniforms(), glnvg__allocPaths(), glnvg__allocTexture(), glnvg__allocVerts(), glnvg__bindTexture(), glnvg__blendCompositeOperation(), glnvg__blendFuncSeparate() (+52 more)
 
 ### Community 220 - "PlugProvider"
-Cohesion: 0.04
+Cohesion: 0.05
 Nodes (54): App, init, module, plugProvider, startAudioClient, terminate, vst3Processor, Optional (+46 more)
 
 ### Community 221 - "UIViewCreatorController"
-Cohesion: 0.04
-Nodes (55): CView, IUIDescription, UIAttributes, CView, IUIDescription, UIAttributes, CButtonState, CControl (+47 more)
+Cohesion: 0.03
+Nodes (82): COffscreenContext, bitmap, COffscreenContext::COffscreenContext(), copyFrom, create, getHeight, getWidth, CBitmap (+74 more)
 
 ### Community 222 - "uigradientscontroller.cpp"
 Cohesion: 0.06
 Nodes (60): CControl, CDataBrowser, CDrawContext, CGradient, CRect, CTextEdit, GenericStringListDataBrowserSource, IActionPerformer (+52 more)
 
-### Community 223 - "AudioChorderNode"
-Cohesion: 0.03
-Nodes (51): BrownNoise, state, white, PinkNoise, counter, kRows, rows, white (+43 more)
+### Community 223 - "ChorderNode"
+Cohesion: 0.10
+Nodes (15): ChorderNode, chordSize, GetAudioNode, humanizeTimingMs, humanizeVelocity, LastChordSize, mAudioNode, mLastCookFrame (+7 more)
 
 ### Community 224 - "ResynthNode"
-Cohesion: 0.04
-Nodes (52): PadPoint, vector, INode, vector, PadPoint, beat, x, y (+44 more)
+Cohesion: 0.05
+Nodes (31): vector, ResynthNode, autoIterate, chaos, cornerAmount, cornerEffect, feedback, kCorners (+23 more)
 
 ### Community 225 - "CRowColumnView"
 Cohesion: 0.06
@@ -2527,7 +2513,7 @@ Nodes (54): Alignment, CRects, AutoLayout, alignment, groupRect, style, CAutoLay
 
 ### Community 226 - "tresult"
 Cohesion: 0.06
-Nodes (32): AttrID, PluginRestoreState(), Attribute, binaryValue, floatValue, intValue, stringValue, type (+24 more)
+Nodes (28): AttrID, Attribute, binaryValue, floatValue, intValue, stringValue, type, atomic (+20 more)
 
 ### Community 227 - "Application"
 Cohesion: 0.06
@@ -2543,19 +2529,19 @@ Nodes (54): Env, FIXED, HINTERNET, Session, AudioSpikeStart(), ConfigureOutputWi
 
 ### Community 230 - "FlowAnimation"
 Cohesion: 0.04
-Nodes (57): ed::Animation::Animation(), ed::Animation::Finish(), ed::Animation::Play(), ed::Animation::Stop(), ed::Animation::Update(), ed::FlowAnimation::Draw(), ed::FlowAnimation::Flow(), ed::FlowAnimation::FlowAnimation() (+49 more)
+Nodes (57): ed::Animation::Animation(), ed::Animation::Finish(), ed::Animation::Play(), ed::Animation::Stop(), ed::Animation::Update(), ed::FlowAnimation::Draw(), ed::FlowAnimation::Flow(), ed::FlowAnimation::UpdatePath() (+49 more)
 
 ### Community 231 - "vstparameters.cpp"
-Cohesion: 0.07
-Nodes (51): AutomationTest::getParameterData(), int32, Parameter, ParamID, ParamValue, String128, TChar, UnitID (+43 more)
+Cohesion: 0.08
+Nodes (45): int32, Parameter, ParamID, ParamValue, String128, TChar, UnitID, int32 (+37 more)
 
 ### Community 232 - "AudioBuffer"
 Cohesion: 0.06
 Nodes (25): AudioBuffer, mBuffer, mMaxSamples, BypassProcessor, mActive, mDelays, mInputPinLookup, mMainIOBypass (+17 more)
 
 ### Community 233 - "ViewController"
-Cohesion: 0.05
-Nodes (45): pixelToPoint(), calculateColor(), calculateMandelbrotBitmap(), atomic, AtomicReferenceCounted, CBitmap, CControl, CFrame (+37 more)
+Cohesion: 0.04
+Nodes (45): IPlatformFrameTouchBarExtension, recreateTouchBar, setTouchBarCreator, calculateColor(), calculateMandelbrotBitmap(), atomic, AtomicReferenceCounted, CBitmap (+37 more)
 
 ### Community 234 - "AudioRibbonNode"
 Cohesion: 0.04
@@ -2574,8 +2560,8 @@ Cohesion: 0.06
 Nodes (39): DocumentType, Append(), EraseValueByPointer(), GenericPointer, allocator_, nameBuffer_, ownAllocator_, parseErrorCode_ (+31 more)
 
 ### Community 238 - "ParameterChangeListener"
-Cohesion: 0.06
-Nodes (40): EnterEditModeFunc, CControl, CFrame, ControlList, CTextButton, CView, EditController, Event (+32 more)
+Cohesion: 0.05
+Nodes (47): EnterEditModeFunc, CControl, valueChanged, CControl, CFrame, ControlList, CTextButton, CView (+39 more)
 
 ### Community 239 - "ImGui_ImplOpenGL3_Data"
 Cohesion: 0.05
@@ -2586,24 +2572,24 @@ Cohesion: 0.06
 Nodes (58): FILE, MINIZ_EXPORT, mz_streamp, mz_ulong, mz_zip_mode, mz_zip_type, tdefl_put_buf_func_ptr, tinfl_decompressor (+50 more)
 
 ### Community 241 - "impl"
-Cohesion: 0.04
-Nodes (47): AudioBufferDataQueue, CView, deque, DrawCallbackToken, int64, Mutex, vector, GenericRenderThread (+39 more)
+Cohesion: 0.03
+Nodes (63): AudioBufferData, peak, sampleRate, systemTime, AudioBufferDataQueue, CView, deque, DrawCallbackToken (+55 more)
 
 ### Community 242 - "Platform"
 Cohesion: 0.05
-Nodes (56): closeCancelSockets(), ApplicationPtr, FileDescriptor, FUnknown, IPtr, Mutex, RunLoop, tresult (+48 more)
+Nodes (53): closeCancelSockets(), ApplicationPtr, FileDescriptor, FUnknown, IPtr, Mutex, RunLoop, tresult (+45 more)
 
 ### Community 243 - "JX10Processor"
 Cohesion: 0.03
-Nodes (57): BaseProcessor, FUnknown, int32, SMTG_OVERRIDE, SynthDataT, tresult, JX10Processor, att (+49 more)
+Nodes (86): BaseController, FUnknown, SMTG_OVERRIDE, tresult, JX10Controller, PLUGIN_API, SMTG_OVERRIDE, Event (+78 more)
 
 ### Community 244 - "GenericStringListDataBrowserSource"
 Cohesion: 0.06
 Nodes (54): CButtonState, CCoord, CDataBrowser, CDrawContext, CFontRef, CMessageResult, CMouseEventResult, CPoint (+46 more)
 
 ### Community 245 - "win32directcomposition.cpp"
-Cohesion: 0.07
-Nodes (53): Children, DestroyCallback, IDCompositionTarget, IDCompositionVisual, POINT, shared_ptr, VisualPtr, createChildVisual (+45 more)
+Cohesion: 0.06
+Nodes (62): Children, CRect, DestroyCallback, DrawCallback, IDCompositionTarget, IDCompositionVisual, POINT, shared_ptr (+54 more)
 
 ### Community 246 - "AudioColorRampNode"
 Cohesion: 0.04
@@ -2611,23 +2597,23 @@ Nodes (44): AudioColorRampAudioSink, mMeterRing, AudioColorRampNode, bandColor, 
 
 ### Community 247 - "GeometryTableNode"
 Cohesion: 0.04
-Nodes (48): IModulator, GeometryTableNode, CookIfNeeded, Evaluate, extent, geometrySource, mBoundsHalfSpan, mBuiltModel (+40 more)
+Nodes (49): IModulator, GeometryTableNode, CookIfNeeded, Evaluate, extent, geometrySource, mBoundsHalfSpan, mBuiltModel (+41 more)
 
 ### Community 248 - "CGBitmap"
-Cohesion: 0.05
-Nodes (48): CGColorSpaceRef, CGContextRef, CGDataProviderRef, CGBitmap, allocBits, bits, bitsDataProvider, bytesPerRow (+40 more)
+Cohesion: 0.06
+Nodes (44): CGContextRef, CGDataProviderRef, CGBitmap, allocBits, bits, bitsDataProvider, bytesPerRow, CGBitmap::CGBitmap() (+36 more)
 
-### Community 249 - "endEdit"
+### Community 249 - "cswitch.cpp"
 Cohesion: 0.08
-Nodes (56): CHorizontalSwitch, CRockerSwitch, CVerticalSwitch, onKeyboardEvent, onKeyboardEvent, onKeyboardEvent, KeyboardEvent, onKeyboardEvent (+48 more)
+Nodes (46): CHorizontalSwitch, CRockerSwitch, CVerticalSwitch, CCoord, IMultiBitmapControl, autoComputeHeightOfOneImage, heightOfOneImage, subPixmaps (+38 more)
 
 ### Community 250 - "xmltok.c"
 Cohesion: 0.06
 Nodes (51): CONVERTER, ascii_toUtf8(), big2_byteToAscii(), big2_byteType(), big2_charMatches(), big2_isNameMin(), big2_isNmstrtMin(), ENCODING (+43 more)
 
 ### Community 251 - "ImGui_ImplWGPU_Data"
-Cohesion: 0.06
-Nodes (59): ImDrawIdx, FrameResources, IndexBuffer, IndexBufferHost, IndexBufferSize, VertexBuffer, VertexBufferHost, VertexBufferSize (+51 more)
+Cohesion: 0.05
+Nodes (63): ImDrawIdx, FrameResources, IndexBuffer, IndexBufferHost, IndexBufferSize, VertexBuffer, VertexBufferHost, VertexBufferSize (+55 more)
 
 ### Community 252 - "FObject"
 Cohesion: 0.06
@@ -2638,8 +2624,8 @@ Cohesion: 0.06
 Nodes (60): assignBusBuffers(), AudioClient, AudioClient::AudioClient(), blockSize, component, create, createLocalMediaServer, eventList (+52 more)
 
 ### Community 254 - "GridLayoutTestApp"
-Cohesion: 0.06
-Nodes (39): toString(), GridArea, colSpan, column, row, rowSpan, AutoSizeController, Cell (+31 more)
+Cohesion: 0.05
+Nodes (49): toString(), GridArea, colSpan, column, row, rowSpan, getNumber(), CPoint (+41 more)
 
 ### Community 255 - "PathNode"
 Cohesion: 0.04
@@ -2647,7 +2633,7 @@ Nodes (47): AxisOutput, axis, owner, Value01, IModulator, IGeometrySource, IModu
 
 ### Community 256 - "TextNode"
 Cohesion: 0.03
-Nodes (54): INode, vector, TextNode, align, color, fitToBox, fontName, fontSize (+46 more)
+Nodes (53): vector, TextNode, align, color, fitToBox, fontName, fontSize, height (+45 more)
 
 ### Community 257 - "segmentbuttoncreator.cpp"
 Cohesion: 0.06
@@ -2657,29 +2643,29 @@ Nodes (54): CSegmentButton, list, getStandardAttributeListValues(), ConstStringP
 Cohesion: 0.09
 Nodes (60): drflac_allocation_callbacks, DRFLAC_API, drflac_container, drflac_cuesheet_track, drflac_cuesheet_track_iterator, drflac_init_info, drflac_meta_proc, DRFLAC_NO_THREAD_SANITIZE (+52 more)
 
-### Community 259 - "Link"
-Cohesion: 0.04
-Nodes (51): FlowDirection, ed::CreateItemAction::Process(), ed::EditorContext::FindLinkAt(), ed::EditorContext::Flow(), ed::EditorContext::NotifyLinkDeleted(), ed::FlowAnimationController::Flow(), CreateItemAction, Accept (+43 more)
+### Community 259 - "CreateItemAction"
+Cohesion: 0.06
+Nodes (33): ed::CreateItemAction::Process(), CreateItemAction, Accept, AcceptItem, Begin, DragEnd, DropNode, DropNothing (+25 more)
 
-### Community 260 - "again.cpp"
-Cohesion: 0.05
-Nodes (48): AAXWrapper_GetDescription(), AAX_Effect_Desc, AGain, bBypass, bHalfGain, currentProcessMode, fGain, fGainReduction (+40 more)
+### Community 260 - "Mat4"
+Cohesion: 0.10
+Nodes (16): Array(), Mat4, m, GetModelMatrix, GetModelMatrix, GetModelMatrix, GetInstanceGroupMatrix, TransformMatrix (+8 more)
 
 ### Community 261 - "VSTGUIWindowDelegate"
 Cohesion: 0.06
 Nodes (58): NSObject, NSWindowDelegate, VSTSDK_WindowDelegate, -initWithWindow, -windowDidResize, -windowWillClose, -windowWillResizetoSize, NSObject (+50 more)
 
-### Community 262 - "DynamicsKernel"
-Cohesion: 0.04
-Nodes (43): OnePoleLP, a, z1, AudioEffectNode, DynamicsKernel, kMaxChannels, kRmsWindowMs, mAnalog (+35 more)
+### Community 262 - "FrequencyShifterKernel"
+Cohesion: 0.08
+Nodes (23): Allpass2ndOrder, x1, x2, y1, y2, AudioEffectNode, FrequencyShifterKernel, kCoeffsASq (+15 more)
 
-### Community 263 - "Transport"
-Cohesion: 0.05
-Nodes (38): atomic, Transport, AdvanceAudioClock, Beats, BeginOfflineAudioBlock, EndOfflineAudioBlock, mAudioBeatsOffset, mAudioSampleCounter (+30 more)
+### Community 263 - "SampleScanner"
+Cohesion: 0.06
+Nodes (43): Kind, path, vector, Entry, extension, fileName, fileNameLower, folderRoot (+35 more)
 
 ### Community 264 - "handle_value"
-Cohesion: 0.07
-Nodes (45): back(), dump_integer(), empty(), end_array(), end_object(), get_number_unsigned(), get_token_string(), handle_value() (+37 more)
+Cohesion: 0.08
+Nodes (39): BasicJsonType, binary_t, back(), binary(), empty(), end_array(), end_object(), from_json() (+31 more)
 
 ### Community 265 - "stbi__context"
 Cohesion: 0.10
@@ -2689,9 +2675,9 @@ Nodes (59): stbi__bmp_data, stbi__context, stbi__gif, stbi__at_eof(), stbi__bmp_
 Cohesion: 0.09
 Nodes (57): CListControl, attached, clearHoveredRow, CListControl::CListControl(), draw, drawFocusOnTop, drawRect, getConfigurator (+49 more)
 
-### Community 267 - "MouseDownUpMoveEvent"
-Cohesion: 0.04
-Nodes (45): CMenuItem::getVirtualKeyCode(), Event, consumed, id, timestamp, type, EventConsumeState, data (+37 more)
+### Community 267 - "MouseEventButtonState"
+Cohesion: 0.03
+Nodes (52): CMenuItem::getVirtualKeyCode(), Event, consumed, id, timestamp, type, EventConsumeState, data (+44 more)
 
 ### Community 268 - "Writer"
 Cohesion: 0.07
@@ -2703,15 +2689,15 @@ Nodes (50): IGeometrySource, INode, OceanNode, amplitude, choppiness, clearcoat,
 
 ### Community 270 - "HostComponentHandler"
 Cohesion: 0.05
-Nodes (32): PluginParameterCount(), PluginSetParameter(), BusDirection, int32, IParamValueQueue, MediaType, ParamID, ParamValue (+24 more)
+Nodes (30): PluginSetParameter(), BusDirection, int32, IParamValueQueue, MediaType, ParamID, ParamValue, TBool (+22 more)
 
 ### Community 271 - "imgui_impl_sdl3.cpp"
 Cohesion: 0.06
 Nodes (54): ImGuiIO, ImGuiKey, SDL_Cursor, SDL_Event, SDL_Keymod, SDL_Renderer, SDL_Window, Uint32 (+46 more)
 
 ### Community 272 - "SyncDelayProcessor"
-Cohesion: 0.05
-Nodes (49): TChar, SyncEntry, title, value, FUnknown, IBStream, tresult, EditController (+41 more)
+Cohesion: 0.08
+Nodes (34): FUnknown, IBStream, int32, IParameterChanges, SpeakerArrangement, TBool, tresult, FUnknown (+26 more)
 
 ### Community 273 - "cexternalview.cpp"
 Cohesion: 0.08
@@ -2730,28 +2716,28 @@ Cohesion: 0.06
 Nodes (53): BigEndianStream, Error, ByteOrderStream, operator<<, read, seek, ByteOrderStream<StreamByteOrder>::operator<<(), ByteOrderStream<StreamByteOrder>::read() (+45 more)
 
 ### Community 277 - "fstrdefs.h"
-Cohesion: 0.08
-Nodes (48): CreateInstanceFunc, FIDStringsEqual(), char16, char8, FIDString, SMTG_CONSTEXPR14, tchar, str8ToStr16() (+40 more)
+Cohesion: 0.14
+Nodes (34): FIDStringsEqual(), char16, char8, FIDString, SMTG_CONSTEXPR14, tchar, str8ToStr16(), strcat16() (+26 more)
 
 ### Community 278 - "impl"
 Cohesion: 0.07
-Nodes (54): Display, Atom, tresult, TUID, Window, WindowClosedFunc, WindowControllerPtr, IWindow (+46 more)
+Nodes (53): Display, Atom, tresult, TUID, Window, WindowClosedFunc, WindowControllerPtr, IWindow (+45 more)
 
-### Community 279 - "ImGuiTableColumn"
-Cohesion: 0.04
-Nodes (55): ImGui::DebugAllocHook(), ImGuiTableColumnFlags, ImS16, ImGuiDebugAllocEntry, AllocCount, FrameCount, FreeCount, ImGuiDebugAllocInfo (+47 more)
+### Community 279 - "ImGuiDebugAllocInfo"
+Cohesion: 0.18
+Nodes (11): ImGui::DebugAllocHook(), ImS16, ImGuiDebugAllocEntry, AllocCount, FrameCount, FreeCount, ImGuiDebugAllocInfo, LastEntriesBuf (+3 more)
 
 ### Community 280 - "DataExchangeController"
-Cohesion: 0.05
-Nodes (42): atomic, CView, CVSTGUITimer, DataExchangeUserContextID, EditController, END_DEFINE_INTERFACES, FUnknown, IPlugView (+34 more)
+Cohesion: 0.06
+Nodes (33): atomic, CView, CVSTGUITimer, DataExchangeUserContextID, EditController, END_DEFINE_INTERFACES, FUnknown, IPlugView (+25 more)
 
 ### Community 281 - "CColorChooser"
 Cohesion: 0.05
 Nodes (47): CColorChooser, alphaSlider, blueSlider, brightnessSlider, color, colorView, controlBeginEdit, controlEndEdit (+39 more)
 
 ### Community 282 - "ViewListenerAdapter"
-Cohesion: 0.05
-Nodes (34): CButtonState, CMouseEventResult, CPoint, CRect, CView, CViewContainer, Event, IViewContainerListener (+26 more)
+Cohesion: 0.06
+Nodes (30): CButtonState, CMouseEventResult, CPoint, CRect, CView, CViewContainer, IViewContainerListener, viewContainerTransformChanged (+22 more)
 
 ### Community 283 - "xmlrole.c"
 Cohesion: 0.13
@@ -2762,24 +2748,24 @@ Cohesion: 0.05
 Nodes (48): AudioEngine, IsAlive, LastBlockLoad, mCompletedGeneration, mCurrent, mLastBlockLoad, mLastCallbackMs, mPreviewPlayer (+40 more)
 
 ### Community 285 - "ProjectionNode"
-Cohesion: 0.04
-Nodes (47): array, INode, Point, x, y, ProjectionNode, CookIfNeeded, EnsureMesh (+39 more)
-
-### Community 286 - "moduleinit.cpp"
 Cohesion: 0.06
-Nodes (50): ACFAPI, acfCLSID, acfIID, acfUInt32, acfUInt64, Utf8ArgPtrs, Utf8Args, wchar_t (+42 more)
+Nodes (35): INode, Point, x, y, ProjectionNode, CookIfNeeded, EnsureMesh, EnsureShader (+27 more)
+
+### Community 286 - "aaxentry.cpp"
+Cohesion: 0.07
+Nodes (40): ACFAPI, acfCLSID, acfIID, acfUInt32, acfUInt64, Utf8ArgPtrs, Utf8Args, wchar_t (+32 more)
 
 ### Community 287 - "timer.cpp"
-Cohesion: 0.05
-Nodes (44): CreateTimerFunc, Extends<Timer, U::Directly<Linux::ITimerHandler>>, instance, CFRunLoopTimerRef, DWORD, int32, Timer, UINT (+36 more)
+Cohesion: 0.08
+Nodes (33): instance, CFRunLoopTimerRef, DWORD, int32, Timer, UINT, uint64, UINT_PTR (+25 more)
 
 ### Community 288 - "ExampleRenderer"
 Cohesion: 0.04
-Nodes (41): D3D12_RECT, D3D12_VERTEX_BUFFER_VIEW, D3D12_VIEWPORT, INT64, IDirect3D12View, getCommandAllocator, getDevice, getFrameIndex (+33 more)
+Nodes (45): D3D12_RECT, D3D12_VERTEX_BUFFER_VIEW, D3D12_VIEWPORT, INT64, SIZE_T, IDirect3D12View, getCommandAllocator, getDevice (+37 more)
 
-### Community 289 - "SpecMeterProcessor"
-Cohesion: 0.04
-Nodes (47): FUnknown, tresult, BaseController, FUnknown, tresult, SpecMeterController, SpecMeterController::initialize(), SMTG_OVERRIDE (+39 more)
+### Community 289 - "mdaBaseController.h"
+Cohesion: 0.02
+Nodes (105): BeatBoxController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult, BeatBoxProcessor::BeatBoxProcessor() (+97 more)
 
 ### Community 290 - "stream.h"
 Cohesion: 0.06
@@ -2789,17 +2775,17 @@ Nodes (23): FileReadStream(), RAPIDJSON_NAMESPACE_BEGIN, FileWriteStream(), RAPI
 Cohesion: 0.05
 Nodes (38): fromScriptRect(), CPoint, CRect, Event, makeScriptEvent(), makeScriptPoint(), makeScriptRect(), createJSFunction() (+30 more)
 
-### Community 292 - "crect.h"
-Cohesion: 0.07
-Nodes (43): AddBiggerOne, AddMulti, AddOverlappingOne, AddSmallerOne, CInvalidRectListTest, CInvalidRectList, add, list (+35 more)
+### Community 292 - "SceneSignature"
+Cohesion: 0.05
+Nodes (28): GetSurfaceTexture, vector, IGeometrySource, GetMaterial, GetModelMatrix, MeshRevision, SceneSignature, animated (+20 more)
 
 ### Community 293 - "HiDPISupport"
 Cohesion: 0.05
 Nodes (40): AWARENESS_CONTEXT, DPI_AWARENESS, EnableNonClientDpiScalingFunc, DllBase, module, getProcAddress(), AdjustWindowRectExForDpiProc, BOOL (+32 more)
 
 ### Community 294 - "module.cpp"
-Cohesion: 0.05
-Nodes (49): ClassInfos, ClassInfo, cardinality, classFlags, data, parseSubCategories, subCategoriesString, FactoryInfo (+41 more)
+Cohesion: 0.04
+Nodes (59): ClassInfos, PFactoryInfo(), ClassInfo, cardinality, classFlags, data, parseSubCategories, subCategoriesString (+51 more)
 
 ### Community 295 - "dr_wav.h"
 Cohesion: 0.08
@@ -2818,16 +2804,16 @@ Cohesion: 0.12
 Nodes (55): stbi__bmp_data, stbi__context, stbi__pngchunk, stbi__at_eof(), stbi__bmp_info(), stbi__bmp_load(), stbi__bmp_parse_header(), stbi__bmp_test() (+47 more)
 
 ### Community 299 - "DelayProcessor"
-Cohesion: 0.05
-Nodes (47): FUnknown, ParamID, ParamValue, String128, TChar, tresult, DelayController, DelayController::getParamStringByValue() (+39 more)
+Cohesion: 0.10
+Nodes (20): DelayProcessor, buffer, dry, fbk, fil, fil0, hmix, ipos (+12 more)
 
 ### Community 300 - "DetuneProcessor"
-Cohesion: 0.05
-Nodes (47): FUnknown, ParamID, ParamValue, String128, TChar, tresult, DetuneController, DetuneController::getParamStringByValue() (+39 more)
+Cohesion: 0.10
+Nodes (20): DetuneProcessor, buf, buflen, bufres, dpos1, dpos2, dry, PLUGIN_API (+12 more)
 
 ### Community 301 - "d2dgraphicscontext.cpp"
-Cohesion: 0.08
-Nodes (48): pixelAlign(), CCoord, CPoint, IDWriteTextLayout, IPlatformGradient, IPlatformGraphicsDeviceContextBitmapExt, IPlatformGraphicsPath, LineCap (+40 more)
+Cohesion: 0.09
+Nodes (44): pixelAlign(), CCoord, CPoint, IDWriteTextLayout, IPlatformGradient, IPlatformGraphicsDeviceContextBitmapExt, IPlatformGraphicsPath, LineCap (+36 more)
 
 ### Community 302 - "UISelection"
 Cohesion: 0.07
@@ -2841,25 +2827,25 @@ Nodes (53): AAX_ICollection, AAX_IEffectDescriptor, AAX_Plugin_Desc, AAX_ICompon
 Cohesion: 0.04
 Nodes (54): AlignContentCenter, AlignContentEnd, AlignContentSpaceAround, AlignContentSpaceBetween, AlignContentStart_Explicit, AlignItemsCenter, AlignItemsEnd, AlignItemsStart (+46 more)
 
-### Community 305 - "CBaseObject"
+### Community 305 - "BitmapFilterChangeAction"
 Cohesion: 0.05
-Nodes (42): DeferedChangesSet, DependentList, CMessageResult, DoneFunction, IAnimationTarget, IdStringPtr, ITimingFunction, CView::addAnimation() (+34 more)
+Nodes (41): BitmapFilterChangeAction, bitmapName, description, newAttributes, oldAttributes, perform, performOrUndo, undo (+33 more)
 
 ### Community 306 - "RunLoop"
 Cohesion: 0.06
-Nodes (51): EventCallback, CallbackFunc, TimerCallback, f, pause(), TimePoint, Timer, TimerID (+43 more)
+Nodes (50): EventCallback, CallbackFunc, TimerCallback, f, TimePoint, Timer, TimerID, TimerInterval (+42 more)
 
 ### Community 307 - "MultiBandProcessor"
-Cohesion: 0.04
-Nodes (48): BaseController, FUnknown, SMTG_OVERRIDE, tresult, MultiBandController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+40 more)
+Cohesion: 0.06
+Nodes (32): BaseProcessor, FUnknown, int32, SMTG_OVERRIDE, tresult, MultiBandProcessor, att1, att2 (+24 more)
 
 ### Community 308 - "panner/source/plugprocessor.cpp"
 Cohesion: 0.05
 Nodes (47): FUnknown, ParamValue, SMTG_OVERRIDE, tresult, PlugProcessor, getStereoPanCoef, mBypass, mPanValue (+39 more)
 
 ### Community 309 - "ParameterChanges"
-Cohesion: 0.06
-Nodes (47): int32, ParamID, ParamValue, tresult, DECLARE_FUNKNOWN_METHODS, int32, IParameterChanges, IParamValueQueue (+39 more)
+Cohesion: 0.05
+Nodes (57): int32, ParamID, ParamValue, tresult, DECLARE_FUNKNOWN_METHODS, int32, IParameterChanges, IParamValueQueue (+49 more)
 
 ### Community 310 - "json.h"
 Cohesion: 0.08
@@ -2873,21 +2859,21 @@ Nodes (49): Broadcast(), IRNodePtr, IRStmtPtr, ostringstream, unordered_map, uno
 Cohesion: 0.08
 Nodes (53): cgltf_bool, cgltf_component_type, cgltf_size, cgltf_ssize, cgltf_type, cgltf_uint, cgltf_accessor, buffer_view (+45 more)
 
-### Community 313 - "IAttributeList"
-Cohesion: 0.05
-Nodes (49): FUID, FUnknown, IAttributeList, iid, PLUGIN_API, IStreamAttributes, getAttributes, getFileName (+41 more)
+### Community 313 - "IHostApplication"
+Cohesion: 0.08
+Nodes (28): allocateMessage(), FUID, FUnknown, IHostApplication, createInstance, iid, PLUGIN_API, IVst3ToAAXWrapper (+20 more)
 
 ### Community 314 - "XdndHandler"
-Cohesion: 0.08
-Nodes (52): free(), ChildWindow, Atom, ChildWindow, CPoint, DragEventData, IPlatformFrameCallback, vector (+44 more)
+Cohesion: 0.05
+Nodes (69): free(), ChildWindow, Atom, ChildWindow, CPoint, DragEventData, IPlatformFrameCallback, Type (+61 more)
 
 ### Community 315 - "PluginGUIEditor"
 Cohesion: 0.05
 Nodes (33): AEffEditor, AEffGUIEditor, beforeSizeChange, doIdleStuff, getRect, idle, knobMode, AEffGUIEditor::onKeyDown() (+25 more)
 
 ### Community 316 - "CXYPad"
-Cohesion: 0.06
-Nodes (45): CancelMouseInteraction, CXYPadTest, MouseWheel, CMouseWheelEditingSupport, endEditTimer, invalidMouseWheelEditTimer, SharedPointer, CBitmap (+37 more)
+Cohesion: 0.07
+Nodes (39): CMouseWheelEditingSupport, endEditTimer, invalidMouseWheelEditTimer, onMouseWheelEditing, CControl, SharedPointer, CBitmap, CDrawContext (+31 more)
 
 ### Community 317 - "CSplashScreen"
 Cohesion: 0.06
@@ -2903,23 +2889,23 @@ Nodes (42): D3Dnvg__allocCall(), D3Dnvg__allocFragUniforms(), D3Dnvg__allocPaths
 
 ### Community 320 - "BeatBoxProcessor"
 Cohesion: 0.04
-Nodes (51): BeatBoxProcessor, dyna, dyne, dynm, dynr, hbuf, hbuflen, hbufpos (+43 more)
+Nodes (50): BeatBoxProcessor, dyna, dyne, dynm, dynr, hbuf, hbuflen, hbufpos (+42 more)
 
 ### Community 321 - "Button"
-Cohesion: 0.04
-Nodes (34): Button, attach, impl, looseFocus, platformViewTypeSupported, remove, setContentScaleFactor, setEditCallbacks (+26 more)
+Cohesion: 0.05
+Nodes (31): Button, attach, impl, looseFocus, platformViewTypeSupported, remove, setContentScaleFactor, setEditCallbacks (+23 more)
 
 ### Community 322 - "uitemplatecontroller.cpp"
 Cohesion: 0.08
 Nodes (48): GenericStringListDataBrowserSource, setupDataSource, CCoord, COptionMenu, CView, CViewContainer, IActionPerformer, IController (+40 more)
 
-### Community 323 - "FieldProgramCache"
-Cohesion: 0.08
-Nodes (38): Scope, CompileBlock(), CompileBodyNode(), CompileCall(), CompileExpr(), CompileSampleProgram(), CompileStmt(), AstNodePtr (+30 more)
+### Community 323 - "WavetableShaperKernel"
+Cohesion: 0.06
+Nodes (23): AudioEffectNode, DcBlocker, prevIn, prevOut, DriveKernel, kMaxChannels, mDcBlockers, mMailbox (+15 more)
 
-### Community 324 - "FormulaNode"
-Cohesion: 0.05
-Nodes (44): DeviceFile, author, code, description, domain, name, nodeSettings, params (+36 more)
+### Community 324 - "PluginScanner"
+Cohesion: 0.07
+Nodes (32): Entry, vector, FoldersPath(), atomic, Entry, mutex, thread, vector (+24 more)
 
 ### Community 325 - "stb/stb_image.h"
 Cohesion: 0.10
@@ -2949,13 +2935,13 @@ Nodes (31): A(), at(), b(), be(), Ee(), f(), getEventsNS(), getViewportDimension
 Cohesion: 0.06
 Nodes (31): A(), at(), b(), be(), Ee(), f(), getEventsNS(), getViewportDimensions() (+23 more)
 
-### Community 332 - "U"
-Cohesion: 0.12
-Nodes (50): ITestResult, addErrorMessage, addMessage, iid, addErrorMessage, addMessage, BusActivationTest::run(), BusConsistencyTest::run() (+42 more)
+### Community 332 - "impl"
+Cohesion: 0.08
+Nodes (34): Children, CViewContainer, optional, ViewLayout, impl, activeScrollbarStyle, containerSize, edgeViewLeft (+26 more)
 
 ### Community 333 - "Plug"
-Cohesion: 0.05
-Nodes (40): FUID, FUnknown, IPrefetchableSupport, getPrefetchableSupport, iid, FUnknown, IBStream, PrefetchableSupport (+32 more)
+Cohesion: 0.11
+Nodes (17): FUID, FUnknown, IPrefetchableSupport, getPrefetchableSupport, iid, END_DEFINE_INTERFACES, FUnknown, int32 (+9 more)
 
 ### Community 334 - "stb_truetype.h"
 Cohesion: 0.08
@@ -2974,20 +2960,20 @@ Cohesion: 0.05
 Nodes (45): BaseController, FUnknown, SMTG_OVERRIDE, tresult, RezFilterController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+37 more)
 
 ### Community 338 - "timingfunctions.cpp"
-Cohesion: 0.06
-Nodes (42): CPoint, CubicBezierTimingFunction, easy, easyIn, easyInOut, easyOut, getPosition, lerp (+34 more)
+Cohesion: 0.12
+Nodes (22): CPoint, CubicBezierTimingFunction, easy, easyIn, easyInOut, easyOut, getPosition, lerp (+14 more)
 
-### Community 339 - "GenericSchemaDocument"
-Cohesion: 0.08
-Nodes (29): GenericSchemaDocument, allocator_, currentError_, docId_, error_, kInitialSchemaMapSize, kInitialSchemaRefSize, ownAllocator_ (+21 more)
+### Community 339 - "ValueType"
+Cohesion: 0.07
+Nodes (35): CreatePattern(), GenericSchemaDocument, allocator_, currentError_, docId_, error_, kInitialSchemaMapSize, kInitialSchemaRefSize (+27 more)
 
 ### Community 340 - "UIFontsController"
 Cohesion: 0.05
 Nodes (49): CColorChooser, CControl, CView, GenericStringListDataBrowserSource, IActionPerformer, IController, IControlListener, IUIDescription (+41 more)
 
 ### Community 341 - "PluginVST3Win.cpp"
-Cohesion: 0.10
-Nodes (49): ProbeOutcome, AddToBlocklistLocked(), Base64Decode(), Base64Encode(), CacheVST3BundlePath(), CheckSentinelForCrashLocked(), ClearSentinel(), ClearVST3Blocklist() (+41 more)
+Cohesion: 0.09
+Nodes (54): ProbeOutcome, AddToBlocklistLocked(), Base64Decode(), Base64Encode(), CacheVST3BundlePath(), CheckSentinelForCrashLocked(), ClearSentinel(), ClearVST3Blocklist() (+46 more)
 
 ### Community 342 - "GranularNode"
 Cohesion: 0.04
@@ -2999,47 +2985,47 @@ Nodes (33): Bit, Cell, flags, neighbours, Matrix, IListener, onCellChanged, Mode
 
 ### Community 344 - "IAttributes"
 Cohesion: 0.05
-Nodes (45): IString, SMTG_OVERRIDE, fromAttributes, toAttributes, StringObject, PLUGIN_API, SMTG_OVERRIDE, FVariant (+37 more)
+Nodes (42): IString, SMTG_OVERRIDE, StringObject, PLUGIN_API, SMTG_OVERRIDE, FVariant, FUID, FUnknown (+34 more)
 
 ### Community 345 - "againcontroller.cpp"
-Cohesion: 0.07
-Nodes (47): AGainController, addUIMessageController, createSubController, defaultMessageText, getDefaultMessageText, AGainController::getMidiControllerAssignment(), AGainController::getParamStringByValue(), AGainController::getParamValueByString() (+39 more)
+Cohesion: 0.06
+Nodes (49): AGainController, addUIMessageController, createSubController, defaultMessageText, getDefaultMessageText, AGainController::getMidiControllerAssignment(), AGainController::getParamStringByValue(), AGainController::getParamValueByString() (+41 more)
 
 ### Community 346 - "SplitterProcessor"
-Cohesion: 0.05
-Nodes (44): BaseController, FUnknown, SMTG_OVERRIDE, tresult, SplitterController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+36 more)
+Cohesion: 0.08
+Nodes (26): BaseProcessor, int32, SMTG_OVERRIDE, tresult, SplitterProcessor, att, buf0, buf1 (+18 more)
 
 ### Community 347 - "CTabView"
-Cohesion: 0.06
-Nodes (45): CBitmap, CControl, CDrawContext, CPoint, CRect, CView, IControlListener, NonAtomicReferenceCounted (+37 more)
+Cohesion: 0.04
+Nodes (60): CBitmap, CButtonState, CControl, CCoord, CDrawContext, CFontRef, CMouseEventResult, COnOffButton (+52 more)
 
 ### Community 348 - "AudioBouncingBallsNode"
 Cohesion: 0.04
 Nodes (43): AudioBouncingBallsNode, kBound, kMaxPending, mBallSize, mBallSpeed, mFlash, mFlashReadout, mInitialized (+35 more)
 
 ### Community 349 - "PluginHandle"
-Cohesion: 0.06
-Nodes (46): PluginHandle, PluginBeginLearn(), PluginCloseEditor(), PluginDestroy(), PluginEditorIsOpen(), PluginEndLearn(), PluginGetParameter(), PluginOpenEditor() (+38 more)
+Cohesion: 0.04
+Nodes (76): PluginDesc, acceptsNotes, format, identifier, manufacturer, name, path, PluginHandle (+68 more)
 
 ### Community 350 - "MNVGcontext"
 Cohesion: 0.09
 Nodes (44): CAMetalLayer, dispatch_semaphore_t, MTLPixelFormat, NSMutableArray, NSObject, NVGvertex, MNVGbuffers, MNVGcontext (+36 more)
 
 ### Community 351 - "TestBase"
-Cohesion: 0.04
-Nodes (28): DECLARE_VSTTEST, TestBase, ScanBussesTest, EditorClassesTest, TestBase, TestBase, MidiLearnTest, TestBase (+20 more)
+Cohesion: 0.15
+Nodes (3): TestBase, ScanBussesTest, SuspendResumeTest
 
 ### Community 352 - "SpoutLogError"
 Cohesion: 0.06
-Nodes (36): Spout::GetAdapterInfo(), Spout::ReceiveSenderData(), DWORD, ID3D11Texture2D, spoutFrameCount::AllowKeyedAccess(), spoutFrameCount::AllowTextureAccess(), spoutFrameCount::CheckAccess(), spoutFrameCount::CheckKeyedAccess() (+28 more)
+Nodes (37): Spout::GetAdapterInfo(), Spout::ReceiveSenderData(), DWORD, ID3D11Texture2D, spoutFrameCount::AllowKeyedAccess(), spoutFrameCount::AllowTextureAccess(), spoutFrameCount::CheckAccess(), spoutFrameCount::CheckKeyedAccess() (+29 more)
 
 ### Community 353 - "CPluginFactory"
-Cohesion: 0.06
-Nodes (47): PFactoryInfo(), CPluginFactory, CPluginFactory::addHostContextCallback(), classCount, classes, CPluginFactory::countClasses(), CPluginFactory::CPluginFactory(), CPluginFactory::createInstance() (+39 more)
+Cohesion: 0.04
+Nodes (58): CreateTimerFunc, Extends<Timer, U::Directly<Linux::ITimerHandler>>, InjectCreateTimerFunction(), PClassInfo(), CPluginFactory, CPluginFactory::addHostContextCallback(), classCount, classes (+50 more)
 
 ### Community 354 - "IRStmt"
-Cohesion: 0.04
-Nodes (49): IRStmt, assignField, assignOp, assignTarget, attribInitExpr, attribInitValues, attribName, attribType (+41 more)
+Cohesion: 0.02
+Nodes (125): IRKind, IRStmtKind, DeclaredInput, domain, isStructural, lanes, name, span (+117 more)
 
 ### Community 355 - "OscReceiveNode"
 Cohesion: 0.05
@@ -3047,15 +3033,15 @@ Nodes (35): atomic, IModulator, INode, mutex, thread, OscReceiveNode, address, h
 
 ### Community 356 - "SamplerNode"
 Cohesion: 0.04
-Nodes (35): AudioCable, INode, NoteCable, unique_ptr, SamplerNode, audioInput, decay, end (+27 more)
+Nodes (39): AudioNode, AudioCable, INode, NoteCable, unique_ptr, SamplerNode, audioInput, decay (+31 more)
 
 ### Community 357 - "cgltf_node"
 Cohesion: 0.04
 Nodes (48): cgltf_camera_type, cgltf_light_type, cgltf_camera, data, extensions, extensions_count, extras, cgltf_camera_index() (+40 more)
 
 ### Community 358 - "mpeprocessor.cpp"
-Cohesion: 0.08
-Nodes (41): ChannelDataList, ChannelData, notes, pressure, x, y, Controller, Handler (+33 more)
+Cohesion: 0.07
+Nodes (46): ChannelDataList, ChannelData, notes, pressure, x, y, Controller, Handler (+38 more)
 
 ### Community 359 - "DRWAV_PRIVATE"
 Cohesion: 0.14
@@ -3066,20 +3052,20 @@ Cohesion: 0.07
 Nodes (42): enable_shared_from_this<IntervalTimer>, EventHandlers, FileDescriptor, IEventHandler, IPtr, ITimerHandler, TimerInterval, Timers (+34 more)
 
 ### Community 361 - "I"
-Cohesion: 0.07
-Nodes (33): FUnknownPtr, operator=, IPtr, adopt(), IPtr, IPtr<I>::IPtr(), IPtr<I>::operator=(), operator= (+25 more)
+Cohesion: 0.09
+Nodes (30): adopt(), IPtr, IPtr<I>::IPtr(), IPtr<I>::operator=(), operator=, ptr, OPtr, owned() (+22 more)
 
 ### Community 362 - "RingModProcessor"
-Cohesion: 0.05
-Nodes (40): FUnknown, ParamID, ParamValue, String128, TChar, tresult, BaseController, FUnknown (+32 more)
+Cohesion: 0.06
+Nodes (30): BaseController, FUnknown, SMTG_OVERRIDE, tresult, RingModController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+22 more)
 
 ### Community 363 - "SubSynthProcessor"
-Cohesion: 0.05
-Nodes (42): BaseController, FUnknown, SMTG_OVERRIDE, tresult, SubSynthController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+34 more)
+Cohesion: 0.08
+Nodes (24): BaseProcessor, int32, SMTG_OVERRIDE, tresult, SubSynthProcessor, dphi, dry, dvd (+16 more)
 
-### Community 364 - "HRESULT"
-Cohesion: 0.07
-Nodes (43): exception, Win32Exception, _errorStr, HRESULT, ULONG, CResourceDescription, DWORD, REFIID (+35 more)
+### Community 364 - "NoteStackNode"
+Cohesion: 0.06
+Nodes (25): AudioNoteStackNode, kVoices, mEnabled, mInbox, mLastStackSize, mNoteCursor, mOutbox, mSemitones (+17 more)
 
 ### Community 365 - "rapidjson.h"
 Cohesion: 0.05
@@ -3094,8 +3080,8 @@ Cohesion: 0.05
 Nodes (37): OnePoleHP, a, z1, AudioEffectNode, DelayKernel, kMaxDelaySeconds, mAnalog, mAnalogHp (+29 more)
 
 ### Community 368 - "MetallicVoice"
-Cohesion: 0.05
-Nodes (40): AllpassStage, c, s, MalletExciter, active, env, envDecay, filter (+32 more)
+Cohesion: 0.04
+Nodes (41): GetMaterialProfile(), MetallicVoice, active, age, ampDecay, cachedDecay, cachedFreq, cachedMaterial (+33 more)
 
 ### Community 369 - "INode"
 Cohesion: 0.05
@@ -3106,8 +3092,8 @@ Cohesion: 0.05
 Nodes (43): AudioBufferList, AudioUnit, AUGraph, AudioIO, addProcessor, audioProcessors, getBeatAndTempo, getHostIcon (+35 more)
 
 ### Community 371 - "JackClient"
-Cohesion: 0.09
-Nodes (43): AudioClientName, BufferPointers, IAudioClient, getIOSetup, process, setBlockSize, setSamplerate, IMidiClient (+35 more)
+Cohesion: 0.10
+Nodes (38): AudioClientName, BufferPointers, IMidiClient, getMidiIOSetup, onEvent, IMediaServerPtr, createMediaServer(), jack_on_process() (+30 more)
 
 ### Community 372 - "STBTT_DEF"
 Cohesion: 0.10
@@ -3122,20 +3108,20 @@ Cohesion: 0.06
 Nodes (21): CharTestFunc, B, CDrawMode, mode, getStyle, setStyle, setAnimateViewResizing, setHideClippedSubviews (+13 more)
 
 ### Community 375 - "Win32OpenGLView"
-Cohesion: 0.07
+Cohesion: 0.06
 Nodes (43): CRITICAL_SECTION, IOpenGLView, drawOpenGL, reshape, PixelFormat, depthBufferSize, flags, samples (+35 more)
 
 ### Community 376 - "imstb_textedit.h"
-Cohesion: 0.13
-Nodes (45): StbTexteditRow, ImGuiInputTextState::OnKeyPressed(), STB_TEXTEDIT_DELETECHARS(), STB_TEXTEDIT_GETWIDTH(), STB_TEXTEDIT_LAYOUTROW(), STB_TEXTEDIT_STRINGLEN(), IMSTB_TEXTEDIT_CHARTYPE, STB_TEXTEDIT_KEYTYPE (+37 more)
+Cohesion: 0.14
+Nodes (40): IMSTB_TEXTEDIT_CHARTYPE, STB_TexteditState, ImGuiInputTextState::OnKeyPressed(), STB_TEXTEDIT_KEYTOTEXT(), stb_textedit_replace(), IMSTB_TEXTEDIT_CHARTYPE, STB_TEXTEDIT_KEYTYPE, STB_TexteditState (+32 more)
 
 ### Community 377 - "CGradientView"
 Cohesion: 0.07
-Nodes (37): CGradientView, attributeChanged, draw, drawAntialiased, frameColor, frameWidth, gradient, gradientAngle (+29 more)
+Nodes (36): CGradientView, attributeChanged, draw, drawAntialiased, frameColor, frameWidth, gradient, gradientAngle (+28 more)
 
 ### Community 378 - "cairofont.cpp"
-Cohesion: 0.07
-Nodes (36): CCoord, CPoint, FontFamilyCallback, IFontPainter, IPlatformString, PlatformGraphicsDeviceContextPtr, Font, drawString (+28 more)
+Cohesion: 0.06
+Nodes (45): CCoord, CPoint, FontFamilyCallback, IFontPainter, IPlatformString, PlatformGraphicsDeviceContextPtr, Font, drawString (+37 more)
 
 ### Community 379 - "D3D11View"
 Cohesion: 0.06
@@ -3150,12 +3136,12 @@ Cohesion: 0.05
 Nodes (37): FUnknown, tresult, DeEsserController, DeEsserController::initialize(), PLUGIN_API, SMTG_OVERRIDE, DeEsserController::terminate(), BaseController (+29 more)
 
 ### Community 382 - "RePsychoProcessor"
-Cohesion: 0.05
-Nodes (39): BaseController, FUnknown, SMTG_OVERRIDE, tresult, RePsychoController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+31 more)
+Cohesion: 0.10
+Nodes (21): BaseProcessor, int32, SMTG_OVERRIDE, tresult, RePsychoProcessor, buf, buf2, buffer (+13 more)
 
 ### Community 383 - "ThruZeroProcessor"
-Cohesion: 0.05
-Nodes (39): BaseController, FUnknown, SMTG_OVERRIDE, tresult, ThruZeroController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+31 more)
+Cohesion: 0.10
+Nodes (21): BaseProcessor, int32, SMTG_OVERRIDE, tresult, ThruZeroProcessor, buffer, buffer2, bufpos (+13 more)
 
 ### Community 384 - "D2DGraphicsPath"
 Cohesion: 0.09
@@ -3190,8 +3176,8 @@ Cohesion: 0.07
 Nodes (24): ApplyAttributes, ApplyCustomViewAttributes, CollectFilteredViewNames, CollectRegisteredViewAndDisplayNames, CreateUnknownView, DefaultViewCreation, BaseViewCreator, AttrType (+16 more)
 
 ### Community 392 - "Impl"
-Cohesion: 0.06
-Nodes (35): Bytef, PostEventHandler, wasInEventHandling, Impl, IContentProvider, InputStream, unique_ptr, ZLibInputContentProvider (+27 more)
+Cohesion: 0.09
+Nodes (29): Bytef, PostEventHandler, wasInEventHandling, Impl, array, ByteOrder, InputStream, OutputStream (+21 more)
 
 ### Community 393 - "imgui_impl_win32.cpp"
 Cohesion: 0.08
@@ -3206,12 +3192,12 @@ Cohesion: 0.05
 Nodes (38): BandistoController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult, BandistoProcessor (+30 more)
 
 ### Community 396 - "win32dragging.cpp"
-Cohesion: 0.10
-Nodes (39): CDropTarget::CDropTarget(), CBitmap, CCoord, CPoint, DragDescription, IDragCallback, LPARAM, LRESULT (+31 more)
+Cohesion: 0.07
+Nodes (53): CDropTarget::CDropTarget(), CBitmap, CCoord, CPoint, DragDescription, IDragCallback, LPARAM, LRESULT (+45 more)
 
 ### Community 397 - "AudioFilterKernel"
-Cohesion: 0.05
-Nodes (34): AudioFilterKernel, kCoeffsPerStage, kEnvAmountSlot, kFreqSlot, kGainSlot, kMaxChannels, kOutputGainSlot, kQSlot (+26 more)
+Cohesion: 0.07
+Nodes (23): AudioFilterKernel, kCoeffsPerStage, kEnvAmountSlot, kFreqSlot, kGainSlot, kMaxChannels, kOutputGainSlot, kQSlot (+15 more)
 
 ### Community 398 - "Biquad"
 Cohesion: 0.07
@@ -3227,7 +3213,7 @@ Nodes (37): AudioRandomNoteGeneratorNode, mCurrentOutNote, mCurrentOutVoiceId, m
 
 ### Community 401 - "namespace"
 Cohesion: 0.08
-Nodes (28): array_t, binary_t, boolean_t, binary(), get_impl_ptr(), get_number_float(), get_ptr(), hex_bytes() (+20 more)
+Nodes (24): data, m_type, m_value, dump_float(), dump_integer(), get_number_float(), get_token_string(), hex_bytes() (+16 more)
 
 ### Community 402 - "ImGui_ImplDX11_Data"
 Cohesion: 0.06
@@ -3238,8 +3224,8 @@ Cohesion: 0.10
 Nodes (42): equal(), stbtt__bitmap, stbtt__point, stbtt__active_edge, next, stbtt__add_point(), stbtt__compute_crossings_x(), stbtt__cuberoot() (+34 more)
 
 ### Community 404 - "Node"
-Cohesion: 0.05
-Nodes (38): HintBuilder, Begin, Editor, End, GetForegroundDrawList, GetGroupMax, GetGroupMin, m_CurrentNode (+30 more)
+Cohesion: 0.02
+Nodes (75): FlowDirection, ed::EditorContext::FindLinkAt(), ed::EditorContext::Flow(), ed::EditorContext::NotifyLinkDeleted(), ed::FlowAnimation::FlowAnimation(), ed::FlowAnimationController::Flow(), FlowAnimationController, Draw (+67 more)
 
 ### Community 405 - "SpoutSenderNames.cpp"
 Cohesion: 0.07
@@ -3249,9 +3235,9 @@ Nodes (30): __movsd(), GLenum, spoutCopy::CopyPixels(), spoutCopy::FlipBuffer(),
 Cohesion: 0.06
 Nodes (32): CGLContextObj, SyphonOpenGLContextIsLegacy(), SyphonOpenGLCreateSharedContext(), SyphonOpenGLImage, SyphonIOSurfaceImageCore, -dealloc, -initWithSurfaceforContext, -textureName (+24 more)
 
-### Community 407 - "legacymidiccout/source/plug.cpp"
-Cohesion: 0.07
-Nodes (35): DataEvent, bytes, size, type, int8, uint8, LegacyMIDICCOutEvent, channel (+27 more)
+### Community 407 - "vsteventshelper.h"
+Cohesion: 0.13
+Nodes (22): DataEvent, bytes, size, type, int8, uint8, LegacyMIDICCOutEvent, channel (+14 more)
 
 ### Community 408 - "surfacedelegate.cpp"
 Cohesion: 0.09
@@ -3261,9 +3247,9 @@ Nodes (37): SurfaceDelegate, attach, commit, damage, damage_buffer, destroy, fra
 Cohesion: 0.05
 Nodes (40): EPianoProcessor, currentProgram, dlfo, fine, Fs, iFs, kEventBufferSize, kgrp (+32 more)
 
-### Community 410 - "AutomationTest"
-Cohesion: 0.05
-Nodes (37): AutomationTest, AutomationTest::addParameterData(), AutomationTest::AutomationTest(), bypassId, countParamChanges, everyNSamples, getName, AutomationTest::getParameterCount() (+29 more)
+### Community 410 - "programchange/source/plug.cpp"
+Cohesion: 0.07
+Nodes (23): FUnknown, IBStream, tresult, FUnknown, int32, SMTG_OVERRIDE, tresult, Plug (+15 more)
 
 ### Community 411 - "IUniversalMidiPacketHandler"
 Cohesion: 0.05
@@ -3273,9 +3259,9 @@ Nodes (43): IUniversalMidiPacketHandler, onAssignableController, onAssignablePer
 Cohesion: 0.07
 Nodes (23): ExternalHWNDBase, child, container, ATOM, HINSTANCE, LONG_PTR, LPARAM, PlatformViewType (+15 more)
 
-### Community 413 - "impl"
-Cohesion: 0.05
-Nodes (39): xkb_context, xkb_state, array, atomic, CCursorType, IEventHandler, IRunLoop, KeyboardEvent (+31 more)
+### Community 413 - "AudioAnalyzeNode"
+Cohesion: 0.06
+Nodes (21): AudioAnalyzeNode, attack, gain, input, mAudioNode, mLastCookFrame, mLastSeconds, mLevels (+13 more)
 
 ### Community 414 - "xmlparser.cpp"
 Cohesion: 0.06
@@ -3291,7 +3277,7 @@ Nodes (41): CameraHandleMf, error, frameMutex, height, lastReadSeq, mirrorX, pen
 
 ### Community 417 - "Control"
 Cohesion: 0.06
-Nodes (42): AcceptResult, ImGuiKey, ed::ContextMenuAction::Accept(), ed::CreateItemAction::Accept(), ed::DeleteItemsAction::Accept(), ed::DeleteItemsAction::Process(), ed::DragAction::Accept(), ed::DragAction::Process() (+34 more)
+Nodes (40): AcceptResult, ImGuiKey, ed::ContextMenuAction::Accept(), ed::CreateItemAction::Accept(), ed::DeleteItemsAction::Accept(), ed::DeleteItemsAction::Process(), ed::DragAction::Accept(), ed::DragAction::Process() (+32 more)
 
 ### Community 418 - "cgltf_primitive"
 Cohesion: 0.05
@@ -3302,8 +3288,8 @@ Cohesion: 0.09
 Nodes (39): CShadowViewContainer, boxesForGauss(), array, CDrawContext, CFrame, CGraphicsTransform, CMessageResult, CPoint (+31 more)
 
 ### Community 420 - "SurfaceRedrawArea"
-Cohesion: 0.07
-Nodes (38): D2D1_COLOR_F, DoneCallback, array, CRect, DrawCallback, IPlatformTimerCallback, Ptr, RECT (+30 more)
+Cohesion: 0.06
+Nodes (33): D2D1_COLOR_F, DoneCallback, array, IPlatformTimerCallback, Ptr, RECT, UINT, SurfaceRedrawArea (+25 more)
 
 ### Community 421 - "ImGui_ImplDX12_Data"
 Cohesion: 0.08
@@ -3319,15 +3305,15 @@ Nodes (42): stbtt_int16, stbtt_fontinfo, cff, charstrings, data, fdselect, fontd
 
 ### Community 424 - "imgui_canvas.cpp"
 Cohesion: 0.08
-Nodes (34): CalcCenterView, CalcViewRect, EnterLocalSpace, FromLocalV, LeaveLocalSpace, SaveInputState, SaveViewportState, SetView (+26 more)
+Nodes (33): CalcCenterView, CalcViewRect, EnterLocalSpace, FromLocalV, LeaveLocalSpace, SaveInputState, SaveViewportState, SetView (+25 more)
 
 ### Community 425 - "Window"
 Cohesion: 0.08
-Nodes (40): FIDString, NativePlatformWindow, ptr, type, getNativePlatformWindow, addWindow(), CALLBACK Window::WndProc(), HINSTANCE (+32 more)
+Nodes (41): FIDString, NativePlatformWindow, ptr, type, getNativePlatformWindow, getNativePlatformWindow, addWindow(), CALLBACK Window::WndProc() (+33 more)
 
 ### Community 426 - "LoudnessProcessor"
-Cohesion: 0.05
-Nodes (35): BaseController, FUnknown, SMTG_OVERRIDE, tresult, LoudnessController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+27 more)
+Cohesion: 0.04
+Nodes (45): FUnknown, ParamID, ParamValue, String128, TChar, tresult, BaseController, FUnknown (+37 more)
 
 ### Community 427 - "GenericDocument"
 Cohesion: 0.06
@@ -3346,20 +3332,20 @@ Cohesion: 0.06
 Nodes (26): Envelope, mAttackInc, mDecayInc, mLevel, mReleaseInc, mReleaseMs, mSampleRate, mStage (+18 more)
 
 ### Community 431 - "AudioNoteEchoNode"
-Cohesion: 0.05
-Nodes (30): AudioNoteEchoNode, kMaxPending, mDecay, mInbox, mMuteDry, mNoteCursor, mOutbox, mPending (+22 more)
+Cohesion: 0.04
+Nodes (37): AudioNoteEchoNode, kMaxPending, mDecay, mInbox, mMuteDry, mNoteCursor, mOutbox, mPending (+29 more)
 
 ### Community 432 - "GridLayoutProperties"
-Cohesion: 0.06
-Nodes (40): AlignContent, AlignItems, Auto, CCoord, Children, CRect, CViewContainer, optional (+32 more)
+Cohesion: 0.09
+Nodes (22): AlignContent, AlignItems, Auto, GridLayoutProperties, alignContent, alignItems, autoColumns, autoRows (+14 more)
 
 ### Community 433 - "TEST_CASE"
-Cohesion: 0.05
-Nodes (40): ArrayConstructor, BoolAttribute, CMemoryStreamTest, DoubleAttribute, TEST_CASE(), TEST_CASE(), CMemoryStream, binaryMode (+32 more)
+Cohesion: 0.10
+Nodes (20): ArrayConstructor, BoolAttribute, DoubleAttribute, TEST_CASE(), IntegerAttribute, PointAttribute, RectAttribute, RemoveAll (+12 more)
 
 ### Community 434 - ".CD3DX12_RESOURCE_DESC"
-Cohesion: 0.09
-Nodes (23): D3D12_RESOURCE_ALLOCATION_INFO, D3D12_RESOURCE_BARRIER, D3D12_RESOURCE_DESC, D3D12_RESOURCE_DIMENSION, D3D12_RESOURCE_FLAGS, D3D12_RESOURCE_STATES, D3D12_TEXTURE_LAYOUT, SIZE_T (+15 more)
+Cohesion: 0.10
+Nodes (22): D3D12_RESOURCE_ALLOCATION_INFO, D3D12_RESOURCE_BARRIER, D3D12_RESOURCE_DESC, D3D12_RESOURCE_DIMENSION, D3D12_RESOURCE_FLAGS, D3D12_RESOURCE_STATES, D3D12_TEXTURE_LAYOUT, CD3DX12_CPU_DESCRIPTOR_HANDLE (+14 more)
 
 ### Community 435 - "drwav"
 Cohesion: 0.19
@@ -3371,11 +3357,11 @@ Nodes (41): DRWAV_API, drwav_fmt, drwav_int32, drwav_uint8, drwav_aiff_extented_
 
 ### Community 437 - "ImGui_ImplDX10_Data"
 Cohesion: 0.07
-Nodes (38): IDXGIFactory, ImGui_ImplDX10_CreateDeviceObjects(), ImGui_ImplDX10_CreateFontsTexture(), ImGui_ImplDX10_Data, IndexBufferSize, pBlendState, pd3dDevice, pDepthStencilState (+30 more)
+Nodes (26): IDXGIFactory, ImGui_ImplDX10_Data, IndexBufferSize, pBlendState, pd3dDevice, pDepthStencilState, pFactory, pFontSampler (+18 more)
 
 ### Community 438 - "stb_textedit.h"
-Cohesion: 0.16
-Nodes (40): ImWchar, STB_TEXTEDIT_GETCHAR(), STB_TEXTEDIT_INSERTCHARS(), STB_TEXTEDIT_KEYTOTEXT(), TextEditorView::doUndoRedo(), STB_TEXTEDIT_KEYTYPE, STB_TexteditState, StbUndoRecord (+32 more)
+Cohesion: 0.13
+Nodes (49): ImGuiInputTextState, ImWchar, StbTexteditRow, STB_TEXTEDIT_DELETECHARS(), STB_TEXTEDIT_GETCHAR(), STB_TEXTEDIT_GETWIDTH(), STB_TEXTEDIT_INSERTCHARS(), STB_TEXTEDIT_LAYOUTROW() (+41 more)
 
 ### Community 439 - "SyphonMessageReceiver"
 Cohesion: 0.06
@@ -3389,25 +3375,25 @@ Nodes (37): DX10Processor, catt, cdec, crel, currentProgram, dept2, depth, dlfo 
 Cohesion: 0.09
 Nodes (19): bitMask(), array, SMTG_ALWAYS_INLINE, UMPMessage, UMPMessage2, data2, UMPMessage4, data3 (+11 more)
 
-### Community 442 - "iplatformgraphicsdevice.h"
-Cohesion: 0.06
-Nodes (35): COffscreenContext, bitmap, COffscreenContext::COffscreenContext(), copyFrom, create, getHeight, getWidth, CBitmap (+27 more)
+### Community 442 - "tutorial.cpp"
+Cohesion: 0.10
+Nodes (31): Controller, Controller::initialize(), Controller::setComponentState(), SMTG_OVERRIDE, EditController, FUnknown, IBStream, int32 (+23 more)
 
 ### Community 443 - "ParserState"
 Cohesion: 0.27
 Nodes (32): AstNodePtr, Token, vector, IsDomainToken(), IsLiteralConstant(), IsPinTypeToken(), IsTypeKeyword(), ParseAnd() (+24 more)
 
-### Community 444 - "AudioNodes.cpp"
-Cohesion: 0.06
-Nodes (23): CookIfNeeded, GetAudioNode, AudioOutputNode, CookIfNeeded, formatIndex, input, mCaptureRing, mOpenSampleRate (+15 more)
+### Community 444 - "PinTable"
+Cohesion: 0.09
+Nodes (26): vector, DeclaredPin, domainName, isOutput, name, typeName, map, vector (+18 more)
 
 ### Community 445 - "AudioNoteSequencerNode"
 Cohesion: 0.05
-Nodes (33): AudioNoteSequencerNode, mCurrentOutNote, mCurrentOutVoiceId, mCurrentStepReadout, mEnabled, mGatePercent, mLastStep, mNote (+25 more)
+Nodes (35): AudioNoteSequencerNode, mCurrentOutNote, mCurrentOutVoiceId, mCurrentStepReadout, mEnabled, mGatePercent, mLastStep, mNote (+27 more)
 
 ### Community 446 - "Switcher3DNode"
 Cohesion: 0.08
-Nodes (32): IGeometrySource, vector, IGeometrySource, INode, Switcher3DNode, Active, ActiveSlot, ComputeActiveSlot (+24 more)
+Nodes (34): IGeometrySource, vector, IGeometrySource, INode, Switcher3DNode, Active, ActiveSlot, ComputeActiveSlot (+26 more)
 
 ### Community 447 - "VideoInNode"
 Cohesion: 0.06
@@ -3415,15 +3401,15 @@ Nodes (34): INode, vector, VideoInNode, active, CloseCamera, CookIfNeeded, devic
 
 ### Community 448 - "AlertBoxController"
 Cohesion: 0.06
-Nodes (32): AlertBoxCallback, enable_shared_from_this<AlertBoxController>, AlertBoxController, alertResult, Button1TagName, Button2TagName, Button3TagName, buttons (+24 more)
+Nodes (33): enable_shared_from_this<AlertBoxController>, AlertBoxController, alertResult, Button1TagName, Button2TagName, Button3TagName, buttons, callback (+25 more)
 
 ### Community 449 - "doProlog"
 Cohesion: 0.15
 Nodes (40): ATTRIBUTE_ID, ELEMENT_TYPE, ENTITY, appendAttributeValue(), ENCODING, KEY, cdataSectionProcessor(), contentProcessor() (+32 more)
 
 ### Community 450 - "impl"
-Cohesion: 0.05
-Nodes (39): ContainerT, Callback, Call, newTimerCallback(), CVSTGUITimer, Event, ModalViewSessionID, Optional (+31 more)
+Cohesion: 0.11
+Nodes (20): ContainerT, Callback, Call, newTimerCallback(), COptionMenu, CVSTGUITimer, ModalViewSessionID, Optional (+12 more)
 
 ### Community 451 - "ChordEvent"
 Cohesion: 0.06
@@ -3442,8 +3428,8 @@ Cohesion: 0.06
 Nodes (34): BaseController, FUnknown, SMTG_OVERRIDE, tresult, ShepardController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+26 more)
 
 ### Community 455 - "mdaTestToneController.cpp"
-Cohesion: 0.09
-Nodes (26): CentParameter, FUnknown, int32, IPtr, Parameter, ParamID, ParamValue, String128 (+18 more)
+Cohesion: 0.12
+Nodes (22): CentParameter, FUnknown, int32, IPtr, Parameter, ParamID, ParamValue, String128 (+14 more)
 
 ### Community 456 - "UIColorChooserController"
 Cohesion: 0.08
@@ -3454,16 +3440,16 @@ Cohesion: 0.11
 Nodes (29): begin, end, IAction, list<IAction*>, iterator, list<IAction*>, NonAtomicReferenceCounted, UIGroupAction (+21 more)
 
 ### Community 458 - "NoteFilterNode"
-Cohesion: 0.05
-Nodes (28): AudioNoteFilterNode, mChance, mInbox, mLastNoteIn, mLastPassed, mNoteCursor, mOutbox, mPassingAs (+20 more)
+Cohesion: 0.04
+Nodes (36): BrownNoise, state, white, PinkNoise, counter, kRows, rows, white (+28 more)
 
 ### Community 459 - "OscillatorNode"
 Cohesion: 0.06
 Nodes (31): AudioWavetableNode, AudioNode, AudioCable, INode, NoteCable, unique_ptr, OscillatorNode, ActiveVoices (+23 more)
 
-### Community 460 - "basic_json"
-Cohesion: 0.12
-Nodes (37): char_int_type, CompatibleType, accept(), add(), array(), basic_json(), decode(), flatten() (+29 more)
+### Community 460 - "size_t"
+Cohesion: 0.20
+Nodes (22): char_int_type, accept(), from_bjdata(), from_bson(), from_cbor(), from_msgpack(), from_ubjson(), get() (+14 more)
 
 ### Community 461 - "FVariant"
 Cohesion: 0.11
@@ -3474,12 +3460,12 @@ Cohesion: 0.06
 Nodes (37): AAXWrapper_GetDescription(), AAX_Effect_Desc, AAX_Aux_Desc, mChannels, mName, AAX_Effect_Desc, mCategory, mManufacturer (+29 more)
 
 ### Community 463 - "VSTInterAppAudioAppDelegateBase"
-Cohesion: 0.07
-Nodes (32): VSTInterAppAudioAppDelegate, -applicationdidFinishLaunchingWithOptions, -applicationsupportedInterfaceOrientationsForWindow, -audioIOConnectionChanged, -createShowHostViewButton, -showHostViewAction, UIViewController, IBOutlet (+24 more)
+Cohesion: 0.15
+Nodes (15): UIApplicationDelegate, UIResponder, UIWindow, VSTInterAppAudioAppDelegateBase, -applicationDidBecomeActive, -applicationdidFinishLaunchingWithOptions, -applicationshouldRestoreApplicationState, -applicationshouldSaveApplicationState (+7 more)
 
 ### Community 464 - "LeslieProcessor"
-Cohesion: 0.05
-Nodes (37): BaseProcessor, FUnknown, int32, SMTG_OVERRIDE, tresult, LeslieProcessor, chp, clp (+29 more)
+Cohesion: 0.03
+Nodes (64): FUnknown, ParamID, ParamValue, String128, TChar, tresult, BaseController, FUnknown (+56 more)
 
 ### Community 465 - "PianoProcessor"
 Cohesion: 0.05
@@ -3494,32 +3480,32 @@ Cohesion: 0.10
 Nodes (19): DataBrowserDelegateAdapter, dbDrawCell, dbGetCurrentColumnWidth, dbGetNumColumns, dbGetNumRows, dbGetRowHeight, dbOnKeyDown(), CButtonState (+11 more)
 
 ### Community 468 - "shareduiresources.cpp"
-Cohesion: 0.11
-Nodes (33): pair, makeOptional(), Optional, operator->, reset, _value, checkAndUpdateUIDescFilePath(), cleanupSharedUIResources() (+25 more)
+Cohesion: 0.09
+Nodes (36): pair, makeOptional(), Optional, operator->, reset, _value, checkAndUpdateUIDescFilePath(), cleanupSharedUIResources() (+28 more)
 
 ### Community 469 - "waylandplatform.cpp"
-Cohesion: 0.08
-Nodes (31): atomic, cairo_device_t, IEventHandler, IRunLoop, IWaylandHost, SharedPointer, WaylandClientContext, wl_display (+23 more)
+Cohesion: 0.10
+Nodes (25): atomic, cairo_device_t, IEventHandler, IRunLoop, IWaylandHost, SharedPointer, WaylandClientContext, wl_display (+17 more)
 
 ### Community 470 - "impl"
-Cohesion: 0.06
-Nodes (35): CDrawMode, CLineStyle, D2D1_MATRIX_3X2_F, Ptr, stack, impl, device, impl (+27 more)
+Cohesion: 0.07
+Nodes (30): CDrawMode, CLineStyle, Ptr, stack, impl, device, impl, applyClip (+22 more)
 
 ### Community 471 - "UIColor"
 Cohesion: 0.08
 Nodes (26): CColor, NonAtomicReferenceCounted, IUIColorListener, uiColorBeginEditing, uiColorChanged, uiColorEndEditing, UIColor, b (+18 more)
 
 ### Community 472 - "PerfRecord"
-Cohesion: 0.06
-Nodes (39): PerfRecord, boolName, cellX, cellY, colorB, colorG, colorR, dstIndex (+31 more)
+Cohesion: 0.03
+Nodes (79): PerfRecord, boolName, cellX, cellY, colorB, colorG, colorR, dstIndex (+71 more)
 
 ### Community 473 - "AudioTextureNode"
 Cohesion: 0.07
 Nodes (30): AudioTextureAudioSink, mMeterRing, AudioTextureNode, AudioTextureNode::AudioTextureNode(), CookIfNeeded, DestroyTexture, EnsureTexture, gain (+22 more)
 
-### Community 474 - "NoteSwitcherNode"
-Cohesion: 0.05
-Nodes (29): AudioNoteSwitcherNode, kSlots, mActiveSlotReadout, mCursor, mInbox, mManual, mManualSlot, mOutbox (+21 more)
+### Community 474 - "GlobalParameterState"
+Cohesion: 0.07
+Nodes (27): BrownNoise, plainParamToNormalized, IBStream, IBStream, tresult, GlobalParameterState, bypassSNA, filterFreq (+19 more)
 
 ### Community 475 - "WavetableNode"
 Cohesion: 0.06
@@ -3537,29 +3523,29 @@ Nodes (38): BINDING, DTD, addBinding(), XML_Char, copyEntityTable(), destroyBind
 Cohesion: 0.09
 Nodes (37): CFileExtension, CNewFileSelector, CFileExtension, CFileExtension::CFileExtension(), getMacType, impl, init, operator== (+29 more)
 
-### Community 479 - "IMultiBitmapControl"
-Cohesion: 0.08
-Nodes (31): CMovieButton, CCoord, IMultiBitmapControl, autoComputeHeightOfOneImage, heightOfOneImage, subPixmaps, CAnimKnob, bInverseBitmap (+23 more)
+### Community 479 - "CMovieButton"
+Cohesion: 0.16
+Nodes (19): CMovieButton, CMovieButton, buttonState, draw, fEntryState, onMouseCancel, onMouseDown, onMouseMoved (+11 more)
 
-### Community 480 - "ImGuiKey"
-Cohesion: 0.09
-Nodes (38): ImGuiKey, ImGui::GetKeyData(), ImGui::GetKeyIndex(), ImGui::GetKeyMagnitude2d(), ImGui::GetKeyName(), ImGui::GetKeyOwner(), ImGui::GetKeyPressedAmount(), ImGui::GetShortcutRoutingData() (+30 more)
+### Community 480 - "ImGuiID"
+Cohesion: 0.03
+Nodes (130): CalcRoutingScore(), IM_MSVC_RUNTIME_CHECKS_OFF, ImGuiDataType, ImGuiID, ImGuiInputFlags, ImGuiItemFlags, ImGuiItemStatusFlags, ImGuiKey (+122 more)
 
 ### Community 481 - "ComboProcessor"
 Cohesion: 0.05
 Nodes (37): ComboProcessor, bias, buffe2, buffer, bufpos, clip, del1, del2 (+29 more)
 
 ### Community 482 - "PresetBrowserViewController"
-Cohesion: 0.07
-Nodes (33): UIViewController, NSArray, PresetBrowserViewController, -cancel, -didReceiveMemoryWarning, -initWithCallback, -prefersStatusBarHidden, -removeSelf (+25 more)
+Cohesion: 0.12
+Nodes (20): UIViewController, NSArray, PresetBrowserViewController, -cancel, -didReceiveMemoryWarning, -initWithCallback, -prefersStatusBarHidden, -removeSelf (+12 more)
 
 ### Community 483 - "UIColorStopEditView"
 Cohesion: 0.11
 Nodes (37): forEachListener(), Proc, invalid, CButtonState, CCoord, CGraphicsPath, CMouseEventResult, CPoint (+29 more)
 
 ### Community 484 - "cstream.cpp"
-Cohesion: 0.08
-Nodes (34): CFileStream, isEndOfFile, openMode, operator<<, readRaw, rewind, seek, stream (+26 more)
+Cohesion: 0.04
+Nodes (61): CMemoryStreamTest, TEST_CASE(), CFileStream, isEndOfFile, open, openMode, operator<<, readRaw (+53 more)
 
 ### Community 485 - "AudioDrumSequencerNode"
 Cohesion: 0.06
@@ -3575,7 +3561,7 @@ Nodes (34): ALLEGRO_BITMAP, ALLEGRO_COLOR, ALLEGRO_EVENT, ALLEGRO_MOUSE_CURSOR, 
 
 ### Community 488 - "quartzgraphicspath.cpp"
 Cohesion: 0.09
-Nodes (34): CGAffineTransform, CGGradientRef, CGPathRef, CGGraphicsPath, addArc, addBezierCurve, addEllipse, addLine (+26 more)
+Nodes (35): CGAffineTransform, CGGradientRef, CGPathRef, radians(), CGGraphicsPath, addArc, addBezierCurve, addEllipse (+27 more)
 
 ### Community 489 - "cgltf_buffer_view"
 Cohesion: 0.06
@@ -3598,26 +3584,26 @@ Cohesion: 0.05
 Nodes (37): VOICE, dc, dc2, detune, dp, dp2, env, envd (+29 more)
 
 ### Community 494 - "Parameter"
-Cohesion: 0.12
-Nodes (36): p, int32, IParamValueQueue, ParamID, ParamValue, Proc, SMTG_ALWAYS_INLINE, Parameter (+28 more)
+Cohesion: 0.13
+Nodes (33): int32, IParamValueQueue, ParamID, ParamValue, Proc, SMTG_ALWAYS_INLINE, Parameter, advance (+25 more)
 
 ### Community 495 - "TestToneController"
-Cohesion: 0.07
-Nodes (26): BaseController, FUnknown, IPtr, Parameter, ParamValue, SMTG_OVERRIDE, String128, TChar (+18 more)
+Cohesion: 0.06
+Nodes (27): BaseController, FUnknown, int32, IPtr, Parameter, ParamValue, SMTG_OVERRIDE, String128 (+19 more)
 
 ### Community 496 - "PlugController"
 Cohesion: 0.08
 Nodes (34): char8, CView, FUnknown, IBStream, int16, int32, IUIDescription, NoteExpressionTypeID (+26 more)
 
 ### Community 497 - "advanced-techniques-tutorial/source/processor.cpp"
-Cohesion: 0.08
-Nodes (34): Controller, Controller::initialize(), Controller::setComponentState(), SMTG_OVERRIDE, EditController, FUnknown, IBStream, tresult (+26 more)
+Cohesion: 0.07
+Nodes (37): getChannelBuffers(), Sample32, Sample64, Controller, Controller::initialize(), Controller::setComponentState(), SMTG_OVERRIDE, EditController (+29 more)
 
 ### Community 498 - "CView"
 Cohesion: 0.10
 Nodes (37): AlphaValueAnimation, animationFinished, animationStart, animationTick, endValue, forceEndValueOnFinish, startValue, ControlValueAnimation (+29 more)
 
-### Community 499 - "BaseViewLayouterEntry"
+### Community 499 - "baseviewlayouter.h"
 Cohesion: 0.06
 Nodes (32): AutoSizeViewLayouter, calculateLayout, forget, get, remember, Children, CRect, CViewContainer (+24 more)
 
@@ -3633,9 +3619,9 @@ Nodes (26): HMENU, UTF8String, UTF8StringView, WCHAR, getWideString(), HMENU, UT
 Cohesion: 0.07
 Nodes (19): Command, ICommandHandler, IWindow, SortFunction, UTF8String, ImageStitcherAppDelegate, inQuit, DocumentContextPtr (+11 more)
 
-### Community 503 - "AudioMixerNode"
-Cohesion: 0.06
-Nodes (26): AudioBlendNode, mBlend, mMailbox, mMeter, AudioCaptureNode, kMaxCaptureFrames, mChannelMode, mGainDb (+18 more)
+### Community 503 - "ImGuiPayload"
+Cohesion: 0.07
+Nodes (19): ImFontGlyphRangesBuilder::AddRanges(), ImFontGlyphRangesBuilder::AddText(), Clear, ImFontGlyphRangesBuilder, AddRanges, AddText, BuildRanges, UsedChars (+11 more)
 
 ### Community 504 - "SyphonInNode"
 Cohesion: 0.08
@@ -3645,13 +3631,13 @@ Nodes (31): INode, vector, SyphonInNode, Connect, CookIfNeeded, EnsurePlaceholde
 Cohesion: 0.10
 Nodes (31): CableType, Color, AppearancePath(), DefaultCableColor(), DefaultNodeOpacity(), DefaultNodeRounding(), DefaultTintWeight(), GetNodeOpacity() (+23 more)
 
-### Community 506 - "DBController"
-Cohesion: 0.10
-Nodes (23): DBData, CControl, CCoord, CDataBrowser, CDrawContext, CFontRef, CRect, CView (+15 more)
+### Community 506 - "AudioFileNode"
+Cohesion: 0.07
+Nodes (20): AudioFileNode, attack, followTransport, gain, loop, mAudioNode, mDuration, mFileName (+12 more)
 
 ### Community 507 - "Pin"
 Cohesion: 0.06
-Nodes (32): EaseOutQuad(), ImVec2, ImLine, ed::CreateItemAction::DragStart(), ed::CreateItemAction::DropPin(), ed::Pin::GetClosestLine(), PinKind, Pin (+24 more)
+Nodes (30): ImVec2, ImLine, ed::CreateItemAction::DragStart(), ed::CreateItemAction::DropPin(), ed::Pin::GetClosestLine(), PinKind, Pin, Draw (+22 more)
 
 ### Community 508 - "Settings"
 Cohesion: 0.06
@@ -3666,8 +3652,8 @@ Cohesion: 0.07
 Nodes (30): BaseController, FUnknown, SMTG_OVERRIDE, tresult, LimiterController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+22 more)
 
 ### Community 511 - "TestBase"
-Cohesion: 0.08
-Nodes (26): FIDString, FUnknown, tchar, Tests, tresult, TUID, u16string, createTestFactoryInstance() (+18 more)
+Cohesion: 0.07
+Nodes (29): atomic, FIDString, FUnknown, tchar, Tests, tresult, TUID, u16string (+21 more)
 
 ### Community 512 - "PadController"
 Cohesion: 0.07
@@ -3677,13 +3663,13 @@ Nodes (29): CControl, CView, EditController, FUnknown, IController, int32, IUIDe
 Cohesion: 0.09
 Nodes (22): AttrType, CControl, CDrawContext, CView, IAnimationTarget, IdStringPtr, IUIDescription, list (+14 more)
 
-### Community 514 - "win32application.cpp"
-Cohesion: 0.09
-Nodes (32): Application, commonDirectories, dispatchPaintMessages, init, keyboardAccelerators, needCommandUpdate, onCommandUpdate, prefs (+24 more)
+### Community 514 - "SpectrumAnalyser"
+Cohesion: 0.08
+Nodes (22): AudioAnalyzerAudioNode, mAnalyser, atomic, SpectrumAnalyser, mAttack, mImag, mLevelsPublish, mLevelsReady (+14 more)
 
 ### Community 515 - "BaseController"
-Cohesion: 0.12
-Nodes (15): BaseController, browser, getCellText, onUpdate, selectedRowBackground, textColor, CButtonState, CCoord (+7 more)
+Cohesion: 0.08
+Nodes (23): BaseController, browser, getCellText, onUpdate, selectedRowBackground, textColor, CButtonState, CCoord (+15 more)
 
 ### Community 516 - "Controller"
 Cohesion: 0.08
@@ -3707,7 +3693,7 @@ Nodes (28): AudioEquationNode, kMaxUnison, kMaxVoices, mActiveVoices, mAgeCounte
 
 ### Community 521 - "CAutoAnimation"
 Cohesion: 0.11
-Nodes (33): CAutoAnimation, CAutoAnimation, animationFrameTime, attached, bWindowOpened, closeWindow, draw, getAnimationTime (+25 more)
+Nodes (32): CAutoAnimation, CAutoAnimation, animationFrameTime, attached, bWindowOpened, closeWindow, draw, getAnimationTime (+24 more)
 
 ### Community 522 - "Step 19: `delay(x, samples)` sample-domain intrinsic"
 Cohesion: 0.06
@@ -3715,7 +3701,7 @@ Nodes (31): 1. Reserved names available in every modifier preset, 2. The self-mu
 
 ### Community 523 - "ObjectId"
 Cohesion: 0.08
-Nodes (20): AsPointer(), IteratorType, ed::ContextMenuAction::Process(), ed::ContextMenuAction::Reject(), ed::DeleteItemsAction::QueryItem(), ed::DeleteItemsAction::QueryLink(), ed::DeleteItemsAction::QueryNode(), EditorContext (+12 more)
+Nodes (18): AsPointer(), IteratorType, ed::ContextMenuAction::Process(), ed::ContextMenuAction::Reject(), ed::DeleteItemsAction::QueryItem(), ed::DeleteItemsAction::QueryLink(), ed::DeleteItemsAction::QueryNode(), EditorContext (+10 more)
 
 ### Community 524 - "mz_uint64"
 Cohesion: 0.12
@@ -3731,7 +3717,7 @@ Nodes (31): NSObject, SyphonClientBase, -initWithServerDescriptionoptionsnewFram
 
 ### Community 527 - "FUnknown"
 Cohesion: 0.09
-Nodes (29): FClassID, FUnknown, IDependent, int32, IPtr, tresult, DeferedChange, msg (+21 more)
+Nodes (30): FClassID, FUnknown, IDependent, int32, IPtr, tresult, DeferedChange, msg (+22 more)
 
 ### Community 528 - "funknown.h"
 Cohesion: 0.07
@@ -3742,12 +3728,12 @@ Cohesion: 0.13
 Nodes (32): ColorComponent(), DenormalizeAlpha(), DenormalizeColorComponent(), GetAlphaNorm(), ColorSpec, uint8, MakeColorSpec(), NormalizeAlpha() (+24 more)
 
 ### Community 530 - "TrackerProcessor"
-Cohesion: 0.06
-Nodes (34): BaseProcessor, int32, SMTG_OVERRIDE, tresult, TrackerProcessor, bold, buf1, buf2 (+26 more)
+Cohesion: 0.04
+Nodes (52): BaseController, FUnknown, SMTG_OVERRIDE, tresult, TrackerController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+44 more)
 
-### Community 531 - "ProcessTest"
-Cohesion: 0.07
-Nodes (30): BusDirection, int32, SMTG_OVERRIDE, ProcessTest, freeBuffers, PLUGIN_API, postProcess, prepareProcessing (+22 more)
+### Community 531 - "ProcessTailTest"
+Cohesion: 0.17
+Nodes (11): SMTG_OVERRIDE, ProcessTailTest, dataPtrDouble, dataPtrFloat, mDontTest, mInSilenceInput, mInTail, mTailSamples (+3 more)
 
 ### Community 532 - "About VST 3"
 Cohesion: 0.06
@@ -3757,21 +3743,21 @@ Nodes (34): 10. 3D Support, 11. Factory Concept, 12. Support Remote control Repr
 Cohesion: 0.09
 Nodes (34): CFontDesc, beforeDelete, CFontDesc::CFontDesc(), cleanup, freePlatformFont, getFontPainter, getPlatformFont, init (+26 more)
 
-### Community 534 - "CLayeredViewContainer"
-Cohesion: 0.11
-Nodes (31): CLayeredViewContainer, attached, drawRect, drawViewLayerRects, getDrawTransform, invalid, invalidRect, layer (+23 more)
+### Community 534 - ".getFrame"
+Cohesion: 0.08
+Nodes (40): CLayeredViewContainer, attached, drawRect, drawViewLayerRects, getDrawTransform, invalid, invalidRect, layer (+32 more)
 
 ### Community 535 - "Listener"
 Cohesion: 0.11
 Nodes (20): IValue, IValueListener, OnEndEditFunc, Type, Listener, onBeginEditFunc, onEndEditFunc, onPerformEditFunc (+12 more)
 
 ### Community 536 - "UIDescriptionAdapter"
-Cohesion: 0.08
-Nodes (12): CBitmap, CFontRef, CGradient, CView, IController, IControlListener, IUIDescription, IViewFactory (+4 more)
-
-### Community 537 - "SchemaValidatingReader"
 Cohesion: 0.07
-Nodes (24): CreatePattern(), AllocatorType, Handler, InputStream, StackAllocator, GetRemoteDocument, operator()(), PatternProperty (+16 more)
+Nodes (14): CBitmap, CFontRef, CGradient, CView, IController, IControlListener, IUIDescription, IViewFactory (+6 more)
+
+### Community 537 - "algorithm.h"
+Cohesion: 0.10
+Nodes (22): Agorithm, Clamp, ClampNorm, clampNorm(), normalizedToPlain(), normalizedToSteps(), plainToNormalized(), stepsToNormalized() (+14 more)
 
 ### Community 538 - "uri.h"
 Cohesion: 0.19
@@ -3786,8 +3772,8 @@ Cohesion: 0.06
 Nodes (28): AudioWaveTerrainNode, kMaxUnison, kMaxVoices, mActiveVoices, mAgeCounter, mAmpAdsr, mBankSlot, mFilterAdsr (+20 more)
 
 ### Community 541 - "RecorderHandleMf"
-Cohesion: 0.06
-Nodes (35): QueuedFrame, pixels, repeatCount, RecorderHandleMf, audioPath, audioStreamId, bufferPool, droppedCount (+27 more)
+Cohesion: 0.05
+Nodes (42): IMFSinkWriter, AddRecorderAudioStream(), ConfigureRecorderVideo(), SampleBuffer, CreateRecorderSinkWriter(), DecodeVideoAudioTrackToBuffer(), QueuedFrame, pixels (+34 more)
 
 ### Community 542 - "CCommandMenuItem"
 Cohesion: 0.07
@@ -3797,9 +3783,9 @@ Nodes (31): Desc, CCommandMenuItem, commandCategory, commandName, execute, itemT
 Cohesion: 0.08
 Nodes (29): EventHandlerVector, gpointer, IEventHandler, ITimerHandler, eventHandlerProc(), ExternalEventHandler, eventHandler, ioChannel (+21 more)
 
-### Community 544 - "IComponentHandler"
-Cohesion: 0.07
-Nodes (34): FUID, FUnknown, IComponentHandler, IComponentHandler2, finishGroupEdit, iid, PLUGIN_API, requestOpenEditor (+26 more)
+### Community 544 - "IEditController"
+Cohesion: 0.04
+Nodes (61): FUID, FUnknown, IComponentHandler, IComponentHandler2, finishGroupEdit, iid, PLUGIN_API, requestOpenEditor (+53 more)
 
 ### Community 545 - "OverdriveProcessor"
 Cohesion: 0.07
@@ -3810,8 +3796,8 @@ Cohesion: 0.10
 Nodes (18): AttrType, CView, IdStringPtr, StringList, StringPtrList, ViewAndDisplayNameList, IUIDescription, IViewFactory (+10 more)
 
 ### Community 547 - "AudioMolderNode"
-Cohesion: 0.07
-Nodes (27): AdvanceVoicePosition(), AudioMolderNode, mActiveBuffer, mActiveVoiceRing, mEnd, mLevel, mLoop, mPingpong (+19 more)
+Cohesion: 0.06
+Nodes (27): AudioMolderNode, mActiveBuffer, mActiveVoiceRing, mEnd, mLevel, mLoop, mPingpong, mPlayheadRing (+19 more)
 
 ### Community 548 - "OutputNode.cpp"
 Cohesion: 0.11
@@ -3831,7 +3817,7 @@ Nodes (22): ControlBeginEdit, ControlEndEdit, ControlModifierClicked, ControlTag
 
 ### Community 552 - "CFrame::Impl"
 Cohesion: 0.06
-Nodes (33): CTooltipSupport, getAnimator, CFrame::Impl, active, activeFocusView, animator, bitmapQuality, collectInvalidRects (+25 more)
+Nodes (34): CTooltipSupport, getAnimator, CFrame::Impl, active, activeFocusView, animator, bitmapQuality, collectInvalidRects (+26 more)
 
 ### Community 553 - "KeyEventResponder"
 Cohesion: 0.06
@@ -3867,7 +3853,7 @@ Nodes (21): AudioNoteRouterNode, mInbox, mLastMask, mLastRoutedNote, mMode, mNex
 
 ### Community 561 - "TEST_CASE"
 Cohesion: 0.07
-Nodes (29): AddView, AddView2, AddViewBeforeOtherView, AddViewToTwoContainer, AddViewTwice, ChangeViewZOrder, DragEvents, DragMoveBetweenTwoViews (+21 more)
+Nodes (27): AddView, AddView2, AddViewBeforeOtherView, AddViewToTwoContainer, AddViewTwice, ChangeViewZOrder, DragEvents, DragMoveBetweenTwoViews (+19 more)
 
 ### Community 562 - "ThreadPool"
 Cohesion: 0.10
@@ -3882,8 +3868,8 @@ Cohesion: 0.09
 Nodes (23): CVuMeter, CBitmap, CDrawContext, CRect, Style, CVuMeter, CVuMeter::CVuMeter(), decreaseValue (+15 more)
 
 ### Community 565 - "impl"
-Cohesion: 0.08
-Nodes (30): DCompositionCreateDevice2Func, Factory, ID2D1Device, IUnknown, REFIID, unique_ptr, vector, DirectCompositionSupportDll (+22 more)
+Cohesion: 0.09
+Nodes (26): DCompositionCreateDevice2Func, Factory, ID2D1Device, IUnknown, REFIID, unique_ptr, vector, DirectCompositionSupportDll (+18 more)
 
 ### Community 566 - "Field — step 10: the `graph` domain (kernels that emit nodes, at edit time)"
 Cohesion: 0.06
@@ -3893,9 +3879,9 @@ Nodes (31): 0.1 One step, one branch, one commit, 0.2 Run every Field harness, n
 Cohesion: 0.09
 Nodes (30): countFrequencies(), FHeapCompare, getBits(), getCode(), wstring, hufBuildDecTable(), hufBuildEncTable(), hufCanonicalCodeTable() (+22 more)
 
-### Community 568 - "TimerHandler"
-Cohesion: 0.07
-Nodes (26): FUID, FUnknown, IComponentHandler3, iid, IContextMenu, getItemCount, iid, PLUGIN_API (+18 more)
+### Community 568 - "IContextMenu"
+Cohesion: 0.12
+Nodes (16): FUID, FUnknown, IComponentHandler3, createContextMenu, iid, IContextMenu, getItemCount, iid (+8 more)
 
 ### Community 569 - "IUnitInfo"
 Cohesion: 0.07
@@ -3905,9 +3891,9 @@ Nodes (32): FUID, FUnknown, IProgramListData, getProgramData, iid, programDataSu
 Cohesion: 0.15
 Nodes (32): stbi__huffman, stbi_inline, stbi__int16, stbi__jpeg, load_jpeg_image(), stbi__bitreverse16(), stbi__build_fast_ac(), stbi__build_huffman() (+24 more)
 
-### Community 571 - "RoundPanProcessor"
-Cohesion: 0.07
-Nodes (26): BaseController, FUnknown, SMTG_OVERRIDE, tresult, RoundPanController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+18 more)
+### Community 571 - "AudioFilePlayerAudioNode"
+Cohesion: 0.09
+Nodes (18): AudioFilePlayerAudioNode, mActiveBuffer, mActiveFileSampleRate, mAnalyser, mFramePos, mGain, mLoop, mMailbox (+10 more)
 
 ### Community 572 - "TalkBoxProcessor"
 Cohesion: 0.06
@@ -3925,9 +3911,9 @@ Nodes (26): callSuper(), encodeFunction(), functionArgs(), getVariable(), Class,
 Cohesion: 0.16
 Nodes (30): const_iterator, int32, NoteExpressionTypeID, NoteExpressionValue, Parameter, PhysicalUITypeID, String128, TChar (+22 more)
 
-### Community 576 - "ITextEditor"
-Cohesion: 0.07
-Nodes (26): KeyboardEvent, Modifiers, VirtualKey, createNewTextEditor(), FindPanelController::FindPanelController(), ITextEditor, canHandleCommand, getPlainText (+18 more)
+### Community 576 - "FindPanelController"
+Cohesion: 0.05
+Nodes (40): CommandKeyArray, Style, make, CControl, CTextEdit, CViewContainer, Event, IControlListener (+32 more)
 
 ### Community 577 - "ChildWindow"
 Cohesion: 0.07
@@ -3943,7 +3929,7 @@ Nodes (29): end, UICommentNode, DataStorage, IContentProvider, IdStringPtr, Outp
 
 ### Community 580 - "Material"
 Cohesion: 0.06
-Nodes (29): GetMaterial, Material, alphaCutoff, anisotropy, anisotropyRotation, clearcoat, clearcoatRoughness, color (+21 more)
+Nodes (31): GetMaterial, GetMaterial, Material, alphaCutoff, anisotropy, anisotropyRotation, clearcoat, clearcoatRoughness (+23 more)
 
 ### Community 581 - "ColorRampNode"
 Cohesion: 0.08
@@ -3957,9 +3943,9 @@ Nodes (21): FilterNode, mBuilt, mHasBuilt, mInput, mInput2, mLastCookFrame, mOut
 Cohesion: 0.07
 Nodes (26): INode, ShapeNode, aspect, bgColor, bgOpacity, cornerRadius, feather, fillColor (+18 more)
 
-### Community 584 - "PluginHostWin.cpp"
+### Community 584 - "MolderNode.cpp"
 Cohesion: 0.09
-Nodes (29): PluginDesc, acceptsNotes, format, identifier, manufacturer, name, path, AnyPluginEditorOpen() (+21 more)
+Nodes (21): AdvanceVoicePosition(), Job, SampleBuffer, vector, BuildDesiredGenome, CookIfNeeded, HarmonicityPercent, Iterate (+13 more)
 
 ### Community 585 - "TEST_CASE"
 Cohesion: 0.07
@@ -3982,8 +3968,8 @@ Cohesion: 0.12
 Nodes (19): DrawFunction, CGraphicsTransform, Transform, transformation, CButtonState, CDrawContext, CMouseEventResult, CPoint (+11 more)
 
 ### Community 590 - "Canvas"
-Cohesion: 0.07
-Nodes (29): Canvas, Begin, CenterView, End, FromLocal, m_DrawList, m_DrawListCommadBufferSize, m_DrawListFirstCommandIndex (+21 more)
+Cohesion: 0.06
+Nodes (34): Canvas, Begin, CenterView, End, FromLocal, m_DrawList, m_DrawListCommadBufferSize, m_DrawListFirstCommandIndex (+26 more)
 
 ### Community 591 - "Style"
 Cohesion: 0.07
@@ -3994,8 +3980,8 @@ Cohesion: 0.07
 Nodes (26): SyphonClientBase, SyphonMetalClient, -initWithServerDescriptiondeviceoptionsnewFrameHandler, -newFrameImage, -stop, CGLContextObj, SyphonClientBase, SyphonOpenGLClient (+18 more)
 
 ### Community 593 - "ftypes.h"
-Cohesion: 0.08
-Nodes (22): ConstStringTable, getString, instance, char16, char8, generateUTF16(), FSwap(), char16 (+14 more)
+Cohesion: 0.07
+Nodes (31): ConstStringTable, getString, instance, char16, char8, generateUTF16(), FSwap(), char16 (+23 more)
 
 ### Community 594 - "XmlRepresentationHelper"
 Cohesion: 0.18
@@ -4023,39 +4009,39 @@ Nodes (22): Button::attach(), Button::Button(), Button::Impl, callbacks, type, v
 
 ### Community 600 - "getAttribute"
 Cohesion: 0.11
-Nodes (31): getFocusColor, setFocusColor, setFocusDrawingEnabled, clearMouseEditingState, CKnobBase::getMouseEditingState(), CBitmap, CGraphicsPath, DragDescription (+23 more)
+Nodes (30): getFocusColor, setFocusColor, setFocusDrawingEnabled, clearMouseEditingState, CKnobBase::getMouseEditingState(), CBitmap, CGraphicsPath, DragDescription (+22 more)
 
 ### Community 601 - "Bitmap"
-Cohesion: 0.09
-Nodes (25): Bitmap, Bitmap::Bitmap(), create, getScaleFactor, load, locked, lockPixels, scaleFactor (+17 more)
+Cohesion: 0.06
+Nodes (35): cairo_status_t, cairo_surface_t, Bitmap, Bitmap::Bitmap(), create, createMemoryPNGRepresentation, getScaleFactor, load (+27 more)
 
 ### Community 602 - "encodings.h"
 Cohesion: 0.16
 Nodes (30): ASCII, AutoUTF, Decode(), Encode(), EncodeUnsafe(), GetRange(), Ch, CharType (+22 more)
 
-### Community 603 - "ResonantMode"
-Cohesion: 0.07
-Nodes (23): GetMaterialProfile(), MaterialProfile, defaultDecay, defaultStiffness, dispersionCoeff, highFreqLoss, modeAmplitudes, modeRatios (+15 more)
+### Community 603 - "MaterialProfile"
+Cohesion: 0.22
+Nodes (9): MaterialProfile, defaultDecay, defaultStiffness, dispersionCoeff, highFreqLoss, modeAmplitudes, modeRatios, nonLinearBeating (+1 more)
 
 ### Community 604 - "CurvesNode"
 Cohesion: 0.09
 Nodes (22): CurvesNode, activeChannel, AddPoint, CookIfNeeded, CurvesNode::CurvesNode(), EnsureShader, Evaluate, mInput (+14 more)
 
-### Community 605 - "VelocityCurveNode"
-Cohesion: 0.07
-Nodes (17): AudioVelocityCurveNode, mCurve, mInbox, mLastVelocityIn, mLastVelocityOut, mNoteCursor, mOutbox, VelocityCurveNode (+9 more)
+### Community 605 - "AudioVelocityCurveNode"
+Cohesion: 0.12
+Nodes (10): AudioVelocityCurveNode, mCurve, mInbox, mLastVelocityIn, mLastVelocityOut, mNoteCursor, mOutbox, CookIfNeeded (+2 more)
 
-### Community 606 - "testPossibleValues"
-Cohesion: 0.07
-Nodes (30): AnimateViewResizing, AutoHeight, BackgroundColorDrawStyle, BackgroundColorDrawStyleValues, CMultiLineTextLabelCreatorTest, ColumnStyle, CRowColumnViewCreatorTest, CTextLabelCreatorTest (+22 more)
+### Community 606 - "TEST_CASE"
+Cohesion: 0.15
+Nodes (13): AnimateViewResizing, ColumnStyle, CRowColumnViewCreatorTest, EqualSizeLayoutCenter, EqualSizeLayoutLeftTop, EqualSizeLayoutRightBottom, EqualSizeLayoutStretch, EqualSizeLayoutValues (+5 more)
 
 ### Community 607 - "TEST_CASE"
 Cohesion: 0.07
 Nodes (30): Attributes, AutosizeFlags, CDragContainerHelperTest, CoordCalculations, Count, CViewTest, DefaultHandling, TEST_CASE() (+22 more)
 
-### Community 608 - "TEST_CASE"
-Cohesion: 0.08
-Nodes (30): ButtonStateFromEventModifierTest, ButtonStateFromMouseEventTest, CastKeyboardEventTest, CastMouseCancelEventTest, CastMouseDownEventTest, CastMouseEnterEventTest, CastMouseExitEventTest, CastMouseMoveEventTest (+22 more)
+### Community 608 - "shared"
+Cohesion: 0.05
+Nodes (63): ButtonStateFromEventModifierTest, ButtonStateFromMouseEventTest, CastKeyboardEventTest, CastMouseCancelEventTest, CastMouseDownEventTest, CastMouseEnterEventTest, CastMouseExitEventTest, CastMouseMoveEventTest (+55 more)
 
 ### Community 609 - "Field build step 1 — restructure `Expression.cpp` into lexer → AST → typed IR → bytecode"
 Cohesion: 0.07
@@ -4090,8 +4076,8 @@ Cohesion: 0.07
 Nodes (30): Chord, chordMask, keyNote, rootNote, FrameRate, flags, framesPerSecond, int16 (+22 more)
 
 ### Community 617 - "TestToneProcessor"
-Cohesion: 0.07
-Nodes (28): BaseProcessor, FUnknown, int32, SMTG_OVERRIDE, tresult, TestToneProcessor, cal, calx (+20 more)
+Cohesion: 0.05
+Nodes (40): ParamID, FUnknown, TBool, tresult, BaseProcessor, FUnknown, int32, SMTG_OVERRIDE (+32 more)
 
 ### Community 618 - "StaticListControlConfigurator"
 Cohesion: 0.09
@@ -4106,24 +4092,24 @@ Cohesion: 0.13
 Nodes (27): StringVector, CButtonState, CDataBrowser, CDrawContext, CMouseEventResult, CPoint, CRect, CTextEdit (+19 more)
 
 ### Community 621 - "waylandutils.cpp"
-Cohesion: 0.12
-Nodes (25): ChildWindow::ChildWindow(), initialize, terminate, ChildWindow, IWaylandFrame, addWindow, removeWindow, KeyboardHandler (+17 more)
+Cohesion: 0.09
+Nodes (40): ChildWindow::ChildWindow(), ChildWindow::createShmBuffer(), initialize, onEnter, onLeave, onPreferredBufferScale, onPreferredBufferTransform, terminate (+32 more)
 
-### Community 622 - "Win32DataObjectEnumerator"
-Cohesion: 0.10
-Nodes (19): AtomicReferenceCounted, IDataPackage, REFIID, AtomicReferenceCounted, IDataPackage, STDMETHODIMP CDropTarget::QueryInterface(), STDMETHODIMP Win32DataObject::EnumFormatEtc(), STDMETHODIMP Win32DataObject::QueryInterface() (+11 more)
+### Community 622 - "COM_DECLSPEC_NOTHROW"
+Cohesion: 0.07
+Nodes (42): COM_DECLSPEC_NOTHROW, IDataObject, AtomicReferenceCounted, BOOL, DWORD, IDataPackage, REFIID, AtomicReferenceCounted (+34 more)
 
 ### Community 623 - "DelegateAdapter"
-Cohesion: 0.07
-Nodes (12): AppDelegate, Command, ICommandHandler, IWindow, IWindow, MyApplication, DelegateAdapter, appInfo (+4 more)
+Cohesion: 0.04
+Nodes (26): App, IWindow, WindowPtr, makeWindow(), AppDelegate, Command, ICommandHandler, IWindow (+18 more)
 
 ### Community 624 - "IValue"
 Cohesion: 0.07
 Nodes (28): StepType, Type, IStepValue, getSteps, InvalidStep, stepToValue, valueToStep, IValue (+20 more)
 
 ### Community 625 - "uidescriptionwindowcontroller.cpp"
-Cohesion: 0.13
-Nodes (17): CPoint, ICommandHandler, IMenuBuilder, IWindow, IWindowController, unique_ptr, WindowController, beforeShow (+9 more)
+Cohesion: 0.05
+Nodes (57): CFrame, Command, Config, CPoint, CustomizationPtr, CView, ICommandHandler, IController (+49 more)
 
 ### Community 626 - "IActionPerformer"
 Cohesion: 0.07
@@ -4134,20 +4120,20 @@ Cohesion: 0.08
 Nodes (27): asLexType(), LexType, CScriptLex, currCh, data, dataEnd, dataPos, getPosition (+19 more)
 
 ### Community 628 - "FlangerKernel"
-Cohesion: 0.08
-Nodes (22): DelayLine, buf, size, writePos, vector, AudioEffectNode, FlangerKernel, kMaxDelayMs (+14 more)
+Cohesion: 0.09
+Nodes (20): DriftLfo, driftPhase, phase, AudioEffectNode, FlangerKernel, kMaxDelayMs, mAnalog, mDriftLfo (+12 more)
 
 ### Community 629 - "ResonatorBankKernel"
 Cohesion: 0.07
 Nodes (28): AudioEffectNode, atomic, PoleData, g, k, panL, panR, ResonatorBankKernel (+20 more)
 
 ### Community 630 - "PanNoteExpressionType"
-Cohesion: 0.14
-Nodes (13): BusDirections, getMidiControllerAssignments, getNumMidiControllerAssignments, hasMatchingCCType, int16, int32, NoteExpressionTypeID, NoteExpressionValue (+5 more)
+Cohesion: 0.09
+Nodes (20): BusDirections, getParamNormalized, getMidiControllerAssignments, getNumMidiControllerAssignments, hasMatchingCCType, CtrlNumber, int16, int32 (+12 more)
 
 ### Community 631 - "GraphicsPath"
-Cohesion: 0.12
-Nodes (26): cairo_path_t, align, CGraphicsTransform, ContextHandle, CPoint, CRect, function, unique_ptr (+18 more)
+Cohesion: 0.09
+Nodes (35): cairo_path_t, align, CGraphicsTransform, ContextHandle, CPoint, CRect, function, PlatformFontPtr (+27 more)
 
 ### Community 632 - "FramesPerSeconds"
 Cohesion: 0.07
@@ -4174,12 +4160,12 @@ Cohesion: 0.07
 Nodes (29): stbrp_context, stbrp_coord, stbrp_node, stbrp_init_target(), stbrp_pack_rects(), stbrp_rect, h, id (+21 more)
 
 ### Community 638 - "IInterAppAudioHost"
-Cohesion: 0.08
-Nodes (26): FUID, FUnknown, IInterAppAudioConnectionNotification, iid, onInterAppAudioConnectionStateChange, IInterAppAudioHost, connectedToHost, createPresetManager (+18 more)
+Cohesion: 0.07
+Nodes (30): FUID, FUnknown, IInterAppAudioConnectionNotification, iid, onInterAppAudioConnectionStateChange, IInterAppAudioHost, connectedToHost, createPresetManager (+22 more)
 
 ### Community 639 - "channelcontext/source/plug.cpp"
-Cohesion: 0.09
-Nodes (20): FUnknown, IBStream, tresult, FUnknown, SMTG_OVERRIDE, tresult, Plug, bBypass (+12 more)
+Cohesion: 0.08
+Nodes (22): Min, FUnknown, IBStream, tresult, FUnknown, SMTG_OVERRIDE, tresult, Plug (+14 more)
 
 ### Community 640 - "VoiceBase"
 Cohesion: 0.10
@@ -4190,8 +4176,8 @@ Cohesion: 0.07
 Nodes (29): stbrp_context, stbrp_coord, stbrp_node, stbrp_init_target(), stbrp_pack_rects(), stbrp_rect, h, id (+21 more)
 
 ### Community 642 - "NoteTouchController"
-Cohesion: 0.10
-Nodes (23): CControl, CView, IUIDescription, UIAttributes, CXYPad, IController, NoteTouchController, controlBeginEdit (+15 more)
+Cohesion: 0.11
+Nodes (22): CControl, CView, IUIDescription, UIAttributes, CXYPad, IController, NoteTouchController, controlBeginEdit (+14 more)
 
 ### Community 643 - "COpenGLView"
 Cohesion: 0.14
@@ -4199,7 +4185,7 @@ Nodes (23): COpenGLView, attached, COpenGLView::COpenGLView(), createPlatformOpe
 
 ### Community 644 - "CocoaTextInputClient"
 Cohesion: 0.07
-Nodes (26): CocoaTextInputClient, cancelCallback, characterIndexForPoint, firstRectForCharacterRange, getMarkedRange, getSelectedRange, hasMarkedText, insertText (+18 more)
+Nodes (29): CocoaTextInputClient, cancel, cancelCallback, characterIndexForPoint, firstRectForCharacterRange, getMarkedRange, getSelectedRange, hasMarkedText (+21 more)
 
 ### Community 645 - "ModelBindingCallbacks"
 Cohesion: 0.12
@@ -4215,7 +4201,7 @@ Nodes (28): Spout, RunSpoutLoopTest(), vector, ForceGpuInteropOnly(), SyphonClie
 
 ### Community 648 - "RingBuffer"
 Cohesion: 0.08
-Nodes (21): AtomicUInt32, Event, FUID, FUnknown, SMTG_OVERRIDE, tresult, Processor, cid (+13 more)
+Nodes (22): AtomicUInt32, Event, FUID, FUnknown, SMTG_OVERRIDE, tresult, Processor, cid (+14 more)
 
 ### Community 649 - "Config"
 Cohesion: 0.07
@@ -4246,8 +4232,8 @@ Cohesion: 0.10
 Nodes (27): EXRAttribute, EXRChannelInfo, AllocateImage(), ComputeChannelLayout(), cpy2(), cpy4(), DecodeChunk(), DecodePixelData() (+19 more)
 
 ### Community 656 - "DeleteItemsAction"
-Cohesion: 0.08
-Nodes (26): ed::DeleteItemsAction::AcceptItem(), ed::DeleteItemsAction::RejectItem(), ed::DeleteItemsAction::RemoveItem(), DeleteItemsAction, Accept, AcceptItem, Begin, DeleteDeadLinks (+18 more)
+Cohesion: 0.07
+Nodes (27): ed::DeleteItemsAction::AcceptItem(), ed::DeleteItemsAction::RejectItem(), ed::DeleteItemsAction::RemoveItem(), DeleteItemsAction, Accept, AcceptItem, Add, Begin (+19 more)
 
 ### Community 657 - "SearchBox"
 Cohesion: 0.18
@@ -4273,9 +4259,9 @@ Nodes (5): createResults(), init_search(), SearchBox(), getXPos(), getYPos()
 Cohesion: 0.18
 Nodes (5): createResults(), init_search(), SearchBox(), getXPos(), getYPos()
 
-### Community 663 - "FONSfont"
-Cohesion: 0.07
-Nodes (28): FONSfont, ascender, cglyphs, data, dataSize, descender, fallbacks, font (+20 more)
+### Community 663 - "FONSglyph"
+Cohesion: 0.15
+Nodes (13): FONSglyph, blur, codepoint, index, next, size, x0, x1 (+5 more)
 
 ### Community 664 - "ShcoreLibrary"
 Cohesion: 0.09
@@ -4285,25 +4271,25 @@ Nodes (21): DPI, x, y, DynamicLibrary, module, AdjustWindowRectExForDpiProc, BOO
 Cohesion: 0.07
 Nodes (27): FUnknown, int16, int8, SMTG_OVERRIDE, tresult, uint8, Plug, bBypass (+19 more)
 
-### Community 666 - "multiple_programchanges/source/plug.cpp"
-Cohesion: 0.09
-Nodes (19): FUnknown, IBStream, tresult, FUnknown, int32, SMTG_OVERRIDE, tresult, Plug (+11 more)
+### Community 666 - "TEST_CASE"
+Cohesion: 0.08
+Nodes (26): Assign4CoordOperator, CenterInside, Corners, CRectTest, Extend, MakeIntegral, OffsetInverse, OperatorEqual (+18 more)
 
 ### Community 667 - "ModuleInfoJsonParser"
-Cohesion: 0.16
-Nodes (17): CompatibilityList, Document, exception, json_parse_result_s, optional, ostream, string_view, Value (+9 more)
+Cohesion: 0.14
+Nodes (21): SourceLocation, line, offset, row, CompatibilityList, Document, exception, json_parse_result_s (+13 more)
 
 ### Community 668 - "animations.cpp"
 Cohesion: 0.15
 Nodes (25): AnimationStyle, CRect, ExchangeViewAnimation, animationTick, destinationRect, doAlphaFade, doPushInFromBottom, doPushInFromLeft (+17 more)
 
-### Community 669 - "UTF8String"
-Cohesion: 0.10
-Nodes (23): CodePointIterator, IPlatformString, SizeType, StringType, UTF8String, value_type, PlatformStringPtr, SizeType (+15 more)
+### Community 669 - "TptSvf"
+Cohesion: 0.08
+Nodes (21): MalletExciter, active, env, envDecay, filter, hardness, noise, noiseMix (+13 more)
 
-### Community 670 - "MouseEventButtonState"
-Cohesion: 0.12
-Nodes (7): initializer_list, Modifiers, data, MouseEventButtonState, data, ModifierKey, MouseButton
+### Community 670 - "PhaserKernel"
+Cohesion: 0.09
+Nodes (19): AllpassStage, x1, y1, AudioEffectNode, atomic, PhaserKernel, kMaxStages, mAnalog (+11 more)
 
 ### Community 671 - "IPlatformGraphicsDeviceContext"
 Cohesion: 0.07
@@ -4339,7 +4325,7 @@ Nodes (26): 1. Trade-Off Analysis: Open Questions & Decisions, 2. Capability & S
 
 ### Community 679 - "ImGui_ImplVulkan_Data"
 Cohesion: 0.07
-Nodes (26): ImGui_ImplVulkan_Data, BufferMemoryAlignment, DescriptorSetLayout, FontCommandBuffer, FontCommandPool, FontDescriptorSet, FontImage, FontMemory (+18 more)
+Nodes (29): ImGui_ImplVulkan_AddTexture(), ImGui_ImplVulkan_Data, BufferMemoryAlignment, DescriptorSetLayout, FontCommandBuffer, FontCommandPool, FontDescriptorSet, FontImage (+21 more)
 
 ### Community 680 - "SyphonOpenGLServer"
 Cohesion: 0.08
@@ -4351,11 +4337,11 @@ Nodes (27): DegradeProcessor, buf0, buf1, buf2, buf3, buf4, buf5, buf6 (+19 more
 
 ### Community 682 - "DubDelayProcessor"
 Cohesion: 0.08
-Nodes (25): DubDelayProcessor, buffer, del, dlbuf, dphi, dry, env, fbk (+17 more)
+Nodes (24): DubDelayProcessor, buffer, del, dlbuf, dphi, dry, env, fbk (+16 more)
 
-### Community 683 - "CBitmapPixelAccess"
-Cohesion: 0.08
-Nodes (21): CBitmapPixelAccess, address, bitmap, bytesPerRow, create, currentPos, getColor, init (+13 more)
+### Community 683 - "ImGuiViewportP"
+Cohesion: 0.09
+Nodes (20): FlattenDrawDataIntoSingleLayer(), _PopUnusedDrawCmd, ImGui::DebugNodeViewport(), ImGui::DebugRenderViewportThumbnail(), ImGui::Render(), ImGui::SetWindowViewport(), ImGui::UpdateViewportsNewFrame(), InitViewportDrawData() (+12 more)
 
 ### Community 684 - "IDataBrowserDelegate"
 Cohesion: 0.07
@@ -4369,17 +4355,17 @@ Nodes (26): AtomicReferenceCounted, IPlatformFrameCallback, IPlatformFrame, conv
 Cohesion: 0.10
 Nodes (25): Atom, create, name, operator(), valid, value, ChildWindow, ChildWindow::ChildWindow() (+17 more)
 
-### Community 687 - "tdefl_compressor"
-Cohesion: 0.14
-Nodes (27): tdefl_compressor, tdefl_flush, tdefl_status, tdefl_sym_freq, tdefl_calculate_minimum_redundancy(), tdefl_compress(), tdefl_compress_block(), tdefl_compress_buffer() (+19 more)
+### Community 687 - "RenderState"
+Cohesion: 0.08
+Nodes (23): IAudioClient, getIOSetup, process, setBlockSize, setSamplerate, IAudioRenderClient, UINT32, RenderState (+15 more)
 
 ### Community 688 - "SizeType"
-Cohesion: 0.15
-Nodes (8): Ch, SchemaErrorCode, SizeType, ISchemaValidator, GetValidateFlags, IsValid, SetValidateFlags, IsPatternMatch()
+Cohesion: 0.12
+Nodes (11): Ch, SizeType, IsPatternMatch(), Property, dependencies, dependenciesSchema, dependenciesValidatorIndex, name (+3 more)
 
-### Community 689 - "OutputStream"
-Cohesion: 0.11
-Nodes (14): BufferedOutputStream, buffer, bufferSize, open, size, ByteOrder, vector, InputStream (+6 more)
+### Community 689 - "BufferedOutputStream"
+Cohesion: 0.22
+Nodes (6): BufferedOutputStream, buffer, bufferSize, size, vector, StdOutStream
 
 ### Community 690 - "Handler"
 Cohesion: 0.10
@@ -4389,9 +4375,9 @@ Nodes (11): deque, SharedPointer, SizeType, State, UIAttributes, Handler, keyStr
 Cohesion: 0.07
 Nodes (26): IdStringPtr, IUIDescription, collectBitmapNames, collectColorNames, collectControlTagNames, collectFontNames, collectGradientNames, collectTemplateViewNames (+18 more)
 
-### Community 692 - "FilterParamDef"
-Cohesion: 0.08
-Nodes (25): vector, E(), FilterDef, category, fragmentBody, inputs, name, params (+17 more)
+### Community 692 - "mdaBaseController.cpp"
+Cohesion: 0.12
+Nodes (21): BaseController::getMidiControllerAssignment(), BaseController::getProgramListCount(), BaseController::getProgramListInfo(), BaseController::getProgramName(), BaseController::getUnitByBus(), BaseController::initialize(), BaseController::notify(), BaseController::queryInterface() (+13 more)
 
 ### Community 693 - "NoiseNode"
 Cohesion: 0.08
@@ -4401,17 +4387,17 @@ Nodes (22): INode, NoiseNode, brightness, colorNoise, contrast, EnsureShader, ga
 Cohesion: 0.13
 Nodes (21): BitmapMap, ID2D1Bitmap, ID2D1RenderTarget, Cache, bitmaps, createBitmap, getBitmap, mutex (+13 more)
 
-### Community 695 - "ConfigureCameraFormat"
-Cohesion: 0.10
-Nodes (26): CameraResolution, GUID, Data1, Data2, Data3, Data4, IMFMediaType, IMFSourceReader (+18 more)
+### Community 695 - "SafeRelease"
+Cohesion: 0.17
+Nodes (19): IMFAttributes, IMFMediaType, IMFSourceReader, CameraThreadMain(), ConfigureCameraFormat(), ConfigureVideoOutputType(), LONG, UINT32 (+11 more)
 
 ### Community 696 - "cclipboard.cpp"
 Cohesion: 0.15
 Nodes (20): CClipboardTest, CClipboard, get, getFilePath, getString, set, setFilePath, setString (+12 more)
 
 ### Community 697 - "UpdateHandler"
-Cohesion: 0.09
-Nodes (23): DeferedChangeList, DependentMap, countEntries(), FUID, FUnknown, IUpdateHandler, SMTG_OVERRIDE, tresult (+15 more)
+Cohesion: 0.08
+Nodes (25): DeferedChangeList, DependentMap, countEntries(), FUID, FUnknown, int32, IUpdateHandler, SMTG_OVERRIDE (+17 more)
 
 ### Community 698 - "Modulators"
 Cohesion: 0.08
@@ -4422,8 +4408,8 @@ Cohesion: 0.08
 Nodes (26): EXRBox2i, TEXRHeader, channels, chunk_count, compression_type, custom_attributes, data_window, display_window (+18 more)
 
 ### Community 700 - "schema.h"
-Cohesion: 0.09
-Nodes (21): V1, AddUniqueElement(), Stack, wchar_t, IGenericRemoteSchemaDocumentProvider, ISchemaStateFactory, CreateHasher, CreateSchemaValidator (+13 more)
+Cohesion: 0.06
+Nodes (33): V1, AddUniqueElement(), Handler, InputStream, Stack, StackAllocator, wchar_t, IGenericRemoteSchemaDocumentProvider (+25 more)
 
 ### Community 701 - "tdefl_compressor"
 Cohesion: 0.14
@@ -4446,8 +4432,8 @@ Cohesion: 0.17
 Nodes (26): stbtt_int32, stbtt_uint16, stbtt_uint32, stbtt_uint8, stbtt_CompareUTF8toUTF16_bigendian(), stbtt_CompareUTF8toUTF16_bigendian_internal(), stbtt__CompareUTF8toUTF16_bigendian_prefix(), stbtt__find_table() (+18 more)
 
 ### Community 706 - "EventList"
-Cohesion: 0.11
-Nodes (19): Event, int32, tresult, EventList, EventList::EventList(), fillCount, getEventByIndex, maxSize (+11 more)
+Cohesion: 0.10
+Nodes (21): Event, int32, tresult, EventList, EventList::EventList(), fillCount, getEventByIndex, maxSize (+13 more)
 
 ### Community 707 - "ParamChanges"
 Cohesion: 0.09
@@ -4462,8 +4448,8 @@ Cohesion: 0.13
 Nodes (22): const_iterator, mutex, Queue, ScheduleMainQueueTaskFunc, SerialQueueVector, Task, IPlatformTaskExecutor, unique_ptr (+14 more)
 
 ### Community 710 - "ValueWrapper"
-Cohesion: 0.14
-Nodes (9): CControl, ControlList, IValue, Type, ValuePtr, ValueWrapper, controls, updateControl (+1 more)
+Cohesion: 0.11
+Nodes (11): CButtonState, CControl, ControlList, IControlListener, IValue, Type, ValuePtr, ValueWrapper (+3 more)
 
 ### Community 711 - "TestView"
 Cohesion: 0.11
@@ -4477,13 +4463,13 @@ Nodes (19): PlatformType, SharedPointer, PlatformParentHandle::create(), Platfor
 Cohesion: 0.10
 Nodes (20): get_stackframe(), gethash(), main(), memtracing_init(), memtracing_kill(), my_free_hook(), my_malloc_hook(), print_stackframe() (+12 more)
 
-### Community 714 - "AudioCaptureRing"
-Cohesion: 0.09
-Nodes (20): AudioCaptureRing, enabled, kCapacity, mEntries, mHead, mTail, overflowCount, Read (+12 more)
+### Community 714 - "CompensationDelay"
+Cohesion: 0.15
+Nodes (10): AudioTerminal, bufferIndex, capture, compensation, CompensationDelay, mBuf, mChannels, mDelay (+2 more)
 
 ### Community 715 - "SpecBlurKernel"
-Cohesion: 0.08
-Nodes (24): atomic, SpecBlurKernel, kFftSize, kHopSize, kLog2Fft, kMaxChannels, kNumBins, mAlphaTableLocal (+16 more)
+Cohesion: 0.05
+Nodes (39): ChannelState, deltaPhiFrozen, fifoSamples, inputFifo, magState, outputOla, phasePrev, phaseSynth (+31 more)
 
 ### Community 716 - "RampNode"
 Cohesion: 0.08
@@ -4499,7 +4485,7 @@ Nodes (18): ALL_NODES, cosmicCanvas, cosmicNebulae, cosmicStars, dragOffset, dra
 
 ### Community 719 - "RaceConditionTestObject"
 Cohesion: 0.10
-Nodes (18): AtomicObjectPtr, array, ObjectType, RTTransferT, storage, atomic, condition_variable, mutex (+10 more)
+Nodes (19): AtomicObjectPtr, array, ObjectType, RTTransferT, storage, atomic, condition_variable, mutex (+11 more)
 
 ### Community 720 - "Controller"
 Cohesion: 0.08
@@ -4525,9 +4511,9 @@ Nodes (25): 0.1 One step, one branch, one commit, 0.2 Run every Field harness, n
 Cohesion: 0.08
 Nodes (24): 1.1 Clean room (non-negotiable), 1.2 No sigils, bare names — unaffected by this step, restated for completeness, 1.3 One step, one branch, one commit, 1.4 Run every Field harness, not only your own, 1.5 The four hand-maintained image-pin chains, 1.6 A failing Apply() changes nothing that is running, 1. Invariants — restated verbatim, they override anything you infer, 2. Goal (+16 more)
 
-### Community 726 - "ImGuiNextWindowData"
-Cohesion: 0.08
-Nodes (23): ImGuiChildFlags, ImGuiCond, ImGuiSizeCallback, ImGuiWindowRefreshFlags, ImGuiNextWindowData, BgAlphaVal, ChildFlags, CollapsedCond (+15 more)
+### Community 726 - "MappingTransform"
+Cohesion: 0.11
+Nodes (8): MappingTransform, rotate, scale, space, translate, triplanarBlend, GetMappingTransform, GetMappingTransform
 
 ### Community 727 - "NodeBuilder"
 Cohesion: 0.08
@@ -4542,12 +4528,12 @@ Cohesion: 0.12
 Nodes (23): NSObject, NSUInteger, SyphonMessageReceiver, SyphonMessageSender, SyphonClientConnectionManager, -addInfoClientisFrameClient, -dealloc, -description (+15 more)
 
 ### Community 730 - "NoteExpressionType"
-Cohesion: 0.10
-Nodes (17): getParamNormalized, CtrlNumber, FUnknown, ParamID, ParamValue, ReleaseTimeModNoteExpressionType, Controller, PLUGIN_API (+9 more)
+Cohesion: 0.11
+Nodes (16): FUnknown, int32, IPtr, NoteExpressionValue, ParamValue, PhysicalUITypeID, SMTG_OVERRIDE, NoteExpressionType (+8 more)
 
 ### Community 731 - "TestRemapParamIDController"
-Cohesion: 0.09
-Nodes (21): FUID, FUnknown, IRemapParamID, getCompatibleParamID, iid, FUnknown, IBStream, ParamID (+13 more)
+Cohesion: 0.05
+Nodes (32): FUID, FUnknown, IRemapParamID, getCompatibleParamID, iid, FUnknown, IBStream, ParamID (+24 more)
 
 ### Community 732 - "UITransportController"
 Cohesion: 0.10
@@ -4561,21 +4547,21 @@ Nodes (21): Event, int32, tresult, VoiceProcessor, activeVoices, mClearOutputNee
 Cohesion: 0.11
 Nodes (24): CControl, CView, EditController, FUnknown, int32, IUIDescription, SizeFunc, UIAttributes (+16 more)
 
-### Community 735 - "mdaJX10Processor.cpp"
-Cohesion: 0.11
-Nodes (22): Event, FUnknown, int32, ParamID, ParamValue, TBool, tresult, clearVoice (+14 more)
+### Community 735 - "GenericArray"
+Cohesion: 0.17
+Nodes (11): ConstValueIterator, Begin(), Clear(), End(), Erase(), GenericArray, GetElementsPointer(), AllocatorType (+3 more)
 
 ### Community 736 - "setWantsFocus"
 Cohesion: 0.13
 Nodes (22): setWantsFocus, CButtonState, CDrawContext, ChangedFunc, CMouseEventResult, CPoint, KeyboardEvent, CGraphicsPath (+14 more)
 
-### Community 737 - "x11platform.h"
-Cohesion: 0.11
-Nodes (22): CButtonState, Modifiers, MouseEvent, getCurrentModifiers, getCurrentMouseButtons, optionMenuPopupStopped, setupEventModifiers(), setupMouseEventButtons() (+14 more)
+### Community 737 - "nvgText"
+Cohesion: 0.26
+Nodes (21): fonsSetAlign(), fonsSetBlur(), fonsSetFont(), fonsSetSize(), fonsSetSpacing(), nvg__allocTextAtlas(), nvg__flushTextTexture(), nvg__getFontScale() (+13 more)
 
 ### Community 738 - "ModelBinding"
-Cohesion: 0.09
-Nodes (21): Model, Ptr, Type, ValueConverterPtr, ValueList, ValuePtr, ModelBinding, maxIterations (+13 more)
+Cohesion: 0.08
+Nodes (23): WindowPtr, makeMandelbrotWindow(), Model, Ptr, Type, ValueConverterPtr, ValueList, ValuePtr (+15 more)
 
 ### Community 739 - "DummyUIDescription"
 Cohesion: 0.10
@@ -4593,9 +4579,9 @@ Nodes (19): CCoord, UISelection, UISelectionView, handleInset, onSelectionChange
 Cohesion: 0.08
 Nodes (23): CControl, CDataBrowser, CViewContainer, IActionPerformer, NonAtomicReferenceCounted, SharedPointer, StringVector, UIDescription (+15 more)
 
-### Community 743 - "sliderviewcreator.cpp"
-Cohesion: 0.18
-Nodes (21): ConstStringPtrList, CView, IdStringPtr, IUIDescription, StringList, UIAttributes, SliderBaseCreator, apply (+13 more)
+### Community 743 - "Filter"
+Cohesion: 0.12
+Nodes (18): Filter, a1a0, a2a0, b0a0, b1a0, b2a0, in1, in2 (+10 more)
 
 ### Community 744 - "AstNode"
 Cohesion: 0.09
@@ -4627,11 +4613,11 @@ Nodes (13): ExDialogType, IPlatformFileSelector, PlatformFileSelectorConfig, Pla
 
 ### Community 751 - "imgui_impl_vulkan.cpp"
 Cohesion: 0.19
-Nodes (22): check_vk_result(), ImGui_ImplVulkan_AddTexture(), ImGui_ImplVulkan_CreateDeviceObjects(), ImGui_ImplVulkan_CreateFontsTexture(), ImGui_ImplVulkan_CreatePipeline(), ImGui_ImplVulkan_CreateShaderModules(), ImGui_ImplVulkan_DestroyDeviceObjects(), ImGui_ImplVulkan_DestroyFontsTexture() (+14 more)
+Nodes (21): check_vk_result(), ImGui_ImplVulkan_CreateDeviceObjects(), ImGui_ImplVulkan_CreateFontsTexture(), ImGui_ImplVulkan_CreatePipeline(), ImGui_ImplVulkan_CreateShaderModules(), ImGui_ImplVulkan_DestroyDeviceObjects(), ImGui_ImplVulkan_DestroyFontsTexture(), ImGui_ImplVulkan_GetBackendData() (+13 more)
 
 ### Community 752 - "imgui_bezier_math.h"
-Cohesion: 0.10
-Nodes (23): ImVec2, ImCubicBezierFixedStepSample, BreakSearch, Length, Point, ImCubicBezierIntersectResult, Count, Points (+15 more)
+Cohesion: 0.09
+Nodes (25): ImVec2, ImCubicBezierFixedStepSample, BreakSearch, Length, Point, ImCubicBezierIntersectResult, Count, Points (+17 more)
 
 ### Community 753 - "SyphonServerConnectionManager"
 Cohesion: 0.14
@@ -4646,8 +4632,8 @@ Cohesion: 0.12
 Nodes (20): CRITSECT, DebugInfo, LockCount, LockSemaphore, OwningThread, RecursionCount, SpinCount, FConditionalGuard (+12 more)
 
 ### Community 756 - "IPlugFrame"
-Cohesion: 0.11
-Nodes (22): FUID, FUnknown, IEventHandler, iid, PLUGIN_API, IPlugFrame, iid, resizeView (+14 more)
+Cohesion: 0.08
+Nodes (28): FUID, FUnknown, int32, IEventHandler, iid, PLUGIN_API, IPlugFrame, iid (+20 more)
 
 ### Community 757 - "ReadOnlyBStream"
 Cohesion: 0.10
@@ -4662,16 +4648,16 @@ Cohesion: 0.12
 Nodes (16): CViewContainer::findSingleTouchEventTarget(), const_iterator, CPoint, CView, ITouchEvent, getTimeStamp, touches, Touch (+8 more)
 
 ### Community 760 - "CAViewLayer"
-Cohesion: 0.09
-Nodes (22): CAViewLayer, drawDelegate, drawLayer, init, invalidRect, layer, onScaleFactorChanged, setAlpha (+14 more)
+Cohesion: 0.06
+Nodes (30): CAViewLayer, drawDelegate, drawLayer, init, invalidRect, layer, onScaleFactorChanged, setAlpha (+22 more)
 
 ### Community 761 - "GLKitOpenGLView"
 Cohesion: 0.10
 Nodes (22): GLKitOpenGLView, doDraw, init, invalidRect, lock, lockContext, makeContextCurrent, parent (+14 more)
 
-### Community 762 - "D2DBitmap"
-Cohesion: 0.10
-Nodes (21): HBITMAP, IPlatformBitmapPixelAccess, SharedPointer, D2DBitmap, createHBitmap, lockPixels, scaleFactor, size (+13 more)
+### Community 762 - "controlcreator.cpp"
+Cohesion: 0.16
+Nodes (17): CControlCreatorDummyControl, ControlCreator, apply, create, getAttributeNames, getAttributeType, getAttributeValue, getBaseViewName (+9 more)
 
 ### Community 763 - "GroupController"
 Cohesion: 0.10
@@ -4679,15 +4665,15 @@ Nodes (23): CControl, CView, EditController, FUnknown, int32, IUIDescription, Pa
 
 ### Community 764 - "Hasher"
 Cohesion: 0.13
-Nodes (7): Type, Hasher, kDefaultSize, stack_, Number, d, u
+Nodes (6): Type, Hasher, kDefaultSize, stack_, Number, u
 
 ### Community 765 - "UIDescriptionListener"
 Cohesion: 0.12
 Nodes (14): UIDescription, UIDescriptionListener, beforeUIDescSave, doUIDescTemplateUpdate, onUIDescBitmapChanged, onUIDescColorChanged, onUIDescFontChanged, onUIDescGradientChanged (+6 more)
 
-### Community 766 - "viewcreator.cpp"
-Cohesion: 0.15
-Nodes (21): CRect, CView, CViewAttributeID, IdStringPtr, IUIDescription, StringList, UIAttributes, CViewAttributeID (+13 more)
+### Community 766 - "AnalyzeNodes.cpp"
+Cohesion: 0.12
+Nodes (17): AudioNodeForNotePorts, CookIfNeeded, EnsureAudioNode, IsRunning, ModulatorOutput, Start, Stop, GetAudioNode (+9 more)
 
 ### Community 767 - "TremoloKernel"
 Cohesion: 0.11
@@ -4697,9 +4683,9 @@ Nodes (14): AudioEffectNode, atomic, TremoloKernel, mMailbox, mOsc, mRateDiv, mS
 Cohesion: 0.11
 Nodes (15): AudioPluginAudioNode, kMaxTrackedVoices, kPitchBendRangeSemitones, mActiveVoiceCount, mActiveVoiceIds, mBypass, mHandle, mLastSeenHandle (+7 more)
 
-### Community 769 - "COM_DECLSPEC_NOTHROW"
-Cohesion: 0.15
-Nodes (23): COM_DECLSPEC_NOTHROW, IDataObject, BOOL, DWORD, STDMETHODIMP CDropTarget::DragEnter(), STDMETHODIMP CDropTarget::DragLeave(), STDMETHODIMP CDropTarget::DragOver(), STDMETHODIMP CDropTarget::Drop() (+15 more)
+### Community 769 - "Voice"
+Cohesion: 0.10
+Nodes (18): EngineState, filter, lastOut, opPhase, phase, Voice, active, age (+10 more)
 
 ### Community 770 - "keycodes.h"
 Cohesion: 0.11
@@ -4713,33 +4699,33 @@ Nodes (23): stbtt__buf, stbtt_uint32, stbtt__buf_get(), stbtt__buf_get8(), stbtt
 Cohesion: 0.16
 Nodes (18): int32, int64, char16, int32, StringCopy(), StringLength(), UString, getLength (+10 more)
 
-### Community 773 - "impl"
-Cohesion: 0.13
-Nodes (23): addXdgWmBaseListener(), bindGlobals(), ChangeType, ContextListeners, StringType, WaylandOutputs, wl_display, wl_output (+15 more)
+### Community 773 - "clientcontext.cpp"
+Cohesion: 0.06
+Nodes (56): addXdgWmBaseListener(), bindGlobals(), ChangeType, ContextListeners, Globals, IContextListener, StringType, WaylandOutputs (+48 more)
 
-### Community 774 - "clientcontext.cpp"
-Cohesion: 0.13
-Nodes (18): IContextListener, wl_compositor, wl_shm, xdg_wm_base, zwp_linux_dmabuf_v1, IWaylandClientContext, unique_ptr, handleGlobal() (+10 more)
+### Community 774 - "DebugPrint"
+Cohesion: 0.14
+Nodes (14): Animators, onTimer, Animator, CVSTGUITimer, NonAtomicReferenceCounted, Timer, animators, gInstance (+6 more)
 
-### Community 775 - "WindowListenerAdapter"
+### Community 775 - "TimingFunctionBase"
 Cohesion: 0.12
-Nodes (11): App, IWindow, WindowPtr, makeWindow(), CPoint, Func, IWindow, IWindowListener (+3 more)
+Nodes (16): ITimingFunction, InterpolationTimingFunction, addPoint, getPosition, points, RepeatTimingFunction, autoReverse, getPosition (+8 more)
 
 ### Community 776 - "TestComponent"
 Cohesion: 0.15
 Nodes (15): BusDirection, FUnknown, IBStream, IComponent, int32, IoMode, MediaType, TBool (+7 more)
 
 ### Community 777 - "PlatformFileSelectorConfig"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (21): CallbackFunc, UTF8String, IPlatformFileSelector, cancel, run, operator==(), PlatformFileExtension, description (+13 more)
 
-### Community 778 - "impl"
-Cohesion: 0.13
-Nodes (23): addXdgWmBaseListener(), bindGlobals(), ChangeType, ContextListeners, StringType, WaylandOutputs, wl_display, wl_output (+15 more)
+### Community 778 - "waylandclientcontext.cpp"
+Cohesion: 0.06
+Nodes (50): addXdgWmBaseListener(), bindGlobals(), ChangeType, ContextListeners, Globals, IContextListener, StringType, WaylandOutputs (+42 more)
 
-### Community 779 - "waylandclientcontext.cpp"
-Cohesion: 0.13
-Nodes (18): IContextListener, wl_compositor, wl_shm, xdg_wm_base, zwp_linux_dmabuf_v1, IWaylandClientContext, unique_ptr, handleGlobal() (+10 more)
+### Community 779 - "CDataBrowser"
+Cohesion: 0.19
+Nodes (7): CButtonState, CDataBrowser, CMenuItem, CMouseEventResult, CPoint, KeyboardEvent, clickCallback
 
 ### Community 780 - "JavaScriptViewFactory"
 Cohesion: 0.15
@@ -4754,12 +4740,12 @@ Cohesion: 0.09
 Nodes (23): Analysis, envelopeAmp, envelopeFreq, fftSize, frameF0, frameVoicing, globalConfidence, globalF0 (+15 more)
 
 ### Community 783 - "MidiCCNode"
-Cohesion: 0.09
-Nodes (13): IModulator, INode, MidiCCNode, channel, controller, device, high, invert (+5 more)
+Cohesion: 0.10
+Nodes (12): IModulator, MidiCCNode, channel, controller, device, high, invert, isNote (+4 more)
 
-### Community 784 - "EnvelopeNode"
-Cohesion: 0.09
-Nodes (14): EnvelopeNode, attackMs, constantIn, decayMs, input, mGateOpen, mLevel, mStage (+6 more)
+### Community 784 - "makeClassInfo2"
+Cohesion: 0.16
+Nodes (13): CreateInstanceFunc, ClassInfo2WithCreateFunc, context, create, char8, FIDString, int32, PClassInfo2 (+5 more)
 
 ### Community 785 - "EngineBlock"
 Cohesion: 0.09
@@ -4777,13 +4763,13 @@ Nodes (19): AAX_CEffectGUI, AAX_EHighlightColor, AAX_Point, AAXWrapper_GUI, AAX_
 Cohesion: 0.09
 Nodes (22): AngleRange, AngleStart, CircleDrawing, CKnobCreatorTest, CoronaColor, CoronaDashDot, CoronaDrawing, CoronaFromCenter (+14 more)
 
-### Community 789 - "datepicker_win32.cpp"
-Cohesion: 0.10
-Nodes (15): ChangeCallback, PlatformViewType, TookFocusCallback, DatePicker::attach(), DatePicker::DatePicker(), DatePicker::Impl, changeCallback, font (+7 more)
+### Community 789 - "DatePicker"
+Cohesion: 0.05
+Nodes (34): ChangeCallback, Date, day, month, year, DatePicker, attach, impl (+26 more)
 
 ### Community 790 - "Model"
 Cohesion: 0.16
-Nodes (15): Complex, CPoint, calculate(), calculateLine(), Point, hypot(), IModelChangeListener, modelChanged (+7 more)
+Nodes (16): Complex, CPoint, calculate(), calculateLine(), Point, hypot(), IModelChangeListener, modelChanged (+8 more)
 
 ### Community 791 - "Notes"
 Cohesion: 0.09
@@ -4810,12 +4796,12 @@ Cohesion: 0.11
 Nodes (17): SyphonOpenGLImage, SyphonIOSurfaceImageLegacy, -dealloc, -initWithSurfaceforContext, -textureName, CGLContextObj, SyphonClientBase, SyphonIOSurfaceImageCore (+9 more)
 
 ### Community 797 - "Platform"
-Cohesion: 0.16
-Nodes (21): ApplicationPtr, FUnknown, shared_ptr, vector, WindowControllerPtr, WindowPtr, main(), Platform (+13 more)
+Cohesion: 0.15
+Nodes (22): ApplicationPtr, FUnknown, shared_ptr, vector, WindowControllerPtr, WindowPtr, main(), pause() (+14 more)
 
-### Community 798 - "locale.h"
-Cohesion: 0.10
-Nodes (16): convert(), u16string, NumberT, u16string, toString(), convert(), String128, TChar (+8 more)
+### Community 798 - "moduleinfotool/source/main.cpp"
+Cohesion: 0.04
+Nodes (50): DescriptionsList, Descriptions, mCaption, mDescriptions, parse, print, key_type, ostream (+42 more)
 
 ### Community 799 - "HostProcessData"
 Cohesion: 0.24
@@ -4825,9 +4811,9 @@ Nodes (19): BusDirection, IComponent, int32, BusDirection, int32, Sample32, Samp
 Cohesion: 0.10
 Nodes (21): END_DEFINE_INTERFACES, FUID, String, NSArray, PresetBrowserViewController, PresetManager, cid, DEF_INTERFACE (+13 more)
 
-### Community 801 - "ProcessContextRequirements"
-Cohesion: 0.14
-Nodes (5): ProcessContextRequirementsTest::ProcessContextRequirementsTest(), ProcessContextRequirementsTest::run(), ProcessContextRequirementsTest::setup(), ProcessContextRequirements, flags
+### Community 801 - "ImPool"
+Cohesion: 0.16
+Nodes (5): ImPool, AliveCount, Buf, FreeIdx, ImPoolIdx
 
 ### Community 802 - "DataPackageIterator"
 Cohesion: 0.13
@@ -4845,17 +4831,17 @@ Nodes (21): IPlatformFactory, asLinuxFactory, asMacFactory, asWin32Factory, crea
 Cohesion: 0.15
 Nodes (9): CFrame, CPoint, IMenuBuilder, IWindow, IWindowController, PlatformFrameConfigPtr, PlatformType, SharedPointer (+1 more)
 
-### Community 806 - "impl"
+### Community 806 - "Signature"
 Cohesion: 0.11
-Nodes (18): CButtonState, CFrame, IController, IControlListener, SharedPointer, UIDescription, impl, customization (+10 more)
+Nodes (17): Signature, axis, chladniM, chladniN, damping, energyQuant, flat, flip (+9 more)
 
 ### Community 807 - "MouseEventCheckView"
-Cohesion: 0.12
-Nodes (15): CButtonState, CMouseEventResult, CPoint, IDropTarget, MouseWheelEvent, SharedPointer, MouseEventCheckView, mouseCancelCalled (+7 more)
+Cohesion: 0.10
+Nodes (17): CButtonState, CMouseEventResult, CPoint, DragEventData, DragOperation, IDropTarget, MouseWheelEvent, SharedPointer (+9 more)
 
 ### Community 808 - "mz_uint64"
-Cohesion: 0.23
-Nodes (22): mz_file_read_func, MZ_TIME_T, mz_uint16, mz_uint32, mz_uint64, mz_zip_dos_to_time_t(), mz_zip_file_read_func(), mz_zip_get_file_modified_time() (+14 more)
+Cohesion: 0.13
+Nodes (32): mz_file_read_func, MZ_TIME_T, mz_uint16, mz_uint32, mz_uint64, mz_crc32(), mz_file_read_func_stdio(), mz_zip_compute_crc32_callback() (+24 more)
 
 ### Community 809 - "uijsonpersistence.cpp"
 Cohesion: 0.36
@@ -4897,41 +4883,41 @@ Nodes (16): SyphonServerBase, SyphonMetalServer, -dealloc, -destroyResources, -d
 Cohesion: 0.12
 Nodes (21): stbi_uc, resample_row_1(), stbi__clamp(), stbi__copyval(), stbi__float_postprocess(), stbi__hdr_convert(), stbi__idct_block(), stbi__idct_simd() (+13 more)
 
-### Community 819 - "SystemTime"
-Cohesion: 0.13
-Nodes (15): WaveformViewManager::WaveformViewManager(), DWORD, GetImplFunc, HMODULE, getUptimeByClockGettime(), GetImplFunc, int64, makeNativeGetSystemTimeFunc() (+7 more)
+### Community 819 - "Array"
+Cohesion: 0.18
+Nodes (9): Base<json_array_element_s>, Base<json_array_s>, Base<json_object_s>, Array, ArrayElement, Iterator, el, Object (+1 more)
 
 ### Community 820 - "DynamicsProcessor"
-Cohesion: 0.10
-Nodes (21): DynamicsProcessor, att, dry, env, env2, gatt, genv, irel (+13 more)
+Cohesion: 0.05
+Nodes (40): DynamicsController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult, FUnknown (+32 more)
 
 ### Community 821 - "AUv3AudioEngine"
 Cohesion: 0.12
 Nodes (17): AUv3WrapperViewController, -embedPlugInView, -viewDidLoad, NSViewController, AUv3WrapperViewController, IBOutlet, NSView, ViewController (+9 more)
 
-### Community 822 - "TestBase"
-Cohesion: 0.10
-Nodes (20): SuspendResumeTest, DECLARE_FUNKNOWN_METHODS, IAudioProcessor, IComponent, IEditController, ProcessSetup, SMTG_OVERRIDE, TestBase (+12 more)
+### Community 822 - "ITextEditorController"
+Cohesion: 0.12
+Nodes (15): Command, KeyboardEvent, Modifiers, VirtualKey, createNewTextEditor(), ITextEditorController, onTextEditorCreated, onTextEditorDestroyed (+7 more)
 
 ### Community 823 - "vstpresetfile.cpp"
 Cohesion: 0.24
 Nodes (19): copyStream(), ChunkType, Entry, FILE, IBStream, tresult, FileStream::FileStream(), open (+11 more)
 
-### Community 824 - "CTabButton"
-Cohesion: 0.11
-Nodes (15): CButtonState, CCoord, CFontRef, CMouseEventResult, COnOffButton, DragEventData, DragOperation, IDropTarget (+7 more)
+### Community 824 - "Genome"
+Cohesion: 0.12
+Nodes (16): Rng, Genome, attackScale, bandAmp, brightnessTilt, decayScale, decayTilt, harmonicStretch (+8 more)
 
 ### Community 825 - "value.h"
-Cohesion: 0.23
-Nodes (20): currentPlainValue(), currentStepValue(), currentStringValue(), IValue, StepType, Type, UTF8String, IMutableStepValue (+12 more)
+Cohesion: 0.17
+Nodes (25): currentPlainValue(), currentStepValue(), currentStringValue(), IValue, StepType, Type, UTF8String, IMutableStepValue (+17 more)
 
-### Community 826 - "StaticStringValue"
-Cohesion: 0.10
-Nodes (8): IValue, IValueListener, Listeners, StaticStringValue, value, ValueBase, idString, listeners
+### Community 826 - "ValueBase"
+Cohesion: 0.25
+Nodes (6): IValue, IValueListener, Listeners, ValueBase, idString, listeners
 
 ### Community 827 - "AppDelegate"
 Cohesion: 0.11
-Nodes (16): AppDelegate, -applicationDidBecomeActive, -applicationDidEnterBackground, -applicationdidFinishLaunchingWithOptions, -applicationWillEnterForeground, -applicationWillResignActive, -applicationWillTerminate, UIApplicationDelegate (+8 more)
+Nodes (17): VSTGUI, AppDelegate, -applicationDidBecomeActive, -applicationDidEnterBackground, -applicationdidFinishLaunchingWithOptions, -applicationWillEnterForeground, -applicationWillResignActive, -applicationWillTerminate (+9 more)
 
 ### Community 828 - "ViewListener"
 Cohesion: 0.12
@@ -4962,16 +4948,16 @@ Cohesion: 0.10
 Nodes (14): INode, SwitcherNode, crossfade, interval, kSlots, mActiveSlot, manual, manualSlot (+6 more)
 
 ### Community 835 - "SmoothedEngine"
-Cohesion: 0.10
-Nodes (21): SmoothedBlock, eng, fmDepth, frequency, glide, mix, pitchBend, volume (+13 more)
+Cohesion: 0.15
+Nodes (13): SmoothedEngine, cutoff, detune, fine, pan, phase, phaseRand, position (+5 more)
 
 ### Community 836 - "PlatformCallbacks"
-Cohesion: 0.11
-Nodes (19): AlertForWindowFunc, AlertFunc, shared_ptr, UTF8String, get, getHighscoreListName, CommandLineArguments, ICommonDirectories (+11 more)
+Cohesion: 0.14
+Nodes (14): AlertForWindowFunc, AlertFunc, CommandLineArguments, IPreference, InitParams, openFiles, PlatformCallbacks, onCommandUpdate (+6 more)
 
 ### Community 837 - "TEST_CASE"
-Cohesion: 0.10
-Nodes (20): BitmapOffset, CSliderCreatorTest, DrawBack, DrawFrame, DrawValue, DrawValueFromCenter, DrawValueInverted, BackColor (+12 more)
+Cohesion: 0.04
+Nodes (51): AutoHeight, BackgroundColorDrawStyle, BackgroundColorDrawStyleValues, BitmapOffset, CMultiLineTextLabelCreatorTest, CSliderCreatorTest, CSplitViewCreatorTest, CTextLabelCreatorTest (+43 more)
 
 ### Community 838 - "HeaderInfo"
 Cohesion: 0.10
@@ -4981,9 +4967,9 @@ Nodes (20): Box2iInfo, HeaderInfo, attributes, channels, chunk_count, compressio
 Cohesion: 0.10
 Nodes (19): ImGui_ImplGlfw_Data, CallbacksChainForAllWindows, ClientApi, InstalledCallbacks, LastValidMousePos, MouseCursors, MouseWindow, PrevUserCallbackMonitor (+11 more)
 
-### Community 840 - "HWND__"
-Cohesion: 0.11
-Nodes (18): spoutGL::CreateOpenGL(), SpoutReceiver::SelectSender(), CopyToClipBoard(), SPOUT_DLLEXP SpoutMessageBoxWindow(), getOuterWindow, Win32OptionMenu::Win32OptionMenu(), CRect, DWORD (+10 more)
+### Community 840 - "SpoutLogNotice"
+Cohesion: 0.09
+Nodes (34): Spout::CheckSender(), Spout::GetSenderAdapter(), Spout::ReleaseReceiver(), Spout::ReleaseSender(), spoutDirectX::SetPerformancePreference(), spoutDirectX::SetPreferredAdapter(), spoutFrameCount::CleanupFrameCount(), spoutFrameCount::SetFrameCount() (+26 more)
 
 ### Community 841 - "stbi__zbuf"
 Cohesion: 0.25
@@ -4998,16 +4984,16 @@ Cohesion: 0.12
 Nodes (17): CGLContextObj, SyphonOpenGLContextSupportsExtension(), SyphonServerRendererGL, SyphonIOSurfaceImageLegacy, SyphonServerRendererLegacyGL, -bind, -capabilitiesDidChange, -dealloc (+9 more)
 
 ### Community 844 - "vstspeaker.h"
-Cohesion: 0.23
+Cohesion: 0.21
 Nodes (19): convertSpeaker_Ambi_1234Order_to_Ambi567Order(), convertSpeaker_Ambi_567Order_to_Ambi1234Order(), getChannelCount(), getSpeaker(), getSpeakerArrangementFromString(), getSpeakerArrangementString(), getSpeakerIndex(), getSpeakerShortName() (+11 more)
 
 ### Community 845 - "Platform"
 Cohesion: 0.15
 Nodes (19): ApplicationPtr, FUnknown, HINSTANCE, _In_, _In_opt_, LPWSTR, WindowControllerPtr, WindowPtr (+11 more)
 
-### Community 846 - "module_linux.cpp"
-Cohesion: 0.17
-Nodes (16): Optional, PathList, Ptr, SnapshotList, findFilesWithExt(), findModules(), getApplicationPath(), getCurrentMachineName() (+8 more)
+### Community 846 - "ImGuiListClipperData"
+Cohesion: 0.14
+Nodes (12): ImGuiListClipper, ImS8, ImGuiListClipperData, ItemsFrozen, ListClipper, LossynessOffset, Ranges, StepNo (+4 more)
 
 ### Community 847 - "PresetFile"
 Cohesion: 0.18
@@ -5021,9 +5007,9 @@ Nodes (19): CButtonState, CDrawContext, CMouseEventResult, CPoint, CRect, CSearc
 Cohesion: 0.11
 Nodes (19): AtomicReferenceCounted, IPlatformTextEdit, drawsPlaceholder, getText, setText, textEdit, updateSize, IPlatformTextEditCallback (+11 more)
 
-### Community 850 - "IWindow"
-Cohesion: 0.10
-Nodes (20): IWindow, activate, changeStyle, close, getFocusViewRect, getPosition, getScaleFactor, getSize (+12 more)
+### Community 850 - "PresetSaveViewController"
+Cohesion: 0.19
+Nodes (13): UITextFieldDelegate, UIViewController, PresetSaveViewController, -cancel, -initWithCallback, -prefersStatusBarHidden, -presetURL, -removeSelf (+5 more)
 
 ### Community 851 - "DescriptionListenerMock"
 Cohesion: 0.15
@@ -5078,8 +5064,8 @@ Cohesion: 0.18
 Nodes (18): CompressRle(), CompressZip(), cpy8(), DecodeEXRImage(), InitSingleResolutionOffsets(), InitTileOffsets(), IsAnyOffsetsAreInvalid(), isValidTile() (+10 more)
 
 ### Community 864 - "FDebugPrint"
-Cohesion: 0.15
-Nodes (12): AmIBeingDebugged(), FDebugBreak(), FDebugPrint(), FPrintLastError(), initNeverDebugger(), operator new(), printDebugString(), UpdateHandler::printForObject() (+4 more)
+Cohesion: 0.17
+Nodes (11): AmIBeingDebugged(), FDebugBreak(), FDebugPrint(), FPrintLastError(), initNeverDebugger(), operator new(), printDebugString(), char8 (+3 more)
 
 ### Community 865 - "TooltipController"
 Cohesion: 0.18
@@ -5114,24 +5100,24 @@ Cohesion: 0.14
 Nodes (15): Event, FUnknown, TBool, tresult, doProcessing, EPianoProcessor::EPianoProcessor(), EPianoProcessor::initialize(), noteEvent (+7 more)
 
 ### Community 873 - "StereoProcessor"
-Cohesion: 0.11
-Nodes (18): BaseProcessor, int32, SMTG_OVERRIDE, tresult, StereoProcessor, buffer, bufpos, dphi (+10 more)
+Cohesion: 0.06
+Nodes (35): BaseController, FUnknown, SMTG_OVERRIDE, tresult, StereoController, PLUGIN_API, SMTG_OVERRIDE, FUnknown (+27 more)
 
 ### Community 874 - "PlugController"
 Cohesion: 0.11
 Nodes (16): DataExchangeUserContextID, EditController, END_DEFINE_INTERFACES, FUnknown, IPlugView, SMTG_OVERRIDE, TBool, tresult (+8 more)
 
 ### Community 875 - "memoryibstream.h"
-Cohesion: 0.18
-Nodes (17): int32, int64, tresult, uint8, vector, ResizableMemoryIBStream, cursor, data (+9 more)
+Cohesion: 0.09
+Nodes (32): EventHandlers, FileDescriptor, IEventHandler, ITimerHandler, TimerHandlers, TimerInterval, tresult, RunLoopImpl (+24 more)
 
-### Community 876 - "DatePicker"
-Cohesion: 0.11
-Nodes (19): Date, day, month, year, DatePicker, attach, impl, looseFocus (+11 more)
+### Community 876 - "TEST_CASE"
+Cohesion: 0.14
+Nodes (14): AddOperator, Clear, Copy, CopyOperator, EqualOperator, CodePointIterator, Set, TEST_CASE() (+6 more)
 
-### Community 877 - "iplatformtaskexecutor.h"
-Cohesion: 0.12
-Nodes (15): IPlatformTaskExecutor, makeSerialQueue, releaseSerialQueue, schedule, waitAllTasksExecuted, operator==(), Queue, identifier (+7 more)
+### Community 877 - "task_test.cpp"
+Cohesion: 0.32
+Nodes (7): TEST_CASE(), TEST_SUITE_SETUP(), TEST_SUITE_TEARDOWN(), scheduleSerialTasksOnBackgroundQueue, SerialQueueTest, SimpleTasks, Validation
 
 ### Community 878 - "PointerEvent"
 Cohesion: 0.11
@@ -5142,16 +5128,16 @@ Cohesion: 0.13
 Nodes (17): IPlatformTextEdit, NSObject, UITextFieldDelegate, UITextEdit, delegate, getText, parent, platformControl (+9 more)
 
 ### Community 880 - "Win32DataPackage"
-Cohesion: 0.14
-Nodes (18): TCHAR, Type, IDataPackage, vector, IUnknown, Win32DataPackage, checkResolveLink, data (+10 more)
+Cohesion: 0.10
+Nodes (24): TCHAR, Type, IDataPackage, vector, IUnknown, Win32DataPackage, checkResolveLink, data (+16 more)
 
-### Community 881 - "Win32MouseObserverWhileDragging"
-Cohesion: 0.11
-Nodes (18): CDropTarget, dragData, pFrame, refCount, vector, IDraggingSession, IDropTarget, unique_ptr (+10 more)
+### Community 881 - "imgui_impl_dx10.cpp"
+Cohesion: 0.29
+Nodes (12): ImGui_ImplDX10_CreateDeviceObjects(), ImGui_ImplDX10_CreateFontsTexture(), ImGui_ImplDX10_GetBackendData(), ImGui_ImplDX10_Init(), ImGui_ImplDX10_InvalidateDeviceObjects(), ImGui_ImplDX10_NewFrame(), ImGui_ImplDX10_RenderDrawData(), ImGui_ImplDX10_SetupRenderState() (+4 more)
 
-### Community 882 - "WaylandFrame"
-Cohesion: 0.13
-Nodes (10): AtomicReferenceCounted, FUnknown, IWaylandFrame, IWaylandHost, wl_display, wl_surface, xdg_surface, xdg_toplevel (+2 more)
+### Community 882 - "TimerHandler"
+Cohesion: 0.06
+Nodes (24): FUnknownPtr, operator=, IPtr, AtomicReferenceCounted, EventHandlers, FUnknown, IEventHandler, IRunLoop (+16 more)
 
 ### Community 883 - "WindowConfiguration"
 Cohesion: 0.11
@@ -5173,9 +5159,9 @@ Nodes (14): GenericStringBuffer, GetLength(), GetSize(), GetString(), Ch, Encodi
 Cohesion: 0.17
 Nodes (19): CBitmap, COptionMenu, CPoint, function, SharedPointer, createColorIcon(), createCSSColorMenu(), COptionMenu (+11 more)
 
-### Community 888 - "multilinetextlabelcreator.cpp"
+### Community 888 - "ProcessContextCheck"
 Cohesion: 0.19
-Nodes (16): ConstStringPtrList, CView, IdStringPtr, IUIDescription, StringList, UIAttributes, MultiLineTextLabelCreator, apply (+8 more)
+Nodes (11): EventLogger, ProcessContext, EventLogger, int64, ProcessContextCheck, check, mEventLogger, mLastSystemTime (+3 more)
 
 ### Community 889 - "AssetCache"
 Cohesion: 0.11
@@ -5185,9 +5171,9 @@ Nodes (16): file_time_type, AssetCache, mBudgetBytes, mEntries, mLru, mTotalByte
 Cohesion: 0.15
 Nodes (13): BankData, data, BuildBankFromPixels(), EvaluateOrbit(), vector, MipForPhaseInc(), Radix2FFT, bitRev (+5 more)
 
-### Community 891 - "MixerNode"
-Cohesion: 0.11
-Nodes (13): MixerNode, gainDb, inputs, kMaxSlots, kSlots, mAudioNode, mChannelLevel, mLastCookFrame (+5 more)
+### Community 891 - "DropTarget"
+Cohesion: 0.22
+Nodes (9): DragEventData, DragOperation, IDropTarget, NonAtomicReferenceCounted, SharedPointer, getDropTarget, DropTarget, parent (+1 more)
 
 ### Community 892 - "AnalyserEngine"
 Cohesion: 0.11
@@ -5198,12 +5184,12 @@ Cohesion: 0.11
 Nodes (17): 0. The shape: `__APPLE__` fast path, portable default, no `_WIN32`, 1. Read these before writing code, 2. Adding a `Platform::` function is a three-sided obligation, 3.1 Thread teardown — never gate `join()` on your own running flag, 3.2 WinMM status bytes — masking channel bits eats System Realtime, 3.3 One callback thread per device — WinMM rings are MPMC, 3.4 GDI glyph outlines — `GGO_GLYPH_INDEX` changes what the first argument means, 3.5 Media Foundation — never assume `stride == width * 4` (+9 more)
 
 ### Community 894 - "TEST_CASE"
-Cohesion: 0.11
-Nodes (18): CParamDisplayCreatorTest, BackColor, BackgroundOffset, Font, FontColor, FrameColor, FrameWidth, RoundRectRadius (+10 more)
+Cohesion: 0.06
+Nodes (32): CParamDisplayCreatorTest, CShadowViewContainerCreatorTest, BackColor, BackgroundOffset, Font, FontColor, FrameColor, FrameWidth (+24 more)
 
 ### Community 895 - "TEST_CASE"
-Cohesion: 0.11
-Nodes (18): CTextButtonCreatorTest, Font, FrameColor, FrameWidth, GradientHighlighted, IconPosition, LegacyGradient, RoundRadius (+10 more)
+Cohesion: 0.07
+Nodes (27): CTextButtonCreatorTest, Gradient, changed, Gradient::~Gradient(), linearGradient, linearGradientEnd, linearGradientStart, radialGradient (+19 more)
 
 ### Community 896 - "impl"
 Cohesion: 0.12
@@ -5225,21 +5211,21 @@ Nodes (16): enable_shared_from_this<Window>, IWindow, tresult, TUID, unique_ptr,
 Cohesion: 0.16
 Nodes (16): Event, FUnknown, TBool, tresult, allNotesOff, doProcessing, PianoProcessor::initialize(), noteEvent (+8 more)
 
-### Community 901 - "Gradient"
-Cohesion: 0.14
-Nodes (14): GradientColorStop, GradientColorStopMap, IPlatformGradient, PlatformGradientBase, map, Gradient, changed, Gradient::~Gradient() (+6 more)
+### Community 901 - "PlatformGradientBase"
+Cohesion: 0.36
+Nodes (5): GradientColorStop, GradientColorStopMap, IPlatformGradient, PlatformGradientBase, map
 
 ### Community 902 - "D2DGraphicsDevice"
-Cohesion: 0.16
-Nodes (18): ID2D1Device, Identifier, PlatformGraphicsDevicePtr, shared_ptr, vector, D2DGraphicsDevice, D2DGraphicsDevice::D2DGraphicsDevice(), get (+10 more)
+Cohesion: 0.08
+Nodes (31): D2D1_MATRIX_3X2_F, ID2D1Device, Identifier, PlatformBitmapPtr, PlatformGraphicsDeviceContextPtr, PlatformGraphicsDevicePtr, shared_ptr, SharedPointer (+23 more)
 
 ### Community 903 - "EnterHighScoreViewController"
 Cohesion: 0.15
 Nodes (14): CView, IController, IUIDescription, IValue, NonAtomicReferenceCounted, OnEndEditFunc, shared_ptr, SharedPointer (+6 more)
 
-### Community 904 - "Preferences"
-Cohesion: 0.21
-Nodes (11): getNumber(), CPoint, initializer_list, IPreference, Optional, UTF8String, Preferences, groupKey (+3 more)
+### Community 904 - "minefieldviewcontroller.cpp"
+Cohesion: 0.52
+Nodes (13): CDrawContext, CFontRef, CRect, dbDrawCell, drawCellNeighbours, drawClosedCell, drawExplosionCell, drawFlag (+5 more)
 
 ### Community 905 - "IWindow"
 Cohesion: 0.11
@@ -5306,8 +5292,8 @@ Cohesion: 0.12
 Nodes (17): FONStextIter, bitmapOption, codepoint, end, font, iblur, isize, next (+9 more)
 
 ### Community 921 - "nvg__expandStroke"
-Cohesion: 0.29
-Nodes (17): NVGvertex, nvg__allocTempVerts(), nvg__bevelJoin(), nvg__buttCapEnd(), nvg__buttCapStart(), nvg__calculateJoins(), nvg__chooseBevel(), nvg__clampi() (+9 more)
+Cohesion: 0.35
+Nodes (15): NVGvertex, nvg__allocTempVerts(), nvg__bevelJoin(), nvg__buttCapEnd(), nvg__buttCapStart(), nvg__calculateJoins(), nvg__chooseBevel(), nvg__clampi() (+7 more)
 
 ### Community 922 - "stbi__err"
 Cohesion: 0.32
@@ -5329,17 +5315,17 @@ Nodes (15): GenericStringListDataBrowserSourceSelectionChanged, dbRowDoubleClick
 Cohesion: 0.18
 Nodes (12): const_iterator, IPlatformTaskExecutor, PlatformTaskExecutorPtr, queue, SerialQueueVector, ThreadPoolTaskExecutor, backgroundQueue, platformTaskExecutor (+4 more)
 
-### Community 928 - "wl_surface"
-Cohesion: 0.13
-Nodes (17): onEnter, onLeave, onPreferredBufferScale, onPreferredBufferTransform, updateScaleFactor, wl_output, wl_surface, onPointerLeave (+9 more)
+### Community 928 - "KeyboardInputEvent"
+Cohesion: 0.25
+Nodes (8): KeyboardInputEvent, eventMask, focus, key, previousFocus, state, time, virt
 
-### Community 929 - "doDrag"
-Cohesion: 0.12
-Nodes (17): CBitmap, DragDescription, DragResult, IDataPackage, IDragCallback, IPlatformOpenGLView, IPlatformOptionMenu, IPlatformTextEdit (+9 more)
+### Community 929 - "ResynthNode.cpp"
+Cohesion: 0.16
+Nodes (12): ClearPath, CookIfNeeded, CornerLabel, EnsureShader, GetOutputTexture, PlayPath, Randomise, RunGeneration (+4 more)
 
 ### Community 930 - "MZ_FORCEINLINE"
-Cohesion: 0.31
-Nodes (17): MZ_FORCEINLINE, mz_uint8, mz_zip_array, mz_write_le16(), mz_write_le32(), mz_write_le64(), mz_zip_array_ensure_capacity(), mz_zip_array_ensure_room() (+9 more)
+Cohesion: 0.29
+Nodes (18): MZ_FORCEINLINE, mz_uint8, mz_zip_array, mz_write_le16(), mz_write_le32(), mz_write_le64(), mz_zip_array_clear(), mz_zip_array_ensure_capacity() (+10 more)
 
 ### Community 931 - "IScriptContext"
 Cohesion: 0.15
@@ -5350,8 +5336,8 @@ Cohesion: 0.18
 Nodes (14): CurveShape, AddPoint, Decode, Encode, Evaluate, MovePoint, points, RemovePoint (+6 more)
 
 ### Community 933 - "GroupNode"
-Cohesion: 0.13
-Nodes (11): AutoFitGroupToMembers(), DrawGroupNode(), GroupOwning(), GroupNode, color, headerH, height, label (+3 more)
+Cohesion: 0.14
+Nodes (8): GroupNode, color, headerH, height, label, renameJustStarted, renaming, width
 
 ### Community 934 - "Voice"
 Cohesion: 0.12
@@ -5361,9 +5347,9 @@ Nodes (17): PartialVoiceState, ampL, ampR, phase, Voice, active, age, ampEnv (+9
 Cohesion: 0.12
 Nodes (14): Voice, active, age, amp, currentFreq, filt, filter, filter2 (+6 more)
 
-### Community 936 - "RemoveAnimationInCallback"
-Cohesion: 0.17
-Nodes (12): AddAnimation, AnimationMessage, AnimatorTest, CancelAnimation, CancelAnimationWithCallback, Animator, CView, IAnimationTarget (+4 more)
+### Community 936 - "PlugController"
+Cohesion: 0.15
+Nodes (12): FUID, FUnknown, IInfoListener, iid, setChannelContextInfos, DELEGATE_REFCOUNT, END_DEFINE_INTERFACES, FUnknown (+4 more)
 
 ### Community 937 - "DispatchList"
 Cohesion: 0.17
@@ -5409,9 +5395,9 @@ Nodes (16): DXGI_FORMAT, GLenum, GLint, GLuint, SpoutReceiver::CopyTexture(), Sp
 Cohesion: 0.21
 Nodes (16): stbi__png, stbi__uint32, stbi__compute_transparency(), stbi__create_png_image(), stbi__create_png_image_raw(), stbi__de_iphone(), stbi__do_png(), stbi__expand_png_palette() (+8 more)
 
-### Community 948 - "irunloopimpl.h"
-Cohesion: 0.20
-Nodes (15): EventHandlers, FileDescriptor, IEventHandler, ITimerHandler, TimerHandlers, TimerInterval, tresult, RunLoopImpl (+7 more)
+### Community 948 - "ProcessSetupCheck"
+Cohesion: 0.19
+Nodes (10): EventLogger, ProcessSetup, EventLogger, ProcessSetup, ProcessSetupCheck, check, mEventLogger, mSetup (+2 more)
 
 ### Community 949 - "mdaDX10Processor.cpp"
 Cohesion: 0.17
@@ -5425,13 +5411,13 @@ Nodes (15): int32, VOICE, car, catt, cdec, cenv, dcar, dmod (+7 more)
 Cohesion: 0.18
 Nodes (13): CResourceDescription, IUnknown, main(), printAndTerminate(), CompressedUIDescription, compressionLevel, kNoPlainUIDescFileBackup, originalIsCompressed (+5 more)
 
-### Community 952 - "DoubleClickDetector"
-Cohesion: 0.26
-Nodes (10): CPoint, MouseDownUpMoveEvent, State, DoubleClickDetector, firstClickState, firstClickTime, isDoubleClick, state (+2 more)
+### Community 952 - "VSTInterAppAudioHostUIControllerViewController"
+Cohesion: 0.17
+Nodes (11): UIViewController, IBOutlet, VSTInterAppAudioHostUIControllerViewController, -hideView, -init, -play, -record, -rewind (+3 more)
 
 ### Community 953 - "ObjCVariable"
-Cohesion: 0.17
-Nodes (11): getVariable(), Ivar, objc_super, optional, __unsafe_unretained, ObjCInstance, obj, os (+3 more)
+Cohesion: 0.12
+Nodes (14): getVariable(), id, Ivar, objc_super, optional, __unsafe_unretained, ObjCInstance, obj (+6 more)
 
 ### Community 954 - "TestViewContainerListener"
 Cohesion: 0.17
@@ -5441,13 +5427,13 @@ Nodes (10): CView, CViewContainer, IViewContainerListener, TestView1, TestView2,
 Cohesion: 0.16
 Nodes (15): CDrawContext, CPoint, CRect, UISelection, CRect, CViewContainer, UICrossLines, background (+7 more)
 
-### Community 956 - "searchtexteditcreator.cpp"
-Cohesion: 0.23
-Nodes (14): CView, IdStringPtr, IUIDescription, StringList, UIAttributes, SearchTextEditCreator, apply, create (+6 more)
+### Community 956 - "mdaDelayProcessor.cpp"
+Cohesion: 0.22
+Nodes (10): FUnknown, TBool, tresult, DelayProcessor::DelayProcessor(), doProcessing, DelayProcessor::initialize(), recalculate, DelayProcessor::setActive() (+2 more)
 
 ### Community 957 - "CycleShaperKernel"
-Cohesion: 0.13
-Nodes (11): CycleShaperKernel, kMaxChannels, kMaxCycleSamples, kMaxTail, mAnalog, mChannels, mSampleRate, mSmoothSamples (+3 more)
+Cohesion: 0.07
+Nodes (26): ChannelState, cyclePeak, inBuffer, inPos, lastCycleLen, lastCyclePeak, lastRenderedTail, lastTailLen (+18 more)
 
 ### Community 958 - "Voice"
 Cohesion: 0.12
@@ -5458,36 +5444,36 @@ Cohesion: 0.14
 Nodes (12): AAX_CEffectParameters, AAX_IEffectParameters, AAXWrapper, AAXWrapper_Parameters, AAXEditorWrapper, mAAXWrapper, SMTG_OVERRIDE, create (+4 more)
 
 ### Community 960 - "TEST_CASE"
-Cohesion: 0.13
-Nodes (15): AddViewsHorizontal, AddViewsVertical, ControllerHorizontal, ControllerVertical, CSplitViewTest, TEST_CASE(), ResizeAllViewsHorizontal, ResizeAllViewsVertical (+7 more)
+Cohesion: 0.09
+Nodes (24): AddViewsHorizontal, AddViewsVertical, ControllerHorizontal, ControllerVertical, CSplitViewTest, CButtonState, CMouseEventResult, CPoint (+16 more)
 
-### Community 961 - "Arg"
-Cohesion: 0.24
-Nodes (14): ArgType, AppendFloat32(), AppendInt32(), AppendPaddedString(), Arg, f, i, s (+6 more)
+### Community 961 - "mdaDetuneProcessor.cpp"
+Cohesion: 0.22
+Nodes (10): FUnknown, TBool, tresult, DetuneProcessor::DetuneProcessor(), doProcessing, DetuneProcessor::initialize(), recalculate, DetuneProcessor::setActive() (+2 more)
 
 ### Community 962 - "TEST_CASE"
 Cohesion: 0.13
 Nodes (15): AssignOperator, CColorTest, CopyConstructor, OperatorEqual, TEST_CASE(), FromString, GetNormalized, HSL (+7 more)
 
-### Community 963 - "PNGMemoryReader"
-Cohesion: 0.15
-Nodes (10): cairo_status_t, cairo_surface_t, createMemoryPNGRepresentation, Buffer, PNGBitmapBuffer, PNGMemoryReader, ptr, size (+2 more)
+### Community 963 - "mdaDubDelayProcessor.cpp"
+Cohesion: 0.22
+Nodes (10): FUnknown, TBool, tresult, doProcessing, DubDelayProcessor::DubDelayProcessor(), DubDelayProcessor::initialize(), recalculate, DubDelayProcessor::setActive() (+2 more)
 
-### Community 964 - "dispatchMouseCancelEvent"
-Cohesion: 0.13
-Nodes (15): CKickButtonTest, COnOffButtonTest, CTextButtonTest, KeyEvents, MouseEvents, TEST_CASE(), KeyEvents, MouseEvents (+7 more)
+### Community 964 - "TEST_CASE"
+Cohesion: 0.08
+Nodes (27): CancelMouseInteraction, CKickButtonTest, COnOffButtonTest, CTextButtonTest, CXYPadTest, MouseWheel, KeyEvents, MouseEvents (+19 more)
 
 ### Community 965 - "field-testing/SKILL.md"
 Cohesion: 0.13
 Nodes (13): 0. Invariants, 1. How testing works in this repo, 2.1 Building it, 2.2 Corpus record shape, 2.3 The precision rule, 2. The step-1 regression corpus, 3. The golden-value harness, 4. Re-baselining across the randomness break (+5 more)
 
-### Community 966 - "convert"
-Cohesion: 0.15
-Nodes (12): ColorF, D2D1_BITMAP_INTERPOLATION_MODE, D2D1_POINT_2F, D2D1_RECT_F, convert(), BitmapInterpolationQuality, CPoint, CRect (+4 more)
+### Community 966 - "d2d.h"
+Cohesion: 0.40
+Nodes (3): D2DGradient, create, ID2D1GradientStopCollection
 
 ### Community 967 - "fragmentShaderAA"
-Cohesion: 0.30
-Nodes (14): constant, fragmentShader(), fragmentShaderAA(), RasterizerData vertexShader(), scissorMask(), sdroundrect(), strokeMask(), mix (+6 more)
+Cohesion: 0.36
+Nodes (12): constant, fragmentShader(), fragmentShaderAA(), scissorMask(), sdroundrect(), strokeMask(), mix, float2 (+4 more)
 
 ### Community 968 - "MacTaskExecutor"
 Cohesion: 0.13
@@ -5569,9 +5555,9 @@ Nodes (9): CViewContainer, DragEventData, DragOperation, IDropTarget, NonAtomicR
 Cohesion: 0.13
 Nodes (14): ICocoaTextInputClient, characterIndexForPoint, firstRectForCharacterRange, getMarkedRange, getSelectedRange, hasMarkedText, insertText, setCancelCallback (+6 more)
 
-### Community 988 - "WinTimer"
-Cohesion: 0.15
-Nodes (14): DWORD, IPlatformTimerCallback, UINT, UINT_PTR, IPlatformTimer, IPlatformTimerCallback, WinTimer, callback (+6 more)
+### Community 988 - "mdaRePsychoProcessor.cpp"
+Cohesion: 0.22
+Nodes (10): FUnknown, TBool, tresult, doProcessing, RePsychoProcessor::initialize(), recalculate, RePsychoProcessor::RePsychoProcessor(), RePsychoProcessor::setActive() (+2 more)
 
 ### Community 989 - "UiTheme"
 Cohesion: 0.13
@@ -5582,7 +5568,7 @@ Cohesion: 0.17
 Nodes (12): BeginStroke, ClearRecording, ContinueStroke, CookIfNeeded, EndStroke, EnsureShaders, FlushStamps, MakeStamp (+4 more)
 
 ### Community 991 - "TEST_CASE"
-Cohesion: 0.14
+Cohesion: 0.13
 Nodes (14): ABGR_2_ARGB, ABGR_2_BGRA, ABGR_2_RGBA, ARGB_2_ABGR, ARGB_2_BGRA, ARGB_2_RGBA, BGRA_2_ABGR, BGRA_2_ARGB (+6 more)
 
 ### Community 992 - "TEST_CASE"
@@ -5594,8 +5580,8 @@ Cohesion: 0.14
 Nodes (14): AutoDragScrolling, AutoHideScrollbars, ContainerSize, CScrollViewContainerCreatorTest, DontDrawFrame, TEST_CASE(), FollowFocusView, HorizontalScrollbar (+6 more)
 
 ### Community 994 - "TEST_CASE"
-Cohesion: 0.14
-Nodes (14): Autosize, CustomViewName, CViewCreatorTest, DisabledBitmap, CView, CViewAttributeID, getViewAttributeString(), TEST_CASE() (+6 more)
+Cohesion: 0.13
+Nodes (15): Autosize, CustomViewName, CViewCreatorTest, DisabledBitmap, Origin, CView, CViewAttributeID, getViewAttributeString() (+7 more)
 
 ### Community 995 - "TEST_CASE"
 Cohesion: 0.14
@@ -5606,12 +5592,12 @@ Cohesion: 0.14
 Nodes (13): Acceptance checklist — run after any node UI change, P10 — The dark-mode contrast budget., P11 — Node-local strings never leak layout., P1 — Every control sits on the row grid. There are no free-floating widgets., P2 — The modulation dot is vertically centred on its control, always., P3 — Row shape: selector left, knobs right., P4 — `mix` is always the last knob of the last knob row., P5 — A row that changes shape must not change the grid. (+5 more)
 
 ### Community 997 - "TEST_CASE"
-Cohesion: 0.14
+Cohesion: 0.15
 Nodes (13): CLineStyleTest, DashLengths, DashPhase, DefaultConstructor, CopyConstructor, LineCap, LineJoin, TEST_CASE() (+5 more)
 
-### Community 998 - "TEST_CASE"
-Cohesion: 0.15
-Nodes (14): CShadowViewContainerCreatorTest, ShadowOffset, TEST_CASE(), CPoint, CRect, IdStringPtr, IUIDescription, Proc (+6 more)
+### Community 998 - "mdaSplitterProcessor.cpp"
+Cohesion: 0.22
+Nodes (10): FUnknown, TBool, tresult, doProcessing, SplitterProcessor::initialize(), recalculate, SplitterProcessor::setActive(), SplitterProcessor::setProcessing() (+2 more)
 
 ### Community 999 - "CSpecialDigit"
 Cohesion: 0.14
@@ -5685,9 +5671,9 @@ Nodes (14): int32, ParamID, ParamValue, String128, UnitID, ParameterInfo, defaul
 Cohesion: 0.14
 Nodes (13): FUID, FUnknown, IParameterFunctionName, getParameterIDFromFunctionName, iid, EditController, FUnknown, IPlugView (+5 more)
 
-### Community 1017 - "BaseController"
-Cohesion: 0.14
-Nodes (13): BaseController, addBypassParameter, kMicroSecondsString, midiCCParamID, PLUGIN_API, sampleRate, SMTG_OVERRIDE, DELEGATE_REFCOUNT (+5 more)
+### Community 1017 - "mdaSubSynthProcessor.cpp"
+Cohesion: 0.22
+Nodes (10): FUnknown, TBool, tresult, doProcessing, SubSynthProcessor::initialize(), recalculate, SubSynthProcessor::setActive(), SubSynthProcessor::setProcessing() (+2 more)
 
 ### Community 1018 - "mdaDegradeProcessor.cpp"
 Cohesion: 0.20
@@ -5705,9 +5691,9 @@ Nodes (10): CocoaTextEdit, getText, parent, platformControl, setText, updateSize
 Cohesion: 0.21
 Nodes (9): array, CControl, CCoord, CSplitView, IController, ISplitViewController, ISplitViewSeparatorDrawer, SplitViewController (+1 more)
 
-### Community 1022 - "SeparatorSubView"
+### Community 1022 - "mdaThruZeroProcessor.cpp"
 Cohesion: 0.22
-Nodes (9): CButtonState, CMouseEventResult, CPoint, CView, SeparatorSubView, mouseCancelCalled, mouseDownCalled, mouseMovedCalled (+1 more)
+Nodes (10): FUnknown, TBool, tresult, doProcessing, ThruZeroProcessor::initialize(), recalculate, ThruZeroProcessor::setActive(), ThruZeroProcessor::setProcessing() (+2 more)
 
 ### Community 1023 - "SharedPointer"
 Cohesion: 0.46
@@ -5725,9 +5711,9 @@ Nodes (9): vector, SpectrogramMatrix, GenerateDefaultPattern, height, rgba, widt
 Cohesion: 0.14
 Nodes (14): Voice, active, age, amp, currentFreq, filt, filter, filter2 (+6 more)
 
-### Community 1027 - "LatestRing"
-Cohesion: 0.18
-Nodes (10): CaptureTapEngine, ready, ring, wanted, atomic, LatestRing, buffers, channels (+2 more)
+### Community 1027 - "CaptureEngineBase"
+Cohesion: 0.07
+Nodes (25): CaptureEngineBase, channels, error, OnFormat, OnFrames, pcmBits, pcmScratch, running (+17 more)
 
 ### Community 1028 - "vstguidebug.cpp"
 Cohesion: 0.18
@@ -5746,8 +5732,8 @@ Cohesion: 0.15
 Nodes (12): 1. Enumerate releases and their windows, 2. Pull the current published notes, 3. For each bullet: find the implementing commit(s), 4. Check timing: is it actually an ancestor of this tag?, 5. Confirm the code existed at the tag, not just that a commit landed, 6. Spot-check every specific noun in the bullet against the real code, 7. Whole-history sweep for claims with no root at all, Applying corrections — ask first (+4 more)
 
 ### Community 1032 - "TEST_CASE"
-Cohesion: 0.15
-Nodes (13): CPointTest, Equal, MakeIntegral, OffsetInverse, TEST_CASE(), OffsetCoords, OffsetPoint, OperatorAdd (+5 more)
+Cohesion: 0.12
+Nodes (16): CPointTest, Equal, p, MakeIntegral, OffsetInverse, TEST_CASE(), forEach(), Proc (+8 more)
 
 ### Community 1033 - "Source"
 Cohesion: 0.15
@@ -5757,9 +5743,9 @@ Nodes (13): Audio Texture, Draw, FieldPixel, Formula, Image Source, Noise, Ramp,
 Cohesion: 0.15
 Nodes (12): 1. Stop snapshotting on every click, 2. Make `BuildPatchData()` linear, 3. Batch the audio-topology rebuild on delete, 4. Move, don't copy, the snapshots, 5. Change the undo stacks to `std::deque`, Confirmed root causes, Fix: undo/redo and node deletion stall on large patches (Windows + macOS), Measurement — do this first and last (+4 more)
 
-### Community 1035 - ".STDMETHOD"
-Cohesion: 0.15
-Nodes (12): DWRITE_GLYPH_RUN, DWRITE_GLYPH_RUN_DESCRIPTION, DWRITE_MEASURING_MODE, DWRITE_STRIKETHROUGH, DWRITE_UNDERLINE, BOOL, IUnknown, __out (+4 more)
+### Community 1035 - "CDataBrowser"
+Cohesion: 0.26
+Nodes (13): CButtonState, CCoord, CDataBrowser, CMouseEventResult, CPoint, dbGetCurrentColumnWidth, dbGetLineWidthAndColor, dbGetNumColumns (+5 more)
 
 ### Community 1036 - "SyphonGLShader"
 Cohesion: 0.15
@@ -5797,9 +5783,9 @@ Nodes (5): FIDString, int32, tresult, TUID, DummyFactory
 Cohesion: 0.21
 Nodes (12): clearBuffers, ComboProcessor::ComboProcessor(), doProcessing, filterFreq, ComboProcessor::initialize(), recalculate, ComboProcessor::setActive(), ComboProcessor::setProcessing() (+4 more)
 
-### Community 1045 - "mdaDynamicsProcessor.cpp"
-Cohesion: 0.19
-Nodes (10): FUnknown, TBool, tresult, checkSilence, doProcessing, DynamicsProcessor::DynamicsProcessor(), DynamicsProcessor::initialize(), recalculate (+2 more)
+### Community 1045 - "Signature"
+Cohesion: 0.15
+Nodes (12): array, Signature, gridH, gridW, hasInput, height, matchInput, mode (+4 more)
 
 ### Community 1046 - "mdaEPianoController.cpp"
 Cohesion: 0.26
@@ -5813,9 +5799,9 @@ Nodes (11): FUnknown, ParamID, ParamValue, String128, TChar, tresult, JX10Contro
 Cohesion: 0.26
 Nodes (11): FUnknown, ParamID, ParamValue, String128, TChar, tresult, PianoController::getParamStringByValue(), PianoController::getParamValueByString() (+3 more)
 
-### Community 1049 - "mdaTrackerProcessor.cpp"
-Cohesion: 0.19
-Nodes (10): FUnknown, TBool, tresult, doProcessing, filterFreq, TrackerProcessor::initialize(), recalculate, TrackerProcessor::setActive() (+2 more)
+### Community 1049 - "eventlogger.h"
+Cohesion: 0.21
+Nodes (8): Codes, int32, EventLogger, addLogEvent, clearLogEvents, mLogEvents, resetLogEvents, LogEvent
 
 ### Community 1050 - "AppDelegate"
 Cohesion: 0.17
@@ -5825,9 +5811,9 @@ Nodes (10): AppDelegate, -applicationDidBecomeActive, -applicationDidEnterBackgr
 Cohesion: 0.15
 Nodes (13): UIViewController, SettingsViewController, -close, -enableMidi, -init, -numberOfComponentsInPickerView, -pickerViewdidSelectRowinComponent, -pickerViewnumberOfRowsInComponent (+5 more)
 
-### Community 1052 - "SpeakerArrangementTest"
-Cohesion: 0.19
-Nodes (11): ProcessSampleSize, SpeakerArrangement, SMTG_OVERRIDE, SpeakerArrangement, SpeakerArrangementTest, getName, getSpeakerArrangementName, inSpArr (+3 more)
+### Community 1052 - "mdaDelayController.cpp"
+Cohesion: 0.24
+Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, DelayController::getParamStringByValue(), DelayController::getParamValueByString() (+2 more)
 
 ### Community 1053 - "CGraphicsTransform"
 Cohesion: 0.17
@@ -5841,9 +5827,9 @@ Nodes (12): IPlatformGraphicsPath, addArc, addBezierCurve, addEllipse, addLine, 
 Cohesion: 0.15
 Nodes (12): CharPosition, characterPosition, documentRect, lineHeight, position, CPoint, CRect, IIMETextInputClient (+4 more)
 
-### Community 1056 - "XdndDataPackage"
-Cohesion: 0.19
-Nodes (11): Type, IDataPackage, Type, vector, XdndDataPackage, getCount, getData, getDataSize (+3 more)
+### Community 1056 - "mdaDetuneController.cpp"
+Cohesion: 0.24
+Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, DetuneController::getParamStringByValue(), DetuneController::getParamValueByString() (+2 more)
 
 ### Community 1057 - "MacTimer"
 Cohesion: 0.19
@@ -5861,9 +5847,9 @@ Nodes (11): IViewCreator, apply, create, getAttributeNames, getAttributeType, ge
 Cohesion: 0.15
 Nodes (13): Architecture, Build from Source, Contributing, Highlights, Infinite, Installation & Quick Start, Keyboard & Canvas Shortcuts, License (+5 more)
 
-### Community 1061 - "ChannelState"
-Cohesion: 0.15
-Nodes (12): ChannelState, cyclePeak, inBuffer, inPos, lastCycleLen, lastCyclePeak, lastRenderedTail, lastTailLen (+4 more)
+### Community 1061 - "mdaRingModController.cpp"
+Cohesion: 0.24
+Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, RingModController::getParamStringByValue(), RingModController::getParamValueByString() (+2 more)
 
 ### Community 1062 - "MidiNodes.cpp"
 Cohesion: 0.17
@@ -5906,32 +5892,32 @@ Cohesion: 0.17
 Nodes (11): NSObject, NSUInteger, SyphonClientConnectionManager, -addInfoClientisFrameClient, -initWithServerDescription, -newSurface, -removeInfoClientisFrameClient, <SyphonFrameReceiving> (+3 more)
 
 ### Community 1072 - "IUpdateHandler"
-Cohesion: 0.20
-Nodes (11): FUID, FUnknown, IDependent, iid, PLUGIN_API, IUpdateHandler, addDependent, deferUpdates (+3 more)
+Cohesion: 0.24
+Nodes (9): FUID, FUnknown, IDependent, iid, PLUGIN_API, IUpdateHandler, addDependent, iid (+1 more)
 
 ### Community 1073 - "IParameterChanges"
 Cohesion: 0.18
 Nodes (12): FUID, FUnknown, IParameterChanges, addParameterData, getParameterCount, getParameterData, iid, IParamValueQueue (+4 more)
 
-### Community 1074 - "WaylandGlobals"
-Cohesion: 0.17
-Nodes (12): Globals, getSubCompositor, WaylandGlobals, compositor, dmabuf, objects, seat, shm (+4 more)
+### Community 1074 - "hostclasses.cpp"
+Cohesion: 0.20
+Nodes (9): String128, tresult, TUID, HostApplication::addRef(), createInstance, HostApplication::getName(), HostApplication::queryInterface(), HostApplication::release() (+1 more)
 
-### Community 1075 - "WaylandGlobals"
-Cohesion: 0.17
-Nodes (12): getSeat, Globals, getSeat, WaylandGlobals, compositor, dmabuf, objects, seat (+4 more)
+### Community 1075 - "uint8_t"
+Cohesion: 0.31
+Nodes (11): decode(), vector, split(), to_bjdata(), to_bson(), to_cbor(), to_msgpack(), to_ubjson() (+3 more)
 
 ### Community 1076 - "mdaBandistoController.cpp"
 Cohesion: 0.24
 Nodes (10): BandistoController::getParamStringByValue(), BandistoController::getParamValueByString(), BandistoController::initialize(), BandistoController::terminate(), FUnknown, ParamID, ParamValue, String128 (+2 more)
 
 ### Community 1077 - "mdaBeatBoxController.cpp"
-Cohesion: 0.24
-Nodes (10): BeatBoxController::getParamStringByValue(), BeatBoxController::getParamValueByString(), BeatBoxController::initialize(), BeatBoxController::terminate(), FUnknown, ParamID, ParamValue, String128 (+2 more)
+Cohesion: 0.29
+Nodes (8): BeatBoxController::getParamStringByValue(), BeatBoxController::getParamValueByString(), BeatBoxController::terminate(), ParamID, ParamValue, String128, TChar, tresult
 
-### Community 1078 - "mdaBeatBoxProcessor.cpp"
-Cohesion: 0.23
-Nodes (9): BeatBoxProcessor::BeatBoxProcessor(), doProcessing, BeatBoxProcessor::initialize(), recalculate, BeatBoxProcessor::setActive(), BeatBoxProcessor::setProcessing(), FUnknown, TBool (+1 more)
+### Community 1078 - "AlertBoxConfig"
+Cohesion: 0.18
+Nodes (11): AlertBoxConfig, defaultButton, description, headline, secondButton, thirdButton, AlertBoxForWindowConfig, callback (+3 more)
 
 ### Community 1079 - "mdaDegradeController.cpp"
 Cohesion: 0.24
@@ -5949,17 +5935,17 @@ Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, DubDelayCo
 Cohesion: 0.24
 Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, DynamicsController::getParamStringByValue(), DynamicsController::getParamValueByString() (+2 more)
 
-### Community 1083 - "mdaLeslieController.cpp"
-Cohesion: 0.24
-Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, LeslieController::getParamStringByValue(), LeslieController::getParamValueByString() (+2 more)
+### Community 1083 - "ColorChangeAction"
+Cohesion: 0.18
+Nodes (10): ColorChangeAction, description, isNewColor, name, newColor, oldColor, perform, performOrUndo (+2 more)
 
 ### Community 1084 - "mdaLimiterController.cpp"
 Cohesion: 0.24
 Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, LimiterController::getParamStringByValue(), LimiterController::getParamValueByString() (+2 more)
 
-### Community 1085 - "mdaLoudnessController.cpp"
-Cohesion: 0.24
-Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, LoudnessController::getParamStringByValue(), LoudnessController::getParamValueByString() (+2 more)
+### Community 1085 - "GradientChangeAction"
+Cohesion: 0.18
+Nodes (10): GradientChangeAction, description, gradient, name, originalGradient, perform, performOrUndo, remove (+2 more)
 
 ### Community 1086 - "mdaMultiBandController.cpp"
 Cohesion: 0.24
@@ -5993,9 +5979,9 @@ Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, SplitterCo
 Cohesion: 0.24
 Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, StereoController::getParamStringByValue(), StereoController::getParamValueByString() (+2 more)
 
-### Community 1094 - "mdaStereoProcessor.cpp"
-Cohesion: 0.21
-Nodes (9): FUnknown, TBool, tresult, doProcessing, StereoProcessor::initialize(), recalculate, StereoProcessor::setActive(), StereoProcessor::StereoProcessor() (+1 more)
+### Community 1094 - "AudioLevels"
+Cohesion: 0.20
+Nodes (8): AudioLevels, bands, high, low, mid, onset, peak, rms
 
 ### Community 1095 - "mdaSubSynthController.cpp"
 Cohesion: 0.24
@@ -6017,17 +6003,17 @@ Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, ThruZeroCo
 Cohesion: 0.24
 Nodes (10): FUnknown, ParamID, ParamValue, String128, TChar, tresult, TrackerController::getParamStringByValue(), TrackerController::getParamValueByString() (+2 more)
 
-### Community 1100 - "ParamChange"
-Cohesion: 0.20
-Nodes (10): int32, ParamID, ParamValue, ParamChange, id, sampleOffset, value, ValuePoint (+2 more)
+### Community 1100 - "setTransparency"
+Cohesion: 0.31
+Nodes (10): CDataBrowser::CDataBrowser(), setViewSize, CDataBrowserHeader::CDataBrowserHeader(), CDataBrowserView::CDataBrowserView(), CBitmap, CCoord, CDataBrowser, CRect (+2 more)
 
 ### Community 1101 - "Handler"
 Cohesion: 0.17
 Nodes (12): Handler, errorNoteDroppedBecauseNoNoteID, errorNoteDroppedBecauseNoteStackFull, errorNoteForNoteOffNotFound, errorProgramChangeReceivedInMPEZone, generateNewNoteID, onMPEControllerChange, onMPENoteOff (+4 more)
 
 ### Community 1102 - "uid.h"
-Cohesion: 0.30
-Nodes (10): Optional, TUID, operator==(), UID, _data, UID::fromString(), fromTUID, size (+2 more)
+Cohesion: 0.18
+Nodes (15): GUID, Data1, Data2, Data3, Data4, Optional, TUID, operator==() (+7 more)
 
 ### Community 1103 - "getEntry"
 Cohesion: 0.30
@@ -6037,45 +6023,45 @@ Nodes (12): int32, ProgramListID, UnitID, getEntry, getUnitProgramListID, prepar
 Cohesion: 0.27
 Nodes (6): int32, SpeakerArrangement, SpeakerArray, count, speaker, SpeakerType
 
-### Community 1105 - "VST3AUPlugInController"
-Cohesion: 0.17
-Nodes (10): DELEGATE_REFCOUNT, FUnknown, IPlugView, SMTG_OVERRIDE, tresult, VST3AUPlugInController, END_DEFINE_INTERFACES, PLUGIN_API (+2 more)
+### Community 1105 - "audiounit-tutorial/source/processor.cpp"
+Cohesion: 0.06
+Nodes (32): DELEGATE_REFCOUNT, FUnknown, IPlugView, SMTG_OVERRIDE, tresult, VST3AUPlugInController, END_DEFINE_INTERFACES, PLUGIN_API (+24 more)
 
 ### Community 1106 - "drawIconAndText"
 Cohesion: 0.24
 Nodes (12): CBitmap, CCoord, CDrawContext, CFontRef, CHoriTxtAlign, CPoint, CRect, IconPosition (+4 more)
 
 ### Community 1107 - "onKeyboardEvent"
-Cohesion: 0.23
-Nodes (11): IKeyboardHook, onKeyboardEvent, OldKeyboardHookAdapter, onKeyboardEvent, onKeyDown, onKeyUp, KeyboardEvent, CView::onKeyboardEvent() (+3 more)
+Cohesion: 0.09
+Nodes (24): CFrame::CollectInvalidRects::CollectInvalidRects(), getCurrentMouseButtons, CButtonState, CFrame, CMouseEventResult, CView, IKeyboardHook, onKeyboardEvent (+16 more)
 
 ### Community 1108 - "RuntimeObjCClass"
 Cohesion: 0.23
 Nodes (9): Class, ObjCClassBuilder, baseClass, cl, finalize, generateUniqueClass, RuntimeObjCClass, cl (+1 more)
 
 ### Community 1109 - "CGGraphicsPathFactory"
-Cohesion: 0.18
-Nodes (10): id, CGGraphicsPathFactory, createPath, createTextPath, instance, PlatformFontPtr, PlatformGraphicsPathFactoryPtr, PlatformGraphicsPathFillMode (+2 more)
+Cohesion: 0.33
+Nodes (7): CGGraphicsPathFactory, createPath, createTextPath, PlatformFontPtr, PlatformGraphicsPathFillMode, PlatformGraphicsPathPtr, IPlatformGraphicsPathFactory
 
 ### Community 1110 - "VSTGUI_UIView"
 Cohesion: 0.26
 Nodes (12): VSTGUI_UIView, -canBecomeFirstResponder, -didMoveToWindow, -drawRect, -initWithUIViewFrameparentsize, -removeTouches, -touchesBeganwithEvent, -touchesCancelledwithEvent (+4 more)
 
-### Community 1111 - "drawBitmapNinePartTiled"
-Cohesion: 0.38
-Nodes (10): BitmapInterpolationQuality, CNinePartTiledDescription, CRect, IPlatformBitmap, createBrushFromBitmap(), drawBitmap, drawBitmapNinePartTiled, fillRectWithBitmap (+2 more)
+### Community 1111 - "convert"
+Cohesion: 0.16
+Nodes (21): ColorF, D2D1_BITMAP_INTERPOLATION_MODE, D2D1_POINT_2F, D2D1_RECT_F, convert(), BitmapInterpolationQuality, CPoint, CRect (+13 more)
 
-### Community 1112 - "win32optionmenu.cpp"
-Cohesion: 0.24
-Nodes (11): COptionMenu, HMENU, getItemMenu(), HBITMAP, IPlatformOptionMenu, list, Win32OptionMenu, bitmaps (+3 more)
+### Community 1112 - "ZLibInputContentProvider"
+Cohesion: 0.22
+Nodes (6): IContentProvider, InputStream, unique_ptr, ZLibInputContentProvider, startPos, zin
 
-### Community 1113 - ".init"
-Cohesion: 0.30
-Nodes (6): Config, UTF8String, WindowPtr, makeWindow(), init, initStatic
+### Community 1113 - "ReadDwordFromRegistry"
+Cohesion: 0.22
+Nodes (9): spoutGL::GetCPUmode(), spoutGL::GetDX9(), spoutGL::GetMemoryShareMode(), spoutGL::GetShareMode(), spoutGL::spoutGL(), spoutSenderNames::spoutSenderNames(), GetSDKversion(), GetSpoutVersion() (+1 more)
 
-### Community 1114 - "WindowController::EditImpl"
-Cohesion: 0.26
-Nodes (5): WindowController::EditImpl, filename, isEditing, uiEditController, onClosed
+### Community 1114 - "VSTInterAppAudioAppDelegate"
+Cohesion: 0.31
+Nodes (6): VSTInterAppAudioAppDelegate, -applicationdidFinishLaunchingWithOptions, -applicationsupportedInterfaceOrientationsForWindow, -audioIOConnectionChanged, -createShowHostViewButton, -showHostViewAction
 
 ### Community 1115 - "Controller"
 Cohesion: 0.24
@@ -6089,13 +6075,13 @@ Nodes (6): GetBuffer(), Ch, Push(), Put(), PutN(), MemoryBuffer
 Cohesion: 0.20
 Nodes (12): ChangeTemplateMinMaxAction, description, maxSize, minSize, oldMaxSize, oldMinSize, perform, setMinMaxSize (+4 more)
 
-### Community 1118 - "FontChangeAction"
-Cohesion: 0.17
-Nodes (11): FontChangeAction, alternativeNames, description, font, name, originalFont, perform, performOrUndo (+3 more)
+### Community 1118 - "BrownNoise"
+Cohesion: 0.36
+Nodes (6): BrownNoise, buffer, bufferSize, BrownNoise<SamplePrecision>::BrownNoise(), int32, SamplePrecision
 
-### Community 1119 - "uicontentprovider.cpp"
-Cohesion: 0.20
-Nodes (10): InputStream, IContentProvider, InputStream, InputStreamContentProvider, InputStreamContentProvider::InputStreamContentProvider(), readRawData, rewind, startPos (+2 more)
+### Community 1119 - ".rewind"
+Cohesion: 0.18
+Nodes (11): InputStream, IContentProvider, InputStream, InputStreamContentProvider, InputStreamContentProvider::InputStreamContentProvider(), readRawData, rewind, startPos (+3 more)
 
 ### Community 1120 - "audit_node_params.py"
 Cohesion: 0.26
@@ -6105,13 +6091,13 @@ Nodes (11): dispatch_map(), function_bodies(), label_of(), main(), klass -> set 
 Cohesion: 0.26
 Nodes (9): Rng, NextFloat, NextRange, NextU32, state, RunYin(), YinResult, confidence (+1 more)
 
-### Community 1122 - "ChannelState"
-Cohesion: 0.17
-Nodes (10): ChannelState, deltaPhiFrozen, fifoSamples, inputFifo, magState, outputOla, phasePrev, phaseSynth (+2 more)
+### Community 1122 - "RangeParameter"
+Cohesion: 0.33
+Nodes (5): ParamValue, SMTG_OVERRIDE, RangeParameter, maxPlain, minPlain
 
-### Community 1123 - "NoteEvent"
-Cohesion: 0.17
-Nodes (12): NoteEvent, bendSemitones, bendUpdate, frameOffset, isNoteOn, note, source, velocity (+4 more)
+### Community 1123 - "AudioStrumNode"
+Cohesion: 0.05
+Nodes (33): NoteEvent, bendSemitones, bendUpdate, frameOffset, isNoteOn, note, source, velocity (+25 more)
 
 ### Community 1124 - "OfflineRenderState"
 Cohesion: 0.17
@@ -6126,7 +6112,7 @@ Cohesion: 0.17
 Nodes (11): Item, amp, note, position, SamplerVoiceSnapshot, count, kMaxVisualVoices, selfActive (+3 more)
 
 ### Community 1127 - "HostEventList"
-Cohesion: 0.20
+Cohesion: 0.18
 Nodes (7): Event, HostEventList, kMaxEvents, mCount, mEvents, mRefCount, Vst::IEventList
 
 ### Community 1128 - "createViewportLoop"
@@ -6221,17 +6207,17 @@ Nodes (9): FUnknown, ParamID, ParamValue, String128, tresult, DX10Controller::ge
 Cohesion: 0.18
 Nodes (9): DELEGATE_REFCOUNT, FUnknown, IPlugView, SMTG_OVERRIDE, tresult, UTF16NameController, END_DEFINE_INTERFACES, PLUGIN_API (+1 more)
 
-### Community 1151 - "TestDefaults"
-Cohesion: 0.18
-Nodes (11): ProcessSampleSize, ProcessTest::ProcessTest(), uint64, TestDefaults, buffersAreEqual, channelIsSilent, defaultBlockSize, defaultSampleRate (+3 more)
+### Community 1151 - "owned"
+Cohesion: 0.44
+Nodes (4): CBitmap, CDrawContext, CRect, owned()
 
 ### Community 1152 - "CColorChooserUISettings"
 Cohesion: 0.18
 Nodes (11): CColorChooserUISettings, checkerBoardBack, checkerBoardColor1, checkerBoardColor2, font, fontColor, margin, CParamDisplay (+3 more)
 
-### Community 1153 - "IPlatformFrameCallback"
-Cohesion: 0.18
-Nodes (10): IPlatformFrameCallback, platformDrawRects, platformOnActivate, platformOnDragEnter, platformOnDragLeave, platformOnDragMove, platformOnDrop, platformOnEvent (+2 more)
+### Community 1153 - "DelayLine"
+Cohesion: 0.25
+Nodes (5): DelayLine, buf, size, writePos, vector
 
 ### Community 1154 - "IdleUpdateHandler"
 Cohesion: 0.22
@@ -6241,13 +6227,13 @@ Nodes (7): atomic, CVSTGUITimer, SharedPointer, IdleUpdateHandler, timer, users,
 Cohesion: 0.29
 Nodes (6): IValueConverter, Type, UTF8String, ValueConverterPtr, DigitsDisplayConverter, digits
 
-### Community 1156 - "ButtonController"
-Cohesion: 0.24
-Nodes (6): ButtonController, CTextButton, IController, IUIDescription, UIAttributes, UTF8StringView
+### Community 1156 - "createAlertBox"
+Cohesion: 0.32
+Nodes (5): AlertBoxCallback, AlertBoxConfig, ValuePtr, WindowPtr, createAlertBox()
 
-### Community 1157 - "ViewWithAFrame"
-Cohesion: 0.27
-Nodes (7): CView, IUIDescription, UIAttributes, ViewWithAFrame, fillColor, frameColor, index
+### Community 1157 - "PhysicalUIMapList"
+Cohesion: 0.25
+Nodes (8): NoteExpressionTypeID, PhysicalUITypeID, PhysicalUIMap, noteExpressionTypeID, physicalUITypeID, PhysicalUIMapList, count, map
 
 ### Community 1158 - "DataPackage"
 Cohesion: 0.22
@@ -6325,17 +6311,17 @@ Nodes (10): 6. Step-by-step procedure, Phase 0 — establish the baseline (befor
 Cohesion: 0.31
 Nodes (10): GLFWwindow, PrevUserCallbackMousebutton, ImGui_ImplGlfw_Init(), ImGui_ImplGlfw_InitForOpenGL(), ImGui_ImplGlfw_InitForOther(), ImGui_ImplGlfw_InitForVulkan(), ImGui_ImplGlfw_InstallCallbacks(), ImGui_ImplGlfw_MouseButtonCallback() (+2 more)
 
-### Community 1177 - "ImGuiResizeBorderDef"
-Cohesion: 0.18
-Nodes (10): ImGuiResizeBorderDef, InnerDir, OuterAngle, SegmentN1, SegmentN2, ImGuiResizeGripDef, AngleMax12, AngleMin12 (+2 more)
+### Community 1177 - "DelayController"
+Cohesion: 0.25
+Nodes (7): DelayController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult
 
 ### Community 1184 - "istreamwrapper.h"
 Cohesion: 0.27
 Nodes (6): Ch, RAPIDJSON_NAMESPACE_BEGIN, Peek4(), Put(), PutBegin(), PutEnd()
 
-### Community 1185 - "D3D11RenderThread"
-Cohesion: 0.22
-Nodes (7): atomic, thread, ThreadFunc, D3D11RenderThread, running, thread, WaveformViewManager::createRenderThread()
+### Community 1185 - "DetuneController"
+Cohesion: 0.25
+Nodes (7): DetuneController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult
 
 ### Community 1186 - "DX10Controller"
 Cohesion: 0.20
@@ -6345,9 +6331,9 @@ Nodes (7): DX10Controller, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, 
 Cohesion: 0.20
 Nodes (7): BaseController, FUnknown, SMTG_OVERRIDE, tresult, PianoController, PLUGIN_API, SMTG_OVERRIDE
 
-### Community 1188 - "RangeNoteExpressionType"
-Cohesion: 0.27
-Nodes (6): NoteExpressionValue, ParamValue, SMTG_OVERRIDE, RangeNoteExpressionType, plainMax, plainMin
+### Community 1188 - "DubDelayController"
+Cohesion: 0.25
+Nodes (7): DubDelayController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult
 
 ### Community 1189 - "Advanced Techniques Tutorial Plug-in"
 Cohesion: 0.20
@@ -6373,9 +6359,9 @@ Nodes (8): CViewContainer::findFirstViewIf(), CViewContainer::forEachChild(), CV
 Cohesion: 0.20
 Nodes (10): AtomicReferenceCounted, IPlatformOpenGLView, init, invalidRect, lockContext, makeContextCurrent, remove, swapBuffers (+2 more)
 
-### Community 1195 - "Timer"
-Cohesion: 0.27
-Nodes (9): IPlatformTimerCallback, IPlatformTimer, IPlatformTimerCallback, ITimerHandler, Timer, onTimer, start, stop (+1 more)
+### Community 1195 - "RePsychoController"
+Cohesion: 0.25
+Nodes (7): BaseController, FUnknown, SMTG_OVERRIDE, tresult, RePsychoController, PLUGIN_API, SMTG_OVERRIDE
 
 ### Community 1196 - "AttributeChangeAction"
 Cohesion: 0.24
@@ -6413,9 +6399,9 @@ Nodes (6): initKnobsAnimation(), getEventPos(), onPointerDown(), onPointerMove()
 Cohesion: 0.22
 Nodes (9): AnimationStyleValues, AnimationTimingFunction, AnimationTimingFunctionValues, AnimationStyle, AnimationTime, TEST_CASE(), TemplateNames, TemplateSwitchControl (+1 more)
 
-### Community 1206 - "BasicJsonType"
+### Community 1206 - "SplitterController"
 Cohesion: 0.25
-Nodes (9): BasicJsonType, from_json(), get_impl(), ValueType, json_sax_dom_parser(), noexcept(), to_json(), priority_tag (+1 more)
+Nodes (7): BaseController, FUnknown, SMTG_OVERRIDE, tresult, SplitterController, PLUGIN_API, SMTG_OVERRIDE
 
 ### Community 1207 - "audio-node-sweep/SKILL.md"
 Cohesion: 0.22
@@ -6485,9 +6471,9 @@ Nodes (8): FUID, FUnknown, IErrorContext, disableErrorUI, errorMessageShown, get
 Cohesion: 0.22
 Nodes (8): FUID, FUnknown, IBStream, ICloneable, IDependent, IPtr, IUpdateHandler, KeyCode
 
-### Community 1224 - "ViewRect"
-Cohesion: 0.28
-Nodes (6): int32, ViewRect, bottom, left, right, top
+### Community 1224 - "SubSynthController"
+Cohesion: 0.25
+Nodes (7): BaseController, FUnknown, SMTG_OVERRIDE, tresult, SubSynthController, PLUGIN_API, SMTG_OVERRIDE
 
 ### Community 1225 - "FONSquad"
 Cohesion: 0.22
@@ -6513,21 +6499,21 @@ Nodes (3): CRect, VSTGUIEditorInterface, frame
 Cohesion: 0.22
 Nodes (9): AtomicReferenceCounted, IPlatformBitmap, getScaleFactor, lockPixels, setScaleFactor, IPlatformBitmapPixelAccess, getAddress, getBytesPerRow (+1 more)
 
-### Community 1231 - "GraphicsPathFactory"
+### Community 1231 - "ThruZeroController"
 Cohesion: 0.25
-Nodes (9): PlatformFontPtr, PlatformGraphicsPathFillMode, PlatformGraphicsPathPtr, GraphicsPathFactory, context, createPath, createTextPath, ContextHandle (+1 more)
+Nodes (7): BaseController, FUnknown, SMTG_OVERRIDE, tresult, ThruZeroController, PLUGIN_API, SMTG_OVERRIDE
 
 ### Community 1232 - "WinString"
 Cohesion: 0.28
 Nodes (7): IPlatformString, WCHAR, WinString, setUTF8String, wideString, wideStringBufferSize, WinString::WinString()
 
-### Community 1233 - "RangeValueConverter"
-Cohesion: 0.22
-Nodes (5): IRangeValueConverter, setRange, RangeValueConverter, maxValue, minValue
+### Community 1233 - "createView"
+Cohesion: 0.32
+Nodes (8): CView, IUIDescription, UIAttributes, createView, startGame, updateCellSize, verifyView, viewSizeChanged
 
-### Community 1234 - "async.cpp"
-Cohesion: 0.28
-Nodes (7): QueuePtr, Task, makeSerialQueue(), Queue, queue, schedule(), SerialQueue
+### Community 1234 - "IApplication"
+Cohesion: 0.25
+Nodes (8): IApplication, createWindow, enableTooltips, executeCommand, quit, registerCommand, showAlertBox, showAlertBoxForWindow
 
 ### Community 1235 - "EquationBank"
 Cohesion: 0.31
@@ -6665,9 +6651,9 @@ Nodes (8): stbtt__csctx, stbtt__csctx_close_shape(), stbtt__csctx_rccurve_to(), 
 Cohesion: 0.46
 Nodes (8): stbtt_vertex, stbtt__close_shape(), stbtt_FreeShape(), stbtt_GetCodepointShape(), stbtt_GetGlyphShape(), stbtt__GetGlyphShapeT2(), stbtt__GetGlyphShapeTT(), stbtt_setvertex()
 
-### Community 1269 - "BeatBoxController"
-Cohesion: 0.25
-Nodes (7): BeatBoxController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult
+### Community 1269 - "OnePoleLP"
+Cohesion: 0.29
+Nodes (3): OnePoleLP, a, z1
 
 ### Community 1270 - "ComboController"
 Cohesion: 0.25
@@ -6681,9 +6667,9 @@ Nodes (4): ComboController::initialize(), ComboController::terminate(), FUnknown
 Cohesion: 0.25
 Nodes (7): DegradeController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult
 
-### Community 1273 - "DynamicsController"
+### Community 1273 - "CookIfNeeded"
 Cohesion: 0.25
-Nodes (7): DynamicsController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown, SMTG_OVERRIDE, tresult
+Nodes (4): CookIfNeeded, IsPlaying, Pause, Play
 
 ### Community 1274 - "EPianoController"
 Cohesion: 0.25
@@ -6693,25 +6679,25 @@ Nodes (7): EPianoController, PLUGIN_API, SMTG_OVERRIDE, BaseController, FUnknown
 Cohesion: 0.25
 Nodes (7): int32, KGRP, end, high, loop, pos, root
 
-### Community 1276 - "JX10Controller"
+### Community 1276 - "SmoothedBlock"
 Cohesion: 0.25
-Nodes (7): BaseController, FUnknown, SMTG_OVERRIDE, tresult, JX10Controller, PLUGIN_API, SMTG_OVERRIDE
+Nodes (8): SmoothedBlock, eng, fmDepth, frequency, glide, mix, pitchBend, volume
 
 ### Community 1277 - "KGRP"
 Cohesion: 0.25
 Nodes (7): int32, KGRP, end, high, loop, pos, root
 
-### Community 1278 - "StereoController"
-Cohesion: 0.25
-Nodes (7): BaseController, FUnknown, SMTG_OVERRIDE, tresult, StereoController, PLUGIN_API, SMTG_OVERRIDE
+### Community 1278 - "SyncDelayController"
+Cohesion: 0.29
+Nodes (6): EditController, FUnknown, REFCOUNT_METHODS, tresult, SyncDelayController, SMTG_OVERRIDE
 
 ### Community 1279 - "TalkBoxController"
 Cohesion: 0.25
 Nodes (7): BaseController, FUnknown, SMTG_OVERRIDE, tresult, TalkBoxController, PLUGIN_API, SMTG_OVERRIDE
 
-### Community 1280 - "TrackerController"
-Cohesion: 0.25
-Nodes (7): BaseController, FUnknown, SMTG_OVERRIDE, tresult, TrackerController, PLUGIN_API, SMTG_OVERRIDE
+### Community 1280 - "MovieInfo"
+Cohesion: 0.29
+Nodes (7): MovieInfo, audioDuration, duration, frameCount, hasAudio, hasVideo, videoDuration
 
 ### Community 1281 - "AppDelegate"
 Cohesion: 0.29
@@ -6721,9 +6707,9 @@ Nodes (6): AppDelegate, -applicationDidFinishLaunching, -applicationShouldTermin
 Cohesion: 0.36
 Nodes (8): FUID, IComponent, IEditController, vector, loadPreset, restoreComponentState, restoreControllerState, savePreset
 
-### Community 1283 - "VST3AUPlugInProcessor"
-Cohesion: 0.25
-Nodes (7): FUnknown, SMTG_OVERRIDE, tresult, VST3AUPlugInProcessor, PLUGIN_API, SMTG_OVERRIDE, Vst::AudioEffect
+### Community 1283 - "GetCGColorSpace"
+Cohesion: 0.53
+Nodes (4): CGColorSpaceRef, GenericMacColorSpace, colorspace, GetCGColorSpace()
 
 ### Community 1284 - "indexOf"
 Cohesion: 0.32
@@ -6737,21 +6723,21 @@ Nodes (6): ITouchEvent, UITouchEvent, currentTime, nativeTouches, touchCounter, 
 Cohesion: 0.25
 Nodes (7): IVisual, commit, resize, setOpacity, setPosition, setZIndex, update
 
-### Community 1287 - "keyboardHook"
-Cohesion: 0.36
-Nodes (6): Func, IKeyboardHook, KeyboardEvent, keyboardHook, onKeyDownFunc, onKeyUpFunc
+### Community 1287 - "KeyswitchTest"
+Cohesion: 0.33
+Nodes (5): DECLARE_VSTTEST, SMTG_OVERRIDE, TestBase, KeyswitchTest, PLUGIN_API
 
-### Community 1288 - "IWindowController"
-Cohesion: 0.25
-Nodes (8): IWindowListener, IWindowController, beforeShow, canClose, constraintSize, createPlatformFrameConfig, getWindowMenuBuilder, onSetContentView
+### Community 1288 - "IContextMenuItem"
+Cohesion: 0.33
+Nodes (6): int32, String128, IContextMenuItem, flags, name, tag
 
-### Community 1289 - "IWindowListener"
-Cohesion: 0.25
-Nodes (8): IWindowListener, onActivated, onClosed, onDeactivated, onHide, onPositionChanged, onShow, onSizeChanged
+### Community 1289 - "ValidStateTransitionTest"
+Cohesion: 0.33
+Nodes (4): SMTG_OVERRIDE, ValidStateTransitionTest, name, PLUGIN_API
 
-### Community 1290 - "Command"
-Cohesion: 0.43
-Nodes (3): Command, canHandleCommand, handleCommand
+### Community 1290 - "error"
+Cohesion: 0.40
+Nodes (4): error, filePath, lineNo, logic_error
 
 ### Community 1291 - "TEST_CASE"
 Cohesion: 0.25
@@ -6765,9 +6751,9 @@ Nodes (7): ATTRIBUTE, ENCODING, POSITION, charRefNumber(), nameLength(), PREFIX(
 Cohesion: 0.25
 Nodes (7): Building miniz - Using vcpkg, Features, Known Problems, Miniz, Patents, Special Thanks, Usage
 
-### Community 1294 - "Property"
-Cohesion: 0.25
-Nodes (7): Property, dependencies, dependenciesSchema, dependenciesValidatorIndex, name, required, schema
+### Community 1294 - "AllpassStage"
+Cohesion: 0.40
+Nodes (3): AllpassStage, c, s
 
 ### Community 1295 - "StringToken"
 Cohesion: 0.29
@@ -6777,9 +6763,9 @@ Nodes (7): computeTokens(), Type, StringToken, result, type, tokenizeString(), S
 Cohesion: 0.25
 Nodes (8): AudioColumnState, bodyW, bodyX, contentW, contentX, count, maxBottom, top
 
-### Community 1297 - "DiscreteParamHandle"
-Cohesion: 0.25
-Nodes (8): DiscreteParamHandle, draw, driven, modulated, nodeIndex, paramIndex, registered, value
+### Community 1297 - "DecodePath"
+Cohesion: 0.60
+Nodes (4): PadPoint, vector, DecodePath, EncodePath
 
 ### Community 1298 - "Preset"
 Cohesion: 0.25
@@ -6829,13 +6815,13 @@ Nodes (6): Still open, The problem in one paragraph, The three tiers (know which
 Cohesion: 0.29
 Nodes (6): Known finding as of this skill being written, Run this first, The three questions it answers, What this does not prove, When a real key is added, Why the modifier check matters more than it looks
 
-### Community 1311 - "TEST_CASE"
-Cohesion: 0.29
-Nodes (7): CSplitViewCreatorTest, Orientation, OrientationValues, ResizeMethod, TEST_CASE(), ResizeMethodValues, SeparatorWidth
+### Community 1311 - "get_ref_impl"
+Cohesion: 0.50
+Nodes (4): get_ref(), get_ref_impl(), ReferenceType, ThisType
 
-### Community 1312 - "TEST_CASE"
-Cohesion: 0.29
-Nodes (7): CVuMeterCreatorTest, DecreaseStepValue, Orientation, OrientationValues, TEST_CASE(), NumLed, OffBitmap
+### Community 1312 - "std::string to_string"
+Cohesion: 0.50
+Nodes (4): std::string to_string(), string_t_helper(), NLOHMANN_BASIC_JSON_TPL, NLOHMANN_BASIC_JSON_TPL_DECLARATION
 
 ### Community 1313 - ".CD3DX12_HEAP_PROPERTIES"
 Cohesion: 0.33
@@ -6893,21 +6879,17 @@ Nodes (5): remove, List, ListenerProvider, listeners, ListenerInterface
 Cohesion: 0.29
 Nodes (7): AtomicReferenceCounted, IPlatformFont, getAscent, getCapHeight, getDescent, getLeading, getPainter
 
-### Community 1327 - "IPlatformViewLayer"
-Cohesion: 0.29
-Nodes (7): AtomicReferenceCounted, IPlatformViewLayer, invalidRect, onScaleFactorChanged, setAlpha, setSize, setZIndex
+### Community 1327 - "PlatformOptionMenuResult"
+Cohesion: 0.50
+Nodes (4): COptionMenu, PlatformOptionMenuResult, index, menu
 
-### Community 1328 - "RedrawTimerHandler"
-Cohesion: 0.33
-Nodes (5): ITimerHandler, NonAtomicReferenceCounted, RedrawCallback, RedrawTimerHandler, redrawCallback
+### Community 1328 - "MinefieldViewController::MinefieldViewController"
+Cohesion: 0.50
+Nodes (4): IController, IValue, WonCallbackFunc, MinefieldViewController::MinefieldViewController()
 
-### Community 1329 - "tasks.cpp"
-Cohesion: 0.43
-Nodes (6): Queue, Task, makeSerialQueue(), releaseSerialQueue(), schedule(), waitAllTasksExecuted()
-
-### Community 1330 - "ModelBindingPtr"
-Cohesion: 0.38
-Nodes (4): CustomizationPtr, ModelBindingPtr, getCustomization, getModelBinding
+### Community 1329 - "PadPoint"
+Cohesion: 0.50
+Nodes (4): PadPoint, beat, x, y
 
 ### Community 1331 - "CollectInvalidRectView"
 Cohesion: 0.33
@@ -6925,17 +6907,9 @@ Nodes (5): Event, Func, IViewEventListener, TestViewEventHandler, func
 Cohesion: 0.33
 Nodes (5): CView, SharedPointer, Template, name, view
 
-### Community 1335 - "FocusDrawingSettings"
-Cohesion: 0.29
-Nodes (6): FocusDrawingSettings, colorName, enabled, width, CCoord, UTF8String
-
-### Community 1336 - "Params"
-Cohesion: 0.29
-Nodes (7): Params, amount, descending, grainMs, key, seed, DefaultRecordingFileName()
-
-### Community 1337 - "EqCurveCache"
-Cohesion: 0.29
-Nodes (7): EqCurveCache, bandCurveDb, curveDb, dragBand, dragInert, dragIsQ, signature
+### Community 1336 - "RealFft"
+Cohesion: 0.09
+Nodes (21): atomic, vector, Params, amount, descending, grainMs, key, seed (+13 more)
 
 ### Community 1338 - "DecodeRecording"
 Cohesion: 0.38
@@ -6989,14 +6963,6 @@ Nodes (6): 7.1 Linear predictive coding — `sample`, 7.2 Pitch-period repetitio
 Cohesion: 0.33
 Nodes (5): Explicitly not a phase, The eleven gaps — final status, What CI proves vs. what doesn't, Where it stands, Windows VST3 Hosting — Status
 
-### Community 1353 - "imgui_canvas.h"
-Cohesion: 0.33
-Nodes (5): Range, BeginComandIndex, BeginVertexIndex, EndCommandIndex, EndVertexIndex
-
-### Community 1354 - "data"
-Cohesion: 0.33
-Nodes (6): data, m_type, m_value, type(), json_value, value_t
-
 ### Community 1355 - "mz_zip_error"
 Cohesion: 0.40
 Nodes (6): mz_zip_error, mz_zip_clear_last_error(), mz_zip_get_error_string(), mz_zip_get_last_error(), mz_zip_peek_last_error(), mz_zip_set_last_error()
@@ -7037,17 +7003,9 @@ Nodes (3): initResizable(), collapseExpand(), restoreWidth()
 Cohesion: 0.40
 Nodes (3): initResizable(), collapseExpand(), restoreWidth()
 
-### Community 1366 - "FONSstate"
-Cohesion: 0.33
-Nodes (6): FONSstate, blur, color, font, size, spacing
-
 ### Community 1367 - "HostAttributeList"
 Cohesion: 0.33
 Nodes (6): map, HostAttributeList, list, make, PLUGIN_API, private
-
-### Community 1368 - ".get"
-Cohesion: 0.53
-Nodes (4): instance, FUnknown, TestingPluginContext, context
 
 ### Community 1369 - "Adding the AudioUnit Version 2 Target"
 Cohesion: 0.33
@@ -7065,37 +7023,17 @@ Nodes (4): CPoint, x, y, CCoord
 Cohesion: 0.33
 Nodes (5): ISplitViewController, getSplitViewSeparatorDrawer, getSplitViewSizeConstraint, restoreViewSize, storeViewSize
 
-### Community 1373 - "IPlatformFrameTouchBarExtension"
-Cohesion: 0.33
-Nodes (5): IPlatformFrameTouchBarExtension, recreateTouchBar, setTouchBarCreator, ValuePtr, installTouchbarSupport()
-
 ### Community 1374 - "LinuxString"
 Cohesion: 0.33
 Nodes (5): IPlatformString, LinuxString, LinuxString::LinuxString(), setUTF8String, str
-
-### Community 1375 - "initSurfaceBuffer"
-Cohesion: 0.60
-Nodes (6): ChildWindow::createShmBuffer(), CPoint, wl_shm, createBuffer(), initSurfaceBuffer(), ShmBuffer
-
-### Community 1376 - ".createView"
-Cohesion: 0.47
-Nodes (3): CView, IUIDescription, UIAttributes
 
 ### Community 1377 - "TEST_CASE"
 Cohesion: 0.33
 Nodes (6): TEST_CASE(), InvalidParse, StopParse, ValidParse, ValidParseWithJunkAtEnd, XMLParserTest
 
-### Community 1378 - "mz_zip_error"
-Cohesion: 0.40
-Nodes (6): mz_zip_error, mz_zip_clear_last_error(), mz_zip_get_error_string(), mz_zip_get_last_error(), mz_zip_peek_last_error(), mz_zip_set_last_error()
-
 ### Community 1379 - "OutputStreamWrapper"
 Cohesion: 0.40
 Nodes (3): CharT, OutputStream, OutputStreamWrapper
-
-### Community 1380 - "SpecBlurKernel.cpp"
-Cohesion: 0.40
-Nodes (5): AudioEffectNode, PrepareToPlay, ProcessBlock, PushParams, Reset
 
 ### Community 1381 - "FastSineTable"
 Cohesion: 0.33
@@ -7108,10 +7046,6 @@ Nodes (6): AudioInChoice, category, channelMode, deviceId, label, shortName
 ### Community 1383 - "EqBandValues"
 Cohesion: 0.33
 Nodes (6): EqBandValues, freq, gain, on, q, type
-
-### Community 1384 - "FilterCurveCache"
-Cohesion: 0.33
-Nodes (6): FilterCurveCache, curveDb, dragIsQ, lastRecomputeTime, lastSeenSignature, signature
 
 ### Community 1385 - ".PushBuffer"
 Cohesion: 0.33
@@ -7293,14 +7227,6 @@ Nodes (4): Getting Help, Getting Started, Introduction, TransportControl
 Cohesion: 0.40
 Nodes (4): Getting Help, Getting Started, Introduction, UTF16Name
 
-### Community 1431 - "silenceprocessing.cpp"
-Cohesion: 0.50
-Nodes (4): int32, ProcessSampleSize, SilenceProcessingTest::isBufferSilent(), SilenceProcessingTest::SilenceProcessingTest()
-
-### Community 1432 - "Note"
-Cohesion: 0.40
-Nodes (5): Note, noteID, pitch, NoteID, Pitch
-
 ### Community 1433 - "IAnimationTarget"
 Cohesion: 0.40
 Nodes (4): IAnimationTarget, animationFinished, animationStart, animationTick
@@ -7309,16 +7235,8 @@ Nodes (4): IAnimationTarget, animationFinished, animationStart, animationTick
 Cohesion: 0.40
 Nodes (3): Cell, column, row
 
-### Community 1435 - "IMouseObserver"
-Cohesion: 0.40
-Nodes (4): IMouseObserver, onMouseEntered, onMouseEvent, onMouseExited
-
-### Community 1436 - "onMouseEntered"
-Cohesion: 0.60
-Nodes (5): CButtonState, CMouseEventResult, CPoint, onMouseEntered(), onMouseExited()
-
-### Community 1437 - "FinalAction"
-Cohesion: 0.60
+### Community 1437 - "finally.h"
+Cohesion: 0.47
 Nodes (4): FinalAction, action, invoke, Proc
 
 ### Community 1438 - "IPlatformResourceInputStream"
@@ -7342,8 +7260,8 @@ Cohesion: 0.50
 Nodes (4): ContextMenuTarget, item, CCommandMenuItem, Vst::IContextMenuTarget
 
 ### Community 1444 - "float4"
-Cohesion: 0.60
-Nodes (4): PSMain(), VSMain(), float4, PSInput
+Cohesion: 0.38
+Nodes (6): RasterizerData vertexShader(), PSMain(), VSMain(), float4, PSInput, vertex
 
 ### Community 1445 - ".onMouseDown"
 Cohesion: 0.60
@@ -7369,10 +7287,6 @@ Nodes (4): Connect, Connected by Nature, Contribution Activity, What I'm Buildin
 Cohesion: 0.60
 Nodes (4): INFINITE_NO_UPDATE_CHECK, run_one(), sweep_runner.sh script, step()
 
-### Community 1451 - "Global"
-Cohesion: 0.40
-Nodes (5): Global, error, expr, name, value
-
 ### Community 1452 - "DrumGridDragState"
 Cohesion: 0.40
 Nodes (5): DrumGridDragState, active, originLane, originStep, paintOn
@@ -7381,21 +7295,13 @@ Nodes (5): DrumGridDragState, active, originLane, originStep, paintOn
 Cohesion: 0.40
 Nodes (5): FieldDeviceSaveRequest, domain, getDeviceFile, justOpened, nameBuf
 
-### Community 1454 - "GateState"
-Cohesion: 0.40
-Nodes (5): GateState, note, scheduledActive, scheduledTarget, suppressOff
+### Community 1454 - "AudioGateNode"
+Cohesion: 0.11
+Nodes (14): AudioGateNode, mGateState, mHoldMs, mInbox, mNoteCursor, mOutbox, mSamplePos, mSampleRate (+6 more)
 
 ### Community 1455 - "Infinite AI Agent Instructions & Skills Index"
 Cohesion: 0.50
 Nodes (3): Core Invariants & Rules, Infinite AI Agent Instructions & Skills Index, Skills Catalog
-
-### Community 1456 - "TEST_CASE"
-Cohesion: 0.50
-Nodes (4): CCheckboxTest, KeyEvents, MouseEvents, TEST_CASE()
-
-### Community 1457 - "CFReleaser"
-Cohesion: 0.67
-Nodes (3): CFTypeRef, CFReleaser, obj
 
 ### Community 1458 - "codebase-navigation/SKILL.md"
 Cohesion: 0.50
@@ -7433,10 +7339,6 @@ Nodes (3): GLFWmonitor, GLFWwindow, ImGui_ImplGlfw_MonitorCallback()
 Cohesion: 0.50
 Nodes (4): ImGui_ImplVulkan_WindowRenderBuffers, Count, FrameRenderBuffers, Index
 
-### Community 1467 - "ImGui::GetAllocatorFunctions"
-Cohesion: 0.67
-Nodes (4): ImGui::GetAllocatorFunctions(), ImGui::SetAllocatorFunctions(), ImGuiMemAllocFunc, ImGuiMemFreeFunc
-
 ### Community 1468 - "ImGuiPlotArrayGetterData"
 Cohesion: 0.50
 Nodes (3): ImGuiPlotArrayGetterData, Stride, Values
@@ -7473,14 +7375,6 @@ Nodes (3): Creating, ModuleInfoLib, Parsing
 Cohesion: 0.50
 Nodes (4): FinishedFunc, StartFunc, TickFunc, FuncAnimation::FuncAnimation()
 
-### Community 1483 - "ITimingFunction"
-Cohesion: 0.50
-Nodes (3): ITimingFunction, getPosition, isDone
-
-### Community 1484 - "IViewAddedRemovedObserver"
-Cohesion: 0.50
-Nodes (3): IViewAddedRemovedObserver, onViewAdded, onViewRemoved
-
 ### Community 1485 - "CResourceDescription"
 Cohesion: 0.50
 Nodes (3): CResourceDescription, type, u
@@ -7489,37 +7383,13 @@ Nodes (3): CResourceDescription, type, u
 Cohesion: 0.50
 Nodes (4): UndoRecord, characters, deleted, position
 
-### Community 1487 - "IFontPainter"
-Cohesion: 0.50
-Nodes (3): IFontPainter, drawString, getStringWidth
-
 ### Community 1488 - "IPlatformGradient"
 Cohesion: 0.50
 Nodes (3): IPlatformGradient, addColorStop, setColorStops
 
-### Community 1489 - "IPlatformGraphicsPathFactory"
-Cohesion: 0.50
-Nodes (3): IPlatformGraphicsPathFactory, createPath, createTextPath
-
-### Community 1490 - "IPlatformTimer"
-Cohesion: 0.50
-Nodes (4): AtomicReferenceCounted, IPlatformTimer, start, stop
-
-### Community 1491 - "createPlatformFrameConfig"
-Cohesion: 0.83
-Nodes (3): PlatformFrameConfigPtr, PlatformType, createPlatformFrameConfig
-
-### Community 1492 - "IContentProvider"
-Cohesion: 0.50
-Nodes (3): IContentProvider, readRawData, rewind
-
 ### Community 1493 - "headless-tests.sh"
 Cohesion: 0.67
 Nodes (3): check_verdict(), INFINITE_NO_UPDATE_CHECK, headless-tests.sh script
-
-### Community 1494 - "CycleShaperKernel.cpp"
-Cohesion: 0.67
-Nodes (3): AudioEffectNode, ProcessBlock, PushParams
 
 ### Community 1495 - "ScaleDef"
 Cohesion: 0.50
@@ -7541,10 +7411,6 @@ Nodes (4): CookIfNeeded, EnsureWorkerStarted, PollMaskResult, SubmitMaskRequest
 Cohesion: 0.50
 Nodes (3): vector, FillProceduralDefault(), RenderPreview
 
-### Community 1500 - "ComScope"
-Cohesion: 0.50
-Nodes (3): ComScope, ok, owned
-
 ### Community 1501 - "initMobileCapabilitiesSlider"
 Cohesion: 0.67
 Nodes (3): initMobileCapabilitiesSlider(), scrollToCard(), setActiveDot()
@@ -7552,10 +7418,6 @@ Nodes (3): initMobileCapabilitiesSlider(), scrollToCard(), setActiveDot()
 ### Community 1502 - "setCustomAllocator"
 Cohesion: 0.67
 Nodes (3): AllocatorFunc, DeallocatorFunc, setCustomAllocator()
-
-### Community 1524 - "NSObject"
-Cohesion: 0.67
-Nodes (3): NSObject, -setDrawCallback, -setScreenChangedCallback
 
 ### Community 1525 - "IEditorExt"
 Cohesion: 0.67
@@ -7568,22 +7430,22 @@ Nodes (3): Point, db, pos
 ## Knowledge Gaps
 - **17310 isolated node(s):** `driver.sh script`, `driver.sh script`, `driver.sh script`, `driver.sh script`, `driver.sh script` (+17305 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 29163 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **90 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **107 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `string` connect `string` to `progressindicatorview.cpp`, `sse2neon.h`, `events.h`, `win32application.cpp`, `cstring.h`, `gl.c`, `Controller`, `TestSuite`, `funknownimpl.h`, `DelegationController`, `SpoutCopy.cpp`, `FieldIR.h`, `src/main.cpp`, `printf`, `UIEditController`, `ImageAnalyzeNode`, `FieldError`, `UIDescriptionAdapter`, `ViewCreatorAdapter`, `imgui.h`, `imgui_node_editor.cpp`, `Render3DNode`, `win32factory.cpp`, `.setControllerClass`, `RecorderHandleMf`, `XdndDataPackage`, `UIAttributesController`, `SharedPointer`, `fstring.cpp`, `UIDialogController`, `ViewFactoryDelegate`, `dr_flac.h`, `ModuleInfo`, `T`, `FieldSynthNode`, `GraphNode`, `MidiNodes.cpp`, `OutputNode.cpp`, `FieldPrimitiveNode`, `PluginParamInfo`, `PitchNamesDataBrowserSource`, `Win32Frame`, `uidescription.cpp`, `ThreadPool`, `Platform.h`, `ctexteditor.cpp`, `DocumentWindowController`, `hufUncompress`, `MacroXYNode`, `PluginScanner`, `uibitmapscontroller.cpp`, `JSON5Writer`, `utility/objcclassbuilder.h`, `PushUndoCheckpoint`, `ImVec2`, `VST3Editor`, `uixmlpersistence.cpp`, `PluginHostWin.cpp`, `UIBaseDataSource`, `TinyJS.cpp`, `CustomDrawView`, `uid.h`, `uinode.cpp`, `WindowController`, `vstgui_uidescription.cpp`, `RuntimeObjCClass`, `FieldSampleNode`, `module_win32.cpp`, `getAttribute`, `xmlparse.c`, `WindowController::EditImpl`, `switchcreators.cpp`, `ChangeTemplateMinMaxAction`, `testPossibleValues`, `FontChangeAction`, `stdint.h`, `dr_mp3.h`, `cbitmapfilter.cpp`, `ShortcutAction`, `Modulation`, `STBTextEditView`, `Data`, `value::parser`, `CDataBrowser`, `waylandutils.cpp`, `FieldPixelNode`, `include/fwd.h`, `json.hpp`, `CScrollbar`, `CScriptLex`, `ModelData`, `EnvironmentNode`, `platform/iwindow.h`, `MolderNode`, `AudioDeviceWin.cpp`, `AudioEffectNode`, `SpoutGL.cpp`, `FieldGraphNode`, `UTF8StringPtr`, `cgltf.h`, `OutputNode`, `Config`, `size`, `ParamPinScreenInfo`, `PaletteNode`, `linuxfactory.cpp`, `PlatformWinSyphon.cpp`, `DecodePixelData`, `impl`, `UIViewSwitchContainer`, `GrainMolderNode`, `SpoutReceiver.cpp`, `AudioSamplerNode`, `WaveTerrainNode`, `set`, `ModuleInfoJsonParser`, `UTF8String`, `SpoutUtils.cpp`, `AudioPluginNode`, `uiviewfactory.cpp`, `win32taskexecutor.cpp`, `CScriptVar`, `DrumSequencerNode`, `d2dfont.cpp`, `EditController`, `FinishedMessage`, `IAudioSource`, `FieldElementNode`, `AttributeChangeAction`, `x11utils.cpp`, `GLUtil.cpp`, `OutputStream`, `Handler`, `Spout.cpp`, `FilterParamDef`, `MetaBallNode`, `ConfigureCameraFormat`, `cclipboard.cpp`, `CParamDisplay`, `VideoSourceNode`, `impl`, `jsoncxx.h`, `TinyJS.h`, `UIEditMenuController`, `AAXWrapper_Parameters`, `SyphonOutNode`, `MediaWin.cpp`, `Text3DNode`, `ImageFramesView`, `nanovg_gl.h`, `PlugProvider`, `UIViewCreatorController`, `uigradientscontroller.cpp`, `ResynthNode`, `tresult`, `PlatformWin.cpp`, `DXGI_FORMAT`, `TChannelInfo`, `sliderviewcreator.cpp`, `AstNode`, `uidesclist.cpp`, `EquationNode`, `ImageSpectralSynthNode`, `FileSelector`, `Platform`, `GenericStringListDataBrowserSource`, `xmltok.c`, `viewcreator.cpp`, `TextNode`, `segmentbuttoncreator.cpp`, `UString`, `clientcontext.cpp`, `Transport`, `waylandclientcontext.cpp`, `JavaScriptViewFactory`, `StringToken`, `ModelSourceNode`, `HostConnectionProxy`, `vst2persistence.cpp`, `FrameResult`, `impl`, `AudioEngine`, `Platform`, `locale.h`, `module.cpp`, `dr_wav.h`, `stb_image_write.h`, `uijsonpersistence.cpp`, `StringStream`, `json.h`, `Template`, `EmitterContext`, `Params`, `XdndHandler`, `DecodeRecording`, `tinyexr.h`, `nanovg_d3d11.h`, `LayerStackNode`, `uitemplatecontroller.cpp`, `FieldProgramCache`, `FormulaNode`, `stb/stb_image.h`, `HeaderInfo`, `Platform`, `stb_truetype.h`, `editorhost.cpp`, `module_linux.cpp`, `UIFontsController`, `PluginVST3Win.cpp`, `GranularNode`, `HostAttributeList`, `IAttributes`, `PluginHandle`, `MNVGcontext`, `LinuxString`, `SpoutLogError`, `IRStmt`, `OscReceiveNode`, `SamplerNode`, `AudioInChoice`, `rapidjson.h`, `uitagscontroller.cpp`, `Win32DataPackage`, `INode`, `PluginVST3State`, `imstb_textedit.h`, `multilinetextlabelcreator.cpp`, `AssetCache`, `src/stb_image.h`, `impl`, `FieldState`, `PaulStretchNode`, `RemoveBgNode`, `TEST_CASE`, `Impl`, `StdOutContext`, `Parser`, `imstb_truetype.h`, `cgltf_image`, `VideoHandleMf`, `IScriptContext`, `CurveShape`, `GroupNode`, `Window`, `Global`, `uiattributes.cpp`, `FieldDeviceSaveRequest`, `TEST_CASE`, `GLuint`, `stb_textedit.h`, `CompressedUIDescription`, `ParserState`, `searchtexteditcreator.cpp`, `AudioNodes.cpp`, `LayerChannel`, `VideoInNode`, `Arg`, `mdaTestToneController.cpp`, `UIColorChooserController`, `UIUndoManager`, `UndoRecord`, `shareduiresources.cpp`, `systemclipboard_win32.cpp`, `UTF8CharacterIterator`, `PerfRecord`, `MediaDecodeWin.cpp`, `UiTheme`, `TEST_CASE`, `cstream.cpp`, `TEST_CASE`, `imgui_stdlib.cpp`, `SyphonInNode`, `CategoryColors.cpp`, `DiscreteSlotScope`, `Settings`?**
+- **Why does `string` connect `string` to `progressindicatorview.cpp`, `sse2neon.h`, `events.h`, `Controller`, `cstring.h`, `gl.c`, `TestSuite`, `CaptureEngineBase`, `FUnknown`, `DelegationController`, `MeshToPointsNode`, `SpoutCopy.cpp`, `unordered_map`, `src/main.cpp`, `Transport`, `UIEditController`, `ImageAnalyzeNode`, `FieldError`, `UIDescriptionAdapter`, `ViewCreatorAdapter`, `imgui.h`, `imgui_node_editor.cpp`, `Render3DNode`, `win32factory.cpp`, `validator.cpp`, `RecorderHandleMf`, `UIAttributesController`, `UIDialogController`, `IAction`, `fstring.cpp`, `ViewFactoryDelegate`, `GraphNode`, `dr_flac.h`, `ModuleInfo`, `T`, `FieldSynthNode`, `MidiNodes.cpp`, `OutputNode.cpp`, `PluginParamInfo`, `FieldPrimitiveNode`, `PitchNamesDataBrowserSource`, `HWND__`, `uidescription.cpp`, `ThreadPool`, `Platform.h`, `ctexteditor.cpp`, `DocumentWindowController`, `hufUncompress`, `MacroXYNode`, `UpdateCheck.cpp`, `ColorChangeAction`, `uibitmapscontroller.cpp`, `JSON5Writer`, `utility/objcclassbuilder.h`, `GradientChangeAction`, `PushUndoCheckpoint`, `ImVec2`, `VST3Editor`, `uixmlpersistence.cpp`, `MolderNode.cpp`, `UIBaseDataSource`, `TinyJS.cpp`, `CustomDrawView`, `uid.h`, `uinode.cpp`, `WindowController`, `vstgui_uidescription.cpp`, `RuntimeObjCClass`, `FieldSampleNode`, `module_win32.cpp`, `getAttribute`, `ReadDwordFromRegistry`, `xmlparse.c`, `switchcreators.cpp`, `ChangeTemplateMinMaxAction`, `stdint.h`, `dr_mp3.h`, `CBitmapPixelAccess`, `ShortcutAction`, `Modulation`, `STBTextEditView`, `Data`, `value::parser`, `CDataBrowser`, `waylandutils.cpp`, `uidescriptionwindowcontroller.cpp`, `FieldPixelNode`, `include/fwd.h`, `json.hpp`, `CScrollbar`, `CScriptLex`, `ModelData`, `EnvironmentNode`, `platform/iwindow.h`, `MolderNode`, `AudioDeviceWin.cpp`, `AudioEffectNode`, `SpoutGL.cpp`, `FieldGraphNode`, `UTF8StringPtr`, `cgltf.h`, `OutputNode`, `Config`, `size`, `ParamPinScreenInfo`, `PaletteNode`, `linuxfactory.cpp`, `PlatformWinSyphon.cpp`, `DecodePixelData`, `impl`, `UIViewSwitchContainer`, `GrainMolderNode`, `SpoutReceiver.cpp`, `AudioSamplerNode`, `WaveTerrainNode`, `GraphInterpreter`, `ModuleInfoJsonParser`, `SpoutUtils.cpp`, `AudioPluginNode`, `uiviewfactory.cpp`, `win32taskexecutor.cpp`, `CScriptVar`, `DrumSequencerNode`, `FieldElementNode`, `EditController`, `FinishedMessage`, `AudioNodes.cpp`, `AttributeChangeAction`, `x11utils.cpp`, `GLUtil.cpp`, `BufferedOutputStream`, `Handler`, `Spout.cpp`, `SafeRelease`, `cclipboard.cpp`, `CParamDisplay`, `VideoSourceNode`, `impl`, `jsoncxx.h`, `TinyJS.h`, `ElementProgram`, `UIEditMenuController`, `AAXWrapper_Parameters`, `SyphonOutNode`, `MediaWin.cpp`, `Text3DNode`, `ImageFramesView`, `nanovg_gl.h`, `PlugProvider`, `UIViewCreatorController`, `uigradientscontroller.cpp`, `tresult`, `PlatformWin.cpp`, `DXGI_FORMAT`, `TChannelInfo`, `AstNode`, `uidesclist.cpp`, `EquationNode`, `ImageSpectralSynthNode`, `FileSelector`, `Platform`, `GenericStringListDataBrowserSource`, `xmltok.c`, `controlcreator.cpp`, `TextNode`, `segmentbuttoncreator.cpp`, `UString`, `clientcontext.cpp`, `SampleScanner`, `waylandclientcontext.cpp`, `error`, `JavaScriptViewFactory`, `StringToken`, `DecodePath`, `ModelSourceNode`, `HostConnectionProxy`, `vst2persistence.cpp`, `FrameResult`, `impl`, `AudioEngine`, `Platform`, `moduleinfotool/source/main.cpp`, `module.cpp`, `dr_wav.h`, `stb_image_write.h`, `uijsonpersistence.cpp`, `StringStream`, `BitmapFilterChangeAction`, `json.h`, `Template`, `EmitterContext`, `RealFft`, `XdndHandler`, `DecodeRecording`, `tinyexr.h`, `nanovg_d3d11.h`, `LayerStackNode`, `uitemplatecontroller.cpp`, `PluginScanner`, `stb/stb_image.h`, `HeaderInfo`, `TEST_CASE`, `Platform`, `stb_truetype.h`, `editorhost.cpp`, `UIFontsController`, `PluginVST3Win.cpp`, `GranularNode`, `HostAttributeList`, `IAttributes`, `PluginHandle`, `MNVGcontext`, `LinuxString`, `SpoutLogError`, `IRStmt`, `OscReceiveNode`, `SamplerNode`, `AudioInChoice`, `rapidjson.h`, `uitagscontroller.cpp`, `Win32DataPackage`, `INode`, `PluginVST3State`, `imstb_textedit.h`, `AssetCache`, `src/stb_image.h`, `TEST_CASE`, `impl`, `FieldState`, `PaulStretchNode`, `RemoveBgNode`, `TEST_CASE`, `Impl`, `StdOutContext`, `Parser`, `imstb_truetype.h`, `cgltf_image`, `AudioAnalyzeNode`, `VideoHandleMf`, `IScriptContext`, `CurveShape`, `GroupNode`, `Window`, `uiattributes.cpp`, `FieldDeviceSaveRequest`, `GLuint`, `stb_textedit.h`, `CompressedUIDescription`, `ParserState`, `PinTable`, `LayerChannel`, `VideoInNode`, `mdaTestToneController.cpp`, `UIColorChooserController`, `UIUndoManager`, `UndoRecord`, `shareduiresources.cpp`, `systemclipboard_win32.cpp`, `UTF8CharacterIterator`, `PerfRecord`, `MediaDecodeWin.cpp`, `UiTheme`, `TEST_CASE`, `cstream.cpp`, `imgui_stdlib.cpp`, `AudioFileNode`, `SyphonInNode`, `CategoryColors.cpp`, `DiscreteSlotScope`, `Settings`?**
   _High betweenness centrality (0.413) - this node is a cross-community bridge._
-- **Why does `T` connect `T` to `imgui_widgets.cpp`, `cstring.h`, `Preferences`, `imgui_internal.h`, `funknownimpl.h`, `ObjectId`, `src/main.cpp`, `uint32`, `funknown.h`, `SMTG_CONSTEXPR`, `cexternalview.cpp`, `vst2persistence.cpp`, `fstrdefs.h`, `set`, `imgui.h`, `BaseWrapper`, `ModuleInfoJsonParser`, `NavigateAction`, `impl`, `uri.h`, `fstring.cpp`, `ImGui_ImplDX12_Data`, `module.cpp`, `HiDPISupport`, `Voice`, `allocators.h`, `LogScale`, `d2dgraphicscontext.cpp`, `UIEditView`, `FilterParamDef`, `ctexteditor.cpp`, `SMTG_ALWAYS_INLINE`, `XdndHandler`, `ObjCVariable`, `utility/objcclassbuilder.h`, `ProcessData`, `rapidjson/document.h`, `basic_json`, `module_linux.cpp`, `uinode.cpp`, `MediaWin.cpp`, `shareduiresources.cpp`, `module_win32.cpp`, `getAttribute`, `CControl`, `cbitmapfilter.cpp`, `cstream.cpp`, `AudioBuffer`, `I`, `STBTextEditView`, `ValueType`, `ImSpanAllocator`, `GenericPointer`, `imgui_bezier_math.h`, `Window`, `json.hpp`, `hasBit`, `AssetCache`, `Pin`, `FObject`, `GridLayoutTestApp`?**
+- **Why does `T` connect `T` to `string`, `events.h`, `imgui_widgets.cpp`, `cstring.h`, `ImVec4`, `imgui_internal.h`, `ObjectId`, `src/main.cpp`, `uint32`, `funknown.h`, `SMTG_CONSTEXPR`, `cexternalview.cpp`, `Node`, `fstrdefs.h`, `vst2persistence.cpp`, `algorithm.h`, `imgui.h`, `ModuleInfoJsonParser`, `BaseWrapper`, `uri.h`, `ImPool`, `fstring.cpp`, `ImGui_ImplDX12_Data`, `module.cpp`, `HiDPISupport`, `Voice`, `allocators.h`, `LogScale`, `d2dgraphicscontext.cpp`, `UIEditView`, `ctexteditor.cpp`, `SafeRelease`, `SMTG_ALWAYS_INLINE`, `XdndHandler`, `ObjCVariable`, `utility/objcclassbuilder.h`, `ProcessData`, `rapidjson/document.h`, `funknownimpl.h`, `size_t`, `impl`, `uinode.cpp`, `WindowController`, `shareduiresources.cpp`, `module_win32.cpp`, `getAttribute`, `GenericArray`, `CControl`, `cstream.cpp`, `AudioBuffer`, `I`, `STBTextEditView`, `GenericPointer`, `ImSpanAllocator`, `imgui_bezier_math.h`, `Window`, `json.hpp`, `hasBit`, `EnvironmentNode`, `AssetCache`, `FObject`, `GridLayoutTestApp`?**
   _High betweenness centrality (0.027) - this node is a cross-community bridge._
-- **Why does `uint32` connect `uint32` to `mdaPianoProcessor.cpp`, `TestComponent`, `mdaBaseProcessor.h`, `funknownimpl.h`, `HostComponentHandler`, `FUnknown`, `ComponentHandler`, `SyncDelayProcessor`, `HostConnectionProxy`, `DummyFactory`, `ProcessTest`, `fstrdefs.h`, `legacymidiccout/source/plug.cpp`, `DataExchangeController`, `EPianoProcessor`, `multiple_programchanges/source/plug.cpp`, `BaseWrapper`, `timer.cpp`, `ProcessContextRequirements`, `fstring.cpp`, `module.cpp`, `Voice`, `NoteExpressionTypeInfo`, `AudioEffect`, `Buffer`, `aaxwrapper.cpp`, `mdaDX10Processor.cpp`, `DX10Processor`, `IAttributeList`, `ProcessData`, `HostCheckerProcessor`, `AAXWrapper`, `againsimple.cpp`, `DataExchangeProcessor`, `FVariant`, `AAX_Plugin_Desc`, `editorhost.cpp`, `impl`, `PianoProcessor`, `Controller`, `PClassInfoW`, `RaceConditionTestObject`, `hostcheckercontroller.cpp`, `Queue`, `IAttributes`, `PlugProvider`, `PluginHandle`, `mdaJX10Processor.cpp`, `Component`, `tresult`, `HostEventList`, `ProcessContext`, `mdaEPianoProcessor.cpp`, `PlugController`, `tutorial.cpp`, `FStreamer`, `ControllerWithUI`, `JX10Processor`, `PanNoteExpressionType`, `FramesPerSeconds`, `HostCheckerController`, `FObject`, `TestBase`?**
+- **Why does `uint32` connect `uint32` to `mdaPianoProcessor.cpp`, `PhysicalUIMapList`, `TestComponent`, `mdaBaseProcessor.h`, `HostComponentHandler`, `FUnknown`, `ComponentHandler`, `SyncDelayProcessor`, `HostConnectionProxy`, `DummyFactory`, `ProcessTailTest`, `fstrdefs.h`, `vsteventshelper.h`, `DataExchangeController`, `EPianoProcessor`, `BaseWrapper`, `timer.cpp`, `fstring.cpp`, `module.cpp`, `Voice`, `NoteExpressionTypeInfo`, `AudioEffect`, `Buffer`, `aaxwrapper.cpp`, `hostclasses.cpp`, `mdaDX10Processor.cpp`, `DX10Processor`, `ProcessData`, `IConnectionPoint`, `AAXWrapper`, `againsimple.cpp`, `funknownimpl.h`, `FVariant`, `AAX_Plugin_Desc`, `editorhost.cpp`, `impl`, `PianoProcessor`, `Controller`, `PClassInfoW`, `RaceConditionTestObject`, `hostcheckercontroller.cpp`, `Queue`, `IAttributes`, `PlugProvider`, `PluginHandle`, `.setControllerClass`, `CPluginFactory`, `tresult`, `HostEventList`, `ProcessContext`, `mdaEPianoProcessor.cpp`, `PlugController`, `again.cpp`, `FStreamer`, `ControllerWithUI`, `JX10Processor`, `PanNoteExpressionType`, `FramesPerSeconds`, `HostCheckerController`, `FObject`, `TestBase`?**
   _High betweenness centrality (0.023) - this node is a cross-community bridge._
 - **Are the 165 inferred relationships involving `main()` (e.g. with `gladLoadGL()` and `ImGui_ImplGlfw_InitForOpenGL()`) actually correct?**
   _`main()` has 165 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `driver.sh script`, `driver.sh script`, `driver.sh script` to the rest of the system?**
   _17310 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `imgui.cpp` be split into smaller, more focused modules?**
-  _Cohesion score 0.007704645700864983 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.007568138388816253 - nodes in this community are weakly interconnected._
 - **Should `string` be split into smaller, more focused modules?**
-  _Cohesion score 0.011238435256631733 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.010827185773190093 - nodes in this community are weakly interconnected._

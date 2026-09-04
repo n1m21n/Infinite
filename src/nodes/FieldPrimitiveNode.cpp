@@ -19,15 +19,15 @@ const std::vector<FieldPrimitiveNode::Preset>& FieldPrimitiveNode::Presets()
         "x = (uv.x - 0.5) * size\n"
         "z = (uv.y - 0.5) * size\n"
         "dist = sqrt(x * x + z * z)\n"
-        "wave = sin(dist * freq - t * speed)\n"
+        "wave = sin(dist * freq - (t + 1.0) * speed)\n"
         "y = wave * height * exp(-dist * 0.4)\n"
         "P = vec3(x, y, z)\n"
-        "slope = cos(dist * freq - t * speed) * freq * height * exp(-dist * 0.4)\n"
+        "slope = cos(dist * freq - (t + 1.0) * speed) * freq * height * exp(-dist * 0.4)\n"
         "nx = if(dist > 0.001, -(x / dist) * slope, 0.0)\n"
         "nz = if(dist > 0.001, -(z / dist) * slope, 0.0)\n"
         "N = normalize(vec3(nx, 1.0, nz))\n"
         "Cd = vec3(0.15 + 0.35 * (y + 0.5), 0.55 + 0.4 * sin(dist * 3.0), 0.85)\n"
-        "publish = sin(t * speed)\n" },
+        "publish = sin((t + 1.0) * speed)\n" },
       { "Solid UV Sphere",
         PrimitiveTopology::Sphere,
         2400,
@@ -37,7 +37,7 @@ const std::vector<FieldPrimitiveNode::Preset>& FieldPrimitiveNode::Presets()
         "param float speed = 1.5 [0.0, 5.0]\n"
         "phi = uv.x * 6.2831853\n"
         "theta = (uv.y - 0.5) * 3.14159265\n"
-        "disp = 1.0 + ripple * sin(phi * freq + t * speed) * cos(theta * freq)\n"
+        "disp = 1.0 + ripple * sin(phi * freq + (t + 1.0) * speed) * cos(theta * freq)\n"
         "r = radius * disp\n"
         "px = cos(theta) * cos(phi) * r\n"
         "py = sin(theta) * r\n"
@@ -45,7 +45,7 @@ const std::vector<FieldPrimitiveNode::Preset>& FieldPrimitiveNode::Presets()
         "P = vec3(px, py, pz)\n"
         "N = normalize(P)\n"
         "Cd = vec3(0.5 + 0.5 * N.x, 0.5 + 0.5 * N.y, 0.5 + 0.5 * N.z)\n"
-        "publish = sin(t * speed)\n" },
+        "publish = sin((t + 1.0) * speed)\n" },
       { "Solid Torus",
         PrimitiveTopology::Torus,
         2500,
@@ -54,12 +54,12 @@ const std::vector<FieldPrimitiveNode::Preset>& FieldPrimitiveNode::Presets()
         "param float twist = 3.0 [0.0, 10.0]\n"
         "param float speed = 1.2 [0.0, 5.0]\n"
         "phi = uv.x * 6.2831853\n"
-        "theta = uv.y * 6.2831853 + phi * twist + t * speed\n"
+        "theta = uv.y * 6.2831853 + phi * twist + (t + 1.0) * speed\n"
         "r = rMajor + rMinor * cos(theta)\n"
         "P = vec3(r * cos(phi), rMinor * sin(theta), r * sin(phi))\n"
         "N = vec3(cos(theta) * cos(phi), sin(theta), cos(theta) * sin(phi))\n"
         "Cd = vec3(0.5 + 0.5 * cos(phi), 0.5 + 0.5 * sin(theta), 0.9)\n"
-        "publish = sin(t * speed)\n" },
+        "publish = sin((t + 1.0) * speed)\n" },
       { "Solid Cylinder",
         PrimitiveTopology::Cylinder,
         2400,
@@ -67,13 +67,14 @@ const std::vector<FieldPrimitiveNode::Preset>& FieldPrimitiveNode::Presets()
         "param float height = 2.4 [0.2, 8.0]\n"
         "param float taper = 0.3 [0.0, 0.9]\n"
         "param float twist = 2.0 [0.0, 8.0]\n"
-        "phi = uv.x * 6.2831853 + uv.y * twist\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853 + uv.y * twist + (t + 1.0) * speed\n"
         "y = (uv.y - 0.5) * height\n"
         "r = radius * (1.0 - uv.y * taper)\n"
         "P = vec3(cos(phi) * r, y, sin(phi) * r)\n"
         "N = vec3(cos(phi), taper * 0.2, sin(phi))\n"
         "Cd = vec3(0.2, 0.5 + 0.5 * uv.y, 0.9)\n"
-        "publish = sin(t)\n" },
+        "publish = sin((t + 1.0) * speed)\n" },
       { "Solid Mobius Ribbon",
         PrimitiveTopology::Plane,
         2500,
@@ -81,14 +82,14 @@ const std::vector<FieldPrimitiveNode::Preset>& FieldPrimitiveNode::Presets()
         "param float width = 0.5 [0.05, 2.0]\n"
         "param float twists = 1.0 [1.0, 5.0]\n"
         "param float speed = 1.0 [0.0, 4.0]\n"
-        "u = uv.x * 6.2831853 + t * speed\n"
+        "u = uv.x * 6.2831853 + (t + 1.0) * speed\n"
         "v = (uv.y - 0.5) * width\n"
         "halfA = u * twists * 0.5\n"
         "r = radius + v * cos(halfA)\n"
         "P = vec3(r * cos(u), v * sin(halfA), r * sin(u))\n"
         "N = vec3(-sin(u), cos(halfA), cos(u))\n"
         "Cd = vec3(0.5 + 0.5 * cos(u), 0.5 + 0.5 * sin(halfA), 0.8)\n"
-        "publish = sin(t * speed)\n" },
+        "publish = sin((t + 1.0) * speed)\n" },
       { "Fibonacci Sphere Points",
         PrimitiveTopology::Points,
         2000,

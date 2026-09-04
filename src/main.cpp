@@ -40051,7 +40051,7 @@ static int RunFieldSampleTest()
    }
 
    // ------------------------------------------------------------
-   // SECTION 11: Factory Presets Compile
+   // SECTION 11: Factory Presets Compile & Zero-Fault Run
    // ------------------------------------------------------------
    {
       bool secOk = true;
@@ -40064,9 +40064,41 @@ static int RunFieldSampleTest()
             printf("SECTION 11: FAIL - preset '%s' did not compile: %s\n", preset.name, node.LastError().c_str());
             secOk = false;
          }
+         else
+         {
+            AudioNode* an = node.GetAudioNode();
+            an->PrepareToPlay(44100.0, 128);
+            std::vector<float> inChan(128, 0.5f);
+            float* inChans[1] = { inChan.data() };
+            AudioBuffer inBuf;
+            inBuf.channels = inChans;
+            inBuf.numChannels = 1;
+            inBuf.numFrames = 128;
+            const AudioBuffer* inputs[1] = { &inBuf };
+
+            std::vector<float> outChan(128, 0.0f);
+            float* outChans[1] = { outChan.data() };
+            AudioBuffer outBuf;
+            outBuf.channels = outChans;
+            outBuf.numChannels = 1;
+            outBuf.numFrames = 128;
+
+            for (int b = 0; b < 50; b++)
+            {
+               node.CookIfNeeded(b + 1);
+               an->ProcessBlock(inputs, 1, outBuf);
+            }
+
+            if (node.FaultCount() > 0)
+            {
+               printf("SECTION 11: FAIL - preset '%s' generated %llu NaN/inf recovery fault(s)\n",
+                      preset.name, (unsigned long long)node.FaultCount());
+               secOk = false;
+            }
+         }
       }
-      if (secOk) printf("SECTION 11 (Factory Presets Compile): OK\n");
-      else { printf("SECTION 11 (Factory Presets Compile): FAIL\n"); allOk = false; }
+      if (secOk) printf("SECTION 11 (Factory Presets Compile & Run): OK\n");
+      else { printf("SECTION 11 (Factory Presets Compile & Run): FAIL\n"); allOk = false; }
    }
 
    // ------------------------------------------------------------
@@ -40318,6 +40350,71 @@ static int RunFieldSampleTest()
 
       if (secOk) printf("SECTION 12 (delay(x, samples) Intrinsic): OK\n");
       else { printf("SECTION 12 (delay(x, samples) Intrinsic): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 13: FieldSynthNode Presets Compile & Zero-Fault Run
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      for (const auto& preset : FieldSynthNode::Presets())
+      {
+         FieldSynthNode synth;
+         synth.code = preset.code;
+         if (!synth.Apply())
+         {
+            printf("SECTION 13: FAIL - preset '%s' did not compile: %s\n", preset.name, synth.LastError().c_str());
+            secOk = false;
+            continue;
+         }
+         AudioNode* an = synth.GetAudioNode();
+         an->PrepareToPlay(44100.0, 128);
+         NoteEventQueue notes;
+         const int cursor = notes.RegisterConsumer();
+         an->SetNoteInbox(&notes, cursor);
+
+         NoteEvent on;
+         on.isNoteOn = true;
+         on.note = 60;
+         on.velocity = 0.9f;
+         on.voiceId = 1;
+         on.frameOffset = 0;
+         notes.Push(on);
+
+         std::vector<float> l(128, 0.0f), r(128, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = 128;
+
+         for (int b = 0; b < 50; b++)
+         {
+            synth.CookIfNeeded(b + 1);
+            an->ProcessBlock(nullptr, 0, buf);
+         }
+
+         NoteEvent off;
+         off.isNoteOn = false;
+         off.voiceId = 1;
+         off.frameOffset = 0;
+         notes.Push(off);
+
+         for (int b = 50; b < 100; b++)
+         {
+            synth.CookIfNeeded(b + 1);
+            an->ProcessBlock(nullptr, 0, buf);
+         }
+
+         if (synth.FaultCount() > 0)
+         {
+            printf("SECTION 13: FAIL - preset '%s' generated %llu NaN/inf recovery fault(s)\n",
+                   preset.name, (unsigned long long)synth.FaultCount());
+            secOk = false;
+         }
+      }
+      if (secOk) printf("SECTION 13 (FieldSynth Presets Zero-Fault Run): OK\n");
+      else { printf("SECTION 13 (FieldSynth Presets Zero-Fault Run): FAIL\n"); allOk = false; }
    }
 
    printf("INFINITE_FIELDSAMPLETEST: %s\n", allOk ? "OK" : "FAIL");
@@ -44059,15 +44156,19 @@ void ApplyModulationAndPalette(int frameId)
          gn.node->CookIfNeeded(frameId);
    }
 
-   // Same reasoning as the Palette loop just above: a standalone FieldPixel
-   // node with nothing wired downstream is never reached by the sink-driven
-   // 2D cook loop (only OutputNode/SyphonOutNode/OscSendNode pull their
-   // inputs), so its preview thumbnail stayed black even for a correctly
-   // compiling kernel - CookIfNeeded was simply never being called on it.
+   // Same reasoning as the Palette loop just above: standalone FieldPixel,
+   // FieldPrimitive, or FieldElement nodes with nothing wired downstream are
+   // never reached by the sink-driven cook loops, so their preview thumbnails
+   // or mini-viewports stayed static or un-cooked - CookIfNeeded was simply
+   // never being called on them.
    for (GraphNode& gn : gNodes)
    {
-      if (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr)
+      if (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr ||
+          dynamic_cast<FieldPrimitiveNode*>(gn.node.get()) != nullptr ||
+          dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr)
+      {
          gn.node->CookIfNeeded(frameId);
+      }
    }
 
    // Build step 15 ("Instrument Mode"): a FieldGraphNode's mounted children
