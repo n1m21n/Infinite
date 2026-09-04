@@ -40,6 +40,19 @@ BASE_COVERED = {
     "ViewportNode": "derives from NullNode, which CableFor and InputCountFor both name",
 }
 
+# Classes whose ImageCable member forwards this node's own OUTPUT (mirroring
+# NullNode's input-forwarding member, but pointed the other way), not a
+# user-wireable input pin - InputCountFor gives the class 0 image-input pins
+# (or only its ModulatorInputSlot-based trigger pin), so there is nothing for
+# CableFor to ever be asked about. Adding one is a deliberate act - confirm
+# InputCountFor really never counts an image pin for it first.
+OUTPUT_FORWARDING_ONLY = {
+    "FieldGraphNode": "mBoundaryOutput forwards the derived boundary output "
+                       "pin's target (build step 15 §5.4) via ImageCable::"
+                       "Resolved()/Pull(), the same mechanism NullNode uses "
+                       "for its input - not an input pin itself",
+}
+
 
 def block(src, header, end="\n   }"):
     i = src.index(header)
@@ -80,7 +93,8 @@ def main():
 
     # --- 1 ------------------------------------------------------------------
     img = classes_with("ImageCable", headers)
-    missing = [c for c in sorted(img) if c not in in_cable and c not in BASE_COVERED]
+    missing = [c for c in sorted(img)
+               if c not in in_cable and c not in BASE_COVERED and c not in OUTPUT_FORWARDING_ONLY]
     print("=== classes with an ImageCable member but absent from CableFor ===")
     for c in missing:
         print(f"  {c:28} {img[c][0]} ({img[c][1]} cable(s)) - its pin will accept a link and drop it")

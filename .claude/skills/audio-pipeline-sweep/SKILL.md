@@ -117,3 +117,7 @@ that line before trusting the result as an *audio*-clock check.
   and is not run here because it depends on what is installed on the machine.
 - **A/V sync against a written movie is a different sweep** - see
   `av-sync-sweep`.
+- **Untested chain worth adding:** deleting an audio node mid-playback while
+  it sits behind a `Mixer` fanned out to 3+ consumers. The dangling-cable and
+  fan-out invariants are each proven separately today; nothing proves them
+  together under deletion.

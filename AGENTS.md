@@ -40,6 +40,7 @@ Whenever working on tasks in this repository, **you must consult and follow the 
 | `audio-node-ui` | UI | Layout/widget grammar for audio node UI | `.claude/skills/audio-node-ui/SKILL.md` |
 | `node-ui-pillars` | UI | Symmetry/contrast rules for all node UI | `.claude/skills/node-ui-pillars/SKILL.md` |
 | `node-param-audit` | UI | Param declaration/UI audit | `.claude/skills/node-param-audit/SKILL.md` |
+| `rhythmic-quantization-standard` | Timing | Standardized rhythmic divisions & quantize table | `.claude/skills/rhythmic-quantization-standard/SKILL.md` |
 | `git-branch-workflow` | Process | Branch-per-feature workflow for this repo | `.claude/skills/git-branch-workflow/SKILL.md` |
 | `bug-blast-radius` | Process | 9-question impact analysis before fixing a bug | `.claude/skills/bug-blast-radius/SKILL.md` |
 | `write-fix-brief` | Process | Turn a bug report into a verified implementation prompt | `.claude/skills/write-fix-brief/SKILL.md` |

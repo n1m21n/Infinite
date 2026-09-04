@@ -522,12 +522,6 @@ bool NoteFilterNode::LastPassed() const
    return mAudioNode ? mAudioNode->LastPassed() : false;
 }
 
-// Grid divisions quantizeDiv indexes into, in beats (a beat is a quarter
-// note) - index 0 is "off" and never reaches this table. Shared by Quantizer
-// and Note Capturer.
-static const double kQuantizeBeats[] = { 1.0, 1.0, 0.5, 0.25, 0.125 };
-static constexpr int kNumQuantizeDiv = 5;
-
 // ------------------------------------------------------------- Note editors
 // The eight nodes below are the note-modification surface, one concern per
 // node - see the class comments on their declarations in NoteNodes.h. A
@@ -1211,7 +1205,7 @@ public:
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
       const int numFrames = output.numFrames;
-      const int div = std::clamp(mDiv.load(std::memory_order_relaxed), 0, kNumQuantizeDiv - 1);
+      const int div = std::clamp(mDiv.load(std::memory_order_relaxed), 0, (int)MusicTime::kNumRateDivisions);
       const double bpm = (double)Transport::Instance().Tempo();
       const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
 
@@ -1229,7 +1223,7 @@ public:
             uint64_t onsetAbs = mSamplePos + (uint64_t)in.frameOffset;
             if (div > 0)
             {
-               const double gridSamples = std::max(1.0, kQuantizeBeats[div] * samplesPerBeat);
+               const double gridSamples = std::max(1.0, MusicTime::QuantizeGridBeats(div) * samplesPerBeat);
                onsetAbs = (uint64_t)(std::ceil((double)onsetAbs / gridSamples) * gridSamples);
             }
             mOutNote.GetOrInsert(in.voiceId) = in.note;
@@ -3683,9 +3677,9 @@ public:
          mRecording = false;
          mRecordedLengthBeats = std::max(0.03125, beats - mRecordStartBeat);
          const int quantizeDiv = mQuantizeDiv.load(std::memory_order_relaxed);
-         if (quantizeDiv > 0 && quantizeDiv < kNumQuantizeDiv)
+         if (quantizeDiv > 0 && quantizeDiv <= (int)MusicTime::kNumRateDivisions)
          {
-            const double gridBeats = kQuantizeBeats[quantizeDiv];
+            const double gridBeats = MusicTime::QuantizeGridBeats(quantizeDiv);
             for (int i = 0; i < mRecordedCount; i++)
                mRecorded[i].beat = std::max(0.0, std::round(mRecorded[i].beat / gridBeats) * gridBeats);
          }

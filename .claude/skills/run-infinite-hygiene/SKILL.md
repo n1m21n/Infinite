@@ -104,6 +104,79 @@ open build/Infinite.app
 Opens the actual editor window, no env vars. Useless for a scripted check —
 it just launches normally and waits for you to click around.
 
+## When NOT to re-run the full suite
+
+A full (or even full-tier) re-run is a check on **shared** code — the parser,
+the runtime, `ParamTable`, `main.cpp` machinery multiple tests depend on. It
+is not a ritual to perform after every change "to be safe" or "to have a
+consistent record." Before re-running anything beyond the test(s) you just
+touched, check `git diff --stat`:
+
+- **Purely additive change** (a new `getenv("INFINITE_<NAME>TEST")` block, no
+  edits to any file outside that block, no edits to another test's fixture
+  code) — other tests cannot have regressed; there is nothing shared for the
+  new code to have broken. A clean build + the new test's own `OK` line is
+  complete evidence. Do not re-run the full suite "to be sure."
+- **Edit to shared code** (`FieldParse.cpp`, `FieldIR.cpp`, `ParamTable`,
+  anything in `src/core/`, a widely-used helper in `main.cpp`) — re-running
+  the specific tests that exercise that code path is warranted; re-running
+  the *entire* suite is warranted only if you can't cheaply enumerate which
+  tests exercise it.
+- **A tooling/harness bug was just found and fixed** (e.g. a flawed shell
+  timeout wrapper) — this invalidates confidence in the *symptom the flawed
+  tool reported* only. It does not invalidate results the same tests reported
+  through a working path minutes earlier. Fix the tool, move forward from
+  where you were; do not restart the whole suite to "have a full consistent
+  record" — that record already exists in the earlier, valid output.
+
+If you catch yourself about to re-run a suite and the actual justification is
+"to be safe" rather than a specific shared file you can name, that's the
+signal to stop — you're re-deriving a fact instead of trusting evidence
+you already have.
+
+## Backgrounded tests: waiting means waiting
+
+If a test (or `driver.sh` itself) is launched as a background command, a
+completion notification arrives automatically when it finishes — that is the
+signal to act on, not a log file you check yourself. Saying "I'll wait for
+the notification rather than poll" and then reading/tailing/catting that same
+test's log file, or checking whether its process is still running, **is**
+polling — the tool you used to check doesn't change what it is. Either:
+
+- do genuinely independent work that doesn't depend on the pending result
+  (a different test, a different file, static reading), or
+- actually stop and let the notification arrive.
+
+Don't do a third thing where you narrate "waiting" and then immediately
+inspect the pending task's own output anyway — that's polling wearing
+waiting's narration, and it wastes exactly as much time as polling honestly
+would.
+
+## Don't hand-verify tests one at a time before the full gate
+
+`driver.sh` already runs every test in its tier, already applies
+`known-test-failures.txt`/`audio-param-sweep-expected.txt`, and already
+prints `[xfail]` vs `[FAIL]` per check. Hand-running individual
+`INFINITE_<NAME>TEST=1` invocations to "confirm" a test before, during, or
+after a `driver.sh` pass duplicates exactly what `driver.sh` is about to do
+(or just did) — it does not produce new information. This applies even when
+each individual confirmation feels quick and safe; five quick confirmations
+plus the full gate is still six runs of the same tests for one answer.
+
+The only reasons to hand-run a single test outside `driver.sh` are (a) fast
+iteration on a fix before the fixture is confirmed working at all, or (b) the
+test isn't wired into `driver.sh` in the first place (check
+`codebase-navigation`'s note on this). "I already confirmed this earlier but
+I'm re-confirming synchronously for completeness/certainty" is never a valid
+reason — if it was confirmed, it's confirmed; spend the run on something that
+is still actually in question, or don't spend it.
+
+Also: don't cite a test's status from memory or a prior session's notes
+("the known pre-existing FIELDGRAPHTEST segfault") without checking it's
+still true. A baseline entry can go stale the moment someone fixes the
+underlying bug — treat `known-test-failures.txt`'s current contents (or a
+fresh run) as the source of truth, not a remembered verdict.
+
 ## Gotchas
 
 - **Verdict lines aren't exit codes.** `main()` always `return 0`s regardless
@@ -121,6 +194,16 @@ it just launches normally and waits for you to click around.
   the minimap — the minimap has no self-test.
 - Screenshot writes at whatever the fixture's framebuffer size is (2880x1472
   on this Retina display) — don't assume a fixed resolution when reading it.
+- **Whole-test known pre-existing failures live in `known-test-failures.txt`,
+  checked programmatically, not as prose in the summary.** A test listed there
+  prints `[xfail]` (exit code stays 0-eligible) instead of `[FAIL]`/`[CRASH]`;
+  a listed test that starts passing prints `[stale-baseline]` so you know to
+  delete its line. **`[xfail]` IS the confirmation — do not re-run that test
+  again to double check it's the known one.** Only chase lines that print
+  `[FAIL]` or `[CRASH]`. If a failure turns out to be pre-existing and
+  unrelated to your change, add one `TESTNAME|reason` line to that file
+  (after confirming the reason against the node's actual source) instead of
+  re-deriving "is this the known one" on every subsequent run.
 - **AUDIOPARAMSWEEPTEST's baseline lives in `audio-param-sweep-expected.txt`,
   not in `driver.sh` or this doc.** Most of AUDIOPARAMSWEEPTEST's `[FAIL]`
   lines are known, hand-audited blind spots of the generic sweep rig (a param

@@ -70,6 +70,18 @@ struct GraphNode
    float spawnY = 0.0f;
    bool needsPosition = true;
 
+   // Build step 15 (FieldGraphNode "Instrument Mode" encapsulation): true
+   // for a node mounted by a FieldGraphNode in encapsulated mode. Canvas-
+   // presentation state, same category as spawnX/spawnY/liveX/liveY above,
+   // not a property of the INode itself - a hidden node still cooks, still
+   // registers its params for modulation, and still counts toward audio
+   // topology every frame exactly like a visible node; only its node-editor
+   // box (ed::BeginNode/EndNode, so also picking/dragging/selection) is
+   // skipped. No existing "hide from canvas" flag was found on this struct
+   // to piggyback on (checked first, per that step's own doc) - this is the
+   // minimal new one.
+   bool hiddenFromCanvas = false;
+
    // The node's live canvas position, refreshed every frame while the editor
    // draws it. Saving reads this rather than calling ed::GetNodePosition,
    // because saving can be triggered from the menu bar or a keyboard shortcut,

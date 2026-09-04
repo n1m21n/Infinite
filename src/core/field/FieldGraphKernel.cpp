@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <set>
 #include <unordered_map>
 
@@ -79,6 +80,8 @@ namespace Field
 
          bool Run(const GraphIRProgram& program)
          {
+            for (const auto& dp : program.declaredParams)
+               mDeclaredParamNames.insert(dp.name);
             for (const auto& s : program.statements)
             {
                if (!ExecStmt(s)) return false;
@@ -92,6 +95,7 @@ namespace Field
          GraphPlan& mPlan;
          FieldError& mError;
          std::unordered_map<std::string, LocalValue> mEnv;
+         std::set<std::string> mDeclaredParamNames;
 
          bool Fail(const SourceSpan& span, const std::string& msg)
          {
@@ -526,6 +530,14 @@ namespace Field
             spec.targetKey = targetKey;
             spec.paramName = s->setParamName;
             spec.value = (float)val.Scalar();
+            // Build step 15 §4.2: provenance for the live-forwarding fast
+            // path - true only for a bare `set(handle, "param", declaredName)`
+            // pass-through, never for a literal or a computed expression.
+            if (s->setValue && s->setValue->kind == IRKind::Variable && !s->setValue->isHandle &&
+                mDeclaredParamNames.count(s->setValue->varName) != 0)
+            {
+               spec.sourceParamName = s->setValue->varName;
+            }
             spec.span = s->span;
             mPlan.sets.push_back(spec);
             return true;
@@ -607,5 +619,39 @@ namespace Field
 
       outPlan.valid = true;
       return true;
+   }
+
+   std::map<std::string, int> ComputeEmitDepths(const GraphPlan& plan)
+   {
+      std::map<std::string, int> depth;
+
+      std::unordered_map<std::string, std::vector<std::string>> preds;
+      for (const auto& c : plan.connects)
+         preds[c.dstKey].push_back(c.srcKey);
+
+      // Memoized DFS. `plan.connects` is a DAG by construction (see this
+      // function's header comment), so no visiting/cycle-guard state beyond
+      // the memo table itself is needed.
+      std::function<int(const std::string&)> visit = [&](const std::string& key) -> int
+      {
+         auto it = depth.find(key);
+         if (it != depth.end())
+            return it->second;
+
+         int best = 0;
+         auto predIt = preds.find(key);
+         if (predIt != preds.end())
+         {
+            for (const auto& srcKey : predIt->second)
+               best = std::max(best, visit(srcKey) + 1);
+         }
+         depth[key] = best;
+         return best;
+      };
+
+      for (const auto& e : plan.emits)
+         visit(e.key);
+
+      return depth;
    }
 }

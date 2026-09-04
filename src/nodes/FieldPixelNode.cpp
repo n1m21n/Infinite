@@ -140,11 +140,18 @@ FieldPixelNode::~FieldPixelNode()
 // colour into mOut on a second pass, so `col` means the same thing whether or
 // not the kernel declares state cells.
 unsigned int FieldPixelNode::GetOutputTexture() { return GLUtil::FboTexture(mOut); }
+unsigned int FieldPixelNode::GetOutputTexture(int index)
+{
+   if (index == 1 && exposeAuxTexture && !mIR.declaredStates.empty())
+      return mState.CurrentOutputTexture();
+   return index == 0 ? GetOutputTexture() : 0;
+}
 int FieldPixelNode::GetOutputWidth() const { return mOut.w; }
 int FieldPixelNode::GetOutputHeight() const { return mOut.h; }
 
 bool FieldPixelNode::Apply()
 {
+   pinRefusal.clear();
    std::vector<Field::Token> tokens;
    Field::FieldError lexErr;
    if (!Field::Lex(code, tokens, lexErr))
@@ -182,6 +189,32 @@ bool FieldPixelNode::Apply()
    {
       mLastError = compileErr;
       return false;
+   }
+
+   // Dynamic pins, Phase 2b (build step 13, §5.1): reconcile the declared
+   // output/input pin tables against this compile's LOCAL `ir` (not yet
+   // swapped into mIR) - a refusal here must leave mIR/mProgram untouched,
+   // same "keep last working program" discipline as a GLSL compile error
+   // above. Must run before the mProgram/mIR commit below.
+   {
+      std::vector<Field::DeclaredPin> declOut, declIn;
+      for (const auto& d : ir.declaredOutputs)
+         declOut.push_back({ d.name, d.typeName, Field::DomainToString(d.domain), true });
+      for (const auto& d : ir.declaredInputs)
+         declIn.push_back({ d.name, d.typeName, Field::DomainToString(d.domain), false });
+
+      std::string pinNotice, pinRefusalMsg;
+      bool outOk = Field::ReconcileFieldPins(mOutputPins, declOut, mNodeIndex, NativeOutputCount(), pinNotice, pinRefusalMsg);
+      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, /*nativeCount=*/1, pinNotice, pinRefusalMsg);
+      if (!outOk || !inOk)
+      {
+         glDeleteProgram(program);
+         mLastError = pinRefusalMsg;
+         pinRefusal = pinRefusalMsg;
+         return false;
+      }
+      if (!pinNotice.empty())
+         mNotice = pinNotice;
    }
 
    if (mProgram != 0)

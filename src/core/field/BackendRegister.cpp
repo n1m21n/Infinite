@@ -5,6 +5,7 @@
 #include "FieldParse.h"
 
 #include <unordered_map>
+#include <unordered_set>
 #include <cmath>
 
 // A dedicated compiler for the sample domain rather than a shared pass with
@@ -369,6 +370,169 @@ namespace Field
                ctx.Fail("'attrib' is not defined in the sample domain", stmt->span,
                         "use 'state' for per-voice memory, or 'param' for a user control");
                return;
+            case AstKind::DeclOutput:
+            {
+               // Build step 12 (doc S1.6): collected independently of
+               // FieldIR.h's DeclOutput/DeclInput lowering - same grammar
+               // and per-entry shape, genuinely separate implementation.
+               auto* d = static_cast<AstDeclOutput*>(stmt.get());
+               if (IsReservedName(d->name))
+               {
+                  ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n/freq/gate) and cannot be declared", stmt->span);
+                  return;
+               }
+               if (scope.count(d->name))
+               {
+                  ctx.Fail("duplicate declaration of '" + d->name + "'", stmt->span);
+                  return;
+               }
+               static const std::unordered_set<std::string> kValidDomains = { "graph", "frame", "element", "pixel", "sample" };
+               if (kValidDomains.find(d->domainName) == kValidDomains.end())
+               {
+                  ctx.Fail("unknown domain '" + d->domainName + "' in output declaration", stmt->span);
+                  return;
+               }
+               if (d->domainName == "graph")
+               {
+                  ctx.Fail("'output' cannot declare a graph-domain pin (graph domain has no per-frame dataflow to expose)", stmt->span);
+                  return;
+               }
+               if (d->domainName == "element" || d->domainName == "pixel")
+               {
+                  ctx.Fail("a sample-domain kernel cannot declare a '" + d->domainName + "'-domain output pin in v1 (no path from sample to " + d->domainName + " here)", stmt->span);
+                  return;
+               }
+               if (d->typeName != "float" && d->typeName != "audio")
+               {
+                  ctx.Fail("output type '" + d->typeName + "' is not supported in the sample domain in v1", stmt->span,
+                           "v1 sample-domain outputs are float (or 'audio', an alias for float) only");
+                  return;
+               }
+               // S5.6/S5.8 row 4: 'audio' is only legal at 'sample' rate.
+               if (d->typeName == "audio" && d->domainName != "sample")
+               {
+                  ctx.Fail("'audio' pins are only legal in the 'sample' domain (got '" + d->domainName + "')", stmt->span,
+                           "a cross-domain audio read would need an explicit resample, not supported in v1");
+                  return;
+               }
+               if ((int)(ctx.prog.declaredOutputs.size() + ctx.prog.declaredInputs.size()) >= 16)
+               {
+                  ctx.Fail("declared pin count exceeds the 16-pin-per-kernel ceiling (build step 12 v1 limit)", stmt->span);
+                  return;
+               }
+
+               bool isReduceRmsForm = d->initExpr && d->initExpr->kind == AstKind::Call &&
+                                      static_cast<AstCall*>(d->initExpr.get())->callee == "reduce.rms";
+
+               if (d->domainName == "frame")
+               {
+                  if (!isReduceRmsForm)
+                  {
+                     ctx.Fail("a frame-domain output declared inside a sample-domain kernel must be exactly reduce.rms(in, loHz, hiHz) in v1", stmt->span,
+                              "a plain per-sample expression is sample-domain, not frame-domain; declare 'output sample float' instead, or wrap in reduce.rms");
+                     return;
+                  }
+                  auto* call = static_cast<AstCall*>(d->initExpr.get());
+                  if (ctx.prog.hasReduceRms)
+                  {
+                     ctx.Fail("only one reduce.rms(...) is supported per sample-domain kernel in v1", stmt->span);
+                     return;
+                  }
+                  if (call->args.size() != 3 || call->args[0]->kind != AstKind::Ident ||
+                      static_cast<AstIdent*>(call->args[0].get())->name != "in" ||
+                      call->args[1]->kind != AstKind::Literal || call->args[2]->kind != AstKind::Literal)
+                  {
+                     ctx.Fail("reduce.rms in the sample domain requires the exact form reduce.rms(in, loHz, hiHz) with "
+                              "compile-time constant loHz/hiHz", stmt->span);
+                     return;
+                  }
+                  ctx.prog.hasReduceRms = true;
+                  ctx.prog.reduceLoHz = (float)static_cast<AstLiteral*>(call->args[1].get())->numberValue;
+                  ctx.prog.reduceHiHz = (float)static_cast<AstLiteral*>(call->args[2].get())->numberValue;
+               }
+               else // "sample"
+               {
+                  if (isReduceRmsForm)
+                  {
+                     ctx.Fail("reduce.rms(...) produces a frame-domain value; declare this as 'output frame float " + d->name + "', not 'output sample'", stmt->span);
+                     return;
+                  }
+                  if (!d->initExpr)
+                  {
+                     ctx.Fail("output '" + d->name + "' requires an initializer expression", stmt->span);
+                     return;
+                  }
+                  // Compiled only for validation - step 12 collects the
+                  // declaration, it does not yet wire the resulting
+                  // register to a node-level output pin (later work).
+                  CompileExpr(ctx, d->initExpr, scope);
+                  if (ctx.Failed()) return;
+               }
+
+               SampleDeclaredPin pin;
+               pin.name = d->name;
+               pin.typeName = d->typeName;
+               pin.domainName = d->domainName;
+               ctx.prog.declaredOutputs.push_back(pin);
+               return;
+            }
+            case AstKind::DeclInput:
+            {
+               auto* d = static_cast<AstDeclInput*>(stmt.get());
+               if (IsReservedName(d->name))
+               {
+                  ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n/freq/gate) and cannot be declared", stmt->span);
+                  return;
+               }
+               if (scope.count(d->name))
+               {
+                  ctx.Fail("duplicate declaration of '" + d->name + "'", stmt->span);
+                  return;
+               }
+               static const std::unordered_set<std::string> kValidDomains = { "graph", "frame", "element", "pixel", "sample" };
+               if (kValidDomains.find(d->domainName) == kValidDomains.end())
+               {
+                  ctx.Fail("unknown domain '" + d->domainName + "' in input declaration", stmt->span);
+                  return;
+               }
+               if (d->domainName == "graph")
+               {
+                  ctx.Fail("'input' cannot declare a graph-domain pin (graph domain has no per-frame dataflow to receive into)", stmt->span);
+                  return;
+               }
+               if (d->typeName != "float" && d->typeName != "audio")
+               {
+                  ctx.Fail("input type '" + d->typeName + "' is not supported in the sample domain in v1", stmt->span,
+                           "v1 sample-domain inputs are float (or 'audio', an alias for float) only - 'geometry' has no meaning at sample rate");
+                  return;
+               }
+               // S5.6/S5.8 row 4: 'audio' is only legal at 'sample' rate.
+               if (d->typeName == "audio" && d->domainName != "sample")
+               {
+                  ctx.Fail("'audio' pins are only legal in the 'sample' domain (got '" + d->domainName + "')", stmt->span,
+                           "a cross-domain audio read would need an explicit resample, not supported in v1");
+                  return;
+               }
+               if ((int)(ctx.prog.declaredOutputs.size() + ctx.prog.declaredInputs.size()) >= 16)
+               {
+                  ctx.Fail("declared pin count exceeds the 16-pin-per-kernel ceiling (build step 12 v1 limit)", stmt->span);
+                  return;
+               }
+
+               SampleDeclaredPin pin;
+               pin.name = d->name;
+               pin.typeName = d->typeName;
+               pin.domainName = d->domainName;
+               ctx.prog.declaredInputs.push_back(pin);
+
+               // Step 12 collects the declaration only - actual audio-input
+               // slot plumbing (wiring this name to a second live input
+               // stream) is later work. Deliberately NOT bound into `scope`:
+               // referencing the name in an expression fails loudly with
+               // "undeclared identifier" rather than silently resolving to
+               // garbage (see CompileExpr's Ident case).
+               return;
+            }
             case AstKind::Assign:
             {
                auto* a = static_cast<AstAssign*>(stmt.get());
