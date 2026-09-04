@@ -5494,7 +5494,10 @@ namespace
       const std::vector<std::string> userPaths = lib.paths;
 
       PushDropdownStyle();
-      const std::string dropdownId = "Load device...##fdd_" + domain;
+      std::string btnLabel = "Load device...";
+      if (factoryNames != nullptr && n->presetIndex >= 0 && (size_t)n->presetIndex < factoryCount)
+         btnLabel = (*factoryNames)[n->presetIndex];
+      const std::string dropdownId = btnLabel + "##fdd_" + domain;
       if (options.empty())
       {
          ImGui::BeginDisabled();
@@ -5505,7 +5508,7 @@ namespace
       {
          gDropdown.options = options;
          gDropdown.categories = categories;
-         gDropdown.current = -1;
+         gDropdown.current = (factoryNames != nullptr && n->presetIndex >= 0 && (size_t)n->presetIndex < factoryCount) ? n->presetIndex : -1;
          gDropdown.onSelect = [nodeIndex, onFactorySelect, factoryCount, userPaths, domain](int idx)
          {
             GraphNode* gn = FindNodeByIndex(nodeIndex);
