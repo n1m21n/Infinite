@@ -2257,7 +2257,7 @@ namespace
          if (!h.draw)
             return; // registered so the modulator keeps writing; just not drawn
          DrawDiscreteParamPin(h, label, width, ImGui::GetFrameHeight());
-         width = std::max(24.0f, width - 18.0f); // the pin ate 14px + 4px of the row
+         width = std::max(24.0f, width - 16.0f); // the pin ate 12px + 4px of the row (DrawDiscreteParamPin's box)
       }
 
       const std::string caption = options[safeCurrent] + "##" + label;
