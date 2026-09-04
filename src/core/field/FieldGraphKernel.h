@@ -85,4 +85,19 @@ namespace Field
                                const std::map<std::string, float>& globals,
                                GraphPlan& outPlan,
                                FieldError& outError);
+
+   // Build step 16 ("Unpack to Canvas"), §3.2: topological depth per emit
+   // key, derived purely from plan.connects (srcKey -> dstKey edges).
+   // depth[key] == 0 for a key that never appears as a dstKey (a root); for
+   // any other key it is 1 + max(depth[src]) over every connect whose dstKey
+   // is that key. Every key in plan.emits gets an entry, including ones
+   // never mentioned in plan.connects at all (depth 0 - nothing feeds them,
+   // nothing follows from that alone). No cycle-breaking logic: emit()'s
+   // handles are bound exactly once and connect() only wires already-bound
+   // handles, so this is a DAG by construction (see the doc's own
+   // justification - unlike the audio-thread topological sort elsewhere in
+   // this codebase, which does need cycle handling because live audio
+   // cables can loop). Pure data in, pure data out - no GraphNode/gNodes/ed::
+   // reference, matching this file's existing separation from main.cpp.
+   std::map<std::string, int> ComputeEmitDepths(const GraphPlan& plan);
 }
