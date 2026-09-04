@@ -5,7 +5,7 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-blue)](https://github.com/n1m21n/Infinite)
 [![License](https://img.shields.io/badge/License-MIT%20%2F%20GPLv3-green)](LICENSE)
 
-A unified node-based audiovisual modular workstation for **macOS** and **Windows**. Real-time GPU image/video compositing, procedural 3D geometry and physics, and a full modular synthesizer rack with native AU and VST3 plugin hosting — all interconnected through a universal modulation graph.
+A unified node-based audiovisual modular workstation for **macOS** and **Windows**. Real-time GPU image/video compositing, procedural 3D geometry and physics, and a full modular synthesizer rack with native AU and VST3 plugin hosting — all interconnected through a universal modulation graph. Most nodes do one fixed thing; **Field**, Infinite's embedded programming language, lets you write what a node does instead.
 
 ![Infinite Screenshot](docs/screenshot.png)
 
@@ -29,22 +29,50 @@ A unified node-based audiovisual modular workstation for **macOS** and **Windows
 
 ---
 
+## Field: write what a node does
+
+Every other node in Infinite does one fixed thing — a Blur node blurs, a Delay node delays. **Field** nodes are different: you write a short kernel, and Field figures out where it runs from what the code touches.
+
+```
+col = vec3(uv.x, uv.y, 0.5)              // once per pixel, on the GPU — a shader
+P.y += sin(P.x * 4.0 + t) * 0.2          // once per point in a mesh — a geometry deformer
+out = in * gain                          // once per audio sample — a DSP effect
+```
+
+That's the one idea underneath the whole language: a **kernel**, run once per element of a **domain**, forever. You never declare where it runs — the domain (and therefore the backend it compiles to) is inferred. Field currently spans five domains and six node types:
+
+| Node | Domain | What it does |
+|---|---|---|
+| **Field Modifier** | element | Per-vertex kernel over existing geometry — modifies `P`, `N`, `uv`, `Cd` and custom attributes |
+| **Field Primitive** | element | Generates procedural point geometry from scratch (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot) |
+| **Field Effect** | sample | Per-sample audio DSP kernel; `in`/`out`, `state` for per-voice memory, `param` for knobs |
+| **Field Synth** | sample | Polyphonic note-driven synth voice using the same sample compiler, with `freq`/`gate` in place of an audio input |
+| **Field Pixel** | pixel | Per-pixel kernel compiled straight to GLSL; `state` cells with `[wrap]` support feedback and stencils |
+| **Field Graph** | graph | Runs once at edit time — `emit()`/`connect()`/`set()`/`place()` declaratively mount and wire real Infinite nodes into a bundle ("Instrument Mode" collapses it to one box; "Unpack to Canvas" expands it back out) |
+
+Any element/pixel/sample kernel can also declare **dynamic pins** right in its code, adding real, cable-wireable, save/load-safe I/O to the node without touching C++. Finished devices — kernel plus params plus presets — save, load, export and import as portable `.infdev` files, so a Field patch is shareable like an audio plugin preset. The full language reference — syntax, domain-transfer operators, reserved words, and the complete node/format reference — is in the [Field Language Manual](Field_Language_Manual.pdf).
+
+---
+
 ## Node Library Overview
 
-Infinite features **160+ modular nodes** across creative domains:
+Infinite features **140+ modular node types**:
 
 | Domain | Key Nodes |
 |---|---|
 | **2D & Video** | Image, Video (hardware-accelerated), Syphon In / Spout In, Paint/Draw canvas, GLSL Formula editor, Shapes (SDF), Noise & Gradient Ramps |
 | **2D FX & Grading** | Blur, Bloom, Glitch (6 modes), Twirl, Ripple, Displace, Halftone, Curves (RGB/Luma splines), Color Ramp, .cube LUTs, Gradient Map, Palette extraction |
 | **Compositing & Masks** | Blend (31 modes), Layer Stack, Remove Background (on-device ML segmentation), Chroma/Luma Key, Feedback loop, Reaction-Diffusion, Resynthesize |
-| **3D Geometry & FX** | Primitives, USD/OBJ/PLY/STL import, 3D Text, 3D Curves, Point Distribution, Mesh Deconstruction, Taubin Smooth, Array, Instancing, Metaballs |
+| **3D Geometry & FX** | Primitives, USD/OBJ/PLY/STL/glTF/GLB import, 3D Text, 3D Curves, Point Distribution, Mesh Deconstruction, Taubin Smooth, Array, Instancing, Metaballs |
 | **3D Scene & Render** | Camera (orbit/perspective/ortho), Lights, 32-bit HDRI Environment, PBR Materials, ACES Tonemapping, Multisampled Antialiasing |
-| **Synths & Sound** | Wavetable synth, Metallic modal resonator, Granular synth, PaulStretch, Sampler, 8-track Drum Sequencer, Multi-waveform Oscillator |
+| **Synths & Sound** | Wavetable synth, Metallic modal resonator, Granular synth, PaulStretch, Sampler, Slicer (onset-detecting sample chopper), 8-track Drum Sequencer, Multi-waveform Oscillator |
+| **Field Language** | Field Modifier, Field Primitive, Field Effect, Field Synth, Field Pixel, Field Graph — see [above](#field-write-what-a-node-does) |
 | **Notes & MIDI** | Live MIDI input/clock, Arpeggiator, Note Sequencer, Chorder, Strum, Bouncing Balls (physics notes), Humanizer, Quantizer |
 | **Audio FX & Plugins** | **AU / VST3 Plugin Host**, Filters, EQ, Dynamics, Lookahead Limiter, Delay, Reverb, Drive/Saturation, Pitch & Frequency Shifters, Chorus, Phaser, Formant |
 | **Modulators & Analysis** | LFO, Random, Pattern CV, Envelope Follower, Math, XY Pad, Audio Analyze (8-band FFT / onset), Image Analyze (luminance / motion) |
 | **Output & I/O** | PNG snapshot, H.264/MOV video recording with synchronized audio, Syphon Out / Spout Out |
+
+The full catalogue, including every node's pins and parameters, is in the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf).
 
 ---
 
