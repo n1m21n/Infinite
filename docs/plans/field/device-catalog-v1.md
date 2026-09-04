@@ -38,6 +38,47 @@ sign-off, stated as final so building can start — not yet implemented.
 | **OPEN-D** (notes) | Folded into `frame`, not a sixth domain | `noteOn`, `notePitch`, `noteVel` reserved in `frame` |
 | **OPEN-E** (new — per-point cross-domain sampling) | **Not solved as a new Field primitive in v1.** The existing render-pipeline pattern (rasterize geometry to a texture, sample that texture in a pixel/geometry node) is the sanctioned answer for now. Revisit a true per-element/per-pixel resample primitive only if a real device proves the render-pipeline route insufficient | render-to-texture + texture sample (existing node-graph feature, not new Field syntax) |
 
+## Where each device actually lives — node-type mapping, corrected
+
+Every device in this catalog is hosted in one of the four *existing* Field
+node classes — checked directly against `src/nodes/`:
+
+| Domain the kernel body runs in | Node class | File |
+|---|---|---|
+| `sample` | `FieldSampleNode` | `src/nodes/FieldSampleNode.h` / `.cpp` |
+| `pixel` | `FieldPixelNode` | `src/nodes/FieldPixelNode.h` / `.cpp` |
+| `element` | `FieldElementNode` | `src/nodes/FieldElementNode.h` / `.cpp` |
+| `graph` (edit-time topology only) | `FieldGraphNode` | `src/nodes/FieldGraphNode.h` / `.cpp` |
+
+**A real gap, worth flagging before anyone starts building a pure
+modulator-style device:** `FieldGraphNode` is **not** a place to put a
+live, continuously-running frame-domain kernel (a Bresenham sequencer, a
+Hénon/Lorenz attractor, a PLL tempo tracker). Checked directly against
+`src/nodes/FieldGraphNode.h` and `step-14-dynamic-pins-graph-node.md` §5.1:
+`FieldGraphNode`'s kernel runs once, at *edit time*, to `emit`/`connect`/
+`set`/`place` other nodes onto the canvas — it has **no output pins at
+all**, and the parser rejects a `graph`-domain pin outright ("graph domain
+has no per-frame dataflow to expose"). It structurally cannot stream out a
+continuous modulation value. There is also **no existing frame-only Field
+node** — `ModulatorNodes.h/.cpp` (Infinite's current LFO/Random/Pattern
+modulators) are hand-written C++, not Field, so there's nothing to
+piggyback on that's already Field-native either.
+
+Two real options, for any device in this catalog whose logic is
+essentially "a standalone modulator" (device #13's attractor trail, or any
+future Bresenham/PLL-style device):
+
+| Option | What it means | Cost |
+|---|---|---|
+| **(a) Piggyback** — declare a `frame`-domain `output` pin on whichever `FieldSampleNode`/`FieldElementNode`/`FieldPixelNode` the device already needs | Works **today**, no new node type — the modulator logic lives inside the device's existing node body and exposes itself as one more pin | Free |
+| **(b) A fifth node type**, a real standalone `FieldFrameNode`/`FieldModulatorNode` | Doesn't exist, isn't in any of the 17 build steps — genuinely new scoping work (registration, save-format lines, UI), comparable in size to one of the earlier numbered steps | A real, unscheduled build step |
+
+**Recommendation: (a) for now.** Every frame-only need in this catalog
+(device #13's attractor history, or a future pure-sequencer device) can
+piggyback on a node it's already touching for another reason. Only invest
+in (b) once enough standalone-modulator devices exist that piggybacking
+starts feeling cramped — don't build a fifth node type speculatively.
+
 ## The catalog: 22 devices
 
 Devices 1-18 are from the backward-analysis exercise; 19-22 are your four
