@@ -12,7 +12,40 @@ const std::vector<FieldElementNode::Preset>& FieldElementNode::Presets()
       { "Color by Normal", "Cd = N * 0.5 + 0.5\n" },
       { "Twist", "a = P.y * 2.0 + t\nP.x = P.x * cos(a) - P.z * sin(a)\nP.z = P.x * sin(a) + P.z * cos(a)\n" },
       { "Noise Ripple", "n = rand(0, 1, 2.0, 0)\nP += N * (n - 0.5) * 0.2\n" },
-      { "Attrib Ramp", "attrib float heat = 0\nheat = (P.y + 1.0) * 0.5\nCd = vec3(heat, 0.2, 1.0 - heat)\n" }
+      { "Attrib Ramp", "attrib float heat = 0\nheat = (P.y + 1.0) * 0.5\nCd = vec3(heat, 0.2, 1.0 - heat)\n" },
+      { "Bass Ribbon Mirror (Device #7)",
+        "param float amp = 0.8 [0.0, 3.0]\n"
+        "param float wave = 4.0 [0.5, 16.0]\n"
+        "param float speed = 3.0 [0.5, 10.0]\n"
+        "disp = sin(P.x * wave + t * speed) * amp * 0.25\n"
+        "P.y += disp\n"
+        "Cd = vec3(0.5 + 0.5 * sin(P.x * 2.0 + t), 0.3, 0.9)\n"
+        "output frame float glow = abs(sin(t * speed))\n" },
+      { "Chladni Sand Dispersion (Device #11)",
+        "param float m = 3.0 [1.0, 10.0]\n"
+        "param float n = 5.0 [1.0, 10.0]\n"
+        "param float amp = 0.25 [0.0, 1.0]\n"
+        "p = vec2(P.x, P.z) * 3.14159265\n"
+        "val = cos(n * p.x) * cos(m * p.y) - cos(m * p.x) * cos(n * p.y)\n"
+        "P.y = abs(val) * amp\n"
+        "Cd = vec3(1.0 - abs(val), 0.7, 0.4)\n" },
+      { "Boundary Chime Sensor (Device #19)",
+        "param float threshold = 0.3 [0.0, 1.0]\n"
+        "param float freq = 2.0 [0.1, 8.0]\n"
+        "P.y += sin(P.x * 4.0 + t * freq) * 0.1\n"
+        "hit = if(P.y > threshold, 1.0, 0.0)\n"
+        "Cd = if(hit > 0.5, vec3(1.0, 0.2, 0.2), vec3(0.2, 0.6, 1.0))\n"
+        "output frame float chime = reduce.max(hit)\n" },
+      { "Predictive Collision Bounce",
+        "param float floorY = -0.5 [-2.0, 1.0]\n"
+        "param float bounce = 0.65 [0.0, 0.95]\n"
+        "state vec3 prevP = vec3(0.0, 0.0, 0.0)\n"
+        "cur = P\n"
+        "vel = cur - prevP\n"
+        "nextY = cur.y + vel.y\n"
+        "vel.y = if(nextY < floorY, -vel.y * bounce, vel.y)\n"
+        "P = cur + vel\n"
+        "prevP = cur\n" }
    };
    return kPresets;
 }

@@ -303,10 +303,106 @@ private:
    double mAbsSampleCounter = 0.0;
 };
 
+const std::vector<FieldSampleNode::Preset>& FieldSampleNode::Presets()
+{
+   static const std::vector<Preset> kPresets = {
+      { "NLMS Feedback Killer",
+        "param float mu = 0.3 [0.001, 1.9]\n"
+        "param float mode = 0.0 [0.0, 1.0]\n"
+        "state float x1 = 0\n"
+        "state float x2 = 0\n"
+        "state float x3 = 0\n"
+        "state float x4 = 0\n"
+        "state float w1 = 0\n"
+        "state float w2 = 0\n"
+        "state float w3 = 0\n"
+        "state float w4 = 0\n"
+        "state float pw = 1\n\n"
+        "y = w1 * x1 + w2 * x2 + w3 * x3 + w4 * x4\n"
+        "e = in - y\n"
+        "pw = pw + (x1 * x1 + x2 * x2 + x3 * x3 + x4 * x4 - pw) * 0.001\n"
+        "g = mu * e / (0.000001 + pw)\n"
+        "w1 = w1 + g * x1\n"
+        "w2 = w2 + g * x2\n"
+        "w3 = w3 + g * x3\n"
+        "w4 = w4 + g * x4\n"
+        "x4 = x3\n"
+        "x3 = x2\n"
+        "x2 = x1\n"
+        "x1 = in\n\n"
+        "out = e + (y - e) * mode\n" },
+      { "Chamberlin Multi-Tap SVF",
+        "param float cutoff = 1200.0 [40.0, 8000.0]\n"
+        "param float q = 0.707 [0.05, 1.0]\n"
+        "param float mixLp = 1.0 [0.0, 1.0]\n"
+        "param float mixBp = 0.0 [0.0, 1.0]\n"
+        "param float mixHp = 0.0 [0.0, 1.0]\n\n"
+        "state float lp = 0\n"
+        "state float bp = 0\n\n"
+        "f = 2.0 * sin(3.141592 * cutoff / sr)\n"
+        "hp = in - lp - q * bp\n"
+        "bp = bp + f * hp\n"
+        "lp = lp + f * bp\n\n"
+        "out = lp * mixLp + bp * mixBp + hp * mixHp\n" },
+      { "Polyphonic FM Bell",
+        "param float modRatio = 2.76 [0.5, 8.0]\n"
+        "param float modIndex = 3.5 [0.0, 10.0]\n"
+        "state float pCarrier = 0\n"
+        "state float pMod = 0\n\n"
+        "pMod = (pMod + (freq * modRatio) / sr) % 1.0\n"
+        "modSig = sin(6.283185 * pMod) * modIndex\n\n"
+        "pCarrier = (pCarrier + (freq / sr) * (1.0 + modSig)) % 1.0\n"
+        "out = sin(6.283185 * pCarrier) * gate\n" },
+      { "Bass Ribbon Driver (Device #7)",
+        "param float boost = 1.5 [0.5, 4.0]\n"
+        "output frame float bass = reduce.rms(in, 20.0, 160.0)\n"
+        "state float env = 0\n"
+        "env = env * 0.995 + abs(in) * 0.005\n"
+        "out = in * boost\n" },
+      { "Boundary Chime Resonator (Device #19)",
+        "param float pitch = 880.0 [110.0, 3520.0]\n"
+        "param float damp = 0.9992 [0.99, 0.9999]\n"
+        "state float env = 0\n"
+        "state float phase = 0\n"
+        "env = env * damp + abs(in) * 0.2\n"
+        "phase = (phase + pitch / sr) % 1.0\n"
+        "out = sin(6.283185 * phase) * env\n" },
+      { "Chladni Resonant Tone (Device #11)",
+        "param float freq1 = 220.0 [55.0, 1760.0]\n"
+        "param float ratio = 1.67 [1.0, 4.0]\n"
+        "state float p1 = 0\n"
+        "state float p2 = 0\n"
+        "p1 = (p1 + freq1 / sr) % 1.0\n"
+        "p2 = (p2 + (freq1 * ratio) / sr) % 1.0\n"
+        "out = (sin(6.283185 * p1) + sin(6.283185 * p2) * 0.5) * 0.4\n" }
+   };
+   return kPresets;
+}
+
+const std::vector<std::string>& FieldSampleNode::PresetNames()
+{
+   static std::vector<std::string> kNames;
+   if (kNames.empty())
+   {
+      for (const auto& p : Presets())
+         kNames.push_back(p.name);
+   }
+   return kNames;
+}
+
+void FieldSampleNode::LoadPreset(int index)
+{
+   const auto& presets = Presets();
+   if (index >= 0 && index < (int)presets.size())
+   {
+      presetIndex = index;
+      code = presets[index].code;
+      Apply();
+   }
+}
+
 // Field build step 17 (.infdev device files) - see FieldElementNode's
-// identical pair for the rationale. FieldSampleNode has no factory
-// Presets() (§0.2 of the plan doc), so this is the only save/load path
-// beyond the enclosing .inf patch.
+// identical pair for the rationale.
 Field::DeviceFile FieldSampleNode::ToDeviceFile() const
 {
    Field::DeviceFile device;

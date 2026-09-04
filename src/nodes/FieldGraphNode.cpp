@@ -24,6 +24,58 @@ std::string FieldGraphNode::NewUid()
    return out;
 }
 
+const std::vector<FieldGraphNode::Preset>& FieldGraphNode::Presets()
+{
+   static const std::vector<Preset> kPresets = {
+      { "Chladni Sand Synth (3-Domain Bundle - Device #11)",
+        "pixel = emit(\"Field Pixel\", 0)\n"
+        "sand = emit(\"Field Element\", 1)\n"
+        "synth = emit(\"Field Sample\", 2)\n"
+        "place(pixel, -320, -180)\n"
+        "place(sand, -320, 180)\n"
+        "place(synth, 80, 0)\n" },
+      { "Bass Ribbon Mirror Bundle (Device #7)",
+        "audio = emit(\"Field Sample\", 0)\n"
+        "geo = emit(\"Field Element\", 1)\n"
+        "place(audio, -280, 0)\n"
+        "place(geo, 80, 0)\n" },
+      { "Boundary Chime Bundle (Device #19)",
+        "sensor = emit(\"Field Element\", 0)\n"
+        "chime = emit(\"Field Sample\", 1)\n"
+        "place(sensor, -280, 0)\n"
+        "place(chime, 80, 0)\n" },
+      { "LFO + Wavetable Voice",
+        "lfo = emit(\"LFO\", 0)\n"
+        "osc = emit(\"Wavetable\", 1)\n"
+        "connect(lfo, 0, osc, 0)\n"
+        "place(lfo, -260, 0)\n"
+        "place(osc, 80, 0)\n" }
+   };
+   return kPresets;
+}
+
+const std::vector<std::string>& FieldGraphNode::PresetNames()
+{
+   static std::vector<std::string> kNames;
+   if (kNames.empty())
+   {
+      for (const auto& p : Presets())
+         kNames.push_back(p.name);
+   }
+   return kNames;
+}
+
+void FieldGraphNode::LoadPreset(int index)
+{
+   const auto& presets = Presets();
+   if (index >= 0 && index < (int)presets.size())
+   {
+      presetIndex = index;
+      code = presets[index].code;
+      Apply();
+   }
+}
+
 // Field build step 17 (.infdev device files) - see FieldElementNode's
 // identical pair for the rationale. No nodeSettings for this domain (plan
 // §2): nothing on FieldGraphNode is a plain settable field beyond `param`

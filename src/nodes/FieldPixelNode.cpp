@@ -96,7 +96,46 @@ const std::vector<FieldPixelNode::Preset>& FieldPixelNode::Presets()
       { "Default (UV Gradient)", "col = vec3(uv.x, uv.y, 0.5);" },
       { "Radial Wave", "param float speed = 2.0 [0.1, 10.0];\nparam float freq = 20.0 [1.0, 50.0];\nd = length(uv - 0.5);\ncol = vec3(0.5 + 0.5 * sin(d * freq - t * speed));" },
       { "Feedback Diffusion", "param float decay = 0.98 [0.9, 1.0];\nstate float a = 0;\nd = length(uv - 0.5);\nsrc_val = if(d < 0.05, 1.0, a * decay);\na = src_val;\ncol = vec3(a);" },
-      { "Modulo Grid", "param float scale = 8.0 [1.0, 32.0];\ngrid = fmod(uv * scale, 1.0);\ncol = vec3(grid.x, grid.y, 0.0);" }
+      { "Modulo Grid", "param float scale = 8.0 [1.0, 32.0];\ngrid = fmod(uv * scale, 1.0);\ncol = vec3(grid.x, grid.y, 0.0);" },
+      { "Chladni Nodal Pattern (Device #11)",
+        "param float m = 3.0 [1.0, 10.0];\n"
+        "param float n = 5.0 [1.0, 10.0];\n"
+        "p = uv * 3.14159265;\n"
+        "val = cos(n * p.x) * cos(m * p.y) - cos(m * p.x) * cos(n * p.y);\n"
+        "line = 1.0 - smoothstep(0.0, 0.08, abs(val));\n"
+        "col = vec3(line, line * 0.85, line * 0.6);" },
+      { "Sound-Colored Field (Device #21)",
+        "param float speed = 1.5 [0.1, 6.0];\n"
+        "param float saturation = 0.8 [0.0, 1.0];\n"
+        "d = length(uv - 0.5);\n"
+        "angle = atan2(uv.y - 0.5, uv.x - 0.5);\n"
+        "hue = fract(angle / 6.283185 + t * 0.1 * speed);\n"
+        "r = clamp(abs(fract(hue + 1.0) * 6.0 - 3.0) - 1.0, 0.0, 1.0);\n"
+        "g = clamp(abs(fract(hue + 0.6666) * 6.0 - 3.0) - 1.0, 0.0, 1.0);\n"
+        "b = clamp(abs(fract(hue + 0.3333) * 6.0 - 3.0) - 1.0, 0.0, 1.0);\n"
+        "rgb = mix(vec3(1.0), vec3(r, g, b), saturation);\n"
+        "col = rgb * (0.6 + 0.4 * sin(d * 20.0 - t * speed));" },
+      { "Phosphor CRT Persistence",
+        "param float decayR = 0.92 [0.5, 0.99];\n"
+        "param float decayG = 0.88 [0.5, 0.99];\n"
+        "param float decayB = 0.70 [0.5, 0.99];\n"
+        "state float pr = 0;\n"
+        "state float pg = 0;\n"
+        "state float pb = 0;\n"
+        "pr = max(col.x, pr * decayR);\n"
+        "pg = max(col.y, pg * decayG);\n"
+        "pb = max(col.z, pb * decayB);\n"
+        "col = vec3(pr, pg, pb);" },
+      { "Kinetic Moire Ripples",
+        "param float freq = 18.0 [2.0, 60.0];\n"
+        "param float speed = 2.5 [0.1, 10.0];\n"
+        "param float rings = 8.0 [1.0, 20.0];\n"
+        "p1 = length(uv - vec2(0.35, 0.5));\n"
+        "p2 = length(uv - vec2(0.65, 0.5));\n"
+        "w1 = sin(p1 * freq * rings - t * speed);\n"
+        "w2 = sin(p2 * freq * rings + t * speed);\n"
+        "val = 0.5 + 0.25 * (w1 + w2);\n"
+        "col = vec3(val, val * 0.7, 1.0 - val);" }
    };
    return kPresets;
 }

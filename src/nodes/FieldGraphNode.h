@@ -143,6 +143,16 @@ public:
    Field::ParamTable& GetParamTable() { return mParamTable; }
    const Field::ParamTable& GetParamTable() const { return mParamTable; }
 
+   struct Preset
+   {
+      const char* name;
+      const char* code;
+   };
+   static const std::vector<Preset>& Presets();
+   static const std::vector<std::string>& PresetNames();
+   void LoadPreset(int index);
+   int presetIndex = 0;
+
    // Field build step 17 (.infdev device files) - see FieldElementNode's
    // identical pair for the rationale.
    Field::DeviceFile ToDeviceFile() const;

@@ -8706,10 +8706,8 @@ namespace
 
       if (!gParamRegisterOnly)
       {
-         // No factory Presets() table for this domain (plan §0.2) - the
-         // dropdown shows only the user's saved .infdev devices.
-         DrawFieldDeviceControls<FieldSampleNode>(n, "sample", nullptr,
-                                                  std::function<void(FieldSampleNode*, int)>());
+         DrawFieldDeviceControls<FieldSampleNode>(n, "sample", &FieldSampleNode::PresetNames(),
+                                                  [](FieldSampleNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
@@ -8786,10 +8784,8 @@ namespace
 
       if (!gParamRegisterOnly)
       {
-         // No factory Presets() table for this domain (plan §0.2) - the
-         // dropdown shows only the user's saved .infdev devices.
-         DrawFieldDeviceControls<FieldGraphNode>(n, "graph", nullptr,
-                                                 std::function<void(FieldGraphNode*, int)>());
+         DrawFieldDeviceControls<FieldGraphNode>(n, "graph", &FieldGraphNode::PresetNames(),
+                                                 [](FieldGraphNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
@@ -39784,6 +39780,25 @@ static int RunFieldSampleTest()
       else { printf("SECTION 10 (freq/gate Reserved Symbols): FAIL\n"); allOk = false; }
    }
 
+   // ------------------------------------------------------------
+   // SECTION 11: Factory Presets Compile
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      for (const auto& preset : FieldSampleNode::Presets())
+      {
+         FieldSampleNode node;
+         node.code = preset.code;
+         if (!node.Apply())
+         {
+            printf("SECTION 11: FAIL - preset '%s' did not compile: %s\n", preset.name, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+      if (secOk) printf("SECTION 11 (Factory Presets Compile): OK\n");
+      else { printf("SECTION 11 (Factory Presets Compile): FAIL\n"); allOk = false; }
+   }
+
    printf("INFINITE_FIELDSAMPLETEST: %s\n", allOk ? "OK" : "FAIL");
    fflush(stdout);
    return allOk ? 0 : 1;
@@ -50571,6 +50586,23 @@ int main(int argc, char** argv)
             allOk = pass && allOk;
          }
 
+         // 15. All factory presets compile
+         {
+            bool pass = true;
+            for (const auto& p : FieldGraphNode::Presets())
+            {
+               FieldGraphNode pnode;
+               pnode.code = p.code;
+               if (!pnode.Apply())
+               {
+                  printf("[FIELDGRAPHRATETEST]   Preset '%s' failed: %s\n", p.name, pnode.LastError().c_str());
+                  pass = false;
+               }
+            }
+            printf("[FIELDGRAPHRATETEST] Assertion 15 (Factory Presets Compile): %s\n", pass ? "OK" : "FAIL");
+            allOk = pass && allOk;
+         }
+
          printf("%s\n", allOk ? "FIELDGRAPHRATE OK" : "SUSPECT");
       }
 
@@ -60981,8 +61013,8 @@ int main(int argc, char** argv)
             ImGui::Separator();
 
             gCurrentNodeIndex = gFieldSampleEditor->NodeIndex();
-            DrawFieldDeviceControls<FieldSampleNode>(gFieldSampleEditor, "sample", nullptr,
-                                                     std::function<void(FieldSampleNode*, int)>());
+            DrawFieldDeviceControls<FieldSampleNode>(gFieldSampleEditor, "sample", &FieldSampleNode::PresetNames(),
+                                                     [](FieldSampleNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
             gCurrentNodeIndex = -1;
 
             static char editBuf[8192];
@@ -61045,8 +61077,8 @@ int main(int argc, char** argv)
             ImGui::Separator();
 
             gCurrentNodeIndex = gFieldGraphEditor->NodeIndex();
-            DrawFieldDeviceControls<FieldGraphNode>(gFieldGraphEditor, "graph", nullptr,
-                                                    std::function<void(FieldGraphNode*, int)>());
+            DrawFieldDeviceControls<FieldGraphNode>(gFieldGraphEditor, "graph", &FieldGraphNode::PresetNames(),
+                                                    [](FieldGraphNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
             gCurrentNodeIndex = -1;
 
             static char editBuf[8192];
