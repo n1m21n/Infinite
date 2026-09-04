@@ -833,6 +833,11 @@ namespace Platform
 // ---------------------------------------------------------------------------
 namespace
 {
+   // Shared with namespace Platform below via unqualified lookup through the
+   // anonymous namespace's implicit using-directive at global scope; the
+   // capture thread here and Platform::AudioInputCapture*() both need it.
+   std::atomic<uint32_t> gRequestedInputDeviceId{ 0 };
+
    // Lock-free "most recent" ring: one buffer, one monotonically increasing
    // frame counter. Writer publishes frame f at (f % capacity); readers take
    // a snapshot of the counter, clamp their lag, and copy. A reader lapped by
@@ -1385,7 +1390,6 @@ namespace Platform
 
    // ---- audio input capture (Audio In node) ---------------------------------
 
-   std::atomic<uint32_t> gRequestedInputDeviceId{ 0 };
    uint32_t gActiveInputDeviceId = 0;
 
    void AudioInputCaptureAddRef()
