@@ -21,3 +21,7 @@
 PHASE1TEST|occasionally flaky on particle-system timing; if it fails once, this line lets you move on without a manual re-run
 PHASEATEST|pre-existing "Smooth" node-name collision unrelated to audio work — see spawned task to fix it
 FIELDPIXELTEST|Assertion 5 (If Lowering) fails pre-existing to Field step 17 (.infdev format) work — step 17 only added ToDeviceFile/LoadDeviceFile methods to FieldPixelNode.cpp (git diff confirms no touch to FieldParse/FieldIR/if-lowering codegen); pre-existing bug in the if(c,a,b) -> mix(...) lowering, unrelated
+WTDRAGTEST|flaky "b filter attack" sub-check (B 4 -> 4 ms, A 4 -> 4 ms) — reproduces on main with Field step 18's changes stashed out, and passes on a re-run of the same unmodified binary; not caused by this step's Field-node UI regrid.
+AUDIOLIFECYCLETEST|AudioEngine::Start fails end-to-end (no real negotiated rate, mailbox never sees a device rate) — reproduces identically with Field step 18's changes stashed out; this sandbox has no real CoreAudio output device for the engine to start against, unrelated to Field UI work.
+AUDIORECOVERYTEST|same root cause as AUDIOLIFECYCLETEST (no real audio device in this sandbox for AudioEngine::Start to negotiate against) — reproduces identically with Field step 18's changes stashed out.
+PLUGINDRAGTEST|"drop onto node: id='' expected=''" — reproduces identically with Field step 18's changes stashed out; no VST plugins installed in this sandbox for the drag fixture to find, unrelated to Field UI work.
