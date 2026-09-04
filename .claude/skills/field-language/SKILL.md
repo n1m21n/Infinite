@@ -5,10 +5,28 @@ description: The syntax, semantics and reserved-word contract of Field, the embe
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 
-Field is **not implemented yet**. These skills exist so implementation sessions
-have a contract instead of a blank page. The design is settled with the owner —
+**Field is implemented.** The compiler lives in `src/core/field/` (`FieldParse.cpp`,
+`FieldIR.cpp`, `Transfer.cpp`, `ReduceOps.cpp`, and friends) and is wired into
+real nodes (`src/nodes/Field*Node.*`) with live editors in the app ("Field
+element editor", "Field pixel editor", etc.). Everything below that reads as a
+future plan ("build step N", "does not exist in Infinite today") should be
+treated with suspicion — verify against the actual source before trusting it,
+and fix this doc when you find it stale. The design is settled with the owner —
 do not re-litigate it, do not invent alternative syntax, and do not reintroduce
 the `@` sigil.
+
+**The one rule that trips people up most:** domains do not mix inside a single
+kernel body. `in`/`out`/`sr`/`n`/`freq`/`gate` exist ONLY in a `sample`-domain
+kernel; `P`/`N`/`uv`/`Cd`/`i`/`count` ONLY in `element`; `uv`/`xy`/`col`/`res`/
+`aspect`/`alpha` ONLY in `pixel`. A kernel cannot reference another domain's
+reserved names to "pull audio into geometry" or similar — v1 has no
+cross-domain read of an `audio` or `image` structural pin from inside kernel
+text (confirmed via `FieldIR.cpp`'s pin-validation and `Transfer.cpp`'s
+`ValidateReduce`, which requires `reduce.rms(in, lo, hi)`'s argument to already
+be `Domain::Sample`). If you want geometry or pixels to react to audio, expose
+a `param` in the element/pixel kernel and drive it from an audio-analysis node
+through the modulation matrix — do not write `in`/`reduce.rms` inside an
+element or pixel kernel body.
 
 Read order: this skill, then
 [`field-compiler`](../field-compiler/SKILL.md) for how the text becomes code.
@@ -121,7 +139,7 @@ not shadow one. Attempting to is a compile error, not a warning.
 |---|---|
 | `frame` | `t` `dt` `frame` |
 | `element` | `P` `N` `uv` `Cd` `i` `count` |
-| `pixel` | `uv` `xy` `col` `res` |
+| `pixel` | `uv` `xy` `col` `res` `aspect` `alpha` |
 | `sample` | `in` `out` `sr` `n` `freq` `gate` |
 | `graph` | none |
 
@@ -347,16 +365,30 @@ param float depth = 1.0 [0, 4]
 size = 1.0 + depth * sin(t * 2)
 ```
 
-**Element — audio driving geometry.** (transfer operators:
-[`field-domains`](../field-domains/SKILL.md))
+**Element — a pure geometry deformer.**
 
 ```
-bass = reduce.rms(in, 20, 200)   # sample domain -> one float, frame rate
-P.y += bass * 2                  # element domain, 60*N times a second
+param float speed = 2.0 [0, 10]
+param float height = 0.3 [0, 2]
+dist = length(P.xz)
+P.y += sin(dist * 4.0 - t * speed) * height   # mentions t and P -> element rate
+Cd = vec3(0.5 + 0.5 * sin(P.y * 5.0), 0.4, 0.8)
+```
+
+**Element — audio-reactive, the actually-legal way.** `reduce.rms(in, ...)`
+only compiles inside a `sample`-domain kernel — `in` is a reserved word of
+`sample`, not `element`. To make geometry react to audio, compute the level in
+a sample/frame-analysis node, expose it as a `param`, and drive that `param`
+from the modulation matrix; the element kernel only ever sees its own `param`:
+
+```
+param float bass = 0.0 [0, 1]     # driven externally via the mod matrix
+P.y += bass * 2
 Cd = vec3(bass, 0.2, 1.0 - bass)
 ```
 
-`bass` is computed once per frame and broadcast. No annotation says so.
+There is no single kernel that legally mixes `in` with `P`/`Cd` — see the rule
+at the top of this file.
 
 **Pixel — a state cell you should think twice about.**
 

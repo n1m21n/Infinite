@@ -1178,7 +1178,6 @@ namespace
       static constexpr int kMaxRetries = 10;
    };
    FieldGraphUnpackPhase2State gFieldGraphUnpackPhase2;
-   bool gGlobalsOpen = false;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
    bool gSettingsOpen = false;
@@ -26097,6 +26096,7 @@ namespace
          { "Canvas & View", "Toggle Params", "Shift+H", "Show / hide parameter knobs & sliders" },
          { "Canvas & View", "Viewport Panel", "Shift+V", "Toggle viewport panel (or dock selected nodes)" },
          { "Canvas & View", "Modulation Matrix", "Shift+M", "Toggle docked modulation matrix" },
+         { "Canvas & View", "Fit View to Content", "Shift+Y", "Frame the whole patch in the canvas view" },
 
          // Transport & Audio
          { "Transport & Audio", "Play / Pause", "Space", "Start / pause timeline and animations" },
@@ -28098,6 +28098,99 @@ namespace
       file << "oversample=" << gAudioOversample << "\n";
    }
 
+   // One flat preference file holding the user's default expression globals -
+   // the set every brand-new patch starts with, independent of any saved
+   // .patch file (which carries its own globals as `glob` lines, see
+   // Patch::Data::globals). Same "glob <name> <escaped expr>" shape as the
+   // patch format so the two stay easy to reason about together, but this is
+   // a separate file: it is an app-wide preference, not part of a document.
+   std::string ExprGlobalsSettingsPath()
+   {
+      std::string dir = AppPaths::AppSupportDir();
+      return dir.empty() ? std::string() : dir + "/Infinite.expression-globals";
+   }
+
+   std::string EscapeExprGlobalsLine(const std::string& value)
+   {
+      std::string clean;
+      for (char c : value)
+      {
+         if (c == '\\')
+            clean += "\\\\";
+         else if (c == '\n')
+            clean += "\\n";
+         else if (c != '\r')
+            clean += c;
+      }
+      return clean;
+   }
+
+   std::string UnescapeExprGlobalsLine(const std::string& raw)
+   {
+      std::string out;
+      for (size_t i = 0; i < raw.size(); i++)
+      {
+         if (raw[i] == '\\' && i + 1 < raw.size() && raw[i + 1] == 'n')
+         {
+            out += '\n';
+            i++;
+         }
+         else if (raw[i] == '\\' && i + 1 < raw.size() && raw[i + 1] == '\\')
+         {
+            out += '\\';
+            i++;
+         }
+         else
+         {
+            out += raw[i];
+         }
+      }
+      return out;
+   }
+
+   // Appends the persisted default globals onto whatever is currently in
+   // ExprGlobals::All() - callers clear first if they want a clean slate.
+   void LoadDefaultExprGlobals()
+   {
+      const std::string path = ExprGlobalsSettingsPath();
+      if (path.empty())
+         return;
+      std::ifstream file(path);
+      if (!file)
+         return;
+      std::string tag, line;
+      while (file >> tag)
+      {
+         std::getline(file, line);
+         if (tag != "glob")
+            continue;
+         std::istringstream nameStream(line);
+         std::string name;
+         nameStream >> name;
+         std::string raw;
+         std::getline(nameStream, raw);
+         if (!raw.empty() && raw[0] == ' ')
+            raw.erase(0, 1);
+         if (name.empty())
+            continue;
+         ExprGlobals::All().push_back({ name, UnescapeExprGlobalsLine(raw), 0.0f, std::string() });
+      }
+   }
+
+   // Saves the live ExprGlobals::All() as the new app-wide default. Called
+   // after every edit in Settings > Expression Globals so the defaults stay
+   // in sync with what's on screen, the same immediate-persist pattern as
+   // SaveWorkspaceSettings/SaveAudioSettings above.
+   void SaveDefaultExprGlobals()
+   {
+      const std::string path = ExprGlobalsSettingsPath();
+      if (path.empty())
+         return;
+      std::ofstream file(path);
+      for (const ExprGlobals::Global& g : ExprGlobals::All())
+         file << "glob " << g.name << " " << EscapeExprGlobalsLine(g.expr) << "\n";
+   }
+
    void DiscardAutosave()
    {
       const std::string path = AutosavePath();
@@ -28305,6 +28398,10 @@ namespace
          Transport::Instance().SetTimeSignature(4, 4);
          Transport::Instance().SetKey(0);
          Transport::Instance().SetScale(0);
+         // A loaded/undone patch restores its own saved globals right after
+         // this call (see ApplyPatchData) - only a genuine fresh document
+         // seeds from the app-wide default set.
+         LoadDefaultExprGlobals();
       }
    }
 
@@ -28809,7 +28906,8 @@ namespace
                "4. Types & Vectors",
                "5. Operators & Math Functions",
                "6. Domain Transfer Operators",
-               "7. Canonical Recipes"
+               "7. Branching & Control Flow",
+               "8. Canonical Recipes"
             };
 
             ImGui::Spacing();
@@ -28893,8 +28991,8 @@ namespace
 
                   ImGui::TableNextColumn(); ImGui::Text("pixel");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("60 x W x H / GLSL");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "uv, xy, col, res");
-                  ImGui::TableNextColumn(); ImGui::Text("Normalized UV [0..1], Pixel XY, Output color (vec3/vec4), Screen resolution.");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "uv, xy, col, res, aspect, alpha");
+                  ImGui::TableNextColumn(); ImGui::Text("Normalized UV [0..1], Pixel XY, Output color (vec3), Screen resolution, aspect ratio, output alpha.");
 
                   ImGui::TableNextColumn(); ImGui::Text("sample");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("48 kHz / Register VM");
@@ -28983,20 +29081,77 @@ namespace
             }
 
             // Section 6: Domain Transfer Operators
-            if ((sSelectedSection == 0 || sSelectedSection == 6) && MatchesFilter("transfers reduce rms resample downsample map"))
+            if ((sSelectedSection == 0 || sSelectedSection == 6) && MatchesFilter("transfers reduce rms mean resample downsample map broadcast"))
             {
                ImGui::SeparatorText("6. Domain Transfer Operators");
-               ImGui::BulletText("reduce.rms(sig, f_lo, f_hi) : Computes RMS energy of audio band (Sample -> Frame rate scalar).");
-               ImGui::BulletText("reduce.sum / reduce.avg / reduce.min / reduce.max : Cross-domain aggregations.");
-               ImGui::BulletText("resample(source, coord) : Interpolated reading across domains.");
-               ImGui::BulletText("downsample(signal, factor) : Sub-rate clock division.");
-               DrawCodeBox("bass = reduce.rms(in, 20, 200)   # Sample -> Frame scalar\nP.y += bass * 2.0                 # Broadcasts to element domain", "cb_transfers");
+               ImGui::TextWrapped("element, pixel and sample are mutually incomparable domains - they never join implicitly. Every crossing between them goes through frame, either explicitly (reduce/resample/downsample) or via a reduce.");
+               ImGui::Spacing();
+
+               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "reduce.<op>(x) - many to one, written explicitly");
+               ImGui::BulletText("Ops: reduce.sum, reduce.rms, reduce.mean, reduce.min, reduce.max.");
+               ImGui::BulletText("reduce.rms(in, loHz, hiHz) : 3-arg band-limited RMS, Sample domain only (Sample -> Frame).");
+               ImGui::BulletText("Sample -> Frame only compiles inside a Field Synth/Effect (sample) kernel - 'in' is a sample-domain name, unreadable from element/pixel.");
+               ImGui::BulletText("In the sample domain, reduce.rms(in, loHz, hiHz) is output-only: write it as 'output frame float name = reduce.rms(in, lo, hi)' (max one per kernel). The result cannot be read back into that same kernel's per-sample lines - it is a pin, driven onto another node's param through the modulation matrix.");
+               DrawCodeBox("# inside a sample-domain kernel (Field Synth / Field Effect)\noutput frame float bass = reduce.rms(in, 20, 200)   # exposed as a pin, not usable below\nout = in   # per-sample processing is independent of the line above", "cb_reduce");
+
+               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "map(N) { ... } - one kernel invocation per lane, explicit");
+               ImGui::TextWrapped("Runs the body N times, once per lane, inside element or pixel kernels (the body domain must be the same or finer than the surrounding one). Cost is N x the body. The lane index inside the body is map_index; N must be a compile-time constant (1-64).");
+
+               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "broadcast - one to many, implicit, NEVER written");
+               ImGui::TextWrapped("Coarse -> fine happens automatically via rate inference. Writing broadcast(...) is a compile error.");
+               DrawCodeBox("amount = 0.5 + 0.5 * sin(t)   # frame domain\nP.y += amount                  # element domain reads it, no syntax needed", "cb_broadcast");
+
+               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "resample(x, Domain) - read domain A while standing in domain B");
+               ImGui::TextWrapped("Domain is a bare identifier: frame, element, pixel or sample. Samples rather than aggregates, so fine -> coarse can alias - prefer reduce.rms for levels/envelopes.");
+               DrawCodeBox("level = resample(lfo, sample)   # frame -> sample, held for the block", "cb_resample");
+
+               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "downsample(x, k) - run at a fraction of the ambient rate");
+               ImGui::TextWrapped("k must be a compile-time constant integer literal >= 1. A non-constant k is refused at compile time.");
+               DrawCodeBox("slow = downsample(lfo, 32)   # evaluates lfo once every 32 samples", "cb_downsample");
             }
 
-            // Section 7: Canonical Recipes
-            if ((sSelectedSection == 0 || sSelectedSection == 7) && MatchesFilter("recipes synth filter ripple sdf example"))
+            // Section 7: Branching & Control Flow
+            if ((sSelectedSection == 0 || sSelectedSection == 7) && MatchesFilter("branching if control flow predication cost"))
             {
-               ImGui::SeparatorText("7. Canonical Recipes");
+               ImGui::SeparatorText("7. Branching & Control Flow");
+               ImGui::TextWrapped("Field allows data-dependent branching (unlike Kronos, which forbids it entirely). Every branch has a real cost that depends on the domain it runs in - always know which domain you're in before you branch.");
+               DrawCodeBox("if (P.y > 0.5) { Cd = vec3(1, 0, 0) }", "cb_if_stmt");
+
+               if (ImGui::BeginTable("##branchtbl", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+               {
+                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+                  ImGui::TableSetupColumn("Lowering", ImGuiTableColumnFlags_WidthFixed, 140.0f);
+                  ImGui::TableSetupColumn("Cost", ImGuiTableColumnFlags_WidthStretch);
+                  ImGui::TableHeadersRow();
+
+                  ImGui::TableNextColumn(); ImGui::Text("frame");
+                  ImGui::TableNextColumn(); ImGui::Text("real branch");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "free");
+
+                  ImGui::TableNextColumn(); ImGui::Text("element");
+                  ImGui::TableNextColumn(); ImGui::Text("real branch");
+                  ImGui::TableNextColumn(); ImGui::Text("breaks vectorization of the batch");
+
+                  ImGui::TableNextColumn(); ImGui::Text("sample");
+                  ImGui::TableNextColumn(); ImGui::Text("real branch");
+                  ImGui::TableNextColumn(); ImGui::Text("mispredict risk on the audio thread");
+
+                  ImGui::TableNextColumn(); ImGui::Text("pixel");
+                  ImGui::TableNextColumn(); ImGui::Text("predication");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.4f, 1.0f), "always pays the sum of both sides (GPU evaluates both)");
+
+                  ImGui::EndTable();
+               }
+               ImGui::Spacing();
+               ImGui::TextWrapped("The function form if(cond, a, b) also exists (from the '=' parameter-expression language) and always evaluates both branches with no short-circuit - it is not the same construct as the statement form above, but both are valid Field/expression syntax.");
+            }
+
+            // Section 8: Canonical Recipes
+            if ((sSelectedSection == 0 || sSelectedSection == 8) && MatchesFilter("recipes synth filter ripple sdf resonator glow example templates"))
+            {
+               ImGui::SeparatorText("8. Canonical Recipes");
+               ImGui::TextWrapped("Ready-to-use starting points - copy into a Field node's editor and adjust the param ranges.");
+               ImGui::Spacing();
 
                ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Audio Synth: Sine Oscillator (Field Synth Node)");
                DrawCodeBox("state float phase = 0\nphase = phase + freq / sr\nphase = phase - floor(phase)\nout = sin(phase * 6.283185) * gate", "cb_recipe_synth");
@@ -29004,11 +29159,17 @@ namespace
                ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Audio Effect: 1-Pole Lowpass Filter (Field Effect Node)");
                DrawCodeBox("param float cutoff = 0.25 [0.01, 0.99]\nstate float z = 0\nz += (in - z) * cutoff\nout = z", "cb_recipe_filter");
 
+               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Audio Effect: Expose a Bass Level (Field Effect Node, reduce.rms)");
+               ImGui::TextWrapped("reduce.rms(in, lo, hi) is output-only in v1: it must be its own 'output frame float <name> = reduce.rms(in, lo, hi)' declaration (at most one per kernel), and that value cannot be read back into this same kernel's per-sample lines - it can only be exposed as a pin and driven onto another node's param through the modulation matrix. Signal processing on 'in' happens independently, in ordinary per-sample lines.");
+               DrawCodeBox("param float boost = 1.5 [0.5, 4.0]\noutput frame float bass = reduce.rms(in, 20.0, 200.0)\nout = in * boost", "cb_recipe_wah");
+
                ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Geometry Deformer: Wave Ripple (Field Modifier Node)");
                DrawCodeBox("param float speed = 2.0 [0, 10]\nparam float height = 0.3 [0, 2]\ndist = length(P.xz)\nP.y += sin(dist * 4.0 - t * speed) * height\nCd = vec3(0.5 + 0.5 * sin(P.y * 5.0), 0.4, 0.8)", "cb_recipe_geom");
 
                ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Pixel Shader: Radial Glow SDF (Field Pixel Node)");
                DrawCodeBox("param float radius = 0.3 [0.05, 0.8]\np = uv - vec2(0.5, 0.5)\nd = length(p) - radius\nglow = clamp(0.02 / (abs(d) + 0.02), 0.0, 1.0)\ncol = vec3(glow * 0.9, glow * 0.4, glow * 1.0)", "cb_recipe_pixel");
+
+               ImGui::TextWrapped("Want geometry or pixels to react to audio? A single kernel can't read 'in' from an element or pixel domain - drive a param from an audio-analysis node through the modulation matrix instead, and reference the param (e.g. 'height' above) from within the geometry/pixel kernel.");
             }
 
             ImGui::EndChild();
@@ -29021,6 +29182,7 @@ namespace
             ImGui::Spacing();
             ImGui::TextDisabled("Named values every '=' parameter expression can read.");
             ImGui::TextDisabled("Each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5");
+            ImGui::TextDisabled("Saved as your app-wide default - every new patch starts with this set.");
             if (ImGui::CollapsingHeader("Language Reference"))
             {
                ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !   . (swizzle)");
@@ -29051,6 +29213,7 @@ namespace
                   PushUndoCheckpoint();
                   g.name = nameBuf;
                   gPatchDirty = true;
+                  SaveDefaultExprGlobals();
                }
 
                ImGui::SameLine();
@@ -29065,6 +29228,7 @@ namespace
                   PushUndoCheckpoint();
                   g.expr = exprBuf;
                   gPatchDirty = true;
+                  SaveDefaultExprGlobals();
                }
 
                ImGui::SameLine();
@@ -29084,6 +29248,7 @@ namespace
                PushUndoCheckpoint();
                globals.erase(globals.begin() + removeAt);
                gPatchDirty = true;
+               SaveDefaultExprGlobals();
             }
 
             ImGui::Separator();
@@ -29094,6 +29259,57 @@ namespace
                snprintf(name, sizeof(name), "g%d", (int)globals.size() + 1);
                globals.push_back({ name, "0", 0.0f, std::string() });
                gPatchDirty = true;
+               SaveDefaultExprGlobals();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Presets...", ImVec2(110, 0)))
+            {
+               ImGui::OpenPopup("ExprPresetsMenuSettings");
+            }
+
+            if (ImGui::BeginPopup("ExprPresetsMenuSettings"))
+            {
+               ImGui::TextDisabled("Click to insert preset global:");
+               ImGui::Separator();
+               std::string currentCategory;
+               for (const ExprGlobals::Preset& p : ExprGlobals::Presets())
+               {
+                  if (p.category != currentCategory)
+                  {
+                     if (!currentCategory.empty())
+                        ImGui::Separator();
+                     currentCategory = p.category;
+                     ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "%s", currentCategory.c_str());
+                  }
+
+                  char itemLabel[256];
+                  snprintf(itemLabel, sizeof(itemLabel), "%s = %s", p.name.c_str(), p.expr.c_str());
+                  if (ImGui::MenuItem(itemLabel, nullptr))
+                  {
+                     PushUndoCheckpoint();
+                     bool found = false;
+                     for (ExprGlobals::Global& g : globals)
+                     {
+                        if (g.name == p.name)
+                        {
+                           g.expr = p.expr;
+                           found = true;
+                           break;
+                        }
+                     }
+                     if (!found)
+                     {
+                        globals.push_back({ p.name, p.expr, 0.0f, std::string() });
+                     }
+                     gPatchDirty = true;
+                     SaveDefaultExprGlobals();
+                  }
+                  if (ImGui::IsItemHovered())
+                  {
+                     ImGui::SetTooltip("%s\nFormula: %s", p.description.c_str(), p.expr.c_str());
+                  }
+               }
+               ImGui::EndPopup();
             }
 
             ImGui::EndTabItem();
@@ -45720,6 +45936,12 @@ int main(int argc, char** argv)
    LoadGeneralSettings();
    LoadWorkspaceSettings();
    LoadAudioSettings();
+   // Startup never routes through NewPatch()'s fresh-document branch (the
+   // graph just starts empty), so seed the default expression globals here
+   // too - overwritten a moment later by CheckAutosaveRecovery() if there's
+   // a patch to recover, same as NewPatch()'s own seeding is overwritten by
+   // a genuine File > Open.
+   LoadDefaultExprGlobals();
    // Feed the loaded device/format prefs into the engine now, before the
    // user ever presses "Start Audio", so a persisted non-default choice
    // actually takes effect on the first Start rather than only after the
@@ -48682,12 +48904,8 @@ int main(int argc, char** argv)
             }
 
             ImGui::Separator();
-            if (ImGui::MenuItem("Fit view to content"))
-               gRequestFitView = true;
             if (ImGui::MenuItem("All shortcuts..."))
                gShortcutsOpen = true;
-            if (ImGui::MenuItem("Expression globals..."))
-               gGlobalsOpen = true;
             if (ImGui::MenuItem("Help / module reference"))
                gHelpOpen = true;
             if (ImGui::MenuItem("Check for updates"))
@@ -49257,9 +49475,42 @@ int main(int argc, char** argv)
       // NavigateAction claims any drag on its configured button regardless of
       // what is underneath, so flip the button per-gesture using last frame's
       // hover state. Shift+drag still gives a rubber-band selection.
+      //
+      // Any floating top-level window (Settings, a Field editor dialog,
+      // Offline Render, the shortcuts/help windows, ...) drawn on top of the
+      // canvas is a separate concern from the above: the node-editor's own
+      // background hit-test in BuildControl (imgui_node_editor.cpp) uses
+      // ImGuiHoveredFlags_RectOnly, which ignores window overlap entirely,
+      // so a click on a floating window's title bar still reads as
+      // "background click" to the canvas. Rather than lean on ImGui's own
+      // (order-sensitive) window-hover resolution, test the mouse directly
+      // against each such window's own last-known rect via FindWindowByName
+      // - same-frame-accurate and independent of Begin() call order, so it
+      // works even on the very next click right after a canvas pan.
+      bool overFieldEditorWindow = false;
+      {
+         static const char* kFloatingWindowNames[] = {
+            "Field element editor", "Field primitive editor", "Field pixel editor",
+            "Field effect editor", "Field synth editor", "Field graph editor",
+            "Settings", "All Shortcuts", "Infinite - help & module reference",
+            "Offline Render"
+         };
+         const ImVec2 mp = ImGui::GetMousePos();
+         for (const char* wname : kFloatingWindowNames)
+         {
+            ImGuiWindow* w = ImGui::FindWindowByName(wname);
+            if (w != nullptr && w->WasActive)
+            {
+               ImRect r(w->Pos, w->Pos + w->Size);
+               if (r.Contains(mp)) { overFieldEditorWindow = true; break; }
+            }
+         }
+      }
+
       {
          ed::Config& liveCfg = const_cast<ed::Config&>(ed::GetConfig(gEditor));
-         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !gHoveringItem && !io.KeyShift)
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !gHoveringItem &&
+             !overFieldEditorWindow && !io.KeyShift)
             gPanWithLeft = true;
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
             gPanWithLeft = false;
@@ -60477,6 +60728,10 @@ int main(int argc, char** argv)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_P, false))
          gPerfPanelOpen = !gPerfPanelOpen;
 
+      // Shift+Y: fit view to content, replacing the old menu-only entry
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_Y, false))
+         gRequestFitView = true;
+
       // Shift+N: the type-to-filter node picker, without having to find empty
       // canvas to double-click. Pressed again it closes, so the same key gets
       // you back out. The close has to be deferred into the popup body (see
@@ -60813,14 +61068,15 @@ int main(int argc, char** argv)
       gRequestGroup = false;
       gRequestUngroup = false;
 
-      // Cmd/Ctrl+Shift+G dissolves a group, leaving its nodes exactly where
-      // they sit. Only the group node goes away - RemoveNodeByIndex drops the
-      // membership set with it, so the freed nodes are immediately available
-      // for another group to adopt.
-      //
-      // Selecting a member counts as selecting its group: having to click the
-      // header first would mean the one gesture that says "this cluster" is
-      // not the gesture that can dissolve it.
+      // Cmd/Ctrl+Shift+G is member-scoped: selecting a group's header
+      // dissolves that whole group (nodes go away as members, the group node
+      // itself goes away via RemoveNodeByIndex, freeing them for another
+      // group to adopt), but selecting one or more ordinary member nodes
+      // detaches only those nodes from their group - same as each member's
+      // own right-click "Ungroup" - leaving the rest of the cluster intact.
+      // A selection can mix both kinds at once (e.g. one whole group plus a
+      // lone member of a different group), so both paths run in the same
+      // pass.
       if (doUngroup)
       {
          const int count = ed::GetSelectedObjectCount();
@@ -60831,7 +61087,8 @@ int main(int argc, char** argv)
 
             // Resolved up front: RemoveNodeByIndex erases from gNodes, which
             // invalidates every GraphNode* taken before it.
-            std::set<int> doomed;
+            std::set<int> doomedGroups;
+            std::vector<int> detachMembers;
             for (int i = 0; i < nodeCount; i++)
             {
                GraphNode* sel = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
@@ -60839,32 +61096,67 @@ int main(int argc, char** argv)
                   continue;
                if (dynamic_cast<GroupNode*>(sel->node.get()) != nullptr)
                {
-                  doomed.insert(sel->index);
+                  doomedGroups.insert(sel->index);
                   continue;
                }
                if (GroupNode* owner = GroupOwning(sel->index))
                {
+                  // A member whose owning group is also directly selected
+                  // (and about to dissolve entirely) doesn't need its own
+                  // detach - that would just nudge it right before the group
+                  // node vanishes anyway.
+                  bool ownerAlsoSelected = false;
                   for (GraphNode& g : gNodes)
                   {
-                     if (g.node.get() == owner)
-                        doomed.insert(g.index);
+                     if (g.node.get() == owner && doomedGroups.count(g.index))
+                        ownerAlsoSelected = true;
+                  }
+                  if (!ownerAlsoSelected)
+                     detachMembers.push_back(sel->index);
+               }
+            }
+
+            const bool anyWork = !doomedGroups.empty() || !detachMembers.empty();
+            // One checkpoint for the whole batch - see the Delete-key handler
+            // above for why (several groups/members touched at once would
+            // otherwise leave Undo only able to claw back the last one).
+            if (anyWork)
+               PushUndoCheckpoint();
+
+            for (int memberIndex : detachMembers)
+            {
+               GraphNode* gn = FindNodeByIndex(memberIndex);
+               if (gn == nullptr)
+                  continue;
+               GroupNode* owner = GroupOwning(memberIndex);
+               if (owner == nullptr)
+                  continue;
+               gGroupMembers[owner].erase(memberIndex);
+               // Membership here is purely geometric - anything fully inside
+               // the group's box gets adopted right back in next frame.
+               // Nudging the node just past the box's bottom edge is what
+               // makes removing it actually stick (same as the per-node
+               // right-click "Ungroup" above).
+               if (int ownerIndex = IndexOfGroupNode(owner); ownerIndex >= 0)
+               {
+                  if (GraphNode* ownerGn = FindNodeByIndex(ownerIndex))
+                  {
+                     const ImVec2 gp = ed::GetNodePosition(ownerGn->NodeId());
+                     const ImVec2 gs = ed::GetNodeSize(ownerGn->NodeId());
+                     const ImVec2 mp = ed::GetNodePosition(gn->NodeId());
+                     ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + 40.0f));
                   }
                }
             }
 
-            // One checkpoint for the whole batch - see the Delete-key handler
-            // above for why (multiple groups dissolved at once would
-            // otherwise leave Undo only able to claw back the last one).
-            if (!doomed.empty())
-               PushUndoCheckpoint();
             gSuppressUndoCheckpoints = true;
-            for (int index : doomed)
+            for (int index : doomedGroups)
             {
                ed::DeleteNode(ed::NodeId(index * GraphNode::kStride));
                RemoveNodeByIndex(index);
             }
             gSuppressUndoCheckpoints = false;
-            if (!doomed.empty())
+            if (anyWork)
                ed::ClearSelection();
          }
       }
@@ -63116,148 +63408,9 @@ int main(int argc, char** argv)
          ImGui::End();
       }
 
-      // ---- expression globals ----
-      // A flat, ordered list of name/expression rows. Deliberately not a node:
-      // a global is read by name from anywhere in the patch, and giving it a
-      // position on the canvas would imply a wire that doesn't exist. It is a
-      // property of the document, so it lives in a document-level window and
-      // is saved with the patch (core/ExprGlobals.h).
-      if (gGlobalsOpen)
-      {
-         ImGui::SetNextWindowSize(ImVec2(560, 360), ImGuiCond_FirstUseEver);
-         if (ImGui::Begin("Expression globals", &gGlobalsOpen))
-         {
-            ImGui::TextDisabled("named values every '=' parameter expression can read");
-            ImGui::TextDisabled("each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5");
-            if (ImGui::CollapsingHeader("language reference"))
-            {
-               ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !   . (swizzle)");
-               ImGui::TextDisabled("functions   sin cos tan abs sign sqrt exp log pow");
-               ImGui::TextDisabled("            floor ceil round mod min max clamp lerp mix");
-               ImGui::TextDisabled("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)");
-               ImGui::TextDisabled("            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)");
-               ImGui::TextDisabled("vectors     vec2(x,y) vec3(x,y,z) vec4(x,y,z,w) or splat vec3(1)");
-               ImGui::TextDisabled("            swizzles: .xy .xyz .xyzw or .rg .rgb .rgba (e.g. P.xz, Cd.bgr)");
-               ImGui::TextDisabled("bound       t = transport seconds, pi");
-               ImGui::TextDisabled("in a param  lo / hi = that param's own range, plus its siblings");
-               ImGui::TextDisabled("            a sibling of the same name shadows a global");
-            }
-            ImGui::Separator();
-
-            std::vector<ExprGlobals::Global>& globals = ExprGlobals::All();
-            int removeAt = -1;
-            for (size_t i = 0; i < globals.size(); i++)
-            {
-               ExprGlobals::Global& g = globals[i];
-               ImGui::PushID((int)i);
-
-               char nameBuf[64];
-               snprintf(nameBuf, sizeof(nameBuf), "%s", g.name.c_str());
-               ImGui::SetNextItemWidth(130.0f);
-               if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf)))
-               {
-                  PushUndoCheckpoint();
-                  g.name = nameBuf;
-                  gPatchDirty = true;
-               }
-
-               ImGui::SameLine();
-               ImGui::TextUnformatted("=");
-               ImGui::SameLine();
-
-               char exprBuf[512];
-               snprintf(exprBuf, sizeof(exprBuf), "%s", g.expr.c_str());
-               ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 150.0f);
-               if (ImGui::InputText("##expr", exprBuf, sizeof(exprBuf)))
-               {
-                  PushUndoCheckpoint();
-                  g.expr = exprBuf;
-                  gPatchDirty = true;
-               }
-
-               // Live value, so a row can be checked without patching it into
-               // something first - the same reason the readout strip exists on
-               // the audio nodes.
-               ImGui::SameLine();
-               ImGui::TextDisabled("%.4f", g.value);
-               ImGui::SameLine();
-               if (ImGui::SmallButton("x"))
-                  removeAt = (int)i;
-
-               if (!g.error.empty())
-                  ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.5f, 1.0f), "   %s", g.error.c_str());
-
-               ImGui::PopID();
-            }
-
-            if (removeAt >= 0)
-            {
-               PushUndoCheckpoint();
-               globals.erase(globals.begin() + removeAt);
-               gPatchDirty = true;
-            }
-
-            ImGui::Separator();
-            if (ImGui::Button("Add global", ImVec2(110, 0)))
-            {
-               PushUndoCheckpoint();
-               char name[32];
-               snprintf(name, sizeof(name), "g%d", (int)globals.size() + 1);
-               globals.push_back({ name, "0", 0.0f, std::string() });
-               gPatchDirty = true;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Presets...", ImVec2(110, 0)))
-            {
-               ImGui::OpenPopup("ExprPresetsMenu");
-            }
-
-            if (ImGui::BeginPopup("ExprPresetsMenu"))
-            {
-               ImGui::TextDisabled("Click to insert preset global:");
-               ImGui::Separator();
-               std::string currentCategory;
-               for (const ExprGlobals::Preset& p : ExprGlobals::Presets())
-               {
-                  if (p.category != currentCategory)
-                  {
-                     if (!currentCategory.empty())
-                        ImGui::Separator();
-                     currentCategory = p.category;
-                     ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "%s", currentCategory.c_str());
-                  }
-
-                  char itemLabel[256];
-                  snprintf(itemLabel, sizeof(itemLabel), "%s = %s", p.name.c_str(), p.expr.c_str());
-                  if (ImGui::MenuItem(itemLabel, nullptr))
-                  {
-                     PushUndoCheckpoint();
-                     bool found = false;
-                     for (ExprGlobals::Global& g : globals)
-                     {
-                        if (g.name == p.name)
-                        {
-                           g.expr = p.expr;
-                           found = true;
-                           break;
-                        }
-                     }
-                     if (!found)
-                     {
-                        globals.push_back({ p.name, p.expr, 0.0f, std::string() });
-                     }
-                     gPatchDirty = true;
-                  }
-                  if (ImGui::IsItemHovered())
-                  {
-                     ImGui::SetTooltip("%s\nFormula: %s", p.description.c_str(), p.expr.c_str());
-                  }
-               }
-               ImGui::EndPopup();
-            }
-         }
-         ImGui::End();
-      }
+      // Expression globals now live only in Settings > Expression Globals
+      // (see DrawSettingsWindow) - the standalone window used to duplicate
+      // that exact editor, plus a Presets button now merged into the tab.
 
       if (gHelpOpen)
          DrawHelpWindow(&gHelpOpen);

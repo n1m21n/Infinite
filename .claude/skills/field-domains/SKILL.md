@@ -11,8 +11,25 @@ lattice and the fixpoint these operators override.
 [`field-realtime`](../field-realtime/SKILL.md) carries the branching cost model
 that interacts with every crossing here.
 
-Transfer operators are build step 8, after `state` (step 6) and `pixel`
-(step 7). Nothing here is implemented yet.
+**Transfer operators are implemented.** `reduce`/`map`/`resample`/`downsample`
+live in `src/core/field/Transfer.cpp` and `ReduceOps.cpp`, wired through
+`FieldIR.cpp`'s validators (`ValidateReduce`, `ValidateResample`,
+`ValidateDownsample`, `ValidateMap`). Verify against that source before
+trusting a claim in this file — several worked examples below were wrong until
+a live compile error (mixing `in` into an element kernel) forced a correction.
+
+**The restriction this skill got wrong: a transfer operator does not let two
+domains share one kernel body.** `reduce.rms(in, lo, hi)` is legal only
+*inside a `sample`-domain kernel* — because `in` itself is a reserved word of
+`sample` and does not exist in any other domain's scope. You cannot write
+`bass = reduce.rms(in, 20, 200)` followed by `P.y += bass` in the same kernel:
+that kernel would have to be simultaneously `sample` (to read `in`) and
+`element` (to read/write `P`), which `FieldIR.cpp`'s structural pin validation
+explicitly refuses — "a cross-domain audio read would need an explicit
+resample, not supported in v1". The reduction has to happen in its own
+sample-domain node; the result reaches an element/pixel kernel as a `param`
+driven through the modulation matrix, not as a shared local variable. Same
+restriction for `image` pins and `pixel`-domain reads from outside `pixel`.
 
 ---
 
@@ -34,7 +51,7 @@ Transfer operators are build step 8, after `state` (step 6) and `pixel`
 
 | Operator | Direction | Written? | Example |
 |---|---|---|---|
-| `reduce` | many → one | explicitly | `bass = reduce.rms(in, 20, 200)` |
+| `reduce` | many → one | explicitly | `bass = reduce.rms(in, 20, 200)` — only inside a `sample`-domain kernel |
 | `map` | one per element | explicitly | `map` a bank of filters |
 | `broadcast` | one → many | **never** — implicit | `P.y += amount` where `amount` is frame-domain |
 | `resample` | read domain A while standing in domain B | explicitly | `resample(audio, frame)` |
@@ -209,34 +226,40 @@ that asynchronous path.
 
 ## 8. Worked example — audio into geometry
 
-Sound drives point positions and colour. Three domains, two crossings, one of
-them implicit.
+Sound drives point positions and colour. This is **two kernels in two nodes**,
+not one — `in` and `P`/`Cd` cannot share a kernel body (see §0 above).
 
 ```
-# --- sample domain: the incoming audio ---
-# --- crossing 1: reduce, sample -> frame ---
-bass = reduce.rms(in, 20, 200)
-high = reduce.rms(in, 4000, 12000)
-
-# --- frame domain ---
-param float amount = 1.0 [0, 4]
-push = bass * amount
-
-# --- crossing 2: broadcast, frame -> element (implicit, unwritten) ---
-P.y += push
-Cd  = vec3(bass, 0.2, high)
+# --- Node A: a sample-domain kernel (Field Effect / Field Synth) ---
+output frame float bass = reduce.rms(in, 20, 200)   # sample -> frame, output-only
+out = in                                              # pass audio through unchanged
 ```
 
-| Line | Domain | Rate | Crossing |
+`reduce.rms` in the sample domain is output-only: it must be written as its
+own `output frame float <name> = reduce.rms(in, loHz, hiHz)` declaration (at
+most one per kernel), and `bass` is **not** readable back inside this same
+kernel's per-sample lines — it only exists as a pin. That pin is exposed on
+Node A the same way an existing meter/analysis node exposes a level, and is
+connected to a target `param` on a different node through the **modulation
+matrix** — a graph connection, not language syntax.
+
+```
+# --- Node B: an element-domain kernel (Field Modifier) ---
+param float speed = 2.0 [0, 10]
+param float bass = 0.0 [0, 1]          # driven by Node A via the mod matrix
+dist = length(P.xz)
+P.y += sin(dist * 4.0 - t * speed) * bass * 1.5
+Cd = vec3(bass, 0.3, 1.0 - bass)
+```
+
+| Kernel | Domain | Rate | How the other kernel's value arrives |
 |---|---|---|---|
-| `reduce.rms(in, …)` | sample → frame | 60/s output | explicit `reduce` |
-| `push = bass * amount` | frame | 60/s | — |
-| `P.y += push` | element | 60 × N/s | implicit broadcast |
-| `Cd = vec3(...)` | element | 60 × N/s | implicit broadcast |
+| Node A's `reduce.rms(in, …)` | sample → frame | 60/s output | explicit `reduce`, sample-domain kernel only |
+| Node B's `bass` | element, read as a `param` | 60 × N/s | modulation-matrix connection, not a language crossing |
 
-Two reductions run on the audio thread and publish two floats per block. The
-multiply runs 60 times a second. Only the last two lines run 300 000 times a
-second. **No annotation was written to make that happen.**
+**No transfer operator crosses `sample` directly into `element` or `pixel`.**
+The frame-domain result of a `sample`-kernel reduce still has to leave that
+node and re-enter the next one as a `param`.
 
 ## 9. Worked example — geometry into pixels
 
@@ -252,7 +275,9 @@ heat = length(P) * 0.1
 avgHeat = reduce.mean(heat)
 
 # --- pixel domain kernel, in a different node ---
-# avgHeat arrives as a frame-domain value -> a uniform. Implicit broadcast.
+# avgHeat does not appear here by name — it reaches this node as a param
+# driven through the modulation matrix, same as the audio case in §8.
+param float avgHeat = 0.0 [0, 1]
 col = mix(col, vec3(1, 0.3, 0), avgHeat)
 ```
 
