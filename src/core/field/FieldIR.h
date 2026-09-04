@@ -54,6 +54,14 @@ namespace Field
       // order-independent.
       bool isOffsetRead = false;
 
+      // Build step 23 (OPEN-B): a Variable or StateRead carrying one child and
+      // this flag is a NEIGHBOUR read - `P.at(i - 1)` - and the child is the
+      // element-index expression, clamped to [0, count-1]. It reads the cook's
+      // INPUT buffer, never a value written earlier in this loop, which is what
+      // keeps the element kernel pure and data-parallel: element j's result can
+      // never depend on whether element j-1 has already run.
+      bool isNeighbourRead = false;
+
       // graph domain (step 10): true when this Variable node refers to a
       // handle bound by emit() rather than an ordinary typed value. Handles
       // have no FieldType - `type` is left at its default and unused.

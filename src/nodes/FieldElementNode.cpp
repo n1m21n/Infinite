@@ -59,7 +59,61 @@ const std::vector<FieldElementNode::Preset>& FieldElementNode::Presets()
         "hit = if(P.y > threshold, 1.0, 0.0)\n"
         "Cd = if(hit > 0.5, vec3(1.0, 0.2, 0.2), vec3(0.2, 0.6, 1.0))\n"
         "output frame float chime = reduce.max(hit)\n"
-        "publish = reduce.max(hit)\n" }
+        "publish = reduce.max(hit)\n" },
+      // Build step 23 (OPEN-B). Both of these are simulations: the shape they
+      // settle into is nowhere in the text, it is what the rule does after a
+      // few hundred cooks. They keep their positions in `state` rather than in
+      // P because the store is refilled from the incoming mesh every cook, so a
+      // `P +=` accumulates nothing on its own.
+      { "Verlet Rope",
+        "param float restDist = 0.06 [0.01, 0.4]\n"
+        "param float stiff = 0.7 [0.05, 1.0]\n"
+        "param float gravity = 4.0 [0.0, 20.0]\n"
+        "param float sway = 0.8 [0.0, 3.0]\n"
+        "state vec3 Q = vec3(0, 0, 0)\n"
+        "state vec3 prevQ = vec3(0, 0, 0)\n"
+        "first = 1.0 - step(0.5, age)\n"
+        "grow = 1.0 - first\n"
+        "Q = mix(Q, P, first)\n"
+        "prevQ = mix(prevQ, P, first)\n"
+        "cur = Q\n"
+        "vel = (cur - prevQ) * 0.985\n"
+        "Q = cur + vel\n"
+        "Q.y -= gravity * dt * dt\n"
+        "prevQ = cur\n"
+        "isRoot = if(i < 0.5, 1.0, 0.0)\n"
+        "nbr = Q.at(i - 1)\n"
+        "delta = Q - nbr\n"
+        "len = max(length(delta), 0.0001)\n"
+        "err = len - restDist\n"
+        "Q -= (delta / len) * err * stiff * grow * (1.0 - isRoot)\n"
+        "root = P + vec3(sin(t * 1.3) * sway * 0.2, 0.0, cos(t * 0.9) * sway * 0.2)\n"
+        "Q = mix(Q, root, isRoot)\n"
+        "prevQ = mix(prevQ, root, isRoot)\n"
+        "P = Q\n"
+        "Cd = vec3(0.9, 0.45 + 0.4 * isRoot, 0.25)\n"
+        "publish = reduce.max(len)\n" },
+      { "Buckling Ribbon",
+        "param float springK = 0.25 [0.02, 0.8]\n"
+        "param float repel = 0.03 [0.0, 0.15]\n"
+        "param float speed = 1.5 [0.0, 6.0]\n"
+        "param float detail = 0.35 [0.05, 1.5]\n"
+        "state vec3 G = vec3(0, 0, 0)\n"
+        "first = 1.0 - step(0.5, age)\n"
+        "grow = 1.0 - first\n"
+        "G = mix(G, P, first)\n"
+        "a = G.at(i - 1)\n"
+        "b = G.at(i + 1)\n"
+        "mid = (a + b) * 0.5\n"
+        "G += (mid - G) * springK * grow\n"
+        "tang = b - a\n"
+        "nrm = normalize(vec3(0.0 - tang.y, tang.x, 0.0))\n"
+        "G += nrm * (repel * sin(t * speed + i * detail)) * grow\n"
+        "isEnd = max(if(i < 0.5, 1.0, 0.0), if(i > count - 1.5, 1.0, 0.0))\n"
+        "G = mix(G, P, isEnd)\n"
+        "P = G\n"
+        "Cd = vec3(0.35 + 0.5 * sin(i * detail), 0.4, 0.95)\n"
+        "publish = sin(t * speed)\n" }
    };
    return kPresets;
 }
@@ -213,6 +267,7 @@ bool FieldElementNode::Apply()
    newState.Allocate(Field::Domain::Element, allocCount);
    newState.Transplant(mState);
    mState = std::move(newState);
+   mStateAge = 0.0f;
    mState.FormatCost(mCostReadout, sizeof(mCostReadout), (int)allocCount);
 
    // Declare user attributes on store
@@ -243,6 +298,7 @@ void FieldElementNode::CookIfNeeded(int frameId)
    if (currentEpoch != mLastResetEpoch)
    {
       mState.ResetAll();
+      mStateAge = 0.0f;
       mLastResetEpoch = currentEpoch;
    }
 
@@ -332,6 +388,9 @@ void FieldElementNode::CookIfNeeded(int frameId)
    {
       mState.Allocate(Field::Domain::Element, boundCount);
       mState.FormatCost(mCostReadout, sizeof(mCostReadout), (int)boundCount);
+      // Resizing the bank zeroes it, so the simulation is starting over: `age`
+      // has to say so, or a one-shot seed would never fire again.
+      mStateAge = 0.0f;
    }
 
    // 1. Gather (AoS -> SoA)
@@ -342,6 +401,7 @@ void FieldElementNode::CookIfNeeded(int frameId)
    env.t = t;
    env.dt = (mLastEvalT > -900000.0f) ? (t - mLastEvalT) : (1.0 / 60.0);
    env.frame = (double)frameId;
+   env.age = (double)mStateAge;
    env.params = &paramValues;
    env.state = &mState;
    std::string vmErr;
@@ -349,6 +409,8 @@ void FieldElementNode::CookIfNeeded(int frameId)
 
    // 3. Scatter (SoA -> AoS)
    mStore.ToMesh(mOutMesh, mProgram->WriteMask(), inMesh, boundCount);
+
+   mStateAge += 1.0f;
 
    mMeshRevision = NextMeshRevision();
    mLastUpstreamRevision = upRev;

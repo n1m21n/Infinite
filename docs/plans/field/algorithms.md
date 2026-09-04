@@ -32,10 +32,15 @@ rules that decide the real-time column.
 4. **One primitive.** Every entry is a body of code run once per element of a
    domain. An entry that cannot be described that way is in §10, not §5–§9.
 5. **Almost nothing here is implemented.** This catalogue is a target, not a
-   status report. The exceptions, as of build step 22: **OPEN-C is answered
-   and built**, so §6.6 (trails), §6.7 (Gray-Scott reaction-diffusion) and
-   §7.4 (advection) are writable today and the first two ship as presets. Entries tagged `[A]` `[B]` `[C]` `[D]` depend on a language question
-   that is still **OPEN** (§4) and cannot be written today at all.
+   status report. The exceptions, as of build step 23: **OPEN-C and OPEN-B are
+   both answered and built.** From OPEN-C, §6.6 (trails), §6.7 (Gray-Scott
+   reaction-diffusion) and §7.4 (advection) are writable today, the first two
+   as shipped presets. From OPEN-B, §8.3's Verlet ropes and distance
+   constraints and any fixed-topology curve smoothing or buckling are writable,
+   two of them as shipped presets — but §6.5's *differential growth* is not,
+   because a kernel cannot change `count`. Entries tagged `[A]` or `[D]` still
+   depend on a language question that is **OPEN** (§4) and cannot be written
+   today at all.
 
 ---
 
@@ -176,26 +181,40 @@ and the transfer operators in `field-domains` §1.
 
 ---
 
-> ### OPEN-B — ordered-neighbour reads in `element`
+> ### OPEN-B — ordered-neighbour reads in `element` — **ANSWERED AND BUILT (step 23)**
 >
-> **Who needs it:** differential growth (§6.5), any spring/rope/cloth
-> constraint (§8.3), any curve smoothing or resampling.
+> **Resolved.** Option **(b)**, `P.at(i - 1)`, per
+> `language-decisions-and-presets.md` §1, and implemented on
+> `feature/field-step-23-element-neighbour-reads`. See
+> `step-23-element-neighbour-reads.md`.
 >
-> A chain, a rope and a growing curve are all "this element and the two next to
-> it". `element`'s reserved set (`P N uv Cd i count`) gives the index `i` and
-> the count, but there is no way to read element `i-1`'s `P`.
+> **Who needed it:** differential growth (§6.5), any spring/rope/cloth
+> constraint (§8.3), any curve smoothing.
 >
-> | Option | Spelling | Cost |
-> |---|---|---|
-> | **(a)** no neighbour access; reduce to `frame` and broadcast | already legal | a chain becomes impossible — the mean of all P is not the neighbour |
-> | **(b)** an ordered read on an attribute — **this document's assumption** | `P.at(i - 1)` | index clamped to `[0, count-1]`; reads the **previous cook's** values (a delay, exactly like `state`) so the pass stays order-independent and parallelisable |
-> | **(c)** an explicit two-phase kernel: gather pass, then update pass | two kernel bodies | honest and slow; doubles the SoA traffic |
-> | **(d)** a `neighbours` construct with a topology input | biggest surface | needs mesh adjacency, which `Mesh.h` does not carry |
+> | | |
+> |---|---|
+> | spelling | `X.at(k)`, where `X` is `P`, `N`, `uv`, `Cd`, a declared `attrib`, or an element `state` cell |
+> | what it reads | the cook's **input** buffer — the incoming mesh for an attribute, the previous cook's value for a state cell. Never a value written earlier in the same loop |
+> | out of range | clamped to `[0, count-1]`; element 0 asking for `i - 1` sees itself |
+> | domain | element only; `.at()` on a param or frame value is refused with a message saying it holds one value for the whole mesh |
+> | cost | the named bases are copied once per cook, before any element runs; a kernel with no `.at()` copies nothing |
 >
-> **Ask the owner.** (b)'s "reads the previous cook" rule is the important half:
-> without it, an in-place `P.at(i-1)` makes the result depend on iteration
-> order, which kills vectorization and makes the element domain
-> non-deterministic.
+> The "previous cook" half was the important half and it survived intact: an
+> in-place read would have made the result depend on iteration order, killing
+> vectorization and determinism.
+>
+> **What this does NOT unlock.** `count` is the input mesh's vertex count and a
+> kernel cannot change it, so §6.5's *differential growth* — which inserts
+> points where the curve stretches — is still not writable. Everything at fixed
+> topology is: §8.3's Verlet ropes and distance constraints, curve smoothing,
+> and buckling/folding, which ship as the "Verlet Rope" and "Buckling Ribbon"
+> presets.
+>
+> One more thing had to come with it: **`age`** is now reserved in the element
+> domain too, for the same reason it was added to `pixel` in step 22 — a
+> simulation needs a one-shot seed, and `frame` is the global cook counter.
+> Element simulations also have to keep their positions in `state`, not in `P`:
+> the store is refilled from the incoming mesh every cook.
 
 ---
 

@@ -577,9 +577,16 @@ namespace Field
             p.Fail("state cell '" + name + "' cannot shadow reserved attribute of sample domain", nameTok.span);
             return nullptr;
          }
-         if (name == "xy" || name == "col" || name == "res" || name == "age")
+         if (name == "xy" || name == "col" || name == "res")
          {
             p.Fail("state cell '" + name + "' cannot shadow reserved attribute of pixel domain", nameTok.span);
+            return nullptr;
+         }
+         // `age` is reserved in BOTH the pixel (step 22) and element (step 23)
+         // domains - it is the one-shot seeding signal for every simulation.
+         if (name == "age")
+         {
+            p.Fail("state cell '" + name + "' cannot shadow the reserved attribute 'age'", nameTok.span);
             return nullptr;
          }
          if (name == "pi" || name == "lo" || name == "hi")

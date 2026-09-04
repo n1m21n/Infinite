@@ -19,6 +19,24 @@ namespace Field
          std::unordered_set<std::string> stateNames;
          bool isPrologue = false;
 
+         // Build step 23: bases this block reads with `.at()`, in first-seen
+         // order, deduplicated. Copied onto the program so the VM knows the
+         // exact - and usually very short - list of lanes to snapshot.
+         std::vector<std::pair<std::string, int>> neighbourBases;
+
+         void RecordNeighbourBase(const std::string& name, int lanes)
+         {
+            for (auto& nb : neighbourBases)
+            {
+               if (nb.first == name)
+               {
+                  if (lanes > nb.second) nb.second = lanes;
+                  return;
+               }
+            }
+            neighbourBases.push_back({ name, lanes });
+         }
+
          CodeEmitter(ElementCompiledCode& c, bool prologue)
             : compiled(c), isPrologue(prologue) {}
 
@@ -66,6 +84,26 @@ namespace Field
          int EmitExpr(const IRNodePtr& node)
          {
             if (!node) return 0;
+
+            // Build step 23 (OPEN-B): `X.at(k)`. Checked before the kind switch
+            // because the base may be either a mesh attribute (IRKind::Variable)
+            // or an element state cell (IRKind::StateRead), and in the latter
+            // case the ordinary path would return the pre-loaded local register
+            // holding THIS element's value - which is exactly the wrong answer.
+            if (node->isNeighbourRead && !node->children.empty())
+            {
+               int idxReg = EmitExpr(node->children[0]);
+               int reg = AllocReg();
+               ElemInstruction inst;
+               inst.op = ElemOpcode::OpLoadNeighbour;
+               inst.dst = reg;
+               inst.src1 = idxReg;
+               inst.stringData = node->varName;
+               inst.lanes = node->type.lanes;
+               compiled.code.push_back(inst);
+               RecordNeighbourBase(node->varName, node->type.lanes);
+               return reg;
+            }
 
             switch (node->kind)
             {
@@ -750,6 +788,7 @@ namespace Field
          {
             le.EmitStmt(s);
          }
+         outProgram.neighbourBases = le.neighbourBases;
          ElemInstruction ret;
          ret.op = ElemOpcode::OpReturn;
          outProgram.loop.code.push_back(ret);
@@ -810,6 +849,77 @@ namespace Field
             return;
          }
 
+         // Cross-lane builtins. Their result is NOT a function of lane l alone, so
+         // they cannot live in the lane loop below - and every one of them used to
+         // fall straight through that loop's if/else chain and leave 0.0 behind.
+         // That is why `length(P)` read zero for every vertex, which quietly made
+         // the shipping "Radial Ripple" and "Spherical Bulge" presets uniform
+         // instead of radial. The comment above this function already required
+         // every name ValidateFunction accepts to be handled here; it wasn't.
+         if (fn == "length" || fn == "normalize" || fn == "distance" ||
+             fn == "dot" || fn == "cross")
+         {
+            auto argLanesOf = [&](size_t a) -> int {
+               int n = (a < inst.argLanes.size()) ? inst.argLanes[a] : regs[inst.argRegs[a]].lanes;
+               return std::max(1, std::min(4, n));
+            };
+            const VectorResult& a0 = regs[inst.argRegs[0]];
+
+            if (fn == "length" || fn == "normalize")
+            {
+               const int n = argLanesOf(0);
+               double sum = 0.0;
+               for (int l = 0; l < n; ++l) sum += a0.v[l] * a0.v[l];
+               const double len = std::sqrt(sum);
+               if (fn == "length")
+               {
+                  dst.lanes = 1;
+                  dst.v[0] = len;
+               }
+               else
+               {
+                  // A zero-length vector normalizes to zero rather than NaN: the
+                  // element domain has no per-vertex error channel, and one
+                  // degenerate vertex must not poison the whole mesh.
+                  dst.lanes = inst.lanes;
+                  for (int l = 0; l < inst.lanes; ++l)
+                     dst.v[l] = (len > 1e-20 && l < n) ? a0.v[l] / len : 0.0;
+               }
+               return;
+            }
+
+            const VectorResult& a1 = regs[inst.argRegs[1]];
+            const int n = std::max(argLanesOf(0), argLanesOf(1));
+
+            if (fn == "distance")
+            {
+               double sum = 0.0;
+               for (int l = 0; l < n; ++l)
+               {
+                  const double d = a0.v[l] - a1.v[l];
+                  sum += d * d;
+               }
+               dst.lanes = 1;
+               dst.v[0] = std::sqrt(sum);
+               return;
+            }
+
+            if (fn == "dot")
+            {
+               double sum = 0.0;
+               for (int l = 0; l < n; ++l) sum += a0.v[l] * a1.v[l];
+               dst.lanes = 1;
+               dst.v[0] = sum;
+               return;
+            }
+
+            dst.lanes = 3;
+            dst.v[0] = a0.v[1] * a1.v[2] - a0.v[2] * a1.v[1];
+            dst.v[1] = a0.v[2] * a1.v[0] - a0.v[0] * a1.v[2];
+            dst.v[2] = a0.v[0] * a1.v[1] - a0.v[1] * a1.v[0];
+            return;
+         }
+
          for (int l = 0; l < inst.lanes; ++l)
          {
             double r = 0.0;
@@ -840,6 +950,13 @@ namespace Field
                r = (d != 0.0) ? std::fmod(lane(0, l), d) : 0.0;
             }
             else if (fn == "step") r = (lane(1, l) < lane(0, l)) ? 0.0 : 1.0;
+            else if (fn == "fract") r = lane(0, l) - std::floor(lane(0, l));
+            else if (fn == "fmod")
+            {
+               const double d = lane(1, l);
+               r = (d != 0.0) ? std::fmod(lane(0, l), d) : 0.0;
+            }
+            else if (fn == "atan2") r = std::atan2(lane(0, l), lane(1, l));
             else if (fn == "clamp") r = std::max(lane(1, l), std::min(lane(2, l), lane(0, l)));
             else if (fn == "lerp" || fn == "mix")
             {
@@ -870,6 +987,7 @@ namespace Field
          if (name == "t") { outValue = env.t; return true; }
          if (name == "dt") { outValue = env.dt; return true; }
          if (name == "frame") { outValue = env.frame; return true; }
+         if (name == "age") { outValue = env.age; return true; }
          if (name == "count") { outValue = (double)elementCount; return true; }
          if (env.params)
          {
@@ -1096,6 +1214,33 @@ namespace Field
                   int idx = inst.swizzleIndices[k];
                   if (idx < 0 || idx > 2 || comps[idx] == nullptr) continue;
                   ApplyCompound(*comps[idx], inst.stringData, (inst.swizzleCount == 1) ? src.v[0] : src.v[k]);
+               }
+               break;
+            }
+
+            case ElemOpcode::OpLoadNeighbour:
+            {
+               if (!requireElement("neighbour read")) return false;
+               VectorResult& dst = regs[inst.dst];
+               dst.lanes = inst.lanes;
+
+               // Clamped, per the OPEN-B decision: element 0 asking for i-1 sees
+               // itself rather than wrapping to the far end of the mesh, so an
+               // open chain behaves like an open chain instead of a torus.
+               long long k = (long long)std::llround(regs[inst.src1].v[0]);
+               if (k < 0) k = 0;
+               if (ctx.count > 0 && (size_t)k >= ctx.count) k = (long long)ctx.count - 1;
+
+               auto snap = mNeighbourSnapshot.find(inst.stringData);
+               for (int l = 0; l < inst.lanes; ++l)
+               {
+                  double val = 0.0;
+                  if (snap != mNeighbourSnapshot.end() && l < (int)snap->second.size())
+                  {
+                     const std::vector<float>& lane = snap->second[l];
+                     if ((size_t)k < lane.size()) val = (double)lane[(size_t)k];
+                  }
+                  dst.v[l] = val;
                }
                break;
             }
@@ -1454,6 +1599,47 @@ namespace Field
 
       // 2. Run Element Loop per element (0..store.Count()-1)
       if (count == 0) return true;
+
+      // Build step 23 (OPEN-B): snapshot the bases this kernel reads with
+      // `.at()`, ONCE, before any element runs. Every neighbour read then sees
+      // the cook's input - the incoming mesh for an attribute, the previous
+      // cook's value for an element state cell - so the loop is a pure function
+      // of its input and element order cannot change the result. Only the
+      // named bases are copied: a kernel with no `.at()` copies nothing.
+      for (const auto& nb : prog.neighbourBases)
+      {
+         const std::string& name = nb.first;
+         const int lanes = nb.second;
+
+         std::vector<std::vector<float>>& dst = mNeighbourSnapshot[name];
+         if ((int)dst.size() < lanes) dst.resize(lanes);
+
+         const std::vector<float>* src[4] = { nullptr, nullptr, nullptr, nullptr };
+         if (name == "P") { src[0] = &store.Px(); src[1] = &store.Py(); src[2] = &store.Pz(); }
+         else if (name == "N") { src[0] = &store.Nx(); src[1] = &store.Ny(); src[2] = &store.Nz(); }
+         else if (name == "uv") { src[0] = &store.U(); src[1] = &store.V(); }
+         else if (name == "Cd") { src[0] = &store.Cr(); src[1] = &store.Cg(); src[2] = &store.Cb(); }
+         else if (store.HasAttrib(name))
+         {
+            for (int l = 0; l < lanes && l < 4; ++l)
+               src[l] = store.GetAttribLane(name, l);
+         }
+         else if (env.state && env.state->HasCell(name))
+         {
+            const StateCell* cell = env.state->FindCell(name);
+            if (cell && cell->domain == Domain::Element)
+            {
+               for (int l = 0; l < lanes && l < cell->lanes && l < 4; ++l)
+                  src[l] = env.state->GetElementLane((size_t)(cell->slotOffset + l));
+            }
+         }
+
+         for (int l = 0; l < lanes && l < 4; ++l)
+         {
+            if (src[l]) dst[l] = *src[l];
+            else dst[l].assign(count, 0.0f);
+         }
+      }
 
       ElementExecContext elemCtx;
       elemCtx.inElementLoop = true;

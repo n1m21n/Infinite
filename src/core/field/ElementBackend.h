@@ -57,6 +57,12 @@ namespace Field
       OpLoadIndex,
       OpLoadCount,
 
+      // Build step 23 (OPEN-B): `X.at(k)`. stringData names the base - a mesh
+      // built-in ("P", "N", "uv", "Cd"), a user attrib, or an element state
+      // cell - src1 holds the index register. Reads the cook's input snapshot,
+      // never the live lane, so the element loop stays order-independent.
+      OpLoadNeighbour,
+
       OpLoadAttrib,
       OpStoreAttrib,
       OpStoreAttribComp,
@@ -111,6 +117,11 @@ namespace Field
       std::vector<DeclaredParam> declaredParams;
       std::vector<DeclaredState> declaredStates;
       bool isTimeDependent = false;
+
+      // Build step 23: the bases this kernel reads with `.at()`, and how many
+      // lanes each needs. Only these are snapshotted before the element loop -
+      // a kernel with no neighbour read pays nothing.
+      std::vector<std::pair<std::string, int>> neighbourBases;
 
       // Verification / profiling counters (§5.8)
       mutable uint64_t prologueEvalCount = 0;
@@ -184,6 +195,11 @@ namespace Field
                         const ElementExecContext& ctx,
                         bool& outRanAnInstruction,
                         std::string& outError);
+
+      // Build step 23: the input buffer every `.at()` reads, name -> lane ->
+      // per-element values. Rebuilt in place each cook so a steady-state graph
+      // does no allocation after the first.
+      std::unordered_map<std::string, std::vector<std::vector<float>>> mNeighbourSnapshot;
 
       std::vector<VectorResult> mFrameRegisters;
       std::vector<VectorResult> mLoopRegisters;

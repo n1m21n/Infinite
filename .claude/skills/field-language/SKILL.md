@@ -512,3 +512,56 @@ B    += first * step(0.94, hash)    # a one-shot scatter the reaction grows
 Without it, a Gray-Scott kernel starting from a uniform `B = 0` sits on a fixed
 point and never starts, and a permanent injection large enough to start it is
 also large enough to saturate the frame.
+
+---
+
+## Neighbour reads in the element domain (build step 23, OPEN-B answered)
+
+The mesh equivalent of the previous section. An **element-domain** value can be
+read at another element's index with `.at()`:
+
+```
+state vec3 G = vec3(0, 0, 0)
+first = 1 - step(0.5, age)
+G = mix(G, P, first)              # seed from the incoming mesh once
+
+a = G.at(i - 1)
+b = G.at(i + 1)
+G += ((a + b) * 0.5 - G) * 0.25   # chain cohesion
+P = G
+```
+
+| Rule | |
+|---|---|
+| spelling | `X.at(k)` where `X` is element-domain and `k` is a single index |
+| what may be read | `P`, `N`, `uv`, `Cd`, any declared `attrib`, and any element `state` cell |
+| what it reads | the cook's **input** buffer — the incoming mesh for an attribute, the **previous cook's** value for a state cell. Never a value written earlier in this loop |
+| out of range | clamped to `[0, count-1]`, so element 0 asking for `i - 1` sees itself. An open chain behaves like an open chain, not a torus |
+| domain | **element only.** A `param`, a frame value or a graph constant holds one value for the whole mesh; `.at()` on one is a compile error saying so |
+| cost | the named bases are copied once per cook, before any element runs. A kernel with no `.at()` copies nothing |
+
+`age` works here exactly as it does in the pixel domain: cooks since this
+node's state bank was cleared, `0` on the first.
+
+### Why the input buffer, and not the live value
+
+Because element `j`'s result must never depend on whether element `j-1` has
+already run. That is the property that lets the loop vectorize and, later, move
+to a GPU compute shader with no thread barriers. The price is that a neighbour
+value is one cook (~16 ms) stale, so a stiff constraint reads slightly
+compliant; sub-step it by chaining nodes rather than by reaching for the live
+lane.
+
+### State, not `P`, is where a simulation lives
+
+The element store is refilled from the incoming mesh **every cook**, so `P +=`
+on its own accumulates nothing — next cook it starts from the input again. A
+kernel that must evolve keeps its positions in a `state` cell, seeds that cell
+from `P` on the first cook, and writes `P` back at the end. Both shipped
+simulations ("Verlet Rope", "Buckling Ribbon") are built that way.
+
+Note what this rules out: `.at()` reads a **fixed** set of elements. `count` is
+the input mesh's vertex count and a kernel cannot change it, so true
+differential growth — which inserts points where the curve stretches — is not
+expressible. What is expressible is everything at fixed topology: Verlet ropes,
+chains, cloth, curve smoothing, buckling and folding.
