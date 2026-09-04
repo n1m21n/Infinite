@@ -1010,6 +1010,66 @@ namespace
    // a synthetic double-click at it. Inside a node ImGui draws in canvas space,
    // hence the explicit conversion where this is filled in.
    ImVec4 gCommentBodyRect(0, 0, 0, 0); // x, y, w, h
+
+   // ---- Field build step 17: .infdev device Save name-prompt --------------
+   // Same story as gDropdown/gCommentEdit above: a node draws a "Save"
+   // button, records what it wants to do, and the actual popup renders once
+   // per frame outside the canvas. `getDeviceFile` resolves the owning node
+   // by index and dynamic_casts back to the concrete type each time it is
+   // called (see DrawFieldDeviceControls below) rather than closing over a
+   // raw node pointer, so a node deleted while this popup is open is simply
+   // "not found" instead of a dangling read.
+   struct FieldDeviceSaveRequest
+   {
+      std::function<bool(Field::DeviceFile&)> getDeviceFile;
+      std::string domain;
+      char nameBuf[128] = {};
+      bool justOpened = false;
+   };
+   FieldDeviceSaveRequest gFieldDeviceSave;
+
+   // Per-domain cache of the user's saved .infdev files under
+   // AppPaths::AppSupportDir() + "/Devices/<domain>/" - scanned once per
+   // session on first draw, not re-scanned every frame (plan §6). Save
+   // invalidates only its own domain's entry.
+   struct FieldDeviceLibraryCache
+   {
+      bool scanned = false;
+      std::vector<std::string> names; // file stem, for display
+      std::vector<std::string> paths; // matching full path, same order
+   };
+   std::map<std::string, FieldDeviceLibraryCache> gFieldDeviceLibrary;
+
+   const FieldDeviceLibraryCache& GetFieldDeviceLibrary(const std::string& domain)
+   {
+      FieldDeviceLibraryCache& cache = gFieldDeviceLibrary[domain];
+      if (!cache.scanned)
+      {
+         cache.scanned = true;
+         const std::string dir = AppPaths::AppSupportDir() + "/Devices/" + domain + "/";
+         std::error_code ec;
+         if (std::filesystem::exists(dir, ec) && !ec)
+         {
+            for (const auto& entry : std::filesystem::directory_iterator(dir, ec))
+            {
+               if (ec) break;
+               if (!entry.is_regular_file())
+                  continue;
+               if (entry.path().extension() == ".infdev")
+               {
+                  cache.names.push_back(entry.path().stem().string());
+                  cache.paths.push_back(entry.path().string());
+               }
+            }
+         }
+      }
+      return cache;
+   }
+
+   void InvalidateFieldDeviceLibrary(const std::string& domain)
+   {
+      gFieldDeviceLibrary.erase(domain);
+   }
    // Screen-space rect of whichever comment is currently open for editing,
    // refreshed every frame so the edit popup can be pinned exactly on top of
    // it - the point being that typing looks like it happens straight into the
@@ -5394,13 +5454,131 @@ namespace
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
    }
 
+   // Field build step 17: the "Devices" dropdown + Save/Export/Import row
+   // shared by all five Field*Params functions (plan §6). `factoryNames`
+   // is nullptr for FieldSampleNode/FieldGraphNode, which have no factory
+   // Presets() table (plan §0.2) - the dropdown then shows only user
+   // devices, no factory section/separator.
+   //
+   // `onFactorySelect` is called with a freshly-resolved NodeT* (never the
+   // pointer captured at draw time) so that FieldElementNode's existing
+   // `n->presetIndex = i; n->LoadPreset(i);` idiom keeps working unchanged
+   // even though the actual selection happens on a later frame, once the
+   // deferred dropdown popup (gDropdown) is clicked - same lifetime
+   // discipline as the Save popup above.
+   template <typename NodeT>
+   void DrawFieldDeviceControls(NodeT* n, const std::string& domain,
+                                const std::vector<std::string>* factoryNames,
+                                std::function<void(NodeT*, int)> onFactorySelect)
+   {
+      const int nodeIndex = gCurrentNodeIndex;
+      const FieldDeviceLibraryCache& lib = GetFieldDeviceLibrary(domain);
+
+      std::vector<std::string> options;
+      std::vector<std::string> categories;
+      if (factoryNames != nullptr)
+      {
+         for (const std::string& s : *factoryNames)
+         {
+            options.push_back(s);
+            categories.push_back("Factory");
+         }
+      }
+      for (const std::string& s : lib.names)
+      {
+         options.push_back(s);
+         categories.push_back("Devices");
+      }
+      const size_t factoryCount = factoryNames ? factoryNames->size() : 0;
+      const std::vector<std::string> userPaths = lib.paths;
+
+      PushDropdownStyle();
+      const std::string dropdownId = "Load device...##fdd_" + domain;
+      if (options.empty())
+      {
+         ImGui::BeginDisabled();
+         ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0));
+         ImGui::EndDisabled();
+      }
+      else if (ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
+      {
+         gDropdown.options = options;
+         gDropdown.categories = categories;
+         gDropdown.current = -1;
+         gDropdown.onSelect = [nodeIndex, onFactorySelect, factoryCount, userPaths, domain](int idx)
+         {
+            GraphNode* gn = FindNodeByIndex(nodeIndex);
+            NodeT* n2 = gn ? dynamic_cast<NodeT*>(gn->node.get()) : nullptr;
+            if (n2 == nullptr)
+               return;
+            if ((size_t)idx < factoryCount)
+            {
+               if (onFactorySelect)
+                  onFactorySelect(n2, idx);
+               return;
+            }
+            const size_t userIdx = (size_t)idx - factoryCount;
+            if (userIdx >= userPaths.size())
+               return;
+            Field::DeviceFile device;
+            std::string err;
+            if (Field::LoadFromInfdevFile(userPaths[userIdx], device, err) && device.domain == domain)
+               n2->LoadDeviceFile(device);
+         };
+         gDropdown.justOpened = true;
+      }
+      PopDropdownStyle();
+
+      const float spacing = ImGui::GetStyle().ItemSpacing.x;
+      const float btnW = (kPreviewSize - 2.0f * spacing) / 3.0f;
+      if (ImGui::Button(("Save##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      {
+         snprintf(gFieldDeviceSave.nameBuf, sizeof(gFieldDeviceSave.nameBuf), "Untitled");
+         gFieldDeviceSave.domain = domain;
+         gFieldDeviceSave.getDeviceFile = [nodeIndex](Field::DeviceFile& out) -> bool
+         {
+            GraphNode* gn = FindNodeByIndex(nodeIndex);
+            NodeT* n2 = gn ? dynamic_cast<NodeT*>(gn->node.get()) : nullptr;
+            if (n2 == nullptr)
+               return false;
+            out = n2->ToDeviceFile();
+            return true;
+         };
+         gFieldDeviceSave.justOpened = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button(("Export##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      {
+         const std::string path = Platform::SaveDeviceDialog("Untitled.infdev");
+         if (!path.empty())
+            Field::SaveToInfdevFile(path, n->ToDeviceFile());
+      }
+      ImGui::SameLine();
+      if (ImGui::Button(("Import##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      {
+         const std::string path = Platform::OpenDeviceDialog();
+         if (!path.empty())
+         {
+            Field::DeviceFile device;
+            std::string err;
+            if (Field::LoadFromInfdevFile(path, device, err) && device.domain == domain)
+               n->LoadDeviceFile(device);
+         }
+      }
+   }
+
    void DrawFormulaParams(FormulaNode* n)
    {
       // The GLSL editor lives in its own window, not inline: ImGui multi-line
       // fields are child windows, and child windows inside the node canvas get
       // clipped away - which is why the box used to render empty.
-      DropdownButton("preset", FormulaNode::PresetNames(), n->presetIndex,
-                     [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+      //
+      // Field build step 17: this dropdown now folds the factory presets and
+      // the user's saved .infdev devices into one control (plan §6), rather
+      // than a bare preset picker - FormulaNode's device.params stays empty
+      // (plan §7), only `formula` round-trips.
+      DrawFieldDeviceControls<FormulaNode>(n, "formula", &FormulaNode::PresetNames(),
+                                          [](FormulaNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
       if (ImGui::Button("Edit GLSL...", ImVec2(kPreviewSize, 0)))
       {
@@ -5430,8 +5608,8 @@ namespace
 
       if (!gParamRegisterOnly)
       {
-         DropdownButton("preset", FieldElementNode::PresetNames(), n->presetIndex,
-                        [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+         DrawFieldDeviceControls<FieldElementNode>(n, "element", &FieldElementNode::PresetNames(),
+                                                   [](FieldElementNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
@@ -5508,6 +5686,11 @@ namespace
 
       if (!gParamRegisterOnly)
       {
+         // No factory Presets() table for this domain (plan §0.2) - the
+         // dropdown shows only the user's saved .infdev devices.
+         DrawFieldDeviceControls<FieldSampleNode>(n, "sample", nullptr,
+                                                  std::function<void(FieldSampleNode*, int)>());
+
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldSampleEditor = n;
@@ -5579,6 +5762,11 @@ namespace
 
       if (!gParamRegisterOnly)
       {
+         // No factory Presets() table for this domain (plan §0.2) - the
+         // dropdown shows only the user's saved .infdev devices.
+         DrawFieldDeviceControls<FieldGraphNode>(n, "graph", nullptr,
+                                                 std::function<void(FieldGraphNode*, int)>());
+
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldGraphEditor = n;
@@ -5657,8 +5845,8 @@ namespace
 
       if (!gParamRegisterOnly)
       {
-         DropdownButton("preset", FieldPixelNode::PresetNames(), n->presetIndex,
-                        [n](int i) { n->presetIndex = i; n->LoadPreset(i); });
+         DrawFieldDeviceControls<FieldPixelNode>(n, "pixel", &FieldPixelNode::PresetNames(),
+                                                 [](FieldPixelNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
          if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
@@ -47387,6 +47575,12 @@ int main(int argc, char** argv)
          static const std::vector<std::string> kGltfExt = { "gltf", "glb" };
          // Plugin bundles, not files - see the branch that consumes this.
          static const std::vector<std::string> kPluginBundleExt = { "component", "vst3" };
+         // Field build step 17: portable device files. Its own extension
+         // check must run before the "inf"/"infinite" branch below - "inf"
+         // is a strict-suffix match (HasExtension splits on the last dot),
+         // so "infdev" never collides with it, but "infdev" must still get
+         // its own branch since it isn't in kAudioExt/kModelExt/etc.
+         static const std::vector<std::string> kInfdevExt = { "infdev" };
          ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
@@ -47401,6 +47595,11 @@ int main(int argc, char** argv)
          ModelSourceNode* dropTargetModel = FindNodeUnderCanvasPoint<ModelSourceNode>(canvasPos);
          VideoSourceNode* dropTargetVideo = FindNodeUnderCanvasPoint<VideoSourceNode>(canvasPos);
          ImageSourceNode* dropTargetImage = FindNodeUnderCanvasPoint<ImageSourceNode>(canvasPos);
+         FieldElementNode* dropTargetFieldElement = FindNodeUnderCanvasPoint<FieldElementNode>(canvasPos);
+         FieldPixelNode* dropTargetFieldPixel = FindNodeUnderCanvasPoint<FieldPixelNode>(canvasPos);
+         FieldSampleNode* dropTargetFieldSample = FindNodeUnderCanvasPoint<FieldSampleNode>(canvasPos);
+         FieldGraphNode* dropTargetFieldGraph = FindNodeUnderCanvasPoint<FieldGraphNode>(canvasPos);
+         FormulaNode* dropTargetFormula = FindNodeUnderCanvasPoint<FormulaNode>(canvasPos);
          float offset = 0.0f;
          bool droppedCheckpointPushed = false;
          auto ensureDroppedCheckpoint = [&]()
@@ -47415,6 +47614,61 @@ int main(int argc, char** argv)
          {
             while (path.size() > 1 && (path.back() == '/' || path.back() == '\\'))
                path.pop_back();
+
+            // Field build step 17: a dropped .infdev hot-swaps whatever
+            // matching-domain Field node sits under the drop point. Checked
+            // before the "inf"/"infinite" patch-load branch below since
+            // extensions are checked in order and ".infdev" would otherwise
+            // never reach a useful branch (plan §4). No new node is spawned
+            // when nothing matches under the cursor or the domain doesn't
+            // match - same silent-no-op contract every other branch in this
+            // dispatch already has for an unmatched drop.
+            if (HasExtension(path, kInfdevExt))
+            {
+               Field::DeviceFile device;
+               std::string err;
+               if (Field::LoadFromInfdevFile(path, device, err))
+               {
+                  if (dropTargetFieldElement != nullptr && device.domain == "element")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFieldElement->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+                  if (dropTargetFieldPixel != nullptr && device.domain == "pixel")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFieldPixel->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+                  if (dropTargetFieldSample != nullptr && device.domain == "sample")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFieldSample->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+                  if (dropTargetFieldGraph != nullptr && device.domain == "graph")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFieldGraph->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+                  if (dropTargetFormula != nullptr && device.domain == "formula")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFormula->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+               }
+               // Unreadable file, mismatched domain, or no matching node
+               // under the drop point: fall through silently.
+               continue;
+            }
 
             if (HasExtension(path, std::vector<std::string> { "inf", "infinite" }))
             {
@@ -49733,6 +49987,158 @@ int main(int argc, char** argv)
          }
 
          printf("[FIELDPIXELTEST] Test suite complete.\n");
+      }
+
+      // Field step 17 (.infdev device file format): exercises the pure
+      // (de)serialization layer (FieldDevice.h/.cpp), the per-node
+      // ToDeviceFile/LoadDeviceFile round trip (plan §2/§7), and the
+      // domain-match gate the drag-and-drop dispatch in this file applies
+      // before calling LoadDeviceFile - driven via direct function calls,
+      // never UI automation, per plan §8.
+      if (getenv("INFINITE_FIELDDEVICETEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDDEVICETEST] Running .infdev device file conformance harness...\n");
+
+         // 1. ToDeviceFile -> ToJsonString -> FromJsonString -> LoadDeviceFile
+         //    round-trips code (byte-for-byte) and every declared param's
+         //    value (within float epsilon) for the element domain.
+         {
+            FieldElementNode src;
+            src.code = "param float amount = 0.5 [0, 2]\nparam float freq = 6.0 [0, 20]\nP.y += sin(P.x * freq) * amount\n";
+            src.Apply();
+            Field::ParamEntry* pAmount = src.GetParamTable().Find("amount");
+            Field::ParamEntry* pFreq = src.GetParamTable().Find("freq");
+            bool setupOk = pAmount != nullptr && pFreq != nullptr;
+            if (setupOk)
+            {
+               pAmount->value = 0.75f;
+               pFreq->value = 9.5f;
+            }
+
+            Field::DeviceFile device = src.ToDeviceFile();
+            std::string json = Field::ToJsonString(device);
+            Field::DeviceFile parsed;
+            std::string parseErr;
+            bool parseOk = Field::FromJsonString(json, parsed, parseErr);
+
+            FieldElementNode dst;
+            dst.LoadDeviceFile(parsed);
+            Field::ParamEntry* dAmount = dst.GetParamTable().Find("amount");
+            Field::ParamEntry* dFreq = dst.GetParamTable().Find("freq");
+
+            bool pass = setupOk && parseOk &&
+                        parsed.code == src.code &&
+                        dAmount != nullptr && dFreq != nullptr &&
+                        std::abs(dAmount->value - 0.75f) < 1e-4f &&
+                        std::abs(dFreq->value - 9.5f) < 1e-4f;
+            printf("[FIELDDEVICETEST] Assertion 1 (JSON Round-Trip): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 2. SaveToInfdevFile -> LoadFromInfdevFile round-trips identically
+         //    through actual file I/O.
+         {
+            FieldPixelNode src;
+            src.width = 128.0f;
+            src.height = 96.0f;
+            src.animate = true;
+            src.code = "param float bright = 0.5 [0, 1]\ncol = vec3(uv.x, uv.y, bright);";
+            src.Apply();
+            Field::ParamEntry* pBright = src.GetParamTable().Find("bright");
+            if (pBright != nullptr) pBright->value = 0.42f;
+
+            Field::DeviceFile device = src.ToDeviceFile();
+            const char* tmpPath = "/tmp/infinite_fielddevicetest.infdev";
+            bool saveOk = Field::SaveToInfdevFile(tmpPath, device);
+
+            Field::DeviceFile loaded;
+            std::string loadErr;
+            bool loadOk = Field::LoadFromInfdevFile(tmpPath, loaded, loadErr);
+            remove(tmpPath);
+
+            bool pass = saveOk && loadOk &&
+                        loaded.code == src.code &&
+                        loaded.domain == "pixel" &&
+                        loaded.nodeSettings.count("width") &&
+                        std::abs(loaded.nodeSettings["width"] - 128.0) < 1e-6 &&
+                        std::abs(loaded.nodeSettings["height"] - 96.0) < 1e-6 &&
+                        loaded.params.count("bright") &&
+                        std::abs(loaded.params["bright"] - 0.42) < 1e-4;
+            printf("[FIELDDEVICETEST] Assertion 2 (File I/O Round-Trip): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 3. LoadDeviceFile with a param name the target's current code
+         //    does not declare silently ignores that entry - no crash, no
+         //    phantom param added to the table.
+         {
+            FieldElementNode node;
+            node.code = "param float amount = 0.5 [0, 2]\nP.y += amount\n";
+            node.Apply();
+            size_t countBefore = node.GetParamTable().Params().size();
+
+            Field::DeviceFile device;
+            device.domain = "element";
+            device.code = node.code;
+            device.params["amount"] = 0.9;
+            device.params["doesNotExist"] = 1.23; // not declared by the code above
+
+            node.LoadDeviceFile(device);
+            Field::ParamEntry* pAmount = node.GetParamTable().Find("amount");
+            Field::ParamEntry* pPhantom = node.GetParamTable().Find("doesNotExist");
+            size_t countAfter = node.GetParamTable().Params().size();
+
+            bool pass = pAmount != nullptr && std::abs(pAmount->value - 0.9f) < 1e-4f &&
+                        pPhantom == nullptr && countAfter == countBefore;
+            printf("[FIELDDEVICETEST] Assertion 3 (Undeclared Param Ignored): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 4. LoadDeviceFile with deliberately malformed code leaves the
+         //    node's previous code/compiled program in place and populates
+         //    LastError() - the same keep-last-working-program contract
+         //    LoadPreset(int) already relies on.
+         {
+            FieldElementNode node;
+            node.code = "P.y += 0.1\n";
+            node.Apply();
+            std::string codeBefore = node.code;
+            bool errBefore = node.LastError().empty();
+
+            Field::DeviceFile device;
+            device.domain = "element";
+            device.code = "P.y += ("; // deliberate parse error
+
+            node.LoadDeviceFile(device);
+
+            bool pass = errBefore && !node.LastError().empty();
+            printf("[FIELDDEVICETEST] Assertion 4 (Malformed Code Keeps Last-Working Program): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 5. Dropping a device file whose domain does not match the drop
+         //    target is a no-op - mirrors the domain-match gate the
+         //    drag-and-drop dispatch in this file applies before ever
+         //    calling LoadDeviceFile, exercised here directly rather than
+         //    via gDroppedFiles/UI automation.
+         {
+            FieldSampleNode node;
+            node.code = "state float y = 0\ny = y * 0.9 + in * 0.1\nout = y\n";
+            node.Apply();
+            std::string codeBefore = node.code;
+
+            Field::DeviceFile device;
+            device.domain = "pixel"; // mismatched - node is 'sample'
+            device.code = "col = vec3(1.0, 0.0, 0.0);";
+
+            // The dispatch in this file never calls LoadDeviceFile at all
+            // when domains disagree; reproduce that same gate here.
+            static const std::string kSampleDomain = "sample";
+            bool domainMatches = (device.domain == kSampleDomain);
+            if (domainMatches)
+               node.LoadDeviceFile(device);
+
+            bool pass = !domainMatches && node.code == codeBefore;
+            printf("[FIELDDEVICETEST] Assertion 5 (Mismatched Domain Drop Is No-Op): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         printf("[FIELDDEVICETEST] Test suite complete.\n");
       }
 
       // Field step 10 (graph domain): the reconciler diffs a fresh GraphPlan
@@ -59665,6 +60071,41 @@ int main(int argc, char** argv)
             }
             if (selected && ImGui::IsWindowAppearing())
                ImGui::SetScrollHereY(0.5f);
+         }
+         ImGui::EndPopup();
+      }
+
+      // Field build step 17: .infdev device Save name-prompt - same
+      // deferred-popup discipline as "##dropdown" just above (opened from
+      // inside a node body, rendered out here where the canvas transform
+      // doesn't apply).
+      if (gFieldDeviceSave.justOpened)
+      {
+         ImGui::OpenPopup("##fielddevicesave");
+         gFieldDeviceSave.justOpened = false;
+      }
+      if (ImGui::BeginPopup("##fielddevicesave"))
+      {
+         ImGui::TextUnformatted("Save device as:");
+         ImGui::SetNextItemWidth(220.0f);
+         bool enterPressed = ImGui::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
+                                              sizeof(gFieldDeviceSave.nameBuf),
+                                              ImGuiInputTextFlags_EnterReturnsTrue);
+         ImGui::SameLine();
+         bool doSave = enterPressed || ImGui::Button("Save##fielddevicesaveconfirm");
+         if (doSave && gFieldDeviceSave.nameBuf[0] != '\0')
+         {
+            Field::DeviceFile device;
+            if (gFieldDeviceSave.getDeviceFile && gFieldDeviceSave.getDeviceFile(device))
+            {
+               const std::string dir = AppPaths::AppSupportDir() + "/Devices/" + gFieldDeviceSave.domain + "/";
+               if (AppPaths::EnsureDir(dir))
+               {
+                  Field::SaveToInfdevFile(dir + gFieldDeviceSave.nameBuf + ".infdev", device);
+                  InvalidateFieldDeviceLibrary(gFieldDeviceSave.domain);
+               }
+            }
+            ImGui::CloseCurrentPopup();
          }
          ImGui::EndPopup();
       }

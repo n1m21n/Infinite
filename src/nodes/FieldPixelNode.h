@@ -9,6 +9,7 @@
 #include "field/PixelState.h"
 #include "field/ParamTable.h"
 #include "field/PinTable.h"
+#include "field/FieldDevice.h"
 #include <string>
 #include <vector>
 
@@ -176,6 +177,11 @@ public:
    static const std::vector<Preset>& Presets();
    static const std::vector<std::string>& PresetNames();
    void LoadPreset(int index);
+
+   // Field build step 17 (.infdev device files) - see FieldElementNode's
+   // identical pair for the rationale.
+   Field::DeviceFile ToDeviceFile() const;
+   void LoadDeviceFile(const Field::DeviceFile& device);
 
    ImageCable input;
    std::string code;

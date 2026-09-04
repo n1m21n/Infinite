@@ -7,6 +7,7 @@
 #include "field/ParamTable.h"
 #include "field/PinTable.h"
 #include "field/SampleProgram.h"
+#include "field/FieldDevice.h"
 
 #include <atomic>
 #include <memory>
@@ -145,6 +146,11 @@ public:
 
    Field::ParamTable& GetParamTable() { return mParamTable; }
    const Field::ParamTable& GetParamTable() const { return mParamTable; }
+
+   // Field build step 17 (.infdev device files) - see FieldElementNode's
+   // identical pair for the rationale.
+   Field::DeviceFile ToDeviceFile() const;
+   void LoadDeviceFile(const Field::DeviceFile& device);
 
    // Once-per-block fault counter (NaN/inf poisoning caught by the audio
    // thread's per-block sweep - see AudioFieldSampleNode::ProcessBlock),

@@ -24,6 +24,35 @@ std::string FieldGraphNode::NewUid()
    return out;
 }
 
+// Field build step 17 (.infdev device files) - see FieldElementNode's
+// identical pair for the rationale. No nodeSettings for this domain (plan
+// §2): nothing on FieldGraphNode is a plain settable field beyond `param`
+// declarations and `code`.
+Field::DeviceFile FieldGraphNode::ToDeviceFile() const
+{
+   Field::DeviceFile device;
+   device.domain = "graph";
+   device.code = code;
+   for (const auto& p : mParamTable.Params())
+   {
+      if (p.isDeclared)
+         device.params[p.name] = p.value;
+   }
+   return device;
+}
+
+void FieldGraphNode::LoadDeviceFile(const Field::DeviceFile& device)
+{
+   code = device.code;
+   Apply();
+   for (const auto& kv : device.params)
+   {
+      Field::ParamEntry* p = mParamTable.Find(kv.first);
+      if (p != nullptr)
+         p->value = kv.second;
+   }
+}
+
 bool FieldGraphNode::Apply()
 {
    std::vector<Field::Token> tokens;

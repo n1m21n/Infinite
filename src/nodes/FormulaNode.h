@@ -5,6 +5,7 @@
 
 #include "INode.h"
 #include "GLUtil.h"
+#include "field/FieldDevice.h"
 
 // User-authored formula source. The user types a GLSL expression body; Apply()
 // wraps it in a standard preamble and compiles at runtime. A failed compile
@@ -36,6 +37,14 @@ public:
    static const std::vector<std::string>& PresetNames();
    void LoadPreset(int index);
    const std::string& LastError() const { return mLastError; }
+
+   // Field build step 17 (.infdev device files). FormulaNode predates Field
+   // and is not itself a Field node (field-integration skill §1) - its
+   // "params" are typed `=` expressions via Expression::Evaluate, not
+   // ParamTable entries, so device.params stays empty/unused here by design
+   // (plan §7). `formula` alone carries everything meaningful.
+   Field::DeviceFile ToDeviceFile() const;
+   void LoadDeviceFile(const Field::DeviceFile& device);
 
    void VisitParams(ParamVisitor& v) override
    {

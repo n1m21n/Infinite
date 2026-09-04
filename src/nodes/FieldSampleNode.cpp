@@ -303,6 +303,39 @@ private:
    double mAbsSampleCounter = 0.0;
 };
 
+// Field build step 17 (.infdev device files) - see FieldElementNode's
+// identical pair for the rationale. FieldSampleNode has no factory
+// Presets() (§0.2 of the plan doc), so this is the only save/load path
+// beyond the enclosing .inf patch.
+Field::DeviceFile FieldSampleNode::ToDeviceFile() const
+{
+   Field::DeviceFile device;
+   device.domain = "sample";
+   device.code = code;
+   for (const auto& p : mParamTable.Params())
+   {
+      if (p.isDeclared)
+         device.params[p.name] = p.value;
+   }
+   device.nodeSettings["maxVoices"] = (double)maxVoices;
+   return device;
+}
+
+void FieldSampleNode::LoadDeviceFile(const Field::DeviceFile& device)
+{
+   code = device.code;
+   auto itV = device.nodeSettings.find("maxVoices");
+   if (itV != device.nodeSettings.end())
+      maxVoices = (int)itV->second;
+   Apply();
+   for (const auto& kv : device.params)
+   {
+      Field::ParamEntry* p = mParamTable.Find(kv.first);
+      if (p != nullptr)
+         p->value = kv.second;
+   }
+}
+
 // -------------------------------------------------------------- main thread
 FieldSampleNode::FieldSampleNode()
    : mAudioNode(std::make_unique<AudioFieldSampleNode>())

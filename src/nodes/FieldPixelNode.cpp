@@ -122,6 +122,43 @@ void FieldPixelNode::LoadPreset(int index)
    }
 }
 
+Field::DeviceFile FieldPixelNode::ToDeviceFile() const
+{
+   Field::DeviceFile device;
+   device.domain = "pixel";
+   device.code = code;
+   for (const auto& p : mParamTable.Params())
+   {
+      if (p.isDeclared)
+         device.params[p.name] = p.value;
+   }
+   device.nodeSettings["width"] = (double)width;
+   device.nodeSettings["height"] = (double)height;
+   device.nodeSettings["animate"] = animate ? 1.0 : 0.0;
+   return device;
+}
+
+void FieldPixelNode::LoadDeviceFile(const Field::DeviceFile& device)
+{
+   code = device.code;
+   auto itW = device.nodeSettings.find("width");
+   if (itW != device.nodeSettings.end())
+      width = (float)itW->second;
+   auto itH = device.nodeSettings.find("height");
+   if (itH != device.nodeSettings.end())
+      height = (float)itH->second;
+   auto itA = device.nodeSettings.find("animate");
+   if (itA != device.nodeSettings.end())
+      animate = itA->second != 0.0;
+   Apply();
+   for (const auto& kv : device.params)
+   {
+      Field::ParamEntry* p = mParamTable.Find(kv.first);
+      if (p != nullptr)
+         p->value = kv.second;
+   }
+}
+
 FieldPixelNode::FieldPixelNode()
 {
    code = Presets()[0].code;

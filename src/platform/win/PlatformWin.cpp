@@ -293,6 +293,26 @@ namespace Platform
                            suggestedName, err);
    }
 
+   std::string OpenDeviceDialog()
+   {
+      std::string err;
+      return RunOpenDialog(L"Open Device",
+                           {
+                              { L"Infinite device", L"*.infdev" },
+                           },
+                           false, std::string(), err);
+   }
+
+   std::string SaveDeviceDialog(const std::string& suggestedName)
+   {
+      std::string err;
+      return RunSaveDialog(L"Save Device",
+                           {
+                              { L"Infinite device", L"*.infdev" },
+                           },
+                           suggestedName, err);
+   }
+
    std::string OpenVideoDialog()
    {
       std::string err;

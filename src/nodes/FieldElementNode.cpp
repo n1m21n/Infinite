@@ -39,6 +39,45 @@ void FieldElementNode::LoadPreset(int index)
    }
 }
 
+Field::DeviceFile FieldElementNode::ToDeviceFile() const
+{
+   Field::DeviceFile device;
+   device.domain = "element";
+   device.code = code;
+   for (const auto& p : mParamTable.Params())
+   {
+      if (p.isDeclared)
+         device.params[p.name] = p.value;
+   }
+   device.nodeSettings["maxElements"] = (double)maxElements;
+   // Only meaningful when nothing is wired into `input` - see the
+   // `if (!n->input)` guard around this same field in main.cpp.
+   if (!input)
+      device.nodeSettings["generateCount"] = (double)generateCount;
+   return device;
+}
+
+void FieldElementNode::LoadDeviceFile(const Field::DeviceFile& device)
+{
+   code = device.code;
+   auto itMax = device.nodeSettings.find("maxElements");
+   if (itMax != device.nodeSettings.end())
+      maxElements = (int)itMax->second;
+   auto itGen = device.nodeSettings.find("generateCount");
+   if (itGen != device.nodeSettings.end())
+      generateCount = (int)itGen->second;
+   Apply();
+   // Param values are matched by name against whatever the freshly-compiled
+   // program actually declared - a name the target's code doesn't declare
+   // is silently skipped (Find returns nullptr), never phantom-added.
+   for (const auto& kv : device.params)
+   {
+      Field::ParamEntry* p = mParamTable.Find(kv.first);
+      if (p != nullptr)
+         p->value = kv.second;
+   }
+}
+
 FieldElementNode::FieldElementNode()
 {
    mPublishOutput.owner = this;
