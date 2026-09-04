@@ -8844,6 +8844,11 @@ namespace
          }
       }
 
+      static const std::vector<std::string> kTopologies = {
+         "Points", "Plane (Grid)", "Sphere", "Cylinder", "Torus", "Disc"
+      };
+      DropdownButton("topology", kTopologies, n->topology, [n](int i) { n->topology = i; });
+
       ModSliderInt("count", &n->count, 1, 100000);
       ModSliderInt("max elements", &n->maxElements, 100, 200000);
 

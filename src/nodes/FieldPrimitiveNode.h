@@ -89,6 +89,7 @@ public:
       v.Text("code", code);
       v.Int("count", count);
       v.Int("maxElements", maxElements);
+      v.Int("topology", topology);
       v.Bool("publishScalarOutput", publishScalarOutput);
       mParamTable.VisitParams(v);
       mState.VisitParams(v);
@@ -137,9 +138,21 @@ public:
    Field::FieldState& State() { return mState; }
    const char* CostReadout() const { return mCostReadout; }
 
+   enum class PrimitiveTopology : int
+   {
+      Points = 0,
+      Plane = 1,
+      Sphere = 2,
+      Cylinder = 3,
+      Torus = 4,
+      Disc = 5
+   };
+
    struct Preset
    {
       const char* name;
+      PrimitiveTopology topology;
+      int defaultCount;
       const char* code;
    };
    static const std::vector<Preset>& Presets();
@@ -153,6 +166,7 @@ public:
    int count = 256;
    int maxElements = 65536;
    int presetIndex = 0;
+   int topology = 0;
 
    struct PublishOutput : public IModulator
    {
@@ -204,6 +218,7 @@ private:
    float mLastEvalT = -999999.0f;
    bool mWasTruncated = false;
    int mActualElementCount = 0;
+   int mLastBuiltTopology = -1;
    int mLastCookFrame = -1;
    size_t mLastParamHash = 0;
 };

@@ -141,6 +141,38 @@ namespace Field
             ctx.Emit(SampleOp::Clamp, dst, x, lo, hi, 0.0f, call.span);
             return dst;
          }
+         if (c == "if")
+         {
+            if (call.args.size() != 3)
+            {
+               ctx.Fail("'if' takes exactly 3 arguments (cond, then_val, else_val)", call.span);
+               return 0;
+            }
+            uint8_t cond = arg(0);
+            uint8_t thenVal = arg(1);
+            uint8_t elseVal = arg(2);
+            uint8_t dst = ctx.AllocReg(call.span);
+            ctx.Emit(SampleOp::Select, dst, cond, thenVal, elseVal, 0.0f, call.span);
+            return dst;
+         }
+         if (c == "mix" || c == "lerp")
+         {
+            if (call.args.size() != 3)
+            {
+               ctx.Fail("'" + c + "' takes exactly 3 arguments (a, b, t)", call.span);
+               return 0;
+            }
+            uint8_t a = arg(0);
+            uint8_t b = arg(1);
+            uint8_t t = arg(2);
+            uint8_t subReg = ctx.AllocReg(call.span);
+            ctx.Emit(SampleOp::Sub, subReg, b, a, 0, 0.0f, call.span);
+            uint8_t mulReg = ctx.AllocReg(call.span);
+            ctx.Emit(SampleOp::Mul, mulReg, subReg, t, 0, 0.0f, call.span);
+            uint8_t dst = ctx.AllocReg(call.span);
+            ctx.Emit(SampleOp::Add, dst, a, mulReg, 0, 0.0f, call.span);
+            return dst;
+         }
          if (c == "delay")
          {
             if (call.args.size() != 2)
