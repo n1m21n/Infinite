@@ -298,7 +298,8 @@ namespace Platform
       std::string err;
       return RunOpenDialog(L"Open Device",
                            {
-                              { L"Infinite device", L"*.infdev" },
+                              { L"Field device (*.field; *.infdev)", L"*.field;*.infdev" },
+                              { L"All files", L"*.*" },
                            },
                            false, std::string(), err);
    }
@@ -308,9 +309,10 @@ namespace Platform
       std::string err;
       return RunSaveDialog(L"Save Device",
                            {
-                              { L"Infinite device", L"*.infdev" },
+                              { L"Field device (*.field)", L"*.field" },
+                              { L"All files", L"*.*" },
                            },
-                           suggestedName, err);
+                           suggestedName.empty() ? "Untitled.field" : suggestedName, err);
    }
 
    std::string OpenVideoDialog()

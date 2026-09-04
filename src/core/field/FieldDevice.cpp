@@ -12,7 +12,7 @@ namespace Field
    std::string ToJsonString(const DeviceFile& device)
    {
       json out;
-      out["format"] = "infdev";
+      out["format"] = "field";
       out["version"] = device.version;
 
       json meta;
@@ -50,9 +50,10 @@ namespace Field
          return false;
       }
 
-      if (!parsed.is_object() || !parsed.contains("format") || parsed["format"] != "infdev")
+      if (!parsed.is_object() || !parsed.contains("format") ||
+          (parsed["format"] != "field" && parsed["format"] != "infdev"))
       {
-         outError = "not an .infdev file (missing/wrong \"format\" field)";
+         outError = "not a .field device file (missing/wrong \"format\" field)";
          return false;
       }
 
@@ -94,7 +95,7 @@ namespace Field
       return true;
    }
 
-   bool SaveToInfdevFile(const std::string& path, const DeviceFile& device)
+   bool SaveToFieldFile(const std::string& path, const DeviceFile& device)
    {
       std::ofstream file(path, std::ios::binary);
       if (!file)
@@ -103,7 +104,7 @@ namespace Field
       return (bool)file;
    }
 
-   bool LoadFromInfdevFile(const std::string& path, DeviceFile& outDevice, std::string& outError)
+   bool LoadFromFieldFile(const std::string& path, DeviceFile& outDevice, std::string& outError)
    {
       std::ifstream file(path, std::ios::binary);
       if (!file)

@@ -594,12 +594,13 @@ namespace Platform
          [panel setTitle:@"Open device"];
          if (@available(macOS 11.0, *))
          {
-            // No registered UTType for ".infdev" (unlike the patch dialogs'
-            // "com.namansoni.infinite.patch") - matched by extension instead,
-            // the same fallback OpenModelDialog below uses for obj/ply/stl.
-            UTType* type = [UTType typeWithFilenameExtension:@"infdev"];
-            if (type != nil)
-               [panel setAllowedContentTypes:@[ type ]];
+            NSMutableArray<UTType*>* types = [NSMutableArray array];
+            UTType* tField = [UTType typeWithFilenameExtension:@"field"];
+            if (tField != nil) [types addObject:tField];
+            UTType* tInfdev = [UTType typeWithFilenameExtension:@"infdev"];
+            if (tInfdev != nil) [types addObject:tInfdev];
+            if ([types count] > 0)
+               [panel setAllowedContentTypes:types];
          }
          if ([panel runModal] != NSModalResponseOK)
             return std::string();
@@ -615,13 +616,17 @@ namespace Platform
          NSSavePanel* panel = [NSSavePanel savePanel];
          [panel setTitle:@"Save device"];
          [panel setNameFieldStringValue:
-            [NSString stringWithUTF8String:suggestedName.empty() ? "Untitled.infdev"
+            [NSString stringWithUTF8String:suggestedName.empty() ? "Untitled.field"
                                                                  : suggestedName.c_str()]];
          if (@available(macOS 11.0, *))
          {
-            UTType* type = [UTType typeWithFilenameExtension:@"infdev"];
-            if (type != nil)
-               [panel setAllowedContentTypes:@[ type ]];
+            NSMutableArray<UTType*>* types = [NSMutableArray array];
+            UTType* tField = [UTType typeWithFilenameExtension:@"field"];
+            if (tField != nil) [types addObject:tField];
+            UTType* tInfdev = [UTType typeWithFilenameExtension:@"infdev"];
+            if (tInfdev != nil) [types addObject:tInfdev];
+            if ([types count] > 0)
+               [panel setAllowedContentTypes:types];
          }
          if ([panel runModal] != NSModalResponseOK)
             return std::string();

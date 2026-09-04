@@ -1105,11 +1105,11 @@ namespace
                if (ec) break;
                if (!entry.is_regular_file())
                   continue;
-               if (entry.path().extension() == ".infdev")
-               {
-                  cache.names.push_back(entry.path().stem().string());
-                  cache.paths.push_back(entry.path().string());
-               }
+                if (entry.path().extension() == ".field" || entry.path().extension() == ".infdev")
+                {
+                   cache.names.push_back(entry.path().stem().string());
+                   cache.paths.push_back(entry.path().string());
+                }
             }
          }
       }
@@ -5603,7 +5603,7 @@ namespace
                return;
             Field::DeviceFile device;
             std::string err;
-            if (Field::LoadFromInfdevFile(userPaths[userIdx], device, err) && device.domain == domain)
+            if (Field::LoadFromFieldFile(userPaths[userIdx], device, err) && device.domain == domain)
                n2->LoadDeviceFile(device);
          };
          gDropdown.justOpened = true;
@@ -5630,9 +5630,9 @@ namespace
       ImGui::SameLine();
       if (ImGui::Button(("Export##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
-         const std::string path = Platform::SaveDeviceDialog("Untitled.infdev");
+         const std::string path = Platform::SaveDeviceDialog("Untitled.field");
          if (!path.empty())
-            Field::SaveToInfdevFile(path, n->ToDeviceFile());
+            Field::SaveToFieldFile(path, n->ToDeviceFile());
       }
       ImGui::SameLine();
       if (ImGui::Button(("Import##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
@@ -5642,7 +5642,7 @@ namespace
          {
             Field::DeviceFile device;
             std::string err;
-            if (Field::LoadFromInfdevFile(path, device, err) && device.domain == domain)
+            if (Field::LoadFromFieldFile(path, device, err) && device.domain == domain)
                n->LoadDeviceFile(device);
          }
       }
@@ -28796,6 +28796,309 @@ namespace
             ImGui::EndTabItem();
          }
 
+         // 5. Field Language Reference Tab
+         if (ImGui::BeginTabItem("Field Language"))
+         {
+            static char sFilterBuf[64] = "";
+            static int sSelectedSection = 0;
+            const char* const kSections[] = {
+               "All Topics",
+               "1. Core Principles",
+               "2. Domains & Reserved Names",
+               "3. Declarations (param, state, attrib)",
+               "4. Types & Vectors",
+               "5. Operators & Math Functions",
+               "6. Domain Transfer Operators",
+               "7. Canonical Recipes"
+            };
+
+            ImGui::Spacing();
+            ImGui::SetNextItemWidth(220.0f);
+            ImGui::Combo("Topic", &sSelectedSection, kSections, IM_ARRAYSIZE(kSections));
+            ImGui::SameLine(0.0f, 12.0f);
+            ImGui::SetNextItemWidth(200.0f);
+            ImGui::InputTextWithHint("##fieldsearch", "Search functions / syntax...", sFilterBuf, sizeof(sFilterBuf));
+            if (sFilterBuf[0] != '\0')
+            {
+               ImGui::SameLine(0.0f, 6.0f);
+               if (ImGui::SmallButton("Clear"))
+                  sFilterBuf[0] = '\0';
+            }
+
+            ImGui::Spacing();
+            ImGui::BeginChild("##fieldrefcontent", ImVec2(0, 0), true);
+
+            auto MatchesFilter = [](const char* text) -> bool {
+               if (sFilterBuf[0] == '\0') return true;
+               std::string str(text);
+               std::string q(sFilterBuf);
+               auto toLower = [](std::string& s) {
+                  for (char& c : s) c = (char)std::tolower((unsigned char)c);
+               };
+               toLower(str);
+               toLower(q);
+               return str.find(q) != std::string::npos;
+            };
+
+            auto DrawCodeBox = [](const char* code, const char* copyId) {
+               ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.10f, 0.16f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.20f, 0.24f, 0.36f, 1.0f));
+               ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f);
+               const float h = ImGui::CalcTextSize(code).y + 16.0f;
+               ImGui::BeginChild(copyId, ImVec2(0, h), true, ImGuiWindowFlags_NoScrollbar);
+               ImGui::TextUnformatted(code);
+               ImGui::SameLine(ImGui::GetWindowWidth() - 60.0f);
+               char btnLabel[32];
+               snprintf(btnLabel, sizeof(btnLabel), "Copy##%s", copyId);
+               if (ImGui::SmallButton(btnLabel))
+                  ImGui::SetClipboardText(code);
+               ImGui::EndChild();
+               ImGui::PopStyleVar();
+               ImGui::PopStyleColor(2);
+               ImGui::Spacing();
+            };
+
+            // Section 1: Core Principles
+            if ((sSelectedSection == 0 || sSelectedSection == 1) && MatchesFilter("principles primitive kernel inferred rates bare names"))
+            {
+               ImGui::SeparatorText("1. Core Principles");
+               ImGui::BulletText("One Primitive: A kernel is a body of code run once per element of its domain.");
+               ImGui::BulletText("Inferred Rates: There is no @rate keyword. The compiler infers domain rates automatically from dependencies.");
+               ImGui::BulletText("Bare Names: Never use '@' sigils. Plain names are used everywhere (e.g. P.y += bass * 2, never @P.y).");
+               ImGui::BulletText("Real-Time Safe: Bounded loops, no dynamic heap allocation or recursion on execution threads.");
+               ImGui::Spacing();
+            }
+
+            // Section 2: Domains & Reserved Names
+            if ((sSelectedSection == 0 || sSelectedSection == 2) && MatchesFilter("domains reserved frame element pixel sample graph"))
+            {
+               ImGui::SeparatorText("2. Domains & Reserved Names");
+               if (ImGui::BeginTable("##domainstbl", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+               {
+                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                  ImGui::TableSetupColumn("Rate / Backend", ImGuiTableColumnFlags_WidthFixed, 140.0f);
+                  ImGui::TableSetupColumn("Reserved Names", ImGuiTableColumnFlags_WidthFixed, 220.0f);
+                  ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch);
+                  ImGui::TableHeadersRow();
+
+                  ImGui::TableNextColumn(); ImGui::Text("frame");
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("60 fps / Bytecode VM");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "t, dt, frame");
+                  ImGui::TableNextColumn(); ImGui::Text("Time in seconds, delta time, integer frame counter.");
+
+                  ImGui::TableNextColumn(); ImGui::Text("element");
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("60 x N / Bytecode VM");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "P, N, uv, Cd, i, count");
+                  ImGui::TableNextColumn(); ImGui::Text("Position (vec3), Normal (vec3), UV (vec2), Color (vec3), vertex index, total count.");
+
+                  ImGui::TableNextColumn(); ImGui::Text("pixel");
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("60 x W x H / GLSL");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "uv, xy, col, res");
+                  ImGui::TableNextColumn(); ImGui::Text("Normalized UV [0..1], Pixel XY, Output color (vec3/vec4), Screen resolution.");
+
+                  ImGui::TableNextColumn(); ImGui::Text("sample");
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("48 kHz / Register VM");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "in, out, sr, n, freq, gate");
+                  ImGui::TableNextColumn(); ImGui::Text("Audio in/out, sample rate (sr), sample index (n), voice note Hz (freq), gate (1.0/0.0).");
+
+                  ImGui::TableNextColumn(); ImGui::Text("graph");
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("Edit time / Interpreter");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "(none)");
+                  ImGui::TableNextColumn(); ImGui::Text("Node graph metaprogramming: emit(), connect(), set(), place().");
+
+                  ImGui::EndTable();
+               }
+               ImGui::Spacing();
+            }
+
+            // Section 3: Declarations
+            if ((sSelectedSection == 0 || sSelectedSection == 3) && MatchesFilter("declarations param state attrib output"))
+            {
+               ImGui::SeparatorText("3. Declarations");
+               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "param <type> <name> = <default> [<min>, <max>]");
+               ImGui::TextWrapped("Declares an exposed control that auto-creates an interactive, modulatable knob/slider in the node UI.");
+               DrawCodeBox("param float cutoff = 0.5 [0, 1]\nparam float resonance = 1.2 [0.1, 4.0]", "cb_param");
+
+               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "state <type> <name> = <init>");
+               ImGui::TextWrapped("Persistent delay cell (one execution unit of memory). Essential for feedback loops, filters, and integrators.");
+               DrawCodeBox("state float z = 0\nz += (in - z) * cutoff\nout = z", "cb_state");
+
+               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "attrib <type> <name> = <init>");
+               ImGui::TextWrapped("Declares custom per-element attributes living on geometry points or vertices.");
+               DrawCodeBox("attrib float heat = 0\nheat += bass * 0.1\nCd = vec3(heat, 0.2, 1.0 - heat)", "cb_attrib");
+            }
+
+            // Section 4: Types & Vectors
+            if ((sSelectedSection == 0 || sSelectedSection == 4) && MatchesFilter("types vectors vec2 vec3 vec4 swizzle rank polymorphism"))
+            {
+               ImGui::SeparatorText("4. Types & Rank Polymorphism");
+               ImGui::BulletText("Types: float, int, bool, vec2, vec3, vec4.");
+               ImGui::BulletText("Swizzling: Components .x .y .z .w and .r .g .b .a. Multi-component swizzles like P.xz or col.bgr are supported.");
+               ImGui::BulletText("Rank Polymorphism: Scalars implicitly broadcast across all vector lanes when combined.");
+               DrawCodeBox("P *= 2.0;               # Scalar 2.0 broadcasts across vec3 P\nCd = vec3(1, 0, 0);     # RGB Red assignment\nvec2 st = uv.yx;        # Swizzle coordinate inversion", "cb_types");
+            }
+
+            // Section 5: Operators & Math Functions
+            if ((sSelectedSection == 0 || sSelectedSection == 5) && MatchesFilter("operators math functions sin cos lerp rand noise"))
+            {
+               ImGui::SeparatorText("5. Operators & Built-in Math Functions");
+               if (ImGui::BeginTable("##opstbl", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+               {
+                  ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthFixed, 140.0f);
+                  ImGui::TableSetupColumn("Functions / Operators", ImGuiTableColumnFlags_WidthFixed, 240.0f);
+                  ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch);
+                  ImGui::TableHeadersRow();
+
+                  ImGui::TableNextColumn(); ImGui::Text("Operators");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "%s", "+ - * / % ^, += -= *= /=");
+                  ImGui::TableNextColumn(); ImGui::Text("^ is right-associative power (2^3 == 8).");
+
+                  ImGui::TableNextColumn(); ImGui::Text("Logic & Compare");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "== != < <= > >=, && || !");
+                  ImGui::TableNextColumn(); ImGui::Text("Standard boolean comparisons and logic gates.");
+
+                  ImGui::TableNextColumn(); ImGui::Text("Trigonometry");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "sin, cos, tan, asin, acos, atan, atan2");
+                  ImGui::TableNextColumn(); ImGui::Text("Standard trig functions (radians).");
+
+                  ImGui::TableNextColumn(); ImGui::Text("Math Utilities");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "abs, floor, ceil, fract, clamp, lerp");
+                  ImGui::TableNextColumn(); ImGui::Text("lerp(a, b, t) is linear interpolation.");
+
+                  ImGui::TableNextColumn(); ImGui::Text("Advanced Math");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "smoothstep, pow, sqrt, exp, log, min, max");
+                  ImGui::TableNextColumn(); ImGui::Text("Hermite interpolation, exponents, roots, min/max bounds.");
+
+                  ImGui::TableNextColumn(); ImGui::Text("Vector Math");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "length, normalize, dot, cross, reflect");
+                  ImGui::TableNextColumn(); ImGui::Text("Vector norms, dot/cross products, reflection.");
+
+                  ImGui::TableNextColumn(); ImGui::Text("Pure Randomness");
+                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "rand(t, seed), noise(t, seed)");
+                  ImGui::TableNextColumn(); ImGui::Text("Deterministic, pure functions of time and seed.");
+
+                  ImGui::EndTable();
+               }
+               ImGui::Spacing();
+            }
+
+            // Section 6: Domain Transfer Operators
+            if ((sSelectedSection == 0 || sSelectedSection == 6) && MatchesFilter("transfers reduce rms resample downsample map"))
+            {
+               ImGui::SeparatorText("6. Domain Transfer Operators");
+               ImGui::BulletText("reduce.rms(sig, f_lo, f_hi) : Computes RMS energy of audio band (Sample -> Frame rate scalar).");
+               ImGui::BulletText("reduce.sum / reduce.avg / reduce.min / reduce.max : Cross-domain aggregations.");
+               ImGui::BulletText("resample(source, coord) : Interpolated reading across domains.");
+               ImGui::BulletText("downsample(signal, factor) : Sub-rate clock division.");
+               DrawCodeBox("bass = reduce.rms(in, 20, 200)   # Sample -> Frame scalar\nP.y += bass * 2.0                 # Broadcasts to element domain", "cb_transfers");
+            }
+
+            // Section 7: Canonical Recipes
+            if ((sSelectedSection == 0 || sSelectedSection == 7) && MatchesFilter("recipes synth filter ripple sdf example"))
+            {
+               ImGui::SeparatorText("7. Canonical Recipes");
+
+               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Audio Synth: Sine Oscillator (Field Synth Node)");
+               DrawCodeBox("state float phase = 0\nphase = phase + freq / sr\nphase = phase - floor(phase)\nout = sin(phase * 6.283185) * gate", "cb_recipe_synth");
+
+               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Audio Effect: 1-Pole Lowpass Filter (Field Effect Node)");
+               DrawCodeBox("param float cutoff = 0.25 [0.01, 0.99]\nstate float z = 0\nz += (in - z) * cutoff\nout = z", "cb_recipe_filter");
+
+               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Geometry Deformer: Wave Ripple (Field Modifier Node)");
+               DrawCodeBox("param float speed = 2.0 [0, 10]\nparam float height = 0.3 [0, 2]\ndist = length(P.xz)\nP.y += sin(dist * 4.0 - t * speed) * height\nCd = vec3(0.5 + 0.5 * sin(P.y * 5.0), 0.4, 0.8)", "cb_recipe_geom");
+
+               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Pixel Shader: Radial Glow SDF (Field Pixel Node)");
+               DrawCodeBox("param float radius = 0.3 [0.05, 0.8]\np = uv - vec2(0.5, 0.5)\nd = length(p) - radius\nglow = clamp(0.02 / (abs(d) + 0.02), 0.0, 1.0)\ncol = vec3(glow * 0.9, glow * 0.4, glow * 1.0)", "cb_recipe_pixel");
+            }
+
+            ImGui::EndChild();
+            ImGui::EndTabItem();
+         }
+
+         // 6. Expression Globals Tab
+         if (ImGui::BeginTabItem("Expression Globals"))
+         {
+            ImGui::Spacing();
+            ImGui::TextDisabled("Named values every '=' parameter expression can read.");
+            ImGui::TextDisabled("Each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5");
+            if (ImGui::CollapsingHeader("Language Reference"))
+            {
+               ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !   . (swizzle)");
+               ImGui::TextDisabled("functions   sin cos tan abs sign sqrt exp log pow");
+               ImGui::TextDisabled("            floor ceil round mod min max clamp lerp mix");
+               ImGui::TextDisabled("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)");
+               ImGui::TextDisabled("            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)");
+               ImGui::TextDisabled("vectors     vec2(x,y) vec3(x,y,z) vec4(x,y,z,w) or splat vec3(1)");
+               ImGui::TextDisabled("            swizzles: .xy .xyz .xyzw or .rg .rgb .rgba (e.g. P.xz, Cd.bgr)");
+               ImGui::TextDisabled("bound       t = transport seconds, pi");
+               ImGui::TextDisabled("in a param  lo / hi = that param's own range, plus its siblings");
+               ImGui::TextDisabled("            a sibling of the same name shadows a global");
+            }
+            ImGui::Separator();
+
+            std::vector<ExprGlobals::Global>& globals = ExprGlobals::All();
+            int removeAt = -1;
+            for (size_t i = 0; i < globals.size(); i++)
+            {
+               ExprGlobals::Global& g = globals[i];
+               ImGui::PushID((int)i);
+
+               char nameBuf[64];
+               snprintf(nameBuf, sizeof(nameBuf), "%s", g.name.c_str());
+               ImGui::SetNextItemWidth(130.0f);
+               if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf)))
+               {
+                  PushUndoCheckpoint();
+                  g.name = nameBuf;
+                  gPatchDirty = true;
+               }
+
+               ImGui::SameLine();
+               ImGui::TextUnformatted("=");
+               ImGui::SameLine();
+
+               char exprBuf[512];
+               snprintf(exprBuf, sizeof(exprBuf), "%s", g.expr.c_str());
+               ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 150.0f);
+               if (ImGui::InputText("##expr", exprBuf, sizeof(exprBuf)))
+               {
+                  PushUndoCheckpoint();
+                  g.expr = exprBuf;
+                  gPatchDirty = true;
+               }
+
+               ImGui::SameLine();
+               ImGui::TextDisabled("%.4f", g.value);
+               ImGui::SameLine();
+               if (ImGui::SmallButton("x"))
+                  removeAt = (int)i;
+
+               if (!g.error.empty())
+                  ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.5f, 1.0f), "   %s", g.error.c_str());
+
+               ImGui::PopID();
+            }
+
+            if (removeAt >= 0)
+            {
+               PushUndoCheckpoint();
+               globals.erase(globals.begin() + removeAt);
+               gPatchDirty = true;
+            }
+
+            ImGui::Separator();
+            if (ImGui::Button("Add global", ImVec2(110, 0)))
+            {
+               PushUndoCheckpoint();
+               char name[32];
+               snprintf(name, sizeof(name), "g%d", (int)globals.size() + 1);
+               globals.push_back({ name, "0", 0.0f, std::string() });
+               gPatchDirty = true;
+            }
+
+            ImGui::EndTabItem();
+         }
+
          ImGui::EndTabBar();
       }
 
@@ -48402,9 +48705,42 @@ int main(int argc, char** argv)
 
          Transport& transport = Transport::Instance();
          const bool isTransportPlaying = transport.IsPlaying();
+
+         // Top bar controls styling: clean, symmetrical, unboxed with pixel-perfect alignment.
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 2.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
+
+         auto TopBarSameLine = [](float spacing = 4.0f) {
+            ImGui::SameLine(0.0f, spacing);
+         };
+         auto TopBarLabel = [](const char* text, bool disabled = false) {
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            window->DC.CurrLineTextBaseOffset = ImGui::GetStyle().FramePadding.y;
+            if (disabled)
+               ImGui::TextDisabled("%s", text);
+            else
+               ImGui::TextUnformatted(text);
+         };
+         auto TopBarSeparator = []() {
+            ImGui::SameLine(0.0f, 8.0f);
+            ImGui::Separator();
+            ImGui::SameLine(0.0f, 8.0f);
+         };
+
+         TopBarSameLine(8.0f);
+
+         // 1. Transport Play & Rewind
          if (isTransportPlaying)
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.52f, 0.28f, 1.0f));
-         if (ImGui::Button("##transportplay", ImVec2(36, 0)))
+         if (ImGui::Button("##transportplay", ImVec2(34, 0)))
             transport.TogglePlay();
          {
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -48425,8 +48761,8 @@ int main(int argc, char** argv)
          if (isTransportPlaying)
             ImGui::PopStyleColor();
 
-         ImGui::SameLine();
-         if (ImGui::Button("##transportrewind", ImVec2(36, 0)))
+         TopBarSameLine(3.0f);
+         if (ImGui::Button("##transportrewind", ImVec2(34, 0)))
             transport.Rewind();
          {
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -48440,32 +48776,9 @@ int main(int argc, char** argv)
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Rewind (Return)");
 
-         ImGui::Separator();
+         TopBarSameLine(4.0f);
 
-         // Transport controls styling: clean, symmetrical, unboxed with pixel-perfect
-         // alignment. Pushed here (ahead of Stop Audio) and popped after the bar/beat
-         // readout below so every element sharing this row - Stop Audio, BPM, time
-         // signature, Key/Scale, and the bar/beat text - has the same frame height and
-         // AlignTextToFramePadding() baseline. Previously Stop Audio sat outside this
-         // block (default, taller FramePadding) while BPM/Key sat inside it (shorter),
-         // so the row visibly broke into different baselines.
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 2.0f));
-         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
-
-         // Audio engine on/off, independent of Play/Pause above: Play just
-         // drives the timeline (what modulators/visuals read), so someone
-         // working on visuals shouldn't have audio hardware opened just to
-         // scrub a patch around - see the removed auto-start at startup.
-         // Audio-graph nodes read silence while this is off, same as a
-         // machine with no usable device.
+         // Audio engine on/off
          {
             const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
             ImGui::PushStyleColor(ImGuiCol_Button, audioOn
@@ -48478,13 +48791,6 @@ int main(int argc, char** argv)
                else
                {
                   gAudioStartError.clear();
-                  // StartAudioEngine (bugs 1/2): a patch loaded while the
-                  // engine was off has every node still prepared with
-                  // whatever rate it was constructed/last-rebuilt with, not
-                  // the device's - this is the "press Start Audio" repro in
-                  // 01-audio-lifecycle-correctness.md. Route through the one
-                  // choke point instead of AudioEngine::Instance().Start()
-                  // directly so this can't reopen at some future call site.
                   if (!StartAudioEngine(gAudioStartError))
                      fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
                }
@@ -48493,12 +48799,6 @@ int main(int argc, char** argv)
             if (!audioOn && !gAudioStartError.empty() && ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
          }
-
-         auto TransportSeparator = []() {
-            ImGui::SameLine(0.0f, 10.0f);
-            ImGui::Separator();
-            ImGui::SameLine(0.0f, 10.0f);
-         };
 
          static const int kDens[] = { 1, 2, 4, 8, 16 };
          auto SnapToValidDenominator = [](int val) -> int {
@@ -48527,14 +48827,13 @@ int main(int argc, char** argv)
          static bool sFieldJustOpened = false;
          static float sDragAccumY = 0.0f;
 
-         TransportSeparator();
+         TopBarSeparator();
 
-         // Tempo: vertical drag (up/down) to adjust, hover-and-type or double-click to type exact BPM.
+         // 2. Tempo (BPM)
          {
             float bpm = transport.Tempo();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("BPM");
-            ImGui::SameLine(0.0f, 4.0f);
+            TopBarLabel("BPM");
+            TopBarSameLine(4.0f);
 
             if (sActiveField == TopBarField::Bpm)
             {
@@ -48558,15 +48857,6 @@ int main(int argc, char** argv)
             else
             {
                char bpmBuf[32];
-               // "###bpmBtn" keeps ImGui's hashed widget ID fixed to the
-               // suffix alone (ImHashStr resets its running hash whenever it
-               // sees "###"), so the ID stays stable across the drag even
-               // though the displayed text changes every frame as bpm
-               // updates. Without it, the changing label changed the ID
-               // every frame, ImGui dropped ActiveId one frame after the
-               // drag started, and the node-editor canvas - which only
-               // refuses to pan while another item is ActiveId - saw no
-               // active item and took over the drag as a pan instead.
                snprintf(bpmBuf, sizeof(bpmBuf), "%.1f###bpmBtn", bpm);
                ImGui::Button(bpmBuf);
                if (ImGui::IsItemHovered())
@@ -48605,10 +48895,9 @@ int main(int argc, char** argv)
             }
          }
 
-         TransportSeparator();
+         TopBarSeparator();
 
-         // Time signature: numerator draggable 1-99; denominator draggable snapping to {1, 2, 4, 8, 16}.
-         // Both support hover-and-type and double-click to type.
+         // 3. Time signature
          {
             int tsNum = transport.TimeSigNumerator();
             const int tsDen = transport.TimeSigDenominator();
@@ -48678,10 +48967,9 @@ int main(int argc, char** argv)
                }
             }
 
-            ImGui::SameLine(0.0f, 4.0f);
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextDisabled("/");
-            ImGui::SameLine(0.0f, 4.0f);
+            TopBarSameLine(3.0f);
+            TopBarLabel("/", true);
+            TopBarSameLine(3.0f);
 
             // Denominator
             if (sActiveField == TopBarField::TsDen)
@@ -48751,9 +49039,9 @@ int main(int argc, char** argv)
             }
          }
 
-         TransportSeparator();
+         TopBarSeparator();
 
-         // Global Key and Scale
+         // 4. Global Key and Scale
          {
             static const char* const kKeyNames[] = {
                "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
@@ -48780,9 +49068,8 @@ int main(int argc, char** argv)
             };
 
             int curKey = transport.Key();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("Key");
-            ImGui::SameLine(0.0f, 4.0f);
+            TopBarLabel("Key");
+            TopBarSameLine(4.0f);
 
             if (ImGui::Button(kKeyNames[std::clamp(curKey, 0, 11)]))
                ImGui::OpenPopup("##globalKeyPopup");
@@ -48796,7 +49083,7 @@ int main(int argc, char** argv)
                ImGui::EndPopup();
             }
 
-            ImGui::SameLine(0.0f, 4.0f);
+            TopBarSameLine(4.0f);
             int curScale = transport.Scale();
             const auto& scaleList = MusicTime::ScaleTypeList();
             const char* curScaleName = (curScale >= 0 && curScale < (int)scaleList.size()) ? scaleList[curScale].c_str() : "major";
@@ -48816,12 +49103,14 @@ int main(int argc, char** argv)
             }
          }
 
-         TransportSeparator();
+         TopBarSeparator();
 
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextDisabled("bar %d  beat %.2f",
-                             1 + (int)transport.Bars(),
-                             std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
+         // 5. Bar & Beat position
+         char barBeatBuf[64];
+         snprintf(barBeatBuf, sizeof(barBeatBuf), "bar %d  beat %.2f",
+                  1 + (int)transport.Bars(),
+                  std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
+         TopBarLabel(barBeatBuf, true);
 
          ImGui::PopStyleColor(6);
          ImGui::PopStyleVar(4);
@@ -48923,6 +49212,7 @@ int main(int argc, char** argv)
                                      : (audioLoad < 0.9) ? ImVec4(0.95f, 0.75f, 0.35f, 1.0f)
                                                           : ImVec4(0.95f, 0.45f, 0.4f, 1.0f);
             ImGui::SameLine(audioX);
+            ImGui::GetCurrentWindow()->DC.CurrLineTextBaseOffset = ImGui::GetStyle().FramePadding.y;
             ImGui::TextColored(audioColor, "%s", audioReadout);
             if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
                ImGui::SetTooltip("%llu buffer underrun%s detected this session",
@@ -48938,6 +49228,7 @@ int main(int argc, char** argv)
          }
 
          ImGui::SameLine(readoutX);
+         ImGui::GetCurrentWindow()->DC.CurrLineTextBaseOffset = ImGui::GetStyle().FramePadding.y;
 
          // Judged against the target when there is one, so hitting a
          // deliberate 30fps cap reads as green rather than as a problem.
@@ -49178,9 +49469,9 @@ int main(int argc, char** argv)
          // Field build step 17: portable device files. Its own extension
          // check must run before the "inf"/"infinite" branch below - "inf"
          // is a strict-suffix match (HasExtension splits on the last dot),
-         // so "infdev" never collides with it, but "infdev" must still get
-         // its own branch since it isn't in kAudioExt/kModelExt/etc.
-         static const std::vector<std::string> kInfdevExt = { "infdev" };
+         // so "field" and "infdev" never collide with it, but must still get
+         // their own branch since they aren't in kAudioExt/kModelExt/etc.
+         static const std::vector<std::string> kFieldExt = { "field", "infdev" };
          ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
@@ -49218,19 +49509,18 @@ int main(int argc, char** argv)
             while (path.size() > 1 && (path.back() == '/' || path.back() == '\\'))
                path.pop_back();
 
-            // Field build step 17: a dropped .infdev hot-swaps whatever
+            // Field build step 17: a dropped .field (or .infdev) hot-swaps whatever
             // matching-domain Field node sits under the drop point. Checked
             // before the "inf"/"infinite" patch-load branch below since
-            // extensions are checked in order and ".infdev" would otherwise
-            // never reach a useful branch (plan §4). No new node is spawned
+            // extensions are checked in order. No new node is spawned
             // when nothing matches under the cursor or the domain doesn't
             // match - same silent-no-op contract every other branch in this
             // dispatch already has for an unmatched drop.
-            if (HasExtension(path, kInfdevExt))
+            if (HasExtension(path, kFieldExt))
             {
                Field::DeviceFile device;
                std::string err;
-               if (Field::LoadFromInfdevFile(path, device, err))
+               if (Field::LoadFromFieldFile(path, device, err))
                {
                    if (dropTargetFieldElement != nullptr && device.domain == "element")
                    {
@@ -51657,7 +51947,7 @@ int main(int argc, char** argv)
          printf("[FIELDPIXELTEST] Test suite complete.\n");
       }
 
-      // Field step 17 (.infdev device file format): exercises the pure
+      // Field step 17 (.field device file format): exercises the pure
       // (de)serialization layer (FieldDevice.h/.cpp), the per-node
       // ToDeviceFile/LoadDeviceFile round trip (plan §2/§7), and the
       // domain-match gate the drag-and-drop dispatch in this file applies
@@ -51665,7 +51955,7 @@ int main(int argc, char** argv)
       // never UI automation, per plan §8.
       if (getenv("INFINITE_FIELDDEVICETEST") != nullptr && frameId == 4)
       {
-         printf("[FIELDDEVICETEST] Running .infdev device file conformance harness...\n");
+         printf("[FIELDDEVICETEST] Running .field device file conformance harness...\n");
 
          // 1. ToDeviceFile -> ToJsonString -> FromJsonString -> LoadDeviceFile
          //    round-trips code (byte-for-byte) and every declared param's
@@ -51702,7 +51992,7 @@ int main(int argc, char** argv)
             printf("[FIELDDEVICETEST] Assertion 1 (JSON Round-Trip): %s\n", pass ? "OK" : "FAIL");
          }
 
-         // 2. SaveToInfdevFile -> LoadFromInfdevFile round-trips identically
+         // 2. SaveToFieldFile -> LoadFromFieldFile round-trips identically
          //    through actual file I/O.
          {
             FieldPixelNode src;
@@ -51715,12 +52005,12 @@ int main(int argc, char** argv)
             if (pBright != nullptr) pBright->value = 0.42f;
 
             Field::DeviceFile device = src.ToDeviceFile();
-            const char* tmpPath = "/tmp/infinite_fielddevicetest.infdev";
-            bool saveOk = Field::SaveToInfdevFile(tmpPath, device);
+            const char* tmpPath = "/tmp/infinite_fielddevicetest.field";
+            bool saveOk = Field::SaveToFieldFile(tmpPath, device);
 
             Field::DeviceFile loaded;
             std::string loadErr;
-            bool loadOk = Field::LoadFromInfdevFile(tmpPath, loaded, loadErr);
+            bool loadOk = Field::LoadFromFieldFile(tmpPath, loaded, loadErr);
             remove(tmpPath);
 
             bool pass = saveOk && loadOk &&
@@ -61894,7 +62184,7 @@ int main(int argc, char** argv)
                const std::string dir = AppPaths::AppSupportDir() + "/Devices/" + gFieldDeviceSave.domain + "/";
                if (AppPaths::EnsureDir(dir))
                {
-                  Field::SaveToInfdevFile(dir + gFieldDeviceSave.nameBuf + ".infdev", device);
+                  Field::SaveToFieldFile(dir + gFieldDeviceSave.nameBuf + ".field", device);
                   InvalidateFieldDeviceLibrary(gFieldDeviceSave.domain);
                }
             }
@@ -62648,9 +62938,9 @@ int main(int argc, char** argv)
       if (gFieldSampleEditorOpen && gFieldSampleEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
-         if (ImGui::Begin("Field sample editor", &gFieldSampleEditorOpen))
+         if (ImGui::Begin("Field effect editor", &gFieldSampleEditorOpen))
          {
-            ImGui::TextDisabled("Field sample-domain kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out");
+            ImGui::TextDisabled("Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out");
             ImGui::TextDisabled("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.");
             ImGui::Separator();
 

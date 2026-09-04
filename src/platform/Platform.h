@@ -105,10 +105,10 @@ namespace Platform
    std::string OpenPatchDialog();
    std::string SavePatchDialog(const std::string& suggestedName);
 
-   // .infdev device files (Field build step 17). Same contract as the patch
+   // .field device files (and legacy .infdev). Same contract as the patch
    // dialogs above - Save returns the chosen path, or "" if cancelled.
    std::string OpenDeviceDialog();
-   std::string SaveDeviceDialog(const std::string& suggestedName);
+   std::string SaveDeviceDialog(const std::string& suggestedName = "Untitled.field");
 
    // ---- text outlines -----------------------------------------------------
    // Glyph outlines for a laid-out string, flattened to polygons in font units

@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <string>
 
@@ -47,28 +48,20 @@ namespace AppPaths
    {
       if (path.empty())
          return false;
-      APPPATHS_STAT_T sb {};
-      return APPPATHS_STAT(path.c_str(), &sb) == 0 && APPPATHS_ISDIR(sb.st_mode);
+      std::error_code ec;
+      return std::filesystem::is_directory(path, ec);
    }
 
-   // Creates a directory (no-op if it already exists). Returns true when the
-   // directory exists afterwards.
-   //
-   // The mkdir RESULT is deliberately not what's returned: it fails with
-   // EEXIST on the overwhelmingly common already-there path. Only the state
-   // afterwards is meaningful. This used to `return true` unconditionally,
-   // which made the doc comment above a lie and, worse, made an unwritable
-   // settings directory invisible - AppSupportDir() handed back a path that
-   // could not be written, so autosave silently no-opped for a whole session
-   // and the user found out only after a crash, when there was nothing to
-   // recover.
+   // Creates a directory and any missing parent directories (no-op if it already exists).
+   // Returns true when the directory exists afterwards.
    inline bool EnsureDir(const std::string& path)
    {
       if (path.empty())
          return false;
       if (DirExists(path))
          return true;
-      APPPATHS_MKDIR(path.c_str());
+      std::error_code ec;
+      std::filesystem::create_directories(path, ec);
       return DirExists(path);
    }
 

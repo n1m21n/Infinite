@@ -1,9 +1,8 @@
 #pragma once
 
-// Field build step 17: the ".infdev" portable device file - one Field
-// program plus its param values plus a small set of node-specific settings,
-// saved/loaded/exported/imported independently of any .inf patch. See
-// docs/plans/field/step-17-infdev-format.md for the full design rationale.
+// Field build step 17: the ".field" (and legacy ".infdev") portable device file -
+// one Field program plus its param values plus a small set of node-specific settings,
+// saved/loaded/exported/imported independently of any .inf patch.
 //
 // This is a serialization-only type plus free functions - it has no
 // knowledge of any concrete node class. Each Field node type (FieldElementNode,
@@ -36,6 +35,10 @@ namespace Field
    bool FromJsonString(const std::string& jsonText, DeviceFile& outDevice, std::string& outError);
 
    // File I/O wrappers - the only place this file touches disk.
-   bool SaveToInfdevFile(const std::string& path, const DeviceFile& device);
-   bool LoadFromInfdevFile(const std::string& path, DeviceFile& outDevice, std::string& outError);
+   bool SaveToFieldFile(const std::string& path, const DeviceFile& device);
+   bool LoadFromFieldFile(const std::string& path, DeviceFile& outDevice, std::string& outError);
+
+   // Backward-compatible aliases
+   inline bool SaveToInfdevFile(const std::string& path, const DeviceFile& device) { return SaveToFieldFile(path, device); }
+   inline bool LoadFromInfdevFile(const std::string& path, DeviceFile& outDevice, std::string& outError) { return LoadFromFieldFile(path, outDevice, outError); }
 }
