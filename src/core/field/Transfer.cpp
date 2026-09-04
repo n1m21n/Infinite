@@ -282,4 +282,21 @@ namespace Field
       }
       return ss.str();
    }
+
+   BoundaryMode BoundaryModeFromString(const std::string& str)
+   {
+      if (str == "wrap") return BoundaryMode::Wrap;
+      if (str == "border") return BoundaryMode::Border;
+      return BoundaryMode::Clamp;
+   }
+
+   const char* BoundaryModeToString(BoundaryMode m)
+   {
+      switch (m)
+      {
+         case BoundaryMode::Wrap: return "wrap";
+         case BoundaryMode::Border: return "border";
+         default: return "clamp";
+      }
+   }
 }

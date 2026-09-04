@@ -577,7 +577,7 @@ namespace Field
             p.Fail("state cell '" + name + "' cannot shadow reserved attribute of sample domain", nameTok.span);
             return nullptr;
          }
-         if (name == "xy" || name == "col" || name == "res")
+         if (name == "xy" || name == "col" || name == "res" || name == "age")
          {
             p.Fail("state cell '" + name + "' cannot shadow reserved attribute of pixel domain", nameTok.span);
             return nullptr;
@@ -604,7 +604,34 @@ namespace Field
             return nullptr;
          }
 
-         return std::make_shared<AstDeclState>(typeTok.text, nameTok.text, initExpr, stateTok.span);
+         // Build step 22 (OPEN-C): optional boundary mode, e.g.
+         //   state float A = 1 [wrap]
+         // It decides what an offset read A(uv + d) returns outside [0,1].
+         // Absent means clamp, which is what every shipping Feedback/Trails
+         // node already does.
+         std::string boundary;
+         if (p.MatchPunct('['))
+         {
+            if (p.AtEnd() || (p.Peek().kind != TokenKind::Ident && p.Peek().kind != TokenKind::Keyword))
+            {
+               p.Fail("expected a boundary mode (clamp, wrap or border) after '[' in state declaration", nameTok.span);
+               return nullptr;
+            }
+            Token bndTok = p.Advance();
+            if (bndTok.text != "clamp" && bndTok.text != "wrap" && bndTok.text != "border")
+            {
+               p.Fail("unknown boundary mode '" + bndTok.text + "' (expected clamp, wrap or border)", bndTok.span);
+               return nullptr;
+            }
+            boundary = bndTok.text;
+            if (!p.MatchPunct(']'))
+            {
+               p.Fail("expected ']' after boundary mode '" + boundary + "'", bndTok.span);
+               return nullptr;
+            }
+         }
+
+         return std::make_shared<AstDeclState>(typeTok.text, nameTok.text, initExpr, stateTok.span, boundary);
       }
 
       AstNodePtr ParseAttribDecl(ParserState& p)

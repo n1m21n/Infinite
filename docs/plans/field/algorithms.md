@@ -31,8 +31,10 @@ rules that decide the real-time column.
    annotation, because there is no syntax for one.
 4. **One primitive.** Every entry is a body of code run once per element of a
    domain. An entry that cannot be described that way is in §10, not §5–§9.
-5. **Nothing here is implemented.** This catalogue is a target, not a status
-   report. Entries tagged `[A]` `[B]` `[C]` `[D]` depend on a language question
+5. **Almost nothing here is implemented.** This catalogue is a target, not a
+   status report. The exceptions, as of build step 22: **OPEN-C is answered
+   and built**, so §6.6 (trails), §6.7 (Gray-Scott reaction-diffusion) and
+   §7.4 (advection) are writable today and the first two ship as presets. Entries tagged `[A]` `[B]` `[C]` `[D]` depend on a language question
    that is still **OPEN** (§4) and cannot be written today at all.
 
 ---
@@ -197,7 +199,20 @@ and the transfer operators in `field-domains` §1.
 
 ---
 
-> ### OPEN-C — offset reads of a `pixel` state cell
+> ### OPEN-C — offset reads of a `pixel` state cell — **ANSWERED AND BUILT (step 22)**
+>
+> **Resolved.** Option **(b)**, the call form, per
+> `language-decisions-and-presets.md` §1, and implemented on
+> `feature/field-step-22-pixel-offset-reads`: `A(uv + d)` is one `texture()`
+> fetch of the previous cook's cell; bare `A` stays sugar for `A(uv)`; the
+> boundary rule is **per cell** — `state float A = 1 [wrap]`, default clamp,
+> `border` reads the declared initial value. A kernel containing any offset
+> read gets an RGBA32F bank instead of RGBA16F. An offset read of a
+> non-`pixel` cell is a compile error naming the fact that the cell has no
+> spatial extent. Verified by `INFINITE_FIELDPIXELTEST` assertions 19-27,
+> including a diffusion test that fails if the fetch coordinate is ever
+> dropped, and §6.7 Gray-Scott now ships as a preset. Everything below is the
+> original question, kept for the reasoning.
 >
 > **Who needs it:** every interesting pixel algorithm. Reaction-diffusion
 > (§6.7) needs a 4-tap Laplacian; advection (§7.4) needs a read at

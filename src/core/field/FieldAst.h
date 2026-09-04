@@ -180,9 +180,14 @@ namespace Field
       std::string typeName;
       std::string name;
       AstNodePtr initExpr;
+      // Build step 22 (OPEN-C): optional boundary mode written after the
+      // initial value - `state float A = 1 [wrap]`. Empty means the default,
+      // which is clamp. Only meaningful for a pixel-domain cell, because it
+      // decides what an offset read A(uv + d) returns outside [0,1].
+      std::string boundary;
 
-      AstDeclState(std::string t, std::string n, AstNodePtr init = nullptr, SourceSpan sp = {})
-         : AstNode(AstKind::DeclState, sp), typeName(std::move(t)), name(std::move(n)), initExpr(std::move(init)) {}
+      AstDeclState(std::string t, std::string n, AstNodePtr init = nullptr, SourceSpan sp = {}, std::string bnd = std::string())
+         : AstNode(AstKind::DeclState, sp), typeName(std::move(t)), name(std::move(n)), initExpr(std::move(init)), boundary(std::move(bnd)) {}
    };
 
    // Build step 12: `output <domain> <type> <name> = <expr>` - declares a

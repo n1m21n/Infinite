@@ -223,6 +223,10 @@ private:
    int mLocT = -1;
    int mLocDt = -1;
    int mLocFrame = -1;
+   int mLocAge = -1;
+   // Cooks since mState was last cleared. Feeds the `age` reserved name, so a
+   // kernel can seed itself exactly once.
+   float mStateAge = 0.0f;
    int mLocSrcTex = -1;
    int mLocSrcAlpha = -1;
    int mLocOutMode = -1;

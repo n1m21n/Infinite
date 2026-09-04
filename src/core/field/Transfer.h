@@ -7,6 +7,7 @@
 namespace Field
 {
    enum class Domain;
+   enum class BoundaryMode : int;
 
    enum class TransferKind
    {
@@ -25,6 +26,12 @@ namespace Field
    Domain DomainCoarsen(Domain d);
    bool DomainFromString(const std::string& str, Domain& outDomain);
    const char* DomainToString(Domain d);
+
+   // Build step 22 (OPEN-C): boundary mode written in a state declaration,
+   // e.g. `state float A = 1 [wrap]`. An unrecognised or empty string is
+   // Clamp, which is the default the parser guarantees.
+   BoundaryMode BoundaryModeFromString(const std::string& str);
+   const char* BoundaryModeToString(BoundaryMode m);
 
    // Error formatting helper for incomparable domains (names both domains and line:col spans + hint)
    FieldError MakeIncomparableDomainError(Domain d1,

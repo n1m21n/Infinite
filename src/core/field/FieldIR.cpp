@@ -492,6 +492,57 @@ namespace Field
             {
                auto call = std::static_pointer_cast<AstCall>(ast);
 
+               // 0. Build step 22 (OPEN-C): a call whose callee names a state
+               // cell is an offset read of that cell - `A(uv + d)` - not a
+               // function call. Bare `A` stays sugar for `A(uv)`, so this is
+               // the only new spelling. Checked before every builtin so a
+               // cell can never be shadowed by one, and after the scope
+               // lookup so an ordinary function name is untouched.
+               if (const VarSymbol* stSym = scope.Find(call->callee))
+               {
+                  if (stSym->isState)
+                  {
+                     if (stSym->domain != Domain::Pixel)
+                     {
+                        error.severity = Severity::Error;
+                        error.span = call->span;
+                        error.message = "'" + call->callee + "' is a " + std::string(DomainToString(stSym->domain)) +
+                                        "-domain state cell and has no spatial extent, so it cannot be read at a coordinate";
+                        error.hint = "offset reads are a pixel-domain form; write '" + call->callee + "' on its own to read the cell";
+                        return nullptr;
+                     }
+                     if (call->args.size() != 1)
+                     {
+                        error.severity = Severity::Error;
+                        error.span = call->span;
+                        error.message = "an offset read of state cell '" + call->callee + "' takes exactly 1 argument: " +
+                                        call->callee + "(uv + d)";
+                        return nullptr;
+                     }
+
+                     auto coordIR = LowerAstExpr(call->args[0], scope, error);
+                     if (!coordIR) return nullptr;
+
+                     if (coordIR->type.lanes != 2)
+                     {
+                        error.severity = Severity::Error;
+                        error.span = call->args[0]->span;
+                        error.message = "an offset read of '" + call->callee + "' needs a vec2 coordinate (got " +
+                                        coordIR->type.ToString() + ")";
+                        error.hint = "e.g. " + call->callee + "(uv + vec2(1.0 / res.x, 0))";
+                        return nullptr;
+                     }
+
+                     auto ir = std::make_shared<IRNode>(IRKind::StateRead, call->span);
+                     ir->varName = call->callee;
+                     ir->isOffsetRead = true;
+                     ir->type = stSym->type;
+                     ir->domain = Domain::Pixel;
+                     ir->children.push_back(coordIR);
+                     return ir;
+                  }
+               }
+
                // 1. broadcast is implicit and must never be written
                if (call->callee == "broadcast")
                {
@@ -2952,8 +3003,20 @@ namespace Field
          };
          addSym("uv", FieldType(DataType::Vec2, 2), Domain::Pixel, true);
          addSym("xy", FieldType(DataType::Vec2, 2), Domain::Pixel, true);
-         addSym("res", FieldType(DataType::Vec2, 2), Domain::Frame, true);
-         addSym("aspect", FieldType(DataType::Float, 1), Domain::Frame, true);
+         // res and aspect are Pixel-domain, not Frame. They are frame-constant
+         // in value, but marking them Frame let rate inference hoist any
+         // expression mentioning them - `d = 1.0 / res` - into the CPU-side
+         // prologue, and the prologue evaluator only knows t/dt/frame/params.
+         // So `res` evaluated to 0 there and every kernel that measured a
+         // texel silently got a texel size of zero (a hoisted vec2 was also
+         // being uploaded with glUniform1f, which cannot carry two lanes).
+         // In GLSL both are bound from fld_res inside main() at no cost, so
+         // keeping them per-pixel is free and correct.
+         addSym("res", FieldType(DataType::Vec2, 2), Domain::Pixel, true);
+         addSym("aspect", FieldType(DataType::Float, 1), Domain::Pixel, true);
+         // Pixel-domain like res: bound from a uniform inside main(), never
+         // hoisted, because the CPU prologue evaluator does not know it.
+         addSym("age", FieldType(DataType::Float, 1), Domain::Pixel, true);
          addSym("t", FieldType(DataType::Float, 1), Domain::Frame, true);
          addSym("dt", FieldType(DataType::Float, 1), Domain::Frame, true);
          addSym("frame", FieldType(DataType::Float, 1), Domain::Frame, true);
@@ -3083,6 +3146,7 @@ namespace Field
             st.lanes = lanes;
             st.initialValues = initVals;
             st.domain = Domain::Pixel;
+            st.boundary = BoundaryModeFromString(ds->boundary);
             st.span = ds->span;
             outProgram.declaredStates.push_back(st);
 
@@ -3558,9 +3622,20 @@ namespace Field
       }
 
       // Second pass: Partition into prologue (Frame/Graph domain) and pixelBody (Pixel domain)
+      //
+      // Only SCALARS are hoisted. A hoisted value crosses into the shader as
+      // one `uniform float` uploaded with glUniform1f, so a hoisted vec2/3/4
+      // arrived with lane 0 set and every other lane left at zero - which is
+      // why `e = vec2(0.22 * cos(t), 0.22 * sin(t))` sat at the origin
+      // instead of orbiting. Keeping multi-lane frame-domain values in the
+      // pixel body costs a few ALU per pixel and is always correct; making
+      // them a real vec2/3/4 uniform is the alternative and needs the CPU
+      // prologue evaluator to return vectors, which it does not.
       for (const auto& s : irStmts)
       {
-         if (s->domain == Domain::Graph || s->domain == Domain::Frame)
+         const bool coarse = (s->domain == Domain::Graph || s->domain == Domain::Frame);
+         const bool scalar = !s->rvalueExpr || s->rvalueExpr->type.lanes == 1;
+         if (coarse && scalar)
          {
             outProgram.prologue.push_back(s);
          }

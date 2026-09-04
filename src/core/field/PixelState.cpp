@@ -8,18 +8,29 @@ namespace Field
    {
    }
 
-   void PixelStateBank::Resize(int w, int h)
+   void PixelStateBank::Resize(int w, int h, bool highPrecision)
    {
       w = std::max(4, w);
       h = std::max(4, h);
-      if (mW != w || mH != h)
+      if (mW != w || mH != h || mHighPrecision != highPrecision)
       {
          mW = w;
          mH = h;
          mNeedsClear = true;
       }
-      GLUtil::EnsureFbo(mPair[0], mW, mH, GL_RGBA16F);
-      GLUtil::EnsureFbo(mPair[1], mW, mH, GL_RGBA16F);
+      // EnsureFbo already reallocates when the internal format changes, so
+      // flipping 16F -> 32F at the same size is handled there; all this has
+      // to do is remember which format is live for the byte count.
+      mHighPrecision = highPrecision;
+      const unsigned int fmt = mHighPrecision ? GL_RGBA32F : GL_RGBA16F;
+      GLUtil::EnsureFbo(mPair[0], mW, mH, fmt);
+      GLUtil::EnsureFbo(mPair[1], mW, mH, fmt);
+   }
+
+   size_t PixelStateBank::BytesInUse() const
+   {
+      const size_t bytesPerTexel = mHighPrecision ? 16 : 8; // RGBA32F vs RGBA16F
+      return (size_t)mW * (size_t)mH * bytesPerTexel * 2;   // ping-pong pair
    }
 
    void PixelStateBank::Reset()

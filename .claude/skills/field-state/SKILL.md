@@ -108,14 +108,18 @@ per-format, so the practical unit is: **one RGBA32F ping-pong pair = ~66 MB at
 ping-pong texture pair" figure corresponds to a single-channel R32F pair
 (2,073,600 × 4 B × 2 ≈ 16.6 MB) or an R16F pair (≈8.3 MB).
 
-> **OPEN — what format backs pixel state?** **(a)** R32F, one texture per cell,
-> exact; **(b)** RGBA32F, four cells packed per texture, fewer binds and fewer
-> allocations, but wastes up to 3 channels for a single cell; **(c)** RGBA16F,
-> half the memory, and enough precision for colour-ish accumulation but **not**
-> for a long-running integrator or a feedback delay, where 16-bit mantissa
-> drift is audible/visible within seconds. The brief's 8 MB figure implies
-> 16-bit. Ask the owner; the answer differs for "trails" (16F is fine) and
-> "reaction-diffusion" (needs 32F).
+> **ANSWERED (build step 22) — what format backs pixel state?** Packed RGBA,
+> four cells per bank, and the width is decided **per kernel by what the
+> kernel does**, which is the split the old OPEN could not choose between:
+>
+> | Kernel | Bank | Why |
+> |---|---|---|
+> | contains at least one offset read — `A(uv + d)` | **RGBA32F** | it is a simulation: it integrates for minutes and 16F drifts visibly within seconds |
+> | current-pixel reads only (trails, feedback) | **RGBA16F** | it re-normalises every frame, so 16F is exact enough at half the memory |
+>
+> `PixelStateBank::Resize(w, h, highPrecision)` takes the flag;
+> `GlslEmitResult::usesOffsetReads` supplies it, and
+> `PixelStateBank::BytesInUse()` is the figure the node face shows.
 
 **The cost must be surfaced in the UI.** Not a tooltip, not a log line — a
 visible readout on the node showing cell count × per-element cost = total, in
@@ -311,3 +315,27 @@ b = a * 2
    stretched-state artifacts.
 9. `/run-infinite-hygiene` passes, and the save/load round trip
    (`INFINITE_ROUNDTRIPTEST`) covers a node carrying state cells.
+
+
+---
+
+## Boundary mode — what an offset read returns outside the frame
+
+Declared **per cell**, never globally, because the choice changes the picture
+rather than the spelling:
+
+```
+state float A = 1 [wrap]      # seamless tiling
+state float B = 0             # clamp, the default
+state float C = 0 [border]    # outside reads C's declared initial value
+```
+
+| Mode | Lowering | What it looks like |
+|---|---|---|
+| `clamp` (default) | `clamp(coord, 0.5/res, 1 - 0.5/res)` | a reaction-diffusion pattern piles up against the edges; matches every shipping Feedback/Trails node |
+| `wrap` | `fract(coord)` | the pattern tiles seamlessly; a vortex that leaves one side re-enters the other |
+| `border` | fetch mixed against the cell's initial value | a diffusing field decays into its background instead of smearing the edge |
+
+The clamp is half a texel in on purpose, so a clamped fetch lands on the edge
+texel's centre rather than blending with whatever the sampler decides lives
+past it.

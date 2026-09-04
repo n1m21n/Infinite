@@ -12,7 +12,14 @@ namespace Field
       PixelStateBank();
       ~PixelStateBank() = default;
 
-      void Resize(int w, int h);
+      // Build step 22 (OPEN-C): highPrecision selects RGBA32F over RGBA16F.
+      // A kernel that reads its neighbours integrates for minutes; at 16F
+      // Gray-Scott visibly drifts within seconds. A plain trails kernel
+      // re-normalises every frame and stays correct at 16F, so it keeps the
+      // cheaper bank. Changing the flag reallocates and clears.
+      void Resize(int w, int h, bool highPrecision = false);
+      bool HighPrecision() const { return mHighPrecision; }
+      size_t BytesInUse() const;
       void Reset();
       void Swap();
       void BindReadUnits(unsigned int program, int samplerLoc);
@@ -38,5 +45,6 @@ namespace Field
       int mW = 0;
       int mH = 0;
       bool mNeedsClear = true;
+      bool mHighPrecision = false;
    };
 }

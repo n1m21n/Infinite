@@ -180,7 +180,60 @@ const std::vector<FieldPixelNode::Preset>& FieldPixelNode::Presets()
         "w1 = sin(p1 * freq * rings - t * speed);\n"
         "w2 = sin(p2 * freq * rings + t * speed);\n"
         "val = 0.5 + 0.25 * (w1 + w2);\n"
-        "col = vec3(val, val * 0.7, 1.0 - val);" }
+        "col = vec3(val, val * 0.7, 1.0 - val);" },
+      // --- Build step 22 (OPEN-C): kernels that read their neighbours. ---
+      // These are the first presets that could not have been written before
+      // an offset read existed, because their whole behaviour is a pixel
+      // asking what the pixels beside it are doing.
+      { "Reaction Diffusion (Gray-Scott)",
+        "param float feed = 0.055 [0.01, 0.09];\n"
+        "param float kill = 0.062 [0.03, 0.075];\n"
+        "param float dA = 1.0 [0.0, 1.0];\n"
+        "param float dB = 0.5 [0.0, 1.0];\n"
+        "param float seed = 0.06 [0.0, 0.5];\n"
+        // [wrap] makes the pattern tile seamlessly across the edges; swap it
+        // for [clamp] and it piles up against the border instead. Two
+        // different pictures, which is why the mode is per-cell.
+        "state float A = 1 [wrap];\n"
+        "state float B = 0 [wrap];\n"
+        "d = 1.0 / res;\n"
+        "lapA = A(uv + vec2(d.x, 0.0)) + A(uv - vec2(d.x, 0.0)) + A(uv + vec2(0.0, d.y)) + A(uv - vec2(0.0, d.y)) - 4.0 * A;\n"
+        "lapB = B(uv + vec2(d.x, 0.0)) + B(uv - vec2(d.x, 0.0)) + B(uv + vec2(0.0, d.y)) + B(uv - vec2(0.0, d.y)) - 4.0 * B;\n"
+        "r = A * B * B;\n"
+        // B has to come from somewhere: with B = 0 everywhere the system sits
+        // on a fixed point and never starts. `age` is 0 only on the first cook
+        // after a clear or a transport reset, so this is a one-shot seed - a
+        // scatter of B that the reaction then grows into coral. Turn the
+        // transport back to the start and it re-seeds and grows again.
+        "h = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);\n"
+        "first = 1.0 - step(0.5, age);\n"
+        "inject = first * step(1.0 - seed, h);\n"
+        // An explicit diffusion step is only stable while dA * step * 8 <= 2,
+        // so the textbook listing's step of 1.0 at dA = 1.0 sits exactly on
+        // the boundary and rings into a checkerboard instead of settling into
+        // a pattern. 0.2 is comfortably inside the bound and only changes how
+        // fast the pattern grows, not which pattern it is.
+        "step = 0.2;\n"
+        "A = clamp(A + step * (dA * lapA - r + feed * (1.0 - A)), 0.0, 1.0);\n"
+        "B = clamp(B + step * (dB * lapB + r - (kill + feed) * B) + inject, 0.0, 1.0);\n"
+        "col = vec3(B * 1.7, B * 0.9 + 0.04, 1.0 - B * 1.3);" },
+      { "Advected Smoke / Vortex",
+        "param float speed = 0.5 [0.0, 3.0];\n"
+        "param float swirl = 2.5 [0.0, 10.0];\n"
+        "param float decay = 0.99 [0.9, 1.0];\n"
+        "param float amount = 0.6 [0.0, 1.0];\n"
+        "state float D = 0 [clamp];\n"
+        "q = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n"
+        // A curl-shaped flow field: the velocity is perpendicular to the
+        // radius, twisted by distance, so the density winds into vortices.
+        "ang = atan2(q.y, q.x) + swirl * length(q) + 1.5707963;\n"
+        "flow = vec2(cos(ang), sin(ang)) * speed * 0.004;\n"
+        // Reading the cell UPSTREAM of the flow is the advection step - the
+        // one read a current-pixel-only state cell cannot express.
+        "e = vec2(0.22 * cos(t * 0.7), 0.22 * sin(t * 0.9));\n"
+        "emit = 1.0 - smoothstep(0.0, 0.05, length(q - e));\n"
+        "D = clamp(D(uv - flow) * decay + emit * amount, 0.0, 1.0);\n"
+        "col = vec3(D * 1.3, D * 0.55 + 0.02, 0.9 - D * 0.7);" }
    };
    return kPresets;
 }
@@ -351,6 +404,7 @@ bool FieldPixelNode::Apply()
    mLocT = glGetUniformLocation(mProgram, "fld_t");
    mLocDt = glGetUniformLocation(mProgram, "fld_dt");
    mLocFrame = glGetUniformLocation(mProgram, "fld_frame");
+   mLocAge = glGetUniformLocation(mProgram, "fld_age");
    mLocSrcTex = glGetUniformLocation(mProgram, "fld_srcTex");
    mLocSrcAlpha = glGetUniformLocation(mProgram, "fld_srcAlpha");
    mLocOutMode = glGetUniformLocation(mProgram, "fld_outMode");
@@ -436,6 +490,7 @@ void FieldPixelNode::CookIfNeeded(int frameId)
       if (mLocT >= 0) glUniform1f(mLocT, clock);
       if (mLocDt >= 0) glUniform1f(mLocDt, dt);
       if (mLocFrame >= 0) glUniform1i(mLocFrame, frameId);
+      if (mLocAge >= 0) glUniform1f(mLocAge, mStateAge);
 
       // Input image texture unit 1 (unit 0 is reserved for state ping-pong)
       glActiveTexture(GL_TEXTURE1);
@@ -482,7 +537,11 @@ void FieldPixelNode::CookIfNeeded(int frameId)
       return;
    }
 
-   mState.Resize(w, h);
+   // Build step 22 (OPEN-C): a kernel that reads its neighbours is a
+   // simulation and integrates for minutes, so its cells go to RGBA32F. A
+   // kernel that only reads its own pixel back (trails, feedback) stays on
+   // the 16F bank at half the memory.
+   mState.Resize(w, h, mEmitResult.usesOffsetReads);
    if (mState.NeedsClear())
    {
       float initVals[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -492,6 +551,7 @@ void FieldPixelNode::CookIfNeeded(int frameId)
             initVals[i] = mIR.declaredStates[i].initialValues[0];
       }
       mState.ClearBoth(initVals);
+      mStateAge = 0.0f;
    }
 
    // Two passes over the same kernel, both reading the PRE-SWAP state texture
@@ -511,6 +571,10 @@ void FieldPixelNode::CookIfNeeded(int frameId)
 
    runPass(mState.WriteFbo(), 0);
    runPass(mOut, 1);
+
+   // Both passes of THIS cook see the same age, so a seed written by the
+   // state pass is the same one the display pass shows.
+   mStateAge += 1.0f;
 
    mState.Swap(); // exactly once, after both passes
 }

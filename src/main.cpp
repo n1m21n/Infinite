@@ -52195,6 +52195,290 @@ int main(int argc, char** argv)
             printf("[FIELDPIXELTEST] Assertion 18 (State Kernel Displays col): %s\n", pass ? "OK" : "FAIL");
          }
 
+         // --- Build step 22 (OPEN-C): offset reads of a pixel state cell ---
+
+         // 19. Gray-Scott reaction-diffusion compiles. This is the whole
+         //     point of OPEN-C: a node Infinite already ships as C++, as
+         //     fifteen lines of editable text.
+         {
+            FieldPixelNode node;
+            node.width = 64.0f; node.height = 64.0f;
+            node.code =
+               "param float feed = 0.055 [0.01, 0.09]\n"
+               "param float kill = 0.062 [0.03, 0.07]\n"
+               "param float dA = 1.0 [0, 1]\n"
+               "param float dB = 0.5 [0, 1]\n"
+               "state float A = 1 [wrap]\n"
+               "state float B = 0 [wrap]\n"
+               "d = 1.0 / res\n"
+               "lapA = A(uv + vec2(d.x, 0)) + A(uv - vec2(d.x, 0)) + A(uv + vec2(0, d.y)) + A(uv - vec2(0, d.y)) - 4 * A\n"
+               "lapB = B(uv + vec2(d.x, 0)) + B(uv - vec2(d.x, 0)) + B(uv + vec2(0, d.y)) + B(uv - vec2(0, d.y)) - 4 * B\n"
+               "r = A * B * B\n"
+               "A = A + dA * lapA - r + feed * (1 - A)\n"
+               "B = B + dB * lapB + r - (kill + feed) * B\n"
+               "col = vec3(B, B * 0.6, 1 - B)\n";
+            bool ok = node.Apply();
+            bool pass = ok && node.Program() != 0 && node.LastError().empty() &&
+                        node.EmitResult().offsetReadCount == 8;
+            if (!pass) printf("[FIELDPIXELTEST]   gray-scott failed: %s (offsetReads=%d)\n",
+                              node.LastError().c_str(), node.EmitResult().offsetReadCount);
+            printf("[FIELDPIXELTEST] Assertion 19 (Gray-Scott Compiles): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 20. The boundary mode is per-cell and reaches the GLSL: wrap
+         //     lowers to fract(), the default (absent) lowers to clamp().
+         //     These are two visibly different pictures, not two spellings.
+         {
+            FieldPixelNode wrapNode;
+            wrapNode.code = "state float A = 1 [wrap]\nA = A(uv + vec2(0.01, 0)) * 0.99\ncol = vec3(A);";
+            wrapNode.Apply();
+            const std::string& wsrc = wrapNode.EmitResult().source;
+
+            FieldPixelNode clampNode;
+            clampNode.code = "state float A = 1\nA = A(uv + vec2(0.01, 0)) * 0.99\ncol = vec3(A);";
+            clampNode.Apply();
+            const std::string& csrc = clampNode.EmitResult().source;
+
+            bool pass = wsrc.find("fract(") != std::string::npos &&
+                        wsrc.find("texture(fld_s_bank0") != std::string::npos &&
+                        csrc.find("fract(") == std::string::npos &&
+                        csrc.find("clamp(") != std::string::npos &&
+                        csrc.find("texture(fld_s_bank0") != std::string::npos;
+            printf("[FIELDPIXELTEST] Assertion 20 (Per-Cell Boundary Mode): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 21. An offset read of a NON-pixel state cell is refused, and the
+         //     message says why rather than "type error".
+         {
+            FieldElementNode node;
+            node.code = "state float A = 0\nP.y = A(uv)\n";
+            node.Apply();
+            const std::string& err = node.LastError();
+            bool pass = !err.empty() && err.find("spatial extent") != std::string::npos;
+            if (!pass) printf("[FIELDPIXELTEST]   element offset read error was: '%s'\n", err.c_str());
+            printf("[FIELDPIXELTEST] Assertion 21 (Offset Read Is Pixel-Only): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 22. A neighbour-reading kernel gets the 32F bank; a plain trails
+         //     kernel keeps the cheaper 16F one. 16F drifts visibly within
+         //     seconds for anything that integrates.
+         {
+            FieldPixelNode sim;
+            sim.width = 64.0f; sim.height = 64.0f;
+            sim.code = "state float A = 1\nA = A(uv + vec2(0.01, 0)) * 0.99\ncol = vec3(A);";
+            sim.Apply();
+            sim.CookIfNeeded(300);
+
+            FieldPixelNode trails;
+            trails.width = 64.0f; trails.height = 64.0f;
+            trails.code = "state float prev = 0\nprev = max(prev * 0.95, col.r)\ncol = vec3(prev);";
+            trails.Apply();
+            trails.CookIfNeeded(300);
+
+            bool pass = sim.EmitResult().usesOffsetReads && sim.State().HighPrecision() &&
+                        !trails.EmitResult().usesOffsetReads && !trails.State().HighPrecision();
+            printf("[FIELDPIXELTEST] Assertion 22 (32F For Simulations Only): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 23. The offset read genuinely reaches a NEIGHBOUR, not the current
+         //     pixel. A spike is injected at the centre and diffused; after
+         //     16 steps a texel several pixels away must be non-zero. Under
+         //     the old current-pixel-only rule it would still be exactly 0,
+         //     so this is the assertion that fails if the fetch coordinate is
+         //     ever quietly dropped.
+         {
+            FieldPixelNode node;
+            node.width = 64.0f; node.height = 64.0f;
+            node.code =
+               "state float A = 0\n"
+               "d = 1.0 / res\n"
+               "spike = 1 - step(0.03, length(uv - vec2(0.5, 0.5)))\n"
+               "lap = A(uv + vec2(d.x, 0)) + A(uv - vec2(d.x, 0)) + A(uv + vec2(0, d.y)) + A(uv - vec2(0, d.y)) - 4 * A\n"
+               "A = A + 0.2 * lap + spike * 0.25\n"
+               "col = vec3(A, A, A);";
+            bool ok = node.Apply();
+            for (int f = 0; f < 16; f++)
+               node.CookIfNeeded(400 + f);
+
+            unsigned int scratchFbo = 0;
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratchFbo, node.GetOutputTexture(), 64, 64, px);
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+
+            // Centre is texel (32,32); the spike disc is ~2 texels across, so
+            // (32,26) is well outside it and can only be lit by diffusion.
+            float centre = 0.0f, away = 0.0f;
+            if (px.size() >= (size_t)64 * 64 * 4)
+            {
+               centre = px[(32 * 64 + 32) * 4];
+               away = px[(26 * 64 + 32) * 4];
+            }
+            bool pass = ok && centre > 0.05f && away > 1.0e-4f && away < centre;
+            if (!pass) printf("[FIELDPIXELTEST]   diffusion: centre = %f, 6 texels away = %f\n", centre, away);
+            if (!pass && getenv("INFINITE_FIELDDUMP") != nullptr)
+               printf("[FIELDPIXELTEST] ---- generated GLSL ----\n%s\n---- end ----\n", node.EmitResult().source.c_str());
+            printf("[FIELDPIXELTEST] Assertion 23 (Offset Read Reaches Neighbours): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 24. The shipped Reaction Diffusion preset actually evolves: after
+         //     240 steps the frame must carry real spatial structure and no
+         //     NaN. A preset that compiles and then sits flat or blows up is
+         //     the failure mode this catches.
+         {
+            FieldPixelNode node;
+            node.width = 128.0f; node.height = 128.0f;
+            for (const auto& pr : FieldPixelNode::Presets())
+            {
+               if (std::string(pr.name).find("Reaction Diffusion") != std::string::npos)
+               {
+                  node.code = pr.code;
+                  break;
+               }
+            }
+            bool ok = node.Apply();
+            // 240 steps is enough to prove it evolves and stays finite, which
+            // is what the assertion is for. A visual check of the pattern
+            // itself wants thousands, so the dump path can ask for more.
+            int steps = 240;
+            if (const char* sEnv = getenv("INFINITE_FIELDDUMP_STEPS")) steps = std::max(1, atoi(sEnv));
+            for (int f = 0; f < steps; f++)
+               node.CookIfNeeded(600 + f);
+
+            unsigned int scratchFbo = 0;
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratchFbo, node.GetOutputTexture(), 128, 128, px);
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+
+            double sum = 0.0, sum2 = 0.0;
+            bool finite = true;
+            const int n = 128 * 128;
+            for (int k = 0; k < n && (size_t)(k * 4) < px.size(); k++)
+            {
+               float v = px[k * 4];
+               if (!std::isfinite(v)) finite = false;
+               sum += v;
+               sum2 += (double)v * v;
+            }
+            double mean = sum / n;
+            double var = sum2 / n - mean * mean;
+            bool pass = ok && finite && var > 1.0e-4;
+            if (!pass) printf("[FIELDPIXELTEST]   RD preset: mean = %f, variance = %f, finite = %d\n", mean, var, (int)finite);
+            // Optional eyeball: INFINITE_FIELDDUMP=<path> writes the frame as
+            // a binary PPM so a human can look at the pattern the numbers
+            // above only assert the existence of.
+            if (const char* dumpPath = getenv("INFINITE_FIELDDUMP_PPM"))
+            {
+               if (FILE* fp = fopen(dumpPath, "wb"))
+               {
+                  fprintf(fp, "P6\n128 128\n255\n");
+                  for (int k = 0; k < n && (size_t)(k * 4 + 2) < px.size(); k++)
+                  {
+                     for (int c = 0; c < 3; c++)
+                     {
+                        float v = px[k * 4 + c];
+                        unsigned char b = (unsigned char)(std::min(1.0f, std::max(0.0f, v)) * 255.0f);
+                        fwrite(&b, 1, 1, fp);
+                     }
+                  }
+                  fclose(fp);
+                  printf("[FIELDPIXELTEST]   wrote %s\n", dumpPath);
+               }
+            }
+            printf("[FIELDPIXELTEST] Assertion 24 (RD Preset Evolves): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 25. `frame` is an int uniform in GLSL; using it in float maths has
+         //     to work, because a one-shot seed ("do this only on the first
+         //     cook") is how any simulation gets a non-uniform starting state.
+         {
+            FieldPixelNode node;
+            node.code = "k = step(2.0, frame);\ncol = vec3(k, k, k);";
+            bool ok = node.Apply();
+            bool pass = ok && node.Program() != 0 && node.LastError().empty();
+            if (!pass) printf("[FIELDPIXELTEST]   frame-as-float failed: %s\n", node.LastError().c_str());
+            printf("[FIELDPIXELTEST] Assertion 25 (frame In Float Maths): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 26. `age` fires exactly once. A cell seeded with
+         //     `first = 1 - step(0.5, age)` must hold the seed value after
+         //     many cooks, not a multiple of it - if age ever read 0 twice,
+         //     every simulation would re-seed itself forever.
+         {
+            FieldPixelNode node;
+            node.width = 32.0f; node.height = 32.0f;
+            node.code =
+               "state float S = 0;\n"
+               "first = 1.0 - step(0.5, age);\n"
+               "S = S + first * 0.25;\n"
+               "col = vec3(S, S, S);";
+            bool ok = node.Apply();
+            for (int f = 0; f < 12; f++)
+               node.CookIfNeeded(900 + f);
+
+            unsigned int scratchFbo = 0;
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratchFbo, node.GetOutputTexture(), 32, 32, px);
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+
+            bool pass = ok && px.size() >= 4 && std::abs(px[0] - 0.25f) < 1.0e-3f;
+            if (!pass && px.size() >= 4) printf("[FIELDPIXELTEST]   age seed accumulated to %f, want 0.25\n", px[0]);
+            printf("[FIELDPIXELTEST] Assertion 26 (age Seeds Once): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 27. The Advected Smoke preset moves density along its flow field:
+         //     the emitter orbits, so after a run the frame carries structure
+         //     away from the emitter rather than a single static dot.
+         {
+            FieldPixelNode node;
+            node.width = 128.0f; node.height = 128.0f;
+            for (const auto& pr : FieldPixelNode::Presets())
+            {
+               if (std::string(pr.name).find("Advected") != std::string::npos)
+               {
+                  node.code = pr.code;
+                  break;
+               }
+            }
+            bool ok = node.Apply();
+            for (int f = 0; f < 400; f++)
+               node.CookIfNeeded(1000 + f);
+
+            unsigned int scratchFbo = 0;
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratchFbo, node.GetOutputTexture(), 128, 128, px);
+            if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+
+            int lit = 0;
+            bool finite = true;
+            const int n = 128 * 128;
+            for (int k = 0; k < n && (size_t)(k * 4) < px.size(); k++)
+            {
+               float v = px[k * 4];
+               if (!std::isfinite(v)) finite = false;
+               if (v > 0.25f) lit++;
+            }
+            // The emitter disc alone is ~50 texels at this size; advection has
+            // to have smeared it over many more than that.
+            bool pass = ok && finite && lit > 200 && lit < n;
+            if (!pass) printf("[FIELDPIXELTEST]   advection: lit texels = %d of %d, finite = %d\n", lit, n, (int)finite);
+            if (const char* dumpPath = getenv("INFINITE_FIELDDUMP_PPM2"))
+            {
+               if (FILE* fp = fopen(dumpPath, "wb"))
+               {
+                  fprintf(fp, "P6\n128 128\n255\n");
+                  for (int k = 0; k < n && (size_t)(k * 4 + 2) < px.size(); k++)
+                     for (int c = 0; c < 3; c++)
+                     {
+                        float v = px[k * 4 + c];
+                        unsigned char b = (unsigned char)(std::min(1.0f, std::max(0.0f, v)) * 255.0f);
+                        fwrite(&b, 1, 1, fp);
+                     }
+                  fclose(fp);
+               }
+            }
+            printf("[FIELDPIXELTEST] Assertion 27 (Advection Transports): %s\n", pass ? "OK" : "FAIL");
+         }
+
          printf("[FIELDPIXELTEST] Test suite complete.\n");
       }
 
