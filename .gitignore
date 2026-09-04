@@ -26,3 +26,6 @@ local-prompts/
 # .claude/skills/repo-privacy-split.
 mcp-server/
 .worktrees/
+
+# graphify skill output - regenerated on demand, never meant to be tracked
+graphify-out/
