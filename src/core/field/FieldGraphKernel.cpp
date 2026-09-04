@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <set>
 #include <unordered_map>
 
@@ -618,5 +619,39 @@ namespace Field
 
       outPlan.valid = true;
       return true;
+   }
+
+   std::map<std::string, int> ComputeEmitDepths(const GraphPlan& plan)
+   {
+      std::map<std::string, int> depth;
+
+      std::unordered_map<std::string, std::vector<std::string>> preds;
+      for (const auto& c : plan.connects)
+         preds[c.dstKey].push_back(c.srcKey);
+
+      // Memoized DFS. `plan.connects` is a DAG by construction (see this
+      // function's header comment), so no visiting/cycle-guard state beyond
+      // the memo table itself is needed.
+      std::function<int(const std::string&)> visit = [&](const std::string& key) -> int
+      {
+         auto it = depth.find(key);
+         if (it != depth.end())
+            return it->second;
+
+         int best = 0;
+         auto predIt = preds.find(key);
+         if (predIt != preds.end())
+         {
+            for (const auto& srcKey : predIt->second)
+               best = std::max(best, visit(srcKey) + 1);
+         }
+         depth[key] = best;
+         return best;
+      };
+
+      for (const auto& e : plan.emits)
+         visit(e.key);
+
+      return depth;
    }
 }

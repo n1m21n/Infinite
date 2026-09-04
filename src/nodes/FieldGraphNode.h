@@ -15,6 +15,17 @@
 #include <utility>
 #include <vector>
 
+// Shared by FieldGraphNode.cpp's Regenerate() call-site auto-placement and
+// main.cpp's step-16 unpack topological-depth layout: only Wavetable/Drum
+// Sequencer render at kAudioWideWidth (main.cpp DrawWavetableBody/
+// DrawDrumSequencerBody), everything else fits the narrower auto-place
+// column without visibly wasting canvas. One classification, two call
+// sites - not a third copy of the list.
+inline bool IsWideAutoPlaceType(const std::string& typeName)
+{
+   return typeName == "Wavetable" || typeName == "Drum Sequencer";
+}
+
 // Field 'graph' domain (build step 10): a kernel that runs once, at edit
 // time, and emits/wires/configures real Infinite nodes (main.cpp §MainGraphHost
 // drives the real graph; see FieldGraphReconciler.h for the diff and
@@ -133,6 +144,14 @@ public:
 
    const Field::GraphOwnershipMap& Ownership() const { return mOwnership; }
    Field::GraphOwnershipMap& Ownership() { return mOwnership; }
+
+   // Build step 16 ("Unpack to Canvas"), §3.2/§4.2: the last successful
+   // Regenerate()'s plan - `connects` feeds Field::ComputeEmitDepths for
+   // topological-depth layout, `emits` gives each key's typeName for the
+   // width classification IsWideAutoPlaceType() below already needs. Empty/
+   // default if nothing has regenerated yet or the last regenerate failed
+   // (mirrors TerminalIndices()' own "nothing yet" handling).
+   const Field::GraphPlan& LastPlan() const { return mLastPlan; }
 
    // 16 lowercase hex chars, regenerated only when this node's identity
    // must diverge from a source node's (paste - doc §5.7.3), never on an

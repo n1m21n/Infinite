@@ -1035,6 +1035,35 @@ namespace
    // in ed::Begin()/ed::End()); drained once, outside that pass, after
    // ed::End() returns - see trap T14 and RunFieldGraphRegenerate.
    FieldGraphNode* gFieldGraphPendingRegenerate = nullptr;
+
+   // Build step 16 ("Unpack to Canvas"). Same trap-T14 shape as
+   // gFieldGraphPendingRegenerate just above: set by the "Unpack to Canvas"
+   // button click inside DrawFieldGraphParams (nested in ed::Begin()/
+   // ed::End()), drained once after ed::End() returns by
+   // RunFieldGraphUnpackPhase1 - see that function's comment.
+   FieldGraphNode* gFieldGraphPendingUnpack = nullptr;
+
+   // Phase 2 of the unpack operation: a poll-and-validate tick driven once
+   // per frame (also after ed::End(), alongside the drain above) while
+   // `active` is true. Phase 1 reveals the mounted children at a provisional
+   // layout and arms this; phase 2 waits for every revealed child's ed::
+   // node size to read as a real measurement (not a freshly-spawned node's
+   // sentinel/placeholder size - doc §3.3/trap 3) before finalizing row
+   // heights and spawning the wrapping GroupNode. Capped at kMaxRetries
+   // frames, after which it finalizes with the kUnpackDYMin-only fallback
+   // stacking rather than waiting forever (doc's own defensive framing of
+   // the "two-frame operation").
+   struct FieldGraphUnpackPhase2State
+   {
+      bool active = false;
+      FieldGraphNode* target = nullptr;
+      std::vector<int> members;               // mounted indices, in layout order
+      std::map<int, int> depthByIndex;        // member index -> topological depth
+      std::map<int, float> columnX;           // depth -> this column's x
+      int retriesLeft = 0;
+      static constexpr int kMaxRetries = 10;
+   };
+   FieldGraphUnpackPhase2State gFieldGraphUnpackPhase2;
    bool gGlobalsOpen = false;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
@@ -5562,6 +5591,20 @@ namespace
          // drain after ed::End() (trap T14).
          if (ImGui::Button("Regenerate", ImVec2(kPreviewSize, 0)))
             gFieldGraphPendingRegenerate = n;
+
+         // Build step 16: only meaningful once there is something
+         // encapsulated to unpack (doc §4.1's precondition). Same
+         // queue-rather-than-mutate-here shape as "Regenerate" just above -
+         // this also runs nested in ed::Begin()/ed::End(), and unpacking
+         // reveals real gNodes entries and eventually spawns a GroupNode
+         // (trap T14).
+         const bool canUnpack = n->encapsulated && !n->MountedIndices().empty();
+         if (!canUnpack)
+            ImGui::BeginDisabled();
+         if (ImGui::Button("Unpack to Canvas", ImVec2(kPreviewSize, 0)) && canUnpack)
+            gFieldGraphPendingUnpack = n;
+         if (!canUnpack)
+            ImGui::EndDisabled();
 
          if (!n->LastError().empty())
          {
@@ -28339,6 +28382,281 @@ namespace
       gPatchDirty = true;
    }
 
+   // Build step 16 ("Unpack to Canvas"), §4.1-§4.2. Phase 1: flips
+   // `encapsulated` off, computes each mounted child's topological-depth
+   // column (Field::ComputeEmitDepths over target->LastPlan().connects) and
+   // a provisional per-column row stack - nothing has been drawn at a real
+   // position for these children yet (they have only ever been hidden), so
+   // there is nothing to measure this frame; phase 2 (RunFieldGraphUnpackPhase2Tick,
+   // below) refines row heights from real measured sizes once they're
+   // available and spawns the wrapping GroupNode. One PushUndoCheckpoint()
+   // covers both phases - gSuppressUndoCheckpoints stays on until phase 2
+   // finishes (doc §4.1: "wrapped in exactly one ... pair"). Must only be
+   // called outside ed::Begin()/ed::End() (trap T14) - see
+   // gFieldGraphPendingUnpack's drain after ed::End(), same site as
+   // gFieldGraphPendingRegenerate's.
+   void RunFieldGraphUnpackPhase1(FieldGraphNode* target)
+   {
+      if (target == nullptr)
+         return;
+      // Precondition already gates the button (DrawFieldGraphParams), but
+      // stay honest if this is ever driven directly (§7 assertion 6: a
+      // FieldGraphNode with no mounted children is a documented no-op).
+      if (!target->encapsulated || target->MountedIndices().empty())
+         return;
+
+      PushUndoCheckpoint();
+      gSuppressUndoCheckpoints = true;
+
+      target->encapsulated = false;
+      // Also clear right now rather than waiting for ApplyModulationAndPalette's
+      // per-frame sync (main.cpp's "sync each mounted child's hiddenFromCanvas
+      // to encapsulated" loop) to get to it later this same frame - that loop
+      // runs before this drain point in frame order, so without this the
+      // children would stay hidden for one extra frame before the sync loop
+      // catches up on the NEXT frame's pass.
+      for (int idx : target->MountedIndices())
+      {
+         GraphNode* gn = FindNodeByIndex(idx);
+         if (gn != nullptr)
+            gn->hiddenFromCanvas = false;
+      }
+
+      constexpr float kUnpackOriginX = 60.0f;
+      constexpr float kUnpackOriginY = 60.0f;
+      constexpr float kUnpackDX = 580.0f;      // = FieldGraphNode.cpp's kAutoPlaceDX
+      constexpr float kUnpackDXWide = 1080.0f; // = kAutoPlaceDXWide
+      constexpr float kUnpackDYMin = 160.0f;   // owner's Δy, kept as a floor
+      constexpr float kUnpackRowMargin = 40.0f;
+
+      const Field::GraphPlan& plan = target->LastPlan();
+      std::map<std::string, int> depthByKey = Field::ComputeEmitDepths(plan);
+
+      // Group mounted indices by depth, preserving plan.emits order within a
+      // column - deterministic, mirrors Regenerate()'s own call-site
+      // ordering discipline (doc §3.2).
+      std::map<int, std::vector<int>> indicesByDepth;
+      std::map<int, int> depthByIndex;
+      for (const auto& e : plan.emits)
+      {
+         int idx = target->Ownership().Get(e.key);
+         if (idx < 0 || !target->OwnsMountedIndex(idx))
+            continue;
+         auto depthIt = depthByKey.find(e.key);
+         int depth = depthIt != depthByKey.end() ? depthIt->second : 0;
+         indicesByDepth[depth].push_back(idx);
+         depthByIndex[idx] = depth;
+      }
+
+      // Column x: cumulative, each column's width the widest type mounted in
+      // it (mirrors Regenerate()'s per-call-site accumulation, keyed by
+      // depth instead of call site - doc §3.3). std::map iterates by
+      // ascending depth already.
+      std::map<int, float> columnX;
+      float nextX = kUnpackOriginX;
+      for (const auto& colEntry : indicesByDepth)
+      {
+         columnX[colEntry.first] = nextX;
+         bool colWide = false;
+         for (int idx : colEntry.second)
+         {
+            GraphNode* gn = FindNodeByIndex(idx);
+            if (gn != nullptr && IsWideAutoPlaceType(gn->typeName))
+               colWide = true;
+         }
+         nextX += colWide ? kUnpackDXWide : kUnpackDX;
+      }
+
+      // Provisional row stacking at the kUnpackDYMin floor (doc §3.3: "frame
+      // 1 spawns everything at a provisional position") - phase 2 refines it
+      // once real sizes are measurable.
+      std::vector<int> members;
+      for (const auto& colEntry : indicesByDepth)
+      {
+         float y = kUnpackOriginY;
+         for (int idx : colEntry.second)
+         {
+            GraphNode* gn = FindNodeByIndex(idx);
+            if (gn == nullptr)
+               continue;
+            gn->spawnX = columnX[colEntry.first];
+            gn->spawnY = y;
+            gn->liveX = gn->spawnX;
+            gn->liveY = gn->spawnY;
+            gn->needsPosition = true;
+            y += kUnpackDYMin + kUnpackRowMargin;
+            members.push_back(idx);
+         }
+      }
+
+      gFieldGraphUnpackPhase2 = FieldGraphUnpackPhase2State{};
+      gFieldGraphUnpackPhase2.active = true;
+      gFieldGraphUnpackPhase2.target = target;
+      gFieldGraphUnpackPhase2.members = members;
+      gFieldGraphUnpackPhase2.depthByIndex = depthByIndex;
+      gFieldGraphUnpackPhase2.columnX = columnX;
+      gFieldGraphUnpackPhase2.retriesLeft = FieldGraphUnpackPhase2State::kMaxRetries;
+
+      gPatchDirty = true;
+   }
+
+   // Build step 16, phase 2 - ticked once per frame (after ed::End(), same
+   // site as the phase-1 drain) while gFieldGraphUnpackPhase2.active is
+   // true. Waits for every revealed member's ed:: node size to read as a
+   // real measurement rather than a freshly-drawn node's sentinel/
+   // placeholder size, range-checked the same way INFINITE_SAMPLERDRAGTEST
+   // already does (doc §3.3/trap 3) rather than a hardcoded frame-count gate
+   // - a literal frameId+1 check does not fit here since a member may have
+   // been hidden (and therefore never drawn even once) for an arbitrary
+   // number of frames before this tick starts polling it. Once every member
+   // validates, or kMaxRetries frames pass without that, finalizes row y
+   // (from real measured heights, or the phase-1 floor-only stacking as a
+   // fallback), spawns the wrapping GroupNode over the finalized bounding
+   // box, and releases the shared undo suppression phase 1 armed.
+   void RunFieldGraphUnpackPhase2Tick()
+   {
+      if (!gFieldGraphUnpackPhase2.active)
+         return;
+
+      FieldGraphUnpackPhase2State& st = gFieldGraphUnpackPhase2;
+
+      // ed::GetNodePosition/GetNodeSize need a live editor context; this
+      // tick runs after ed::End() has already cleared it for the frame
+      // (ed::SetCurrentEditor(nullptr) right after ed::End()) - same
+      // save/restore shape FindFreeSpawnPosition already uses.
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+
+      constexpr float kUnpackOriginY = 60.0f;
+      constexpr float kUnpackDYMin = 160.0f;
+      constexpr float kUnpackRowMargin = 40.0f;
+      constexpr float kAudioNodeWidthFallback = 440.0f;
+      constexpr float kAudioWideWidthFallback = 960.0f;
+
+      std::map<int, ImVec2> sizeByIndex;
+      std::map<int, ImVec2> posByIndex;
+      bool allValid = true;
+      for (int idx : st.members)
+      {
+         GraphNode* gn = FindNodeByIndex(idx);
+         if (gn == nullptr)
+            continue;
+         ImVec2 p = ed::GetNodePosition(gn->NodeId());
+         ImVec2 s = ed::GetNodeSize(gn->NodeId());
+         posByIndex[idx] = p;
+         sizeByIndex[idx] = s;
+         bool valid = s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f;
+         if (!valid)
+            allValid = false;
+      }
+
+      st.retriesLeft--;
+      if (!allValid && st.retriesLeft >= 0)
+      {
+         ed::SetCurrentEditor(prevEditor);
+         return; // keep polling next frame
+      }
+
+      if (allValid)
+      {
+         std::map<int, std::vector<int>> byDepth;
+         for (int idx : st.members)
+            byDepth[st.depthByIndex[idx]].push_back(idx);
+
+         for (auto& colEntry : byDepth)
+         {
+            float y = kUnpackOriginY;
+            for (int idx : colEntry.second)
+            {
+               GraphNode* gn = FindNodeByIndex(idx);
+               if (gn == nullptr)
+                  continue;
+               const float h = std::max(kUnpackDYMin, sizeByIndex[idx].y);
+               gn->spawnY = y;
+               gn->liveY = y;
+               ed::SetNodePosition(gn->NodeId(), ImVec2(gn->spawnX, y));
+               y += h + kUnpackRowMargin;
+            }
+         }
+      }
+      // else: retries exhausted before every size validated - fall back to
+      // phase 1's kUnpackDYMin-only stacking (already applied to spawnY/the
+      // node-editor position), no measured-height refinement (doc §7's
+      // stated defensive fallback rather than looping forever).
+
+      // Bounding box over the now-finalized positions - same accumulation
+      // shape as the Cmd/Ctrl+G selection-wrap handler (main.cpp's
+      // "doGroup" block), sourced from this unpack's members instead of the
+      // live selection. Uses a nominal per-type size instead of a possibly-
+      // still-sentinel measured one for any member whose size never
+      // validated (the fallback-stacking path above), so the group's box
+      // isn't sized off garbage.
+      bool any = false;
+      ImVec2 bmin(0.0f, 0.0f), bmax(0.0f, 0.0f);
+      for (int idx : st.members)
+      {
+         GraphNode* gn = FindNodeByIndex(idx);
+         if (gn == nullptr)
+            continue;
+         ImVec2 p = ed::GetNodePosition(gn->NodeId());
+         ImVec2 s = sizeByIndex[idx];
+         if (!(s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f))
+            s = ImVec2(IsWideAutoPlaceType(gn->typeName) ? kAudioWideWidthFallback : kAudioNodeWidthFallback,
+                       kUnpackDYMin);
+         if (!any)
+         {
+            bmin = p;
+            bmax = ImVec2(p.x + s.x, p.y + s.y);
+            any = true;
+         }
+         else
+         {
+            bmin.x = std::min(bmin.x, p.x);
+            bmin.y = std::min(bmin.y, p.y);
+            bmax.x = std::max(bmax.x, p.x + s.x);
+            bmax.y = std::max(bmax.y, p.y + s.y);
+         }
+      }
+
+      if (any)
+      {
+         // Same kPad/kHeader padding numbers as the selection-wrap handler
+         // (doc §4.2 step 6: reuse, don't invent new padding).
+         const float kPad = 32.0f;
+         const float kHeader = 24.0f;
+         const float gx = bmin.x - kPad;
+         const float gy = bmin.y - kPad - kHeader;
+         const float gw = (bmax.x - bmin.x) + kPad * 2.0f;
+         const float gh = (bmax.y - bmin.y) + kPad * 2.0f + kHeader;
+
+         if (GraphNode* ggn = SpawnNode("Group", "Compositing", gx, gy))
+         {
+            if (auto* grp = dynamic_cast<GroupNode*>(ggn->node.get()))
+            {
+               // No generic user-assigned display name exists for a
+               // FieldGraphNode instance (checked - only GroupNode itself
+               // has a rename-in-place `label`; there is no node-title
+               // system to borrow from) - short, unique, not pretty, per
+               // doc §4.2 step 5.
+               grp->label = "Unpacked: " + st.target->Uid().substr(0, 8);
+               // Position only - AutoFitGroupToMembers (already runs every
+               // frame) takes over sizing from the very next frame, same as
+               // the selection-wrap handler already relies on (doc trap 4).
+               grp->width = gw;
+               grp->height = gh;
+               gGroupMembers[grp] = st.target->MountedIndices();
+            }
+         }
+      }
+
+      ed::SetCurrentEditor(prevEditor);
+
+      st.active = false;
+      st.target = nullptr;
+      gSuppressUndoCheckpoints = false;
+      gPatchDirty = true;
+   }
+
    void PerformCopyPaste(const std::set<int>& toCopy)
    {
       if (toCopy.empty()) return;
@@ -50508,6 +50826,296 @@ int main(int argc, char** argv)
          printf("%s\n", allOk ? "FIELDGRAPHLIVEPARAM OK" : "SUSPECT");
       }
 
+      // Build step 16 ("Unpack to Canvas") harness. Unlike the encapsulation/
+      // live-param/undo harnesses above (which never touch a real ed::
+      // node position/size - they only ever check FieldGraphNode/GraphNode
+      // bookkeeping directly), this step's exit criterion needs real
+      // post-layout bounding boxes, which only exist after the node editor
+      // has actually drawn each revealed child at least a couple of times
+      // (doc §3.3/trap 3). So this harness spans real frames rather than
+      // doing everything inside one frameId gate: setup + triggering the
+      // unpack happens at frameId==4 (same "runs before this frame's node
+      // draw loop" position the other Field harnesses already use to call
+      // RunFieldGraphRegenerate directly - safe for the same reason), then
+      // the ordinary per-frame drains (RunFieldGraphUnpackPhase1's arm,
+      // RunFieldGraphUnpackPhase2Tick's poll) run every subsequent real
+      // frame exactly as they do for a real user click, and assertions run
+      // at frameId==30 - comfortably past kMaxRetries (10) frames of
+      // phase-2 polling even in the worst case, so gFieldGraphUnpackPhase2
+      // is guaranteed inactive (finished, one way or the other) by then.
+      static int sUnpackTestFgnIdx = -1;
+      static int sUnpackTestConsumerIdx = -1;
+      static std::vector<int> sUnpackTestMembers;
+      static bool sUnpackTestAllOk = true;
+
+      if (getenv("INFINITE_FIELDGRAPHUNPACKTEST") != nullptr && frameId == 4)
+      {
+         printf("[FIELDGRAPHUNPACKTEST] Running Field graph unpack-to-canvas harness...\n");
+         bool setupOk = true;
+
+         // Assertion 6 (disabled/no-op on an empty mMountedIndices): a
+         // never-regenerated Field Graph node has nothing to unpack -
+         // calling the operation directly (as if the disabled button were
+         // driven programmatically) must be a documented no-op, not a
+         // crash or a partial mutation. Self-contained, own NewPatch(), run
+         // before the main multi-frame scenario below.
+         {
+            NewPatch();
+            GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+            auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+            bool encBefore = fgn->encapsulated;
+            RunFieldGraphUnpackPhase1(fgn);
+            bool pass6 = (fgn->encapsulated == encBefore) && fgn->encapsulated &&
+                         !gFieldGraphUnpackPhase2.active;
+            printf("[FIELDGRAPHUNPACKTEST] Assertion 6 (No-op on empty mMountedIndices): "
+                   "stillEncapsulated=%d phase2Armed=%d  %s\n",
+                   (int)fgn->encapsulated, (int)gFieldGraphUnpackPhase2.active, pass6 ? "OK" : "FAIL");
+            setupOk = setupOk && pass6;
+         }
+
+         // Main scenario: a 3-deep chain (Noise -> Curves -> Curves, wired
+         // via connect()) so the topological-depth assertion has a real
+         // depth-2 node with transitive depth-0/1 dependencies, plus an
+         // outer cable wired into the FieldGraphNode's own derived boundary
+         // output pin (the terminal, "c") to prove §4.3's no-op finding -
+         // the outer cable's real target is the FieldGraphNode itself
+         // (RunFieldGraphRegenerate's boundarySource), which never changes
+         // identity or address across an unpack, so the cable must survive
+         // untouched.
+         NewPatch();
+         GraphNode* gn = SpawnNode("Field Graph", "Utility", 0.0f, 0.0f);
+         int fgnIdx = gn->index;
+         auto* fgn = static_cast<FieldGraphNode*>(gn->node.get());
+         fgn->code =
+            "a = emit(\"Noise\", 0)\n"
+            "b = emit(\"Curves\", 1)\n"
+            "c = emit(\"Curves\", 2)\n"
+            "connect(a, 0, b, 0)\n"
+            "connect(b, 0, c, 0)\n";
+         RunFieldGraphRegenerate(fgn);
+
+         fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+         ApplyModulationAndPalette(4); // cook once so the terminal has a real texture
+         fgn = static_cast<FieldGraphNode*>(FindNodeByIndex(fgnIdx)->node.get());
+         fgn->SetBoundaryOutputTarget(ResolveFieldGraphBoundaryTerminal(fgn));
+
+         // Outer cable onto the boundary output pin - positioned well clear
+         // of where the unpacked cluster will land so AutoFitGroupToMembers
+         // never mistakes it for a member.
+         GraphNode* consumer = SpawnNode("Curves", "Compositing", 3000.0f, 0.0f);
+         int consumerIdx = consumer->index;
+         std::string connErr;
+         bool connected = ConnectNodes(fgnIdx, 0, consumerIdx, 0, connErr);
+         bool wiredToKernel = connected;
+         if (wiredToKernel)
+         {
+            ImageCable* cable = CableFor(*FindNodeByIndex(consumerIdx), 0);
+            wiredToKernel = cable != nullptr && cable->IsConnected() &&
+                            cable->GetSource() == FindNodeByIndex(fgnIdx)->node.get();
+         }
+         setupOk = setupOk && wiredToKernel;
+         printf("[FIELDGRAPHUNPACKTEST] Setup (outer cable wired to kernel before unpack): wired=%d  %s\n",
+                (int)wiredToKernel, wiredToKernel ? "OK" : "FAIL");
+
+         bool encBefore = fgn->encapsulated;
+         bool nonEmptyBefore = !fgn->MountedIndices().empty();
+         sUnpackTestMembers.assign(fgn->MountedIndices().begin(), fgn->MountedIndices().end());
+
+         // Same call the "Unpack to Canvas" button makes (DrawFieldGraphParams
+         // queues gFieldGraphPendingUnpack; this test calls the queued
+         // function directly, at the same before-the-node-draw-loop point in
+         // the frame every other Field harness in this file already calls
+         // RunFieldGraphRegenerate directly from - safe for the same reason).
+         RunFieldGraphUnpackPhase1(fgn);
+
+         sUnpackTestFgnIdx = fgnIdx;
+         sUnpackTestConsumerIdx = consumerIdx;
+
+         bool pass0 = encBefore && nonEmptyBefore && !fgn->encapsulated && gFieldGraphUnpackPhase2.active;
+         printf("[FIELDGRAPHUNPACKTEST] Setup (phase 1 armed): wasEncapsulated=%d nowUnencapsulated=%d phase2Armed=%d  %s\n",
+                (int)encBefore, (int)(!fgn->encapsulated), (int)gFieldGraphUnpackPhase2.active, pass0 ? "OK" : "FAIL");
+         setupOk = setupOk && pass0;
+
+         if (!setupOk)
+            printf("[FIELDGRAPHUNPACKTEST] setup FAIL - assertions at frameId==30 will not be meaningful\n");
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHUNPACKTEST") != nullptr && frameId == 30)
+      {
+         bool allOk = true;
+
+         GraphNode* fgnGn = FindNodeByIndex(sUnpackTestFgnIdx);
+         auto* fgn = fgnGn != nullptr ? static_cast<FieldGraphNode*>(fgnGn->node.get()) : nullptr;
+
+         // Assertion 1: encapsulated flipped false; every mounted child's
+         // hiddenFromCanvas cleared; exactly one new GroupNode exists whose
+         // gGroupMembers set equals the mounted children's indices exactly.
+         bool pass1 = fgn != nullptr && !fgn->encapsulated && !gFieldGraphUnpackPhase2.active;
+         for (int idx : sUnpackTestMembers)
+         {
+            GraphNode* child = FindNodeByIndex(idx);
+            pass1 = pass1 && child != nullptr && !child->hiddenFromCanvas;
+         }
+         GroupNode* spawnedGroup = nullptr;
+         int groupCount = 0;
+         for (GraphNode& n : gNodes)
+         {
+            if (auto* g = dynamic_cast<GroupNode*>(n.node.get()))
+            {
+               groupCount++;
+               spawnedGroup = g;
+            }
+         }
+         bool membershipMatches = spawnedGroup != nullptr && gGroupMembers.count(spawnedGroup) != 0 &&
+                                   gGroupMembers[spawnedGroup] ==
+                                      std::set<int>(sUnpackTestMembers.begin(), sUnpackTestMembers.end());
+         pass1 = pass1 && (groupCount == 1) && membershipMatches;
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 1 (encapsulated false, children unhidden, 1 group with exact membership): "
+                "encFalse=%d groupCount=%d membershipMatches=%d  %s\n",
+                (int)(fgn != nullptr && !fgn->encapsulated), groupCount, (int)membershipMatches, pass1 ? "OK" : "FAIL");
+         allOk = allOk && pass1;
+
+         // Editor-context save/restore for the position/size reads below -
+         // this runs after this frame's ed::End() already cleared the
+         // current editor (same shape as FindFreeSpawnPosition/
+         // RunFieldGraphUnpackPhase2Tick).
+         ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
+
+         // Assertion 2: no two of the members' post-layout bounding boxes
+         // overlap.
+         struct Box { ImVec2 mn, mx; };
+         std::vector<Box> boxes;
+         for (int idx : sUnpackTestMembers)
+         {
+            GraphNode* gn = FindNodeByIndex(idx);
+            if (gn == nullptr) continue;
+            ImVec2 p = ed::GetNodePosition(gn->NodeId());
+            ImVec2 s = ed::GetNodeSize(gn->NodeId());
+            boxes.push_back({ p, ImVec2(p.x + s.x, p.y + s.y) });
+         }
+         bool noOverlap = true;
+         for (size_t i = 0; i < boxes.size() && noOverlap; i++)
+            for (size_t j = i + 1; j < boxes.size() && noOverlap; j++)
+            {
+               const Box& A = boxes[i]; const Box& B = boxes[j];
+               bool overlap = A.mx.x > B.mn.x && A.mn.x < B.mx.x && A.mx.y > B.mn.y && A.mn.y < B.mx.y;
+               if (overlap) noOverlap = false;
+            }
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 2 (No overlapping bounding boxes among %zu members): %s\n",
+                boxes.size(), noOverlap ? "OK" : "FAIL");
+         allOk = allOk && noOverlap;
+
+         // Assertion 3: topological x-ordering - "c" (depth 2) sits strictly
+         // right of both "a" (depth 0) and "b" (depth 1), which sits
+         // strictly right of "a" - transitively via plan.connects.
+         bool topoOk = false;
+         if (fgn != nullptr)
+         {
+            int aIdx = fgn->Ownership().Get("a#0");
+            int bIdx = fgn->Ownership().Get("b#1");
+            int cIdx = fgn->Ownership().Get("c#2");
+            GraphNode* ag = FindNodeByIndex(aIdx);
+            GraphNode* bg = FindNodeByIndex(bIdx);
+            GraphNode* cg = FindNodeByIndex(cIdx);
+            if (ag != nullptr && bg != nullptr && cg != nullptr)
+            {
+               float ax = ed::GetNodePosition(ag->NodeId()).x;
+               float bx = ed::GetNodePosition(bg->NodeId()).x;
+               float cx = ed::GetNodePosition(cg->NodeId()).x;
+               topoOk = (bx > ax) && (cx > bx) && (cx > ax);
+            }
+         }
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 3 (Topological x-ordering across 3 depths): %s\n",
+                topoOk ? "OK" : "FAIL");
+         allOk = allOk && topoOk;
+
+         ed::SetCurrentEditor(prevEditor);
+
+         // Assertion 4 (§4.3's expected no-op, asserted rather than assumed):
+         // the outer cable wired to the FieldGraphNode's boundary output pin
+         // before unpacking is still connected, to the same INode*, after
+         // unpacking - zero detached, because the outer cable's real target
+         // was always the FieldGraphNode itself (never the terminal), and
+         // the FieldGraphNode's identity/address never changes across an
+         // unpack.
+         bool boundaryPreserved = false;
+         {
+            GraphNode* consumer = FindNodeByIndex(sUnpackTestConsumerIdx);
+            ImageCable* cable = consumer != nullptr ? CableFor(*consumer, 0) : nullptr;
+            boundaryPreserved = fgnGn != nullptr && cable != nullptr && cable->IsConnected() &&
+                                cable->GetSource() == fgnGn->node.get();
+         }
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 4 (Boundary cable identity preserved, zero detach): %s\n",
+                boundaryPreserved ? "OK" : "FAIL");
+         allOk = allOk && boundaryPreserved;
+
+         // Assertion 5 (part 1): undo after unpack restores `encapsulated`
+         // and removes the spawned GroupNode in one step. The children's
+         // hiddenFromCanvas re-sync is driven by the per-frame loop in
+         // ApplyModulationAndPalette (main.cpp, "Build step 15" comment
+         // above `child->hiddenFromCanvas = fgn->encapsulated;"), which for
+         // this frame has already run before this test block executes - so
+         // Undo() here takes effect for that loop's *next* pass, at
+         // frameId==31, same one-frame lag FIELDGRAPHENCAPTEST's own
+         // assertion 4 already relies on for the opposite toggle direction.
+         bool undoOk = false;
+         {
+            Undo();
+            GraphNode* afterUndoGn = FindNodeByIndex(sUnpackTestFgnIdx);
+            auto* afterUndoFgn = afterUndoGn != nullptr ? static_cast<FieldGraphNode*>(afterUndoGn->node.get()) : nullptr;
+            bool encRestored = afterUndoFgn != nullptr && afterUndoFgn->encapsulated;
+            bool groupGone = true;
+            for (GraphNode& n : gNodes)
+               if (dynamic_cast<GroupNode*>(n.node.get()) != nullptr) groupGone = false;
+            undoOk = encRestored && groupGone;
+            printf("[FIELDGRAPHUNPACKTEST] Assertion 5a (Undo restores encapsulated, removes group): "
+                   "encRestored=%d groupGone=%d  %s\n",
+                   (int)encRestored, (int)groupGone, undoOk ? "OK" : "FAIL");
+         }
+         allOk = allOk && undoOk;
+         sUnpackTestAllOk = allOk;
+      }
+
+      if (getenv("INFINITE_FIELDGRAPHUNPACKTEST") != nullptr && frameId == 31)
+      {
+         // Assertion 5 (part 2): one real frame after Undo(), the sync loop
+         // in ApplyModulationAndPalette has now run once with the restored
+         // `encapsulated == true`, so every member should be hidden again.
+         //
+         // Undo() goes through ApplyPatchData, which - same as
+         // FIELDGRAPHUNDOTEST's own assertions 3/6 - reassigns node indices
+         // (see its `remap` out-param). sUnpackTestMembers holds the
+         // pre-undo indices, which are no longer meaningful; re-resolve the
+         // three emit keys through the (now-restored) FieldGraphNode's own
+         // ownership map instead, exactly as FIELDGRAPHUNDOTEST does with
+         // "osc#" + i.
+         GraphNode* fgnGn = FindNodeByIndex(sUnpackTestFgnIdx);
+         if (fgnGn == nullptr)
+         {
+            for (GraphNode& n : gNodes)
+               if (dynamic_cast<FieldGraphNode*>(n.node.get()) != nullptr) fgnGn = &n;
+         }
+         auto* fgn = fgnGn != nullptr ? static_cast<FieldGraphNode*>(fgnGn->node.get()) : nullptr;
+         bool childrenHidden = fgn != nullptr;
+         for (const char* key : { "a#0", "b#1", "c#2" })
+         {
+            int idx = fgn != nullptr ? fgn->Ownership().Get(key) : -1;
+            GraphNode* child = idx >= 0 ? FindNodeByIndex(idx) : nullptr;
+            childrenHidden = childrenHidden && child != nullptr && child->hiddenFromCanvas;
+         }
+         printf("[FIELDGRAPHUNPACKTEST] Assertion 5b (Children re-hidden one frame after undo): childrenHidden=%d  %s\n",
+                (int)childrenHidden, childrenHidden ? "OK" : "FAIL");
+         bool allOk = sUnpackTestAllOk && childrenHidden;
+
+         NewPatch();
+         sUnpackTestFgnIdx = -1;
+         sUnpackTestConsumerIdx = -1;
+         sUnpackTestMembers.clear();
+         sUnpackTestAllOk = true;
+         printf("%s\n", allOk ? "FIELDGRAPHUNPACK OK" : "SUSPECT");
+      }
+
       if (getenv("INFINITE_FIELDPINSTEST") != nullptr && frameId == 4)
       {
          printf("[FIELDPINSTEST] Running dynamic pins (build step 11) harness...\n");
@@ -59262,6 +59870,18 @@ int main(int argc, char** argv)
          RunFieldGraphRegenerate(gFieldGraphPendingRegenerate);
          gFieldGraphPendingRegenerate = nullptr;
       }
+
+      // Build step 16 ("Unpack to Canvas"): same trap-T14 deferral as the
+      // Regenerate drain just above - phase 1 reveals real gNodes entries
+      // and phase 2 (ticked unconditionally below, while armed) eventually
+      // spawns a GroupNode, neither of which is safe nested inside the
+      // ed::Begin()/ed::End() pass just closed.
+      if (gFieldGraphPendingUnpack != nullptr)
+      {
+         RunFieldGraphUnpackPhase1(gFieldGraphPendingUnpack);
+         gFieldGraphPendingUnpack = nullptr;
+      }
+      RunFieldGraphUnpackPhase2Tick();
 
       // Dynamic pins, Phase 1 (build step 11, §5.5): trigger-pin edge
       // detection for every FieldGraphNode, polled once per frame right

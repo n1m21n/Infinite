@@ -107,12 +107,9 @@ bool FieldGraphNode::Regenerate(Field::IFieldGraphHost& host)
       constexpr float kAutoPlaceDY = 260.0f;
       constexpr float kAutoPlaceDYWide = 520.0f;
 
-      // Only Wavetable/Drum Sequencer render at kAudioWideWidth
-      // (main.cpp DrawWavetableBody/DrawDrumSequencerBody) - everything
-      // else fits the narrower column without visibly wasting canvas.
-      auto isWide = [](const std::string& typeName) {
-         return typeName == "Wavetable" || typeName == "Drum Sequencer";
-      };
+      // Shared with step 16's unpack layout - see IsWideAutoPlaceType's own
+      // comment (FieldGraphNode.h) for why this isn't duplicated a third time.
+      auto isWide = IsWideAutoPlaceType;
 
       std::unordered_map<std::string, float> callSiteX;
       std::unordered_map<std::string, int> callSiteCloneCount;
@@ -284,7 +281,23 @@ void FieldGraphNode::VisitParams(ParamVisitor& v)
    // "restore, then let the next real pass reconcile" pattern in the other
    // three Field node types).
    if (ownershipText != prevOwnershipText)
+   {
       mOwnership = Field::GraphOwnershipMap::FromText(ownershipText);
+
+      // Same derived-cache rebuild Regenerate() does after reconciling a
+      // fresh plan (§3.1) - a patch load, paste, or undo/redo restores
+      // ownershipText but never calls Regenerate(), so without this
+      // mMountedIndices stays whatever it was on this INode instance before
+      // the load (typically empty, for a freshly-constructed one) and the
+      // per-frame hiddenFromCanvas sync loop in main.cpp silently has
+      // nothing to iterate - a real child stays visible forever after an
+      // undo back to `encapsulated == true`. Found via build step 16's
+      // unpack-then-undo harness, which is the first path to require this
+      // sync on a non-empty ownership map restored outside Regenerate().
+      mMountedIndices.clear();
+      for (const auto& entry : mOwnership.Entries())
+         mMountedIndices.insert(entry.second);
+   }
    if (mUid.empty())
       mUid = NewUid();
 }
