@@ -180,6 +180,7 @@ namespace
 #include "audio/AudioFileWriter.h"
 #include "nodes/NoteNodes.h"
 #include "nodes/SamplerNode.h"
+#include "nodes/SlicerNode.h"
 #include "nodes/PaulStretchNode.h"
 #include "nodes/MolderNode.h"
 #include "nodes/GrainMolderNode.h"
@@ -388,6 +389,8 @@ namespace
       // is rather than as a bare one-shot playback node.
       if (name == "Sampler")
          return "sample player";
+      if (name == "Slicer")
+         return "slicer";
       if (name == "PaulStretch")
          return "paul stretch";
       if (name == "Granular")
@@ -4144,6 +4147,7 @@ namespace
       REGISTER_NODE(ImageSpectralSynthNode, Spectral Synth, "Synths");
       REGISTER_NODE(MetallicNode, Metallic, "Synths");
       REGISTER_NODE(SamplerNode, Sampler, "Synths");
+      REGISTER_NODE(SlicerNode, Slicer, "Synths");
       REGISTER_NODE(PaulStretchNode, PaulStretch, "Synths");
       REGISTER_NODE(MolderNode, Molder, "Synths");
       REGISTER_NODE(GrainMolderNode, Grain Molder, "Synths");
@@ -5275,6 +5279,8 @@ namespace
          audio->ReloadFromPath();
       if (auto* sampler = dynamic_cast<SamplerNode*>(node))
          sampler->ReloadFromPath();
+      if (auto* slicer = dynamic_cast<SlicerNode*>(node))
+         slicer->ReloadFromPath();
       if (auto* paul = dynamic_cast<PaulStretchNode*>(node))
          paul->ReloadFromPath();
       if (auto* molder = dynamic_cast<MolderNode*>(node))
@@ -9424,6 +9430,152 @@ namespace
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
+   // Waveform + slice markers for the Slicer. Clicking inside a slice's band
+   // auditions that slice; in onsets mode each marker (except the pinned one
+   // at 0) can be dragged. Grid boundaries are derived from the transport, so
+   // dragging them is disabled rather than silently undone on the next
+   // recompute.
+   void DrawSlicerWaveform(SlicerNode* n, float h, float width)
+   {
+      static const char* kPitchClass[12] = { "C", "C#", "D", "D#", "E", "F",
+                                             "F#", "G", "G#", "A", "A#", "B" };
+
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool hasSample = n->waveformCacheCount > 0;
+      const std::vector<float>& slices = n->Slices();
+      const int sliceCount = (int)slices.size();
+
+      // Body click-catcher first, so it owns hover/active by default; the
+      // marker grab-zones are added afterwards at the same screen position.
+      // ImGui overlap resolution is NOT "last submitted wins" - a later item
+      // is blocked while an earlier one already holds g.HoveredId unless that
+      // earlier item opted in via SetNextItemAllowOverlap() *before* it.
+      ImGui::SetNextItemAllowOverlap();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##slicerwavebody", ImVec2(w, h));
+      if (hasSample && sliceCount > 0 && ImGui::IsItemActivated())
+      {
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         int hit = 0;
+         for (int i = 0; i < sliceCount; i++)
+         {
+            if (slices[i] <= frac)
+               hit = i;
+         }
+         n->TriggerSlicePreview(hit);
+      }
+      if (hasSample && sliceCount > 0 && ImGui::IsItemHovered())
+      {
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         int hit = 0;
+         for (int i = 0; i < sliceCount; i++)
+         {
+            if (slices[i] <= frac)
+               hit = i;
+         }
+         const int note = SlicerNode::kBaseNote + hit;
+         char val[48];
+         snprintf(val, sizeof(val), "slice %d - %s%d - click to audition", hit + 1,
+                  kPitchClass[note % 12], note / 12 - 1);
+         SetAudioReadout("#", val);
+      }
+
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (hasSample)
+      {
+         // Alternating band shading behind the waveform, so "where does one
+         // slice end" reads without counting marker lines.
+         for (int i = 0; i < sliceCount; i += 2)
+         {
+            const float x0 = origin.x + w * std::clamp(slices[i], 0.0f, 1.0f);
+            const float x1 = origin.x + w * ((i + 1 < sliceCount) ? std::clamp(slices[i + 1], 0.0f, 1.0f) : 1.0f);
+            dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
+                              isLight ? IM_COL32(0, 0, 0, 14) : IM_COL32(255, 255, 255, 12));
+         }
+
+         const int count = n->waveformCacheCount;
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - n->waveformMax[i] * h * 0.45f;
+            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
+         }
+
+         // Voices in flight, faded by their own amplitude.
+         const SlicerVoiceSnapshot& snap = n->VisualSnapshot();
+         for (int v = 0; v < snap.count; v++)
+         {
+            if (snap.voices[v].amp < 0.002f)
+               continue;
+            const float px = origin.x + w * std::clamp(snap.voices[v].position, 0.0f, 1.0f);
+            const int alpha = (int)(std::clamp(snap.voices[v].amp, 0.0f, 1.0f) * 235.0f) + 20;
+            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
+                        isLight ? IM_COL32(230, 140, 20, alpha) : IM_COL32(255, 200, 90, alpha), 2.0f);
+         }
+
+         // Slice markers, plus the note each slice answers to when it fits.
+         const ImU32 markerCol = isLight ? IM_COL32(20, 140, 90, 230) : IM_COL32(120, 230, 175, 220);
+         for (int i = 0; i < sliceCount; i++)
+         {
+            const float x = origin.x + w * std::clamp(slices[i], 0.0f, 1.0f);
+            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), markerCol, i == 0 ? 1.0f : 1.5f);
+
+            const float nextX = origin.x + w * ((i + 1 < sliceCount) ? std::clamp(slices[i + 1], 0.0f, 1.0f) : 1.0f);
+            const int note = SlicerNode::kBaseNote + i;
+            char label[8];
+            snprintf(label, sizeof(label), "%s%d", kPitchClass[note % 12], note / 12 - 1);
+            const ImVec2 ts = ImGui::CalcTextSize(label);
+            if (nextX - x > ts.x + 6.0f)
+               dl->AddText(ImVec2(x + 3.0f, origin.y + 2.0f), ScopeTextCol(), label);
+         }
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+
+      if (hasSample && n->MarkersAreEditable())
+      {
+         // Narrow grab-zones centred on each marker, submitted after the body
+         // button above. Marker 0 is pinned at the sample's start.
+         const float handleW = 9.0f;
+         for (int i = 1; i < sliceCount; i++)
+         {
+            const float x = origin.x + w * std::clamp(slices[i], 0.0f, 1.0f);
+            const float btnX = std::clamp(x - handleW * 0.5f, origin.x, br.x - handleW);
+            char id[32];
+            snprintf(id, sizeof(id), "##slicermk%d", i);
+            ImGui::SetCursorScreenPos(ImVec2(btnX, origin.y));
+            ImGui::InvisibleButton(id, ImVec2(handleW, h));
+            if (ImGui::IsItemActivated())
+               PushUndoCheckpoint();
+            if (ImGui::IsItemActive())
+               n->MoveSliceMarker(i, (ImGui::GetIO().MousePos.x - origin.x) / w);
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+               ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+         }
+      }
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
    // Waveform and playhead renderer for PaulStretch extreme time-stretcher
    void DrawPaulStretchWaveform(PaulStretchNode* n, float h, float width)
    {
@@ -11943,6 +12095,202 @@ namespace
          n->position = std::clamp(n->position, n->start, n->end);
       ImGui::SameLine();
       AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
+
+      EndAudioBody();
+   }
+
+
+   // Custom node body for the Slicer.
+   //
+   // Draw order below IS the modulation-pin numbering (ModSlider and
+   // RegisterDiscreteParam both take paramIndex = gParamCounter++), so new
+   // params are appended at the end forever - reordering silently rewires
+   // every saved patch's modulation cables.
+   //
+   // Row order (all two-column, each cell exactly AudioHalfWidth()):
+   //    1: slice by (dropdown) | onsets
+   //    2: division (dropdown) | sensitivity
+   //    3: pitch               | finetune
+   //    4: attack              | decay        <- the envelope pair, adjacent
+   //    5: speed               | volume
+   //    6: crossthrough (cbox) | (deliberately empty)
+   //
+   // Pillars: P1 every control sits on the two-column grid (the button strip
+   // is the one deliberate full-width row); P2 the crossthrough checkbox uses
+   // ModCheckbox, which passes ImGui::GetFrameHeight() to
+   // DrawDiscreteParamPin and so centres its modulation dot with no per-node
+   // offset code (same idiom as DrawWavetableBody's engine on/off); P3 both
+   // selectors and the checkbox occupy the left column of their rows, so the
+   // left edge reads as one non-slider column; P5 the mode swap greys the
+   // inactive control instead of removing its cell, so no cell ever moves;
+   // P6 eleven controls is odd, so exactly one cell must be spare - it is the
+   // far-right of the last row, P6's sanctioned position, rather than the
+   // ragged full-width `volume` row this used to end on; P10 the dropdowns
+   // and the checkbox go through the shared AudioBareDropdown /
+   // PushCheckboxStyle theming, never a hand-rolled colour; P11 everything
+   // numeric goes to the readout strip. P4 does not apply - a Synths node
+   // has no `mix`.
+   //
+   // Discrete params (the two dropdowns and the checkbox) are allocated from
+   // kDiscreteParamBase and keyed by label hash, NOT from gParamCounter, so
+   // adding the checkbox shifts no float pin ordinal.
+   void DrawSlicerBody(GraphNode& gn, SlicerNode* n)
+   {
+      static const std::vector<std::string> kSliceByNames = { "onsets", "grid" };
+      static const std::vector<std::string> kDivisionNames = [] {
+         std::vector<std::string> v;
+         for (int i = 0; i < kSlicerNumDivisions; i++)
+            v.push_back(kSlicerDivisionNames[i]);
+         return v;
+      }();
+
+      const int sliceCount = n->SliceCount();
+      char stat[192];
+      if (!n->FileName().empty())
+         snprintf(stat, sizeof(stat), "%s  -  %d slice%s  -  %s", n->FileName().c_str(), sliceCount,
+                  sliceCount == 1 ? "" : "s", n->sliceBy == 0 ? "onsets" : "grid");
+      else
+         snprintf(stat, sizeof(stat), "%s  -  %s", n->Status().c_str(),
+                  n->sliceBy == 0 ? "onsets" : "grid");
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      // Button strip - the one deliberate full-width row (P1's exception).
+      if (ImGui::Button("Load...", ImVec2(90, 0)))
+      {
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            n->LoadFile(path);
+         }
+      }
+      ImGui::SameLine();
+      const bool recording = n->IsRecording();
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
+      {
+         PushUndoCheckpoint();
+         if (recording)
+            n->StopRecording();
+         else
+            n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+
+      ImGui::SameLine();
+      const bool playing = n->IsPlaying();
+      if (playing)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(playing ? "Stop" : "Audition", ImVec2(90, 0)))
+      {
+         if (playing)
+            n->StopPreview();
+         else
+            n->TriggerSlicePreview(-1);
+      }
+      if (playing)
+         ImGui::PopStyleColor();
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("#", "plays the whole sample on this node's own voice");
+
+      ImGui::SameLine();
+      ImGui::BeginDisabled(n->FileName().empty() || n->sliceBy != 0);
+      if (ImGui::Button("re-slice", ImVec2(90, 0)))
+      {
+         PushUndoCheckpoint();
+         n->ReSlice();
+      }
+      ImGui::EndDisabled();
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("#", "re-runs transient detection at the current sensitivity");
+
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      DrawSlicerWaveform(n, 140.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      const bool onsetMode = (n->sliceBy == 0);
+      const float halfW = AudioHalfWidth();
+      const float gap = ImGui::GetStyle().ItemSpacing.x;
+
+      // Row 1: slice by | onsets. Row 2: division | sensitivity.
+      // Both selectors sit in the left column of consecutive rows (P3), and
+      // the two mode-specific controls keep their own permanent cells so
+      // switching modes never moves the grid (P5).
+      {
+         const float x0 = gAudioContentX;
+         const float y = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         AudioBareDropdown("slice by##slicerSliceBy", kSliceByNames, n->sliceBy,
+                           [n](int i) { PushUndoCheckpoint(); n->sliceBy = i; }, halfW);
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(halfW, ImGui::GetFrameHeight()));
+      }
+      ImGui::SameLine();
+      ImGui::BeginDisabled(!onsetMode);
+      if (AudioSliderInt("onsets", &n->onsets, 1, SlicerNode::kMaxSlices, halfW))
+         n->onsets = std::clamp(n->onsets, 1, SlicerNode::kMaxSlices);
+      ImGui::EndDisabled();
+
+      {
+         const float x0 = gAudioContentX;
+         const float y = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::BeginDisabled(onsetMode);
+         AudioBareDropdown("division##slicerDivision", kDivisionNames, n->division,
+                           [n](int i) { PushUndoCheckpoint(); n->division = i; }, halfW);
+         ImGui::EndDisabled();
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(halfW, ImGui::GetFrameHeight()));
+      }
+      ImGui::SameLine();
+      ImGui::BeginDisabled(!onsetMode);
+      AudioSlider("sensitivity", &n->sensitivity, 0.0f, 100.0f, "%.0f %%", halfW);
+      ImGui::EndDisabled();
+
+      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", halfW);
+      ImGui::SameLine();
+      AudioSlider("finetune", &n->finetune, -100.0f, 100.0f, "%.0f c", halfW);
+
+      // attack extends the hidden 2 ms de-click ramp rather than adding a
+      // second envelope, so 0 is exactly the old (instant) behaviour. The
+      // skew puts 100 ms at 12 o'clock over the 0..500 throw.
+      AudioSlider("attack", &n->attack, 0.0f, 500.0f, "%.1f ms", halfW,
+                  SkewAttack100Taper::PosToValue, SkewAttack100Taper::ValueToPos);
+      ImGui::SameLine();
+      // decay owns the ENVELOPE only. The top of its throw is a no-decay
+      // detent - the slice holds at full level after its attack. Where it
+      // stops is `crossthrough`'s business, not decay's.
+      const char* decayFmt = (n->decay >= SlicerNode::kDecayInfinite) ? "hold" : "%.0f ms";
+      AudioSlider("decay", &n->decay, 5.0f, 5000.0f, decayFmt, halfW, LogTaper::PosToValue,
+                  LogTaper::ValueToPos);
+
+      // speed is exponential (linear in log2) so 1.0x sits at the middle of
+      // the 0.25..4 throw instead of a quarter of the way along it.
+      AudioSlider("speed", &n->speed, 0.25f, 4.0f, "%.2fx", halfW, LogTaper::PosToValue,
+                  LogTaper::ValueToPos);
+      ImGui::SameLine();
+      AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", halfW);
+
+      // Row 6, left cell only: the right cell is the one deliberate spare
+      // (P6). The `bool tmp` dance is required - ModCheckbox reports a
+      // modulator-driven flip only through its return value.
+      {
+         const float y = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, y));
+         bool cross = n->crossthrough;
+         if (ModCheckbox("crossthrough##slicerCrossthrough", &cross))
+         {
+            PushUndoCheckpoint();
+            n->crossthrough = cross;
+         }
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("crossthrough",
+                            n->crossthrough ? "slices run past their own boundary"
+                                            : "each slice stops at the next onset");
+      }
+      (void)gap;
 
       EndAudioBody();
    }
@@ -19422,6 +19770,8 @@ namespace
          DrawPluginBody(gn, n);
       else if (auto* n = dynamic_cast<SamplerNode*>(gn.node.get()))
          DrawSamplerBody(gn, n);
+      else if (auto* n = dynamic_cast<SlicerNode*>(gn.node.get()))
+         DrawSlicerBody(gn, n);
       else if (auto* n = dynamic_cast<PaulStretchNode*>(gn.node.get()))
          DrawPaulStretchBody(gn, n);
       else if (auto* n = dynamic_cast<MolderNode*>(gn.node.get()))
@@ -25403,6 +25753,7 @@ namespace
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Equation Synth", "A synth defined by a live formula (y = f(x, a, b, c, d, t)) instead of a fixed waveform - knobs a-d feed the equation directly, so turning them reshapes the waveform itself rather than modulating a preset one." },
          { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
+         { "Slicer", "Chops a sample into slices and maps them chromatically to the keyboard from MIDI note 36 upward - note 36 plays slice 1, 37 plays slice 2, and so on. A note past the last slice is silent; it does not wrap round to slice 1. Load a file (or drag one in from the Samples panel), or record from the audio input pin. slice by picks where the boundaries come from: onsets runs transient detection over the sample on a background thread, grid divides it arithmetically at the *global transport tempo* (there is no per-node bpm - change the tempo and the grid follows). sensitivity is the detection threshold and is the only control that re-runs the analysis; onsets just caps the result to the strongest N, and division/slice by recompute boundaries instantly. Click a slice band in the waveform to audition it, and in onsets mode drag any marker to move a boundary by hand - hand-edited markers are saved with the patch. Two separate controls decide how long a slice lasts: crossthrough sets whether playback may run PAST the slice's own next onset (off by default - each slice stops where the next begins), while decay shapes only the amplitude envelope, reading 'hold' at the top of its throw where the slice stays at full level. So: crossthrough off + hold is the classic tight chop; crossthrough off + a decay ends at whichever comes first; crossthrough on + hold plays through the rest of the sample; crossthrough on + a decay is a one-shot with a tail over the rest of the break. attack extends each slice's own fade-in from instant up to half a second." },
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
@@ -26010,6 +26361,7 @@ namespace
                { "Wavetable Synth", "Multi-voice polyphonic wavetable oscillator (up to 8 voices) with two independent A/B wavetable engines crossfaded against each other, wavetable position morphing, detuned unison, and integrated stereo spread." },
                { "Sampler", "High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback." },
                { "Drum Sequencer", "8-lane pattern drum sequencer with individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, and decay envelopes." },
+               { "Slicer", "Transient- or grid-sliced sample playback: chops a loaded sample into up to 64 slices and maps them chromatically from MIDI note 36, with draggable slice markers, a per-slice attack/decay pair, and a crossthrough toggle that lets a slice run past its own boundary." },
                { "Equation Synth", "Real-time bytebeat and mathematical expression synthesis evaluating user formulas with dynamic variables (t, x, y, inputs)." },
                { "Wave Terrain Synth", "2D terrain trajectory orbital synthesis - a moving point traces a path across a height-mapped surface to generate a waveform." },
                { "Spectral Synth", "Additive harmonic-bank synthesis with overtone-series sculpting." },
@@ -36633,6 +36985,434 @@ static bool RunAudioDisplacementFixture()
    return all;
 }
 
+// Slicer: synthesises a WAV with transients at known positions, asserts the
+// detector finds them, that each slice triggers from its own MIDI note (36 +
+// k), that a note past the last slice is silent, that grid mode at a known
+// transport tempo produces the arithmetically expected boundaries, that
+// `crossthrough` off confines a slice to its own next onset and on lets it
+// run past, and that `attack` actually ramps the slice in (against a
+// zero-attack control render).
+static bool RunSlicerFixture()
+{
+   const int sampleRate = 44100;
+   const int numFrames = sampleRate; // 1.0 s
+   const double kBurstSeconds[4] = { 0.0, 0.25, 0.5, 0.75 };
+   const int kNumBursts = 4;
+
+   std::vector<float> mono((size_t)numFrames, 0.0f);
+   for (int b = 0; b < kNumBursts; b++)
+   {
+      const int start = (int)(kBurstSeconds[b] * sampleRate);
+      // 120 ms bursts whose envelope reaches ~e^-24 by the end: a hard cutoff
+      // while the tone is still audible is itself a broadband transient, and
+      // the detector rightly reports it as a fifth onset.
+      const int burstLen = (int)(0.12 * sampleRate);
+      for (int i = 0; i < burstLen && start + i < numFrames; i++)
+      {
+         const float t = (float)i / (float)sampleRate;
+         const float env = std::exp(-t * 200.0f);
+         mono[start + i] = env * (0.9f * sinf(2.0f * 3.14159265f * 220.0f * t) +
+                                  0.35f * sinf(2.0f * 3.14159265f * 1750.0f * t));
+      }
+   }
+
+   const std::string path = TmpPath("infinite_slicer_fixture.wav");
+   {
+      std::vector<int16_t> pcm((size_t)numFrames);
+      for (int i = 0; i < numFrames; i++)
+         pcm[i] = (int16_t)(std::clamp(mono[i], -1.0f, 1.0f) * 32000.0f);
+      std::ofstream f(path, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+      writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)pcm.data(), dataSize);
+   }
+
+   // A second, deliberately DIFFERENT signal for the attack test: 1.0 s of
+   // constant-amplitude 220 Hz sine. The burst WAV above cannot be used -
+   // its bursts are exp(-t*200) enveloped, so by t = 50 ms the source itself
+   // is already ~4.5e-5 and a 50 ms attack would measure as a false FAIL.
+   const std::string sinePath = TmpPath("infinite_slicer_attack.wav");
+   {
+      std::vector<int16_t> pcm((size_t)numFrames);
+      for (int i = 0; i < numFrames; i++)
+      {
+         const float t = (float)i / (float)sampleRate;
+         pcm[i] = (int16_t)(0.8f * sinf(2.0f * 3.14159265f * 220.0f * t) * 32000.0f);
+      }
+      std::ofstream f(sinePath, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+      writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)pcm.data(), dataSize);
+   }
+
+   bool ok = true;
+
+   // Cooks until the analysis worker has published its result (analysis runs
+   // on its own thread, exactly as it does in the app).
+   auto settle = [](SlicerNode& node, int& frame)
+   {
+      for (int i = 0; i < 400; i++)
+      {
+         node.CookIfNeeded(frame++);
+         if (!node.IsAnalyzing() && node.SliceCount() > 1)
+            return true;
+         std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      }
+      node.CookIfNeeded(frame++);
+      return false;
+   };
+
+   // ---- 1. detection: four slices, each within 15 ms of the truth --------
+   {
+      SlicerNode node;
+      int frame = 1;
+      if (!node.LoadFile(path))
+      {
+         printf("SLICERTEST BUG (fixture failed to load its own test file)\n");
+         return false;
+      }
+      settle(node, frame);
+
+      const std::vector<float>& slices = node.Slices();
+      if ((int)slices.size() != kNumBursts)
+      {
+         printf("SLICERTEST detected %d slices, expected %d FAIL\n", (int)slices.size(), kNumBursts);
+         ok = false;
+      }
+      else
+      {
+         for (int i = 0; i < kNumBursts; i++)
+         {
+            const double got = (double)slices[i] * numFrames / sampleRate;
+            const double err = std::fabs(got - kBurstSeconds[i]);
+            if (err > 0.015)
+            {
+               printf("SLICERTEST slice %d at %.4fs, expected %.4fs (err %.1f ms) FAIL\n", i, got,
+                      kBurstSeconds[i], err * 1000.0);
+               ok = false;
+            }
+         }
+      }
+   }
+
+   // Renders a single note-on into `out` (mono, `frames` long) and returns
+   // false only if the fixture's own WAV failed to load. `grid` picks grid
+   // mode (deterministic boundaries, no analysis wait) instead of onsets.
+   auto renderNoteBuf = [&](const std::string& wavPath, int note, int frames, float attackMs,
+                            float decayMs, bool crossthrough, bool grid,
+                            std::vector<float>& out) -> bool
+   {
+      SlicerNode node;
+      int frame = 1;
+      if (!node.LoadFile(wavPath))
+         return false;
+      if (grid)
+      {
+         node.sliceBy = 1;
+         node.division = 0; // 1/4 -> 0.5 s at 120 BPM, one boundary in 1.0 s
+      }
+      else
+      {
+         settle(node, frame);
+      }
+
+      // These reach the audio thread ONLY through PushParams, which runs
+      // inside CookIfNeeded - so they must be set before that cook, not
+      // after it.
+      node.attack = attackMs;
+      node.decay = decayMs;
+      node.crossthrough = crossthrough;
+
+      AudioNode* an = node.GetAudioNode();
+      an->PrepareToPlay((double)sampleRate, frames);
+      node.CookIfNeeded(frame++);
+
+      NoteEventQueue queue;
+      const int cursor = queue.RegisterConsumer();
+      an->SetNoteInbox(&queue, cursor);
+      NoteEvent on;
+      on.note = note;
+      on.velocity = 1.0f;
+      on.isNoteOn = true;
+      on.frameOffset = 0;
+      queue.Push(on);
+
+      std::vector<float> l((size_t)frames, 0.0f), r((size_t)frames, 0.0f);
+      float* chans[2] = { l.data(), r.data() };
+      AudioBuffer buf;
+      buf.channels = chans;
+      buf.numChannels = 2;
+      buf.numFrames = frames;
+      an->ProcessBlock(nullptr, 0, buf);
+
+      out = std::move(l);
+      return true;
+   };
+
+   auto peakRange = [](const std::vector<float>& v, int lo, int hi) -> float
+   {
+      float peak = 0.0f;
+      for (int i = std::max(0, lo); i < std::min((int)v.size(), hi); i++)
+         peak = std::max(peak, std::fabs(v[i]));
+      return peak;
+   };
+   auto rmsRange = [](const std::vector<float>& v, int lo, int hi) -> float
+   {
+      double acc = 0.0;
+      int n = 0;
+      for (int i = std::max(0, lo); i < std::min((int)v.size(), hi); i++)
+      {
+         acc += (double)v[i] * (double)v[i];
+         n++;
+      }
+      return (n > 0) ? (float)std::sqrt(acc / n) : 0.0f;
+   };
+
+   // ---- 2. every slice triggers from 36 + k; 36 + count is silent -------
+   {
+      auto renderNote = [&](int note, int frames) -> float
+      {
+         SlicerNode node;
+         int frame = 1;
+         if (!node.LoadFile(path))
+            return -1.0f;
+         settle(node, frame);
+
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay((double)sampleRate, frames);
+         node.CookIfNeeded(frame++);
+
+         NoteEventQueue queue;
+         const int cursor = queue.RegisterConsumer();
+         an->SetNoteInbox(&queue, cursor);
+         NoteEvent on;
+         on.note = note;
+         on.velocity = 1.0f;
+         on.isNoteOn = true;
+         on.frameOffset = 0;
+         queue.Push(on);
+
+         std::vector<float> l((size_t)frames, 0.0f), r((size_t)frames, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = frames;
+         an->ProcessBlock(nullptr, 0, buf);
+
+         float peak = 0.0f;
+         for (float v : l)
+            peak = std::max(peak, std::fabs(v));
+         return peak;
+      };
+
+      for (int k = 0; k < kNumBursts; k++)
+      {
+         const float peak = renderNote(SlicerNode::kBaseNote + k, 2048);
+         if (peak < 0.0f)
+         {
+            printf("SLICERTEST BUG (fixture failed to load its own test file)\n");
+            return false;
+         }
+         if (peak < 0.05f)
+         {
+            printf("SLICERTEST note %d (slice %d) rendered silence (peak %.5f) FAIL\n",
+                   SlicerNode::kBaseNote + k, k, peak);
+            ok = false;
+         }
+      }
+
+      // A note past the last slice must be silent - no wrap, no clamp, no
+      // fall back to slice 0.
+      const float overflow = renderNote(SlicerNode::kBaseNote + kNumBursts, 2048);
+      if (overflow > 1.0e-5f)
+      {
+         printf("SLICERTEST note %d past the last slice was not silent (peak %.5f) FAIL\n",
+                SlicerNode::kBaseNote + kNumBursts, overflow);
+         ok = false;
+      }
+   }
+
+   // ---- 3. grid mode boundaries are arithmetic from the transport tempo --
+   {
+      const float savedTempo = Transport::Instance().Tempo();
+      Transport::Instance().SetTempo(120.0f);
+
+      SlicerNode node;
+      int frame = 1;
+      node.LoadFile(path);
+      settle(node, frame);
+      node.sliceBy = 1;   // grid
+      node.division = 0;  // 1/4 -> 0.5 s at 120 BPM
+      node.CookIfNeeded(frame++);
+
+      const std::vector<float>& slices = node.Slices();
+      const double expectedLen = 0.5;
+      const int expectedCount = 2; // ceil(1.0 / 0.5)
+      if ((int)slices.size() != expectedCount)
+      {
+         printf("SLICERTEST grid 1/4 @120bpm gave %d slices, expected %d FAIL\n",
+                (int)slices.size(), expectedCount);
+         ok = false;
+      }
+      else
+      {
+         for (int i = 0; i < expectedCount; i++)
+         {
+            const double got = (double)slices[i] * numFrames / sampleRate;
+            if (std::fabs(got - (double)i * expectedLen) > 0.001)
+            {
+               printf("SLICERTEST grid boundary %d at %.4fs, expected %.4fs FAIL\n", i, got,
+                      (double)i * expectedLen);
+               ok = false;
+            }
+         }
+      }
+
+      // 1/8T at 120 BPM: 0.25 * 2/3 = 0.16667 s.
+      node.division = 2;
+      node.CookIfNeeded(frame++);
+      const std::vector<float>& trip = node.Slices();
+      const double tripLen = (60.0 / 120.0) * (4.0 / 8.0) * (2.0 / 3.0);
+      if (trip.size() < 2 ||
+          std::fabs((double)trip[1] * numFrames / sampleRate - tripLen) > 0.001)
+      {
+         printf("SLICERTEST grid 1/8T boundary wrong FAIL\n");
+         ok = false;
+      }
+
+      Transport::Instance().SetTempo(savedTempo);
+   }
+
+   // ---- 4. onsets cap and division changes must NOT relaunch the worker --
+   {
+      SlicerNode node;
+      int frame = 1;
+      node.LoadFile(path);
+      settle(node, frame);
+      node.onsets = 2;
+      node.CookIfNeeded(frame++);
+      if (node.IsAnalyzing())
+      {
+         printf("SLICERTEST changing 'onsets' relaunched the analysis worker FAIL\n");
+         ok = false;
+      }
+      if (node.SliceCount() != 2)
+      {
+         printf("SLICERTEST onsets cap of 2 gave %d slices FAIL\n", node.SliceCount());
+         ok = false;
+      }
+      node.sliceBy = 1;
+      node.division = 5;
+      node.CookIfNeeded(frame++);
+      if (node.IsAnalyzing())
+      {
+         printf("SLICERTEST changing 'slice by'/'division' relaunched the worker FAIL\n");
+         ok = false;
+      }
+   }
+
+   // ---- 5. crossthrough OFF confines a slice to its own next onset ------
+   // The assertion the whole feature exists for. Boundary = slice 1 at
+   // 0.25 s = frame 11025; the +/-256 guard covers the 3 ms (132-frame)
+   // fade-out plus interpolation slop.
+   {
+      const int boundary = (int)(0.25 * sampleRate);
+      std::vector<float> outL;
+      if (!renderNoteBuf(path, SlicerNode::kBaseNote, 16384, 0.0f, 5000.0f, /*cross=*/false,
+                         /*grid=*/false, outL))
+      {
+         printf("SLICERTEST BUG (fixture failed to load its own test file)\n");
+         return false;
+      }
+      const float before = peakRange(outL, 0, boundary - 256);
+      const float after = peakRange(outL, boundary + 256, 16384);
+      if (before < 0.05f)
+      {
+         printf("SLICERTEST crossthrough off: slice never sounded (peak %.5f) FAIL\n", before);
+         ok = false;
+      }
+      if (after > 1.0e-4f)
+      {
+         printf("SLICERTEST crossthrough off: slice ran past its own next onset "
+                "(peak %.5f after frame %d) FAIL\n", after, boundary + 256);
+         ok = false;
+      }
+   }
+
+   // ---- 6. crossthrough ON keeps going past the boundary ----------------
+   {
+      const int boundary = (int)(0.25 * sampleRate);
+      std::vector<float> outL;
+      if (!renderNoteBuf(path, SlicerNode::kBaseNote, 16384, 0.0f, 5000.0f, /*cross=*/true,
+                         /*grid=*/false, outL))
+      {
+         printf("SLICERTEST BUG (fixture failed to load its own test file)\n");
+         return false;
+      }
+      const float after = peakRange(outL, boundary + 256, 16384);
+      if (after < 0.05f)
+      {
+         printf("SLICERTEST crossthrough on: slice stopped at its boundary anyway "
+                "(peak %.5f after frame %d) FAIL\n", after, boundary + 256);
+         ok = false;
+      }
+   }
+
+   // ---- 7. attack ramps the slice in; attack 0 does not -----------------
+   // Uses the constant-amplitude sine, never the burst WAV. RMS, not peak:
+   // a 220 Hz carrier's zero crossings make a short-window peak noisy.
+   {
+      const float savedTempo = Transport::Instance().Tempo();
+      Transport::Instance().SetTempo(120.0f);
+
+      std::vector<float> withAttack, control;
+      const bool okA = renderNoteBuf(sinePath, SlicerNode::kBaseNote, 16384, 50.0f, 5000.0f,
+                                     /*cross=*/false, /*grid=*/true, withAttack);
+      const bool okB = renderNoteBuf(sinePath, SlicerNode::kBaseNote, 16384, 0.0f, 5000.0f,
+                                     /*cross=*/false, /*grid=*/true, control);
+      Transport::Instance().SetTempo(savedTempo);
+
+      if (!okA || !okB)
+      {
+         printf("SLICERTEST BUG (fixture failed to load its own attack test file)\n");
+         return false;
+      }
+
+      // 50 ms attack = 2205 frames. First 10 ms vs ~40-60 ms, still climbing.
+      const float earlyA = rmsRange(withAttack, 0, 441);
+      const float lateA = rmsRange(withAttack, 1764, 2646);
+      const float earlyB = rmsRange(control, 0, 441);
+      const float lateB = rmsRange(control, 1764, 2646);
+
+      if (!(lateA > 1.0e-3f && earlyA * 10.0f < lateA))
+      {
+         printf("SLICERTEST attack 50 ms did not ramp: rms(0-10ms)=%.6f rms(40-60ms)=%.6f FAIL\n",
+                earlyA, lateA);
+         ok = false;
+      }
+      if (!(lateB > 1.0e-3f && earlyB > lateB * 0.5f && earlyB < lateB * 2.0f))
+      {
+         printf("SLICERTEST attack 0 control was not flat: rms(0-10ms)=%.6f rms(40-60ms)=%.6f "
+                "FAIL\n", earlyB, lateB);
+         ok = false;
+      }
+   }
+
+   printf("SLICERTEST %s\n", ok ? "OK" : "FAIL");
+   return ok;
+}
+
 static int RunDspTest()
 {
    const bool gainOk = RunGainFixture();
@@ -36647,6 +37427,7 @@ static int RunDspTest()
    const bool delayOk = RunDelayFixture();
    const bool reverbOk = RunReverbFixture();
    const bool samplerOk = RunSamplerFixture();
+   const bool slicerOk = RunSlicerFixture();
    const bool portableFftOk = RunPortableFftFixture();
    const bool paulStretchOk = RunPaulStretchFixture();
    const bool granularOk = RunGranularFixture();
@@ -36660,7 +37441,7 @@ static int RunDspTest()
    const bool equationOk = RunEquationFixture();
    const bool audioDisplacementOk = RunAudioDisplacementFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
-                    musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk &&
+                    musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk && slicerOk &&
                     paulStretchOk && granularOk && drumSeqOk && wavetableShaperOk && eqOk && noteStackOk &&
                     freqShifterOk && spectralSynthOk && waveTerrainOk && equationOk && audioDisplacementOk &&
                     portableFftOk;
@@ -44806,6 +45587,40 @@ int main(int argc, char** argv)
             if (auto* samplerFixture = dynamic_cast<SamplerNode*>(gNodes[24].node.get()))
                samplerFixture->LoadFile(fixtureWav);
          }
+         // Appended AFTER every earlier spawn on purpose: the block below
+         // indexes gNodes[24] (Sampler), [26] (EQ), [1], [3], [4], [6], [7],
+         // [8] by hard-coded number, so inserting anywhere earlier silently
+         // breaks the fixture.
+         SpawnNode("Slicer", "Synths", 5900.0f, 20.0f);                 // 31
+         {
+            // Multi-transient WAV so the slicer's body draws real markers and
+            // a real slice count rather than the empty placeholder.
+            const std::string slicerWav = TmpPath("infinite_audiouitest_slicer.wav");
+            const int slicerFrames = 44100;
+            std::vector<int16_t> slicerPcm(slicerFrames, 0);
+            for (int b = 0; b < 4; b++)
+            {
+               const int start = (int)(0.25 * b * 44100);
+               for (int i = 0; i < 1323 && start + i < slicerFrames; i++)
+               {
+                  const float t = (float)i / 44100.0f;
+                  const float env = expf(-t * 120.0f);
+                  slicerPcm[start + i] = (int16_t)(env * sinf(2.0f * 3.14159265f * 220.0f * t) * 30000.0f);
+               }
+            }
+            std::ofstream sf(slicerWav, std::ios::binary);
+            auto writeU32s = [&](uint32_t v) { sf.write((const char*)&v, 4); };
+            auto writeU16s = [&](uint16_t v) { sf.write((const char*)&v, 2); };
+            const uint32_t slicerDataSize = (uint32_t)(slicerPcm.size() * sizeof(int16_t));
+            sf.write("RIFF", 4); writeU32s(36 + slicerDataSize); sf.write("WAVE", 4);
+            sf.write("fmt ", 4); writeU32s(16); writeU16s(1); writeU16s(1);
+            writeU32s(44100); writeU32s(44100 * 2); writeU16s(2); writeU16s(16);
+            sf.write("data", 4); writeU32s(slicerDataSize);
+            sf.write((const char*)slicerPcm.data(), slicerDataSize);
+            sf.close();
+            if (auto* slicerFixture = dynamic_cast<SlicerNode*>(gNodes.back().node.get()))
+               slicerFixture->LoadFile(slicerWav);
+         }
          {
             // Same idea, for the Drum Sequencer's lane 0/1: a loaded sample
             // and an armed step or two so the fixture's screenshot shows the
@@ -48348,6 +49163,7 @@ int main(int argc, char** argv)
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
          SamplerNode* dropTargetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasPos);
+         SlicerNode* dropTargetSlicer = FindNodeUnderCanvasPoint<SlicerNode>(canvasPos);
          PaulStretchNode* dropTargetPaul = FindNodeUnderCanvasPoint<PaulStretchNode>(canvasPos);
          GranularNode* dropTargetGran = FindNodeUnderCanvasPoint<GranularNode>(canvasPos);
          MolderNode* dropTargetMolder = FindNodeUnderCanvasPoint<MolderNode>(canvasPos);
@@ -48508,6 +49324,14 @@ int main(int argc, char** argv)
                   ensureDroppedCheckpoint();
                   dropTargetSampler->LoadFile(path);
                   dropTargetSampler = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
+               if (dropTargetSlicer != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetSlicer->LoadFile(path);
+                  dropTargetSlicer = nullptr;
                   gPatchDirty = true;
                   continue;
                }
@@ -60558,6 +61382,13 @@ int main(int argc, char** argv)
                   // Dropped onto an existing Sampler: swap its file.
                   PushUndoCheckpoint();
                   targetSampler->LoadFile(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (SlicerNode* targetSlicer = FindNodeUnderCanvasPoint<SlicerNode>(canvasMouse))
+               {
+                  // Dropped onto an existing Slicer: swap its file and re-slice.
+                  PushUndoCheckpoint();
+                  targetSlicer->LoadFile(gSampleDragPath);
                   gPatchDirty = true;
                }
                else if (PaulStretchNode* targetPaul = FindNodeUnderCanvasPoint<PaulStretchNode>(canvasMouse))
