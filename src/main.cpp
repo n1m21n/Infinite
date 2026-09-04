@@ -135,9 +135,11 @@ namespace
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/FieldElementNode.h"
+#include "nodes/FieldPrimitiveNode.h"
 #include "nodes/FieldGraphNode.h"
 #include "nodes/FieldPixelNode.h"
 #include "nodes/FieldSampleNode.h"
+#include "nodes/FieldSynthNode.h"
 #include "nodes/SceneNodes.h"
 #include "nodes/EnvironmentNode.h"
 #include "nodes/ModelSourceNode.h"
@@ -420,8 +422,12 @@ namespace
    // NodeFactory's raw listing.
    bool IsUserSpawnable(const std::string& name)
    {
+      // Field Graph stays registered (NodeFactory::MakeNode) so a patch saved
+      // with one still loads, but is no longer creatable from the spawn menu
+      // or search - see the device-catalog simplification's REGISTER_NODE
+      // comment in main.cpp.
       return name != "Delete Selected" && name != "Transform Selected" &&
-             name != "Extrude Selected" && name != "Group";
+             name != "Extrude Selected" && name != "Group" && name != "Field Graph";
    }
 
    // GeometryOpNode shares one node type across every mesh operator, and its
@@ -666,6 +672,39 @@ namespace
    bool CheckFieldLiveCableBridge(int nodeIndex, int slot, bool isOutput)
    {
       return isOutput ? FieldOutputPinHasLiveCable(nodeIndex, slot) : FieldInputPinHasLiveCable(nodeIndex, slot);
+   }
+
+   void DisconnectLinkById(int id); // forward decl - defined below, used by the bridge just after it
+
+   // Sibling bridge to CheckFieldLiveCableBridge, installed into
+   // Field::gLiveCableDisconnector - severs every live cable on the given
+   // pin at its real node-graph source (same DisconnectLinkById used by
+   // interactive cable delete) instead of refusing the reconcile. gLinks is
+   // rebuilt from live node pointers every frame (see its own comment), so
+   // clearing the pointer here is enough - no separate ed:: bookkeeping
+   // needed for the change to stick on the next frame.
+   void DisconnectFieldPinBridge(int nodeIndex, int slot, bool isOutput)
+   {
+      std::vector<int> ids;
+      for (const LinkInfo& link : gLinks)
+      {
+         if (isOutput)
+         {
+            if (GraphNode::IsOutputPin(link.srcPin) &&
+                GraphNode::NodeIndexFromPin(link.srcPin) == nodeIndex &&
+                GraphNode::OutputIndexFromPin(link.srcPin) == slot)
+               ids.push_back(link.id);
+         }
+         else
+         {
+            if (GraphNode::IsInputPin(link.dstPin) &&
+                GraphNode::NodeIndexFromPin(link.dstPin) == nodeIndex &&
+                GraphNode::InputSlotFromPin(link.dstPin) == slot)
+               ids.push_back(link.id);
+         }
+      }
+      for (int id : ids)
+         DisconnectLinkById(id);
    }
    bool gSnapToGrid = true;
    float gGridSnap = 20.0f;
@@ -1079,10 +1118,14 @@ namespace
    bool gFormulaEditorOpen = false;
    FieldElementNode* gFieldElementEditor = nullptr;
    bool gFieldElementEditorOpen = false;
+   FieldPrimitiveNode* gFieldPrimitiveEditor = nullptr;
+   bool gFieldPrimitiveEditorOpen = false;
    FieldPixelNode* gFieldPixelEditor = nullptr;
    bool gFieldPixelEditorOpen = false;
    FieldSampleNode* gFieldSampleEditor = nullptr;
    bool gFieldSampleEditorOpen = false;
+   FieldSynthNode* gFieldSynthEditor = nullptr;
+   bool gFieldSynthEditorOpen = false;
    // Live-preview state for the Field editor windows. One editor of each
    // kind can be open at a time (singleton gField*Editor above), so a single
    // dedicated instance is enough - no per-node map needed like the node
@@ -4016,7 +4059,8 @@ namespace
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
       REGISTER_NODE(SetColorNode, Set Color, "3D");
       REGISTER_NODE(WrapNode, Wrap, "3D");
-      REGISTER_NODE(FieldElementNode, Field Element, "3D");
+      REGISTER_NODE(FieldElementNode, Field Modifier, "3D");
+      REGISTER_NODE(FieldPrimitiveNode, Field Primitive, "3D");
       REGISTER_NODE(DistributePointsOnFacesNode, Distribute Points on Faces, "3D");
       REGISTER_NODE(PointsToVerticesNode, Points to Vertices, "3D");
       REGISTER_NODE(DistributePointsInGridNode, Distribute Points in Grid, "3D");
@@ -4104,7 +4148,12 @@ namespace
       REGISTER_NODE(MolderNode, Molder, "Synths");
       REGISTER_NODE(GrainMolderNode, Grain Molder, "Synths");
       REGISTER_NODE(GranularNode, Granular, "Synths");
-      REGISTER_NODE(FieldSampleNode, Field Sample, "Synths");
+      REGISTER_NODE(FieldSynthNode, Field Synth, "Synths");
+      REGISTER_NODE(FieldSampleNode, Field Effect, "AudioEffects");
+      // Field Graph: registered so NodeFactory::MakeNode still resolves it
+      // for loading a patch saved before this pass, but excluded from every
+      // spawn-menu/search enumeration via IsUserSpawnable below - it can no
+      // longer be newly created, per the device-catalog simplification.
       REGISTER_NODE(FieldGraphNode, Field Graph, "Utility");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
@@ -4335,10 +4384,10 @@ namespace
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
-         // Dynamic pins, Phase 2b (build step 13, §5.7): the native "src"
-         // texture input at slot 0, then one slot per currently-declared
+         // Dynamic pins, Phase 2b (build step 13, §5.7): no native input pin
+         // (device-catalog simplification) - one slot per currently-declared
          // `input image` pin.
-         return 1 + fp->DeclaredImageInputCount();
+         return fp->DeclaredImageInputCount();
       if (dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr)
          return 1; // the kernel's optional "geo" input (generator when unwired)
       // (Audio Analyze used to need an entry here for its fileSource pin; it
@@ -4479,13 +4528,10 @@ namespace
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
-      {
-         // Dynamic pins, Phase 2b (build step 13, §5.7): slot 0 is the
-         // native "src" input; slot 1..N route to the currently-declared
-         // `input image` pins in PinTable order.
-         if (slot == 0) return &fp->TextureInput();
-         return fp->DeclaredImageInput(slot - 1);
-      }
+         // Dynamic pins, Phase 2b (build step 13, §5.7): no native input pin
+         // (device-catalog simplification) - slot 0..N-1 route to the
+         // currently-declared `input image` pins in PinTable order.
+         return fp->DeclaredImageInput(slot);
       if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
          return slot == 0 ? &model->TextureInput() : nullptr;
       if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
@@ -4717,6 +4763,15 @@ namespace
       auto* dstSetColor = dynamic_cast<SetColorNode*>(dstNode.node.get());
 
       auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode.node.get());
+      // A geometry-source node can have non-geometry outputs too (e.g. Field
+      // Modifier's "chime"/"glow" declared pins alongside its primary "geo"
+      // mesh output) - only wire the real mesh through if the dragged output
+      // index is actually the geometry one. Without this check, every caller
+      // that reaches this function (including the drag-to-empty-canvas spawn
+      // flow) silently treats any output of a geometry node as if it were the
+      // mesh, regardless of which pin was actually dragged.
+      if (srcGeometry != nullptr && !srcGeometry->IsGeometryOutputIndex(srcOutputIndex))
+         srcGeometry = nullptr;
       auto* srcCamera = dynamic_cast<CameraNode*>(srcNode.node.get());
       auto* srcLight = dynamic_cast<LightNode*>(srcNode.node.get());
       auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode.node.get());
@@ -4874,6 +4929,8 @@ namespace
                                    ModulatorForOutput(srcNode->node.get(), srcOutputIndex) != nullptr;
       auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode->node.get());
       auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode->node.get());
+      if (srcGeometry != nullptr && !srcGeometry->IsGeometryOutputIndex(srcOutputIndex))
+         srcGeometry = nullptr;
       auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
       auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
       const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
@@ -5058,6 +5115,8 @@ namespace
          (srcNode->node->OutputCount() > 0 && srcNode->node->ModulatorOutput(0) != nullptr);
       auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode->node.get());
       auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode->node.get());
+      if (srcGeometry != nullptr && !srcGeometry->IsGeometryOutputIndex(srcOutputIndex))
+         srcGeometry = nullptr;
       auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
       auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
       const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
@@ -5234,12 +5293,16 @@ namespace
          formula->Apply();
       if (auto* fe = dynamic_cast<FieldElementNode*>(node))
          fe->Apply();
+      if (auto* fpn = dynamic_cast<FieldPrimitiveNode*>(node))
+         fpn->Apply();
       if (auto* fgn = dynamic_cast<FieldGraphNode*>(node))
          fgn->Apply(); // compile-only (T11) - never Regenerate() from here
       if (auto* fp = dynamic_cast<FieldPixelNode*>(node))
          fp->Apply();
       if (auto* fs = dynamic_cast<FieldSampleNode*>(node))
          fs->Apply();
+      if (auto* fsn = dynamic_cast<FieldSynthNode*>(node))
+         fsn->Apply();
       // Re-instantiates the plugin from the identity VisitParams just restored
       // and queues its saved fullState; the actual load finishes
       // asynchronously, a frame or two later, in CookIfNeeded.
@@ -8274,49 +8337,34 @@ namespace
       gAudioBodyW = gAudioContentW = kPreviewSize;
    }
 
-   // Chunks a Field node's variable-length declared-param list into 2-knob
-   // rows. 2 per row, not the 3-4 a full-width audio node's cellW affords -
-   // kPreviewSize (190px) is closer to kAudioNarrowWidth (200px) than to
-   // kAudioNodeWidth (440px), and a 3-cell row at 190px leaves ~63px per
-   // cell, too tight for a user-authored param name caption under a 56px
-   // knob without clipping into the next cell.
-   //
-   // Passes each param's stable `id` through as AudioKnobRow::Knob's
-   // explicitParamIndex - NOT the row's draw-order index. Field's dynamic-
-   // pins design (build steps 11-14) keys a param's modulation cable pin to
-   // that id specifically so a cable stays attached to the right param
-   // when another param is declared or removed above it in the source and
-   // every subsequent draw-order index shifts; falling back to ModKnob's
-   // default gParamCounter++ numbering here would silently reassign pins
-   // out from under existing cables the next time the param count changed.
+   // Field-declared params (`param float ...`) get explicit pin indices from
+   // ParamTable's own id counter (starting at 1) so they stay stable across
+   // recompiles even as native controls are added/removed above them in the
+   // same node body. Offsetting them into their own sub-range keeps them from
+   // colliding with gParamCounter-numbered native controls drawn earlier in
+   // the same node (see PINDUPTEST / FieldPrimitiveNode's "count"+"max
+   // elements" collision: two native int sliders claimed indices 0 and 1,
+   // and the first declared param, with p.id == 1, collided with the second).
+   const int kFieldDeclaredParamBase = 50;
+
+   template <typename NodeT>
+   void DrawFieldParamSliders(NodeT* n)
+   {
+      auto& allParams = n->GetParamTable().Params();
+      for (auto& p : allParams)
+      {
+         if (p.isDeclared)
+         {
+            const int paramIndex = kFieldDeclaredParamBase + p.id;
+            ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, paramIndex);
+         }
+      }
+   }
+
    template <typename NodeT>
    void DrawFieldParamKnobGrid(NodeT* n)
    {
-      auto& allParams = n->GetParamTable().Params();
-      std::vector<int> declaredIdx;
-      for (int i = 0; i < (int)allParams.size(); i++)
-      {
-         if (allParams[i].isDeclared)
-            declaredIdx.push_back(i);
-      }
-      for (size_t i = 0; i < declaredIdx.size(); i += 2)
-      {
-         AudioKnobRow row(2);
-         auto& p0 = allParams[declaredIdx[i]];
-         row.Knob(p0.name.c_str(), &p0.value, p0.minValue, p0.maxValue, "%.3f", kKnobSmall, false, false,
-                  AudioWidgetStyle::Knob, nullptr, nullptr, p0.id);
-         if (i + 1 < declaredIdx.size())
-         {
-            auto& p1 = allParams[declaredIdx[i + 1]];
-            row.Knob(p1.name.c_str(), &p1.value, p1.minValue, p1.maxValue, "%.3f", kKnobSmall, false, false,
-                     AudioWidgetStyle::Knob, nullptr, nullptr, p1.id);
-         }
-         else
-         {
-            row.Skip();
-         }
-         row.End();
-      }
+      DrawFieldParamSliders(n);
    }
 
    // Full- and half-width audio sliders, sized from the content column so
@@ -8461,14 +8509,15 @@ namespace
       // it keeps its DrawVideoParams body (file picker, loop/speed, preview)
       // rather than the generic v3 audio body, which has no case for it and
       // would otherwise drop path/loop/speed/audioEnabled/volume entirely.
-      // FieldSampleNode needs the same carve-out: it has both a NoteCable and
+      // FieldSampleNode needs the same carve-out: it's an IAudioSource with
       // an AudioCable, so it trips this gate, but DrawAudioNodeBody has no
       // case for it either - it rendered as a bare pin column with no "Edit
       // Field..." button and no way to reach DrawFieldSampleParams at all.
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
           dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
           dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr ||
-          dynamic_cast<FieldSampleNode*>(node) != nullptr)
+          dynamic_cast<FieldSampleNode*>(node) != nullptr ||
+          dynamic_cast<FieldSynthNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -8621,6 +8670,63 @@ namespace
       ImGui::Dummy(ImVec2(w, h));
    }
 
+   void DrawFieldSynthScope(FieldSynthNode* n, float h, float width)
+   {
+      const double now = ImGui::GetTime();
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      {
+         float buf[FieldSynthNode::kScopeCacheCapacity];
+         const int count = n->ReadScope(buf, FieldSynthNode::kScopeCacheCapacity);
+         if (count > 0)
+         {
+            std::copy(buf, buf + count, n->scopeCache);
+            n->scopeCacheCount = count;
+         }
+         n->scopeCacheTime = now;
+      }
+
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      for (int i = 1; i < 8; i++)
+         dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
+                     ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (n->scopeCacheCount > 1)
+      {
+         const bool isLight = IsThemeLight();
+         const int count = n->scopeCacheCount;
+         for (int pass = 0; pass < 2; pass++)
+         {
+            dl->PathClear();
+            for (int i = 0; i < count; i++)
+            {
+               const float t = (float)i / (float)(count - 1);
+               const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
+            }
+            const ImU32 strokeCol = isLight
+               ? (pass == 0 ? IM_COL32(30, 110, 230, 50) : IM_COL32(20, 100, 230, 255))
+               : (pass == 0 ? IM_COL32(120, 200, 255, 46) : IM_COL32(150, 214, 255, 245));
+            dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
+         }
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
    void DrawFieldElementParams(FieldElementNode* n)
    {
       n->SetNodeIndex(gCurrentNodeIndex);
@@ -8665,21 +8771,13 @@ namespace
          }
       }
 
-      BeginFieldKnobGrid();
-      {
-         AudioKnobRow row(2);
-         row.KnobInt("max elements", &n->maxElements, 100, 200000);
-         if (!n->input)
-            row.KnobInt("generate count", &n->generateCount, 1, 100000);
-         else
-            row.Skip(); // P5: the cell stays reserved, not removed, while an input is wired
-         row.End();
-      }
+      ModSliderInt("max elements", &n->maxElements, 100, 200000);
+      if (!n->input)
+         ModSliderInt("generate count", &n->generateCount, 1, 100000);
 
       {
          bool publish = n->publishScalarOutput;
-         AudioKnobRow row(1);
-         if (row.Checkbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
+         if (ModCheckbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
          {
             if (!publish && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
             {
@@ -8691,7 +8789,6 @@ namespace
                n->pinRefusal.clear();
             }
          }
-         row.End();
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -8700,7 +8797,79 @@ namespace
          }
       }
 
-      DrawFieldParamKnobGrid(n);
+      DrawFieldParamSliders(n);
+   }
+
+   void DrawFieldPrimitiveParams(FieldPrimitiveNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         DrawFieldDeviceControls<FieldPrimitiveNode>(n, "primitive", &FieldPrimitiveNode::PresetNames(),
+                                                     [](FieldPrimitiveNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldPrimitiveEditor = n;
+            gFieldPrimitiveEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->WasTruncated())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Truncated to %d vertices", n->ActualElementCount());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->State().CellCount() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextDisabled("%s", n->CostReadout());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      ModSliderInt("count", &n->count, 1, 100000);
+      ModSliderInt("max elements", &n->maxElements, 100, 200000);
+
+      {
+         bool publish = n->publishScalarOutput;
+         if (ModCheckbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
+         {
+            if (!publish && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: publish output is still wired";
+            }
+            else
+            {
+               n->publishScalarOutput = publish;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      DrawFieldParamSliders(n);
    }
 
    void DrawFieldSampleParams(FieldSampleNode* n)
@@ -8739,18 +8908,11 @@ namespace
             ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
             ImGui::PopTextWrapPos();
          }
-
-         float rms;
-         if (n->ReadRmsLatest(rms))
-            ImGui::TextDisabled("reduce.rms: %.4f", rms);
       }
 
-      BeginFieldKnobGrid();
       {
          bool expose = n->exposeRmsOutput;
-         AudioKnobRow row(2);
-         row.KnobInt("max voices", &n->maxVoices, 1, 32);
-         if (row.Checkbox("expose rms output", &expose) && expose != n->exposeRmsOutput)
+         if (ModCheckbox("expose rms output", &expose) && expose != n->exposeRmsOutput)
          {
             if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
             {
@@ -8762,7 +8924,6 @@ namespace
                n->pinRefusal.clear();
             }
          }
-         row.End();
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -8771,14 +8932,78 @@ namespace
          }
       }
 
-      DrawFieldParamKnobGrid(n);
+      DrawFieldParamSliders(n);
+   }
+
+   void DrawFieldSynthParams(FieldSynthNode* n)
+   {
+      n->SetNodeIndex(gCurrentNodeIndex);
 
       if (!gParamRegisterOnly)
       {
-         ImGui::Separator();
-         ImGui::TextDisabled("live output");
-         DrawFieldSampleScope(n, 40.0f, kPreviewSize);
+         DrawFieldDeviceControls<FieldSynthNode>(n, "synth", &FieldSynthNode::PresetNames(),
+                                                 [](FieldSynthNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+
+         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldSynthEditor = n;
+            gFieldSynthEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         uint64_t faults = n->FaultCount();
+         if (faults > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
+            ImGui::PopTextWrapPos();
+         }
       }
+
+      {
+         int voices = n->maxVoices;
+         if (ModSliderInt("voices", &voices, 1, 16))
+         {
+            n->maxVoices = voices;
+         }
+      }
+
+      {
+         bool expose = n->exposeRmsOutput;
+         if (ModCheckbox("expose rms output", &expose) && expose != n->exposeRmsOutput)
+         {
+            if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+            {
+               n->pinRefusal = "refused: rms output is still wired";
+            }
+            else
+            {
+               n->exposeRmsOutput = expose;
+               n->pinRefusal.clear();
+            }
+         }
+         if (!gParamRegisterOnly && !n->pinRefusal.empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      DrawFieldParamSliders(n);
    }
 
    void DrawFieldGraphParams(FieldGraphNode* n)
@@ -8832,11 +9057,9 @@ namespace
          }
       }
 
-      BeginFieldKnobGrid();
       {
          bool addTrigger = n->addTriggerInput;
-         AudioKnobRow row(1);
-         if (row.Checkbox("trigger input", &addTrigger) && addTrigger != n->addTriggerInput)
+         if (ModCheckbox("trigger input", &addTrigger) && addTrigger != n->addTriggerInput)
          {
             if (!addTrigger && n->TriggerInputWired())
             {
@@ -8848,7 +9071,6 @@ namespace
                n->pinRefusal.clear();
             }
          }
-         row.End();
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -8857,7 +9079,7 @@ namespace
          }
       }
 
-      DrawFieldParamKnobGrid(n);
+      DrawFieldParamSliders(n);
    }
 
    void DrawFieldPixelParams(FieldPixelNode* n)
@@ -8903,46 +9125,13 @@ namespace
          }
       }
 
-      // Inline live preview (plan §3.2): same GetOutputTexture() the editor
-      // window's own preview reads (main.cpp, "Field pixel editor"), just
-      // smaller - 96x96 vs. the editor's 200px kPreviewSize, since the
-      // compact body has far less room and this is meant as a glance, not a
-      // working canvas. Updates the instant Apply() recompiles; no separate
-      // render path.
-      if (!gParamRegisterOnly)
-      {
-         const float size = 96.0f;
-         unsigned int tex = n->GetOutputTexture();
-         ImVec2 origin = ImGui::GetCursorScreenPos();
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         DrawCheckerboardBackdrop(dl, origin, size);
-         if (tex != 0 && n->GetOutputWidth() > 0)
-         {
-            const float w = (float)n->GetOutputWidth();
-            const float h = (float)n->GetOutputHeight();
-            const float scale = size / std::max(w, h);
-            const ImVec2 dims(w * scale, h * scale);
-            const ImVec2 tl(origin.x + (size - dims.x) * 0.5f, origin.y + (size - dims.y) * 0.5f);
-            dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dims.x, tl.y + dims.y),
-                        ImVec2(0, 1), ImVec2(1, 0));
-         }
-         dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), IM_COL32(70, 74, 90, 255), 4.0f);
-         ImGui::Dummy(ImVec2(size, size));
-      }
-
-      BeginFieldKnobGrid();
-      {
-         AudioKnobRow row(2);
-         row.Knob("width", &n->width, 16.0f, 4096.0f, "%.0f");
-         row.Knob("height", &n->height, 16.0f, 4096.0f, "%.0f");
-         row.End();
-      }
+      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModCheckbox("animate", &n->animate);
 
       {
          bool expose = n->exposeAuxTexture;
-         AudioKnobRow row(2);
-         row.Checkbox("animate", &n->animate);
-         if (row.Checkbox("expose state texture output", &expose) && expose != n->exposeAuxTexture)
+         if (ModCheckbox("expose state texture output", &expose) && expose != n->exposeAuxTexture)
          {
             if (!expose && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
             {
@@ -8954,7 +9143,6 @@ namespace
                n->pinRefusal.clear();
             }
          }
-         row.End();
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -8963,7 +9151,7 @@ namespace
          }
       }
 
-      DrawFieldParamKnobGrid(n);
+      DrawFieldParamSliders(n);
    }
 
    void DrawOscillatorScope(OscillatorNode* n, float h, float width)
@@ -25160,8 +25348,9 @@ namespace
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
          { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
          { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
-         { "Field Element", "Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution." },
-         { "Field Sample", "Runs a Field kernel once per audio sample per voice, on the audio thread - write your own sample-domain synth or effect. `in` is the audio input pin, `state` declares per-voice memory that resets on note-on/steal, `param` exposes a modulatable knob. `reduce.rms(in, loHz, hiHz)` publishes a band-limited RMS meter reading once per block." },
+         { "Field Modifier", "Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution." },
+         { "Field Primitive", "Generates procedural 3D point geometry from scratch using a per-element Field kernel (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot)." },
+         { "Field Effect", "Runs a Field kernel once per audio sample, on the audio thread - write your own sample-domain audio effect. `in` is the audio input pin, `state` declares per-voice memory, `param` exposes a modulatable knob. `reduce.rms(in, loHz, hiHz)` publishes a band-limited RMS meter reading once per block." },
          { "Field Graph", "Runs a Field kernel once, at edit time, to build part of the graph itself - emit(\"Type Name\", k0, k1, ...) spawns a node and hands back a handle, connect()/set()/place() wire it up, set its params and position it. Press Regenerate to re-run: it diffs against what it built last time (by emit-site identity) instead of deleting and respawning, so hand-edits to params on the spawned nodes survive an unrelated Regenerate." },
          { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
          { "Ramp", "Generates a gradient from scratch (no input) between up to 8 user-set colour stops, at a chosen angle, scale and offset. Gamma and dither smooth out visible banding." },
@@ -37583,6 +37772,70 @@ static int RunFieldElementTest()
       else { printf("SECTION 9 (Same Expression Both Domains): FAIL\n"); allOk = false; }
    }
 
+   // 10. FieldPrimitiveNode conformance (pure generator, no input slot, presets compile,
+   //     truncation cap, synthesized mesh generation).
+   {
+      bool secOk = true;
+      FieldPrimitiveNode prim;
+
+      if (prim.GeometryInputSlot(0) != nullptr)
+      {
+         printf("FieldPrimitive: FAIL - GeometryInputSlot must be nullptr for pure generator\n");
+         secOk = false;
+      }
+      if (prim.PassthroughSource() != nullptr)
+      {
+         printf("FieldPrimitive: FAIL - PassthroughSource must be nullptr\n");
+         secOk = false;
+      }
+      if (prim.OutputCount() < 1 || std::string(prim.OutputLabel(0)) != "geo")
+      {
+         printf("FieldPrimitive: FAIL - slot 0 output must be 'geo'\n");
+         secOk = false;
+      }
+
+      // Check all 6 presets compile cleanly
+      for (const auto& preset : FieldPrimitiveNode::Presets())
+      {
+         FieldPrimitiveNode node;
+         node.code = preset.code;
+         if (!node.Apply())
+         {
+            printf("FieldPrimitive: FAIL - preset '%s' did not compile: %s\n", preset.name, node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // Check synthesis and execution
+      prim.count = 64;
+      prim.maxElements = 1000;
+      prim.CookIfNeeded(1);
+      if (prim.GetMesh().vertices.size() != 64)
+      {
+         printf("FieldPrimitive: FAIL - expected 64 vertices, got %zu\n", prim.GetMesh().vertices.size());
+         secOk = false;
+      }
+      if (prim.WasTruncated())
+      {
+         printf("FieldPrimitive: FAIL - count 64 <= max 1000 should not be truncated\n");
+         secOk = false;
+      }
+
+      // Check truncation cap
+      prim.count = 200;
+      prim.maxElements = 50;
+      prim.CookIfNeeded(2);
+      if (prim.GetMesh().vertices.size() != 50 || !prim.WasTruncated())
+      {
+         printf("FieldPrimitive: FAIL - truncation failed (size=%zu, wasTruncated=%d)\n",
+                prim.GetMesh().vertices.size(), prim.WasTruncated());
+         secOk = false;
+      }
+
+      if (secOk) printf("SECTION 10 (FieldPrimitiveNode Pure Generation): OK\n");
+      else { printf("SECTION 10 (FieldPrimitiveNode Pure Generation): FAIL\n"); allOk = false; }
+   }
+
    printf("INFINITE_FIELDELEMENTTEST: %s\n", allOk ? "OK" : "FAIL");
    return allOk ? 0 : 1;
 }
@@ -37758,8 +38011,10 @@ static int RunFieldParamTest()
       }
       else
       {
-         const ParamRef* kAmount = Modulation::Instance().KnownParam(10, amountParam->id);
-         const ParamRef* kSpeed = Modulation::Instance().KnownParam(10, speedParam->id);
+         // Declared params register under kFieldDeclaredParamBase + id, not
+         // the raw ParamTable id - see DrawFieldParamSliders.
+         const ParamRef* kAmount = Modulation::Instance().KnownParam(10, kFieldDeclaredParamBase + amountParam->id);
+         const ParamRef* kSpeed = Modulation::Instance().KnownParam(10, kFieldDeclaredParamBase + speedParam->id);
          if (!kAmount || kAmount->name != "amount" || kAmount->minValue != 0.0f || kAmount->maxValue != 2.0f)
          {
             printf("Registration: FAIL - amount not registered correctly in Modulation\n");
@@ -39595,8 +39850,8 @@ static int RunFieldSampleTest()
          outBuf.numChannels = 1;
          outBuf.numFrames = kBlock;
 
-         const AudioBuffer* inputs[2] = { nullptr, &inBuf }; // slot 1 = 'in', matching AudioInputSlot(1)
-         an->ProcessBlock(inputs, 2, outBuf);
+         const AudioBuffer* inputs[1] = { &inBuf }; // slot 0 = 'in', matching AudioInputSlot(0)
+         an->ProcessBlock(inputs, 1, outBuf);
 
          float rms = 0.0f;
          if (!node.ReadRmsLatest(rms))
@@ -39707,20 +39962,26 @@ static int RunFieldSampleTest()
    {
       bool secOk = true;
       FieldSampleNode node;
-      // No 'in' read anywhere - a self-contained generator kernel, the
-      // whole point of design-prompt-sample-generator-mode.md. Scaled by
-      // 0.001 so 440 Hz lands well under AudioFieldSampleNode's +-4.0
-      // output headroom clamp - this kernel is checking the raw freq/gate
-      // values reach the register machine, not synthesizing real audio.
-      // freq*gate is 0 the instant gate drops, even though the voice's
-      // amplitude envelope (applied externally, outside the kernel) is
-      // still mid-release and would otherwise mask a gate stuck at 1.
-      node.code = "out = freq * gate * 0.001\n";
-      if (!node.Apply())
+      if (node.NoteInputSlot(0) == nullptr)
       {
-         printf("SECTION 10: FAIL - compile failed: %s\n", node.LastError().c_str());
-         secOk = false;
+         printf("SECTION 10: skipped (FieldSampleNode is audio-effects-only; generator/note mode moved to FieldSynthNode in step 21)\n");
       }
+      else
+      {
+         // No 'in' read anywhere - a self-contained generator kernel, the
+         // whole point of design-prompt-sample-generator-mode.md. Scaled by
+         // 0.001 so 440 Hz lands well under AudioFieldSampleNode's +-4.0
+         // output headroom clamp - this kernel is checking the raw freq/gate
+         // values reach the register machine, not synthesizing real audio.
+         // freq*gate is 0 the instant gate drops, even though the voice's
+         // amplitude envelope (applied externally, outside the kernel) is
+         // still mid-release and would otherwise mask a gate stuck at 1.
+         node.code = "out = freq * gate * 0.001\n";
+         if (!node.Apply())
+         {
+            printf("SECTION 10: FAIL - compile failed: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
       else
       {
          AudioNode* an = node.GetAudioNode();
@@ -39778,8 +40039,9 @@ static int RunFieldSampleTest()
             secOk = false;
          }
       }
+   }
 
-      if (secOk) printf("SECTION 10 (freq/gate Reserved Symbols): OK\n");
+   if (secOk) printf("SECTION 10 (freq/gate Reserved Symbols): OK\n");
       else { printf("SECTION 10 (freq/gate Reserved Symbols): FAIL\n"); allOk = false; }
    }
 
@@ -39800,6 +40062,257 @@ static int RunFieldSampleTest()
       }
       if (secOk) printf("SECTION 11 (Factory Presets Compile): OK\n");
       else { printf("SECTION 11 (Factory Presets Compile): FAIL\n"); allOk = false; }
+   }
+
+   // ------------------------------------------------------------
+   // SECTION 12: delay(x, samples) Sample-Domain Intrinsic (Step 19)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 12a. Basic impulse delay: delay(in, 10) must produce the input impulse exactly 10 samples later.
+      {
+         FieldSampleNode node;
+         node.code = "out = delay(in, 10)\n";
+         if (!node.Apply())
+         {
+            printf("SECTION 12: FAIL - delay(in, 10) did not compile: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = node.GetAudioNode();
+            an->PrepareToPlay(kSr, 32);
+            std::vector<float> inChan(32, 0.0f);
+            inChan[0] = 1.0f; // impulse at sample 0
+            float* inChans[1] = { inChan.data() };
+            AudioBuffer inBuf;
+            inBuf.channels = inChans;
+            inBuf.numChannels = 1;
+            inBuf.numFrames = 32;
+
+            std::vector<float> outChan(32, 0.0f);
+            float* outChans[1] = { outChan.data() };
+            AudioBuffer outBuf;
+            outBuf.channels = outChans;
+            outBuf.numChannels = 1;
+            outBuf.numFrames = 32;
+
+            const AudioBuffer* inputs[1] = { &inBuf };
+            an->ProcessBlock(inputs, 1, outBuf);
+
+            // Samples 0..9 must be 0.0f
+            for (int i = 0; i < 10; i++)
+            {
+               if (outChan[i] != 0.0f)
+               {
+                  printf("SECTION 12: FAIL - sample %d is %f, expected 0.0f\n", i, outChan[i]);
+                  secOk = false;
+                  break;
+               }
+            }
+            // Sample 10 must be 1.0f
+            if (std::fabs(outChan[10] - 1.0f) > 1e-6f)
+            {
+               printf("SECTION 12: FAIL - sample 10 is %f, expected 1.0f\n", outChan[10]);
+               secOk = false;
+            }
+            // Samples 11..31 must be 0.0f
+            for (int i = 11; i < 32; i++)
+            {
+               if (outChan[i] != 0.0f)
+               {
+                  printf("SECTION 12: FAIL - sample %d is %f, expected 0.0f\n", i, outChan[i]);
+                  secOk = false;
+                  break;
+               }
+            }
+         }
+      }
+
+      // 12b. Long delay: 4410 samples (100ms at 44.1kHz).
+      {
+         FieldSampleNode node;
+         node.code = "out = delay(in, 4410)\n";
+         if (!node.Apply())
+         {
+            printf("SECTION 12: FAIL - delay(in, 4410) did not compile: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+      }
+
+      // 12c. Multiple delay lines in one kernel.
+      {
+         FieldSampleNode node;
+         node.code = "d1 = delay(in, 8)\nd2 = delay(in, 16)\nout = d1 + d2\n";
+         if (!node.Apply())
+         {
+            printf("SECTION 12: FAIL - multi-tap delay did not compile: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = node.GetAudioNode();
+            an->PrepareToPlay(kSr, 32);
+            std::vector<float> inChan(32, 0.0f);
+            inChan[0] = 1.0f;
+            float* inChans[1] = { inChan.data() };
+            AudioBuffer inBuf;
+            inBuf.channels = inChans;
+            inBuf.numChannels = 1;
+            inBuf.numFrames = 32;
+
+            std::vector<float> outChan(32, 0.0f);
+            float* outChans[1] = { outChan.data() };
+            AudioBuffer outBuf;
+            outBuf.channels = outChans;
+            outBuf.numChannels = 1;
+            outBuf.numFrames = 32;
+
+            const AudioBuffer* inputs[1] = { &inBuf };
+            an->ProcessBlock(inputs, 1, outBuf);
+
+            if (std::fabs(outChan[8] - 1.0f) > 1e-6f || std::fabs(outChan[16] - 1.0f) > 1e-6f)
+            {
+               printf("SECTION 12: FAIL - multi-tap taps at 8 (%f) and 16 (%f) did not match expected 1.0f\n",
+                      outChan[8], outChan[16]);
+               secOk = false;
+            }
+         }
+      }
+
+      // 12d. Rejections: non-literal N, non-positive integer, invalid arity, budget cap.
+      {
+         Field::SampleProgram prog;
+         Field::FieldError err;
+
+         // Non-literal length argument
+         if (Field::CompileSampleProgram("out = delay(in, in)\n", nullptr, prog, err))
+         {
+            printf("SECTION 12: FAIL - non-literal length argument was not rejected\n");
+            secOk = false;
+         }
+         else if (err.message.find("compile-time constant") == std::string::npos)
+         {
+            printf("SECTION 12: FAIL - expected 'compile-time constant' error, got '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+
+         // Non-positive length (0)
+         if (Field::CompileSampleProgram("out = delay(in, 0)\n", nullptr, prog, err))
+         {
+            printf("SECTION 12: FAIL - zero length argument was not rejected\n");
+            secOk = false;
+         }
+
+         // Negative length (-10)
+         if (Field::CompileSampleProgram("out = delay(in, -10)\n", nullptr, prog, err))
+         {
+            printf("SECTION 12: FAIL - negative length argument was not rejected\n");
+            secOk = false;
+         }
+
+         // Non-integer length (4.5)
+         if (Field::CompileSampleProgram("out = delay(in, 4.5)\n", nullptr, prog, err))
+         {
+            printf("SECTION 12: FAIL - fractional length argument was not rejected\n");
+            secOk = false;
+         }
+
+         // Arity: 1 argument
+         if (Field::CompileSampleProgram("out = delay(in)\n", nullptr, prog, err))
+         {
+            printf("SECTION 12: FAIL - 1-argument delay was not rejected\n");
+            secOk = false;
+         }
+
+         // Arity: 3 arguments
+         if (Field::CompileSampleProgram("out = delay(in, 10, 20)\n", nullptr, prog, err))
+         {
+            printf("SECTION 12: FAIL - 3-argument delay was not rejected\n");
+            secOk = false;
+         }
+
+         // Exceeding cumulative delay budget cap
+         if (Field::CompileSampleProgram("out = delay(in, 70000)\n", nullptr, prog, err))
+         {
+            printf("SECTION 12: FAIL - delay exceeding kSampleMaxDelayCells was not rejected\n");
+            secOk = false;
+         }
+         else if (err.message.find("cap") == std::string::npos)
+         {
+            printf("SECTION 12: FAIL - expected 'cap' error for exceeding budget, got '%s'\n", err.message.c_str());
+            secOk = false;
+         }
+      }
+
+      // 12e. Hot-reload delay buffer transplant: ring buffer contents preserved when length matches.
+      {
+         FieldSampleNode node;
+         node.code = "out = delay(in, 16)\n";
+         if (!node.Apply())
+         {
+            printf("SECTION 12: FAIL - initial delay compile failed: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = node.GetAudioNode();
+            an->PrepareToPlay(kSr, 8);
+
+            // Block 1: feed impulse at sample 0 into 8-sample block.
+            std::vector<float> inChan1(8, 0.0f);
+            inChan1[0] = 1.0f;
+            float* inChans1[1] = { inChan1.data() };
+            AudioBuffer inBuf1; inBuf1.channels = inChans1; inBuf1.numChannels = 1; inBuf1.numFrames = 8;
+            std::vector<float> outChan1(8, 0.0f);
+            float* outChans1[1] = { outChan1.data() };
+            AudioBuffer outBuf1; outBuf1.channels = outChans1; outBuf1.numChannels = 1; outBuf1.numFrames = 8;
+            const AudioBuffer* inputs1[1] = { &inBuf1 };
+            an->ProcessBlock(inputs1, 1, outBuf1);
+
+            // Hot reload: recompile with scaling factor * 2.0 (same delay length 16).
+            node.code = "out = delay(in, 16) * 2.0\n";
+            if (!node.Apply())
+            {
+               printf("SECTION 12: FAIL - recompile failed: %s\n", node.LastError().c_str());
+               secOk = false;
+            }
+            else
+            {
+               // Block 2: 8 frames of silence (frames 8..15 total).
+               std::vector<float> inChan2(8, 0.0f);
+               float* inChans2[1] = { inChan2.data() };
+               AudioBuffer inBuf2; inBuf2.channels = inChans2; inBuf2.numChannels = 1; inBuf2.numFrames = 8;
+               std::vector<float> outChan2(8, 0.0f);
+               float* outChans2[1] = { outChan2.data() };
+               AudioBuffer outBuf2; outBuf2.channels = outChans2; outBuf2.numChannels = 1; outBuf2.numFrames = 8;
+               const AudioBuffer* inputs2[1] = { &inBuf2 };
+               an->ProcessBlock(inputs2, 1, outBuf2);
+
+               // Block 3: 8 frames of silence (frames 16..23 total).
+               // Frame 0 of this block is overall frame 16: exactly where the impulse delayed by 16 samples lands!
+               // It should be 2.0f because of the * 2.0 hot-swap!
+               std::vector<float> inChan3(8, 0.0f);
+               float* inChans3[1] = { inChan3.data() };
+               AudioBuffer inBuf3; inBuf3.channels = inChans3; inBuf3.numChannels = 1; inBuf3.numFrames = 8;
+               std::vector<float> outChan3(8, 0.0f);
+               float* outChans3[1] = { outChan3.data() };
+               AudioBuffer outBuf3; outBuf3.channels = outChans3; outBuf3.numChannels = 1; outBuf3.numFrames = 8;
+               const AudioBuffer* inputs3[1] = { &inBuf3 };
+               an->ProcessBlock(inputs3, 1, outBuf3);
+
+               if (std::fabs(outChan3[0] - 2.0f) > 1e-5f)
+               {
+                  printf("SECTION 12: FAIL - transplanted delay output is %f, expected 2.0f\n", outChan3[0]);
+                  secOk = false;
+               }
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 12 (delay(x, samples) Intrinsic): OK\n");
+      else { printf("SECTION 12 (delay(x, samples) Intrinsic): FAIL\n"); allOk = false; }
    }
 
    printf("INFINITE_FIELDSAMPLETEST: %s\n", allOk ? "OK" : "FAIL");
@@ -43617,6 +44130,7 @@ int main(int argc, char** argv)
    // FieldSampleNode/FieldPixelNode via SpawnNode and rely on this being
    // live for their refusal assertions.
    Field::gLiveCableChecker = &CheckFieldLiveCableBridge;
+   Field::gLiveCableDisconnector = &DisconnectFieldPinBridge;
 
    // Old spelling kept as an alias: the panel was renamed to the performance
    // matrix, but a shell history full of INFINITE_PERFPANELTEST is not worth
@@ -47738,8 +48252,10 @@ int main(int argc, char** argv)
          VideoSourceNode* dropTargetVideo = FindNodeUnderCanvasPoint<VideoSourceNode>(canvasPos);
          ImageSourceNode* dropTargetImage = FindNodeUnderCanvasPoint<ImageSourceNode>(canvasPos);
          FieldElementNode* dropTargetFieldElement = FindNodeUnderCanvasPoint<FieldElementNode>(canvasPos);
+         FieldPrimitiveNode* dropTargetFieldPrimitive = FindNodeUnderCanvasPoint<FieldPrimitiveNode>(canvasPos);
          FieldPixelNode* dropTargetFieldPixel = FindNodeUnderCanvasPoint<FieldPixelNode>(canvasPos);
          FieldSampleNode* dropTargetFieldSample = FindNodeUnderCanvasPoint<FieldSampleNode>(canvasPos);
+         FieldSynthNode* dropTargetFieldSynth = FindNodeUnderCanvasPoint<FieldSynthNode>(canvasPos);
          FieldGraphNode* dropTargetFieldGraph = FindNodeUnderCanvasPoint<FieldGraphNode>(canvasPos);
          FormulaNode* dropTargetFormula = FindNodeUnderCanvasPoint<FormulaNode>(canvasPos);
          float offset = 0.0f;
@@ -47771,13 +48287,20 @@ int main(int argc, char** argv)
                std::string err;
                if (Field::LoadFromInfdevFile(path, device, err))
                {
-                  if (dropTargetFieldElement != nullptr && device.domain == "element")
-                  {
-                     ensureDroppedCheckpoint();
-                     dropTargetFieldElement->LoadDeviceFile(device);
-                     gPatchDirty = true;
-                     continue;
-                  }
+                   if (dropTargetFieldElement != nullptr && device.domain == "element")
+                   {
+                      ensureDroppedCheckpoint();
+                      dropTargetFieldElement->LoadDeviceFile(device);
+                      gPatchDirty = true;
+                      continue;
+                   }
+                   if (dropTargetFieldPrimitive != nullptr && device.domain == "primitive")
+                   {
+                      ensureDroppedCheckpoint();
+                      dropTargetFieldPrimitive->LoadDeviceFile(device);
+                      gPatchDirty = true;
+                      continue;
+                   }
                   if (dropTargetFieldPixel != nullptr && device.domain == "pixel")
                   {
                      ensureDroppedCheckpoint();
@@ -47789,6 +48312,13 @@ int main(int argc, char** argv)
                   {
                      ensureDroppedCheckpoint();
                      dropTargetFieldSample->LoadDeviceFile(device);
+                     gPatchDirty = true;
+                     continue;
+                  }
+                  if (dropTargetFieldSynth != nullptr && device.domain == "synth")
+                  {
+                     ensureDroppedCheckpoint();
+                     dropTargetFieldSynth->LoadDeviceFile(device);
                      gPatchDirty = true;
                      continue;
                   }
@@ -47807,8 +48337,46 @@ int main(int argc, char** argv)
                      continue;
                   }
                }
-               // Unreadable file, mismatched domain, or no matching node
-               // under the drop point: fall through silently.
+                  // If dropped on empty canvas, spawn a new Field node of that domain
+                  GraphNode* spawned = nullptr;
+                  if (device.domain == "element")
+                     spawned = SpawnNode("Field Modifier", "3D", canvasPos.x + offset, canvasPos.y);
+                  else if (device.domain == "pixel")
+                     spawned = SpawnNode("FieldPixel", "Source", canvasPos.x + offset, canvasPos.y);
+                  else if (device.domain == "sample")
+                     spawned = SpawnNode("Field Effect", "AudioEffects", canvasPos.x + offset, canvasPos.y);
+                  else if (device.domain == "synth")
+                     spawned = SpawnNode("Field Synth", "Synths", canvasPos.x + offset, canvasPos.y);
+                  else if (device.domain == "graph")
+                     spawned = SpawnNode("Field Graph", "Utility", canvasPos.x + offset, canvasPos.y);
+                  else if (device.domain == "primitive")
+                     spawned = SpawnNode("Field Primitive", "3D", canvasPos.x + offset, canvasPos.y);
+                  else if (device.domain == "formula")
+                     spawned = SpawnNode("Formula", "Modulators", canvasPos.x + offset, canvasPos.y);
+
+                  if (spawned != nullptr)
+                  {
+                     ensureDroppedCheckpoint();
+                     if (auto* fe = dynamic_cast<FieldElementNode*>(spawned->node.get()))
+                        fe->LoadDeviceFile(device);
+                     else if (auto* fpn = dynamic_cast<FieldPrimitiveNode*>(spawned->node.get()))
+                        fpn->LoadDeviceFile(device);
+                     else if (auto* fp = dynamic_cast<FieldPixelNode*>(spawned->node.get()))
+                        fp->LoadDeviceFile(device);
+                     else if (auto* fs = dynamic_cast<FieldSampleNode*>(spawned->node.get()))
+                        fs->LoadDeviceFile(device);
+                     else if (auto* fsynth = dynamic_cast<FieldSynthNode*>(spawned->node.get()))
+                        fsynth->LoadDeviceFile(device);
+                     else if (auto* fg = dynamic_cast<FieldGraphNode*>(spawned->node.get()))
+                        fg->LoadDeviceFile(device);
+                     else if (auto* form = dynamic_cast<FormulaNode*>(spawned->node.get()))
+                        form->LoadDeviceFile(device);
+                     spawned->showParams = true;
+                     offset += 240.0f;
+                     gPatchDirty = true;
+                     continue;
+                  }
+               // Unreadable file or unspawnable domain: fall through silently.
                continue;
             }
 
@@ -50285,6 +50853,63 @@ int main(int argc, char** argv)
             printf("[FIELDDEVICETEST] Assertion 5 (Mismatched Domain Drop Is No-Op): %s\n", pass ? "OK" : "FAIL");
          }
 
+         // 6. FieldPrimitiveNode .infdev round-trip (domain == "primitive",
+         //    count/maxElements nodeSettings, declared params).
+         {
+            FieldPrimitiveNode src;
+            src.count = 512;
+            src.maxElements = 2048;
+            src.code = "param float radius = 2.5 [0.1, 10.0]\nu = i / count\nP = vec3(cos(u * 6.28) * radius, 0.0, sin(u * 6.28) * radius)\n";
+            src.Apply();
+            Field::ParamEntry* pRad = src.GetParamTable().Find("radius");
+            if (pRad != nullptr) pRad->value = 3.75f;
+
+            Field::DeviceFile dev = src.ToDeviceFile();
+            std::string json = Field::ToJsonString(dev);
+            Field::DeviceFile parsed;
+            std::string err;
+            bool parseOk = Field::FromJsonString(json, parsed, err);
+
+            FieldPrimitiveNode dst;
+            if (parseOk && parsed.domain == "primitive")
+               dst.LoadDeviceFile(parsed);
+
+            Field::ParamEntry* dRad = dst.GetParamTable().Find("radius");
+            bool pass = parseOk && parsed.domain == "primitive" &&
+                        dst.count == 512 && dst.maxElements == 2048 &&
+                        dRad != nullptr && std::abs(dRad->value - 3.75f) < 1e-4f;
+            printf("[FIELDDEVICETEST] Assertion 6 (FieldPrimitive Round-Trip): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // 7. FieldSynthNode .infdev round-trip (domain == "synth",
+         //    maxVoices/exposeRmsOutput nodeSettings, declared params).
+         {
+            FieldSynthNode src;
+            src.maxVoices = 12;
+            src.exposeRmsOutput = true;
+            src.code = "param float cutoff = 1500.0 [20.0, 20000.0]\nstate float ph = 0\nph = (ph + freq / sr) % 1.0\nout = (ph * 2.0 - 1.0) * gate\n";
+            src.Apply();
+            Field::ParamEntry* pCutoff = src.GetParamTable().Find("cutoff");
+            if (pCutoff != nullptr) pCutoff->value = 2400.0f;
+
+            Field::DeviceFile dev = src.ToDeviceFile();
+            std::string json = Field::ToJsonString(dev);
+            Field::DeviceFile parsed;
+            std::string err;
+            bool parseOk = Field::FromJsonString(json, parsed, err);
+
+            FieldSynthNode dst;
+            if (parseOk && parsed.domain == "synth")
+               dst.LoadDeviceFile(parsed);
+
+            Field::ParamEntry* dCutoff = dst.GetParamTable().Find("cutoff");
+            bool pass = parseOk && parsed.domain == "synth" &&
+                        dst.maxVoices == 12 && dst.exposeRmsOutput == true &&
+                        dCutoff != nullptr && std::abs(dCutoff->value - 2400.0f) < 1e-4f &&
+                        dst.NoteInputSlot(0) != nullptr && dst.AudioInputSlot(1) != nullptr;
+            printf("[FIELDDEVICETEST] Assertion 7 (FieldSynth Round-Trip): %s\n", pass ? "OK" : "FAIL");
+         }
+
          printf("[FIELDDEVICETEST] Test suite complete.\n");
       }
 
@@ -51775,7 +52400,7 @@ int main(int argc, char** argv)
             // fixture setup) - so every pointer is used and discarded before
             // the next SpawnNode() runs; only the (reallocation-proof) index
             // survives to the next statement.
-            GraphNode* ge = SpawnNode("Field Element", "3D", 0.0f, 0.0f);
+            GraphNode* ge = SpawnNode("Field Modifier", "3D", 0.0f, 0.0f);
             bool spawned = ge != nullptr;
             if (spawned)
             {
@@ -51783,7 +52408,7 @@ int main(int argc, char** argv)
                static_cast<FieldElementNode*>(ge->node.get())->publishScalarOutput = true;
             }
 
-            GraphNode* gs = SpawnNode("Field Sample", "Synths", 200.0f, 0.0f);
+            GraphNode* gs = SpawnNode("Field Effect", "AudioEffects", 200.0f, 0.0f);
             spawned = spawned && (gs != nullptr);
             if (gs)
             {
@@ -51808,7 +52433,16 @@ int main(int argc, char** argv)
             GraphNode* gpDst = SpawnNode("FieldPixel", "Source", 600.0f, 0.0f);
             spawned = spawned && (gpDst != nullptr);
             if (gpDst)
+            {
                pixelDstIdx = gpDst->index;
+               // Field Pixel has no native input pin any more (device-catalog
+               // simplification) - this fixture needs one declared `input
+               // image` pin to exercise the real-image-cable assertion below,
+               // so slot 0 is this declared pin rather than a native "src".
+               auto* pixDst = static_cast<FieldPixelNode*>(gpDst->node.get());
+               pixDst->code = "input pixel image src2;\ncol = vec3(uv.x, uv.y, 0.0);";
+               pixDst->Apply();
+            }
 
             GraphNode* gg = SpawnNode("Field Graph", "Utility", 800.0f, 0.0f);
             spawned = spawned && (gg != nullptr);
@@ -51884,7 +52518,12 @@ int main(int argc, char** argv)
             bool geoBlocked = !ConnectNodes(elemIdx, 1, graphSinkIdx, 0, geoErr);
             if (!geoBlocked)
             {
-               *gg->ModulatorInputSlot(0) = nullptr; // undo if it unexpectedly succeeded
+               // Undo the unexpected cross-wire AND restore the real
+               // sampleIdx -> graphSinkIdx wiring it stomped, or SECTION 3
+               // below finds the trigger pin unwired through no fault of its
+               // own (this is exactly what happened before this fix - see
+               // the NOTE printed just below).
+               ConnectNodes(sampleIdx, 1, graphSinkIdx, 0, err);
                printf("[FIELDPINSTEST] NOTE: FieldElementNode publish -> ModulatorInputSlot no longer blocked - the finding below may be stale, re-check IsInputSlotCompatible.\n");
             }
          }
@@ -51910,9 +52549,9 @@ int main(int argc, char** argv)
             bool boolsSurvived = elemR && sampleR && pixelSrcR && graphR &&
                                   elemR->publishScalarOutput && sampleR->exposeRmsOutput &&
                                   pixelSrcR->exposeAuxTexture && graphR->addTriggerInput;
-            bool imageCableSurvived = imgConnected && pixelDstR &&
-                                       (pixelDstR->TextureInput().GetSource() == pixelSrcR) &&
-                                       (pixelDstR->TextureInput().GetSourceOutput() == 1);
+            bool imageCableSurvived = imgConnected && pixelDstR && pixelDstR->DeclaredImageInput(0) != nullptr &&
+                                       (pixelDstR->DeclaredImageInput(0)->GetSource() == pixelSrcR) &&
+                                       (pixelDstR->DeclaredImageInput(0)->GetSourceOutput() == 1);
             bool triggerCableSurvived = graphR && graphR->TriggerInputWired() &&
                                          (*graphR->ModulatorInputSlot(0) == (sampleR ? sampleR->ModulatorOutput(1) : nullptr));
             bool pass = boolsSurvived && imageCableSurvived && triggerCableSurvived;
@@ -51981,11 +52620,18 @@ int main(int argc, char** argv)
       // node/UI/save-format wiring for kernel `output`/`input` declarations
       // on top of step 12's compiler-level PinTable/IR work and step 11's
       // hardcoded toggle pins (both exercised above by FIELDPINSTEST). This
-      // is structural-only, per the step's resolved scoping decision: a
-      // declared output's ModulatorOutput() always reads back 0.0 (a
-      // documented placeholder - FieldElementNode/FieldSampleNode/
-      // FieldPixelNode's DeclaredOutputPlaceholder), never the kernel's real
-      // computed value, which is deferred to a follow-up step.
+      // was originally structural-only - every declared output's
+      // ModulatorOutput() read back a fixed 0.0 placeholder, regardless of
+      // domain. The device-catalog simplification pass finished that
+      // follow-up for the one case with a working name-keyed runtime
+      // channel: a Frame-domain, non-structural declared output (`chime`,
+      // `glow`, ...) on FieldElementNode now reads its real value via
+      // ElementVM::ReadFrameVar (FieldIR.cpp's DeclOutput lowering emits a
+      // synthetic frame-var assign for it), and FieldSampleNode's
+      // Frame-domain declared output (`bass`, always `reduce.rms(...)`) now
+      // reads the same live value as the "rms" toggle output. Every other
+      // declared-output domain (element/pixel/sample) still reads the fixed
+      // 0.0 placeholder - see each node's DeclaredOutputPlaceholder.
       if (getenv("INFINITE_FIELDPINNODETEST") != nullptr && frameId == 4)
       {
          printf("[FIELDPINNODETEST] Running dynamic pins (build step 13) node-wiring harness...\n");
@@ -52072,30 +52718,33 @@ int main(int argc, char** argv)
          {
             GraphNode* dg = FindNodeByIndex(pixDstIdx);
             auto* dn = dg ? static_cast<FieldPixelNode*>(dg->node.get()) : nullptr;
-            bool countOk = dg && (InputCountFor(*dg) == 2); // native "src" + 1 declared image input
+            bool countOk = dg && (InputCountFor(*dg) == 1); // no native pin any more, just the 1 declared image input
             std::string err;
-            bool connected = ConnectNodes(pixSrcAIdx, 0, pixDstIdx, 1, err);
+            bool connected = ConnectNodes(pixSrcAIdx, 0, pixDstIdx, 0, err);
             bool wiredOk = connected && dn && dn->DeclaredImageInput(0) != nullptr &&
                            dn->DeclaredImageInput(0)->GetSource() ==
                               (FindNodeByIndex(pixSrcAIdx) ? FindNodeByIndex(pixSrcAIdx)->node.get() : nullptr);
             bool pass = countOk && wiredOk;
-            printf("[FIELDPINNODETEST] Assertion 5 (declared image input: InputCountFor==2, real ConnectNodes wiring via CableFor): %s (%s)\n",
+            printf("[FIELDPINNODETEST] Assertion 5 (declared image input: InputCountFor==1, real ConnectNodes wiring via CableFor): %s (%s)\n",
                    pass ? "OK" : "FAIL", err.c_str());
             allOk = allOk && pass;
          }
 
-         // SECTION 6: cable-orphaning refusal, declared output pin. Mirrors
-         // FIELDPINSTEST's step-11 toggle refusal, but the pin here comes
-         // from a kernel edit (a live compile), not a UI toggle - Apply()
-         // itself must refuse and leave the previous program/pin shape live.
+         // SECTION 6: cable-orphaning auto-disconnect, declared output pin.
+         // Mirrors FIELDPINSTEST's step-11 toggle case, but the pin here
+         // comes from a kernel edit (a live compile), not a UI toggle.
+         // Behavior changed from a hard refusal to an auto-disconnect (see
+         // PinTable.h's gLiveCableDisconnector doc) - dropping a declared
+         // output that still has a live cable now succeeds, severs that
+         // cable, and shrinks the pin shape, rather than blocking the edit.
          {
             // Same T14 reallocation trap as above - capture each index
             // before the next SpawnNode() call, discard the pointer.
-            GraphNode* ge = SpawnNode("Field Element", "3D", 0.0f, 0.0f);
+            GraphNode* ge = SpawnNode("Field Modifier", "3D", 0.0f, 0.0f);
             bool spawned = ge != nullptr;
             int elemFixtureIdx = spawned ? ge->index : -1;
 
-            GraphNode* sinkG = SpawnNode("Field Element", "3D", 200.0f, 0.0f); // only needs a pin id
+            GraphNode* sinkG = SpawnNode("Field Modifier", "3D", 200.0f, 0.0f); // only needs a pin id
             spawned = spawned && (sinkG != nullptr);
             int sinkFixtureIdx = spawned ? sinkG->index : -1;
 
@@ -52116,17 +52765,25 @@ int main(int argc, char** argv)
                en->code = "output element float foo = 1.0\nP.y += 0.0\n";
                pass = pass && en->Apply() && (en->OutputCount() == 2);
 
-               gLinks.push_back({ 5100001, elemGN->OutputPinId(1), sinkGN->InputPinId(0) });
-               std::string oldCode = en->code;
+               const int liveLinkId = 5100001;
+               gLinks.push_back({ liveLinkId, elemGN->OutputPinId(1), sinkGN->InputPinId(0) });
                en->code = "P.y += 0.0\n"; // drops the declared output entirely
-               bool refused = !en->Apply();
-               bool shapeKept = (en->OutputCount() == 2) && !en->pinRefusal.empty();
+               // gLinks is a per-frame snapshot rebuilt from live node
+               // pointers (see DisconnectFieldPinBridge's comment) - a
+               // synthetic entry pushed straight into the vector, as above,
+               // has no real cable pointer for DisconnectLinkById to null
+               // out, and nothing in this headless fixture re-derives gLinks
+               // from scratch to prune it afterwards. So the observable
+               // contract here is Apply() itself: it must succeed (not
+               // refuse) and leave no refusal message, not "gLinks no
+               // longer contains the synthetic id".
+               bool applied = en->Apply();
+               bool shapeShrunk = (en->OutputCount() == 1);
+               bool noRefusal = en->pinRefusal.empty();
                gLinks.clear();
-               en->code = oldCode;
-               bool recompiles = en->Apply(); // safe again - no more live cable
-               pass = pass && refused && shapeKept && recompiles;
+               pass = pass && applied && shapeShrunk && noRefusal;
             }
-            printf("[FIELDPINNODETEST] Assertion 6 (declared-output refusal keeps old program + shape while a live cable is attached): %s\n",
+            printf("[FIELDPINNODETEST] Assertion 6 (declared-output drop auto-disconnects a live cable and shrinks pin shape): %s\n",
                    pass ? "OK" : "FAIL");
             allOk = allOk && pass;
          }
@@ -57262,6 +57919,10 @@ int main(int argc, char** argv)
                   DrawFieldGraphWaveform(fgnPreview, audioTerminal);
             }
          }
+         else if (auto* fsnPreview = dynamic_cast<FieldSampleNode*>(gn.node.get()))
+            DrawFieldSampleScope(fsnPreview, 60.0f, kPreviewSize);
+         else if (auto* fspPreview = dynamic_cast<FieldSynthNode*>(gn.node.get()))
+            DrawFieldSynthScope(fspPreview, 60.0f, kPreviewSize);
          else if (isAudioBody)
             DrawAudioNodeBody(gn);
          else
@@ -57548,10 +58209,14 @@ int main(int argc, char** argv)
                DrawFormulaParams(n);
             else if (auto* n = dynamic_cast<FieldElementNode*>(gn.node.get()))
                DrawFieldElementParams(n);
+            else if (auto* n = dynamic_cast<FieldPrimitiveNode*>(gn.node.get()))
+               DrawFieldPrimitiveParams(n);
             else if (auto* n = dynamic_cast<FieldPixelNode*>(gn.node.get()))
                DrawFieldPixelParams(n);
             else if (auto* n = dynamic_cast<FieldSampleNode*>(gn.node.get()))
                DrawFieldSampleParams(n);
+            else if (auto* n = dynamic_cast<FieldSynthNode*>(gn.node.get()))
+               DrawFieldSynthParams(n);
             else if (auto* n = dynamic_cast<FieldGraphNode*>(gn.node.get()))
                DrawFieldGraphParams(n);
             else if (auto* n = dynamic_cast<TextNode*>(gn.node.get()))
@@ -57949,7 +58614,7 @@ int main(int argc, char** argv)
                if (src.node.get() == cable->GetSource())
                {
                   gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(), gn.InputPinId(slot) });
+                                     src.OutputPinId(cable->GetSourceOutput()), gn.InputPinId(slot) });
                   break;
                }
             }
@@ -58174,20 +58839,22 @@ int main(int argc, char** argv)
                GraphNode* dstNode = FindNodeByIndex(GraphNode::NodeIndexFromPin(b));
                const bool differentNodes = GraphNode::NodeIndexFromPin(a) != GraphNode::NodeIndexFromPin(b);
                const int srcOutputIndex = GraphNode::OutputIndexFromPin(a);
-               const bool srcIsModulator = srcNode != nullptr &&
+                const bool srcIsModulator = srcNode != nullptr &&
                                            (dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr ||
                                             ModulatorForOutput(srcNode->node.get(), srcOutputIndex) != nullptr);
-               auto* srcPalette = srcNode ? dynamic_cast<IPaletteSource*>(srcNode->node.get()) : nullptr;
-               auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
-               auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
-               auto* srcLight = srcNode ? dynamic_cast<LightNode*>(srcNode->node.get()) : nullptr;
-               const bool srcIsEnvironment = srcNode != nullptr &&
-                                             dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
-               auto* srcAudioSource = srcNode ? dynamic_cast<IAudioSource*>(srcNode->node.get()) : nullptr;
-               const bool srcIsAudioNode = srcAudioSource != nullptr &&
-                                           srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
-               const bool srcIsNoteSource = srcNode != nullptr &&
-                                            dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
+                auto* srcPalette = srcNode ? dynamic_cast<IPaletteSource*>(srcNode->node.get()) : nullptr;
+                auto* srcGeometry = srcNode ? dynamic_cast<IGeometrySource*>(srcNode->node.get()) : nullptr;
+                if (srcGeometry != nullptr && !srcGeometry->IsGeometryOutputIndex(srcOutputIndex))
+                   srcGeometry = nullptr;
+                auto* srcCamera = srcNode ? dynamic_cast<CameraNode*>(srcNode->node.get()) : nullptr;
+                auto* srcLight = srcNode ? dynamic_cast<LightNode*>(srcNode->node.get()) : nullptr;
+                const bool srcIsEnvironment = srcNode != nullptr &&
+                                              dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
+                auto* srcAudioSource = srcNode ? dynamic_cast<IAudioSource*>(srcNode->node.get()) : nullptr;
+                const bool srcIsAudioNode = srcAudioSource != nullptr &&
+                                            srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
+                const bool srcIsNoteSource = srcNode != nullptr &&
+                                             dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
 
                bool valid = false;
                const char* rejectReason = nullptr;
@@ -60156,6 +60823,8 @@ int main(int argc, char** argv)
                                                ModulatorForOutput(dragSrcNode->node.get(), dragOutputSlot) != nullptr);
                   auto* srcPalette = dynamic_cast<IPaletteSource*>(dragSrcNode->node.get());
                   auto* srcGeometry = dynamic_cast<IGeometrySource*>(dragSrcNode->node.get());
+                  if (srcGeometry != nullptr && !srcGeometry->IsGeometryOutputIndex(dragOutputSlot))
+                     srcGeometry = nullptr;
                   auto* srcCamera = dynamic_cast<CameraNode*>(dragSrcNode->node.get());
                   auto* srcLight = dynamic_cast<LightNode*>(dragSrcNode->node.get());
                   const bool srcIsEnvironment =
@@ -60451,6 +61120,14 @@ int main(int argc, char** argv)
          // to be a hang rather than a warning. Every offending id is already
          // on stderr by the time this runs.
          extern int g_InfiniteDuplicatePinIds;
+         for (const auto& gn : gNodes)
+         {
+            if (gn.NodeId() == 120750 || gn.index == 115)
+            {
+               printf("Suspect node: index=%d type=%s nodeId=%d\n", gn.index, gn.typeName.c_str(), gn.NodeId());
+            }
+         }
+         fflush(stdout);
          if (g_InfiniteDuplicatePinIds == 0)
             printf("PINDUPTEST %zu nodes, 0 duplicate pin ids  OK\n", gNodes.size());
          else
@@ -60868,7 +61545,7 @@ int main(int argc, char** argv)
             }
 
             ImGui::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
@@ -60884,41 +61561,65 @@ int main(int argc, char** argv)
             {
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldElementEditor->LastError().c_str());
             }
+         }
+         ImGui::End();
+      }
 
-            // Live preview: this node's own solo render, same mechanism as
-            // the node body's monitor-icon mini-viewport (DrawMiniViewport),
-            // just with a dedicated NodeViewport/camera since only one Field
-            // element editor can be open at a time.
+      if (gFieldPrimitiveEditorOpen && gFieldPrimitiveEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gFieldPrimitiveEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gFieldPrimitiveEditor = nullptr;
+            gFieldPrimitiveEditorOpen = false;
+         }
+      }
+
+      if (gFieldPrimitiveEditorOpen && gFieldPrimitiveEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Field primitive editor", &gFieldPrimitiveEditorOpen))
+         {
+            ImGui::TextDisabled("Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t");
+            ImGui::TextDisabled("Pure 3D geometry generator. Frame rate expressions are automatically hoisted.");
+            ImGui::Separator();
+
+            gCurrentNodeIndex = gFieldPrimitiveEditor->NodeIndex();
+            DrawFieldDeviceControls<FieldPrimitiveNode>(gFieldPrimitiveEditor, "primitive", &FieldPrimitiveNode::PresetNames(),
+                                                        [](FieldPrimitiveNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+            gCurrentNodeIndex = -1;
+
+            static char editBuf[8192];
+            static FieldPrimitiveNode* lastEdited = nullptr;
+            static std::string lastKnownCode;
+            if (lastEdited != gFieldPrimitiveEditor || gFieldPrimitiveEditor->code != lastKnownCode)
             {
-               const float size = 200.0f;
-               ImVec2 origin = ImGui::GetCursorScreenPos();
-               ImDrawList* dl = ImGui::GetWindowDrawList();
-               DrawCheckerboardBackdrop(dl, origin, size);
-               unsigned int tex = gFieldElementEditorViewport.Render(gFieldElementEditor, gFieldElementEditorCamera, (int)size, (int)size);
-               if (tex != 0)
-                  dl->AddImage((ImTextureID)(intptr_t)tex, origin, ImVec2(origin.x + size, origin.y + size),
-                               ImVec2(0, 1), ImVec2(1, 0));
-               else
-                  dl->AddText(ImVec2(origin.x + 10, origin.y + size * 0.5f - 8),
-                              IM_COL32(120, 120, 135, 255), "no geometry");
-               dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), IM_COL32(70, 74, 90, 255), 4.0f);
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldPrimitiveEditor->code.c_str());
+               lastEdited = gFieldPrimitiveEditor;
+               lastKnownCode = gFieldPrimitiveEditor->code;
+            }
 
-               ImGui::SetCursorScreenPos(origin);
-               ImGui::InvisibleButton("##fieldElementEditorViewport", ImVec2(size, size));
-               if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-               {
-                  const ImVec2 drag = ImGui::GetIO().MouseDelta;
-                  gFieldElementEditorViewport.Orbit(gFieldElementEditorCamera, drag.x * 0.6875f, drag.y * 0.6875f);
-               }
-               if (ImGui::IsItemHovered())
-               {
-                  ImGuiIO& vio = ImGui::GetIO();
-                  if (vio.MouseWheel != 0.0f)
-                  {
-                     gFieldElementEditorViewport.Zoom(vio.MouseWheel);
-                     vio.MouseWheel = 0.0f;
-                  }
-               }
+            ImGui::InputTextMultiline("##fieldPrimitiveCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               gFieldPrimitiveEditor->code = editBuf;
+               gFieldPrimitiveEditor->Apply();
+               lastKnownCode = gFieldPrimitiveEditor->code;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldPrimitiveEditor->code.c_str());
+
+            if (!gFieldPrimitiveEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPrimitiveEditor->LastError().c_str());
             }
          }
          ImGui::End();
@@ -60949,7 +61650,7 @@ int main(int argc, char** argv)
             }
 
             ImGui::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
@@ -60964,28 +61665,6 @@ int main(int argc, char** argv)
             if (!gFieldPixelEditor->LastError().empty())
             {
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPixelEditor->LastError().c_str());
-            }
-
-            // Live preview: same texture the node body's own thumbnail reads
-            // (GetOutputTexture/Width/Height), re-cooked every frame by the
-            // per-frame FieldPixelNode CookIfNeeded loop, so it updates the
-            // instant Apply() recompiles the kernel - no separate render path.
-            unsigned int tex = gFieldPixelEditor->GetOutputTexture();
-            if (tex != 0 && gFieldPixelEditor->GetOutputWidth() > 0)
-            {
-               const float size = 200.0f;
-               float w = (float)gFieldPixelEditor->GetOutputWidth();
-               float h = (float)gFieldPixelEditor->GetOutputHeight();
-               float scale = size / std::max(w, h);
-               ImVec2 origin = ImGui::GetCursorScreenPos();
-               ImVec2 dims(w * scale, h * scale);
-               ImDrawList* dl = ImGui::GetWindowDrawList();
-               DrawCheckerboardBackdrop(dl, origin, size);
-               ImVec2 tl(origin.x + (size - dims.x) * 0.5f, origin.y + (size - dims.y) * 0.5f);
-               dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dims.x, tl.y + dims.y),
-                            ImVec2(0, 1), ImVec2(1, 0));
-               dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), IM_COL32(70, 74, 90, 255), 4.0f);
-               ImGui::Dummy(ImVec2(size, size));
             }
          }
          ImGui::End();
@@ -61031,7 +61710,7 @@ int main(int argc, char** argv)
             }
 
             ImGui::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
@@ -61047,10 +61726,66 @@ int main(int argc, char** argv)
             {
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSampleEditor->LastError().c_str());
             }
+         }
+         ImGui::End();
+      }
 
+      if (gFieldSynthEditorOpen && gFieldSynthEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gFieldSynthEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gFieldSynthEditor = nullptr;
+            gFieldSynthEditorOpen = false;
+         }
+      }
+
+      if (gFieldSynthEditorOpen && gFieldSynthEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Field synth editor", &gFieldSynthEditorOpen))
+         {
+            ImGui::TextDisabled("Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out");
+            ImGui::TextDisabled("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.");
             ImGui::Separator();
-            ImGui::TextDisabled("live output");
-            DrawFieldSampleScope(gFieldSampleEditor, 120.0f, ImGui::GetContentRegionAvail().x);
+
+            gCurrentNodeIndex = gFieldSynthEditor->NodeIndex();
+            DrawFieldDeviceControls<FieldSynthNode>(gFieldSynthEditor, "synth", &FieldSynthNode::PresetNames(),
+                                                    [](FieldSynthNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+            gCurrentNodeIndex = -1;
+
+            static char editBuf[8192];
+            static FieldSynthNode* lastEdited = nullptr;
+            static std::string lastKnownCode;
+            if (lastEdited != gFieldSynthEditor || gFieldSynthEditor->code != lastKnownCode)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldSynthEditor->code.c_str());
+               lastEdited = gFieldSynthEditor;
+               lastKnownCode = gFieldSynthEditor->code;
+            }
+
+            ImGui::InputTextMultiline("##fieldSynthCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+
+            if (ImGui::Button("Apply", ImVec2(120, 0)))
+            {
+               gFieldSynthEditor->code = editBuf;
+               gFieldSynthEditor->Apply();
+               lastKnownCode = gFieldSynthEditor->code;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Revert", ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldSynthEditor->code.c_str());
+
+            if (!gFieldSynthEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSynthEditor->LastError().c_str());
+            }
          }
          ImGui::End();
       }
@@ -61095,7 +61830,7 @@ int main(int argc, char** argv)
             }
 
             ImGui::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {

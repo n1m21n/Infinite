@@ -120,6 +120,14 @@ class IGeometrySource
 public:
    virtual ~IGeometrySource() {}
 
+   // Whether output pin `index` on this node actually carries GetMesh()'s
+   // geometry. Defaults to "only the primary output (index 0)" so a
+   // multi-output node (e.g. a Field node with scalar outputs alongside its
+   // geo output) doesn't let a non-geometry pin silently act as if it were
+   // the mesh output just because the node happens to implement this
+   // interface at all. Mirrors IAudioSource::IsAudioOutputIndex (INode.h).
+   virtual bool IsGeometryOutputIndex(int index) const { return index == 0; }
+
    // Mesh in object space, plus the model matrix that places it in the scene.
    virtual const Mesh& GetMesh() = 0;
 

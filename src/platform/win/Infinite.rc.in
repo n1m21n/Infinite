@@ -27,6 +27,7 @@
 GLFW_ICON ICON "@CMAKE_CURRENT_SOURCE_DIR@/src/platform/win/Infinite.ico"
 IDI_ICON1 ICON "@CMAKE_CURRENT_SOURCE_DIR@/src/platform/win/Infinite.ico"
 1         ICON "@CMAKE_CURRENT_SOURCE_DIR@/src/platform/win/Infinite.ico"
+IDI_DEVICE_ICON ICON "@CMAKE_CURRENT_SOURCE_DIR@/src/platform/win/InfiniteDevice.ico"
 
 #define INFINITE_VERSION      @INFINITE_VERSION_RC@
 #define INFINITE_VERSION_STR  "@INFINITE_VERSION_RC_STR@"

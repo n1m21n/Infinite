@@ -42,8 +42,8 @@ public:
    // native "geo" (0), then "publish" when the toggle is on, then each
    // currently-declared entry of mOutputPins in PinTable insertion order.
    // See Apply() for how mOutputPins gets reconciled/refused; see
-   // mDeclaredOutputMods below for why ModulatorOutput() on a declared pin
-   // is a placeholder, not the kernel's real computed value.
+   // mDeclaredOutputMods/DeclaredOutputPlaceholder below for which declared
+   // pins read a real live value vs. a fixed placeholder 0.
    int NativeOutputCount() const { return publishScalarOutput ? 2 : 1; }
    int DeclaredOutputCount() const
    {
@@ -84,7 +84,18 @@ public:
       {
          if (!p.isDeclared) continue;
          if (seen == declIdx)
-            return (declIdx < Field::PinTable::kMaxDeclaredPins) ? &mDeclaredOutputMods[declIdx] : nullptr;
+         {
+            if (declIdx >= Field::PinTable::kMaxDeclaredPins)
+               return nullptr;
+            // Re-point this slot's placeholder at its current pin identity
+            // every call, not just at reconcile time: PinTable::Pins() order
+            // (and so declIdx<->name mapping) can shift across an Apply(),
+            // and this stays cheap enough to just always redo it.
+            DeclaredOutputPlaceholder& mod = mDeclaredOutputMods[declIdx];
+            mod.owner = this;
+            mod.pinName = (p.domainName == "frame" && p.typeName != "audio" && p.typeName != "image") ? p.name : std::string();
+            return &mod;
+         }
          seen++;
       }
       return nullptr;
@@ -227,19 +238,27 @@ private:
    Field::PinTable mOutputPins;
    Field::PinTable mInputPins;
 
-   // Placeholder IModulator per declared-output slot position. The Field
-   // compiler pipeline (FieldIR.cpp/ElementBackend.cpp) does not yet read or
-   // write a declared output's actual runtime value - see step-13 agent
-   // notes / the step-13 doc's resolved scoping decision - so this always
-   // reads 0. Real per-pin computed values are deferred to a follow-up
-   // step; wiring a cable to a declared output pin today is structurally
-   // valid (connects, saves/loads, survives undo) but always carries 0
-   // until that follow-up lands. One instance per slot position (not a
-   // single shared instance) so distinct declared pins are distinct
-   // IModulator identities, matching every other multi-output node.
+   // One instance per slot position (not a single shared instance) so
+   // distinct declared pins are distinct IModulator identities, matching
+   // every other multi-output node. A frame-domain, non-structural declared
+   // output (`chime`, `glow`, ...) reads its real, live value via
+   // ElementVM::ReadFrameVar, the same name-keyed channel `publish` already
+   // uses (FieldIR.cpp's DeclOutput lowering now emits the frame-var write
+   // that makes this possible). Any other declared output (element/pixel/
+   // sample domain, or audio/image-typed) has no such runtime channel yet -
+   // pinName is left empty for those, and this reads a fixed 0 as before.
    struct DeclaredOutputPlaceholder : public IModulator
    {
-      float Value01() override { return 0.0f; }
+      FieldElementNode* owner = nullptr;
+      std::string pinName;
+      float Value01() override
+      {
+         if (owner == nullptr || pinName.empty())
+            return 0.0f;
+         float v = 0.0f;
+         owner->mVM.ReadFrameVar(pinName, v);
+         return v;
+      }
    };
    DeclaredOutputPlaceholder mDeclaredOutputMods[Field::PinTable::kMaxDeclaredPins];
 
@@ -252,4 +271,11 @@ private:
    bool mWasTruncated = false;
    int mActualElementCount = 0;
    int mLastCookFrame = -1;
+
+   // Hash of mParamTable's current values as of the last rebuild. A static
+   // kernel (no `t`, no `state`) has no other signal that a param slider
+   // moved - upstream revision doesn't change and isTimeDependent is false -
+   // so without this, CookIfNeeded's needRebuild gate never fires and the
+   // mesh silently goes stale relative to the slider.
+   size_t mLastParamHash = 0;
 };

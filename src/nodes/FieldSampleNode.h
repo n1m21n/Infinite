@@ -2,7 +2,6 @@
 
 #include "core/AudioCable.h"
 #include "core/INode.h"
-#include "core/NoteCable.h"
 #include "Modulation.h"
 #include "field/ParamTable.h"
 #include "field/PinTable.h"
@@ -36,13 +35,17 @@ public:
    void VisitParams(ParamVisitor& v) override;
 
    AudioNode* GetAudioNode() override;
-   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
-   // Slot 1, not 0 - slot 0 is the note pin's slot in the shared pin index
-   // space (see SamplerNode.h's identical convention).
-   AudioCable* AudioInputSlot(int slot) override { return slot == 1 ? &audioInput : nullptr; }
+   // Field Effect is audio-effects-only (no note-driven presets, note input
+   // removed). "in" lives at slot 0 - InputCountFor's generic audio/note pin
+   // probe (main.cpp) stops counting at the first slot index that answers
+   // neither AudioInputSlot nor NoteInputSlot, so leaving slot 0 unanswered
+   // (as when this used to reserve it for a since-removed note pin) makes the
+   // node report zero input pins and hides "in" entirely - a real functional
+   // regression, not just a cosmetic one.
+   AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &audioInput : nullptr; }
    const char* InputLabel(int slot) const override
    {
-      return slot == 0 ? "notes" : slot == 1 ? "in" : nullptr;
+      return slot == 0 ? "in" : nullptr;
    }
 
    // Dynamic pins, Phase 1 (build step 11, §5.2): a second output, "rms",
@@ -118,6 +121,13 @@ public:
             // (same rationale as FieldElementNode's native "geo" output).
             if (p.typeName == "audio")
                return nullptr;
+            // A frame-domain declared output (`bass`, ...) is always
+            // `reduce.rms(...)` (enforced at reconcile time - see
+            // BackendRegister.cpp), so it reads the exact same live value as
+            // the fixed "rms" toggle output: no separate per-pin channel
+            // needed, just hand back the existing RmsOutput instance.
+            if (p.domainName == "frame")
+               return static_cast<IModulator*>(&mRmsOutput);
             return (declIdx < Field::PinTable::kMaxDeclaredPins) ? &mDeclaredOutputMods[declIdx] : nullptr;
          }
          seen++;
@@ -179,9 +189,7 @@ public:
    int ReadScope(float* out, int capacity);
 
    std::string code = "state float y = 0\ny = y * 0.999 + in * 0.1\nout = y\n";
-   int maxVoices = 8;
 
-   NoteCable noteInput;
    AudioCable audioInput;
 
    // Editor-window scope cache, drained/redrawn at a capped rate - mirrors

@@ -36,6 +36,8 @@ namespace Field
       const float* paramVals = nullptr; // indexed by SampleProgram::params[i] order
       const float* stateCur = nullptr;  // indexed by SampleProgram::state[i] order
       float* stateNext = nullptr;       // write-only; same indexing as stateCur
+      float* delayBuf = nullptr;        // Step 19: storage for delay ring buffers
+      int* delayCursors = nullptr;      // Step 19: per-delay-line write cursors
    };
 
    // `regs` must have at least prog.numRegs entries (kSampleMaxRegs is
@@ -60,6 +62,30 @@ namespace Field
             case SampleOp::LoadParam: regs[ins.dst] = in.paramVals[ins.a]; break;
             case SampleOp::LoadState: regs[ins.dst] = in.stateCur[ins.a]; break;
             case SampleOp::StoreState: in.stateNext[ins.a] = DspMath::FlushDenormal(regs[ins.b]); break;
+            case SampleOp::Delay:
+            {
+               const int delayIdx = ins.a;
+               if (delayIdx >= 0 && delayIdx < (int)prog.delays.size() && in.delayBuf != nullptr && in.delayCursors != nullptr)
+               {
+                  const SampleDelayLine& dl = prog.delays[delayIdx];
+                  int cur = in.delayCursors[dl.cursorIndex];
+                  if (cur < 0 || cur >= dl.length)
+                     cur = 0;
+                  float* ring = in.delayBuf + dl.bufferOffset;
+                  const float delayedVal = ring[cur];
+                  ring[cur] = DspMath::FlushDenormal(regs[ins.b]);
+                  cur++;
+                  if (cur >= dl.length)
+                     cur = 0;
+                  in.delayCursors[dl.cursorIndex] = cur;
+                  regs[ins.dst] = delayedVal;
+               }
+               else
+               {
+                  regs[ins.dst] = 0.0f;
+               }
+               break;
+            }
             case SampleOp::Move: regs[ins.dst] = regs[ins.a]; break;
             case SampleOp::Add: regs[ins.dst] = regs[ins.a] + regs[ins.b]; break;
             case SampleOp::Sub: regs[ins.dst] = regs[ins.a] - regs[ins.b]; break;

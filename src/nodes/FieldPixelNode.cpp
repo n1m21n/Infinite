@@ -94,44 +94,89 @@ const std::vector<FieldPixelNode::Preset>& FieldPixelNode::Presets()
 {
    static const std::vector<Preset> kPresets = {
       { "Default (UV Gradient)", "col = vec3(uv.x, uv.y, 0.5);" },
-      { "Radial Wave", "param float speed = 2.0 [0.1, 10.0];\nparam float freq = 20.0 [1.0, 50.0];\nd = length(uv - 0.5);\ncol = vec3(0.5 + 0.5 * sin(d * freq - t * speed));" },
-      { "Feedback Diffusion", "param float decay = 0.98 [0.9, 1.0];\nstate float a = 0;\nd = length(uv - 0.5);\nsrc_val = if(d < 0.05, 1.0, a * decay);\na = src_val;\ncol = vec3(a);" },
-      { "Modulo Grid", "param float scale = 8.0 [1.0, 32.0];\ngrid = fmod(uv * scale, 1.0);\ncol = vec3(grid.x, grid.y, 0.0);" },
-      { "Chladni Nodal Pattern (Device #11)",
+      { "Color Gradient",
+        "param float angle = 45.0 [0.0, 360.0];\n"
+        "param float speed = 0.5 [0.0, 5.0];\n"
+        "rad = angle * 0.01745329;\n"
+        "dir = vec2(cos(rad), sin(rad));\n"
+        "d = dot(uv - 0.5, dir) + 0.5 + sin(t * speed) * 0.1;\n"
+        "col = mix(vec3(0.1, 0.2, 0.8), vec3(1.0, 0.4, 0.2), clamp(d, 0.0, 1.0));" },
+      { "Noise Texture",
+        "param float scale = 12.0 [2.0, 40.0];\n"
+        "param float speed = 1.0 [0.0, 4.0];\n"
+        // Aspect-corrected so the noise cells stay isotropic instead of
+        // stretching on a non-square width/height.
+        "p = vec2(uv.x * aspect, uv.y) * scale;\n"
+        "n1 = sin(p.x + t * speed) * cos(p.y - t * speed * 0.7);\n"
+        "n2 = sin(p.x * 2.1 - t * speed * 1.2) * cos(p.y * 1.9 + t * speed);\n"
+        "val = 0.5 + 0.25 * (n1 + n2);\n"
+        "col = vec3(val * 0.9, val * 0.7, val * 1.1);" },
+      { "Organic Blobs / Metaballs",
+        "param float speed = 1.2 [0.1, 5.0];\n"
+        "param float size = 0.16 [0.05, 0.3];\n"
+        // Aspect-corrected so the blobs stay round instead of stretching
+        // into ellipses on a non-square width/height.
+        "p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n"
+        "b1 = vec2(0.28 * cos(t * speed), 0.28 * sin(t * speed * 0.8));\n"
+        "b2 = vec2(0.24 * cos(t * speed * 1.3 + 2.0), 0.24 * sin(t * speed * 1.1 + 1.0));\n"
+        "b3 = vec2(0.26 * sin(t * speed * 0.7 + 4.0), 0.26 * cos(t * speed * 0.9 + 3.0));\n"
+        // Classic inverse-square metaball energy field: each blob
+        // contributes r^2/(dist^2+eps), and the iso-surface sits at fld==1,
+        // which is exactly where two blobs' influence circles overlap and
+        // merge - a 1/dist falloff (the old formula) drops off too fast to
+        // ever blend two blobs into one shape, so it always looked like
+        // separate plain circles instead of blobby metaballs.
+        "r2 = size * size;\n"
+        "d1 = dot(p - b1, p - b1) + 0.0008;\n"
+        "d2 = dot(p - b2, p - b2) + 0.0008;\n"
+        "d3 = dot(p - b3, p - b3) + 0.0008;\n"
+        "fld = r2 / d1 + r2 / d2 + r2 / d3;\n"
+        "iso = smoothstep(0.85, 1.15, fld);\n"
+        "col = vec3(iso * 0.2, iso * 0.8, iso * 0.9);" },
+      { "Radial Rings / Waves",
+        "param float freq = 24.0 [2.0, 60.0];\n"
+        "param float speed = 3.0 [0.1, 10.0];\n"
+        "p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n"
+        "d = length(p);\n"
+        "wave = sin(d * freq - t * speed);\n"
+        "col = vec3(0.5 + 0.5 * wave, 0.4 + 0.3 * cos(d * freq * 0.5), 0.8 + 0.2 * wave);" },
+      { "Modulo Grid",
+        "param float scale = 8.0 [1.0, 32.0];\n"
+        // Aspect-corrected so grid cells stay square instead of stretching
+        // on a non-square width/height.
+        "p = vec2(uv.x * aspect, uv.y) * scale;\n"
+        "grid = fmod(p, 1.0);\n"
+        "col = vec3(grid.x, grid.y, 0.0);" },
+      { "Chladni Nodal Pattern",
         "param float m = 3.0 [1.0, 10.0];\n"
         "param float n = 5.0 [1.0, 10.0];\n"
-        "p = uv * 3.14159265;\n"
+        // Aspect-corrected so the nodal pattern stays isotropic instead of
+        // stretching on a non-square width/height.
+        "p = vec2(uv.x * aspect, uv.y) * 3.14159265;\n"
         "val = cos(n * p.x) * cos(m * p.y) - cos(m * p.x) * cos(n * p.y);\n"
         "line = 1.0 - smoothstep(0.0, 0.08, abs(val));\n"
         "col = vec3(line, line * 0.85, line * 0.6);" },
-      { "Sound-Colored Field (Device #21)",
+      { "Sound-Colored Field",
         "param float speed = 1.5 [0.1, 6.0];\n"
         "param float saturation = 0.8 [0.0, 1.0];\n"
-        "d = length(uv - 0.5);\n"
-        "angle = atan2(uv.y - 0.5, uv.x - 0.5);\n"
+        "p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n"
+        "d = length(p);\n"
+        "angle = atan2(p.y, p.x);\n"
         "hue = fract(angle / 6.283185 + t * 0.1 * speed);\n"
         "r = clamp(abs(fract(hue + 1.0) * 6.0 - 3.0) - 1.0, 0.0, 1.0);\n"
         "g = clamp(abs(fract(hue + 0.6666) * 6.0 - 3.0) - 1.0, 0.0, 1.0);\n"
         "b = clamp(abs(fract(hue + 0.3333) * 6.0 - 3.0) - 1.0, 0.0, 1.0);\n"
         "rgb = mix(vec3(1.0), vec3(r, g, b), saturation);\n"
         "col = rgb * (0.6 + 0.4 * sin(d * 20.0 - t * speed));" },
-      { "Phosphor CRT Persistence",
-        "param float decayR = 0.92 [0.5, 0.99];\n"
-        "param float decayG = 0.88 [0.5, 0.99];\n"
-        "param float decayB = 0.70 [0.5, 0.99];\n"
-        "state float pr = 0;\n"
-        "state float pg = 0;\n"
-        "state float pb = 0;\n"
-        "pr = max(col.x, pr * decayR);\n"
-        "pg = max(col.y, pg * decayG);\n"
-        "pb = max(col.z, pb * decayB);\n"
-        "col = vec3(pr, pg, pb);" },
       { "Kinetic Moire Ripples",
         "param float freq = 18.0 [2.0, 60.0];\n"
         "param float speed = 2.5 [0.1, 10.0];\n"
         "param float rings = 8.0 [1.0, 20.0];\n"
-        "p1 = length(uv - vec2(0.35, 0.5));\n"
-        "p2 = length(uv - vec2(0.65, 0.5));\n"
+        "p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n"
+        "c1 = vec2(-0.15, 0.0);\n"
+        "c2 = vec2(0.15, 0.0);\n"
+        "p1 = length(p - c1);\n"
+        "p2 = length(p - c2);\n"
         "w1 = sin(p1 * freq * rings - t * speed);\n"
         "w2 = sin(p2 * freq * rings + t * speed);\n"
         "val = 0.5 + 0.25 * (w1 + w2);\n"
@@ -379,12 +424,11 @@ void FieldPixelNode::CookIfNeeded(int frameId)
       }
    }
 
-   // Pull() cooks the upstream node for this frame first (it previously
-   // wasn't cooked at all here - a raw INode* with no ImageCable meant
-   // nothing upstream of this pin was ever guaranteed to have run this frame).
-   unsigned int upstreamTex = input.IsConnected() ? input.Pull(frameId) : 0;
-   unsigned int srcTex = upstreamTex != 0 ? upstreamTex : GetDefaultBlackTexture();
-   float srcAlpha = upstreamTex != 0 ? 1.0f : 0.0f;
+   // No native input pin (device-catalog simplification: Field Pixel is
+   // generation-only for now) - `src` in a kernel always reads the black
+   // texture/alpha-0, same as an unconnected pin used to.
+   unsigned int srcTex = GetDefaultBlackTexture();
+   float srcAlpha = 0.0f;
 
    auto setupUniforms = [this, w, h, clock, dt, frameId, srcTex, srcAlpha, &hoistedValues]()
    {
@@ -410,9 +454,19 @@ void FieldPixelNode::CookIfNeeded(int frameId)
          {
             glUniform1f(loc, hoistedValues[slot.hoistedIndex]);
          }
-         else if (slot.paramIndex >= 0 && slot.paramIndex < (int)mParamTable.Params().size())
+         else if (slot.paramIndex >= 0)
          {
-            glUniform1f(loc, mParamTable.Params()[slot.paramIndex].value);
+            // slot.paramIndex is this compile's own declaration order (an
+            // index into GlslBackend's local program.declaredParams), NOT a
+            // position in mParamTable - mParamTable is a persistent, name-
+            // keyed table that accumulates entries across every preset ever
+            // loaded into this node instance (Reconcile only appends/renames,
+            // never reorders or removes), so the two indices only happened to
+            // line up for a node's very first compile. Look up by name - the
+            // same stable key the UI sliders and Reconcile both use - instead
+            // of trusting positional alignment between two unrelated arrays.
+            if (const Field::ParamEntry* p = mParamTable.Find(slot.varName))
+               glUniform1f(loc, p->value);
          }
       }
 

@@ -6,6 +6,7 @@
 namespace Field
 {
    LiveCableChecker gLiveCableChecker = nullptr;
+   LiveCableDisconnector gLiveCableDisconnector = nullptr;
 
    const PinEntry* PinTable::Find(const std::string& name) const
    {
@@ -198,6 +199,7 @@ namespace Field
       PinTable scratch = live;
       scratch.Reconcile(declared, nodeIndex, outNotice);
 
+      std::string autoDisconnected;
       if (gLiveCableChecker != nullptr)
       {
          for (size_t i = 0; i < live.Pins().size(); ++i)
@@ -209,8 +211,17 @@ namespace Field
             if (nowEntry != nullptr && !nowEntry->isDeclared &&
                 gLiveCableChecker(nodeIndex, preSlot[i], oldEntry.isOutput))
             {
-               if (!outRefusal.empty()) outRefusal += ", ";
-               outRefusal += "'" + oldEntry.name + "'";
+               if (gLiveCableDisconnector != nullptr)
+               {
+                  gLiveCableDisconnector(nodeIndex, preSlot[i], oldEntry.isOutput);
+                  if (!autoDisconnected.empty()) autoDisconnected += ", ";
+                  autoDisconnected += "'" + oldEntry.name + "'";
+               }
+               else
+               {
+                  if (!outRefusal.empty()) outRefusal += ", ";
+                  outRefusal += "'" + oldEntry.name + "'";
+               }
             }
          }
       }
@@ -221,6 +232,14 @@ namespace Field
          outRefusal = std::string("Cannot apply: pin") + (plural ? "s " : " ") + outRefusal +
                       " still connected - disconnect the cable first.";
          return false;
+      }
+
+      if (!autoDisconnected.empty())
+      {
+         if (!outNotice.empty()) outNotice += "; ";
+         bool plural = autoDisconnected.find(',') != std::string::npos;
+         outNotice += std::string("auto-disconnected pin") + (plural ? "s " : " ") + autoDisconnected +
+                      " (no longer declared by this preset)";
       }
 
       live = std::move(scratch);

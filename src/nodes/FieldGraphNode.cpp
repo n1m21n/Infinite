@@ -27,29 +27,71 @@ std::string FieldGraphNode::NewUid()
 const std::vector<FieldGraphNode::Preset>& FieldGraphNode::Presets()
 {
    static const std::vector<Preset> kPresets = {
-      { "Chladni Sand Synth (3-Domain Bundle - Device #11)",
+      { "Synth + Effects Voice",
+        "seq = emit(\"Note Sequencer\", 0)\n"
+        "synth = emit(\"Wavetable\", 1)\n"
+        "flt = emit(\"Audio Filter\", 2)\n"
+        "rev = emit(\"Reverb\", 3)\n"
+        "out = emit(\"Audio Out\", 4)\n"
+        "lfo = emit(\"LFO\", 5)\n"
+        "connect(seq, 0, synth, 0)\n"
+        "connect(synth, 0, flt, 0)\n"
+        "connect(flt, 0, rev, 0)\n"
+        "connect(rev, 0, out, 0)\n"
+        "connect(lfo, 0, flt, 0)\n"
+        "place(seq, -420, 0)\n"
+        "place(lfo, -420, 220)\n"
+        "place(synth, -200, 0)\n"
+        "place(flt, 20, 0)\n"
+        "place(rev, 240, 0)\n"
+        "place(out, 460, 0)\n" },
+      { "3D Scene Pipeline",
+        "geo = emit(\"Geometry\", 0)\n"
+        "xform = emit(\"Transform\", 1)\n"
+        "disp = emit(\"Displacement\", 2)\n"
+        "render = emit(\"Render 3D\", 3)\n"
+        "connect(geo, 0, xform, 0)\n"
+        "connect(xform, 0, disp, 0)\n"
+        "connect(disp, 0, render, 0)\n"
+        "place(geo, -360, 0)\n"
+        "place(xform, -120, 0)\n"
+        "place(disp, 120, 0)\n"
+        "place(render, 360, 0)\n" },
+      { "2D Compositing Pipeline",
+        "tex = emit(\"Texture\", 0)\n"
+        "noise = emit(\"Noise\", 1)\n"
+        "blend = emit(\"Blend\", 2)\n"
+        "flt = emit(\"Filter\", 3)\n"
+        "connect(tex, 0, blend, 0)\n"
+        "connect(noise, 0, blend, 1)\n"
+        "connect(blend, 0, flt, 0)\n"
+        "place(tex, -320, -100)\n"
+        "place(noise, -320, 100)\n"
+        "place(blend, -60, 0)\n"
+        "place(flt, 180, 0)\n" },
+      { "LFO + Wavetable Voice",
+        "lfo = emit(\"LFO\", 0)\n"
+        "osc = emit(\"Wavetable\", 1)\n"
+        "connect(lfo, 0, osc, 0)\n"
+        "place(lfo, -260, 0)\n"
+        "place(osc, 80, 0)\n" },
+      { "Chladni Sand Synth",
         "pixel = emit(\"Field Pixel\", 0)\n"
         "sand = emit(\"Field Element\", 1)\n"
         "synth = emit(\"Field Sample\", 2)\n"
         "place(pixel, -320, -180)\n"
         "place(sand, -320, 180)\n"
         "place(synth, 80, 0)\n" },
-      { "Bass Ribbon Mirror Bundle (Device #7)",
+      { "Bass Ribbon Mirror Bundle",
         "audio = emit(\"Field Sample\", 0)\n"
         "geo = emit(\"Field Element\", 1)\n"
         "place(audio, -280, 0)\n"
         "place(geo, 80, 0)\n" },
-      { "Boundary Chime Bundle (Device #19)",
+      { "Boundary Chime Bundle",
         "sensor = emit(\"Field Element\", 0)\n"
         "chime = emit(\"Field Sample\", 1)\n"
         "place(sensor, -280, 0)\n"
-        "place(chime, 80, 0)\n" },
-      { "LFO + Wavetable Voice",
-        "lfo = emit(\"LFO\", 0)\n"
-        "osc = emit(\"Wavetable\", 1)\n"
-        "connect(lfo, 0, osc, 0)\n"
-        "place(lfo, -260, 0)\n"
-        "place(osc, 80, 0)\n" }
+        "place(chime, 80, 0)\n" }
    };
    return kPresets;
 }

@@ -141,6 +141,61 @@ namespace Field
             ctx.Emit(SampleOp::Clamp, dst, x, lo, hi, 0.0f, call.span);
             return dst;
          }
+         if (c == "delay")
+         {
+            if (call.args.size() != 2)
+            {
+               ctx.Fail("'delay' takes exactly 2 arguments (x, samples)", call.span);
+               return 0;
+            }
+            uint8_t srcReg = arg(0);
+            if (ctx.Failed()) return 0;
+
+            const auto& lenArg = call.args[1];
+            if (!lenArg || lenArg->kind != AstKind::Literal)
+            {
+               ctx.Fail("delay length must be a compile-time constant integer literal", lenArg ? lenArg->span : call.span);
+               return 0;
+            }
+            auto* lit = static_cast<AstLiteral*>(lenArg.get());
+            double numVal = lit->numberValue;
+            if (numVal < 1.0 || std::floor(numVal) != numVal)
+            {
+               ctx.Fail("delay length must be a positive integer literal (>= 1)", lenArg->span);
+               return 0;
+            }
+            int delaySamples = (int)numVal;
+
+            int delayIdx = (int)ctx.prog.delays.size();
+            if (delayIdx >= kSampleMaxDelayLines)
+            {
+               ctx.Fail("sample-domain kernel exceeds the delay-line count cap (" + std::to_string(kSampleMaxDelayLines) + ")",
+                        call.span);
+               return 0;
+            }
+
+            int currentTotalCells = 0;
+            for (const auto& dl : ctx.prog.delays)
+               currentTotalCells += dl.length;
+
+            if (currentTotalCells + delaySamples > kSampleMaxDelayCells)
+            {
+               ctx.Fail("sample-domain kernel exceeds the cumulative delay-buffer cap (" +
+                        std::to_string(currentTotalCells + delaySamples) + " > " +
+                        std::to_string(kSampleMaxDelayCells) + " cells)", call.span);
+               return 0;
+            }
+
+            SampleDelayLine dl;
+            dl.bufferOffset = currentTotalCells;
+            dl.length = delaySamples;
+            dl.cursorIndex = delayIdx;
+            ctx.prog.delays.push_back(dl);
+
+            uint8_t dst = ctx.AllocReg(call.span);
+            ctx.Emit(SampleOp::Delay, dst, (uint8_t)delayIdx, srcReg, 0, 0.0f, call.span);
+            return dst;
+         }
          if (c == "reduce.rms")
          {
             ctx.Fail("reduce.rms publishes to the frame domain and has no per-sample value",
@@ -700,6 +755,11 @@ namespace Field
             case AstKind::Call:
             {
                auto* call = static_cast<AstCall*>(stmt.get());
+               if (call->callee == "delay")
+               {
+                  CompileCall(ctx, *call, scope);
+                  return;
+               }
                if (call->callee != "reduce.rms")
                {
                   ctx.Fail("'" + call->callee + "' is not supported inside a sample-domain kernel in v1", stmt->span);
@@ -818,6 +878,26 @@ namespace Field
                {
                   cell.transplantFromIndex = j;
                   break;
+               }
+            }
+         }
+
+         // Step 19: Delay line transplant resolution. If delay line lengths match at
+         // the same AST call site index, reuse the existing buffer offset and cursor.
+         for (int i = 0; i < (int)outProgram.delays.size(); i++)
+         {
+            auto& dl = outProgram.delays[i];
+            dl.transplantFromOffset = -1;
+            dl.transplantFromLength = 0;
+            dl.transplantFromCursor = -1;
+            if (i < (int)previous->delays.size())
+            {
+               const auto& prevDl = previous->delays[i];
+               if (prevDl.length == dl.length)
+               {
+                  dl.transplantFromOffset = prevDl.bufferOffset;
+                  dl.transplantFromLength = prevDl.length;
+                  dl.transplantFromCursor = prevDl.cursorIndex;
                }
             }
          }
