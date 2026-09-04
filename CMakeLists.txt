@@ -229,6 +229,7 @@ set(COMMON_SOURCES
     src/core/field/FieldState.cpp
     src/core/field/FieldCycles.cpp
     src/core/field/ParamTable.cpp
+    src/core/field/FieldDevice.cpp
     src/core/field/PinTable.cpp
     src/core/field/GlslBackend.cpp
     src/core/field/PixelState.cpp

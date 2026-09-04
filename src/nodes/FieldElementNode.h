@@ -8,6 +8,7 @@
 #include "field/FieldState.h"
 #include "field/ParamTable.h"
 #include "field/PinTable.h"
+#include "field/FieldDevice.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -174,6 +175,12 @@ public:
    static const std::vector<Preset>& Presets();
    static const std::vector<std::string>& PresetNames();
    void LoadPreset(int index);
+
+   // Field build step 17 (.infdev device files): reads code, GetParamTable(),
+   // generateCount, maxElements into/out of a portable Field::DeviceFile. See
+   // FieldDevice.h and docs/plans/field/step-17-infdev-format.md §3.
+   Field::DeviceFile ToDeviceFile() const;
+   void LoadDeviceFile(const Field::DeviceFile& device);
 
    IGeometrySource* input = nullptr;
    std::string code;

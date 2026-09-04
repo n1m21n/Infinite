@@ -8,6 +8,7 @@
 #include "field/FieldGraphOwnership.h"
 #include "field/FieldIR.h"
 #include "field/ParamTable.h"
+#include "field/FieldDevice.h"
 
 #include <map>
 #include <set>
@@ -141,6 +142,11 @@ public:
 
    Field::ParamTable& GetParamTable() { return mParamTable; }
    const Field::ParamTable& GetParamTable() const { return mParamTable; }
+
+   // Field build step 17 (.infdev device files) - see FieldElementNode's
+   // identical pair for the rationale.
+   Field::DeviceFile ToDeviceFile() const;
+   void LoadDeviceFile(const Field::DeviceFile& device);
 
    const Field::GraphOwnershipMap& Ownership() const { return mOwnership; }
    Field::GraphOwnershipMap& Ownership() { return mOwnership; }
