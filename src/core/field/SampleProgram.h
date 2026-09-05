@@ -36,6 +36,15 @@ namespace Field
    static constexpr int kSampleMaxTableCells = 16384;
    static constexpr int kSampleMaxTables = 16;
 
+   // Step 25 (OPEN-D): a kernel may declare more than one live audio-rate
+   // input (`input sample audio <name>`) on top of the native "in" pin.
+   // Matches Field::PinTable::kMaxDeclaredPins (16, the per-kernel combined
+   // output+input declared-pin ceiling already enforced in
+   // BackendRegister.cpp) - kept as its own constant here rather than
+   // including PinTable.h, since SampleProgram.h is a leaf header consumed
+   // from the audio thread.
+   static constexpr int kSampleMaxDeclaredAudioInputs = 16;
+
    enum class SampleOp : uint8_t
    {
       Nop = 0,
@@ -45,6 +54,7 @@ namespace Field
       LoadN,       // dst = n   (per-sample shared running sample counter)
       LoadFreq,    // dst = freq  (per-voice: the voice's current note frequency in Hz)
       LoadGate,    // dst = gate  (per-voice: 1.0 while the voice's note is held, 0.0 after note-off)
+      LoadDeclaredIn, // dst = declaredIns[a]  (Step 25: a declared 'input sample audio <name>', per-sample shared, indexed by declared-audio-input ordinal)
       LoadParam,   // dst = paramVals[a]  (per-sample shared, hoisted above the voice loop)
       LoadState,   // dst = stateCur[a]   (per-voice)
       StoreState,  // stateNext[a] = <src in b>  (per-voice; emitted once per cell at program end)

@@ -256,6 +256,17 @@ and the transfer operators in `field-domains` §1.
 
 > ### OPEN-D — a second `sample` input, and note/event input
 >
+> **ANSWERED AND BUILT (step 25), the audio-input half only.** Resolved as
+> **kernel-declared dynamic input pins**, not option (a), (b), or (c) below:
+> `input sample audio <name>` binds the name into the kernel's scope (via a
+> new `LoadDeclaredIn` register-machine opcode reading a
+> `SampleRuntimeInput::declaredIns[]` slot) and spawns a real, connectable
+> `AudioCable` on the node — one per declared audio input, following the
+> already-working `FieldPixelNode::DeclaredImageInput` pattern rather than a
+> hardcoded `in2`. `input sample float <name>` remains collected but unbound
+> (unresolved, not part of this step). The note/event half (rows below tagged
+> `[D]`) is still open.
+>
 > **Who needs it:** the two-input adaptive filters (echo cancellation, noise
 > cancellation), and every rung-4 entry that learns from what the user *plays*
 > (§9.2).

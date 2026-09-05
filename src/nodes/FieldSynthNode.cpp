@@ -164,6 +164,23 @@ public:
       // Slot 0 is notes, slot 1 is audio in (if connected)
       const AudioBuffer* inBuf = (numInputs > 1) ? inputs[1] : nullptr;
 
+      // Step 25 (OPEN-D): declared `input sample audio <name>` pins start at
+      // slot 2 (right after "notes"/"in") - see
+      // FieldSynthNode::AudioInputSlot()/NativeInputCount().
+      const AudioBuffer* declaredBufs[Field::kSampleMaxDeclaredAudioInputs] = {};
+      {
+         int audioOrdinal = 0;
+         for (const auto& d : mActiveProgram->declaredInputs)
+         {
+            if (d.typeName != "audio") continue;
+            if (audioOrdinal >= Field::kSampleMaxDeclaredAudioInputs) break;
+            const int slot = 2 + audioOrdinal;
+            declaredBufs[audioOrdinal] = (slot < numInputs) ? inputs[slot] : nullptr;
+            audioOrdinal++;
+         }
+      }
+      float declaredInVals[Field::kSampleMaxDeclaredAudioInputs] = {};
+
       NoteEvent evts[64];
       int numEvts = 0;
       int evtIdx = 0;
@@ -211,6 +228,9 @@ public:
          const float nVal = (float)mAbsSampleCounter;
          mAbsSampleCounter++;
 
+         for (int d = 0; d < Field::kSampleMaxDeclaredAudioInputs; d++)
+            declaredInVals[d] = (declaredBufs[d] != nullptr && declaredBufs[d]->numChannels > 0) ? declaredBufs[d]->channels[0][i] : 0.0f;
+
          const int numParams = (int)mActiveProgram->params.size();
          for (int p = 0; p < numParams; p++)
             paramVals[p] = mMailbox.SmoothedValue(mActiveProgram->params[p].mailboxId);
@@ -229,6 +249,7 @@ public:
             rin.n = nVal;
             rin.freq = MidiNoteToHz(mVoices.NoteAt(v));
             rin.gate = mGateHeld[v] ? 1.0f : 0.0f;
+            rin.declaredIns = declaredInVals;
             rin.paramVals = paramVals;
             rin.stateCur = mStateCur[v];
             rin.stateNext = mStateNext[v];
@@ -585,7 +606,7 @@ bool FieldSynthNode::Apply()
       std::string pinNotice, pinRefusalMsg;
       bool outOk = Field::ReconcileFieldPins(mOutputPins, declOut, mNodeIndex, NativeOutputCount(), pinNotice, pinRefusalMsg);
       // Native inputs count is 2 (notes at slot 0, audio in at slot 1)
-      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, /*nativeCount=*/2, pinNotice, pinRefusalMsg);
+      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, NativeInputCount(), pinNotice, pinRefusalMsg);
       if (!outOk || !inOk)
       {
          mLastError = pinRefusalMsg;

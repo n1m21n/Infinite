@@ -33,6 +33,12 @@ namespace Field
       float n = 0.0f;
       float freq = 0.0f;
       float gate = 0.0f;
+      // Step 25: per-sample values of this kernel's declared 'input sample
+      // audio <name>' pins, indexed by declared-audio-input ordinal (the
+      // order BackendRegister.cpp's DeclInput case saw 'audio'-typed
+      // declarations in) - always populated (0.0f for an unconnected
+      // input), same convention as `in` itself.
+      const float* declaredIns = nullptr;
       const float* paramVals = nullptr; // indexed by SampleProgram::params[i] order
       const float* stateCur = nullptr;  // indexed by SampleProgram::state[i] order
       float* stateNext = nullptr;       // write-only; same indexing as stateCur
@@ -60,6 +66,9 @@ namespace Field
             case SampleOp::LoadN: regs[ins.dst] = in.n; break;
             case SampleOp::LoadFreq: regs[ins.dst] = in.freq; break;
             case SampleOp::LoadGate: regs[ins.dst] = in.gate; break;
+            case SampleOp::LoadDeclaredIn:
+               regs[ins.dst] = (in.declaredIns != nullptr) ? in.declaredIns[ins.a] : 0.0f;
+               break;
             case SampleOp::LoadParam: regs[ins.dst] = in.paramVals[ins.a]; break;
             case SampleOp::LoadState: regs[ins.dst] = in.stateCur[ins.a]; break;
             case SampleOp::StoreState: in.stateNext[ins.a] = DspMath::FlushDenormal(regs[ins.b]); break;

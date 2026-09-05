@@ -145,7 +145,24 @@ public:
       // the note pin that used to occupy slot 0 is gone.
       const AudioBuffer* inBuf = (numInputs > 0) ? inputs[0] : nullptr;
 
+      // Step 25 (OPEN-D): declared `input sample audio <name>` pins start at
+      // slot 1 (right after "in"), one AudioBuffer* per declared-audio-input
+      // ordinal - see FieldSampleNode::AudioInputSlot()/NativeInputCount().
+      const AudioBuffer* declaredBufs[Field::kSampleMaxDeclaredAudioInputs] = {};
+      {
+         int audioOrdinal = 0;
+         for (const auto& d : mActiveProgram->declaredInputs)
+         {
+            if (d.typeName != "audio") continue;
+            if (audioOrdinal >= Field::kSampleMaxDeclaredAudioInputs) break;
+            const int slot = 1 + audioOrdinal;
+            declaredBufs[audioOrdinal] = (slot < numInputs) ? inputs[slot] : nullptr;
+            audioOrdinal++;
+         }
+      }
+
       float paramVals[Field::kSampleMaxParams] = {};
+      float declaredInVals[Field::kSampleMaxDeclaredAudioInputs] = {};
 
       bool sawFault = false;
 
@@ -155,6 +172,9 @@ public:
          const float srVal = (float)mSampleRate;
          const float nVal = (float)mAbsSampleCounter;
          mAbsSampleCounter += 1.0;
+
+         for (int d = 0; d < Field::kSampleMaxDeclaredAudioInputs; d++)
+            declaredInVals[d] = (declaredBufs[d] != nullptr && declaredBufs[d]->numChannels > 0) ? declaredBufs[d]->channels[0][i] : 0.0f;
 
          const int numParams = (int)mActiveProgram->params.size();
          for (int p = 0; p < numParams; p++)
@@ -173,6 +193,7 @@ public:
          rin.n = nVal;
          rin.freq = 0.0f;
          rin.gate = 0.0f;
+         rin.declaredIns = declaredInVals;
          rin.paramVals = paramVals;
          rin.stateCur = mStateCur;
          rin.stateNext = mStateNext;
@@ -562,7 +583,7 @@ bool FieldSampleNode::Apply()
 
       std::string pinNotice, pinRefusalMsg;
       bool outOk = Field::ReconcileFieldPins(mOutputPins, declOut, mNodeIndex, NativeOutputCount(), pinNotice, pinRefusalMsg);
-      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, /*nativeCount=*/2, pinNotice, pinRefusalMsg);
+      bool inOk = outOk && Field::ReconcileFieldPins(mInputPins, declIn, mNodeIndex, NativeInputCount(), pinNotice, pinRefusalMsg);
       if (!outOk || !inOk)
       {
          mLastError = pinRefusalMsg;

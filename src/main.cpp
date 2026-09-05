@@ -42761,36 +42761,90 @@ static int RunFieldPinDeclTest()
          }
       }
 
-      // 6d. input <name> is collected but NOT bound into scope - referencing
-      // it inside the kernel body is a loud compile error, not silent garbage.
+      // 6d. Step 25 (OPEN-D): `input sample audio <name>` now binds into
+      // scope for real - referencing it compiles, and it reads live per-
+      // sample values from the kernel's second audio input (FieldSampleNode/
+      // FieldSynthNode's dynamic AudioCable pin, see FieldSampleNode.h). A
+      // `float`-typed (or non-sample-domain) declared input still has no
+      // live source in v1 and stays unbound, same as before this step.
       {
          std::string src = "input sample audio sidechain\nout = sidechain\n";
          Field::SampleProgram prog;
          Field::FieldError err;
-         if (Field::CompileSampleProgram(src, nullptr, prog, err))
+         if (!Field::CompileSampleProgram(src, nullptr, prog, err))
          {
-            printf("SECTION 6: FAIL - referencing an unbound sample-domain input did not fail to compile\n");
+            printf("SECTION 6: FAIL - 'input sample audio' referenced in the kernel body did not compile: %s\n", err.message.c_str());
             secOk = false;
          }
-         else if (err.message.find("used before assignment") == std::string::npos)
+         else if (prog.declaredInputs.size() != 1 || prog.declaredInputs[0].name != "sidechain" ||
+                  prog.declaredInputs[0].typeName != "audio")
          {
-            printf("SECTION 6: FAIL - expected a loud 'used before assignment' error, got '%s'\n", err.message.c_str());
+            printf("SECTION 6: FAIL - SampleProgram::declaredInputs does not match expected ('sidechain', audio)\n");
             secOk = false;
          }
 
-         // But the declaration itself (without referencing it) is collected.
-         std::string src2 = "input sample audio sidechain\nout = in\n";
+         // A declared 'float' input is still collected only, not bound -
+         // referencing it remains a loud compile error.
+         std::string src2 = "input sample float ref\nout = ref\n";
          Field::SampleProgram prog2;
          Field::FieldError err2;
-         if (!Field::CompileSampleProgram(src2, nullptr, prog2, err2))
+         if (Field::CompileSampleProgram(src2, nullptr, prog2, err2))
          {
-            printf("SECTION 6: FAIL - bare (unreferenced) input declaration did not compile: %s\n", err2.message.c_str());
+            printf("SECTION 6: FAIL - referencing an unbound 'float'-typed sample-domain input did not fail to compile\n");
             secOk = false;
          }
-         else if (prog2.declaredInputs.size() != 1 || prog2.declaredInputs[0].name != "sidechain")
+         else if (err2.message.find("used before assignment") == std::string::npos)
          {
-            printf("SECTION 6: FAIL - SampleProgram::declaredInputs does not match expected ('sidechain')\n");
+            printf("SECTION 6: FAIL - expected a loud 'used before assignment' error for the 'float' input, got '%s'\n", err2.message.c_str());
             secOk = false;
+         }
+      }
+
+      // 6e. Step 25 (OPEN-D), end to end through FieldSampleNode: a declared
+      // second audio input actually carries live per-sample values from its
+      // own AudioCable/pin slot (slot 1, right after native "in" at slot 0),
+      // independent of "in" itself.
+      {
+         FieldSampleNode node;
+         node.code = "input sample audio sidechain\nout = sidechain + in * 0.0\n";
+         if (!node.Apply())
+         {
+            printf("SECTION 6: FAIL - end-to-end second-audio-input program did not compile: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+         else if (node.AudioInputSlot(1) == nullptr)
+         {
+            printf("SECTION 6: FAIL - declared 'sidechain' audio input did not get a real cable at slot 1\n");
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = node.GetAudioNode();
+            an->PrepareToPlay(44100.0, 4);
+
+            std::vector<float> mainIn(4, 9.0f); // ignored: multiplied by 0.0 in the kernel
+            std::vector<float> sideIn = { 0.25f, 0.5f, 0.75f, 1.0f };
+            float* mainChans[1] = { mainIn.data() };
+            float* sideChans[1] = { sideIn.data() };
+            AudioBuffer mainBuf; mainBuf.channels = mainChans; mainBuf.numChannels = 1; mainBuf.numFrames = 4;
+            AudioBuffer sideBuf; sideBuf.channels = sideChans; sideBuf.numChannels = 1; sideBuf.numFrames = 4;
+            const AudioBuffer* inputs[2] = { &mainBuf, &sideBuf };
+
+            std::vector<float> l(4, 0.0f), r(4, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer outBuf; outBuf.channels = chans; outBuf.numChannels = 2; outBuf.numFrames = 4;
+
+            an->ProcessBlock(inputs, 2, outBuf);
+
+            bool matches = true;
+            for (int i = 0; i < 4; i++)
+               if (std::fabs(l[i] - sideIn[i]) > 1e-5f) matches = false;
+            if (!matches)
+            {
+               printf("SECTION 6: FAIL - declared audio input's per-sample values did not reach the kernel (got %f,%f,%f,%f expected %f,%f,%f,%f)\n",
+                      l[0], l[1], l[2], l[3], sideIn[0], sideIn[1], sideIn[2], sideIn[3]);
+               secOk = false;
+            }
          }
       }
 

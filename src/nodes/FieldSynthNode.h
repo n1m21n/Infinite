@@ -35,12 +35,41 @@ public:
 
    AudioNode* GetAudioNode() override;
 
-   // Inputs: slot 0 is notes, slot 1 is audio in (optional, e.g. for vocoding or audio-rate FM)
+   // Inputs: slot 0 is notes, slot 1 is audio in (optional, e.g. for vocoding or audio-rate FM).
+   // Dynamic pins, Step 25 (OPEN-D second audio input): declared `input
+   // sample audio <name>` pins get a real connectable AudioCable each,
+   // starting right after the native "notes"/"in" pair - same layering
+   // scheme as FieldPixelNode::DeclaredImageInput.
+   int NativeInputCount() const { return 2; }
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
-   AudioCable* AudioInputSlot(int slot) override { return slot == 1 ? &audioInput : nullptr; }
+   AudioCable* AudioInputSlot(int slot) override
+   {
+      if (slot == 1) return &audioInput;
+      int declIdx = slot - NativeInputCount();
+      if (declIdx < 0 || declIdx >= Field::PinTable::kMaxDeclaredPins) return nullptr;
+      int seen = 0;
+      for (const auto& p : mInputPins.Pins())
+      {
+         if (!p.isDeclared || p.typeName != "audio") continue;
+         if (seen == declIdx) return &mDeclaredAudioInputs[declIdx];
+         seen++;
+      }
+      return nullptr;
+   }
    const char* InputLabel(int slot) const override
    {
-      return slot == 0 ? "notes" : slot == 1 ? "in" : nullptr;
+      if (slot == 0) return "notes";
+      if (slot == 1) return "in";
+      int declIdx = slot - NativeInputCount();
+      if (declIdx < 0) return nullptr;
+      int seen = 0;
+      for (const auto& p : mInputPins.Pins())
+      {
+         if (!p.isDeclared || p.typeName != "audio") continue;
+         if (seen == declIdx) return p.name.c_str();
+         seen++;
+      }
+      return nullptr;
    }
 
    int NativeOutputCount() const { return exposeRmsOutput ? 2 : 1; }
@@ -172,6 +201,9 @@ private:
       float Value01() override { return 0.0f; }
    };
    DeclaredOutputPlaceholder mDeclaredOutputMods[Field::PinTable::kMaxDeclaredPins];
+   // Step 25 (OPEN-D): one real AudioCable per declared `input sample audio
+   // <name>` pin - see AudioInputSlot() above.
+   AudioCable mDeclaredAudioInputs[Field::PinTable::kMaxDeclaredPins];
 
    std::vector<Field::SampleParamSlot> mCompiledParams;
    Field::SampleProgram mLastCompiled;

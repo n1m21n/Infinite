@@ -42,10 +42,38 @@ public:
    // (as when this used to reserve it for a since-removed note pin) makes the
    // node report zero input pins and hides "in" entirely - a real functional
    // regression, not just a cosmetic one.
-   AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &audioInput : nullptr; }
+   // Dynamic pins, Step 25 (OPEN-D second audio input): declared `input
+   // sample audio <name>` pins get a real connectable AudioCable each,
+   // starting right after the native "in" pin - same layering scheme as
+   // FieldPixelNode::DeclaredImageInput.
+   int NativeInputCount() const { return 1; }
+   AudioCable* AudioInputSlot(int slot) override
+   {
+      if (slot == 0) return &audioInput;
+      int declIdx = slot - NativeInputCount();
+      if (declIdx < 0 || declIdx >= Field::PinTable::kMaxDeclaredPins) return nullptr;
+      int seen = 0;
+      for (const auto& p : mInputPins.Pins())
+      {
+         if (!p.isDeclared || p.typeName != "audio") continue;
+         if (seen == declIdx) return &mDeclaredAudioInputs[declIdx];
+         seen++;
+      }
+      return nullptr;
+   }
    const char* InputLabel(int slot) const override
    {
-      return slot == 0 ? "in" : nullptr;
+      if (slot == 0) return "in";
+      int declIdx = slot - NativeInputCount();
+      if (declIdx < 0) return nullptr;
+      int seen = 0;
+      for (const auto& p : mInputPins.Pins())
+      {
+         if (!p.isDeclared || p.typeName != "audio") continue;
+         if (seen == declIdx) return p.name.c_str();
+         seen++;
+      }
+      return nullptr;
    }
 
    // Dynamic pins, Phase 1 (build step 11, §5.2): a second output, "rms",
@@ -228,6 +256,9 @@ private:
       float Value01() override { return 0.0f; }
    };
    DeclaredOutputPlaceholder mDeclaredOutputMods[Field::PinTable::kMaxDeclaredPins];
+   // Step 25 (OPEN-D): one real AudioCable per declared `input sample audio
+   // <name>` pin - see AudioInputSlot() above.
+   AudioCable mDeclaredAudioInputs[Field::PinTable::kMaxDeclaredPins];
    // (name -> mailboxId) for the currently-compiled program's params, set by
    // Apply(); CookIfNeeded pushes each frame by walking this list rather
    // than assuming ParamTable's own iteration order matches mailbox id
