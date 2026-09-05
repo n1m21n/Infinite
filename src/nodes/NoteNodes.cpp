@@ -2897,8 +2897,7 @@ public:
          const int base = (mPrevNote >= 0) ? mPrevNote : (rangeLow + rangeHigh) / 2;
          const int delta = (int)std::lround(mRng.Next() * (float)maxStep);
          const int raw = std::clamp(base + delta, 0, 127);
-         const int snapped = MusicTime::SnapToScale(raw, root, scale, MusicTime::kSnapNearest);
-         const int note = std::clamp(snapped, rangeLow, rangeHigh);
+         const int note = MusicTime::SnapToScaleInRange(raw, root, scale, rangeLow, rangeHigh);
          mPrevNote = note;
          mLastNoteReadout.store(note, std::memory_order_relaxed);
 
@@ -4096,8 +4095,7 @@ public:
             const bool useGlobal = mUseGlobalScale.load(std::memory_order_relaxed);
             const int scale = useGlobal ? Transport::Instance().Scale() : mScale.load(std::memory_order_relaxed);
             const int root = useGlobal ? Transport::Instance().Key() : mRoot.load(std::memory_order_relaxed);
-            int note = MusicTime::SnapToScale(rawNote, root, scale, MusicTime::kSnapNearest);
-            note = std::clamp(note, rangeLow, rangeHigh);
+            const int note = MusicTime::SnapToScaleInRange(rawNote, root, scale, rangeLow, rangeHigh);
 
             const int noteVoiceId = NextVoiceId();
             if (Pending* on = FreeSlot())

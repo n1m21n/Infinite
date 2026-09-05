@@ -265,6 +265,35 @@ namespace MusicTime
       return midiNote; // unreachable for any real scale table (chromatic always matches at delta 0)
    }
 
+   // Like SnapToScale, but the result is also constrained to [lo, hi]. A plain
+   // SnapToScale-then-clamp can push a note back out of the scale (the range
+   // boundary itself need not be a scale tone) - this instead searches inward
+   // from the boundary that was crossed so the result is always both in-scale
+   // and in-range. Falls back to lo if no in-scale note exists in the range at
+   // all (a range narrower than the scale's smallest gap).
+   inline int SnapToScaleInRange(int midiNote, int root, int scale, int lo, int hi)
+   {
+      if (lo > hi)
+         std::swap(lo, hi);
+      const int clamped = std::clamp(midiNote, lo, hi);
+      const int snapped = SnapToScale(clamped, root, scale, kSnapNearest);
+      if (snapped >= lo && snapped <= hi)
+         return snapped;
+      if (snapped > hi)
+      {
+         for (int n = hi; n >= lo; n--)
+            if (ScaleContainsPitchClass(scale, ((n - root) % 12 + 12) % 12))
+               return n;
+      }
+      else
+      {
+         for (int n = lo; n <= hi; n++)
+            if (ScaleContainsPitchClass(scale, ((n - root) % 12 + 12) % 12))
+               return n;
+      }
+      return lo;
+   }
+
    // Floor division (rounds toward -infinity), needed below because C++'s
    // `/` truncates toward zero - `-1 / 7 == 0` would put degree -1 in octave
    // 0 at scale index -1 instead of octave -1 at index (count - 1).
