@@ -49033,6 +49033,77 @@ int main(int argc, char** argv)
          gNodes[2].showParams = false;
          gNodes[4].showParams = false;
       }
+      else if (const char* geomDensityArg = getenv("INFINITE_GEOMDENSITYTEST"))
+      {
+         // 3D geometry density stress fixture: a UV sphere's triangle count is
+         // exactly rings*sectors*2 (Mesh.cpp's Sphere(rings, sectors)), so
+         // pinning sectors (sides*2 = 500) and driving rings (detail) from the
+         // requested triangle target gives a clean tris = detail*1000 dial.
+         // Fixed at 1920x1080 with AA/shadows off so the measurement (below,
+         // near INFINITE_FPSTEST) isolates geometry cost alone - see
+         // INFINITE_RESSWEEPTEST / INFINITE_QUALITYSWEEPTEST for those axes.
+         SpawnNode("Sphere", "3D", 40.0f, 40.0f);      // 0
+         SpawnNode("Render 3D", "3D", 400.0f, 40.0f);  // 1
+         auto* sphere = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
+         const long triTarget = std::max(1L, atol(geomDensityArg));
+         sphere->sides = 250;                                   // sectors = 500, fixed
+         sphere->detail = (int)std::max(3L, triTarget / 1000L);  // rings; tris = rings*1000
+         render->geometry[0] = sphere;
+         render->width = 1920.0f; render->height = 1080.0f;
+         render->samples = 0;         // AA off
+         render->shadowsEnabled = false;
+      }
+      else if (const char* resSweepArg = getenv("INFINITE_RESSWEEPTEST"))
+      {
+         // Output-resolution stress fixture: fixed, moderate geometry (200
+         // rings * 500 sectors = 200,000 triangles - the same rings*sectors*2
+         // math as GEOMDENSITYTEST) so the measurement isolates resolution's
+         // effect on frame time from geometry cost. Resolution is "WxH",
+         // e.g. INFINITE_RESSWEEPTEST=3840x2160; defaults to 1920x1080 if
+         // unparseable.
+         SpawnNode("Sphere", "3D", 40.0f, 40.0f);      // 0
+         SpawnNode("Render 3D", "3D", 400.0f, 40.0f);  // 1
+         auto* sphere = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
+         sphere->sides = 250; sphere->detail = 200; // 200,000 tris
+         render->geometry[0] = sphere;
+         int resW = 1920, resH = 1080;
+         sscanf(resSweepArg, "%dx%d", &resW, &resH);
+         render->width = (float)std::max(16, resW);
+         render->height = (float)std::max(16, resH);
+         render->samples = 0;
+         render->shadowsEnabled = false;
+      }
+      else if (const char* qualityArg = getenv("INFINITE_QUALITYSWEEPTEST"))
+      {
+         // Render quality-knob stress fixture. Render3DNode's only two
+         // runtime-adjustable real-time quality controls are the MSAA sample
+         // count (Render3DNode::SampleNames(): Off/2x/4x/8x, an index into
+         // that list) and the shadow map size (ShadowQualityNames():
+         // 1024/2048/4096) - both swept from here. Fixed at 1920x1080 / the
+         // same 200,000-triangle sphere as RESSWEEPTEST so the measurement
+         // isolates the quality knob's own cost. INFINITE_QUALITYSWEEPTEST is
+         // the MSAA sample index (0-3); optional INFINITE_QUALITY_SHADOWQ
+         // (0-2) also enables shadows at that map size.
+         SpawnNode("Sphere", "3D", 40.0f, 40.0f);      // 0
+         SpawnNode("Render 3D", "3D", 400.0f, 40.0f);  // 1
+         auto* sphere = static_cast<GeometryNode*>(gNodes[0].node.get());
+         auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
+         sphere->sides = 250; sphere->detail = 200; // 200,000 tris
+         render->geometry[0] = sphere;
+         render->width = 1920.0f; render->height = 1080.0f;
+         render->samples = std::max(0, std::min(3, atoi(qualityArg)));
+         if (const char* shadowQArg = getenv("INFINITE_QUALITY_SHADOWQ"))
+         {
+            render->shadowsEnabled = true;
+            render->shadowQuality = std::max(0, std::min(2, atoi(shadowQArg)));
+         }
+         else
+         {
+            render->shadowsEnabled = false;
+         }
+      }
       else if (const char* loadPatchPath = getenv("INFINITE_LOADPATCH"))
       {
          LoadPatchFrom(loadPatchPath);
@@ -59916,6 +59987,107 @@ int main(int argc, char** argv)
                    sUncapped, gLastFrameMs);
             printf("%s\n", (gLastFrameMs > 30.0 && gLastFrameMs < 37.0)
                               ? "FRAME LIMITER OK" : "SUSPECT - limiter missed its budget");
+         }
+      }
+
+      // 3D geometry density stress fixture, measurement half - see the setup
+      // half above (INFINITE_GEOMDENSITYTEST, before the main loop starts).
+      // Explicit CookIfNeeded is needed every frame because the main loop's
+      // ordinary per-frame cook pass (above, "apply modulation and palette")
+      // only walks Output/Syphon/OscSend nodes - a bare Render 3D with
+      // nothing downstream would otherwise never cook at all. Uncapped +
+      // vsync off so the frame limiter/display refresh don't mask the real
+      // per-frame cost; 30 frames of warmup (mesh upload, driver
+      // shader/FBO allocation) then 120 sampled frames, matching the
+      // node-chain FPS investigation's sampling window.
+      if (getenv("INFINITE_GEOMDENSITYTEST") != nullptr)
+      {
+         static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
+         static int sSampleCount = 0;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
+         if (frameId >= 2)
+            render->CookIfNeeded(frameId);
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+         {
+            sSum += gLastFrameMs;
+            sMin = std::min(sMin, gLastFrameMs);
+            sMax = std::max(sMax, gLastFrameMs);
+            sSampleCount++;
+         }
+         if (frameId == 152)
+         {
+            const double avg = sSampleCount > 0 ? sSum / sSampleCount : 0.0;
+            const double fps = avg > 0.0 ? 1000.0 / avg : 0.0;
+            printf("GEOMDENSITYTEST tris=%zu avg=%.3fms min=%.3fms max=%.3fms fps=%.2f\n",
+                   render->LastTriangleCount(), avg, sMin, sMax, fps);
+            printf("%s\n", sSampleCount > 0 ? "GEOMDENSITYTEST DONE" : "GEOMDENSITYTEST FAIL (no samples)");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // Output-resolution stress fixture, measurement half - see
+      // INFINITE_RESSWEEPTEST's setup above. Same warmup/sample/explicit-cook
+      // scheme as GEOMDENSITYTEST.
+      if (getenv("INFINITE_RESSWEEPTEST") != nullptr)
+      {
+         static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
+         static int sSampleCount = 0;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
+         if (frameId >= 2)
+            render->CookIfNeeded(frameId);
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+         {
+            sSum += gLastFrameMs;
+            sMin = std::min(sMin, gLastFrameMs);
+            sMax = std::max(sMax, gLastFrameMs);
+            sSampleCount++;
+         }
+         if (frameId == 152)
+         {
+            const double avg = sSampleCount > 0 ? sSum / sSampleCount : 0.0;
+            const double fps = avg > 0.0 ? 1000.0 / avg : 0.0;
+            printf("RESSWEEPTEST res=%dx%d avg=%.3fms min=%.3fms max=%.3fms fps=%.2f\n",
+                   (int)render->width, (int)render->height, avg, sMin, sMax, fps);
+            printf("%s\n", sSampleCount > 0 ? "RESSWEEPTEST DONE" : "RESSWEEPTEST FAIL (no samples)");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // Render quality-knob (MSAA / shadow map size) stress fixture,
+      // measurement half - see INFINITE_QUALITYSWEEPTEST's setup above. Same
+      // warmup/sample/explicit-cook scheme as GEOMDENSITYTEST.
+      if (getenv("INFINITE_QUALITYSWEEPTEST") != nullptr)
+      {
+         static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
+         static int sSampleCount = 0;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
+         if (frameId >= 2)
+            render->CookIfNeeded(frameId);
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+         {
+            sSum += gLastFrameMs;
+            sMin = std::min(sMin, gLastFrameMs);
+            sMax = std::max(sMax, gLastFrameMs);
+            sSampleCount++;
+         }
+         if (frameId == 152)
+         {
+            const double avg = sSampleCount > 0 ? sSum / sSampleCount : 0.0;
+            const double fps = avg > 0.0 ? 1000.0 / avg : 0.0;
+            printf("QUALITYSWEEPTEST samples=%s(%dx active) shadows=%d shadowSize=%d "
+                   "avg=%.3fms min=%.3fms max=%.3fms fps=%.2f\n",
+                   render->samples == 0 ? "Off" : render->samples == 1 ? "2x" :
+                   render->samples == 2 ? "4x" : "8x",
+                   render->ActiveSamples(), render->shadowsEnabled ? 1 : 0,
+                   render->ActiveShadowSize(), avg, sMin, sMax, fps);
+            printf("%s\n", sSampleCount > 0 ? "QUALITYSWEEPTEST DONE" : "QUALITYSWEEPTEST FAIL (no samples)");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
 
