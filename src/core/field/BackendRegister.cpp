@@ -680,18 +680,41 @@ namespace Field
                   return;
                }
 
+               // Step 25 (OPEN-D): count 'audio'-typed declared inputs seen
+               // so far (before this one is pushed) - this is this pin's
+               // declared-audio-input ordinal, matching the order the node
+               // side (FieldSampleNode.h/FieldSynthNode.h's AudioInputSlot(),
+               // populated from mInputPins in the same declared order) wires
+               // a real AudioCable and, each sample, a SampleRuntimeInput::
+               // declaredIns[] entry.
+               int audioOrdinal = 0;
+               for (const auto& existing : ctx.prog.declaredInputs)
+                  if (existing.typeName == "audio") audioOrdinal++;
+
                SampleDeclaredPin pin;
                pin.name = d->name;
                pin.typeName = d->typeName;
                pin.domainName = d->domainName;
                ctx.prog.declaredInputs.push_back(pin);
 
-               // Step 12 collects the declaration only - actual audio-input
-               // slot plumbing (wiring this name to a second live input
-               // stream) is later work. Deliberately NOT bound into `scope`:
-               // referencing the name in an expression fails loudly with
-               // "undeclared identifier" rather than silently resolving to
-               // garbage (see CompileExpr's Ident case).
+               if (d->typeName == "audio" && audioOrdinal < kSampleMaxDeclaredAudioInputs)
+               {
+                  // A declared 'audio' input is a real second (or third, ...)
+                  // live audio-rate signal - bind it into scope for real,
+                  // reading a per-sample value the caller supplies via
+                  // SampleRuntimeInput::declaredIns[audioOrdinal], the same
+                  // way `in` itself loads via LoadIn.
+                  uint8_t dst = ctx.AllocReg(stmt->span);
+                  ctx.Emit(SampleOp::LoadDeclaredIn, dst, (uint8_t)audioOrdinal, 0, 0, 0.0f, stmt->span);
+                  scope[d->name] = dst;
+               }
+               // Else ('float'-typed, or a non-sample domain pin): collected
+               // for save/load and cross-node identity purposes only, same
+               // as build step 12 originally shipped - no live per-sample
+               // source exists for it in v1. Deliberately NOT bound into
+               // `scope`: referencing the name in an expression fails
+               // loudly with "used before assignment" rather than silently
+               // resolving to garbage (see CompileExpr's Ident case).
                return;
             }
             case AstKind::Assign:
