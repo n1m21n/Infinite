@@ -16867,7 +16867,6 @@ namespace
       const ImU32 thresholdCol = isLight ? IM_COL32(210, 130, 20, 200) : IM_COL32(255, 180, 70, 190);
       const float threshX = DynVizDbToX(threshold, origin.x, curveW);
       dl->AddLine(ImVec2(threshX, origin.y), ImVec2(threshX, curveBr.y), thresholdCol, 1.5f);
-      dl->AddText(ImVec2(threshX + 3.0f, origin.y + 2.0f), thresholdCol, "threshold");
 
       // The gain-computer curve itself, with makeup gain folded in so the
       // picture matches what actually comes out. The curve's bend at
