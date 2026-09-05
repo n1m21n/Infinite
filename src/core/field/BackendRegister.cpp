@@ -26,7 +26,8 @@ namespace Field
       bool IsReservedName(const std::string& name)
       {
          return name == "in" || name == "out" || name == "sr" || name == "n" ||
-                name == "freq" || name == "gate";
+                name == "freq" || name == "gate" ||
+                name == "noteOn" || name == "notePitch" || name == "noteVel";
       }
 
       struct Ctx
@@ -302,6 +303,30 @@ namespace Field
                   ctx.Emit(SampleOp::LoadGate, dst, 0, 0, 0, 0.0f, node->span);
                   return dst;
                }
+               // Step 26 (OPEN-D note history): folded into the sample
+               // domain's reserved set alongside freq/gate, rather than a
+               // main-thread frame-domain VM - FieldSynthNode has no
+               // element/pixel kernel to host one, and freq/gate already
+               // establish the precedent that a per-voice/per-node note
+               // fact is a sample-domain reserved read, not a param.
+               if (id->name == "noteOn")
+               {
+                  uint8_t dst = ctx.AllocReg(node->span);
+                  ctx.Emit(SampleOp::LoadNoteOn, dst, 0, 0, 0, 0.0f, node->span);
+                  return dst;
+               }
+               if (id->name == "notePitch")
+               {
+                  uint8_t dst = ctx.AllocReg(node->span);
+                  ctx.Emit(SampleOp::LoadNotePitch, dst, 0, 0, 0, 0.0f, node->span);
+                  return dst;
+               }
+               if (id->name == "noteVel")
+               {
+                  uint8_t dst = ctx.AllocReg(node->span);
+                  ctx.Emit(SampleOp::LoadNoteVel, dst, 0, 0, 0, 0.0f, node->span);
+                  return dst;
+               }
                if (tableScope.count(id->name))
                {
                   ctx.Fail("table '" + id->name + "' cannot be read as a bare identifier", node->span,
@@ -539,7 +564,7 @@ namespace Field
                auto* d = static_cast<AstDeclOutput*>(stmt.get());
                if (IsReservedName(d->name))
                {
-                  ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n/freq/gate) and cannot be declared", stmt->span);
+                  ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n/freq/gate/noteOn/notePitch/noteVel) and cannot be declared", stmt->span);
                   return;
                }
                if (scope.count(d->name))
@@ -642,7 +667,7 @@ namespace Field
                auto* d = static_cast<AstDeclInput*>(stmt.get());
                if (IsReservedName(d->name))
                {
-                  ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n/freq/gate) and cannot be declared", stmt->span);
+                  ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n/freq/gate/noteOn/notePitch/noteVel) and cannot be declared", stmt->span);
                   return;
                }
                if (scope.count(d->name))
@@ -791,7 +816,8 @@ namespace Field
                            "assign to an indexed element: '" + name + "[idx] = val'");
                   return;
                }
-               if (name == "in" || name == "sr" || name == "n" || name == "freq" || name == "gate")
+               if (name == "in" || name == "sr" || name == "n" || name == "freq" || name == "gate" ||
+                   name == "noteOn" || name == "notePitch" || name == "noteVel")
                {
                   ctx.Fail("cannot assign to '" + name + "' (reserved, read-only)", stmt->span);
                   return;

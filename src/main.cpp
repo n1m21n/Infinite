@@ -42440,6 +42440,280 @@ static int RunFieldSampleTest()
       else { printf("SECTION 15 (State Tables state float name[N]): FAIL\n"); allOk = false; }
    }
 
+   // ------------------------------------------------------------
+   // SECTION 16: FieldSynthNode noteOn/notePitch/noteVel (Step 26, OPEN-D
+   // note history - folded into the sample domain's reserved set alongside
+   // freq/gate; see docs/plans/field/step-24-language-opens-remainder.md
+   // section 3).
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // NOTE on test design: AudioFieldSynthNode::ProcessBlock scales every
+      // kernel's raw `out` by that voice's ADSR click-guard envelope AND its
+      // velocity before it reaches the buffer (`sampleAcc += kernelOut * env
+      // * vel;`, this file's FieldSynthNode.cpp) - a pre-existing, correct
+      // design unrelated to Step 26. Both factors are always >= 0, so a
+      // kernel that emits a signed canary (+1.0 if the reserved word reads
+      // as expected, -1.0 if not) survives that scaling with its *sign*
+      // intact even though its magnitude is unpredictable. Every assertion
+      // below reads sign only, never magnitude, for exactly this reason.
+
+      // 16a. noteOn is a one-sample edge, not a held level like gate: the
+      // canary is positive only on the exact sample the note-on registers,
+      // and non-positive (0.0 while the voice is not yet active, negative
+      // once it is) on every other sample - including samples before AND
+      // after it, and into a following block with no new events.
+      {
+         FieldSynthNode synth;
+         synth.code = "out = if(noteOn > 0.5, 1.0, -1.0)\n";
+         if (!synth.Apply())
+         {
+            printf("SECTION 16: FAIL - noteOn program did not compile: %s\n", synth.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = synth.GetAudioNode();
+            an->PrepareToPlay(44100.0, 128);
+
+            NoteEventQueue notes;
+            const int cursor = notes.RegisterConsumer();
+            an->SetNoteInbox(&notes, cursor);
+
+            NoteEvent on;
+            on.isNoteOn = true;
+            on.note = 69; // A4 -> 440 Hz
+            on.velocity = 0.75f;
+            on.voiceId = 1;
+            on.frameOffset = 5;
+            notes.Push(on);
+
+            std::vector<float> l(128, 0.0f), r(128, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer buf;
+            buf.channels = chans;
+            buf.numChannels = 2;
+            buf.numFrames = 128;
+
+            synth.CookIfNeeded(1);
+            an->ProcessBlock(nullptr, 0, buf);
+
+            if (!(l[5] > 1e-6f))
+            {
+               printf("SECTION 16: FAIL - noteOn canary at sample 5 is %f, expected > 0 (edge sample)\n", l[5]);
+               secOk = false;
+            }
+            for (int s = 0; s < 128; s++)
+            {
+               if (s == 5) continue;
+               if (s < 5)
+               {
+                  // Voice not yet active: the whole mix path contributes
+                  // exactly 0, regardless of the canary's sign.
+                  if (std::fabs(l[s]) > 1e-6f)
+                  {
+                     printf("SECTION 16: FAIL - noteOn canary at sample %d (before note-on) is %f, expected 0.0\n", s, l[s]);
+                     secOk = false;
+                     break;
+                  }
+               }
+               else if (!(l[s] < -1e-6f))
+               {
+                  printf("SECTION 16: FAIL - noteOn canary at sample %d is %f, expected < 0 (edge already passed, not held)\n", s, l[s]);
+                  secOk = false;
+                  break;
+               }
+            }
+
+            // A second block with no new events: the edge must not re-fire
+            // or stay latched - every sample must read the "not this sample"
+            // (negative) canary.
+            std::fill(l.begin(), l.end(), 0.0f);
+            an->ProcessBlock(nullptr, 0, buf);
+            for (int s = 0; s < 128; s++)
+            {
+               if (!(l[s] < -1e-6f))
+               {
+                  printf("SECTION 16: FAIL - noteOn canary at sample %d of block 2 is %f, expected < 0 (no new note-on)\n", s, l[s]);
+                  secOk = false;
+                  break;
+               }
+            }
+         }
+      }
+
+      // 16b. notePitch is a held snapshot of the most recent note-on (unlike
+      // noteOn), and persists across note-off - MidiNoteToHz convention (A4
+      // = note 69 -> 440 Hz), reused from freq.
+      {
+         FieldSynthNode synth;
+         synth.code = "out = if(notePitch > 439.0 && notePitch < 441.0, 1.0, -1.0)\n";
+         if (!synth.Apply())
+         {
+            printf("SECTION 16: FAIL - notePitch program did not compile: %s\n", synth.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = synth.GetAudioNode();
+            an->PrepareToPlay(44100.0, 128);
+
+            NoteEventQueue notes;
+            const int cursor = notes.RegisterConsumer();
+            an->SetNoteInbox(&notes, cursor);
+
+            NoteEvent on;
+            on.isNoteOn = true;
+            on.note = 69;
+            on.velocity = 1.0f;
+            on.voiceId = 1;
+            on.frameOffset = 0;
+            notes.Push(on);
+
+            std::vector<float> l(128, 0.0f), r(128, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer buf;
+            buf.channels = chans;
+            buf.numChannels = 2;
+            buf.numFrames = 128;
+
+            synth.CookIfNeeded(1);
+            an->ProcessBlock(nullptr, 0, buf);
+
+            NoteEvent off;
+            off.isNoteOn = false;
+            off.voiceId = 1;
+            off.frameOffset = 0;
+            notes.Push(off);
+            an->ProcessBlock(nullptr, 0, buf);
+
+            // The release ramp keeps the envelope positive (asymptotically
+            // decaying, never negative) for the whole of this second block,
+            // so the canary's sign alone still proves notePitch held 440 Hz
+            // through the note-off.
+            for (int s = 0; s < 128; s++)
+            {
+               if (!(l[s] > 1e-6f))
+               {
+                  printf("SECTION 16: FAIL - notePitch canary at sample %d of block 2 (post note-off) is %f, expected > 0 (440 Hz held)\n", s, l[s]);
+                  secOk = false;
+                  break;
+               }
+            }
+         }
+      }
+
+      // 16c. noteVel matches the note-on's velocity (already 0..1, see
+      // NoteEvent::velocity).
+      {
+         FieldSynthNode synth;
+         synth.code = "out = if(noteVel > 0.62 && noteVel < 0.64, 1.0, -1.0)\n";
+         if (!synth.Apply())
+         {
+            printf("SECTION 16: FAIL - noteVel program did not compile: %s\n", synth.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = synth.GetAudioNode();
+            an->PrepareToPlay(44100.0, 128);
+
+            NoteEventQueue notes;
+            const int cursor = notes.RegisterConsumer();
+            an->SetNoteInbox(&notes, cursor);
+
+            NoteEvent on;
+            on.isNoteOn = true;
+            on.note = 60;
+            on.velocity = 0.63f;
+            on.voiceId = 1;
+            on.frameOffset = 0;
+            notes.Push(on);
+
+            std::vector<float> l(128, 0.0f), r(128, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer buf;
+            buf.channels = chans;
+            buf.numChannels = 2;
+            buf.numFrames = 128;
+
+            synth.CookIfNeeded(1);
+            an->ProcessBlock(nullptr, 0, buf);
+            an->ProcessBlock(nullptr, 0, buf); // let the attack ramp fully settle
+
+            if (!(l[0] > 1e-6f))
+            {
+               printf("SECTION 16: FAIL - noteVel canary at sample 0 of block 2 is %f, expected > 0 (velocity 0.63 held)\n", l[0]);
+               secOk = false;
+            }
+         }
+      }
+
+      // 16d. noteOn/notePitch/noteVel are reserved: declaring a `param` or
+      // `state` cell of that name, or assigning to one, is a compile error
+      // (same treatment as freq/gate).
+      {
+         FieldSynthNode synth;
+         synth.code = "param float noteOn = 0 [0, 1]\nout = 0\n";
+         if (synth.Apply())
+         {
+            printf("SECTION 16: FAIL - 'param float noteOn' was not rejected\n");
+            secOk = false;
+         }
+
+         FieldSynthNode synth2;
+         synth2.code = "noteOn = 1.0\nout = 0\n";
+         if (synth2.Apply())
+         {
+            printf("SECTION 16: FAIL - assignment to 'noteOn' was not rejected\n");
+            secOk = false;
+         }
+
+         FieldSynthNode synth3;
+         synth3.code = "state float notePitch = 0\nout = 0\n";
+         if (synth3.Apply())
+         {
+            printf("SECTION 16: FAIL - 'state float notePitch' was not rejected\n");
+            secOk = false;
+         }
+      }
+
+      // 16e. Inert default elsewhere: FieldSampleNode (audio-effects-only,
+      // no note pipeline) compiles the same reserved names and always
+      // reads 0.0 - the spec's "reserved everywhere, live only where a real
+      // note pipeline exists" rule.
+      {
+         FieldSampleNode node;
+         node.code = "out = noteOn + notePitch + noteVel\n";
+         if (!node.Apply())
+         {
+            printf("SECTION 16: FAIL - noteOn/notePitch/noteVel did not compile on FieldSampleNode: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = node.GetAudioNode();
+            an->PrepareToPlay(44100.0, 128);
+            std::vector<float> l(128, 0.0f), r(128, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer buf;
+            buf.channels = chans;
+            buf.numChannels = 2;
+            buf.numFrames = 128;
+            an->ProcessBlock(nullptr, 0, buf);
+            if (std::fabs(l[0]) > 1e-6f)
+            {
+               printf("SECTION 16: FAIL - FieldSampleNode noteOn/notePitch/noteVel sum is %f, expected 0.0f (no note pipeline)\n", l[0]);
+               secOk = false;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 16 (noteOn/notePitch/noteVel Note History): OK\n");
+      else { printf("SECTION 16 (noteOn/notePitch/noteVel Note History): FAIL\n"); allOk = false; }
+   }
+
    printf("INFINITE_FIELDSAMPLETEST: %s\n", allOk ? "OK" : "FAIL");
    fflush(stdout);
    return allOk ? 0 : 1;

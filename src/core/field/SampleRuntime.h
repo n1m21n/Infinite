@@ -21,6 +21,15 @@ namespace Field
    // `freq`/`gate` are per-voice (unlike in/sr/n/paramVals): the caller
    // fetches them fresh for each voice, from that voice's own note-on
    // frequency and held state - see FieldSampleNode.cpp's per-voice loop.
+   // `noteOn`/`notePitch`/`noteVel` (Step 26, OPEN-D note history) are, like
+   // in/sr/n, shared across every voice and fetched once per sample above
+   // the voice loop: they are a per-*node* snapshot of the most recent note
+   // event, not a per-voice one. `noteOn` is a one-sample edge (1.0 only on
+   // the exact sample a note-on registered, 0.0 every other sample) - the
+   // caller (FieldSynthNode.cpp) computes it inside the same per-sample
+   // note-event loop that already drives freq/gate, so no cross-thread
+   // channel is needed: production and consumption are both on the audio
+   // thread in the same ProcessBlock call.
    // Always populated regardless of whether `in` is connected - a Field
    // sample kernel can be a self-contained generator with no upstream
    // audio source (design-prompt-sample-generator-mode.md).
@@ -33,6 +42,9 @@ namespace Field
       float n = 0.0f;
       float freq = 0.0f;
       float gate = 0.0f;
+      float noteOn = 0.0f;
+      float notePitch = 0.0f;
+      float noteVel = 0.0f;
       // Step 25: per-sample values of this kernel's declared 'input sample
       // audio <name>' pins, indexed by declared-audio-input ordinal (the
       // order BackendRegister.cpp's DeclInput case saw 'audio'-typed
@@ -66,6 +78,9 @@ namespace Field
             case SampleOp::LoadN: regs[ins.dst] = in.n; break;
             case SampleOp::LoadFreq: regs[ins.dst] = in.freq; break;
             case SampleOp::LoadGate: regs[ins.dst] = in.gate; break;
+            case SampleOp::LoadNoteOn: regs[ins.dst] = in.noteOn; break;
+            case SampleOp::LoadNotePitch: regs[ins.dst] = in.notePitch; break;
+            case SampleOp::LoadNoteVel: regs[ins.dst] = in.noteVel; break;
             case SampleOp::LoadDeclaredIn:
                regs[ins.dst] = (in.declaredIns != nullptr) ? in.declaredIns[ins.a] : 0.0f;
                break;
