@@ -183,6 +183,11 @@ namespace Field
                if (name == "t") return "fld_t";
                if (name == "dt") return "fld_dt";
                if (name == "frame") return "fld_frame";
+               // Step 26 (OPEN-D note history): no pixel-domain node has a
+               // note pipeline, so these are always an inert compile-time
+               // 0.0 - no uniform, no CPU-side plumbing needed, unlike
+               // fld_age (which is real per-node state).
+               if (name == "noteOn" || name == "notePitch" || name == "noteVel") return "0.0";
 
                auto hit = ctx.hoistedMap.find(name);
                if (hit != ctx.hoistedMap.end())

@@ -590,7 +590,8 @@ namespace Field
          std::string name = nameTok.text;
 
          // Check reserved words per domain
-         if (name == "t" || name == "dt" || name == "frame" || name == "count")
+         if (name == "t" || name == "dt" || name == "frame" || name == "count" ||
+             name == "noteOn" || name == "notePitch" || name == "noteVel")
          {
             p.Fail("state cell '" + name + "' cannot shadow reserved attribute of frame domain", nameTok.span);
             return nullptr;

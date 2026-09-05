@@ -192,6 +192,13 @@ public:
 
       for (int i = 0; i < buffer.numFrames; i++)
       {
+         // Step 26 (OPEN-D note history): noteOn is an edge, not a held
+         // level like gate - true only for the one sample where a note-on
+         // is registered below, reset every sample. notePitch/noteVel hold
+         // the *last* registered note-on's values (a per-node snapshot,
+         // shared by every voice, mirroring in/sr/n rather than the
+         // per-voice freq/gate).
+         bool noteOnEdge = false;
          while (evtIdx < numEvts && evts[evtIdx].frameOffset <= i)
          {
             if (evts[evtIdx].isNoteOn)
@@ -199,6 +206,9 @@ public:
                const int v = mVoices.NoteOn(evts[evtIdx].note, evts[evtIdx].velocity, evts[evtIdx].voiceId);
                mVoiceId[v] = evts[evtIdx].voiceId;
                mGateHeld[v] = true;
+               noteOnEdge = true;
+               mLastNotePitchHz = MidiNoteToHz(evts[evtIdx].note);
+               mLastNoteVel = evts[evtIdx].velocity;
                const int n = (int)mActiveProgram->state.size();
                for (int c = 0; c < n; c++)
                {
@@ -249,6 +259,9 @@ public:
             rin.n = nVal;
             rin.freq = MidiNoteToHz(mVoices.NoteAt(v));
             rin.gate = mGateHeld[v] ? 1.0f : 0.0f;
+            rin.noteOn = noteOnEdge ? 1.0f : 0.0f;
+            rin.notePitch = mLastNotePitchHz;
+            rin.noteVel = mLastNoteVel;
             rin.declaredIns = declaredInVals;
             rin.paramVals = paramVals;
             rin.stateCur = mStateCur[v];
@@ -385,6 +398,12 @@ private:
 
    NoteEventQueue* mNoteInbox = nullptr;
    int mNoteCursor = -1;
+
+   // Step 26 (OPEN-D note history): per-node snapshot of the most recent
+   // note-on, shared across voices. Audio-thread-only, never read/written
+   // from the main thread.
+   float mLastNotePitchHz = 0.0f;
+   float mLastNoteVel = 0.0f;
 
    double mSampleRate = 44100.0;
    uint64_t mAbsSampleCounter = 0;

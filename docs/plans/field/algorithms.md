@@ -151,7 +151,14 @@ and the transfer operators in `field-domains` §1.
 
 ---
 
-> ### OPEN-A — bounded `state` arrays and a ring cell
+> ### OPEN-A — bounded `state` arrays and a ring cell — **ANSWERED AND BUILT (step 24)**
+>
+> **Resolved.** Option **(c)**, raw indexing, built as `state float
+> name[N] = init` (`sample` and `frame` domains only): `name[k]` reads/writes
+> with `k` clamped into `[0, N-1]` — never wraps, never errors — so an
+> out-of-range index cannot exist (rule 5 still holds). Verified by
+> `INFINITE_FIELDSAMPLETEST` SECTION 15. Everything below is the original
+> question, kept for the reasoning.
 >
 > **Who needs it:** any delay line (comb, reverb, chorus), pitch-period
 > repetition (§7.2), LPC/LMS above order ~8 without 32 hand-written lines,
@@ -256,16 +263,31 @@ and the transfer operators in `field-domains` §1.
 
 > ### OPEN-D — a second `sample` input, and note/event input
 >
-> **ANSWERED AND BUILT (step 25), the audio-input half only.** Resolved as
-> **kernel-declared dynamic input pins**, not option (a), (b), or (c) below:
-> `input sample audio <name>` binds the name into the kernel's scope (via a
-> new `LoadDeclaredIn` register-machine opcode reading a
-> `SampleRuntimeInput::declaredIns[]` slot) and spawns a real, connectable
-> `AudioCable` on the node — one per declared audio input, following the
-> already-working `FieldPixelNode::DeclaredImageInput` pattern rather than a
-> hardcoded `in2`. `input sample float <name>` remains collected but unbound
-> (unresolved, not part of this step). The note/event half (rows below tagged
-> `[D]`) is still open.
+> **ANSWERED AND BUILT (step 25), the audio-input half; ANSWERED AND BUILT
+> (step 26), the note/event half.** Resolved as **kernel-declared dynamic
+> input pins**, not option (a), (b), or (c) below: `input sample audio <name>`
+> binds the name into the kernel's scope (via a new `LoadDeclaredIn`
+> register-machine opcode reading a `SampleRuntimeInput::declaredIns[]` slot)
+> and spawns a real, connectable `AudioCable` on the node — one per declared
+> audio input, following the already-working
+> `FieldPixelNode::DeclaredImageInput` pattern rather than a hardcoded `in2`.
+> `input sample float <name>` remains collected but unbound (unresolved, not
+> part of this step).
+>
+> Step 26 answered the note/event half as **option (c), folded into `frame`'s
+> reserved set — no sixth `note` domain**: `noteOn` / `notePitch` / `noteVel`
+> join `freq`/`gate` as reserved names, but unlike those two (per-voice) they
+> are a per-node snapshot shared by every voice, following the `in`/`sr`/`n`
+> pattern instead.
+>
+> | | |
+> |---|---|
+> | `noteOn` | `1.0` only on the sample a note-on registers (an edge, not held like `gate`), else `0.0` |
+> | `notePitch` | the most recently registered note's Hz, `MidiNoteToHz` convention (same as `freq`); holds across note-off |
+> | `noteVel` | that note's velocity, `0..1`; holds across note-off |
+> | Cross-thread design | **none needed** — no `MeterRing` bridge. `FieldSynthNode` is the only node with a note pipeline, and its `NoteEventQueue` drain and its `RunSampleProgram` kernel call both already happen inside the same `AudioFieldSynthNode::ProcessBlock` invocation on the audio thread; production and consumption never cross threads |
+> | Elsewhere (`element`/`pixel`/`graph`, and any node with no note pipeline) | reserved, but always reads `0.0` — `ExecutionEnv`/`GlslBackend` seed them inert, same treatment as `age`'s per-domain precedent |
+> | Verified by | `INFINITE_FIELDSAMPLETEST` SECTION 16 |
 >
 > **Who needs it:** the two-input adaptive filters (echo cancellation, noise
 > cancellation), and every rung-4 entry that learns from what the user *plays*

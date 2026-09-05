@@ -988,6 +988,9 @@ namespace Field
          if (name == "dt") { outValue = env.dt; return true; }
          if (name == "frame") { outValue = env.frame; return true; }
          if (name == "age") { outValue = env.age; return true; }
+         if (name == "noteOn") { outValue = env.noteOn; return true; }
+         if (name == "notePitch") { outValue = env.notePitch; return true; }
+         if (name == "noteVel") { outValue = env.noteVel; return true; }
          if (name == "count") { outValue = (double)elementCount; return true; }
          if (env.params)
          {

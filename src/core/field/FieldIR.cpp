@@ -2772,6 +2772,14 @@ namespace Field
          // it is the global cook counter and is already in the thousands by the
          // time a node is spawned.
          sym.name = "age"; sym.type = FieldType(DataType::Float, 1); sym.domain = Domain::Frame; sym.isReserved = true; sym.isReadOnly = true; scope.Add(sym);
+         // Step 26 (OPEN-D note history): reserved everywhere in frame
+         // domain for consistency, but only FieldSynthNode's sample-domain
+         // kernel (BackendRegister.cpp) ever has live note data - an
+         // element-domain kernel has no note pipeline, so these read as an
+         // inert 0.0 constant (see ElementBackend.cpp's LoadEnvScalar).
+         sym.name = "noteOn"; sym.type = FieldType(DataType::Float, 1); sym.domain = Domain::Frame; sym.isReserved = true; sym.isReadOnly = true; scope.Add(sym);
+         sym.name = "notePitch"; sym.type = FieldType(DataType::Float, 1); sym.domain = Domain::Frame; sym.isReserved = true; sym.isReadOnly = true; scope.Add(sym);
+         sym.name = "noteVel"; sym.type = FieldType(DataType::Float, 1); sym.domain = Domain::Frame; sym.isReserved = true; sym.isReadOnly = true; scope.Add(sym);
       }
 
       std::vector<AstNodePtr> stmts;
@@ -3109,6 +3117,14 @@ namespace Field
          addSym("t", FieldType(DataType::Float, 1), Domain::Frame, true);
          addSym("dt", FieldType(DataType::Float, 1), Domain::Frame, true);
          addSym("frame", FieldType(DataType::Float, 1), Domain::Frame, true);
+         // Step 26 (OPEN-D note history): like `age` just above, these are
+         // always an inert 0.0 in the pixel domain (no node with a pixel
+         // kernel has a note pipeline) - bound the same way, as Pixel domain
+         // so GlslBackend.cpp emits them inline rather than trying to hoist
+         // them into the CPU-side prologue evaluator, which doesn't know them.
+         addSym("noteOn", FieldType(DataType::Float, 1), Domain::Pixel, true);
+         addSym("notePitch", FieldType(DataType::Float, 1), Domain::Pixel, true);
+         addSym("noteVel", FieldType(DataType::Float, 1), Domain::Pixel, true);
          addSym("col", FieldType(DataType::Vec3, 3), Domain::Pixel, false);
          addSym("alpha", FieldType(DataType::Float, 1), Domain::Pixel, false);
       }
@@ -3914,6 +3930,11 @@ namespace Field
          addSym("n", FieldType(DataType::Float, 1), Domain::Sample);
          addSym("freq", FieldType(DataType::Float, 1), Domain::Sample);
          addSym("gate", FieldType(DataType::Float, 1), Domain::Sample);
+         // Step 26 (OPEN-D note history): seeded purely for the leaf-naming
+         // rate-zero error message below, same reasoning as freq/gate above.
+         addSym("noteOn", FieldType(DataType::Float, 1), Domain::Frame);
+         addSym("notePitch", FieldType(DataType::Float, 1), Domain::Frame);
+         addSym("noteVel", FieldType(DataType::Float, 1), Domain::Frame);
       }
 
       // doc §5.5.2: a graph kernel may read a global, but only one whose
