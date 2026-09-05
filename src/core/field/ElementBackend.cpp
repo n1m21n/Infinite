@@ -794,6 +794,28 @@ namespace Field
          outProgram.loop.code.push_back(ret);
       }
 
+      // 3. Emit PostLoop bytecode (Frame domain, but the value being computed
+      // reads this cook's just-finished element loop output - e.g. any
+      // top-level statement whose expression reduces an Element-domain local;
+      // see FieldIR.cpp's postLoop partitioning). Runs once, using its own
+      // independent register bank: a named value it needs from the ordinary
+      // prologue (a param, `t`, or another hoisted frame local) still
+      // resolves correctly because those are looked up BY NAME through
+      // mFrameVars/env at runtime (OpLoadVar's loadByName), not by register
+      // index, so starting register numbering over at 0 here is safe.
+      {
+         CodeEmitter ple(outProgram.postLoop, true);
+         for (const auto& ds : ir.declaredStates)
+            ple.stateNames.insert(ds.name);
+         for (const auto& s : ir.postLoop)
+         {
+            ple.EmitStmt(s);
+         }
+         ElemInstruction ret;
+         ret.op = ElemOpcode::OpReturn;
+         outProgram.postLoop.code.push_back(ret);
+      }
+
       return true;
    }
 
@@ -1601,74 +1623,89 @@ namespace Field
          prog.prologueEvalCount++;
 
       // 2. Run Element Loop per element (0..store.Count()-1)
-      if (count == 0) return true;
-
-      // Build step 23 (OPEN-B): snapshot the bases this kernel reads with
-      // `.at()`, ONCE, before any element runs. Every neighbour read then sees
-      // the cook's input - the incoming mesh for an attribute, the previous
-      // cook's value for an element state cell - so the loop is a pure function
-      // of its input and element order cannot change the result. Only the
-      // named bases are copied: a kernel with no `.at()` copies nothing.
-      for (const auto& nb : prog.neighbourBases)
+      if (count > 0)
       {
-         const std::string& name = nb.first;
-         const int lanes = nb.second;
-
-         std::vector<std::vector<float>>& dst = mNeighbourSnapshot[name];
-         if ((int)dst.size() < lanes) dst.resize(lanes);
-
-         const std::vector<float>* src[4] = { nullptr, nullptr, nullptr, nullptr };
-         if (name == "P") { src[0] = &store.Px(); src[1] = &store.Py(); src[2] = &store.Pz(); }
-         else if (name == "N") { src[0] = &store.Nx(); src[1] = &store.Ny(); src[2] = &store.Nz(); }
-         else if (name == "uv") { src[0] = &store.U(); src[1] = &store.V(); }
-         else if (name == "Cd") { src[0] = &store.Cr(); src[1] = &store.Cg(); src[2] = &store.Cb(); }
-         else if (store.HasAttrib(name))
+         // Build step 23 (OPEN-B): snapshot the bases this kernel reads with
+         // `.at()`, ONCE, before any element runs. Every neighbour read then sees
+         // the cook's input - the incoming mesh for an attribute, the previous
+         // cook's value for an element state cell - so the loop is a pure function
+         // of its input and element order cannot change the result. Only the
+         // named bases are copied: a kernel with no `.at()` copies nothing.
+         for (const auto& nb : prog.neighbourBases)
          {
-            for (int l = 0; l < lanes && l < 4; ++l)
-               src[l] = store.GetAttribLane(name, l);
-         }
-         else if (env.state && env.state->HasCell(name))
-         {
-            const StateCell* cell = env.state->FindCell(name);
-            if (cell && cell->domain == Domain::Element)
+            const std::string& name = nb.first;
+            const int lanes = nb.second;
+
+            std::vector<std::vector<float>>& dst = mNeighbourSnapshot[name];
+            if ((int)dst.size() < lanes) dst.resize(lanes);
+
+            const std::vector<float>* src[4] = { nullptr, nullptr, nullptr, nullptr };
+            if (name == "P") { src[0] = &store.Px(); src[1] = &store.Py(); src[2] = &store.Pz(); }
+            else if (name == "N") { src[0] = &store.Nx(); src[1] = &store.Ny(); src[2] = &store.Nz(); }
+            else if (name == "uv") { src[0] = &store.U(); src[1] = &store.V(); }
+            else if (name == "Cd") { src[0] = &store.Cr(); src[1] = &store.Cg(); src[2] = &store.Cb(); }
+            else if (store.HasAttrib(name))
             {
-               for (int l = 0; l < lanes && l < cell->lanes && l < 4; ++l)
-                  src[l] = env.state->GetElementLane((size_t)(cell->slotOffset + l));
+               for (int l = 0; l < lanes && l < 4; ++l)
+                  src[l] = store.GetAttribLane(name, l);
+            }
+            else if (env.state && env.state->HasCell(name))
+            {
+               const StateCell* cell = env.state->FindCell(name);
+               if (cell && cell->domain == Domain::Element)
+               {
+                  for (int l = 0; l < lanes && l < cell->lanes && l < 4; ++l)
+                     src[l] = env.state->GetElementLane((size_t)(cell->slotOffset + l));
+               }
+            }
+
+            for (int l = 0; l < lanes && l < 4; ++l)
+            {
+               if (src[l]) dst[l] = *src[l];
+               else dst[l].assign(count, 0.0f);
             }
          }
 
-         for (int l = 0; l < lanes && l < 4; ++l)
+         ElementExecContext elemCtx;
+         elemCtx.inElementLoop = true;
+         elemCtx.count = count;
+         elemCtx.store = &store;
+         elemCtx.px = store.Px().data();
+         elemCtx.py = store.Py().data();
+         elemCtx.pz = store.Pz().data();
+         elemCtx.nx = store.Nx().data();
+         elemCtx.ny = store.Ny().data();
+         elemCtx.nz = store.Nz().data();
+         elemCtx.u = store.U().data();
+         elemCtx.v = store.V().data();
+         elemCtx.cr = store.Cr().data();
+         elemCtx.cg = store.Cg().data();
+         elemCtx.cb = store.Cb().data();
+
+         for (size_t elemIdx = 0; elemIdx < count; ++elemIdx)
          {
-            if (src[l]) dst[l] = *src[l];
-            else dst[l].assign(count, 0.0f);
+            prog.elementEvalCount++;
+            elemCtx.index = elemIdx;
+
+            bool ranAnInstruction = false;
+            if (!ExecuteBlock(prog.loop, mLoopRegisters, env, elemCtx, ranAnInstruction, outError))
+               return false;
          }
       }
 
-      ElementExecContext elemCtx;
-      elemCtx.inElementLoop = true;
-      elemCtx.count = count;
-      elemCtx.store = &store;
-      elemCtx.px = store.Px().data();
-      elemCtx.py = store.Py().data();
-      elemCtx.pz = store.Pz().data();
-      elemCtx.nx = store.Nx().data();
-      elemCtx.ny = store.Ny().data();
-      elemCtx.nz = store.Nz().data();
-      elemCtx.u = store.U().data();
-      elemCtx.v = store.V().data();
-      elemCtx.cr = store.Cr().data();
-      elemCtx.cg = store.Cg().data();
-      elemCtx.cb = store.Cb().data();
+      // 3. Run PostLoop (Frame domain, but depends on this cook's element-loop
+      // output - e.g. reduce.<op>(bareVar) over a plain element local). Must
+      // run AFTER the element loop populates the reduced value's per-element
+      // buffer for THIS cook, not before it like ordinary prologue code -
+      // see ElementIRProgram::postLoop (FieldIR.h) for why the two can't
+      // share one pass. Runs even when count == 0 - OpReduceElementAttrib
+      // already defines a reduce over zero elements as 0.0.
+      if (mFrameRegisters.size() < (size_t)prog.postLoop.numRegisters)
+         mFrameRegisters.resize(prog.postLoop.numRegisters);
 
-      for (size_t elemIdx = 0; elemIdx < count; ++elemIdx)
-      {
-         prog.elementEvalCount++;
-         elemCtx.index = elemIdx;
-
-         bool ranAnInstruction = false;
-         if (!ExecuteBlock(prog.loop, mLoopRegisters, env, elemCtx, ranAnInstruction, outError))
-            return false;
-      }
+      bool postLoopRanAnInstruction = false;
+      if (!ExecuteBlock(prog.postLoop, mFrameRegisters, env, frameCtx, postLoopRanAnInstruction, outError))
+         return false;
 
       return true;
    }

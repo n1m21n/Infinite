@@ -39543,6 +39543,162 @@ static int RunFieldElementTest()
       else { printf("SECTION 16 (age Seeds Once & Simulations Evolve): FAIL\n"); allOk = false; }
    }
 
+   // 17. Bugfix (reduce-local-variable-storage): reduce.<op>(x) over a plain
+   // element-domain local (an ordinary assignment, not P/N/uv/Cd and not an
+   // `attrib` declaration) must read this cook's REAL per-element data, not
+   // silently read 0.0. Before the fix, `wave`/`hit` below had no persistent
+   // per-element storage - OpReduceElementAttrib's GetAttribLane(name, lane)
+   // always missed - and the value being domain-coarsened to Frame also
+   // hoisted it into the prologue, which runs BEFORE the element loop
+   // populates the buffer for this cook, so even fixing storage alone would
+   // still read stale/zero data on the first cook.
+   {
+      bool secOk = true;
+
+      auto cookOnce = [](const std::string& code,
+                          const Mesh& mesh,
+                          const char* outputName,
+                          float& outValue,
+                          std::string& outErr) -> bool
+      {
+         FieldElementNode node;
+         node.code = code;
+         if (!node.Apply()) { outErr = node.LastError(); return false; }
+
+         Field::FieldState state;
+         for (const auto& ds : node.Program()->declaredStates)
+            state.DeclareCell(ds.name, ds.typeName, ds.type, ds.lanes, ds.initialValues, ds.domain);
+         state.Allocate(Field::Domain::Element, mesh.vertices.size());
+
+         std::map<std::string, float> params;
+         for (const auto& dp : node.Program()->declaredParams)
+            params[dp.name] = (float)dp.defaultValue;
+
+         Field::ElementStore store;
+         store.FromMesh(mesh);
+         for (const auto& decl : node.Program()->declaredAttribs)
+            store.DeclareAttrib(decl.first, decl.second);
+
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         env.t = 0.0;
+         env.dt = 1.0 / 60.0;
+         env.params = &params;
+         env.state = &state;
+         std::string err;
+         if (!vm.Execute(*node.Program(), store, env, err)) { outErr = err; return false; }
+
+         if (!vm.ReadFrameVar(outputName, outValue))
+         {
+            outErr = std::string("output '") + outputName + "' was not readable via ReadFrameVar";
+            return false;
+         }
+         return true;
+      };
+
+      // 17a. reduce.max over a plain local ('wave'), no `attrib` declaration.
+      {
+         const int N = 64;
+         const float freq = 6.0f;
+         Mesh mesh;
+         for (int i = 0; i < N; ++i)
+         {
+            Vertex v;
+            v.px = (float)i / (float)(N - 1); // P.x in [0, 1]
+            v.py = 0.0f; v.pz = 0.0f;
+            mesh.vertices.push_back(v);
+         }
+
+         double expectedMax = -1e30;
+         for (int i = 0; i < N; ++i)
+         {
+            double x = (double)i / (double)(N - 1);
+            double s = std::sin(x * (double)freq);
+            if (s > expectedMax) expectedMax = s;
+         }
+
+         std::string code =
+            "param float freq = 6.0 [1.0, 20.0]\n"
+            "wave = sin(P.x * freq)\n"
+            "output frame float wobble = reduce.max(wave)\n";
+
+         float wobble = 0.0f;
+         std::string err;
+         if (!cookOnce(code, mesh, "wobble", wobble, err))
+         {
+            printf("Reduce-local: FAIL - reduce.max(wave) kernel: %s\n", err.c_str());
+            secOk = false;
+         }
+         else if (std::fabs(wobble) < 1e-6f)
+         {
+            printf("Reduce-local: FAIL - reduce.max(wave) over a plain local read 0.0 (bug not fixed); expected ~%.4f\n", expectedMax);
+            secOk = false;
+         }
+         else if (std::fabs((double)wobble - expectedMax) > 1e-3)
+         {
+            printf("Reduce-local: FAIL - reduce.max(wave) = %.6f, expected %.6f\n", wobble, expectedMax);
+            secOk = false;
+         }
+      }
+
+      // 17b. The shipped "Boundary Chime Sensor" preset: chime must be 0.0
+      // when no vertex crosses threshold, and non-zero once one does.
+      {
+         const FieldElementNode::Preset* chimePreset = nullptr;
+         for (const auto& preset : FieldElementNode::Presets())
+         {
+            if (std::string(preset.name) == "Boundary Chime Sensor") { chimePreset = &preset; break; }
+         }
+
+         if (!chimePreset)
+         {
+            printf("Reduce-local: FAIL - could not find 'Boundary Chime Sensor' preset\n");
+            secOk = false;
+         }
+         else
+         {
+            Mesh flatMesh;
+            for (int i = 0; i < 32; ++i)
+            {
+               Vertex v; v.px = (float)i / 31.0f; v.py = 0.0f; v.pz = 0.0f;
+               flatMesh.vertices.push_back(v);
+            }
+
+            float chimeFlat = -1.0f;
+            std::string ferr;
+            if (!cookOnce(chimePreset->code, flatMesh, "chime", chimeFlat, ferr))
+            {
+               printf("Reduce-local: FAIL - Boundary Chime Sensor (flat): %s\n", ferr.c_str());
+               secOk = false;
+            }
+            else if (chimeFlat != 0.0f)
+            {
+               printf("Reduce-local: FAIL - Boundary Chime Sensor read chime=%.4f with no vertex above threshold (expected 0.0)\n", chimeFlat);
+               secOk = false;
+            }
+
+            Mesh hitMesh = flatMesh;
+            hitMesh.vertices[0].py = 5.0f; // well above the default 0.3 threshold
+
+            float chimeHit = -1.0f;
+            std::string herr;
+            if (!cookOnce(chimePreset->code, hitMesh, "chime", chimeHit, herr))
+            {
+               printf("Reduce-local: FAIL - Boundary Chime Sensor (hit): %s\n", herr.c_str());
+               secOk = false;
+            }
+            else if (std::fabs(chimeHit - 1.0f) > 1e-4f)
+            {
+               printf("Reduce-local: FAIL - Boundary Chime Sensor read chime=%.4f with a vertex above threshold (expected 1.0)\n", chimeHit);
+               secOk = false;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 17 (reduce over a plain element-domain local reads real per-element data): OK\n");
+      else { printf("SECTION 17 (reduce over a plain element-domain local reads real per-element data): FAIL\n"); allOk = false; }
+   }
+
    printf("INFINITE_FIELDELEMENTTEST: %s\n", allOk ? "OK" : "FAIL");
    return allOk ? 0 : 1;
 }

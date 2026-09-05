@@ -171,6 +171,33 @@ namespace Field
          // clear "must be declared at top level" message.
          int declDepth = 0;
 
+         // Bugfix (reduce-local-variable-storage): only ever set by
+         // LowerElementProgramToIR, pointed at the owning ElementIRProgram's
+         // declaredAttribs list. `reduce.<op>(bareVar)` on a plain local (not
+         // P/N/uv/Cd and not already declared via `attrib`) needs somewhere
+         // per-element-persistent to read from at runtime - a plain local
+         // only ever lives in ElementBackend's transient per-iteration
+         // localRegs map, which OpReduceElementAttrib cannot see. Registering
+         // the name here the same way an explicit `attrib` declaration does
+         // is enough: FieldElementNode.cpp already calls
+         // ElementStore::DeclareAttrib for every entry in declaredAttribs,
+         // and ElementBackend.cpp's Assign codegen already unconditionally
+         // emits OpStoreAttrib for a plain local's first assignment (see the
+         // `else` branch below `isPrologue` in EmitStmt) - it was just
+         // writing into a store slot that was never allocated, so
+         // ctx.store->HasAttrib(name) silently failed and the write no-oped.
+         std::vector<std::pair<std::string, DataType>>* attribsNeedingStorage = nullptr;
+
+         void MarkNeedsPersistentStorage(const std::string& name, DataType type)
+         {
+            if (!attribsNeedingStorage) return;
+            for (const auto& a : *attribsNeedingStorage)
+            {
+               if (a.first == name) return;
+            }
+            attribsNeedingStorage->push_back({ name, type });
+         }
+
          bool Has(const std::string& name) const
          {
             return symbols.find(name) != symbols.end();
@@ -764,6 +791,44 @@ namespace Field
                         return nullptr;
                      }
 
+                     // Bugfix (reduce-local-variable-storage): an element-domain bare
+                     // name that isn't one of the four reserved attributes (P/N/uv/Cd)
+                     // has no per-element persistent storage today unless it was
+                     // already declared with `attrib` - it only ever lives in
+                     // ElementBackend's transient per-iteration register map, which
+                     // OpReduceElementAttrib cannot see (it reads through
+                     // ElementStore::GetAttribLane). Mark it so the store allocates
+                     // real storage for it, the same way an explicit `attrib`
+                     // declaration already does. Either way (freshly marked, or
+                     // already `attrib`-declared), its real per-cook data only exists
+                     // once the element loop has run - unlike P/N/uv/Cd, which are
+                     // pre-populated from the input mesh before the loop starts - so
+                     // this reduce must be flagged for the postLoop pass regardless.
+                     bool needsPostLoop = false;
+                     if (isBareVar && xIR->domain == Domain::Element)
+                     {
+                        std::string baseName;
+                        if (argAst->kind == AstKind::Ident)
+                        {
+                           baseName = std::static_pointer_cast<AstIdent>(argAst)->name;
+                        }
+                        else if (argAst->kind == AstKind::Access)
+                        {
+                           auto acc = std::static_pointer_cast<AstAccess>(argAst);
+                           if (acc->base && acc->base->kind == AstKind::Ident)
+                              baseName = std::static_pointer_cast<AstIdent>(acc->base)->name;
+                        }
+
+                        static const std::unordered_set<std::string> kReservedElementAttribs = { "P", "N", "uv", "Cd" };
+                        if (!baseName.empty() && kReservedElementAttribs.find(baseName) == kReservedElementAttribs.end())
+                        {
+                           needsPostLoop = true;
+                           const VarSymbol* baseSym = scope.Find(baseName);
+                           if (baseSym && !baseSym->isAttrib)
+                              scope.MarkNeedsPersistentStorage(baseName, baseSym->type.kind);
+                        }
+                     }
+
                      if (!ValidateReduce(reduceOp, 1, xIR->domain, call->span, error))
                      {
                         return nullptr;
@@ -772,6 +837,7 @@ namespace Field
                      auto ir = std::make_shared<IRNode>(IRKind::Call, call->span);
                      ir->callee = call->callee;
                      ir->transferKind = TransferKind::Reduce;
+                     ir->reduceNeedsPostLoop = needsPostLoop;
                      ir->type = xIR->type;
                      ir->domain = DomainCoarsen(xIR->domain);
                      ir->children.push_back(xIR);
@@ -2739,6 +2805,32 @@ namespace Field
       return outIR != nullptr && outError.Empty();
    }
 
+   namespace
+   {
+      // Bugfix (reduce-local-variable-storage): true if `node`'s subtree
+      // contains a reduce() call flagged reduceNeedsPostLoop - i.e. one whose
+      // bare-variable argument is Element-domain and NOT one of P/N/uv/Cd (see
+      // IRNode::reduceNeedsPostLoop's comment in FieldIR.h). Deliberately NOT a
+      // blanket "reduce argument is Element-domain" check: reduce(P) (etc.) is
+      // still perfectly fine to hoist into the ordinary prologue, because
+      // ElementStore::FromMesh already has this cook's P/N/uv/Cd data before
+      // the element loop starts - only a plain/attrib local's data is written
+      // BY the loop itself, which is what actually requires postLoop.
+      bool ContainsElementSourcedReduce(const IRNodePtr& node)
+      {
+         if (!node) return false;
+         if (node->transferKind == TransferKind::Reduce && node->reduceNeedsPostLoop)
+         {
+            return true;
+         }
+         for (const auto& c : node->children)
+         {
+            if (ContainsElementSourcedReduce(c)) return true;
+         }
+         return false;
+      }
+   }
+
    bool LowerElementProgramToIR(const AstNodePtr& ast, ElementIRProgram& outProgram, FieldError& outError)
    {
       outError.Clear();
@@ -2754,6 +2846,10 @@ namespace Field
       ElementScope scope;
       scope.targetDomain = Domain::Element;
       scope.enforceDeclaration = true;
+      // Bugfix (reduce-local-variable-storage): a bare local reduced by
+      // reduce.<op>() gets registered here, in the same place an explicit
+      // `attrib` declaration lands, so the store actually allocates it.
+      scope.attribsNeedingStorage = &outProgram.declaredAttribs;
 
       // Seed reserved words of Element and Frame domains
       {
@@ -3019,11 +3115,27 @@ namespace Field
          return false;
       }
 
-      // Second pass: Partition into prologue (Frame/Graph domain) and element loop (Element domain)
-      // This is the rate inference hoist! (§5.5)
+      // Second pass: Partition into prologue (Frame/Graph domain), element loop
+      // (Element domain), and postLoop (Frame/Graph domain, but reads this
+      // cook's element-loop output via a reduce over an Element-domain value -
+      // bugfix reduce-local-variable-storage). This is the rate inference
+      // hoist! (§5.5)
       for (const auto& s : irStmts)
       {
+         bool needsPostLoop = false;
          if (s->domain == Domain::Graph || s->domain == Domain::Frame)
+         {
+            if (s->kind == IRStmtKind::Assign)
+               needsPostLoop = ContainsElementSourcedReduce(s->rvalueExpr);
+            else if (s->kind == IRStmtKind::Expr)
+               needsPostLoop = ContainsElementSourcedReduce(s->expr);
+         }
+
+         if (needsPostLoop)
+         {
+            outProgram.postLoop.push_back(s);
+         }
+         else if (s->domain == Domain::Graph || s->domain == Domain::Frame)
          {
             outProgram.prologue.push_back(s);
          }
