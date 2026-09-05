@@ -281,6 +281,7 @@ set(COMMON_SOURCES
     src/audio/dsp/CycleShaperKernel.cpp
     src/audio/dsp/SpecBlurKernel.cpp
     src/nodes/ImageSourceNode.cpp
+    src/nodes/SlideshowNode.cpp
     src/nodes/ShapeNode.cpp
     src/nodes/FormulaNode.cpp
     src/nodes/FilterNode.cpp
