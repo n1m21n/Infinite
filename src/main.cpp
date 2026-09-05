@@ -11192,7 +11192,12 @@ namespace
       }
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      // Live Terrain Viewport & Orbit Scanning Overlay (Aspect-Ratio Preserving)
+      // Baked Wavetable Stack - the node bakes the incoming texture into an
+      // 8-frame band-limited wavetable bank every rebuild (orbit-sampled ->
+      // FFT -> mip pyramid, see WaveTerrainNode::RenderPreview); this shows
+      // those baked cycles directly (stacked morph frames, à la a classic
+      // wavetable editor) instead of the raw texture + orbit path, so the
+      // display matches what the audio thread is actually playing back.
       {
          const float containerW = gAudioContentW;
          const float previewH = 140.0f;
@@ -11200,59 +11205,74 @@ namespace
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 containerBr(origin.x + containerW, origin.y + previewH);
 
-         // Background panel
          dl->AddRectFilled(origin, containerBr, IM_COL32(14, 16, 20, 255), 4.0f);
-         dl->AddRect(origin, containerBr, IM_COL32(40, 44, 56, 180), 4.0f, 0, 1.0f);
+         dl->PushClipRect(origin, containerBr, true);
 
-         if (n->GetOutputTexture() != 0)
+         const int frameCount = WaveTerrainNode::kDisplayFrameCount;
+         const int sampleCount = WaveTerrainNode::kDisplayFrameSize;
+         const float framePos = std::clamp(n->position, 0.0f, 1.0f) * (float)(frameCount - 1);
+
+         // Stack offset: each frame further from the current morph position
+         // recedes up-and-right, like looking down a row of wavetable cycles.
+         const float stackDx = 10.0f;
+         const float stackDy = 8.0f;
+         const float traceW = containerW - stackDx * (frameCount - 1) - 12.0f;
+         const float traceH = (previewH - stackDy * (frameCount - 1) - 16.0f) * 0.62f;
+         constexpr int kPlotPoints = 160;
+
+         auto sampleFrame = [n](int frame, float t) -> float {
+            const float x = t * (float)WaveTerrainNode::kDisplayFrameSize;
+            const int i0 = (int)x & (WaveTerrainNode::kDisplayFrameSize - 1);
+            const int i1 = (i0 + 1) & (WaveTerrainNode::kDisplayFrameSize - 1);
+            const float fx = x - floorf(x);
+            const float* d = n->DisplayFrame(frame);
+            return d[i0] + (d[i1] - d[i0]) * fx;
+         };
+
+         // Back-to-front so nearer (closer to the current morph position)
+         // traces draw on top of farther ones.
+         int order[WaveTerrainNode::kDisplayFrameCount];
+         for (int i = 0; i < frameCount; i++)
+            order[i] = i;
+         std::sort(order, order + frameCount, [framePos](int a, int b) {
+            return fabsf((float)a - framePos) > fabsf((float)b - framePos);
+         });
+
+         for (int oi = 0; oi < frameCount; oi++)
          {
-            const float imgSize = previewH - 8.0f;
-            const float imgX = origin.x + (containerW - imgSize) * 0.5f;
-            const float imgY = origin.y + 4.0f;
-            const ImVec2 imgTl(imgX, imgY);
-            const ImVec2 imgBr(imgX + imgSize, imgY + imgSize);
+            const int f = order[oi];
+            const float dist = fabsf((float)f - framePos) / (float)std::max(1, frameCount - 1);
+            const float prox = 1.0f - std::clamp(dist, 0.0f, 1.0f); // 1 = current frame
 
-            dl->AddImage((ImTextureID)(intptr_t)n->GetOutputTexture(), imgTl, imgBr, ImVec2(0, 1), ImVec2(1, 0));
-            dl->AddRect(imgTl, imgBr, IM_COL32(50, 200, 255, 120), 2.0f, 0, 1.0f);
+            const float baseX = origin.x + 6.0f + stackDx * (float)f;
+            const float baseY = origin.y + previewH - 8.0f - stackDy * (float)f;
 
-            // Dynamic Glowing Orbit Trajectory Overlay (drawn cleanly on top of image every frame).
-            // Frame 0 (cyan) and frame 7 (magenta) are both drawn now that the
-            // morph knob spans a real fraction of the image between them
-            // (see EvaluateOrbit's morphCy in WaveTerrainDsp.h) - previously
-            // only frame 0 was ever drawn here, so the span the `position`
-            // ("morph") knob sweeps across was invisible while dragging it.
-            constexpr int kOrbitPoints = 128;
-            ImVec2 orbitPts[kOrbitPoints];
-            ImVec2 orbitPtsEnd[kOrbitPoints];
-            const float totalRot = n->rotation + n->CurrentRotation();
-            const float totalRotRad = totalRot * (3.14159265f / 180.0f);
-
-            for (int i = 0; i < kOrbitPoints; i++)
+            ImVec2 pts[kPlotPoints];
+            for (int i = 0; i < kPlotPoints; i++)
             {
-               const float t = (float)i / (float)kOrbitPoints;
-               float u = 0.0f, v = 0.0f;
-               WaveTerrainDsp::EvaluateOrbit(n->orbitType, t, 0, n->centerX, n->centerY,
-                                            n->radiusX, n->radiusY, n->ratioA, n->ratioB,
-                                            n->phaseOffset, totalRotRad, u, v);
-               orbitPts[i] = ImVec2(imgTl.x + std::clamp(u, 0.0f, 1.0f) * imgSize,
-                                    imgBr.y - std::clamp(v, 0.0f, 1.0f) * imgSize);
-
-               float u7 = 0.0f, v7 = 0.0f;
-               WaveTerrainDsp::EvaluateOrbit(n->orbitType, t, WaveTerrainDsp::kFrames - 1, n->centerX, n->centerY,
-                                            n->radiusX, n->radiusY, n->ratioA, n->ratioB,
-                                            n->phaseOffset, totalRotRad, u7, v7);
-               orbitPtsEnd[i] = ImVec2(imgTl.x + std::clamp(u7, 0.0f, 1.0f) * imgSize,
-                                       imgBr.y - std::clamp(v7, 0.0f, 1.0f) * imgSize);
+               const float t = (float)i / (float)(kPlotPoints - 1);
+               const float s = sampleFrame(f, t);
+               pts[i] = ImVec2(baseX + t * traceW, baseY - traceH * 0.5f - s * traceH * 0.5f);
             }
 
-            // Frame 7 (magenta), drawn first so frame 0's cyan sits on top.
-            dl->AddPolyline(orbitPtsEnd, kOrbitPoints, IM_COL32(240, 0, 200, 55), ImDrawFlags_Closed, 3.5f);
-            dl->AddPolyline(orbitPtsEnd, kOrbitPoints, IM_COL32(255, 170, 240, 200), ImDrawFlags_Closed, 1.5f);
+            const ImU32 glow = IM_COL32(40, 200, 220, (int)(30 + 40 * prox));
+            const bool isLight = IsThemeLight();
+            const ImU32 coreLo = isLight ? IM_COL32(0, 130, 190, (int)(70 + 120 * prox))
+                                          : IM_COL32(60, 210, 255, (int)(70 + 130 * prox));
+            const ImU32 coreHi = isLight ? IM_COL32(0, 90, 150, 255) : IM_COL32(190, 250, 255, 255);
+            const ImU32 core = prox > 0.97f ? coreHi : coreLo;
 
-            // Frame 0 (cyan).
-            dl->AddPolyline(orbitPts, kOrbitPoints, IM_COL32(0, 240, 220, 60), ImDrawFlags_Closed, 3.5f);
-            dl->AddPolyline(orbitPts, kOrbitPoints, IM_COL32(200, 255, 255, 240), ImDrawFlags_Closed, 1.5f);
+            dl->AddPolyline(pts, kPlotPoints, glow, 0, prox > 0.97f ? 3.5f : 2.0f);
+            dl->AddPolyline(pts, kPlotPoints, core, 0, prox > 0.97f ? 1.6f : 1.0f);
          }
+
+         dl->PopClipRect();
+         dl->AddRect(origin, containerBr, IM_COL32(40, 44, 56, 180), 4.0f, 0, 1.0f);
+
+         char label[64];
+         snprintf(label, sizeof(label), "wavetable  -  frame %.2f / %d", n->position * (frameCount - 1), frameCount - 1);
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 6.0f), IM_COL32(140, 150, 165, 200), label);
+
          ImGui::Dummy(ImVec2(containerW, previewH));
       }
       ImGui::Dummy(ImVec2(0.0f, 6.0f));

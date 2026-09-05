@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 #include "audio/AudioBuffer.h"
@@ -816,6 +817,9 @@ void WaveTerrainNode::RenderPreview(int /*frameId*/)
                                          orbitType, channel,
                                          centerX, centerY, radiusX, radiusY,
                                          ratioA, ratioB, phaseOffset, totalRotRad);
+
+      for (int f = 0; f < WaveTerrainDsp::kFrames; f++)
+         std::memcpy(mDisplayFrames[f], bank.Frame(f, 0), sizeof(mDisplayFrames[f]));
 
       mAudioNode->SwapBank(bank);
 
