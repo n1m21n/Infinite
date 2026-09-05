@@ -67,6 +67,21 @@ namespace Field
       // have no FieldType - `type` is left at its default and unused.
       bool isHandle = false;
 
+      // Bugfix (reduce-local-variable-storage): true for a reduce() IRNode
+      // (transferKind == TransferKind::Reduce) whose bare-variable argument is
+      // Element-domain and NOT one of the four reserved mesh attributes
+      // (P/N/uv/Cd). Those four are already fully populated before the
+      // element loop begins (ElementStore::FromMesh loads them from the input
+      // mesh up front), so reducing them can run in the ordinary prologue
+      // exactly as it always has. Any other bare name - a plain local, or one
+      // declared with `attrib` - only gets its real per-element data as a
+      // side effect of the element loop itself running THIS cook, so any
+      // statement using this reduce's result must be deferred to
+      // ElementIRProgram::postLoop, which runs once, after the loop finishes.
+      // Set only at reduce-lowering time in LowerAstExpr; read only by
+      // LowerElementProgramToIR's prologue/postLoop partitioning.
+      bool reduceNeedsPostLoop = false;
+
       double numberValue = 0.0;
       double vecValues[4] = { 0.0, 0.0, 0.0, 0.0 };
 
@@ -249,6 +264,15 @@ namespace Field
    {
       std::vector<IRStmtPtr> prologue;    // Hoisted frame/graph statements
       std::vector<IRStmtPtr> elementLoop; // Per-element statements
+      // Bugfix (reduce-local-variable-storage): frame/graph-domain statements
+      // that are only frame-domain because they coarsen a reduce() over an
+      // Element-domain value (e.g. `output frame float wobble =
+      // reduce.max(wave)` where `wave` is an ordinary per-element local).
+      // These cannot run in `prologue` - `prologue` executes once, BEFORE
+      // the element loop populates `wave`'s per-element buffer for this
+      // cook - so they run in their own pass, once, AFTER the element loop.
+      // See LowerElementProgramToIR's partitioning and ElementVM::Execute.
+      std::vector<IRStmtPtr> postLoop;
       MeshWriteMask writeMask;
       std::vector<std::pair<std::string, DataType>> declaredAttribs;
       std::vector<DeclaredParam> declaredParams;

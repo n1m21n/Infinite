@@ -112,6 +112,11 @@ namespace Field
    public:
       ElementCompiledCode prologue;
       ElementCompiledCode loop;
+      // Bugfix (reduce-local-variable-storage): frame-domain code that reads
+      // this cook's just-finished element loop output (a reduce() over a
+      // plain per-element local). Runs once, after `loop`, never before it -
+      // see ElementVM::Execute and ElementIRProgram::postLoop.
+      ElementCompiledCode postLoop;
       MeshWriteMask writeMask;
       std::vector<std::pair<std::string, DataType>> declaredAttribs;
       std::vector<DeclaredParam> declaredParams;
