@@ -114,6 +114,7 @@ namespace
 #define INFINITE_VERSION_STRING "0.0.0"
 #endif
 #include "nodes/ImageSourceNode.h"
+#include "nodes/SlideshowNode.h"
 #include "nodes/ShapeNode.h"
 #include "nodes/FormulaNode.h"
 #include "nodes/FilterNode.h"
@@ -3992,6 +3993,7 @@ namespace
    void RegisterNodes()
    {
       REGISTER_NODE(ImageSourceNode, Image Source, "Source");
+      REGISTER_NODE(SlideshowNode, Slideshow, "Source");
       REGISTER_NODE(ShapeNode, Shape, "Source");
       for (int i = 0; i < (int)ShapeNode::ShapeNames().size(); i++)
       {
@@ -5278,6 +5280,8 @@ namespace
    {
       if (auto* img = dynamic_cast<ImageSourceNode*>(node))
          img->ReloadFromPath();
+      if (auto* slideshow = dynamic_cast<SlideshowNode*>(node))
+         slideshow->ReloadFromFolder();
       if (auto* env = dynamic_cast<EnvironmentNode*>(node))
          env->ReloadFromPath();
       if (auto* model = dynamic_cast<ModelSourceNode*>(node))
@@ -5363,6 +5367,39 @@ namespace
          ImGui::TextDisabled("%s  (%dx%d)", file.c_str(), n->GetOutputWidth(), n->GetOutputHeight());
          ImGui::PopTextWrapPos();
       }
+   }
+
+   void DrawSlideshowParams(SlideshowNode* n)
+   {
+      if (ImGui::Button("Choose folder...", ImVec2(kPreviewSize, 0)))
+         n->LoadViaDialog();
+
+      if (!n->FolderPath().empty())
+      {
+         if (ImGui::Button("Refresh", ImVec2(kPreviewSize, 0)))
+            n->ReloadFromFolder();
+      }
+
+      DropdownButton("transition", SlideshowNode::TransitionNames(), n->transition,
+                     [n](int i) { n->transition = i; });
+      ModSlider("hold", &n->holdDuration, 0.05f, 60.0f, "%.2f s");
+      ModSlider("transition time", &n->transitionDuration, 0.0f, 15.0f, "%.2f s");
+      DropdownButton("fit", SlideshowNode::FitModeNames(), n->fitMode,
+                     [n](int i) { n->fitMode = i; });
+      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      if (!n->LastError().empty())
+         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+      if (n->ImageCount() > 0)
+      {
+         const std::string file = n->CurrentFileName();
+         ImGui::TextDisabled("%d/%d  %s", n->CurrentImageNumber(), n->ImageCount(), file.c_str());
+      }
+      else
+         ImGui::TextDisabled("Choose a folder containing images.");
+      ImGui::PopTextWrapPos();
    }
 
    void DrawSyphonOutParams(SyphonOutNode* n)
@@ -25787,6 +25824,7 @@ namespace
       static const std::unordered_map<std::string, const char*> kText = {
          // ---------------- Source / Text ----------------
          { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
+         { "Slideshow", "Plays the supported images in one folder in alphabetical order. Hold and transition time follow the global transport; Native Size keeps source pixels 1:1, Best Fit stretches to fill, and Proportional Fit preserves aspect." },
          { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available. Also outputs the clip's own audio track, if it has one, on the same transport-driven clock as the picture (audioEnabled/volume)." },
          { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
@@ -60937,6 +60975,8 @@ int main(int argc, char** argv)
          {
             if (auto* n = dynamic_cast<ImageSourceNode*>(gn.node.get()))
                DrawImageSourceParams(n);
+            else if (auto* n = dynamic_cast<SlideshowNode*>(gn.node.get()))
+               DrawSlideshowParams(n);
             else if (auto* n = dynamic_cast<SyphonInNode*>(gn.node.get()))
                DrawSyphonInParams(n);
             else if (auto* n = dynamic_cast<EnvironmentNode*>(gn.node.get()))
