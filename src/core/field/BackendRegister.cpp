@@ -69,11 +69,23 @@ namespace Field
             in.op = op; in.dst = dst; in.a = a; in.b = b; in.c = c; in.imm = imm;
             prog.code.push_back(in);
          }
+
+         std::vector<uint8_t> condStack;
+
+         uint8_t ActiveCond() const
+         {
+            return condStack.empty() ? 0 : condStack.back();
+         }
+         bool HasActiveCond() const
+         {
+            return !condStack.empty();
+         }
       };
 
       using Scope = std::unordered_map<std::string, uint8_t>;
+      using TableScope = std::unordered_map<std::string, int>;
 
-      uint8_t CompileExpr(Ctx& ctx, const AstNodePtr& node, Scope& scope);
+      uint8_t CompileExpr(Ctx& ctx, const AstNodePtr& node, Scope& scope, const TableScope& tableScope);
 
       uint8_t EmitImm(Ctx& ctx, float value, const SourceSpan& span)
       {
@@ -84,10 +96,10 @@ namespace Field
 
       // Fixed-arity intrinsic dispatch shared by both the operator forms
       // (unary '-', '!') and the function-call forms (sin(x), clamp(x,l,h), ...).
-      uint8_t CompileCall(Ctx& ctx, const AstCall& call, Scope& scope)
+      uint8_t CompileCall(Ctx& ctx, const AstCall& call, Scope& scope, const TableScope& tableScope)
       {
          const std::string& c = call.callee;
-         auto arg = [&](size_t i) -> uint8_t { return CompileExpr(ctx, call.args[i], scope); };
+         auto arg = [&](size_t i) -> uint8_t { return CompileExpr(ctx, call.args[i], scope, tableScope); };
 
          auto unary = [&](SampleOp op) -> uint8_t
          {
@@ -246,7 +258,7 @@ namespace Field
          return 0;
       }
 
-      uint8_t CompileExpr(Ctx& ctx, const AstNodePtr& node, Scope& scope)
+      uint8_t CompileExpr(Ctx& ctx, const AstNodePtr& node, Scope& scope, const TableScope& tableScope)
       {
          if (ctx.Failed() || !node) return 0;
 
@@ -290,6 +302,12 @@ namespace Field
                   ctx.Emit(SampleOp::LoadGate, dst, 0, 0, 0, 0.0f, node->span);
                   return dst;
                }
+               if (tableScope.count(id->name))
+               {
+                  ctx.Fail("table '" + id->name + "' cannot be read as a bare identifier", node->span,
+                           "index it with square brackets: '" + id->name + "[idx]'");
+                  return 0;
+               }
                auto it = scope.find(id->name);
                if (it == scope.end())
                {
@@ -302,7 +320,7 @@ namespace Field
             case AstKind::Unary:
             {
                auto* u = static_cast<AstUnary*>(node.get());
-               uint8_t a = CompileExpr(ctx, u->operand, scope);
+               uint8_t a = CompileExpr(ctx, u->operand, scope, tableScope);
                uint8_t dst = ctx.AllocReg(node->span);
                if (u->op == "-") ctx.Emit(SampleOp::Neg, dst, a, 0, 0, 0.0f, node->span);
                else if (u->op == "!") ctx.Emit(SampleOp::LogNot, dst, a, 0, 0, 0.0f, node->span);
@@ -312,8 +330,8 @@ namespace Field
             case AstKind::Binary:
             {
                auto* b = static_cast<AstBinary*>(node.get());
-               uint8_t lhs = CompileExpr(ctx, b->lhs, scope);
-               uint8_t rhs = CompileExpr(ctx, b->rhs, scope);
+               uint8_t lhs = CompileExpr(ctx, b->lhs, scope, tableScope);
+               uint8_t rhs = CompileExpr(ctx, b->rhs, scope, tableScope);
                SampleOp op;
                if (b->op == "+") op = SampleOp::Add;
                else if (b->op == "-") op = SampleOp::Sub;
@@ -339,7 +357,29 @@ namespace Field
                return dst;
             }
             case AstKind::Call:
-               return CompileCall(ctx, *static_cast<AstCall*>(node.get()), scope);
+               return CompileCall(ctx, *static_cast<AstCall*>(node.get()), scope, tableScope);
+            case AstKind::Index:
+            {
+               auto* idx = static_cast<AstIndex*>(node.get());
+               if (!idx->base || idx->base->kind != AstKind::Ident)
+               {
+                  ctx.Fail("indexed expression must be a table identifier in the sample domain", node->span);
+                  return 0;
+               }
+               const std::string& tblName = static_cast<AstIdent*>(idx->base.get())->name;
+               auto tit = tableScope.find(tblName);
+               if (tit == tableScope.end())
+               {
+                  ctx.Fail("'" + tblName + "' is not a declared state table", idx->base->span,
+                           "declare it with 'state float " + tblName + "[N] = init'");
+                  return 0;
+               }
+               uint8_t idxReg = CompileExpr(ctx, idx->index, scope, tableScope);
+               if (ctx.Failed()) return 0;
+               uint8_t dst = ctx.AllocReg(node->span);
+               ctx.Emit(SampleOp::LoadTable, dst, (uint8_t)tit->second, idxReg, 0, 0.0f, node->span);
+               return dst;
+            }
             case AstKind::Access:
                ctx.Fail("vector/swizzle access is not supported in the sample domain in v1", node->span,
                         "v1 is scalar-only; split vectors into separate float state/params");
@@ -350,22 +390,22 @@ namespace Field
          }
       }
 
-      void CompileBlock(Ctx& ctx, const std::vector<AstNodePtr>& stmts, Scope& scope);
-      void CompileStmt(Ctx& ctx, const AstNodePtr& stmt, Scope& scope);
+      void CompileBlock(Ctx& ctx, const std::vector<AstNodePtr>& stmts, Scope& scope, TableScope& tableScope);
+      void CompileStmt(Ctx& ctx, const AstNodePtr& stmt, Scope& scope, TableScope& tableScope);
 
       // ParseIf/ParseFor accept a single statement as a body without
       // requiring braces (if (cond) x = 1, no Block wrapper) - normalize
       // both shapes here so CompileBlock always sees a real statement list.
-      void CompileBodyNode(Ctx& ctx, const AstNodePtr& node, Scope& scope)
+      void CompileBodyNode(Ctx& ctx, const AstNodePtr& node, Scope& scope, TableScope& tableScope)
       {
          if (!node) return;
          if (node->kind == AstKind::Block)
-            CompileBlock(ctx, static_cast<AstBlock*>(node.get())->statements, scope);
+            CompileBlock(ctx, static_cast<AstBlock*>(node.get())->statements, scope, tableScope);
          else
-            CompileStmt(ctx, node, scope);
+            CompileStmt(ctx, node, scope, tableScope);
       }
 
-      void CompileStmt(Ctx& ctx, const AstNodePtr& stmt, Scope& scope)
+      void CompileStmt(Ctx& ctx, const AstNodePtr& stmt, Scope& scope, TableScope& tableScope)
       {
          if (ctx.Failed() || !stmt) return;
 
@@ -379,7 +419,7 @@ namespace Field
                   ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n) and cannot be declared", stmt->span);
                   return;
                }
-               if (scope.count(d->name))
+               if (scope.count(d->name) || tableScope.count(d->name))
                {
                   ctx.Fail("duplicate declaration of '" + d->name + "'", stmt->span);
                   return;
@@ -400,6 +440,40 @@ namespace Field
                   }
                   initVal = (float)static_cast<AstLiteral*>(d->initExpr.get())->numberValue;
                }
+
+               if (d->tableSize > 0)
+               {
+                  int tableIdx = (int)ctx.prog.tables.size();
+                  if (tableIdx >= kSampleMaxTables)
+                  {
+                     ctx.Fail("sample-domain kernel exceeds the table count cap (" + std::to_string(kSampleMaxTables) + ")",
+                              stmt->span);
+                     return;
+                  }
+
+                  int currentTotalCells = 0;
+                  for (const auto& tbl : ctx.prog.tables)
+                     currentTotalCells += tbl.length;
+
+                  if (currentTotalCells + d->tableSize > kSampleMaxTableCells)
+                  {
+                     ctx.Fail("sample-domain kernel exceeds the cumulative table-buffer cap (" +
+                              std::to_string(currentTotalCells + d->tableSize) + " > " +
+                              std::to_string(kSampleMaxTableCells) + " cells)", stmt->span);
+                     return;
+                  }
+
+                  SampleTable tbl;
+                  tbl.name = d->name;
+                  tbl.bufferOffset = currentTotalCells;
+                  tbl.length = d->tableSize;
+                  tbl.initialValue = initVal;
+                  ctx.prog.tables.push_back(tbl);
+
+                  tableScope[d->name] = tableIdx;
+                  return;
+               }
+
                SampleStateInit si;
                si.name = d->name;
                si.typeName = "float";
@@ -552,7 +626,7 @@ namespace Field
                   // Compiled only for validation - step 12 collects the
                   // declaration, it does not yet wire the resulting
                   // register to a node-level output pin (later work).
-                  CompileExpr(ctx, d->initExpr, scope);
+                  CompileExpr(ctx, d->initExpr, scope, tableScope);
                   if (ctx.Failed()) return;
                }
 
@@ -623,6 +697,64 @@ namespace Field
             case AstKind::Assign:
             {
                auto* a = static_cast<AstAssign*>(stmt.get());
+
+               if (a->lvalue->kind == AstKind::Index)
+               {
+                  auto* idx = static_cast<AstIndex*>(a->lvalue.get());
+                  if (!idx->base || idx->base->kind != AstKind::Ident)
+                  {
+                     ctx.Fail("indexed assignment target must be a table identifier in the sample domain", stmt->span);
+                     return;
+                  }
+                  const std::string& tblName = static_cast<AstIdent*>(idx->base.get())->name;
+                  auto tit = tableScope.find(tblName);
+                  if (tit == tableScope.end())
+                  {
+                     ctx.Fail("'" + tblName + "' is not a declared state table", idx->base->span);
+                     return;
+                  }
+
+                  int tblIdx = tit->second;
+                  uint8_t idxReg = CompileExpr(ctx, idx->index, scope, tableScope);
+                  if (ctx.Failed()) return;
+                  uint8_t rhs = CompileExpr(ctx, a->rvalue, scope, tableScope);
+                  if (ctx.Failed()) return;
+
+                  uint8_t valToStore = rhs;
+                  if (a->op != "=")
+                  {
+                     uint8_t curVal = ctx.AllocReg(stmt->span);
+                     ctx.Emit(SampleOp::LoadTable, curVal, (uint8_t)tblIdx, idxReg, 0, 0.0f, stmt->span);
+
+                     SampleOp op;
+                     if (a->op == "+=") op = SampleOp::Add;
+                     else if (a->op == "-=") op = SampleOp::Sub;
+                     else if (a->op == "*=") op = SampleOp::Mul;
+                     else if (a->op == "/=") op = SampleOp::Div;
+                     else
+                     {
+                        ctx.Fail("assignment operator '" + a->op + "' is not supported for tables", stmt->span);
+                        return;
+                     }
+                     valToStore = ctx.AllocReg(stmt->span);
+                     ctx.Emit(op, valToStore, curVal, rhs, 0, 0.0f, stmt->span);
+                  }
+
+                  // If inside an 'if' block, predicate the store branchlessly:
+                  // StoreTable(tbl, idx, Select(activeCond, valToStore, curVal))
+                  if (ctx.HasActiveCond())
+                  {
+                     uint8_t curVal = ctx.AllocReg(stmt->span);
+                     ctx.Emit(SampleOp::LoadTable, curVal, (uint8_t)tblIdx, idxReg, 0, 0.0f, stmt->span);
+                     uint8_t predVal = ctx.AllocReg(stmt->span);
+                     ctx.Emit(SampleOp::Select, predVal, ctx.ActiveCond(), valToStore, curVal, 0.0f, stmt->span);
+                     valToStore = predVal;
+                  }
+
+                  ctx.Emit(SampleOp::StoreTable, 0, (uint8_t)tblIdx, idxReg, valToStore, 0.0f, stmt->span);
+                  return;
+               }
+
                if (a->lvalue->kind != AstKind::Ident)
                {
                   ctx.Fail("assignment target must be a plain name in the sample domain in v1", stmt->span,
@@ -630,13 +762,19 @@ namespace Field
                   return;
                }
                const std::string& name = static_cast<AstIdent*>(a->lvalue.get())->name;
+               if (tableScope.count(name))
+               {
+                  ctx.Fail("cannot assign directly to table '" + name + "'", stmt->span,
+                           "assign to an indexed element: '" + name + "[idx] = val'");
+                  return;
+               }
                if (name == "in" || name == "sr" || name == "n" || name == "freq" || name == "gate")
                {
                   ctx.Fail("cannot assign to '" + name + "' (reserved, read-only)", stmt->span);
                   return;
                }
 
-               uint8_t rhs = CompileExpr(ctx, a->rvalue, scope);
+               uint8_t rhs = CompileExpr(ctx, a->rvalue, scope, tableScope);
                if (ctx.Failed()) return;
 
                uint8_t finalReg;
@@ -672,17 +810,40 @@ namespace Field
             case AstKind::If:
             {
                auto* ifs = static_cast<AstIf*>(stmt.get());
-               uint8_t condReg = CompileExpr(ctx, ifs->cond, scope);
+               uint8_t condReg = CompileExpr(ctx, ifs->cond, scope, tableScope);
                if (ctx.Failed()) return;
 
                Scope baseScope = scope;
 
+               // Maintain active condition on condStack so side-effects like StoreTable
+               // can be branchlessly predicated using Select.
+               uint8_t thenCond = condReg;
+               if (ctx.HasActiveCond())
+               {
+                  uint8_t combined = ctx.AllocReg(stmt->span);
+                  ctx.Emit(SampleOp::LogAnd, combined, ctx.ActiveCond(), condReg, 0, 0.0f, stmt->span);
+                  thenCond = combined;
+               }
+
+               ctx.condStack.push_back(thenCond);
                Scope thenScope = baseScope;
-               CompileBodyNode(ctx, ifs->thenBlock, thenScope);
+               CompileBodyNode(ctx, ifs->thenBlock, thenScope, tableScope);
+               ctx.condStack.pop_back();
                if (ctx.Failed()) return;
 
+               uint8_t elseCond = ctx.AllocReg(stmt->span);
+               ctx.Emit(SampleOp::LogNot, elseCond, condReg, 0, 0, 0.0f, stmt->span);
+               if (ctx.HasActiveCond())
+               {
+                  uint8_t combined = ctx.AllocReg(stmt->span);
+                  ctx.Emit(SampleOp::LogAnd, combined, ctx.ActiveCond(), elseCond, 0, 0.0f, stmt->span);
+                  elseCond = combined;
+               }
+
+               ctx.condStack.push_back(elseCond);
                Scope elseScope = baseScope;
-               CompileBodyNode(ctx, ifs->elseBlock, elseScope);
+               CompileBodyNode(ctx, ifs->elseBlock, elseScope, tableScope);
+               ctx.condStack.pop_back();
                if (ctx.Failed()) return;
 
                // Only names that already existed before the if merge across
@@ -719,7 +880,7 @@ namespace Field
                if (initA->op != "=" || initA->lvalue->kind != AstKind::Ident ||
                    initA->rvalue->kind != AstKind::Literal) { fail(); return; }
                const std::string loopVar = static_cast<AstIdent*>(initA->lvalue.get())->name;
-               if (IsReservedName(loopVar) || scope.count(loopVar))
+               if (IsReservedName(loopVar) || scope.count(loopVar) || tableScope.count(loopVar))
                {
                   ctx.Fail("'" + loopVar + "' cannot be used as a for-loop variable (reserved or already declared)",
                            stmt->span);
@@ -778,7 +939,7 @@ namespace Field
                {
                   uint8_t iterReg = EmitImm(ctx, (float)k, stmt->span);
                   scope[loopVar] = iterReg;
-                  CompileBodyNode(ctx, f->body, scope);
+                  CompileBodyNode(ctx, f->body, scope, tableScope);
                   if (ctx.Failed()) return;
                }
                scope.erase(loopVar);
@@ -789,7 +950,7 @@ namespace Field
                auto* call = static_cast<AstCall*>(stmt.get());
                if (call->callee == "delay")
                {
-                  CompileCall(ctx, *call, scope);
+                  CompileCall(ctx, *call, scope, tableScope);
                   return;
                }
                if (call->callee != "reduce.rms")
@@ -816,7 +977,7 @@ namespace Field
                return;
             }
             case AstKind::Block:
-               CompileBlock(ctx, static_cast<AstBlock*>(stmt.get())->statements, scope);
+               CompileBlock(ctx, static_cast<AstBlock*>(stmt.get())->statements, scope, tableScope);
                return;
             default:
                ctx.Fail("statement kind is not supported inside a sample-domain kernel in v1", stmt->span,
@@ -825,12 +986,12 @@ namespace Field
          }
       }
 
-      void CompileBlock(Ctx& ctx, const std::vector<AstNodePtr>& stmts, Scope& scope)
+      void CompileBlock(Ctx& ctx, const std::vector<AstNodePtr>& stmts, Scope& scope, TableScope& tableScope)
       {
          for (const auto& s : stmts)
          {
             if (ctx.Failed()) return;
-            CompileStmt(ctx, s, scope);
+            CompileStmt(ctx, s, scope, tableScope);
          }
       }
    }
@@ -859,13 +1020,14 @@ namespace Field
 
       Ctx ctx { outProgram, outError };
       Scope scope;
+      TableScope tableScope;
 
       // 'out' behaves like an ordinary local, seeded to silence so a kernel
       // that never assigns it is a valid (if useless) always-silent program
       // rather than a compile error.
       scope["out"] = EmitImm(ctx, 0.0f, SourceSpan{});
 
-      CompileBlock(ctx, static_cast<AstProgram*>(astProgram.get())->statements, scope);
+      CompileBlock(ctx, static_cast<AstProgram*>(astProgram.get())->statements, scope, tableScope);
       if (ctx.Failed())
       {
          outProgram = SampleProgram{};
@@ -930,6 +1092,23 @@ namespace Field
                   dl.transplantFromOffset = prevDl.bufferOffset;
                   dl.transplantFromLength = prevDl.length;
                   dl.transplantFromCursor = prevDl.cursorIndex;
+               }
+            }
+         }
+
+         // Step 24: Table transplant resolution. If table name and length match,
+         // reuse existing buffer offset to preserve table data across recompile.
+         for (auto& tbl : outProgram.tables)
+         {
+            tbl.transplantFromOffset = -1;
+            tbl.transplantFromLength = 0;
+            for (const auto& prevTbl : previous->tables)
+            {
+               if (prevTbl.name == tbl.name && prevTbl.length == tbl.length)
+               {
+                  tbl.transplantFromOffset = prevTbl.bufferOffset;
+                  tbl.transplantFromLength = prevTbl.length;
+                  break;
                }
             }
          }

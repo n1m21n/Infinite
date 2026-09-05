@@ -38,6 +38,7 @@ namespace Field
       float* stateNext = nullptr;       // write-only; same indexing as stateCur
       float* delayBuf = nullptr;        // Step 19: storage for delay ring buffers
       int* delayCursors = nullptr;      // Step 19: per-delay-line write cursors
+      float* tableBuf = nullptr;        // Step 24: storage for state tables
    };
 
    // `regs` must have at least prog.numRegs entries (kSampleMaxRegs is
@@ -83,6 +84,36 @@ namespace Field
                else
                {
                   regs[ins.dst] = 0.0f;
+               }
+               break;
+            }
+            case SampleOp::LoadTable:
+            {
+               const int tableIdx = ins.a;
+               if (tableIdx >= 0 && tableIdx < (int)prog.tables.size() && in.tableBuf != nullptr)
+               {
+                  const SampleTable& tbl = prog.tables[tableIdx];
+                  int idx = (int)regs[ins.b];
+                  if (idx < 0) idx = 0;
+                  else if (idx >= tbl.length) idx = tbl.length - 1;
+                  regs[ins.dst] = in.tableBuf[tbl.bufferOffset + idx];
+               }
+               else
+               {
+                  regs[ins.dst] = 0.0f;
+               }
+               break;
+            }
+            case SampleOp::StoreTable:
+            {
+               const int tableIdx = ins.a;
+               if (tableIdx >= 0 && tableIdx < (int)prog.tables.size() && in.tableBuf != nullptr)
+               {
+                  const SampleTable& tbl = prog.tables[tableIdx];
+                  int idx = (int)regs[ins.b];
+                  if (idx < 0) idx = 0;
+                  else if (idx >= tbl.length) idx = tbl.length - 1;
+                  in.tableBuf[tbl.bufferOffset + idx] = DspMath::FlushDenormal(regs[ins.c]);
                }
                break;
             }

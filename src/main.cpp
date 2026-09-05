@@ -42235,6 +42235,211 @@ static int RunFieldSampleTest()
       else { printf("SECTION 14 (FieldSynth Polyphonic delay() Isolation): FAIL\n"); allOk = false; }
    }
 
+   // ------------------------------------------------------------
+   // SECTION 15: State Tables (Step 24: state float name[N] = init)
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+
+      // 15a. Basic table read/write, indexing, clamping, and in-place ops.
+      {
+         FieldSampleNode node;
+         node.code =
+            "state float tab[4] = 1.0\n"
+            "state float phase = 0\n"
+            "if (phase == 0.0) {\n"
+            "   tab[0] = 0.5\n"
+            "   tab[1] = 1.5\n"
+            "   tab[2] += 1.0\n"
+            "   tab[3] *= 3.0\n"
+            "}\n"
+            "phase = phase + 1.0\n"
+            "out = tab[phase - 1.0]\n";
+
+         if (!node.Apply())
+         {
+            printf("SECTION 15: FAIL - table program did not compile: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = node.GetAudioNode();
+            an->PrepareToPlay(44100.0, 128);
+
+            std::vector<float> l(128, 0.0f), r(128, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer outBuf;
+            outBuf.channels = chans;
+            outBuf.numChannels = 2;
+            outBuf.numFrames = 128;
+
+            an->ProcessBlock(nullptr, 0, outBuf);
+
+            // sample 0 (phase 0): out = tab[0] after write = 0.5f
+            // sample 1 (phase 1): out = tab[1] after write = 1.5f
+            // sample 2 (phase 2): out = tab[2] after write = 2.0f (1.0 + 1.0)
+            // sample 3 (phase 3): out = tab[3] after write = 3.0f (1.0 * 3.0)
+            // sample 4 (phase 4): out = tab[4] -> clamped to tab[3] = 3.0f
+            if (std::fabs(l[0] - 0.5f) > 1e-5f || std::fabs(l[1] - 1.5f) > 1e-5f ||
+                std::fabs(l[2] - 2.0f) > 1e-5f || std::fabs(l[3] - 3.0f) > 1e-5f ||
+                std::fabs(l[4] - 3.0f) > 1e-5f)
+            {
+               printf("SECTION 15: FAIL - table output values (%f, %f, %f, %f, %f) expected (0.5, 1.5, 2.0, 3.0, 3.0)\n",
+                      l[0], l[1], l[2], l[3], l[4]);
+               secOk = false;
+            }
+         }
+      }
+
+      // 15b. Underflow clamping: negative index clamps to index 0.
+      {
+         FieldSampleNode node;
+         node.code =
+            "state float tab[4] = 0.0\n"
+            "tab[0] = 3.5\n"
+            "out = tab[-10]\n";
+
+         if (!node.Apply())
+         {
+            printf("SECTION 15: FAIL - negative-index table program did not compile: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = node.GetAudioNode();
+            an->PrepareToPlay(44100.0, 128);
+
+            std::vector<float> l(128, 0.0f), r(128, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer outBuf;
+            outBuf.channels = chans;
+            outBuf.numChannels = 2;
+            outBuf.numFrames = 128;
+
+            an->ProcessBlock(nullptr, 0, outBuf);
+
+            if (std::fabs(l[0] - 3.5f) > 1e-5f)
+            {
+               printf("SECTION 15: FAIL - negative index clamp failed: got %f, expected 3.5f\n", l[0]);
+               secOk = false;
+            }
+         }
+      }
+
+      // 15c. Hot reload transplant across recompile with matching (name, length).
+      {
+         FieldSampleNode node;
+         node.code =
+            "state float hist[4] = 0.0\n"
+            "hist[0] = 2.5\n"
+            "out = hist[0]\n";
+
+         if (!node.Apply())
+         {
+            printf("SECTION 15: FAIL - initial table transplant program did not compile: %s\n", node.LastError().c_str());
+            secOk = false;
+         }
+         else
+         {
+            AudioNode* an = node.GetAudioNode();
+            an->PrepareToPlay(44100.0, 128);
+
+            std::vector<float> l(128, 0.0f), r(128, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer outBuf;
+            outBuf.channels = chans;
+            outBuf.numChannels = 2;
+            outBuf.numFrames = 128;
+
+            an->ProcessBlock(nullptr, 0, outBuf);
+
+            // Recompile with same table name and length, but reading instead of writing:
+            node.code =
+               "state float hist[4] = 0.0\n"
+               "out = hist[0]\n";
+
+            if (!node.Apply())
+            {
+               printf("SECTION 15: FAIL - recompiled table program did not compile: %s\n", node.LastError().c_str());
+               secOk = false;
+            }
+            else
+            {
+               std::vector<float> l2(128, 0.0f), r2(128, 0.0f);
+               float* chans2[2] = { l2.data(), r2.data() };
+               AudioBuffer outBuf2;
+               outBuf2.channels = chans2;
+               outBuf2.numChannels = 2;
+               outBuf2.numFrames = 128;
+
+               an->ProcessBlock(nullptr, 0, outBuf2);
+
+               if (std::fabs(l2[0] - 2.5f) > 1e-5f)
+               {
+                  printf("SECTION 15: FAIL - table hot reload transplant failed: got %f, expected 2.5f\n", l2[0]);
+                  secOk = false;
+               }
+            }
+         }
+      }
+
+      // 15d. Compile rejections: non-const length, non-float type, bare ident read/write, budget cap.
+      {
+         Field::SampleProgram prog;
+         Field::FieldError err;
+
+         // Non-literal size
+         if (Field::CompileSampleProgram("state float tab[n] = 0.0\nout = 0\n", nullptr, prog, err))
+         {
+            printf("SECTION 15: FAIL - non-literal table size was not rejected\n");
+            secOk = false;
+         }
+
+         // Non-float type
+         if (Field::CompileSampleProgram("state int tab[4] = 0\nout = 0\n", nullptr, prog, err))
+         {
+            printf("SECTION 15: FAIL - non-float table was not rejected\n");
+            secOk = false;
+         }
+
+         // Bare table ident read
+         if (Field::CompileSampleProgram("state float tab[4] = 0.0\nout = tab\n", nullptr, prog, err))
+         {
+            printf("SECTION 15: FAIL - bare table ident read was not rejected\n");
+            secOk = false;
+         }
+
+         // Bare table ident write
+         if (Field::CompileSampleProgram("state float tab[4] = 0.0\ntab = 1.0\nout = 0\n", nullptr, prog, err))
+         {
+            printf("SECTION 15: FAIL - bare table ident write was not rejected\n");
+            secOk = false;
+         }
+
+         // Exceeds table cell cap (16385 > 16384)
+         if (Field::CompileSampleProgram("state float tab[16385] = 0.0\nout = 0\n", nullptr, prog, err))
+         {
+            printf("SECTION 15: FAIL - table exceeding cell cap was not rejected\n");
+            secOk = false;
+         }
+
+         // Element domain rejection
+         std::vector<Field::Token> tokens;
+         Field::AstNodePtr ast;
+         Field::ElementIRProgram ir;
+         if (Field::Lex("state float tab[4] = 0.0\nP.y += tab[0]\n", tokens, err) &&
+             Field::ParseProgram(tokens, ast, err) &&
+             Field::LowerElementProgramToIR(ast, ir, err))
+         {
+            printf("SECTION 15: FAIL - table state decl in element domain was not rejected\n");
+            secOk = false;
+         }
+      }
+
+      if (secOk) printf("SECTION 15 (State Tables state float name[N]): OK\n");
+      else { printf("SECTION 15 (State Tables state float name[N]): FAIL\n"); allOk = false; }
+   }
+
    printf("INFINITE_FIELDSAMPLETEST: %s\n", allOk ? "OK" : "FAIL");
    fflush(stdout);
    return allOk ? 0 : 1;

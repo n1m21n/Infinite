@@ -30,6 +30,12 @@ namespace Field
    static constexpr int kSampleMaxDelayCells = 65536;
    static constexpr int kSampleMaxDelayLines = 16;
 
+   // Table capacity (Step 24): 16384 cells (64 KB) cumulative budget across
+   // all state float name[N] table declarations in a kernel. Fits comfortably
+   // in L1/L2 cache without dynamic allocation on the audio thread.
+   static constexpr int kSampleMaxTableCells = 16384;
+   static constexpr int kSampleMaxTables = 16;
+
    enum class SampleOp : uint8_t
    {
       Nop = 0,
@@ -43,6 +49,8 @@ namespace Field
       LoadState,   // dst = stateCur[a]   (per-voice)
       StoreState,  // stateNext[a] = <src in b>  (per-voice; emitted once per cell at program end)
       Delay,       // dst = delay(src:b, line:a)  (Step 19: read delayed sample, write src, advance ring)
+      LoadTable,   // dst = table[idx:b] (Step 24: table a, clamped index in reg b)
+      StoreTable,  // table[idx:b] = src:c (Step 24: table a, clamped index in reg b, val in reg c)
       Move,        // dst = a
       Add, Sub, Mul, Div, Mod, Pow, Neg,
       Lt, Le, Gt, Ge, Eq, Ne,
@@ -116,6 +124,17 @@ namespace Field
       int transplantFromCursor = -1;
    };
 
+   // Step 24: Table layout and transplant metadata for state float name[N] = init.
+   struct SampleTable
+   {
+      std::string name;
+      int bufferOffset = 0;   // start index in table buffer (0..kSampleMaxTableCells-1)
+      int length = 0;         // length in floats (N)
+      float initialValue = 0.0f;
+      int transplantFromOffset = -1; // -1 = fresh buffer (zeroed/initVal); >= 0 = copy from previous
+      int transplantFromLength = 0;
+   };
+
    struct SampleProgram
    {
       std::vector<SampleInstr> code; // fixed-size after Compile(); audio thread only indexes it
@@ -126,6 +145,7 @@ namespace Field
       std::vector<SampleStateInit> state; // one entry per declared state cell
       std::vector<SampleParamSlot> params; // one entry per declared param
       std::vector<SampleDelayLine> delays; // Step 19: delay line allocations in AST order
+      std::vector<SampleTable> tables;     // Step 24: table allocations in AST order
 
       bool hasReduceRms = false;
       float reduceLoHz = 20.0f;

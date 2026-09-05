@@ -190,61 +190,89 @@ namespace Field
          return nullptr;
       }
 
-      // Postfix access (swizzles / dotted calls like reduce.sum): Primary ( '.' ( SWIZZLE | METHOD(...) ) )*
+      // Postfix access (swizzles / dotted calls like reduce.sum / bracket indexing): Primary ( ( '.' ( SWIZZLE | METHOD(...) ) ) | '[' EXPR ']' )*
       AstNodePtr ParsePostfix(ParserState& p)
       {
          AstNodePtr base = ParsePrimary(p);
          if (p.Failed() || !base) return base;
 
-         while (!p.AtEnd() && p.Peek().IsOp("."))
+         while (!p.AtEnd())
          {
-            Token dotTok = p.Advance(); // consume '.'
-            if (p.AtEnd() || (p.Peek().kind != TokenKind::Ident && p.Peek().kind != TokenKind::Keyword))
+            if (p.Peek().IsOp("."))
             {
-               p.Fail("expected a component name after '.'", dotTok.span);
-               return nullptr;
-            }
-            Token fieldTok = p.Advance();
-
-            if (!p.AtEnd() && p.Peek().IsPunct('('))
-            {
-               Token lparen = p.Advance(); // consume '('
-               std::vector<AstNodePtr> args;
-               if (!p.MatchPunct(')'))
+               Token dotTok = p.Advance(); // consume '.'
+               if (p.AtEnd() || (p.Peek().kind != TokenKind::Ident && p.Peek().kind != TokenKind::Keyword))
                {
-                  AstNodePtr firstArg = ParseOr(p);
-                  if (firstArg) args.push_back(firstArg);
-                  while (p.MatchPunct(','))
-                  {
-                     AstNodePtr nextArg = ParseOr(p);
-                     if (nextArg) args.push_back(nextArg);
-                  }
+                  p.Fail("expected a component name after '.'", dotTok.span);
+                  return nullptr;
+               }
+               Token fieldTok = p.Advance();
+
+               if (!p.AtEnd() && p.Peek().IsPunct('('))
+               {
+                  Token lparen = p.Advance(); // consume '('
+                  std::vector<AstNodePtr> args;
                   if (!p.MatchPunct(')'))
                   {
-                     p.Fail("expected ')'", lparen.span);
-                     return nullptr;
+                     AstNodePtr firstArg = ParseOr(p);
+                     if (firstArg) args.push_back(firstArg);
+                     while (p.MatchPunct(','))
+                     {
+                        AstNodePtr nextArg = ParseOr(p);
+                        if (nextArg) args.push_back(nextArg);
+                     }
+                     if (!p.MatchPunct(')'))
+                     {
+                        p.Fail("expected ')'", lparen.span);
+                        return nullptr;
+                     }
                   }
-               }
 
-               std::string calleeName;
-               if (base->kind == AstKind::Ident)
-               {
-                  calleeName = std::static_pointer_cast<AstIdent>(base)->name + "." + fieldTok.text;
+                  std::string calleeName;
+                  if (base->kind == AstKind::Ident)
+                  {
+                     calleeName = std::static_pointer_cast<AstIdent>(base)->name + "." + fieldTok.text;
+                  }
+                  else
+                  {
+                     calleeName = fieldTok.text;
+                  }
+
+                  SourceSpan span = { base->span.offset, base->span.line, base->span.col,
+                                      (fieldTok.span.offset + fieldTok.span.length) - base->span.offset };
+                  base = std::make_shared<AstCall>(calleeName, std::move(args), span);
                }
                else
                {
-                  calleeName = fieldTok.text;
+                  SourceSpan span = { base->span.offset, base->span.line, base->span.col,
+                                      (fieldTok.span.offset + fieldTok.span.length) - base->span.offset };
+                  base = std::make_shared<AstAccess>(base, fieldTok.text, span);
                }
-
+            }
+            else if (p.Peek().IsPunct('['))
+            {
+               // Do not consume '[' for index access if base is a literal (e.g. `state float A = 1 [wrap]`)
+               if (base->kind != AstKind::Ident && base->kind != AstKind::Access &&
+                   base->kind != AstKind::Call && base->kind != AstKind::Index)
+               {
+                  break;
+               }
+               Token lbracket = p.Advance(); // consume '['
+               AstNodePtr indexExpr = ParseOr(p);
+               if (p.Failed() || !indexExpr) return nullptr;
+               if (!p.Peek().IsPunct(']'))
+               {
+                  p.Fail("expected ']' after index expression", lbracket.span);
+                  return nullptr;
+               }
+               Token rbracket = p.Advance(); // consume ']'
                SourceSpan span = { base->span.offset, base->span.line, base->span.col,
-                                   (fieldTok.span.offset + fieldTok.span.length) - base->span.offset };
-               base = std::make_shared<AstCall>(calleeName, std::move(args), span);
+                                   (rbracket.span.offset + rbracket.span.length) - base->span.offset };
+               base = std::make_shared<AstIndex>(base, indexExpr, span);
             }
             else
             {
-               SourceSpan span = { base->span.offset, base->span.line, base->span.col,
-                                   (fieldTok.span.offset + fieldTok.span.length) - base->span.offset };
-               base = std::make_shared<AstAccess>(base, fieldTok.text, span);
+               break;
             }
          }
 
@@ -595,6 +623,41 @@ namespace Field
             return nullptr;
          }
 
+         int tableSize = 0;
+         if (p.MatchPunct('['))
+         {
+            if (p.AtEnd())
+            {
+               p.Fail("expected integer literal for table size in state declaration", nameTok.span);
+               return nullptr;
+            }
+            Token sizeTok = p.Peek();
+            if (sizeTok.kind != TokenKind::Number)
+            {
+               std::string nonConst = (sizeTok.kind == TokenKind::Ident) ? sizeTok.text : "expression";
+               p.Fail("table size must be a compile-time constant integer literal (non-constant: '" + nonConst + "')", sizeTok.span);
+               return nullptr;
+            }
+            p.Advance();
+            double numVal = sizeTok.numberValue;
+            if (numVal < 1.0 || floor(numVal) != numVal)
+            {
+               p.Fail("table size must be a positive integer literal >= 1", sizeTok.span);
+               return nullptr;
+            }
+            tableSize = (int)numVal;
+            if (!p.MatchPunct(']'))
+            {
+               p.Fail("expected ']' after table size in state declaration", sizeTok.span);
+               return nullptr;
+            }
+            if (typeTok.text != "float")
+            {
+               p.Fail("table state cell '" + name + "' must have element type 'float' in v1", typeTok.span);
+               return nullptr;
+            }
+         }
+
          if (!p.MatchOp("="))
          {
             p.Fail("expected '=' in state declaration", nameTok.span);
@@ -638,7 +701,7 @@ namespace Field
             }
          }
 
-         return std::make_shared<AstDeclState>(typeTok.text, nameTok.text, initExpr, stateTok.span, boundary);
+         return std::make_shared<AstDeclState>(typeTok.text, nameTok.text, initExpr, stateTok.span, boundary, tableSize);
       }
 
       AstNodePtr ParseAttribDecl(ParserState& p)
@@ -855,6 +918,14 @@ namespace Field
             AstNodePtr rhs = ParseOr(p);
             if (p.Failed() || !rhs) return nullptr;
             return std::make_shared<AstAssign>(opTok.text, lhs, rhs, opTok.span);
+         }
+
+         if (!p.AtEnd() && (p.Peek().IsOp("++") || p.Peek().IsOp("--")))
+         {
+            Token opTok = p.Advance();
+            std::string op = (opTok.text == "++") ? "+=" : "-=";
+            auto oneLit = std::make_shared<AstLiteral>(1.0, opTok.span);
+            return std::make_shared<AstAssign>(op, lhs, oneLit, opTok.span);
          }
 
          return lhs;

@@ -24,6 +24,7 @@ namespace Field
       Unary,
       Call,
       Access,
+      Index,
       Ident,
       Literal
    };
@@ -74,6 +75,16 @@ namespace Field
 
       AstAccess(AstNodePtr b, std::string f, SourceSpan sp = {})
          : AstNode(AstKind::Access, sp), base(std::move(b)), field(std::move(f)) {}
+   };
+
+   // Step 24: `base[index]` - bounded array/table indexing (frame & sample domains)
+   struct AstIndex : public AstNode
+   {
+      AstNodePtr base;
+      AstNodePtr index;
+
+      AstIndex(AstNodePtr b, AstNodePtr idx, SourceSpan sp = {})
+         : AstNode(AstKind::Index, sp), base(std::move(b)), index(std::move(idx)) {}
    };
 
    struct AstUnary : public AstNode
@@ -185,9 +196,12 @@ namespace Field
       // which is clamp. Only meaningful for a pixel-domain cell, because it
       // decides what an offset read A(uv + d) returns outside [0,1].
       std::string boundary;
+      // Build step 24 (OPEN-A): bounded array/table size `state float name[N] = init`.
+      // 0 indicates a standard scalar state cell; >0 indicates a table of size N.
+      int tableSize = 0;
 
-      AstDeclState(std::string t, std::string n, AstNodePtr init = nullptr, SourceSpan sp = {}, std::string bnd = std::string())
-         : AstNode(AstKind::DeclState, sp), typeName(std::move(t)), name(std::move(n)), initExpr(std::move(init)), boundary(std::move(bnd)) {}
+      AstDeclState(std::string t, std::string n, AstNodePtr init = nullptr, SourceSpan sp = {}, std::string bnd = std::string(), int tblSize = 0)
+         : AstNode(AstKind::DeclState, sp), typeName(std::move(t)), name(std::move(n)), initExpr(std::move(init)), boundary(std::move(bnd)), tableSize(tblSize) {}
    };
 
    // Build step 12: `output <domain> <type> <name> = <expr>` - declares a

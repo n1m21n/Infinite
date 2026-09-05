@@ -1466,6 +1466,15 @@ namespace Field
             {
                auto decl = std::static_pointer_cast<AstDeclState>(ast);
 
+               if (decl->tableSize > 0)
+               {
+                  error.severity = Severity::Error;
+                  error.span = decl->span;
+                  error.message = "table state declarations ('state float " + decl->name + "[N]') are supported in frame and sample domains only (got " +
+                                  std::string(DomainToString(scope.targetDomain)) + ")";
+                  return nullptr;
+               }
+
                if (scope.Has(decl->name))
                {
                   error.severity = Severity::Error;

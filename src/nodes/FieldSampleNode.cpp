@@ -33,6 +33,8 @@ public:
       std::fill(mDelaySwapBuffer, mDelaySwapBuffer + Field::kSampleMaxDelayCells, 0.0f);
       std::fill(mDelayCursors, mDelayCursors + Field::kSampleMaxDelayLines, 0);
       std::fill(mDelaySwapCursors, mDelaySwapCursors + Field::kSampleMaxDelayLines, 0);
+      std::fill(mTableBuffer, mTableBuffer + Field::kSampleMaxTableCells, 0.0f);
+      std::fill(mTableSwapBuffer, mTableSwapBuffer + Field::kSampleMaxTableCells, 0.0f);
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
@@ -105,6 +107,31 @@ public:
             }
          }
 
+         // Table transplant (Step 24): preserve live table contents across hot reloads
+         // when table name and length match; otherwise initialize to initialValue.
+         std::memcpy(mTableSwapBuffer, mTableBuffer, sizeof(mTableSwapBuffer));
+         std::fill(mTableBuffer, mTableBuffer + Field::kSampleMaxTableCells, 0.0f);
+
+         for (const auto& tbl : fresh->tables)
+         {
+            if (tbl.bufferOffset + tbl.length <= Field::kSampleMaxTableCells)
+            {
+               if (tbl.transplantFromOffset >= 0 && tbl.transplantFromLength == tbl.length &&
+                   tbl.transplantFromOffset + tbl.transplantFromLength <= Field::kSampleMaxTableCells)
+               {
+                  std::memcpy(mTableBuffer + tbl.bufferOffset,
+                              mTableSwapBuffer + tbl.transplantFromOffset,
+                              tbl.length * sizeof(float));
+               }
+               else
+               {
+                  std::fill(mTableBuffer + tbl.bufferOffset,
+                            mTableBuffer + tbl.bufferOffset + tbl.length,
+                            tbl.initialValue);
+               }
+            }
+         }
+
          mActiveProgram = fresh;
       }
 
@@ -151,6 +178,7 @@ public:
          rin.stateNext = mStateNext;
          rin.delayBuf = mDelayBuffer;
          rin.delayCursors = mDelayCursors;
+         rin.tableBuf = mTableBuffer;
 
          float sampleAcc = Field::RunSampleProgram(*mActiveProgram, rin, regs);
          std::memcpy(mStateCur, mStateNext, sizeof(mStateCur));
@@ -203,6 +231,22 @@ public:
                if (sawFault) break;
             }
          }
+         if (!sawFault)
+         {
+            for (const auto& tbl : mActiveProgram->tables)
+            {
+               const float* ptr = mTableBuffer + tbl.bufferOffset;
+               for (int k = 0; k < tbl.length; k++)
+               {
+                  if (std::isnan(ptr[k]) || std::isinf(ptr[k]))
+                  {
+                     sawFault = true;
+                     break;
+                  }
+               }
+               if (sawFault) break;
+            }
+         }
       }
       if (sawFault)
       {
@@ -218,6 +262,10 @@ public:
          {
             std::fill(mDelayBuffer + dl.bufferOffset, mDelayBuffer + dl.bufferOffset + dl.length, 0.0f);
             mDelayCursors[dl.cursorIndex] = 0;
+         }
+         for (const auto& tbl : mActiveProgram->tables)
+         {
+            std::fill(mTableBuffer + tbl.bufferOffset, mTableBuffer + tbl.bufferOffset + tbl.length, tbl.initialValue);
          }
          mFaultCount.fetch_add(1, std::memory_order_relaxed);
       }
@@ -251,6 +299,10 @@ private:
    float mDelaySwapBuffer[Field::kSampleMaxDelayCells];
    int mDelayCursors[Field::kSampleMaxDelayLines];
    int mDelaySwapCursors[Field::kSampleMaxDelayLines];
+
+   // Step 24: Bounded state table storage.
+   float mTableBuffer[Field::kSampleMaxTableCells];
+   float mTableSwapBuffer[Field::kSampleMaxTableCells];
 
    MeterRing mMeter;
    MeterRing mScopeRing;

@@ -42,6 +42,8 @@ public:
       std::memset(mDelaySwapBuffer, 0, sizeof(mDelaySwapBuffer));
       std::memset(mDelayCursors, 0, sizeof(mDelayCursors));
       std::memset(mDelaySwapCursors, 0, sizeof(mDelaySwapCursors));
+      std::memset(mTableBuffer, 0, sizeof(mTableBuffer));
+      std::memset(mTableSwapBuffer, 0, sizeof(mTableSwapBuffer));
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
@@ -117,6 +119,34 @@ public:
                       dl.cursorIndex >= 0 && dl.cursorIndex < Field::kSampleMaxDelayLines)
                   {
                      mDelayCursors[v][dl.cursorIndex] = mDelaySwapCursors[dl.transplantFromCursor];
+                  }
+               }
+            }
+         }
+
+         // Table transplant (Step 24): preserve live table contents across hot reloads
+         // per voice when table name and length match; otherwise initialize to initialValue.
+         for (int v = 0; v < kMaxVoices; v++)
+         {
+            std::memcpy(mTableSwapBuffer, mTableBuffer[v], sizeof(mTableSwapBuffer));
+            std::fill(mTableBuffer[v], mTableBuffer[v] + Field::kSampleMaxTableCells, 0.0f);
+
+            for (const auto& tbl : fresh->tables)
+            {
+               if (tbl.bufferOffset + tbl.length <= Field::kSampleMaxTableCells)
+               {
+                  if (tbl.transplantFromOffset >= 0 && tbl.transplantFromLength == tbl.length &&
+                      tbl.transplantFromOffset + tbl.transplantFromLength <= Field::kSampleMaxTableCells)
+                  {
+                     std::memcpy(mTableBuffer[v] + tbl.bufferOffset,
+                                 mTableSwapBuffer + tbl.transplantFromOffset,
+                                 tbl.length * sizeof(float));
+                  }
+                  else
+                  {
+                     std::fill(mTableBuffer[v] + tbl.bufferOffset,
+                               mTableBuffer[v] + tbl.bufferOffset + tbl.length,
+                               tbl.initialValue);
                   }
                }
             }
@@ -204,6 +234,7 @@ public:
             rin.stateNext = mStateNext[v];
             rin.delayBuf = mDelayBuffer[v];
             rin.delayCursors = mDelayCursors[v];
+            rin.tableBuf = mTableBuffer[v];
 
             const float kernelOut = Field::RunSampleProgram(*mActiveProgram, rin, regs);
             const float env = mVoices.EnvelopeAt(v).Process();
@@ -255,6 +286,22 @@ public:
                if (sawFault) break;
             }
          }
+         if (!sawFault)
+         {
+            for (const auto& tbl : mActiveProgram->tables)
+            {
+               const float* ptr = mTableBuffer[v] + tbl.bufferOffset;
+               for (int k = 0; k < tbl.length; k++)
+               {
+                  if (std::isnan(ptr[k]) || std::isinf(ptr[k]))
+                  {
+                     sawFault = true;
+                     break;
+                  }
+               }
+               if (sawFault) break;
+            }
+         }
       }
 
       if (sawFault)
@@ -273,6 +320,10 @@ public:
             {
                std::fill(mDelayBuffer[v] + dl.bufferOffset, mDelayBuffer[v] + dl.bufferOffset + dl.length, 0.0f);
                mDelayCursors[v][dl.cursorIndex] = 0;
+            }
+            for (const auto& tbl : mActiveProgram->tables)
+            {
+               std::fill(mTableBuffer[v] + tbl.bufferOffset, mTableBuffer[v] + tbl.bufferOffset + tbl.length, tbl.initialValue);
             }
          }
          mFaultCount.fetch_add(1, std::memory_order_relaxed);
@@ -306,6 +357,10 @@ private:
    float mDelaySwapBuffer[Field::kSampleMaxDelayCells];
    int mDelayCursors[kMaxVoices][Field::kSampleMaxDelayLines];
    int mDelaySwapCursors[Field::kSampleMaxDelayLines];
+
+   // Step 24: Bounded state table storage per voice.
+   float mTableBuffer[kMaxVoices][Field::kSampleMaxTableCells];
+   float mTableSwapBuffer[Field::kSampleMaxTableCells];
 
    NoteEventQueue* mNoteInbox = nullptr;
    int mNoteCursor = -1;
