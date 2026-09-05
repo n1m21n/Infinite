@@ -338,10 +338,10 @@ float CVToPitchNode::Value01()
    int semitone = low + idx;
 
    if (scale != MusicTime::kChromatic)
-      semitone = MusicTime::SnapToScale(semitone, root, scale, MusicTime::kSnapNearest);
+      semitone = MusicTime::SnapToScaleInRange(semitone, root, scale, low, high);
    mLastSemitone = semitone;
 
-   const int snappedIdx = std::clamp(semitone - low, 0, semitoneCount - 1);
+   const int snappedIdx = semitone - low;
    const float target01 = (float)snappedIdx / (float)std::max(1, semitoneCount - 1);
 
    // Glide smooths the quantized output itself (portamento) - see the class
