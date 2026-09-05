@@ -16830,22 +16830,25 @@ namespace
    {
       const float w = gAudioBodyW;
       const float h = kAudioTimeVizH;
-      const float curveW = w;
+      const float grMeterW = 10.0f;
+      const float grMeterGap = 6.0f;
+      const float curveW = w - grMeterW - grMeterGap;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + w, origin.y + h);
+      const ImVec2 curveBr(origin.x + curveW, br.y);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      dl->AddRectFilled(origin, ImVec2(curveBr.x, br.y), ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, curveBr, true);
 
       static const float kDbTicks[] = { -48.0f, -36.0f, -24.0f, -12.0f, 0.0f };
       for (float db : kDbTicks)
       {
          const float x = DynVizDbToX(db, origin.x, curveW);
          const float y = DynVizDbToY(db, origin.y, h);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + curveW, y),
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, curveBr.y), db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(curveBr.x, y),
                      db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
          char tickBuf[8];
          snprintf(tickBuf, sizeof(tickBuf), "%.0f", db);
@@ -16857,8 +16860,20 @@ namespace
                   ImVec2(DynVizDbToX(kDynVizMaxDb, origin.x, curveW), DynVizDbToY(kDynVizMaxDb, origin.y, h)),
                   IM_COL32(255, 255, 255, 24), 1.0f);
 
+      // Threshold marker - a vertical line at the knee so the point the
+      // curve bends at reads as a control, not just an inflection the eye
+      // has to find. Amber to stay distinct from the curve (blue) and the
+      // live operating point (white) drawn below.
+      const ImU32 thresholdCol = isLight ? IM_COL32(210, 130, 20, 200) : IM_COL32(255, 180, 70, 190);
+      const float threshX = DynVizDbToX(threshold, origin.x, curveW);
+      dl->AddLine(ImVec2(threshX, origin.y), ImVec2(threshX, curveBr.y), thresholdCol, 1.5f);
+      dl->AddText(ImVec2(threshX + 3.0f, origin.y + 2.0f), thresholdCol, "threshold");
+
       // The gain-computer curve itself, with makeup gain folded in so the
-      // picture matches what actually comes out.
+      // picture matches what actually comes out. The curve's bend at
+      // threshold and its slope past it (1/ratio) ARE threshold and ratio -
+      // this is the static shape of the compressor, independent of program
+      // material.
       dl->PathClear();
       const int kNumPoints = 96;
       for (int i = 0; i < kNumPoints; i++)
@@ -16870,13 +16885,61 @@ namespace
       }
       dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
+      // Live operating point - where the signal actually is right now, read
+      // straight off the kernel's own smoothed envelope (ExtraMeterValue),
+      // never recomputed from the static curve. That's what makes attack and
+      // release visible: the dot lags behind a sudden input jump and eases
+      // back down exactly on the kernel's own timing, not an idealized one.
+      const float liveInDb = std::clamp(n->ExtraMeterValue(0), kDynVizMinDb, kDynVizMaxDb);
+      const float liveGrDb = std::clamp(n->ExtraMeterValue(1), 0.0f, 40.0f);
+      const bool hasSignal = liveInDb > kDynVizMinDb + 0.5f;
+      if (hasSignal)
+      {
+         const float liveOutDb = liveInDb - liveGrDb + makeupDb;
+         const float dotX = DynVizDbToX(liveInDb, origin.x, curveW);
+         const float unprocessedY = DynVizDbToY(liveInDb, origin.y, h);
+         const float dotY = DynVizDbToY(liveOutDb, origin.y, h);
+
+         // Fill the gap between the unprocessed diagonal and the live output
+         // - the visible "how much" of the reduction happening right now.
+         if (liveGrDb > 0.05f)
+         {
+            dl->AddLine(ImVec2(dotX, unprocessedY), ImVec2(dotX, dotY),
+                        isLight ? IM_COL32(230, 120, 20, 150) : IM_COL32(255, 160, 60, 150), 2.5f);
+         }
+
+         const ImU32 dotCol = isLight ? IM_COL32(20, 20, 20, 255) : IM_COL32(255, 255, 255, 255);
+         dl->AddCircleFilled(ImVec2(dotX, dotY), 4.0f, dotCol);
+         dl->AddCircle(ImVec2(dotX, dotY), 4.0f, ScopeBgCol(), 0, 1.5f);
+      }
+
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      dl->AddRect(origin, ImVec2(curveBr.x, br.y), ScopeBorderCol(), 3.0f);
+
+      // Gain-reduction meter, a slim bar riding the curve's right edge -
+      // release shows here as the bar's own fall time, since it reads the
+      // same smoothed value as the dot rather than the instantaneous one.
+      {
+         const ImVec2 meterOrigin(curveBr.x + grMeterGap, origin.y);
+         const ImVec2 meterBr(br.x, br.y);
+         dl->AddRectFilled(meterOrigin, meterBr, ScopeBgCol(), 2.0f);
+         const float grT = std::clamp(liveGrDb / 24.0f, 0.0f, 1.0f);
+         const float barTop = meterOrigin.y + (meterBr.y - meterOrigin.y) * (1.0f - grT);
+         if (grT > 0.005f)
+         {
+            dl->AddRectFilled(ImVec2(meterOrigin.x + 1.0f, barTop), ImVec2(meterBr.x - 1.0f, meterBr.y),
+                              isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 160, 60, 220), 1.5f);
+         }
+         dl->AddRect(meterOrigin, meterBr, ScopeBorderCol(), 2.0f);
+      }
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%.0f dB in -> %.0f dB out, %.0f:1", threshold, threshold + makeupDb, ratio);
+         if (hasSignal)
+            snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, %.0f:1", liveInDb, liveGrDb, ratio);
+         else
+            snprintf(buf, sizeof(buf), "%.0f dB in -> %.0f dB out, %.0f:1", threshold, threshold + makeupDb, ratio);
          SetAudioReadout("dynamics", buf);
       }
 
