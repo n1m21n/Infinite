@@ -113,7 +113,67 @@ const std::vector<FieldElementNode::Preset>& FieldElementNode::Presets()
         "G = mix(G, P, isEnd)\n"
         "P = G\n"
         "Cd = vec3(0.35 + 0.5 * sin(i * detail), 0.4, 0.95)\n"
-        "publish = sin(t * speed)\n" }
+        "publish = sin(t * speed)\n" },
+      { "Vortex Swirl & Strain Glow",
+        "param float twist = 1.5 [0.0, 5.0]\n"
+        "param float freq = 4.0 [0.5, 12.0]\n"
+        "param float amp = 0.3 [0.0, 1.5]\n"
+        "param float speed = 1.5 [0.0, 6.0]\n"
+        "px = P.x\n"
+        "pz = P.z\n"
+        "r = length(vec2(px, pz))\n\n"
+        "angle = (twist / (r + 0.3)) + t * speed\n"
+        "cosA = cos(angle)\n"
+        "sinA = sin(angle)\n\n"
+        "P.x = px * cosA - pz * sinA\n"
+        "P.z = px * sinA + pz * cosA\n\n"
+        "wave = sin(r * freq - t * speed * 2.0)\n"
+        "P.y += wave * amp / (1.0 + r * 0.5)\n\n"
+        "strain = abs(wave) / (1.0 + r)\n"
+        "Cd = vec3(0.1 + 0.8 * strain, 0.4 + 0.4 * sin(angle), 0.9 - 0.5 * strain)\n\n"
+        "output frame float peakStrain = reduce.max(strain)\n"
+        "publish = peakStrain\n" },
+      { "Organic Breathing Harmonic",
+        "param float amp = 0.25 [0.0, 1.0]\n"
+        "param float freq = 3.5 [0.5, 10.0]\n"
+        "param float speed = 2.0 [0.0, 8.0]\n"
+        "disp = sin(P.x * freq + t * speed) * cos(P.y * freq - t * speed * 0.7) * sin(P.z * freq + t * speed * 1.3) * amp\n"
+        "P += N * disp\n\n"
+        "crest = clamp((disp / (amp + 0.0001)) * 0.5 + 0.5, 0.0, 1.0)\n"
+        "Cd = vec3(0.05 + 0.3 * crest, 0.2 + 0.8 * crest, 0.5 + 0.5 * crest)\n\n"
+        "elev = length(P)\n"
+        "output frame float avgRadius = reduce.mean(elev)\n"
+        "publish = avgRadius\n" },
+      { "Neighbor-Deviation Shatter",
+        "param float jitter = 0.15 [0.0, 0.6]\n"
+        "param float facetSize = 0.08 [0.02, 0.3]\n"
+        "param float speed = 0.6 [0.0, 3.0]\n"
+        "a = P.at(i - 1)\n"
+        "b = P.at(i + 1)\n"
+        "localAvg = (a + b + P) * 0.3333333\n"
+        "dev = P - localAvg\n"
+        "devLen = length(dev)\n"
+        "h = rand(0.0, 1.0, 0.0, i)\n"
+        "offsetDir = normalize(dev + vec3(0.0001, 0.0, 0.0))\n"
+        "P += offsetDir * (h - 0.5) * jitter * facetSize * 10.0\n"
+        "Cd = vec3(0.5 + 0.5 * sin(i * 1.7 + t * speed), 0.4 + 0.4 * h, 0.6)\n"
+        "publish = reduce.mean(devLen)\n" },
+      { "Traveling Wavefront Cloth",
+        "param float speed1 = 1.2 [0.1, 4.0]\n"
+        "param float speed2 = 0.7 [0.1, 4.0]\n"
+        "param float freq1 = 3.0 [0.5, 10.0]\n"
+        "param float freq2 = 4.5 [0.5, 10.0]\n"
+        "param float amp = 0.25 [0.0, 1.0]\n"
+        "dir1 = vec2(0.866, 0.5)\n"
+        "dir2 = vec2(-0.5, 0.866)\n"
+        "pxz = P.xz\n"
+        "d1 = dot(pxz, dir1)\n"
+        "d2 = dot(pxz, dir2)\n"
+        "w1 = sin(d1 * freq1 - t * speed1)\n"
+        "w2 = sin(d2 * freq2 + t * speed2)\n"
+        "P.y += (w1 + w2) * 0.5 * amp\n"
+        "Cd = vec3(0.5 + 0.5 * w1, 0.5 + 0.5 * w2, 0.8)\n"
+        "publish = sin(t * speed1)\n" }
    };
    return kPresets;
 }
