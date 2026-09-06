@@ -1026,8 +1026,42 @@ namespace
       std::function<void(int)> onSelect;
       int current = 0;
       bool justOpened = false;
+      // The opening button's screen-space rect, captured via
+      // ed::CanvasToScreen() at the call site (still inside the node
+      // editor's canvas transform at that point) so the popup - drawn later,
+      // outside the canvas - can bridge back to it with a connecting tail.
+      // Zero-sized (Min==Max) means "no anchor known"; the tail is skipped
+      // rather than drawn from a stale/degenerate rect.
+      ImVec2 anchorMin = ImVec2(0.0f, 0.0f);
+      ImVec2 anchorMax = ImVec2(0.0f, 0.0f);
    };
    DropdownRequest gDropdown;
+
+   // True only between ed::BeginNode/ed::EndNode for the node currently being
+   // drawn - i.e. while ImGui coordinates are in the node editor's local
+   // canvas space and need ed::CanvasToScreen() to become real screen pixels.
+   // DropdownButton is also called from plain ImGui windows outside any node
+   // (e.g. the docked browser panel's sort/type filter, DrawBrowserFilterStrip)
+   // where GetItemRectMin/Max() is already real screen space and running it
+   // through CanvasToScreen would silently apply a stale/unrelated pan+zoom.
+   bool gInsideNodeCanvas = false;
+
+   // Call immediately after the button that opens the dropdown. Only records
+   // an anchor while inside a node body (see gInsideNodeCanvas) - see
+   // DropdownRequest::anchorMin for why the conversion only makes sense there.
+   inline void SetDropdownAnchorFromLastItem()
+   {
+      if (gInsideNodeCanvas)
+      {
+         gDropdown.anchorMin = ed::CanvasToScreen(ImGui::GetItemRectMin());
+         gDropdown.anchorMax = ed::CanvasToScreen(ImGui::GetItemRectMax());
+      }
+      else
+      {
+         gDropdown.anchorMin = ImVec2(0.0f, 0.0f);
+         gDropdown.anchorMax = ImVec2(0.0f, 0.0f);
+      }
+   }
 
    // Same story for ImGui's colour picker: opened inside a node it inherits the
    // canvas transform and the hue bar / sliders stop tracking the cursor. Route
@@ -2494,6 +2528,7 @@ namespace
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
+         SetDropdownAnchorFromLastItem();
       }
       PopDropdownStyle();
       if (!showCaption)
@@ -3273,6 +3308,15 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       if (isLight)
       {
+         // Soft under-knob shadow: a couple of low-alpha, downward-offset
+         // circles drawn before the bezel fill approximate a blurred drop
+         // shadow (ImGui has no native blur) - same layering idiom as the
+         // hover ring below, just larger radius / lower alpha / offset down.
+         // Kept dark even in light mode so it still reads as a shadow, not
+         // a glow.
+         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, IM_COL32(30, 32, 40, 16), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, IM_COL32(30, 32, 40, 22), 32);
          dl->AddCircleFilled(center, radius, IM_COL32(220, 224, 234, 255), 32);
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(242, 245, 250, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
@@ -3301,6 +3345,13 @@ namespace
       }
       else
       {
+         // Dark theme: the panel behind a knob is already near-black, so the
+         // shadow needs a touch more alpha than the light-theme version to
+         // still separate the bezel from the body - same two-layer fake-blur
+         // idiom, tuned darker/stronger for this background.
+         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, IM_COL32(0, 0, 0, 45), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, IM_COL32(0, 0, 0, 60), 32);
          dl->AddCircleFilled(center, radius, IM_COL32(36, 38, 48, 255), 32);
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(22, 23, 30, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
@@ -3445,6 +3496,12 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       if (isLight)
       {
+         // Soft under-knob shadow - see KnobFloat's identical treatment
+         // above for the rationale (fake-blur via layered low-alpha circles,
+         // offset down so the bezel reads as sitting above the panel).
+         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, IM_COL32(30, 32, 40, 16), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, IM_COL32(30, 32, 40, 22), 32);
          dl->AddCircleFilled(center, radius, IM_COL32(220, 224, 234, 255), 32);
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(242, 245, 250, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
@@ -3472,6 +3529,11 @@ namespace
       }
       else
       {
+         // Dark theme: slightly stronger alpha than the light version, same
+         // rationale as KnobFloat's dark branch above.
+         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, IM_COL32(0, 0, 0, 45), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, IM_COL32(0, 0, 0, 60), 32);
          dl->AddCircleFilled(center, radius, IM_COL32(36, 38, 48, 255), 32);
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(22, 23, 30, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
@@ -6035,6 +6097,7 @@ namespace
                n2->LoadDeviceFile(device);
          };
          gDropdown.justOpened = true;
+         SetDropdownAnchorFromLastItem();
       }
       PopDropdownStyle();
 
@@ -8573,6 +8636,7 @@ namespace
                gDropdown.onSelect = std::move(onSelect);
                gDropdown.current = safe;
                gDropdown.justOpened = true;
+               SetDropdownAnchorFromLastItem();
             }
             if (h.registered)
                DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
@@ -8658,6 +8722,7 @@ namespace
                      gDropdown.onSelect = std::move(onSelect);
                      gDropdown.current = safe;
                      gDropdown.justOpened = true;
+                     SetDropdownAnchorFromLastItem();
                   }
                   if (h.registered)
                      DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
@@ -10898,6 +10963,7 @@ namespace
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safe;
          gDropdown.justOpened = true;
+         SetDropdownAnchorFromLastItem();
       }
       if (h.registered)
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
@@ -14903,6 +14969,7 @@ namespace
             };
             gDropdown.current = currentIdx;
             gDropdown.justOpened = true;
+            SetDropdownAnchorFromLastItem();
          }
          PopDropdownStyle();
       }
@@ -61811,6 +61878,7 @@ int main(int argc, char** argv)
                             ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
 
          ed::BeginNode(gn.NodeId());
+         gInsideNodeCanvas = true;
          ImGui::PushID(gn.index);
          const bool dimmed = gn.node->bypassed;
          if (dimmed)
@@ -62795,6 +62863,7 @@ int main(int argc, char** argv)
          if (dimmed)
             ImGui::PopStyleVar();
          ImGui::PopID();
+         gInsideNodeCanvas = false;
          ed::EndNode();
          ed::PopStyleColor(2);
       }
@@ -65162,6 +65231,48 @@ int main(int argc, char** argv)
             }
             if (selected && ImGui::IsWindowAppearing())
                ImGui::SetScrollHereY(0.5f);
+         }
+
+         // Speech-bubble-style connecting tail back to the button that
+         // opened this popup (HIG style pass stage 2, item B) - only when
+         // an anchor was actually recorded (SetDropdownAnchorFromLastItem
+         // skips it for the handful of non-node call sites, e.g. the docked
+         // browser panel's filter dropdowns, where there is no canvas
+         // transform to convert through). Drawn on the foreground draw list
+         // rather than this window's own - a window's draw list is clipped
+         // to its own rect, which would cut off a tail poking outside it.
+         if (gDropdown.anchorMin.x != gDropdown.anchorMax.x ||
+             gDropdown.anchorMin.y != gDropdown.anchorMax.y)
+         {
+            const ImVec2 winPos = ImGui::GetWindowPos();
+            const ImVec2 winSize = ImGui::GetWindowSize();
+            const float anchorCenterX = (gDropdown.anchorMin.x + gDropdown.anchorMax.x) * 0.5f;
+            // ImGui's own popup placement already decided above-vs-below the
+            // anchor button (and can flip it to fit the viewport) - read
+            // that decision back from where the popup actually landed
+            // rather than re-deriving it, so the tail always agrees with
+            // the popup's real position.
+            const bool popupBelow = winPos.y >= gDropdown.anchorMin.y;
+            constexpr float kHalfW = 6.0f;
+            constexpr float kTailLen = 7.0f;
+            const float tailX = std::clamp(anchorCenterX, winPos.x + kHalfW + 4.0f,
+                                            winPos.x + winSize.x - kHalfW - 4.0f);
+            const float baseY = popupBelow ? winPos.y : winPos.y + winSize.y;
+            const float tipY = popupBelow ? baseY - kTailLen : baseY + kTailLen;
+            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            const ImU32 fillCol = ImGui::GetColorU32(ImGuiCol_PopupBg);
+            fg->AddTriangleFilled(ImVec2(tailX - kHalfW, baseY), ImVec2(tailX + kHalfW, baseY),
+                                  ImVec2(tailX, tipY), fillCol);
+            // Thin border matching the popup's own, so the tail reads as
+            // part of the same shape instead of a separate floating chip -
+            // only the two outer edges, not the base (which the popup's own
+            // top/bottom border already draws over).
+            const ImU32 borderCol = ImGui::GetColorU32(ImGuiCol_Border);
+            if (ImGui::GetStyle().PopupBorderSize > 0.0f)
+            {
+               fg->AddLine(ImVec2(tailX - kHalfW, baseY), ImVec2(tailX, tipY), borderCol, 1.0f);
+               fg->AddLine(ImVec2(tailX + kHalfW, baseY), ImVec2(tailX, tipY), borderCol, 1.0f);
+            }
          }
          ImGui::EndPopup();
       }
