@@ -62,7 +62,20 @@ public:
    // modulator, no expression) - same precedence rule as those two.
    bool GetPlaybackValue(int nodeIndex, int paramIndex, double nowSec, float& outValue) const;
 
-private:
+   // Everything this node recorded goes away with it. Mirrors
+   // Modulation::UnbindAllFor / PaletteBinding::UnbindAllFor at the node
+   // delete site - without it the (nodeIndex, paramIndex) keys outlive the
+   // node, and since indices are handed out by a running counter and reused
+   // across an Undo's respawn, a stale key can silently start driving a
+   // completely unrelated param on whatever node next lands on that index.
+   void ClearForNode(int nodeIndex);
+
+   // Drops every recording and any in-progress session. Called when the
+   // whole graph goes away (NewPatch), for the same reason
+   // Modulation::Clear() is - node indices restart from 1, so a leftover
+   // recording would re-attach to whichever node lands on its index next.
+   void Clear();
+
    struct Sample
    {
       float value;
@@ -79,6 +92,35 @@ private:
       double startTime = 0.0;      // nowSec at which this loop began
    };
 
+   using PlaybackMap = std::map<Key, Playback>;
+
+   // Undo/Redo support. A recording is session state, not patch content: it
+   // is not in Patch::Data and never reaches a saved file. But undo still has
+   // to make one appear and disappear at the right point in history - the
+   // same way a typed expression does - so the undo stack snapshots this map
+   // alongside the graph and hands it back through Restore(), keyed through
+   // ApplyPatchData's old-index -> new-index remap. This mirrors
+   // RemapViewportPanelNodes in main.cpp exactly.
+   //
+   // The in-progress session (Shift still held) is deliberately NOT part of
+   // the snapshot: a half-drawn gesture is not a state anyone can return to.
+   const PlaybackMap& Playbacks() const { return mPlayback; }
+
+   // Replaces every recording with `playbacks`, restarting each loop from
+   // `nowSec`. Restarting rather than preserving startTime is the point: the
+   // recorded timestamps come from a clock that has kept running since the
+   // snapshot, so keeping the old startTime would drop the loop in at an
+   // arbitrary phase. Also clears any in-progress session, since the graph
+   // underneath it has just been rebuilt.
+   void Restore(PlaybackMap playbacks, double nowSec);
+
+   // Installs one recording, leaving every other param's alone. Used when a
+   // node is duplicated or pasted: the copy inherits the original's loop,
+   // startTime included, so the two run in phase rather than the copy
+   // restarting from wherever the paste happened to land.
+   void SetPlayback(int nodeIndex, int paramIndex, Playback playback);
+
+private:
    bool mShiftHeld = false;
    std::map<Key, std::vector<Sample>> mSession;
    std::map<Key, Playback> mPlayback;

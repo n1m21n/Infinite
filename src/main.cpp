@@ -5138,6 +5138,42 @@ namespace
       int paletteOrigIndex = -1;
       int swatchIndex = 0;
    };
+   // A typed expression on one of the cluster's params. Unlike a mod link
+   // this names no source node - the text is self-contained (patch-wide
+   // named values it reads live in ExprGlobals, which the copy shares) - so
+   // there is nothing to rewire, only to carry across.
+   struct ClusterExprLink
+   {
+      int dstIndex = -1;
+      int paramIndex = 0;
+      std::string text;
+   };
+   // A Shift-drag recording looping on one of the cluster's params. Session
+   // state rather than patch content (see UndoEntry), and carried for the
+   // same reason: the user sees a red, moving knob, so a copy of that node
+   // that came back still is a copy of something they aren't looking at.
+   struct ClusterGestureLink
+   {
+      int dstIndex = -1;
+      int paramIndex = 0;
+      GestureRecorder::Playback playback;
+   };
+
+   // Everything about a set of nodes that is NOT stored on the nodes
+   // themselves: it all keys off (nodeIndex, paramIndex) or off a pin, so it
+   // has to be captured before the copies are spawned and rewired onto them
+   // afterwards. One struct rather than parallel vectors because there are
+   // five capture/apply sites, and every kind added as a separate out-param
+   // was another edit at all ten - which is exactly how expressions and
+   // recordings came to be silently dropped by duplicate and paste.
+   struct ClusterClipboard
+   {
+      std::vector<ClusterLink> links;
+      std::vector<ClusterModLink> modLinks;
+      std::vector<ClusterPaletteLink> paletteLinks;
+      std::vector<ClusterExprLink> exprs;
+      std::vector<ClusterGestureLink> gestures;
+   };
 
    // Snapshots every connection landing on a node in `indices`, split into the
    // three storage kinds a connection can live in (see docs/plans - plain
@@ -5151,14 +5187,16 @@ namespace
    // cluster) are deliberately not captured: only links whose *destination*
    // is in `indices` are kept, since re-wiring an original's sole consumer
    // onto the copy instead would silently steal it.
-   void CaptureClusterLinks(const std::set<int>& indices,
-                             std::vector<ClusterLink>& outLinks,
-                             std::vector<ClusterModLink>& outModLinks,
-                             std::vector<ClusterPaletteLink>& outPaletteLinks)
+   void CaptureClusterLinks(const std::set<int>& indices, ClusterClipboard& out)
    {
+      std::vector<ClusterLink>& outLinks = out.links;
+      std::vector<ClusterModLink>& outModLinks = out.modLinks;
+      std::vector<ClusterPaletteLink>& outPaletteLinks = out.paletteLinks;
       outLinks.clear();
       outModLinks.clear();
       outPaletteLinks.clear();
+      out.exprs.clear();
+      out.gestures.clear();
 
       for (const LinkInfo& link : gLinks)
       {
@@ -5184,6 +5222,18 @@ namespace
          outPaletteLinks.push_back({ entry.first.first, entry.first.second,
                                       entry.second.nodeIndex, entry.second.swatchIndex });
       }
+      for (const auto& entry : Modulation::Instance().Expressions())
+      {
+         if (!indices.count(entry.first.first))
+            continue;
+         out.exprs.push_back({ entry.first.first, entry.first.second, entry.second });
+      }
+      for (const auto& entry : GestureRecorder::Instance().Playbacks())
+      {
+         if (!indices.count(entry.first.first))
+            continue;
+         out.gestures.push_back({ entry.first.first, entry.first.second, entry.second });
+      }
    }
 
    // Rewires captured links onto the fresh copies. `newByOrig` maps each
@@ -5193,11 +5243,11 @@ namespace
    // FindNodeByIndex since it may have been deleted since capture. Caller is
    // expected to already be inside a gSuppressUndoCheckpoints region so this
    // reads as one undo step alongside the spawn.
-   void ApplyClusterLinks(const std::map<int, GraphNode*>& newByOrig,
-                           const std::vector<ClusterLink>& links,
-                           const std::vector<ClusterModLink>& modLinks,
-                           const std::vector<ClusterPaletteLink>& paletteLinks)
+   void ApplyClusterLinks(const std::map<int, GraphNode*>& newByOrig, const ClusterClipboard& clip)
    {
+      const std::vector<ClusterLink>& links = clip.links;
+      const std::vector<ClusterModLink>& modLinks = clip.modLinks;
+      const std::vector<ClusterPaletteLink>& paletteLinks = clip.paletteLinks;
       for (const ClusterLink& link : links)
       {
          auto dstIt = newByOrig.find(link.dstIndex);
@@ -5238,6 +5288,19 @@ namespace
             continue;
          PaletteBinding::Instance().Bind(dstIt->second->index, paletteLink.colorIndex,
                                           resolvedPaletteIndex, paletteLink.swatchIndex);
+      }
+      for (const ClusterExprLink& expr : clip.exprs)
+      {
+         auto dstIt = newByOrig.find(expr.dstIndex);
+         if (dstIt != newByOrig.end())
+            Modulation::Instance().SetExpression(dstIt->second->index, expr.paramIndex, expr.text);
+      }
+      for (const ClusterGestureLink& gesture : clip.gestures)
+      {
+         auto dstIt = newByOrig.find(gesture.dstIndex);
+         if (dstIt != newByOrig.end())
+            GestureRecorder::Instance().SetPlayback(dstIt->second->index, gesture.paramIndex,
+                                                    gesture.playback);
       }
    }
 
@@ -16877,6 +16940,25 @@ namespace
          }
          *n->ParamPtr("selectedBand") = (float)cache.dragBand;
          selected = cache.dragBand;
+         // Grabbing a handle is grabbing the params it writes, so it has to
+         // cancel their gesture loops exactly the way grabbing the knob does
+         // (ModKnob's IsItemActivated branch) - otherwise the drag and the
+         // loop write the same param on the same frame and the loop wins.
+         // Only the params this drag will actually move: the Q diamond does
+         // not touch freq/gain, and a click that landed away from every
+         // handle (dragInert) moves nothing at all.
+         if (!cache.dragInert)
+         {
+            GestureRecorder& gr = GestureRecorder::Instance();
+            const int b = cache.dragBand;
+            if (cache.dragIsQ)
+               gr.StopPlayback(gCurrentNodeIndex, EqBandKnobParam(b, 1));
+            else
+            {
+               gr.StopPlayback(gCurrentNodeIndex, EqBandKnobParam(b, 0));
+               gr.StopPlayback(gCurrentNodeIndex, EqBandKnobParam(b, 2));
+            }
+         }
       }
 
       // Double-click a band's dot toggles its bandOn, and cancels this
@@ -16932,19 +17014,33 @@ namespace
             const bool qActiveHere = isDragTarget && cache.dragIsQ;
             const bool dotActiveHere = isDragTarget && !cache.dragIsQ;
 
+            // Only ONE band's knobs are on screen at a time, but the curve is
+            // drawn from all five - so a gesture loop running on a band the
+            // user has switched away from moves the curve with nothing
+            // visible to explain it and nothing to grab to stop it. These
+            // handles are that band's only on-screen representation, so they
+            // carry the same red the knob would (ModKnob's `recording`).
+            const GestureRecorder& gr = GestureRecorder::Instance();
+            const bool dotRec = gr.IsRecording(gCurrentNodeIndex, EqBandKnobParam(b, 0)) ||
+                                gr.IsRecording(gCurrentNodeIndex, EqBandKnobParam(b, 2));
+            const bool qRec = gr.IsRecording(gCurrentNodeIndex, EqBandKnobParam(b, 1));
+            const ImU32 recCol = IM_COL32(235, 70, 70, isSelected ? 255 : 190);
+
             const float dotR = isSelected ? (dotActiveHere ? 6.5f : 4.8f) : (dotActiveHere ? 5.0f : 3.2f);
+            const ImU32 dotCol = dotRec ? recCol : IM_COL32(235, 245, 255, isSelected ? 255 : 170);
             if (bands[b].on)
             {
-               dl->AddCircleFilled(ImVec2(hx[b], hy[b]), dotR, IM_COL32(235, 245, 255, isSelected ? 255 : 170), 12);
+               dl->AddCircleFilled(ImVec2(hx[b], hy[b]), dotR, dotCol, 12);
             }
             else
             {
-               dl->AddCircle(ImVec2(hx[b], hy[b]), dotR, IM_COL32(235, 245, 255, isSelected ? 220 : 120), 12, 1.5f);
+               dl->AddCircle(ImVec2(hx[b], hy[b]), dotR,
+                             dotRec ? recCol : IM_COL32(235, 245, 255, isSelected ? 220 : 120), 12, 1.5f);
             }
             dl->AddCircle(ImVec2(hx[b], hy[b]), dotR, IM_COL32(20, 24, 32, 220), 12, 1.2f);
 
             const float qr = isSelected ? (qActiveHere ? 6.5f : 5.0f) : (qActiveHere ? 5.5f : 3.6f);
-            const ImU32 qCol = isSelected ? IM_COL32(255, 205, 120, 255) : IM_COL32(255, 205, 120, 150);
+            const ImU32 qCol = qRec ? recCol : (isSelected ? IM_COL32(255, 205, 120, 255) : IM_COL32(255, 205, 120, 150));
             const ImVec2 qPts[4] = { ImVec2(qx[b], qy[b] - qr), ImVec2(qx[b] + qr, qy[b]),
                                      ImVec2(qx[b], qy[b] + qr), ImVec2(qx[b] - qr, qy[b]) };
             dl->AddConvexPolyFilled(qPts, 4, qCol);
@@ -27582,6 +27678,11 @@ namespace
       PushUndoCheckpoint();
       Modulation::Instance().UnbindAllFor(index);
       PaletteBinding::Instance().UnbindAllFor(index);
+      // Third line, same reason as the two above: without it a recording
+      // outlives its node, and node indices are reused (gNextIndex restarts
+      // on NewPatch, and Undo respawns everything), so a stale key can start
+      // driving an unrelated param.
+      GestureRecorder::Instance().ClearForNode(index);
       ForgetDiscreteSlots(index);
       gModHistory.erase(index);
       DisconnectAllTo(victim->node.get());
@@ -27705,10 +27806,8 @@ namespace
 
          // 2. Modulation / inbound cluster link rescue (doc §5.7 Case 4 & 5)
          std::set<int> dying = { existing };
-         std::vector<ClusterLink> rescuedLinks;
-         std::vector<ClusterModLink> rescuedMod;
-         std::vector<ClusterPaletteLink> rescuedPalette;
-         CaptureClusterLinks(dying, rescuedLinks, rescuedMod, rescuedPalette);
+         ClusterClipboard rescued;
+         CaptureClusterLinks(dying, rescued);
 
          // 3. Outbound cable rescue (generated node feeding external node, doc §5.7 Case 5)
          struct OutboundLink {
@@ -27758,7 +27857,7 @@ namespace
             {
                std::map<int, GraphNode*> newByOrig;
                newByOrig[existing] = freshGn;
-               ApplyClusterLinks(newByOrig, rescuedLinks, rescuedMod, rescuedPalette);
+               ApplyClusterLinks(newByOrig, rescued);
             }
 
             for (const auto& ob : rescuedOutbound)
@@ -27926,10 +28025,8 @@ namespace
          }
 
          std::set<int> dying = { existing };
-         std::vector<ClusterLink> rescuedLinks;
-         std::vector<ClusterModLink> rescuedMod;
-         std::vector<ClusterPaletteLink> rescuedPalette;
-         CaptureClusterLinks(dying, rescuedLinks, rescuedMod, rescuedPalette);
+         ClusterClipboard rescued;
+         CaptureClusterLinks(dying, rescued);
 
          struct OutboundLink {
             int srcSlot;
@@ -27978,7 +28075,7 @@ namespace
             {
                std::map<int, GraphNode*> newByOrig;
                newByOrig[existing] = freshGn;
-               ApplyClusterLinks(newByOrig, rescuedLinks, rescuedMod, rescuedPalette);
+               ApplyClusterLinks(newByOrig, rescued);
             }
 
             for (const auto& ob : rescuedOutbound)
@@ -28701,9 +28798,54 @@ namespace
    // remaining element, and each element is a full Patch::Data (two
    // heap-allocated strings per param per node) - expensive to shift at a
    // 200-deep cap on a large patch. pop_front() is O(1) on a deque.
-   std::deque<Patch::Data> gUndoStack;
-   std::deque<Patch::Data> gRedoStack;
+   // One point in history. `patch` is the graph; `gestures` is the Shift-drag
+   // recordings looping at that moment (see GestureRecorder). Recordings are
+   // session state rather than patch content - they are not in Patch::Data
+   // and never reach a saved file - but undo still has to make one appear and
+   // disappear at the right point in history, exactly the way a typed
+   // expression (which IS in Patch::Data) already does. Snapshotting them
+   // alongside the graph is what gives that: the checkpoint pushed when the
+   // user grabbed the knob predates the recording, so undoing to it removes
+   // the recording, and redo brings it back. Carried across ApplyPatchData's
+   // respawn through the same old-index -> new-index remap as
+   // RemapViewportPanelNodes.
+   struct UndoEntry
+   {
+      Patch::Data patch;
+      GestureRecorder::PlaybackMap gestures;
+   };
+   std::deque<UndoEntry> gUndoStack;
+   std::deque<UndoEntry> gRedoStack;
    const size_t kMaxUndoDepth = 200;
+
+   // The clock GestureRecorder timestamps its samples with, read safely.
+   // Undo/Redo are reachable before ImGui::CreateContext() - the headless
+   // self-tests that exercise the undo stack (PERFMATRIXTEST) run from main()
+   // well before the context exists, and ImGui::GetTime() dereferences
+   // GImGui unconditionally. No context also means nothing can have recorded
+   // a gesture, so the value returned in that case is never actually read.
+   double GestureClockNow()
+   {
+      return ImGui::GetCurrentContext() != nullptr ? ImGui::GetTime() : 0.0;
+   }
+
+   // Rewrites a snapshot's gesture keys from the indices that were live when
+   // it was captured to the fresh indices ApplyPatchData just handed out.
+   // A recording whose node has no remap entry belonged to a node that does
+   // not exist at this point in history and is dropped - same rule as
+   // RemapViewportPanelNodes.
+   GestureRecorder::PlaybackMap RemapGestures(const GestureRecorder::PlaybackMap& gestures,
+                                              const std::map<int, int>& remap)
+   {
+      GestureRecorder::PlaybackMap out;
+      for (const auto& [key, playback] : gestures)
+      {
+         auto it = remap.find(key.first);
+         if (it != remap.end())
+            out[GestureRecorder::Key(it->second, key.second)] = playback;
+      }
+      return out;
+   }
 
    void NewPatch()
    {
@@ -28730,6 +28872,13 @@ namespace
       gLinks.clear();
       gModHistory.clear();
       Modulation::Instance().Clear();
+      // Same reason as Modulation::Clear() above: gNextIndex restarts at 1,
+      // so a recording left keyed to an old node index would silently
+      // re-attach to whichever node lands on that index next. Undo/Redo
+      // restore their own snapshot immediately after this (see Undo()), so
+      // clearing here is what makes a recording actually disappear when you
+      // undo past the point it was made.
+      GestureRecorder::Instance().Clear();
       ForgetAllDiscreteSlots();
       PaletteBinding::Instance().Clear();
       ExprGlobals::Clear();
@@ -29924,7 +30073,11 @@ namespace
    {
       if (gSuppressUndoCheckpoints)
          return;
-      gUndoStack.push_back(std::move(snapshot));
+      // Gestures are captured here rather than passed in by the caller: both
+      // callers push *before* the mutation they are checkpointing, and the
+      // one that captures its Patch::Data early (the node drag) cannot change
+      // a recording in between, so "now" is the pre-mutation state either way.
+      gUndoStack.push_back({ std::move(snapshot), GestureRecorder::Instance().Playbacks() });
       if (gUndoStack.size() > kMaxUndoDepth)
          gUndoStack.pop_front();
       // A fresh action invalidates whatever redo history pointed at a future
@@ -30402,9 +30555,7 @@ namespace
       std::vector<INode*> clipboardSources;
       std::vector<int> clipboardOrigIndex;
       std::vector<int> clipboardOrigGroup;
-      std::vector<ClusterLink> clipboardLinks;
-      std::vector<ClusterModLink> clipboardModLinks;
-      std::vector<ClusterPaletteLink> clipboardPaletteLinks;
+      ClusterClipboard clipboardCluster;
 
       for (int index : toCopy)
       {
@@ -30416,7 +30567,7 @@ namespace
          clipboardOrigIndex.push_back(gn->index);
          clipboardOrigGroup.push_back(IndexOfGroupNode(GroupOwning(gn->index)));
       }
-      CaptureClusterLinks(toCopy, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
+      CaptureClusterLinks(toCopy, clipboardCluster);
 
       const ImVec2 off =
          ClusterOffset(std::set<int>(clipboardOrigIndex.begin(), clipboardOrigIndex.end()));
@@ -30493,7 +30644,7 @@ namespace
          if (GraphNode* gn = FindNodeByIndex(kv.second))
             newByOrig[kv.first] = gn;
       }
-      ApplyClusterLinks(newByOrig, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
+      ApplyClusterLinks(newByOrig, clipboardCluster);
       gSuppressUndoCheckpoints = false;
    }
 
@@ -30501,12 +30652,15 @@ namespace
    {
       if (gUndoStack.empty())
          return;
-      gRedoStack.push_back(BuildPatchData());
-      Patch::Data prev = std::move(gUndoStack.back());
+      gRedoStack.push_back({ BuildPatchData(), GestureRecorder::Instance().Playbacks() });
+      UndoEntry prev = std::move(gUndoStack.back());
       gUndoStack.pop_back();
       std::map<int, int> remap;
-      ApplyPatchData(prev, &remap);
+      ApplyPatchData(prev.patch, &remap);
       RemapViewportPanelNodes(remap);
+      // After ApplyPatchData, never before: NewPatch (its first step) clears
+      // the recorder, so restoring earlier would just be wiped.
+      GestureRecorder::Instance().Restore(RemapGestures(prev.gestures, remap), GestureClockNow());
       gPatchDirty = true;
       gPatchStatus = "Undo";
    }
@@ -30515,12 +30669,13 @@ namespace
    {
       if (gRedoStack.empty())
          return;
-      gUndoStack.push_back(BuildPatchData());
-      Patch::Data next = std::move(gRedoStack.back());
+      gUndoStack.push_back({ BuildPatchData(), GestureRecorder::Instance().Playbacks() });
+      UndoEntry next = std::move(gRedoStack.back());
       gRedoStack.pop_back();
       std::map<int, int> remap;
-      ApplyPatchData(next, &remap);
+      ApplyPatchData(next.patch, &remap);
       RemapViewportPanelNodes(remap);
+      GestureRecorder::Instance().Restore(RemapGestures(next.gestures, remap), GestureClockNow());
       gPatchDirty = true;
       gPatchStatus = "Redo";
    }
@@ -47608,6 +47763,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr || getenv("INFINITE_OSCTEST") != nullptr ||
          getenv("INFINITE_MODBOUNDSTEST") != nullptr || getenv("INFINITE_MODMATRIXTEST") != nullptr ||
+         getenv("INFINITE_GESTUREUNDOTEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
@@ -49520,6 +49676,8 @@ int main(int argc, char** argv)
                                 ? atoi(getenv("INFINITE_MODMATRIXDOCK"))
                                 : 1;
          }
+         if (getenv("INFINITE_GESTUREUNDOTEST") != nullptr)
+            gNodes[0].showParams = true; // params must be drawn for them to register
          if (getenv("INFINITE_MODMATRIXTEST") != nullptr)
          {
             // Range to Range, not LFO: a deterministic constantIn (like
@@ -49588,9 +49746,7 @@ int main(int argc, char** argv)
    std::vector<int> clipboardOrigGroup;     // that item's owning group's index, or -1
    // Connections landing on the copied cluster, captured at Cmd+C time since
    // the graph can change before Cmd+V runs (see ApplyClusterLinks).
-   std::vector<ClusterLink> clipboardLinks;
-   std::vector<ClusterModLink> clipboardModLinks;
-   std::vector<ClusterPaletteLink> clipboardPaletteLinks;
+   ClusterClipboard clipboardCluster;
    int frameId = 0;
 
    while (!glfwWindowShouldClose(window))
@@ -63202,10 +63358,8 @@ int main(int argc, char** argv)
 
             // Captured now, against the still-live selection, before any
             // SpawnNode call below can reallocate gNodes.
-            std::vector<ClusterLink> dupLinks;
-            std::vector<ClusterModLink> dupModLinks;
-            std::vector<ClusterPaletteLink> dupPaletteLinks;
-            CaptureClusterLinks(toDup, dupLinks, dupModLinks, dupPaletteLinks);
+            ClusterClipboard dupCluster;
+            CaptureClusterLinks(toDup, dupCluster);
 
             // Resolve everything first: SpawnNode can reallocate gNodes.
             const ImVec2 off = ClusterOffset(toDup);
@@ -63275,7 +63429,7 @@ int main(int argc, char** argv)
                if (auto* g = dynamic_cast<GroupNode*>(groupIt->second->node.get()))
                   gGroupMembers[g].insert(memberIt->second->index);
             }
-            ApplyClusterLinks(newByOrig, dupLinks, dupModLinks, dupPaletteLinks);
+            ApplyClusterLinks(newByOrig, dupCluster);
             gSuppressUndoCheckpoints = false;
          }
       }
@@ -63498,9 +63652,7 @@ int main(int argc, char** argv)
          clipboardSources.clear();
          clipboardOrigIndex.clear();
          clipboardOrigGroup.clear();
-         clipboardLinks.clear();
-         clipboardModLinks.clear();
-         clipboardPaletteLinks.clear();
+         clipboardCluster = ClusterClipboard();
          int count = ed::GetSelectedObjectCount();
          if (count > 0)
          {
@@ -63534,7 +63686,7 @@ int main(int argc, char** argv)
                clipboardOrigIndex.push_back(gn->index);
                clipboardOrigGroup.push_back(IndexOfGroupNode(GroupOwning(gn->index)));
             }
-            CaptureClusterLinks(toCopy, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
+            CaptureClusterLinks(toCopy, clipboardCluster);
          }
       }
 
@@ -63607,7 +63759,7 @@ int main(int argc, char** argv)
             if (auto* g = dynamic_cast<GroupNode*>(groupIt->second->node.get()))
                gGroupMembers[g].insert(memberIt->second->index);
          }
-         ApplyClusterLinks(newByOrig, clipboardLinks, clipboardModLinks, clipboardPaletteLinks);
+         ApplyClusterLinks(newByOrig, clipboardCluster);
          gSuppressUndoCheckpoints = false;
       }
 
@@ -66235,6 +66387,62 @@ int main(int argc, char** argv)
                    gModMatrixFillRows, firstRows, (int)drifted, gModMatrixScrollMax,
                    ok ? "OK" : "- BUG");
             printf("%s\n", ok ? "MOD MATRIX GEOM OK" : "SUSPECT");
+         }
+      }
+
+      // A Shift-drag recording is session state, not patch content - so undo
+      // has to carry it by hand (see UndoEntry/RemapGestures). Three things
+      // can silently break at once and none of them is visible without a
+      // fixture: the recording surviving an undo that predates it, the undo
+      // *not* restoring it on redo, and - because ApplyPatchData respawns
+      // every node with a fresh index - the restored recording landing on the
+      // wrong index. This drives the real GestureRecorder API in the real
+      // frame order and checks all three.
+      if (getenv("INFINITE_GESTUREUNDOTEST") != nullptr)
+      {
+         static int sidesParam = -1;
+         static bool madeOk = false, undoOk = false, redoOk = false, checked = false;
+         GestureRecorder& rec = GestureRecorder::Instance();
+
+         if (frameId == 1)
+         {
+            for (const ParamRef& ref : Modulation::Instance().FrameParams())
+               if (ref.nodeIndex == gNodes[0].index && ref.name == "sides")
+                  sidesParam = ref.paramIndex;
+            // The checkpoint a knob grab pushes, before the drag records
+            // anything - this is the state undo must return to.
+            PushUndoCheckpoint();
+            const double t = ImGui::GetTime();
+            rec.BeginFrame(/*shiftHeld=*/true, t);
+            rec.NotifyMovement(gNodes[0].index, sidesParam, 4.0f, t, /*isNewGrab=*/true);
+            rec.NotifyMovement(gNodes[0].index, sidesParam, 9.0f, t + 0.1, /*isNewGrab=*/false);
+         }
+         // The main loop's own BeginFrame(io.KeyShift == false) already ran
+         // this frame, ending the session and turning the trace into a loop.
+         else if (frameId == 3)
+         {
+            madeOk = sidesParam >= 0 && rec.IsRecording(gNodes[0].index, sidesParam);
+            Undo();
+            undoOk = !rec.IsRecording(gNodes[0].index, sidesParam);
+         }
+         else if (frameId == 5)
+         {
+            Redo();
+            // Note what this does and does not prove: RemapGestures runs, but
+            // NewPatch resets gNextIndex to 1 and respawns in order, so on a
+            // single-node fixture the remap is the identity and a key that
+            // was never rewritten would pass too. The appear/disappear/
+            // reappear sequence is the assertion; the non-identity remap
+            // needs a fixture that deletes a node between snapshots.
+            redoOk = rec.IsRecording(gNodes[0].index, sidesParam);
+         }
+         else if (frameId == 7 && !checked)
+         {
+            checked = true;
+            const bool ok = madeOk && undoOk && redoOk;
+            printf("gesture undo: recorded=%d goneAfterUndo=%d backAfterRedo=%d param=%d node=%d\n",
+                   (int)madeOk, (int)undoOk, (int)redoOk, sidesParam, gNodes[0].index);
+            printf("%s\n", ok ? "GESTURE UNDO OK" : "GESTURE UNDO FAIL");
          }
       }
 

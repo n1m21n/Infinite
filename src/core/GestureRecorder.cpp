@@ -1,5 +1,7 @@
 #include "GestureRecorder.h"
 
+#include <iterator>
+
 GestureRecorder& GestureRecorder::Instance()
 {
    static GestureRecorder instance;
@@ -92,4 +94,33 @@ bool GestureRecorder::GetPlaybackValue(int nodeIndex, int paramIndex, double now
    }
    outValue = s.back().value;
    return true;
+}
+
+void GestureRecorder::ClearForNode(int nodeIndex)
+{
+   for (auto it = mPlayback.begin(); it != mPlayback.end();)
+      it = (it->first.first == nodeIndex) ? mPlayback.erase(it) : std::next(it);
+   for (auto it = mSession.begin(); it != mSession.end();)
+      it = (it->first.first == nodeIndex) ? mSession.erase(it) : std::next(it);
+}
+
+void GestureRecorder::Clear()
+{
+   mPlayback.clear();
+   mSession.clear();
+}
+
+void GestureRecorder::Restore(PlaybackMap playbacks, double nowSec)
+{
+   mPlayback = std::move(playbacks);
+   for (auto& [key, pb] : mPlayback)
+      pb.startTime = nowSec;
+   mSession.clear();
+}
+
+void GestureRecorder::SetPlayback(int nodeIndex, int paramIndex, Playback playback)
+{
+   if (playback.samples.size() < 2)
+      return; // matches BeginFrame: a trace with no movement is not a loop
+   mPlayback[Key(nodeIndex, paramIndex)] = std::move(playback);
 }
