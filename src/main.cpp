@@ -2662,7 +2662,10 @@ namespace
                ImGui::PopStyleColor(2);
          }
          if (ImGui::IsItemActivated())
+         {
             PushUndoCheckpoint();
+            GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
+         }
          if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime());
          const bool hovered = ImGui::IsItemHovered();
@@ -2699,7 +2702,10 @@ namespace
          // Activation is the first frame of the drag, before that frame's own
          // delta is applied, so this is still the pre-drag value.
          if (ImGui::IsItemActivated())
+         {
             PushUndoCheckpoint();
+            GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
+         }
          if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime());
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -2794,7 +2800,8 @@ namespace
    bool VFaderFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                     float height, ImU32 fillColor, bool readOnly, float cellW = 0.0f,
                     FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
-                    bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f)
+                    bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f,
+                    int gestureNodeIndex = -1, int gestureParamIndex = -1)
    {
       const float cell = cellW > 0.0f ? cellW : kFaderWidth;
       const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -2817,6 +2824,8 @@ namespace
       const bool hovered = ImGui::IsItemHovered();
       const bool active = !readOnly && ImGui::IsItemActive();
       bool changed = false;
+      if (gestureNodeIndex >= 0 && ImGui::IsItemActivated())
+         GestureRecorder::Instance().StopPlayback(gestureNodeIndex, gestureParamIndex);
       if (active && ImGui::GetIO().MouseDelta.y != 0.0f)
       {
          // Travel is the fader's own length, not a fixed 200px as on the
@@ -2833,6 +2842,10 @@ namespace
             changed = true;
          }
       }
+      if (active && gestureNodeIndex >= 0 && ImGui::GetIO().KeyShift)
+         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime());
+      if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
+         fillColor = IM_COL32(235, 70, 70, 255);
 
       const float cx = p.x + cell * 0.5f;
       const float top = p.y + 4.0f;
@@ -3104,7 +3117,8 @@ namespace
    }
 
    bool BipolarKnobFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
-                         float diameter, ImU32 fillColor, bool readOnly, float cellW = 0.0f)
+                         float diameter, ImU32 fillColor, bool readOnly, float cellW = 0.0f,
+                         int gestureNodeIndex = -1, int gestureParamIndex = -1)
    {
       const float kTwoPi = 6.28318530717958647692f;
       const float aMin = 0.75f * kTwoPi * 0.5f; // 135 deg
@@ -3129,6 +3143,8 @@ namespace
       const bool hovered = ImGui::IsItemHovered();
       const bool active = !readOnly && ImGui::IsItemActive();
       bool changed = false;
+      if (gestureNodeIndex >= 0 && ImGui::IsItemActivated())
+         GestureRecorder::Instance().StopPlayback(gestureNodeIndex, gestureParamIndex);
 
       // Double-click resets to center
       if (hovered && !readOnly && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -3148,6 +3164,10 @@ namespace
             changed = true;
          }
       }
+      if (active && gestureNodeIndex >= 0 && ImGui::GetIO().KeyShift)
+         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime());
+      if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
+         fillColor = IM_COL32(235, 70, 70, 255);
 
       const ImVec2 center(p.x + cell * 0.5f, p.y + diameter * 0.5f);
       const float radius = diameter * 0.5f - 2.0f;
@@ -3501,7 +3521,10 @@ namespace
          changed = DrawWidget(value, recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235),
                               /*readOnly=*/false);
          if (ImGui::IsItemActivated())
+         {
             PushUndoCheckpoint();
+            GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
+         }
          if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime());
          const bool hovered = ImGui::IsItemHovered();
@@ -6766,7 +6789,8 @@ namespace
       const std::string caption = n->label.empty() ? std::string("slider") : n->label;
       VFaderFloat(caption.c_str(), &n->value, 0.0f, 1.0f, "%.2f", kMacroFaderH,
                   IsThemeLight() ? IM_COL32(59, 130, 246, 255) : IM_COL32(96, 165, 250, 255),
-                  false, kMacroCell);
+                  false, kMacroCell, nullptr, nullptr, false, 0.0f, 0.0f,
+                  gCurrentNodeIndex, 0);
    }
 
    void DrawMacroSliderParams(MacroSliderNode* n)
@@ -6779,7 +6803,7 @@ namespace
       const std::string caption = n->label.empty() ? std::string("bipolar") : n->label;
       BipolarKnobFloat(caption.c_str(), &n->value, -1.0f, 1.0f, "%.2f", kKnobStd,
                        IsThemeLight() ? IM_COL32(245, 158, 11, 255) : IM_COL32(251, 191, 36, 255),
-                       false, kMacroCell);
+                       false, kMacroCell, gCurrentNodeIndex, 0);
    }
 
    void DrawMacroBipolarKnobParams(MacroBipolarKnobNode* n)
@@ -46805,6 +46829,26 @@ void ApplyModulationAndPalette(int frameId)
       }
    }
 
+   // Shift-drag recordings (see GestureRecorder) loop back into their param
+   // once their session ends - same precedence as above: a wired modulator
+   // or a typed expression already owns the field, so a recording only
+   // plays back once neither is in the way.
+   for (const ParamRef& ref : modulation.FrameParams())
+   {
+      if (ref.value == nullptr)
+         continue;
+      if (modulation.IsModulated(ref.nodeIndex, ref.paramIndex) ||
+          modulation.HasExpression(ref.nodeIndex, ref.paramIndex))
+         continue;
+      float playbackValue = 0.0f;
+      // ImGui::GetTime(), not `t` above (Transport's own clock) - samples
+      // were timestamped with ImGui::GetTime() when recorded (see ModSlider/
+      // ModKnob/VFaderFloat/BipolarKnobFloat), so playback has to read the
+      // same clock back.
+      if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex, ImGui::GetTime(), playbackValue))
+         *ref.value = ShapeToParam(ref, playbackValue);
+   }
+
    for (GraphNode& gn : gNodes)
    {
       if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(gn.node.get()))
@@ -51210,7 +51254,7 @@ int main(int argc, char** argv)
       // Shift-held movement is the sole trigger for gesture recording - see
       // GestureRecorder.h. Checked once per frame here (not per-widget) so
       // every param touched while Shift stays down joins the same session.
-      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift);
+      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, ImGui::GetTime());
       gGlobalScaleTooltipHovered = false;
 
       if (!gPendingSelect.empty())
