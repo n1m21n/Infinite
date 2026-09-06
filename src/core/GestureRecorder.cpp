@@ -38,7 +38,10 @@ void GestureRecorder::NotifyMovement(int nodeIndex, int paramIndex, float value,
 
 bool GestureRecorder::IsRecording(int nodeIndex, int paramIndex) const
 {
-   return mShiftHeld && mSession.find(Key(nodeIndex, paramIndex)) != mSession.end();
+   const Key key(nodeIndex, paramIndex);
+   if (mShiftHeld && mSession.find(key) != mSession.end())
+      return true;
+   return mPlayback.find(key) != mPlayback.end();
 }
 
 void GestureRecorder::StopPlayback(int nodeIndex, int paramIndex)

@@ -37,8 +37,9 @@ public:
    void NotifyMovement(int nodeIndex, int paramIndex, float value, double nowSec);
 
    // Whether this param should render its "recording" (red) visual state
-   // right now - true for the rest of the session once touched, per the
-   // class comment above.
+   // right now - true for the rest of the session once touched (per the
+   // class comment above), and true again for as long as its recorded trace
+   // is looping back into it (see GetPlaybackValue) once the session ends.
    bool IsRecording(int nodeIndex, int paramIndex) const;
 
    // The user grabbed this control directly (not a shift-drag) - stop
