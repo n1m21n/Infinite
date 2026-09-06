@@ -84,7 +84,7 @@ namespace
 #include "core/Transport.h"
 #include "core/AudioTopologyRequest.h"
 #include "core/Modulation.h"
-#include "core/GestureDetector.h"
+#include "core/GestureRecorder.h"
 #include "core/Expression.h"
 #include "core/field/FieldTypes.h"
 #include "core/field/FieldSwizzle.h"
@@ -627,11 +627,6 @@ namespace
       int dstPin = 0;
    };
    const int kLinkIdBase = 4000000; // far above any node/pin id
-   // A gesture suggestion's ghost cable is drawn with a bare ed::Link() call
-   // that has no real Modulation::Bind() behind it (see GestureDetector.h) -
-   // it must live in its own id space so it's never treated as a link that
-   // could be selected/deleted/unbound the way a real one at kLinkIdBase is.
-   const int kGestureSuggestionLinkIdBase = 8000000;
    std::vector<LinkInfo> gLinks;
 
    const LinkInfo* FindLink(int id)
@@ -2427,6 +2422,10 @@ namespace
       const std::string* hasExprErr = hasExpr ? Modulation::Instance().ExpressionErrorFor(nodeIndex, paramIndex)
                                                : nullptr;
       const bool exprErrored = hasExprErr != nullptr && !hasExprErr->empty();
+      // Shift-held movement, not modulation or an expression - a distinct,
+      // purely transient state, so it can coexist with exprErrored (still
+      // editable) but never with modulated/hasExpr (both read-only already).
+      const bool recording = !modulated && GestureRecorder::Instance().IsRecording(nodeIndex, paramIndex);
       gDrawnParamPins.insert(pinId);
 
       ImGui::PushID(paramIndex + 5000);
@@ -2644,21 +2643,28 @@ namespace
          // reachable to fix or clear via double-click, right-click, or
          // hovering and typing '=' - see HandleParamTypeHotkeys - same as it
          // would be if this were a fresh, non-expression param.
+         const ImU32 activeCol = recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235);
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
-                                       IM_COL32(120, 200, 255, 235), /*readOnly=*/false, posToValue, valueToPos);
+                                       activeCol, /*readOnly=*/false, posToValue, valueToPos);
          }
          else
          {
+            if (recording)
+            {
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+            }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
+            if (recording)
+               ImGui::PopStyleColor(2);
          }
          if (ImGui::IsItemActivated())
-         {
             PushUndoCheckpoint();
-            GestureDetector::Instance().NotifyTouch(nodeIndex, paramIndex, *value, ImGui::GetTime());
-         }
+         if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime());
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
@@ -2672,23 +2678,30 @@ namespace
       }
       else
       {
+         const ImU32 activeCol = recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235);
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
-                                       IM_COL32(120, 200, 255, 235), /*readOnly=*/false, posToValue, valueToPos);
+                                       activeCol, /*readOnly=*/false, posToValue, valueToPos);
          }
          else
          {
+            if (recording)
+            {
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+            }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
+            if (recording)
+               ImGui::PopStyleColor(2);
          }
          // Activation is the first frame of the drag, before that frame's own
          // delta is applied, so this is still the pre-drag value.
          if (ImGui::IsItemActivated())
-         {
             PushUndoCheckpoint();
-            GestureDetector::Instance().NotifyTouch(nodeIndex, paramIndex, *value, ImGui::GetTime());
-         }
+         if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime());
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
          // Right-click also jumps straight into the text field, same as
@@ -3344,6 +3357,7 @@ namespace
       const std::string* hasExprErr = hasExpr ? Modulation::Instance().ExpressionErrorFor(nodeIndex, paramIndex)
                                                : nullptr;
       const bool exprErrored = hasExprErr != nullptr && !hasExprErr->empty();
+      const bool recording = !modulated && GestureRecorder::Instance().IsRecording(nodeIndex, paramIndex);
       gDrawnParamPins.insert(pinId);
 
       ImGui::PushID(paramIndex + 5000);
@@ -3484,12 +3498,12 @@ namespace
       }
       else // plain interactive, including a currently-errored expression
       {
-         changed = DrawWidget(value, IM_COL32(120, 200, 255, 235), /*readOnly=*/false);
+         changed = DrawWidget(value, recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235),
+                              /*readOnly=*/false);
          if (ImGui::IsItemActivated())
-         {
             PushUndoCheckpoint();
-            GestureDetector::Instance().NotifyTouch(nodeIndex, paramIndex, *value, ImGui::GetTime());
-         }
+         if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime());
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
@@ -4152,7 +4166,6 @@ namespace
       REGISTER_NODE(GeometryTableNode, Geometry Table, "Modulators");
       REGISTER_NODE(ConstantNode, Constant, "Modulators");
       REGISTER_NODE(NullModulatorNode, Null Modulator, "Modulators");
-      REGISTER_NODE(ParamFollowerModulatorNode, Param Follower, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
@@ -5276,73 +5289,6 @@ namespace
       gn.spawnY = y;
       gNodes.push_back(std::move(gn));
       return &gNodes.back();
-   }
-
-   // Turns a pending GestureDetector::Suggestion into the real thing: a
-   // spawned modulator node plus one or more Modulation::Bind() calls, wired
-   // exactly the way a manual drag-connect (or the self-test fixtures) would.
-   // Lives here, not in GestureDetector itself, because both SpawnNode() and
-   // PushUndoCheckpoint() are private to this anonymous namespace - the
-   // detector only ever hands back data, never touches gNodes directly.
-   //
-   // Bind() does not push its own undo checkpoint (only the manual
-   // drag-connect call site does, right before its Bind()) - so this wraps
-   // the whole spawn+bind in one explicit checkpoint up front, otherwise the
-   // Bind() half would land uncheckpointed and a single Ctrl+Z could leave a
-   // dangling binding pointed at a node undo just removed.
-   void ConfirmGestureSuggestion(const GestureDetector::Suggestion& sugg)
-   {
-      PushUndoCheckpoint();
-
-      GraphNode* srcGn = FindNodeByIndex(sugg.sourceNode);
-      const ImVec2 srcPos = srcGn != nullptr ? ed::GetNodePosition(srcGn->NodeId()) : ImVec2(0.0f, 0.0f);
-
-      if (sugg.kind == GestureDetector::Kind::SelfOscillation)
-      {
-         GraphNode* pattern = SpawnNode("Pattern", "Modulators", srcPos.x, srcPos.y - 160.0f);
-         if (pattern == nullptr)
-            return;
-         auto* pn = static_cast<PatternNode*>(pattern->node.get());
-         // A plain two-step toggle: the gesture that triggered this was a
-         // discrete snap between two values, not a sweep, so a longer step
-         // run would invent texture the user never actually played.
-         pn->steps[0] = 0.0f;
-         pn->steps[1] = 1.0f;
-         pn->length = 2;
-         pn->stepBeats = sugg.stepBeatsEstimate;
-         Modulation::Instance().Bind(sugg.sourceNode, sugg.sourceParam, pattern->index, 0);
-         // Bind() defaults the range to the destination's full declared span;
-         // narrow it to the exact two values the user actually demonstrated.
-         Modulation::Instance().SetRange(sugg.sourceNode, sugg.sourceParam, sugg.clusterLow, sugg.clusterHigh);
-         return;
-      }
-
-      // TwoParamLink / Fanout: one follower watching the source param, bound
-      // to every destination - the fan-out a single modulator already
-      // supports (one IModulator, many ParamRef destinations).
-      ImVec2 sum = srcPos;
-      int count = 1;
-      for (const auto& dest : sugg.destinations)
-      {
-         if (GraphNode* dstGn = FindNodeByIndex(dest.first))
-         {
-            const ImVec2 p = ed::GetNodePosition(dstGn->NodeId());
-            sum.x += p.x;
-            sum.y += p.y;
-            count++;
-         }
-      }
-      const ImVec2 midpoint(sum.x / (float)count, sum.y / (float)count - 100.0f);
-
-      GraphNode* follower = SpawnNode("Param Follower", "Modulators", midpoint.x, midpoint.y);
-      if (follower == nullptr)
-         return;
-      auto* pf = static_cast<ParamFollowerModulatorNode*>(follower->node.get());
-      pf->watchedNodeIndex = sugg.sourceNode;
-      pf->watchedParamIndex = sugg.sourceParam;
-
-      for (const auto& dest : sugg.destinations)
-         Modulation::Instance().Bind(dest.first, dest.second, follower->index, 0);
    }
 
    // File-backed and compiled-from-text nodes keep derived state (a loaded
@@ -51261,6 +51207,10 @@ int main(int argc, char** argv)
       ed::GetStyle().GridSpacing = gGridSnap;
       ed::Begin("graph", ImVec2(graphWidth, graphHeight));
       gParamPinScreenList.clear();
+      // Shift-held movement is the sole trigger for gesture recording - see
+      // GestureRecorder.h. Checked once per frame here (not per-widget) so
+      // every param touched while Shift stays down joins the same session.
+      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift);
       gGlobalScaleTooltipHovered = false;
 
       if (!gPendingSelect.empty())
@@ -62365,109 +62315,6 @@ int main(int argc, char** argv)
                const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Stream);
                ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
             }
-         }
-      }
-
-      // ---- gesture-suggested modulation: ghost cable + confirm badge ----
-      // See GestureDetector.h for the detection side. This only draws the
-      // preview and reads a click - the actual spawn+bind lives in
-      // ConfirmGestureSuggestion, called below once the badge is clicked.
-      if (const GestureDetector::Suggestion* sugg = GestureDetector::Instance().PendingSuggestion(ImGui::GetTime()))
-      {
-         GraphNode* srcGn = FindNodeByIndex(sugg->sourceNode);
-         bool anyDestDrawn = false;
-         if (srcGn != nullptr)
-         {
-            const int srcPin = srcGn->ParamPinId(sugg->sourceParam);
-            // Pulses gently so the ghost cable reads as a suggestion, not a
-            // real connection - ed::Link() has no dash-pattern option, so a
-            // slow alpha breathe is the cheapest way to distinguish it from
-            // the solid modulation cables drawn above.
-            const float pulse = 0.35f + 0.35f * (0.5f + 0.5f * std::sin(ImGui::GetTime() * 3.0));
-            const ImU32 ghostCol = IM_COL32(255, 210, 60, (int)(pulse * 255.0f));
-
-            if (sugg->kind != GestureDetector::Kind::SelfOscillation && gDrawnParamPins.count(srcPin) != 0)
-            {
-               int linkSeq = 0;
-               for (const auto& dest : sugg->destinations)
-               {
-                  GraphNode* dstGn = FindNodeByIndex(dest.first);
-                  if (dstGn == nullptr)
-                     continue;
-                  const int dstPin = dstGn->ParamPinId(dest.second);
-                  if (gDrawnParamPins.count(dstPin) == 0)
-                     continue; // not visible this frame (collapsed/hidden) - nothing to anchor the ghost cable to
-                  if (Modulation::Instance().IsModulated(dest.first, dest.second))
-                     continue; // already bound to something real - don't suggest clobbering it
-                  ed::Link(kGestureSuggestionLinkIdBase + linkSeq++, srcPin, dstPin, ImColor(ghostCol), 2.0f);
-                  anyDestDrawn = true;
-               }
-            }
-
-            // Badge anchor: the source param's own pin, for both the link/fanout
-            // suggestion and the single-param Pattern suggestion.
-            int badgePinIdx = -1;
-            for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
-            {
-               if (gParamPinScreenList[pi].nodeIndex == sugg->sourceNode &&
-                   gParamPinScreenList[pi].paramIndex == sugg->sourceParam)
-               {
-                  badgePinIdx = (int)pi;
-                  break;
-               }
-            }
-
-            const bool wantBadge = sugg->kind == GestureDetector::Kind::SelfOscillation ? true : anyDestDrawn;
-            if (badgePinIdx >= 0 && wantBadge)
-            {
-               const auto& pInfo = gParamPinScreenList[badgePinIdx];
-               const ImVec2 badgeCenter(pInfo.rowMax.x + 12.0f, pInfo.rowMin.y - 4.0f);
-               const float badgeR = 9.0f;
-               ImDrawList* dl = ImGui::GetWindowDrawList();
-               dl->AddCircleFilled(badgeCenter, badgeR, IM_COL32(60, 200, 110, 235));
-               dl->AddCircle(badgeCenter, badgeR, IM_COL32(20, 90, 50, 255), 16, 1.5f);
-               dl->AddLine(ImVec2(badgeCenter.x - 4.0f, badgeCenter.y),
-                           ImVec2(badgeCenter.x - 1.0f, badgeCenter.y + 3.5f),
-                           IM_COL32(255, 255, 255, 255), 1.8f);
-               dl->AddLine(ImVec2(badgeCenter.x - 1.0f, badgeCenter.y + 3.5f),
-                           ImVec2(badgeCenter.x + 4.5f, badgeCenter.y - 4.0f),
-                           IM_COL32(255, 255, 255, 255), 1.8f);
-
-               // ImGui::GetMousePos() is remapped into this same canvas-local
-               // space for the duration of ed::Begin()/ed::End() (see the
-               // matching comment on the assign-mode hover pattern below), so
-               // it's directly comparable to badgeCenter with no
-               // ed::ScreenToCanvas conversion needed.
-               const ImVec2 mp = ImGui::GetMousePos();
-               const float dx = mp.x - badgeCenter.x;
-               const float dy = mp.y - badgeCenter.y;
-               const bool hovered = (dx * dx + dy * dy) <= (badgeR + 3.0f) * (badgeR + 3.0f);
-               if (hovered)
-               {
-                  ed::Suspend();
-                  ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-                  ImGui::SetTooltip(sugg->kind == GestureDetector::Kind::SelfOscillation
-                                        ? "Turn this into a Pattern modulator"
-                                        : "Turn this gesture into a modulation link");
-                  ed::Resume();
-                  if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-                  {
-                     ConfirmGestureSuggestion(*sugg);
-                     GestureDetector::Instance().Dismiss();
-                  }
-               }
-            }
-            else
-            {
-               // Source pin isn't visible this frame, or every destination of a
-               // multi-param suggestion is gone (already modulated / offscreen) -
-               // nothing left worth suggesting.
-               GestureDetector::Instance().Dismiss();
-            }
-         }
-         else
-         {
-            GestureDetector::Instance().Dismiss();
          }
       }
 

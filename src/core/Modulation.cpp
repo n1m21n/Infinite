@@ -189,16 +189,6 @@ const ParamRef* Modulation::KnownParam(int nodeIndex, int paramIndex) const
    return it != mKnownParams.end() ? &it->second : nullptr;
 }
 
-const ParamRef* Modulation::FrameParam(int nodeIndex, int paramIndex) const
-{
-   for (const ParamRef& ref : mFrameParams)
-   {
-      if (ref.nodeIndex == nodeIndex && ref.paramIndex == paramIndex)
-         return &ref;
-   }
-   return nullptr;
-}
-
 const std::string* Modulation::ExpressionFor(int nodeIndex, int paramIndex) const
 {
    auto it = mExpressions.find(Key(nodeIndex, paramIndex));
