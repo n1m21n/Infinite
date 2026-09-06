@@ -2984,7 +2984,20 @@ namespace
       }
 
       ImGui::SetCursorScreenPos(p);
-      ImGui::Dummy(ImVec2(cell, rowH));
+      // ItemSize, not Dummy: Dummy is ItemSize *plus* ItemAdd(bb, 0), and
+      // that ItemAdd overwrites g.LastItemData with a zero id - so every
+      // IsItemActivated/IsItemActive/IsItemHovered a caller runs after this
+      // widget returns was querying the spacer, not the InvisibleButton
+      // above. IsItemActive() in particular is false for an id-0 item even
+      // mid-drag, which silently killed ModKnob's whole post-draw block:
+      // no undo checkpoint on grab, no GestureRecorder::StopPlayback, and
+      // no NotifyMovement - so Shift+drag never started a recording and the
+      // knob never went red (the EQ band freq/Q/gain knobs, and every other
+      // ModKnob/ModKnob-fader in the app). ImGui::SliderFloat leaves its own
+      // item last, which is why ModSlider's identical block always worked.
+      // ItemSize advances the layout cursor exactly as Dummy did and leaves
+      // the InvisibleButton's item data standing.
+      ImGui::ItemSize(ImVec2(cell, rowH));
       return changed;
    }
 
@@ -3147,7 +3160,20 @@ namespace
       // positions each cell absolutely gets the correct row height from the
       // last cell it draws.
       ImGui::SetCursorScreenPos(p);
-      ImGui::Dummy(ImVec2(cell, rowH));
+      // ItemSize, not Dummy: Dummy is ItemSize *plus* ItemAdd(bb, 0), and
+      // that ItemAdd overwrites g.LastItemData with a zero id - so every
+      // IsItemActivated/IsItemActive/IsItemHovered a caller runs after this
+      // widget returns was querying the spacer, not the InvisibleButton
+      // above. IsItemActive() in particular is false for an id-0 item even
+      // mid-drag, which silently killed ModKnob's whole post-draw block:
+      // no undo checkpoint on grab, no GestureRecorder::StopPlayback, and
+      // no NotifyMovement - so Shift+drag never started a recording and the
+      // knob never went red (the EQ band freq/Q/gain knobs, and every other
+      // ModKnob/ModKnob-fader in the app). ImGui::SliderFloat leaves its own
+      // item last, which is why ModSlider's identical block always worked.
+      // ItemSize advances the layout cursor exactly as Dummy did and leaves
+      // the InvisibleButton's item data standing.
+      ImGui::ItemSize(ImVec2(cell, rowH));
       return changed;
    }
 
