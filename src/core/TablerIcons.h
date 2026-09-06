@@ -203,4 +203,31 @@ namespace Tabler
       const ImVec2 h2 = Point24(center, size, 20.0f, 20.0f);
       dl->AddLine(h1, h2, col, stroke);
    }
+
+   // Tabler: star (5-pointed star, outline or filled)
+   inline void DrawStar(ImDrawList* dl, ImVec2 center, float size, ImU32 col, bool filled = false, float customStroke = 0.0f)
+   {
+      if (!dl) return;
+      const float s = size / 24.0f;
+      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.2f, 1.6f * s);
+      const float rOut = 9.2f * s;
+      const float rIn = 4.4f * s;
+      const ImVec2 starCenter(center.x, center.y + 0.6f * s);
+
+      ImVec2 pts[10];
+      const float pi = 3.14159265358979323846f;
+      for (int i = 0; i < 10; ++i)
+      {
+         const float angle = -pi * 0.5f + (float)i * (pi / 5.0f);
+         const float r = (i % 2 == 0) ? rOut : rIn;
+         pts[i] = ImVec2(starCenter.x + r * cosf(angle), starCenter.y + r * sinf(angle));
+      }
+
+      if (filled)
+      {
+         for (int i = 0; i < 10; ++i)
+            dl->AddTriangleFilled(starCenter, pts[i], pts[(i + 1) % 10], col);
+      }
+      dl->AddPolyline(pts, 10, col, ImDrawFlags_Closed, stroke);
+   }
 }

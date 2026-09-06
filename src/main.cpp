@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <unordered_set>
 #include <filesystem>
 #include <sys/stat.h>
 #include "platform/AppPaths.h"
@@ -1394,6 +1395,173 @@ namespace
       const BrowserFilterState* states[4] = { &gModulesFilter, &gSampleFilter, &gMediaFilter, &gPluginFilter };
       for (int i = 0; i < 4; i++)
          file << states[i]->sortMode << " " << states[i]->typeFilter << " " << (states[i]->descending ? 1 : 0) << "\n";
+   }
+
+   // Persisted favourites for items across the four browser panel modes:
+   // modules (by name), samples (by file path), media (by file path), and
+   // plugins (by identifier). Saved to AppPaths::AppSupportDir() + "/Infinite.browserfavorites".
+   struct BrowserFavorites
+   {
+      std::unordered_set<std::string> modules;
+      std::unordered_set<std::string> samples;
+      std::unordered_set<std::string> media;
+      std::unordered_set<std::string> plugins;
+      uint64_t version = 1;
+
+      uint64_t Version() const { return version; }
+
+      bool IsFavoriteModule(const std::string& name) const { return modules.count(name) > 0; }
+      bool IsFavoriteSample(const std::string& path) const { return samples.count(path) > 0; }
+      bool IsFavoriteMedia(const std::string& path) const { return media.count(path) > 0; }
+      bool IsFavoritePlugin(const std::string& id) const { return plugins.count(id) > 0; }
+
+      void ToggleModule(const std::string& name)
+      {
+         if (modules.count(name))
+            modules.erase(name);
+         else
+            modules.insert(name);
+         version++;
+         Save();
+      }
+
+      void ToggleSample(const std::string& path)
+      {
+         if (samples.count(path))
+            samples.erase(path);
+         else
+            samples.insert(path);
+         version++;
+         Save();
+      }
+
+      void ToggleMedia(const std::string& path)
+      {
+         if (media.count(path))
+            media.erase(path);
+         else
+            media.insert(path);
+         version++;
+         Save();
+      }
+
+      void TogglePlugin(const std::string& id)
+      {
+         if (plugins.count(id))
+            plugins.erase(id);
+         else
+            plugins.insert(id);
+         version++;
+         Save();
+      }
+
+      std::string Path() const
+      {
+         const std::string dir = AppPaths::AppSupportDir();
+         return dir.empty() ? std::string() : dir + "/Infinite.browserfavorites";
+      }
+
+      void Load()
+      {
+         const std::string path = Path();
+         if (path.empty())
+            return;
+         std::ifstream file(path);
+         if (!file)
+            return;
+         modules.clear();
+         samples.clear();
+         media.clear();
+         plugins.clear();
+         std::string line;
+         std::string section;
+         while (std::getline(file, line))
+         {
+            if (!line.empty() && line.back() == '\r')
+               line.pop_back();
+            if (line.empty() || line[0] == '#')
+               continue;
+            if (line.front() == '[' && line.back() == ']')
+            {
+               section = line.substr(1, line.size() - 2);
+               continue;
+            }
+            if (section == "modules")
+               modules.insert(line);
+            else if (section == "samples")
+               samples.insert(line);
+            else if (section == "media")
+               media.insert(line);
+            else if (section == "plugins")
+               plugins.insert(line);
+         }
+         version++;
+      }
+
+      void Save() const
+      {
+         const std::string path = Path();
+         if (path.empty())
+            return;
+         std::ofstream file(path);
+         if (!file)
+            return;
+         file << "[modules]\n";
+         for (const auto& m : modules)
+            file << m << "\n";
+         file << "[samples]\n";
+         for (const auto& s : samples)
+            file << s << "\n";
+         file << "[media]\n";
+         for (const auto& m : media)
+            file << m << "\n";
+         file << "[plugins]\n";
+         for (const auto& p : plugins)
+            file << p << "\n";
+      }
+   };
+   BrowserFavorites gBrowserFavorites;
+
+   // Draws a small square star button for toggling favourites on list items.
+   // Returns true if clicked.
+   bool DrawFavoriteStar(const char* id, bool isFav)
+   {
+      const float h = ImGui::GetFrameHeight();
+      const float btnW = h * 0.75f;
+      const float btnH = btnW;
+      const ImVec2 size(btnW, btnH);
+      const float rowH = h;
+
+      const float startY = ImGui::GetCursorPosY();
+      ImGui::SetCursorPosY(startY + (rowH - btnH) * 0.5f);
+
+      const bool pressed = ImGui::InvisibleButton(id, size);
+      const bool hovered = ImGui::IsItemHovered();
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 bmin = ImGui::GetItemRectMin();
+      const ImVec2 bmax = ImGui::GetItemRectMax();
+      const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+      const float iconSize = btnH * 0.9f;
+
+      ImU32 col;
+      if (isFav)
+         col = hovered ? IM_COL32(255, 225, 75, 255) : IM_COL32(255, 200, 40, 255);
+      else if (hovered)
+         col = IM_COL32(255, 215, 80, 220);
+      else
+      {
+         ImVec4 c = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+         c.w *= 0.6f;
+         col = ImGui::GetColorU32(c);
+      }
+
+      Tabler::DrawStar(dl, center, iconSize, col, isFav);
+      if (hovered)
+         ImGui::SetTooltip("%s", isFav ? "Remove from favourites" : "Add to favourites");
+
+      ImGui::SetCursorPosY(startY);
+      return pressed;
    }
 
    // ---- modulatable parameters --------------------------------------------
@@ -13771,7 +13939,7 @@ namespace
    {
       // AIFF covers both "aif" and "aiff" - same format, two adjacent
       // entries for it would be noise (see HasAudioExtension).
-      static const std::vector<std::string> names = { "All", "WAV", "AIFF", "CAF", "M4A", "MP3", "FLAC" };
+      static const std::vector<std::string> names = { "All", "Favourites", "WAV", "AIFF", "CAF", "M4A", "MP3", "FLAC" };
       return names;
    }
 
@@ -13779,23 +13947,24 @@ namespace
    {
       switch (typeFilter)
       {
-         case 1: return e.extension == "wav";
-         case 2: return e.extension == "aif" || e.extension == "aiff";
-         case 3: return e.extension == "caf";
-         case 4: return e.extension == "m4a";
-         case 5: return e.extension == "mp3";
-         case 6: return e.extension == "flac";
+         case 1: return gBrowserFavorites.IsFavoriteSample(e.path);
+         case 2: return e.extension == "wav";
+         case 3: return e.extension == "aif" || e.extension == "aiff";
+         case 4: return e.extension == "caf";
+         case 5: return e.extension == "m4a";
+         case 6: return e.extension == "mp3";
+         case 7: return e.extension == "flac";
          default: return true; // 0 = All, and any out-of-range index
       }
    }
 
-   // "All", "Video", "Image", then every individual extension from
+   // "All", "Favourites", "Video", "Image", then every individual extension from
    // MediaExtensions.h in the same order that header lists them - the
    // authority the OS drop handler already uses, not a second list.
    const std::vector<std::string>& MediaTypeFilterNames()
    {
       static const std::vector<std::string> names = [] {
-         std::vector<std::string> v = { "All", "Video", "Image" };
+         std::vector<std::string> v = { "All", "Favourites", "Video", "Image" };
          for (const std::string& ext : MediaExtensions::Video())
          {
             std::string upper = ext;
@@ -13820,10 +13989,12 @@ namespace
       if (typeFilter == 0)
          return true;
       if (typeFilter == 1)
-         return std::find(video.begin(), video.end(), e.extension) != video.end();
+         return gBrowserFavorites.IsFavoriteMedia(e.path);
       if (typeFilter == 2)
+         return std::find(video.begin(), video.end(), e.extension) != video.end();
+      if (typeFilter == 3)
          return std::find(image.begin(), image.end(), e.extension) != image.end();
-      const int videoIdx = typeFilter - 3;
+      const int videoIdx = typeFilter - 4;
       if (videoIdx >= 0 && videoIdx < (int)video.size())
          return e.extension == video[videoIdx];
       const int imageIdx = videoIdx - (int)video.size();
@@ -13833,17 +14004,24 @@ namespace
    }
 
    // Shared by Samples and Media - both draw from SampleScanner::Entry and
-   // both modes' sort option list is the same three names (see
-   // DrawLibrarySearchPanel). sortMode: 0 Name, 1 File type, 2 Folder.
+   // both modes' sort option list is the same four names (see
+   // DrawLibrarySearchPanel). sortMode: 0 Name, 1 File type, 2 Folder, 3 Favourites.
    // Every branch falls through to the lowercased-name compare (with a raw
-   // fileName tiebreak) so ties within a type/folder still read
+   // fileName tiebreak) so ties within a type/folder/favourites still read
    // alphabetically, and File-type/Folder ties don't need their own
    // tiebreak beyond that. Compares the already-lowercased fileNameLower
    // rather than folding per call - std::sort/stable_sort invoke the
    // predicate O(n log n) times, and per-call allocation there is what
    // stalls a sort visibly past a few thousand entries.
-   bool CompareSampleEntries(const SampleScanner::Entry* a, const SampleScanner::Entry* b, int sortMode)
+   bool CompareSampleEntries(const SampleScanner::Entry* a, const SampleScanner::Entry* b, int sortMode, bool mediaKind = false)
    {
+      if (sortMode == 3)
+      {
+         const bool favA = mediaKind ? gBrowserFavorites.IsFavoriteMedia(a->path) : gBrowserFavorites.IsFavoriteSample(a->path);
+         const bool favB = mediaKind ? gBrowserFavorites.IsFavoriteMedia(b->path) : gBrowserFavorites.IsFavoriteSample(b->path);
+         if (favA != favB)
+            return favA > favB;
+      }
       if (sortMode == 1 && a->extension != b->extension)
          return a->extension < b->extension;
       if (sortMode == 2 && a->folderRoot != b->folderRoot)
@@ -13878,8 +14056,8 @@ namespace
 
       const int sortMode = state.sortMode;
       std::stable_sort(filtered.begin(), filtered.end(),
-                        [sortMode](const SampleScanner::Entry* a, const SampleScanner::Entry* b) {
-                           return CompareSampleEntries(a, b, sortMode);
+                        [sortMode, mediaKind](const SampleScanner::Entry* a, const SampleScanner::Entry* b) {
+                           return CompareSampleEntries(a, b, sortMode, mediaKind);
                         });
       if (state.descending)
          std::reverse(filtered.begin(), filtered.end());
@@ -13985,6 +14163,7 @@ namespace
       {
          std::string lastQuery;
          uint64_t lastIndexVersion = 0;
+         uint64_t lastFavoritesVersion = 0;
          int lastSortMode = -1;
          int lastTypeFilter = -1;
          bool lastDescending = false;
@@ -14000,7 +14179,7 @@ namespace
       // old per-mode `static char` search buffers here used to guarantee for
       // the query alone.
       BrowserFilterState& filterState = mediaKind ? gMediaFilter : gSampleFilter;
-      static const std::vector<std::string> kLibrarySortNames = { "Name", "File type", "Folder" };
+      static const std::vector<std::string> kLibrarySortNames = { "Name", "File type", "Folder", "Favourites" };
       const bool filterChanged = DrawBrowserFilterStrip(
          filterState, searchHint, kLibrarySortNames, mediaKind ? MediaTypeFilterNames() : SampleTypeFilterNames());
       if (filterChanged)
@@ -14022,6 +14201,7 @@ namespace
       // of these five keys and that control silently stops updating the
       // list the moment the user touches it.
       if (cache.lastQuery != q || cache.lastIndexVersion != scanner.IndexVersion() ||
+          cache.lastFavoritesVersion != gBrowserFavorites.Version() ||
           cache.lastSortMode != filterState.sortMode || cache.lastTypeFilter != filterState.typeFilter ||
           cache.lastDescending != filterState.descending)
       {
@@ -14029,6 +14209,7 @@ namespace
 
          cache.lastQuery = q;
          cache.lastIndexVersion = scanner.IndexVersion();
+         cache.lastFavoritesVersion = gBrowserFavorites.Version();
          cache.lastSortMode = filterState.sortMode;
          cache.lastTypeFilter = filterState.typeFilter;
          cache.lastDescending = filterState.descending;
@@ -14062,6 +14243,11 @@ namespace
 
             ImGui::PushID(entry.path.c_str());
 
+            const float rowH = ImGui::GetFrameHeight();
+            const float starBtnW = rowH * 0.75f;
+            const float spacing = ImGui::GetStyle().ItemSpacing.x;
+            const bool isFav = mediaKind ? gBrowserFavorites.IsFavoriteMedia(entry.path) : gBrowserFavorites.IsFavoriteSample(entry.path);
+
          // Media mode has no audition - images/video get no play button, and
          // the Selectable alone keeps the same full-width layout it always
          // had there.
@@ -14070,7 +14256,6 @@ namespace
             const bool isPlaying = (gPreviewingSamplePath == entry.path);
             // Smaller than a full frame-height button - at full size the
             // icon dominated the row next to the filename text.
-            const float rowH = ImGui::GetFrameHeight();
             const float btnH = rowH * 0.7f;
             const float btnW = btnH; // square, tighter than a wide text label
             const float rowStartY = ImGui::GetCursorPosY();
@@ -14150,7 +14335,9 @@ namespace
          // key off *this* item, not the play button, so a drag started on
          // the button (which is a separate widget one item back) never
          // begins a sample drag.
-         ImGui::Selectable(entry.fileName.c_str());
+         const float availW = ImGui::GetContentRegionAvail().x;
+         const float textW = std::max(20.0f, availW - starBtnW - spacing);
+         ImGui::Selectable(entry.fileName.c_str(), false, 0, ImVec2(textW, 0));
          if (!mediaKind && getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
          {
             const ImVec2 mn = ImGui::GetItemRectMin();
@@ -14183,6 +14370,15 @@ namespace
                ImGui::SetTooltip("%s", entry.path.c_str());
          }
 
+         ImGui::SameLine();
+         if (DrawFavoriteStar("##fav", isFav))
+         {
+            if (mediaKind)
+               gBrowserFavorites.ToggleMedia(entry.path);
+            else
+               gBrowserFavorites.ToggleSample(entry.path);
+         }
+
          ImGui::PopID();
          }
       }
@@ -14209,7 +14405,7 @@ namespace
 
    const std::vector<std::string>& PluginTypeFilterNames()
    {
-      static const std::vector<std::string> names = { "All", "AU", "VST3" };
+      static const std::vector<std::string> names = { "All", "Favourites", "AU", "VST3" };
       return names;
    }
 
@@ -14217,17 +14413,25 @@ namespace
    {
       switch (typeFilter)
       {
-         case 1: return e.format == "au";
-         case 2: return e.format == "vst3";
+         case 1: return gBrowserFavorites.IsFavoritePlugin(e.identifier);
+         case 2: return e.format == "au";
+         case 3: return e.format == "vst3";
          default: return true; // 0 = All, and any out-of-range index
       }
    }
 
-   // sortMode: 0 Name, 1 Format, 2 Manufacturer. Every branch falls through
-   // to the name compare so ties within a format/manufacturer still read
+   // sortMode: 0 Name, 1 Format, 2 Manufacturer, 3 Favourites. Every branch falls through
+   // to the name compare so ties within a format/manufacturer/favourites still read
    // alphabetically.
    bool ComparePluginEntries(const PluginScanner::Entry* a, const PluginScanner::Entry* b, int sortMode)
    {
+      if (sortMode == 3)
+      {
+         const bool favA = gBrowserFavorites.IsFavoritePlugin(a->identifier);
+         const bool favB = gBrowserFavorites.IsFavoritePlugin(b->identifier);
+         if (favA != favB)
+            return favA > favB;
+      }
       if (sortMode == 1 && a->format != b->format)
          return a->format < b->format;
       if (sortMode == 2 && a->manufacturer != b->manufacturer)
@@ -14406,7 +14610,7 @@ namespace
          }
       }
 
-      static const std::vector<std::string> kPluginSortNames = { "Name", "Format", "Manufacturer" };
+      static const std::vector<std::string> kPluginSortNames = { "Name", "Format", "Manufacturer", "Favourites" };
       // Empty typeNames under !INFINITE_ENABLE_VST3 hides the type control
       // rather than showing a dropdown with one real option (AU) - the
       // index only ever holds AU entries in that build anyway.
@@ -14427,6 +14631,7 @@ namespace
       {
          std::string lastQuery;
          uint64_t lastIndexVersion = 0;
+         uint64_t lastFavoritesVersion = 0;
          int lastSortMode = -1;
          int lastTypeFilter = -1;
          bool lastDescending = false;
@@ -14439,6 +14644,7 @@ namespace
       // same LibraryFilterCache shape as Samples/Media (see that struct) -
       // a third instance, not a new abstraction.
       if (sCache.lastQuery != q || sCache.lastIndexVersion != gPluginScanner.IndexVersion() ||
+          sCache.lastFavoritesVersion != gBrowserFavorites.Version() ||
           sCache.lastSortMode != gPluginFilter.sortMode || sCache.lastTypeFilter != gPluginFilter.typeFilter ||
           sCache.lastDescending != gPluginFilter.descending)
       {
@@ -14446,6 +14652,7 @@ namespace
 
          sCache.lastQuery = q;
          sCache.lastIndexVersion = gPluginScanner.IndexVersion();
+         sCache.lastFavoritesVersion = gBrowserFavorites.Version();
          sCache.lastSortMode = gPluginFilter.sortMode;
          sCache.lastTypeFilter = gPluginFilter.typeFilter;
          sCache.lastDescending = gPluginFilter.descending;
@@ -14462,12 +14669,21 @@ namespace
       for (const PluginScanner::Entry* entryPtr : sCache.filtered)
       {
          const PluginScanner::Entry& entry = *entryPtr;
+         ImGui::PushID(entry.identifier.c_str());
+
+         const float rowH = ImGui::GetFrameHeight();
+         const float starBtnW = rowH * 0.75f;
+         const float spacing = ImGui::GetStyle().ItemSpacing.x;
+         const bool isFav = gBrowserFavorites.IsFavoritePlugin(entry.identifier);
 
          std::string label = "[" + (entry.format == "vst3" ? std::string("VST3") : std::string("AU")) +
                               "] " + entry.name;
          if (!entry.manufacturer.empty())
             label += "  -  " + entry.manufacturer;
-         ImGui::Selectable(label.c_str());
+
+         const float availW = ImGui::GetContentRegionAvail().x;
+         const float textW = std::max(20.0f, availW - starBtnW - spacing);
+         ImGui::Selectable(label.c_str(), false, 0, ImVec2(textW, 0));
          if (!testRowCaptured && getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
          {
             const ImVec2 mn = ImGui::GetItemRectMin();
@@ -14488,6 +14704,12 @@ namespace
          }
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s\n%s", entry.format.c_str(), entry.identifier.c_str());
+
+         ImGui::SameLine();
+         if (DrawFavoriteStar("##fav", isFav))
+            gBrowserFavorites.TogglePlugin(entry.identifier);
+
+         ImGui::PopID();
       }
       ImGui::EndChild();
 
@@ -45773,6 +45995,21 @@ static bool RunBrowserSortTest()
          makeEntry("/f1", "track.WAV", "wav"), // case-tie against the entry above
       };
 
+      gBrowserFavorites.samples.clear();
+      gBrowserFavorites.samples.insert("/f1/Track.wav");
+      gBrowserFavorites.samples.insert("/f2/Gamma.mp3");
+
+      BrowserFilterState favState;
+      favState.typeFilter = 1; // Favourites
+      auto favOnly = FilterAndSortSampleEntries(index, "", favState, false);
+      check(favOnly.size() == 2, "sample Favourites filter length");
+
+      BrowserFilterState favSortState;
+      favSortState.sortMode = 3; // Favourites
+      auto byFav = FilterAndSortSampleEntries(index, "", favSortState, false);
+      check(byFav.size() == 7 && byFav[0]->fileName == "Gamma.mp3" && byFav[1]->fileName == "Track.wav",
+            "sample favourites sort orders favourites first");
+
       BrowserFilterState state;
       state.sortMode = 0; // Name
       auto byName = FilterAndSortSampleEntries(index, "", state, /*mediaKind=*/false);
@@ -45796,7 +46033,7 @@ static bool RunBrowserSortTest()
       check(descIsReverse, "sample name sort descending reverses ascending");
 
       BrowserFilterState typeState;
-      typeState.typeFilter = 2; // AIFF - covers both "aif" and "aiff"
+      typeState.typeFilter = 3; // AIFF - covers both "aif" and "aiff"
       auto aiffOnly = FilterAndSortSampleEntries(index, "", typeState, false);
       check(aiffOnly.size() == 2, "sample AIFF filter groups aif+aiff, length");
 
@@ -45827,6 +46064,7 @@ static bool RunBrowserSortTest()
    {
       auto makeEntry = [](const std::string& fileName, const std::string& ext) {
          SampleScanner::Entry e;
+         e.path = fileName;
          e.fileName = fileName;
          e.fileNameLower = fileName;
          std::transform(e.fileNameLower.begin(), e.fileNameLower.end(), e.fileNameLower.begin(), ::tolower);
@@ -45837,19 +46075,27 @@ static bool RunBrowserSortTest()
          makeEntry("clip.mov", "mov"), makeEntry("clip.mp4", "mp4"),
          makeEntry("photo.png", "png"), makeEntry("photo.jpg", "jpg"),
       };
+
+      gBrowserFavorites.media.clear();
+      gBrowserFavorites.media.insert("clip.mp4");
+      BrowserFilterState favMediaState;
+      favMediaState.typeFilter = 1; // Favourites
+      auto favMedia = FilterAndSortSampleEntries(index, "", favMediaState, /*mediaKind=*/true);
+      check(favMedia.size() == 1 && favMedia[0]->fileName == "clip.mp4", "media Favourites type filter");
+
       BrowserFilterState videoState;
-      videoState.typeFilter = 1; // Video
+      videoState.typeFilter = 2; // Video
       auto video = FilterAndSortSampleEntries(index, "", videoState, /*mediaKind=*/true);
       check(video.size() == 2, "media Video type filter length");
 
       BrowserFilterState imageState;
-      imageState.typeFilter = 2; // Image
+      imageState.typeFilter = 3; // Image
       auto image = FilterAndSortSampleEntries(index, "", imageState, true);
       check(image.size() == 2, "media Image type filter length");
 
-      // Individual-extension options start right after "All"/"Video"/"Image".
+      // Individual-extension options start right after "All"/"Favourites"/"Video"/"Image".
       const auto& names = MediaTypeFilterNames();
-      const int pngIndex = 3 + (int)MediaExtensions::Video().size() +
+      const int pngIndex = 4 + (int)MediaExtensions::Video().size() +
          (int)(std::find(MediaExtensions::Image().begin(), MediaExtensions::Image().end(), "png") -
                MediaExtensions::Image().begin());
       BrowserFilterState pngState;
@@ -45875,6 +46121,18 @@ static bool RunBrowserSortTest()
          makeEntry("au", "Beta", "Zenith"),
       };
 
+      gBrowserFavorites.plugins.clear();
+      gBrowserFavorites.plugins.insert("vst3:alpha");
+      BrowserFilterState favPluginState;
+      favPluginState.typeFilter = 1; // Favourites
+      auto favPlugin = FilterAndSortPluginEntries(index, "", favPluginState);
+      check(favPlugin.size() == 1 && favPlugin[0]->name == "alpha", "plugin Favourites type filter");
+
+      BrowserFilterState favPluginSort;
+      favPluginSort.sortMode = 3; // Favourites sort
+      auto byFavPlugin = FilterAndSortPluginEntries(index, "", favPluginSort);
+      check(byFavPlugin.size() == 3 && byFavPlugin[0]->name == "alpha", "plugin favourites sort");
+
       BrowserFilterState nameState;
       auto byName = FilterAndSortPluginEntries(index, "", nameState);
       check(byName.size() == 3 && byName[0]->name == "alpha" && byName[1]->name == "Beta" &&
@@ -45894,17 +46152,17 @@ static bool RunBrowserSortTest()
       check(byMfr.size() == 3 && byMfr[0]->manufacturer == "Acme", "plugin manufacturer sort");
 
       BrowserFilterState auState;
-      auState.typeFilter = 1; // AU
+      auState.typeFilter = 2; // AU
       auto auOnly = FilterAndSortPluginEntries(index, "", auState);
       check(auOnly.size() == 2, "plugin AU type filter length");
 
       BrowserFilterState vst3State;
-      vst3State.typeFilter = 2; // VST3
+      vst3State.typeFilter = 3; // VST3
       auto vst3Only = FilterAndSortPluginEntries(index, "", vst3State);
       check(vst3Only.size() == 1 && vst3Only[0]->name == "alpha", "plugin VST3 type filter length");
    }
 
-   // ---- Modules: category semantic rank ordering ----
+   // ---- Modules: category semantic rank ordering & favourites ----
    {
       check(CategoryColors::SemanticRank("Source") < CategoryColors::SemanticRank("3D"), "category rank: 2D before 3D");
       check(CategoryColors::SemanticRank("3D") < CategoryColors::SemanticRank("Synths"),
@@ -45915,7 +46173,15 @@ static bool RunBrowserSortTest()
             "category rank: unknown categories sort last, together");
 
       check(ILess("alpha", "Beta") && !ILess("Beta", "alpha"), "module name compare is case-insensitive");
+
+      gBrowserFavorites.modules.clear();
+      gBrowserFavorites.modules.insert("Oscillator");
+      check(gBrowserFavorites.IsFavoriteModule("Oscillator"), "module favourites query is true for favorited module");
+      check(!gBrowserFavorites.IsFavoriteModule("NonExistent"), "module favourites query is false for non-favorited module");
    }
+
+   // Restore saved favorites from disk after tests
+   gBrowserFavorites.Load();
 
    printf("%s\n", ok ? "BROWSER SORT TEST PASS" : "BROWSER SORT TEST FAIL");
    return ok;
@@ -47683,6 +47949,7 @@ int main(int argc, char** argv)
    if (!gHeadlessTestWindow)
       glfwSwapInterval(gVsync ? 1 : 0);
    LoadBrowserFilterPrefs();
+   gBrowserFavorites.Load();
 
    gEditor = ed::CreateEditor(&config);
    ed::SetCurrentEditor(gEditor); // ed::GetStyle() below needs a current editor
@@ -65202,6 +65469,8 @@ int main(int argc, char** argv)
                });
                categoryIds.push_back(std::string());
                categoryNames.push_back("All");
+               categoryIds.push_back("__fav__");
+               categoryNames.push_back("Favourites");
                for (const std::string& c : cats)
                {
                   categoryIds.push_back(c);
@@ -65209,16 +65478,18 @@ int main(int argc, char** argv)
                }
             }
 
-            static const std::vector<std::string> kModuleSortNames = { "Category", "Name" };
+            static const std::vector<std::string> kModuleSortNames = { "Category", "Name", "Favourites" };
             if (DrawBrowserFilterStrip(gModulesFilter, "search modules...", kModuleSortNames, categoryNames))
                SaveBrowserFilterPrefs();
 
             std::string q = gModulesFilter.query;
             std::transform(q.begin(), q.end(), q.begin(), ::tolower);
             const bool sortByName = (gModulesFilter.sortMode == 1);
+            const bool sortByFav = (gModulesFilter.sortMode == 2);
             const std::string categoryFilter =
                (gModulesFilter.typeFilter > 0 && gModulesFilter.typeFilter < (int)categoryIds.size())
                   ? categoryIds[gModulesFilter.typeFilter] : std::string();
+            const bool filterByFav = (categoryFilter == "__fav__");
 
             std::string spawnName, spawnCategory;
             ImGui::Separator();
@@ -65230,19 +65501,21 @@ int main(int argc, char** argv)
             // modes' thousands-of-entries case (see that struct's comment).
             // Measured, not assumed - revisit if this mode's entry count
             // grows by an order of magnitude.
-            if (sortByName)
+            if (sortByName || sortByFav)
             {
-               // Flat alphabetical list across all categories, no headings -
+               // Flat alphabetical/favourites list across all categories, no headings -
                // a flat list interrupted by category headings is neither
                // one thing nor the other.
                std::vector<std::pair<std::string, std::string>> matches; // name, category
                for (const std::string& category : NodeFactory::Instance().GetCategories())
                {
-                  if (!categoryFilter.empty() && category != categoryFilter)
+                  if (!categoryFilter.empty() && !filterByFav && category != categoryFilter)
                      continue;
                   for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                   {
                      if (!IsUserSpawnable(name))
+                        continue;
+                     if (filterByFav && !gBrowserFavorites.IsFavoriteModule(name))
                         continue;
                      if (!q.empty())
                      {
@@ -65254,24 +65527,51 @@ int main(int argc, char** argv)
                      matches.emplace_back(name, category);
                   }
                }
-               // Case-insensitive fold, with a stable tiebreak on the raw
-               // name (see ILess) so entries differing only in case don't
-               // shuffle between frames.
-               std::stable_sort(matches.begin(), matches.end(),
-                                 [](const std::pair<std::string, std::string>& a,
-                                    const std::pair<std::string, std::string>& b) {
-                  return ILess(a.first, b.first);
-               });
+               if (sortByFav)
+               {
+                  std::stable_sort(matches.begin(), matches.end(),
+                                    [](const std::pair<std::string, std::string>& a,
+                                       const std::pair<std::string, std::string>& b) {
+                     const bool favA = gBrowserFavorites.IsFavoriteModule(a.first);
+                     const bool favB = gBrowserFavorites.IsFavoriteModule(b.first);
+                     if (favA != favB)
+                        return favA > favB;
+                     return ILess(a.first, b.first);
+                  });
+               }
+               else
+               {
+                  // Case-insensitive fold, with a stable tiebreak on the raw
+                  // name (see ILess) so entries differing only in case don't
+                  // shuffle between frames.
+                  std::stable_sort(matches.begin(), matches.end(),
+                                    [](const std::pair<std::string, std::string>& a,
+                                       const std::pair<std::string, std::string>& b) {
+                     return ILess(a.first, b.first);
+                  });
+               }
                if (gModulesFilter.descending)
                   std::reverse(matches.begin(), matches.end());
 
+               const float rowH = ImGui::GetFrameHeight();
+               const float starBtnW = rowH * 0.75f;
+               const float spacing = ImGui::GetStyle().ItemSpacing.x;
+
                for (const auto& match : matches)
                {
-                  if (ImGui::Selectable(DisplayName(match.first).c_str()))
+                  ImGui::PushID(match.first.c_str());
+                  const bool isFav = gBrowserFavorites.IsFavoriteModule(match.first);
+                  const float availW = ImGui::GetContentRegionAvail().x;
+                  const float textW = std::max(20.0f, availW - starBtnW - spacing);
+                  if (ImGui::Selectable(DisplayName(match.first).c_str(), false, 0, ImVec2(textW, 0)))
                   {
                      spawnName = match.first;
                      spawnCategory = match.second;
                   }
+                  ImGui::SameLine();
+                  if (DrawFavoriteStar("##fav", isFav))
+                     gBrowserFavorites.ToggleModule(match.first);
+                  ImGui::PopID();
                }
             }
             else
@@ -65279,9 +65579,13 @@ int main(int argc, char** argv)
                // Category view (default - today's behaviour, unchanged for
                // people who don't touch the sort control): grouped
                // headings in NodeFactory's own registration order.
+               const float rowH = ImGui::GetFrameHeight();
+               const float starBtnW = rowH * 0.75f;
+               const float spacing = ImGui::GetStyle().ItemSpacing.x;
+
                for (const std::string& category : NodeFactory::Instance().GetCategories())
                {
-                  if (!categoryFilter.empty() && category != categoryFilter)
+                  if (!categoryFilter.empty() && !filterByFav && category != categoryFilter)
                      continue;
                   // With a query the categories are only drawn when something in them
                   // matches, so an empty heading never sits there on its own.
@@ -65289,6 +65593,8 @@ int main(int argc, char** argv)
                   for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                   {
                      if (!IsUserSpawnable(name))
+                        continue;
+                     if (filterByFav && !gBrowserFavorites.IsFavoriteModule(name))
                         continue;
                      if (q.empty())
                      {
@@ -65308,11 +65614,19 @@ int main(int argc, char** argv)
                   ImGui::SeparatorText(DisplayName(category).c_str());
                   for (const std::string& name : matches)
                   {
-                     if (ImGui::Selectable(DisplayName(name).c_str()))
+                     ImGui::PushID(name.c_str());
+                     const bool isFav = gBrowserFavorites.IsFavoriteModule(name);
+                     const float availW = ImGui::GetContentRegionAvail().x;
+                     const float textW = std::max(20.0f, availW - starBtnW - spacing);
+                     if (ImGui::Selectable(DisplayName(name).c_str(), false, 0, ImVec2(textW, 0)))
                      {
                         spawnName = name;
                         spawnCategory = category;
                      }
+                     ImGui::SameLine();
+                     if (DrawFavoriteStar("##fav", isFav))
+                        gBrowserFavorites.ToggleModule(name);
+                     ImGui::PopID();
                   }
                }
             }
