@@ -29300,18 +29300,62 @@ namespace
 
             const std::vector<std::string>& presets = CategoryColors::PresetNames();
             const int currentPreset = CategoryColors::CurrentPreset();
+
+            // Small fingerprint swatches (panel/text/accent) let a user tell
+            // "Nord" from "Nord Light" from "Dracula" apart without needing
+            // to already know what each preset looks like. The border color
+            // is chosen from the *live* theme's polarity (not the swatch's
+            // own color) so a near-white swatch stays legible against a
+            // near-white active-theme popup, and a near-black swatch stays
+            // legible against a near-black one.
+            auto drawThemeSwatches = [&](ImVec2 pos, float sz, float gap, const CategoryColors::UiTheme& t) {
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               const CategoryColors::Color swatchCols[3] = { t.panelBg, t.text, t.accent };
+               const ImU32 borderCol = isLight
+                  ? ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 0.0f, 0.45f))
+                  : ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.45f));
+               for (int s = 0; s < 3; s++)
+               {
+                  ImVec2 p0(pos.x + s * (sz + gap), pos.y);
+                  ImVec2 p1(p0.x + sz, p0.y + sz);
+                  const CategoryColors::Color& c = swatchCols[s];
+                  dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), 2.0f);
+                  dl->AddRect(p0, p1, borderCol, 2.0f, 0, 1.0f);
+               }
+            };
+
+            const float kSwatchSz = 10.0f;
+            const float kSwatchGap = 3.0f;
+            const float kSwatchStripW = 3 * kSwatchSz + 2 * kSwatchGap;
+
             ImGui::SetNextItemWidth(220.0f);
             if (ImGui::BeginCombo("##themepreset", presets[currentPreset].c_str()))
             {
                for (int i = 0; i < (int)presets.size(); i++)
                {
-                  if (ImGui::Selectable(presets[i].c_str(), currentPreset == i))
+                  const bool selected = (currentPreset == i);
+                  if (ImGui::Selectable(presets[i].c_str(), selected))
                   {
                      CategoryColors::SetPreset(i);
                      ApplyTheme();
                   }
+                  const ImVec2 rMin = ImGui::GetItemRectMin();
+                  const ImVec2 rMax = ImGui::GetItemRectMax();
+                  const float y = rMin.y + (rMax.y - rMin.y - kSwatchSz) * 0.5f;
+                  const float x = rMax.x - 8.0f - kSwatchStripW;
+                  drawThemeSwatches(ImVec2(x, y), kSwatchSz, kSwatchGap, CategoryColors::UiThemeForPreset(i));
                }
                ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+            // Fingerprint swatch for the currently-selected preset, so the
+            // tab reads at a glance even before opening the dropdown.
+            {
+               const ImVec2 cursor = ImGui::GetCursorScreenPos();
+               const float rowH = ImGui::GetFrameHeight();
+               const float y = cursor.y + (rowH - kSwatchSz) * 0.5f;
+               drawThemeSwatches(ImVec2(cursor.x, y), kSwatchSz, kSwatchGap, CategoryColors::UiThemeForPreset(currentPreset));
+               ImGui::Dummy(ImVec2(kSwatchStripW, rowH));
             }
             ImGui::SameLine();
             if (ImGui::Button("Reset to Defaults"))

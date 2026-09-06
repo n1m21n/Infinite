@@ -28,6 +28,11 @@ namespace CategoryColors
    const UiTheme& CurrentUiTheme();
    bool IsThemeLight();
 
+   // The UiTheme belonging to preset `index` (clamped), regardless of which
+   // preset is currently active. Used to preview other presets (e.g. in the
+   // theme picker dropdown) without switching the live theme.
+   const UiTheme& UiThemeForPreset(int index);
+
    // Display names of theme presets in menu order.
    const std::vector<std::string>& PresetNames();
    int CurrentPreset();

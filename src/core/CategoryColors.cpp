@@ -59,7 +59,14 @@ const std::vector<Preset>& Presets()
       { { 0.180f, 0.204f, 0.251f },  // window  nord0 #2E3440
         { 0.231f, 0.259f, 0.322f },  // panel   nord1 #3B4252
         { 0.925f, 0.937f, 0.957f },  // text    nord6 #ECEFF4
-        { 0.298f, 0.337f, 0.416f },  // textDim nord3 #4C566A
+        // textDim: plain nord3 (#4C566A) measures only ~1.36:1 against this
+        // preset's own panelBg (nord1) and ~1.7:1 against windowBg (nord0) -
+        // well under the 3:1 UI-element floor, and far below every other
+        // dark preset here (next-worst is Tokyo Night at ~2.5-2.8:1). Blended
+        // 50/50 toward nord4 (#D8DEE9) to land at ~3.6:1 / ~4.4:1 while
+        // keeping the same blue-grey hue - still visibly "dim" next to
+        // full-brightness nord6 text, just no longer unreadable.
+        { 0.573f, 0.604f, 0.665f }, // textDim nord3/nord4 blend
         { 0.263f, 0.298f, 0.369f },  // border  nord2 #434C5E
         { 0.533f, 0.753f, 0.816f } } // accent  nord8 #88C0D0
       },
@@ -354,6 +361,14 @@ void SetPreset(int index)
 const UiTheme& CurrentUiTheme()
 {
    return Presets()[gCurrent].ui;
+}
+
+const UiTheme& UiThemeForPreset(int index)
+{
+   const auto& presets = Presets();
+   const int count = (int)presets.size();
+   const int clamped = count > 0 ? std::max(0, std::min(index, count - 1)) : 0;
+   return presets[clamped].ui;
 }
 
 bool IsThemeLight()
