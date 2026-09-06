@@ -45,6 +45,7 @@ private:
    void EnsurePlaceholder();
    void ReopenCamera();
    void CloseCamera();
+   std::string ResolveDeviceId();
 
    Platform::CameraHandle* mCamera = nullptr;
    unsigned int mTex = 0;
